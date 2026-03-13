@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Manager Pro</title>
+    <link rel="stylesheet" href="css/portfolio.css">
+</head>
+<body>
+
+<div class="appContainer">
+
+    <div class="leftWrapper">
+        <header class="topBar">
+            <h2 class="brand">Portfolio</h2>
+
+            <div class="metrics">
+                <div class="metricBox">
+                    <span class="metricTitle">Suma Total</span>
+                    <span class="metricValue">---</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">% cuenta</span>
+                    <span class="metricValue">---</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">€ dividendos</span>
+                    <span class="metricValue">---</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">€ Interés</span>
+                    <span class="metricValue" id="topTotalInteres">0,00 €</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">% cripto</span>
+                    <span class="metricValue">---</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">% acciones</span>
+                    <span class="metricValue">---</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">% ETF</span>
+                    <span class="metricValue">---</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">% comoditis</span>
+                    <span class="metricValue">---</span>
+                </div>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <div class="searchContainer">
+                <input type="text" placeholder="Buscar activo...">
+            </div>
+
+            <div class="navButtons">
+                <button class="navBtn" data-page="vistaGeneral">Vista general</button>
+                <button class="navBtn active" data-page="intereses">Intereses</button>
+                <button class="navBtn" data-page="dividendos">Dividendos</button>
+                <button class="navBtn" data-page="transacciones">Transacciones</button>
+                <button class="navBtn" data-page="metricas">Métricas</button>
+            </div>
+        </nav>
+
+        <main class="mainContent">
+            <section id="dynamicContent" class="contentArea"></section>
+        </main>
+    </div>
+
+    <div class="sideWrapper" id="sideWrapper">
+        <button id="togglePanel" class="toggleButton">▶</button>
+
+        <aside class="sidePanel" id="sidePanel">
+            <div class="assetsList">
+                <button class="assetBtn" data-symbol="XAU" data-name="Oro" data-price="4.560,00" data-change="+0,50%">
+                    <span>XAU</span>
+                    <span>4560</span>
+                </button>
+
+                <button class="assetBtn selected" data-symbol="BTCUSD" data-name="Bitcoin / Dólar estadounidense" data-price="72.396,00" data-change="+1.864,44 (+2,64%)">
+                    <span>BTCUSD</span>
+                    <span>72396</span>
+                </button>
+
+                <button class="assetBtn" data-symbol="ETHUSD" data-name="Ethereum / Dólar estadounidense" data-price="2.105,00" data-change="+1,12%">
+                    <span>ETHUSD</span>
+                    <span>2105</span>
+                </button>
+
+                <button class="assetBtn" data-symbol="XRP" data-name="Ripple" data-price="1,36" data-change="+3,49%">
+                    <span>XRP</span>
+                    <span>1.36</span>
+                </button>
+            </div>
+
+            <div class="assetDetailView">
+                <div class="detailHeader" id="detSymbol">BTCUSD</div>
+                <div class="detailSub" id="detName">Bitcoin / Dólar estadounidense</div>
+                <div class="detailPrice" id="detPrice">72.396,00 <span>USD</span></div>
+                <div class="detailChange" id="detChange">+1.864,44 (+2,64%)</div>
+                <div class="marketStatus">● Mercado abierto</div>
+            </div>
+        </aside>
+    </div>
+
+</div>
+
+<script src="js/main.js"></script>
+</body>
+</html>

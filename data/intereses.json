@@ -1,0 +1,10 @@
+{
+  "rows": [
+    {
+      "fecha": "nuevo-mes",
+      "saldoPromedio": "100,00 €",
+      "acumulado": "10,00 €",
+      "impuestos": "0,00 €"
+    }
+  ]
+}
