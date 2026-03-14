@@ -113,38 +113,45 @@
         <button id="togglePanel" class="toggleButton">▶</button>
 
         <aside class="sidePanel" id="sidePanel">
-            <div class="assetsList">
-                <button class="assetBtn" data-symbol="XAU" data-name="Oro" data-price="4.560,00" data-change="+0,50%">
-                    <span>XAU</span>
-                    <span>4560</span>
-                </button>
-
-                <button class="assetBtn selected" data-symbol="BTCUSD" data-name="Bitcoin / Dólar estadounidense" data-price="72.396,00" data-change="+1.864,44 (+2,64%)">
-                    <span>BTCUSD</span>
-                    <span>72396</span>
-                </button>
-
-                <button class="assetBtn" data-symbol="ETHUSD" data-name="Ethereum / Dólar estadounidense" data-price="2.105,00" data-change="+1,12%">
-                    <span>ETHUSD</span>
-                    <span>2105</span>
-                </button>
-
-                <button class="assetBtn" data-symbol="XRP" data-name="Ripple" data-price="1,36" data-change="+3,49%">
-                    <span>XRP</span>
-                    <span>1.36</span>
-                </button>
+            <div class="assetToolbar">
+                <button id="addAssetBtn" class="primaryButton assetAddBtn">Añadir activo</button>
+                <div class="assetOrderActions">
+                    <button id="moveAssetUpBtn" class="secondaryButton assetOrderBtn">Subir</button>
+                    <button id="moveAssetDownBtn" class="secondaryButton assetOrderBtn">Bajar</button>
+                </div>
             </div>
 
+            <div class="assetsList" id="assetsList"></div>
+
             <div class="assetDetailView">
-                <div class="detailHeader" id="detSymbol">BTCUSD</div>
-                <div class="detailSub" id="detName">Bitcoin / Dólar estadounidense</div>
-                <div class="detailPrice" id="detPrice">72.396,00 <span>USD</span></div>
-                <div class="detailChange" id="detChange">+1.864,44 (+2,64%)</div>
-                <div class="marketStatus">● Mercado abierto</div>
+                <div class="detailHeader" id="detSymbol">---</div>
+                <div class="detailSub" id="detName">Selecciona un activo</div>
             </div>
         </aside>
     </div>
 
+</div>
+
+<div class="modalOverlay hidden" id="assetModalOverlay">
+    <div class="assetModal" role="dialog" aria-modal="true" aria-labelledby="assetModalTitle">
+        <h3 class="assetModalTitle" id="assetModalTitle">Nuevo activo</h3>
+
+        <label class="assetModalLabel" for="assetNameInput">Nombre del activo</label>
+        <input id="assetNameInput" class="assetModalInput" type="text" placeholder="Ej: Microsoft o Solana">
+
+        <label class="assetModalLabel" for="assetTypeSelect">Tipo del activo</label>
+        <select id="assetTypeSelect" class="assetModalSelect">
+            <option value="cripto">Cripto</option>
+            <option value="acciones">Acciones</option>
+            <option value="etfs">ETFs</option>
+            <option value="comoditis">Comoditis</option>
+        </select>
+
+        <div class="assetModalActions">
+            <button id="confirmAssetModalBtn" class="primaryButton">Confirmar</button>
+            <button id="cancelAssetModalBtn" class="secondaryButton">Cancelar</button>
+        </div>
+    </div>
 </div>
 
 <script src="js/main.js"></script>

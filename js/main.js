@@ -1,18 +1,31 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     const toggleButton = document.getElementById("togglePanel")
     const sideWrapper = document.getElementById("sideWrapper")
     const navButtons = document.querySelectorAll(".navBtn")
     const contentArea = document.getElementById("dynamicContent")
-    const assetButtons = document.querySelectorAll(".assetBtn")
+    const addAssetButton = document.getElementById("addAssetBtn")
+    const moveAssetUpButton = document.getElementById("moveAssetUpBtn")
+    const moveAssetDownButton = document.getElementById("moveAssetDownBtn")
+    const assetModalOverlay = document.getElementById("assetModalOverlay")
+    const confirmAssetModalButton = document.getElementById("confirmAssetModalBtn")
+    const cancelAssetModalButton = document.getElementById("cancelAssetModalBtn")
+    const assetNameInput = document.getElementById("assetNameInput")
+    const assetTypeSelect = document.getElementById("assetTypeSelect")
 
     initSidePanel(toggleButton, sideWrapper)
-    initAssetSelector(assetButtons)
     initNavigation(navButtons, contentArea)
+    initAddAssetButton(addAssetButton, assetModalOverlay, assetNameInput, assetTypeSelect)
+    initAssetOrderButtons(moveAssetUpButton, moveAssetDownButton)
+    initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect)
+    await refreshAssetsSidebar()
 
     loadPage("intereses")
 })
 
 let dividendosAutosaveTimeout = null
+let assetAutosaveTimeout = null
+let currentAssetId = null
+let assetModalState = null
 
 function initSidePanel(toggleButton, sideWrapper) {
     if (!toggleButton || !sideWrapper) {
@@ -25,41 +38,21 @@ function initSidePanel(toggleButton, sideWrapper) {
     })
 }
 
+function clearNavSelection() {
+    document.querySelectorAll(".navBtn").forEach((button) => {
+        button.classList.remove("active")
+    })
+}
+
 function initAssetSelector(assetButtons) {
     if (!assetButtons.length) {
         return
     }
 
     assetButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-            assetButtons.forEach((item) => item.classList.remove("selected"))
-            button.classList.add("selected")
-
-            const symbol = button.dataset.symbol || ""
-            const name = button.dataset.name || ""
-            const price = button.dataset.price || ""
-            const change = button.dataset.change || ""
-
-            const detSymbol = document.getElementById("detSymbol")
-            const detName = document.getElementById("detName")
-            const detPrice = document.getElementById("detPrice")
-            const detChange = document.getElementById("detChange")
-
-            if (detSymbol) {
-                detSymbol.textContent = symbol
-            }
-
-            if (detName) {
-                detName.textContent = name
-            }
-
-            if (detPrice) {
-                detPrice.innerHTML = `${price} <span>USD</span>`
-            }
-
-            if (detChange) {
-                detChange.textContent = change
-            }
+        button.addEventListener("click", async () => {
+            clearNavSelection()
+            await selectAsset(button.dataset.assetId || "")
         })
     })
 }
@@ -198,6 +191,502 @@ function handleCellFocus(event) {
                 cell.textContent = normalizeNumberForEdit(value)
             }
         }
+    } else if (tableBody.id === 'assetOperationsBody') {
+        if (columnIndex === 3 || columnIndex === 4 || columnIndex === 5) {
+            const value = parseEuroNumber(cell.textContent)
+
+            if (cell.textContent.trim() !== "") {
+                cell.textContent = normalizeNumberForEdit(value)
+            }
+        }
+    }
+}
+
+async function loadAssetsList() {
+    const response = await fetch("/api/activos")
+
+    if (!response.ok) {
+        throw new Error("No se pudo cargar la lista de activos")
+    }
+
+    const data = await response.json()
+    return Array.isArray(data.assets) ? data.assets : []
+}
+
+async function loadAssetData(assetId) {
+    const response = await fetch(`/api/activos/${assetId}`)
+
+    if (!response.ok) {
+        throw new Error("No se pudo cargar el activo")
+    }
+
+    return await response.json()
+}
+
+async function saveAssetDataToServer(assetData) {
+    const response = await fetch(`/api/activos/${assetData.id}`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(assetData)
+    })
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+}
+
+async function createAssetOnServer(name, type) {
+    const response = await fetch("/api/activos", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name, type })
+    })
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
+}
+
+async function reorderAssetOnServer(assetId, direction) {
+    const response = await fetch("/api/activos/reorder", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ assetId, direction })
+    })
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
+}
+
+function updateAssetDetail(asset) {
+    const detSymbol = document.getElementById("detSymbol")
+    const detName = document.getElementById("detName")
+
+    if (detSymbol) {
+        detSymbol.textContent = asset.symbol || "---"
+    }
+
+    if (detName) {
+        detName.textContent = asset.name || "Activo"
+    }
+}
+
+function renderAssetsList(assets) {
+    const assetsList = document.getElementById("assetsList")
+
+    if (!assetsList) {
+        return
+    }
+
+    assetsList.innerHTML = ""
+
+    assets.forEach((asset) => {
+        const button = document.createElement("button")
+        button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}`
+        button.dataset.assetId = asset.id
+        button.dataset.assetOrder = String(asset.order ?? 0)
+        button.innerHTML = `
+            <span>${asset.symbol || asset.name}</span>
+            <span>${asset.price || "0,00"}</span>
+        `
+        assetsList.appendChild(button)
+    })
+
+    initAssetSelector([...assetsList.querySelectorAll(".assetBtn")])
+}
+
+async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTable = false) {
+    try {
+        const assets = await loadAssetsList()
+        renderAssetsList(assets)
+
+        if (!assets.length) {
+            return
+        }
+
+        const assetIdToSelect = selectedAssetId || assets[0].id
+        currentAssetId = assetIdToSelect
+        renderAssetsList(assets)
+
+        const selectedAsset = assets.find((asset) => asset.id === assetIdToSelect) || assets[0]
+        const fullAsset = await loadAssetData(selectedAsset.id)
+        updateAssetDetail(fullAsset)
+
+        if (renderTable) {
+            renderAssetTablePage(fullAsset)
+        }
+    } catch (error) {
+        console.error("Error refrescando activos:", error)
+    }
+}
+
+async function selectAsset(assetId) {
+    if (!assetId) {
+        return
+    }
+
+    currentAssetId = assetId
+    const assetData = await loadAssetData(assetId)
+    updateAssetDetail(assetData)
+    renderAssetsList(await loadAssetsList())
+    renderAssetTablePage(assetData)
+}
+
+function buildAssetTypeLabel(assetType) {
+    const labels = {
+        cripto: "Cripto",
+        acciones: "Acciones",
+        etfs: "ETFs",
+        comoditis: "Comoditis"
+    }
+
+    return labels[assetType] || assetType
+}
+
+function renderAssetTablePage(asset) {
+    const contentArea = document.getElementById("dynamicContent")
+
+    if (!contentArea) {
+        return
+    }
+
+    contentArea.innerHTML = `
+        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "USD"}">
+            <div class="assetPageHeader">
+                <div>
+                    <h1 class="assetPageTitle">${asset.symbol || asset.name}</h1>
+                    <div class="assetPageSubtitle">${asset.name} · ${buildAssetTypeLabel(asset.type)}</div>
+                </div>
+            </div>
+
+            <div class="assetTableWrapper">
+                <table class="assetOperationsTable">
+                    <thead>
+                        <tr>
+                            <th>Fecha operación</th>
+                            <th>Tipo de operación</th>
+                            <th>Participaciones</th>
+                            <th>Precio Participación</th>
+                            <th>Capital Invertido bruto</th>
+                            <th>Comisiones</th>
+                            <th>Capital Invertido neto</th>
+                        </tr>
+                    </thead>
+                    <tbody id="assetOperationsBody"></tbody>
+                </table>
+            </div>
+
+            <div class="assetActions">
+                <button id="addAssetRowBtn" class="primaryButton">Añadir fila</button>
+                <button id="saveAssetBtn" class="secondaryButton">Guardar JSON</button>
+            </div>
+        </section>
+    `
+
+    renderAssetRows(asset.rows || [])
+    initAssetTableLogic(asset)
+}
+
+function renderAssetRows(rows) {
+    const assetOperationsBody = document.getElementById("assetOperationsBody")
+
+    if (!assetOperationsBody) {
+        return
+    }
+
+    assetOperationsBody.innerHTML = ""
+
+    rows.forEach((rowData) => {
+        const rowElement = document.createElement("tr")
+        rowElement.innerHTML = `
+            <td contenteditable="true">${rowData.fechaOperacion || ""}</td>
+            <td contenteditable="true">${rowData.tipoOperacion || "Compra"}</td>
+            <td contenteditable="true">${rowData.participaciones || ""}</td>
+            <td contenteditable="true">${formatCellEuroValue(rowData.precioParticipacion)}</td>
+            <td contenteditable="true">${formatCellEuroValue(rowData.capitalInvertidoBruto)}</td>
+            <td contenteditable="true">${formatCellEuroValue(rowData.comisiones)}</td>
+            <td class="rowTotal">0,00 €</td>
+        `
+        assetOperationsBody.appendChild(rowElement)
+    })
+
+    updateAssetTableTotals()
+}
+
+function collectAssetRowsFromTable() {
+    const rowElements = [...document.querySelectorAll("#assetOperationsBody tr")]
+
+    return rowElements.map((rowElement) => {
+        const cells = rowElement.querySelectorAll("td")
+
+        return {
+            fechaOperacion: cells[0]?.textContent.trim() || "",
+            tipoOperacion: cells[1]?.textContent.trim() || "",
+            participaciones: cells[2]?.textContent.trim() || "",
+            precioParticipacion: cells[3]?.textContent.trim() || "",
+            capitalInvertidoBruto: cells[4]?.textContent.trim() || "",
+            comisiones: cells[5]?.textContent.trim() || ""
+        }
+    })
+}
+
+function buildCurrentAssetPayload() {
+    const assetPage = document.querySelector(".assetTablePage")
+
+    return {
+        id: currentAssetId,
+        name: assetPage?.dataset.assetName || document.getElementById("detName")?.textContent.trim() || "Activo",
+        symbol: assetPage?.dataset.assetSymbol || document.getElementById("detSymbol")?.textContent.trim() || "ACTIVO",
+        type: assetPage?.dataset.assetType || "cripto",
+        price: assetPage?.dataset.assetPrice || "0,00",
+        currency: assetPage?.dataset.assetCurrency || "USD",
+        change: "+0,00%",
+        status: "Mercado abierto",
+        order: Number(document.querySelector(`.assetBtn[data-asset-id="${currentAssetId}"]`)?.dataset.assetOrder || 0),
+        rows: collectAssetRowsFromTable()
+    }
+}
+
+function updateAssetTableTotals() {
+    const rowElements = document.querySelectorAll("#assetOperationsBody tr")
+
+    rowElements.forEach((rowElement) => {
+        const cells = rowElement.querySelectorAll("td")
+        const bruto = parseEuroNumber(cells[4]?.textContent || "")
+        const comisiones = parseEuroNumber(cells[5]?.textContent || "")
+        const neto = bruto - comisiones
+
+        if (cells[6]) {
+            cells[6].textContent = formatEuro(neto)
+        }
+    })
+}
+
+function addNewAssetRow() {
+    const assetOperationsBody = document.getElementById("assetOperationsBody")
+
+    if (!assetOperationsBody) {
+        return
+    }
+
+    const rowElement = document.createElement("tr")
+    rowElement.innerHTML = `
+        <td contenteditable="true"></td>
+        <td contenteditable="true">Compra</td>
+        <td contenteditable="true"></td>
+        <td contenteditable="true"></td>
+        <td contenteditable="true"></td>
+        <td contenteditable="true"></td>
+        <td class="rowTotal">0,00 €</td>
+    `
+
+    assetOperationsBody.appendChild(rowElement)
+    updateAssetTableTotals()
+}
+
+function scheduleAssetAutosave() {
+    clearTimeout(assetAutosaveTimeout)
+
+    assetAutosaveTimeout = setTimeout(async () => {
+        if (!currentAssetId || !document.getElementById("assetOperationsBody")) {
+            return
+        }
+
+        try {
+            await saveAssetDataToServer(buildCurrentAssetPayload())
+            await refreshAssetsSidebar(currentAssetId, false)
+        } catch (error) {
+            console.error("Error en autoguardado del activo:", error)
+        }
+    }, 500)
+}
+
+function initAssetTableLogic(asset) {
+    currentAssetId = asset.id
+
+    const assetOperationsBody = document.getElementById("assetOperationsBody")
+    const addAssetRowButton = document.getElementById("addAssetRowBtn")
+    const saveAssetButton = document.getElementById("saveAssetBtn")
+
+    if (assetOperationsBody) {
+        assetOperationsBody.addEventListener("input", () => {
+            updateAssetTableTotals()
+            scheduleAssetAutosave()
+        })
+
+        assetOperationsBody.addEventListener("focus", handleCellFocus, true)
+        assetOperationsBody.addEventListener("blur", (event) => {
+            handleCellBlur(event)
+            scheduleAssetAutosave()
+        }, true)
+    }
+
+    if (addAssetRowButton) {
+        addAssetRowButton.addEventListener("click", () => {
+            addNewAssetRow()
+            scheduleAssetAutosave()
+        })
+    }
+
+    if (saveAssetButton) {
+        saveAssetButton.addEventListener("click", async () => {
+            await saveAssetDataToServer(buildCurrentAssetPayload())
+            await refreshAssetsSidebar(currentAssetId, false)
+            alert("JSON del activo guardado")
+        })
+    }
+}
+
+function openAssetModal() {
+    const assetModalOverlay = document.getElementById("assetModalOverlay")
+    const assetNameInput = document.getElementById("assetNameInput")
+    const assetTypeSelect = document.getElementById("assetTypeSelect")
+
+    if (!assetModalOverlay || !assetNameInput || !assetTypeSelect) {
+        return
+    }
+
+    assetNameInput.value = ""
+    assetTypeSelect.value = "cripto"
+    assetModalOverlay.classList.remove("hidden")
+    assetModalState = { isOpen: true }
+    assetNameInput.focus()
+}
+
+function closeAssetModal() {
+    const assetModalOverlay = document.getElementById("assetModalOverlay")
+
+    if (!assetModalOverlay) {
+        return
+    }
+
+    assetModalOverlay.classList.add("hidden")
+    assetModalState = null
+}
+
+async function submitAssetModal() {
+    const assetNameInput = document.getElementById("assetNameInput")
+    const assetTypeSelect = document.getElementById("assetTypeSelect")
+
+    if (!assetNameInput || !assetTypeSelect) {
+        return
+    }
+
+    const name = assetNameInput.value.trim()
+    const type = assetTypeSelect.value.trim()
+
+    if (!name) {
+        assetNameInput.focus()
+        return
+    }
+
+    try {
+        const response = await createAssetOnServer(name, type)
+        const createdAsset = response.asset
+        closeAssetModal()
+        currentAssetId = createdAsset.id
+        await refreshAssetsSidebar(createdAsset.id, true)
+    } catch (error) {
+        console.error(error)
+        alert("No se pudo crear el activo.")
+    }
+}
+
+function initAddAssetButton(addAssetButton) {
+    if (!addAssetButton) {
+        return
+    }
+
+    addAssetButton.addEventListener("click", () => {
+        openAssetModal()
+    })
+}
+
+function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect) {
+    if (confirmAssetModalButton) {
+        confirmAssetModalButton.addEventListener("click", async () => {
+            await submitAssetModal()
+        })
+    }
+
+    if (cancelAssetModalButton) {
+        cancelAssetModalButton.addEventListener("click", () => {
+            closeAssetModal()
+        })
+    }
+
+    if (assetModalOverlay) {
+        assetModalOverlay.addEventListener("click", (event) => {
+            if (event.target === assetModalOverlay) {
+                closeAssetModal()
+            }
+        })
+    }
+
+    if (assetNameInput) {
+        assetNameInput.addEventListener("keydown", async (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault()
+                await submitAssetModal()
+            }
+        })
+    }
+
+    if (assetTypeSelect) {
+        assetTypeSelect.addEventListener("keydown", async (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault()
+                await submitAssetModal()
+            }
+        })
+    }
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && assetModalState?.isOpen) {
+            closeAssetModal()
+        }
+    })
+}
+
+function initAssetOrderButtons(moveAssetUpButton, moveAssetDownButton) {
+    if (moveAssetUpButton) {
+        moveAssetUpButton.addEventListener("click", async () => {
+            await handleAssetReorder("up")
+        })
+    }
+
+    if (moveAssetDownButton) {
+        moveAssetDownButton.addEventListener("click", async () => {
+            await handleAssetReorder("down")
+        })
+    }
+}
+
+async function handleAssetReorder(direction) {
+    if (!currentAssetId) {
+        return
+    }
+
+    try {
+        await reorderAssetOnServer(currentAssetId, direction)
+        await refreshAssetsSidebar(currentAssetId, false)
+    } catch (error) {
+        console.error(error)
+        alert("No se pudo reordenar el activo.")
     }
 }
 
@@ -243,6 +732,21 @@ function handleCellBlur(event) {
         }
 
         updateDividendosTotals()
+        return
+    }
+
+    if (tableBody?.id === "assetOperationsBody") {
+        const hasText = cell.textContent.trim() !== ""
+
+        if (columnIndex === 3 || columnIndex === 4 || columnIndex === 5) {
+            const value = parseEuroNumber(cell.textContent)
+
+            if (hasText) {
+                cell.textContent = formatEuro(value)
+            }
+        }
+
+        updateAssetTableTotals()
     }
 }
 
