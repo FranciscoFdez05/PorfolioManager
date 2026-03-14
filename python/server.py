@@ -337,6 +337,17 @@ def saveActivo(assetId):
     return jsonify({"ok": True})
 
 
+@app.route("/api/activos/<assetId>", methods=["DELETE"])
+def deleteActivo(assetId):
+    assetFile = getAssetFile(assetId)
+
+    if not assetFile.exists():
+        return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+
+    assetFile.unlink()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/activos/reorder", methods=["POST"])
 def reorderActivos():
     requestData = request.get_json(silent=True) or {}

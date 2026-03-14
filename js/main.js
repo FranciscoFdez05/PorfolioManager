@@ -11,12 +11,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const cancelAssetModalButton = document.getElementById("cancelAssetModalBtn")
     const assetNameInput = document.getElementById("assetNameInput")
     const assetTypeSelect = document.getElementById("assetTypeSelect")
+    const confirmModalOverlay = document.getElementById("confirmModalOverlay")
+    const confirmModalAcceptButton = document.getElementById("confirmModalAcceptBtn")
+    const confirmModalCancelButton = document.getElementById("confirmModalCancelBtn")
 
     initSidePanel(toggleButton, sideWrapper)
     initNavigation(navButtons, contentArea)
     initAddAssetButton(addAssetButton, assetModalOverlay, assetNameInput, assetTypeSelect)
     initAssetOrderButtons(moveAssetUpButton, moveAssetDownButton)
     initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect)
+    initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
     await refreshAssetsSidebar()
 
     loadPage("intereses")
@@ -26,6 +30,7 @@ let dividendosAutosaveTimeout = null
 let assetAutosaveTimeout = null
 let currentAssetId = null
 let assetModalState = null
+let confirmModalState = null
 
 function initSidePanel(toggleButton, sideWrapper) {
     if (!toggleButton || !sideWrapper) {
@@ -110,6 +115,7 @@ async function initInteresesLogic() {
             updateTotals()
         })
 
+        interesesBody.addEventListener("click", handleRowDeleteClick)
         interesesBody.addEventListener("focus", handleCellFocus, true)
         interesesBody.addEventListener("blur", handleCellBlur, true)
     }
@@ -156,6 +162,9 @@ async function initInteresesLogic() {
         })
     }
 }
+
+
+
 
 function handleCellFocus(event) {
     const cell = event.target
@@ -230,6 +239,17 @@ async function saveAssetDataToServer(assetData) {
             "Content-Type": "application/json"
         },
         body: JSON.stringify(assetData)
+    })
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+}
+
+async function deleteAssetOnServer(assetId) {
+    const response = await fetch(`/api/activos/${assetId}`, {
+        method: "DELETE"
     })
 
     if (!response.ok) {
@@ -315,6 +335,18 @@ async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTabl
         renderAssetsList(assets)
 
         if (!assets.length) {
+            currentAssetId = null
+            const detSymbol = document.getElementById("detSymbol")
+            const detName = document.getElementById("detName")
+
+            if (detSymbol) {
+                detSymbol.textContent = "---"
+            }
+
+            if (detName) {
+                detName.textContent = "Selecciona un activo"
+            }
+
             return
         }
 
@@ -377,6 +409,7 @@ function renderAssetTablePage(asset) {
                 <table class="assetOperationsTable">
                     <thead>
                         <tr>
+                            <th class="rowActionHeader"></th>
                             <th>Fecha operación</th>
                             <th>Tipo de operación</th>
                             <th>Participaciones</th>
@@ -393,6 +426,7 @@ function renderAssetTablePage(asset) {
             <div class="assetActions">
                 <button id="addAssetRowBtn" class="primaryButton">Añadir fila</button>
                 <button id="saveAssetBtn" class="secondaryButton">Guardar JSON</button>
+                <button id="deleteAssetBtn" class="dangerButton">Eliminar activo</button>
             </div>
         </section>
     `
@@ -413,6 +447,7 @@ function renderAssetRows(rows) {
     rows.forEach((rowData) => {
         const rowElement = document.createElement("tr")
         rowElement.innerHTML = `
+            <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
             <td contenteditable="true">${rowData.fechaOperacion || ""}</td>
             <td contenteditable="true">${rowData.tipoOperacion || "Compra"}</td>
             <td contenteditable="true">${rowData.participaciones || ""}</td>
@@ -434,12 +469,122 @@ function collectAssetRowsFromTable() {
         const cells = rowElement.querySelectorAll("td")
 
         return {
-            fechaOperacion: cells[0]?.textContent.trim() || "",
-            tipoOperacion: cells[1]?.textContent.trim() || "",
-            participaciones: cells[2]?.textContent.trim() || "",
-            precioParticipacion: cells[3]?.textContent.trim() || "",
-            capitalInvertidoBruto: cells[4]?.textContent.trim() || "",
-            comisiones: cells[5]?.textContent.trim() || ""
+            fechaOperacion: cells[1]?.textContent.trim() || "",
+            tipoOperacion: cells[2]?.textContent.trim() || "",
+            participaciones: cells[3]?.textContent.trim() || "",
+            precioParticipacion: cells[4]?.textContent.trim() || "",
+            capitalInvertidoBruto: cells[5]?.textContent.trim() || "",
+            comisiones: cells[6]?.textContent.trim() || ""
+        }
+    })
+}
+
+function isPlaceholderValue(value, placeholders = []) {
+    return placeholders.includes((value || "").trim().toLowerCase())
+}
+
+function isEmptyInteresesRow(rowElement) {
+    const cells = rowElement.querySelectorAll("td")
+    const fecha = cells[1]?.textContent.trim() || ""
+    const saldoPromedio = parseEuroNumber(cells[2]?.textContent || "")
+    const acumulado = parseEuroNumber(cells[3]?.textContent || "")
+    const impuestos = parseEuroNumber(cells[4]?.textContent || "")
+
+    return (!fecha || isPlaceholderValue(fecha, ["nuevo-mes"])) &&
+        saldoPromedio === 0 &&
+        acumulado === 0 &&
+        impuestos === 0
+}
+
+function isEmptyDividendosRow(rowElement) {
+    const cells = rowElement.querySelectorAll("td")
+    const fecha = cells[1]?.textContent.trim() || ""
+    const instrumento = cells[2]?.textContent.trim() || ""
+    const acciones = parseFloat((cells[3]?.textContent || "0").replace(",", ".")) || 0
+    const dividendoAccion = parseDollarNumber(cells[4]?.textContent || "")
+    const impuestos = parseEuroNumber(cells[5]?.textContent || "")
+    const total = parseEuroNumber(cells[6]?.textContent || "")
+
+    return (!fecha || isPlaceholderValue(fecha, ["nueva-fecha"])) &&
+        (!instrumento || isPlaceholderValue(instrumento, ["instrumento"])) &&
+        acciones === 0 &&
+        dividendoAccion === 0 &&
+        impuestos === 0 &&
+        total === 0
+}
+
+function isEmptyAssetRow(rowElement) {
+    const cells = rowElement.querySelectorAll("td")
+    const fechaOperacion = cells[1]?.textContent.trim() || ""
+    const tipoOperacion = cells[2]?.textContent.trim() || ""
+    const participaciones = parseFloat((cells[3]?.textContent || "0").replace(",", ".")) || 0
+    const precioParticipacion = parseEuroNumber(cells[4]?.textContent || "")
+    const capitalInvertidoBruto = parseEuroNumber(cells[5]?.textContent || "")
+    const comisiones = parseEuroNumber(cells[6]?.textContent || "")
+
+    return !fechaOperacion &&
+        (!tipoOperacion || isPlaceholderValue(tipoOperacion, ["compra"])) &&
+        participaciones === 0 &&
+        precioParticipacion === 0 &&
+        capitalInvertidoBruto === 0 &&
+        comisiones === 0
+}
+
+function handleRowDeleteClick(event) {
+    const deleteButton = event.target.closest(".rowDeleteBtn")
+
+    if (!deleteButton) {
+        return
+    }
+
+    const rowElement = deleteButton.closest("tr")
+    const tableBody = rowElement?.closest("tbody")
+
+    if (!rowElement || !tableBody) {
+        return
+    }
+
+    let isEmptyRow = false
+
+    if (tableBody.id === "interesesBody") {
+        isEmptyRow = isEmptyInteresesRow(rowElement)
+    } else if (tableBody.id === "dividendosBody") {
+        isEmptyRow = isEmptyDividendosRow(rowElement)
+    } else if (tableBody.id === "assetOperationsBody") {
+        isEmptyRow = isEmptyAssetRow(rowElement)
+    }
+
+    const removeRow = () => {
+        rowElement.remove()
+
+        if (tableBody.id === "interesesBody") {
+            updateTotals()
+            return
+        }
+
+        if (tableBody.id === "dividendosBody") {
+            updateDividendosTotals()
+            scheduleDividendosAutosave()
+            return
+        }
+
+        if (tableBody.id === "assetOperationsBody") {
+            updateAssetTableTotals()
+            scheduleAssetAutosave()
+        }
+    }
+
+    if (isEmptyRow) {
+        removeRow()
+        return
+    }
+
+    openConfirmModal({
+        title: "Eliminar fila",
+        message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
+        confirmLabel: "Eliminar",
+        onConfirm: async () => {
+            removeRow()
         }
     })
 }
@@ -466,12 +611,12 @@ function updateAssetTableTotals() {
 
     rowElements.forEach((rowElement) => {
         const cells = rowElement.querySelectorAll("td")
-        const bruto = parseEuroNumber(cells[4]?.textContent || "")
-        const comisiones = parseEuroNumber(cells[5]?.textContent || "")
+        const bruto = parseEuroNumber(cells[5]?.textContent || "")
+        const comisiones = parseEuroNumber(cells[6]?.textContent || "")
         const neto = bruto - comisiones
 
-        if (cells[6]) {
-            cells[6].textContent = formatEuro(neto)
+        if (cells[7]) {
+            cells[7].textContent = formatEuro(neto)
         }
     })
 }
@@ -485,6 +630,7 @@ function addNewAssetRow() {
 
     const rowElement = document.createElement("tr")
     rowElement.innerHTML = `
+        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td contenteditable="true"></td>
         <td contenteditable="true">Compra</td>
         <td contenteditable="true"></td>
@@ -521,6 +667,7 @@ function initAssetTableLogic(asset) {
     const assetOperationsBody = document.getElementById("assetOperationsBody")
     const addAssetRowButton = document.getElementById("addAssetRowBtn")
     const saveAssetButton = document.getElementById("saveAssetBtn")
+    const deleteAssetButton = document.getElementById("deleteAssetBtn")
 
     if (assetOperationsBody) {
         assetOperationsBody.addEventListener("input", () => {
@@ -528,6 +675,7 @@ function initAssetTableLogic(asset) {
             scheduleAssetAutosave()
         })
 
+        assetOperationsBody.addEventListener("click", handleRowDeleteClick)
         assetOperationsBody.addEventListener("focus", handleCellFocus, true)
         assetOperationsBody.addEventListener("blur", (event) => {
             handleCellBlur(event)
@@ -547,6 +695,39 @@ function initAssetTableLogic(asset) {
             await saveAssetDataToServer(buildCurrentAssetPayload())
             await refreshAssetsSidebar(currentAssetId, false)
             alert("JSON del activo guardado")
+        })
+    }
+
+    if (deleteAssetButton) {
+        deleteAssetButton.addEventListener("click", () => {
+            const rows = collectAssetRowsFromTable()
+            const hasContent = rows.some((row) => {
+                return row.fechaOperacion.trim() !== "" ||
+                    !isPlaceholderValue(row.tipoOperacion, ["", "compra"]) ||
+                    row.participaciones.trim() !== "" ||
+                    parseEuroNumber(row.precioParticipacion) !== 0 ||
+                    parseEuroNumber(row.capitalInvertidoBruto) !== 0 ||
+                    parseEuroNumber(row.comisiones) !== 0
+            })
+
+            openConfirmModal({
+                title: "Eliminar activo",
+                message: hasContent
+                    ? "Este activo tiene contenido guardado. ¿Quieres eliminarlo igualmente?"
+                    : "¿Quieres eliminar este activo?",
+                confirmLabel: "Eliminar",
+                onConfirm: async () => {
+                    await deleteAssetOnServer(currentAssetId)
+                    currentAssetId = null
+                    const contentArea = document.getElementById("dynamicContent")
+
+                    if (contentArea) {
+                        contentArea.innerHTML = `<div class="placeholderPage">Activo eliminado.</div>`
+                    }
+
+                    await refreshAssetsSidebar(null, false)
+                }
+            })
         })
     }
 }
@@ -576,6 +757,61 @@ function closeAssetModal() {
 
     assetModalOverlay.classList.add("hidden")
     assetModalState = null
+}
+
+function openConfirmModal({ title = "Confirmar acción", message = "¿Seguro que quieres continuar?", confirmLabel = "Confirmar", onConfirm }) {
+    const confirmModalOverlay = document.getElementById("confirmModalOverlay")
+    const confirmModalTitle = document.getElementById("confirmModalTitle")
+    const confirmModalMessage = document.getElementById("confirmModalMessage")
+    const confirmModalAcceptButton = document.getElementById("confirmModalAcceptBtn")
+
+    if (!confirmModalOverlay || !confirmModalTitle || !confirmModalMessage || !confirmModalAcceptButton) {
+        return
+    }
+
+    confirmModalTitle.textContent = title
+    confirmModalMessage.textContent = message
+    confirmModalAcceptButton.textContent = confirmLabel
+    confirmModalOverlay.classList.remove("hidden")
+    confirmModalState = { onConfirm }
+}
+
+function closeConfirmModal() {
+    const confirmModalOverlay = document.getElementById("confirmModalOverlay")
+
+    if (!confirmModalOverlay) {
+        return
+    }
+
+    confirmModalOverlay.classList.add("hidden")
+    confirmModalState = null
+}
+
+function initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton) {
+    if (confirmModalAcceptButton) {
+        confirmModalAcceptButton.addEventListener("click", async () => {
+            const onConfirm = confirmModalState?.onConfirm
+            closeConfirmModal()
+
+            if (onConfirm) {
+                await onConfirm()
+            }
+        })
+    }
+
+    if (confirmModalCancelButton) {
+        confirmModalCancelButton.addEventListener("click", () => {
+            closeConfirmModal()
+        })
+    }
+
+    if (confirmModalOverlay) {
+        confirmModalOverlay.addEventListener("click", (event) => {
+            if (event.target === confirmModalOverlay) {
+                closeConfirmModal()
+            }
+        })
+    }
 }
 
 async function submitAssetModal() {
@@ -658,6 +894,11 @@ function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetM
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && assetModalState?.isOpen) {
             closeAssetModal()
+            return
+        }
+
+        if (event.key === "Escape" && confirmModalState) {
+            closeConfirmModal()
         }
     })
 }
@@ -791,6 +1032,7 @@ function renderRowsFromData(interesesData) {
         const rowElement = document.createElement("tr")
 
         rowElement.innerHTML = `
+            <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
             <td contenteditable="true">${rowData.fecha || ""}</td>
             <td contenteditable="true">${formatCellEuroValue(rowData.saldoPromedio)}</td>
             <td contenteditable="true">${formatCellEuroValue(rowData.acumulado)}</td>
@@ -811,10 +1053,10 @@ function collectInteresesDataFromTable() {
         const cells = rowElement.querySelectorAll("td")
 
         return {
-            fecha: cells[0]?.textContent.trim() || "",
-            saldoPromedio: cells[1]?.textContent.trim() || "",
-            acumulado: cells[2]?.textContent.trim() || "",
-            impuestos: cells[3]?.textContent.trim() || ""
+            fecha: cells[1]?.textContent.trim() || "",
+            saldoPromedio: cells[2]?.textContent.trim() || "",
+            acumulado: cells[3]?.textContent.trim() || "",
+            impuestos: cells[4]?.textContent.trim() || ""
         }
     })
 
@@ -864,12 +1106,12 @@ function updateTotals() {
 
     rowElements.forEach((rowElement) => {
         const cells = rowElement.querySelectorAll("td")
-        const acumulado = parseEuroNumber(cells[2]?.textContent || "")
-        const impuestos = parseEuroNumber(cells[3]?.textContent || "")
+        const acumulado = parseEuroNumber(cells[3]?.textContent || "")
+        const impuestos = parseEuroNumber(cells[4]?.textContent || "")
         const rowTotal = acumulado - impuestos
 
-        if (cells[4]) {
-            cells[4].textContent = formatEuro(rowTotal)
+        if (cells[5]) {
+            cells[5].textContent = formatEuro(rowTotal)
         }
 
         totalNeto += rowTotal
@@ -903,6 +1145,7 @@ function addNewInteresesRow() {
     const rowElement = document.createElement("tr")
 
     rowElement.innerHTML = `
+        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td contenteditable="true">nuevo-mes</td>
         <td contenteditable="true"></td>
         <td contenteditable="true"></td>
@@ -1004,6 +1247,7 @@ function renderDividendosRowsFromData(dividendosData) {
         const rowElement = document.createElement("tr")
 
         rowElement.innerHTML = `
+            <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
             <td contenteditable="true">${rowData.fecha || ""}</td>
             <td contenteditable="true">${rowData.instrumento || ""}</td>
             <td contenteditable="true">${rowData.acciones || ""}</td>
@@ -1025,12 +1269,12 @@ function collectDividendosDataFromTable() {
         const cells = rowElement.querySelectorAll("td")
 
         return {
-            fecha: cells[0]?.textContent.trim() || "",
-            instrumento: cells[1]?.textContent.trim() || "",
-            acciones: cells[2]?.textContent.trim() || "",
-            dividendoAccion: cells[3]?.textContent.trim() || "",
-            impuestos: cells[4]?.textContent.trim() || "",
-            total: cells[5]?.textContent.trim() || ""
+            fecha: cells[1]?.textContent.trim() || "",
+            instrumento: cells[2]?.textContent.trim() || "",
+            acciones: cells[3]?.textContent.trim() || "",
+            dividendoAccion: cells[4]?.textContent.trim() || "",
+            impuestos: cells[5]?.textContent.trim() || "",
+            total: cells[6]?.textContent.trim() || ""
         }
     })
 
@@ -1080,8 +1324,8 @@ function updateDividendosTotals() {
 
     rowElements.forEach((rowElement) => {
         const cells = rowElement.querySelectorAll("td")
-        const impuestos = parseEuroNumber(cells[4]?.textContent || "")
-        const rowTotal = parseEuroNumber(cells[5]?.textContent || "")
+        const impuestos = parseEuroNumber(cells[5]?.textContent || "")
+        const rowTotal = parseEuroNumber(cells[6]?.textContent || "")
 
         totalNeto += rowTotal
         totalImpuestos += impuestos
@@ -1114,6 +1358,7 @@ function addNewDividendosRow() {
     const rowElement = document.createElement("tr")
 
     rowElement.innerHTML = `
+        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td contenteditable="true">nueva-fecha</td>
         <td contenteditable="true">instrumento</td>
         <td contenteditable="true"></td>
@@ -1273,6 +1518,7 @@ async function initDividendosLogic() {
             scheduleDividendosAutosave()
         })
 
+        dividendosBody.addEventListener("click", handleRowDeleteClick)
         dividendosBody.addEventListener("focus", handleCellFocus, true)
         dividendosBody.addEventListener("blur", (event) => {
             handleCellBlur(event)
@@ -1323,3 +1569,399 @@ async function initDividendosLogic() {
         })
     }
 }
+
+document.addEventListener("keydown", (event) => {
+    const editableCell = event.target.closest('td[contenteditable="true"]')
+    if (!editableCell || event.key !== "Enter") {
+        return
+    }
+
+    event.preventDefault()
+    editableCell.blur()
+})
+
+function isDividendosPerShareCell(cell) {
+    if (!cell) {
+        return false
+    }
+
+    const row = cell.parentElement
+    const table = cell.closest("table")
+    const headerRow = table ? table.querySelector("thead tr") : null
+    const columnIndex = row ? Array.from(row.children).indexOf(cell) : -1
+    const headerCell = headerRow && columnIndex >= 0 ? headerRow.children[columnIndex] : null
+    const headerText = (headerCell?.textContent || "").trim().toLowerCase()
+    return headerText === "dividendos / acción"
+}
+
+function isDividendosActionsCell(cell) {
+    if (!cell) {
+        return false
+    }
+
+    const row = cell.parentElement
+    const table = cell.closest("table")
+    const headerRow = table ? table.querySelector("thead tr") : null
+    const columnIndex = row ? Array.from(row.children).indexOf(cell) : -1
+    const headerCell = headerRow && columnIndex >= 0 ? headerRow.children[columnIndex] : null
+    const headerText = (headerCell?.textContent || "").trim().toLowerCase()
+    return headerText === "acciones"
+}
+
+function isDividendosEuroCell(cell) {
+    if (!cell) {
+        return false
+    }
+
+    const row = cell.parentElement
+    const table = cell.closest("table")
+    const headerRow = table ? table.querySelector("thead tr") : null
+    const columnIndex = row ? Array.from(row.children).indexOf(cell) : -1
+    const headerCell = headerRow && columnIndex >= 0 ? headerRow.children[columnIndex] : null
+    const headerText = (headerCell?.textContent || "").trim().toLowerCase()
+    return headerText === "impuestos" || headerText === "total"
+}
+
+function getTableHeaderText(cell) {
+    if (!cell) {
+        return ""
+    }
+
+    const row = cell.parentElement
+    const table = cell.closest("table")
+    const headerRow = table ? table.querySelector("thead tr") : null
+    const columnIndex = row ? Array.from(row.children).indexOf(cell) : -1
+    const headerCell = headerRow && columnIndex >= 0 ? headerRow.children[columnIndex] : null
+    return (headerCell?.textContent || "").trim().toLowerCase()
+}
+
+function isAssetParticipationsCell(cell) {
+    return getTableHeaderText(cell) === "participaciones"
+}
+
+function isAssetCommissionsCell(cell) {
+    return getTableHeaderText(cell) === "comisiones"
+}
+
+function parseLooseNumber(value) {
+    const text = String(value ?? "").replace(/[^\d,.\-]/g, "").trim()
+    if (!text) {
+        return null
+    }
+
+    let normalized = text
+    if (text.includes(",") && text.includes(".")) {
+        normalized = text.replace(/\./g, "").replace(",", ".")
+    } else {
+        normalized = text.replace(",", ".")
+    }
+
+    const parsed = Number(normalized)
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatDollarSafe(value) {
+    const parsed = parseLooseNumber(value)
+    if (parsed === null) {
+        return ""
+    }
+
+    return `${parsed.toLocaleString("es-ES", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    })} $`
+}
+
+function formatEuroSafe(value) {
+    const parsed = parseLooseNumber(value)
+    if (parsed === null) {
+        return ""
+    }
+
+    return `${parsed.toLocaleString("es-ES", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    })} €`
+}
+
+document.addEventListener("focusin", (event) => {
+    const cell = event.target.closest('td[contenteditable="true"]')
+    if (isAssetParticipationsCell(cell) || isAssetCommissionsCell(cell)) {
+        queueMicrotask(() => {
+            const text = String(cell.textContent || "")
+            cell.textContent = text.replace(/[€$]/g, "").trim()
+        })
+        return
+    }
+
+    if (!isDividendosPerShareCell(cell)) {
+        if (isDividendosActionsCell(cell) || isDividendosEuroCell(cell)) {
+            queueMicrotask(() => {
+                const text = String(cell.textContent || "")
+                cell.textContent = text.replace(/[€$]/g, "").trim()
+            })
+        }
+        return
+    }
+
+    queueMicrotask(() => {
+        const parsed = parseLooseNumber(cell.textContent)
+        cell.textContent = parsed === null ? "" : String(parsed).replace(".", ",")
+    })
+})
+
+document.addEventListener("focusout", (event) => {
+    const cell = event.target.closest('td[contenteditable="true"]')
+    if (isAssetParticipationsCell(cell)) {
+        queueMicrotask(() => {
+            const text = String(cell.textContent || "")
+            cell.textContent = text.replace(/[€$]/g, "").trim()
+        })
+        return
+    }
+
+    if (isAssetCommissionsCell(cell)) {
+        queueMicrotask(() => {
+            const text = String(cell.textContent || "").trim()
+            cell.textContent = formatEuroSafe(text)
+        })
+        return
+    }
+
+    if (!isDividendosPerShareCell(cell)) {
+        if (isDividendosActionsCell(cell)) {
+            queueMicrotask(() => {
+                const text = String(cell.textContent || "")
+                cell.textContent = text.replace(/[€$]/g, "").trim()
+            })
+        } else if (isDividendosEuroCell(cell)) {
+            queueMicrotask(() => {
+                const text = String(cell.textContent || "").trim()
+                cell.textContent = formatEuroSafe(text)
+            })
+        }
+        return
+    }
+
+    queueMicrotask(() => {
+        const text = String(cell.textContent || "").trim()
+        cell.textContent = formatDollarSafe(text)
+    })
+})
+
+let interesesAutosaveTimer = null
+let suppressAutosaveAlert = false
+
+const originalWindowAlert = window.alert.bind(window)
+window.alert = (message) => {
+    const text = String(message || "")
+    if (suppressAutosaveAlert && text.toLowerCase().includes("datos guardados en data/intereses.json")) {
+        suppressAutosaveAlert = false
+        return
+    }
+
+    originalWindowAlert(message)
+}
+
+function runWithoutAlerts(callback) {
+    suppressAutosaveAlert = true
+    try {
+        callback()
+    } finally {
+        window.setTimeout(() => {
+            suppressAutosaveAlert = false
+        }, 1500)
+    }
+}
+
+function hideAutoSaveButtons() {
+    document.querySelectorAll("button").forEach((button) => {
+        if (button.textContent.trim().toLowerCase() === "guardar") {
+            button.style.display = "none"
+        }
+    })
+}
+
+function isInteresesTableCell(element) {
+    const cell = element?.closest?.("td")
+    const table = cell?.closest?.("table")
+    const headerText = (table?.querySelector?.("thead")?.textContent || "").toLowerCase()
+    return headerText.includes("saldo promedio") && headerText.includes("acumulado")
+}
+
+function triggerInteresesAutosave() {
+    const saveButton = Array.from(document.querySelectorAll("button")).find(
+        (button) => button.textContent.trim().toLowerCase() === "guardar"
+    )
+
+    if (saveButton) {
+        runWithoutAlerts(() => {
+            saveButton.click()
+        })
+    }
+}
+
+function scheduleInteresesAutosave(delay = 500) {
+    window.clearTimeout(interesesAutosaveTimer)
+    interesesAutosaveTimer = window.setTimeout(() => {
+        triggerInteresesAutosave()
+    }, delay)
+}
+
+document.addEventListener("focusout", (event) => {
+    if (isInteresesTableCell(event.target)) {
+        scheduleInteresesAutosave(300)
+    }
+})
+
+document.addEventListener("DOMContentLoaded", () => {
+    requestAnimationFrame(hideAutoSaveButtons)
+})
+
+new MutationObserver(() => {
+    hideAutoSaveButtons()
+}).observe(document.body, { childList: true, subtree: true })
+function getVisibleAssetTable() {
+    return Array.from(document.querySelectorAll("table")).find((table) => {
+        const headerText = (table.querySelector("thead")?.textContent || "").toLowerCase()
+        return headerText.includes("fecha operación") && headerText.includes("participaciones")
+    }) || null
+}
+
+function getAssetActionRow() {
+    return Array.from(document.querySelectorAll("button"))
+        .find((button) => button.textContent.trim().toLowerCase() === "guardar json")
+        ?.parentElement || null
+}
+
+function buildAssetRowsFromTable(table) {
+    const headerCells = Array.from(table.querySelectorAll("thead th"))
+    const headers = headerCells.map((cell) => (cell.textContent || "").trim()).filter(Boolean)
+    const rows = Array.from(table.querySelectorAll("tbody tr")).map((row) => {
+        const cells = Array.from(row.children).slice(-headers.length)
+        const rowData = {}
+        headers.forEach((header, index) => {
+            rowData[header] = (cells[index]?.textContent || "").trim()
+        })
+        return rowData
+    })
+
+    return { headers, rows }
+}
+
+function downloadJsonFile(filename, payload) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(url)
+}
+
+function exportCurrentAssetJson() {
+    const table = getVisibleAssetTable()
+    if (!table) {
+        return
+    }
+
+    const title = document.querySelector("h1, h2")?.textContent?.trim() || "activo"
+    const payload = {
+        nombre: title,
+        ...buildAssetRowsFromTable(table)
+    }
+
+    downloadJsonFile(`${title.toLowerCase().replace(/\s+/g, "-") || "activo"}.json`, payload)
+}
+
+function importCurrentAssetJson() {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = "application/json,.json"
+    input.addEventListener("change", async () => {
+        const file = input.files?.[0]
+        if (!file) {
+            return
+        }
+
+        const text = await file.text()
+        const payload = JSON.parse(text)
+        const table = getVisibleAssetTable()
+        if (!table || !Array.isArray(payload.rows)) {
+            return
+        }
+
+        const tbody = table.querySelector("tbody")
+        const headers = Array.from(table.querySelectorAll("thead th"))
+            .map((cell) => (cell.textContent || "").trim())
+            .filter(Boolean)
+
+        tbody.innerHTML = ""
+        payload.rows.forEach((rowData) => {
+            const row = document.createElement("tr")
+            const deleteCell = document.createElement("td")
+            deleteCell.innerHTML = '<button type="button" class="row-delete-btn">X</button>'
+            row.appendChild(deleteCell)
+
+            headers.forEach((header) => {
+                const cell = document.createElement("td")
+                cell.contentEditable = "true"
+                cell.textContent = rowData[header] || ""
+                row.appendChild(cell)
+            })
+
+            tbody.appendChild(row)
+        })
+
+        const hiddenSaveButton = Array.from(document.querySelectorAll("button")).find(
+            (button) => button.dataset.assetHiddenSave === "true"
+        )
+        hiddenSaveButton?.click()
+    })
+
+    input.click()
+}
+
+function enhanceAssetJsonActions() {
+    const actionRow = getAssetActionRow()
+    if (!actionRow) {
+        return
+    }
+
+    const saveButton = Array.from(actionRow.querySelectorAll("button")).find(
+        (button) => button.textContent.trim().toLowerCase() === "guardar json"
+    )
+
+    if (!saveButton) {
+        return
+    }
+
+    saveButton.style.display = "none"
+    saveButton.dataset.assetHiddenSave = "true"
+
+    if (!actionRow.querySelector('[data-asset-export="true"]')) {
+        const exportButton = document.createElement("button")
+        exportButton.type = "button"
+        exportButton.className = saveButton.className
+        exportButton.textContent = "Exportar JSON"
+        exportButton.dataset.assetExport = "true"
+        exportButton.addEventListener("click", exportCurrentAssetJson)
+        actionRow.insertBefore(exportButton, saveButton.nextSibling)
+
+        const importButton = document.createElement("button")
+        importButton.type = "button"
+        importButton.className = saveButton.className
+        importButton.textContent = "Importar JSON"
+        importButton.dataset.assetImport = "true"
+        importButton.addEventListener("click", importCurrentAssetJson)
+        actionRow.insertBefore(importButton, exportButton.nextSibling)
+    }
+}
+
+new MutationObserver(() => {
+    enhanceAssetJsonActions()
+}).observe(document.body, { childList: true, subtree: true })
+
+document.addEventListener("DOMContentLoaded", () => {
+    enhanceAssetJsonActions()
+})

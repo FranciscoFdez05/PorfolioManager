@@ -1,3 +1,10 @@
 {
-  "rows": []
+  "rows": [
+    {
+      "fecha": "nuevo-mes",
+      "saldoPromedio": "",
+      "acumulado": "",
+      "impuestos": ""
+    }
+  ]
 }
