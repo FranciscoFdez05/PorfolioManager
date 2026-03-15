@@ -333,6 +333,7 @@ body{
     display:flex;
     flex-direction:column;
     gap:18px;
+    padding-right:18px;
 }
 
 .assetPageHeader{
@@ -362,12 +363,18 @@ body{
     overflow-y:auto;
     overflow-x:hidden;
     padding-left:34px;
-    padding-right:14px;
+    padding-right:0;
     background:#10294f;
+    scrollbar-width:none;
+}
+
+.assetTableWrapper::-webkit-scrollbar{
+    width:0;
+    height:0;
 }
 
 .assetOperationsTable{
-    width:calc(100% - 34px);
+    width:100%;
     min-width:0;
     border-collapse:collapse;
     table-layout:fixed;
@@ -425,6 +432,7 @@ body{
     display:flex;
     flex-direction:column;
     gap:14px;
+    padding-right:18px;
 }
 
 .overviewFilters{
@@ -458,6 +466,12 @@ body{
     overflow:auto;
     border:1px solid #2a4f86;
     background:#10294f;
+    scrollbar-width:none;
+}
+
+.overviewTableWrapper::-webkit-scrollbar{
+    width:0;
+    height:0;
 }
 
 .overviewTable{
@@ -641,6 +655,7 @@ body{
     column-gap:48px;
     row-gap:24px;
     align-items:start;
+    padding-right:18px;
 }
 
 .interesesTableSection{
@@ -655,10 +670,16 @@ body{
     padding-left:34px;
     border:1px solid #2a4f86;
     background:#10294f;
+    scrollbar-width:none;
+}
+
+.interesesTableWrapper::-webkit-scrollbar{
+    width:0;
+    height:0;
 }
 
 .interesesTable{
-    width:calc(100% - 34px);
+    width:100%;
     border-collapse:collapse;
     table-layout:fixed;
     background:#10294f;
@@ -803,9 +824,11 @@ body{
     flex-direction:column;
     gap:26px;
     margin-right:18px;
+    width:100%;
 }
 
 .summaryCard{
+    width:100%;
     background:#10294f;
     border:2px solid #2f4d79;
     color:#ffffff;
@@ -872,10 +895,16 @@ body{
     padding-left:34px;
     border:1px solid #2a4f86;
     background:#10294f;
+    scrollbar-width:none;
+}
+
+.dividendosTableWrapper::-webkit-scrollbar{
+    width:0;
+    height:0;
 }
 
 .dividendosTable{
-    width:calc(100% - 34px);
+    width:100%;
     border-collapse:collapse;
     table-layout:fixed;
     background:#10294f;
