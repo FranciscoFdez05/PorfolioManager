@@ -1,4 +1,42 @@
-<div class="placeholderPage">
-    <h2>Vista general</h2>
-    <p>Contenido pendiente.</p>
-</div>
+<section class="overviewPage">
+    <div class="overviewFilters" id="overviewFilters">
+        <label class="overviewFilterOption">
+            <input type="checkbox" value="cripto" checked>
+            <span>Cripto</span>
+        </label>
+        <label class="overviewFilterOption">
+            <input type="checkbox" value="acciones" checked>
+            <span>Acciones</span>
+        </label>
+        <label class="overviewFilterOption">
+            <input type="checkbox" value="etfs" checked>
+            <span>ETFs</span>
+        </label>
+        <label class="overviewFilterOption">
+            <input type="checkbox" value="comoditis" checked>
+            <span>Comoditis</span>
+        </label>
+    </div>
+
+    <div class="overviewTableWrapper">
+        <table class="overviewTable">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Tipo</th>
+                    <th>Participaciones</th>
+                    <th>Promedio compra</th>
+                    <th>Valor actual</th>
+                    <th>Invertido bruto</th>
+                    <th>Comisiones</th>
+                    <th>Invertido neto</th>
+                    <th>Neto actual</th>
+                    <th>Rendimiento</th>
+                </tr>
+            </thead>
+            <tbody id="overviewTableBody"></tbody>
+        </table>
+    </div>
+
+    <p class="overviewEmpty hidden" id="overviewEmptyState">No hay activos para mostrar con los filtros seleccionados.</p>
+</section>

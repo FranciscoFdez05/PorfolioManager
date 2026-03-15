@@ -23,7 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
     await refreshAssetsSidebar()
 
-    loadPage("intereses")
+    loadPage("vistaGeneral")
 })
 
 let dividendosAutosaveTimeout = null
@@ -31,6 +31,7 @@ let assetAutosaveTimeout = null
 let currentAssetId = null
 let assetModalState = null
 let confirmModalState = null
+let draggedAssetId = null
 
 function initSidePanel(toggleButton, sideWrapper) {
     if (!toggleButton || !sideWrapper) {
@@ -89,7 +90,9 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
         const htmlContent = await response.text()
         contentArea.innerHTML = htmlContent
 
-        if (page === "intereses") {
+        if (page === "vistaGeneral") {
+            await initVistaGeneralLogic()
+        } else if (page === "intereses") {
             await initInteresesLogic()
         } else if (page === "dividendos") {
             await initDividendosLogic()
@@ -292,6 +295,23 @@ async function reorderAssetOnServer(assetId, direction) {
     return await response.json()
 }
 
+async function saveAssetOrderOnServer(orderedAssetIds) {
+    const response = await fetch("/api/activos/reorder", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ orderedAssetIds })
+    })
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
+}
+
 function updateAssetDetail(asset) {
     const detSymbol = document.getElementById("detSymbol")
     const detName = document.getElementById("detName")
@@ -319,6 +339,7 @@ function renderAssetsList(assets) {
         button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}`
         button.dataset.assetId = asset.id
         button.dataset.assetOrder = String(asset.order ?? 0)
+        button.draggable = true
         button.innerHTML = `
             <span>${asset.symbol || asset.name}</span>
             <span>${asset.price || "0,00"}</span>
@@ -327,12 +348,14 @@ function renderAssetsList(assets) {
     })
 
     initAssetSelector([...assetsList.querySelectorAll(".assetBtn")])
+    initAssetDragAndDrop(assetsList)
 }
 
 async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTable = false) {
     try {
         const assets = await loadAssetsList()
         renderAssetsList(assets)
+        await refreshOverviewIfVisible()
 
         if (!assets.length) {
             currentAssetId = null
@@ -378,6 +401,116 @@ async function selectAsset(assetId) {
     renderAssetTablePage(assetData)
 }
 
+async function refreshOverviewIfVisible() {
+    if (document.getElementById("overviewTableBody")) {
+        await renderVistaGeneralTable()
+    }
+}
+
+function initAssetDragAndDrop(assetsList) {
+    const assetButtons = [...assetsList.querySelectorAll(".assetBtn")]
+
+    assetButtons.forEach((button) => {
+        button.addEventListener("dragstart", (event) => {
+            draggedAssetId = button.dataset.assetId || null
+            button.classList.add("dragging")
+
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = "move"
+                event.dataTransfer.setData("text/plain", draggedAssetId || "")
+            }
+        })
+
+        button.addEventListener("dragend", () => {
+            button.classList.remove("dragging")
+            clearAssetDragState()
+            draggedAssetId = null
+        })
+
+        button.addEventListener("dragover", (event) => {
+            if (!draggedAssetId || draggedAssetId === button.dataset.assetId) {
+                return
+            }
+
+            event.preventDefault()
+            button.classList.add("dragOver")
+        })
+
+        button.addEventListener("dragleave", () => {
+            button.classList.remove("dragOver")
+        })
+
+        button.addEventListener("drop", async (event) => {
+            event.preventDefault()
+
+            const targetAssetId = button.dataset.assetId || ""
+
+            button.classList.remove("dragOver")
+
+            if (!draggedAssetId || !targetAssetId || draggedAssetId === targetAssetId) {
+                return
+            }
+
+            try {
+                await handleAssetDropReorder(draggedAssetId, targetAssetId, event.clientY)
+            } catch (error) {
+                console.error(error)
+                alert("No se pudo reordenar el activo.")
+            } finally {
+                clearAssetDragState()
+                draggedAssetId = null
+            }
+        })
+    })
+
+    if (!assetsList.dataset.dragBound) {
+        assetsList.dataset.dragBound = "true"
+        assetsList.addEventListener("dragover", (event) => {
+            if (!draggedAssetId) {
+                return
+            }
+
+            event.preventDefault()
+        })
+    }
+}
+
+function clearAssetDragState() {
+    document.querySelectorAll(".assetBtn.dragOver, .assetBtn.dragging").forEach((button) => {
+        button.classList.remove("dragOver", "dragging")
+    })
+}
+
+async function handleAssetDropReorder(sourceAssetId, targetAssetId, pointerY) {
+    const assets = await loadAssetsList()
+    const orderedIds = assets.map((asset) => asset.id)
+    const sourceIndex = orderedIds.indexOf(sourceAssetId)
+    const targetIndex = orderedIds.indexOf(targetAssetId)
+
+    if (sourceIndex === -1 || targetIndex === -1) {
+        throw new Error("No se encontró el activo para reordenar")
+    }
+
+    orderedIds.splice(sourceIndex, 1)
+
+    const targetButton = document.querySelector(`.assetBtn[data-asset-id="${targetAssetId}"]`)
+    const targetRect = targetButton?.getBoundingClientRect()
+    const insertAfterTarget = Boolean(targetRect && pointerY > targetRect.top + (targetRect.height / 2))
+    let insertIndex = targetIndex
+
+    if (insertAfterTarget) {
+        insertIndex += 1
+    }
+
+    if (sourceIndex < targetIndex) {
+        insertIndex -= 1
+    }
+
+    orderedIds.splice(Math.max(0, insertIndex), 0, sourceAssetId)
+    await saveAssetOrderOnServer(orderedIds)
+    await refreshAssetsSidebar(currentAssetId, false)
+}
+
 function buildAssetTypeLabel(assetType) {
     const labels = {
         cripto: "Cripto",
@@ -387,6 +520,139 @@ function buildAssetTypeLabel(assetType) {
     }
 
     return labels[assetType] || assetType
+}
+
+async function initVistaGeneralLogic() {
+    const filtersContainer = document.getElementById("overviewFilters")
+
+    if (filtersContainer && !filtersContainer.dataset.bound) {
+        filtersContainer.dataset.bound = "true"
+        filtersContainer.addEventListener("change", () => {
+            renderVistaGeneralTable()
+        })
+    }
+
+    await renderVistaGeneralTable()
+}
+
+function getSelectedOverviewTypes() {
+    return [...document.querySelectorAll('#overviewFilters input[type="checkbox"]:checked')].map((input) => input.value)
+}
+
+function parseParticipationNumber(value) {
+    const cleanValue = String(value || "")
+        .replace(/\s/g, "")
+        .replace(/\./g, "")
+        .replace(",", ".")
+
+    const parsedValue = parseFloat(cleanValue)
+    return Number.isNaN(parsedValue) ? 0 : parsedValue
+}
+
+function getSignedParticipation(row) {
+    const participaciones = parseParticipationNumber(row.participaciones)
+    const operationType = (row.tipoOperacion || "").trim().toLowerCase()
+
+    if (operationType.includes("venta")) {
+        return participaciones * -1
+    }
+
+    return participaciones
+}
+
+function buildOverviewRow(asset) {
+    const rows = Array.isArray(asset.rows) ? asset.rows : []
+    const participaciones = rows.reduce((total, row) => total + getSignedParticipation(row), 0)
+    const invertidoBruto = rows.reduce((total, row) => total + parseEuroNumber(row.capitalInvertidoBruto || ""), 0)
+    const comisiones = rows.reduce((total, row) => total + parseEuroNumber(row.comisiones || ""), 0)
+    const invertidoNeto = invertidoBruto - comisiones
+    const valorActual = parseEuroNumber(asset.price || "")
+    const netoActual = participaciones * valorActual
+    const promedioCompra = participaciones > 0 ? invertidoBruto / participaciones : 0
+    const rendimiento = netoActual - invertidoNeto
+
+    return {
+        nombre: asset.name || asset.symbol || "Activo",
+        tipo: buildAssetTypeLabel(asset.type),
+        assetType: asset.type,
+        participaciones,
+        promedioCompra,
+        valorActual,
+        invertidoBruto,
+        comisiones,
+        invertidoNeto,
+        netoActual,
+        rendimiento
+    }
+}
+
+function renderOverviewRows(rows) {
+    const tableBody = document.getElementById("overviewTableBody")
+    const emptyState = document.getElementById("overviewEmptyState")
+
+    if (!tableBody) {
+        return
+    }
+
+    tableBody.innerHTML = ""
+
+    if (!rows.length) {
+        if (emptyState) {
+            emptyState.classList.remove("hidden")
+        }
+        return
+    }
+
+    if (emptyState) {
+        emptyState.classList.add("hidden")
+    }
+
+    rows.forEach((row) => {
+        const tr = document.createElement("tr")
+        const profitClass = row.rendimiento >= 0 ? "overviewProfitPositive" : "overviewProfitNegative"
+
+        tr.innerHTML = `
+            <td>${row.nombre}</td>
+            <td>${row.tipo}</td>
+            <td class="overviewNumericCell">${normalizeNumberForEdit(row.participaciones.toFixed(6))}</td>
+            <td class="overviewNumericCell">${formatEuro(row.promedioCompra)}</td>
+            <td class="overviewNumericCell overviewCurrentPriceCell">${formatEuro(row.valorActual)}</td>
+            <td class="overviewNumericCell">${formatEuro(row.invertidoBruto)}</td>
+            <td class="overviewNumericCell">${formatEuro(row.comisiones)}</td>
+            <td class="overviewNumericCell">${formatEuro(row.invertidoNeto)}</td>
+            <td class="overviewNumericCell">${formatEuro(row.netoActual)}</td>
+            <td class="overviewNumericCell ${profitClass}">${formatEuro(row.rendimiento)}</td>
+        `
+
+        tableBody.appendChild(tr)
+    })
+}
+
+async function renderVistaGeneralTable() {
+    const tableBody = document.getElementById("overviewTableBody")
+
+    if (!tableBody) {
+        return
+    }
+
+    try {
+        const assets = await loadAssetsList()
+        const selectedTypes = new Set(getSelectedOverviewTypes())
+
+        if (!selectedTypes.size) {
+            renderOverviewRows([])
+            return
+        }
+
+        const fullAssets = await Promise.all(assets.map((asset) => loadAssetData(asset.id)))
+        const rows = fullAssets
+            .filter((asset) => selectedTypes.has(asset.type))
+            .map((asset) => buildOverviewRow(asset))
+
+        renderOverviewRows(rows)
+    } catch (error) {
+        console.error("Error cargando vista general:", error)
+    }
 }
 
 function renderAssetTablePage(asset) {
@@ -716,16 +982,25 @@ function initAssetTableLogic(asset) {
                     ? "Este activo tiene contenido guardado. ¿Quieres eliminarlo igualmente?"
                     : "¿Quieres eliminar este activo?",
                 confirmLabel: "Eliminar",
+                confirmSide: "right",
                 onConfirm: async () => {
-                    await deleteAssetOnServer(currentAssetId)
-                    currentAssetId = null
-                    const contentArea = document.getElementById("dynamicContent")
+                    openConfirmModal({
+                        title: "Segunda verificación",
+                        message: "Esta acción eliminará el activo de forma definitiva. ¿Confirmas que quieres borrarlo?",
+                        confirmLabel: "Eliminar",
+                        confirmSide: "left",
+                        onConfirm: async () => {
+                            await deleteAssetOnServer(currentAssetId)
+                            currentAssetId = null
+                            const contentArea = document.getElementById("dynamicContent")
 
-                    if (contentArea) {
-                        contentArea.innerHTML = `<div class="placeholderPage">Activo eliminado.</div>`
-                    }
+                            if (contentArea) {
+                                contentArea.innerHTML = `<div class="placeholderPage">Activo eliminado.</div>`
+                            }
 
-                    await refreshAssetsSidebar(null, false)
+                            await refreshAssetsSidebar(null, false)
+                        }
+                    })
                 }
             })
         })
@@ -759,19 +1034,21 @@ function closeAssetModal() {
     assetModalState = null
 }
 
-function openConfirmModal({ title = "Confirmar acción", message = "¿Seguro que quieres continuar?", confirmLabel = "Confirmar", onConfirm }) {
+function openConfirmModal({ title = "Confirmar acción", message = "¿Seguro que quieres continuar?", confirmLabel = "Confirmar", onConfirm, confirmSide = "left" }) {
     const confirmModalOverlay = document.getElementById("confirmModalOverlay")
     const confirmModalTitle = document.getElementById("confirmModalTitle")
     const confirmModalMessage = document.getElementById("confirmModalMessage")
     const confirmModalAcceptButton = document.getElementById("confirmModalAcceptBtn")
+    const confirmModalActions = document.querySelector(".confirmModalActions")
 
-    if (!confirmModalOverlay || !confirmModalTitle || !confirmModalMessage || !confirmModalAcceptButton) {
+    if (!confirmModalOverlay || !confirmModalTitle || !confirmModalMessage || !confirmModalAcceptButton || !confirmModalActions) {
         return
     }
 
     confirmModalTitle.textContent = title
     confirmModalMessage.textContent = message
     confirmModalAcceptButton.textContent = confirmLabel
+    confirmModalActions.classList.toggle("confirmPrimaryRight", confirmSide === "right")
     confirmModalOverlay.classList.remove("hidden")
     confirmModalState = { onConfirm }
 }
@@ -784,6 +1061,7 @@ function closeConfirmModal() {
     }
 
     confirmModalOverlay.classList.add("hidden")
+    document.querySelector(".confirmModalActions")?.classList.remove("confirmPrimaryRight")
     confirmModalState = null
 }
 

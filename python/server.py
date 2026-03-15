@@ -351,27 +351,40 @@ def deleteActivo(assetId):
 @app.route("/api/activos/reorder", methods=["POST"])
 def reorderActivos():
     requestData = request.get_json(silent=True) or {}
-    assetId = slugify(requestData.get("assetId", ""))
-    direction = str(requestData.get("direction", "")).strip().lower()
-
-    if not assetId:
-        return jsonify({"ok": False, "error": "assetId es obligatorio"}), 400
-
-    if direction not in {"up", "down"}:
-        return jsonify({"ok": False, "error": "direction inválida"}), 400
 
     assets = listAssets()
-    currentIndex = next((index for index, asset in enumerate(assets) if asset["id"] == assetId), None)
+    orderedAssetIds = requestData.get("orderedAssetIds")
 
-    if currentIndex is None:
-        return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+    if isinstance(orderedAssetIds, list):
+        normalizedIds = [slugify(assetId) for assetId in orderedAssetIds if str(assetId).strip()]
+        currentIds = [asset["id"] for asset in assets]
 
-    swapIndex = currentIndex - 1 if direction == "up" else currentIndex + 1
+        if sorted(normalizedIds) != sorted(currentIds):
+            return jsonify({"ok": False, "error": "orderedAssetIds no coincide con los activos actuales"}), 400
 
-    if swapIndex < 0 or swapIndex >= len(assets):
-        return jsonify({"ok": True, "moved": False})
+        assetById = {asset["id"]: asset for asset in assets}
+        assets = [assetById[assetId] for assetId in normalizedIds]
+    else:
+        assetId = slugify(requestData.get("assetId", ""))
+        direction = str(requestData.get("direction", "")).strip().lower()
 
-    assets[currentIndex], assets[swapIndex] = assets[swapIndex], assets[currentIndex]
+        if not assetId:
+            return jsonify({"ok": False, "error": "assetId es obligatorio"}), 400
+
+        if direction not in {"up", "down"}:
+            return jsonify({"ok": False, "error": "direction inválida"}), 400
+
+        currentIndex = next((index for index, asset in enumerate(assets) if asset["id"] == assetId), None)
+
+        if currentIndex is None:
+            return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+
+        swapIndex = currentIndex - 1 if direction == "up" else currentIndex + 1
+
+        if swapIndex < 0 or swapIndex >= len(assets):
+            return jsonify({"ok": True, "moved": False})
+
+        assets[currentIndex], assets[swapIndex] = assets[swapIndex], assets[currentIndex]
 
     for index, asset in enumerate(assets):
         assetData = readAssetFile(asset["id"])
