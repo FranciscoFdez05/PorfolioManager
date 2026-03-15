@@ -5,6 +5,7 @@ import json
 baseDir = Path(__file__).resolve().parent.parent
 dataDir = baseDir / "data"
 activosDir = dataDir / "activos"
+gastosDir = dataDir / "gastos"
 interesesFile = dataDir / "intereses.json"
 dividendosFile = dataDir / "dividendos.json"
 
@@ -12,6 +13,7 @@ dividendosFile = dataDir / "dividendos.json"
 def ensureDataFile():
     dataDir.mkdir(parents=True, exist_ok=True)
     activosDir.mkdir(parents=True, exist_ok=True)
+    gastosDir.mkdir(parents=True, exist_ok=True)
 
     if not interesesFile.exists():
         with interesesFile.open("w", encoding="utf-8") as file:

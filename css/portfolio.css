@@ -958,6 +958,254 @@ body{
     margin-right:18px;
 }
 
+/* ===== GASTOS ===== */
+
+.gastosPage{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    padding-right:18px;
+}
+
+.gastosYearBar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:8px 2px 2px 2px;
+    margin-bottom:4px;
+    width:100%;
+}
+
+.gastosYearActions{
+    display:flex;
+    align-items:center;
+    flex-direction:row;
+    gap:12px;
+    margin-left:auto;
+    flex:0 0 auto;
+}
+
+.gastosMonthBar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:8px;
+    width:100%;
+}
+
+.gastosYearList{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    flex:1 1 auto;
+}
+
+.gastosYearBtn,
+.gastosAddYearBtn,
+.gastosMonthTab{
+    min-width:92px;
+    height:44px;
+    padding:0 16px;
+    border:1px solid #466a9f;
+    border-radius:4px;
+    background:#132c55;
+    color:#ffffff;
+    cursor:pointer;
+    font-size:16px;
+    font-weight:700;
+}
+
+.gastosYearBtn.active,
+.gastosMonthTab.active{
+    background:#24529a;
+    border-color:#72a2ff;
+}
+
+.gastosYearBtn.yearViewActive{
+    box-shadow:inset 0 0 0 2px #9fd0ff;
+}
+
+.gastosAddYearBtn{
+    min-width:52px;
+    font-size:34px;
+    line-height:1;
+}
+
+.gastosAnnualWrapper,
+.gastosMovementsWrapper{
+    overflow:auto;
+    border:1px solid #2a4f86;
+    background:#10294f;
+    scrollbar-width:none;
+    padding-left:34px;
+}
+
+.gastosMovementsWrapper{
+    max-height:470px;
+    overflow-y:auto;
+    overflow-x:hidden;
+}
+
+.gastosAnnualWrapper::-webkit-scrollbar,
+.gastosMovementsWrapper::-webkit-scrollbar{
+    width:0;
+    height:0;
+}
+
+.gastosAnnualTable,
+.gastosMovementsTable{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+    background:#10294f;
+    color:#ffffff;
+}
+
+.gastosAnnualTable thead th,
+.gastosMovementsTable thead th{
+    padding:10px 12px;
+    background:#3f81bf;
+    color:#ffffff;
+    font-size:14px;
+    font-weight:700;
+    text-align:left;
+    border-right:1px solid rgba(255,255,255,0.15);
+    white-space:nowrap;
+}
+
+.gastosAnnualTable thead th{
+    padding:8px 10px;
+    font-size:13px;
+}
+
+.gastosAnnualTable tbody td,
+.gastosMovementsTable tbody td{
+    padding:8px 10px;
+    border-right:1px solid #2a4f86;
+    border-bottom:1px solid #2a4f86;
+    background:#cfd9e6;
+    color:#0c1930;
+    font-size:14px;
+}
+
+.gastosAnnualTable tbody td{
+    padding:6px 8px;
+    font-size:13px;
+}
+
+.gastosMovementsTable thead th{
+    padding:9px 12px;
+}
+
+.gastosMovementsTable tbody td{
+    padding:6px 10px;
+    height:38px;
+    vertical-align:middle;
+}
+
+.gastosAnnualTable tbody tr:nth-child(odd) td,
+.gastosMovementsTable tbody tr:nth-child(odd) td{
+    background:#c2cfdf;
+}
+
+.gastosAnnualTable tbody td[contenteditable="true"],
+.gastosMovementsTable tbody td[contenteditable="true"]{
+    outline:none;
+}
+
+.gastosAnnualTable tbody td[contenteditable="true"]:focus,
+.gastosMovementsTable tbody td[contenteditable="true"]:focus{
+    background:#dfe9f7;
+    box-shadow:inset 0 0 0 2px #2962ff;
+}
+
+.gastosTypeSelect{
+    width:100%;
+    height:26px;
+    border:none;
+    background:transparent;
+    color:#0c1930;
+    font-size:14px;
+    outline:none;
+    appearance:none;
+    cursor:pointer;
+    padding:0;
+    line-height:1.2;
+}
+
+.gastosMovementsTable{
+    width:100%;
+}
+
+.gastosMovementsTable td[contenteditable="true"]{
+    min-height:26px;
+    line-height:1.2;
+}
+
+.gastosSectionRow td{
+    background:#1672c2 !important;
+    color:#ffffff !important;
+    font-weight:700;
+}
+
+.gastosTotalRow td{
+    font-weight:700;
+}
+
+.gastosAnnualTable th:first-child,
+.gastosAnnualTable td:first-child{
+    width:0;
+}
+
+.gastosAnnualTable th:nth-child(2),
+.gastosAnnualTable td:nth-child(2){
+    width:114px;
+}
+
+.gastosMonthHeader{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+
+.gastosMonthTabs{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin:0;
+    flex:1 1 auto;
+    max-width:none;
+}
+
+.gastosMonthActions{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    flex:0 0 auto;
+}
+
+
+.gastosMonthTab{
+    min-width:auto;
+    height:38px;
+    font-size:14px;
+    font-weight:600;
+}
+
+.gastosMonthTitle{
+    color:#dce7f7;
+    font-size:18px;
+    font-weight:700;
+}
+
+.gastosActions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
 @media (max-width:1280px){
     .dividendosLayout{
         grid-template-columns:1fr;

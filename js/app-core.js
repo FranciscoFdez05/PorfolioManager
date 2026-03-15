@@ -78,6 +78,16 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
     }
 
     try {
+        if (typeof window.flushPendingPageChanges === "function") {
+            try {
+                await window.flushPendingPageChanges()
+            } catch (flushError) {
+                console.error("No se pudieron guardar los cambios pendientes antes de cambiar de página:", flushError)
+            } finally {
+                window.flushPendingPageChanges = null
+            }
+        }
+
         const response = await fetch(`./html/${page}.html`)
 
         if (!response.ok) {
@@ -93,6 +103,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initInteresesLogic()
         } else if (page === "dividendos") {
             await initDividendosLogic()
+        } else if (page === "gastos") {
+            await initGastosLogic()
         }
     } catch (error) {
         console.error(error)

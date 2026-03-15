@@ -1,0 +1,64 @@
+<section class="gastosPage">
+    <div class="gastosYearBar">
+        <div class="gastosYearList" id="gastosYearList"></div>
+        <div class="gastosYearActions">
+            <button id="deleteGastosYearBtn" class="dangerButton" type="button">Eliminar año</button>
+            <button id="addGastosYearBtn" class="gastosAddYearBtn" type="button">+</button>
+        </div>
+    </div>
+
+    <div class="gastosMonthBar">
+        <div class="gastosMonthTabs" id="gastosMonthTabs"></div>
+        <div class="gastosMonthActions">
+            <button id="addMensualidadRowBtn" class="primaryButton" type="button">Añadir mensualidad</button>
+        </div>
+    </div>
+
+    <div class="gastosAnnualWrapper" id="gastosAnnualWrapper">
+        <table class="gastosAnnualTable">
+            <thead>
+                <tr>
+                    <th class="rowActionHeader"></th>
+                    <th id="gastosAnnualYearLabel">2026</th>
+                    <th>Enero</th>
+                    <th>Febrero</th>
+                    <th>Marzo</th>
+                    <th>Abril</th>
+                    <th>Mayo</th>
+                    <th>Junio</th>
+                    <th>Julio</th>
+                    <th>Agosto</th>
+                    <th>Septiembre</th>
+                    <th>Octubre</th>
+                    <th>Noviembre</th>
+                    <th>Diciembre</th>
+                </tr>
+            </thead>
+            <tbody id="gastosAnnualBody"></tbody>
+        </table>
+    </div>
+
+    <div class="gastosMonthHeader" id="gastosMonthHeader">
+        <div class="gastosMonthTitle" id="gastosMonthTitle">Movimientos de Enero</div>
+    </div>
+
+    <div class="gastosMovementsWrapper hidden" id="gastosMovementsWrapper">
+        <table class="gastosMovementsTable">
+            <thead>
+                <tr>
+                    <th class="rowActionHeader"></th>
+                    <th>Fecha</th>
+                    <th>Nombre</th>
+                    <th>Tipo</th>
+                    <th>Cantidad</th>
+                </tr>
+            </thead>
+            <tbody id="gastosMovementsBody"></tbody>
+        </table>
+    </div>
+
+    <div class="gastosActions" id="gastosActions">
+        <button id="addGastoRowBtn" class="primaryButton" type="button">Añadir fila</button>
+        <button id="saveGastosBtn" class="secondaryButton" type="button">Guardar</button>
+    </div>
+</section>
