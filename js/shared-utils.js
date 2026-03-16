@@ -44,6 +44,65 @@ function formatDollar(value) {
     }).format(value) + " $"
 }
 
+function normalizeCurrencyCode(currency) {
+    const normalized = String(currency || "EUR").trim().toUpperCase()
+
+    if (["USD", "USDT", "USDC", "BUSD"].includes(normalized)) {
+        return "USD"
+    }
+
+    return normalized || "EUR"
+}
+
+function formatMoney(value, currency = "EUR") {
+    const normalizedCurrency = normalizeCurrencyCode(currency)
+    const formattedNumber = new Intl.NumberFormat("es-ES", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(value)
+
+    const suffixByCurrency = {
+        EUR: "€",
+        USD: "$",
+        GBP: "GBP",
+        CHF: "CHF",
+        JPY: "JPY",
+        SEK: "SEK"
+    }
+
+    return `${formattedNumber} ${suffixByCurrency[normalizedCurrency] || normalizedCurrency}`
+}
+
+function formatCellMoneyValue(value, currency = "EUR") {
+    const parsedValue = parseLooseNumber(value)
+
+    if (parsedValue === null || String(value).trim() === "") {
+        return ""
+    }
+
+    return formatMoney(parsedValue, currency)
+}
+
+function stripCurrencyText(value) {
+    return String(value ?? "")
+        .replace(/[€$]/g, "")
+        .replace(/\b(?:USD|EUR|GBP|CHF|JPY|SEK|USDT|USDC|BUSD)\b/gi, "")
+        .trim()
+}
+
+function getCurrentAssetCurrency() {
+    return document.querySelector(".assetTablePage")?.dataset.assetCurrency || "EUR"
+}
+
+function formatMoneySafe(value, currency = "EUR") {
+    const parsed = parseLooseNumber(value)
+    if (parsed === null) {
+        return ""
+    }
+
+    return formatMoney(parsed, currency)
+}
+
 function normalizeNumberForEdit(value) {
     return String(value).replace(".", ",")
 }
@@ -241,8 +300,7 @@ document.addEventListener("focusin", (event) => {
     const cell = event.target.closest('td[contenteditable="true"]')
     if (isAssetParticipationsCell(cell) || isAssetCommissionsCell(cell)) {
         queueMicrotask(() => {
-            const text = String(cell.textContent || "")
-            cell.textContent = text.replace(/[€$]/g, "").trim()
+            cell.textContent = stripCurrencyText(cell.textContent || "")
         })
         return
     }
@@ -250,8 +308,7 @@ document.addEventListener("focusin", (event) => {
     if (!isDividendosPerShareCell(cell)) {
         if (isDividendosActionsCell(cell) || isDividendosEuroCell(cell)) {
             queueMicrotask(() => {
-                const text = String(cell.textContent || "")
-                cell.textContent = text.replace(/[€$]/g, "").trim()
+                cell.textContent = stripCurrencyText(cell.textContent || "")
             })
         }
         return
@@ -267,8 +324,7 @@ document.addEventListener("focusout", (event) => {
     const cell = event.target.closest('td[contenteditable="true"]')
     if (isAssetParticipationsCell(cell)) {
         queueMicrotask(() => {
-            const text = String(cell.textContent || "")
-            cell.textContent = text.replace(/[€$]/g, "").trim()
+            cell.textContent = stripCurrencyText(cell.textContent || "")
         })
         return
     }
@@ -276,7 +332,7 @@ document.addEventListener("focusout", (event) => {
     if (isAssetCommissionsCell(cell)) {
         queueMicrotask(() => {
             const text = String(cell.textContent || "").trim()
-            cell.textContent = formatEuroSafe(text)
+            cell.textContent = formatMoneySafe(text, getCurrentAssetCurrency())
         })
         return
     }
@@ -284,8 +340,7 @@ document.addEventListener("focusout", (event) => {
     if (!isDividendosPerShareCell(cell)) {
         if (isDividendosActionsCell(cell)) {
             queueMicrotask(() => {
-                const text = String(cell.textContent || "")
-                cell.textContent = text.replace(/[€$]/g, "").trim()
+                cell.textContent = stripCurrencyText(cell.textContent || "")
             })
         } else if (isDividendosEuroCell(cell)) {
             queueMicrotask(() => {

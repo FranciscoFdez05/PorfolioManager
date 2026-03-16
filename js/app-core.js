@@ -9,14 +9,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const cancelAssetModalButton = document.getElementById("cancelAssetModalBtn")
     const assetNameInput = document.getElementById("assetNameInput")
     const assetTypeSelect = document.getElementById("assetTypeSelect")
+    const assetTickerInput = document.getElementById("assetTickerInput")
+    const searchAssetTickerButton = document.getElementById("searchAssetTickerBtn")
     const confirmModalOverlay = document.getElementById("confirmModalOverlay")
     const confirmModalAcceptButton = document.getElementById("confirmModalAcceptBtn")
     const confirmModalCancelButton = document.getElementById("confirmModalCancelBtn")
 
     initSidePanel(toggleButton, sideWrapper)
     initNavigation(navButtons, contentArea)
-    initAddAssetButton(addAssetButton, assetModalOverlay, assetNameInput, assetTypeSelect)
-    initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect)
+    initAddAssetButton(addAssetButton, assetModalOverlay, assetNameInput, assetTypeSelect, assetTickerInput)
+    initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect, assetTickerInput, searchAssetTickerButton)
     initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
     await refreshAssetsSidebar()
 

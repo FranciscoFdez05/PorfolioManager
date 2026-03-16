@@ -45,13 +45,13 @@ async function deleteAssetOnServer(assetId) {
     }
 }
 
-async function createAssetOnServer(name, type) {
+async function createAssetOnServer(name, type, finnhubSymbol = "") {
     const response = await fetch("/api/activos", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ name, type })
+        body: JSON.stringify({ name, type, finnhubSymbol })
     })
 
     if (!response.ok) {
@@ -60,6 +60,46 @@ async function createAssetOnServer(name, type) {
     }
 
     return await response.json()
+}
+
+async function refreshAssetMarketDataOnServer(assetId) {
+    const response = await fetch(`/api/activos/${assetId}/refresh-market-data`, {
+        method: "POST"
+    })
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
+}
+
+async function searchFinnhubSymbolOnServer(query) {
+    const response = await fetch(`/api/finnhub/search?q=${encodeURIComponent(query)}`)
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
+}
+
+function extractApiErrorMessage(error) {
+    const rawMessage = String(error?.message || "Error desconocido")
+    const jsonStart = rawMessage.indexOf("{")
+
+    if (jsonStart === -1) {
+        return rawMessage
+    }
+
+    try {
+        const payload = JSON.parse(rawMessage.slice(jsonStart))
+        return payload.error || rawMessage
+    } catch {
+        return rawMessage
+    }
 }
 
 async function saveAssetOrderOnServer(orderedAssetIds) {
@@ -82,6 +122,10 @@ async function saveAssetOrderOnServer(orderedAssetIds) {
 function updateAssetDetail(asset) {
     const detSymbol = document.getElementById("detSymbol")
     const detName = document.getElementById("detName")
+    const detPrice = document.getElementById("detPrice")
+    const detChange = document.getElementById("detChange")
+    const detStatus = document.getElementById("detStatus")
+    const detFinnhub = document.getElementById("detFinnhub")
 
     if (detSymbol) {
         detSymbol.textContent = asset.symbol || "---"
@@ -89,6 +133,24 @@ function updateAssetDetail(asset) {
 
     if (detName) {
         detName.textContent = asset.name || "Activo"
+    }
+
+    if (detPrice) {
+        detPrice.textContent = formatMoney(parseLooseNumber(asset.price || "0") || 0, asset.currency || "EUR")
+    }
+
+    if (detChange) {
+        const changeValue = String(asset.change || "---").trim()
+        detChange.textContent = `Cambio: ${changeValue}`
+        detChange.classList.toggle("negative", changeValue.startsWith("-"))
+    }
+
+    if (detStatus) {
+        detStatus.textContent = asset.status || "Sin datos de mercado"
+    }
+
+    if (detFinnhub) {
+        detFinnhub.textContent = `Ticker Finnhub: ${asset.finnhubSymbol || "---"}`
     }
 }
 
@@ -108,8 +170,11 @@ function renderAssetsList(assets) {
         button.dataset.assetOrder = String(asset.order ?? 0)
         button.draggable = true
         button.innerHTML = `
-            <span>${asset.symbol || asset.name}</span>
-            <span>${asset.price || "0,00"}</span>
+            <span class="assetBtnMain">
+                <span class="assetBtnSymbol">${asset.symbol || asset.name}</span>
+                <span class="assetBtnName">${asset.name || asset.symbol || "Activo"}</span>
+            </span>
+            <span class="assetBtnPrice">${formatMoney(parseLooseNumber(asset.price || "0") || 0, asset.currency || "EUR")}</span>
         `
         assetsList.appendChild(button)
     })
@@ -129,6 +194,10 @@ async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTabl
             currentAssetId = null
             const detSymbol = document.getElementById("detSymbol")
             const detName = document.getElementById("detName")
+            const detPrice = document.getElementById("detPrice")
+            const detChange = document.getElementById("detChange")
+            const detStatus = document.getElementById("detStatus")
+            const detFinnhub = document.getElementById("detFinnhub")
 
             if (detSymbol) {
                 detSymbol.textContent = "---"
@@ -136,6 +205,23 @@ async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTabl
 
             if (detName) {
                 detName.textContent = "Selecciona un activo"
+            }
+
+            if (detPrice) {
+                detPrice.textContent = "0,00 €"
+            }
+
+            if (detChange) {
+                detChange.textContent = "---"
+                detChange.classList.remove("negative")
+            }
+
+            if (detStatus) {
+                detStatus.textContent = "Sin datos de mercado"
+            }
+
+            if (detFinnhub) {
+                detFinnhub.textContent = "Ticker Finnhub: ---"
             }
 
             return
@@ -410,10 +496,10 @@ function getSignedParticipation(row) {
 function buildOverviewRow(asset) {
     const rows = Array.isArray(asset.rows) ? asset.rows : []
     const participaciones = rows.reduce((total, row) => total + getSignedParticipation(row), 0)
-    const invertidoBruto = rows.reduce((total, row) => total + parseEuroNumber(row.capitalInvertidoBruto || ""), 0)
-    const comisiones = rows.reduce((total, row) => total + parseEuroNumber(row.comisiones || ""), 0)
+    const invertidoBruto = rows.reduce((total, row) => total + (parseLooseNumber(row.capitalInvertidoBruto || "") || 0), 0)
+    const comisiones = rows.reduce((total, row) => total + (parseLooseNumber(row.comisiones || "") || 0), 0)
     const invertidoNeto = invertidoBruto - comisiones
-    const valorActual = parseEuroNumber(asset.price || "")
+    const valorActual = parseLooseNumber(asset.price || "") || 0
     const netoActual = participaciones * valorActual
     const promedioCompra = participaciones > 0 ? invertidoBruto / participaciones : 0
     const rendimiento = netoActual - invertidoNeto
@@ -425,6 +511,7 @@ function buildOverviewRow(asset) {
         participaciones,
         promedioCompra,
         valorActual,
+        currency: asset.currency || "EUR",
         invertidoBruto,
         comisiones,
         invertidoNeto,
@@ -462,13 +549,13 @@ function renderOverviewRows(rows) {
             <td>${row.nombre}</td>
             <td>${row.tipo}</td>
             <td class="overviewNumericCell">${normalizeNumberForEdit(row.participaciones.toFixed(6))}</td>
-            <td class="overviewNumericCell">${formatEuro(row.promedioCompra)}</td>
-            <td class="overviewNumericCell overviewCurrentPriceCell">${formatEuro(row.valorActual)}</td>
-            <td class="overviewNumericCell">${formatEuro(row.invertidoBruto)}</td>
-            <td class="overviewNumericCell">${formatEuro(row.comisiones)}</td>
-            <td class="overviewNumericCell">${formatEuro(row.invertidoNeto)}</td>
-            <td class="overviewNumericCell">${formatEuro(row.netoActual)}</td>
-            <td class="overviewNumericCell ${profitClass}">${formatEuro(row.rendimiento)}</td>
+            <td class="overviewNumericCell">${formatMoney(row.promedioCompra, row.currency)}</td>
+            <td class="overviewNumericCell overviewCurrentPriceCell">${formatMoney(row.valorActual, row.currency)}</td>
+            <td class="overviewNumericCell">${formatMoney(row.invertidoBruto, row.currency)}</td>
+            <td class="overviewNumericCell">${formatMoney(row.comisiones, row.currency)}</td>
+            <td class="overviewNumericCell">${formatMoney(row.invertidoNeto, row.currency)}</td>
+            <td class="overviewNumericCell">${formatMoney(row.netoActual, row.currency)}</td>
+            <td class="overviewNumericCell ${profitClass}">${formatMoney(row.rendimiento, row.currency)}</td>
         `
 
         tableBody.appendChild(tr)
@@ -510,11 +597,26 @@ function renderAssetTablePage(asset) {
     }
 
     contentArea.innerHTML = `
-        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "USD"}">
+        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "USD"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}">
             <div class="assetPageHeader">
                 <div>
                     <h1 class="assetPageTitle">${asset.symbol || asset.name}</h1>
                     <div class="assetPageSubtitle">${asset.name} · ${buildAssetTypeLabel(asset.type)}</div>
+                </div>
+                <div class="assetMarketPanel">
+                    <label class="assetModalLabel" for="assetFinnhubSymbolInput">Ticker Finnhub</label>
+                    <input id="assetFinnhubSymbolInput" class="assetModalInput assetInlineInput" type="text" value="${asset.finnhubSymbol || ""}" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
+                    <div class="assetSearchActions">
+                        <button id="searchCurrentAssetTickerBtn" class="secondaryButton" type="button">Buscar ticker</button>
+                    </div>
+                    <div id="currentAssetSearchFeedback" class="assetSearchFeedback hidden"></div>
+                    <div id="currentAssetSearchResults" class="assetSearchResults hidden"></div>
+                    <div class="assetQuoteSummary">
+                        <span>Precio: ${formatMoney(parseLooseNumber(asset.price || "0") || 0, asset.currency || "EUR")}</span>
+                        <span>Cambio: ${asset.change || "+0,00%"}</span>
+                        <span>Divisa: ${asset.currency || "EUR"}</span>
+                        <span>Estado: ${asset.status || "Sin actualizar"}</span>
+                    </div>
                 </div>
             </div>
 
@@ -537,6 +639,7 @@ function renderAssetTablePage(asset) {
             </div>
 
             <div class="assetActions">
+                <button id="refreshAssetMarketBtn" class="primaryButton">Actualizar cotización</button>
                 <button id="addAssetRowBtn" class="primaryButton">Añadir fila</button>
                 <button id="saveAssetBtn" class="secondaryButton">Guardar JSON</button>
                 <button id="deleteAssetBtn" class="dangerButton">Eliminar activo</button>
@@ -550,6 +653,8 @@ function renderAssetTablePage(asset) {
 
 function renderAssetRows(rows) {
     const assetOperationsBody = document.getElementById("assetOperationsBody")
+    const assetPage = document.querySelector(".assetTablePage")
+    const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
 
     if (!assetOperationsBody) {
         return
@@ -564,10 +669,10 @@ function renderAssetRows(rows) {
             <td contenteditable="true">${rowData.fechaOperacion || ""}</td>
             <td contenteditable="true">${rowData.tipoOperacion || "Compra"}</td>
             <td contenteditable="true">${rowData.participaciones || ""}</td>
-            <td contenteditable="true">${formatCellEuroValue(rowData.precioParticipacion)}</td>
-            <td contenteditable="true">${formatCellEuroValue(rowData.capitalInvertidoBruto)}</td>
-            <td contenteditable="true">${formatCellEuroValue(rowData.comisiones)}</td>
-            <td class="rowTotal">0,00 €</td>
+            <td contenteditable="true">${formatCellMoneyValue(rowData.precioParticipacion, assetCurrency)}</td>
+            <td contenteditable="true">${formatCellMoneyValue(rowData.capitalInvertidoBruto, assetCurrency)}</td>
+            <td contenteditable="true">${formatCellMoneyValue(rowData.comisiones, assetCurrency)}</td>
+            <td class="rowTotal">${formatMoney(0, assetCurrency)}</td>
         `
         assetOperationsBody.appendChild(rowElement)
     })
@@ -704,16 +809,18 @@ function handleRowDeleteClick(event) {
 
 function buildCurrentAssetPayload() {
     const assetPage = document.querySelector(".assetTablePage")
+    const finnhubSymbolInput = document.getElementById("assetFinnhubSymbolInput")
 
     return {
         id: currentAssetId,
         name: assetPage?.dataset.assetName || document.getElementById("detName")?.textContent.trim() || "Activo",
         symbol: assetPage?.dataset.assetSymbol || document.getElementById("detSymbol")?.textContent.trim() || "ACTIVO",
+        finnhubSymbol: (finnhubSymbolInput?.value || assetPage?.dataset.assetFinnhubSymbol || "").trim().toUpperCase(),
         type: assetPage?.dataset.assetType || "cripto",
         price: assetPage?.dataset.assetPrice || "0,00",
         currency: assetPage?.dataset.assetCurrency || "USD",
-        change: "+0,00%",
-        status: "Mercado abierto",
+        change: assetPage?.dataset.assetChange || "+0,00%",
+        status: assetPage?.dataset.assetStatus || "Mercado abierto",
         order: Number(document.querySelector(`.assetBtn[data-asset-id="${currentAssetId}"]`)?.dataset.assetOrder || 0),
         rows: collectAssetRowsFromTable()
     }
@@ -721,21 +828,128 @@ function buildCurrentAssetPayload() {
 
 function updateAssetTableTotals() {
     const rowElements = document.querySelectorAll("#assetOperationsBody tr")
+    const assetCurrency = document.querySelector(".assetTablePage")?.dataset.assetCurrency || "EUR"
 
     rowElements.forEach((rowElement) => {
         const cells = rowElement.querySelectorAll("td")
-        const bruto = parseEuroNumber(cells[5]?.textContent || "")
-        const comisiones = parseEuroNumber(cells[6]?.textContent || "")
+        const bruto = parseLooseNumber(cells[5]?.textContent || "") || 0
+        const comisiones = parseLooseNumber(cells[6]?.textContent || "") || 0
         const neto = bruto - comisiones
 
         if (cells[7]) {
-            cells[7].textContent = formatEuro(neto)
+            cells[7].textContent = formatMoney(neto, assetCurrency)
         }
     })
 }
 
+function setAssetSearchFeedback(container, message = "", isError = false) {
+    if (!container) {
+        return
+    }
+
+    if (!message) {
+        container.textContent = ""
+        container.classList.add("hidden")
+        container.classList.remove("assetSearchError")
+        return
+    }
+
+    container.textContent = message
+    container.classList.remove("hidden")
+    container.classList.toggle("assetSearchError", isError)
+}
+
+function renderFinnhubSearchResults(container, results, onSelect) {
+    if (!container) {
+        return
+    }
+
+    container.innerHTML = ""
+
+    if (!Array.isArray(results) || !results.length) {
+        container.classList.add("hidden")
+        return
+    }
+
+    results.forEach((result) => {
+        const button = document.createElement("button")
+        button.type = "button"
+        button.className = "assetSearchResultBtn"
+        button.innerHTML = `
+            <span class="assetSearchResultTitle">${result.symbol}</span>
+            <span class="assetSearchResultSubtitle">${result.description}</span>
+            <span class="assetSearchResultMeta">${result.type || "market"}</span>
+        `
+        button.addEventListener("click", () => {
+            onSelect(result)
+        })
+        container.appendChild(button)
+    })
+
+    container.classList.remove("hidden")
+}
+
+async function handleFinnhubSearch({ query, feedbackElement, resultsElement, onSelect }) {
+    const normalizedQuery = String(query || "").trim()
+
+    if (!normalizedQuery) {
+        setAssetSearchFeedback(feedbackElement, "Escribe el nombre o ticker del activo.", true)
+        renderFinnhubSearchResults(resultsElement, [], onSelect)
+        return
+    }
+
+    setAssetSearchFeedback(feedbackElement, "Buscando en Finnhub...")
+
+    try {
+        const response = await searchFinnhubSymbolOnServer(normalizedQuery)
+        const results = Array.isArray(response.results) ? response.results : []
+
+        if (!results.length) {
+            setAssetSearchFeedback(feedbackElement, "No se encontraron resultados para esa búsqueda.", true)
+            renderFinnhubSearchResults(resultsElement, [], onSelect)
+            return
+        }
+
+        setAssetSearchFeedback(feedbackElement, "Selecciona el ticker correcto.")
+        renderFinnhubSearchResults(resultsElement, results, onSelect)
+    } catch (error) {
+        console.error(error)
+        setAssetSearchFeedback(feedbackElement, "No se pudo consultar Finnhub. Revisa la API key.", true)
+        renderFinnhubSearchResults(resultsElement, [], onSelect)
+    }
+}
+
+async function refreshCurrentAssetMarketData({ feedbackElement = null, successMessage = "" } = {}) {
+    if (!currentAssetId) {
+        return
+    }
+
+    try {
+        const payload = buildCurrentAssetPayload()
+        await saveAssetDataToServer(payload)
+        const response = await refreshAssetMarketDataOnServer(currentAssetId)
+        updateAssetDetail(response.asset)
+        renderAssetTablePage(response.asset)
+        await refreshAssetsSidebar(currentAssetId, false)
+
+        if (feedbackElement && successMessage) {
+            setAssetSearchFeedback(feedbackElement, successMessage)
+        }
+    } catch (error) {
+        console.error(error)
+        const errorMessage = extractApiErrorMessage(error)
+
+        if (feedbackElement) {
+            setAssetSearchFeedback(feedbackElement, errorMessage, true)
+        } else {
+            alert(errorMessage)
+        }
+    }
+}
+
 function addNewAssetRow() {
     const assetOperationsBody = document.getElementById("assetOperationsBody")
+    const assetCurrency = document.querySelector(".assetTablePage")?.dataset.assetCurrency || "EUR"
 
     if (!assetOperationsBody) {
         return
@@ -750,7 +964,7 @@ function addNewAssetRow() {
         <td contenteditable="true"></td>
         <td contenteditable="true"></td>
         <td contenteditable="true"></td>
-        <td class="rowTotal">0,00 €</td>
+        <td class="rowTotal">${formatMoney(0, assetCurrency)}</td>
     `
 
     assetOperationsBody.appendChild(rowElement)
@@ -779,8 +993,13 @@ function initAssetTableLogic(asset) {
 
     const assetOperationsBody = document.getElementById("assetOperationsBody")
     const addAssetRowButton = document.getElementById("addAssetRowBtn")
+    const refreshAssetMarketButton = document.getElementById("refreshAssetMarketBtn")
     const saveAssetButton = document.getElementById("saveAssetBtn")
     const deleteAssetButton = document.getElementById("deleteAssetBtn")
+    const assetFinnhubSymbolInput = document.getElementById("assetFinnhubSymbolInput")
+    const searchCurrentAssetTickerButton = document.getElementById("searchCurrentAssetTickerBtn")
+    const currentAssetSearchFeedback = document.getElementById("currentAssetSearchFeedback")
+    const currentAssetSearchResults = document.getElementById("currentAssetSearchResults")
 
     if (assetOperationsBody) {
         assetOperationsBody.addEventListener("input", () => {
@@ -796,10 +1015,49 @@ function initAssetTableLogic(asset) {
         }, true)
     }
 
+    if (assetFinnhubSymbolInput) {
+        assetFinnhubSymbolInput.addEventListener("input", () => {
+            scheduleAssetAutosave()
+        })
+
+        assetFinnhubSymbolInput.addEventListener("blur", async () => {
+            assetFinnhubSymbolInput.value = assetFinnhubSymbolInput.value.trim().toUpperCase()
+            scheduleAssetAutosave()
+        })
+    }
+
     if (addAssetRowButton) {
         addAssetRowButton.addEventListener("click", () => {
             addNewAssetRow()
             scheduleAssetAutosave()
+        })
+    }
+
+    if (refreshAssetMarketButton) {
+        refreshAssetMarketButton.addEventListener("click", async () => {
+            await refreshCurrentAssetMarketData()
+        })
+    }
+
+    if (searchCurrentAssetTickerButton) {
+        searchCurrentAssetTickerButton.addEventListener("click", async () => {
+            await handleFinnhubSearch({
+                query: assetFinnhubSymbolInput?.value || asset.name || asset.symbol || "",
+                feedbackElement: currentAssetSearchFeedback,
+                resultsElement: currentAssetSearchResults,
+                onSelect: (result) => {
+                    if (assetFinnhubSymbolInput) {
+                        assetFinnhubSymbolInput.value = result.symbol
+                    }
+
+                    setAssetSearchFeedback(currentAssetSearchFeedback, `Ticker seleccionado: ${result.symbol}. Actualizando cotización...`)
+                    renderFinnhubSearchResults(currentAssetSearchResults, [], () => {})
+                    refreshCurrentAssetMarketData({
+                        feedbackElement: currentAssetSearchFeedback,
+                        successMessage: `Cotización actualizada con ${result.symbol}.`
+                    })
+                }
+            })
         })
     }
 
@@ -858,13 +1116,19 @@ function openAssetModal() {
     const assetModalOverlay = document.getElementById("assetModalOverlay")
     const assetNameInput = document.getElementById("assetNameInput")
     const assetTypeSelect = document.getElementById("assetTypeSelect")
+    const assetTickerInput = document.getElementById("assetTickerInput")
+    const assetSearchFeedback = document.getElementById("assetSearchFeedback")
+    const assetSearchResults = document.getElementById("assetSearchResults")
 
-    if (!assetModalOverlay || !assetNameInput || !assetTypeSelect) {
+    if (!assetModalOverlay || !assetNameInput || !assetTypeSelect || !assetTickerInput || !assetSearchFeedback || !assetSearchResults) {
         return
     }
 
     assetNameInput.value = ""
     assetTypeSelect.value = "cripto"
+    assetTickerInput.value = ""
+    setAssetSearchFeedback(assetSearchFeedback, "")
+    renderFinnhubSearchResults(assetSearchResults, [], () => {})
     assetModalOverlay.classList.remove("hidden")
     assetModalState = { isOpen: true }
     assetNameInput.focus()
@@ -942,13 +1206,15 @@ function initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirm
 async function submitAssetModal() {
     const assetNameInput = document.getElementById("assetNameInput")
     const assetTypeSelect = document.getElementById("assetTypeSelect")
+    const assetTickerInput = document.getElementById("assetTickerInput")
 
-    if (!assetNameInput || !assetTypeSelect) {
+    if (!assetNameInput || !assetTypeSelect || !assetTickerInput) {
         return
     }
 
     const name = assetNameInput.value.trim()
     const type = assetTypeSelect.value.trim()
+    const finnhubSymbol = assetTickerInput.value.trim().toUpperCase()
 
     if (!name) {
         assetNameInput.focus()
@@ -956,7 +1222,7 @@ async function submitAssetModal() {
     }
 
     try {
-        const response = await createAssetOnServer(name, type)
+        const response = await createAssetOnServer(name, type, finnhubSymbol)
         const createdAsset = response.asset
         closeAssetModal()
         currentAssetId = createdAsset.id
@@ -977,7 +1243,10 @@ function initAddAssetButton(addAssetButton) {
     })
 }
 
-function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect) {
+function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect, assetTickerInput, searchAssetTickerButton) {
+    const assetSearchFeedback = document.getElementById("assetSearchFeedback")
+    const assetSearchResults = document.getElementById("assetSearchResults")
+
     if (confirmAssetModalButton) {
         confirmAssetModalButton.addEventListener("click", async () => {
             await submitAssetModal()
@@ -1013,6 +1282,37 @@ function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetM
                 event.preventDefault()
                 await submitAssetModal()
             }
+        })
+    }
+
+    if (assetTickerInput) {
+        assetTickerInput.addEventListener("keydown", async (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault()
+                await submitAssetModal()
+            }
+        })
+    }
+
+    if (searchAssetTickerButton) {
+        searchAssetTickerButton.addEventListener("click", async () => {
+            await handleFinnhubSearch({
+                query: assetTickerInput?.value || assetNameInput?.value || "",
+                feedbackElement: assetSearchFeedback,
+                resultsElement: assetSearchResults,
+                onSelect: (result) => {
+                    if (assetTickerInput) {
+                        assetTickerInput.value = result.symbol
+                    }
+
+                    if (assetNameInput && !assetNameInput.value.trim()) {
+                        assetNameInput.value = result.description
+                    }
+
+                    setAssetSearchFeedback(assetSearchFeedback, `Ticker seleccionado: ${result.symbol}`)
+                    renderFinnhubSearchResults(assetSearchResults, [], () => {})
+                }
+            })
         })
     }
 

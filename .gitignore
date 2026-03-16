@@ -2,6 +2,8 @@
 # DATA (mantener carpeta, ignorar contenido)
 # =========================
 data/*
+data/activos/*
+data/gastos/*
 !data/.gitkeep
 
 # =========================
@@ -25,6 +27,12 @@ __pycache__/
 # =========================
 .env*
 venv/
+
+
+
+
+API/*.key
+!API/.gitkeep
 
 # =========================
 # TEMPORALES

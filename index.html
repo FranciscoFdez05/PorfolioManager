@@ -123,6 +123,10 @@
             <div class="assetDetailView">
                 <div class="detailHeader" id="detSymbol">---</div>
                 <div class="detailSub" id="detName">Selecciona un activo</div>
+                <div class="detailPrice" id="detPrice">0,00 €</div>
+                <div class="detailChange" id="detChange">---</div>
+                <div class="detailMeta" id="detStatus">Sin datos de mercado</div>
+                <div class="detailMeta" id="detFinnhub">Ticker Finnhub: ---</div>
             </div>
         </aside>
     </div>
@@ -143,6 +147,14 @@
             <option value="etfs">ETFs</option>
             <option value="comoditis">Comoditis</option>
         </select>
+
+        <label class="assetModalLabel" for="assetTickerInput">Ticker Finnhub</label>
+        <input id="assetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
+        <div class="assetSearchActions">
+            <button id="searchAssetTickerBtn" class="secondaryButton" type="button">Buscar ticker</button>
+        </div>
+        <div id="assetSearchFeedback" class="assetSearchFeedback hidden"></div>
+        <div id="assetSearchResults" class="assetSearchResults hidden"></div>
 
         <div class="assetModalActions">
             <button id="confirmAssetModalBtn" class="primaryButton">Confirmar</button>

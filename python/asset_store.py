@@ -41,6 +41,7 @@ def listAssets():
             "id": data.get("id", assetFile.stem),
             "name": data.get("name", assetFile.stem),
             "symbol": data.get("symbol", assetFile.stem.upper()),
+            "finnhubSymbol": data.get("finnhubSymbol", ""),
             "type": data.get("type", ""),
             "order": data.get("order", index),
             "price": data.get("price", "0,00"),

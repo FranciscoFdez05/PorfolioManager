@@ -6,14 +6,17 @@ baseDir = Path(__file__).resolve().parent.parent
 dataDir = baseDir / "data"
 activosDir = dataDir / "activos"
 gastosDir = dataDir / "gastos"
+apiDir = baseDir / "API"
 interesesFile = dataDir / "intereses.json"
 dividendosFile = dataDir / "dividendos.json"
+finnhubKeyFile = apiDir / "finnhub.key"
 
 
 def ensureDataFile():
     dataDir.mkdir(parents=True, exist_ok=True)
     activosDir.mkdir(parents=True, exist_ok=True)
     gastosDir.mkdir(parents=True, exist_ok=True)
+    apiDir.mkdir(parents=True, exist_ok=True)
 
     if not interesesFile.exists():
         with interesesFile.open("w", encoding="utf-8") as file:
@@ -50,3 +53,19 @@ def writeDividendosFile(data):
 
     with dividendosFile.open("w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
+
+
+def readFinnhubApiKey():
+    ensureDataFile()
+
+    if not finnhubKeyFile.exists():
+        return None
+
+    with finnhubKeyFile.open("r", encoding="utf-8") as file:
+        for line in file:
+            apiKey = line.strip()
+
+            if apiKey and not apiKey.startswith("#"):
+                return apiKey
+
+    return None

@@ -283,11 +283,44 @@ body{
     background:#10224d;
 }
 
+.assetBtnMain{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    min-width:0;
+}
+
+.assetBtnSymbol{
+    font-size:14px;
+    font-weight:700;
+    color:#ffffff;
+}
+
+.assetBtnName{
+    font-size:12px;
+    color:#a9bddc;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:150px;
+}
+
+.assetBtnPrice{
+    margin-left:12px;
+    font-size:14px;
+    font-weight:700;
+    color:#ffffff;
+    white-space:nowrap;
+    text-align:right;
+}
+
 .assetDetailView{
     padding:24px 20px;
     display:flex;
     flex-direction:column;
     gap:8px;
+    border-top:1px solid #16325b;
+    background:linear-gradient(180deg, #07172d 0%, #0a1b34 100%);
 }
 
 .detailHeader{
@@ -300,7 +333,7 @@ body{
     font-size:14px;
     color:#d3def1;
     line-height:1.4;
-    margin-bottom:10px;
+    margin-bottom:2px;
 }
 
 .detailPrice{
@@ -317,6 +350,16 @@ body{
 .detailChange{
     font-size:15px;
     color:#26d07c;
+}
+
+.detailChange.negative{
+    color:#ff8f98;
+}
+
+.detailMeta{
+    font-size:13px;
+    line-height:1.4;
+    color:#b7c9e6;
 }
 
 .assetTablePage{
@@ -345,6 +388,86 @@ body{
     color:#a9bddc;
     font-size:14px;
     text-transform:capitalize;
+}
+
+.assetMarketPanel{
+    min-width:min(360px, 100%);
+    max-width:420px;
+}
+
+.assetInlineInput{
+    margin-bottom:10px;
+}
+
+.assetQuoteSummary{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    color:#d7e3f6;
+    font-size:14px;
+}
+
+.assetSearchActions{
+    display:flex;
+    gap:10px;
+    margin:-4px 0 10px 0;
+}
+
+.assetSearchFeedback{
+    margin:0 0 10px 0;
+    color:#cfe1ff;
+    font-size:13px;
+}
+
+.assetSearchFeedback.assetSearchError{
+    color:#ffb1b7;
+}
+
+.assetSearchResults{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:12px;
+    max-height:220px;
+    overflow:auto;
+}
+
+.assetSearchResultBtn{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:3px;
+    width:100%;
+    padding:10px 12px;
+    border:1px solid #355b92;
+    border-radius:6px;
+    background:#0d213f;
+    color:#ffffff;
+    cursor:pointer;
+    text-align:left;
+}
+
+.assetSearchResultBtn:hover{
+    background:#14305a;
+}
+
+.assetSearchResultTitle{
+    font-size:14px;
+    font-weight:700;
+}
+
+.assetSearchResultSubtitle{
+    color:#b8cbe7;
+    font-size:12px;
+    line-height:1.35;
+}
+
+.assetSearchResultMeta{
+    color:#7fb0ff;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.4px;
 }
 
 .assetTableWrapper{

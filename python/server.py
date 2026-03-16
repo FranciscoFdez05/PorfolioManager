@@ -1,8 +1,9 @@
 from flask import Flask, jsonify, request, send_from_directory
 
-from app_data import baseDir, ensureDataFile, readDividendosFile, readInteresesFile, writeDividendosFile, writeInteresesFile
+from app_data import baseDir, ensureDataFile, readDividendosFile, readFinnhubApiKey, readInteresesFile, writeDividendosFile, writeInteresesFile
 from asset_store import getAssetFile, listAssets, readAssetFile, writeAssetFile
 from asset_utils import createDefaultAssetPayload, sanitizeAssetPayload, sanitizeAssetType, slugify
+from finnhub_client import fetch_quote, search_symbol
 from gastos_store import create_default_gastos_year, delete_gastos_year, list_gastos_years, normalize_year, read_gastos_year, sanitize_gastos_payload, write_gastos_year
 
 app = Flask(
@@ -178,6 +179,7 @@ def createActivo():
     requestData = request.get_json(silent=True) or {}
     assetName = str(requestData.get("name", "")).strip()
     assetType = sanitizeAssetType(requestData.get("type", ""))
+    finnhubSymbol = str(requestData.get("finnhubSymbol", "")).strip().upper()
 
     if not assetName:
         return jsonify({"ok": False, "error": "El nombre del activo es obligatorio"}), 400
@@ -192,6 +194,7 @@ def createActivo():
         return jsonify({"ok": False, "error": "Ya existe un activo con ese nombre"}), 409
 
     payload = createDefaultAssetPayload(assetName, assetType, assetId)
+    payload["finnhubSymbol"] = finnhubSymbol
     payload["order"] = len(listAssets())
     writeAssetFile(assetId, payload)
 
@@ -218,6 +221,48 @@ def saveActivo(assetId):
 
     writeAssetFile(assetId, payload)
     return jsonify({"ok": True})
+
+
+@app.route("/api/activos/<assetId>/refresh-market-data", methods=["POST"])
+def refreshActivoMarketData(assetId):
+    assetData = readAssetFile(assetId)
+
+    if assetData is None:
+        return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+
+    finnhubSymbol = str(assetData.get("finnhubSymbol", "")).strip().upper()
+
+    if not finnhubSymbol:
+        return jsonify({"ok": False, "error": "El activo no tiene ticker de Finnhub configurado"}), 400
+
+    apiKey = readFinnhubApiKey()
+    quote, error = fetch_quote(finnhubSymbol, apiKey)
+
+    if error:
+        statusCode = 503 if "API key" in error or "conectar" in error else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    assetData["finnhubSymbol"] = quote["symbol"]
+    assetData["price"] = quote["price"]
+    assetData["currency"] = quote["currency"]
+    assetData["change"] = quote["change"]
+    assetData["status"] = quote["status"]
+    writeAssetFile(assetId, assetData)
+
+    return jsonify({"ok": True, "asset": assetData, "marketData": quote["marketData"]})
+
+
+@app.route("/api/finnhub/search", methods=["GET"])
+def searchFinnhubSymbol():
+    query = str(request.args.get("q", "")).strip()
+    apiKey = readFinnhubApiKey()
+    results, error = search_symbol(query, apiKey)
+
+    if error:
+        statusCode = 503 if "API key" in error or "conectar" in error else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    return jsonify({"ok": True, "results": results})
 
 
 @app.route("/api/activos/<assetId>", methods=["DELETE"])
