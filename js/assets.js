@@ -175,8 +175,15 @@ function updateAssetDetail(asset) {
     const detName = document.getElementById("detName")
     const detPrice = document.getElementById("detPrice")
     const detChange = document.getElementById("detChange")
+    const detType = document.getElementById("detType")
+    const detPosition = document.getElementById("detPosition")
+    const detInvested = document.getElementById("detInvested")
+    const detPnL = document.getElementById("detPnL")
+    const detAvgPrice = document.getElementById("detAvgPrice")
+    const detFees = document.getElementById("detFees")
     const detStatus = document.getElementById("detStatus")
     const detFinnhub = document.getElementById("detFinnhub")
+    const summary = buildOverviewRow(asset)
 
     if (detSymbol) {
         detSymbol.textContent = asset.symbol || "---"
@@ -194,6 +201,31 @@ function updateAssetDetail(asset) {
         const changeValue = String(asset.change || "---").trim()
         detChange.textContent = `Cambio: ${changeValue}`
         detChange.classList.toggle("negative", changeValue.startsWith("-"))
+    }
+
+    if (detType) {
+        detType.textContent = buildAssetTypeLabel(asset.type)
+    }
+
+    if (detPosition) {
+        detPosition.textContent = formatAssetParticipationValue(summary.participaciones, asset.type)
+    }
+
+    if (detInvested) {
+        detInvested.textContent = formatMoney(summary.invertidoNeto, summary.currency)
+    }
+
+    if (detPnL) {
+        detPnL.textContent = formatMoney(summary.rendimiento, summary.currency)
+        detPnL.classList.toggle("negative", summary.rendimiento < 0)
+    }
+
+    if (detAvgPrice) {
+        detAvgPrice.textContent = formatMoney(summary.promedioCompra, summary.currency)
+    }
+
+    if (detFees) {
+        detFees.textContent = formatMoney(summary.comisiones, summary.currency)
     }
 
     if (detStatus) {
@@ -247,6 +279,12 @@ async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTabl
             const detName = document.getElementById("detName")
             const detPrice = document.getElementById("detPrice")
             const detChange = document.getElementById("detChange")
+            const detType = document.getElementById("detType")
+            const detPosition = document.getElementById("detPosition")
+            const detInvested = document.getElementById("detInvested")
+            const detPnL = document.getElementById("detPnL")
+            const detAvgPrice = document.getElementById("detAvgPrice")
+            const detFees = document.getElementById("detFees")
             const detStatus = document.getElementById("detStatus")
             const detFinnhub = document.getElementById("detFinnhub")
 
@@ -265,6 +303,31 @@ async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTabl
             if (detChange) {
                 detChange.textContent = "---"
                 detChange.classList.remove("negative")
+            }
+
+            if (detType) {
+                detType.textContent = "---"
+            }
+
+            if (detPosition) {
+                detPosition.textContent = "0"
+            }
+
+            if (detInvested) {
+                detInvested.textContent = "0,00 €"
+            }
+
+            if (detPnL) {
+                detPnL.textContent = "0,00 €"
+                detPnL.classList.remove("negative")
+            }
+
+            if (detAvgPrice) {
+                detAvgPrice.textContent = "0,00 €"
+            }
+
+            if (detFees) {
+                detFees.textContent = "0,00 €"
             }
 
             if (detStatus) {
@@ -425,6 +488,13 @@ function buildAssetTypeLabel(assetType) {
     }
 
     return labels[assetType] || assetType
+}
+
+function createAssetSymbolFromName(name) {
+    return String(name || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
+        .slice(0, 10) || "ACTIVO"
 }
 
 function formatPercent(value) {
@@ -648,7 +718,7 @@ function renderOverviewRows(rows) {
         tr.innerHTML = `
             <td>${row.nombre}</td>
             <td>${row.tipo}</td>
-            <td class="overviewNumericCell">${normalizeNumberForEdit(row.participaciones.toFixed(6))}</td>
+            <td class="overviewNumericCell">${formatAssetParticipationValue(row.participaciones, row.assetType)}</td>
             <td class="overviewNumericCell">${formatMoney(row.promedioCompra, row.currency)}</td>
             <td class="overviewNumericCell overviewCurrentPriceCell">${formatMoney(row.valorActual, row.currency)}</td>
             <td class="overviewNumericCell">${formatMoney(row.invertidoBruto, row.currency)}</td>
@@ -702,7 +772,10 @@ function renderAssetTablePage(asset) {
         <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}">
             <div class="assetPageHeader">
                 <div>
-                    <h1 class="assetPageTitle">${asset.symbol || asset.name}</h1>
+                    <div class="assetTitleRow">
+                        <h1 class="assetPageTitle">${asset.symbol || asset.name}</h1>
+                        <button id="editAssetNameBtn" class="assetEditNameBtn" type="button" title="Editar nombre del activo" aria-label="Editar nombre del activo">✎</button>
+                    </div>
                     <div class="assetPageSubtitle">${asset.name} · ${buildAssetTypeLabel(asset.type)}</div>
                 </div>
                 <div class="assetCurrencyPanel">
@@ -762,7 +835,7 @@ function renderAssetRows(rows) {
             <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
             <td contenteditable="true">${rowData.fechaOperacion || ""}</td>
             <td contenteditable="true">${rowData.tipoOperacion || "Compra"}</td>
-            <td contenteditable="true">${rowData.participaciones || ""}</td>
+            <td contenteditable="true">${formatAssetParticipationValue(rowData.participaciones, assetPage?.dataset.assetType || "acciones")}</td>
             <td contenteditable="true">${formatCellMoneyValue(rowData.precioParticipacion, assetCurrency)}</td>
             <td contenteditable="true">${formatCellMoneyValue(rowData.capitalInvertidoBruto, assetCurrency)}</td>
             <td contenteditable="true">${formatCellMoneyValue(rowData.comisiones, assetCurrency)}</td>
@@ -1054,6 +1127,87 @@ async function refreshCurrentAssetMarketData({ feedbackElement = null, successMe
     }
 }
 
+async function renameCurrentAsset() {
+    openEditAssetModal()
+}
+
+function openEditAssetModal() {
+    if (!currentAssetId) {
+        return
+    }
+
+    const editAssetModalOverlay = document.getElementById("editAssetModalOverlay")
+    const editAssetNameInput = document.getElementById("editAssetNameInput")
+    const assetPage = document.querySelector(".assetTablePage")
+    const currentName = assetPage?.dataset.assetName || document.getElementById("detName")?.textContent.trim() || ""
+
+    if (!editAssetModalOverlay || !editAssetNameInput) {
+        return
+    }
+
+    editAssetNameInput.value = currentName
+    editAssetModalOverlay.classList.remove("hidden")
+    editAssetModalState = { isOpen: true }
+
+    requestAnimationFrame(() => {
+        editAssetNameInput.focus()
+        editAssetNameInput.select()
+    })
+}
+
+function closeEditAssetModal() {
+    const editAssetModalOverlay = document.getElementById("editAssetModalOverlay")
+
+    if (!editAssetModalOverlay) {
+        return
+    }
+
+    editAssetModalOverlay.classList.add("hidden")
+    editAssetModalState = null
+}
+
+async function submitEditAssetModal() {
+    if (!currentAssetId) {
+        return
+    }
+
+    const editAssetNameInput = document.getElementById("editAssetNameInput")
+
+    if (!editAssetNameInput) {
+        return
+    }
+
+    const payload = buildCurrentAssetPayload()
+    const currentName = String(payload.name || "").trim()
+    const trimmedName = editAssetNameInput.value.trim()
+
+    if (!trimmedName) {
+        editAssetNameInput.focus()
+        return
+    }
+
+    if (trimmedName === currentName) {
+        closeEditAssetModal()
+        return
+    }
+
+    const currentSymbol = String(payload.symbol || "").trim()
+    const generatedCurrentSymbol = createAssetSymbolFromName(currentName)
+
+    payload.name = trimmedName
+
+    if (!currentSymbol || currentSymbol === generatedCurrentSymbol) {
+        payload.symbol = createAssetSymbolFromName(trimmedName)
+    }
+
+    await saveAssetDataToServer(payload)
+    closeEditAssetModal()
+    const updatedAsset = await loadAssetData(currentAssetId)
+    updateAssetDetail(updatedAsset)
+    renderAssetTablePage(updatedAsset)
+    await refreshAssetsSidebar(currentAssetId, false)
+}
+
 function addNewAssetRow() {
     const assetOperationsBody = document.getElementById("assetOperationsBody")
     const assetCurrency = document.querySelector(".assetTablePage")?.dataset.assetCurrency || "EUR"
@@ -1102,6 +1256,7 @@ function initAssetTableLogic(asset) {
     const addAssetRowButton = document.getElementById("addAssetRowBtn")
     const refreshAssetMarketButton = document.getElementById("refreshAssetMarketBtn")
     const toggleAssetCurrencyButton = document.getElementById("toggleAssetCurrencyBtn")
+    const editAssetNameButton = document.getElementById("editAssetNameBtn")
     const saveAssetButton = document.getElementById("saveAssetBtn")
     const deleteAssetButton = document.getElementById("deleteAssetBtn")
 
@@ -1155,6 +1310,17 @@ function initAssetTableLogic(asset) {
                 alert(extractApiErrorMessage(error))
                 toggleAssetCurrencyButton.disabled = false
                 toggleAssetCurrencyButton.textContent = originalLabel
+            }
+        })
+    }
+
+    if (editAssetNameButton) {
+        editAssetNameButton.addEventListener("click", async () => {
+            try {
+                await renameCurrentAsset()
+            } catch (error) {
+                console.error(error)
+                alert("No se pudo actualizar el nombre del activo.")
             }
         })
     }
@@ -1346,6 +1512,53 @@ async function submitAssetModal() {
     }
 }
 
+function initEditAssetModal() {
+    const editAssetModalOverlay = document.getElementById("editAssetModalOverlay")
+    const editAssetNameInput = document.getElementById("editAssetNameInput")
+    const confirmEditAssetModalButton = document.getElementById("confirmEditAssetModalBtn")
+    const cancelEditAssetModalButton = document.getElementById("cancelEditAssetModalBtn")
+
+    if (confirmEditAssetModalButton) {
+        confirmEditAssetModalButton.addEventListener("click", async () => {
+            try {
+                await submitEditAssetModal()
+            } catch (error) {
+                console.error(error)
+                alert("No se pudo actualizar el nombre del activo.")
+            }
+        })
+    }
+
+    if (cancelEditAssetModalButton) {
+        cancelEditAssetModalButton.addEventListener("click", () => {
+            closeEditAssetModal()
+        })
+    }
+
+    if (editAssetNameInput) {
+        editAssetNameInput.addEventListener("keydown", async (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault()
+
+                try {
+                    await submitEditAssetModal()
+                } catch (error) {
+                    console.error(error)
+                    alert("No se pudo actualizar el nombre del activo.")
+                }
+            }
+        })
+    }
+
+    if (editAssetModalOverlay) {
+        editAssetModalOverlay.addEventListener("click", (event) => {
+            if (event.target === editAssetModalOverlay) {
+                closeEditAssetModal()
+            }
+        })
+    }
+}
+
 function initAddAssetButton(addAssetButton) {
     if (!addAssetButton) {
         return
@@ -1359,6 +1572,7 @@ function initAddAssetButton(addAssetButton) {
 function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect, assetTickerInput, searchAssetTickerButton) {
     const assetSearchFeedback = document.getElementById("assetSearchFeedback")
     const assetSearchResults = document.getElementById("assetSearchResults")
+    initEditAssetModal()
 
     if (confirmAssetModalButton) {
         confirmAssetModalButton.addEventListener("click", async () => {
@@ -1430,6 +1644,11 @@ function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetM
     document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && assetModalState?.isOpen) {
             closeAssetModal()
+            return
+        }
+
+        if (event.key === "Escape" && editAssetModalState?.isOpen) {
+            closeEditAssetModal()
             return
         }
 

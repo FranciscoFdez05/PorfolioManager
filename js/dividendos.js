@@ -42,7 +42,7 @@ function renderDividendosRowsFromData(dividendosData) {
             <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
             <td contenteditable="true">${rowData.fecha || ""}</td>
             <td contenteditable="true">${rowData.instrumento || ""}</td>
-            <td contenteditable="true">${rowData.acciones || ""}</td>
+            <td contenteditable="true">${formatShareQuantity(rowData.acciones)}</td>
             <td contenteditable="true">${formatCellDollarValue(rowData.dividendoAccion)}</td>
             <td contenteditable="true">${formatCellEuroValue(rowData.impuestos)}</td>
             <td contenteditable="true" class="rowTotal">${formatCellEuroValue(rowData.total)}</td>

@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 import json
+import re
 
 FINNHUB_QUOTE_URL = "https://finnhub.io/api/v1/quote"
 FINNHUB_SEARCH_URL = "https://finnhub.io/api/v1/search"
@@ -42,6 +43,17 @@ MARKET_SUFFIX_CURRENCIES = {
     ".L": "GBP",
 }
 SUPPORTED_DISPLAY_CURRENCIES = {"EUR", "USD"}
+SEARCH_QUERY_ALIASES = {
+    "tsmc": ["TSM", "Taiwan Semiconductor", "2330.TW"],
+    "tencent": ["0700.HK", "TCEHY", "Tencent Holdings"],
+    "universal": ["Universal Corp", "UVV"],
+    "universal corp": ["UVV", "Universal Corp"],
+    "universal music": ["Universal Music Group", "UMG.AS", "UMGNF"],
+}
+PREFERRED_EXCHANGES_BY_TYPE = {
+    "acciones": {"XNYS", "XNAS", "NYSE", "NASDAQ", "ARCX", "BATS", "XNCM"},
+    "etfs": {"ARCX", "XNAS", "XNYS", "BATS", "NASDAQ", "NYSE"},
+}
 
 
 def _format_decimal(value, digits=2):
@@ -101,6 +113,7 @@ def _score_remote_symbol(item, normalized_query, normalized_asset_name="", prefe
     display_symbol = str(item.get("displaySymbol", symbol)).strip().upper()
     description = str(item.get("description", "")).strip()
     result_type = str(item.get("type", "")).strip().lower()
+    exchange = str(item.get("exchange", "")).strip().upper()
     compact_symbol = _compact_symbol(symbol)
     compact_display = _compact_symbol(display_symbol)
     normalized_description = _normalize_text(description)
@@ -127,6 +140,13 @@ def _score_remote_symbol(item, normalized_query, normalized_asset_name="", prefe
             score += 220
         elif result_type in {"crypto", "forex"}:
             score -= 220
+    elif preferred_asset_type == "etfs":
+        if result_type in {"etf", "etp", "fund"}:
+            score += 320
+        elif result_type == "common stock":
+            score += 60
+        elif result_type in {"crypto", "forex"}:
+            score -= 320
     elif preferred_asset_type == "cripto":
         if result_type == "crypto":
             score += 220
@@ -143,6 +163,12 @@ def _score_remote_symbol(item, normalized_query, normalized_asset_name="", prefe
 
         if "XAU" in symbol:
             score += 260
+
+    if preferred_asset_type in PREFERRED_EXCHANGES_BY_TYPE and exchange in PREFERRED_EXCHANGES_BY_TYPE[preferred_asset_type]:
+        score += 80
+
+    if preferred_asset_type in {"acciones", "etfs"} and any(token in normalized_description for token in ("etf", "fund", "ucits", "ishares", "vanguard", "invesco", "spdr", "xtrackers", "amundi")):
+        score += 70 if preferred_asset_type == "etfs" else 20
 
     return score
 
@@ -246,6 +272,12 @@ def _score_local_symbol(item, normalized_query, candidate_codes, normalized_asse
 
     if preferred_asset_type == "acciones" and item.get("type") in {"crypto", "forex"}:
         score -= 220
+
+    if preferred_asset_type == "etfs":
+        if item.get("type") == "crypto":
+            score -= 320
+        elif item.get("type") == "forex":
+            score -= 260
 
     if preferred_asset_type == "cripto":
         if item.get("type") == "crypto":
@@ -494,32 +526,43 @@ def search_symbol(query_text, api_key, timeout=10, limit=8, asset_name="", prefe
     if not api_key:
         return None, "No se ha encontrado la API key de Finnhub"
 
-    try:
-        payload = _fetch_json(FINNHUB_SEARCH_URL, {
-            "q": normalized_query,
-            "token": api_key
-        }, timeout=timeout)
-    except HTTPError as error:
-        return None, f"Finnhub devolvió HTTP {error.code}"
-    except URLError:
-        return None, "No se pudo conectar con Finnhub"
+    alias_queries = SEARCH_QUERY_ALIASES.get(_normalize_text(normalized_query), [])
+    search_queries = []
+
+    for query in [normalized_query, *alias_queries]:
+        clean_query = str(query or "").strip()
+        if clean_query and clean_query not in search_queries:
+            search_queries.append(clean_query)
 
     remote_results = []
+    seen_remote_symbols = set()
 
-    for item in payload.get("result") or []:
-        symbol = str(item.get("symbol", "")).strip().upper()
-        description = str(item.get("description", "")).strip()
+    for search_query in search_queries:
+        try:
+            payload = _fetch_json(FINNHUB_SEARCH_URL, {
+                "q": search_query,
+                "token": api_key
+            }, timeout=timeout)
+        except HTTPError as error:
+            return None, f"Finnhub devolvió HTTP {error.code}"
+        except URLError:
+            return None, "No se pudo conectar con Finnhub"
 
-        if not symbol or not description:
-            continue
+        for item in payload.get("result") or []:
+            symbol = str(item.get("symbol", "")).strip().upper()
+            description = str(item.get("description", "")).strip()
 
-        remote_results.append({
-            "symbol": symbol,
-            "description": description,
-            "displaySymbol": str(item.get("displaySymbol", symbol)).strip().upper() or symbol,
-            "type": str(item.get("type", "")).strip() or "market",
-            "exchange": str(item.get("mic", "")).strip().upper()
-        })
+            if not symbol or not description or symbol in seen_remote_symbols:
+                continue
+
+            seen_remote_symbols.add(symbol)
+            remote_results.append({
+                "symbol": symbol,
+                "description": description,
+                "displaySymbol": str(item.get("displaySymbol", symbol)).strip().upper() or symbol,
+                "type": str(item.get("type", "")).strip() or "market",
+                "exchange": str(item.get("mic", "")).strip().upper()
+            })
 
     local_results = _search_local_symbols(
         normalized_query,

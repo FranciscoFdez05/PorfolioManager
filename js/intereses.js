@@ -8,7 +8,7 @@ function handleCellBlur(event) {
     const tableBody = cell.closest('tbody')
     const columnIndex = cell.cellIndex
 
-    if (tableBody?.id === "interesesBody" && (columnIndex === 1 || columnIndex === 2 || columnIndex === 3)) {
+    if (tableBody?.id === "interesesBody" && (columnIndex === 2 || columnIndex === 3 || columnIndex === 4)) {
         const value = parseEuroNumber(cell.textContent)
         const hasText = cell.textContent.trim() !== ""
 
@@ -24,10 +24,10 @@ function handleCellBlur(event) {
         const hasText = cell.textContent.trim() !== ""
 
         if (columnIndex === 3) {
-            const value = parseDollarNumber(cell.textContent)
+            const value = parseLooseNumber(cell.textContent)
 
             if (hasText) {
-                cell.textContent = formatDollar(value)
+                cell.textContent = formatShareQuantity(value)
             }
         }
 
@@ -46,7 +46,15 @@ function handleCellBlur(event) {
     if (tableBody?.id === "assetOperationsBody") {
         const hasText = cell.textContent.trim() !== ""
 
-        if (columnIndex === 3 || columnIndex === 4 || columnIndex === 5) {
+        if (columnIndex === 3) {
+            const value = parseLooseNumber(cell.textContent)
+
+            if (hasText) {
+                cell.textContent = formatAssetParticipationValue(value)
+            }
+        }
+
+        if (columnIndex === 4 || columnIndex === 5 || columnIndex === 6) {
             const value = parseEuroNumber(cell.textContent)
 
             if (hasText) {

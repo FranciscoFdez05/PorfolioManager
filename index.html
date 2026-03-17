@@ -126,6 +126,32 @@
                 <div class="detailSub" id="detName">Selecciona un activo</div>
                 <div class="detailPrice" id="detPrice">0,00 €</div>
                 <div class="detailChange" id="detChange">---</div>
+                <div class="detailStats">
+                    <div class="detailStatCard">
+                        <span class="detailStatLabel">Tipo</span>
+                        <span class="detailStatValue" id="detType">---</span>
+                    </div>
+                    <div class="detailStatCard">
+                        <span class="detailStatLabel">Posición</span>
+                        <span class="detailStatValue" id="detPosition">0</span>
+                    </div>
+                    <div class="detailStatCard">
+                        <span class="detailStatLabel">Invertido</span>
+                        <span class="detailStatValue" id="detInvested">0,00 €</span>
+                    </div>
+                    <div class="detailStatCard">
+                        <span class="detailStatLabel">P/L</span>
+                        <span class="detailStatValue" id="detPnL">0,00 €</span>
+                    </div>
+                    <div class="detailStatCard">
+                        <span class="detailStatLabel">Precio medio</span>
+                        <span class="detailStatValue" id="detAvgPrice">0,00 €</span>
+                    </div>
+                    <div class="detailStatCard">
+                        <span class="detailStatLabel">Comisiones</span>
+                        <span class="detailStatValue" id="detFees">0,00 €</span>
+                    </div>
+                </div>
                 <div class="detailMeta" id="detStatus">Sin datos de mercado</div>
                 <div class="detailMeta" id="detFinnhub">Ticker mercado: ---</div>
             </div>
@@ -172,6 +198,19 @@
         <div class="assetModalActions confirmModalActions">
             <button id="confirmModalAcceptBtn" class="dangerButton">Eliminar</button>
             <button id="confirmModalCancelBtn" class="secondaryButton">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<div class="modalOverlay hidden" id="editAssetModalOverlay">
+    <div class="assetModal" role="dialog" aria-modal="true" aria-labelledby="editAssetModalTitle">
+        <h3 class="assetModalTitle" id="editAssetModalTitle">Editar activo</h3>
+        <label class="assetModalLabel" for="editAssetNameInput">Nombre del activo</label>
+        <input id="editAssetNameInput" class="assetModalInput" type="text" placeholder="Nuevo nombre del activo">
+
+        <div class="assetModalActions">
+            <button id="confirmEditAssetModalBtn" class="primaryButton">Confirmar</button>
+            <button id="cancelEditAssetModalBtn" class="secondaryButton">Cancelar</button>
         </div>
     </div>
 </div>

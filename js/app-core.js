@@ -32,6 +32,7 @@ let assetAutosaveTimeout = null
 let currentAssetId = null
 let assetModalState = null
 let confirmModalState = null
+let editAssetModalState = null
 let draggedAssetId = null
 
 function initSidePanel(toggleButton, sideWrapper) {
@@ -182,7 +183,7 @@ function handleCellFocus(event) {
     const columnIndex = cell.cellIndex
 
     if (tableBody.id === 'interesesBody') {
-        if (columnIndex === 1 || columnIndex === 2 || columnIndex === 3) {
+        if (columnIndex === 2 || columnIndex === 3 || columnIndex === 4) {
             const value = parseEuroNumber(cell.textContent)
 
             if (cell.textContent.trim() !== "") {
@@ -191,7 +192,7 @@ function handleCellFocus(event) {
         }
     } else if (tableBody.id === 'dividendosBody') {
         if (columnIndex === 3) {
-            const value = parseDollarNumber(cell.textContent)
+            const value = parseLooseNumber(cell.textContent)
 
             if (cell.textContent.trim() !== "") {
                 cell.textContent = normalizeNumberForEdit(value)
@@ -206,7 +207,15 @@ function handleCellFocus(event) {
             }
         }
     } else if (tableBody.id === 'assetOperationsBody') {
-        if (columnIndex === 3 || columnIndex === 4 || columnIndex === 5) {
+        if (columnIndex === 3) {
+            const value = parseLooseNumber(cell.textContent)
+
+            if (cell.textContent.trim() !== "") {
+                cell.textContent = normalizeNumberForEdit(value)
+            }
+        }
+
+        if (columnIndex === 4 || columnIndex === 5 || columnIndex === 6) {
             const value = parseEuroNumber(cell.textContent)
 
             if (cell.textContent.trim() !== "") {

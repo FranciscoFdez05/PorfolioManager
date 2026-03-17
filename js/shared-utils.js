@@ -107,6 +107,41 @@ function normalizeNumberForEdit(value) {
     return String(value).replace(".", ",")
 }
 
+function formatShareQuantity(value, maxDecimals = 6) {
+    const parsedValue = parseLooseNumber(value)
+
+    if (parsedValue === null || String(value ?? "").trim() === "") {
+        return ""
+    }
+
+    return parsedValue.toLocaleString("es-ES", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: maxDecimals
+    })
+}
+
+function getAssetParticipationDecimals(assetType) {
+    const normalizedType = String(assetType || "").trim().toLowerCase()
+
+    if (normalizedType === "cripto" || normalizedType === "comoditis") {
+        return 8
+    }
+
+    if (normalizedType === "acciones" || normalizedType === "etfs") {
+        return 6
+    }
+
+    return 6
+}
+
+function getCurrentAssetType() {
+    return document.querySelector(".assetTablePage")?.dataset.assetType || "acciones"
+}
+
+function formatAssetParticipationValue(value, assetType = getCurrentAssetType()) {
+    return formatShareQuantity(value, getAssetParticipationDecimals(assetType))
+}
+
 function formatCellEuroValue(value) {
     const parsedValue = parseEuroNumber(value)
 
@@ -324,7 +359,8 @@ document.addEventListener("focusout", (event) => {
     const cell = event.target.closest('td[contenteditable="true"]')
     if (isAssetParticipationsCell(cell)) {
         queueMicrotask(() => {
-            cell.textContent = stripCurrencyText(cell.textContent || "")
+            const text = String(cell.textContent || "").trim()
+            cell.textContent = formatAssetParticipationValue(text)
         })
         return
     }
