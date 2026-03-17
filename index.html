@@ -116,6 +116,7 @@
         <aside class="sidePanel" id="sidePanel">
             <div class="assetToolbar">
                 <button id="addAssetBtn" class="primaryButton assetAddBtn">Añadir activo</button>
+                <button id="refreshSidebarMarketBtn" class="primaryButton assetAddBtn" type="button">Actualizar cotizaciones</button>
             </div>
 
             <div class="assetsList" id="assetsList"></div>
@@ -126,7 +127,7 @@
                 <div class="detailPrice" id="detPrice">0,00 €</div>
                 <div class="detailChange" id="detChange">---</div>
                 <div class="detailMeta" id="detStatus">Sin datos de mercado</div>
-                <div class="detailMeta" id="detFinnhub">Ticker Finnhub: ---</div>
+                <div class="detailMeta" id="detFinnhub">Ticker mercado: ---</div>
             </div>
         </aside>
     </div>
@@ -148,7 +149,7 @@
             <option value="comoditis">Comoditis</option>
         </select>
 
-        <label class="assetModalLabel" for="assetTickerInput">Ticker Finnhub</label>
+        <label class="assetModalLabel" for="assetTickerInput">Ticker mercado</label>
         <input id="assetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
         <div class="assetSearchActions">
             <button id="searchAssetTickerBtn" class="secondaryButton" type="button">Buscar ticker</button>

@@ -33,9 +33,10 @@ def createDefaultAssetPayload(name, assetType, assetId=None):
         "type": assetType,
         "order": 0,
         "price": "0,00",
-        "currency": "USD",
+        "currency": "EUR",
         "change": "+0,00%",
         "status": "Mercado abierto",
+        "lastUpdated": "",
         "rows": [
             {
                 "fechaOperacion": "",
@@ -89,9 +90,10 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "type": assetType,
         "order": int(requestData.get("order", 0) or 0),
         "price": str(requestData.get("price", "0,00")).strip(),
-        "currency": str(requestData.get("currency", "USD")).strip() or "USD",
+        "currency": str(requestData.get("currency", "EUR")).strip() or "EUR",
         "change": str(requestData.get("change", "+0,00%")).strip() or "+0,00%",
         "status": str(requestData.get("status", "Mercado abierto")).strip() or "Mercado abierto",
+        "lastUpdated": str(requestData.get("lastUpdated", "")).strip(),
         "rows": sanitizeAssetRows(rows)
     }
 

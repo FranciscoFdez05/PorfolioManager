@@ -9,6 +9,7 @@ gastosDir = dataDir / "gastos"
 apiDir = baseDir / "API"
 interesesFile = dataDir / "intereses.json"
 dividendosFile = dataDir / "dividendos.json"
+twelvedataKeyFile = apiDir / "twelvedata.key"
 finnhubKeyFile = apiDir / "finnhub.key"
 
 
@@ -58,14 +59,20 @@ def writeDividendosFile(data):
 def readFinnhubApiKey():
     ensureDataFile()
 
-    if not finnhubKeyFile.exists():
-        return None
+    if finnhubKeyFile.exists():
+        with finnhubKeyFile.open("r", encoding="utf-8") as file:
+            for line in file:
+                apiKey = line.strip()
 
-    with finnhubKeyFile.open("r", encoding="utf-8") as file:
-        for line in file:
-            apiKey = line.strip()
+                if apiKey and not apiKey.startswith("#"):
+                    return apiKey
 
-            if apiKey and not apiKey.startswith("#"):
-                return apiKey
+    if twelvedataKeyFile.exists():
+        with twelvedataKeyFile.open("r", encoding="utf-8") as file:
+            for line in file:
+                apiKey = line.strip()
+
+                if apiKey and not apiKey.startswith("#"):
+                    return apiKey
 
     return None

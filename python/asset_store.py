@@ -45,9 +45,10 @@ def listAssets():
             "type": data.get("type", ""),
             "order": data.get("order", index),
             "price": data.get("price", "0,00"),
-            "currency": data.get("currency", "USD"),
+            "currency": data.get("currency", "EUR"),
             "change": data.get("change", "+0,00%"),
-            "status": data.get("status", "Mercado abierto")
+            "status": data.get("status", "Mercado abierto"),
+            "lastUpdated": data.get("lastUpdated", "")
         })
 
     return sorted(assets, key=lambda asset: (asset.get("order", 0), asset.get("symbol", "")))

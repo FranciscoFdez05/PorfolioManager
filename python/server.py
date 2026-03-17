@@ -3,7 +3,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from app_data import baseDir, ensureDataFile, readDividendosFile, readFinnhubApiKey, readInteresesFile, writeDividendosFile, writeInteresesFile
 from asset_store import getAssetFile, listAssets, readAssetFile, writeAssetFile
 from asset_utils import createDefaultAssetPayload, sanitizeAssetPayload, sanitizeAssetType, slugify
-from finnhub_client import fetch_quote, search_symbol
+from finnhub_client import convert_amount, convert_quote_currency, fetch_quote, search_symbol
 from gastos_store import create_default_gastos_year, delete_gastos_year, list_gastos_years, normalize_year, read_gastos_year, sanitize_gastos_payload, write_gastos_year
 
 app = Flask(
@@ -11,6 +11,65 @@ app = Flask(
     static_folder="../",
     static_url_path=""
 )
+
+
+def normalize_currency_code(currency, fallback="EUR"):
+    normalized = str(currency or "").strip().upper()
+
+    if normalized in {"USDT", "USDC", "BUSD"}:
+        return "USD"
+
+    return normalized or fallback
+
+
+def parse_loose_number(value):
+    text = str(value or "").strip()
+
+    if not text:
+        return None
+
+    cleaned = "".join(character for character in text if character.isdigit() or character in ",.-")
+
+    if not cleaned:
+        return None
+
+    if "," in cleaned and "." in cleaned:
+        normalized = cleaned.replace(".", "").replace(",", ".")
+    else:
+        normalized = cleaned.replace(",", ".")
+
+    try:
+        return float(normalized)
+    except ValueError:
+        return None
+
+
+def format_decimal(value, digits=2):
+    return f"{float(value):.{digits}f}".replace(".", ",")
+
+
+def convert_asset_rows_currency(rows, source_currency, target_currency):
+    converted_rows = []
+
+    for row in rows or []:
+        converted_row = dict(row)
+
+        for field_name in ("precioParticipacion", "capitalInvertidoBruto", "comisiones"):
+            parsed_value = parse_loose_number(converted_row.get(field_name, ""))
+
+            if parsed_value is None:
+                continue
+
+            converted_value, error = convert_amount(parsed_value, source_currency, target_currency)
+
+            if error:
+                return None, error
+
+            converted_row[field_name] = format_decimal(converted_value)
+
+        converted_rows.append(converted_row)
+
+    return converted_rows, None
 
 
 @app.route("/")
@@ -242,21 +301,74 @@ def refreshActivoMarketData(assetId):
         statusCode = 503 if "API key" in error or "conectar" in error else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
+    target_currency = normalize_currency_code(assetData.get("currency", ""), fallback="EUR")
+    quote, error = convert_quote_currency(quote, target_currency)
+
+    if error:
+        statusCode = 503 if "API key" in error or "conectar" in error or "divisa" in error else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
     assetData["finnhubSymbol"] = quote["symbol"]
     assetData["price"] = quote["price"]
     assetData["currency"] = quote["currency"]
     assetData["change"] = quote["change"]
     assetData["status"] = quote["status"]
+    assetData["lastUpdated"] = quote["lastUpdated"]
     writeAssetFile(assetId, assetData)
 
     return jsonify({"ok": True, "asset": assetData, "marketData": quote["marketData"]})
 
 
+@app.route("/api/activos/<assetId>/currency", methods=["POST"])
+def changeActivoCurrency(assetId):
+    assetData = readAssetFile(assetId)
+
+    if assetData is None:
+        return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+
+    requestData = request.get_json(silent=True) or {}
+    current_currency = normalize_currency_code(assetData.get("currency", ""), fallback="EUR")
+    target_currency = normalize_currency_code(requestData.get("currency", ""), fallback=current_currency)
+
+    if target_currency not in {"EUR", "USD"}:
+        return jsonify({"ok": False, "error": "Solo se permite cambiar entre EUR y USD"}), 400
+
+    if current_currency == target_currency:
+        return jsonify({"ok": True, "asset": assetData, "converted": False})
+
+    converted_price = parse_loose_number(assetData.get("price", ""))
+
+    if converted_price is not None:
+        converted_price, error = convert_amount(converted_price, current_currency, target_currency)
+
+        if error:
+            statusCode = 503 if "conectar" in error or "divisa" in error else 400
+            return jsonify({"ok": False, "error": error}), statusCode
+
+        assetData["price"] = format_decimal(converted_price)
+
+    converted_rows, error = convert_asset_rows_currency(assetData.get("rows", []), current_currency, target_currency)
+
+    if error:
+        statusCode = 503 if "conectar" in error or "divisa" in error else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    assetData["rows"] = converted_rows
+    assetData["currency"] = target_currency
+    assetData["status"] = f"Activo convertido de {current_currency} a {target_currency}"
+    writeAssetFile(assetId, assetData)
+
+    return jsonify({"ok": True, "asset": assetData, "converted": True})
+
+
 @app.route("/api/finnhub/search", methods=["GET"])
+@app.route("/api/market/search", methods=["GET"])
 def searchFinnhubSymbol():
     query = str(request.args.get("q", "")).strip()
+    assetName = str(request.args.get("assetName", "")).strip()
+    assetType = str(request.args.get("assetType", "")).strip()
     apiKey = readFinnhubApiKey()
-    results, error = search_symbol(query, apiKey)
+    results, error = search_symbol(query, apiKey, asset_name=assetName, preferred_asset_type=assetType)
 
     if error:
         statusCode = 503 if "API key" in error or "conectar" in error else 400

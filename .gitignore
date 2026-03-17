@@ -28,9 +28,9 @@ __pycache__/
 .env*
 venv/
 
-
-
-
+# =========================
+# APIs KEYs
+# =========================
 API/*.key
 !API/.gitkeep
 
