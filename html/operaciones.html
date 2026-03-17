@@ -1,4 +1,69 @@
-<div class="placeholderPage">
-    <h2>Operaciones</h2>
-    <p>Contenido pendiente.</p>
-</div>
+<section class="operationsPage">
+    <div class="operationsHeader">
+        <div>
+            <h2 class="operationsTitle">Operaciones Spot</h2>
+            <p class="operationsSubtitle">Controla compras y ventas con filtros por tipo y estado.</p>
+        </div>
+    </div>
+
+    <div class="operationsFilters">
+        <div class="operationsFilterGroup">
+            <span class="operationsFilterLabel">Tipo</span>
+            <div class="operationsFilterButtons" id="operationsTypeFilters">
+                <label class="overviewFilterOption operationsFilterOption">
+                    <input type="checkbox" value="Compra" data-filter-group="type" checked>
+                    <span>Compra</span>
+                </label>
+                <label class="overviewFilterOption operationsFilterOption">
+                    <input type="checkbox" value="Venta" data-filter-group="type" checked>
+                    <span>Venta</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="operationsFilterGroup">
+            <span class="operationsFilterLabel">Estado</span>
+            <div class="operationsFilterButtons" id="operationsStatusFilters">
+                <label class="overviewFilterOption operationsFilterOption">
+                    <input type="checkbox" value="Activo" data-filter-group="status" checked>
+                    <span>Activo</span>
+                </label>
+                <label class="overviewFilterOption operationsFilterOption">
+                    <input type="checkbox" value="Cerrado" data-filter-group="status" checked>
+                    <span>Cerrado</span>
+                </label>
+                <label class="overviewFilterOption operationsFilterOption">
+                    <input type="checkbox" value="Completado" data-filter-group="status" checked>
+                    <span>Completado</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="operationsTableWrapper">
+        <table class="operationsTable">
+            <thead>
+                <tr>
+                    <th class="rowActionHeader"></th>
+                    <th>Activo</th>
+                    <th>Fecha Apertura</th>
+                    <th>Par</th>
+                    <th>Orden</th>
+                    <th>Precio Orden</th>
+                    <th>Cantidad</th>
+                    <th>Total</th>
+                    <th>Estado</th>
+                    <th>Fecha Cierre</th>
+                </tr>
+            </thead>
+            <tbody id="operationsBody"></tbody>
+        </table>
+    </div>
+
+    <div class="operationsActions">
+        <button id="addOperationRowBtn" class="primaryButton" type="button">Añadir fila</button>
+        <button id="exportOperationsBtn" class="secondaryButton" type="button">Exportar JSON</button>
+        <button id="importOperationsBtn" class="secondaryButton" type="button">Importar JSON</button>
+        <button id="saveOperationsBtn" class="secondaryButton" type="button">Guardar</button>
+    </div>
+</section>

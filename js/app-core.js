@@ -109,6 +109,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initDividendosLogic()
         } else if (page === "gastos") {
             await initGastosLogic()
+        } else if (page === "operaciones") {
+            await initOperacionesLogic()
         }
     } catch (error) {
         console.error(error)

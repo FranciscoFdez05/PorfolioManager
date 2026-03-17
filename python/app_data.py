@@ -9,6 +9,7 @@ gastosDir = dataDir / "gastos"
 apiDir = baseDir / "API"
 interesesFile = dataDir / "intereses.json"
 dividendosFile = dataDir / "dividendos.json"
+operacionesFile = dataDir / "operaciones.json"
 twelvedataKeyFile = apiDir / "twelvedata.key"
 finnhubKeyFile = apiDir / "finnhub.key"
 
@@ -25,6 +26,10 @@ def ensureDataFile():
 
     if not dividendosFile.exists():
         with dividendosFile.open("w", encoding="utf-8") as file:
+            json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
+
+    if not operacionesFile.exists():
+        with operacionesFile.open("w", encoding="utf-8") as file:
             json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
 
 
@@ -53,6 +58,20 @@ def writeDividendosFile(data):
     ensureDataFile()
 
     with dividendosFile.open("w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+
+
+def readOperacionesFile():
+    ensureDataFile()
+
+    with operacionesFile.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def writeOperacionesFile(data):
+    ensureDataFile()
+
+    with operacionesFile.open("w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 

@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, send_from_directory
 
-from app_data import baseDir, ensureDataFile, readDividendosFile, readFinnhubApiKey, readInteresesFile, writeDividendosFile, writeInteresesFile
+from app_data import baseDir, ensureDataFile, readDividendosFile, readFinnhubApiKey, readInteresesFile, readOperacionesFile, writeDividendosFile, writeInteresesFile, writeOperacionesFile
 from asset_store import getAssetFile, listAssets, readAssetFile, writeAssetFile
 from asset_utils import createDefaultAssetPayload, sanitizeAssetPayload, sanitizeAssetType, slugify
 from finnhub_client import convert_amount, convert_quote_currency, fetch_quote, search_symbol
@@ -154,6 +154,60 @@ def saveDividendos():
 @app.route("/api/dividendos/reset", methods=["POST"])
 def resetDividendos():
     writeDividendosFile({"rows": []})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/operaciones", methods=["GET"])
+def getOperaciones():
+    data = readOperacionesFile()
+    return jsonify(data)
+
+
+@app.route("/api/operaciones", methods=["POST"])
+def saveOperaciones():
+    requestData = request.get_json(silent=True) or {}
+    rows = requestData.get("rows", [])
+
+    if not isinstance(rows, list):
+        return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+
+    sanitizedRows = []
+
+    for index, row in enumerate(rows):
+        orden = str(row.get("orden", "Compra")).strip().capitalize()
+        estado = str(row.get("estado", "Activo")).strip().capitalize()
+
+        if orden not in {"Compra", "Venta"}:
+            orden = "Compra"
+
+        if estado not in {"Activo", "Cerrado", "Completado"}:
+            estado = "Activo"
+
+        currency = str(row.get("currency", "EUR")).strip().upper()
+        precio_currency = str(row.get("precioCurrency", "EUR")).strip().upper()
+
+        if currency not in {"EUR", "USD"}:
+            currency = "EUR"
+
+        if precio_currency not in {"EUR", "USD"}:
+            precio_currency = "EUR"
+
+        sanitizedRows.append({
+            "id": str(row.get("id", f"operacion-{index + 1}")).strip() or f"operacion-{index + 1}",
+            "activo": str(row.get("activo", "")).strip(),
+            "fechaApertura": str(row.get("fechaApertura", row.get("fecha", ""))).strip(),
+            "par": str(row.get("par", "")).strip(),
+            "orden": orden,
+            "precioOrden": str(row.get("precioOrden", row.get("precio", ""))).strip(),
+            "precioCurrency": precio_currency,
+            "cantidad": str(row.get("cantidad", "")).strip(),
+            "total": str(row.get("total", "")).strip(),
+            "currency": currency,
+            "estado": estado,
+            "fechaCierre": str(row.get("fechaCierre", "")).strip()
+        })
+
+    writeOperacionesFile({"rows": sanitizedRows})
     return jsonify({"ok": True})
 
 
