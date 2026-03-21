@@ -45,8 +45,12 @@ function handleCellBlur(event) {
 
     if (tableBody?.id === "assetOperationsBody") {
         const hasText = cell.textContent.trim() !== ""
+        const fieldName = cell.dataset.field || ""
+        const assetType = getCurrentAssetType()
+        const assetCurrency = getCurrentAssetCurrency()
+        const assetPriceCurrency = getCurrentAssetPriceCurrency()
 
-        if (columnIndex === 3) {
+        if (fieldName === "participaciones" || columnIndex === 3) {
             const value = parseLooseNumber(cell.textContent)
 
             if (hasText) {
@@ -54,11 +58,24 @@ function handleCellBlur(event) {
             }
         }
 
-        if (columnIndex === 4 || columnIndex === 5 || columnIndex === 6) {
-            const value = parseEuroNumber(cell.textContent)
+        if (["precioParticipacion", "capitalInvertidoBruto", "comisiones"].includes(fieldName) || (fieldName === "" && (columnIndex === 4 || columnIndex === 5 || columnIndex === 6))) {
+            const moneyCurrency = getAssetTableMoneyCurrency(assetType, fieldName || "precioParticipacion", assetCurrency, assetPriceCurrency)
+            const value = moneyCurrency === "EUR"
+                ? parseEuroNumber(cell.textContent)
+                : parseDollarNumber(cell.textContent)
 
             if (hasText) {
-                cell.textContent = formatEuro(value)
+                cell.textContent = fieldName === "comisiones"
+                    ? formatAssetCommissionValue(value, moneyCurrency)
+                    : formatMoney(value, moneyCurrency)
+            }
+        }
+
+        if (fieldName === "comisionesSatoshis") {
+            const value = parseLooseNumber(cell.textContent)
+
+            if (hasText) {
+                cell.textContent = formatCellSatoshisValue(value)
             }
         }
 

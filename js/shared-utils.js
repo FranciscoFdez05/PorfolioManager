@@ -54,11 +54,11 @@ function normalizeCurrencyCode(currency) {
     return normalized || "EUR"
 }
 
-function formatMoney(value, currency = "EUR") {
+function formatMoneyWithDecimals(value, currency = "EUR", decimals = 2) {
     const normalizedCurrency = normalizeCurrencyCode(currency)
     const formattedNumber = new Intl.NumberFormat("es-ES", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
     }).format(value)
 
     const suffixByCurrency = {
@@ -71,6 +71,10 @@ function formatMoney(value, currency = "EUR") {
     }
 
     return `${formattedNumber} ${suffixByCurrency[normalizedCurrency] || normalizedCurrency}`
+}
+
+function formatMoney(value, currency = "EUR") {
+    return formatMoneyWithDecimals(value, currency, 2)
 }
 
 function formatCellMoneyValue(value, currency = "EUR") {
@@ -92,6 +96,11 @@ function stripCurrencyText(value) {
 
 function getCurrentAssetCurrency() {
     return document.querySelector(".assetTablePage")?.dataset.assetCurrency || "EUR"
+}
+
+function getCurrentAssetPriceCurrency() {
+    const assetPage = document.querySelector(".assetTablePage")
+    return assetPage?.dataset.assetPriceCurrency || assetPage?.dataset.assetCurrency || "EUR"
 }
 
 function formatMoneySafe(value, currency = "EUR") {
@@ -283,11 +292,60 @@ function getTableHeaderText(cell) {
 }
 
 function isAssetParticipationsCell(cell) {
-    return getTableHeaderText(cell) === "participaciones"
+    return cell?.dataset?.field === "participaciones" || getTableHeaderText(cell) === "participaciones"
 }
 
 function isAssetCommissionsCell(cell) {
-    return getTableHeaderText(cell) === "comisiones"
+    return cell?.dataset?.field === "comisiones" || getTableHeaderText(cell) === "comisiones"
+}
+
+function isAssetCryptoCommissionsCell(cell) {
+    return cell?.dataset?.field === "comisionesSatoshis" || getTableHeaderText(cell) === "comisiones cripto"
+}
+
+function isCryptoAssetType(assetType) {
+    return String(assetType || "").trim().toLowerCase() === "cripto"
+}
+
+function getAssetTableMoneyCurrency(assetType, fieldName, assetCurrency = "EUR", priceCurrency = assetCurrency) {
+    if (isCryptoAssetType(assetType) && fieldName === "precioParticipacion") {
+        return priceCurrency
+    }
+
+    return assetCurrency
+}
+
+function formatSatoshis(value) {
+    const parsed = parseLooseNumber(value)
+
+    if (parsed === null) {
+        return ""
+    }
+
+    return parsed.toLocaleString("es-ES", {
+        minimumFractionDigits: 8,
+        maximumFractionDigits: 8
+    })
+}
+
+function formatCellSatoshisValue(value) {
+    const parsed = parseLooseNumber(value)
+
+    if (parsed === null || String(value ?? "").trim() === "") {
+        return "0,00000000"
+    }
+
+    return formatSatoshis(parsed)
+}
+
+function formatAssetCommissionValue(value, currency = "EUR") {
+    const parsed = parseLooseNumber(value)
+
+    if (parsed === null || String(value ?? "").trim() === "") {
+        return "0,000 €"
+    }
+
+    return formatMoneyWithDecimals(parsed, currency, 3)
 }
 
 function parseLooseNumber(value) {
@@ -365,10 +423,18 @@ document.addEventListener("focusout", (event) => {
         return
     }
 
+    if (isAssetCryptoCommissionsCell(cell)) {
+        queueMicrotask(() => {
+            const text = String(cell.textContent || "").trim()
+            cell.textContent = formatCellSatoshisValue(text)
+        })
+        return
+    }
+
     if (isAssetCommissionsCell(cell)) {
         queueMicrotask(() => {
             const text = String(cell.textContent || "").trim()
-            cell.textContent = formatMoneySafe(text, getCurrentAssetCurrency())
+            cell.textContent = formatAssetCommissionValue(text, getCurrentAssetCurrency())
         })
         return
     }

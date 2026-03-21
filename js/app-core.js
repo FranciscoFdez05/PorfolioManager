@@ -207,19 +207,35 @@ function handleCellFocus(event) {
             }
         }
     } else if (tableBody.id === 'assetOperationsBody') {
-        if (columnIndex === 3) {
+        const fieldName = cell.dataset.field || ""
+        const assetType = getCurrentAssetType()
+        const assetCurrency = getCurrentAssetCurrency()
+        const assetPriceCurrency = getCurrentAssetPriceCurrency()
+
+        if (fieldName === "participaciones" || columnIndex === 3) {
             const value = parseLooseNumber(cell.textContent)
+
+            if (cell.textContent.trim() !== "") {
+                cell.textContent = normalizeNumberForEdit(value ?? 0)
+            }
+        }
+
+        if (["precioParticipacion", "capitalInvertidoBruto", "comisiones"].includes(fieldName) || (fieldName === "" && (columnIndex === 4 || columnIndex === 5 || columnIndex === 6))) {
+            const moneyCurrency = getAssetTableMoneyCurrency(assetType, fieldName || "precioParticipacion", assetCurrency, assetPriceCurrency)
+            const value = moneyCurrency === "EUR"
+                ? parseEuroNumber(cell.textContent)
+                : parseDollarNumber(cell.textContent)
 
             if (cell.textContent.trim() !== "") {
                 cell.textContent = normalizeNumberForEdit(value)
             }
         }
 
-        if (columnIndex === 4 || columnIndex === 5 || columnIndex === 6) {
-            const value = parseEuroNumber(cell.textContent)
+        if (fieldName === "comisionesSatoshis") {
+            const value = parseLooseNumber(cell.textContent)
 
             if (cell.textContent.trim() !== "") {
-                cell.textContent = normalizeNumberForEdit(value)
+                cell.textContent = normalizeNumberForEdit(value ?? 0)
             }
         }
     }

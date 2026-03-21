@@ -3,7 +3,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from app_data import baseDir, ensureDataFile, readDividendosFile, readFinnhubApiKey, readInteresesFile, readOperacionesFile, writeDividendosFile, writeInteresesFile, writeOperacionesFile
 from asset_store import getAssetFile, listAssets, readAssetFile, writeAssetFile
 from asset_utils import createDefaultAssetPayload, sanitizeAssetPayload, sanitizeAssetType, slugify
-from finnhub_client import convert_amount, convert_quote_currency, fetch_quote, search_symbol
+from finnhub_client import convert_amount, convert_quote_currency, fetch_exchange_rate, fetch_quote, search_symbol
 from gastos_store import create_default_gastos_year, delete_gastos_year, list_gastos_years, normalize_year, read_gastos_year, sanitize_gastos_payload, write_gastos_year
 
 app = Flask(
@@ -48,13 +48,22 @@ def format_decimal(value, digits=2):
     return f"{float(value):.{digits}f}".replace(".", ",")
 
 
-def convert_asset_rows_currency(rows, source_currency, target_currency):
+def convert_asset_rows_currency(rows, source_currency, target_currency, asset_type="", fields=None):
     converted_rows = []
+    normalized_asset_type = str(asset_type or "").strip().lower()
 
     for row in rows or []:
         converted_row = dict(row)
+        money_fields = ("precioParticipacion", "comisiones")
 
-        for field_name in ("precioParticipacion", "capitalInvertidoBruto", "comisiones"):
+        if normalized_asset_type != "cripto":
+            money_fields = ("precioParticipacion", "capitalInvertidoBruto", "comisiones")
+
+        if fields:
+            allowed_fields = set(fields)
+            money_fields = tuple(field_name for field_name in money_fields if field_name in allowed_fields)
+
+        for field_name in money_fields:
             parsed_value = parse_loose_number(converted_row.get(field_name, ""))
 
             if parsed_value is None:
@@ -75,6 +84,23 @@ def convert_asset_rows_currency(rows, source_currency, target_currency):
 @app.route("/")
 def serveIndex():
     return send_from_directory(baseDir, "index.html")
+
+
+@app.route("/api/exchange-rate", methods=["GET"])
+def getExchangeRate():
+    source_currency = normalize_currency_code(request.args.get("source", ""), fallback="EUR")
+    target_currency = normalize_currency_code(request.args.get("target", ""), fallback=source_currency)
+
+    if source_currency == target_currency:
+        return jsonify({"ok": True, "source": source_currency, "target": target_currency, "rate": 1.0})
+
+    rate, error = fetch_exchange_rate(source_currency, target_currency)
+
+    if error:
+        statusCode = 503 if "conectar" in error or "divisa" in error else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    return jsonify({"ok": True, "source": source_currency, "target": target_currency, "rate": rate})
 
 
 @app.route("/api/intereses", methods=["GET"])
@@ -381,11 +407,43 @@ def changeActivoCurrency(assetId):
         return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
 
     requestData = request.get_json(silent=True) or {}
+    scope = str(requestData.get("scope", "asset")).strip().lower()
+    is_crypto = str(assetData.get("type", "")).strip().lower() == "cripto"
     current_currency = normalize_currency_code(assetData.get("currency", ""), fallback="EUR")
-    target_currency = normalize_currency_code(requestData.get("currency", ""), fallback=current_currency)
+    current_precio_currency = normalize_currency_code(assetData.get("precioCurrency", assetData.get("currency", "")), fallback=current_currency)
+    target_currency = normalize_currency_code(
+        requestData.get("currency", ""),
+        fallback=current_precio_currency if scope == "price" else current_currency
+    )
 
     if target_currency not in {"EUR", "USD"}:
         return jsonify({"ok": False, "error": "Solo se permite cambiar entre EUR y USD"}), 400
+
+    if scope == "price":
+        if not is_crypto:
+            return jsonify({"ok": False, "error": "La moneda separada del precio solo aplica a criptos"}), 400
+
+        if current_precio_currency == target_currency:
+            return jsonify({"ok": True, "asset": assetData, "converted": False})
+
+        converted_rows, error = convert_asset_rows_currency(
+            assetData.get("rows", []),
+            current_precio_currency,
+            target_currency,
+            assetData.get("type", ""),
+            fields=("precioParticipacion",)
+        )
+
+        if error:
+            statusCode = 503 if "conectar" in error or "divisa" in error else 400
+            return jsonify({"ok": False, "error": error}), statusCode
+
+        assetData["rows"] = converted_rows
+        assetData["precioCurrency"] = target_currency
+        assetData["status"] = f"Precio de participación convertido de {current_precio_currency} a {target_currency}"
+        writeAssetFile(assetId, assetData)
+
+        return jsonify({"ok": True, "asset": assetData, "converted": True})
 
     if current_currency == target_currency:
         return jsonify({"ok": True, "asset": assetData, "converted": False})
@@ -401,7 +459,13 @@ def changeActivoCurrency(assetId):
 
         assetData["price"] = format_decimal(converted_price)
 
-    converted_rows, error = convert_asset_rows_currency(assetData.get("rows", []), current_currency, target_currency)
+    converted_rows, error = convert_asset_rows_currency(
+        assetData.get("rows", []),
+        current_currency,
+        target_currency,
+        assetData.get("type", ""),
+        fields=("capitalInvertidoBruto", "comisiones") if is_crypto else None
+    )
 
     if error:
         statusCode = 503 if "conectar" in error or "divisa" in error else 400

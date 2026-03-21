@@ -46,6 +46,7 @@ def listAssets():
             "order": data.get("order", index),
             "price": data.get("price", "0,00"),
             "currency": data.get("currency", "EUR"),
+            "precioCurrency": data.get("precioCurrency", data.get("currency", "EUR")),
             "change": data.get("change", "+0,00%"),
             "status": data.get("status", "Mercado abierto"),
             "lastUpdated": data.get("lastUpdated", "")

@@ -34,6 +34,7 @@ def createDefaultAssetPayload(name, assetType, assetId=None):
         "order": 0,
         "price": "0,00",
         "currency": "EUR",
+        "precioCurrency": "EUR",
         "change": "+0,00%",
         "status": "Mercado abierto",
         "lastUpdated": "",
@@ -44,7 +45,8 @@ def createDefaultAssetPayload(name, assetType, assetId=None):
                 "participaciones": "",
                 "precioParticipacion": "",
                 "capitalInvertidoBruto": "",
-                "comisiones": ""
+                "comisiones": "",
+                "comisionesSatoshis": ""
             }
         ]
     }
@@ -60,7 +62,8 @@ def sanitizeAssetRows(rows):
             "participaciones": str(row.get("participaciones", "")).strip(),
             "precioParticipacion": str(row.get("precioParticipacion", "")).strip(),
             "capitalInvertidoBruto": str(row.get("capitalInvertidoBruto", "")).strip(),
-            "comisiones": str(row.get("comisiones", "")).strip()
+            "comisiones": str(row.get("comisiones", "")).strip(),
+            "comisionesSatoshis": str(row.get("comisionesSatoshis", "")).strip()
         })
 
     return sanitizedRows
@@ -91,6 +94,7 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "order": int(requestData.get("order", 0) or 0),
         "price": str(requestData.get("price", "0,00")).strip(),
         "currency": str(requestData.get("currency", "EUR")).strip() or "EUR",
+        "precioCurrency": str(requestData.get("precioCurrency", requestData.get("currency", "EUR"))).strip() or "EUR",
         "change": str(requestData.get("change", "+0,00%")).strip() or "+0,00%",
         "status": str(requestData.get("status", "Mercado abierto")).strip() or "Mercado abierto",
         "lastUpdated": str(requestData.get("lastUpdated", "")).strip(),
