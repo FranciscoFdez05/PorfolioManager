@@ -1,4 +1,6 @@
 const exchangeRateCache = new Map()
+let externalVentasRowsCache = []
+let externalTransaccionesRowsCache = []
 
 async function fetchExchangeRateOnServer(sourceCurrency, targetCurrency) {
     const source = normalizeCurrencyCode(sourceCurrency)
@@ -142,13 +144,13 @@ async function deleteAssetOnServer(assetId) {
     }
 }
 
-async function createAssetOnServer(name, type, finnhubSymbol = "") {
+async function createAssetOnServer(name, type, marketSymbol = "", marketProvider = "finnhub") {
     const response = await fetch("/api/activos", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ name, type, finnhubSymbol })
+        body: JSON.stringify({ name, type, marketSymbol, marketProvider, finnhubSymbol: marketSymbol })
     })
 
     if (!response.ok) {
@@ -157,6 +159,30 @@ async function createAssetOnServer(name, type, finnhubSymbol = "") {
     }
 
     return await response.json()
+}
+
+async function loadVentasRowsForAssets() {
+    const response = await fetch("/api/ventas")
+
+    if (!response.ok) {
+        throw new Error("No se pudo cargar la lista de ventas")
+    }
+
+    const data = await response.json()
+    externalVentasRowsCache = Array.isArray(data?.rows) ? data.rows : []
+    return externalVentasRowsCache
+}
+
+async function loadTransaccionesRowsForAssets() {
+    const response = await fetch("/api/transacciones")
+
+    if (!response.ok) {
+        throw new Error("No se pudo cargar la lista de transacciones")
+    }
+
+    const data = await response.json()
+    externalTransaccionesRowsCache = Array.isArray(data?.rows) ? data.rows : []
+    return externalTransaccionesRowsCache
 }
 
 async function refreshAssetMarketDataOnServer(assetId) {
@@ -203,6 +229,29 @@ async function searchFinnhubSymbolOnServer(query, { assetName = "", assetType = 
     }
 
     const response = await fetch(`/api/market/search?${params.toString()}`)
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
+}
+
+async function searchEodhdSymbolOnServer(query, { assetName = "", assetType = "" } = {}) {
+    const params = new URLSearchParams({
+        q: query
+    })
+
+    if (assetName) {
+        params.set("assetName", assetName)
+    }
+
+    if (assetType) {
+        params.set("assetType", assetType)
+    }
+
+    const response = await fetch(`/api/eodhd/search?${params.toString()}`)
 
     if (!response.ok) {
         const errorText = await response.text()
@@ -332,7 +381,9 @@ async function updateAssetDetail(asset) {
     }
 
     if (detFinnhub) {
-        detFinnhub.textContent = `Ticker mercado: ${asset.finnhubSymbol || "---"}`
+        const marketProvider = String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")).toUpperCase()
+        const marketSymbol = asset.marketSymbol || asset.finnhubSymbol || "---"
+        detFinnhub.textContent = `Ticker mercado: ${marketSymbol} · API: ${marketProvider}`
     }
 }
 
@@ -368,6 +419,8 @@ async function renderAssetsList(assets) {
 
 async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTable = false) {
     try {
+        await loadVentasRowsForAssets()
+        await loadTransaccionesRowsForAssets()
         const assets = await loadAssetsList()
         await renderAssetsList(assets)
         await refreshTopPortfolioMetrics(assets)
@@ -594,7 +647,7 @@ function createAssetSymbolFromName(name) {
     return String(name || "")
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, "")
-        .slice(0, 10) || "ACTIVO"
+        .slice(0, 24) || "ACTIVO"
 }
 
 function formatPercent(value) {
@@ -602,6 +655,16 @@ function formatPercent(value) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     }).format(value) + " %"
+}
+
+function formatCellPercentValue(value) {
+    const numericValue = parseLooseNumber(value)
+
+    if (numericValue === null) {
+        return String(value || "").trim()
+    }
+
+    return formatPercent(numericValue)
 }
 
 function calculateYieldPercent(invertidoNeto, rendimiento) {
@@ -638,6 +701,7 @@ function applyTopPortfolioMetrics(metrics) {
     updateTopMetricElement("topTotalCuenta", formatEuro(metrics.totalCuenta))
     updateTopMetricElement("topPorcentajeCuenta", formatPercent(calculateYieldPercent(metrics.invertido, metrics.rendimiento)))
     updateTopMetricElement("topInvertido", formatEuro(metrics.invertido))
+    updateTopMetricElement("topRendimientoEuros", formatEuro(metrics.rendimiento))
 
     updateTopMetricElement("topPorcentajeCripto", formatPercent(calculateYieldPercent(metrics.tipos.cripto.invertidoNeto, metrics.tipos.cripto.rendimiento)))
     updateTopMetricElement("topEurosCripto", formatEuro(metrics.tipos.cripto.invertidoNeto))
@@ -712,7 +776,7 @@ async function refreshOverviewMarketData(buttonElement = null) {
 
     try {
         const assets = await loadAssetsList()
-        const assetsWithTicker = assets.filter((asset) => String(asset.finnhubSymbol || "").trim())
+        const assetsWithTicker = assets.filter((asset) => String(asset.marketSymbol || asset.finnhubSymbol || "").trim())
 
         for (const asset of assetsWithTicker) {
             try {
@@ -768,6 +832,27 @@ function getSignedParticipation(row) {
     return participaciones
 }
 
+function parseAssetOperationDate(value) {
+    const text = String(value || "").trim()
+
+    if (!text) {
+        return Number.POSITIVE_INFINITY
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+        return new Date(`${text}T00:00:00`).getTime()
+    }
+
+    const match = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
+
+    if (!match) {
+        return Number.POSITIVE_INFINITY
+    }
+
+    const [, day, month, year] = match
+    return new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T00:00:00`).getTime()
+}
+
 function getAveragePurchasePrice(rows) {
     const totals = rows.reduce((accumulator, row) => {
         const operationType = (row.tipoOperacion || "").trim().toLowerCase()
@@ -794,14 +879,7 @@ function getAveragePurchasePrice(rows) {
 }
 
 function getRowGrossAmount(row, assetType = "") {
-    const precioParticipacion = parseLooseNumber(row.precioParticipacion || "")
-    const participaciones = parseParticipationNumber(row.participaciones)
     const capitalInvertidoBruto = parseLooseNumber(row.capitalInvertidoBruto || "")
-
-    if (!isCryptoAssetType(assetType) && precioParticipacion !== null && participaciones > 0) {
-        return precioParticipacion * participaciones
-    }
-
     return capitalInvertidoBruto || 0
 }
 
@@ -816,15 +894,97 @@ function getRowSignedCost(row, assetType = "") {
     return costeFila
 }
 
+function getRowAnnualCostAmount(row, assetType = "") {
+    return 0
+}
+
+function getRowTotalCostForLot(row, assetType = "") {
+    const participaciones = parseParticipationNumber(row.participaciones)
+    const capitalInvertidoBruto = parseLooseNumber(row.capitalInvertidoBruto || "")
+    const grossBasedCost = capitalInvertidoBruto !== null ? capitalInvertidoBruto : 0
+
+    if (participaciones <= 0) {
+        return grossBasedCost
+    }
+
+    return grossBasedCost
+}
+
+function buildRemainingAssetLots(asset) {
+    const rows = Array.isArray(asset.rows) ? [...asset.rows] : []
+    rows.sort((left, right) => parseAssetOperationDate(left.fechaOperacion) - parseAssetOperationDate(right.fechaOperacion))
+
+    const lots = []
+
+    rows.forEach((row) => {
+        const operationType = String(row.tipoOperacion || "").trim().toLowerCase()
+        const participaciones = parseParticipationNumber(row.participaciones)
+
+        if (participaciones <= 0) {
+            return
+        }
+
+        if (operationType.includes("venta")) {
+            consumeAssetLots(lots, participaciones)
+            return
+        }
+
+        const totalCost = getRowTotalCostForLot(row, asset.type)
+        lots.push({
+            remaining: participaciones,
+            unitCost: participaciones > 0 ? totalCost / participaciones : 0,
+            totalCost
+        })
+    })
+
+    const externalSales = externalVentasRowsCache
+        .filter((row) => String(row.assetId || "") === String(asset.id || ""))
+        .sort((left, right) => parseAssetOperationDate(left.fecha) - parseAssetOperationDate(right.fecha))
+
+    externalSales.forEach((saleRow) => {
+        const soldQuantity = parseParticipationNumber(saleRow.cantidad)
+
+        if (soldQuantity > 0) {
+            consumeAssetLots(lots, soldQuantity)
+        }
+    })
+
+    return lots
+}
+
+function consumeAssetLots(lots, quantityToSell) {
+    let remainingToSell = quantityToSell
+
+    for (const lot of lots) {
+        if (remainingToSell <= 0) {
+            break
+        }
+
+        const quantityFromLot = Math.min(lot.remaining, remainingToSell)
+
+        if (quantityFromLot <= 0) {
+            continue
+        }
+
+        lot.remaining -= quantityFromLot
+        remainingToSell -= quantityFromLot
+    }
+}
+
 function buildOverviewRow(asset) {
     const rows = Array.isArray(asset.rows) ? asset.rows : []
-    const participaciones = rows.reduce((total, row) => total + getSignedParticipation(row), 0)
-    const invertidoBruto = rows.reduce((total, row) => total + getRowSignedCost(row, asset.type), 0)
+    const remainingLots = buildRemainingAssetLots(asset)
+    const rawParticipaciones = remainingLots.reduce((total, lot) => total + lot.remaining, 0)
+    const transaccionesFeeAmount = externalTransaccionesRowsCache
+        .filter((row) => String(row.assetId || "") === String(asset.id || ""))
+        .reduce((total, row) => total + (parseLooseNumber(row.comisionRed || "") || 0), 0)
+    const participaciones = Math.max(0, rawParticipaciones - transaccionesFeeAmount)
+    const invertidoBruto = remainingLots.reduce((total, lot) => total + (lot.remaining * lot.unitCost), 0)
     const comisiones = rows.reduce((total, row) => total + (parseLooseNumber(row.comisiones || "") || 0), 0)
     const invertidoNeto = invertidoBruto - comisiones
     const valorActual = parseLooseNumber(asset.price || "") || 0
     const netoActual = participaciones * valorActual
-    const promedioCompra = getAveragePurchasePrice(rows)
+    const promedioCompra = participaciones > 0 ? invertidoBruto / participaciones : 0
     const rendimiento = netoActual - invertidoNeto
 
     return {
@@ -922,17 +1082,18 @@ function renderAssetTablePage(asset) {
     const targetCurrency = currentCurrency === "EUR" ? "USD" : "EUR"
     const targetPriceCurrency = currentPriceCurrency === "EUR" ? "USD" : "EUR"
     const isCrypto = isCryptoAssetType(asset.type)
+    const isEtf = String(asset.type || "").trim().toLowerCase() === "etfs"
 
     if (!contentArea) {
         return
     }
 
     contentArea.innerHTML = `
-        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-price-currency="${asset.precioCurrency || asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}">
+        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-price-currency="${asset.precioCurrency || asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-market-provider="${asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-market-symbol="${asset.marketSymbol || asset.finnhubSymbol || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}">
             <div class="assetPageHeader">
                 <div>
                     <div class="assetTitleRow">
-                        <h1 class="assetPageTitle">${asset.symbol || asset.name}</h1>
+                        <h1 class="assetPageTitle">${asset.name || asset.symbol}</h1>
                         <button id="editAssetNameBtn" class="assetEditNameBtn" type="button" title="Editar nombre del activo" aria-label="Editar nombre del activo">✎</button>
                     </div>
                     <div class="assetPageSubtitle">${asset.name} · ${buildAssetTypeLabel(asset.type)}</div>
@@ -975,6 +1136,7 @@ function renderAssetTablePage(asset) {
                             <th>Participaciones</th>
                             <th>Precio Participación</th>
                             <th>Capital Invertido bruto</th>
+                            ${isEtf ? "<th>Coste Anual</th>" : ""}
                             <th>Comisiones</th>
                             <th>Capital Invertido neto</th>
                         </tr>
@@ -984,7 +1146,7 @@ function renderAssetTablePage(asset) {
             </div>
 
             <div class="assetActions">
-                <button id="refreshAssetMarketBtn" class="primaryButton">Actualizar cotización</button>
+                <button id="refreshAssetMarketBtn" class="primaryButton">Actualizar cotización (${String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")).toUpperCase()})</button>
                 <button id="addAssetRowBtn" class="primaryButton">Añadir fila</button>
                 <button id="saveAssetBtn" class="secondaryButton">Guardar JSON</button>
                 <button id="deleteAssetBtn" class="dangerButton">Eliminar activo</button>
@@ -1003,6 +1165,7 @@ function renderAssetRows(rows) {
     const assetPriceCurrency = assetPage?.dataset.assetPriceCurrency || assetCurrency
     const assetType = assetPage?.dataset.assetType || "acciones"
     const isCrypto = isCryptoAssetType(assetType)
+    const isEtf = String(assetType || "").trim().toLowerCase() === "etfs"
 
     if (!assetOperationsBody) {
         return
@@ -1012,14 +1175,14 @@ function renderAssetRows(rows) {
 
     rows.forEach((rowData) => {
         const rowElement = document.createElement("tr")
-        const grossAmount = getRowGrossAmount(rowData, assetType)
         rowElement.innerHTML = `
             <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
             <td contenteditable="true" data-field="fechaOperacion">${rowData.fechaOperacion || ""}</td>
             <td contenteditable="true" data-field="tipoOperacion">${rowData.tipoOperacion || "Compra"}</td>
             <td contenteditable="true" data-field="participaciones">${formatAssetParticipationValue(rowData.participaciones, assetType)}</td>
             <td contenteditable="true" data-field="precioParticipacion">${formatCellMoneyValue(rowData.precioParticipacion, getAssetTableMoneyCurrency(assetType, "precioParticipacion", assetCurrency, assetPriceCurrency))}</td>
-            <td contenteditable="true" data-field="capitalInvertidoBruto">${formatMoney(grossAmount, getAssetTableMoneyCurrency(assetType, "capitalInvertidoBruto", assetCurrency))}</td>
+            <td contenteditable="true" data-field="capitalInvertidoBruto">${formatCellMoneyValue(rowData.capitalInvertidoBruto, getAssetTableMoneyCurrency(assetType, "capitalInvertidoBruto", assetCurrency))}</td>
+            ${isEtf ? `<td contenteditable="true" data-field="costeAnual">${formatCellPercentValue(rowData.costeAnual)}</td>` : ""}
             <td contenteditable="true" data-field="comisiones">${isCrypto ? formatAssetCommissionValue(rowData.comisiones, getAssetTableMoneyCurrency(assetType, "comisiones", assetCurrency, assetPriceCurrency)) : formatCellMoneyValue(rowData.comisiones, getAssetTableMoneyCurrency(assetType, "comisiones", assetCurrency, assetPriceCurrency))}</td>
             <td class="rowTotal">${formatMoney(0, assetCurrency)}</td>
         `
@@ -1043,15 +1206,9 @@ function collectAssetRowsFromTable() {
             participaciones: getFieldValue("participaciones"),
             precioParticipacion: getFieldValue("precioParticipacion"),
             capitalInvertidoBruto: getFieldValue("capitalInvertidoBruto"),
+            costeAnual: getFieldValue("costeAnual"),
             comisiones: getFieldValue("comisiones"),
             comisionesSatoshis: getFieldValue("comisionesSatoshis")
-        }
-
-        if (!isCryptoAssetType(assetType)) {
-            rowData.capitalInvertidoBruto = formatMoney(
-                getRowGrossAmount(rowData, assetType),
-                getAssetTableMoneyCurrency(assetType, "capitalInvertidoBruto", assetCurrency)
-            )
         }
 
         return rowData
@@ -1098,6 +1255,7 @@ function isEmptyAssetRow(rowElement) {
     const participaciones = parseFloat((rowElement.querySelector('[data-field="participaciones"]')?.textContent || "0").replace(",", ".")) || 0
     const precioParticipacion = parseLooseNumber(rowElement.querySelector('[data-field="precioParticipacion"]')?.textContent || "") || 0
     const capitalInvertidoBruto = parseLooseNumber(rowElement.querySelector('[data-field="capitalInvertidoBruto"]')?.textContent || "") || 0
+    const costeAnual = parseLooseNumber(rowElement.querySelector('[data-field="costeAnual"]')?.textContent || "") || 0
     const comisiones = parseLooseNumber(rowElement.querySelector('[data-field="comisiones"]')?.textContent || "") || 0
     const comisionesSatoshis = parseLooseNumber(rowElement.querySelector('[data-field="comisionesSatoshis"]')?.textContent || "") || 0
 
@@ -1106,6 +1264,7 @@ function isEmptyAssetRow(rowElement) {
         participaciones === 0 &&
         precioParticipacion === 0 &&
         capitalInvertidoBruto === 0 &&
+        costeAnual === 0 &&
         comisiones === 0 &&
         comisionesSatoshis === 0
 }
@@ -1171,12 +1330,19 @@ function handleRowDeleteClick(event) {
 
 function buildCurrentAssetPayload() {
     const assetPage = document.querySelector(".assetTablePage")
+    const marketSymbol = (assetPage?.dataset.assetMarketSymbol || assetPage?.dataset.assetFinnhubSymbol || "").trim().toUpperCase()
+    const marketProvider = inferMarketProviderFromSymbol(
+        marketSymbol,
+        (assetPage?.dataset.assetMarketProvider || "finnhub").trim().toLowerCase()
+    )
 
     return {
         id: currentAssetId,
         name: assetPage?.dataset.assetName || document.getElementById("detName")?.textContent.trim() || "Activo",
         symbol: assetPage?.dataset.assetSymbol || document.getElementById("detSymbol")?.textContent.trim() || "ACTIVO",
-        finnhubSymbol: (assetPage?.dataset.assetFinnhubSymbol || "").trim().toUpperCase(),
+        marketProvider,
+        marketSymbol,
+        finnhubSymbol: marketSymbol,
         type: assetPage?.dataset.assetType || "cripto",
         price: assetPage?.dataset.assetPrice || "0,00",
         currency: assetPage?.dataset.assetCurrency || "EUR",
@@ -1194,25 +1360,19 @@ function updateAssetTableTotals() {
     const assetPage = document.querySelector(".assetTablePage")
     const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
     const assetType = assetPage?.dataset.assetType || "acciones"
+    const isEtf = String(assetType || "").trim().toLowerCase() === "etfs"
 
     rowElements.forEach((rowElement) => {
         const rowData = {
             participaciones: rowElement.querySelector('[data-field="participaciones"]')?.textContent || "",
             precioParticipacion: rowElement.querySelector('[data-field="precioParticipacion"]')?.textContent || "",
-            capitalInvertidoBruto: rowElement.querySelector('[data-field="capitalInvertidoBruto"]')?.textContent || ""
+            capitalInvertidoBruto: rowElement.querySelector('[data-field="capitalInvertidoBruto"]')?.textContent || "",
+            costeAnual: rowElement.querySelector('[data-field="costeAnual"]')?.textContent || ""
         }
         const bruto = getRowGrossAmount(rowData, assetType)
         const comisiones = parseLooseNumber(rowElement.querySelector('[data-field="comisiones"]')?.textContent || "") || 0
         const neto = bruto - comisiones
         const rowTotalCell = rowElement.querySelector(".rowTotal")
-        const grossCell = rowElement.querySelector('[data-field="capitalInvertidoBruto"]')
-
-        if (grossCell && !isCryptoAssetType(assetType)) {
-            grossCell.textContent = formatMoney(
-                bruto,
-                getAssetTableMoneyCurrency(assetType, "capitalInvertidoBruto", assetCurrency)
-            )
-        }
 
         if (rowTotalCell) {
             rowTotalCell.textContent = formatMoney(neto, getAssetTableMoneyCurrency(assetType, "capitalInvertidoNeto", assetCurrency))
@@ -1237,7 +1397,32 @@ function setAssetSearchFeedback(container, message = "", isError = false) {
     container.classList.toggle("assetSearchError", isError)
 }
 
-function renderFinnhubSearchResults(container, results, onSelect) {
+function inferMarketProviderFromSymbol(symbol, fallback = "finnhub") {
+    const normalizedSymbol = String(symbol || "").trim().toUpperCase()
+    const normalizedFallback = String(fallback || "finnhub").trim().toLowerCase()
+
+    if (!normalizedSymbol) {
+        return normalizedFallback || "finnhub"
+    }
+
+    if (normalizedSymbol.includes(":")) {
+        return "finnhub"
+    }
+
+    const eodhdExchangeCodes = new Set(["XETRA", "PA", "LSE", "US", "SW", "AS", "MC", "MI", "DU", "BE", "F", "MU", "ST", "VI", "LS"])
+
+    if (normalizedSymbol.includes(".")) {
+        const exchangeCode = normalizedSymbol.split(".").pop()
+
+        if (eodhdExchangeCodes.has(exchangeCode)) {
+            return "eodhd"
+        }
+    }
+
+    return normalizedFallback || "finnhub"
+}
+
+function renderMarketSearchResults(container, results, onSelect) {
     if (!container) {
         return
     }
@@ -1257,7 +1442,8 @@ function renderFinnhubSearchResults(container, results, onSelect) {
         const hasQuote = String(result.price || "").trim() !== ""
         const quoteClass = changeValue.startsWith("-") ? "negative" : "positive"
         const displaySymbol = result.displaySymbol || result.symbol
-        const metaLabel = [result.type || "market", result.exchange || ""].filter(Boolean).join(" · ")
+        const providerLabel = String(result.provider || "").trim().toUpperCase()
+        const metaLabel = [providerLabel, result.type || "market", result.exchange || ""].filter(Boolean).join(" · ")
         button.innerHTML = `
             <span class="assetSearchResultTitle">${displaySymbol}</span>
             <span class="assetSearchResultSubtitle">${result.description}</span>
@@ -1285,11 +1471,11 @@ async function handleFinnhubSearch({ query, assetName = "", assetType = "", feed
 
     if (!normalizedQuery) {
         setAssetSearchFeedback(feedbackElement, "Escribe el nombre o ticker del activo.", true)
-        renderFinnhubSearchResults(resultsElement, [], onSelect)
+        renderMarketSearchResults(resultsElement, [], onSelect)
         return
     }
 
-    setAssetSearchFeedback(feedbackElement, "Buscando en mercado...")
+    setAssetSearchFeedback(feedbackElement, "Buscando ticker en Finnhub...")
 
     try {
         const response = await searchFinnhubSymbolOnServer(normalizedQuery, { assetName, assetType })
@@ -1297,16 +1483,46 @@ async function handleFinnhubSearch({ query, assetName = "", assetType = "", feed
 
         if (!results.length) {
             setAssetSearchFeedback(feedbackElement, "No se encontraron resultados para esa búsqueda.", true)
-            renderFinnhubSearchResults(resultsElement, [], onSelect)
+            renderMarketSearchResults(resultsElement, [], onSelect)
             return
         }
 
-        setAssetSearchFeedback(feedbackElement, "Selecciona el ticker correcto.")
-        renderFinnhubSearchResults(resultsElement, results, onSelect)
+        setAssetSearchFeedback(feedbackElement, "Selecciona el ticker correcto de Finnhub.")
+        renderMarketSearchResults(resultsElement, results, onSelect)
     } catch (error) {
         console.error(error)
         setAssetSearchFeedback(feedbackElement, "No se pudo consultar Finnhub. Revisa la API key.", true)
-        renderFinnhubSearchResults(resultsElement, [], onSelect)
+        renderMarketSearchResults(resultsElement, [], onSelect)
+    }
+}
+
+async function handleEodhdSearch({ query, assetName = "", assetType = "", feedbackElement, resultsElement, onSelect }) {
+    const normalizedQuery = String(query || "").trim()
+
+    if (!normalizedQuery) {
+        setAssetSearchFeedback(feedbackElement, "Escribe el nombre o ticker del activo.", true)
+        renderMarketSearchResults(resultsElement, [], onSelect)
+        return
+    }
+
+    setAssetSearchFeedback(feedbackElement, "Buscando ticker en EODHD...")
+
+    try {
+        const response = await searchEodhdSymbolOnServer(normalizedQuery, { assetName, assetType })
+        const results = Array.isArray(response.results) ? response.results : []
+
+        if (!results.length) {
+            setAssetSearchFeedback(feedbackElement, "No se encontraron resultados en EODHD para esa búsqueda.", true)
+            renderMarketSearchResults(resultsElement, [], onSelect)
+            return
+        }
+
+        setAssetSearchFeedback(feedbackElement, "Selecciona el ticker correcto de EODHD.")
+        renderMarketSearchResults(resultsElement, results, onSelect)
+    } catch (error) {
+        console.error(error)
+        setAssetSearchFeedback(feedbackElement, "No se pudo consultar EODHD. Revisa la API key.", true)
+        renderMarketSearchResults(resultsElement, [], onSelect)
     }
 }
 
@@ -1425,6 +1641,7 @@ function addNewAssetRow() {
     const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
     const assetType = assetPage?.dataset.assetType || "acciones"
     const isCrypto = isCryptoAssetType(assetType)
+    const isEtf = String(assetType || "").trim().toLowerCase() === "etfs"
 
     if (!assetOperationsBody) {
         return
@@ -1438,6 +1655,7 @@ function addNewAssetRow() {
         <td contenteditable="true" data-field="participaciones"></td>
         <td contenteditable="true" data-field="precioParticipacion"></td>
         <td contenteditable="true" data-field="capitalInvertidoBruto"></td>
+        ${isEtf ? '<td contenteditable="true" data-field="costeAnual"></td>' : ""}
         <td contenteditable="true" data-field="comisiones">${isCrypto ? '0,000 €' : ''}</td>
         <td class="rowTotal">${formatMoney(0, assetCurrency)}</td>
     `
@@ -1633,8 +1851,9 @@ function openAssetModal() {
     assetNameInput.value = ""
     assetTypeSelect.value = "cripto"
     assetTickerInput.value = ""
+    assetTickerInput.dataset.marketProvider = "finnhub"
     setAssetSearchFeedback(assetSearchFeedback, "")
-    renderFinnhubSearchResults(assetSearchResults, [], () => {})
+    renderMarketSearchResults(assetSearchResults, [], () => {})
     assetModalOverlay.classList.remove("hidden")
     assetModalState = { isOpen: true }
     assetNameInput.focus()
@@ -1721,7 +1940,11 @@ async function submitAssetModal() {
 
     const name = assetNameInput.value.trim()
     const type = assetTypeSelect.value.trim()
-    const finnhubSymbol = assetTickerInput.value.trim().toUpperCase()
+    const marketSymbol = assetTickerInput.value.trim().toUpperCase()
+    const marketProvider = inferMarketProviderFromSymbol(
+        marketSymbol,
+        assetTickerInput.dataset.marketProvider || "finnhub"
+    )
 
     if (!name) {
         setAssetSearchFeedback(assetSearchFeedback, "Introduce el nombre del activo.", true)
@@ -1735,7 +1958,7 @@ async function submitAssetModal() {
         return
     }
 
-    if (!finnhubSymbol) {
+    if (!marketSymbol) {
         setAssetSearchFeedback(assetSearchFeedback, "Introduce o selecciona el ticker de mercado.", true)
         assetTickerInput.focus()
         return
@@ -1743,7 +1966,7 @@ async function submitAssetModal() {
 
     try {
         setAssetSearchFeedback(assetSearchFeedback, "")
-        const response = await createAssetOnServer(name, type, finnhubSymbol)
+        const response = await createAssetOnServer(name, type, marketSymbol, marketProvider)
         const createdAsset = response.asset
         closeAssetModal()
         currentAssetId = createdAsset.id
@@ -1811,7 +2034,7 @@ function initAddAssetButton(addAssetButton) {
     })
 }
 
-function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect, assetTickerInput, searchAssetTickerButton) {
+function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect, assetTickerInput, searchAssetTickerFinnhubButton, searchAssetTickerEodhdButton) {
     const assetSearchFeedback = document.getElementById("assetSearchFeedback")
     const assetSearchResults = document.getElementById("assetSearchResults")
     initEditAssetModal()
@@ -1855,8 +2078,22 @@ function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetM
         })
     }
 
-    if (searchAssetTickerButton) {
-        searchAssetTickerButton.addEventListener("click", async () => {
+    const runTickerSelection = (result, providerName) => {
+        if (assetTickerInput) {
+            assetTickerInput.value = result.symbol
+            assetTickerInput.dataset.marketProvider = String(result.provider || providerName).trim().toLowerCase()
+        }
+
+        if (assetNameInput && !assetNameInput.value.trim()) {
+            assetNameInput.value = result.description
+        }
+
+        setAssetSearchFeedback(assetSearchFeedback, `Ticker seleccionado (${providerName}): ${result.symbol}`)
+        renderMarketSearchResults(assetSearchResults, [], () => {})
+    }
+
+    if (searchAssetTickerFinnhubButton) {
+        searchAssetTickerFinnhubButton.addEventListener("click", async () => {
             const typedTicker = assetTickerInput?.value.trim() || ""
             const typedName = assetNameInput?.value.trim() || ""
             const searchQuery = typedName || typedTicker
@@ -1867,18 +2104,24 @@ function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetM
                 assetType: assetTypeSelect?.value || "",
                 feedbackElement: assetSearchFeedback,
                 resultsElement: assetSearchResults,
-                onSelect: (result) => {
-                    if (assetTickerInput) {
-                        assetTickerInput.value = result.symbol
-                    }
+                onSelect: (result) => runTickerSelection(result, "Finnhub")
+            })
+        })
+    }
 
-                    if (assetNameInput && !assetNameInput.value.trim()) {
-                        assetNameInput.value = result.description
-                    }
+    if (searchAssetTickerEodhdButton) {
+        searchAssetTickerEodhdButton.addEventListener("click", async () => {
+            const typedTicker = assetTickerInput?.value.trim() || ""
+            const typedName = assetNameInput?.value.trim() || ""
+            const searchQuery = typedName || typedTicker
 
-                    setAssetSearchFeedback(assetSearchFeedback, `Ticker seleccionado: ${result.symbol}`)
-                    renderFinnhubSearchResults(assetSearchResults, [], () => {})
-                }
+            await handleEodhdSearch({
+                query: searchQuery,
+                assetName: typedName,
+                assetType: assetTypeSelect?.value || "",
+                feedbackElement: assetSearchFeedback,
+                resultsElement: assetSearchResults,
+                onSelect: (result) => runTickerSelection(result, "EODHD")
             })
         })
     }

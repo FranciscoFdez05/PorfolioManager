@@ -10,8 +10,12 @@ apiDir = baseDir / "API"
 interesesFile = dataDir / "intereses.json"
 dividendosFile = dataDir / "dividendos.json"
 operacionesFile = dataDir / "operaciones.json"
+ventasFile = dataDir / "ventas.json"
+transaccionesFile = dataDir / "transacciones.json"
 twelvedataKeyFile = apiDir / "twelvedata.key"
 finnhubKeyFile = apiDir / "finnhub.key"
+eodhdKeyFile = apiDir / "eodhd.key"
+_eodhdKeyRotationIndex = 0
 
 
 def ensureDataFile():
@@ -30,6 +34,14 @@ def ensureDataFile():
 
     if not operacionesFile.exists():
         with operacionesFile.open("w", encoding="utf-8") as file:
+            json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
+
+    if not ventasFile.exists():
+        with ventasFile.open("w", encoding="utf-8") as file:
+            json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
+
+    if not transaccionesFile.exists():
+        with transaccionesFile.open("w", encoding="utf-8") as file:
             json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
 
 
@@ -75,6 +87,34 @@ def writeOperacionesFile(data):
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 
+def readVentasFile():
+    ensureDataFile()
+
+    with ventasFile.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def writeVentasFile(data):
+    ensureDataFile()
+
+    with ventasFile.open("w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+
+
+def readTransaccionesFile():
+    ensureDataFile()
+
+    with transaccionesFile.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def writeTransaccionesFile(data):
+    ensureDataFile()
+
+    with transaccionesFile.open("w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+
+
 def readFinnhubApiKey():
     ensureDataFile()
 
@@ -95,3 +135,49 @@ def readFinnhubApiKey():
                     return apiKey
 
     return None
+
+
+def readEodhdApiKey():
+    ensureDataFile()
+
+    if eodhdKeyFile.exists():
+        with eodhdKeyFile.open("r", encoding="utf-8") as file:
+            for line in file:
+                apiKey = line.strip()
+
+                if apiKey and not apiKey.startswith("#"):
+                    return apiKey
+
+    return None
+
+
+def readEodhdApiKeys():
+    ensureDataFile()
+
+    apiKeys = []
+
+    if not eodhdKeyFile.exists():
+        return apiKeys
+
+    with eodhdKeyFile.open("r", encoding="utf-8") as file:
+        for line in file:
+            apiKey = line.strip()
+
+            if apiKey and not apiKey.startswith("#") and apiKey not in apiKeys:
+                apiKeys.append(apiKey)
+
+    return apiKeys
+
+
+def readRotatedEodhdApiKeys():
+    global _eodhdKeyRotationIndex
+
+    apiKeys = readEodhdApiKeys()
+
+    if not apiKeys:
+        return []
+
+    startIndex = _eodhdKeyRotationIndex % len(apiKeys)
+    _eodhdKeyRotationIndex = (startIndex + 1) % len(apiKeys)
+
+    return apiKeys[startIndex:] + apiKeys[:startIndex]

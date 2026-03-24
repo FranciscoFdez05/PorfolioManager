@@ -1,4 +1,40 @@
-<div class="placeholderPage">
-    <h2>Ventas</h2>
-    <p>Contenido pendiente.</p>
-</div>
+<section class="operationsPage">
+    <div class="operationsHeader">
+        <div>
+            <h2 class="operationsTitle">Ventas</h2>
+            <p class="operationsSubtitle">Calcula las ventas con criterio FIFO para Hacienda: cada fila consume primero las compras más antiguas que sigan pendientes.</p>
+        </div>
+    </div>
+
+    <div class="operationsTableWrapper">
+        <table class="operationsTable">
+            <thead>
+                <tr>
+                    <th class="rowActionHeader"></th>
+                    <th>Fecha Venta</th>
+                    <th>Activo</th>
+                    <th>Cantidad</th>
+                    <th>Coste FIFO unitario</th>
+                    <th>Valor de venta</th>
+                    <th>Dinero a declarar</th>
+                    <th>Tramo 1 (19%)</th>
+                    <th>Tramo 2 (21%)</th>
+                    <th>Tramo 3 (23%)</th>
+                    <th>Tramo 4 (27%)</th>
+                    <th>Tramo 5 (28%)</th>
+                    <th>Total a pagar</th>
+                    <th>Bruto</th>
+                    <th>Neto</th>
+                </tr>
+            </thead>
+            <tbody id="ventasBody"></tbody>
+        </table>
+    </div>
+
+    <div class="operationsActions">
+        <button id="addVentaRowBtn" class="primaryButton" type="button">Añadir fila</button>
+        <button id="exportVentasBtn" class="secondaryButton" type="button">Exportar JSON</button>
+        <button id="importVentasBtn" class="secondaryButton" type="button">Importar JSON</button>
+        <button id="saveVentasBtn" class="secondaryButton" type="button">Guardar</button>
+    </div>
+</section>

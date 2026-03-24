@@ -1,4 +1,42 @@
-<div class="placeholderPage">
-    <h2>Transacciones</h2>
-    <p>Contenido pendiente.</p>
-</div>
+<section class="operationsPage">
+    <div class="operationsHeader">
+        <div>
+            <h2 class="operationsTitle">Transacciones</h2>
+            <p class="operationsSubtitle">Registra movimientos entre tus wallets por cripto. Del total solo se descuenta la comisión cripto.</p>
+        </div>
+    </div>
+
+    <div class="transaccionesAssetPanel">
+        <div class="transaccionesAssetPanelHeader">
+            <div>
+                <p class="transaccionesAssetPanelLabel">Criptos</p>
+                <h3 class="transaccionesAssetPanelTitle">Selecciona la moneda para registrar sus transacciones</h3>
+            </div>
+        </div>
+        <div id="transaccionesAssetMenu" class="transaccionesAssetMenu"></div>
+        <p id="transaccionesAssetHint" class="transaccionesAssetHint"></p>
+    </div>
+
+    <div class="operationsTableWrapper">
+        <table class="operationsTable">
+            <thead>
+                <tr>
+                    <th class="rowActionHeader"></th>
+                    <th>Fecha operación</th>
+                    <th>Wallet Origen</th>
+                    <th>Total cripto</th>
+                    <th>Comisión red</th>
+                    <th>Wallet destino</th>
+                </tr>
+            </thead>
+            <tbody id="transaccionesBody"></tbody>
+        </table>
+    </div>
+
+    <div class="operationsActions">
+        <button id="addTransaccionRowBtn" class="primaryButton" type="button">Añadir fila</button>
+        <button id="exportTransaccionesBtn" class="secondaryButton" type="button">Exportar JSON</button>
+        <button id="importTransaccionesBtn" class="secondaryButton" type="button">Importar JSON</button>
+        <button id="saveTransaccionesBtn" class="secondaryButton" type="button">Guardar</button>
+    </div>
+</section>

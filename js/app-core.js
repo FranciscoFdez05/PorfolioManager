@@ -11,7 +11,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const assetNameInput = document.getElementById("assetNameInput")
     const assetTypeSelect = document.getElementById("assetTypeSelect")
     const assetTickerInput = document.getElementById("assetTickerInput")
-    const searchAssetTickerButton = document.getElementById("searchAssetTickerBtn")
+    const searchAssetTickerFinnhubButton = document.getElementById("searchAssetTickerFinnhubBtn")
+    const searchAssetTickerEodhdButton = document.getElementById("searchAssetTickerEodhdBtn")
     const confirmModalOverlay = document.getElementById("confirmModalOverlay")
     const confirmModalAcceptButton = document.getElementById("confirmModalAcceptBtn")
     const confirmModalCancelButton = document.getElementById("confirmModalCancelBtn")
@@ -20,7 +21,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     initNavigation(navButtons, contentArea)
     initAddAssetButton(addAssetButton, assetModalOverlay, assetNameInput, assetTypeSelect, assetTickerInput)
     initSidebarRefreshButton(refreshSidebarMarketButton)
-    initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect, assetTickerInput, searchAssetTickerButton)
+    initAssetModal(
+        assetModalOverlay,
+        confirmAssetModalButton,
+        cancelAssetModalButton,
+        assetNameInput,
+        assetTypeSelect,
+        assetTickerInput,
+        searchAssetTickerFinnhubButton,
+        searchAssetTickerEodhdButton
+    )
     initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
     await refreshAssetsSidebar()
 
@@ -110,6 +120,10 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initDividendosLogic()
         } else if (page === "gastos") {
             await initGastosLogic()
+        } else if (page === "ventas") {
+            await initVentasLogic()
+        } else if (page === "transacciones") {
+            await initTransaccionesLogic()
         } else if (page === "operaciones") {
             await initOperacionesLogic()
         }

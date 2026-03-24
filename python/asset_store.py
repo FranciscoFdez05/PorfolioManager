@@ -1,7 +1,7 @@
 import json
 
 from app_data import activosDir, dataDir, ensureDataFile
-from asset_utils import slugify
+from asset_utils import inferMarketProviderFromSymbol, slugify
 
 
 def getAssetFile(assetId):
@@ -41,6 +41,8 @@ def listAssets():
             "id": data.get("id", assetFile.stem),
             "name": data.get("name", assetFile.stem),
             "symbol": data.get("symbol", assetFile.stem.upper()),
+            "marketProvider": data.get("marketProvider", inferMarketProviderFromSymbol(data.get("marketSymbol", data.get("finnhubSymbol", "")))),
+            "marketSymbol": data.get("marketSymbol", data.get("finnhubSymbol", "")),
             "finnhubSymbol": data.get("finnhubSymbol", ""),
             "type": data.get("type", ""),
             "order": data.get("order", index),

@@ -1,8 +1,10 @@
 from flask import Flask, jsonify, request, send_from_directory
 
-from app_data import baseDir, ensureDataFile, readDividendosFile, readFinnhubApiKey, readInteresesFile, readOperacionesFile, writeDividendosFile, writeInteresesFile, writeOperacionesFile
+from app_data import baseDir, ensureDataFile, readDividendosFile, readEodhdApiKey, readFinnhubApiKey, readInteresesFile, readOperacionesFile, readRotatedEodhdApiKeys, readTransaccionesFile, readVentasFile, writeDividendosFile, writeInteresesFile, writeOperacionesFile, writeTransaccionesFile, writeVentasFile
 from asset_store import getAssetFile, listAssets, readAssetFile, writeAssetFile
-from asset_utils import createDefaultAssetPayload, sanitizeAssetPayload, sanitizeAssetType, slugify
+from asset_utils import createDefaultAssetPayload, inferMarketProviderFromSymbol, normalizeMarketProvider, sanitizeAssetPayload, sanitizeAssetType, slugify
+from eodhd_client import fetch_quote as fetch_eodhd_quote
+from eodhd_client import search_symbol as search_eodhd_symbol
 from finnhub_client import convert_amount, convert_quote_currency, fetch_exchange_rate, fetch_quote, search_symbol
 from gastos_store import create_default_gastos_year, delete_gastos_year, list_gastos_years, normalize_year, read_gastos_year, sanitize_gastos_payload, write_gastos_year
 
@@ -20,6 +22,35 @@ def normalize_currency_code(currency, fallback="EUR"):
         return "USD"
 
     return normalized or fallback
+
+
+def call_eodhd_with_fallbacks(callback):
+    apiKeys = readRotatedEodhdApiKeys()
+
+    if not apiKeys:
+        legacyKey = readEodhdApiKey()
+
+        if legacyKey:
+            apiKeys = [legacyKey]
+
+    if not apiKeys:
+        return None, "No se ha encontrado ninguna API key de EODHD"
+
+    lastError = None
+
+    for apiKey in apiKeys:
+        try:
+            result, error = callback(apiKey)
+        except Exception as error:
+            result = None
+            error = str(error)
+
+        if not error:
+            return result, None
+
+        lastError = error
+
+    return None, lastError or "Todas las API keys de EODHD han fallado"
 
 
 def parse_loose_number(value):
@@ -237,6 +268,78 @@ def saveOperaciones():
     return jsonify({"ok": True})
 
 
+@app.route("/api/ventas", methods=["GET"])
+def getVentas():
+    data = readVentasFile()
+    return jsonify(data)
+
+
+@app.route("/api/ventas", methods=["POST"])
+def saveVentas():
+    requestData = request.get_json(silent=True) or {}
+    rows = requestData.get("rows", [])
+
+    if not isinstance(rows, list):
+        return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+
+    sanitizedRows = []
+
+    for index, row in enumerate(rows):
+        sanitizedRows.append({
+            "id": str(row.get("id", f"venta-{index + 1}")).strip() or f"venta-{index + 1}",
+            "fecha": str(row.get("fecha", "")).strip(),
+            "assetId": str(row.get("assetId", "")).strip(),
+            "activo": str(row.get("activo", "")).strip(),
+            "cantidad": str(row.get("cantidad", "")).strip(),
+            "valorCompra": str(row.get("valorCompra", row.get("precioCompra", row.get("valor_compra", "")))).strip(),
+            "valorVenta": str(row.get("valorVenta", row.get("precioVenta", row.get("valor_venta", "")))).strip(),
+            "dineroDeclarar": str(row.get("dineroDeclarar", row.get("gananciaRealizada", ""))).strip(),
+            "tramo1": str(row.get("tramo1", "")).strip(),
+            "tramo2": str(row.get("tramo2", "")).strip(),
+            "tramo3": str(row.get("tramo3", "")).strip(),
+            "tramo4": str(row.get("tramo4", "")).strip(),
+            "tramo5": str(row.get("tramo5", "")).strip(),
+            "totalPagar": str(row.get("totalPagar", row.get("impuestos", ""))).strip(),
+            "bruto": str(row.get("bruto", "")).strip(),
+            "neto": str(row.get("neto", "")).strip()
+        })
+
+    writeVentasFile({"rows": sanitizedRows})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/transacciones", methods=["GET"])
+def getTransacciones():
+    data = readTransaccionesFile()
+    return jsonify(data)
+
+
+@app.route("/api/transacciones", methods=["POST"])
+def saveTransacciones():
+    requestData = request.get_json(silent=True) or {}
+    rows = requestData.get("rows", [])
+
+    if not isinstance(rows, list):
+        return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+
+    sanitizedRows = []
+
+    for index, row in enumerate(rows):
+        sanitizedRows.append({
+            "id": str(row.get("id", f"transaccion-{index + 1}")).strip() or f"transaccion-{index + 1}",
+            "assetId": str(row.get("assetId", "")).strip(),
+            "assetName": str(row.get("assetName", "")).strip(),
+            "fechaOperacion": str(row.get("fechaOperacion", "")).strip(),
+            "walletOrigen": str(row.get("walletOrigen", "")).strip(),
+            "total": str(row.get("total", "")).strip(),
+            "comisionRed": str(row.get("comisionRed", "")).strip(),
+            "walletDestino": str(row.get("walletDestino", "")).strip()
+        })
+
+    writeTransaccionesFile({"rows": sanitizedRows})
+    return jsonify({"ok": True})
+
+
 @app.route("/api/gastos", methods=["GET"])
 def getGastosYears():
     years = list_gastos_years()
@@ -318,7 +421,11 @@ def createActivo():
     requestData = request.get_json(silent=True) or {}
     assetName = str(requestData.get("name", "")).strip()
     assetType = sanitizeAssetType(requestData.get("type", ""))
-    finnhubSymbol = str(requestData.get("finnhubSymbol", "")).strip().upper()
+    marketSymbol = str(requestData.get("marketSymbol", requestData.get("finnhubSymbol", ""))).strip().upper()
+    marketProvider = normalizeMarketProvider(
+        requestData.get("marketProvider", ""),
+        fallback=inferMarketProviderFromSymbol(marketSymbol)
+    )
 
     if not assetName:
         return jsonify({"ok": False, "error": "El nombre del activo es obligatorio"}), 400
@@ -333,7 +440,9 @@ def createActivo():
         return jsonify({"ok": False, "error": "Ya existe un activo con ese nombre"}), 409
 
     payload = createDefaultAssetPayload(assetName, assetType, assetId)
-    payload["finnhubSymbol"] = finnhubSymbol
+    payload["marketProvider"] = marketProvider
+    payload["marketSymbol"] = marketSymbol
+    payload["finnhubSymbol"] = marketSymbol
     payload["order"] = len(listAssets())
     writeAssetFile(assetId, payload)
 
@@ -369,13 +478,20 @@ def refreshActivoMarketData(assetId):
     if assetData is None:
         return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
 
-    finnhubSymbol = str(assetData.get("finnhubSymbol", "")).strip().upper()
+    marketSymbol = str(assetData.get("marketSymbol", assetData.get("finnhubSymbol", ""))).strip().upper()
+    marketProvider = normalizeMarketProvider(
+        assetData.get("marketProvider", ""),
+        fallback=inferMarketProviderFromSymbol(marketSymbol)
+    )
 
-    if not finnhubSymbol:
-        return jsonify({"ok": False, "error": "El activo no tiene ticker de Finnhub configurado"}), 400
+    if not marketSymbol:
+        return jsonify({"ok": False, "error": "El activo no tiene ticker de mercado configurado"}), 400
 
-    apiKey = readFinnhubApiKey()
-    quote, error = fetch_quote(finnhubSymbol, apiKey)
+    if marketProvider == "eodhd":
+        quote, error = call_eodhd_with_fallbacks(lambda apiKey: fetch_eodhd_quote(marketSymbol, apiKey))
+    else:
+        apiKey = readFinnhubApiKey()
+        quote, error = fetch_quote(marketSymbol, apiKey)
 
     if error:
         statusCode = 503 if "API key" in error or "conectar" in error else 400
@@ -388,6 +504,8 @@ def refreshActivoMarketData(assetId):
         statusCode = 503 if "API key" in error or "conectar" in error or "divisa" in error else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
+    assetData["marketProvider"] = marketProvider
+    assetData["marketSymbol"] = quote["symbol"]
     assetData["finnhubSymbol"] = quote["symbol"]
     assetData["price"] = quote["price"]
     assetData["currency"] = quote["currency"]
@@ -487,6 +605,22 @@ def searchFinnhubSymbol():
     assetType = str(request.args.get("assetType", "")).strip()
     apiKey = readFinnhubApiKey()
     results, error = search_symbol(query, apiKey, asset_name=assetName, preferred_asset_type=assetType)
+
+    if error:
+        statusCode = 503 if "API key" in error or "conectar" in error else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    return jsonify({"ok": True, "results": results})
+
+
+@app.route("/api/eodhd/search", methods=["GET"])
+def searchEodhdSymbol():
+    query = str(request.args.get("q", "")).strip()
+    assetName = str(request.args.get("assetName", "")).strip()
+    assetType = str(request.args.get("assetType", "")).strip()
+    results, error = call_eodhd_with_fallbacks(
+        lambda apiKey: search_eodhd_symbol(query, apiKey, asset_name=assetName, preferred_asset_type=assetType)
+    )
 
     if error:
         statusCode = 503 if "API key" in error or "conectar" in error else 400

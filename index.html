@@ -27,6 +27,11 @@
                 </div>
 
                 <div class="metricBox">
+                    <span class="metricTitle">Rendimiento €</span>
+                    <span class="metricValue" id="topRendimientoEuros">---</span>
+                </div>
+
+                <div class="metricBox">
                     <span class="metricTitle">Invertido</span>
                     <span class="metricValue" id="topInvertido">---</span>
                 </div>
@@ -178,7 +183,8 @@
         <label class="assetModalLabel" for="assetTickerInput">Ticker mercado</label>
         <input id="assetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
         <div class="assetSearchActions">
-            <button id="searchAssetTickerBtn" class="secondaryButton" type="button">Buscar ticker</button>
+            <button id="searchAssetTickerFinnhubBtn" class="secondaryButton" type="button">Buscar ticker Finnhub</button>
+            <button id="searchAssetTickerEodhdBtn" class="secondaryButton" type="button">Buscar ticker EODHD</button>
         </div>
         <div id="assetSearchFeedback" class="assetSearchFeedback hidden"></div>
         <div id="assetSearchResults" class="assetSearchResults hidden"></div>
@@ -220,6 +226,8 @@
 <script src="js/intereses.js"></script>
 <script src="js/dividendos.js"></script>
 <script src="js/gastos.js"></script>
+<script src="js/ventas.js"></script>
+<script src="js/transacciones.js"></script>
 <script src="js/operaciones.js"></script>
 <script src="js/shared-utils.js"></script>
 </body>

@@ -2,6 +2,8 @@ import re
 
 
 ALLOWED_ASSET_TYPES = {"cripto", "acciones", "etfs", "comoditis"}
+ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd"}
+EODHD_EXCHANGE_CODES = {"XETRA", "PA", "LSE", "US", "SW", "AS", "MC", "MI", "DU", "BE", "F", "MU", "ST", "VI", "LS"}
 
 
 def slugify(value):
@@ -12,7 +14,7 @@ def slugify(value):
 
 def createAssetSymbol(name):
     cleaned = re.sub(r"[^A-Za-z0-9]", "", str(name).upper())
-    return cleaned[:10] or "ACTIVO"
+    return cleaned[:24] or "ACTIVO"
 
 
 def sanitizeAssetType(assetType):
@@ -24,11 +26,40 @@ def sanitizeAssetType(assetType):
     return normalized
 
 
+def normalizeMarketProvider(provider, fallback="finnhub"):
+    normalized = slugify(provider).replace("-", "")
+
+    if normalized not in ALLOWED_MARKET_PROVIDERS:
+        return fallback
+
+    return normalized
+
+
+def inferMarketProviderFromSymbol(symbol, fallback="finnhub"):
+    normalized_symbol = str(symbol or "").strip().upper()
+
+    if not normalized_symbol:
+        return fallback
+
+    if ":" in normalized_symbol:
+        return "finnhub"
+
+    if "." in normalized_symbol:
+        exchange_code = normalized_symbol.rsplit(".", 1)[-1]
+
+        if exchange_code in EODHD_EXCHANGE_CODES:
+            return "eodhd"
+
+    return fallback
+
+
 def createDefaultAssetPayload(name, assetType, assetId=None):
     return {
         "id": assetId or slugify(name),
         "name": str(name).strip(),
         "symbol": createAssetSymbol(name),
+        "marketProvider": "finnhub",
+        "marketSymbol": "",
         "finnhubSymbol": "",
         "type": assetType,
         "order": 0,
@@ -45,6 +76,7 @@ def createDefaultAssetPayload(name, assetType, assetId=None):
                 "participaciones": "",
                 "precioParticipacion": "",
                 "capitalInvertidoBruto": "",
+                "costeAnual": "",
                 "comisiones": "",
                 "comisionesSatoshis": ""
             }
@@ -62,6 +94,7 @@ def sanitizeAssetRows(rows):
             "participaciones": str(row.get("participaciones", "")).strip(),
             "precioParticipacion": str(row.get("precioParticipacion", "")).strip(),
             "capitalInvertidoBruto": str(row.get("capitalInvertidoBruto", "")).strip(),
+            "costeAnual": str(row.get("costeAnual", "")).strip(),
             "comisiones": str(row.get("comisiones", "")).strip(),
             "comisionesSatoshis": str(row.get("comisionesSatoshis", "")).strip()
         })
@@ -89,7 +122,7 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "id": assetId,
         "name": assetName,
         "symbol": str(requestData.get("symbol") or createAssetSymbol(assetName)).strip() or createAssetSymbol(assetName),
-        "finnhubSymbol": str(requestData.get("finnhubSymbol", "")).strip().upper(),
+        "marketSymbol": str(requestData.get("marketSymbol", requestData.get("finnhubSymbol", ""))).strip().upper(),
         "type": assetType,
         "order": int(requestData.get("order", 0) or 0),
         "price": str(requestData.get("price", "0,00")).strip(),
@@ -100,5 +133,11 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "lastUpdated": str(requestData.get("lastUpdated", "")).strip(),
         "rows": sanitizeAssetRows(rows)
     }
+
+    payload["marketProvider"] = normalizeMarketProvider(
+        requestData.get("marketProvider", ""),
+        fallback=inferMarketProviderFromSymbol(payload["marketSymbol"])
+    )
+    payload["finnhubSymbol"] = payload["marketSymbol"]
 
     return payload, None
