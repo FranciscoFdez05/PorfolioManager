@@ -2,14 +2,12 @@ import json
 
 from app_data import ensureDataFile, gastosDir
 
-GASTOS_TYPES = {"gasoil", "cafe", "comidas/cenas", "compras", "otros"}
 MONTH_KEYS = [
     "enero", "febrero", "marzo", "abril", "mayo", "junio",
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
 ]
 DEFAULT_MENSUALIDADES = ["iCloud", "Office", "Proton", "Spotify", "Rainbow", "ChatGPT", "AppleCare"]
-DEFAULT_GASTOS_TYPES = ["Gasoil", "Café", "Comidas/Cenas", "Compras", "Otros"]
-
+GASTOS_TYPES_FILE = gastosDir / "tipos.json"
 
 def normalize_year(year_value):
     text = str(year_value or "").strip()
@@ -33,6 +31,7 @@ def create_default_gastos_year(year):
     normalized_year = normalize_year(year)
     return {
         "year": normalized_year,
+        "gastosTipos": [],
         "mensualidades": [
             {"nombre": name, "meses": build_empty_month_summary()}
             for name in DEFAULT_MENSUALIDADES
@@ -44,6 +43,25 @@ def create_default_gastos_year(year):
             for month in MONTH_KEYS
         }
     }
+
+
+def read_gastos_types():
+    ensureDataFile()
+
+    if not GASTOS_TYPES_FILE.exists():
+        return []
+
+    with GASTOS_TYPES_FILE.open("r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    return sanitize_gastos_types(data)
+
+
+def write_gastos_types(types):
+    ensureDataFile()
+
+    with GASTOS_TYPES_FILE.open("w", encoding="utf-8") as file:
+        json.dump({"types": sanitize_gastos_types(types)}, file, ensure_ascii=False, indent=2)
 
 
 def list_gastos_years():
@@ -97,10 +115,6 @@ def sanitize_month_rows(rows):
 
     for row in rows:
         tipo_original = str(row.get("tipo", "")).strip()
-        tipo_normalizado = tipo_original.lower()
-
-        if tipo_normalizado not in GASTOS_TYPES:
-            continue
 
         sanitized_rows.append({
             "fecha": str(row.get("fecha", "")).strip(),
@@ -128,6 +142,24 @@ def sanitize_mensualidades_rows(rows):
     return sanitized_rows
 
 
+def sanitize_gastos_types(payload):
+    values = payload.get("types", payload) if isinstance(payload, dict) else payload
+    sanitized = []
+    seen = set()
+
+    for value in values if isinstance(values, list) else []:
+        label = str(value or "").strip()
+        normalized = label.lower()
+
+        if not label or normalized in seen:
+            continue
+
+        sanitized.append(label)
+        seen.add(normalized)
+
+    return sanitized
+
+
 def sanitize_gastos_payload(payload, fallback_year=None):
     year = normalize_year(payload.get("year") or fallback_year)
     if not year:
@@ -137,17 +169,42 @@ def sanitize_gastos_payload(payload, fallback_year=None):
     if not mensualidades:
         mensualidades = create_default_gastos_year(year)["mensualidades"]
 
+    gastos_tipos = []
+    seen_tipos = set()
+
+    for value in payload.get("gastosTipos", []) if isinstance(payload.get("gastosTipos", []), list) else []:
+        label = str(value or "").strip()
+        normalized = label.lower()
+
+        if not label or normalized in seen_tipos:
+            continue
+
+        gastos_tipos.append(label)
+        seen_tipos.add(normalized)
+
     months_payload = payload.get("months", {})
     sanitized_months = {}
 
     for month in MONTH_KEYS:
         month_data = months_payload.get(month, {})
+        sanitized_rows = sanitize_month_rows(month_data.get("rows", []))
         sanitized_months[month] = {
-            "rows": sanitize_month_rows(month_data.get("rows", []))
+            "rows": sanitized_rows
         }
+
+        for row in sanitized_rows:
+            label = str(row.get("tipo", "")).strip()
+            normalized = label.lower()
+
+            if not label or normalized in seen_tipos:
+                continue
+
+            gastos_tipos.append(label)
+            seen_tipos.add(normalized)
 
     return {
         "year": year,
+        "gastosTipos": gastos_tipos,
         "mensualidades": mensualidades,
         "months": sanitized_months
     }, None

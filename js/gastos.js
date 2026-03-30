@@ -13,8 +13,6 @@ const GASTOS_MONTHS = [
     { key: "diciembre", label: "Diciembre" }
 ]
 
-const GASTOS_TYPES = ["Gasoil", "Café", "Comidas/Cenas", "Compras", "Otros"]
-
 let gastosYears = []
 let currentGastosYear = null
 let currentGastosMonth = "enero"
@@ -22,6 +20,55 @@ let currentGastosData = null
 let currentGastosView = "year"
 let gastosAutosaveTimeout = null
 let gastosPersistenceBound = false
+let sharedGastosTypes = []
+
+function sanitizeGastoTypeLabel(value) {
+    return String(value || "").trim().replace(/\s+/g, " ")
+}
+
+function normalizeComparableGastoText(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+}
+
+function ensureGastosDataShape(data) {
+    if (!data || typeof data !== "object") {
+        return data
+    }
+
+    const mergedTypes = []
+    const pushMergedType = (value) => {
+        const label = sanitizeGastoTypeLabel(value)
+        if (!label) {
+            return
+        }
+
+        if (mergedTypes.some((type) => normalizeComparableGastoText(type) === normalizeComparableGastoText(label))) {
+            return
+        }
+
+        mergedTypes.push(label)
+    }
+
+    ;(Array.isArray(data.gastosTipos) ? data.gastosTipos : []).forEach(pushMergedType)
+    ;(Array.isArray(data.customTypes) ? data.customTypes : []).forEach(pushMergedType)
+
+    Object.values(data.months || {}).forEach((monthData) => {
+        ;(monthData?.rows || []).forEach((row) => pushMergedType(row?.tipo || ""))
+    })
+
+    data.gastosTipos = mergedTypes
+    delete data.customTypes
+
+    return data
+}
+
+function getAvailableGastosTypes() {
+    return Array.isArray(sharedGastosTypes) ? sharedGastosTypes : []
+}
 
 async function loadGastosYears() {
     const response = await fetch("/api/gastos")
@@ -42,6 +89,35 @@ async function loadGastosYear(year) {
     }
 
     return await response.json()
+}
+
+async function loadSharedGastosTypes() {
+    const response = await fetch("/api/gastos-tipos")
+
+    if (!response.ok) {
+        throw new Error("No se pudo cargar la lista global de tipos de gasto")
+    }
+
+    const data = await response.json()
+    return Array.isArray(data.types) ? data.types : []
+}
+
+async function saveSharedGastosTypes(types) {
+    const response = await fetch("/api/gastos-tipos", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ types })
+    })
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    const data = await response.json()
+    return Array.isArray(data.types) ? data.types : []
 }
 
 async function createGastosYear(year) {
@@ -92,6 +168,7 @@ async function deleteGastosYearRequest(year) {
 
 async function initGastosLogic() {
     gastosYears = await loadGastosYears()
+    sharedGastosTypes = await loadSharedGastosTypes()
     currentGastosYear = gastosYears[0] || "2026"
     currentGastosMonth = "enero"
     currentGastosView = "year"
@@ -122,6 +199,7 @@ function bindGastosEvents() {
     const deleteYearButton = document.getElementById("deleteGastosYearBtn")
     const addRowButton = document.getElementById("addGastoRowBtn")
     const addMensualidadRowButton = document.getElementById("addMensualidadRowBtn")
+    const addGastoTypeRowButton = document.getElementById("addGastoTypeRowBtn")
     const saveButton = document.getElementById("saveGastosBtn")
 
     if (addYearButton && !addYearButton.dataset.bound) {
@@ -196,6 +274,17 @@ function bindGastosEvents() {
         })
     }
 
+    if (addGastoTypeRowButton && !addGastoTypeRowButton.dataset.bound) {
+        addGastoTypeRowButton.dataset.bound = "true"
+        addGastoTypeRowButton.addEventListener("click", async () => {
+            syncGastosDataFromTables()
+            sharedGastosTypes.push("Gasto")
+            sharedGastosTypes = dedupeGastosTypes(sharedGastosTypes)
+            await persistSharedGastosTypes()
+            renderCurrentGastosView()
+        })
+    }
+
     if (saveButton && !saveButton.dataset.bound) {
         saveButton.dataset.bound = "true"
         saveButton.addEventListener("click", async () => {
@@ -211,7 +300,7 @@ function bindGastosEvents() {
 }
 
 async function renderGastosYear(year) {
-    currentGastosData = await loadGastosYear(year)
+    currentGastosData = ensureGastosDataShape(await loadGastosYear(year))
     currentGastosYear = currentGastosData.year
 
     renderGastosYearButtons()
@@ -245,8 +334,9 @@ function renderGastosYearButtons() {
 
 function buildMonthlyExpenseTotals() {
     const totals = {}
+    const availableTypes = getAvailableGastosTypes()
 
-    GASTOS_TYPES.forEach((type) => {
+    availableTypes.forEach((type) => {
         totals[type] = {}
         GASTOS_MONTHS.forEach((month) => {
             totals[type][month.key] = 0
@@ -257,7 +347,7 @@ function buildMonthlyExpenseTotals() {
         const rows = currentGastosData?.months?.[month.key]?.rows || []
         rows.forEach((row) => {
             const type = String(row.tipo || "").trim()
-            if (!GASTOS_TYPES.includes(type)) {
+            if (!availableTypes.includes(type)) {
                 return
             }
 
@@ -280,6 +370,7 @@ function renderGastosAnnualTable() {
     annualBody.innerHTML = ""
 
     const expenseTotals = buildMonthlyExpenseTotals()
+    const availableTypes = getAvailableGastosTypes()
 
     const mensualidadesRow = document.createElement("tr")
     mensualidadesRow.className = "gastosSectionRow"
@@ -317,11 +408,11 @@ function renderGastosAnnualTable() {
     gastosRow.innerHTML = `<td colspan="14">Gastos</td>`
     annualBody.appendChild(gastosRow)
 
-    GASTOS_TYPES.forEach((type) => {
+    availableTypes.forEach((type, rowIndex) => {
         const tr = document.createElement("tr")
         tr.innerHTML = `
-            <td></td>
-            <td>${type}</td>
+            <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" data-gastos-delete-type-row="${rowIndex}" title="Eliminar gasto">X</button></td>
+            <td contenteditable="true" data-gastos-type-row="${rowIndex}">${type}</td>
             ${GASTOS_MONTHS.map((month) => `<td>${expenseTotals[type][month.key] ? formatEuro(expenseTotals[type][month.key]) : "- €"}</td>`).join("")}
         `
         annualBody.appendChild(tr)
@@ -333,7 +424,7 @@ function renderGastosAnnualTable() {
         <td></td>
         <td>Total</td>
         ${GASTOS_MONTHS.map((month) => {
-            const total = GASTOS_TYPES.reduce((sum, type) => sum + expenseTotals[type][month.key], 0)
+            const total = availableTypes.reduce((sum, type) => sum + expenseTotals[type][month.key], 0)
             return `<td>${total ? formatEuro(total) : "- €"}</td>`
         }).join("")}
     `
@@ -346,7 +437,7 @@ function renderGastosAnnualTable() {
         <td>TOTAL</td>
         ${GASTOS_MONTHS.map((month) => {
             const totalMensualidades = currentGastosData.mensualidades.reduce((sum, row) => sum + parseEuroNumber(row.meses?.[month.key] || ""), 0)
-            const totalGastos = GASTOS_TYPES.reduce((sum, type) => sum + expenseTotals[type][month.key], 0)
+            const totalGastos = availableTypes.reduce((sum, type) => sum + expenseTotals[type][month.key], 0)
             return `<td>${formatEuro(totalMensualidades + totalGastos)}</td>`
         }).join("")}
     `
@@ -356,41 +447,70 @@ function renderGastosAnnualTable() {
 function handleGastosAnnualDeleteClick(event) {
     const deleteButton = event.target.closest("[data-gastos-delete-manual-row]")
 
-    if (!deleteButton) {
+    if (deleteButton) {
+        const rowIndex = Number(deleteButton.dataset.gastosDeleteManualRow)
+        const rowData = currentGastosData?.mensualidades?.[rowIndex]
+
+        if (!rowData) {
+            return
+        }
+
+        const hasContent = Boolean(
+            ((rowData.nombre || "").trim() && (rowData.nombre || "").trim().toLowerCase() !== "mensualidad") ||
+            GASTOS_MONTHS.some((month) => parseEuroNumber(rowData.meses?.[month.key] || "") !== 0)
+        )
+
+        const removeRow = () => {
+            currentGastosData.mensualidades.splice(rowIndex, 1)
+            renderCurrentGastosView()
+            scheduleGastosAutosave()
+        }
+
+        if (!hasContent) {
+            removeRow()
+            return
+        }
+
+        openConfirmModal({
+            title: "Eliminar mensualidad",
+            message: "Esta fila de mensualidades tiene contenido. ¿Quieres eliminarla?",
+            confirmLabel: "Eliminar",
+            confirmSide: "right",
+            onConfirm: async () => {
+                removeRow()
+            }
+        })
         return
     }
 
-    const rowIndex = Number(deleteButton.dataset.gastosDeleteManualRow)
-    const rowData = currentGastosData?.mensualidades?.[rowIndex]
-
-    if (!rowData) {
+    const deleteTypeButton = event.target.closest("[data-gastos-delete-type-row]")
+    if (!deleteTypeButton) {
         return
     }
 
-    const hasContent = Boolean(
-        ((rowData.nombre || "").trim() && (rowData.nombre || "").trim().toLowerCase() !== "mensualidad") ||
-        GASTOS_MONTHS.some((month) => parseEuroNumber(rowData.meses?.[month.key] || "") !== 0)
+    const rowIndex = Number(deleteTypeButton.dataset.gastosDeleteTypeRow)
+    const typeLabel = sharedGastosTypes?.[rowIndex]
+
+    if (!typeLabel) {
+        return
+    }
+
+    const normalizedType = normalizeComparableGastoText(typeLabel)
+    const typeInUse = Object.values(currentGastosData.months || {}).some((monthData) =>
+        (monthData?.rows || []).some((row) => normalizeComparableGastoText(row?.tipo || "") === normalizedType)
     )
 
-    const removeRow = () => {
-        currentGastosData.mensualidades.splice(rowIndex, 1)
-        renderCurrentGastosView()
-        scheduleGastosAutosave()
-    }
-
-    if (!hasContent) {
-        removeRow()
+    if (typeInUse) {
+        alert("No puedes eliminar este gasto porque ya se esta usando en movimientos.")
         return
     }
 
-    openConfirmModal({
-        title: "Eliminar mensualidad",
-        message: "Esta fila de mensualidades tiene contenido. ¿Quieres eliminarla?",
-        confirmLabel: "Eliminar",
-        confirmSide: "right",
-        onConfirm: async () => {
-            removeRow()
-        }
+    sharedGastosTypes.splice(rowIndex, 1)
+    persistSharedGastosTypes().then(() => {
+        renderCurrentGastosView()
+    }).catch((error) => {
+        console.error(error)
+        alert("No se pudo guardar la lista global de gastos.")
     })
 }
 
@@ -467,6 +587,7 @@ function renderGastosMonthTable() {
 function buildGastoMovementRow(row = {}) {
     const tr = document.createElement("tr")
     const normalizedType = normalizeGastoTipo(row.tipo || "")
+    const availableTypes = getAvailableGastosTypes()
     tr.innerHTML = `
         <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td contenteditable="true">${row.fecha || ""}</td>
@@ -474,7 +595,7 @@ function buildGastoMovementRow(row = {}) {
         <td>
             <select class="gastosTypeSelect">
                 <option value=""></option>
-                ${GASTOS_TYPES.map((type) => `<option value="${type}"${normalizedType === type ? " selected" : ""}>${type}</option>`).join("")}
+                ${availableTypes.map((type) => `<option value="${type}"${normalizedType === type ? " selected" : ""}>${type}</option>`).join("")}
             </select>
         </td>
         <td contenteditable="true">${formatCellEuroValue(row.cantidad || "")}</td>
@@ -569,6 +690,9 @@ function syncGastosDataFromTables() {
         }
     })
 
+    const gastoTypeRows = document.querySelectorAll("[data-gastos-type-row]")
+    sharedGastosTypes = dedupeGastosTypes(Array.from(gastoTypeRows).map((cell) => sanitizeGastoTypeLabel(cell.textContent)).filter(Boolean))
+
     const bodyRows = [...document.querySelectorAll("#gastosMovementsBody tr")]
     currentGastosData.months[currentGastosMonth].rows = bodyRows.map((rowElement) => {
         const cells = rowElement.querySelectorAll("td")
@@ -584,13 +708,18 @@ function syncGastosDataFromTables() {
 }
 
 function normalizeGastoTipo(value) {
-    const raw = String(value || "").trim().toLowerCase()
-    const normalized = raw
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
+    const label = sanitizeGastoTypeLabel(value)
+    const normalized = normalizeComparableGastoText(label)
+    const found = getAvailableGastosTypes().find((type) => normalizeComparableGastoText(type) === normalized)
+    return found || label
+}
 
-    const found = GASTOS_TYPES.find((type) => type.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normalized)
-    return found || value.trim()
+function dedupeGastosTypes(values) {
+    return values.filter((type, index, array) => array.findIndex((item) => normalizeComparableGastoText(item) === normalizeComparableGastoText(type)) === index)
+}
+
+async function persistSharedGastosTypes() {
+    sharedGastosTypes = await saveSharedGastosTypes(dedupeGastosTypes(sharedGastosTypes))
 }
 
 function scheduleGastosAutosave(delay = 500) {
@@ -611,6 +740,7 @@ async function persistCurrentGastosData(options = {}) {
 
     syncGastosDataFromTables()
     window.clearTimeout(gastosAutosaveTimeout)
+    await persistSharedGastosTypes()
     await saveGastosYear(currentGastosYear, currentGastosData, options)
 }
 

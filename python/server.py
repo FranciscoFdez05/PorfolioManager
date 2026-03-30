@@ -6,7 +6,7 @@ from asset_utils import createDefaultAssetPayload, inferMarketProviderFromSymbol
 from eodhd_client import fetch_quote as fetch_eodhd_quote
 from eodhd_client import search_symbol as search_eodhd_symbol
 from finnhub_client import convert_amount, convert_quote_currency, fetch_exchange_rate, fetch_quote, search_symbol
-from gastos_store import create_default_gastos_year, delete_gastos_year, list_gastos_years, normalize_year, read_gastos_year, sanitize_gastos_payload, write_gastos_year
+from gastos_store import create_default_gastos_year, delete_gastos_year, list_gastos_years, normalize_year, read_gastos_types, read_gastos_year, sanitize_gastos_payload, sanitize_gastos_types, write_gastos_types, write_gastos_year
 
 app = Flask(
     __name__,
@@ -356,6 +356,19 @@ def getGastosYears():
         years = [default_year]
 
     return jsonify({"years": years})
+
+
+@app.route("/api/gastos-tipos", methods=["GET"])
+def getGastosTipos():
+    return jsonify({"types": read_gastos_types()})
+
+
+@app.route("/api/gastos-tipos", methods=["POST"])
+def saveGastosTipos():
+    requestData = request.get_json(silent=True) or {}
+    types = sanitize_gastos_types(requestData.get("types", []))
+    write_gastos_types(types)
+    return jsonify({"ok": True, "types": types})
 
 
 @app.route("/api/gastos", methods=["POST"])
