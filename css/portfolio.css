@@ -735,6 +735,8 @@ body{
 .gastosMovementsWrapper{
     border:1px solid #2a4f86;
     background:#10294f;
+    max-height:calc(100vh - 245px);
+    overflow:auto;
     scrollbar-width:none;
 }
 
@@ -822,7 +824,6 @@ body{
 
 .overviewTableWrapper{
     max-height:calc(100vh - 245px);
-    overflow:auto;
 }
 
 .overviewTable{
@@ -982,9 +983,6 @@ body{
 
 .interesesTableWrapper{
     position:relative;
-    max-height:620px;
-    overflow-y:auto;
-    overflow-x:auto;
     padding-left:34px;
 }
 
@@ -1155,9 +1153,6 @@ body{
 
 .dividendosTableWrapper{
     position:relative;
-    max-height:620px;
-    overflow-y:auto;
-    overflow-x:auto;
     padding-left:34px;
 }
 
@@ -1191,11 +1186,19 @@ body{
     padding-right:18px;
 }
 
+.operationsPageCompact{
+    gap:12px;
+}
+
 .operationsHeader{
     display:flex;
     align-items:flex-start;
     justify-content:space-between;
     gap:16px;
+}
+
+.operationsPageCompact .operationsHeader{
+    gap:8px;
 }
 
 .operationsTitle{
@@ -1218,10 +1221,18 @@ body{
     align-items:flex-start;
 }
 
+.operationsPageCompact .operationsFilters{
+    gap:12px 18px;
+}
+
 .operationsFilterGroup{
     display:flex;
     flex-direction:column;
     gap:8px;
+}
+
+.operationsPageCompact .operationsFilterGroup{
+    gap:6px;
 }
 
 .operationsFilterLabel{
@@ -1238,12 +1249,28 @@ body{
 }
 
 .operationsTableWrapper{
+    position:relative;
+    max-height:calc(100vh - 315px);
     overflow:auto;
     padding-left:34px;
 }
 
+.ventasPageExpanded .operationsTableWrapper{
+    max-height:calc(100vh - 225px);
+}
+
+.operationsPageCompact .operationsTableWrapper{
+    max-height:calc(100vh - 300px);
+}
+
 .operationsTable{
     min-width:1260px;
+}
+
+.operationsTable thead th{
+    position:sticky;
+    top:0;
+    z-index:2;
 }
 
 .operationsTable tbody td{
@@ -1324,6 +1351,14 @@ body{
     flex-wrap:wrap;
 }
 
+.operationsPageCompact .operationsActions{
+    margin-top:-2px;
+}
+
+.transaccionesPageCompact .operationsTableWrapper{
+    max-height:calc(100vh - 325px);
+}
+
 .transaccionesAssetPanel{
     border:1px solid #2a4f86;
     background:#10294f;
@@ -1392,6 +1427,35 @@ body{
     margin:0;
     color:#c0d6fb;
     font-size:13px;
+}
+
+.transaccionesPageCompact .transaccionesAssetPanel{
+    padding:8px 10px;
+    gap:6px;
+}
+
+.transaccionesPageCompact .transaccionesAssetPanelLabel{
+    margin-bottom:0;
+    font-size:10px;
+}
+
+.transaccionesPageCompact .transaccionesAssetPanelTitle{
+    font-size:12px;
+    line-height:1.15;
+}
+
+.transaccionesPageCompact .transaccionesAssetMenu{
+    gap:4px;
+}
+
+.transaccionesPageCompact .transaccionesAssetBtn{
+    min-width:82px;
+    padding:5px 9px;
+    font-size:13px;
+}
+
+.transaccionesPageCompact .transaccionesAssetHint{
+    font-size:11px;
 }
 
 /* ===== GASTOS ===== */
@@ -1471,7 +1535,6 @@ body{
 
 .gastosAnnualWrapper,
 .gastosMovementsWrapper{
-    overflow:auto;
     border:1px solid #2a4f86;
     background:#10294f;
     scrollbar-width:none;
