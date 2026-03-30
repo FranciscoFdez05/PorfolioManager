@@ -373,7 +373,9 @@ async function updateAssetDetail(asset) {
     }
 
     if (detFees) {
-        detFees.textContent = formatMoney(summary.comisiones, summary.currency)
+        detFees.textContent = isCryptoAssetType(asset.type)
+            ? formatAssetCommissionValue(summary.comisiones)
+            : formatMoney(summary.comisiones, summary.currency)
     }
 
     if (detStatus) {
@@ -394,24 +396,47 @@ async function renderAssetsList(assets) {
         return
     }
 
-    assetsList.innerHTML = ""
+    const fragment = document.createDocumentFragment()
 
     for (const asset of assets) {
-        const displayPrice = await getAssetDisplayPriceValue(asset)
-        const button = document.createElement("button")
-        button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}`
-        button.dataset.assetId = asset.id
-        button.dataset.assetOrder = String(asset.order ?? 0)
-        button.draggable = true
-        button.innerHTML = `
-            <span class="assetBtnMain">
-                <span class="assetBtnSymbol">${asset.symbol || asset.name}</span>
-                <span class="assetBtnName">${asset.name || asset.symbol || "Activo"}</span>
-            </span>
-            <span class="assetBtnPrice">${formatMoney(displayPrice, asset.precioCurrency || asset.currency || "EUR")}</span>
-        `
-        assetsList.appendChild(button)
+        try {
+            const displayPrice = await getAssetDisplayPriceValue(asset)
+            const displayCurrency = asset.precioCurrency || asset.currency || "EUR"
+            const button = document.createElement("button")
+            button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}`
+            button.dataset.assetId = asset.id
+            button.dataset.assetOrder = String(asset.order ?? 0)
+            button.draggable = true
+            button.innerHTML = `
+                <span class="assetBtnMain">
+                    <span class="assetBtnSymbol">${asset.symbol || asset.name}</span>
+                    <span class="assetBtnName">${asset.name || asset.symbol || "Activo"}</span>
+                </span>
+                <span class="assetBtnPrice">${formatMoney(displayPrice, displayCurrency)}</span>
+            `
+            fragment.appendChild(button)
+        } catch (error) {
+            console.error(`No se pudo renderizar el precio del activo ${asset.name || asset.symbol || asset.id}:`, error)
+            const fallbackPrice = parseLooseNumber(asset.price || "") || 0
+            const fallbackCurrency = asset.currency || "EUR"
+            const button = document.createElement("button")
+            button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}`
+            button.dataset.assetId = asset.id
+            button.dataset.assetOrder = String(asset.order ?? 0)
+            button.draggable = true
+            button.innerHTML = `
+                <span class="assetBtnMain">
+                    <span class="assetBtnSymbol">${asset.symbol || asset.name}</span>
+                    <span class="assetBtnName">${asset.name || asset.symbol || "Activo"}</span>
+                </span>
+                <span class="assetBtnPrice">${formatMoney(fallbackPrice, fallbackCurrency)}</span>
+            `
+            fragment.appendChild(button)
+        }
     }
+
+    assetsList.innerHTML = ""
+    assetsList.appendChild(fragment)
 
     initAssetSelector([...assetsList.querySelectorAll(".assetBtn")])
     initAssetDragAndDrop(assetsList)
@@ -973,6 +998,7 @@ function consumeAssetLots(lots, quantityToSell) {
 
 function buildOverviewRow(asset) {
     const rows = Array.isArray(asset.rows) ? asset.rows : []
+    const isCrypto = isCryptoAssetType(asset.type)
     const remainingLots = buildRemainingAssetLots(asset)
     const rawParticipaciones = remainingLots.reduce((total, lot) => total + lot.remaining, 0)
     const transaccionesFeeAmount = externalTransaccionesRowsCache
@@ -981,7 +1007,7 @@ function buildOverviewRow(asset) {
     const participaciones = Math.max(0, rawParticipaciones - transaccionesFeeAmount)
     const invertidoBruto = remainingLots.reduce((total, lot) => total + (lot.remaining * lot.unitCost), 0)
     const comisiones = rows.reduce((total, row) => total + (parseLooseNumber(row.comisiones || "") || 0), 0)
-    const invertidoNeto = invertidoBruto - comisiones
+    const invertidoNeto = isCrypto ? invertidoBruto : invertidoBruto - comisiones
     const valorActual = parseLooseNumber(asset.price || "") || 0
     const netoActual = participaciones * valorActual
     const promedioCompra = participaciones > 0 ? invertidoBruto / participaciones : 0
@@ -1028,6 +1054,9 @@ function renderOverviewRows(rows) {
     rows.forEach((row) => {
         const tr = document.createElement("tr")
         const profitClass = row.overviewYieldValue >= 0 ? "overviewProfitPositive" : "overviewProfitNegative"
+        const overviewCommissions = isCryptoAssetType(row.assetType)
+            ? "0"
+            : formatMoney(row.comisiones, row.overviewInvestedCurrency)
 
         tr.innerHTML = `
             <td>${row.nombre}</td>
@@ -1036,7 +1065,7 @@ function renderOverviewRows(rows) {
             <td class="overviewNumericCell">${formatMoney(row.promedioCompra, row.precioCurrency || row.currency)}</td>
             <td class="overviewNumericCell overviewCurrentPriceCell">${formatMoney(row.overviewCurrentPrice ?? row.valorActual, row.precioCurrency || row.currency)}</td>
             <td class="overviewNumericCell">${formatMoney(row.invertidoBruto, row.overviewInvestedCurrency)}</td>
-            <td class="overviewNumericCell">${formatMoney(row.comisiones, row.overviewInvestedCurrency)}</td>
+            <td class="overviewNumericCell">${overviewCommissions}</td>
             <td class="overviewNumericCell">${formatMoney(row.invertidoNeto, row.overviewInvestedCurrency)}</td>
             <td class="overviewNumericCell">${formatMoney(row.overviewCurrentValue, row.overviewInvestedCurrency)}</td>
             <td class="overviewNumericCell ${profitClass}">${formatMoney(row.overviewYieldValue, row.overviewInvestedCurrency)}</td>
@@ -1175,6 +1204,7 @@ function renderAssetRows(rows) {
 
     rows.forEach((rowData) => {
         const rowElement = document.createElement("tr")
+        const cryptoCommissionValue = parseLooseNumber(rowData.comisiones) ? formatAssetCommissionValue(rowData.comisiones) : ""
         rowElement.innerHTML = `
             <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
             <td contenteditable="true" data-field="fechaOperacion">${rowData.fechaOperacion || ""}</td>
@@ -1183,7 +1213,7 @@ function renderAssetRows(rows) {
             <td contenteditable="true" data-field="precioParticipacion">${formatCellMoneyValue(rowData.precioParticipacion, getAssetTableMoneyCurrency(assetType, "precioParticipacion", assetCurrency, assetPriceCurrency))}</td>
             <td contenteditable="true" data-field="capitalInvertidoBruto">${formatCellMoneyValue(rowData.capitalInvertidoBruto, getAssetTableMoneyCurrency(assetType, "capitalInvertidoBruto", assetCurrency))}</td>
             ${isEtf ? `<td contenteditable="true" data-field="costeAnual">${formatCellPercentValue(rowData.costeAnual)}</td>` : ""}
-            <td contenteditable="true" data-field="comisiones">${isCrypto ? formatAssetCommissionValue(rowData.comisiones, getAssetTableMoneyCurrency(assetType, "comisiones", assetCurrency, assetPriceCurrency)) : formatCellMoneyValue(rowData.comisiones, getAssetTableMoneyCurrency(assetType, "comisiones", assetCurrency, assetPriceCurrency))}</td>
+            <td ${isCrypto ? 'data-field="comisiones"' : 'contenteditable="true" data-field="comisiones"'}>${isCrypto ? `<input type="text" class="cryptoCommissionInput" inputmode="decimal" value="${cryptoCommissionValue}" placeholder="0,00000000" style="width:100%;background:transparent;border:none;color:inherit;font:inherit;padding:0;outline:none;">` : formatCellMoneyValue(rowData.comisiones, getAssetTableMoneyCurrency(assetType, "comisiones", assetCurrency, assetPriceCurrency))}</td>
             <td class="rowTotal">${formatMoney(0, assetCurrency)}</td>
         `
         assetOperationsBody.appendChild(rowElement)
@@ -1199,7 +1229,16 @@ function collectAssetRowsFromTable() {
     const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
 
     return rowElements.map((rowElement) => {
-        const getFieldValue = (fieldName) => rowElement.querySelector(`[data-field="${fieldName}"]`)?.textContent.trim() || ""
+        const getFieldValue = (fieldName) => {
+            const fieldElement = rowElement.querySelector(`[data-field="${fieldName}"]`)
+            const inputElement = fieldElement?.querySelector("input")
+
+            if (inputElement) {
+                return inputElement.value.trim()
+            }
+
+            return fieldElement?.textContent.trim() || ""
+        }
         const rowData = {
             fechaOperacion: getFieldValue("fechaOperacion"),
             tipoOperacion: getFieldValue("tipoOperacion"),
@@ -1256,7 +1295,8 @@ function isEmptyAssetRow(rowElement) {
     const precioParticipacion = parseLooseNumber(rowElement.querySelector('[data-field="precioParticipacion"]')?.textContent || "") || 0
     const capitalInvertidoBruto = parseLooseNumber(rowElement.querySelector('[data-field="capitalInvertidoBruto"]')?.textContent || "") || 0
     const costeAnual = parseLooseNumber(rowElement.querySelector('[data-field="costeAnual"]')?.textContent || "") || 0
-    const comisiones = parseLooseNumber(rowElement.querySelector('[data-field="comisiones"]')?.textContent || "") || 0
+    const comisionesCell = rowElement.querySelector('[data-field="comisiones"]')
+    const comisiones = parseLooseNumber(comisionesCell?.querySelector("input")?.value || comisionesCell?.textContent || "") || 0
     const comisionesSatoshis = parseLooseNumber(rowElement.querySelector('[data-field="comisionesSatoshis"]')?.textContent || "") || 0
 
     return !fechaOperacion &&
@@ -1370,8 +1410,9 @@ function updateAssetTableTotals() {
             costeAnual: rowElement.querySelector('[data-field="costeAnual"]')?.textContent || ""
         }
         const bruto = getRowGrossAmount(rowData, assetType)
-        const comisiones = parseLooseNumber(rowElement.querySelector('[data-field="comisiones"]')?.textContent || "") || 0
-        const neto = bruto - comisiones
+        const comisionesCell = rowElement.querySelector('[data-field="comisiones"]')
+        const comisiones = parseLooseNumber(comisionesCell?.querySelector("input")?.value || comisionesCell?.textContent || "") || 0
+        const neto = isCryptoAssetType(assetType) ? bruto : bruto - comisiones
         const rowTotalCell = rowElement.querySelector(".rowTotal")
 
         if (rowTotalCell) {
@@ -1656,7 +1697,7 @@ function addNewAssetRow() {
         <td contenteditable="true" data-field="precioParticipacion"></td>
         <td contenteditable="true" data-field="capitalInvertidoBruto"></td>
         ${isEtf ? '<td contenteditable="true" data-field="costeAnual"></td>' : ""}
-        <td contenteditable="true" data-field="comisiones">${isCrypto ? '0,000 €' : ''}</td>
+        <td ${isCrypto ? 'data-field="comisiones"' : 'contenteditable="true" data-field="comisiones"'}>${isCrypto ? '<input type="text" class="cryptoCommissionInput" inputmode="decimal" value="" placeholder="0,00000000" style="width:100%;background:transparent;border:none;color:inherit;font:inherit;padding:0;outline:none;">' : ''}</td>
         <td class="rowTotal">${formatMoney(0, assetCurrency)}</td>
     `
 

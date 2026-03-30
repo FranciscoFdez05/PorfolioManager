@@ -94,6 +94,23 @@ function stripCurrencyText(value) {
         .trim()
 }
 
+function selectEditableCellContent(cell) {
+    if (!cell) {
+        return
+    }
+
+    const selection = window.getSelection()
+
+    if (!selection) {
+        return
+    }
+
+    const range = document.createRange()
+    range.selectNodeContents(cell)
+    selection.removeAllRanges()
+    selection.addRange(range)
+}
+
 function getCurrentAssetCurrency() {
     return document.querySelector(".assetTablePage")?.dataset.assetCurrency || "EUR"
 }
@@ -113,7 +130,17 @@ function formatMoneySafe(value, currency = "EUR") {
 }
 
 function normalizeNumberForEdit(value) {
-    return String(value).replace(".", ",")
+    const parsedValue = Number(value)
+
+    if (!Number.isFinite(parsedValue)) {
+        return String(value ?? "").replace(".", ",")
+    }
+
+    return parsedValue.toLocaleString("es-ES", {
+        useGrouping: false,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 12
+    })
 }
 
 function formatShareQuantity(value, maxDecimals = 6) {
@@ -342,10 +369,13 @@ function formatAssetCommissionValue(value, currency = "EUR") {
     const parsed = parseLooseNumber(value)
 
     if (parsed === null || String(value ?? "").trim() === "") {
-        return "0,000 €"
+        return "0,00000000"
     }
 
-    return formatMoneyWithDecimals(parsed, currency, 3)
+    return parsed.toLocaleString("es-ES", {
+        minimumFractionDigits: 8,
+        maximumFractionDigits: 12
+    })
 }
 
 function parseLooseNumber(value) {
@@ -393,7 +423,16 @@ document.addEventListener("focusin", (event) => {
     const cell = event.target.closest('td[contenteditable="true"]')
     if (isAssetParticipationsCell(cell) || isAssetCommissionsCell(cell)) {
         queueMicrotask(() => {
-            cell.textContent = stripCurrencyText(cell.textContent || "")
+            const strippedText = stripCurrencyText(cell.textContent || "")
+
+            if (isAssetCommissionsCell(cell) && isCryptoAssetType(getCurrentAssetType())) {
+                const parsed = parseLooseNumber(strippedText)
+                cell.textContent = parsed === 0 ? "" : strippedText
+                selectEditableCellContent(cell)
+                return
+            }
+
+            cell.textContent = strippedText
         })
         return
     }
@@ -434,7 +473,15 @@ document.addEventListener("focusout", (event) => {
     if (isAssetCommissionsCell(cell)) {
         queueMicrotask(() => {
             const text = String(cell.textContent || "").trim()
-            cell.textContent = formatAssetCommissionValue(text, getCurrentAssetCurrency())
+            if (isCryptoAssetType(getCurrentAssetType())) {
+                cell.textContent = formatAssetCommissionValue(text, getCurrentAssetCurrency())
+                return
+            }
+
+            const currentCurrency = getCurrentAssetCurrency()
+            cell.textContent = currentCurrency === "EUR"
+                ? formatEuroSafe(text)
+                : formatDollarSafe(text)
         })
         return
     }

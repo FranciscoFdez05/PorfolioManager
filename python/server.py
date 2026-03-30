@@ -79,6 +79,11 @@ def format_decimal(value, digits=2):
     return f"{float(value):.{digits}f}".replace(".", ",")
 
 
+def is_temporary_service_error(error):
+    normalized_error = str(error or "").lower()
+    return any(fragment in normalized_error for fragment in ("conectar", "divisa", "tard", "timeout"))
+
+
 def convert_asset_rows_currency(rows, source_currency, target_currency, asset_type="", fields=None):
     converted_rows = []
     normalized_asset_type = str(asset_type or "").strip().lower()
@@ -128,7 +133,7 @@ def getExchangeRate():
     rate, error = fetch_exchange_rate(source_currency, target_currency)
 
     if error:
-        statusCode = 503 if "conectar" in error or "divisa" in error else 400
+        statusCode = 503 if is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "source": source_currency, "target": target_currency, "rate": rate})
@@ -494,14 +499,14 @@ def refreshActivoMarketData(assetId):
         quote, error = fetch_quote(marketSymbol, apiKey)
 
     if error:
-        statusCode = 503 if "API key" in error or "conectar" in error else 400
+        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     target_currency = normalize_currency_code(assetData.get("currency", ""), fallback="EUR")
     quote, error = convert_quote_currency(quote, target_currency)
 
     if error:
-        statusCode = 503 if "API key" in error or "conectar" in error or "divisa" in error else 400
+        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     assetData["marketProvider"] = marketProvider
@@ -553,7 +558,7 @@ def changeActivoCurrency(assetId):
         )
 
         if error:
-            statusCode = 503 if "conectar" in error or "divisa" in error else 400
+            statusCode = 503 if is_temporary_service_error(error) else 400
             return jsonify({"ok": False, "error": error}), statusCode
 
         assetData["rows"] = converted_rows
@@ -572,7 +577,7 @@ def changeActivoCurrency(assetId):
         converted_price, error = convert_amount(converted_price, current_currency, target_currency)
 
         if error:
-            statusCode = 503 if "conectar" in error or "divisa" in error else 400
+            statusCode = 503 if is_temporary_service_error(error) else 400
             return jsonify({"ok": False, "error": error}), statusCode
 
         assetData["price"] = format_decimal(converted_price)
@@ -586,7 +591,7 @@ def changeActivoCurrency(assetId):
     )
 
     if error:
-        statusCode = 503 if "conectar" in error or "divisa" in error else 400
+        statusCode = 503 if is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     assetData["rows"] = converted_rows
@@ -607,7 +612,7 @@ def searchFinnhubSymbol():
     results, error = search_symbol(query, apiKey, asset_name=assetName, preferred_asset_type=assetType)
 
     if error:
-        statusCode = 503 if "API key" in error or "conectar" in error else 400
+        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})
@@ -623,7 +628,7 @@ def searchEodhdSymbol():
     )
 
     if error:
-        statusCode = 503 if "API key" in error or "conectar" in error else 400
+        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})

@@ -418,6 +418,8 @@ def fetch_exchange_rate(source_currency, target_currency, timeout=10):
         pass
     except URLError:
         pass
+    except TimeoutError:
+        pass
 
     try:
         payload = _fetch_json_absolute(f"{EXCHANGE_RATE_API_URL}/{source}", timeout=timeout)
@@ -425,6 +427,8 @@ def fetch_exchange_rate(source_currency, target_currency, timeout=10):
         return None, f"Cambio de divisa devolvió HTTP {error.code}"
     except URLError:
         return None, "No se pudo conectar al servicio de cambio de divisa"
+    except TimeoutError:
+        return None, "El servicio de cambio de divisa tardó demasiado en responder"
 
     result = str(payload.get("result", "")).lower()
 
@@ -468,21 +472,13 @@ def convert_quote_currency(quote, target_currency, timeout=10):
 
     current_price = float(quote.get("marketData", {}).get("currentPrice") or 0)
     previous_close = float(quote.get("marketData", {}).get("previousClose") or 0)
-    converted_current_price, error = convert_amount(current_price, source_currency, target_currency, timeout=timeout)
-
-    if error:
-        return None, error
-
-    if previous_close > 0:
-        converted_previous_close, error = convert_amount(previous_close, source_currency, target_currency, timeout=timeout)
-        if error:
-            return None, error
-    else:
-        converted_previous_close = 0
-
     exchange_rate, error = fetch_exchange_rate(source_currency, target_currency, timeout=timeout)
+
     if error:
         return None, error
+
+    converted_current_price = current_price * exchange_rate
+    converted_previous_close = previous_close * exchange_rate if previous_close > 0 else 0
 
     converted_quote = dict(quote)
     converted_quote["price"] = _format_decimal(converted_current_price)

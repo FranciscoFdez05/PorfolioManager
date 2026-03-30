@@ -7,6 +7,7 @@ let operationsAutosaveTimeout = null
 let operationsPersistenceBound = false
 let currentOperationTypeFilter = new Set(OPERATION_ORDER_OPTIONS)
 let currentOperationStatusFilter = new Set(OPERATION_STATUS_OPTIONS)
+const OPERATION_QUANTITY_DECIMALS = 8
 
 async function loadOperacionesData() {
     const response = await fetch("/api/operaciones")
@@ -205,7 +206,7 @@ function buildOperationRow(row) {
                 ${OPERATION_CURRENCY_OPTIONS.map((option) => `<option value="${option}"${(row.precioCurrency || "EUR") === option ? " selected" : ""}>${option === "EUR" ? "Euros" : "Dólares"}</option>`).join("")}
             </select>
         </td>
-        <td contenteditable="true" data-field="cantidad">${formatOperationsNumber(row.cantidad)}</td>
+        <td contenteditable="true" data-field="cantidad">${formatOperationsQuantity(row.cantidad)}</td>
         <td class="rowTotal operationsTotalCell" data-field="totalCell">
             <div class="operationsTotalDisplay" contenteditable="true" data-field="total">${formatOperationsMoney(row.total, row.currency || "EUR")}</div>
             <select class="operationsSelect operationsCurrencySelectHidden" data-field="currency" aria-label="Moneda total">
@@ -232,6 +233,19 @@ function formatOperationsNumber(value) {
     return parsedValue.toLocaleString("es-ES", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 8
+    })
+}
+
+function formatOperationsQuantity(value) {
+    const parsedValue = parseLooseNumber(value)
+
+    if (parsedValue === null || String(value || "").trim() === "") {
+        return ""
+    }
+
+    return parsedValue.toLocaleString("es-ES", {
+        minimumFractionDigits: OPERATION_QUANTITY_DECIMALS,
+        maximumFractionDigits: OPERATION_QUANTITY_DECIMALS
     })
 }
 
@@ -263,7 +277,7 @@ function handleOperationsBlur(event) {
     const field = cell.dataset.field
 
     if (field === "cantidad") {
-        cell.textContent = formatOperationsNumber(cell.textContent)
+        cell.textContent = formatOperationsQuantity(cell.textContent)
     }
 
     if (field === "precioOrden") {

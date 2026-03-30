@@ -234,7 +234,13 @@ function handleCellFocus(event) {
             }
         }
 
-        if (["precioParticipacion", "capitalInvertidoBruto", "comisiones"].includes(fieldName) || (fieldName === "" && (columnIndex === 4 || columnIndex === 5 || columnIndex === 6))) {
+        if (fieldName === "comisiones" && isCryptoAssetType(assetType)) {
+            const value = parseLooseNumber(cell.textContent)
+
+            if (cell.textContent.trim() !== "") {
+                cell.textContent = normalizeNumberForEdit(value ?? 0)
+            }
+        } else if (["precioParticipacion", "capitalInvertidoBruto", "comisiones"].includes(fieldName) || (fieldName === "" && (columnIndex === 4 || columnIndex === 5 || columnIndex === 6))) {
             const moneyCurrency = getAssetTableMoneyCurrency(assetType, fieldName || "precioParticipacion", assetCurrency, assetPriceCurrency)
             const value = moneyCurrency === "EUR"
                 ? parseEuroNumber(cell.textContent)
