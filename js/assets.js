@@ -1,6 +1,9 @@
 const exchangeRateCache = new Map()
 let externalVentasRowsCache = []
 let externalTransaccionesRowsCache = []
+let externalOperacionesRowsCache = []
+let currentAssetPersistedOperationRows = []
+let currentAssetPersistedConversionRows = []
 
 async function fetchExchangeRateOnServer(sourceCurrency, targetCurrency) {
     const source = normalizeCurrencyCode(sourceCurrency)
@@ -57,19 +60,14 @@ async function convertAmountForDisplay(amount, sourceCurrency, targetCurrency) {
 
 async function getAssetDisplayPriceValue(asset) {
     const rawPrice = parseLooseNumber(asset?.price || "0") || 0
-    const sourceCurrency = asset?.currency || "EUR"
-    const targetCurrency = asset?.precioCurrency || asset?.currency || "EUR"
-
-    return await convertAmountForDisplay(rawPrice, sourceCurrency, targetCurrency)
+    return rawPrice
 }
 
 async function buildOverviewDisplayRow(asset) {
-    const row = buildOverviewRow(asset)
+    const row = await buildOverviewRow(asset)
     const investedCurrency = row.currency
     const netoActualDisplay = row.netoActual
-    const currentPriceDisplay = isCryptoAssetType(row.assetType)
-        ? await convertAmountForDisplay(row.valorActual, row.currency, row.precioCurrency || row.currency)
-        : row.valorActual
+    const currentPriceDisplay = row.valorActual
     const rendimientoDisplay = netoActualDisplay - row.invertidoNeto
 
     return {
@@ -183,6 +181,142 @@ async function loadTransaccionesRowsForAssets() {
     const data = await response.json()
     externalTransaccionesRowsCache = Array.isArray(data?.rows) ? data.rows : []
     return externalTransaccionesRowsCache
+}
+
+async function loadOperacionesRowsForAssets() {
+    const response = await fetch("/api/operaciones")
+
+    if (!response.ok) {
+        throw new Error("No se pudieron cargar las operaciones para activos")
+    }
+
+    const data = await response.json()
+    externalOperacionesRowsCache = Array.isArray(data?.rows) ? data.rows : []
+    return externalOperacionesRowsCache
+}
+
+function setExternalOperacionesRowsForAssets(rows) {
+    externalOperacionesRowsCache = Array.isArray(rows) ? rows : []
+}
+
+async function refreshSelectedAssetFromExternalData() {
+    const assets = await loadAssetsList()
+    await renderAssetsList(assets)
+    await refreshTopPortfolioMetrics(assets)
+    await refreshOverviewIfVisible()
+
+    const selectedAssetId = document.querySelector(".assetBtn.selected")?.dataset.assetId || currentAssetId || assets[0]?.id
+
+    if (!selectedAssetId) {
+        return
+    }
+
+    currentAssetId = selectedAssetId
+    const fullAsset = await loadAssetData(selectedAssetId)
+    await updateAssetDetail(fullAsset)
+}
+
+function getCompletedOperationsCryptoImpact(asset) {
+    const assetId = String(asset?.id || "").trim()
+    const persistedRows = Array.isArray(asset?.operationRows) ? asset.operationRows : []
+    const liveRows = Array.isArray(externalOperacionesRowsCache) ? externalOperacionesRowsCache : []
+    const sourceRows = [
+        ...persistedRows.filter((row) => String(row.assetId || "").trim() === assetId),
+        ...liveRows.filter((row) => String(row.assetId || "").trim() === assetId)
+    ].reduce((rows, row) => {
+        const rowId = String(row.id || "").trim()
+        const existingIndex = rowId ? rows.findIndex((item) => String(item.id || "").trim() === rowId) : -1
+
+        if (existingIndex >= 0) {
+            rows[existingIndex] = row
+        } else {
+            rows.push(row)
+        }
+
+        return rows
+    }, [])
+
+    const completedRows = sourceRows
+        .filter((row) => String(row.estado || "").trim().toLowerCase() === "completado")
+
+    const summary = completedRows
+        .reduce((summary, row) => {
+            const quantity = parseLooseNumber(row.cantidad || "") || 0
+            const commission = parseLooseNumber(row.comisionesCripto || row.comisiones || "") || 0
+            const operationType = String(row.orden || "").trim().toLowerCase()
+
+            if (quantity <= 0) {
+                return summary
+            }
+
+            if (operationType === "venta") {
+                summary.quantityDelta -= quantity + commission
+                summary.commissionTotal += commission
+                return summary
+            }
+
+            if (operationType === "compra") {
+                summary.quantityDelta += Math.max(0, quantity - commission)
+                summary.commissionTotal += commission
+                return summary
+            }
+
+            return summary
+        }, { quantityDelta: 0, commissionTotal: 0 })
+
+    return {
+        ...summary,
+        rows: completedRows.sort((left, right) => {
+            const leftDate = parseAssetOperationDate(left.fechaApertura || left.fecha || left.fechaCierre || "")
+            const rightDate = parseAssetOperationDate(right.fechaApertura || right.fecha || right.fechaCierre || "")
+            return leftDate - rightDate
+        })
+    }
+}
+
+function getTransaccionesCryptoImpact(asset) {
+    const assetId = String(asset?.id || "").trim()
+    const sourceRows = Array.isArray(externalTransaccionesRowsCache)
+        ? externalTransaccionesRowsCache.filter((row) => String(row?.assetId || "").trim() === assetId)
+        : []
+
+    const summary = sourceRows.reduce((accumulator, row) => {
+        const walletType = String(row?.walletTipo || "").trim().toLowerCase()
+        const quantity = parseLooseNumber(row?.total || "") || 0
+        const networkFee = Math.max(0, parseLooseNumber(row?.comisionRed || "") || 0)
+
+        if (quantity <= 0) {
+            return accumulator
+        }
+
+        if (walletType === "recibida") {
+            accumulator.quantityDelta += quantity
+            return accumulator
+        }
+
+        if (walletType === "enviada") {
+            accumulator.quantityDelta -= quantity + networkFee
+            accumulator.commissionTotal += networkFee
+            return accumulator
+        }
+
+        return accumulator
+    }, { quantityDelta: 0, commissionTotal: 0 })
+
+    return {
+        ...summary,
+        rows: sourceRows
+    }
+}
+
+function getAssetVentasRows(asset) {
+    const assetId = String(asset?.id || "").trim()
+
+    return Array.isArray(externalVentasRowsCache)
+        ? externalVentasRowsCache
+            .filter((row) => String(row?.assetId || "").trim() === assetId)
+            .sort((left, right) => parseAssetOperationDate(left.fecha || "") - parseAssetOperationDate(right.fecha || ""))
+        : []
 }
 
 async function refreshAssetMarketDataOnServer(assetId) {
@@ -329,7 +463,7 @@ async function updateAssetDetail(asset) {
     const detFees = document.getElementById("detFees")
     const detStatus = document.getElementById("detStatus")
     const detFinnhub = document.getElementById("detFinnhub")
-    const summary = buildOverviewRow(asset)
+    const summary = await buildOverviewRow(asset)
     const investedCurrency = summary.currency
 
     if (detSymbol) {
@@ -342,7 +476,7 @@ async function updateAssetDetail(asset) {
 
     if (detPrice) {
         const displayPrice = await getAssetDisplayPriceValue(asset)
-        detPrice.textContent = formatMoney(displayPrice, asset.precioCurrency || asset.currency || "EUR")
+        detPrice.textContent = formatMoney(displayPrice, asset.currency || "EUR")
     }
 
     if (detChange) {
@@ -356,7 +490,10 @@ async function updateAssetDetail(asset) {
     }
 
     if (detPosition) {
-        detPosition.textContent = formatAssetParticipationValue(summary.participaciones, asset.type)
+        detPosition.textContent = formatAssetParticipationValue(
+            summary.participacionesSinTransacciones ?? summary.participaciones,
+            asset.type
+        )
     }
 
     if (detInvested) {
@@ -369,12 +506,12 @@ async function updateAssetDetail(asset) {
     }
 
     if (detAvgPrice) {
-        detAvgPrice.textContent = formatMoney(summary.promedioCompra, summary.precioCurrency || summary.currency)
+        detAvgPrice.textContent = formatMoney(summary.promedioCompra, summary.currency)
     }
 
     if (detFees) {
         detFees.textContent = isCryptoAssetType(asset.type)
-            ? formatAssetCommissionValue(summary.comisiones)
+            ? formatAssetCommissionValue(summary.comisionesCripto)
             : formatMoney(summary.comisiones, summary.currency)
     }
 
@@ -401,7 +538,7 @@ async function renderAssetsList(assets) {
     for (const asset of assets) {
         try {
             const displayPrice = await getAssetDisplayPriceValue(asset)
-            const displayCurrency = asset.precioCurrency || asset.currency || "EUR"
+            const displayCurrency = asset.currency || "EUR"
             const button = document.createElement("button")
             button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}`
             button.dataset.assetId = asset.id
@@ -446,6 +583,7 @@ async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTabl
     try {
         await loadVentasRowsForAssets()
         await loadTransaccionesRowsForAssets()
+        await loadOperacionesRowsForAssets()
         const assets = await loadAssetsList()
         await renderAssetsList(assets)
         await refreshTopPortfolioMetrics(assets)
@@ -749,7 +887,7 @@ async function refreshTopPortfolioMetrics(assets = null) {
     const metrics = createEmptyTopMetrics()
     const fullAssets = await Promise.all(baseAssets.map((asset) => loadAssetData(asset.id)))
     const metricSummaries = await Promise.all(fullAssets.map(async (asset) => {
-        const summary = buildOverviewRow(asset)
+        const summary = await buildOverviewRow(asset)
         const euroMetrics = await buildSummaryMetricsInEuros(summary)
 
         return { summary, euroMetrics }
@@ -846,6 +984,181 @@ function parseParticipationNumber(value) {
     return Number.isNaN(parsedValue) ? 0 : parsedValue
 }
 
+function getCryptoRowCommissionCrypto(row = {}) {
+    return row.comisionesCripto ?? row.comisionesSatoshis ?? row.comisiones ?? ""
+}
+
+function getCryptoRowCommissionFiat(row = {}) {
+    return row.comisionesFiat ?? ""
+}
+
+function deriveAssetBaseSymbolFromData(assetOrDataset = {}) {
+    const marketSymbol = String(assetOrDataset.marketSymbol || assetOrDataset.finnhubSymbol || assetOrDataset.assetMarketSymbol || assetOrDataset.assetFinnhubSymbol || "").trim().toUpperCase()
+    const fallbackSymbol = String(assetOrDataset.symbol || assetOrDataset.assetSymbol || assetOrDataset.name || assetOrDataset.assetName || "").trim().toUpperCase()
+
+    if (marketSymbol.includes(":")) {
+        const symbolPart = marketSymbol.split(":").pop() || ""
+        const basePart = symbolPart.split("/")[0].split("-")[0].split("_")[0] || ""
+        const stablecoinSuffixes = ["USDT", "USDC", "BUSD", "DAI", "FDUSD", "PYUSD", "TUSD", "USDE", "EURC", "USD", "EUR"]
+
+        for (const suffix of stablecoinSuffixes) {
+            if (basePart.endsWith(suffix)) {
+                return basePart.slice(0, -suffix.length) || fallbackSymbol
+            }
+        }
+
+        return basePart || fallbackSymbol
+    }
+
+    if (marketSymbol.includes("/")) {
+        return marketSymbol.split("/")[0] || fallbackSymbol
+    }
+
+    return fallbackSymbol
+}
+
+function getConvertedInOperationLabel(baseSymbol) {
+    return `Convertidos a ${baseSymbol}`
+}
+
+function getConvertedOutOperationLabel(baseSymbol) {
+    return `${baseSymbol} convertidos`
+}
+
+function normalizeAssetOperationTypeLabel(value, baseSymbol = deriveAssetBaseSymbolFromData()) {
+    const normalizedValue = String(value || "Compra").trim().toLowerCase()
+
+    if (normalizedValue === "venta") {
+        return "Venta"
+    }
+
+    return "Compra"
+}
+
+function buildAssetOperationTypeSelect(value, assetData = {}) {
+    const normalizedValue = normalizeAssetOperationTypeLabel(value, deriveAssetBaseSymbolFromData(assetData))
+
+    return `
+        <select class="operationsSelect" data-field="tipoOperacion">
+            <option value="Compra"${normalizedValue === "Compra" ? " selected" : ""}>Compra</option>
+            <option value="Venta"${normalizedValue === "Venta" ? " selected" : ""}>Venta</option>
+        </select>
+    `
+}
+
+function isConvertedOutOperationType(operationType = "") {
+    const normalized = String(operationType || "").trim().toLowerCase()
+    return normalized.includes(" convertidos") || normalized === "convertidos"
+}
+
+function isConvertedInOperationType(operationType = "") {
+    const normalized = String(operationType || "").trim().toLowerCase()
+    return normalized.includes("convertidos a")
+}
+
+function buildAssetConversionTypeSelect(value, assetData = {}) {
+    const baseSymbol = deriveAssetBaseSymbolFromData(assetData)
+    const convertedInLabel = getConvertedInOperationLabel(baseSymbol)
+    const convertedOutLabel = getConvertedOutOperationLabel(baseSymbol)
+    const normalizedValue = String(value || "").trim().toLowerCase()
+    const selectedValue = normalizedValue === convertedOutLabel.toLowerCase()
+        ? convertedOutLabel
+        : convertedInLabel
+
+    return `
+        <select class="operationsSelect" data-field="tipo">
+            <option value="${convertedInLabel}"${selectedValue === convertedInLabel ? " selected" : ""}>${convertedInLabel} (Comprar)</option>
+            <option value="${convertedOutLabel}"${selectedValue === convertedOutLabel ? " selected" : ""}>${convertedOutLabel} (Vender)</option>
+        </select>
+    `
+}
+
+function createConversionRowId() {
+    return `conversion-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function normalizeAssetConversionTypeLabel(value, assetData = {}) {
+    const baseSymbol = deriveAssetBaseSymbolFromData(assetData)
+    const convertedInLabel = getConvertedInOperationLabel(baseSymbol)
+    const convertedOutLabel = getConvertedOutOperationLabel(baseSymbol)
+    const normalizedValue = String(value || "").trim().toLowerCase()
+
+    if (normalizedValue === convertedOutLabel.toLowerCase() || isConvertedOutOperationType(normalizedValue)) {
+        return convertedOutLabel
+    }
+
+    return convertedInLabel
+}
+
+function getPrimaryAssetRows(asset = {}) {
+    return Array.isArray(asset.rows)
+        ? asset.rows.filter((row) => {
+            const operationType = String(row?.tipoOperacion || "").trim()
+            return !isConvertedInOperationType(operationType) && !isConvertedOutOperationType(operationType)
+        })
+        : []
+}
+
+function getAssetConversionRows(asset = {}) {
+    const explicitRows = Array.isArray(asset.conversionRows) ? asset.conversionRows : []
+    const legacyRows = Array.isArray(asset.rows)
+        ? asset.rows
+            .filter((row) => {
+                const operationType = String(row?.tipoOperacion || "").trim()
+                return isConvertedInOperationType(operationType) || isConvertedOutOperationType(operationType)
+            })
+            .map((row, index) => ({
+                id: createConversionRowId(),
+                fecha: String(row.fechaOperacion || "").trim(),
+                par: String(row.par || "").trim(),
+                tipo: normalizeAssetConversionTypeLabel(row.tipoOperacion || "", asset),
+                cantidad: String(row.participaciones || "").trim(),
+                legacyOrder: index
+            }))
+        : []
+
+    const mergedRows = [...explicitRows, ...legacyRows]
+    const uniqueRows = []
+    const seenKeys = new Set()
+
+    mergedRows.forEach((row, index) => {
+        const normalizedRow = {
+            id: String(row.id || createConversionRowId()).trim() || createConversionRowId(),
+            fecha: String(row.fecha || row.fechaOperacion || "").trim(),
+            par: String(row.par || "").trim(),
+            tipo: normalizeAssetConversionTypeLabel(row.tipo || row.tipoOperacion || "", asset),
+            cantidad: String(row.cantidad || row.participaciones || "").trim(),
+            sortIndex: index
+        }
+        const dedupeKey = [
+            normalizedRow.fecha,
+            normalizedRow.par,
+            normalizedRow.tipo,
+            normalizedRow.cantidad
+        ].join("|")
+
+        if (seenKeys.has(dedupeKey)) {
+            return
+        }
+
+        seenKeys.add(dedupeKey)
+        uniqueRows.push(normalizedRow)
+    })
+
+    uniqueRows.sort((left, right) => {
+        const leftDate = parseAssetOperationDate(left.fecha)
+        const rightDate = parseAssetOperationDate(right.fecha)
+
+        if (leftDate === rightDate) {
+            return (left.sortIndex || 0) - (right.sortIndex || 0)
+        }
+
+        return leftDate - rightDate
+    })
+
+    return uniqueRows.map(({ sortIndex, ...row }) => row)
+}
+
 function getSignedParticipation(row) {
     const participaciones = parseParticipationNumber(row.participaciones)
     const operationType = (row.tipoOperacion || "").trim().toLowerCase()
@@ -935,44 +1248,205 @@ function getRowTotalCostForLot(row, assetType = "") {
     return grossBasedCost
 }
 
-function buildRemainingAssetLots(asset) {
-    const rows = Array.isArray(asset.rows) ? [...asset.rows] : []
-    rows.sort((left, right) => parseAssetOperationDate(left.fechaOperacion) - parseAssetOperationDate(right.fechaOperacion))
+async function convertCryptoRowMoneyToAssetCurrency(amount, row, assetCurrency) {
+    const numericAmount = Number(amount) || 0
+    const sourceCurrency = normalizeAssetRowCurrency(row?.currency, assetCurrency)
+    return await convertAmountForDisplay(numericAmount, sourceCurrency, assetCurrency)
+}
+
+async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency || "EUR") {
+    const rows = [...getPrimaryAssetRows(asset)]
+    const conversionRows = getAssetConversionRows(asset)
+    const completedOperationsImpact = getCompletedOperationsCryptoImpact(asset)
+    const transaccionesImpact = getTransaccionesCryptoImpact(asset)
+    const ventasRows = getAssetVentasRows(asset)
 
     const lots = []
+    const timelineEvents = []
 
-    rows.forEach((row) => {
-        const operationType = String(row.tipoOperacion || "").trim().toLowerCase()
-        const participaciones = parseParticipationNumber(row.participaciones)
-
-        if (participaciones <= 0) {
-            return
-        }
-
-        if (operationType.includes("venta")) {
-            consumeAssetLots(lots, participaciones)
-            return
-        }
-
-        const totalCost = getRowTotalCostForLot(row, asset.type)
-        lots.push({
-            remaining: participaciones,
-            unitCost: participaciones > 0 ? totalCost / participaciones : 0,
-            totalCost
+    for (const row of rows) {
+        timelineEvents.push({
+            kind: "assetRow",
+            date: parseAssetOperationDate(row.fechaOperacion || ""),
+            row
         })
-    })
+    }
 
-    const externalSales = externalVentasRowsCache
-        .filter((row) => String(row.assetId || "") === String(asset.id || ""))
-        .sort((left, right) => parseAssetOperationDate(left.fecha) - parseAssetOperationDate(right.fecha))
+    for (const operationRow of completedOperationsImpact.rows) {
+        timelineEvents.push({
+            kind: "operacion",
+            date: parseAssetOperationDate(operationRow.fechaApertura || operationRow.fecha || operationRow.fechaCierre || ""),
+            row: operationRow
+        })
+    }
 
-    externalSales.forEach((saleRow) => {
-        const soldQuantity = parseParticipationNumber(saleRow.cantidad)
+    for (const ventaRow of ventasRows) {
+        timelineEvents.push({
+            kind: "ventaExterna",
+            date: parseAssetOperationDate(ventaRow.fecha || ""),
+            row: ventaRow
+        })
+    }
 
-        if (soldQuantity > 0) {
-            consumeAssetLots(lots, soldQuantity)
+    for (const transaccionRow of transaccionesImpact.rows) {
+        timelineEvents.push({
+            kind: "transaccion",
+            date: parseAssetOperationDate(transaccionRow.fechaOperacion || ""),
+            row: transaccionRow
+        })
+    }
+
+    for (const conversionRow of conversionRows) {
+        timelineEvents.push({
+            kind: "conversion",
+            date: parseAssetOperationDate(conversionRow.fecha || ""),
+            row: conversionRow
+        })
+    }
+
+    timelineEvents.sort((left, right) => left.date - right.date)
+
+    for (const event of timelineEvents) {
+        if (event.kind === "assetRow") {
+            const row = event.row
+            const operationType = String(row.tipoOperacion || "").trim().toLowerCase()
+            const participaciones = parseParticipationNumber(row.participaciones)
+            const cryptoCommission = isCryptoAssetType(asset.type)
+                ? Math.max(0, parseLooseNumber(getCryptoRowCommissionCrypto(row)) || 0)
+                : 0
+
+            if (participaciones <= 0) {
+                continue
+            }
+
+            if (operationType.includes("venta")) {
+                consumeAssetLots(lots, participaciones + cryptoCommission)
+                continue
+            }
+
+            const netParticipaciones = Math.max(0, participaciones - cryptoCommission)
+
+            if (netParticipaciones <= 0) {
+                continue
+            }
+
+            let totalCost = getRowTotalCostForLot(row, asset.type)
+
+            if (isCryptoAssetType(asset.type)) {
+                totalCost = await convertCryptoRowMoneyToAssetCurrency(totalCost, row, targetCurrency)
+            }
+
+            lots.push({
+                remaining: netParticipaciones,
+                priceQuantity: netParticipaciones,
+                unitCost: netParticipaciones > 0 ? totalCost / netParticipaciones : 0,
+                displayUnitPrice: netParticipaciones > 0 ? totalCost / netParticipaciones : 0,
+                totalCost
+            })
+            continue
         }
-    })
+
+        if (event.kind === "operacion") {
+            const operationRow = event.row
+            const operationType = String(operationRow.orden || "").trim().toLowerCase()
+            const quantity = parseLooseNumber(operationRow.cantidad || "") || 0
+            const cryptoCommission = Math.max(0, parseLooseNumber(operationRow.comisionesCripto || operationRow.comisiones || "") || 0)
+
+            if (quantity <= 0) {
+                continue
+            }
+
+            if (operationType === "venta") {
+                consumeAssetLots(lots, quantity + cryptoCommission)
+                continue
+            }
+
+            const netParticipaciones = Math.max(0, quantity - cryptoCommission)
+
+            if (netParticipaciones <= 0) {
+                continue
+            }
+
+            const totalCost = await convertAmountForDisplay(
+                parseLooseNumber(operationRow.total || "") || 0,
+                normalizeCurrencyCode(operationRow.currency || operationRow.precioCurrency || targetCurrency),
+                targetCurrency
+            )
+            const executionPrice = await convertAmountForDisplay(
+                parseLooseNumber(operationRow.precioOrden || "") || 0,
+                normalizeCurrencyCode(operationRow.precioCurrency || operationRow.currency || targetCurrency),
+                targetCurrency
+            )
+
+            lots.push({
+                remaining: netParticipaciones,
+                priceQuantity: quantity,
+                unitCost: netParticipaciones > 0 ? totalCost / netParticipaciones : 0,
+                displayUnitPrice: executionPrice,
+                totalCost
+            })
+            continue
+        }
+
+        if (event.kind === "ventaExterna") {
+            const quantity = parseLooseNumber(event.row.cantidad || "") || 0
+
+            if (quantity > 0) {
+                consumeAssetLots(lots, quantity)
+            }
+            continue
+        }
+
+        if (event.kind === "transaccion") {
+            const transaccionRow = event.row
+            const walletType = String(transaccionRow.walletTipo || "").trim().toLowerCase()
+            const quantity = parseLooseNumber(transaccionRow.total || "") || 0
+            const networkFee = Math.max(0, parseLooseNumber(transaccionRow.comisionRed || "") || 0)
+
+            if (quantity <= 0 || walletType === "entre_wallet") {
+                continue
+            }
+
+            if (walletType === "enviada") {
+                consumeAssetLots(lots, quantity + networkFee)
+                continue
+            }
+
+            if (walletType === "recibida") {
+                lots.push({
+                    remaining: quantity,
+                    priceQuantity: quantity,
+                    unitCost: 0,
+                    displayUnitPrice: 0,
+                    totalCost: 0
+                })
+            }
+            continue
+        }
+
+        if (event.kind === "conversion") {
+            const conversionRow = event.row
+            const quantity = parseLooseNumber(conversionRow.cantidad || "") || 0
+            const conversionType = String(conversionRow.tipo || "").trim()
+
+            if (quantity <= 0) {
+                continue
+            }
+
+            if (isConvertedOutOperationType(conversionType)) {
+                consumeAssetLots(lots, quantity)
+                continue
+            }
+
+            lots.push({
+                remaining: quantity,
+                priceQuantity: quantity,
+                unitCost: 0,
+                displayUnitPrice: 0,
+                totalCost: 0
+            })
+        }
+    }
 
     return lots
 }
@@ -992,38 +1466,55 @@ function consumeAssetLots(lots, quantityToSell) {
         }
 
         lot.remaining -= quantityFromLot
+        if (typeof lot.priceQuantity === "number") {
+            lot.priceQuantity = Math.max(0, lot.priceQuantity - quantityFromLot)
+        }
         remainingToSell -= quantityFromLot
     }
 }
 
-function buildOverviewRow(asset) {
+async function buildOverviewRow(asset) {
     const rows = Array.isArray(asset.rows) ? asset.rows : []
     const isCrypto = isCryptoAssetType(asset.type)
-    const remainingLots = buildRemainingAssetLots(asset)
+    const assetCurrency = normalizeCurrencyCode(asset.currency || "EUR")
+    const remainingLots = await buildRemainingAssetLots(asset, assetCurrency)
     const rawParticipaciones = remainingLots.reduce((total, lot) => total + lot.remaining, 0)
-    const transaccionesFeeAmount = externalTransaccionesRowsCache
-        .filter((row) => String(row.assetId || "") === String(asset.id || ""))
-        .reduce((total, row) => total + (parseLooseNumber(row.comisionRed || "") || 0), 0)
-    const participaciones = Math.max(0, rawParticipaciones - transaccionesFeeAmount)
+    const completedOperationsImpact = getCompletedOperationsCryptoImpact(asset)
+    const transaccionesImpact = getTransaccionesCryptoImpact(asset)
+    const participacionesSinTransacciones = Math.max(0, rawParticipaciones)
+    const participaciones = participacionesSinTransacciones
     const invertidoBruto = remainingLots.reduce((total, lot) => total + (lot.remaining * lot.unitCost), 0)
-    const comisiones = rows.reduce((total, row) => total + (parseLooseNumber(row.comisiones || "") || 0), 0)
-    const invertidoNeto = isCrypto ? invertidoBruto : invertidoBruto - comisiones
+    const comisionesCripto = isCrypto
+        ? rows.reduce((total, row) => total + (parseLooseNumber(getCryptoRowCommissionCrypto(row)) || 0), 0) + completedOperationsImpact.commissionTotal + transaccionesImpact.commissionTotal
+        : 0
+    const comisionesFiat = isCrypto
+        ? (await Promise.all(rows.map(async (row) => {
+            const feeAmount = parseLooseNumber(getCryptoRowCommissionFiat(row)) || 0
+            return await convertCryptoRowMoneyToAssetCurrency(feeAmount, row, assetCurrency)
+        }))).reduce((total, value) => total + value, 0)
+        : rows.reduce((total, row) => total + (parseLooseNumber(row.comisiones || "") || 0), 0)
+    const invertidoNeto = invertidoBruto - comisionesFiat
     const valorActual = parseLooseNumber(asset.price || "") || 0
     const netoActual = participaciones * valorActual
-    const promedioCompra = participaciones > 0 ? invertidoBruto / participaciones : 0
+    const displayPriceQuantity = remainingLots.reduce((total, lot) => total + (lot.priceQuantity ?? lot.remaining), 0)
+    const displayPriceCost = remainingLots.reduce((total, lot) => total + ((lot.displayUnitPrice ?? lot.unitCost) * (lot.priceQuantity ?? lot.remaining)), 0)
+    const promedioCompra = displayPriceQuantity > 0 ? displayPriceCost / displayPriceQuantity : 0
     const rendimiento = netoActual - invertidoNeto
 
     return {
         nombre: asset.name || asset.symbol || "Activo",
         tipo: buildAssetTypeLabel(asset.type),
         assetType: asset.type,
+        participacionesSinTransacciones,
         participaciones,
         promedioCompra,
         valorActual,
-        currency: asset.currency || "EUR",
-        precioCurrency: asset.precioCurrency || asset.currency || "EUR",
+        currency: assetCurrency,
+        precioCurrency: assetCurrency,
         invertidoBruto,
-        comisiones,
+        comisiones: comisionesFiat,
+        comisionesFiat,
+        comisionesCripto,
         invertidoNeto,
         netoActual,
         rendimiento
@@ -1054,16 +1545,14 @@ function renderOverviewRows(rows) {
     rows.forEach((row) => {
         const tr = document.createElement("tr")
         const profitClass = row.overviewYieldValue >= 0 ? "overviewProfitPositive" : "overviewProfitNegative"
-        const overviewCommissions = isCryptoAssetType(row.assetType)
-            ? "0"
-            : formatMoney(row.comisiones, row.overviewInvestedCurrency)
+        const overviewCommissions = formatMoney(row.comisionesFiat ?? row.comisiones, row.overviewInvestedCurrency)
 
         tr.innerHTML = `
             <td>${row.nombre}</td>
             <td>${row.tipo}</td>
             <td class="overviewNumericCell">${formatAssetParticipationValue(row.participaciones, row.assetType)}</td>
-            <td class="overviewNumericCell">${formatMoney(row.promedioCompra, row.precioCurrency || row.currency)}</td>
-            <td class="overviewNumericCell overviewCurrentPriceCell">${formatMoney(row.overviewCurrentPrice ?? row.valorActual, row.precioCurrency || row.currency)}</td>
+            <td class="overviewNumericCell">${formatMoney(row.promedioCompra, row.currency)}</td>
+            <td class="overviewNumericCell overviewCurrentPriceCell">${formatMoney(row.overviewCurrentPrice ?? row.valorActual, row.currency)}</td>
             <td class="overviewNumericCell">${formatMoney(row.invertidoBruto, row.overviewInvestedCurrency)}</td>
             <td class="overviewNumericCell">${overviewCommissions}</td>
             <td class="overviewNumericCell">${formatMoney(row.invertidoNeto, row.overviewInvestedCurrency)}</td>
@@ -1106,10 +1595,10 @@ async function renderVistaGeneralTable() {
 
 function renderAssetTablePage(asset) {
     const contentArea = document.getElementById("dynamicContent")
+    const primaryRows = getPrimaryAssetRows(asset)
+    const conversionRows = getAssetConversionRows(asset)
     const currentCurrency = String(asset.currency || "EUR").trim().toUpperCase()
-    const currentPriceCurrency = String(asset.precioCurrency || asset.currency || "EUR").trim().toUpperCase()
     const targetCurrency = currentCurrency === "EUR" ? "USD" : "EUR"
-    const targetPriceCurrency = currentPriceCurrency === "EUR" ? "USD" : "EUR"
     const isCrypto = isCryptoAssetType(asset.type)
     const isEtf = String(asset.type || "").trim().toLowerCase() === "etfs"
 
@@ -1118,7 +1607,7 @@ function renderAssetTablePage(asset) {
     }
 
     contentArea.innerHTML = `
-        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-price-currency="${asset.precioCurrency || asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-market-provider="${asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-market-symbol="${asset.marketSymbol || asset.finnhubSymbol || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}">
+        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-price-currency="${asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-market-provider="${asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-market-symbol="${asset.marketSymbol || asset.finnhubSymbol || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}">
             <div class="assetPageHeader">
                 <div>
                     <div class="assetTitleRow">
@@ -1130,14 +1619,7 @@ function renderAssetTablePage(asset) {
                 ${isCrypto ? `
                     <div class="assetCurrencyPanel assetCurrencyPanelCrypto">
                         <div class="assetCurrencyBlock">
-                            <div class="assetCurrencyLabel">Precio participación</div>
-                            <div class="assetCurrencyCurrent">Actual: ${currentPriceCurrency}</div>
-                            <button id="toggleAssetPriceCurrencyBtn" class="secondaryButton assetCurrencyBtn" type="button" data-target-currency="${targetPriceCurrency}">
-                                Pasar a ${targetPriceCurrency}
-                            </button>
-                        </div>
-                        <div class="assetCurrencyBlock">
-                            <div class="assetCurrencyLabel">Resto de importes</div>
+                            <div class="assetCurrencyLabel">Moneda menú lateral</div>
                             <div class="assetCurrencyCurrent">Actual: ${currentCurrency}</div>
                             <button id="toggleAssetCurrencyBtn" class="secondaryButton assetCurrencyBtn" type="button" data-target-currency="${targetCurrency}">
                                 Pasar a ${targetCurrency}
@@ -1162,11 +1644,13 @@ function renderAssetTablePage(asset) {
                             <th class="rowActionHeader"></th>
                             <th>Fecha operación</th>
                             <th>Tipo de operación</th>
+                            ${isCrypto ? "<th>Exchange</th>" : ""}
                             <th>Participaciones</th>
                             <th>Precio Participación</th>
+                            ${isCrypto ? "<th>Moneda fiat</th>" : ""}
                             <th>Capital Invertido bruto</th>
                             ${isEtf ? "<th>Coste Anual</th>" : ""}
-                            <th>Comisiones</th>
+                            ${isCrypto ? "<th>Comisiones cripto</th><th>Comisiones fiat</th>" : "<th>Comisiones</th>"}
                             <th>Capital Invertido neto</th>
                         </tr>
                     </thead>
@@ -1183,7 +1667,9 @@ function renderAssetTablePage(asset) {
         </section>
     `
 
-    renderAssetRows(asset.rows || [])
+    currentAssetPersistedOperationRows = Array.isArray(asset.operationRows) ? asset.operationRows : []
+    currentAssetPersistedConversionRows = conversionRows
+    renderAssetRows(primaryRows)
     initAssetTableLogic(asset)
 }
 
@@ -1204,17 +1690,37 @@ function renderAssetRows(rows) {
 
     rows.forEach((rowData) => {
         const rowElement = document.createElement("tr")
-        const cryptoCommissionValue = parseLooseNumber(rowData.comisiones) ? formatAssetCommissionValue(rowData.comisiones) : ""
+        const rowCurrency = normalizeAssetRowCurrency(rowData.currency, assetCurrency)
+        const cryptoCommissionValue = parseLooseNumber(getCryptoRowCommissionCrypto(rowData)) ? formatAssetCommissionValue(getCryptoRowCommissionCrypto(rowData)) : ""
+        const cryptoFiatCommissionValue = formatCellMoneyValue(
+            getCryptoRowCommissionFiat(rowData),
+            getAssetTableMoneyCurrency(assetType, "comisionesFiat", assetCurrency, assetPriceCurrency, rowCurrency)
+        )
         rowElement.innerHTML = `
             <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
             <td contenteditable="true" data-field="fechaOperacion">${rowData.fechaOperacion || ""}</td>
-            <td contenteditable="true" data-field="tipoOperacion">${rowData.tipoOperacion || "Compra"}</td>
+            <td>${buildAssetOperationTypeSelect(rowData.tipoOperacion, {
+                symbol: assetPage?.dataset.assetSymbol || "",
+                marketSymbol: assetPage?.dataset.assetMarketSymbol || assetPage?.dataset.assetFinnhubSymbol || ""
+            })}</td>
+            ${isCrypto ? `<td contenteditable="true" data-field="exchange">${rowData.exchange || ""}</td>` : ""}
             <td contenteditable="true" data-field="participaciones">${formatAssetParticipationValue(rowData.participaciones, assetType)}</td>
-            <td contenteditable="true" data-field="precioParticipacion">${formatCellMoneyValue(rowData.precioParticipacion, getAssetTableMoneyCurrency(assetType, "precioParticipacion", assetCurrency, assetPriceCurrency))}</td>
-            <td contenteditable="true" data-field="capitalInvertidoBruto">${formatCellMoneyValue(rowData.capitalInvertidoBruto, getAssetTableMoneyCurrency(assetType, "capitalInvertidoBruto", assetCurrency))}</td>
+            <td contenteditable="true" data-field="precioParticipacion">${formatCellMoneyValue(rowData.precioParticipacion, getAssetTableMoneyCurrency(assetType, "precioParticipacion", assetCurrency, assetPriceCurrency, rowCurrency))}</td>
+            ${isCrypto ? `
+                <td>
+                    <select class="operationsSelect" data-field="currency" aria-label="Moneda fiat de la fila">
+                        <option value="EUR"${rowCurrency === "EUR" ? " selected" : ""}>EUR</option>
+                        <option value="USD"${rowCurrency === "USD" ? " selected" : ""}>USD</option>
+                    </select>
+                </td>
+            ` : ""}
+            <td contenteditable="true" data-field="capitalInvertidoBruto">${formatCellMoneyValue(rowData.capitalInvertidoBruto, getAssetTableMoneyCurrency(assetType, "capitalInvertidoBruto", assetCurrency, assetPriceCurrency, rowCurrency))}</td>
             ${isEtf ? `<td contenteditable="true" data-field="costeAnual">${formatCellPercentValue(rowData.costeAnual)}</td>` : ""}
-            <td ${isCrypto ? 'data-field="comisiones"' : 'contenteditable="true" data-field="comisiones"'}>${isCrypto ? `<input type="text" class="cryptoCommissionInput" inputmode="decimal" value="${cryptoCommissionValue}" placeholder="0,00000000" style="width:100%;background:transparent;border:none;color:inherit;font:inherit;padding:0;outline:none;">` : formatCellMoneyValue(rowData.comisiones, getAssetTableMoneyCurrency(assetType, "comisiones", assetCurrency, assetPriceCurrency))}</td>
-            <td class="rowTotal">${formatMoney(0, assetCurrency)}</td>
+            ${isCrypto
+                ? `<td data-field="comisionesCripto"><input type="text" class="cryptoCommissionInput" inputmode="decimal" value="${cryptoCommissionValue}" placeholder="0,00000000" style="width:100%;background:transparent;border:none;color:inherit;font:inherit;padding:0;outline:none;"></td>
+            <td contenteditable="true" data-field="comisionesFiat">${cryptoFiatCommissionValue}</td>`
+                : `<td contenteditable="true" data-field="comisiones">${formatCellMoneyValue(rowData.comisiones, getAssetTableMoneyCurrency(assetType, "comisiones", assetCurrency, assetPriceCurrency, rowCurrency))}</td>`}
+            <td class="rowTotal">${formatMoney(0, getAssetTableMoneyCurrency(assetType, "capitalInvertidoNeto", assetCurrency, assetPriceCurrency, rowCurrency))}</td>
         `
         assetOperationsBody.appendChild(rowElement)
     })
@@ -1241,13 +1747,17 @@ function collectAssetRowsFromTable() {
         }
         const rowData = {
             fechaOperacion: getFieldValue("fechaOperacion"),
-            tipoOperacion: getFieldValue("tipoOperacion"),
+            tipoOperacion: rowElement.querySelector('select[data-field="tipoOperacion"]')?.value || "Compra",
+            exchange: getFieldValue("exchange"),
+            currency: normalizeAssetRowCurrency(rowElement.querySelector('select[data-field="currency"]')?.value, assetCurrency),
             participaciones: getFieldValue("participaciones"),
             precioParticipacion: getFieldValue("precioParticipacion"),
             capitalInvertidoBruto: getFieldValue("capitalInvertidoBruto"),
             costeAnual: getFieldValue("costeAnual"),
             comisiones: getFieldValue("comisiones"),
-            comisionesSatoshis: getFieldValue("comisionesSatoshis")
+            comisionesFiat: getFieldValue("comisionesFiat"),
+            comisionesCripto: getFieldValue("comisionesCripto"),
+            comisionesSatoshis: getFieldValue("comisionesCripto")
         }
 
         return rowData
@@ -1290,17 +1800,20 @@ function isEmptyDividendosRow(rowElement) {
 
 function isEmptyAssetRow(rowElement) {
     const fechaOperacion = rowElement.querySelector('[data-field="fechaOperacion"]')?.textContent.trim() || ""
-    const tipoOperacion = rowElement.querySelector('[data-field="tipoOperacion"]')?.textContent.trim() || ""
+    const tipoOperacion = rowElement.querySelector('select[data-field="tipoOperacion"]')?.value.trim() || ""
+    const exchange = rowElement.querySelector('[data-field="exchange"]')?.textContent.trim() || ""
     const participaciones = parseFloat((rowElement.querySelector('[data-field="participaciones"]')?.textContent || "0").replace(",", ".")) || 0
     const precioParticipacion = parseLooseNumber(rowElement.querySelector('[data-field="precioParticipacion"]')?.textContent || "") || 0
     const capitalInvertidoBruto = parseLooseNumber(rowElement.querySelector('[data-field="capitalInvertidoBruto"]')?.textContent || "") || 0
     const costeAnual = parseLooseNumber(rowElement.querySelector('[data-field="costeAnual"]')?.textContent || "") || 0
-    const comisionesCell = rowElement.querySelector('[data-field="comisiones"]')
+    const comisionesCell = rowElement.querySelector('[data-field="comisiones"], [data-field="comisionesFiat"]')
     const comisiones = parseLooseNumber(comisionesCell?.querySelector("input")?.value || comisionesCell?.textContent || "") || 0
-    const comisionesSatoshis = parseLooseNumber(rowElement.querySelector('[data-field="comisionesSatoshis"]')?.textContent || "") || 0
+    const cryptoCommissionInput = rowElement.querySelector('[data-field="comisionesCripto"] input')
+    const comisionesSatoshis = parseLooseNumber(cryptoCommissionInput?.value || rowElement.querySelector('[data-field="comisionesSatoshis"]')?.textContent || "") || 0
 
     return !fechaOperacion &&
         (!tipoOperacion || isPlaceholderValue(tipoOperacion, ["compra"])) &&
+        !exchange &&
         participaciones === 0 &&
         precioParticipacion === 0 &&
         capitalInvertidoBruto === 0 &&
@@ -1386,23 +1899,51 @@ function buildCurrentAssetPayload() {
         type: assetPage?.dataset.assetType || "cripto",
         price: assetPage?.dataset.assetPrice || "0,00",
         currency: assetPage?.dataset.assetCurrency || "EUR",
-        precioCurrency: assetPage?.dataset.assetPriceCurrency || assetPage?.dataset.assetCurrency || "EUR",
+        precioCurrency: assetPage?.dataset.assetCurrency || "EUR",
         change: assetPage?.dataset.assetChange || "+0,00%",
         status: assetPage?.dataset.assetStatus || "Mercado abierto",
         lastUpdated: assetPage?.dataset.assetLastUpdated || "",
+        operationRows: currentAssetPersistedOperationRows,
+        conversionRows: currentAssetPersistedConversionRows,
         order: Number(document.querySelector(`.assetBtn[data-asset-id="${currentAssetId}"]`)?.dataset.assetOrder || 0),
         rows: collectAssetRowsFromTable()
     }
+}
+
+function updateAssetRowMoneyDisplays(rowElement) {
+    if (!rowElement) {
+        return
+    }
+
+    const assetPage = document.querySelector(".assetTablePage")
+    const assetType = assetPage?.dataset.assetType || "acciones"
+    const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
+    const assetPriceCurrency = assetPage?.dataset.assetPriceCurrency || assetCurrency
+    const rowCurrency = getAssetRowCurrency(rowElement, assetCurrency)
+
+    ;["precioParticipacion", "capitalInvertidoBruto", "comisiones", "comisionesFiat"].forEach((fieldName) => {
+        const cell = rowElement.querySelector(`[data-field="${fieldName}"]`)
+
+        if (!cell) {
+            return
+        }
+
+        const moneyCurrency = getAssetTableMoneyCurrency(assetType, fieldName, assetCurrency, assetPriceCurrency, rowCurrency)
+        const rawValue = cell.textContent || ""
+        cell.textContent = formatCellMoneyValue(rawValue, moneyCurrency)
+    })
 }
 
 function updateAssetTableTotals() {
     const rowElements = document.querySelectorAll("#assetOperationsBody tr")
     const assetPage = document.querySelector(".assetTablePage")
     const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
+    const assetPriceCurrency = assetPage?.dataset.assetPriceCurrency || assetCurrency
     const assetType = assetPage?.dataset.assetType || "acciones"
     const isEtf = String(assetType || "").trim().toLowerCase() === "etfs"
 
     rowElements.forEach((rowElement) => {
+        const rowCurrency = getAssetRowCurrency(rowElement, assetCurrency)
         const rowData = {
             participaciones: rowElement.querySelector('[data-field="participaciones"]')?.textContent || "",
             precioParticipacion: rowElement.querySelector('[data-field="precioParticipacion"]')?.textContent || "",
@@ -1410,13 +1951,13 @@ function updateAssetTableTotals() {
             costeAnual: rowElement.querySelector('[data-field="costeAnual"]')?.textContent || ""
         }
         const bruto = getRowGrossAmount(rowData, assetType)
-        const comisionesCell = rowElement.querySelector('[data-field="comisiones"]')
+        const comisionesCell = rowElement.querySelector('[data-field="comisiones"], [data-field="comisionesFiat"]')
         const comisiones = parseLooseNumber(comisionesCell?.querySelector("input")?.value || comisionesCell?.textContent || "") || 0
-        const neto = isCryptoAssetType(assetType) ? bruto : bruto - comisiones
+        const neto = bruto - comisiones
         const rowTotalCell = rowElement.querySelector(".rowTotal")
 
         if (rowTotalCell) {
-            rowTotalCell.textContent = formatMoney(neto, getAssetTableMoneyCurrency(assetType, "capitalInvertidoNeto", assetCurrency))
+            rowTotalCell.textContent = formatMoney(neto, getAssetTableMoneyCurrency(assetType, "capitalInvertidoNeto", assetCurrency, assetPriceCurrency, rowCurrency))
         }
     })
 }
@@ -1692,12 +2233,26 @@ function addNewAssetRow() {
     rowElement.innerHTML = `
         <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td contenteditable="true" data-field="fechaOperacion"></td>
-        <td contenteditable="true" data-field="tipoOperacion">Compra</td>
+        <td>${buildAssetOperationTypeSelect("Compra", {
+            symbol: assetPage.dataset.assetSymbol || "",
+            marketSymbol: assetPage.dataset.assetMarketSymbol || assetPage.dataset.assetFinnhubSymbol || ""
+        })}</td>
+        ${isCrypto ? '<td contenteditable="true" data-field="exchange"></td>' : ""}
         <td contenteditable="true" data-field="participaciones"></td>
         <td contenteditable="true" data-field="precioParticipacion"></td>
+        ${isCrypto ? `
+            <td>
+                <select class="operationsSelect" data-field="currency" aria-label="Moneda fiat de la fila">
+                    <option value="EUR"${assetCurrency === "EUR" ? " selected" : ""}>EUR</option>
+                    <option value="USD"${assetCurrency === "USD" ? " selected" : ""}>USD</option>
+                </select>
+            </td>
+        ` : ""}
         <td contenteditable="true" data-field="capitalInvertidoBruto"></td>
         ${isEtf ? '<td contenteditable="true" data-field="costeAnual"></td>' : ""}
-        <td ${isCrypto ? 'data-field="comisiones"' : 'contenteditable="true" data-field="comisiones"'}>${isCrypto ? '<input type="text" class="cryptoCommissionInput" inputmode="decimal" value="" placeholder="0,00000000" style="width:100%;background:transparent;border:none;color:inherit;font:inherit;padding:0;outline:none;">' : ''}</td>
+        ${isCrypto
+            ? '<td data-field="comisionesCripto"><input type="text" class="cryptoCommissionInput" inputmode="decimal" value="" placeholder="0,00000000" style="width:100%;background:transparent;border:none;color:inherit;font:inherit;padding:0;outline:none;"></td><td contenteditable="true" data-field="comisionesFiat"></td>'
+            : '<td contenteditable="true" data-field="comisiones"></td>'}
         <td class="rowTotal">${formatMoney(0, assetCurrency)}</td>
     `
 
@@ -1729,13 +2284,20 @@ function initAssetTableLogic(asset) {
     const addAssetRowButton = document.getElementById("addAssetRowBtn")
     const refreshAssetMarketButton = document.getElementById("refreshAssetMarketBtn")
     const toggleAssetCurrencyButton = document.getElementById("toggleAssetCurrencyBtn")
-    const toggleAssetPriceCurrencyButton = document.getElementById("toggleAssetPriceCurrencyBtn")
     const editAssetNameButton = document.getElementById("editAssetNameBtn")
     const saveAssetButton = document.getElementById("saveAssetBtn")
     const deleteAssetButton = document.getElementById("deleteAssetBtn")
 
     if (assetOperationsBody) {
         assetOperationsBody.addEventListener("input", () => {
+            updateAssetTableTotals()
+            scheduleAssetAutosave()
+        })
+        assetOperationsBody.addEventListener("change", (event) => {
+            const currencySelect = event.target.closest('select[data-field="currency"]')
+            if (currencySelect) {
+                updateAssetRowMoneyDisplays(currencySelect.closest("tr"))
+            }
             updateAssetTableTotals()
             scheduleAssetAutosave()
         })
@@ -1788,33 +2350,6 @@ function initAssetTableLogic(asset) {
         })
     }
 
-    if (toggleAssetPriceCurrencyButton) {
-        toggleAssetPriceCurrencyButton.addEventListener("click", async () => {
-            const targetCurrency = String(toggleAssetPriceCurrencyButton.dataset.targetCurrency || "").trim().toUpperCase()
-            const originalLabel = toggleAssetPriceCurrencyButton.textContent
-
-            if (!targetCurrency) {
-                return
-            }
-
-            toggleAssetPriceCurrencyButton.disabled = true
-            toggleAssetPriceCurrencyButton.textContent = `Cambiando a ${targetCurrency}...`
-
-            try {
-                await saveAssetDataToServer(buildCurrentAssetPayload())
-                const response = await changeAssetCurrencyOnServer(currentAssetId, targetCurrency, "price")
-                await updateAssetDetail(response.asset)
-                renderAssetTablePage(response.asset)
-                await refreshAssetsSidebar(currentAssetId, false)
-            } catch (error) {
-                console.error(error)
-                alert(extractApiErrorMessage(error))
-                toggleAssetPriceCurrencyButton.disabled = false
-                toggleAssetPriceCurrencyButton.textContent = originalLabel
-            }
-        })
-    }
-
     if (editAssetNameButton) {
         editAssetNameButton.addEventListener("click", async () => {
             try {
@@ -1840,10 +2375,13 @@ function initAssetTableLogic(asset) {
             const hasContent = rows.some((row) => {
                 return row.fechaOperacion.trim() !== "" ||
                     !isPlaceholderValue(row.tipoOperacion, ["", "compra"]) ||
+                    row.exchange.trim() !== "" ||
                     row.participaciones.trim() !== "" ||
-                    parseEuroNumber(row.precioParticipacion) !== 0 ||
-                    parseEuroNumber(row.capitalInvertidoBruto) !== 0 ||
-                    parseEuroNumber(row.comisiones) !== 0
+                    parseLooseNumber(row.precioParticipacion) !== 0 ||
+                    parseLooseNumber(row.capitalInvertidoBruto) !== 0 ||
+                    parseLooseNumber(row.comisiones) !== 0 ||
+                    parseLooseNumber(row.comisionesFiat) !== 0 ||
+                    parseLooseNumber(row.comisionesCripto) !== 0
             })
 
             openConfirmModal({

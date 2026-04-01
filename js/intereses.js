@@ -8,7 +8,7 @@ function handleCellBlur(event) {
     const tableBody = cell.closest('tbody')
     const columnIndex = cell.cellIndex
 
-    if (tableBody?.id === "interesesBody" && (columnIndex === 2 || columnIndex === 3 || columnIndex === 4)) {
+    if (tableBody?.id === "interesesBody" && (columnIndex === 2 || columnIndex === 3)) {
         const value = parseEuroNumber(cell.textContent)
         const hasText = cell.textContent.trim() !== ""
 
@@ -49,8 +49,9 @@ function handleCellBlur(event) {
         const assetType = getCurrentAssetType()
         const assetCurrency = getCurrentAssetCurrency()
         const assetPriceCurrency = getCurrentAssetPriceCurrency()
+        const rowCurrency = getAssetRowCurrency(cell, assetCurrency)
 
-        if (fieldName === "participaciones" || columnIndex === 3) {
+        if (fieldName === "participaciones") {
             const value = parseLooseNumber(cell.textContent)
 
             if (hasText) {
@@ -64,20 +65,20 @@ function handleCellBlur(event) {
             if (hasText) {
                 cell.textContent = formatAssetCommissionValue(value)
             }
-        } else if (["precioParticipacion", "capitalInvertidoBruto", "comisiones"].includes(fieldName) || (fieldName === "" && (columnIndex === 4 || columnIndex === 5 || columnIndex === 6))) {
-            const moneyCurrency = getAssetTableMoneyCurrency(assetType, fieldName || "precioParticipacion", assetCurrency, assetPriceCurrency)
+        } else if (["precioParticipacion", "capitalInvertidoBruto", "comisiones", "comisionesFiat"].includes(fieldName)) {
+            const moneyCurrency = getAssetTableMoneyCurrency(assetType, fieldName || "precioParticipacion", assetCurrency, assetPriceCurrency, rowCurrency)
             const value = moneyCurrency === "EUR"
                 ? parseEuroNumber(cell.textContent)
                 : parseDollarNumber(cell.textContent)
 
             if (hasText) {
-                cell.textContent = fieldName === "comisiones"
+                cell.textContent = (fieldName === "comisiones" || fieldName === "comisionesFiat")
                     ? formatAssetCommissionValue(value, moneyCurrency)
                     : formatMoney(value, moneyCurrency)
             }
         }
 
-        if (fieldName === "comisionesSatoshis") {
+        if (fieldName === "comisionesSatoshis" || fieldName === "comisionesCripto") {
             const value = parseLooseNumber(cell.textContent)
 
             if (hasText) {
@@ -132,7 +133,6 @@ function renderRowsFromData(interesesData) {
         rowElement.innerHTML = `
             <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
             <td contenteditable="true">${rowData.fecha || ""}</td>
-            <td contenteditable="true">${formatCellEuroValue(rowData.saldoPromedio)}</td>
             <td contenteditable="true">${formatCellEuroValue(rowData.acumulado)}</td>
             <td contenteditable="true">${formatCellEuroValue(rowData.impuestos)}</td>
             <td class="rowTotal">0,00 €</td>
@@ -152,9 +152,8 @@ function collectInteresesDataFromTable() {
 
         return {
             fecha: cells[1]?.textContent.trim() || "",
-            saldoPromedio: cells[2]?.textContent.trim() || "",
-            acumulado: cells[3]?.textContent.trim() || "",
-            impuestos: cells[4]?.textContent.trim() || ""
+            acumulado: cells[2]?.textContent.trim() || "",
+            impuestos: cells[3]?.textContent.trim() || ""
         }
     })
 
@@ -192,12 +191,12 @@ function updateTotals() {
 
     rowElements.forEach((rowElement) => {
         const cells = rowElement.querySelectorAll("td")
-        const acumulado = parseEuroNumber(cells[3]?.textContent || "")
-        const impuestos = parseEuroNumber(cells[4]?.textContent || "")
+        const acumulado = parseEuroNumber(cells[2]?.textContent || "")
+        const impuestos = parseEuroNumber(cells[3]?.textContent || "")
         const rowTotal = acumulado - impuestos
 
-        if (cells[5]) {
-            cells[5].textContent = formatEuro(rowTotal)
+        if (cells[4]) {
+            cells[4].textContent = formatEuro(rowTotal)
         }
 
         totalNeto += rowTotal
@@ -233,7 +232,6 @@ function addNewInteresesRow() {
     rowElement.innerHTML = `
         <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td contenteditable="true">nuevo-mes</td>
-        <td contenteditable="true"></td>
         <td contenteditable="true"></td>
         <td contenteditable="true"></td>
         <td class="rowTotal">0,00 €</td>

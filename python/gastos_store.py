@@ -20,7 +20,37 @@ def get_year_file(year):
     normalized_year = normalize_year(year)
     if not normalized_year:
         return None
+    return gastosDir / f"gastos{normalized_year}.json"
+
+
+def get_legacy_year_file(year):
+    normalized_year = normalize_year(year)
+    if not normalized_year:
+        return None
     return gastosDir / f"{normalized_year}.json"
+
+
+def resolve_existing_year_file(year):
+    preferred_file = get_year_file(year)
+    legacy_file = get_legacy_year_file(year)
+
+    if preferred_file and preferred_file.exists():
+        return preferred_file
+
+    if legacy_file and legacy_file.exists():
+        return legacy_file
+
+    return preferred_file
+
+
+def extract_year_from_gastos_filename(file_path):
+    stem = file_path.stem
+    normalized_stem = stem.lower()
+
+    if normalized_stem.startswith("gastos"):
+        return normalize_year(stem[6:])
+
+    return normalize_year(stem)
 
 
 def build_empty_month_summary():
@@ -69,8 +99,8 @@ def list_gastos_years():
     years = []
 
     for file_path in gastosDir.glob("*.json"):
-        year = normalize_year(file_path.stem)
-        if year:
+        year = extract_year_from_gastos_filename(file_path)
+        if year and year not in years:
             years.append(year)
 
     return sorted(years)
@@ -78,7 +108,7 @@ def list_gastos_years():
 
 def read_gastos_year(year):
     ensureDataFile()
-    year_file = get_year_file(year)
+    year_file = resolve_existing_year_file(year)
 
     if year_file is None or not year_file.exists():
         return None
@@ -92,22 +122,29 @@ def read_gastos_year(year):
 def write_gastos_year(year, data):
     ensureDataFile()
     year_file = get_year_file(year)
+    legacy_year_file = get_legacy_year_file(year)
     if year_file is None:
         return
 
     with year_file.open("w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
+    if legacy_year_file and legacy_year_file.exists() and legacy_year_file != year_file:
+        legacy_year_file.unlink()
+
 
 def delete_gastos_year(year):
     ensureDataFile()
     year_file = get_year_file(year)
+    legacy_year_file = get_legacy_year_file(year)
+    deleted = False
 
-    if year_file is None or not year_file.exists():
-        return False
+    for file_path in (year_file, legacy_year_file):
+        if file_path is not None and file_path.exists():
+            file_path.unlink()
+            deleted = True
 
-    year_file.unlink()
-    return True
+    return deleted
 
 
 def sanitize_month_rows(rows):

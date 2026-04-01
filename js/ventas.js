@@ -11,8 +11,10 @@ let ventasAutosaveTimeout = null
 let ventasPersistenceBound = false
 let ventasAssets = []
 let ventasAssetDetails = new Map()
+let ventasYears = []
+let currentVentasYear = null
 
-async function loadVentasData() {
+async function loadVentasIndex() {
     const response = await fetch("/api/ventas")
 
     if (!response.ok) {
@@ -22,8 +24,35 @@ async function loadVentasData() {
     return await response.json()
 }
 
-async function saveVentasData(payload, options = {}) {
+async function loadVentasYear(year) {
+    const response = await fetch(`/api/ventas/${year}`)
+
+    if (!response.ok) {
+        throw new Error("No se pudo cargar el año de ventas")
+    }
+
+    return await response.json()
+}
+
+async function createVentasYear(year) {
     const response = await fetch("/api/ventas", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ year })
+    })
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
+}
+
+async function saveVentasData(year, payload, options = {}) {
+    const response = await fetch(`/api/ventas/${year}`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
@@ -36,6 +65,19 @@ async function saveVentasData(payload, options = {}) {
         const errorText = await response.text()
         throw new Error(`HTTP ${response.status}: ${errorText}`)
     }
+}
+
+async function deleteVentasYearRequest(year) {
+    const response = await fetch(`/api/ventas/${year}`, {
+        method: "DELETE"
+    })
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
 }
 
 async function loadVentasAssets() {
@@ -67,23 +109,31 @@ async function loadVentasAssets() {
 }
 
 async function initVentasLogic() {
-    const [ventasPayload] = await Promise.all([
-        loadVentasData(),
+    const [ventasIndex] = await Promise.all([
+        loadVentasIndex(),
         loadVentasAssets()
     ])
 
+    ventasYears = Array.isArray(ventasIndex?.years) ? ventasIndex.years : []
+    currentVentasYear = ventasYears[0] || "2026"
+    const ventasPayload = await loadVentasYear(currentVentasYear)
+
     currentVentasData = {
+        year: ventasPayload?.year || currentVentasYear,
         rows: Array.isArray(ventasPayload?.rows) ? ventasPayload.rows.map(normalizeVentaRow) : []
     }
 
     bindVentasPersistenceGuards()
     window.flushPendingPageChanges = flushVentasPendingChanges
+    renderVentasYearButtons()
     renderVentasTable()
     bindVentasEvents()
 }
 
 function bindVentasEvents() {
     const ventasBody = document.getElementById("ventasBody")
+    const addYearButton = document.getElementById("addVentasYearBtn")
+    const deleteYearButton = document.getElementById("deleteVentasYearBtn")
     const addButton = document.getElementById("addVentaRowBtn")
     const saveButton = document.getElementById("saveVentasBtn")
     const exportButton = document.getElementById("exportVentasBtn")
@@ -95,6 +145,53 @@ function bindVentasEvents() {
         ventasBody.addEventListener("change", handleVentasChange)
         ventasBody.addEventListener("input", handleVentasInput)
         ventasBody.addEventListener("blur", handleVentasBlur, true)
+    }
+
+    if (addYearButton && !addYearButton.dataset.bound) {
+        addYearButton.dataset.bound = "true"
+        addYearButton.addEventListener("click", async () => {
+            const suggestedYear = String(new Date().getFullYear())
+            const year = prompt("Escribe el nuevo año (YYYY)", suggestedYear)?.trim()
+
+            if (!year) {
+                return
+            }
+
+            try {
+                await persistVentasData()
+                await createVentasYear(year)
+                ventasYears = (await loadVentasIndex()).years || []
+                await renderVentasYear(year)
+            } catch (error) {
+                console.error(error)
+                alert("No se pudo crear el año.")
+            }
+        })
+    }
+
+    if (deleteYearButton && !deleteYearButton.dataset.bound) {
+        deleteYearButton.dataset.bound = "true"
+        deleteYearButton.addEventListener("click", () => {
+            openConfirmModal({
+                title: "Eliminar año",
+                message: `Vas a eliminar el año ${currentVentasYear}. ¿Quieres continuar?`,
+                confirmLabel: "Eliminar",
+                confirmSide: "right",
+                onConfirm: async () => {
+                    openConfirmModal({
+                        title: "Segunda verificación",
+                        message: `Esta acción borrará definitivamente el año ${currentVentasYear}. ¿Confirmas que quieres eliminarlo?`,
+                        confirmLabel: "Eliminar",
+                        confirmSide: "left",
+                        onConfirm: async () => {
+                            const response = await deleteVentasYearRequest(currentVentasYear)
+                            ventasYears = Array.isArray(response.years) ? response.years : (await loadVentasIndex()).years || []
+                            await renderVentasYear(ventasYears[0] || "2026")
+                        }
+                    })
+                }
+            })
+        })
     }
 
     if (addButton && !addButton.dataset.bound) {
@@ -112,7 +209,7 @@ function bindVentasEvents() {
         saveButton.addEventListener("click", async () => {
             try {
                 await persistVentasData()
-                alert("Datos guardados en data/ventas.json")
+                alert(`Datos guardados en ventas/ventas${currentVentasYear}.json`)
             } catch (error) {
                 console.error(error)
                 alert("No se pudieron guardar las ventas.")
@@ -129,6 +226,39 @@ function bindVentasEvents() {
         importButton.dataset.bound = "true"
         importButton.addEventListener("click", importVentasJson)
     }
+}
+
+async function renderVentasYear(year) {
+    const payload = await loadVentasYear(year)
+    currentVentasYear = payload?.year || year
+    currentVentasData = {
+        year: currentVentasYear,
+        rows: Array.isArray(payload?.rows) ? payload.rows.map(normalizeVentaRow) : []
+    }
+    renderVentasYearButtons()
+    renderVentasTable()
+}
+
+function renderVentasYearButtons() {
+    const list = document.getElementById("ventasYearList")
+
+    if (!list) {
+        return
+    }
+
+    list.innerHTML = ""
+
+    ventasYears.forEach((year) => {
+        const button = document.createElement("button")
+        button.type = "button"
+        button.className = `gastosYearBtn${year === currentVentasYear ? " active" : ""}`
+        button.textContent = year
+        button.addEventListener("click", async () => {
+            await persistVentasData()
+            await renderVentasYear(year)
+        })
+        list.appendChild(button)
+    })
 }
 
 function createEmptyVentaRow() {
@@ -634,8 +764,10 @@ async function persistVentasData(options = {}) {
         }
     })
 
+    currentVentasData.year = currentVentasYear
+
     window.clearTimeout(ventasAutosaveTimeout)
-    await saveVentasData(currentVentasData, options)
+    await saveVentasData(currentVentasYear, currentVentasData, options)
 
     if (!options.keepalive) {
         await refreshAssetsSidebar(currentAssetId, false)
@@ -680,7 +812,7 @@ function bindVentasPersistenceGuards() {
 
 function exportVentasJson() {
     syncVentasDataFromTable()
-    downloadJsonFile("ventas.json", currentVentasData)
+    downloadJsonFile(`ventas-${currentVentasYear}.json`, currentVentasData)
 }
 
 function importVentasJson() {
@@ -697,6 +829,7 @@ function importVentasJson() {
         const text = await file.text()
         const payload = JSON.parse(text)
         const rows = Array.isArray(payload.rows) ? payload.rows : []
+        currentVentasData.year = currentVentasYear
         currentVentasData.rows = rows.map(normalizeVentaRow)
         renderVentasTable()
         scheduleVentasAutosave()

@@ -1,12 +1,15 @@
+import re
+
 from flask import Flask, jsonify, request, send_from_directory
 
-from app_data import baseDir, ensureDataFile, readDividendosFile, readEodhdApiKey, readFinnhubApiKey, readInteresesFile, readOperacionesFile, readRotatedEodhdApiKeys, readTransaccionesFile, readVentasFile, writeDividendosFile, writeInteresesFile, writeOperacionesFile, writeTransaccionesFile, writeVentasFile
+from app_data import baseDir, ensureDataFile, readDividendosFile, readEodhdApiKey, readFinnhubApiKey, readInteresesFile, readOperacionesFile, readRotatedEodhdApiKeys, readStablecoinsFile, readTransaccionesFile, writeDividendosFile, writeInteresesFile, writeOperacionesFile, writeStablecoinsFile, writeTransaccionesFile
 from asset_store import getAssetFile, listAssets, readAssetFile, writeAssetFile
-from asset_utils import createDefaultAssetPayload, inferMarketProviderFromSymbol, normalizeMarketProvider, sanitizeAssetPayload, sanitizeAssetType, slugify
+from asset_utils import createDefaultAssetPayload, inferMarketProviderFromSymbol, normalizeMarketProvider, sanitizeAssetOperationRows, sanitizeAssetPayload, sanitizeAssetType, slugify
 from eodhd_client import fetch_quote as fetch_eodhd_quote
 from eodhd_client import search_symbol as search_eodhd_symbol
 from finnhub_client import convert_amount, convert_quote_currency, fetch_exchange_rate, fetch_quote, search_symbol
 from gastos_store import create_default_gastos_year, delete_gastos_year, list_gastos_years, normalize_year, read_gastos_types, read_gastos_year, sanitize_gastos_payload, sanitize_gastos_types, write_gastos_types, write_gastos_year
+from ventas_store import create_default_ventas_year, delete_ventas_year, list_ventas_years, migrate_legacy_ventas_if_needed, read_all_ventas_rows, read_ventas_year, sanitize_ventas_payload, write_ventas_year
 
 app = Flask(
     __name__,
@@ -14,14 +17,45 @@ app = Flask(
     static_url_path=""
 )
 
-
 def normalize_currency_code(currency, fallback="EUR"):
     normalized = str(currency or "").strip().upper()
 
-    if normalized in {"USDT", "USDC", "BUSD"}:
+    if normalized in {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "PYUSD", "TUSD", "USDE"} or normalized.endswith("USD"):
         return "USD"
 
+    if normalized in {"EURC"} or normalized.endswith("EUR"):
+        return "EUR"
+
     return normalized or fallback
+
+
+def normalize_stablecoin_symbol(value):
+    return re.sub(r"[^A-Z0-9]", "", str(value or "").strip().upper())
+
+
+def sanitize_stablecoin_catalog_entry(entry):
+    entry = entry or {}
+    market_symbol = str(entry.get("marketSymbol", entry.get("symbol", ""))).strip().upper()
+    display_symbol = str(entry.get("displaySymbol", market_symbol or entry.get("symbol", ""))).strip().upper()
+    symbol = normalize_stablecoin_symbol(entry.get("symbol", ""))
+
+    if not symbol and display_symbol:
+        symbol = normalize_stablecoin_symbol(display_symbol.split("/")[0].split("_")[0].split("-")[0])
+
+    if not symbol and market_symbol:
+        market_tail = market_symbol.split(":").pop()
+        symbol = normalize_stablecoin_symbol(market_tail.split("/")[0].split("_")[0].split("-")[0])
+
+    if not symbol:
+        return None
+
+    return {
+        "symbol": symbol,
+        "marketSymbol": market_symbol or symbol,
+        "displaySymbol": display_symbol or symbol,
+        "description": str(entry.get("description", "")).strip(),
+        "provider": str(entry.get("provider", "FINNHUB")).strip().upper() or "FINNHUB"
+    }
 
 
 def call_eodhd_with_fallbacks(callback):
@@ -79,6 +113,51 @@ def format_decimal(value, digits=2):
     return f"{float(value):.{digits}f}".replace(".", ",")
 
 
+def build_completed_operations_by_asset(rows):
+    operations_by_asset = {}
+
+    for row in rows or []:
+        asset_id = slugify(row.get("assetId", ""))
+        estado = str(row.get("estado", "")).strip().capitalize()
+
+        if not asset_id or estado != "Completado":
+            continue
+
+        operations_by_asset.setdefault(asset_id, []).append({
+            "id": str(row.get("id", "")).strip(),
+            "assetId": asset_id,
+            "activo": str(row.get("activo", "")).strip(),
+            "fechaApertura": str(row.get("fechaApertura", row.get("fecha", ""))).strip(),
+            "par": str(row.get("par", "")).strip(),
+            "stablecoinSymbol": str(row.get("stablecoinSymbol", "")).strip().upper(),
+            "orden": str(row.get("orden", "Compra")).strip().capitalize(),
+            "precioOrden": str(row.get("precioOrden", row.get("precio", ""))).strip(),
+            "precioCurrency": str(row.get("precioCurrency", row.get("currency", "EUR"))).strip().upper(),
+            "cantidad": str(row.get("cantidad", "")).strip(),
+            "comisionesCripto": str(row.get("comisionesCripto", row.get("comisiones", ""))).strip(),
+            "total": str(row.get("total", "")).strip(),
+            "currency": str(row.get("currency", "EUR")).strip().upper(),
+            "estado": "Completado",
+            "fechaCierre": str(row.get("fechaCierre", "")).strip()
+        })
+
+    return {asset_id: sanitizeAssetOperationRows(asset_rows) for asset_id, asset_rows in operations_by_asset.items()}
+
+
+def sync_completed_operations_into_assets(rows):
+    operations_by_asset = build_completed_operations_by_asset(rows)
+
+    for asset in listAssets():
+        asset_id = asset["id"]
+        asset_data = readAssetFile(asset_id)
+
+        if asset_data is None:
+            continue
+
+        asset_data["operationRows"] = operations_by_asset.get(asset_id, [])
+        writeAssetFile(asset_id, asset_data)
+
+
 def is_temporary_service_error(error):
     normalized_error = str(error or "").lower()
     return any(fragment in normalized_error for fragment in ("conectar", "divisa", "tard", "timeout"))
@@ -94,6 +173,8 @@ def convert_asset_rows_currency(rows, source_currency, target_currency, asset_ty
 
         if normalized_asset_type != "cripto":
             money_fields = ("precioParticipacion", "capitalInvertidoBruto", "comisiones")
+        else:
+            money_fields = ("precioParticipacion", "capitalInvertidoBruto", "comisiones", "comisionesFiat")
 
         if fields:
             allowed_fields = set(fields)
@@ -162,7 +243,6 @@ def saveIntereses():
     for row in rows:
         sanitizedRows.append({
             "fecha": str(row.get("fecha", "")).strip(),
-            "saldoPromedio": str(row.get("saldoPromedio", "")).strip(),
             "acumulado": str(row.get("acumulado", "")).strip(),
             "impuestos": str(row.get("impuestos", "")).strip()
         })
@@ -222,6 +302,7 @@ def resetDividendos():
 @app.route("/api/operaciones", methods=["GET"])
 def getOperaciones():
     data = readOperacionesFile()
+    sync_completed_operations_into_assets(data.get("rows", []))
     return jsonify(data)
 
 
@@ -256,13 +337,16 @@ def saveOperaciones():
 
         sanitizedRows.append({
             "id": str(row.get("id", f"operacion-{index + 1}")).strip() or f"operacion-{index + 1}",
+            "assetId": str(row.get("assetId", "")).strip(),
             "activo": str(row.get("activo", "")).strip(),
             "fechaApertura": str(row.get("fechaApertura", row.get("fecha", ""))).strip(),
             "par": str(row.get("par", "")).strip(),
+            "stablecoinSymbol": str(row.get("stablecoinSymbol", "")).strip().upper(),
             "orden": orden,
             "precioOrden": str(row.get("precioOrden", row.get("precio", ""))).strip(),
             "precioCurrency": precio_currency,
             "cantidad": str(row.get("cantidad", "")).strip(),
+            "comisionesCripto": str(row.get("comisionesCripto", row.get("comisiones", ""))).strip(),
             "total": str(row.get("total", "")).strip(),
             "currency": currency,
             "estado": estado,
@@ -270,47 +354,218 @@ def saveOperaciones():
         })
 
     writeOperacionesFile({"rows": sanitizedRows})
+    sync_completed_operations_into_assets(sanitizedRows)
     return jsonify({"ok": True})
 
 
-@app.route("/api/ventas", methods=["GET"])
-def getVentas():
-    data = readVentasFile()
-    return jsonify(data)
+@app.route("/api/stablecoins", methods=["GET"])
+def getStablecoins():
+    data = readStablecoinsFile() or {}
+    catalog = data.get("catalog", [])
+    enabled_symbols = data.get("enabledSymbols", [])
+    rows = data.get("rows", [])
+
+    if not isinstance(catalog, list):
+        catalog = []
+
+    if not isinstance(enabled_symbols, list):
+        enabled_symbols = []
+
+    if not isinstance(rows, list):
+        rows = []
+
+    migrated_symbols = []
+
+    for symbol in enabled_symbols:
+        normalized_symbol = normalize_stablecoin_symbol(symbol)
+
+        if normalized_symbol and normalized_symbol not in migrated_symbols:
+            migrated_symbols.append(normalized_symbol)
+
+    for row in rows:
+        normalized_symbol = normalize_stablecoin_symbol(row.get("stablecoinSymbol", ""))
+
+        if normalized_symbol and normalized_symbol not in migrated_symbols:
+            migrated_symbols.append(normalized_symbol)
+
+    if not catalog and migrated_symbols:
+        catalog = [sanitize_stablecoin_catalog_entry({"symbol": symbol}) for symbol in migrated_symbols]
+        catalog = [entry for entry in catalog if entry]
+        data = {
+            "catalog": catalog,
+            "enabledSymbols": migrated_symbols if not enabled_symbols else enabled_symbols,
+            "rows": rows
+        }
+        writeStablecoinsFile(data)
+        enabled_symbols = data["enabledSymbols"]
+
+    return jsonify({"catalog": catalog, "enabledSymbols": enabled_symbols, "rows": rows})
 
 
-@app.route("/api/ventas", methods=["POST"])
-def saveVentas():
+@app.route("/api/stablecoins", methods=["POST"])
+def saveStablecoins():
     requestData = request.get_json(silent=True) or {}
+    catalog = requestData.get("catalog", requestData.get("availableSymbols", []))
+    enabled_symbols = requestData.get("enabledSymbols", [])
     rows = requestData.get("rows", [])
+
+    if not isinstance(catalog, list):
+        return jsonify({"ok": False, "error": "catalog debe ser una lista"}), 400
+
+    if not isinstance(enabled_symbols, list):
+        return jsonify({"ok": False, "error": "enabledSymbols debe ser una lista"}), 400
 
     if not isinstance(rows, list):
         return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
 
-    sanitizedRows = []
+    sanitized_catalog = []
+    catalog_symbols = []
+
+    for entry in catalog:
+        normalized_entry = sanitize_stablecoin_catalog_entry(entry if isinstance(entry, dict) else {"symbol": entry})
+
+        if not normalized_entry or normalized_entry["symbol"] in catalog_symbols:
+            continue
+
+        catalog_symbols.append(normalized_entry["symbol"])
+        sanitized_catalog.append(normalized_entry)
+
+    sanitized_enabled_symbols = []
+
+    for symbol in enabled_symbols:
+        normalized_symbol = normalize_stablecoin_symbol(symbol)
+
+        if not normalized_symbol:
+            continue
+
+        if catalog_symbols and normalized_symbol not in catalog_symbols:
+            continue
+
+        if normalized_symbol not in sanitized_enabled_symbols:
+            sanitized_enabled_symbols.append(normalized_symbol)
+
+    if not sanitized_catalog and sanitized_enabled_symbols:
+        sanitized_catalog = [sanitize_stablecoin_catalog_entry({"symbol": symbol}) for symbol in sanitized_enabled_symbols]
+        sanitized_catalog = [entry for entry in sanitized_catalog if entry]
+        catalog_symbols = [entry["symbol"] for entry in sanitized_catalog]
+
+    if not sanitized_catalog:
+        inferred_symbols = []
+
+        for row in rows:
+            normalized_symbol = normalize_stablecoin_symbol(row.get("stablecoinSymbol", ""))
+
+            if normalized_symbol and normalized_symbol not in inferred_symbols:
+                inferred_symbols.append(normalized_symbol)
+
+        if inferred_symbols:
+            sanitized_catalog = [sanitize_stablecoin_catalog_entry({"symbol": symbol}) for symbol in inferred_symbols]
+            sanitized_catalog = [entry for entry in sanitized_catalog if entry]
+            catalog_symbols = [entry["symbol"] for entry in sanitized_catalog]
+
+    sanitized_rows = []
 
     for index, row in enumerate(rows):
-        sanitizedRows.append({
-            "id": str(row.get("id", f"venta-{index + 1}")).strip() or f"venta-{index + 1}",
+        stablecoin_symbol = normalize_stablecoin_symbol(row.get("stablecoinSymbol", ""))
+        movement_type = str(row.get("tipo", "Compra")).strip().capitalize()
+        currency = str(row.get("currency", "USD")).strip().upper()
+
+        if not stablecoin_symbol or (catalog_symbols and stablecoin_symbol not in catalog_symbols):
+            stablecoin_symbol = sanitized_enabled_symbols[0] if sanitized_enabled_symbols else (catalog_symbols[0] if catalog_symbols else "")
+
+        if movement_type not in {"Compra", "Gasto"}:
+            movement_type = "Compra"
+
+        if currency not in {"EUR", "USD"}:
+            currency = "USD"
+
+        sanitized_rows.append({
+            "id": str(row.get("id", f"stablecoin-{index + 1}")).strip() or f"stablecoin-{index + 1}",
+            "stablecoinSymbol": stablecoin_symbol,
             "fecha": str(row.get("fecha", "")).strip(),
-            "assetId": str(row.get("assetId", "")).strip(),
-            "activo": str(row.get("activo", "")).strip(),
+            "tipo": movement_type,
             "cantidad": str(row.get("cantidad", "")).strip(),
-            "valorCompra": str(row.get("valorCompra", row.get("precioCompra", row.get("valor_compra", "")))).strip(),
-            "valorVenta": str(row.get("valorVenta", row.get("precioVenta", row.get("valor_venta", "")))).strip(),
-            "dineroDeclarar": str(row.get("dineroDeclarar", row.get("gananciaRealizada", ""))).strip(),
-            "tramo1": str(row.get("tramo1", "")).strip(),
-            "tramo2": str(row.get("tramo2", "")).strip(),
-            "tramo3": str(row.get("tramo3", "")).strip(),
-            "tramo4": str(row.get("tramo4", "")).strip(),
-            "tramo5": str(row.get("tramo5", "")).strip(),
-            "totalPagar": str(row.get("totalPagar", row.get("impuestos", ""))).strip(),
-            "bruto": str(row.get("bruto", "")).strip(),
-            "neto": str(row.get("neto", "")).strip()
+            "precio": str(row.get("precio", "")).strip(),
+            "total": str(row.get("total", "")).strip(),
+            "currency": currency,
+            "nota": str(row.get("nota", "")).strip()
         })
 
-    writeVentasFile({"rows": sanitizedRows})
+    payload = {
+        "catalog": sanitized_catalog,
+        "enabledSymbols": sanitized_enabled_symbols,
+        "rows": sanitized_rows
+    }
+    writeStablecoinsFile(payload)
+    return jsonify({"ok": True, "data": payload})
+
+
+@app.route("/api/ventas", methods=["GET"])
+def getVentas():
+    default_year = "2026"
+    years = migrate_legacy_ventas_if_needed(default_year)
+    return jsonify({"years": years, "rows": read_all_ventas_rows()})
+
+
+@app.route("/api/ventas", methods=["POST"])
+def createVentasYear():
+    requestData = request.get_json(silent=True) or {}
+    year = normalize_year(requestData.get("year"))
+
+    if not year:
+        return jsonify({"ok": False, "error": "Año inválido"}), 400
+
+    migrate_legacy_ventas_if_needed(year)
+
+    if read_ventas_year(year) is not None:
+        return jsonify({"ok": False, "error": "Ese año ya existe"}), 409
+
+    payload = create_default_ventas_year(year)
+    write_ventas_year(year, payload)
+    return jsonify({"ok": True, "year": year, "data": payload}), 201
+
+
+@app.route("/api/ventas/<year>", methods=["GET"])
+def getVentasYear(year):
+    migrate_legacy_ventas_if_needed(normalize_year(year) or "2026")
+    data = read_ventas_year(year)
+
+    if data is None:
+        return jsonify({"ok": False, "error": "Año no encontrado"}), 404
+
+    return jsonify(data)
+
+
+@app.route("/api/ventas/<year>", methods=["POST"])
+def saveVentasYear(year):
+    requestData = request.get_json(silent=True) or {}
+    payload, error = sanitize_ventas_payload(requestData, year)
+
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+
+    write_ventas_year(year, payload)
     return jsonify({"ok": True})
+
+
+@app.route("/api/ventas/<year>", methods=["DELETE"])
+def deleteVentasYear(year):
+    normalized_year = normalize_year(year)
+
+    if not normalized_year:
+        return jsonify({"ok": False, "error": "Año inválido"}), 400
+
+    if not delete_ventas_year(normalized_year):
+        return jsonify({"ok": False, "error": "Año no encontrado"}), 404
+
+    remaining_years = list_ventas_years()
+
+    if not remaining_years:
+        payload = create_default_ventas_year("2026")
+        write_ventas_year("2026", payload)
+        remaining_years = ["2026"]
+
+    return jsonify({"ok": True, "years": remaining_years})
 
 
 @app.route("/api/transacciones", methods=["GET"])
@@ -335,10 +590,12 @@ def saveTransacciones():
             "assetId": str(row.get("assetId", "")).strip(),
             "assetName": str(row.get("assetName", "")).strip(),
             "fechaOperacion": str(row.get("fechaOperacion", "")).strip(),
-            "walletOrigen": str(row.get("walletOrigen", "")).strip(),
             "total": str(row.get("total", "")).strip(),
             "comisionRed": str(row.get("comisionRed", "")).strip(),
-            "walletDestino": str(row.get("walletDestino", "")).strip()
+            "walletTipo": str(row.get("walletTipo", "entre_wallet")).strip().lower() or "entre_wallet",
+            "walletDestino": str(row.get("walletDestino", "")).strip(),
+            "hashTransaccion": str(row.get("hashTransaccion", row.get("walletOrigen", ""))).strip(),
+            "nota": str(row.get("nota", "")).strip()
         })
 
     writeTransaccionesFile({"rows": sanitizedRows})
@@ -474,6 +731,14 @@ def getActivo(assetId):
     if data is None:
         return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
 
+    if not isinstance(data.get("operationRows"), list):
+        operaciones_data = readOperacionesFile() or {}
+        sync_completed_operations_into_assets(operaciones_data.get("rows", []))
+        data = readAssetFile(assetId) or data
+
+    if not isinstance(data.get("operationRows"), list):
+        data["operationRows"] = []
+
     return jsonify(data)
 
 
@@ -484,6 +749,11 @@ def saveActivo(assetId):
 
     if error:
         return jsonify({"ok": False, "error": error}), 400
+
+    existing_asset = readAssetFile(assetId) or {}
+
+    if not requestData.get("operationRows") and isinstance(existing_asset.get("operationRows"), list):
+        payload["operationRows"] = existing_asset.get("operationRows", [])
 
     writeAssetFile(assetId, payload)
     return jsonify({"ok": True})
@@ -556,30 +826,7 @@ def changeActivoCurrency(assetId):
         return jsonify({"ok": False, "error": "Solo se permite cambiar entre EUR y USD"}), 400
 
     if scope == "price":
-        if not is_crypto:
-            return jsonify({"ok": False, "error": "La moneda separada del precio solo aplica a criptos"}), 400
-
-        if current_precio_currency == target_currency:
-            return jsonify({"ok": True, "asset": assetData, "converted": False})
-
-        converted_rows, error = convert_asset_rows_currency(
-            assetData.get("rows", []),
-            current_precio_currency,
-            target_currency,
-            assetData.get("type", ""),
-            fields=("precioParticipacion",)
-        )
-
-        if error:
-            statusCode = 503 if is_temporary_service_error(error) else 400
-            return jsonify({"ok": False, "error": error}), statusCode
-
-        assetData["rows"] = converted_rows
-        assetData["precioCurrency"] = target_currency
-        assetData["status"] = f"Precio de participación convertido de {current_precio_currency} a {target_currency}"
-        writeAssetFile(assetId, assetData)
-
-        return jsonify({"ok": True, "asset": assetData, "converted": True})
+        return jsonify({"ok": False, "error": "La moneda separada del precio ya no se usa en criptos"}), 400
 
     if current_currency == target_currency:
         return jsonify({"ok": True, "asset": assetData, "converted": False})
@@ -595,21 +842,28 @@ def changeActivoCurrency(assetId):
 
         assetData["price"] = format_decimal(converted_price)
 
-    converted_rows, error = convert_asset_rows_currency(
-        assetData.get("rows", []),
-        current_currency,
-        target_currency,
-        assetData.get("type", ""),
-        fields=("capitalInvertidoBruto", "comisiones") if is_crypto else None
-    )
+    if not is_crypto:
+        converted_rows, error = convert_asset_rows_currency(
+            assetData.get("rows", []),
+            current_currency,
+            target_currency,
+            assetData.get("type", ""),
+            fields=None
+        )
 
-    if error:
-        statusCode = 503 if is_temporary_service_error(error) else 400
-        return jsonify({"ok": False, "error": error}), statusCode
+        if error:
+            statusCode = 503 if is_temporary_service_error(error) else 400
+            return jsonify({"ok": False, "error": error}), statusCode
 
-    assetData["rows"] = converted_rows
+        assetData["rows"] = converted_rows
+
     assetData["currency"] = target_currency
-    assetData["status"] = f"Activo convertido de {current_currency} a {target_currency}"
+    assetData["precioCurrency"] = target_currency
+    assetData["status"] = (
+        f"Moneda de visualización convertida de {current_currency} a {target_currency}"
+        if is_crypto
+        else f"Activo convertido de {current_currency} a {target_currency}"
+    )
     writeAssetFile(assetId, assetData)
 
     return jsonify({"ok": True, "asset": assetData, "converted": True})

@@ -47,6 +47,12 @@
       "saldoPromedio": "28,41 €",
       "acumulado": "0,05 €",
       "impuestos": "0,01 €"
+    },
+    {
+      "fecha": "abril-26",
+      "saldoPromedio": "",
+      "acumulado": "0,53 €",
+      "impuestos": "0,10 €"
     }
   ]
 }

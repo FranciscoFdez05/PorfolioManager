@@ -290,7 +290,7 @@ function bindGastosEvents() {
         saveButton.addEventListener("click", async () => {
             try {
                 await persistCurrentGastosData()
-                alert(`Datos guardados en gastos/${currentGastosYear}.json`)
+                alert(`Datos guardados en gastos/gastos${currentGastosYear}.json`)
             } catch (error) {
                 console.error(error)
                 alert("No se pudieron guardar los gastos.")

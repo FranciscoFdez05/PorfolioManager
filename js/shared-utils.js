@@ -47,8 +47,16 @@ function formatDollar(value) {
 function normalizeCurrencyCode(currency) {
     const normalized = String(currency || "EUR").trim().toUpperCase()
 
-    if (["USD", "USDT", "USDC", "BUSD"].includes(normalized)) {
+    if (!normalized) {
+        return "EUR"
+    }
+
+    if (["USD", "USDT", "USDC", "BUSD", "DAI", "FDUSD", "PYUSD", "TUSD", "USDE"].includes(normalized) || normalized.endsWith("USD")) {
         return "USD"
+    }
+
+    if (["EUR", "EURC"].includes(normalized) || normalized.endsWith("EUR")) {
+        return "EUR"
     }
 
     return normalized || "EUR"
@@ -118,6 +126,17 @@ function getCurrentAssetCurrency() {
 function getCurrentAssetPriceCurrency() {
     const assetPage = document.querySelector(".assetTablePage")
     return assetPage?.dataset.assetPriceCurrency || assetPage?.dataset.assetCurrency || "EUR"
+}
+
+function normalizeAssetRowCurrency(currency, fallback = "EUR") {
+    const normalized = String(currency || fallback).trim().toUpperCase()
+    return normalized === "USD" ? "USD" : "EUR"
+}
+
+function getAssetRowCurrency(rowOrCell, fallback = getCurrentAssetCurrency()) {
+    const rowElement = rowOrCell?.closest ? rowOrCell.closest("tr") : null
+    const explicitCurrency = rowElement?.querySelector('select[data-field="currency"]')?.value
+    return normalizeAssetRowCurrency(explicitCurrency, fallback)
 }
 
 function formatMoneySafe(value, currency = "EUR") {
@@ -323,20 +342,25 @@ function isAssetParticipationsCell(cell) {
 }
 
 function isAssetCommissionsCell(cell) {
-    return cell?.dataset?.field === "comisiones" || getTableHeaderText(cell) === "comisiones"
+    return cell?.dataset?.field === "comisiones" ||
+        cell?.dataset?.field === "comisionesFiat" ||
+        getTableHeaderText(cell) === "comisiones" ||
+        getTableHeaderText(cell) === "comisiones fiat"
 }
 
 function isAssetCryptoCommissionsCell(cell) {
-    return cell?.dataset?.field === "comisionesSatoshis" || getTableHeaderText(cell) === "comisiones cripto"
+    return cell?.dataset?.field === "comisionesSatoshis" ||
+        cell?.dataset?.field === "comisionesCripto" ||
+        getTableHeaderText(cell) === "comisiones cripto"
 }
 
 function isCryptoAssetType(assetType) {
     return String(assetType || "").trim().toLowerCase() === "cripto"
 }
 
-function getAssetTableMoneyCurrency(assetType, fieldName, assetCurrency = "EUR", priceCurrency = assetCurrency) {
-    if (isCryptoAssetType(assetType) && fieldName === "precioParticipacion") {
-        return priceCurrency
+function getAssetTableMoneyCurrency(assetType, fieldName, assetCurrency = "EUR", priceCurrency = assetCurrency, rowCurrency = "") {
+    if (isCryptoAssetType(assetType) && ["precioParticipacion", "capitalInvertidoBruto", "comisiones", "comisionesFiat", "capitalInvertidoNeto"].includes(fieldName)) {
+        return normalizeAssetRowCurrency(rowCurrency, assetCurrency)
     }
 
     return assetCurrency
@@ -379,6 +403,10 @@ function formatAssetCommissionValue(value, currency = "EUR") {
 }
 
 function parseLooseNumber(value) {
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value : null
+    }
+
     const text = String(value ?? "").replace(/[^\d,.\-]/g, "").trim()
     if (!text) {
         return null
@@ -424,14 +452,6 @@ document.addEventListener("focusin", (event) => {
     if (isAssetParticipationsCell(cell) || isAssetCommissionsCell(cell)) {
         queueMicrotask(() => {
             const strippedText = stripCurrencyText(cell.textContent || "")
-
-            if (isAssetCommissionsCell(cell) && isCryptoAssetType(getCurrentAssetType())) {
-                const parsed = parseLooseNumber(strippedText)
-                cell.textContent = parsed === 0 ? "" : strippedText
-                selectEditableCellContent(cell)
-                return
-            }
-
             cell.textContent = strippedText
         })
         return
@@ -473,12 +493,7 @@ document.addEventListener("focusout", (event) => {
     if (isAssetCommissionsCell(cell)) {
         queueMicrotask(() => {
             const text = String(cell.textContent || "").trim()
-            if (isCryptoAssetType(getCurrentAssetType())) {
-                cell.textContent = formatAssetCommissionValue(text, getCurrentAssetCurrency())
-                return
-            }
-
-            const currentCurrency = getCurrentAssetCurrency()
+            const currentCurrency = getAssetRowCurrency(cell, getCurrentAssetCurrency())
             cell.textContent = currentCurrency === "EUR"
                 ? formatEuroSafe(text)
                 : formatDollarSafe(text)
@@ -616,7 +631,33 @@ function downloadJsonFile(filename, payload) {
     URL.revokeObjectURL(url)
 }
 
+function getCurrentAssetExportPayload() {
+    if (typeof buildCurrentAssetPayload === "function" && document.querySelector(".assetTablePage")) {
+        return buildCurrentAssetPayload()
+    }
+
+    return null
+}
+
+function isAssetJsonPayload(payload) {
+    if (!payload || typeof payload !== "object") {
+        return false
+    }
+
+    return typeof payload.name === "string" &&
+        typeof payload.type === "string" &&
+        Array.isArray(payload.rows)
+}
+
 function exportCurrentAssetJson() {
+    const assetPayload = getCurrentAssetExportPayload()
+
+    if (assetPayload) {
+        const filenameBase = String(assetPayload.id || assetPayload.name || "activo").trim().toLowerCase() || "activo"
+        downloadJsonFile(`${filenameBase}.json`, assetPayload)
+        return
+    }
+
     const table = getVisibleAssetTable()
     if (!table) {
         return
@@ -643,6 +684,29 @@ function importCurrentAssetJson() {
 
         const text = await file.text()
         const payload = JSON.parse(text)
+        const currentAssetPayload = getCurrentAssetExportPayload()
+
+        if (currentAssetPayload) {
+            if (!isAssetJsonPayload(payload)) {
+                alert("El JSON no tiene el formato de un activo válido.")
+                return
+            }
+
+            const normalizedPayload = {
+                ...payload,
+                id: currentAssetPayload.id,
+                order: currentAssetPayload.order,
+                rows: Array.isArray(payload.rows) ? payload.rows : []
+            }
+
+            await saveAssetDataToServer(normalizedPayload)
+            const updatedAsset = await loadAssetData(normalizedPayload.id)
+            await updateAssetDetail(updatedAsset)
+            renderAssetTablePage(updatedAsset)
+            await refreshAssetsSidebar(updatedAsset.id, false)
+            return
+        }
+
         const table = getVisibleAssetTable()
         if (!table || !Array.isArray(payload.rows)) {
             return

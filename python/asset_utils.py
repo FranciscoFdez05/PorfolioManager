@@ -69,15 +69,21 @@ def createDefaultAssetPayload(name, assetType, assetId=None):
         "change": "+0,00%",
         "status": "Mercado abierto",
         "lastUpdated": "",
+        "operationRows": [],
+        "conversionRows": [],
         "rows": [
             {
                 "fechaOperacion": "",
                 "tipoOperacion": "Compra",
+                "exchange": "",
+                "currency": "EUR",
                 "participaciones": "",
                 "precioParticipacion": "",
                 "capitalInvertidoBruto": "",
                 "costeAnual": "",
                 "comisiones": "",
+                "comisionesFiat": "",
+                "comisionesCripto": "",
                 "comisionesSatoshis": ""
             }
         ]
@@ -88,18 +94,93 @@ def sanitizeAssetRows(rows):
     sanitizedRows = []
 
     for row in rows:
+        legacy_crypto_fee = str(row.get("comisionesSatoshis", row.get("comisiones", ""))).strip()
+        crypto_fee = str(row.get("comisionesCripto", legacy_crypto_fee)).strip()
+        fiat_fee = str(row.get("comisionesFiat", "")).strip()
+        currency = str(row.get("currency", "EUR")).strip().upper() or "EUR"
+
+        if currency not in {"EUR", "USD"}:
+            currency = "EUR"
+
         sanitizedRows.append({
             "fechaOperacion": str(row.get("fechaOperacion", "")).strip(),
             "tipoOperacion": str(row.get("tipoOperacion", "")).strip(),
+            "exchange": str(row.get("exchange", "")).strip(),
+            "currency": currency,
             "participaciones": str(row.get("participaciones", "")).strip(),
             "precioParticipacion": str(row.get("precioParticipacion", "")).strip(),
             "capitalInvertidoBruto": str(row.get("capitalInvertidoBruto", "")).strip(),
             "costeAnual": str(row.get("costeAnual", "")).strip(),
-            "comisiones": str(row.get("comisiones", "")).strip(),
-            "comisionesSatoshis": str(row.get("comisionesSatoshis", "")).strip()
+            "comisiones": fiat_fee,
+            "comisionesFiat": fiat_fee,
+            "comisionesCripto": crypto_fee,
+            "comisionesSatoshis": crypto_fee
         })
 
     return sanitizedRows
+
+
+def sanitizeAssetOperationRows(rows):
+    sanitized_rows = []
+
+    for index, row in enumerate(rows or []):
+        orden = str(row.get("orden", "Compra")).strip().capitalize()
+        estado = str(row.get("estado", "Activo")).strip().capitalize()
+        currency = str(row.get("currency", "EUR")).strip().upper() or "EUR"
+        precio_currency = str(row.get("precioCurrency", currency)).strip().upper() or currency
+
+        if orden not in {"Compra", "Venta"}:
+            orden = "Compra"
+
+        if estado not in {"Activo", "Cerrado", "Completado"}:
+            estado = "Activo"
+
+        if currency not in {"EUR", "USD"}:
+            currency = "EUR"
+
+        if precio_currency not in {"EUR", "USD"}:
+            precio_currency = currency
+
+        sanitized_rows.append({
+            "id": str(row.get("id", f"operacion-{index + 1}")).strip() or f"operacion-{index + 1}",
+            "assetId": str(row.get("assetId", "")).strip(),
+            "activo": str(row.get("activo", "")).strip(),
+            "fechaApertura": str(row.get("fechaApertura", row.get("fecha", ""))).strip(),
+            "par": str(row.get("par", "")).strip(),
+            "stablecoinSymbol": str(row.get("stablecoinSymbol", "")).strip().upper(),
+            "orden": orden,
+            "precioOrden": str(row.get("precioOrden", row.get("precio", ""))).strip(),
+            "precioCurrency": precio_currency,
+            "cantidad": str(row.get("cantidad", "")).strip(),
+            "comisionesCripto": str(row.get("comisionesCripto", row.get("comisiones", ""))).strip(),
+            "total": str(row.get("total", "")).strip(),
+            "currency": currency,
+            "estado": estado,
+            "fechaCierre": str(row.get("fechaCierre", "")).strip()
+        })
+
+    return sanitized_rows
+
+
+def sanitizeAssetConversionRows(rows, asset_symbol=""):
+    sanitized_rows = []
+    normalized_symbol = str(asset_symbol or "").strip().upper()
+
+    for index, row in enumerate(rows or []):
+        conversion_type = str(row.get("tipo", row.get("tipoOperacion", ""))).strip()
+
+        if not conversion_type and normalized_symbol:
+            conversion_type = f"Convertidos a {normalized_symbol}"
+
+        sanitized_rows.append({
+            "id": str(row.get("id", f"conversion-{index + 1}")).strip() or f"conversion-{index + 1}",
+            "fecha": str(row.get("fecha", row.get("fechaOperacion", ""))).strip(),
+            "par": str(row.get("par", "")).strip(),
+            "tipo": conversion_type,
+            "cantidad": str(row.get("cantidad", row.get("participaciones", ""))).strip()
+        })
+
+    return sanitized_rows
 
 
 def sanitizeAssetPayload(requestData, fallbackAssetId=None):
@@ -131,8 +212,16 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "change": str(requestData.get("change", "+0,00%")).strip() or "+0,00%",
         "status": str(requestData.get("status", "Mercado abierto")).strip() or "Mercado abierto",
         "lastUpdated": str(requestData.get("lastUpdated", "")).strip(),
+        "operationRows": sanitizeAssetOperationRows(requestData.get("operationRows", [])),
+        "conversionRows": sanitizeAssetConversionRows(
+            requestData.get("conversionRows", []),
+            requestData.get("symbol") or createAssetSymbol(assetName)
+        ),
         "rows": sanitizeAssetRows(rows)
     }
+
+    if assetType == "cripto":
+        payload["precioCurrency"] = payload["currency"]
 
     payload["marketProvider"] = normalizeMarketProvider(
         requestData.get("marketProvider", ""),

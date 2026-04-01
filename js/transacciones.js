@@ -3,6 +3,12 @@ let transaccionesAutosaveTimeout = null
 let transaccionesPersistenceBound = false
 let transaccionesCryptoAssets = []
 let currentTransaccionAssetId = null
+let transaccionesPersistChain = Promise.resolve()
+const TRANSACCION_WALLET_OPTIONS = [
+    { value: "entre_wallet", label: "Entre wallet" },
+    { value: "recibida", label: "Recibida" },
+    { value: "enviada", label: "Enviada" }
+]
 
 async function loadTransaccionesData() {
     const response = await fetch("/api/transacciones")
@@ -73,8 +79,11 @@ function bindTransaccionesEvents() {
 
     if (body && !body.dataset.bound) {
         body.dataset.bound = "true"
+        body.addEventListener("click", handleTransaccionesClick)
         body.addEventListener("click", handleTransaccionesDeleteClick)
+        body.addEventListener("change", handleTransaccionesChange)
         body.addEventListener("input", handleTransaccionesInput)
+        body.addEventListener("focus", handleTransaccionesFocus, true)
         body.addEventListener("blur", handleTransaccionesBlur, true)
     }
 
@@ -124,10 +133,12 @@ function createEmptyTransaccionRow() {
         assetId: currentTransaccionAssetId || "",
         assetName: selectedAsset?.name || "",
         fechaOperacion: "",
-        walletOrigen: "",
         total: "0,00000000",
         comisionRed: "0,00000000",
-        walletDestino: ""
+        walletTipo: "entre_wallet",
+        walletDestino: "",
+        hashTransaccion: "",
+        nota: ""
     }
 }
 
@@ -189,7 +200,7 @@ function renderTransaccionesTable() {
         const emptyRow = document.createElement("tr")
         emptyRow.innerHTML = `
             <td class="rowDeleteCell"></td>
-            <td colspan="5" class="operationsEmptyCell">Crea o selecciona una cripto para registrar transacciones.</td>
+            <td colspan="7" class="operationsEmptyCell">Crea o selecciona una cripto para registrar transacciones.</td>
         `
         body.appendChild(emptyRow)
         renderTransaccionesAssetMenu()
@@ -202,7 +213,7 @@ function renderTransaccionesTable() {
         const emptyRow = document.createElement("tr")
         emptyRow.innerHTML = `
             <td class="rowDeleteCell"></td>
-            <td colspan="5" class="operationsEmptyCell">Todavía no hay transacciones registradas.</td>
+            <td colspan="7" class="operationsEmptyCell">Todavía no hay transacciones registradas.</td>
         `
         body.appendChild(emptyRow)
         return
@@ -215,16 +226,61 @@ function renderTransaccionesTable() {
     renderTransaccionesAssetMenu()
 }
 
+function normalizeHashTransaccionValue(value) {
+    return String(value || "").trim()
+}
+
+function formatHashTransaccionDisplay(value) {
+    const normalizedValue = normalizeHashTransaccionValue(value)
+
+    if (!normalizedValue) {
+        return ""
+    }
+
+    if (normalizedValue.length <= 14) {
+        return normalizedValue
+    }
+
+    return `${normalizedValue.slice(0, 6)}...${normalizedValue.slice(-6)}`
+}
+
+function normalizeTransaccionWalletTipo(value) {
+    const normalizedValue = String(value || "").trim().toLowerCase()
+
+    if (normalizedValue === "recibida") {
+        return "recibida"
+    }
+
+    if (normalizedValue === "enviada" || normalizedValue === "no_mia") {
+        return "enviada"
+    }
+
+    return "entre_wallet"
+}
+
+function buildTransaccionWalletSelect(value) {
+    const normalizedValue = normalizeTransaccionWalletTipo(value)
+
+    return `
+        <select class="operationsSelect transaccionWalletSelect" data-field="walletTipo">
+            ${TRANSACCION_WALLET_OPTIONS.map((option) => `<option value="${option.value}"${option.value === normalizedValue ? " selected" : ""}>${option.label}</option>`).join("")}
+        </select>
+    `
+}
+
 function buildTransaccionRow(row) {
     const tr = document.createElement("tr")
+    const hashTransaccion = normalizeHashTransaccionValue(row.hashTransaccion || row.walletOrigen || "")
     tr.dataset.transaccionId = row.id
     tr.innerHTML = `
         <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td contenteditable="true" data-field="fechaOperacion">${row.fechaOperacion || ""}</td>
-        <td contenteditable="true" data-field="walletOrigen">${row.walletOrigen || ""}</td>
         <td contenteditable="true" data-field="total">${formatTransaccionesNumber(row.total)}</td>
         <td contenteditable="true" data-field="comisionRed">${formatTransaccionesNumber(row.comisionRed)}</td>
+        <td>${buildTransaccionWalletSelect(row.walletTipo)}</td>
         <td contenteditable="true" data-field="walletDestino">${row.walletDestino || ""}</td>
+        <td contenteditable="true" class="transaccionHashCell" data-field="hashTransaccion" data-full-value="${hashTransaccion}" title="Haz clic para copiar el hash completo">${formatHashTransaccionDisplay(hashTransaccion)}</td>
+        <td contenteditable="true" data-field="nota">${row.nota || ""}</td>
     `
     return tr
 }
@@ -243,11 +299,29 @@ function formatTransaccionesNumber(value) {
 }
 
 function handleTransaccionesInput(event) {
+    const row = event.target.closest("tr[data-transaccion-id]")
+
+    if (!row) {
+        return
+    }
+
+    const hashCell = event.target.closest('.transaccionHashCell[data-field="hashTransaccion"]')
+
+    if (hashCell) {
+        hashCell.dataset.fullValue = normalizeHashTransaccionValue(hashCell.textContent)
+    }
+
+    scheduleTransaccionesAutosave()
+}
+
+function handleTransaccionesChange(event) {
     if (!event.target.closest("tr[data-transaccion-id]")) {
         return
     }
 
-    scheduleTransaccionesAutosave()
+    if (event.target.matches('select[data-field="walletTipo"]')) {
+        scheduleTransaccionesAutosave()
+    }
 }
 
 function handleTransaccionesBlur(event) {
@@ -263,7 +337,34 @@ function handleTransaccionesBlur(event) {
         cell.textContent = formatTransaccionesNumber(cell.textContent)
     }
 
+    if (field === "hashTransaccion") {
+        const normalizedHash = normalizeHashTransaccionValue(cell.textContent)
+        cell.dataset.fullValue = normalizedHash
+        cell.textContent = formatHashTransaccionDisplay(normalizedHash)
+    }
+
     scheduleTransaccionesAutosave()
+}
+
+async function copyHashTransaccionToClipboard(cell) {
+    const fullHash = normalizeHashTransaccionValue(cell?.dataset?.fullValue || cell?.textContent || "")
+
+    if (!fullHash) {
+        return
+    }
+
+    try {
+        await navigator.clipboard.writeText(fullHash)
+        cell.classList.add("copied")
+        cell.title = "Hash copiado"
+        window.clearTimeout(Number(cell.dataset.copyTimeoutId || 0))
+        cell.dataset.copyTimeoutId = String(window.setTimeout(() => {
+            cell.classList.remove("copied")
+            cell.title = "Haz clic para copiar el hash completo"
+        }, 1200))
+    } catch (error) {
+        console.error("No se pudo copiar el hash:", error)
+    }
 }
 
 function handleTransaccionesDeleteClick(event) {
@@ -285,6 +386,26 @@ function handleTransaccionesDeleteClick(event) {
     scheduleTransaccionesAutosave()
 }
 
+function handleTransaccionesClick(event) {
+    const hashCell = event.target.closest('.transaccionHashCell[data-field="hashTransaccion"]')
+
+    if (!hashCell) {
+        return
+    }
+
+    copyHashTransaccionToClipboard(hashCell)
+}
+
+function handleTransaccionesFocus(event) {
+    const hashCell = event.target.closest('.transaccionHashCell[data-field="hashTransaccion"]')
+
+    if (!hashCell) {
+        return
+    }
+
+    hashCell.textContent = normalizeHashTransaccionValue(hashCell.dataset.fullValue || hashCell.textContent || "")
+}
+
 function syncTransaccionesDataFromTable() {
     const bodyRows = [...document.querySelectorAll("#transaccionesBody tr[data-transaccion-id]")]
     const selectedAsset = getCurrentTransaccionesAsset()
@@ -294,10 +415,12 @@ function syncTransaccionesDataFromTable() {
         assetId: currentTransaccionAssetId || "",
         assetName: selectedAsset?.name || "",
         fechaOperacion: rowElement.querySelector('[data-field="fechaOperacion"]')?.textContent.trim() || "",
-        walletOrigen: rowElement.querySelector('[data-field="walletOrigen"]')?.textContent.trim() || "",
         total: rowElement.querySelector('[data-field="total"]')?.textContent.trim() || "",
         comisionRed: rowElement.querySelector('[data-field="comisionRed"]')?.textContent.trim() || "",
-        walletDestino: rowElement.querySelector('[data-field="walletDestino"]')?.textContent.trim() || ""
+        walletTipo: normalizeTransaccionWalletTipo(rowElement.querySelector('select[data-field="walletTipo"]')?.value || "entre_wallet"),
+        walletDestino: rowElement.querySelector('[data-field="walletDestino"]')?.textContent.trim() || "",
+        hashTransaccion: normalizeHashTransaccionValue(rowElement.querySelector('[data-field="hashTransaccion"]')?.dataset.fullValue || rowElement.querySelector('[data-field="hashTransaccion"]')?.textContent || ""),
+        nota: rowElement.querySelector('[data-field="nota"]')?.textContent.trim() || ""
     }))
 
     currentTransaccionesData.rows = [...hiddenRows, ...visibleRows]
@@ -317,7 +440,15 @@ function scheduleTransaccionesAutosave(delay = 500) {
 async function persistTransaccionesData(options = {}) {
     syncTransaccionesDataFromTable()
     window.clearTimeout(transaccionesAutosaveTimeout)
-    await saveTransaccionesData(currentTransaccionesData, options)
+    const snapshot = {
+        rows: (currentTransaccionesData.rows || []).map((row) => ({ ...row }))
+    }
+
+    transaccionesPersistChain = transaccionesPersistChain
+        .catch(() => {})
+        .then(() => saveTransaccionesData(snapshot, options))
+
+    await transaccionesPersistChain
 
     if (!options.keepalive) {
         await refreshAssetsSidebar(currentAssetId, false)
@@ -384,10 +515,12 @@ function importTransaccionesJson() {
             assetId: String(row.assetId || ""),
             assetName: String(row.assetName || ""),
             fechaOperacion: String(row.fechaOperacion || ""),
-            walletOrigen: String(row.walletOrigen || ""),
             total: String(row.total || ""),
             comisionRed: String(row.comisionRed || ""),
-            walletDestino: String(row.walletDestino || "")
+            walletTipo: normalizeTransaccionWalletTipo(row.walletTipo || "entre_wallet"),
+            walletDestino: String(row.walletDestino || ""),
+            hashTransaccion: String(row.hashTransaccion || row.walletOrigen || ""),
+            nota: String(row.nota || "")
         }))
 
         const importedAssetIds = new Set(currentTransaccionesData.rows.map((row) => row.assetId).filter(Boolean))

@@ -33,30 +33,37 @@
         </div>
     </div>
 
-    <div class="operationsTableWrapper">
-        <table class="operationsTable">
-            <thead>
-                <tr>
-                    <th class="rowActionHeader"></th>
-                    <th>Activo</th>
-                    <th>Fecha Apertura</th>
-                    <th>Par</th>
-                    <th>Orden</th>
-                    <th>Precio Orden</th>
-                    <th>Cantidad</th>
-                    <th>Total</th>
-                    <th>Estado</th>
-                    <th>Fecha Cierre</th>
-                </tr>
-            </thead>
-            <tbody id="operationsBody"></tbody>
-        </table>
-    </div>
+    <div class="operationsWorkspace">
+        <div class="operationsMainColumn">
+            <div id="operationsPairsSummary" class="operationsPairsSummary hidden"></div>
 
-    <div class="operationsActions">
-        <button id="addOperationRowBtn" class="primaryButton" type="button">Añadir fila</button>
-        <button id="exportOperationsBtn" class="secondaryButton" type="button">Exportar JSON</button>
-        <button id="importOperationsBtn" class="secondaryButton" type="button">Importar JSON</button>
-        <button id="saveOperationsBtn" class="secondaryButton" type="button">Guardar</button>
+            <div class="operationsTableWrapper">
+                <table class="operationsTable">
+                    <thead>
+                        <tr>
+                            <th class="rowActionHeader"></th>
+                            <th>Activo</th>
+                            <th>Fecha Apertura</th>
+                            <th>Par</th>
+                            <th>Orden</th>
+                            <th>Precio Orden</th>
+                            <th>Cantidad</th>
+                            <th>Comisiones</th>
+                            <th>Total</th>
+                            <th>Estado</th>
+                            <th>Fecha Cierre</th>
+                        </tr>
+                    </thead>
+                    <tbody id="operationsBody"></tbody>
+                </table>
+            </div>
+
+            <div class="operationsActions">
+                <button id="addOperationRowBtn" class="primaryButton" type="button">Añadir fila</button>
+                <button id="exportOperationsBtn" class="secondaryButton" type="button">Exportar JSON</button>
+                <button id="importOperationsBtn" class="secondaryButton" type="button">Importar JSON</button>
+                <button id="saveOperationsBtn" class="secondaryButton" type="button">Guardar</button>
+            </div>
+        </div>
     </div>
 </section>

@@ -1,0 +1,32 @@
+<section class="toolsPage">
+    <div class="toolsHero">
+        <div class="toolsAssetPicker">
+            <label class="toolsLabel" for="conversionesAssetSelect">Activo</label>
+            <select id="conversionesAssetSelect" class="operationsSelect toolsAssetSelect"></select>
+        </div>
+        <div class="toolsSelectedAsset" id="conversionesSelectedAsset">
+            <div class="toolsSelectedLabel">Conversiones</div>
+            <div class="toolsSelectedValue">Selecciona un activo</div>
+        </div>
+    </div>
+
+    <div class="assetTableWrapper">
+        <table class="assetOperationsTable">
+            <thead>
+                <tr>
+                    <th class="rowActionHeader"></th>
+                    <th>Fecha</th>
+                    <th>Par</th>
+                    <th>Tipo</th>
+                    <th>Cantidad</th>
+                </tr>
+            </thead>
+            <tbody id="conversionesBody"></tbody>
+        </table>
+    </div>
+
+    <div class="assetActions">
+        <button id="addConversionRowBtn" class="primaryButton" type="button">Añadir fila</button>
+        <button id="saveConversionesBtn" class="secondaryButton" type="button">Guardar JSON</button>
+    </div>
+</section>

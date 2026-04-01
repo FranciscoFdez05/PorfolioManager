@@ -6,12 +6,14 @@ baseDir = Path(__file__).resolve().parent.parent
 dataDir = baseDir / "data"
 activosDir = dataDir / "activos"
 gastosDir = dataDir / "gastos"
+ventasDir = dataDir / "ventas"
 apiDir = baseDir / "API"
 interesesFile = dataDir / "intereses.json"
 dividendosFile = dataDir / "dividendos.json"
 operacionesFile = dataDir / "operaciones.json"
 ventasFile = dataDir / "ventas.json"
 transaccionesFile = dataDir / "transacciones.json"
+stablecoinsFile = dataDir / "stablecoins.json"
 twelvedataKeyFile = apiDir / "twelvedata.key"
 finnhubKeyFile = apiDir / "finnhub.key"
 eodhdKeyFile = apiDir / "eodhd.key"
@@ -22,6 +24,7 @@ def ensureDataFile():
     dataDir.mkdir(parents=True, exist_ok=True)
     activosDir.mkdir(parents=True, exist_ok=True)
     gastosDir.mkdir(parents=True, exist_ok=True)
+    ventasDir.mkdir(parents=True, exist_ok=True)
     apiDir.mkdir(parents=True, exist_ok=True)
 
     if not interesesFile.exists():
@@ -43,6 +46,10 @@ def ensureDataFile():
     if not transaccionesFile.exists():
         with transaccionesFile.open("w", encoding="utf-8") as file:
             json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
+
+    if not stablecoinsFile.exists():
+        with stablecoinsFile.open("w", encoding="utf-8") as file:
+            json.dump({"catalog": [], "enabledSymbols": [], "rows": []}, file, ensure_ascii=False, indent=2)
 
 
 def readInteresesFile():
@@ -112,6 +119,20 @@ def writeTransaccionesFile(data):
     ensureDataFile()
 
     with transaccionesFile.open("w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+
+
+def readStablecoinsFile():
+    ensureDataFile()
+
+    with stablecoinsFile.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def writeStablecoinsFile(data):
+    ensureDataFile()
+
+    with stablecoinsFile.open("w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
 
 

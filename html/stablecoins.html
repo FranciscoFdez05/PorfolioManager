@@ -1,0 +1,54 @@
+<section class="operationsPage operationsPageCompact stablecoinsPage">
+    <div class="stablecoinsHeaderPanel">
+        <div class="stablecoinsHeaderCopy">
+            <p class="transaccionesAssetPanelLabel">Stablecoins</p>
+            <h3 class="transaccionesAssetPanelTitle">Controla compras y gastos de stablecoins elegidas desde Finnhub</h3>
+        </div>
+        <div class="stablecoinsHeaderTools">
+            <button id="openStablecoinModalBtn" class="secondaryButton stablecoinsCompactBtn" type="button">Añadir stablecoin</button>
+            <div id="stablecoinsEnabledMenu" class="stablecoinsEnabledMenu"></div>
+        </div>
+    </div>
+
+    <div id="stablecoinsSummary" class="stablecoinsSummary"></div>
+
+    <div class="operationsTableWrapper stablecoinsTableWrapper">
+        <table class="operationsTable stablecoinsTable">
+            <thead>
+                <tr>
+                    <th class="rowActionHeader"></th>
+                    <th>Stablecoin</th>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Divisa fiat</th>
+                    <th>Cantidad</th>
+                    <th>Precio unitario</th>
+                    <th>Total fiat</th>
+                    <th>Nota</th>
+                </tr>
+            </thead>
+            <tbody id="stablecoinsBody"></tbody>
+        </table>
+    </div>
+
+    <div class="operationsActions">
+        <button id="addStablecoinRowBtn" class="primaryButton" type="button">Añadir fila</button>
+        <button id="exportStablecoinsBtn" class="secondaryButton" type="button">Exportar JSON</button>
+        <button id="importStablecoinsBtn" class="secondaryButton" type="button">Importar JSON</button>
+        <button id="saveStablecoinsBtn" class="secondaryButton" type="button">Guardar</button>
+    </div>
+</section>
+
+<div class="modalOverlay hidden" id="stablecoinModalOverlay">
+    <div class="assetModal stablecoinModal" role="dialog" aria-modal="true" aria-labelledby="stablecoinModalTitle">
+        <h3 class="assetModalTitle" id="stablecoinModalTitle">Añadir stablecoin</h3>
+        <label class="assetModalLabel" for="stablecoinSearchInput">Nombre o ticker en Finnhub</label>
+        <input id="stablecoinSearchInput" class="assetModalInput" type="text" placeholder="Ej: USDT o Tether">
+        <div class="assetModalActions stablecoinModalActions">
+            <button id="stablecoinSearchBtn" class="primaryButton" type="button">Buscar</button>
+            <button id="closeStablecoinModalBtn" class="secondaryButton" type="button">Cerrar</button>
+        </div>
+        <p id="stablecoinSearchFeedback" class="assetSearchFeedback hidden"></p>
+        <div id="stablecoinSearchResults" class="assetSearchResults hidden"></div>
+    </div>
+</div>
