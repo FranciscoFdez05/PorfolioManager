@@ -204,7 +204,7 @@ function buildOperationsStablecoinBalanceSummary(stablecoinsPayload = operations
 
         if (row.tipo === "Compra") {
             summary[symbol].manualBuys += amount
-        } else if (row.tipo === "Gasto") {
+        } else if (row.tipo === "Venta" || row.tipo === "Gasto") {
             summary[symbol].manualExpenses += amount
         }
     })

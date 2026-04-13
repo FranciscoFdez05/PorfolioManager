@@ -1,5 +1,6 @@
-from pathlib import Path
 import json
+import os
+from pathlib import Path
 
 
 baseDir = Path(__file__).resolve().parent.parent
@@ -19,173 +20,143 @@ finnhubKeyFile = apiDir / "finnhub.key"
 eodhdKeyFile = apiDir / "eodhd.key"
 _eodhdKeyRotationIndex = 0
 
+_FILE_DEFAULTS = [
+    (interesesFile, {"rows": []}),
+    (dividendosFile, {"rows": []}),
+    (operacionesFile, {"rows": []}),
+    (ventasFile, {"rows": []}),
+    (transaccionesFile, {"rows": []}),
+    (stablecoinsFile, {"catalog": [], "enabledSymbols": [], "rows": []}),
+]
+
+
+def _read_json(file_path):
+    with file_path.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def _write_json(file_path, data):
+    with file_path.open("w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+
+
+def _read_first_api_key(file_path):
+    if not file_path.exists():
+        return None
+    with file_path.open("r", encoding="utf-8") as file:
+        for line in file:
+            apiKey = line.strip()
+            if apiKey and not apiKey.startswith("#"):
+                return apiKey
+    return None
+
 
 def ensureDataFile():
-    dataDir.mkdir(parents=True, exist_ok=True)
-    activosDir.mkdir(parents=True, exist_ok=True)
-    gastosDir.mkdir(parents=True, exist_ok=True)
-    ventasDir.mkdir(parents=True, exist_ok=True)
-    apiDir.mkdir(parents=True, exist_ok=True)
+    for directory in (dataDir, activosDir, gastosDir, ventasDir, apiDir):
+        directory.mkdir(parents=True, exist_ok=True)
 
-    if not interesesFile.exists():
-        with interesesFile.open("w", encoding="utf-8") as file:
-            json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
-
-    if not dividendosFile.exists():
-        with dividendosFile.open("w", encoding="utf-8") as file:
-            json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
-
-    if not operacionesFile.exists():
-        with operacionesFile.open("w", encoding="utf-8") as file:
-            json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
-
-    if not ventasFile.exists():
-        with ventasFile.open("w", encoding="utf-8") as file:
-            json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
-
-    if not transaccionesFile.exists():
-        with transaccionesFile.open("w", encoding="utf-8") as file:
-            json.dump({"rows": []}, file, ensure_ascii=False, indent=2)
-
-    if not stablecoinsFile.exists():
-        with stablecoinsFile.open("w", encoding="utf-8") as file:
-            json.dump({"catalog": [], "enabledSymbols": [], "rows": []}, file, ensure_ascii=False, indent=2)
+    for file_path, default in _FILE_DEFAULTS:
+        if not file_path.exists():
+            _write_json(file_path, default)
 
 
 def readInteresesFile():
     ensureDataFile()
-
-    with interesesFile.open("r", encoding="utf-8") as file:
-        return json.load(file)
+    return _read_json(interesesFile)
 
 
 def writeInteresesFile(data):
     ensureDataFile()
-
-    with interesesFile.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+    _write_json(interesesFile, data)
 
 
 def readDividendosFile():
     ensureDataFile()
-
-    with dividendosFile.open("r", encoding="utf-8") as file:
-        return json.load(file)
+    return _read_json(dividendosFile)
 
 
 def writeDividendosFile(data):
     ensureDataFile()
-
-    with dividendosFile.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+    _write_json(dividendosFile, data)
 
 
 def readOperacionesFile():
     ensureDataFile()
-
-    with operacionesFile.open("r", encoding="utf-8") as file:
-        return json.load(file)
+    return _read_json(operacionesFile)
 
 
 def writeOperacionesFile(data):
     ensureDataFile()
-
-    with operacionesFile.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+    _write_json(operacionesFile, data)
 
 
 def readVentasFile():
     ensureDataFile()
-
-    with ventasFile.open("r", encoding="utf-8") as file:
-        return json.load(file)
+    return _read_json(ventasFile)
 
 
 def writeVentasFile(data):
     ensureDataFile()
-
-    with ventasFile.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+    _write_json(ventasFile, data)
 
 
 def readTransaccionesFile():
     ensureDataFile()
-
-    with transaccionesFile.open("r", encoding="utf-8") as file:
-        return json.load(file)
+    return _read_json(transaccionesFile)
 
 
 def writeTransaccionesFile(data):
     ensureDataFile()
-
-    with transaccionesFile.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+    _write_json(transaccionesFile, data)
 
 
 def readStablecoinsFile():
     ensureDataFile()
-
-    with stablecoinsFile.open("r", encoding="utf-8") as file:
-        return json.load(file)
+    return _read_json(stablecoinsFile)
 
 
 def writeStablecoinsFile(data):
     ensureDataFile()
-
-    with stablecoinsFile.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+    _write_json(stablecoinsFile, data)
 
 
 def readFinnhubApiKey():
+    key = os.environ.get("FINNHUB_API_KEY", "").strip()
+    if key:
+        return key
     ensureDataFile()
-
-    if finnhubKeyFile.exists():
-        with finnhubKeyFile.open("r", encoding="utf-8") as file:
-            for line in file:
-                apiKey = line.strip()
-
-                if apiKey and not apiKey.startswith("#"):
-                    return apiKey
-
-    if twelvedataKeyFile.exists():
-        with twelvedataKeyFile.open("r", encoding="utf-8") as file:
-            for line in file:
-                apiKey = line.strip()
-
-                if apiKey and not apiKey.startswith("#"):
-                    return apiKey
-
-    return None
+    return _read_first_api_key(finnhubKeyFile) or _read_first_api_key(twelvedataKeyFile)
 
 
 def readEodhdApiKey():
+    env_keys = os.environ.get("EODHD_API_KEYS", "").strip()
+    if env_keys:
+        first_key = env_keys.split(",")[0].strip()
+        if first_key:
+            return first_key
     ensureDataFile()
-
-    if eodhdKeyFile.exists():
-        with eodhdKeyFile.open("r", encoding="utf-8") as file:
-            for line in file:
-                apiKey = line.strip()
-
-                if apiKey and not apiKey.startswith("#"):
-                    return apiKey
-
-    return None
+    return _read_first_api_key(eodhdKeyFile)
 
 
 def readEodhdApiKeys():
+    env_keys_str = os.environ.get("EODHD_API_KEYS", "").strip()
+    if env_keys_str:
+        return [k.strip() for k in env_keys_str.split(",") if k.strip()]
+
     ensureDataFile()
 
-    apiKeys = []
-
     if not eodhdKeyFile.exists():
-        return apiKeys
+        return []
+
+    seen = set()
+    apiKeys = []
 
     with eodhdKeyFile.open("r", encoding="utf-8") as file:
         for line in file:
             apiKey = line.strip()
-
-            if apiKey and not apiKey.startswith("#") and apiKey not in apiKeys:
+            if apiKey and not apiKey.startswith("#") and apiKey not in seen:
                 apiKeys.append(apiKey)
+                seen.add(apiKey)
 
     return apiKeys
 

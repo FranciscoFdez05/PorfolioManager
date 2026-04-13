@@ -634,6 +634,13 @@ body{
     scrollbar-width:none;
 }
 
+.conversionesTableWrapper{
+    max-height:calc(100vh - 395px);
+    min-height:494px;
+    overflow-y:auto;
+    overflow-x:hidden;
+}
+
 .assetTableWrapper::-webkit-scrollbar{
     width:0;
     height:0;
@@ -657,6 +664,12 @@ body{
     text-align:left;
     border-right:none;
     border-bottom:1px solid #273246;
+}
+
+.conversionesTableWrapper .assetOperationsTable thead th{
+    position:sticky;
+    top:0;
+    z-index:2;
 }
 
 .assetOperationsTable thead th:last-child{
@@ -859,6 +872,14 @@ body{
     position:sticky;
     top:0;
     z-index:2;
+}
+
+.overviewTable thead th:nth-child(-n+2){
+    text-align:left;
+}
+
+.overviewTable thead th:nth-child(n+3){
+    text-align:right;
 }
 
 .overviewTable .overviewNumericCell{
@@ -1208,6 +1229,11 @@ body{
 @media (max-width:1100px){
     .toolsHero{
         grid-template-columns:1fr;
+    }
+
+    .conversionesTableWrapper{
+        max-height:500px;
+        min-height:420px;
     }
 }
 

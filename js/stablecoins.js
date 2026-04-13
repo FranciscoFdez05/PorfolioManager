@@ -1,4 +1,4 @@
-const STABLECOIN_MOVEMENT_TYPES = ["Compra", "Gasto"]
+const STABLECOIN_MOVEMENT_TYPES = ["Compra", "Venta"]
 
 let currentStablecoinsData = { catalog: [], enabledSymbols: [], rows: [] }
 let currentStablecoinsOperationsRows = []
@@ -67,9 +67,10 @@ function normalizeStablecoinCatalogEntry(entry = {}) {
 
 function normalizeStablecoinMovementRow(row = {}) {
     const stablecoinSymbol = normalizeStablecoinSymbol(row.stablecoinSymbol || "")
-    const movementType = STABLECOIN_MOVEMENT_TYPES.includes(String(row.tipo || "").trim())
-        ? String(row.tipo).trim()
-        : "Compra"
+    const rawMovementType = String(row.tipo || "").trim()
+    const movementType = rawMovementType === "Gasto"
+        ? "Venta"
+        : (STABLECOIN_MOVEMENT_TYPES.includes(rawMovementType) ? rawMovementType : "Compra")
     const currency = normalizeCurrencyCode(row.currency || "USD")
 
     return {
@@ -185,7 +186,7 @@ function buildStablecoinBalanceSummary(stablecoinsPayload = currentStablecoinsDa
 
         if (row.tipo === "Compra") {
             summary[symbol].manualBuys += amount
-        } else if (row.tipo === "Gasto") {
+        } else if (row.tipo === "Venta") {
             summary[symbol].manualExpenses += amount
         }
     })
@@ -454,7 +455,7 @@ function renderStablecoinsSummary() {
             <div class="stablecoinSummaryMain">${formatMoney(item.available, "USD")}</div>
             <div class="stablecoinSummaryMeta">
                 <span>Compras manuales: ${formatMoney(item.manualBuys, "USD")}</span>
-                <span>Gastos manuales: ${formatMoney(item.manualExpenses, "USD")}</span>
+                <span>Ventas manuales: ${formatMoney(item.manualExpenses, "USD")}</span>
                 <span>Operaciones completadas: ${formatMoney(item.operationsBuys - item.operationsSales, "USD")}</span>
             </div>
         `

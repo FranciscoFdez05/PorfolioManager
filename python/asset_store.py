@@ -4,6 +4,10 @@ from app_data import activosDir, dataDir, ensureDataFile
 from asset_utils import inferMarketProviderFromSymbol, slugify
 
 
+def isTemporaryConflictAssetFile(assetFile):
+    return "edit conflict" in assetFile.name.lower()
+
+
 def getAssetFile(assetId):
     safeAssetId = slugify(assetId)
     return activosDir / f"{safeAssetId}.json"
@@ -32,8 +36,13 @@ def writeAssetFile(assetId, data):
 def listAssets():
     ensureDataFile()
     assets = []
+    assetFiles = [
+        assetFile
+        for assetFile in sorted(activosDir.glob("*.json"))
+        if not isTemporaryConflictAssetFile(assetFile)
+    ]
 
-    for index, assetFile in enumerate(sorted(activosDir.glob("*.json"))):
+    for index, assetFile in enumerate(assetFiles):
         with assetFile.open("r", encoding="utf-8") as file:
             data = json.load(file)
 

@@ -1,0 +1,263 @@
+from flask import Blueprint, jsonify, request
+
+from app_data import readFinnhubApiKey, readOperacionesFile
+from asset_store import getAssetFile, listAssets, readAssetFile, writeAssetFile
+from asset_utils import (
+    createDefaultAssetPayload, inferMarketProviderFromSymbol,
+    normalizeMarketProvider, sanitizeAssetPayload, sanitizeAssetType, slugify,
+)
+from eodhd_client import fetch_quote as fetch_eodhd_quote
+from finnhub_client import convert_amount, convert_quote_currency, fetch_quote
+from helpers import (
+    call_eodhd_with_fallbacks, convert_asset_rows_currency, format_decimal,
+    is_temporary_service_error, normalize_currency_code, parse_loose_number,
+    sync_completed_operations_into_assets,
+)
+
+activos_bp = Blueprint("activos", __name__)
+
+
+@activos_bp.route("/api/activos", methods=["GET"])
+def getActivos():
+    return jsonify({"assets": listAssets()})
+
+
+@activos_bp.route("/api/activos", methods=["POST"])
+def createActivo():
+    requestData = request.get_json(silent=True) or {}
+    assetName = str(requestData.get("name", "")).strip()
+    assetType = sanitizeAssetType(requestData.get("type", ""))
+    marketSymbol = str(requestData.get("marketSymbol", requestData.get("finnhubSymbol", ""))).strip().upper()
+    marketProvider = normalizeMarketProvider(
+        requestData.get("marketProvider", ""),
+        fallback=inferMarketProviderFromSymbol(marketSymbol)
+    )
+
+    if not assetName:
+        return jsonify({"ok": False, "error": "El nombre del activo es obligatorio"}), 400
+
+    if not assetType:
+        return jsonify({"ok": False, "error": "Tipo de activo inválido"}), 400
+
+    assetId = slugify(assetName)
+    assetFile = getAssetFile(assetId)
+
+    if assetFile.exists():
+        return jsonify({"ok": False, "error": "Ya existe un activo con ese nombre"}), 409
+
+    payload = createDefaultAssetPayload(assetName, assetType, assetId)
+    payload["marketProvider"] = marketProvider
+    payload["marketSymbol"] = marketSymbol
+    payload["finnhubSymbol"] = marketSymbol
+    payload["order"] = len(listAssets())
+    writeAssetFile(assetId, payload)
+
+    return jsonify({"ok": True, "asset": payload}), 201
+
+
+@activos_bp.route("/api/activos/reorder", methods=["POST"])
+def reorderActivos():
+    requestData = request.get_json(silent=True) or {}
+    assets = listAssets()
+    orderedAssetIds = requestData.get("orderedAssetIds")
+
+    if isinstance(orderedAssetIds, list):
+        normalizedIds = [slugify(assetId) for assetId in orderedAssetIds if str(assetId).strip()]
+        currentIds = [asset["id"] for asset in assets]
+
+        if sorted(normalizedIds) != sorted(currentIds):
+            return jsonify({"ok": False, "error": "orderedAssetIds no coincide con los activos actuales"}), 400
+
+        assetById = {asset["id"]: asset for asset in assets}
+        assets = [assetById[assetId] for assetId in normalizedIds]
+    else:
+        assetId = slugify(requestData.get("assetId", ""))
+        direction = str(requestData.get("direction", "")).strip().lower()
+
+        if not assetId:
+            return jsonify({"ok": False, "error": "assetId es obligatorio"}), 400
+
+        if direction not in {"up", "down"}:
+            return jsonify({"ok": False, "error": "direction inválida"}), 400
+
+        currentIndex = next((index for index, asset in enumerate(assets) if asset["id"] == assetId), None)
+
+        if currentIndex is None:
+            return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+
+        swapIndex = currentIndex - 1 if direction == "up" else currentIndex + 1
+
+        if swapIndex < 0 or swapIndex >= len(assets):
+            return jsonify({"ok": True, "moved": False})
+
+        assets[currentIndex], assets[swapIndex] = assets[swapIndex], assets[currentIndex]
+
+    for index, asset in enumerate(assets):
+        assetData = readAssetFile(asset["id"])
+
+        if assetData is None:
+            continue
+
+        assetData["order"] = index
+        writeAssetFile(asset["id"], assetData)
+
+    return jsonify({"ok": True, "moved": True})
+
+
+@activos_bp.route("/api/activos/<assetId>", methods=["GET"])
+def getActivo(assetId):
+    data = readAssetFile(assetId)
+
+    if data is None:
+        return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+
+    if not isinstance(data.get("operationRows"), list):
+        operaciones_data = readOperacionesFile() or {}
+        sync_completed_operations_into_assets(operaciones_data.get("rows", []))
+        data = readAssetFile(assetId) or data
+
+    if not isinstance(data.get("operationRows"), list):
+        data["operationRows"] = []
+
+    return jsonify(data)
+
+
+@activos_bp.route("/api/activos/<assetId>", methods=["POST"])
+def saveActivo(assetId):
+    requestData = request.get_json(silent=True) or {}
+    payload, error = sanitizeAssetPayload(requestData, slugify(assetId))
+
+    if error:
+        return jsonify({"ok": False, "error": error}), 400
+
+    existing_asset = readAssetFile(assetId) or {}
+
+    if not requestData.get("operationRows") and isinstance(existing_asset.get("operationRows"), list):
+        payload["operationRows"] = existing_asset.get("operationRows", [])
+
+    writeAssetFile(assetId, payload)
+    return jsonify({"ok": True})
+
+
+@activos_bp.route("/api/activos/<assetId>/refresh-market-data", methods=["POST"])
+def refreshActivoMarketData(assetId):
+    assetData = readAssetFile(assetId)
+
+    if assetData is None:
+        return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+
+    marketSymbol = str(assetData.get("marketSymbol", assetData.get("finnhubSymbol", ""))).strip().upper()
+    marketProvider = normalizeMarketProvider(
+        assetData.get("marketProvider", ""),
+        fallback=inferMarketProviderFromSymbol(marketSymbol)
+    )
+
+    if not marketSymbol:
+        return jsonify({"ok": False, "error": "El activo no tiene ticker de mercado configurado"}), 400
+
+    if marketProvider == "eodhd":
+        quote, error = call_eodhd_with_fallbacks(lambda apiKey: fetch_eodhd_quote(marketSymbol, apiKey))
+    else:
+        apiKey = readFinnhubApiKey()
+        quote, error = fetch_quote(marketSymbol, apiKey)
+
+    if error:
+        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    target_currency = normalize_currency_code(assetData.get("currency", ""), fallback="EUR")
+    quote, error = convert_quote_currency(quote, target_currency)
+
+    if error:
+        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    assetData["marketProvider"] = marketProvider
+    assetData["marketSymbol"] = quote["symbol"]
+    assetData["finnhubSymbol"] = quote["symbol"]
+    assetData["price"] = quote["price"]
+    assetData["currency"] = quote["currency"]
+    assetData["change"] = quote["change"]
+    assetData["status"] = quote["status"]
+    assetData["lastUpdated"] = quote["lastUpdated"]
+    writeAssetFile(assetId, assetData)
+
+    return jsonify({"ok": True, "asset": assetData, "marketData": quote["marketData"]})
+
+
+@activos_bp.route("/api/activos/<assetId>/currency", methods=["POST"])
+def changeActivoCurrency(assetId):
+    assetData = readAssetFile(assetId)
+
+    if assetData is None:
+        return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+
+    requestData = request.get_json(silent=True) or {}
+    scope = str(requestData.get("scope", "asset")).strip().lower()
+    is_crypto = str(assetData.get("type", "")).strip().lower() == "cripto"
+    current_currency = normalize_currency_code(assetData.get("currency", ""), fallback="EUR")
+    current_precio_currency = normalize_currency_code(
+        assetData.get("precioCurrency", assetData.get("currency", "")),
+        fallback=current_currency
+    )
+    target_currency = normalize_currency_code(
+        requestData.get("currency", ""),
+        fallback=current_precio_currency if scope == "price" else current_currency
+    )
+
+    if target_currency not in {"EUR", "USD"}:
+        return jsonify({"ok": False, "error": "Solo se permite cambiar entre EUR y USD"}), 400
+
+    if scope == "price":
+        return jsonify({"ok": False, "error": "La moneda separada del precio ya no se usa en criptos"}), 400
+
+    if current_currency == target_currency:
+        return jsonify({"ok": True, "asset": assetData, "converted": False})
+
+    converted_price = parse_loose_number(assetData.get("price", ""))
+
+    if converted_price is not None:
+        converted_price, error = convert_amount(converted_price, current_currency, target_currency)
+
+        if error:
+            statusCode = 503 if is_temporary_service_error(error) else 400
+            return jsonify({"ok": False, "error": error}), statusCode
+
+        assetData["price"] = format_decimal(converted_price)
+
+    if not is_crypto:
+        converted_rows, error = convert_asset_rows_currency(
+            assetData.get("rows", []),
+            current_currency,
+            target_currency,
+            assetData.get("type", ""),
+            fields=None
+        )
+
+        if error:
+            statusCode = 503 if is_temporary_service_error(error) else 400
+            return jsonify({"ok": False, "error": error}), statusCode
+
+        assetData["rows"] = converted_rows
+
+    assetData["currency"] = target_currency
+    assetData["precioCurrency"] = target_currency
+    assetData["status"] = (
+        f"Moneda de visualización convertida de {current_currency} a {target_currency}"
+        if is_crypto
+        else f"Activo convertido de {current_currency} a {target_currency}"
+    )
+    writeAssetFile(assetId, assetData)
+
+    return jsonify({"ok": True, "asset": assetData, "converted": True})
+
+
+@activos_bp.route("/api/activos/<assetId>", methods=["DELETE"])
+def deleteActivo(assetId):
+    assetFile = getAssetFile(assetId)
+
+    if not assetFile.exists():
+        return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+
+    assetFile.unlink()
+    return jsonify({"ok": True})
