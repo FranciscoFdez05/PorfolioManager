@@ -1,194 +1,176 @@
-import json
-
-from app_data import ensureDataFile, ventasDir, ventasFile
+from db import get_db
 from gastos_store import normalize_year
 
-
-def get_ventas_year_file(year):
-    normalized_year = normalize_year(year)
-    if not normalized_year:
-        return None
-    return ventasDir / f"ventas{normalized_year}.json"
-
-
-def get_legacy_ventas_year_file(year):
-    normalized_year = normalize_year(year)
-    if not normalized_year:
-        return None
-    return ventasDir / f"{normalized_year}.json"
-
-
-def resolve_existing_ventas_year_file(year):
-    preferred_file = get_ventas_year_file(year)
-    legacy_file = get_legacy_ventas_year_file(year)
-
-    if preferred_file and preferred_file.exists():
-        return preferred_file
-
-    if legacy_file and legacy_file.exists():
-        return legacy_file
-
-    return preferred_file
-
-
-def extract_year_from_ventas_filename(file_path):
-    stem = file_path.stem
-    normalized_stem = stem.lower()
-
-    if normalized_stem.startswith("ventas"):
-        return normalize_year(stem[6:])
-
-    return normalize_year(stem)
+_MAX_SHORT = 30
+_MAX_NAME = 120
 
 
 def create_default_ventas_year(year):
-    normalized_year = normalize_year(year)
-    return {
-        "year": normalized_year,
-        "rows": []
-    }
+    return {"year": normalize_year(year), "rows": []}
 
 
 def sanitize_ventas_rows(rows):
-    sanitized_rows = []
-
-    for index, row in enumerate(rows if isinstance(rows, list) else []):
-        sanitized_rows.append({
-            "id": str(row.get("id", f"venta-{index + 1}")).strip() or f"venta-{index + 1}",
-            "fecha": str(row.get("fecha", "")).strip(),
-            "assetId": str(row.get("assetId", "")).strip(),
-            "activo": str(row.get("activo", "")).strip(),
-            "cantidad": str(row.get("cantidad", "")).strip(),
-            "valorCompra": str(row.get("valorCompra", row.get("precioCompra", row.get("valor_compra", "")))).strip(),
-            "valorVenta": str(row.get("valorVenta", row.get("precioVenta", row.get("valor_venta", "")))).strip(),
-            "dineroDeclarar": str(row.get("dineroDeclarar", row.get("gananciaRealizada", ""))).strip(),
-            "tramo1": str(row.get("tramo1", "")).strip(),
-            "tramo2": str(row.get("tramo2", "")).strip(),
-            "tramo3": str(row.get("tramo3", "")).strip(),
-            "tramo4": str(row.get("tramo4", "")).strip(),
-            "tramo5": str(row.get("tramo5", "")).strip(),
-            "totalPagar": str(row.get("totalPagar", row.get("impuestos", ""))).strip(),
-            "bruto": str(row.get("bruto", "")).strip(),
-            "neto": str(row.get("neto", "")).strip()
+    if not isinstance(rows, list):
+        return []
+    if len(rows) > 500:
+        rows = rows[:500]
+    sanitized = []
+    for index, row in enumerate(rows):
+        sanitized.append({
+            "id": str(row.get("id", f"venta-{index + 1}"))[:_MAX_SHORT].strip() or f"venta-{index + 1}",
+            "fecha": str(row.get("fecha", ""))[:_MAX_SHORT].strip(),
+            "assetId": str(row.get("assetId", ""))[:_MAX_SHORT].strip(),
+            "activo": str(row.get("activo", ""))[:_MAX_NAME].strip(),
+            "cantidad": str(row.get("cantidad", ""))[:_MAX_SHORT].strip(),
+            "valorCompra": str(row.get("valorCompra", row.get("precioCompra", row.get("valor_compra", ""))))[:_MAX_SHORT].strip(),
+            "valorVenta": str(row.get("valorVenta", row.get("precioVenta", row.get("valor_venta", ""))))[:_MAX_SHORT].strip(),
+            "dineroDeclarar": str(row.get("dineroDeclarar", row.get("gananciaRealizada", "")))[:_MAX_SHORT].strip(),
+            "tramo1": str(row.get("tramo1", ""))[:_MAX_SHORT].strip(),
+            "tramo2": str(row.get("tramo2", ""))[:_MAX_SHORT].strip(),
+            "tramo3": str(row.get("tramo3", ""))[:_MAX_SHORT].strip(),
+            "tramo4": str(row.get("tramo4", ""))[:_MAX_SHORT].strip(),
+            "tramo5": str(row.get("tramo5", ""))[:_MAX_SHORT].strip(),
+            "totalPagar": str(row.get("totalPagar", row.get("impuestos", "")))[:_MAX_SHORT].strip(),
+            "bruto": str(row.get("bruto", ""))[:_MAX_SHORT].strip(),
+            "neto": str(row.get("neto", ""))[:_MAX_SHORT].strip(),
         })
-
-    return sanitized_rows
+    return sanitized
 
 
 def sanitize_ventas_payload(payload, fallback_year=None):
     year = normalize_year(payload.get("year") or fallback_year)
     if not year:
         return None, "Año inválido"
-
-    return {
-        "year": year,
-        "rows": sanitize_ventas_rows(payload.get("rows", []))
-    }, None
+    return {"year": year, "rows": sanitize_ventas_rows(payload.get("rows", []))}, None
 
 
 def list_ventas_years():
-    ensureDataFile()
-    years = []
-
-    for file_path in ventasDir.glob("*.json"):
-        year = extract_year_from_ventas_filename(file_path)
-        if year and year not in years:
-            years.append(year)
-
-    return sorted(years)
+    conn = get_db()
+    return [r["year"] for r in conn.execute("SELECT DISTINCT year FROM ventas ORDER BY year").fetchall()]
 
 
 def read_ventas_year(year):
-    ensureDataFile()
-    year_file = resolve_existing_ventas_year_file(year)
-
-    if year_file is None or not year_file.exists():
+    normalized = normalize_year(year)
+    if not normalized:
         return None
 
-    with year_file.open("r", encoding="utf-8") as file:
-        data = json.load(file)
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, fecha, asset_id, activo, cantidad, valor_compra, valor_venta, "
+        "dinero_declarar, tramo1, tramo2, tramo3, tramo4, tramo5, total_pagar, bruto, neto "
+        "FROM ventas WHERE year = ? ORDER BY rowid",
+        (normalized,)
+    ).fetchall()
 
-    return sanitize_ventas_payload(data, year)[0]
+    if not rows:
+        return None
+
+    return {
+        "year": normalized,
+        "rows": [
+            {
+                "id": r["id"],
+                "fecha": r["fecha"],
+                "assetId": r["asset_id"],
+                "activo": r["activo"],
+                "cantidad": r["cantidad"],
+                "valorCompra": r["valor_compra"],
+                "valorVenta": r["valor_venta"],
+                "dineroDeclarar": r["dinero_declarar"],
+                "tramo1": r["tramo1"],
+                "tramo2": r["tramo2"],
+                "tramo3": r["tramo3"],
+                "tramo4": r["tramo4"],
+                "tramo5": r["tramo5"],
+                "totalPagar": r["total_pagar"],
+                "bruto": r["bruto"],
+                "neto": r["neto"],
+            }
+            for r in rows
+        ],
+    }
 
 
 def write_ventas_year(year, data):
-    ensureDataFile()
-    year_file = get_ventas_year_file(year)
-    legacy_year_file = get_legacy_ventas_year_file(year)
-
-    if year_file is None:
+    normalized = normalize_year(year)
+    if not normalized:
         return
 
-    with year_file.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
-
-    if legacy_year_file and legacy_year_file.exists() and legacy_year_file != year_file:
-        legacy_year_file.unlink()
+    conn = get_db()
+    conn.execute("DELETE FROM ventas WHERE year = ?", (normalized,))
+    conn.executemany(
+        "INSERT INTO ventas "
+        "(id, year, fecha, asset_id, activo, cantidad, valor_compra, valor_venta, "
+        "dinero_declarar, tramo1, tramo2, tramo3, tramo4, tramo5, total_pagar, bruto, neto) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (r.get("id", ""), normalized, r.get("fecha", ""), r.get("assetId", ""),
+             r.get("activo", ""), r.get("cantidad", ""), r.get("valorCompra", ""),
+             r.get("valorVenta", ""), r.get("dineroDeclarar", ""),
+             r.get("tramo1", ""), r.get("tramo2", ""), r.get("tramo3", ""),
+             r.get("tramo4", ""), r.get("tramo5", ""), r.get("totalPagar", ""),
+             r.get("bruto", ""), r.get("neto", ""))
+            for r in data.get("rows", [])
+        ]
+    )
+    conn.commit()
 
 
 def delete_ventas_year(year):
-    ensureDataFile()
-    year_file = get_ventas_year_file(year)
-    legacy_year_file = get_legacy_ventas_year_file(year)
-    deleted = False
+    normalized = normalize_year(year)
+    if not normalized:
+        return False
 
-    for file_path in (year_file, legacy_year_file):
-        if file_path is not None and file_path.exists():
-            file_path.unlink()
-            deleted = True
+    conn = get_db()
+    result = conn.execute("DELETE FROM ventas WHERE year = ?", (normalized,))
+    conn.commit()
+    return result.rowcount > 0
 
-    return deleted
+
+def migrate_legacy_ventas_if_needed(default_year):
+    """En la versión SQLite no hay ficheros legacy que migrar.
+    Si no hay ningún año crea uno vacío con el año por defecto."""
+    years = list_ventas_years()
+    if years:
+        return years
+    write_ventas_year(default_year, create_default_ventas_year(default_year))
+    return [default_year]
+
+
+def read_all_ventas_rows():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, fecha, asset_id, activo, cantidad, valor_compra, valor_venta, "
+        "dinero_declarar, tramo1, tramo2, tramo3, tramo4, tramo5, total_pagar, bruto, neto "
+        "FROM ventas ORDER BY year, rowid"
+    ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "fecha": r["fecha"],
+            "assetId": r["asset_id"],
+            "activo": r["activo"],
+            "cantidad": r["cantidad"],
+            "valorCompra": r["valor_compra"],
+            "valorVenta": r["valor_venta"],
+            "dineroDeclarar": r["dinero_declarar"],
+            "tramo1": r["tramo1"],
+            "tramo2": r["tramo2"],
+            "tramo3": r["tramo3"],
+            "tramo4": r["tramo4"],
+            "tramo5": r["tramo5"],
+            "totalPagar": r["total_pagar"],
+            "bruto": r["bruto"],
+            "neto": r["neto"],
+        }
+        for r in rows
+    ]
 
 
 def extract_year_from_sale_date(value, fallback_year):
     text = str(value or "").strip()
-
     if len(text) >= 4 and text[:4].isdigit() and (len(text) == 4 or text[4] in "-/"):
         return text[:4]
-
     if len(text) >= 4 and text[-4:].isdigit():
         return text[-4:]
-
     return fallback_year
-
-
-def migrate_legacy_ventas_if_needed(default_year):
-    ensureDataFile()
-    existing_years = list_ventas_years()
-
-    if existing_years:
-        return existing_years
-
-    legacy_rows = []
-
-    if ventasFile.exists():
-        with ventasFile.open("r", encoding="utf-8") as file:
-            legacy_data = json.load(file)
-        legacy_rows = sanitize_ventas_rows(legacy_data.get("rows", []))
-
-    if not legacy_rows:
-        payload = create_default_ventas_year(default_year)
-        write_ventas_year(default_year, payload)
-        return [default_year]
-
-    rows_by_year = {}
-
-    for row in legacy_rows:
-        row_year = normalize_year(extract_year_from_sale_date(row.get("fecha", ""), default_year)) or default_year
-        rows_by_year.setdefault(row_year, []).append(row)
-
-    for year, rows in rows_by_year.items():
-        write_ventas_year(year, {"year": year, "rows": rows})
-
-    return list_ventas_years()
-
-
-def read_all_ventas_rows():
-    ensureDataFile()
-    rows = []
-
-    for year in list_ventas_years():
-        payload = read_ventas_year(year)
-        rows.extend(payload.get("rows", []) if payload else [])
-
-    return rows

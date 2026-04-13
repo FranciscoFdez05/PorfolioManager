@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 
-from app_data import readFinnhubApiKey, readOperacionesFile
-from asset_store import getAssetFile, listAssets, readAssetFile, writeAssetFile
+from app_data import readFinnhubApiKey
+from asset_store import deleteAssetFile, getAssetFile, listAssets, readAssetFile, updateAssetsOrder, writeAssetFile
 from asset_utils import (
     createDefaultAssetPayload, inferMarketProviderFromSymbol,
     normalizeMarketProvider, sanitizeAssetPayload, sanitizeAssetType, slugify,
@@ -11,7 +11,6 @@ from finnhub_client import convert_amount, convert_quote_currency, fetch_quote
 from helpers import (
     call_eodhd_with_fallbacks, convert_asset_rows_currency, format_decimal,
     is_temporary_service_error, normalize_currency_code, parse_loose_number,
-    sync_completed_operations_into_assets,
 )
 
 activos_bp = Blueprint("activos", __name__)
@@ -92,15 +91,7 @@ def reorderActivos():
 
         assets[currentIndex], assets[swapIndex] = assets[swapIndex], assets[currentIndex]
 
-    for index, asset in enumerate(assets):
-        assetData = readAssetFile(asset["id"])
-
-        if assetData is None:
-            continue
-
-        assetData["order"] = index
-        writeAssetFile(asset["id"], assetData)
-
+    updateAssetsOrder([asset["id"] for asset in assets])
     return jsonify({"ok": True, "moved": True})
 
 
@@ -110,14 +101,6 @@ def getActivo(assetId):
 
     if data is None:
         return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
-
-    if not isinstance(data.get("operationRows"), list):
-        operaciones_data = readOperacionesFile() or {}
-        sync_completed_operations_into_assets(operaciones_data.get("rows", []))
-        data = readAssetFile(assetId) or data
-
-    if not isinstance(data.get("operationRows"), list):
-        data["operationRows"] = []
 
     return jsonify(data)
 
@@ -254,10 +237,7 @@ def changeActivoCurrency(assetId):
 
 @activos_bp.route("/api/activos/<assetId>", methods=["DELETE"])
 def deleteActivo(assetId):
-    assetFile = getAssetFile(assetId)
-
-    if not assetFile.exists():
+    if not deleteAssetFile(assetId):
         return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
 
-    assetFile.unlink()
     return jsonify({"ok": True})

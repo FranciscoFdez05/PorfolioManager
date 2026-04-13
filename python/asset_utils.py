@@ -5,6 +5,16 @@ ALLOWED_ASSET_TYPES = {"cripto", "acciones", "etfs", "comoditis"}
 ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd"}
 EODHD_EXCHANGE_CODES = {"XETRA", "PA", "LSE", "US", "SW", "AS", "MC", "MI", "DU", "BE", "F", "MU", "ST", "VI", "LS"}
 
+_MAX_NAME = 120
+_MAX_SYMBOL = 40
+_MAX_TICKER = 60
+_MAX_SHORT = 30
+_MAX_TEXT = 200
+
+
+def _trunc(value, max_len):
+    return str(value or "")[:max_len]
+
 
 def slugify(value):
     normalized = re.sub(r"[^a-zA-Z0-9]+", "-", str(value).strip().lower())
@@ -94,23 +104,23 @@ def sanitizeAssetRows(rows):
     sanitizedRows = []
 
     for row in rows:
-        legacy_crypto_fee = str(row.get("comisionesSatoshis", row.get("comisiones", ""))).strip()
-        crypto_fee = str(row.get("comisionesCripto", legacy_crypto_fee)).strip()
-        fiat_fee = str(row.get("comisionesFiat", "")).strip()
-        currency = str(row.get("currency", "EUR")).strip().upper() or "EUR"
+        legacy_crypto_fee = _trunc(row.get("comisionesSatoshis", row.get("comisiones", "")), _MAX_SHORT).strip()
+        crypto_fee = _trunc(row.get("comisionesCripto", legacy_crypto_fee), _MAX_SHORT).strip()
+        fiat_fee = _trunc(row.get("comisionesFiat", ""), _MAX_SHORT).strip()
+        currency = _trunc(row.get("currency", "EUR"), 10).strip().upper() or "EUR"
 
         if currency not in {"EUR", "USD"}:
             currency = "EUR"
 
         sanitizedRows.append({
-            "fechaOperacion": str(row.get("fechaOperacion", "")).strip(),
-            "tipoOperacion": str(row.get("tipoOperacion", "")).strip(),
-            "exchange": str(row.get("exchange", "")).strip(),
+            "fechaOperacion": _trunc(row.get("fechaOperacion", ""), _MAX_SHORT).strip(),
+            "tipoOperacion": _trunc(row.get("tipoOperacion", ""), _MAX_SHORT).strip(),
+            "exchange": _trunc(row.get("exchange", ""), _MAX_SHORT).strip(),
             "currency": currency,
-            "participaciones": str(row.get("participaciones", "")).strip(),
-            "precioParticipacion": str(row.get("precioParticipacion", "")).strip(),
-            "capitalInvertidoBruto": str(row.get("capitalInvertidoBruto", "")).strip(),
-            "costeAnual": str(row.get("costeAnual", "")).strip(),
+            "participaciones": _trunc(row.get("participaciones", ""), _MAX_SHORT).strip(),
+            "precioParticipacion": _trunc(row.get("precioParticipacion", ""), _MAX_SHORT).strip(),
+            "capitalInvertidoBruto": _trunc(row.get("capitalInvertidoBruto", ""), _MAX_SHORT).strip(),
+            "costeAnual": _trunc(row.get("costeAnual", ""), _MAX_SHORT).strip(),
             "comisiones": fiat_fee,
             "comisionesFiat": fiat_fee,
             "comisionesCripto": crypto_fee,
@@ -142,21 +152,21 @@ def sanitizeAssetOperationRows(rows):
             precio_currency = currency
 
         sanitized_rows.append({
-            "id": str(row.get("id", f"operacion-{index + 1}")).strip() or f"operacion-{index + 1}",
-            "assetId": str(row.get("assetId", "")).strip(),
-            "activo": str(row.get("activo", "")).strip(),
-            "fechaApertura": str(row.get("fechaApertura", row.get("fecha", ""))).strip(),
-            "par": str(row.get("par", "")).strip(),
-            "stablecoinSymbol": str(row.get("stablecoinSymbol", "")).strip().upper(),
+            "id": _trunc(row.get("id", f"operacion-{index + 1}"), _MAX_SHORT).strip() or f"operacion-{index + 1}",
+            "assetId": _trunc(row.get("assetId", ""), _MAX_SHORT).strip(),
+            "activo": _trunc(row.get("activo", ""), _MAX_NAME).strip(),
+            "fechaApertura": _trunc(row.get("fechaApertura", row.get("fecha", "")), _MAX_SHORT).strip(),
+            "par": _trunc(row.get("par", ""), _MAX_SYMBOL).strip(),
+            "stablecoinSymbol": _trunc(row.get("stablecoinSymbol", ""), _MAX_SYMBOL).strip().upper(),
             "orden": orden,
-            "precioOrden": str(row.get("precioOrden", row.get("precio", ""))).strip(),
+            "precioOrden": _trunc(row.get("precioOrden", row.get("precio", "")), _MAX_SHORT).strip(),
             "precioCurrency": precio_currency,
-            "cantidad": str(row.get("cantidad", "")).strip(),
-            "comisionesCripto": str(row.get("comisionesCripto", row.get("comisiones", ""))).strip(),
-            "total": str(row.get("total", "")).strip(),
+            "cantidad": _trunc(row.get("cantidad", ""), _MAX_SHORT).strip(),
+            "comisionesCripto": _trunc(row.get("comisionesCripto", row.get("comisiones", "")), _MAX_SHORT).strip(),
+            "total": _trunc(row.get("total", ""), _MAX_SHORT).strip(),
             "currency": currency,
             "estado": estado,
-            "fechaCierre": str(row.get("fechaCierre", "")).strip()
+            "fechaCierre": _trunc(row.get("fechaCierre", ""), _MAX_SHORT).strip()
         })
 
     return sanitized_rows
@@ -184,7 +194,7 @@ def sanitizeAssetConversionRows(rows, asset_symbol=""):
 
 
 def sanitizeAssetPayload(requestData, fallbackAssetId=None):
-    assetName = str(requestData.get("name", "")).strip()
+    assetName = _trunc(requestData.get("name", ""), _MAX_NAME).strip()
     assetType = sanitizeAssetType(requestData.get("type", ""))
 
     if not assetName:
@@ -199,19 +209,22 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
     if not isinstance(rows, list):
         return None, "rows debe ser una lista"
 
+    if len(rows) > 500:
+        return None, "Demasiadas filas (máximo 500)"
+
     payload = {
         "id": assetId,
         "name": assetName,
-        "symbol": str(requestData.get("symbol") or createAssetSymbol(assetName)).strip() or createAssetSymbol(assetName),
-        "marketSymbol": str(requestData.get("marketSymbol", requestData.get("finnhubSymbol", ""))).strip().upper(),
+        "symbol": _trunc(requestData.get("symbol") or createAssetSymbol(assetName), _MAX_SYMBOL).strip() or createAssetSymbol(assetName),
+        "marketSymbol": _trunc(requestData.get("marketSymbol", requestData.get("finnhubSymbol", "")), _MAX_TICKER).strip().upper(),
         "type": assetType,
         "order": int(requestData.get("order", 0) or 0),
-        "price": str(requestData.get("price", "0,00")).strip(),
-        "currency": str(requestData.get("currency", "EUR")).strip() or "EUR",
-        "precioCurrency": str(requestData.get("precioCurrency", requestData.get("currency", "EUR"))).strip() or "EUR",
-        "change": str(requestData.get("change", "+0,00%")).strip() or "+0,00%",
-        "status": str(requestData.get("status", "Mercado abierto")).strip() or "Mercado abierto",
-        "lastUpdated": str(requestData.get("lastUpdated", "")).strip(),
+        "price": _trunc(requestData.get("price", "0,00"), _MAX_SHORT).strip(),
+        "currency": _trunc(requestData.get("currency", "EUR"), 10).strip() or "EUR",
+        "precioCurrency": _trunc(requestData.get("precioCurrency", requestData.get("currency", "EUR")), 10).strip() or "EUR",
+        "change": _trunc(requestData.get("change", "+0,00%"), _MAX_SHORT).strip() or "+0,00%",
+        "status": _trunc(requestData.get("status", "Mercado abierto"), _MAX_TEXT).strip() or "Mercado abierto",
+        "lastUpdated": _trunc(requestData.get("lastUpdated", ""), _MAX_TEXT).strip(),
         "operationRows": sanitizeAssetOperationRows(requestData.get("operationRows", [])),
         "conversionRows": sanitizeAssetConversionRows(
             requestData.get("conversionRows", []),
