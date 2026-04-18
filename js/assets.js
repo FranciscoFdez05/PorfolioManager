@@ -587,6 +587,7 @@ async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTabl
         const assets = await loadAssetsList()
         await renderAssetsList(assets)
         await refreshTopPortfolioMetrics(assets)
+        await refreshTopDividendosIntereses()
         await refreshOverviewIfVisible()
 
         if (!assets.length) {

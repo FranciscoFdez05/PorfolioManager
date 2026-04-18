@@ -106,7 +106,7 @@ def sanitizeAssetRows(rows):
     for row in rows:
         legacy_crypto_fee = _trunc(row.get("comisionesSatoshis", row.get("comisiones", "")), _MAX_SHORT).strip()
         crypto_fee = _trunc(row.get("comisionesCripto", legacy_crypto_fee), _MAX_SHORT).strip()
-        fiat_fee = _trunc(row.get("comisionesFiat", ""), _MAX_SHORT).strip()
+        fiat_fee = _trunc(row.get("comisionesFiat") or row.get("comisiones", ""), _MAX_SHORT).strip()
         currency = _trunc(row.get("currency", "EUR"), 10).strip().upper() or "EUR"
 
         if currency not in {"EUR", "USD"}:

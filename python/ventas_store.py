@@ -46,7 +46,7 @@ def sanitize_ventas_payload(payload, fallback_year=None):
 
 def list_ventas_years():
     conn = get_db()
-    return [r["year"] for r in conn.execute("SELECT DISTINCT year FROM ventas ORDER BY year").fetchall()]
+    return [r["year"] for r in conn.execute("SELECT year FROM ventas_years ORDER BY year").fetchall()]
 
 
 def read_ventas_year(year):
@@ -55,15 +55,16 @@ def read_ventas_year(year):
         return None
 
     conn = get_db()
+    year_exists = conn.execute("SELECT 1 FROM ventas_years WHERE year = ?", (normalized,)).fetchone()
+    if not year_exists:
+        return None
+
     rows = conn.execute(
         "SELECT id, fecha, asset_id, activo, cantidad, valor_compra, valor_venta, "
         "dinero_declarar, tramo1, tramo2, tramo3, tramo4, tramo5, total_pagar, bruto, neto "
         "FROM ventas WHERE year = ? ORDER BY rowid",
         (normalized,)
     ).fetchall()
-
-    if not rows:
-        return None
 
     return {
         "year": normalized,
@@ -97,6 +98,7 @@ def write_ventas_year(year, data):
         return
 
     conn = get_db()
+    conn.execute("INSERT OR IGNORE INTO ventas_years (year) VALUES (?)", (normalized,))
     conn.execute("DELETE FROM ventas WHERE year = ?", (normalized,))
     conn.executemany(
         "INSERT INTO ventas "
@@ -122,14 +124,19 @@ def delete_ventas_year(year):
         return False
 
     conn = get_db()
-    result = conn.execute("DELETE FROM ventas WHERE year = ?", (normalized,))
+    conn.execute("DELETE FROM ventas WHERE year = ?", (normalized,))
+    result = conn.execute("DELETE FROM ventas_years WHERE year = ?", (normalized,))
     conn.commit()
     return result.rowcount > 0
 
 
 def migrate_legacy_ventas_if_needed(default_year):
     """En la versión SQLite no hay ficheros legacy que migrar.
-    Si no hay ningún año crea uno vacío con el año por defecto."""
+    Si no hay ningún año crea uno vacío con el año por defecto.
+    También migra años existentes en la tabla ventas que no estén en ventas_years."""
+    conn = get_db()
+    conn.execute("INSERT OR IGNORE INTO ventas_years (year) SELECT DISTINCT year FROM ventas")
+    conn.commit()
     years = list_ventas_years()
     if years:
         return years

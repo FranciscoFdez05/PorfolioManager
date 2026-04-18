@@ -178,6 +178,10 @@ CREATE TABLE IF NOT EXISTS mensualidades (
     UNIQUE(year, nombre)
 );
 
+CREATE TABLE IF NOT EXISTS ventas_years (
+    year TEXT PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS ventas (
     id             TEXT NOT NULL,
     year           TEXT NOT NULL,

@@ -33,8 +33,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     )
     initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
     await refreshAssetsSidebar()
+    await refreshTopDividendosIntereses()
 
     loadPage("vistaGeneral")
+    refreshOverviewMarketData()
 })
 
 let dividendosAutosaveTimeout = null
@@ -269,6 +271,34 @@ function handleCellFocus(event) {
                 cell.textContent = normalizeNumberForEdit(value ?? 0)
             }
         }
+    }
+}
+
+async function refreshTopDividendosIntereses() {
+    try {
+        const [interesesData, dividendosData] = await Promise.all([
+            loadInteresesData(),
+            loadDividendosData()
+        ])
+
+        const totalInteres = (Array.isArray(interesesData?.rows) ? interesesData.rows : [])
+            .reduce((sum, row) => sum + (parseEuroNumber(row.acumulado) - parseEuroNumber(row.impuestos)), 0)
+
+        const totalDividendos = (Array.isArray(dividendosData?.rows) ? dividendosData.rows : [])
+            .reduce((sum, row) => sum + parseEuroNumber(row.total), 0)
+
+        const topTotalInteres = document.getElementById("topTotalInteres")
+        const topTotalDividendos = document.getElementById("topTotalDividendos")
+
+        if (topTotalInteres) {
+            topTotalInteres.textContent = formatEuro(totalInteres)
+        }
+
+        if (topTotalDividendos) {
+            topTotalDividendos.textContent = formatEuro(totalDividendos)
+        }
+    } catch (error) {
+        console.error("Error actualizando métricas de dividendos/intereses:", error)
     }
 }
 
