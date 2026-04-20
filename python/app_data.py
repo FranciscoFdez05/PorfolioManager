@@ -172,6 +172,44 @@ def writeTransaccionesFile(data):
     conn.commit()
 
 
+# --- Dividendo Calendar ---
+
+CALENDAR_MONTHS = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+]
+
+
+def readDividendoCalendar():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT month, asset_name FROM dividendo_calendar ORDER BY month, sort_order, asset_name"
+    ).fetchall()
+    calendar = {m: [] for m in CALENDAR_MONTHS}
+    for r in rows:
+        month = r["month"]
+        if month in calendar:
+            calendar[month].append(r["asset_name"])
+    return {"calendar": calendar}
+
+
+def writeDividendoCalendar(data):
+    conn = get_db()
+    calendar = data.get("calendar", {})
+    conn.execute("DELETE FROM dividendo_calendar")
+    rows_to_insert = []
+    for month in CALENDAR_MONTHS:
+        for order, asset_name in enumerate(calendar.get(month, [])):
+            name = str(asset_name).strip()[:120]
+            if name:
+                rows_to_insert.append((month, name, order))
+    conn.executemany(
+        "INSERT OR IGNORE INTO dividendo_calendar (month, asset_name, sort_order) VALUES (?, ?, ?)",
+        rows_to_insert
+    )
+    conn.commit()
+
+
 # --- Stablecoins ---
 
 def readStablecoinsFile():

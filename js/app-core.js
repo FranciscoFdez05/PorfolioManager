@@ -46,7 +46,7 @@ let assetModalState = null
 let confirmModalState = null
 let editAssetModalState = null
 let draggedAssetId = null
-const PAGE_HTML_VERSION = "20260401e"
+const PAGE_HTML_VERSION = "20260420d"
 
 function initSidePanel(toggleButton, sideWrapper) {
     if (!toggleButton || !sideWrapper) {
@@ -137,6 +137,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initConversionesLogic()
         } else if (page === "herramientas") {
             await initHerramientasLogic()
+        } else if (page === "metricas") {
+            await initMetricasLogic()
         }
     } catch (error) {
         console.error(error)

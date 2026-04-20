@@ -868,13 +868,13 @@ function applyTopPortfolioMetrics(metrics) {
     updateTopMetricElement("topRendimientoEuros", formatEuro(metrics.rendimiento))
 
     updateTopMetricElement("topPorcentajeCripto", formatPercent(calculateYieldPercent(metrics.tipos.cripto.invertidoNeto, metrics.tipos.cripto.rendimiento)))
-    updateTopMetricElement("topEurosCripto", formatEuro(metrics.tipos.cripto.invertidoNeto))
+    updateTopMetricElement("topEurosCripto", formatEuro(metrics.tipos.cripto.netoActual))
     updateTopMetricElement("topPorcentajeAcciones", formatPercent(calculateYieldPercent(metrics.tipos.acciones.invertidoNeto, metrics.tipos.acciones.rendimiento)))
-    updateTopMetricElement("topEurosAcciones", formatEuro(metrics.tipos.acciones.invertidoNeto))
+    updateTopMetricElement("topEurosAcciones", formatEuro(metrics.tipos.acciones.netoActual))
     updateTopMetricElement("topPorcentajeEtf", formatPercent(calculateYieldPercent(metrics.tipos.etfs.invertidoNeto, metrics.tipos.etfs.rendimiento)))
-    updateTopMetricElement("topEurosEtf", formatEuro(metrics.tipos.etfs.invertidoNeto))
+    updateTopMetricElement("topEurosEtf", formatEuro(metrics.tipos.etfs.netoActual))
     updateTopMetricElement("topPorcentajeComoditis", formatPercent(calculateYieldPercent(metrics.tipos.comoditis.invertidoNeto, metrics.tipos.comoditis.rendimiento)))
-    updateTopMetricElement("topEurosComoditis", formatEuro(metrics.tipos.comoditis.invertidoNeto))
+    updateTopMetricElement("topEurosComoditis", formatEuro(metrics.tipos.comoditis.netoActual))
 }
 
 async function refreshTopPortfolioMetrics(assets = null) {
@@ -2211,6 +2211,9 @@ async function submitEditAssetModal() {
     }
 
     await saveAssetDataToServer(payload)
+    if (currentName !== trimmedName && typeof renameCalendarioAsset === "function") {
+        await renameCalendarioAsset(currentName, trimmedName)
+    }
     closeEditAssetModal()
     const updatedAsset = await loadAssetData(currentAssetId)
     await updateAssetDetail(updatedAsset)

@@ -270,6 +270,7 @@ async function initDividendosLogic() {
         })
     }
 
+    initCalendarioDividendosButton()
 }
 
 document.addEventListener("keydown", (event) => {

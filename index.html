@@ -223,10 +223,33 @@
     </div>
 </div>
 
+<div class="modalOverlay hidden" id="calendarioDividendosOverlay">
+    <div class="calendarioModal" role="dialog" aria-modal="true" aria-labelledby="calendarioModalTitle">
+        <div class="calendarioModalHeader">
+            <h3 class="assetModalTitle" id="calendarioModalTitle">Calendario Dividendos</h3>
+            <button id="closeCalendarioDividendosBtn" class="calendarioCloseBtn" type="button" aria-label="Cerrar">✕</button>
+        </div>
+        <div class="calendarioModalBody">
+            <table class="calendarioTable" id="calendarioTable">
+                <thead>
+                    <tr>
+                        <th class="calendarioTrimestre">1º Trimestre</th>
+                        <th class="calendarioTrimestre">2º Trimestre</th>
+                        <th class="calendarioTrimestre">3º Trimestre</th>
+                        <th class="calendarioTrimestre">4º Trimestre</th>
+                    </tr>
+                </thead>
+                <tbody id="calendarioBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="js/app-core.js?v=20260418a"></script>
-<script src="js/assets.js?v=20260418a"></script>
+<script src="js/assets.js?v=20260420d"></script>
 <script src="js/intereses.js?v=20260418a"></script>
-<script src="js/dividendos.js?v=20260418a"></script>
+<script src="js/dividendos.js?v=20260420c"></script>
 <script src="js/gastos.js?v=20260401g"></script>
 <script src="js/ventas.js?v=20260401g"></script>
 <script src="js/transacciones.js?v=20260401g"></script>
@@ -234,6 +257,7 @@
 <script src="js/operaciones.js?v=20260401g"></script>
 <script src="js/conversiones.js?v=20260401g"></script>
 <script src="js/herramientas.js?v=20260401g"></script>
-<script src="js/shared-utils.js?v=20260401g"></script>
+<script src="js/metricas.js?v=20260420b"></script>
+<script src="js/shared-utils.js?v=20260420a"></script>
 </body>
 </html>

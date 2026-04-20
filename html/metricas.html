@@ -1,4 +1,122 @@
-<div class="placeholderPage">
-    <h2>Métricas</h2>
-    <p>Contenido pendiente.</p>
+<div class="metricasPage">
+
+    <div class="metricasHeader">
+        <h2 class="metricasTitle">Métricas del Portfolio</h2>
+        <div id="metricasLoading" class="metricasLoading">Cargando datos...</div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="metricasKpiRow">
+        <div class="metricasKpiCard">
+            <div class="mkpiLabel">Total Cuenta</div>
+            <div class="mkpiValue" id="mkpiTotalCuenta">---</div>
+        </div>
+        <div class="metricasKpiCard">
+            <div class="mkpiLabel">Invertido Neto</div>
+            <div class="mkpiValue" id="mkpiInvertido">---</div>
+        </div>
+        <div class="metricasKpiCard">
+            <div class="mkpiLabel">Rendimiento €</div>
+            <div class="mkpiValue" id="mkpiRendimiento">---</div>
+        </div>
+        <div class="metricasKpiCard">
+            <div class="mkpiLabel">Rendimiento %</div>
+            <div class="mkpiValue" id="mkpiRendPct">---</div>
+        </div>
+        <div class="metricasKpiCard">
+            <div class="mkpiLabel">Dividendos</div>
+            <div class="mkpiValue" id="mkpiDividendos">---</div>
+        </div>
+        <div class="metricasKpiCard">
+            <div class="mkpiLabel">Interés neto</div>
+            <div class="mkpiValue" id="mkpiInteres">---</div>
+        </div>
+        <div class="metricasKpiCard">
+            <div class="mkpiLabel">Nº Activos</div>
+            <div class="mkpiValue" id="mkpiNumActivos">---</div>
+        </div>
+    </div>
+
+    <!-- ── Distribución ─────────────────────────────────────── -->
+    <div class="metricasSection">
+        <div class="metricasSectionHeader">
+            <span class="metricasSectionTitle">Distribución del Portfolio</span>
+            <div class="mToggleGroup">
+                <button class="mToggleBtn active" data-charttype="doughnut">Circular</button>
+                <button class="mToggleBtn" data-charttype="bar">Barras</button>
+            </div>
+        </div>
+        <div class="metricasChartsGrid2">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Por tipo de activo</div>
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartTipos"></canvas>
+                </div>
+            </div>
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Por activo individual</div>
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartActivos"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Rendimiento ──────────────────────────────────────── -->
+    <div class="metricasSection">
+        <div class="metricasSectionHeader">
+            <span class="metricasSectionTitle">Rendimiento</span>
+        </div>
+        <div class="metricasChartsGrid1">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Por tipo de activo</div>
+                <div class="metricasChartWrap" style="height:200px">
+                    <canvas id="mChartRendTipos"></canvas>
+                </div>
+            </div>
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Por activo individual</div>
+                <div class="metricasChartWrap metricasChartDynamic" id="mChartRendActivosWrap">
+                    <canvas id="mChartRendActivos"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Dividendos ───────────────────────────────────────── -->
+    <div class="metricasSection" id="mSectionDividendos">
+        <div class="metricasSectionHeader">
+            <span class="metricasSectionTitle">Dividendos por instrumento</span>
+        </div>
+        <div class="metricasChartCard">
+            <div class="metricasChartWrap metricasChartDynamic" id="mChartDivWrap">
+                <canvas id="mChartDividendos"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Tabla top activos ─────────────────────────────────── -->
+    <div class="metricasSection">
+        <div class="metricasSectionHeader">
+            <span class="metricasSectionTitle">Posiciones</span>
+        </div>
+        <div class="metricasChartCard metricasTableCard">
+            <table class="metricasTable" id="metricasTopTable">
+                <thead>
+                    <tr>
+                        <th class="mThSort" data-sortkey="rank">#<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="name">Activo<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="type">Tipo<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="netoActualEur">Valor actual<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="invertidoEur">Invertido neto<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="rendimientoEur">Rendimiento €<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="rendPct">Rendimiento %<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="cartPct">% Cartera<span class="mSortArrow"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="metricasTopBody"></tbody>
+            </table>
+        </div>
+    </div>
+
 </div>

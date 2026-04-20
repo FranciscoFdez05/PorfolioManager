@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, request
 
 from app_data import (
-    readDividendosFile, readInteresesFile, readTransaccionesFile,
-    writeDividendosFile, writeInteresesFile, writeTransaccionesFile,
+    readDividendoCalendar, readDividendosFile, readInteresesFile, readTransaccionesFile,
+    writeDividendoCalendar, writeDividendosFile, writeInteresesFile, writeTransaccionesFile,
 )
 
 registros_bp = Blueprint("registros", __name__)
@@ -80,6 +80,20 @@ def saveDividendos():
 @registros_bp.route("/api/dividendos/reset", methods=["POST"])
 def resetDividendos():
     writeDividendosFile({"rows": []})
+    return jsonify({"ok": True})
+
+
+@registros_bp.route("/api/dividendos/calendar", methods=["GET"])
+def getDividendoCalendar():
+    return jsonify(readDividendoCalendar())
+
+
+@registros_bp.route("/api/dividendos/calendar", methods=["POST"])
+def saveDividendoCalendar():
+    requestData = request.get_json(silent=True) or {}
+    if "calendar" not in requestData or not isinstance(requestData["calendar"], dict):
+        return jsonify({"ok": False, "error": "JSON inválido"}), 400
+    writeDividendoCalendar(requestData)
     return jsonify({"ok": True})
 
 

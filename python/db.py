@@ -209,6 +209,13 @@ CREATE INDEX IF NOT EXISTS idx_activo_conversion_rows_asset_id ON activo_convers
 CREATE INDEX IF NOT EXISTS idx_gastos_rows_year_month ON gastos_rows(year, month);
 CREATE INDEX IF NOT EXISTS idx_mensualidades_year ON mensualidades(year);
 CREATE INDEX IF NOT EXISTS idx_ventas_year ON ventas(year);
+
+CREATE TABLE IF NOT EXISTS dividendo_calendar (
+    month      TEXT NOT NULL,
+    asset_name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (month, asset_name)
+);
 """
 
 
