@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, request
 
 from app_data import (
-    readDividendoCalendar, readDividendosFile, readInteresesFile, readTransaccionesFile,
-    writeDividendoCalendar, writeDividendosFile, writeInteresesFile, writeTransaccionesFile,
+    readBonosFile, readDividendoCalendar, readDividendosFile, readInteresesFile, readRentaFijaFile, readTransaccionesFile,
+    writeBonosFile, writeDividendoCalendar, writeDividendosFile, writeInteresesFile, writeRentaFijaFile, writeTransaccionesFile,
 )
 
 registros_bp = Blueprint("registros", __name__)
@@ -127,4 +127,81 @@ def saveTransacciones():
         })
 
     writeTransaccionesFile({"rows": sanitizedRows})
+    return jsonify({"ok": True})
+
+
+@registros_bp.route("/api/bonos", methods=["GET"])
+def getBonos():
+    return jsonify(readBonosFile())
+
+
+@registros_bp.route("/api/bonos", methods=["POST"])
+def saveBonos():
+    requestData = request.get_json(silent=True)
+
+    if not requestData or "rows" not in requestData:
+        return jsonify({"ok": False, "error": "JSON inválido"}), 400
+
+    rows = requestData["rows"]
+
+    if not isinstance(rows, list):
+        return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+
+    sanitizedRows = []
+
+    for row in rows:
+        tipo = str(row.get("tipo", "gubernamental")).strip().lower()
+        if tipo not in ("gubernamental", "corporativo"):
+            tipo = "gubernamental"
+        sanitizedRows.append({
+            "fecha": str(row.get("fecha", "")).strip(),
+            "tipo": tipo,
+            "instrumento": str(row.get("instrumento", "")).strip(),
+            "cupon": str(row.get("cupon", "")).strip(),
+            "vencimiento": str(row.get("vencimiento", "")).strip(),
+            "invertido": str(row.get("invertido", "")).strip(),
+            "interesAcumulado": str(row.get("interesAcumulado", "")).strip(),
+            "impuestos": str(row.get("impuestos", "")).strip(),
+            "nota": str(row.get("nota", "")).strip(),
+        })
+
+    writeBonosFile({"rows": sanitizedRows})
+    return jsonify({"ok": True})
+
+
+@registros_bp.route("/api/rentafija", methods=["GET"])
+def getRentaFija():
+    return jsonify(readRentaFijaFile())
+
+
+@registros_bp.route("/api/rentafija", methods=["POST"])
+def saveRentaFija():
+    requestData = request.get_json(silent=True)
+
+    if not requestData or "rows" not in requestData:
+        return jsonify({"ok": False, "error": "JSON inválido"}), 400
+
+    rows = requestData["rows"]
+
+    if not isinstance(rows, list):
+        return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+
+    sanitizedRows = []
+
+    for row in rows:
+        tipo = str(row.get("tipo", "bancario")).strip().lower()
+        if tipo not in ("bancario", "estatal"):
+            tipo = "bancario"
+        sanitizedRows.append({
+            "fecha": str(row.get("fecha", "")).strip(),
+            "tipo": tipo,
+            "instrumento": str(row.get("instrumento", "")).strip(),
+            "rentabilidad": str(row.get("rentabilidad", "")).strip(),
+            "vencimiento": str(row.get("vencimiento", "")).strip(),
+            "invertido": str(row.get("invertido", "")).strip(),
+            "interesAcumulado": str(row.get("interesAcumulado", "")).strip(),
+            "impuestos": str(row.get("impuestos", "")).strip(),
+        })
+
+    writeRentaFijaFile({"rows": sanitizedRows})
     return jsonify({"ok": True})

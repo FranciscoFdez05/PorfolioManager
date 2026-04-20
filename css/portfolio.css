@@ -1,5 +1,10 @@
 *{
     box-sizing:border-box;
+    scrollbar-width:none;
+}
+
+*::-webkit-scrollbar{
+    display:none;
 }
 
 html,
@@ -130,7 +135,65 @@ body{
 .navButtons{
     display:flex;
     gap:8px;
-    flex-wrap:wrap;
+    flex-wrap:nowrap;
+    align-items:center;
+}
+
+.navDropdown{
+    position:relative;
+}
+
+.navDropdownBtn{
+    height:34px;
+    padding:0 16px;
+    border:1px solid #334155;
+    border-radius:8px;
+    background:#0f1724;
+    color:#e5edf9;
+    cursor:pointer;
+    font-size:14px;
+    transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    white-space:nowrap;
+}
+
+.navDropdownBtn:hover{
+    background:#162033;
+    border-color:#475569;
+}
+
+.navDropdownBtn.active{
+    background:#1d4ed8;
+    border-color:#3b82f6;
+    color:#ffffff;
+    font-weight:700;
+}
+
+.navDropdownMenu{
+    display:none;
+    position:absolute;
+    top:calc(100% + 4px);
+    left:0;
+    background:#0f1724;
+    border:1px solid #334155;
+    border-radius:8px;
+    padding:4px;
+    z-index:200;
+    min-width:140px;
+    flex-direction:column;
+    gap:2px;
+}
+
+.navDropdownMenu.open{
+    display:flex;
+}
+
+.navDropdownItem{
+    width:100%;
+    text-align:left;
+    border-radius:6px;
+    border-color:transparent;
+    background:transparent;
+    padding:0 12px;
 }
 
 .navBtn{
@@ -238,7 +301,7 @@ body{
     border-bottom:1px solid #1f2937;
     overflow-y:auto;
     overflow-x:hidden;
-    scrollbar-width:thin;
+    scrollbar-width:none;
 }
 
 .assetToolbar{
@@ -776,7 +839,8 @@ body{
 .overviewTable,
 .interesesTable,
 .dividendosTable,
-.operationsTable{
+.operationsTable,
+.bonosTable{
     width:100%;
     border-collapse:collapse;
     table-layout:fixed;
@@ -787,7 +851,8 @@ body{
 .overviewTable thead th,
 .interesesTable thead th,
 .dividendosTable thead th,
-.operationsTable thead th{
+.operationsTable thead th,
+.bonosTable thead th{
     padding:10px 12px;
     background:#0f1724;
     color:#f8fbff;
@@ -801,14 +866,16 @@ body{
 .overviewTable thead th:last-child,
 .interesesTable thead th:last-child,
 .dividendosTable thead th:last-child,
-.operationsTable thead th:last-child{
+.operationsTable thead th:last-child,
+.bonosTable thead th:last-child{
     border-right:none;
 }
 
 .overviewTable tbody td,
 .interesesTable tbody td,
 .dividendosTable tbody td,
-.operationsTable tbody td{
+.operationsTable tbody td,
+.bonosTable tbody td{
     padding:10px 12px;
     border-right:none;
     border-bottom:1px solid #273246;
@@ -820,14 +887,16 @@ body{
 .overviewTable tbody tr:nth-child(odd) td,
 .interesesTable tbody tr:nth-child(odd) td,
 .dividendosTable tbody tr:nth-child(odd) td,
-.operationsTable tbody tr:nth-child(odd) td{
+.operationsTable tbody tr:nth-child(odd) td,
+.bonosTable tbody tr:nth-child(odd) td{
     background:#111827;
 }
 
 .overviewTable tbody td:last-child,
 .interesesTable tbody td:last-child,
 .dividendosTable tbody td:last-child,
-.operationsTable tbody td:last-child{
+.operationsTable tbody td:last-child,
+.bonosTable tbody td:last-child{
     border-right:none;
 }
 
@@ -835,6 +904,7 @@ body{
 .interesesTable tbody tr:hover td,
 .dividendosTable tbody tr:hover td,
 .operationsTable tbody tr:hover td,
+.bonosTable tbody tr:hover td,
 .assetOperationsTable tbody tr:hover td{
     background:#111827;
 }
@@ -848,14 +918,16 @@ body{
 .overviewTable td[contenteditable="true"],
 .interesesTable td[contenteditable="true"],
 .dividendosTable td[contenteditable="true"],
-.operationsTable td[contenteditable="true"]{
+.operationsTable td[contenteditable="true"],
+.bonosTable td[contenteditable="true"]{
     outline:none;
 }
 
 .overviewTable td[contenteditable="true"]:focus,
 .interesesTable td[contenteditable="true"]:focus,
 .dividendosTable td[contenteditable="true"]:focus,
-.operationsTable td[contenteditable="true"]:focus{
+.operationsTable td[contenteditable="true"]:focus,
+.bonosTable td[contenteditable="true"]:focus{
     background:#162235;
     box-shadow:inset 0 0 0 2px #3b82f6;
 }
@@ -866,7 +938,19 @@ body{
 
 .overviewTable{
     min-width:1120px;
+    table-layout:fixed;
 }
+
+.overviewTable colgroup col:nth-child(1){ width:130px; }
+.overviewTable colgroup col:nth-child(2){ width:110px; }
+.overviewTable colgroup col:nth-child(3){ width:120px; }
+.overviewTable colgroup col:nth-child(4){ width:130px; }
+.overviewTable colgroup col:nth-child(5){ width:120px; }
+.overviewTable colgroup col:nth-child(6){ width:110px; }
+.overviewTable colgroup col:nth-child(7){ width:100px; }
+.overviewTable colgroup col:nth-child(8){ width:110px; }
+.overviewTable colgroup col:nth-child(9){ width:110px; }
+.overviewTable colgroup col:nth-child(10){ width:120px; }
 
 .overviewTable thead th{
     position:sticky;
@@ -874,12 +958,31 @@ body{
     z-index:2;
 }
 
-.overviewTable thead th:nth-child(-n+2){
+.overviewTable thead th:first-child,
+.overviewTable tbody td:first-child{
     text-align:left;
+    vertical-align:middle;
+    font-weight:600;
+    padding-left:12px;
+}
+
+.overviewTable thead th:nth-child(2),
+.overviewTable tbody td:nth-child(2){
+    text-align:left;
+    vertical-align:middle;
+}
+
+.overviewTable thead th:nth-child(-n+2){
+    text-align:center;
 }
 
 .overviewTable thead th:nth-child(n+3){
     text-align:right;
+}
+
+.overviewTable tbody td:last-child{
+    vertical-align:middle;
+    line-height:1.6;
 }
 
 .overviewTable .overviewNumericCell{
@@ -2525,40 +2628,80 @@ body{
 .metricasLoading.hidden{ display:none; }
 
 /* ── KPI row ── */
-.metricasKpiRow{
+.metricasKpiSection{
     display:flex;
     gap:12px;
-    flex-wrap:wrap;
+    flex-wrap:nowrap;
+    overflow-x:auto;
     margin-bottom:28px;
+    align-items:flex-start;
 }
 
-.metricasKpiCard{
-    flex:1;
-    min-width:120px;
-    background:#111827;
-    border:1px solid #1e2d45;
-    border-radius:10px;
-    padding:16px 18px;
+.metricasKpiGroup{
     display:flex;
     flex-direction:column;
     gap:6px;
+    flex-shrink:0;
 }
 
-.mkpiLabel{
-    font-size:0.72rem;
+.metricasKpiGroupLabel{
+    font-size:0.65rem;
     text-transform:uppercase;
-    letter-spacing:.08em;
-    color:#7a8fb0;
+    letter-spacing:.12em;
+    color:#4a5a7a;
+    padding-left:2px;
+    font-weight:600;
+}
+
+.metricasKpiCards{
+    display:flex;
+    gap:6px;
+    flex-wrap:nowrap;
+}
+
+.metricasKpiCard{
+    min-width:0;
+    background:#111827;
+    border:1px solid #1e2d45;
+    border-top:2px solid transparent;
+    border-radius:8px;
+    padding:12px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+    transition:border-color .15s;
+    flex-shrink:0;
+}
+
+.metricasKpiCard:hover{
+    background:#131f33;
+}
+
+.mkpiGroupPortfolio .metricasKpiCard{ border-top-color:#3a7bd5; }
+.mkpiGroupIngresos  .metricasKpiCard{ border-top-color:#2ecc71; }
+.mkpiGroupBonos     .metricasKpiCard{ border-top-color:#9b59b6; }
+.mkpiGroupRf        .metricasKpiCard{ border-top-color:#00bcd4; }
+
+.mkpiLabel{
+    font-size:0.73rem;
+    text-transform:uppercase;
+    letter-spacing:.07em;
+    color:#6a7f9a;
+    white-space:nowrap;
 }
 
 .mkpiValue{
-    font-size:1.35rem;
+    font-size:1.28rem;
     font-weight:700;
     color:#e5edf9;
+    white-space:nowrap;
 }
 
 .mkpiValue.mPositive{ color:#2ecc71; }
 .mkpiValue.mNegative{ color:#e74c3c; }
+
+/* legacy alias kept for backward compat */
+.metricasKpiRow{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:28px; }
 
 /* ── Sections ── */
 .metricasSection{
@@ -2758,4 +2901,410 @@ body{
     display:flex;
     flex-direction:column;
     gap:16px;
+}
+
+
+/* ===== ACTIVOS PAGE ===== */
+
+.activosPage{
+    padding:20px 24px 40px;
+}
+
+.activosToolbar{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-bottom:20px;
+}
+
+.activosFilters{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+}
+
+.activosFilterBtn{
+    padding:6px 16px;
+    border:1px solid #1e2d45;
+    border-radius:20px;
+    background:transparent;
+    color:#7a8fb0;
+    font-size:0.82rem;
+    cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s;
+}
+
+.activosFilterBtn:hover{
+    background:#151f35;
+    color:#ccd6f6;
+}
+
+.activosFilterBtn.active{
+    background:#1e2d45;
+    border-color:#3a7bd5;
+    color:#e5edf9;
+    font-weight:600;
+}
+
+.activosSearch{
+    height:34px;
+    padding:0 12px;
+    border:1px solid #1e2d45;
+    border-radius:8px;
+    background:#111827;
+    color:#e5edf9;
+    font-size:0.85rem;
+    outline:none;
+    min-width:200px;
+    transition:border-color .15s;
+}
+
+.activosSearch:focus{
+    border-color:#3a7bd5;
+}
+
+.activosSearch::placeholder{
+    color:#4a5a78;
+}
+
+.activosCount{
+    font-size:0.8rem;
+    color:#4a5a78;
+    margin-left:4px;
+}
+
+/* ── Grid ── */
+.activosGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+    gap:14px;
+}
+
+/* ── Card ── */
+.avCard{
+    position:relative;
+    background:#111827;
+    border:1px solid #1e2d45;
+    border-radius:12px;
+    padding:16px 16px 14px;
+    cursor:pointer;
+    overflow:hidden;
+    transition:border-color .15s,transform .12s,box-shadow .15s;
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+}
+
+.avCard:hover{
+    border-color:var(--av-color,#3a7bd5);
+    box-shadow:0 4px 20px rgba(0,0,0,0.35);
+    transform:translateY(-2px);
+}
+
+.avCard:hover .avCardActions{
+    opacity:1;
+}
+
+.avCardTop{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:4px;
+}
+
+.avBadge{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:4px;
+    border:1px solid;
+    font-size:0.72rem;
+    font-weight:700;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+}
+
+.avCardActions{
+    display:flex;
+    gap:4px;
+    opacity:0;
+    transition:opacity .15s;
+}
+
+.avActionBtn{
+    width:26px;
+    height:26px;
+    border:1px solid #1e2d45;
+    border-radius:6px;
+    background:#0d1525;
+    color:#7a8fb0;
+    font-size:0.85rem;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:background .12s,color .12s,border-color .12s;
+}
+
+.avEditBtn:hover{
+    background:#1e2d45;
+    color:#3a7bd5;
+    border-color:#3a7bd5;
+}
+
+.avDeleteBtn:hover{
+    background:#2d1515;
+    color:#e74c3c;
+    border-color:#e74c3c;
+}
+
+.avCardSymbol{
+    font-size:1.15rem;
+    font-weight:800;
+    color:#e5edf9;
+    line-height:1.1;
+}
+
+.avCardName{
+    font-size:0.8rem;
+    color:#7a8fb0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.avCardPrice{
+    font-size:1.05rem;
+    font-weight:700;
+    color:#ccd6f6;
+    margin-top:6px;
+}
+
+.avCardTicker{
+    font-size:0.72rem;
+    color:#4a5a78;
+    margin-top:2px;
+}
+
+.avCardBar{
+    position:absolute;
+    bottom:0;
+    left:0;
+    right:0;
+    height:3px;
+    opacity:0.6;
+    border-radius:0 0 12px 12px;
+}
+
+.avCardMetrics{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px 10px;
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid #1e2d45;
+}
+
+.avMetricItem{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+}
+
+.avMetricLabel{
+    font-size:0.68rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:#4a5a78;
+}
+
+.avMetricValue{
+    font-size:0.82rem;
+    font-weight:600;
+    color:#ccd6f6;
+}
+
+.avPos{ color:#2ecc71; }
+.avNeg{ color:#e74c3c; }
+
+.avMetricItemWide{
+    grid-column:1 / -1;
+}
+
+.avCard.avDragging{
+    opacity:0.4;
+    cursor:grabbing;
+}
+
+.avCard.avDragOver{
+    border-color:var(--av-color, #3a7bd5);
+    box-shadow:0 0 0 2px var(--av-color, #3a7bd5);
+    transform:scale(1.02);
+}
+
+.avCard[draggable="true"]{
+    cursor:grab;
+}
+
+.ovTypeBadge{
+    display:inline-block;
+    padding:2px 8px;
+    border-radius:4px;
+    border:1px solid;
+    font-size:0.72rem;
+    font-weight:700;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    white-space:nowrap;
+}
+
+/* ── Bonos ────────────────────────────────────────────────── */
+
+.bonosPage{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    padding:16px;
+    min-height:0;
+}
+
+.bonosToolbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.bonosFilters{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+}
+
+.bonosFilterBtn{
+    background:#1a2236;
+    color:#8899bb;
+    border:1px solid #2a3550;
+    border-radius:6px;
+    padding:6px 14px;
+    font-size:0.85rem;
+    cursor:pointer;
+    transition:all .15s;
+}
+
+.bonosFilterBtn:hover{
+    background:#223;
+    color:#ccd6f6;
+}
+
+.bonosFilterBtn.active{
+    background:#1e3a5f;
+    color:#5b9cf6;
+    border-color:#3a7bd5;
+}
+
+.bonosSummary{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.bonosSummaryCard{
+    background:#111827;
+    border:1px solid #1f2937;
+    border-radius:8px;
+    padding:12px 18px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    min-width:140px;
+}
+
+.bonosSummaryGub{
+    border-color:#3a7bd544;
+}
+
+.bonosSummaryCorp{
+    border-color:#e0c06844;
+}
+
+.bonosSummaryLabel{
+    font-size:0.72rem;
+    color:#8899bb;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+}
+
+.bonosSummaryValue{
+    font-size:1.1rem;
+    font-weight:700;
+    color:#ccd6f6;
+}
+
+.bonosTableWrapper{
+    overflow:auto;
+    padding-left:34px;
+}
+
+.bonosTable{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+    background:#0f1724;
+    color:#e8eefc;
+}
+
+.bonosTable thead th{
+    padding:10px 12px;
+    background:#0f1724;
+    color:#f8fbff;
+    font-size:14px;
+    font-weight:700;
+    text-align:left;
+    border-bottom:1px solid #273246;
+    white-space:nowrap;
+}
+
+.bonosTable tbody td{
+    padding:10px 12px;
+    border-bottom:1px solid #273246;
+    background:#111827;
+    color:#e6edf8;
+    font-size:14px;
+    vertical-align:middle;
+}
+
+.bonosTable tbody tr:hover td{
+    background:#162033;
+}
+
+.bonosTable td[contenteditable="true"]{
+    outline:none;
+}
+
+.bonosTable td[contenteditable="true"]:focus{
+    outline:none;
+    background:#162033;
+}
+
+.bonosTipoSelect{
+    background:#1a2236;
+    color:#ccd6f6;
+    border:1px solid #2a3550;
+    border-radius:4px;
+    padding:3px 6px;
+    font-size:0.82rem;
+    cursor:pointer;
+}
+
+.bonosTotalCell{
+    font-weight:600;
+    color:#ccd6f6;
+}
+
+.bonosEmpty{
+    text-align:center;
+    color:#8899bb;
+    padding:32px;
+    font-size:0.9rem;
 }

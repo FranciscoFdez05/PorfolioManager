@@ -549,7 +549,7 @@ function runWithoutAlerts(callback) {
 
 function hideAutoSaveButtons() {
     document.querySelectorAll("button").forEach((button) => {
-        if (button.textContent.trim().toLowerCase() === "guardar") {
+        if (button.textContent.trim().toLowerCase() === "guardar" && !button.dataset.noAutohide) {
             button.style.display = "none"
         }
     })

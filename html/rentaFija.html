@@ -1,0 +1,64 @@
+<div class="bonosPage rentaFijaPage">
+
+    <div class="bonosToolbar">
+        <button id="rentaFijaAddBtn" class="primaryButton">+ Añadir</button>
+
+        <div class="bonosFilters" id="rentaFijaFilters">
+            <button class="bonosFilterBtn active" data-tipo="all">Todos</button>
+            <button class="bonosFilterBtn" data-tipo="bancario">Bancario</button>
+            <button class="bonosFilterBtn" data-tipo="estatal">Estatal</button>
+        </div>
+
+        <button id="saveRentaFijaBtn" class="primaryButton">Guardar</button>
+    </div>
+
+    <div class="bonosSummary">
+        <div class="bonosSummaryCard">
+            <span class="bonosSummaryLabel">Total neto</span>
+            <span class="bonosSummaryValue" id="rfTotalNeto">0,00 €</span>
+        </div>
+        <div class="bonosSummaryCard">
+            <span class="bonosSummaryLabel">Interés acumulado</span>
+            <span class="bonosSummaryValue" id="rfTotalInteres">0,00 €</span>
+        </div>
+        <div class="bonosSummaryCard">
+            <span class="bonosSummaryLabel">Impuestos</span>
+            <span class="bonosSummaryValue" id="rfTotalImpuestos">0,00 €</span>
+        </div>
+        <div class="bonosSummaryCard">
+            <span class="bonosSummaryLabel">Invertido total</span>
+            <span class="bonosSummaryValue" id="rfTotalInvertido">0,00 €</span>
+        </div>
+        <div class="bonosSummaryCard bonosSummaryGub">
+            <span class="bonosSummaryLabel">Bancario neto</span>
+            <span class="bonosSummaryValue" id="rfTotalBancario">0,00 €</span>
+        </div>
+        <div class="bonosSummaryCard bonosSummaryCorp">
+            <span class="bonosSummaryLabel">Estatal neto</span>
+            <span class="bonosSummaryValue" id="rfTotalEstatal">0,00 €</span>
+        </div>
+    </div>
+
+    <div class="bonosTableWrapper">
+        <table class="bonosTable">
+            <thead>
+                <tr>
+                    <th class="rowActionHeader"></th>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Instrumento</th>
+                    <th>Rentabilidad %</th>
+                    <th>Vencimiento</th>
+                    <th>Invertido</th>
+                    <th>Interés acum.</th>
+                    <th>Impuestos</th>
+                    <th>Total neto</th>
+                </tr>
+            </thead>
+            <tbody id="rentaFijaBody"></tbody>
+        </table>
+    </div>
+
+    <p class="bonosEmpty hidden" id="rentaFijaEmpty">No hay productos de renta fija registrados.</p>
+
+</div>

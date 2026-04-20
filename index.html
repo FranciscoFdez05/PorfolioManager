@@ -21,40 +21,20 @@
                     <span class="metricValue" id="topTotalCuenta">---</span>
                 </div>
 
-                <div class="metricBox">
+                <!-- <div class="metricBox">
                     <span class="metricTitle">% cuenta</span>
                     <span class="metricValue" id="topPorcentajeCuenta">---</span>
-                </div>
+                </div> -->
 
-                <div class="metricBox">
+                <!-- <div class="metricBox">
                     <span class="metricTitle">Rendimiento €</span>
                     <span class="metricValue" id="topRendimientoEuros">---</span>
-                </div>
+                </div> -->
 
-                <div class="metricBox">
+                <!-- <div class="metricBox">
                     <span class="metricTitle">Invertido</span>
                     <span class="metricValue" id="topInvertido">---</span>
-                </div>
-
-                <div class="metricBox">
-                    <span class="metricTitle">€ dividendos</span>
-                    <span class="metricValue" id="topTotalDividendos">0,00 €</span>
-                </div>
-
-                <div class="metricBox">
-                    <span class="metricTitle">€ Interés</span>
-                    <span class="metricValue" id="topTotalInteres">0,00 €</span>
-                </div>
-
-                <div class="metricBox">
-                    <span class="metricTitle">% cripto</span>
-                    <span class="metricValue" id="topPorcentajeCripto">---</span>
-                </div>
-
-                <div class="metricBox">
-                    <span class="metricTitle">€ cripto</span>
-                    <span class="metricValue" id="topEurosCripto">---</span>
-                </div>
+                </div> -->
 
                 <div class="metricBox">
                     <span class="metricTitle">% acciones</span>
@@ -85,6 +65,36 @@
                     <span class="metricTitle">€ comoditis</span>
                     <span class="metricValue" id="topEurosComoditis">---</span>
                 </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">% cripto</span>
+                    <span class="metricValue" id="topPorcentajeCripto">---</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">€ cripto</span>
+                    <span class="metricValue" id="topEurosCripto">---</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">€ dividendos</span>
+                    <span class="metricValue" id="topTotalDividendos">0,00 €</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">€ Interés</span>
+                    <span class="metricValue" id="topTotalInteres">0,00 €</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">€ Bonos</span>
+                    <span class="metricValue" id="topTotalBonos">0,00 €</span>
+                </div>
+
+                <div class="metricBox">
+                    <span class="metricTitle">€ Renta Fija</span>
+                    <span class="metricValue" id="topTotalRentaFija">0,00 €</span>
+                </div>
             </div>
         </header>
 
@@ -96,15 +106,38 @@
 
             <div class="navButtons">
                 <button class="navBtn active" data-page="vistaGeneral">Vista general</button>
-                <button class="navBtn" data-page="intereses">Intereses</button>
-                <button class="navBtn" data-page="dividendos">Dividendos</button>
+
                 <button class="navBtn" data-page="gastos">Gastos</button>
                 <button class="navBtn" data-page="ingresos">Ingresos</button>
-                <button class="navBtn" data-page="ventas">Ventas</button>
-                <button class="navBtn" data-page="stablecoins">Stablecoins</button>
-                <button class="navBtn" data-page="operaciones">Operaciones</button>
-                <button class="navBtn" data-page="conversiones">Conversiones</button>
-                <button class="navBtn" data-page="transacciones">Transacciones</button>
+
+                <div class="navDropdown">
+                    <button class="navDropdownBtn" type="button">Finanzas ▾</button>
+                    <div class="navDropdownMenu">
+                        <button class="navBtn navDropdownItem" data-page="activos">Activos</button>
+                        <button class="navBtn navDropdownItem" data-page="intereses">Intereses</button>
+                        <button class="navBtn navDropdownItem" data-page="dividendos">Dividendos</button>
+                        <button class="navBtn navDropdownItem" data-page="ventas">Ventas</button>
+                    </div>
+                </div>
+
+                <div class="navDropdown">
+                    <button class="navDropdownBtn" type="button">Renta ▾</button>
+                    <div class="navDropdownMenu">
+                        <button class="navBtn navDropdownItem" data-page="bonos">Bonos</button>
+                        <button class="navBtn navDropdownItem" data-page="rentaFija">Renta Fija</button>
+                    </div>
+                </div>
+
+                <div class="navDropdown">
+                    <button class="navDropdownBtn" type="button">Crypto ▾</button>
+                    <div class="navDropdownMenu">
+                        <button class="navBtn navDropdownItem" data-page="stablecoins">Stablecoins</button>
+                        <button class="navBtn navDropdownItem" data-page="operaciones">Operaciones</button>
+                        <button class="navBtn navDropdownItem" data-page="transacciones">Transacciones</button>
+                        <button class="navBtn navDropdownItem" data-page="conversiones">Conversiones</button>
+                    </div>
+                </div>
+
                 <button class="navBtn" data-page="herramientas">Herramientas</button>
                 <button class="navBtn" data-page="metricas">Métricas</button>
             </div>
@@ -246,8 +279,8 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="js/app-core.js?v=20260418a"></script>
-<script src="js/assets.js?v=20260420d"></script>
+<script src="js/app-core.js?v=20260420k"></script>
+<script src="js/assets.js?v=20260420j"></script>
 <script src="js/intereses.js?v=20260418a"></script>
 <script src="js/dividendos.js?v=20260420c"></script>
 <script src="js/gastos.js?v=20260401g"></script>
@@ -257,6 +290,8 @@
 <script src="js/operaciones.js?v=20260401g"></script>
 <script src="js/conversiones.js?v=20260401g"></script>
 <script src="js/herramientas.js?v=20260401g"></script>
+<script src="js/bonos.js?v=20260420a"></script>
+<script src="js/rentaFija.js?v=20260420a"></script>
 <script src="js/metricas.js?v=20260420b"></script>
 <script src="js/shared-utils.js?v=20260420a"></script>
 </body>

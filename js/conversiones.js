@@ -13,8 +13,12 @@ async function initConversionesLogic() {
         return
     }
 
-    renderConversionesAssetOptions(assets)
-    conversionesSelectedAssetId = currentAssetId || assets[0]?.id || ""
+    const cryptoAssets = assets.filter((a) => a.type === "cripto")
+    renderConversionesAssetOptions(cryptoAssets)
+    const firstId = cryptoAssets[0]?.id || ""
+    conversionesSelectedAssetId = (currentAssetId && cryptoAssets.find((a) => a.id === currentAssetId))
+        ? currentAssetId
+        : firstId
 
     if (conversionesSelectedAssetId) {
         assetSelect.value = conversionesSelectedAssetId
@@ -71,6 +75,11 @@ function renderConversionesAssetOptions(assets) {
     const assetSelect = document.getElementById("conversionesAssetSelect")
 
     if (!assetSelect) {
+        return
+    }
+
+    if (!assets.length) {
+        assetSelect.innerHTML = `<option value="">Sin activos cripto</option>`
         return
     }
 

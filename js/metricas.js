@@ -95,24 +95,30 @@ async function buildMetricasPayload() {
         }
     }))
 
-    const [divResp, intResp] = await Promise.all([
+    const [divResp, intResp, bonosResp, rfResp] = await Promise.all([
         fetch("/api/dividendos"),
-        fetch("/api/intereses")
+        fetch("/api/intereses"),
+        fetch("/api/bonos"),
+        fetch("/api/rentafija")
     ])
-    const divData = await divResp.json()
-    const intData = await intResp.json()
+    const divData   = await divResp.json()
+    const intData   = await intResp.json()
+    const bonosData = await bonosResp.json()
+    const rfData    = await rfResp.json()
 
     return {
         summaries,
-        dividendos: Array.isArray(divData.rows) ? divData.rows : [],
-        intereses:  Array.isArray(intData.rows)  ? intData.rows  : []
+        dividendos: Array.isArray(divData.rows)   ? divData.rows   : [],
+        intereses:  Array.isArray(intData.rows)    ? intData.rows   : [],
+        bonos:      Array.isArray(bonosData.rows)  ? bonosData.rows : [],
+        rentaFija:  Array.isArray(rfData.rows)     ? rfData.rows    : []
     }
 }
 
 // ── KPI cards ──────────────────────────────────────────────────────────────
 
 function mUpdateKpis(payload) {
-    const { summaries, dividendos, intereses } = payload
+    const { summaries, dividendos, intereses, bonos, rentaFija } = payload
 
     const totalCuenta  = summaries.reduce((s, a) => s + a.netoActualEur,  0)
     const invertido    = summaries.reduce((s, a) => s + a.invertidoEur,   0)
@@ -126,20 +132,44 @@ function mUpdateKpis(payload) {
     mSetKpi("mkpiInvertido",   formatEuro(invertido))
     mSetKpi("mkpiRendimiento", formatEuro(rendimiento), rendimiento >= 0 ? "mPositive" : "mNegative")
     mSetKpi("mkpiRendPct",     formatPercent(rendPct),  rendPct      >= 0 ? "mPositive" : "mNegative")
+    const bonosRows   = Array.isArray(bonos) ? bonos : []
+    const bonosNeto   = bonosRows.reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const bonosGub    = bonosRows.filter((r) => r.tipo === "gubernamental")
+        .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const bonosCorp   = bonosRows.filter((r) => r.tipo === "corporativo")
+        .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+
     mSetKpi("mkpiDividendos",  formatEuro(totalDiv))
     mSetKpi("mkpiInteres",     formatEuro(totalInt))
-    mSetKpi("mkpiNumActivos",  summaries.length)
+    mSetKpi("mkpiBonos",       formatEuro(bonosNeto))
+    mSetKpi("mkpiBonosGub",    formatEuro(bonosGub))
+    mSetKpi("mkpiBonosCorp",   formatEuro(bonosCorp))
+
+    const rfRows     = Array.isArray(rentaFija) ? rentaFija : []
+    const rfNeto     = rfRows.reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const rfBancario = rfRows.filter((r) => r.tipo === "bancario")
+        .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const rfEstatal  = rfRows.filter((r) => r.tipo === "estatal")
+        .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+
+    mSetKpi("mkpiRentaFija",   formatEuro(rfNeto))
+    mSetKpi("mkpiRfBancario",  formatEuro(rfBancario))
+    mSetKpi("mkpiRfEstatal",   formatEuro(rfEstatal))
 }
 
 // ── charts ─────────────────────────────────────────────────────────────────
 
-function mRenderDistTipos(summaries, displayType) {
+function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = []) {
     const types  = ["cripto", "acciones", "etfs", "comoditis"]
-    const labels = types.map((t) => M_TYPE_LABELS[t])
-    const values = types.map((t) =>
-        summaries.filter((a) => a.type === t).reduce((s, a) => s + Math.max(0, a.netoActualEur), 0)
-    )
-    const colors = types.map((t) => M_TYPE_COLORS[t])
+    const bonosTotal = bonos.reduce((s, r) => s + Math.max(0, parseEuroNumber(r.invertido || "")), 0)
+    const rfTotal    = rentaFija.reduce((s, r) => s + Math.max(0, parseEuroNumber(r.invertido || "")), 0)
+    const labels = [...types.map((t) => M_TYPE_LABELS[t]), "Bonos", "Renta Fija"]
+    const values = [
+        ...types.map((t) => summaries.filter((a) => a.type === t).reduce((s, a) => s + Math.max(0, a.netoActualEur), 0)),
+        bonosTotal,
+        rfTotal
+    ]
+    const colors = [...types.map((t) => M_TYPE_COLORS[t]), "#9b59b6", "#00bcd4"]
     const total  = values.reduce((a, b) => a + b, 0)
 
     if (displayType === "doughnut") {
@@ -193,8 +223,22 @@ function mRenderDistTipos(summaries, displayType) {
     }
 }
 
-function mRenderDistActivos(summaries, displayType) {
-    const sorted = [...summaries].sort((a, b) => b.netoActualEur - a.netoActualEur)
+function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = []) {
+    const bonosMap = {}
+    bonos.forEach((r) => {
+        const name = r.instrumento || "Bono"
+        bonosMap[name] = (bonosMap[name] || 0) + Math.max(0, parseEuroNumber(r.invertido || ""))
+    })
+    const rfMap = {}
+    rentaFija.forEach((r) => {
+        const name = r.instrumento || "Renta Fija"
+        rfMap[name] = (rfMap[name] || 0) + Math.max(0, parseEuroNumber(r.invertido || ""))
+    })
+    const extras = [
+        ...Object.entries(bonosMap).map(([name, val]) => ({ name, netoActualEur: val })),
+        ...Object.entries(rfMap).map(([name, val]) => ({ name, netoActualEur: val }))
+    ]
+    const sorted = [...summaries, ...extras].sort((a, b) => b.netoActualEur - a.netoActualEur)
     const labels = sorted.map((a) => a.name)
     const values = sorted.map((a) => Math.max(0, a.netoActualEur))
     const colors = labels.map((_, i) => M_PALETTE[i % M_PALETTE.length])
@@ -376,6 +420,174 @@ function mRenderDividendos(dividendos) {
     })
 }
 
+// ── bonos charts ───────────────────────────────────────────────────────────
+
+function mRenderBonosTipos(bonos) {
+    const section = document.getElementById("mSectionBonos")
+    if (!bonos.length) {
+        if (section) section.classList.add("hidden")
+        return
+    }
+    if (section) section.classList.remove("hidden")
+
+    const GUB_COLOR  = "#9b59b6"
+    const CORP_COLOR = "#c39bd3"
+
+    const gubNeto  = bonos.filter((r) => r.tipo === "gubernamental")
+        .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const corpNeto = bonos.filter((r) => r.tipo === "corporativo")
+        .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const total = gubNeto + corpNeto
+
+    mCreateChart("mChartBonosTipos", {
+        type: "doughnut",
+        data: {
+            labels: ["Gubernamentales", "Corporativos"],
+            datasets: [{
+                data: [Math.max(0, gubNeto), Math.max(0, corpNeto)],
+                backgroundColor: [GUB_COLOR + "cc", CORP_COLOR + "cc"],
+                borderColor: "#0b1120",
+                borderWidth: 3,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            cutout: "60%",
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, total) } }
+            }
+        }
+    })
+}
+
+function mRenderBonosInst(bonos) {
+    if (!bonos.length) return
+
+    const map = {}
+    bonos.forEach((r) => {
+        const name = r.instrumento || "Sin nombre"
+        const neto = parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || "")
+        map[name] = (map[name] || 0) + neto
+    })
+
+    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1])
+    const labels = sorted.map(([name]) => name)
+    const values = sorted.map(([, v]) => v)
+    const colors = values.map((v) => v >= 0 ? "#9b59b6bb" : "#e74c3cbb")
+    const borders = values.map((v) => v >= 0 ? "#9b59b6" : "#e74c3c")
+
+    const wrap = document.getElementById("mChartBonosInstWrap")
+    if (wrap) wrap.style.height = Math.max(180, sorted.length * 36 + 40) + "px"
+
+    mCreateChart("mChartBonosInst", {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [{
+                label: "Interés neto (€)",
+                data: values,
+                backgroundColor: colors,
+                borderColor: borders,
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            indexAxis: "y",
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { display: false },
+                tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
+            },
+            scales: { x: mAxisX(), y: mAxisY(12) }
+        }
+    })
+}
+
+// ── renta fija charts ──────────────────────────────────────────────────────
+
+function mRenderRentaFijaTipos(rentaFija) {
+    const section = document.getElementById("mSectionRentaFija")
+    if (!rentaFija.length) { if (section) section.classList.add("hidden"); return }
+    if (section) section.classList.remove("hidden")
+
+    const bancarioNeto = rentaFija.filter((r) => r.tipo === "bancario")
+        .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const estatalNeto  = rentaFija.filter((r) => r.tipo === "estatal")
+        .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const total = bancarioNeto + estatalNeto
+
+    mCreateChart("mChartRfTipos", {
+        type: "doughnut",
+        data: {
+            labels: ["Bancario", "Estatal"],
+            datasets: [{
+                data: [Math.max(0, bancarioNeto), Math.max(0, estatalNeto)],
+                backgroundColor: ["#00bcd4cc", "#8bc34acc"],
+                borderColor: "#0b1120",
+                borderWidth: 3,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            cutout: "60%",
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, total) } }
+            }
+        }
+    })
+}
+
+function mRenderRentaFijaInst(rentaFija) {
+    if (!rentaFija.length) return
+    const map = {}
+    rentaFija.forEach((r) => {
+        const name = r.instrumento || "Sin nombre"
+        const neto = parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || "")
+        map[name] = (map[name] || 0) + neto
+    })
+    const sorted  = Object.entries(map).sort((a, b) => b[1] - a[1])
+    const labels  = sorted.map(([name]) => name)
+    const values  = sorted.map(([, v]) => v)
+    const colors  = values.map((v) => v >= 0 ? "#00bcd4bb" : "#e74c3cbb")
+    const borders = values.map((v) => v >= 0 ? "#00bcd4" : "#e74c3c")
+
+    const wrap = document.getElementById("mChartRfInstWrap")
+    if (wrap) wrap.style.height = Math.max(180, sorted.length * 36 + 40) + "px"
+
+    mCreateChart("mChartRfInst", {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [{
+                label: "Interés neto (€)",
+                data: values,
+                backgroundColor: colors,
+                borderColor: borders,
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            indexAxis: "y",
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { display: false },
+                tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
+            },
+            scales: { x: mAxisX(), y: mAxisY(12) }
+        }
+    })
+}
+
 // ── top-positions table ────────────────────────────────────────────────────
 
 function mSortSummaries(summaries) {
@@ -466,12 +678,17 @@ function mBindTableSort(summaries) {
 // ── main init ──────────────────────────────────────────────────────────────
 
 function mRenderAll(payload) {
-    const { summaries, dividendos } = payload
-    mRenderDistTipos(summaries, _metricasDisplayType)
-    mRenderDistActivos(summaries, _metricasDisplayType)
+    const { summaries, dividendos, bonos, rentaFija } = payload
+    const b = bonos || [], rf = rentaFija || []
+    mRenderDistTipos(summaries, _metricasDisplayType, b, rf)
+    mRenderDistActivos(summaries, _metricasDisplayType, b, rf)
     mRenderRendTipos(summaries)
     mRenderRendActivos(summaries)
     mRenderDividendos(dividendos)
+    mRenderBonosTipos(b)
+    mRenderBonosInst(b)
+    mRenderRentaFijaTipos(rf)
+    mRenderRentaFijaInst(rf)
     mRenderTopTable(summaries)
 }
 
@@ -497,8 +714,8 @@ async function initMetricasLogic() {
                 toggleBtns.forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasDisplayType = btn.dataset.charttype
-                mRenderDistTipos(_metricasPayload.summaries, _metricasDisplayType)
-                mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType)
+                mRenderDistTipos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [])
+                mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [])
             })
         })
     } catch (err) {

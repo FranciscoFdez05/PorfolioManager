@@ -1543,14 +1543,27 @@ function renderOverviewRows(rows) {
         emptyState.classList.add("hidden")
     }
 
+    const OV_TYPE_COLORS = { cripto: "#f7931a", acciones: "#3a7bd5", etfs: "#2ecc71", comoditis: "#e0c068" }
+
     rows.forEach((row) => {
         const tr = document.createElement("tr")
-        const profitClass = row.overviewYieldValue >= 0 ? "overviewProfitPositive" : "overviewProfitNegative"
+        const yieldVal = row.overviewYieldValue ?? 0
+        const profitClass = yieldVal >= 0 ? "overviewProfitPositive" : "overviewProfitNegative"
         const overviewCommissions = formatMoney(row.comisionesFiat ?? row.comisiones, row.overviewInvestedCurrency)
+
+        const typeColor = OV_TYPE_COLORS[row.assetType] || "#888"
+        const typeBadge = `<span class="ovTypeBadge" style="background:${typeColor}22;color:${typeColor};border-color:${typeColor}44">${row.tipo}</span>`
+
+        const sign = yieldVal >= 0 ? "+" : ""
+        const yieldEur = formatMoney(yieldVal, row.overviewInvestedCurrency)
+        const yieldPct = row.invertidoNeto > 0
+            ? sign + ((yieldVal / row.invertidoNeto) * 100).toFixed(2) + " %"
+            : "—"
+        const rendCell = `<span class="${profitClass}">${sign}${yieldEur}</span><br><span class="${profitClass}" style="font-size:0.78rem;opacity:0.85">${yieldPct}</span>`
 
         tr.innerHTML = `
             <td>${row.nombre}</td>
-            <td>${row.tipo}</td>
+            <td>${typeBadge}</td>
             <td class="overviewNumericCell">${formatAssetParticipationValue(row.participaciones, row.assetType)}</td>
             <td class="overviewNumericCell">${formatMoney(row.promedioCompra, row.currency)}</td>
             <td class="overviewNumericCell overviewCurrentPriceCell">${formatMoney(row.overviewCurrentPrice ?? row.valorActual, row.currency)}</td>
@@ -1558,7 +1571,7 @@ function renderOverviewRows(rows) {
             <td class="overviewNumericCell">${overviewCommissions}</td>
             <td class="overviewNumericCell">${formatMoney(row.invertidoNeto, row.overviewInvestedCurrency)}</td>
             <td class="overviewNumericCell">${formatMoney(row.overviewCurrentValue, row.overviewInvestedCurrency)}</td>
-            <td class="overviewNumericCell ${profitClass}">${formatMoney(row.overviewYieldValue, row.overviewInvestedCurrency)}</td>
+            <td class="overviewNumericCell">${rendCell}</td>
         `
 
         tableBody.appendChild(tr)
@@ -2726,3 +2739,272 @@ function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetM
     })
 }
 
+
+// ── Página Activos ─────────────────────────────────────────────────────────
+
+const AV_TYPE_COLORS = {
+    cripto:    "#f7931a",
+    acciones:  "#3a7bd5",
+    etfs:      "#2ecc71",
+    comoditis: "#e0c068"
+}
+const AV_TYPE_LABELS = {
+    cripto:    "Cripto",
+    acciones:  "Acciones",
+    etfs:      "ETFs",
+    comoditis: "Comoditis"
+}
+
+let _activosAllAssets = []
+let _activosFilterType = "all"
+let _activosSearch = ""
+
+function avFilteredAssets() {
+    return _activosAllAssets.filter((a) => {
+        const matchType = _activosFilterType === "all" || a.type === _activosFilterType
+        const q = _activosSearch.toLowerCase()
+        const matchSearch = !q
+            || (a.name || "").toLowerCase().includes(q)
+            || (a.symbol || "").toLowerCase().includes(q)
+        return matchType && matchSearch
+    })
+}
+
+function avBuildCard(asset) {
+    const color     = AV_TYPE_COLORS[asset.type]  || "#888"
+    const typeLabel = AV_TYPE_LABELS[asset.type]  || asset.type || ""
+    const price     = parseLooseNumber(asset.price || "") || 0
+    const currency  = asset.currency || "EUR"
+    const provider  = String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "") || "").toUpperCase()
+    const ticker    = asset.marketSymbol || asset.finnhubSymbol || ""
+
+    const m         = asset._metrics
+    const hasM      = !!m
+    const rClass    = hasM ? (m.rendimientoEur >= 0 ? "avPos" : "avNeg") : ""
+    const rendSign  = hasM ? (m.rendimientoEur >= 0 ? "+" : "") : ""
+
+    const card = document.createElement("div")
+    card.className = "avCard"
+    card.dataset.assetId = asset.id
+    card.style.setProperty("--av-color", color)
+    card.draggable = true
+
+    card.innerHTML = `
+        <div class="avCardTop">
+            <span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span>
+            <div class="avCardActions">
+                <button type="button" class="avActionBtn avEditBtn" data-asset-id="${asset.id}" title="Editar nombre">✎</button>
+                <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">✕</button>
+            </div>
+        </div>
+        <div class="avCardSymbol">${asset.symbol || asset.name}</div>
+        <div class="avCardName">${asset.name || asset.symbol || "Activo"}</div>
+        <div class="avCardPrice">${formatMoney(price, currency)}</div>
+        <div class="avCardTicker">${ticker ? `${ticker}${provider ? " · " + provider : ""}` : "Sin ticker"}</div>
+        <div class="avCardMetrics">
+            <div class="avMetricItem">
+                <span class="avMetricLabel">Posición</span>
+                <span class="avMetricValue">${hasM ? formatShareQuantity(m.participaciones) : "—"}</span>
+            </div>
+            <div class="avMetricItem">
+                <span class="avMetricLabel">Valor actual</span>
+                <span class="avMetricValue">${hasM ? formatEuro(m.netoActualEur) : "—"}</span>
+            </div>
+            <div class="avMetricItem avMetricItemWide">
+                <span class="avMetricLabel">Rendimiento</span>
+                <span class="avMetricValue ${rClass}">${hasM ? rendSign + formatEuro(m.rendimientoEur) + (m.invertidoEur > 0 ? "  (" + rendSign + ((m.rendimientoEur / m.invertidoEur) * 100).toFixed(2) + " %)" : "") : "—"}</span>
+            </div>
+        </div>
+        <div class="avCardBar" style="background:${color}"></div>
+    `
+
+    return card
+}
+
+function avRenderGrid() {
+    const grid  = document.getElementById("activosGrid")
+    const count = document.getElementById("activosCount")
+    if (!grid) return
+
+    const filtered = avFilteredAssets()
+    if (count) count.textContent = `${filtered.length} activo${filtered.length !== 1 ? "s" : ""}`
+
+    grid.innerHTML = ""
+    const frag = document.createDocumentFragment()
+    filtered.forEach((a) => frag.appendChild(avBuildCard(a)))
+    grid.appendChild(frag)
+}
+
+async function avHandleCardClick(event) {
+    const deleteBtn = event.target.closest(".avDeleteBtn")
+    if (deleteBtn) {
+        const id = deleteBtn.dataset.assetId
+        const asset = _activosAllAssets.find((a) => a.id === id)
+        openConfirmModal(`¿Eliminar "${asset?.name || id}"? Esta acción no se puede deshacer.`, async () => {
+            await deleteAssetFromServer(id)
+            _activosAllAssets = _activosAllAssets.filter((a) => a.id !== id)
+            avRenderGrid()
+            await refreshAssetsSidebar()
+        })
+        return
+    }
+
+    const editBtn = event.target.closest(".avEditBtn")
+    if (editBtn) {
+        const id = editBtn.dataset.assetId
+        currentAssetId = id
+        const fullAsset = await loadAssetData(id)
+        await updateAssetDetail(fullAsset)
+        openEditAssetModal()
+        return
+    }
+
+    const card = event.target.closest(".avCard")
+    if (card) {
+        const id = card.dataset.assetId
+        clearNavSelection()
+        await selectAsset(id)
+    }
+}
+
+async function initActivosPageLogic() {
+    _activosAllAssets = await loadAssetsList()
+    _activosFilterType = "all"
+    _activosSearch = ""
+
+    avRenderGrid()
+
+    const grid = document.getElementById("activosGrid")
+    if (grid) grid.addEventListener("click", avHandleCardClick)
+
+    const filters = document.getElementById("activosFilters")
+    if (filters) {
+        filters.addEventListener("click", (e) => {
+            const btn = e.target.closest(".activosFilterBtn")
+            if (!btn) return
+            filters.querySelectorAll(".activosFilterBtn").forEach((b) => b.classList.remove("active"))
+            btn.classList.add("active")
+            _activosFilterType = btn.dataset.type
+            avRenderGrid()
+        })
+    }
+
+    const search = document.getElementById("activosSearch")
+    if (search) {
+        search.addEventListener("input", () => {
+            _activosSearch = search.value.trim()
+            avRenderGrid()
+        })
+    }
+
+    avLoadMetrics()
+
+    const addBtn = document.getElementById("activosAddBtn")
+    if (addBtn) addBtn.addEventListener("click", () => openAssetModal())
+
+    avInitDragDrop()
+}
+
+function avInitDragDrop() {
+    const grid = document.getElementById("activosGrid")
+    if (!grid) return
+
+    let avDraggedId = null
+
+    grid.addEventListener("dragstart", (e) => {
+        const card = e.target.closest(".avCard")
+        if (!card) return
+        avDraggedId = card.dataset.assetId
+        draggedAssetId = avDraggedId
+        card.classList.add("avDragging")
+        if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = "move"
+            e.dataTransfer.setData("text/plain", avDraggedId)
+        }
+    })
+
+    grid.addEventListener("dragend", (e) => {
+        const card = e.target.closest(".avCard")
+        if (card) card.classList.remove("avDragging")
+        grid.querySelectorAll(".avDragOver").forEach((c) => c.classList.remove("avDragOver"))
+        avDraggedId = null
+        draggedAssetId = null
+    })
+
+    grid.addEventListener("dragover", (e) => {
+        e.preventDefault()
+        const card = e.target.closest(".avCard")
+        if (!card || !avDraggedId || card.dataset.assetId === avDraggedId) return
+        grid.querySelectorAll(".avDragOver").forEach((c) => c.classList.remove("avDragOver"))
+        card.classList.add("avDragOver")
+    })
+
+    grid.addEventListener("dragleave", (e) => {
+        const card = e.target.closest(".avCard")
+        if (card) card.classList.remove("avDragOver")
+    })
+
+    grid.addEventListener("drop", async (e) => {
+        e.preventDefault()
+        const targetCard = e.target.closest(".avCard")
+        if (!targetCard || !avDraggedId || targetCard.dataset.assetId === avDraggedId) return
+        targetCard.classList.remove("avDragOver")
+        try {
+            await handleAssetDropReorder(avDraggedId, targetCard.dataset.assetId, e.clientY)
+            _activosAllAssets = await loadAssetsList()
+            _activosAllAssets.forEach((a) => {
+                const old = _activosAllAssets.find((o) => o.id === a.id)
+                if (old) a._metrics = old._metrics
+            })
+            avRenderGrid()
+            avLoadMetrics()
+        } catch (err) {
+            console.error("avDrop error", err)
+        }
+        avDraggedId = null
+        draggedAssetId = null
+    })
+}
+
+async function avLoadMetrics() {
+    const baseAssets = _activosAllAssets
+    if (!baseAssets.length) return
+
+    await Promise.all(baseAssets.map(async (asset) => {
+        try {
+            const full  = await loadAssetData(asset.id)
+            const row   = await buildOverviewRow(full)
+            const euros = await buildSummaryMetricsInEuros(row)
+
+            const m = {
+                participaciones: row.participaciones,
+                netoActualEur:   euros.netoActualEur,
+                invertidoEur:    euros.invertidoNetoEur,
+                rendimientoEur:  euros.rendimientoEur
+            }
+            asset._metrics = m
+
+            const cardEl = document.querySelector(`.avCard[data-asset-id="${asset.id}"]`)
+            if (!cardEl) return
+
+            const rClass  = m.rendimientoEur >= 0 ? "avPos" : "avNeg"
+            const sign    = m.rendimientoEur >= 0 ? "+" : ""
+            const rendPct = m.invertidoEur > 0
+                ? sign + ((m.rendimientoEur / m.invertidoEur) * 100).toFixed(2) + " %"
+                : "—"
+
+            const rendStr = sign + formatEuro(m.rendimientoEur) +
+                (m.invertidoEur > 0 ? "  (" + rendPct + ")" : "")
+
+            const vals = cardEl.querySelectorAll(".avMetricValue")
+            if (vals.length >= 3) {
+                vals[0].textContent = formatShareQuantity(m.participaciones)
+                vals[1].textContent = formatEuro(m.netoActualEur)
+                vals[2].textContent = rendStr
+                vals[2].className   = "avMetricValue " + rClass
+            }
+        } catch (e) {
+            console.error("avLoadMetrics error", asset.id, e)
+        }
+    }))
+}

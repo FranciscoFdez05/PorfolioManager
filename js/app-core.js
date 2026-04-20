@@ -60,9 +60,8 @@ function initSidePanel(toggleButton, sideWrapper) {
 }
 
 function clearNavSelection() {
-    document.querySelectorAll(".navBtn").forEach((button) => {
-        button.classList.remove("active")
-    })
+    document.querySelectorAll(".navBtn").forEach((button) => button.classList.remove("active"))
+    document.querySelectorAll(".navDropdownBtn").forEach((button) => button.classList.remove("active"))
 }
 
 function initAssetSelector(assetButtons) {
@@ -82,11 +81,32 @@ function initNavigation(navButtons, contentArea) {
     navButtons.forEach((button) => {
         button.addEventListener("click", () => {
             navButtons.forEach((item) => item.classList.remove("active"))
+            document.querySelectorAll(".navDropdownBtn").forEach((b) => b.classList.remove("active"))
             button.classList.add("active")
+
+            const parentMenu = button.closest(".navDropdown")
+            if (parentMenu) {
+                parentMenu.querySelector(".navDropdownBtn").classList.add("active")
+                parentMenu.querySelector(".navDropdownMenu").classList.remove("open")
+            }
 
             const page = button.dataset.page
             loadPage(page, contentArea)
         })
+    })
+
+    document.querySelectorAll(".navDropdownBtn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation()
+            const menu = btn.nextElementSibling
+            const isOpen = menu.classList.contains("open")
+            document.querySelectorAll(".navDropdownMenu.open").forEach((m) => m.classList.remove("open"))
+            if (!isOpen) menu.classList.add("open")
+        })
+    })
+
+    document.addEventListener("click", () => {
+        document.querySelectorAll(".navDropdownMenu.open").forEach((m) => m.classList.remove("open"))
     })
 }
 
@@ -137,8 +157,14 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initConversionesLogic()
         } else if (page === "herramientas") {
             await initHerramientasLogic()
+        } else if (page === "bonos") {
+            await initBonosLogic()
+        } else if (page === "rentaFija") {
+            await initRentaFijaLogic()
         } else if (page === "metricas") {
             await initMetricasLogic()
+        } else if (page === "activos") {
+            await initActivosPageLogic()
         }
     } catch (error) {
         console.error(error)
@@ -278,9 +304,11 @@ function handleCellFocus(event) {
 
 async function refreshTopDividendosIntereses() {
     try {
-        const [interesesData, dividendosData] = await Promise.all([
+        const [interesesData, dividendosData, bonosResp, rfResp] = await Promise.all([
             loadInteresesData(),
-            loadDividendosData()
+            loadDividendosData(),
+            fetch("/api/bonos").then((r) => r.json()).catch(() => ({ rows: [] })),
+            fetch("/api/rentafija").then((r) => r.json()).catch(() => ({ rows: [] }))
         ])
 
         const totalInteres = (Array.isArray(interesesData?.rows) ? interesesData.rows : [])
@@ -289,16 +317,17 @@ async function refreshTopDividendosIntereses() {
         const totalDividendos = (Array.isArray(dividendosData?.rows) ? dividendosData.rows : [])
             .reduce((sum, row) => sum + parseEuroNumber(row.total), 0)
 
-        const topTotalInteres = document.getElementById("topTotalInteres")
-        const topTotalDividendos = document.getElementById("topTotalDividendos")
+        const totalBonos = (Array.isArray(bonosResp?.rows) ? bonosResp.rows : [])
+            .reduce((sum, r) => sum + parseEuroNumber(r.interesAcumulado) - parseEuroNumber(r.impuestos), 0)
 
-        if (topTotalInteres) {
-            topTotalInteres.textContent = formatEuro(totalInteres)
-        }
+        const totalRentaFija = (Array.isArray(rfResp?.rows) ? rfResp.rows : [])
+            .reduce((sum, r) => sum + parseEuroNumber(r.interesAcumulado) - parseEuroNumber(r.impuestos), 0)
 
-        if (topTotalDividendos) {
-            topTotalDividendos.textContent = formatEuro(totalDividendos)
-        }
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = formatEuro(val) }
+        set("topTotalInteres", totalInteres)
+        set("topTotalDividendos", totalDividendos)
+        set("topTotalBonos", totalBonos)
+        set("topTotalRentaFija", totalRentaFija)
     } catch (error) {
         console.error("Error actualizando métricas de dividendos/intereses:", error)
     }

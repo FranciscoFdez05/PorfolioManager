@@ -216,6 +216,31 @@ CREATE TABLE IF NOT EXISTS dividendo_calendar (
     sort_order INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (month, asset_name)
 );
+
+CREATE TABLE IF NOT EXISTS renta_fija (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha             TEXT NOT NULL DEFAULT '',
+    tipo              TEXT NOT NULL DEFAULT 'bancario',
+    instrumento       TEXT NOT NULL DEFAULT '',
+    rentabilidad      TEXT NOT NULL DEFAULT '',
+    vencimiento       TEXT NOT NULL DEFAULT '',
+    invertido         TEXT NOT NULL DEFAULT '',
+    interes_acumulado TEXT NOT NULL DEFAULT '',
+    impuestos         TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS bonos (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha             TEXT NOT NULL DEFAULT '',
+    tipo              TEXT NOT NULL DEFAULT 'gubernamental',
+    instrumento       TEXT NOT NULL DEFAULT '',
+    cupon             TEXT NOT NULL DEFAULT '',
+    vencimiento       TEXT NOT NULL DEFAULT '',
+    invertido         TEXT NOT NULL DEFAULT '',
+    interes_acumulado TEXT NOT NULL DEFAULT '',
+    impuestos         TEXT NOT NULL DEFAULT '',
+    nota              TEXT NOT NULL DEFAULT ''
+);
 """
 
 
