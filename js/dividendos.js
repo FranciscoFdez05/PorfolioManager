@@ -1,3 +1,16 @@
+let _dividendosAssets = []
+
+function buildDividendosInstrumentoSelect(selectedName) {
+    const exists = _dividendosAssets.some((a) => a.name === selectedName)
+    const extra  = (!exists && selectedName)
+        ? `<option value="${selectedName}" selected>${selectedName}</option>`
+        : ""
+    const opts = _dividendosAssets.map((a) =>
+        `<option value="${a.name}"${a.name === selectedName ? " selected" : ""}>${a.name}</option>`
+    ).join("")
+    return `<select class="bonosTipoSelect">${extra}${opts}</select>`
+}
+
 async function loadDividendosData() {
     try {
         const response = await fetch("/api/dividendos")
@@ -20,7 +33,11 @@ async function renderDividendosTable() {
         return
     }
 
-    const dividendosData = await loadDividendosData()
+    const [dividendosData, assetsList] = await Promise.all([
+        loadDividendosData(),
+        loadAssetsList().catch(() => [])
+    ])
+    _dividendosAssets = assetsList.filter((a) => a.type === "acciones" || a.type === "etfs")
     renderDividendosRowsFromData(dividendosData)
 }
 
@@ -41,7 +58,7 @@ function renderDividendosRowsFromData(dividendosData) {
         rowElement.innerHTML = `
             <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
             <td contenteditable="true">${rowData.fecha || ""}</td>
-            <td contenteditable="true">${rowData.instrumento || ""}</td>
+            <td>${buildDividendosInstrumentoSelect(rowData.instrumento || "")}</td>
             <td contenteditable="true">${formatShareQuantity(rowData.acciones)}</td>
             <td contenteditable="true">${formatCellDollarValue(rowData.dividendoAccion)}</td>
             <td contenteditable="true">${formatCellEuroValue(rowData.impuestos)}</td>
@@ -62,7 +79,7 @@ function collectDividendosDataFromTable() {
 
         return {
             fecha: cells[1]?.textContent.trim() || "",
-            instrumento: cells[2]?.textContent.trim() || "",
+            instrumento: cells[2]?.querySelector("select")?.value || cells[2]?.textContent.trim() || "",
             acciones: cells[3]?.textContent.trim() || "",
             dividendoAccion: cells[4]?.textContent.trim() || "",
             impuestos: cells[5]?.textContent.trim() || "",
@@ -139,8 +156,8 @@ function addNewDividendosRow() {
 
     rowElement.innerHTML = `
         <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
-        <td contenteditable="true">nueva-fecha</td>
-        <td contenteditable="true">instrumento</td>
+        <td contenteditable="true"></td>
+        <td>${buildDividendosInstrumentoSelect("")}</td>
         <td contenteditable="true"></td>
         <td contenteditable="true"></td>
         <td contenteditable="true"></td>

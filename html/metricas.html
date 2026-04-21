@@ -20,12 +20,12 @@
                     <div class="mkpiValue" id="mkpiInvertido">---</div>
                 </div>
                 <div class="metricasKpiCard">
-                    <div class="mkpiLabel">Rendimiento €</div>
-                    <div class="mkpiValue" id="mkpiRendimiento">---</div>
-                </div>
-                <div class="metricasKpiCard">
                     <div class="mkpiLabel">Rendimiento %</div>
                     <div class="mkpiValue" id="mkpiRendPct">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Rendimiento €</div>
+                    <div class="mkpiValue" id="mkpiRendimiento">---</div>
                 </div>
             </div>
         </div>
@@ -86,6 +86,11 @@
     <div class="metricasSection">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Distribución del Portfolio</span>
+            <div class="mToggleGroup">
+                <button class="mDistMetricBtn active" data-metric="netoActualEur">Valor actual</button>
+                <button class="mDistMetricBtn" data-metric="invertidoEur">Invertido</button>
+                <button class="mDistMetricBtn" data-metric="rendimientoEur">Rendimiento</button>
+            </div>
             <div class="mToggleGroup">
                 <button class="mToggleBtn active" data-charttype="doughnut">Circular</button>
                 <button class="mToggleBtn" data-charttype="bar">Barras</button>

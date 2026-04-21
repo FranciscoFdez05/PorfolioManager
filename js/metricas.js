@@ -1,5 +1,6 @@
 let _metricasCharts = {}
 let _metricasDisplayType = "doughnut"
+let _metricasDistMetric = "netoActualEur"
 let _metricasPayload = null
 let _metricasSortKey = "netoActualEur"
 let _metricasSortDir = "desc"
@@ -117,6 +118,23 @@ async function buildMetricasPayload() {
 
 // ── KPI cards ──────────────────────────────────────────────────────────────
 
+function mSyncTopBar(summaries, rendimiento, invertido, totalCuenta) {
+    const topSet = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
+    topSet("topTotalCuenta",       formatEuro(totalCuenta))
+    topSet("topRendimientoEuros",  formatEuro(rendimiento))
+    topSet("topPorcentajeCuenta",  formatPercent(invertido > 0 ? (rendimiento / invertido) * 100 : 0))
+
+    const typeMap = { cripto: "Cripto", acciones: "Acciones", etfs: "Etf", comoditis: "Comoditis" }
+    Object.entries(typeMap).forEach(([type, suffix]) => {
+        const group = summaries.filter((a) => a.type === type)
+        const neto  = group.reduce((s, a) => s + a.netoActualEur, 0)
+        const inv   = group.reduce((s, a) => s + a.invertidoEur, 0)
+        const rend  = group.reduce((s, a) => s + a.rendimientoEur, 0)
+        topSet(`topEuros${suffix}`,      formatEuro(neto))
+        topSet(`topPorcentaje${suffix}`, formatPercent(inv > 0 ? (rend / inv) * 100 : 0))
+    })
+}
+
 function mUpdateKpis(payload) {
     const { summaries, dividendos, intereses, bonos, rentaFija } = payload
 
@@ -132,6 +150,8 @@ function mUpdateKpis(payload) {
     mSetKpi("mkpiInvertido",   formatEuro(invertido))
     mSetKpi("mkpiRendimiento", formatEuro(rendimiento), rendimiento >= 0 ? "mPositive" : "mNegative")
     mSetKpi("mkpiRendPct",     formatPercent(rendPct),  rendPct      >= 0 ? "mPositive" : "mNegative")
+
+    mSyncTopBar(summaries, rendimiento, invertido, totalCuenta)
     const bonosRows   = Array.isArray(bonos) ? bonos : []
     const bonosNeto   = bonosRows.reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
     const bonosGub    = bonosRows.filter((r) => r.tipo === "gubernamental")
@@ -155,24 +175,49 @@ function mUpdateKpis(payload) {
     mSetKpi("mkpiRentaFija",   formatEuro(rfNeto))
     mSetKpi("mkpiRfBancario",  formatEuro(rfBancario))
     mSetKpi("mkpiRfEstatal",   formatEuro(rfEstatal))
+
+    const topSet2 = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
+    topSet2("topTotalDividendos", formatEuro(totalDiv))
+    topSet2("topTotalInteres",    formatEuro(totalInt))
+    topSet2("topTotalBonos",      formatEuro(bonosNeto))
+    topSet2("topTotalRentaFija",  formatEuro(rfNeto))
 }
 
 // ── charts ─────────────────────────────────────────────────────────────────
 
-function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = []) {
+function mDistMetricLabel(metric) {
+    if (metric === "rendimientoEur") return "Rendimiento (€)"
+    if (metric === "invertidoEur")   return "Invertido (€)"
+    return "Valor actual (€)"
+}
+
+function mDistAssetVal(a, metric) {
+    return metric === "rendimientoEur" ? a.rendimientoEur
+         : metric === "invertidoEur"   ? a.invertidoEur
+         : a.netoActualEur
+}
+
+function mDistBonoVal(r, metric) {
+    return metric === "rendimientoEur"
+        ? parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || "")
+        : parseEuroNumber(r.invertido || "")
+}
+
+function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], metric = "netoActualEur") {
     const types  = ["cripto", "acciones", "etfs", "comoditis"]
-    const bonosTotal = bonos.reduce((s, r) => s + Math.max(0, parseEuroNumber(r.invertido || "")), 0)
-    const rfTotal    = rentaFija.reduce((s, r) => s + Math.max(0, parseEuroNumber(r.invertido || "")), 0)
+    const bonosTotal = bonos.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
+    const rfTotal    = rentaFija.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
     const labels = [...types.map((t) => M_TYPE_LABELS[t]), "Bonos", "Renta Fija"]
-    const values = [
-        ...types.map((t) => summaries.filter((a) => a.type === t).reduce((s, a) => s + Math.max(0, a.netoActualEur), 0)),
+    const rawValues = [
+        ...types.map((t) => summaries.filter((a) => a.type === t).reduce((s, a) => s + mDistAssetVal(a, metric), 0)),
         bonosTotal,
         rfTotal
     ]
     const colors = [...types.map((t) => M_TYPE_COLORS[t]), "#9b59b6", "#00bcd4"]
-    const total  = values.reduce((a, b) => a + b, 0)
 
     if (displayType === "doughnut") {
+        const values = rawValues.map((v) => Math.max(0, v))
+        const total  = values.reduce((a, b) => a + b, 0)
         mCreateChart("mChartTipos", {
             type: "doughnut",
             data: {
@@ -196,13 +241,14 @@ function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = []) {
             }
         })
     } else {
+        const total = rawValues.reduce((a, b) => a + Math.abs(b), 0)
         mCreateChart("mChartTipos", {
             type: "bar",
             data: {
                 labels,
                 datasets: [{
-                    label: "Valor actual (€)",
-                    data: values,
+                    label: mDistMetricLabel(metric),
+                    data: rawValues,
                     backgroundColor: colors.map((c) => c + "cc"),
                     borderColor: colors,
                     borderWidth: 1,
@@ -223,28 +269,33 @@ function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = []) {
     }
 }
 
-function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = []) {
+function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], metric = "netoActualEur") {
     const bonosMap = {}
     bonos.forEach((r) => {
         const name = r.instrumento || "Bono"
-        bonosMap[name] = (bonosMap[name] || 0) + Math.max(0, parseEuroNumber(r.invertido || ""))
+        bonosMap[name] = (bonosMap[name] || 0) + mDistBonoVal(r, metric)
     })
     const rfMap = {}
     rentaFija.forEach((r) => {
         const name = r.instrumento || "Renta Fija"
-        rfMap[name] = (rfMap[name] || 0) + Math.max(0, parseEuroNumber(r.invertido || ""))
+        rfMap[name] = (rfMap[name] || 0) + mDistBonoVal(r, metric)
     })
     const extras = [
-        ...Object.entries(bonosMap).map(([name, val]) => ({ name, netoActualEur: val })),
-        ...Object.entries(rfMap).map(([name, val]) => ({ name, netoActualEur: val }))
+        ...Object.entries(bonosMap).map(([name, val]) => ({ name, _val: val })),
+        ...Object.entries(rfMap).map(([name, val]) => ({ name, _val: val }))
     ]
-    const sorted = [...summaries, ...extras].sort((a, b) => b.netoActualEur - a.netoActualEur)
-    const labels = sorted.map((a) => a.name)
-    const values = sorted.map((a) => Math.max(0, a.netoActualEur))
+    const allItems = [
+        ...summaries.map((a) => ({ name: a.name, _val: mDistAssetVal(a, metric) })),
+        ...extras
+    ].sort((a, b) => b._val - a._val)
+
+    const labels = allItems.map((a) => a.name)
+    const rawValues = allItems.map((a) => a._val)
     const colors = labels.map((_, i) => M_PALETTE[i % M_PALETTE.length])
-    const total  = values.reduce((a, b) => a + b, 0)
 
     if (displayType === "doughnut") {
+        const values = rawValues.map((v) => Math.max(0, v))
+        const total  = values.reduce((a, b) => a + b, 0)
         mCreateChart("mChartActivos", {
             type: "doughnut",
             data: {
@@ -273,8 +324,8 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = []) 
             data: {
                 labels,
                 datasets: [{
-                    label: "Valor actual (€)",
-                    data: values,
+                    label: mDistMetricLabel(metric),
+                    data: rawValues,
                     backgroundColor: colors.map((c) => c + "bb"),
                     borderColor: colors,
                     borderWidth: 1,
@@ -680,8 +731,8 @@ function mBindTableSort(summaries) {
 function mRenderAll(payload) {
     const { summaries, dividendos, bonos, rentaFija } = payload
     const b = bonos || [], rf = rentaFija || []
-    mRenderDistTipos(summaries, _metricasDisplayType, b, rf)
-    mRenderDistActivos(summaries, _metricasDisplayType, b, rf)
+    mRenderDistTipos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
+    mRenderDistActivos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
     mRenderRendTipos(summaries)
     mRenderRendActivos(summaries)
     mRenderDividendos(dividendos)
@@ -696,6 +747,7 @@ async function initMetricasLogic() {
     Object.values(_metricasCharts).forEach((c) => c?.destroy())
     _metricasCharts = {}
     _metricasDisplayType = "doughnut"
+    _metricasDistMetric = "netoActualEur"
     _metricasPayload = null
 
     const loading = document.getElementById("metricasLoading")
@@ -714,8 +766,19 @@ async function initMetricasLogic() {
                 toggleBtns.forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasDisplayType = btn.dataset.charttype
-                mRenderDistTipos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [])
-                mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [])
+                mRenderDistTipos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
+                mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
+            })
+        })
+
+        const metricBtns = document.querySelectorAll(".mDistMetricBtn")
+        metricBtns.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                metricBtns.forEach((b) => b.classList.remove("active"))
+                btn.classList.add("active")
+                _metricasDistMetric = btn.dataset.metric
+                mRenderDistTipos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
+                mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
             })
         })
     } catch (err) {

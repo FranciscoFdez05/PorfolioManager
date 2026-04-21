@@ -2733,7 +2733,7 @@ body{
     overflow:hidden;
 }
 
-.mToggleBtn{
+.mToggleBtn, .mDistMetricBtn{
     background:transparent;
     border:none;
     color:#7a8fb0;
@@ -2743,12 +2743,12 @@ body{
     transition:background .15s,color .15s;
 }
 
-.mToggleBtn.active{
+.mToggleBtn.active, .mDistMetricBtn.active{
     background:#1e2d45;
     color:#e5edf9;
 }
 
-.mToggleBtn:hover:not(.active){
+.mToggleBtn:hover:not(.active), .mDistMetricBtn:hover:not(.active){
     background:#151f35;
     color:#aabbd8;
 }

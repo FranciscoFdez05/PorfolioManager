@@ -232,6 +232,10 @@ async function initDividendosLogic() {
             scheduleDividendosAutosave()
         })
 
+        dividendosBody.addEventListener("change", () => {
+            scheduleDividendosAutosave()
+        })
+
         dividendosBody.addEventListener("click", handleRowDeleteClick)
         dividendosBody.addEventListener("focus", handleCellFocus, true)
         dividendosBody.addEventListener("blur", (event) => {
