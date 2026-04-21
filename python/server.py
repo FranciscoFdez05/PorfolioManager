@@ -6,6 +6,7 @@ from flask import Flask, abort, send_from_directory
 
 from app_data import baseDir, ensureDataFile
 from routes.activos import activos_bp
+from routes.backup import backup_bp
 from routes.gastos import gastos_bp
 from routes.market import market_bp
 from routes.operaciones import operaciones_bp
@@ -29,6 +30,7 @@ app = Flask(
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
 app.register_blueprint(activos_bp)
+app.register_blueprint(backup_bp)
 app.register_blueprint(gastos_bp)
 app.register_blueprint(market_bp)
 app.register_blueprint(operaciones_bp)

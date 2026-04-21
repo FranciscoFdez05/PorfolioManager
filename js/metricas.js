@@ -6,6 +6,8 @@ let _metricasPayload = null
 let _metricasSortKey = "netoActualEur"
 let _metricasSortDir = "desc"
 let _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","bonos","rentaFija"])
+let _metricasGastosTipoFilter = new Set()
+let _mGastosChartsCache = null
 
 const M_GASTOS_KEYS   = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
 const M_GASTOS_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
@@ -759,10 +761,39 @@ function mRenderGastos(yearsList, yearData) {
     mRenderGastosCharts(yearData, totalMes, totalTipo)
 }
 
+function mRenderGastosTipoFilterBtns(tipos) {
+    const group = document.getElementById("mGastosTipoFilterGroup")
+    if (!group) return
+    const key = [...tipos].sort().join(",")
+    if (group.dataset.typeKey === key) return
+    group.dataset.typeKey = key
+    group.innerHTML = ""
+    tipos.sort().forEach((tipo) => {
+        const btn = document.createElement("button")
+        btn.className = "mActivosFilterBtn" + (_metricasGastosTipoFilter.has(tipo) ? "" : " active")
+        btn.textContent = tipo
+        btn.addEventListener("click", () => {
+            if (_metricasGastosTipoFilter.has(tipo)) {
+                _metricasGastosTipoFilter.delete(tipo)
+                btn.classList.add("active")
+            } else {
+                _metricasGastosTipoFilter.add(tipo)
+                btn.classList.remove("active")
+            }
+            if (_mGastosChartsCache) {
+                mRenderGastosCharts(_mGastosChartsCache.yearData, _mGastosChartsCache.totalMes, _mGastosChartsCache.totalTipo)
+            }
+        })
+        group.appendChild(btn)
+    })
+}
+
 function mRenderGastosCharts(yearData, totalMes, totalTipo) {
+    _mGastosChartsCache = { yearData, totalMes, totalTipo }
     const mesTitle  = document.getElementById("mGastosMesTitle")
     const tipoTitle = document.getElementById("mGastosTipoTitle")
     const mesWrap   = document.getElementById("mChartGastosMesWrap")
+    mRenderGastosTipoFilterBtns(Object.keys(totalTipo).filter((k) => totalTipo[k] > 0))
 
     // Left chart: always annual monthly totals, fixed label
     if (mesTitle)  mesTitle.textContent = "Tabla Gastos"
@@ -840,7 +871,7 @@ function mGastosTipoColor(label) {
 }
 
 function mRenderGastosTipoChart(tipoData) {
-    const tipoEntries = Object.entries(tipoData).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+    const tipoEntries = Object.entries(tipoData).filter(([k, v]) => v > 0 && !_metricasGastosTipoFilter.has(k)).sort((a, b) => b[1] - a[1])
     if (!tipoEntries.length) { mDestroyChart("mChartGastosTipo"); return }
     const tipoLabels = tipoEntries.map(([k]) => k)
     const tipoValues = tipoEntries.map(([, v]) => v)
@@ -968,6 +999,8 @@ async function initMetricasLogic() {
     _metricasDistMetric = "netoActualEur"
     _metricasGastosMonth = "all"
     _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","bonos","rentaFija"])
+    _metricasGastosTipoFilter = new Set()
+    _mGastosChartsCache = null
     _metricasPayload = null
 
     const loading = document.getElementById("metricasLoading")

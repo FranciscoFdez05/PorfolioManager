@@ -21,6 +21,7 @@ let currentGastosView = "year"
 let gastosAutosaveTimeout = null
 let gastosPersistenceBound = false
 let sharedGastosTypes = []
+let _gastosDataLoaded = false
 
 function sanitizeGastoTypeLabel(value) {
     return String(value || "").trim().replace(/\s+/g, " ")
@@ -191,6 +192,21 @@ async function initGastosLogic() {
         movementsBody.addEventListener("click", handleGastosDeleteClick)
         movementsBody.addEventListener("change", handleGastosTypeChange)
         movementsBody.addEventListener("blur", handleGastosMovementBlur, true)
+        movementsBody.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter") return
+            const cell = e.target.closest('td[contenteditable="true"]')
+            if (!cell) return
+            e.preventDefault()
+            const row = cell.parentElement
+            const columnIndex = Array.from(row.children).indexOf(cell)
+            if (columnIndex === 4) {
+                const value = parseEuroNumber(cell.textContent)
+                cell.textContent = cell.textContent.trim() === "" ? "" : formatEuro(value)
+                syncGastosDataFromTables()
+                scheduleGastosAutosave()
+            }
+            cell.blur()
+        })
     }
 }
 
@@ -253,6 +269,12 @@ function bindGastosEvents() {
         })
     }
 
+    const sortByDateButton = document.getElementById("sortGastosByDateBtn")
+    if (sortByDateButton && !sortByDateButton.dataset.bound) {
+        sortByDateButton.dataset.bound = "true"
+        sortByDateButton.addEventListener("click", sortGastosByDate)
+    }
+
     if (addRowButton && !addRowButton.dataset.bound) {
         addRowButton.dataset.bound = "true"
         addRowButton.addEventListener("click", () => {
@@ -300,8 +322,10 @@ function bindGastosEvents() {
 }
 
 async function renderGastosYear(year) {
+    _gastosDataLoaded = false
     currentGastosData = ensureGastosDataShape(await loadGastosYear(year))
     currentGastosYear = currentGastosData.year
+    _gastosDataLoaded = true
 
     renderGastosYearButtons()
     renderGastosMonthTabs()
@@ -552,31 +576,31 @@ function renderCurrentGastosView() {
         return
     }
 
+    const sortBtn = document.getElementById("sortGastosByDateBtn")
     if (currentGastosView === "year") {
         renderGastosAnnualTable()
         annualWrapper.classList.remove("hidden")
         movementsWrapper.classList.add("hidden")
         monthHeader.classList.add("hidden")
         actions.classList.add("hidden")
+        if (sortBtn) sortBtn.classList.add("hidden")
     } else {
         renderGastosMonthTable()
         annualWrapper.classList.add("hidden")
         movementsWrapper.classList.remove("hidden")
         monthHeader.classList.remove("hidden")
         actions.classList.remove("hidden")
+        if (sortBtn) sortBtn.classList.remove("hidden")
     }
 }
 
 function renderGastosMonthTable() {
     const body = document.getElementById("gastosMovementsBody")
-    const title = document.getElementById("gastosMonthTitle")
 
-    if (!body || !title || !currentGastosData) {
+    if (!body || !currentGastosData) {
         return
     }
 
-    const currentMonth = GASTOS_MONTHS.find((month) => month.key === currentGastosMonth)
-    title.textContent = `Movimientos de ${currentMonth?.label || ""}`
     body.innerHTML = ""
 
     const rows = currentGastosData.months?.[currentGastosMonth]?.rows || []
@@ -584,6 +608,28 @@ function renderGastosMonthTable() {
     rows.forEach((row) => {
         body.appendChild(buildGastoMovementRow(row))
     })
+
+}
+
+function sortGastosByDate() {
+    const body = document.getElementById("gastosMovementsBody")
+    if (!body) return
+    const rows = [...body.querySelectorAll("tr")]
+    rows.sort((a, b) => {
+        const da = gastoParseDate(a.querySelectorAll("td")[2]?.textContent.trim())
+        const db = gastoParseDate(b.querySelectorAll("td")[2]?.textContent.trim())
+        return da - db
+    })
+    rows.forEach((tr) => body.appendChild(tr))
+    syncGastosDataFromTables()
+    scheduleGastosAutosave()
+}
+
+function gastoParseDate(str) {
+    if (!str) return Infinity
+    const p = str.split("-")
+    if (p.length === 3) return new Date(p[2], p[1] - 1, p[0]).getTime()
+    return Infinity
 }
 
 function buildGastoMovementRow(row = {}) {
@@ -591,7 +637,7 @@ function buildGastoMovementRow(row = {}) {
     const normalizedType = normalizeGastoTipo(row.tipo || "")
     const availableTypes = getAvailableGastosTypes()
     tr.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
+        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">✕</button></td>
         <td contenteditable="true">${row.fecha || ""}</td>
         <td contenteditable="true">${row.nombre || ""}</td>
         <td>
@@ -672,7 +718,7 @@ function handleGastosTypeChange(event) {
 }
 
 function syncGastosDataFromTables() {
-    if (!currentGastosData) {
+    if (!currentGastosData || !_gastosDataLoaded) {
         return
     }
 
@@ -744,7 +790,7 @@ function scheduleGastosAutosave(delay = 500) {
 }
 
 async function persistCurrentGastosData(options = {}) {
-    if (!currentGastosYear || !currentGastosData) {
+    if (!currentGastosYear || !currentGastosData || !_gastosDataLoaded) {
         return
     }
 
@@ -771,7 +817,7 @@ function bindGastosPersistenceGuards() {
     gastosPersistenceBound = true
 
     window.addEventListener("beforeunload", () => {
-        if (!currentGastosYear || !currentGastosData) {
+        if (!currentGastosYear || !currentGastosData || !_gastosDataLoaded) {
             return
         }
 
@@ -782,7 +828,7 @@ function bindGastosPersistenceGuards() {
     })
 
     document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState !== "hidden" || !currentGastosYear || !currentGastosData) {
+        if (document.visibilityState !== "hidden" || !currentGastosYear || !currentGastosData || !_gastosDataLoaded) {
             return
         }
 

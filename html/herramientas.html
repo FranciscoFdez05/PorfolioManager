@@ -1,4 +1,292 @@
-<div class="placeholderPage">
-    <h2>Herramientas</h2>
-    <p>Contenido pendiente.</p>
+<div class="herramientasPage">
+
+    <div class="herramientasNav">
+        <button class="herramientaBtn active" data-tool="interes">Interés Compuesto</button>
+        <button class="herramientaBtn" data-tool="rentabilidad">Rentabilidad</button>
+        <button class="herramientaBtn" data-tool="precioMedio">Precio Medio</button>
+        <button class="herramientaBtn" data-tool="regla72">Regla del 72</button>
+        <button class="herramientaBtn" data-tool="cagr">CAGR</button>
+        <button class="herramientaBtn" data-tool="rentDividendo">Rent. Dividendo</button>
+    </div>
+
+    <div class="herramientasContent" id="herramientasContent">
+
+        <!-- ── Interés Compuesto ───────────────────────────────────── -->
+        <div class="herramientaPanel active" id="toolInteres">
+            <h3 class="herramientaPanelTitle">Calculadora de Interés Compuesto</h3>
+            <div class="herramientaBody">
+                <div class="herramientaInputs">
+                    <div class="herramientaField">
+                        <label>Capital inicial (€)</label>
+                        <input type="number" id="hIntCapital" value="1000" min="0">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Aportación mensual (€)</label>
+                        <input type="number" id="hIntAportacion" value="100" min="0">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Rentabilidad anual (%)</label>
+                        <input type="number" id="hIntTasa" value="7" step="0.1">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Años</label>
+                        <input type="number" id="hIntAnos" value="10" min="1" max="100">
+                    </div>
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hIntCalcBtn">Calcular</button>
+                        <button class="herramientaResetBtn" data-panel="toolInteres">Reiniciar</button>
+                    </div>
+                </div>
+                <div class="herramientaResults hidden" id="hIntResults">
+                    <div class="herramientaResultGrid">
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Capital final</div>
+                            <div class="hResultValue hResultPositive" id="hIntCapitalFinal">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Total aportado</div>
+                            <div class="hResultValue" id="hIntTotalAportado">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Intereses generados</div>
+                            <div class="hResultValue hResultPositive" id="hIntIntereses">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Multiplicador</div>
+                            <div class="hResultValue" id="hIntMultiplicador">---</div>
+                        </div>
+                    </div>
+                    <div class="herramientaChartWrap">
+                        <canvas id="hIntChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Rentabilidad ───────────────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolRentabilidad">
+            <h3 class="herramientaPanelTitle">Calculadora de Rentabilidad</h3>
+            <div class="herramientaBody">
+                <div class="herramientaInputs">
+                    <div class="herramientaField">
+                        <label>Precio de compra (€)</label>
+                        <input type="number" id="hRentCompra" value="100" min="0" step="0.01">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Precio de venta / actual (€)</label>
+                        <input type="number" id="hRentVenta" value="120" min="0" step="0.01">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Dividendos cobrados (€)</label>
+                        <input type="number" id="hRentDividendos" value="0" min="0" step="0.01">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Comisiones totales (€)</label>
+                        <input type="number" id="hRentComisiones" value="0" min="0" step="0.01">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Años de holding</label>
+                        <input type="number" id="hRentAnos" value="1" min="0.1" step="0.1">
+                    </div>
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hRentCalcBtn">Calcular</button>
+                        <button class="herramientaResetBtn" data-panel="toolRentabilidad">Reiniciar</button>
+                    </div>
+                </div>
+                <div class="herramientaResults hidden" id="hRentResults">
+                    <div class="herramientaResultGrid">
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">P&amp;L</div>
+                            <div class="hResultValue" id="hRentPnL">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Rentabilidad total</div>
+                            <div class="hResultValue" id="hRentTotal">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Rentabilidad anualizada</div>
+                            <div class="hResultValue" id="hRentAnualizada">---</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Precio Medio ───────────────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolPrecioMedio">
+            <h3 class="herramientaPanelTitle">Calculadora de Precio Medio</h3>
+            <div class="herramientaBody herramientaBodyFull">
+                <table class="hPrecioMedioTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Precio (€)</th>
+                            <th>Cantidad</th>
+                            <th>Total (€)</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="hPrecioMedioBody"></tbody>
+                </table>
+                <div class="hPrecioMedioActions">
+                    <button class="herramientaSecBtn" id="hPrecioAddRow">+ Añadir compra</button>
+                    <button class="herramientaCalcBtn" id="hPrecioCalcBtn">Calcular</button>
+                    <button class="herramientaResetBtn" data-panel="toolPrecioMedio">Reiniciar</button>
+                </div>
+                <div class="herramientaResults hidden" id="hPrecioResults">
+                    <div class="herramientaResultGrid">
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Precio medio</div>
+                            <div class="hResultValue hResultPositive" id="hPrecioMedioResult">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Total invertido</div>
+                            <div class="hResultValue" id="hPrecioTotalInv">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Total unidades</div>
+                            <div class="hResultValue" id="hPrecioTotalUnidades">---</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Regla del 72 ───────────────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolRegla72">
+            <h3 class="herramientaPanelTitle">Regla del 72</h3>
+            <div class="herramientaBody herramientaBodyCols">
+                <div class="herramientaBlock">
+                    <h4 class="herramientaBlockTitle">¿En cuánto tiempo doblo mi inversión?</h4>
+                    <div class="herramientaField">
+                        <label>Rentabilidad anual (%)</label>
+                        <input type="number" id="hR72Tasa" value="7" step="0.1" min="0.1">
+                    </div>
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hR72TasaBtn">Calcular</button>
+                        <button class="herramientaResetBtn" data-panel="toolRegla72">Reiniciar</button>
+                    </div>
+                    <div class="herramientaResults hidden" id="hR72TasaResults">
+                        <div class="herramientaResultCard hResultBig">
+                            <div class="hResultLabel">Años para doblar</div>
+                            <div class="hResultValue hResultPositive" id="hR72TasaAnos">---</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="herramientaBlock">
+                    <h4 class="herramientaBlockTitle">¿Qué rentabilidad necesito para doblar en X años?</h4>
+                    <div class="herramientaField">
+                        <label>Años objetivo</label>
+                        <input type="number" id="hR72Anos" value="10" min="1">
+                    </div>
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hR72AnosBtn">Calcular</button>
+                    </div>
+                    <div class="herramientaResults hidden" id="hR72AnosResults">
+                        <div class="herramientaResultCard hResultBig">
+                            <div class="hResultLabel">Rentabilidad necesaria</div>
+                            <div class="hResultValue hResultPositive" id="hR72AnosTasa">---</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── CAGR ───────────────────────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolCagr">
+            <h3 class="herramientaPanelTitle">Calculadora CAGR</h3>
+            <div class="herramientaBody">
+                <div class="herramientaInputs">
+                    <div class="herramientaField">
+                        <label>Valor inicial (€)</label>
+                        <input type="number" id="hCagrInicial" value="1000" min="0" step="0.01">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Valor final (€)</label>
+                        <input type="number" id="hCagrFinal" value="2000" min="0" step="0.01">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Años</label>
+                        <input type="number" id="hCagrAnos" value="5" min="0.1" step="0.1">
+                    </div>
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hCagrCalcBtn">Calcular</button>
+                        <button class="herramientaResetBtn" data-panel="toolCagr">Reiniciar</button>
+                    </div>
+                </div>
+                <div class="herramientaResults hidden" id="hCagrResults">
+                    <div class="herramientaResultGrid">
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">CAGR</div>
+                            <div class="hResultValue" id="hCagrResult">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Crecimiento total</div>
+                            <div class="hResultValue" id="hCagrCrecimiento">---</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Rentabilidad Dividendo ─────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolRentDividendo">
+            <h3 class="herramientaPanelTitle">Rentabilidad por Dividendo</h3>
+            <div class="herramientaBody herramientaBodyFull">
+
+                <!-- Calculadora yield manual -->
+                <div class="hDivSection">
+                    <div class="hDivSectionHeader">
+                        <span class="hDivSectionTitle">Calculadora de yield</span>
+                    </div>
+                    <div class="herramientaBody">
+                        <div class="herramientaInputs">
+                            <div class="herramientaField">
+                                <label>Precio actual por acción (€)</label>
+                                <input type="number" id="hYieldPrecio" value="100" min="0" step="0.01">
+                            </div>
+                            <div class="herramientaField">
+                                <label>Dividendo anual por acción (€)</label>
+                                <input type="number" id="hYieldDiv" value="4" min="0" step="0.01">
+                            </div>
+                            <div class="herramientaField">
+                                <label>Número de acciones</label>
+                                <input type="number" id="hYieldAcciones" value="10" min="0" step="0.01">
+                            </div>
+                            <div class="herramientaField">
+                                <label>Retención (%)</label>
+                                <input type="number" id="hYieldRetencion" value="19" min="0" max="100" step="0.1">
+                            </div>
+                            <div class="hBtnRow">
+                                <button class="herramientaCalcBtn" id="hYieldCalcBtn">Calcular</button>
+                                <button class="herramientaResetBtn" data-panel="toolRentDividendo">Reiniciar</button>
+                            </div>
+                        </div>
+                        <div class="herramientaResults hidden" id="hYieldResults">
+                            <div class="herramientaResultGrid">
+                                <div class="herramientaResultCard">
+                                    <div class="hResultLabel">Dividend Yield</div>
+                                    <div class="hResultValue hResultPositive" id="hYieldPct">---</div>
+                                </div>
+                                <div class="herramientaResultCard">
+                                    <div class="hResultLabel">Ingresos brutos anuales</div>
+                                    <div class="hResultValue" id="hYieldBruto">---</div>
+                                </div>
+                                <div class="herramientaResultCard">
+                                    <div class="hResultLabel">Ingresos netos anuales</div>
+                                    <div class="hResultValue hResultPositive" id="hYieldNeto">---</div>
+                                </div>
+                                <div class="herramientaResultCard">
+                                    <div class="hResultLabel">Ingreso mensual neto</div>
+                                    <div class="hResultValue" id="hYieldMensual">---</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
 </div>

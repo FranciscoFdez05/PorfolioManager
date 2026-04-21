@@ -142,6 +142,7 @@
 
                 <button class="navBtn" data-page="herramientas">Herramientas</button>
                 <button class="navBtn" data-page="metricas">Métricas</button>
+                <button class="navBackupBtn" id="openBackupModalBtn" type="button" title="Copia de seguridad">💾</button>
             </div>
         </nav>
 
@@ -280,21 +281,36 @@
     </div>
 </div>
 
+<div class="modalOverlay hidden" id="backupModalOverlay">
+    <div class="assetModal backupModal" role="dialog" aria-modal="true">
+        <h3 class="assetModalTitle">Copias de seguridad</h3>
+        <div class="backupModalActions">
+            <button id="createBackupBtn" class="primaryButton" type="button">Crear backup ahora</button>
+            <span id="backupStatusMsg" class="backupStatusMsg"></span>
+        </div>
+        <div class="backupListTitle">Backups disponibles</div>
+        <div class="backupList" id="backupList"><span class="backupEmpty">Cargando...</span></div>
+        <div class="assetModalActions" style="margin-top:16px">
+            <button id="closeBackupModalBtn" class="secondaryButton" type="button">Cerrar</button>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="js/app-core.js?v=20260420k"></script>
+<script src="js/app-core.js?v=20260421f"></script>
 <script src="js/assets.js?v=20260420j"></script>
 <script src="js/intereses.js?v=20260418a"></script>
 <script src="js/dividendos.js?v=20260421a"></script>
-<script src="js/gastos.js?v=20260421b"></script>
+<script src="js/gastos.js?v=20260421g"></script>
 <script src="js/ventas.js?v=20260401g"></script>
 <script src="js/transacciones.js?v=20260401g"></script>
 <script src="js/stablecoins.js?v=20260401g"></script>
 <script src="js/operaciones.js?v=20260401g"></script>
 <script src="js/conversiones.js?v=20260401g"></script>
-<script src="js/herramientas.js?v=20260401g"></script>
+<script src="js/herramientas.js?v=20260421b"></script>
 <script src="js/bonos.js?v=20260420a"></script>
 <script src="js/rentaFija.js?v=20260420a"></script>
-<script src="js/metricas.js?v=20260421n"></script>
+<script src="js/metricas.js?v=20260421o"></script>
 <script src="js/shared-utils.js?v=20260421a"></script>
 </body>
 </html>

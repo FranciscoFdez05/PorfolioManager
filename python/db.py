@@ -255,5 +255,15 @@ def get_db() -> sqlite3.Connection:
     return _local.conn
 
 
+def reset_db():
+    conn = getattr(_local, "conn", None)
+    if conn is not None:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _local.conn = None
+
+
 def init_db():
     get_db()

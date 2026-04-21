@@ -213,6 +213,25 @@ body{
     border-color:#475569;
 }
 
+.navBackupBtn{
+    height:34px;
+    width:34px;
+    padding:0;
+    border:1px solid #334155;
+    border-radius:8px;
+    background:#0f1724;
+    color:#e5edf9;
+    cursor:pointer;
+    font-size:16px;
+    flex-shrink:0;
+    transition:background 0.15s ease, border-color 0.15s ease;
+}
+
+.navBackupBtn:hover{
+    background:#162033;
+    border-color:#475569;
+}
+
 .navBtn.active{
     background:#1d4ed8;
     border-color:#3b82f6;
@@ -1045,6 +1064,88 @@ body{
     box-shadow:0 20px 44px rgba(0,0,0,0.42);
 }
 
+.backupModal{
+    width:min(500px, 100%);
+}
+
+.backupModalActions{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:16px;
+}
+
+.backupStatusMsg{
+    font-size:13px;
+    color:#22c55e;
+}
+
+.backupStatusMsg.error{
+    color:#ef4444;
+}
+
+.backupListTitle{
+    font-size:12px;
+    color:#64748b;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    margin-bottom:8px;
+}
+
+.backupList{
+    max-height:260px;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+.backupEmpty{
+    font-size:13px;
+    color:#64748b;
+    padding:8px 0;
+}
+
+.backupItem{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:8px 10px;
+    border:1px solid #1e293b;
+    border-radius:8px;
+    background:#0f1724;
+    gap:8px;
+}
+
+.backupItemName{
+    font-size:13px;
+    color:#94a3b8;
+    flex:1;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.backupRestoreBtn{
+    height:28px;
+    padding:0 12px;
+    border:1px solid #334155;
+    border-radius:6px;
+    background:#1e293b;
+    color:#e5edf9;
+    cursor:pointer;
+    font-size:12px;
+    white-space:nowrap;
+    flex-shrink:0;
+    transition:background 0.15s;
+}
+
+.backupRestoreBtn:hover{
+    background:#273246;
+    border-color:#475569;
+}
+
 .assetModalTitle{
     margin:0 0 18px 0;
     color:#ffffff;
@@ -1144,6 +1245,16 @@ body{
     font-weight:700;
 }
 
+
+.gastosMonthHeader{
+    display:flex;
+    align-items:center;
+    gap:14px;
+}
+.gastosMonthSortBtn{
+    font-size:0.78rem;
+    padding:5px 12px;
+}
 .rowActionHeader{
     width:0;
     padding:0 !important;
@@ -1163,28 +1274,30 @@ body{
 .rowDeleteBtn,
 .row-delete-btn{
     position:absolute;
-    left:-30px;
+    left:-28px;
     top:50%;
     transform:translateY(-50%);
-    width:24px;
-    height:24px;
-    border:1px solid #334155;
-    border-radius:6px;
-    background:#111827;
-    color:#f87171;
-    font-size:14px;
-    font-weight:700;
+    width:22px;
+    height:22px;
+    border:none;
+    border-radius:50%;
+    background:transparent;
+    color:#64748b;
+    font-size:13px;
+    font-weight:600;
     line-height:1;
     cursor:pointer;
-    box-shadow:none;
-    transition:background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:background 0.15s ease, color 0.15s ease;
 }
 
 .rowDeleteBtn:hover,
 .row-delete-btn:hover{
-    background:#162033;
-    border-color:#7f1d1d;
-    color:#fca5a5;
+    background:rgba(239,68,68,0.15);
+    border:none;
+    color:#f87171;
     transform:translateY(-50%) scale(1.05);
 }
 
@@ -1277,6 +1390,295 @@ body{
     padding:20px;
     color:#ffffff;
 }
+
+/* ── Herramientas ──────────────────────────────────────────────────────── */
+.herramientasPage{
+    padding:20px;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+}
+.herramientasNav{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+}
+.herramientaBtn{
+    background:transparent;
+    border:1px solid #2a3a5a;
+    color:#7a8fb0;
+    font-size:0.82rem;
+    padding:7px 16px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .15s,color .15s,border-color .15s;
+}
+.herramientaBtn.active{
+    background:#1e2d45;
+    color:#e5edf9;
+    border-color:#3a5580;
+}
+.herramientaBtn:hover:not(.active){
+    background:#151f35;
+    color:#aabbd8;
+}
+
+.herramientaPanel{ display:none; }
+.herramientaPanel.active{ display:block; }
+
+.herramientaPanelTitle{
+    font-size:1rem;
+    font-weight:600;
+    color:#ccd6f6;
+    margin-bottom:20px;
+}
+
+.herramientaBody{
+    display:flex;
+    gap:32px;
+    flex-wrap:wrap;
+    align-items:flex-start;
+}
+.herramientaBodyFull{
+    flex-direction:column;
+}
+.herramientaBodyCols{
+    display:flex;
+    gap:40px;
+    flex-wrap:wrap;
+    align-items:flex-start;
+}
+
+.herramientaInputs{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    min-width:240px;
+}
+.herramientaBlock{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    background:#0f1824;
+    border:1px solid #1c2d45;
+    border-radius:10px;
+    padding:20px;
+    min-width:260px;
+}
+.herramientaBlockTitle{
+    font-size:0.82rem;
+    color:#7a8fb0;
+    font-weight:500;
+    margin:0;
+}
+.herramientaField{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+}
+.herramientaField label{
+    font-size:0.76rem;
+    color:#7a8fb0;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+}
+.herramientaField input{
+    background:#0f1824;
+    border:1px solid #2a3a5a;
+    color:#e5edf9;
+    font-size:0.92rem;
+    padding:8px 10px;
+    border-radius:6px;
+    outline:none;
+    width:100%;
+    box-sizing:border-box;
+    transition:border-color .15s;
+}
+.herramientaField input:focus{
+    border-color:#3a7bd5;
+}
+.herramientaCalcBtn{
+    background:#1e3a6e;
+    border:1px solid #3a5580;
+    color:#ccd6f6;
+    font-size:0.85rem;
+    font-weight:600;
+    padding:9px 20px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .15s;
+    align-self:flex-start;
+    margin-top:4px;
+}
+.herramientaCalcBtn:hover{ background:#254a88; }
+.herramientaSecBtn{
+    background:transparent;
+    border:1px solid #2a3a5a;
+    color:#7a8fb0;
+    font-size:0.82rem;
+    padding:7px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .15s,color .15s;
+}
+.herramientaSecBtn:hover{ background:#151f35; color:#aabbd8; }
+
+.herramientaResults{ flex:1; }
+.herramientaResultGrid{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-bottom:20px;
+}
+.herramientaResultCard{
+    background:#0f1824;
+    border:1px solid #1c2d45;
+    border-radius:10px;
+    padding:14px 18px;
+    min-width:140px;
+}
+.hResultBig{ min-width:200px; padding:20px 24px; }
+.hResultLabel{
+    font-size:0.72rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:#7a8fb0;
+    margin-bottom:6px;
+}
+.hResultValue{
+    font-size:1.25rem;
+    font-weight:700;
+    color:#e5edf9;
+}
+.hResultBig .hResultValue{ font-size:1.7rem; }
+.hResultPositive{ color:#2ecc71; }
+.hResultNegative{ color:#e74c3c; }
+
+.herramientaChartWrap{
+    height:300px;
+    position:relative;
+}
+
+/* Precio Medio table */
+.hPrecioMedioTable{
+    width:100%;
+    border-collapse:collapse;
+    font-size:0.85rem;
+    margin-bottom:12px;
+}
+.hPrecioMedioTable th{
+    text-align:left;
+    color:#7a8fb0;
+    font-size:0.72rem;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    padding:8px 10px;
+    border-bottom:1px solid #1c2d45;
+}
+.hPrecioMedioTable td{
+    padding:5px 10px;
+    border-bottom:1px solid #131e30;
+    color:#ccd6f6;
+    vertical-align:middle;
+}
+.hPrecioMedioTable .hPmNum{ color:#7a8fb0; width:32px; }
+.hPrecioInput{
+    background:#0f1824;
+    border:1px solid #2a3a5a;
+    color:#e5edf9;
+    font-size:0.85rem;
+    padding:5px 8px;
+    border-radius:5px;
+    outline:none;
+    width:110px;
+}
+.hPrecioInput:focus{ border-color:#3a7bd5; }
+.hPrecioDeleteBtn{
+    background:transparent;
+    border:none;
+    color:#e74c3c;
+    cursor:pointer;
+    font-size:0.8rem;
+    padding:2px 6px;
+    border-radius:4px;
+    opacity:.7;
+}
+.hPrecioDeleteBtn:hover{ opacity:1; background:#1c1424; }
+.hPrecioMedioActions{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    margin-bottom:18px;
+}
+.hBtnRow{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+    margin-top:4px;
+}
+.herramientaResetBtn{
+    background:transparent;
+    border:1px solid #3a2020;
+    color:#a06060;
+    font-size:0.82rem;
+    padding:7px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .15s,color .15s;
+}
+.herramientaResetBtn:hover{ background:#1c0f0f; color:#e74c3c; border-color:#e74c3c; }
+
+/* Rent. Dividendo */
+.hDivSection{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    margin-bottom:28px;
+}
+.hDivSectionHeader{
+    display:flex;
+    align-items:center;
+    gap:16px;
+}
+.hDivSectionTitle{
+    font-size:0.82rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    color:#7a8fb0;
+    font-weight:500;
+}
+.hDivChartWrap{
+    position:relative;
+    min-height:200px;
+    margin-bottom:16px;
+}
+.hDivTable{
+    width:100%;
+    border-collapse:collapse;
+    font-size:0.85rem;
+    margin-bottom:8px;
+}
+.hDivTable th{
+    text-align:left;
+    color:#7a8fb0;
+    font-size:0.72rem;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    padding:8px 12px;
+    border-bottom:1px solid #1c2d45;
+}
+.hDivTable td{
+    padding:7px 12px;
+    border-bottom:1px solid #131e30;
+    color:#ccd6f6;
+    vertical-align:middle;
+}
+.hDivTable tbody tr:nth-child(odd) td{ background:#0d1520; }
+.hDivName{ font-weight:500; }
+.hDivNum{ text-align:right; font-variant-numeric:tabular-nums; }
+.hDivPos{ color:#2ecc71; font-weight:600; }
+.hDivNeg{ color:#e74c3c; }
 
 .toolsPage{
     display:flex;
@@ -2280,11 +2682,11 @@ body{
 
 .gastosMonthTabs{
     display:flex;
-    gap:10px;
-    flex-wrap:wrap;
+    gap:5px;
+    flex-wrap:nowrap;
     margin:0;
     flex:1 1 auto;
-    max-width:none;
+    overflow:hidden;
 }
 
 .gastosMonthActions{
@@ -2292,7 +2694,7 @@ body{
     align-items:center;
     justify-content:flex-end;
     flex:0 0 auto;
-    gap:12px;
+    gap:6px;
 }
 
 .gastosTypePanel{
@@ -2413,6 +2815,16 @@ body{
     height:38px;
     font-size:14px;
     font-weight:600;
+    padding:0 14px;
+}
+
+.gastosMonthActions .primaryButton,
+.gastosMonthActions .secondaryButton,
+.gastosMonthActions .dangerButton{
+    font-size:14px;
+    padding:6px 14px;
+    height:38px;
+    white-space:nowrap;
 }
 
 .gastosMonthTitle{

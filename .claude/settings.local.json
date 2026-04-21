@@ -3,7 +3,11 @@
     "allow": [
       "Bash(curl -s http://localhost:5000/api/gastos/2026)",
       "Bash(python -c ' *)",
-      "Bash(curl -s -X POST http://localhost:5000/api/gastos/2026 -H 'Content-Type: application/json' -d @-)"
+      "Bash(curl -s -X POST http://localhost:5000/api/gastos/2026 -H 'Content-Type: application/json' -d @-)",
+      "Bash(sqlite3 portfolio.db \".tables\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python \"c:/Users/Francisco/OneDrive/VS-Code/Python/PorfolioPython/data/check_db.py\")",
+      "Bash(grep -E \"\\\\.py$\")"
     ]
   }
 }
