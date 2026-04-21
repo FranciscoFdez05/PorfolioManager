@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:5000/api/gastos/2026)",
+      "Bash(python -c ' *)",
+      "Bash(curl -s -X POST http://localhost:5000/api/gastos/2026 -H 'Content-Type: application/json' -d @-)"
+    ]
+  }
+}

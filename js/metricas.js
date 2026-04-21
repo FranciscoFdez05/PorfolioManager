@@ -1,9 +1,14 @@
 let _metricasCharts = {}
 let _metricasDisplayType = "doughnut"
 let _metricasDistMetric = "netoActualEur"
+let _metricasGastosMonth = "all"
 let _metricasPayload = null
 let _metricasSortKey = "netoActualEur"
 let _metricasSortDir = "desc"
+let _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","bonos","rentaFija"])
+
+const M_GASTOS_KEYS   = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
+const M_GASTOS_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
 
 const M_PALETTE = [
     "#3a7bd5", "#f7931a", "#2ecc71", "#e74c3c", "#9b59b6",
@@ -96,23 +101,33 @@ async function buildMetricasPayload() {
         }
     }))
 
-    const [divResp, intResp, bonosResp, rfResp] = await Promise.all([
+    const [divResp, intResp, bonosResp, rfResp, gastosYearsResp] = await Promise.all([
         fetch("/api/dividendos"),
         fetch("/api/intereses"),
         fetch("/api/bonos"),
-        fetch("/api/rentafija")
+        fetch("/api/rentafija"),
+        fetch("/api/gastos").catch(() => null)
     ])
     const divData   = await divResp.json()
     const intData   = await intResp.json()
     const bonosData = await bonosResp.json()
     const rfData    = await rfResp.json()
 
+    const gastosYearsData = gastosYearsResp ? await gastosYearsResp.json().catch(() => ({ years: [] })) : { years: [] }
+    const gastosYearsList = Array.isArray(gastosYearsData.years) ? gastosYearsData.years : []
+    const latestYear      = gastosYearsList[0] || null
+    const gastosYearData  = latestYear
+        ? await fetch(`/api/gastos/${latestYear}`).then((r) => r.json()).catch(() => null)
+        : null
+
     return {
         summaries,
-        dividendos: Array.isArray(divData.rows)   ? divData.rows   : [],
-        intereses:  Array.isArray(intData.rows)    ? intData.rows   : [],
-        bonos:      Array.isArray(bonosData.rows)  ? bonosData.rows : [],
-        rentaFija:  Array.isArray(rfData.rows)     ? rfData.rows    : []
+        dividendos:      Array.isArray(divData.rows)   ? divData.rows   : [],
+        intereses:       Array.isArray(intData.rows)    ? intData.rows   : [],
+        bonos:           Array.isArray(bonosData.rows)  ? bonosData.rows : [],
+        rentaFija:       Array.isArray(rfData.rows)     ? rfData.rows    : [],
+        gastosYearsList,
+        gastosYearData
     }
 }
 
@@ -271,21 +286,25 @@ function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], me
 
 function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], metric = "netoActualEur") {
     const bonosMap = {}
-    bonos.forEach((r) => {
-        const name = r.instrumento || "Bono"
-        bonosMap[name] = (bonosMap[name] || 0) + mDistBonoVal(r, metric)
-    })
+    if (_metricasActivosFilter.has("bonos")) {
+        bonos.forEach((r) => {
+            const name = r.instrumento || "Bono"
+            bonosMap[name] = (bonosMap[name] || 0) + mDistBonoVal(r, metric)
+        })
+    }
     const rfMap = {}
-    rentaFija.forEach((r) => {
-        const name = r.instrumento || "Renta Fija"
-        rfMap[name] = (rfMap[name] || 0) + mDistBonoVal(r, metric)
-    })
+    if (_metricasActivosFilter.has("rentaFija")) {
+        rentaFija.forEach((r) => {
+            const name = r.instrumento || "Renta Fija"
+            rfMap[name] = (rfMap[name] || 0) + mDistBonoVal(r, metric)
+        })
+    }
     const extras = [
         ...Object.entries(bonosMap).map(([name, val]) => ({ name, _val: val })),
         ...Object.entries(rfMap).map(([name, val]) => ({ name, _val: val }))
     ]
     const allItems = [
-        ...summaries.map((a) => ({ name: a.name, _val: mDistAssetVal(a, metric) })),
+        ...summaries.filter((a) => _metricasActivosFilter.has(a.type)).map((a) => ({ name: a.name, _val: mDistAssetVal(a, metric) })),
         ...extras
     ].sort((a, b) => b._val - a._val)
 
@@ -348,10 +367,12 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
 
 function mRenderRendTipos(summaries) {
     const types  = ["cripto", "acciones", "etfs", "comoditis"]
-    const labels = types.map((t) => M_TYPE_LABELS[t])
-    const values = types.map((t) =>
-        summaries.filter((a) => a.type === t).reduce((s, a) => s + a.rendimientoEur, 0)
-    )
+    const pairs  = types.map((t) => ({
+        label: M_TYPE_LABELS[t],
+        value: summaries.filter((a) => a.type === t).reduce((s, a) => s + a.rendimientoEur, 0)
+    })).sort((a, b) => b.value - a.value)
+    const labels = pairs.map((p) => p.label)
+    const values = pairs.map((p) => p.value)
     const colors = values.map((v) => (v >= 0 ? "#2ecc71cc" : "#e74c3ccc"))
     const borders = values.map((v) => (v >= 0 ? "#2ecc71" : "#e74c3c"))
 
@@ -639,6 +660,202 @@ function mRenderRentaFijaInst(rentaFija) {
     })
 }
 
+// ── gastos ─────────────────────────────────────────────────────────────────
+
+function mComputeGastosData(yearData) {
+    const totalMes = Object.fromEntries(M_GASTOS_KEYS.map((k) => [k, 0]))
+    const totalTipo = {}
+    let totalMensualidades = 0
+    let totalMovimientos = 0
+
+    ;(yearData?.mensualidades || []).forEach((m) => {
+        M_GASTOS_KEYS.forEach((k) => {
+            const val = parseEuroNumber(m.meses?.[k] || "")
+            totalMes[k] += val
+            totalMensualidades += val
+        })
+    })
+
+    Object.entries(yearData?.months || {}).forEach(([monthKey, monthData]) => {
+        ;(monthData?.rows || []).forEach((row) => {
+            const val = parseEuroNumber(row.cantidad || "")
+            totalMes[monthKey] = (totalMes[monthKey] || 0) + val
+            totalMovimientos += val
+            const tipo = (row.tipo || "Sin tipo").trim()
+            totalTipo[tipo] = (totalTipo[tipo] || 0) + val
+        })
+    })
+
+    return { totalMes, totalTipo, totalMensualidades, totalMovimientos }
+}
+
+function mRenderGastos(yearsList, yearData) {
+    const section = document.getElementById("mSectionGastos")
+    if (!yearsList.length || !yearData) {
+        if (section) section.classList.add("hidden")
+        return
+    }
+    if (section) section.classList.remove("hidden")
+
+    const { totalMes, totalTipo, totalMensualidades, totalMovimientos } = mComputeGastosData(yearData)
+    const totalGeneral = totalMensualidades + totalMovimientos
+
+    mSetKpi("mkpiGastosTotal",         formatEuro(totalGeneral))
+    mSetKpi("mkpiGastosMensualidades", formatEuro(totalMensualidades))
+    mSetKpi("mkpiGastosMovimientos",   formatEuro(totalMovimientos))
+
+    // Year toggle
+    const yearToggle = document.getElementById("mGastosYearToggle")
+    if (yearToggle) {
+        if (!yearToggle.dataset.bound) {
+            yearToggle.dataset.bound = "true"
+            yearToggle.innerHTML = yearsList.map((y) =>
+                `<button class="mToggleBtn${String(y) === String(yearData.year) ? " active" : ""}" data-gastosyear="${y}">${y}</button>`
+            ).join("")
+            yearToggle.addEventListener("click", async (e) => {
+                const btn = e.target.closest("[data-gastosyear]")
+                if (!btn) return
+                yearToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
+                btn.classList.add("active")
+                _metricasGastosMonth = "all"
+                const newData = await fetch(`/api/gastos/${btn.dataset.gastosyear}`).then((r) => r.json()).catch(() => null)
+                if (newData) {
+                    _metricasPayload.gastosYearData = newData
+                    const monthToggle = document.getElementById("mGastosMonthToggle")
+                    if (monthToggle) { monthToggle.dataset.bound = ""; monthToggle.innerHTML = "" }
+                    mRenderGastos(yearsList, newData)
+                }
+            })
+        } else {
+            yearToggle.querySelectorAll(".mToggleBtn").forEach((b) =>
+                b.classList.toggle("active", b.dataset.gastosyear === String(yearData.year))
+            )
+        }
+    }
+
+    // Month toggle
+    const monthToggle = document.getElementById("mGastosMonthToggle")
+    if (monthToggle && !monthToggle.dataset.bound) {
+        monthToggle.dataset.bound = "true"
+        const allBtn = `<button class="mToggleBtn${_metricasGastosMonth === "all" ? " active" : ""}" data-gastosmonth="all">Todos</button>`
+        const monthBtns = M_GASTOS_KEYS.map((k, i) =>
+            `<button class="mToggleBtn${_metricasGastosMonth === k ? " active" : ""}" data-gastosmonth="${k}">${M_GASTOS_LABELS[i]}</button>`
+        ).join("")
+        monthToggle.innerHTML = allBtn + monthBtns
+        monthToggle.addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-gastosmonth]")
+            if (!btn) return
+            monthToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
+            btn.classList.add("active")
+            _metricasGastosMonth = btn.dataset.gastosmonth
+            mRenderGastosCharts(yearData, totalMes, totalTipo)
+        })
+    } else if (monthToggle) {
+        monthToggle.querySelectorAll(".mToggleBtn").forEach((b) =>
+            b.classList.toggle("active", b.dataset.gastosmonth === _metricasGastosMonth)
+        )
+    }
+
+    mRenderGastosCharts(yearData, totalMes, totalTipo)
+}
+
+function mRenderGastosCharts(yearData, totalMes, totalTipo) {
+    const mesTitle  = document.getElementById("mGastosMesTitle")
+    const tipoTitle = document.getElementById("mGastosTipoTitle")
+    const mesWrap   = document.getElementById("mChartGastosMesWrap")
+
+    // Left chart: always annual monthly totals, fixed label
+    if (mesTitle)  mesTitle.textContent = "Tabla Gastos"
+    if (mesWrap)   mesWrap.style.height = "300px"
+
+    const mesValues = M_GASTOS_KEYS.map((k) => totalMes[k] || 0)
+    const mesColors = M_GASTOS_LABELS.map((_, i) => M_PALETTE[i % M_PALETTE.length])
+    mCreateChart("mChartGastosMes", {
+        type: "bar",
+        data: {
+            labels: M_GASTOS_LABELS,
+            datasets: [{ label: "Gastos (€)", data: mesValues, backgroundColor: mesColors.map((c) => c + "bb"), borderColor: mesColors, borderWidth: 1, borderRadius: 4 }]
+        },
+        options: {
+            ...M_CHART_DEFAULTS, indexAxis: "y",
+            plugins: { ...M_CHART_DEFAULTS.plugins, legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } } },
+            scales: { x: mAxisX(), y: mAxisY(11) }
+        }
+    })
+
+    // Right chart: by month selection
+    if (_metricasGastosMonth === "all") {
+        if (tipoTitle) tipoTitle.textContent = "Por tipo (anual)"
+        mRenderGastosTipoChart(totalTipo)
+    } else {
+        const monthIdx  = M_GASTOS_KEYS.indexOf(_metricasGastosMonth)
+        const monthName = M_GASTOS_LABELS[monthIdx] || _metricasGastosMonth
+        if (tipoTitle) tipoTitle.textContent = `Por tipo — ${monthName}`
+
+        const monthTipo = {}
+        ;(yearData?.months?.[_metricasGastosMonth]?.rows || []).forEach((r) => {
+            const val  = parseEuroNumber(r.cantidad || "")
+            const tipo = (r.tipo || "Sin tipo").trim()
+            if (val > 0) monthTipo[tipo] = (monthTipo[tipo] || 0) + val
+        })
+        const mensTotal = (yearData?.mensualidades || []).reduce((s, m) => s + parseEuroNumber(m.meses?.[_metricasGastosMonth] || ""), 0)
+        if (mensTotal > 0) monthTipo["Mensualidades"] = (monthTipo["Mensualidades"] || 0) + mensTotal
+
+        mRenderGastosTipoChart(monthTipo)
+    }
+}
+
+const M_GASTOS_TIPO_PALETTE = [
+    "#e74c3c",  // rojo
+    "#3498db",  // azul claro
+    "#2ecc71",  // verde
+    "#f1c40f",  // amarillo
+    "#9b59b6",  // morado
+    "#ff6b35",  // naranja
+    "#1abc9c",  // turquesa
+    "#e91e63",  // rosa/magenta
+    "#00bcd4",  // cyan
+    "#8bc34a",  // verde lima
+    "#1a5276",  // azul oscuro
+    "#a04000",  // marrón naranja
+]
+
+const M_GASTOS_TIPO_FIXED = {
+    "compras":        "#00bcd4",
+    "mensualidades":  "#3498db",
+    "comidas/cenas":  "#2ecc71",
+    "comidas":        "#2ecc71",
+    "gasoil":         "#ff6b35",
+    "otros":          "#9b59b6",
+    "cafe":           "#795548",
+    "café":           "#795548",
+}
+
+function mGastosTipoColor(label) {
+    const key = String(label).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    if (M_GASTOS_TIPO_FIXED[key]) return M_GASTOS_TIPO_FIXED[key]
+    let hash = 0
+    for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) & 0xfffff
+    return M_GASTOS_TIPO_PALETTE[hash % M_GASTOS_TIPO_PALETTE.length]
+}
+
+function mRenderGastosTipoChart(tipoData) {
+    const tipoEntries = Object.entries(tipoData).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+    if (!tipoEntries.length) { mDestroyChart("mChartGastosTipo"); return }
+    const tipoLabels = tipoEntries.map(([k]) => k)
+    const tipoValues = tipoEntries.map(([, v]) => v)
+    const tipoColors = tipoLabels.map((label) => mGastosTipoColor(label))
+    const tipoTotal  = tipoValues.reduce((a, b) => a + b, 0)
+    mCreateChart("mChartGastosTipo", {
+        type: "doughnut",
+        data: { labels: tipoLabels, datasets: [{ data: tipoValues, backgroundColor: tipoColors, borderColor: "#0b1120", borderWidth: 2, hoverOffset: 10 }] },
+        options: {
+            ...M_CHART_DEFAULTS, cutout: "55%",
+            plugins: { ...M_CHART_DEFAULTS.plugins, legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" }, tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } } }
+        }
+    })
+}
+
 // ── top-positions table ────────────────────────────────────────────────────
 
 function mSortSummaries(summaries) {
@@ -729,7 +946,7 @@ function mBindTableSort(summaries) {
 // ── main init ──────────────────────────────────────────────────────────────
 
 function mRenderAll(payload) {
-    const { summaries, dividendos, bonos, rentaFija } = payload
+    const { summaries, dividendos, bonos, rentaFija, gastosYearsList, gastosYearData } = payload
     const b = bonos || [], rf = rentaFija || []
     mRenderDistTipos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
     mRenderDistActivos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
@@ -740,6 +957,7 @@ function mRenderAll(payload) {
     mRenderBonosInst(b)
     mRenderRentaFijaTipos(rf)
     mRenderRentaFijaInst(rf)
+    mRenderGastos(gastosYearsList || [], gastosYearData || null)
     mRenderTopTable(summaries)
 }
 
@@ -748,6 +966,8 @@ async function initMetricasLogic() {
     _metricasCharts = {}
     _metricasDisplayType = "doughnut"
     _metricasDistMetric = "netoActualEur"
+    _metricasGastosMonth = "all"
+    _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","bonos","rentaFija"])
     _metricasPayload = null
 
     const loading = document.getElementById("metricasLoading")
@@ -759,6 +979,20 @@ async function initMetricasLogic() {
         mUpdateKpis(_metricasPayload)
         mRenderAll(_metricasPayload)
         mBindTableSort(_metricasPayload.summaries)
+
+        document.querySelectorAll(".mActivosFilterBtn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const tipo = btn.dataset.atype
+                if (_metricasActivosFilter.has(tipo)) {
+                    _metricasActivosFilter.delete(tipo)
+                    btn.classList.remove("active")
+                } else {
+                    _metricasActivosFilter.add(tipo)
+                    btn.classList.add("active")
+                }
+                mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
+            })
+        })
 
         const toggleBtns = document.querySelectorAll(".mToggleBtn")
         toggleBtns.forEach((btn) => {

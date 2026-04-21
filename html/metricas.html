@@ -80,9 +80,27 @@
             </div>
         </div>
 
+        <div class="metricasKpiGroup mkpiGroupGastos">
+            <span class="metricasKpiGroupLabel">Gastos</span>
+            <div class="metricasKpiCards">
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Total año</div>
+                    <div class="mkpiValue" id="mkpiGastosTotal">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Mensualidades</div>
+                    <div class="mkpiValue" id="mkpiGastosMensualidades">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Movimientos</div>
+                    <div class="mkpiValue" id="mkpiGastosMovimientos">---</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- ── Distribución ─────────────────────────────────────── -->
+    <!-- -- Distribución --------------------------------------- -->
     <div class="metricasSection">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Distribución del Portfolio</span>
@@ -104,7 +122,17 @@
                 </div>
             </div>
             <div class="metricasChartCard">
-                <div class="metricasChartTitle">Por activo individual</div>
+                <div class="mActivosHeader">
+                    <div class="metricasChartTitle">Por activo individual</div>
+                    <div class="mActivosFilterGroup" id="mActivosFilterGroup">
+                        <button class="mActivosFilterBtn active" data-atype="cripto">Cripto</button>
+                        <button class="mActivosFilterBtn active" data-atype="acciones">Acciones</button>
+                        <button class="mActivosFilterBtn active" data-atype="etfs">ETFs</button>
+                        <button class="mActivosFilterBtn active" data-atype="comoditis">Comoditis</button>
+                        <button class="mActivosFilterBtn active" data-atype="bonos">Bonos</button>
+                        <button class="mActivosFilterBtn active" data-atype="rentaFija">Renta Fija</button>
+                    </div>
+                </div>
                 <div class="metricasChartWrap" style="height:280px">
                     <canvas id="mChartActivos"></canvas>
                 </div>
@@ -112,7 +140,7 @@
         </div>
     </div>
 
-    <!-- ── Rendimiento ──────────────────────────────────────── -->
+    <!-- -- Rendimiento ---------------------------------------- -->
     <div class="metricasSection">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Rendimiento</span>
@@ -133,7 +161,7 @@
         </div>
     </div>
 
-    <!-- ── Dividendos ───────────────────────────────────────── -->
+    <!-- -- Dividendos ----------------------------------------- -->
     <div class="metricasSection" id="mSectionDividendos">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Dividendos por instrumento</span>
@@ -145,7 +173,7 @@
         </div>
     </div>
 
-    <!-- ── Renta Fija ─────────────────────────────────────────── -->
+    <!-- -- Renta Fija ------------------------------------------- -->
     <div class="metricasSection" id="mSectionRentaFija">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Renta Fija</span>
@@ -166,7 +194,7 @@
         </div>
     </div>
 
-    <!-- ── Bonos ──────────────────────────────────────────────── -->
+    <!-- -- Bonos ------------------------------------------------ -->
     <div class="metricasSection" id="mSectionBonos">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Bonos</span>
@@ -187,7 +215,32 @@
         </div>
     </div>
 
-    <!-- ── Tabla top activos ────────────────────────────────── -->
+    <!-- -- Gastos --------------------------------------------- -->
+    <div class="metricasSection" id="mSectionGastos">
+        <div class="metricasSectionHeader mGastosHeader">
+            <div class="mGastosHeaderLeft">
+                <span class="metricasSectionTitle">Gastos</span>
+                <div class="mToggleGroup" id="mGastosYearToggle"></div>
+            </div>
+            <div class="mToggleGroup mGastosMonthToggle" id="mGastosMonthToggle"></div>
+        </div>
+        <div class="metricasChartsGrid2">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle" id="mGastosMesTitle">Gastos por mes</div>
+                <div class="metricasChartWrap metricasChartDynamic" id="mChartGastosMesWrap">
+                    <canvas id="mChartGastosMes"></canvas>
+                </div>
+            </div>
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle" id="mGastosTipoTitle">Por tipo</div>
+                <div class="metricasChartWrap" style="height:300px">
+                    <canvas id="mChartGastosTipo"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- -- Tabla top activos ---------------------------------- -->
     <div class="metricasSection">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Posiciones</span>

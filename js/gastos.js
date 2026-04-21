@@ -506,8 +506,10 @@ function handleGastosAnnualDeleteClick(event) {
     }
 
     sharedGastosTypes.splice(rowIndex, 1)
+    if (currentGastosData) currentGastosData.gastosTipos = [...sharedGastosTypes]
     persistSharedGastosTypes().then(() => {
         renderCurrentGastosView()
+        scheduleGastosAutosave()
     }).catch((error) => {
         console.error(error)
         alert("No se pudo guardar la lista global de gastos.")
@@ -674,6 +676,10 @@ function syncGastosDataFromTables() {
         return
     }
 
+    if (!document.querySelector(".gastosPage")) {
+        return
+    }
+
     const annualRows = document.querySelectorAll("[data-gastos-name-row]")
     annualRows.forEach((cell) => {
         const rowIndex = Number(cell.dataset.gastosNameRow)
@@ -693,18 +699,22 @@ function syncGastosDataFromTables() {
     const gastoTypeRows = document.querySelectorAll("[data-gastos-type-row]")
     sharedGastosTypes = dedupeGastosTypes(Array.from(gastoTypeRows).map((cell) => sanitizeGastoTypeLabel(cell.textContent)).filter(Boolean))
 
-    const bodyRows = [...document.querySelectorAll("#gastosMovementsBody tr")]
-    currentGastosData.months[currentGastosMonth].rows = bodyRows.map((rowElement) => {
-        const cells = rowElement.querySelectorAll("td")
-        const tipo = normalizeGastoTipo(rowElement.querySelector(".gastosTypeSelect")?.value || "")
-
-        return {
-            fecha: cells[1]?.textContent.trim() || "",
-            nombre: cells[2]?.textContent.trim() || "",
-            tipo,
-            cantidad: cells[4]?.textContent.trim() || ""
+    if (currentGastosView === "month") {
+        const bodyRows = [...document.querySelectorAll("#gastosMovementsBody tr")]
+        if (!currentGastosData.months[currentGastosMonth]) {
+            currentGastosData.months[currentGastosMonth] = { rows: [] }
         }
-    }).filter((row) => row.fecha || row.nombre || row.tipo || parseEuroNumber(row.cantidad) !== 0)
+        currentGastosData.months[currentGastosMonth].rows = bodyRows.map((rowElement) => {
+            const cells = rowElement.querySelectorAll("td")
+            const tipo = normalizeGastoTipo(rowElement.querySelector(".gastosTypeSelect")?.value || "")
+            return {
+                fecha: cells[1]?.textContent.trim() || "",
+                nombre: cells[2]?.textContent.trim() || "",
+                tipo,
+                cantidad: cells[4]?.textContent.trim() || ""
+            }
+        }).filter((row) => row.fecha || row.nombre || row.tipo || parseEuroNumber(row.cantidad) !== 0)
+    }
 }
 
 function normalizeGastoTipo(value) {
@@ -739,6 +749,7 @@ async function persistCurrentGastosData(options = {}) {
     }
 
     syncGastosDataFromTables()
+    currentGastosData.gastosTipos = [...sharedGastosTypes]
     window.clearTimeout(gastosAutosaveTimeout)
     await persistSharedGastosTypes()
     await saveGastosYear(currentGastosYear, currentGastosData, options)

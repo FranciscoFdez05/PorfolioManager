@@ -972,9 +972,6 @@ body{
     vertical-align:middle;
 }
 
-.overviewTable thead th:nth-child(-n+2){
-    text-align:center;
-}
 
 .overviewTable thead th:nth-child(n+3){
     text-align:right;
@@ -2681,6 +2678,7 @@ body{
 .mkpiGroupIngresos  .metricasKpiCard{ border-top-color:#2ecc71; }
 .mkpiGroupBonos     .metricasKpiCard{ border-top-color:#9b59b6; }
 .mkpiGroupRf        .metricasKpiCard{ border-top-color:#00bcd4; }
+.mkpiGroupGastos    .metricasKpiCard{ border-top-color:#e74c3c; }
 
 .mkpiLabel{
     font-size:0.73rem;
@@ -2716,6 +2714,10 @@ body{
     justify-content:space-between;
     margin-bottom:14px;
 }
+
+.mGastosHeader{ flex-wrap:nowrap; gap:12px; }
+.mGastosHeaderLeft{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.mGastosMonthToggle{ flex-shrink:0; }
 
 .metricasSectionTitle{
     font-size:1rem;
@@ -2778,6 +2780,42 @@ body{
     letter-spacing:.07em;
     color:#7a8fb0;
     margin-bottom:14px;
+}
+
+.mActivosHeader{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:14px;
+}
+.mActivosHeader .metricasChartTitle{
+    margin-bottom:0;
+}
+.mActivosFilterGroup{
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px;
+}
+.mActivosFilterBtn{
+    background:transparent;
+    border:1px solid #2a3a5a;
+    color:#7a8fb0;
+    font-size:0.72rem;
+    padding:3px 9px;
+    border-radius:4px;
+    cursor:pointer;
+    transition:background .15s,color .15s;
+}
+.mActivosFilterBtn.active{
+    background:#1e2d45;
+    color:#e5edf9;
+    border-color:#3a5580;
+}
+.mActivosFilterBtn:hover:not(.active){
+    background:#151f35;
+    color:#aabbd8;
 }
 
 .metricasChartWrap{
