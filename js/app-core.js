@@ -45,12 +45,16 @@ async function loadGlobalSettings() {
         const res  = await fetch("/api/settings")
         const data = await res.json()
         if (data.ok) {
-            window._settingsStaleHours = data.staleHours ?? 24
-            window._hiddenAssets       = new Set(data.hiddenAssets || [])
+            window._settingsStaleHours      = data.staleHours ?? 24
+            window._hiddenAssets            = new Set(data.hiddenAssets || [])
+            window._metricasDisplayType     = data.metricasDisplayType ?? "doughnut"
+            window._metricasDistMetric      = data.metricasDistMetric  ?? "netoActualEur"
         }
     } catch {
-        window._settingsStaleHours = 24
-        window._hiddenAssets       = new Set()
+        window._settingsStaleHours      = 24
+        window._hiddenAssets            = new Set()
+        window._metricasDisplayType     = "doughnut"
+        window._metricasDistMetric      = "netoActualEur"
     }
 }
 
@@ -61,7 +65,7 @@ let assetModalState = null
 let confirmModalState = null
 let editAssetModalState = null
 let draggedAssetId = null
-const PAGE_HTML_VERSION = "20260422f"
+const PAGE_HTML_VERSION = "20260422i"
 
 function initSidePanel(toggleButton, sideWrapper) {
     if (!toggleButton || !sideWrapper) {

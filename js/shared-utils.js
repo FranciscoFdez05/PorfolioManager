@@ -791,3 +791,105 @@ new MutationObserver(() => {
 document.addEventListener("DOMContentLoaded", () => {
     enhanceAssetJsonActions()
 })
+
+// ── Custom select dropdown ──────────────────────────────────────────────────
+
+function _buildCustomSelect(select) {
+    if (select._csInit) return
+    select._csInit = true
+
+    const wrapper = document.createElement("div")
+    wrapper.className = "csWrapper"
+
+    const trigger = document.createElement("div")
+    trigger.className = "csTrigger"
+
+    const label = document.createElement("span")
+    label.className = "csLabel"
+
+    const arrow = document.createElement("span")
+    arrow.className = "csArrow"
+    arrow.textContent = "▾"
+
+    trigger.appendChild(label)
+    trigger.appendChild(arrow)
+
+    const menu = document.createElement("div")
+    menu.className = "csMenu"
+
+    select.parentNode.insertBefore(wrapper, select)
+    wrapper.appendChild(select)
+    wrapper.appendChild(trigger)
+    wrapper.appendChild(menu)
+    select.style.display = "none"
+
+    function syncOptions() {
+        menu.innerHTML = ""
+        Array.from(select.options).forEach((opt) => {
+            if (!opt.value && !opt.text.trim()) return
+            const item = document.createElement("div")
+            item.className = "csOption" + (opt.selected ? " csSelected" : "")
+            item.dataset.val = opt.value
+            item.textContent = opt.text
+            item.addEventListener("mousedown", (e) => {
+                e.preventDefault()
+                select.value = opt.value
+                select.dispatchEvent(new Event("change", { bubbles: true }))
+                syncLabel()
+                syncOptions()
+                menu.classList.remove("csOpen")
+                trigger.classList.remove("csOpen")
+            })
+            menu.appendChild(item)
+        })
+    }
+
+    function syncLabel() {
+        const sel = select.options[select.selectedIndex]
+        label.textContent = sel ? sel.text : ""
+    }
+
+    syncOptions()
+    syncLabel()
+
+    trigger.addEventListener("click", (e) => {
+        e.stopPropagation()
+        const isOpen = menu.classList.contains("csOpen")
+        document.querySelectorAll(".csMenu.csOpen").forEach((m) => {
+            m.classList.remove("csOpen")
+            m.previousElementSibling?.classList.remove("csOpen")
+        })
+        if (!isOpen) {
+            syncOptions()
+            menu.classList.add("csOpen")
+            trigger.classList.add("csOpen")
+        }
+    })
+
+    document.addEventListener("click", () => {
+        menu.classList.remove("csOpen")
+        trigger.classList.remove("csOpen")
+    })
+
+    select.addEventListener("change", () => {
+        syncLabel()
+        syncOptions()
+    })
+
+    new MutationObserver(() => {
+        syncOptions()
+        syncLabel()
+    }).observe(select, { childList: true })
+}
+
+new MutationObserver((mutations) => {
+    for (const m of mutations) {
+        for (const node of m.addedNodes) {
+            if (node.nodeType !== 1) continue
+            if (node.tagName === "SELECT" && !node.dataset.noCustom) _buildCustomSelect(node)
+            node.querySelectorAll?.("select:not([data-no-custom])").forEach(_buildCustomSelect)
+        }
+    }
+}).observe(document.body, { childList: true, subtree: true })
+
+document.querySelectorAll("select:not([data-no-custom])").forEach(_buildCustomSelect)

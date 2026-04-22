@@ -968,8 +968,8 @@ function mRenderAll(payload) {
 async function initMetricasLogic() {
     Object.values(_metricasCharts).forEach((c) => c?.destroy())
     _metricasCharts = {}
-    _metricasDisplayType = "doughnut"
-    _metricasDistMetric = "netoActualEur"
+    _metricasDisplayType = window._metricasDisplayType ?? "doughnut"
+    _metricasDistMetric  = window._metricasDistMetric  ?? "netoActualEur"
     _metricasGastosMonth = "all"
     _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","bonos","rentaFija"])
     _metricasGastosTipoFilter = new Set()
@@ -1000,12 +1000,15 @@ async function initMetricasLogic() {
             })
         })
 
-        const toggleBtns = document.querySelectorAll(".mToggleBtn")
+        const toggleBtns = document.querySelectorAll(".mToggleBtn[data-charttype]")
         toggleBtns.forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.charttype === _metricasDisplayType)
             btn.addEventListener("click", () => {
                 toggleBtns.forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasDisplayType = btn.dataset.charttype
+                window._metricasDisplayType = _metricasDisplayType
+                fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ metricasDisplayType: _metricasDisplayType }) })
                 mRenderDistTipos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
                 mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
             })
@@ -1013,10 +1016,13 @@ async function initMetricasLogic() {
 
         const metricBtns = document.querySelectorAll(".mDistMetricBtn")
         metricBtns.forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.metric === _metricasDistMetric)
             btn.addEventListener("click", () => {
                 metricBtns.forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasDistMetric = btn.dataset.metric
+                window._metricasDistMetric = _metricasDistMetric
+                fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ metricasDistMetric: _metricasDistMetric }) })
                 mRenderDistTipos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
                 mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
             })

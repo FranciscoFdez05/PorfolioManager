@@ -13,6 +13,8 @@ _DEFAULTS = {
     "staleHours": 24,
     "hiddenAssets": [],
     "theme": "default",
+    "metricasDisplayType": "doughnut",
+    "metricasDistMetric": "netoActualEur",
 }
 
 
@@ -78,8 +80,10 @@ def get_settings():
         "eodhdKeyCount":   len([k for k in eodhd_raw.splitlines() if k.strip()]),
         "autoBackupDays": int(cfg.get("autoBackupDays") or 0),
         "staleHours":     int(cfg.get("staleHours") or 24),
-        "hiddenAssets":   cfg.get("hiddenAssets") or [],
-        "theme":          cfg.get("theme") or "default",
+        "hiddenAssets":        cfg.get("hiddenAssets") or [],
+        "theme":               cfg.get("theme") or "default",
+        "metricasDisplayType": cfg.get("metricasDisplayType") or "doughnut",
+        "metricasDistMetric":  cfg.get("metricasDistMetric") or "netoActualEur",
     })
 
 
@@ -115,6 +119,10 @@ def save_settings():
         cfg["hiddenAssets"] = [str(i) for i in data["hiddenAssets"] if i]
     if "theme" in data:
         cfg["theme"] = str(data["theme"]) if data["theme"] in {"default", "black", "light"} else "default"
+    if "metricasDisplayType" in data:
+        cfg["metricasDisplayType"] = str(data["metricasDisplayType"]) if data["metricasDisplayType"] in {"doughnut", "bar"} else "doughnut"
+    if "metricasDistMetric" in data:
+        cfg["metricasDistMetric"] = str(data["metricasDistMetric"]) if data["metricasDistMetric"] in {"netoActualEur", "invertidoEur", "rendimientoEur"} else "netoActualEur"
 
     _write_ajustes(cfg)
     return jsonify({"ok": True})
