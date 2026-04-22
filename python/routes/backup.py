@@ -10,7 +10,17 @@ backup_bp = Blueprint("backup", __name__)
 _BASE_DIR = Path(__file__).resolve().parent.parent.parent
 _DB_PATH = _BASE_DIR / "data" / "portfolio.db"
 _BACKUP_DIR = _BASE_DIR / "data" / "backups"
-_FILENAME_RE = re.compile(r'^portfolio_\d{8}_\d{6}\.db$')
+_FILENAME_RE = re.compile(r'^portfolio_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.db$')
+
+
+def _parse_backup_dt(name):
+    m = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', name)
+    if not m:
+        return datetime.min
+    try:
+        return datetime.strptime(m.group(1), "%d-%m-%Y_%H-%M-%S")
+    except ValueError:
+        return datetime.min
 
 
 def _list_backups():
@@ -18,6 +28,7 @@ def _list_backups():
         return []
     files = sorted(
         [f.name for f in _BACKUP_DIR.iterdir() if _FILENAME_RE.match(f.name)],
+        key=_parse_backup_dt,
         reverse=True
     )
     return files
@@ -26,7 +37,7 @@ def _list_backups():
 @backup_bp.route("/api/backup", methods=["POST"])
 def createBackup():
     _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
     filename = f"portfolio_{ts}.db"
     backup_path = _BACKUP_DIR / filename
 
@@ -69,3 +80,17 @@ def restoreBackup():
     src.close()
 
     return jsonify({"ok": True})
+
+
+@backup_bp.route("/api/backups/<filename>", methods=["DELETE"])
+def deleteBackup(filename):
+    filename = filename.strip()
+    if not _FILENAME_RE.match(filename):
+        return jsonify({"ok": False, "error": "Nombre de fichero inválido"}), 400
+
+    backup_path = _BACKUP_DIR / filename
+    if not backup_path.exists():
+        return jsonify({"ok": False, "error": "Backup no encontrado"}), 404
+
+    backup_path.unlink()
+    return jsonify({"ok": True, "backups": _list_backups()})

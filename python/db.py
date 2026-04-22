@@ -217,6 +217,11 @@ CREATE TABLE IF NOT EXISTS dividendo_calendar (
     PRIMARY KEY (month, asset_name)
 );
 
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS renta_fija (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     fecha             TEXT NOT NULL DEFAULT '',

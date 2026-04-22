@@ -7,7 +7,17 @@
       "Bash(sqlite3 portfolio.db \".tables\")",
       "Bash(python3 -c ' *)",
       "Bash(python \"c:/Users/Francisco/OneDrive/VS-Code/Python/PorfolioPython/data/check_db.py\")",
-      "Bash(grep -E \"\\\\.py$\")"
+      "Bash(grep -E \"\\\\.py$\")",
+      "Bash(cp \"data/backups/portfolio_21-04-2026_23-29-40.db\" \"data/portfolio.db\")",
+      "Bash(rm -f \"data/portfolio.db-wal\" \"data/portfolio.db-shm\")",
+      "Bash(python python/server.py)",
+      "Bash(curl -s http://localhost:5000/api/activos)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('activos:', len\\(d.get\\('activos',[]\\)\\)\\)\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
+      "Read(//c/Users/Francisco/.claude/projects/c--Users-Francisco-OneDrive-VS-Code-Python-PorfolioPython/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Francisco\\.claude\\projects\\c--Users-Francisco-OneDrive-VS-Code-Python-PorfolioPython\\memory"
     ]
   }
 }

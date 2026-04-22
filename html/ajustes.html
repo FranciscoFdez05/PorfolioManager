@@ -1,0 +1,125 @@
+<div class="ajustesLayout" id="ajustesLayout">
+
+    <div class="ajustesCol" id="ajustesColLeft">
+
+        <div class="ajustesSection" data-ajuste-id="tema">
+            <button class="ajustesLockBtn" type="button" title="Bloquear/desbloquear posición">🔒</button>
+            <div class="ajustesSectionTitle">Paleta de color</div>
+            <div class="ajustesSectionDesc">Elige el tema visual de la aplicación.</div>
+            <div class="ajustesTemaGrid" id="ajustesTemaGrid">
+                <button class="ajustesTemaBtn" data-theme="default" type="button">
+                    <span class="ajustesTemaPreview temaDefault"></span>
+                    <span class="ajustesTemaLabel">Noche Clara</span>
+                </button>
+                <button class="ajustesTemaBtn" data-theme="black" type="button">
+                    <span class="ajustesTemaPreview temaBlack"></span>
+                    <span class="ajustesTemaLabel">Oscuro</span>
+                </button>
+                <button class="ajustesTemaBtn" data-theme="light" type="button">
+                    <span class="ajustesTemaPreview temaLight"></span>
+                    <span class="ajustesTemaLabel">Claro</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="ajustesSection" data-ajuste-id="apikeys">
+            <button class="ajustesLockBtn" type="button" title="Bloquear/desbloquear posición">🔒</button>
+            <div class="ajustesSectionTitle">Claves API</div>
+            <div class="ajustesSectionDesc">Las claves se guardan en los ficheros <code>API/finnhub.key</code> y <code>API/eodhd.key</code>.</div>
+            <div class="ajustesField">
+                <div class="ajustesLabelRow">
+                    <label class="ajustesLabel" for="ajustesFinnhubKey">Finnhub API Key</label>
+                    <span class="ajustesKeyStatus" id="ajustesFinnhubStatus"></span>
+                </div>
+                <div class="ajustesInputRow">
+                    <input id="ajustesFinnhubKey" class="ajustesInput" type="password" placeholder="Nueva clave Finnhub…" autocomplete="off">
+                    <button class="ajustesToggleBtn" type="button" data-target="ajustesFinnhubKey" title="Mostrar/ocultar">👁</button>
+                    <button id="ajustesGuardarFinnhubBtn" class="primaryButton" type="button">Añadir</button>
+                </div>
+                <span id="ajustesFinnhubMsg" class="ajustesStatusMsg"></span>
+            </div>
+            <div class="ajustesField">
+                <div class="ajustesLabelRow">
+                    <label class="ajustesLabel" for="ajustesEodhdKeys">EODHD API Key(s)</label>
+                    <span class="ajustesKeyStatus" id="ajustesEodhdStatus"></span>
+                </div>
+                <div class="ajustesInputRow">
+                    <input id="ajustesEodhdKeys" class="ajustesInput" type="password" placeholder="Nueva clave EODHD…" autocomplete="off">
+                    <button class="ajustesToggleBtn" type="button" data-target="ajustesEodhdKeys" title="Mostrar/ocultar">👁</button>
+                    <button id="ajustesGuardarEodhdBtn" class="primaryButton" type="button">Añadir</button>
+                </div>
+                <span id="ajustesEodhdMsg" class="ajustesStatusMsg"></span>
+            </div>
+        </div>
+
+        <div class="ajustesSection" data-ajuste-id="stale">
+            <button class="ajustesLockBtn" type="button" title="Bloquear/desbloquear posición">🔒</button>
+            <div class="ajustesSectionTitle">Umbral de cotizaciones</div>
+            <div class="ajustesSectionDesc">Marca los precios del sidebar como desactualizados pasadas estas horas.</div>
+            <div class="ajustesField">
+                <label class="ajustesLabel" for="ajustesStaleHours">Horas hasta desactualizado</label>
+                <select id="ajustesStaleHours" class="ajustesSelect">
+                    <option value="4">4 horas</option>
+                    <option value="8">8 horas</option>
+                    <option value="12">12 horas</option>
+                    <option value="24">24 horas</option>
+                    <option value="48">48 horas</option>
+                    <option value="0">Nunca</option>
+                </select>
+            </div>
+            <div class="ajustesActions">
+                <button id="ajustesGuardarStaleBtn" class="primaryButton" type="button">Guardar</button>
+                <span id="ajustesStaleMsg" class="ajustesStatusMsg"></span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="ajustesCol" id="ajustesColRight">
+
+        <div class="ajustesSection" data-ajuste-id="autobackup">
+            <button class="ajustesLockBtn" type="button" title="Bloquear/desbloquear posición">🔒</button>
+            <div class="ajustesSectionTitle">Auto-backup</div>
+            <div class="ajustesSectionDesc">Crea automáticamente una copia de seguridad al arrancar el servidor si han pasado los días indicados.</div>
+            <div class="ajustesField">
+                <label class="ajustesLabel" for="ajustesAutoBackup">Frecuencia</label>
+                <select id="ajustesAutoBackup" class="ajustesSelect">
+                    <option value="0">Desactivado</option>
+                    <option value="1">Cada día</option>
+                    <option value="3">Cada 3 días</option>
+                    <option value="7">Cada semana</option>
+                    <option value="14">Cada 2 semanas</option>
+                    <option value="30">Cada mes</option>
+                </select>
+            </div>
+            <div class="ajustesActions">
+                <button id="ajustesGuardarBackupFreqBtn" class="primaryButton" type="button">Guardar</button>
+                <span id="ajustesBackupFreqMsg" class="ajustesStatusMsg"></span>
+            </div>
+        </div>
+
+        <div class="ajustesSection" data-ajuste-id="hidden">
+            <button class="ajustesLockBtn" type="button" title="Bloquear/desbloquear posición">🔒</button>
+            <div class="ajustesSectionTitle">Activos ocultos</div>
+            <div class="ajustesSectionDesc">Los activos ocultos no aparecen en el sidebar pero sus datos se conservan.</div>
+            <div class="ajustesHiddenList" id="ajustesHiddenList">
+                <span class="ajustesBackupEmpty">Cargando…</span>
+            </div>
+        </div>
+
+        <div class="ajustesSection" data-ajuste-id="backups">
+            <button class="ajustesLockBtn" type="button" title="Bloquear/desbloquear posición">🔒</button>
+            <div class="ajustesSectionTitle">Copias de seguridad</div>
+            <div class="ajustesSectionDesc">Crea o restaura una copia completa de la base de datos.</div>
+            <div class="ajustesActions">
+                <button id="ajustesCrearBackupBtn" class="primaryButton" type="button">Crear backup ahora</button>
+                <span id="ajustesBackupMsg" class="ajustesStatusMsg"></span>
+            </div>
+            <div class="ajustesBackupList" id="ajustesBackupList">
+                <span class="ajustesBackupEmpty">Cargando…</span>
+            </div>
+        </div>
+
+    </div>
+
+</div>

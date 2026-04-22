@@ -761,39 +761,12 @@ function mRenderGastos(yearsList, yearData) {
     mRenderGastosCharts(yearData, totalMes, totalTipo)
 }
 
-function mRenderGastosTipoFilterBtns(tipos) {
-    const group = document.getElementById("mGastosTipoFilterGroup")
-    if (!group) return
-    const key = [...tipos].sort().join(",")
-    if (group.dataset.typeKey === key) return
-    group.dataset.typeKey = key
-    group.innerHTML = ""
-    tipos.sort().forEach((tipo) => {
-        const btn = document.createElement("button")
-        btn.className = "mActivosFilterBtn" + (_metricasGastosTipoFilter.has(tipo) ? "" : " active")
-        btn.textContent = tipo
-        btn.addEventListener("click", () => {
-            if (_metricasGastosTipoFilter.has(tipo)) {
-                _metricasGastosTipoFilter.delete(tipo)
-                btn.classList.add("active")
-            } else {
-                _metricasGastosTipoFilter.add(tipo)
-                btn.classList.remove("active")
-            }
-            if (_mGastosChartsCache) {
-                mRenderGastosCharts(_mGastosChartsCache.yearData, _mGastosChartsCache.totalMes, _mGastosChartsCache.totalTipo)
-            }
-        })
-        group.appendChild(btn)
-    })
-}
 
 function mRenderGastosCharts(yearData, totalMes, totalTipo) {
     _mGastosChartsCache = { yearData, totalMes, totalTipo }
     const mesTitle  = document.getElementById("mGastosMesTitle")
     const tipoTitle = document.getElementById("mGastosTipoTitle")
     const mesWrap   = document.getElementById("mChartGastosMesWrap")
-    mRenderGastosTipoFilterBtns(Object.keys(totalTipo).filter((k) => totalTipo[k] > 0))
 
     // Left chart: always annual monthly totals, fixed label
     if (mesTitle)  mesTitle.textContent = "Tabla Gastos"

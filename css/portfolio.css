@@ -144,16 +144,18 @@ body{
 }
 
 .navDropdownBtn{
-    height:34px;
-    padding:0 16px;
+    height:30px;
+    width:120px;
+    padding:0 10px;
     border:1px solid #334155;
-    border-radius:8px;
+    border-radius:6px;
     background:#0f1724;
     color:#e5edf9;
     cursor:pointer;
-    font-size:14px;
+    font-size:13px;
     transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     white-space:nowrap;
+    text-align:center;
 }
 
 .navDropdownBtn:hover{
@@ -178,7 +180,7 @@ body{
     border-radius:8px;
     padding:4px;
     z-index:200;
-    min-width:140px;
+    min-width:120px;
     flex-direction:column;
     gap:2px;
 }
@@ -189,23 +191,28 @@ body{
 
 .navDropdownItem{
     width:100%;
-    text-align:left;
+    height:30px;
+    text-align:center;
     border-radius:6px;
     border-color:transparent;
     background:transparent;
-    padding:0 12px;
+    padding:0 10px;
+    font-size:13px;
 }
 
 .navBtn{
-    height:34px;
-    padding:0 16px;
+    height:30px;
+    width:120px;
+    padding:0 10px;
     border:1px solid #334155;
-    border-radius:8px;
+    border-radius:6px;
     background:#0f1724;
     color:#e5edf9;
     cursor:pointer;
-    font-size:14px;
+    font-size:13px;
     transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    white-space:nowrap;
+    text-align:center;
 }
 
 .navBtn:hover{
@@ -237,6 +244,12 @@ body{
     border-color:#3b82f6;
     color:#ffffff;
     font-weight:700;
+}
+
+.navBtn[data-page="ajustes"]{
+    width:40px;
+    padding:0;
+    font-size:18px;
 }
 
 .mainContent{
@@ -3272,6 +3285,49 @@ body{
     background:#151f35;
 }
 
+#overviewTable th:nth-child(n+4),
+#overviewTable td:nth-child(n+4){
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+}
+
+#overviewTable th:nth-child(1),
+#overviewTable td:nth-child(1){
+    text-align:center;
+    width:40px;
+    padding-left:8px;
+    padding-right:8px;
+}
+
+#overviewTable th:nth-child(2),
+#overviewTable td:nth-child(2){
+    text-align:left;
+    min-width:160px;
+}
+
+#overviewTable th:nth-child(3),
+#overviewTable td:nth-child(3){
+    text-align:left;
+}
+
+#overviewTable th,
+#overviewTable td{
+    white-space:nowrap;
+    padding:11px 14px;
+    font-size:0.83rem;
+    vertical-align:middle;
+}
+
+#overviewTable{
+    width:max-content;
+    min-width:100%;
+}
+
+.overviewPage .metricasTableCard{
+    overflow:visible;
+    overflow-x:auto;
+}
+
 .mTdRank{
     color:#4a5a78;
     font-weight:700;
@@ -3285,8 +3341,8 @@ body{
     color:#e5edf9;
 }
 
-.mCellPos{ color:#2ecc71; font-weight:600; }
-.mCellNeg{ color:#e74c3c; font-weight:600; }
+.mCellPos, .metricasTable td.mCellPos{ color:#2ecc71; font-weight:600; }
+.mCellNeg, .metricasTable td.mCellNeg{ color:#e74c3c; font-weight:600; }
 
 .mTypeBadge{
     display:inline-block;
@@ -3758,3 +3814,738 @@ body{
     padding:32px;
     font-size:0.9rem;
 }
+
+/* --- Ajustes --- */
+.ajustesLayout{
+    padding:28px 24px;
+    display:flex;
+    gap:24px;
+    align-items:flex-start;
+}
+
+.ajustesCol{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+}
+
+.ajustesSection{
+    break-inside:avoid;
+    margin-bottom:24px;
+    background:#0f1724;
+    border:1px solid #1e2d45;
+    border-radius:12px;
+    padding:24px 28px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    position:relative;
+}
+
+.ajustesSection.ajustesUnlocked{
+    border-color:#334155;
+    cursor:grab;
+}
+
+.ajustesSection.ajustesDragging{
+    opacity:0.4;
+    cursor:grabbing;
+}
+
+.ajustesLockBtn{
+    position:absolute;
+    top:12px;
+    right:12px;
+    width:26px;
+    height:26px;
+    background:transparent;
+    border:none;
+    border-radius:6px;
+    font-size:14px;
+    cursor:pointer;
+    opacity:0.4;
+    transition:opacity 0.15s;
+    line-height:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+}
+
+.ajustesLockBtn:hover{
+    opacity:1;
+}
+
+.ajustesSectionTitle{
+    font-size:1rem;
+    font-weight:700;
+    color:#e5edf9;
+    letter-spacing:0.02em;
+}
+
+.ajustesSectionDesc{
+    font-size:0.85rem;
+    color:#64748b;
+}
+
+.ajustesSectionDesc code{
+    background:#162033;
+    padding:2px 6px;
+    border-radius:4px;
+    font-size:0.82rem;
+    color:#94a3b8;
+}
+
+.ajustesField{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+.ajustesLabel{
+    font-size:0.85rem;
+    font-weight:600;
+    color:#94a3b8;
+}
+
+.ajustesInputRow{
+    display:flex;
+    gap:8px;
+    align-items:center;
+}
+
+.ajustesInput{
+    flex:1;
+    height:38px;
+    padding:0 12px;
+    background:#0a1120;
+    border:1px solid #1e2d45;
+    border-radius:8px;
+    color:#e5edf9;
+    font-size:0.9rem;
+    outline:none;
+    transition:border-color 0.15s;
+}
+
+.ajustesInput:focus{
+    border-color:#3b82f6;
+}
+
+.ajustesToggleBtn{
+    height:38px;
+    width:38px;
+    background:#0f1724;
+    border:1px solid #1e2d45;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#64748b;
+    transition:border-color 0.15s, color 0.15s;
+    flex-shrink:0;
+}
+
+.ajustesToggleBtn:hover{
+    border-color:#475569;
+    color:#94a3b8;
+}
+
+.ajustesActions{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-top:4px;
+}
+
+.ajustesStatusMsg{
+    font-size:0.85rem;
+    color:#64748b;
+}
+
+.ajustesStatusMsg.ok{ color:#4ade80; }
+.ajustesStatusMsg.error{ color:#f87171; }
+
+.ajustesLabelRow{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.ajustesKeyStatus{
+    font-size:0.78rem;
+    font-weight:600;
+    padding:2px 8px;
+    border-radius:999px;
+    background:#0a1120;
+    border:1px solid #1e2d45;
+    color:#64748b;
+}
+
+.ajustesKeyStatus.ok{
+    color:#4ade80;
+    border-color:rgba(74,222,128,0.3);
+    background:rgba(74,222,128,0.06);
+}
+
+.ajustesKeyStatus.missing{
+    color:#f87171;
+    border-color:rgba(248,113,113,0.3);
+    background:rgba(248,113,113,0.06);
+}
+
+.ajustesBackupList{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-top:4px;
+    max-height:126px;
+    overflow-y:auto;
+    scrollbar-width:thin;
+    scrollbar-color:#1e2d45 transparent;
+    padding-right:4px;
+}
+
+.ajustesBackupItem{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 12px;
+    background:#0a1120;
+    border:1px solid #1e2d45;
+    border-radius:8px;
+}
+
+.ajustesBackupItem .ajustesBackupName{
+    flex:1;
+    min-width:0;
+}
+
+.ajustesBackupName{
+    font-size:0.85rem;
+    color:#94a3b8;
+    font-family:monospace;
+}
+
+.ajustesRestoreBtn{
+    font-size:0.8rem;
+    padding:4px 12px;
+    height:28px;
+    background:transparent;
+    border:1px solid #334155;
+    border-radius:6px;
+    color:#94a3b8;
+    cursor:pointer;
+    transition:background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.ajustesRestoreBtn:hover{
+    background:rgba(239,68,68,0.12);
+    border-color:#f87171;
+    color:#f87171;
+}
+
+.ajustesDeleteBackupBtn{
+    font-size:0.8rem;
+    padding:0;
+    width:26px;
+    height:26px;
+    background:transparent;
+    border:1px solid #334155;
+    border-radius:6px;
+    color:#64748b;
+    cursor:pointer;
+    transition:background 0.15s, border-color 0.15s, color 0.15s;
+    flex-shrink:0;
+}
+
+.ajustesDeleteBackupBtn:hover{
+    background:rgba(239,68,68,0.15);
+    border-color:#ef4444;
+    color:#ef4444;
+}
+
+.ajustesSelect{
+    height:38px;
+    padding:0 12px;
+    background:#0a1120;
+    border:1px solid #1e2d45;
+    border-radius:8px;
+    color:#e5edf9;
+    font-size:0.9rem;
+    outline:none;
+    cursor:pointer;
+    min-width:180px;
+}
+
+.ajustesSelect:focus{ border-color:#3b82f6; }
+
+.ajustesHiddenList{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-top:4px;
+}
+
+.ajustesHiddenItem{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:8px 12px;
+    background:#0a1120;
+    border:1px solid #1e2d45;
+    border-radius:8px;
+}
+
+.ajustesHiddenName{
+    font-size:0.85rem;
+    color:#94a3b8;
+}
+
+.ajustesHiddenToggle{
+    font-size:0.8rem;
+    padding:4px 14px;
+    height:28px;
+    background:rgba(74,222,128,0.08);
+    border:1px solid rgba(74,222,128,0.3);
+    border-radius:6px;
+    color:#4ade80;
+    cursor:pointer;
+    transition:background 0.15s, border-color 0.15s, color 0.15s;
+    flex-shrink:0;
+}
+
+.ajustesHiddenToggle.hidden{
+    background:rgba(100,116,139,0.1);
+    border-color:#334155;
+    color:#64748b;
+}
+
+.ajustesHiddenToggle:hover{
+    opacity:0.85;
+}
+
+.assetBtn.stale .assetBtnPrice{
+    color:#64748b;
+}
+
+.assetBtn.stale .assetBtnSymbol{
+    color:#64748b;
+}
+
+.ajustesBackupEmpty{
+    font-size:0.85rem;
+    color:#475569;
+    padding:12px 0;
+}
+
+/* --- Tema picker --- */
+.ajustesTemaGrid{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.ajustesTemaBtn{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    background:transparent;
+    border:2px solid #1e2d45;
+    border-radius:10px;
+    padding:10px 14px;
+    cursor:pointer;
+    transition:border-color 0.15s;
+    flex:1;
+    min-width:80px;
+}
+
+.ajustesTemaBtn:hover{ border-color:#475569; }
+.ajustesTemaBtn.active{ border-color:#3b82f6; }
+
+.ajustesTemaPreview{
+    width:56px;
+    height:36px;
+    border-radius:6px;
+    border:1px solid rgba(255,255,255,0.08);
+}
+
+.temaDefault{
+    background:linear-gradient(135deg, #060e1a 50%, #0f1724 50%);
+}
+
+.temaBlack{
+    background:linear-gradient(135deg, #000000 50%, #111111 50%);
+}
+
+.temaLight{
+    background:linear-gradient(135deg, #ffffff 50%, #f0f2f5 50%);
+    border-color:rgba(0,0,0,0.12) !important;
+}
+
+.ajustesTemaLabel{
+    font-size:0.78rem;
+    color:#94a3b8;
+    white-space:nowrap;
+}
+
+.ajustesTemaBtn.active .ajustesTemaLabel{ color:#93c5fd; }
+
+/* ============================================================
+   TEMAS
+   ============================================================ */
+
+/* --- Otra Oscura (negro puro) --- */
+html[data-theme="black"] body,
+html[data-theme="black"] .appContainer,
+html[data-theme="black"] .leftWrapper{ background:#000; }
+
+html[data-theme="black"] .topBar{ background:#050505; border-color:#111; }
+html[data-theme="black"] .metricBox{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .metricTitle{ color:#888; }
+html[data-theme="black"] .metricValue{ color:#f0f0f0; }
+
+html[data-theme="black"] .tabs{ background:#000; border-color:#111; }
+html[data-theme="black"] .navBtn,
+html[data-theme="black"] .navDropdownBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .navBtn:hover,
+html[data-theme="black"] .navDropdownBtn:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .navDropdownMenu{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .navDropdownItem{ color:#e0e0e0; }
+html[data-theme="black"] .searchContainer input{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+
+html[data-theme="black"] .sideWrapper,
+html[data-theme="black"] .sidePanel{ background:#000; border-color:#111; }
+html[data-theme="black"] .assetBtn{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .assetBtn:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .assetBtnSymbol{ color:#f0f0f0; }
+html[data-theme="black"] .assetBtnName{ color:#888; }
+html[data-theme="black"] .assetDetailView{ background:#000; }
+html[data-theme="black"] .detailStatCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .detailHeader,
+html[data-theme="black"] .detailSub,
+html[data-theme="black"] .detailPrice,
+html[data-theme="black"] .detailMeta,
+html[data-theme="black"] .detailStatLabel,
+html[data-theme="black"] .detailStatValue{ color:#e0e0e0; }
+
+html[data-theme="black"] .mainContent,
+html[data-theme="black"] .contentArea{ background:#000; color:#e0e0e0; }
+
+html[data-theme="black"] table{ background:#000; }
+html[data-theme="black"] th{ background:#0a0a0a; border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] td{ border-color:#111; color:#e0e0e0; }
+html[data-theme="black"] tr:hover td{ background:#0a0a0a !important; }
+html[data-theme="black"] tbody tr:nth-child(even) td{ background:#050505; }
+
+html[data-theme="black"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="black"] select,
+html[data-theme="black"] textarea{ background:#050505 !important; border-color:#1a1a1a !important; color:#e0e0e0 !important; }
+
+html[data-theme="black"] .assetModal,
+html[data-theme="black"] .calendarioModal,
+html[data-theme="black"] .backupModal{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .assetModalTitle{ color:#f0f0f0; }
+
+html[data-theme="black"] .ajustesSection,
+html[data-theme="black"] .ajustesLayout{ background:#000; }
+html[data-theme="black"] .ajustesSection{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .ajustesInput,
+html[data-theme="black"] .ajustesSelect{ background:#050505; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .ajustesSectionTitle{ color:#f0f0f0; }
+html[data-theme="black"] .ajustesSectionDesc{ color:#666; }
+html[data-theme="black"] .ajustesLabel{ color:#888; }
+html[data-theme="black"] .ajustesBackupItem,
+html[data-theme="black"] .ajustesHiddenItem{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .ajustesBackupName,
+html[data-theme="black"] .ajustesHiddenName{ color:#888; }
+
+html[data-theme="black"] .secondaryButton{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .secondaryButton:hover{ background:#111; border-color:#2a2a2a; }
+
+/* --- Clara (blanco) --- */
+html[data-theme="light"] body,
+html[data-theme="light"] .appContainer,
+html[data-theme="light"] .leftWrapper{ background:#f0f2f5; color:#0f172a; }
+
+html[data-theme="light"] .topBar{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .metricBox{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .metricTitle{ color:#64748b; }
+html[data-theme="light"] .metricValue{ color:#0f172a; }
+
+html[data-theme="light"] .tabs{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .navBtn,
+html[data-theme="light"] .navDropdownBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .navBtn:hover,
+html[data-theme="light"] .navDropdownBtn:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .navBtn.active,
+html[data-theme="light"] .navDropdownBtn.active{ background:#1d4ed8; border-color:#3b82f6; color:#fff; }
+html[data-theme="light"] .navDropdownMenu{ background:#ffffff; border-color:#e2e8f0; box-shadow:0 4px 16px rgba(0,0,0,0.12); }
+html[data-theme="light"] .navDropdownItem{ color:#1e293b; }
+html[data-theme="light"] .navDropdownItem:hover{ background:#f1f5f9; }
+html[data-theme="light"] .searchContainer input{ background:#f1f5f9; border-color:#e2e8f0; color:#0f172a; }
+
+html[data-theme="light"] .sideWrapper,
+html[data-theme="light"] .sidePanel{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .assetBtn{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .assetBtn:hover{ background:#f1f5f9; border-color:#cbd5e1; }
+html[data-theme="light"] .assetBtn.selected{ background:#1d4ed8; border-color:#3b82f6; }
+html[data-theme="light"] .assetBtn.selected .assetBtnSymbol,
+html[data-theme="light"] .assetBtn.selected .assetBtnName,
+html[data-theme="light"] .assetBtn.selected .assetBtnPrice{ color:#fff; }
+html[data-theme="light"] .assetBtnSymbol{ color:#0f172a; }
+html[data-theme="light"] .assetBtnName{ color:#64748b; }
+html[data-theme="light"] .assetBtnPrice{ color:#1e293b; }
+html[data-theme="light"] .assetDetailView{ background:#ffffff; }
+html[data-theme="light"] .detailStatCard{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .detailHeader{ color:#0f172a; }
+html[data-theme="light"] .detailSub,
+html[data-theme="light"] .detailMeta{ color:#64748b; }
+html[data-theme="light"] .detailPrice{ color:#0f172a; }
+html[data-theme="light"] .detailStatLabel{ color:#64748b; }
+html[data-theme="light"] .detailStatValue{ color:#0f172a; }
+html[data-theme="light"] .toggleButton{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+
+html[data-theme="light"] .mainContent,
+html[data-theme="light"] .contentArea{ background:#f0f2f5; color:#0f172a; }
+
+html[data-theme="light"] table{ background:#ffffff; }
+html[data-theme="light"] th{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] td{ border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] tr:hover td{ background:#f1f5f9 !important; }
+html[data-theme="light"] tbody tr:nth-child(even) td{ background:#fafbfc; }
+
+html[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="light"] select,
+html[data-theme="light"] textarea{ background:#ffffff !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+
+html[data-theme="light"] .modalOverlay{ background:rgba(0,0,0,0.4); }
+html[data-theme="light"] .assetModal,
+html[data-theme="light"] .calendarioModal{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .assetModalTitle{ color:#0f172a; }
+html[data-theme="light"] .assetModalLabel{ color:#475569; }
+html[data-theme="light"] .assetModalInput,
+html[data-theme="light"] .assetModalSelect{ background:#f8f9fa !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+
+html[data-theme="light"] .ajustesLayout{ background:#f0f2f5; }
+html[data-theme="light"] .ajustesSection{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .ajustesSectionTitle{ color:#0f172a; }
+html[data-theme="light"] .ajustesSectionDesc{ color:#64748b; }
+html[data-theme="light"] .ajustesLabel{ color:#475569; }
+html[data-theme="light"] .ajustesInput,
+html[data-theme="light"] .ajustesSelect{ background:#f8f9fa !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+html[data-theme="light"] .ajustesBackupItem,
+html[data-theme="light"] .ajustesHiddenItem{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .ajustesBackupName,
+html[data-theme="light"] .ajustesHiddenName{ color:#475569; }
+html[data-theme="light"] .ajustesSectionDesc code{ background:#f1f5f9; color:#475569; }
+
+html[data-theme="light"] .secondaryButton{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .secondaryButton:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .dangerButton{ background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
+
+html[data-theme="light"] .pageTitle,
+html[data-theme="light"] h1, html[data-theme="light"] h2,
+html[data-theme="light"] h3, html[data-theme="light"] h4{ color:#0f172a; }
+
+html[data-theme="light"] .navBackupBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+
+/* ── Light theme: Métricas ── */
+html[data-theme="light"] .metricasPage{ background:#f0f2f5; }
+html[data-theme="light"] .metricasTitle{ color:#0f172a; }
+html[data-theme="light"] .metricasKpiGroupLabel{ color:#64748b; }
+html[data-theme="light"] .metricasKpiCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .metricasKpiCard:hover{ background:#f8faff; }
+html[data-theme="light"] .mkpiLabel{ color:#64748b; }
+html[data-theme="light"] .mkpiValue{ color:#0f172a; }
+html[data-theme="light"] .metricasChartCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .metricasChartTitle{ color:#475569; }
+html[data-theme="light"] .mActivosFilterBtn{ border-color:#cbd5e1; color:#475569; }
+html[data-theme="light"] .mActivosFilterBtn.active{ background:#e8edf5; color:#1e293b; border-color:#94a3b8; }
+html[data-theme="light"] .mActivosFilterBtn:hover:not(.active){ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .metricasSectionTitle{ color:#0f172a; }
+html[data-theme="light"] .metricasSection{ color:#0f172a; }
+
+/* ── Light theme: Gastos tabs & wrappers ── */
+html[data-theme="light"] .gastosYearBtn,
+html[data-theme="light"] .gastosAddYearBtn,
+html[data-theme="light"] .gastosMonthTab{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .gastosYearBtn:hover,
+html[data-theme="light"] .gastosAddYearBtn:hover,
+html[data-theme="light"] .gastosMonthTab:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .gastosYearBtn.active,
+html[data-theme="light"] .gastosMonthTab.active{ background:#1d4ed8; border-color:#3b82f6; color:#fff; }
+html[data-theme="light"] .gastosAnnualWrapper,
+html[data-theme="light"] .gastosMovementsWrapper{ background:#ffffff; }
+html[data-theme="light"] .gastosAnnualTable,
+html[data-theme="light"] .gastosMovementsTable{ background:#ffffff; color:#1e293b; }
+html[data-theme="light"] .gastosAnnualTable thead th,
+html[data-theme="light"] .gastosMovementsTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] .gastosAnnualTable tbody td,
+html[data-theme="light"] .gastosMovementsTable tbody td{ background:#ffffff; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .gastosAnnualTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .gastosMovementsTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
+html[data-theme="light"] .gastosAnnualTable tbody tr:hover td,
+html[data-theme="light"] .gastosMovementsTable tbody tr:hover td{ background:#f1f5f9 !important; }
+html[data-theme="light"] .gastosAnnualTable .totalRow td,
+html[data-theme="light"] .gastosMovementsTable .totalRow td{ background:#e8edf5; color:#0f172a; border-color:#cbd5e1; }
+html[data-theme="light"] .gastosAnnualTable .headerRow td{ background:#dbeafe; color:#1d4ed8; }
+html[data-theme="light"] .gastosMonthActions .primaryButton{ background:#1d4ed8; }
+html[data-theme="light"] .gastosEliminarAnoBtn,
+html[data-theme="light"] .gastosMonthActions .dangerButton{ background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
+
+/* ── Light theme: Vista General filters ── */
+html[data-theme="light"] .overviewFilterOption{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .activosFilterBtn{ border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .activosFilterBtn:hover{ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .activosFilterBtn.active{ background:#e8edf5; border-color:#94a3b8; color:#1e293b; }
+html[data-theme="light"] .overviewTableWrapper{ background:#ffffff; }
+
+/* ── Light theme: Bonos / Renta Fija ── */
+html[data-theme="light"] .bonosFilterBtn{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] .bonosFilterBtn:hover{ background:#e8edf5; color:#1e293b; }
+html[data-theme="light"] .bonosFilterBtn.active{ background:#dbeafe; color:#1d4ed8; border-color:#93c5fd; }
+html[data-theme="light"] .bonosSummaryCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .bonosSummaryLabel{ color:#64748b; }
+html[data-theme="light"] .bonosSummaryValue{ color:#0f172a; }
+html[data-theme="light"] .bonosTable,
+html[data-theme="light"] .bonosTableWrapper{ background:#ffffff; }
+html[data-theme="light"] .bonosTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] .bonosTable tbody td{ background:#ffffff; color:#1e293b; border-color:#e2e8f0; }
+html[data-theme="light"] .bonosTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
+html[data-theme="light"] .bonosTable tbody tr:nth-child(even) td{ background:#fafbfc; }
+html[data-theme="light"] .bonosPage{ color:#1e293b; }
+
+/* ── Black theme: Métricas ── */
+html[data-theme="black"] .metricasKpiCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .metricasKpiCard:hover{ background:#111; }
+html[data-theme="black"] .metricasKpiGroupLabel{ color:#555; }
+html[data-theme="black"] .mkpiLabel{ color:#555; }
+html[data-theme="black"] .mkpiValue{ color:#f0f0f0; }
+html[data-theme="black"] .metricasChartCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .metricasChartTitle{ color:#666; }
+html[data-theme="black"] .mActivosFilterBtn{ border-color:#222; color:#555; }
+html[data-theme="black"] .mActivosFilterBtn.active{ background:#111; color:#e0e0e0; border-color:#333; }
+html[data-theme="black"] .mActivosFilterBtn:hover:not(.active){ background:#0f0f0f; color:#aaa; }
+
+/* ── Black theme: Gastos tabs & wrappers ── */
+html[data-theme="black"] .gastosYearBtn,
+html[data-theme="black"] .gastosAddYearBtn,
+html[data-theme="black"] .gastosMonthTab{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .gastosYearBtn:hover,
+html[data-theme="black"] .gastosAddYearBtn:hover,
+html[data-theme="black"] .gastosMonthTab:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .gastosAnnualWrapper,
+html[data-theme="black"] .gastosMovementsWrapper{ background:#000; }
+html[data-theme="black"] .gastosAnnualTable,
+html[data-theme="black"] .gastosMovementsTable{ background:#000; color:#e0e0e0; }
+html[data-theme="black"] .gastosAnnualTable thead th,
+html[data-theme="black"] .gastosMovementsTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] .gastosAnnualTable tbody td,
+html[data-theme="black"] .gastosMovementsTable tbody td{ background:#0a0a0a; border-color:#111; color:#e0e0e0; }
+html[data-theme="black"] .gastosAnnualTable tbody tr:nth-child(odd) td,
+html[data-theme="black"] .gastosMovementsTable tbody tr:nth-child(odd) td{ background:#050505; }
+html[data-theme="black"] .gastosAnnualTable .totalRow td,
+html[data-theme="black"] .gastosMovementsTable .totalRow td{ background:#0a0a0a; color:#f0f0f0; border-color:#1a1a1a; }
+
+/* ── Black theme: Vista General filters ── */
+html[data-theme="black"] .overviewFilterOption{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .activosFilterBtn{ border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .activosFilterBtn:hover{ background:#0a0a0a; color:#e0e0e0; }
+html[data-theme="black"] .activosFilterBtn.active{ background:#111; border-color:#333; color:#f0f0f0; }
+
+/* ── Black theme: Bonos / Renta Fija ── */
+html[data-theme="black"] .bonosFilterBtn{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] .bonosFilterBtn:hover{ background:#111; color:#e0e0e0; }
+html[data-theme="black"] .bonosFilterBtn.active{ background:#111; color:#e0e0e0; border-color:#333; }
+html[data-theme="black"] .bonosSummaryCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .bonosSummaryLabel{ color:#666; }
+html[data-theme="black"] .bonosSummaryValue{ color:#f0f0f0; }
+html[data-theme="black"] .bonosTable,
+html[data-theme="black"] .bonosTableWrapper{ background:#000; }
+html[data-theme="black"] .bonosTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] .bonosTable tbody td{ color:#e0e0e0; border-color:#111; }
+
+/* ── Light theme: shared table wrappers & specific td overrides (high-specificity) ── */
+html[data-theme="light"] .overviewTableWrapper,
+html[data-theme="light"] .interesesTableWrapper,
+html[data-theme="light"] .dividendosTableWrapper,
+html[data-theme="light"] .operationsTableWrapper{ background:#ffffff; }
+
+html[data-theme="light"] .overviewTable,
+html[data-theme="light"] .interesesTable,
+html[data-theme="light"] .dividendosTable,
+html[data-theme="light"] .operationsTable{ background:#ffffff; color:#1e293b; }
+
+html[data-theme="light"] .overviewTable thead th,
+html[data-theme="light"] .interesesTable thead th,
+html[data-theme="light"] .dividendosTable thead th,
+html[data-theme="light"] .operationsTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+
+html[data-theme="light"] .overviewTable tbody td,
+html[data-theme="light"] .interesesTable tbody td,
+html[data-theme="light"] .dividendosTable tbody td,
+html[data-theme="light"] .operationsTable tbody td{ background:#ffffff; color:#1e293b; border-color:#e2e8f0; }
+
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .interesesTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .dividendosTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .operationsTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
+
+html[data-theme="light"] .overviewTable tbody tr:hover td,
+html[data-theme="light"] .interesesTable tbody tr:hover td,
+html[data-theme="light"] .dividendosTable tbody tr:hover td,
+html[data-theme="light"] .operationsTable tbody tr:hover td{ background:#f1f5f9 !important; }
+
+/* ── Black theme: shared table wrappers & specific td overrides (high-specificity) ── */
+html[data-theme="black"] .overviewTableWrapper,
+html[data-theme="black"] .interesesTableWrapper,
+html[data-theme="black"] .dividendosTableWrapper,
+html[data-theme="black"] .operationsTableWrapper{ background:#000; }
+
+html[data-theme="black"] .overviewTable,
+html[data-theme="black"] .interesesTable,
+html[data-theme="black"] .dividendosTable,
+html[data-theme="black"] .operationsTable{ background:#000; color:#e0e0e0; }
+
+html[data-theme="black"] .overviewTable thead th,
+html[data-theme="black"] .interesesTable thead th,
+html[data-theme="black"] .dividendosTable thead th,
+html[data-theme="black"] .operationsTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+
+html[data-theme="black"] .overviewTable tbody td,
+html[data-theme="black"] .interesesTable tbody td,
+html[data-theme="black"] .dividendosTable tbody td,
+html[data-theme="black"] .operationsTable tbody td{ background:#0a0a0a; color:#e0e0e0; border-color:#111; }
+
+html[data-theme="black"] .overviewTable tbody tr:nth-child(odd) td,
+html[data-theme="black"] .interesesTable tbody tr:nth-child(odd) td,
+html[data-theme="black"] .dividendosTable tbody tr:nth-child(odd) td,
+html[data-theme="black"] .operationsTable tbody tr:nth-child(odd) td{ background:#050505; }
+
+html[data-theme="black"] .overviewTable tbody tr:hover td,
+html[data-theme="black"] .interesesTable tbody tr:hover td,
+html[data-theme="black"] .dividendosTable tbody tr:hover td,
+html[data-theme="black"] .operationsTable tbody tr:hover td{ background:#111 !important; }
+
+/* ── Light theme: Activos cards ── */
+html[data-theme="light"] .avCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .avCard:hover{ border-color:var(--av-color,#3a7bd5); }
+html[data-theme="light"] .avCardName{ color:#64748b; }
+html[data-theme="light"] .avCardPrice{ color:#0f172a; }
+html[data-theme="light"] .avCardTicker{ color:#94a3b8; }
+html[data-theme="light"] .avCardMetrics{ border-top-color:#e2e8f0; }
+html[data-theme="light"] .avMetricLabel{ color:#94a3b8; }
+html[data-theme="light"] .avMetricValue{ color:#1e293b; }
+
+/* ── Black theme: Activos cards ── */
+html[data-theme="black"] .avCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .avCardName{ color:#666; }
+html[data-theme="black"] .avCardPrice{ color:#f0f0f0; }
+html[data-theme="black"] .avCardTicker{ color:#444; }
+html[data-theme="black"] .avCardMetrics{ border-top-color:#1a1a1a; }
+html[data-theme="black"] .avMetricLabel{ color:#555; }
+html[data-theme="black"] .avMetricValue{ color:#e0e0e0; }

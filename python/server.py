@@ -6,6 +6,7 @@ from flask import Flask, abort, send_from_directory
 
 from app_data import baseDir, ensureDataFile
 from routes.activos import activos_bp
+from routes.ajustes import ajustes_bp
 from routes.backup import backup_bp
 from routes.gastos import gastos_bp
 from routes.market import market_bp
@@ -30,6 +31,7 @@ app = Flask(
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
 app.register_blueprint(activos_bp)
+app.register_blueprint(ajustes_bp)
 app.register_blueprint(backup_bp)
 app.register_blueprint(gastos_bp)
 app.register_blueprint(market_bp)
@@ -75,7 +77,61 @@ def serveStatic(path):
     return send_from_directory(baseDir, normalized)
 
 
+def _check_auto_backup():
+    import json
+    import re
+    import sqlite3
+    from datetime import datetime, timedelta
+
+    ajustes_path = baseDir / "data" / "JSON" / "ajustes.json"
+    days = 0
+    try:
+        if ajustes_path.exists():
+            cfg = json.loads(ajustes_path.read_text("utf-8"))
+            days = int(cfg.get("autoBackupDays") or 0)
+    except Exception:
+        return
+    if days <= 0:
+        return
+
+    db_path = baseDir / "data" / "portfolio.db"
+    if not db_path.exists():
+        return
+
+    backups_dir = baseDir / "data" / "backups"
+    filename_re = re.compile(r'^portfolio_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.db$')
+    if backups_dir.exists():
+        candidates = sorted(
+            [f for f in backups_dir.iterdir() if filename_re.match(f.name)],
+            key=lambda f: f.name,
+            reverse=True
+        )
+        if candidates:
+            m = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', candidates[0].name)
+            if m:
+                try:
+                    last_dt = datetime.strptime(m.group(1), "%d-%m-%Y_%H-%M-%S")
+                    if datetime.now() - last_dt < timedelta(days=days):
+                        return
+                except ValueError:
+                    pass
+
+    try:
+        backups_dir.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        dst_path = backups_dir / f"portfolio_{ts}.db"
+        src = sqlite3.connect(str(db_path))
+        dst = sqlite3.connect(str(dst_path))
+        src.backup(dst)
+        dst.close()
+        src.close()
+        logging.info("Auto-backup creado: %s", dst_path.name)
+    except Exception as e:
+        logging.warning("Auto-backup fallido: %s", e)
+
+
 if __name__ == "__main__":
     ensureDataFile()
+    _check_auto_backup()
     debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     app.run(host="127.0.0.1", port=5000, debug=debug_mode)

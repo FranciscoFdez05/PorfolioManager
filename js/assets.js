@@ -69,13 +69,16 @@ async function buildOverviewDisplayRow(asset) {
     const netoActualDisplay = row.netoActual
     const currentPriceDisplay = row.valorActual
     const rendimientoDisplay = netoActualDisplay - row.invertidoNeto
+    const yieldPctVal = row.invertidoNeto > 0 ? (rendimientoDisplay / row.invertidoNeto) * 100 : 0
 
     return {
         ...row,
+        sidebarOrder: asset.order ?? 0,
         overviewInvestedCurrency: investedCurrency,
         overviewCurrentPrice: currentPriceDisplay,
         overviewCurrentValue: netoActualDisplay,
-        overviewYieldValue: rendimientoDisplay
+        overviewYieldValue: rendimientoDisplay,
+        yieldPctVal
     }
 }
 
@@ -533,15 +536,24 @@ async function renderAssetsList(assets) {
         return
     }
 
+    const hidden   = window._hiddenAssets instanceof Set ? window._hiddenAssets : new Set()
+    const staleMs  = ((window._settingsStaleHours ?? 24) > 0)
+        ? (window._settingsStaleHours ?? 24) * 3600 * 1000
+        : Infinity
+    const now      = Date.now()
+    const visible  = assets.filter((a) => !hidden.has(a.id))
     const fragment = document.createDocumentFragment()
 
-    for (const asset of assets) {
+    for (const asset of visible) {
+        const isStale = staleMs < Infinity && asset.lastUpdated
+            ? (now - new Date(asset.lastUpdated).getTime()) > staleMs
+            : false
         try {
-            const displayPrice = await getAssetDisplayPriceValue(asset)
+            const displayPrice    = await getAssetDisplayPriceValue(asset)
             const displayCurrency = asset.currency || "EUR"
             const button = document.createElement("button")
-            button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}`
-            button.dataset.assetId = asset.id
+            button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}${isStale ? " stale" : ""}`
+            button.dataset.assetId    = asset.id
             button.dataset.assetOrder = String(asset.order ?? 0)
             button.draggable = true
             button.innerHTML = `
@@ -554,11 +566,11 @@ async function renderAssetsList(assets) {
             fragment.appendChild(button)
         } catch (error) {
             console.error(`No se pudo renderizar el precio del activo ${asset.name || asset.symbol || asset.id}:`, error)
-            const fallbackPrice = parseLooseNumber(asset.price || "") || 0
+            const fallbackPrice    = parseLooseNumber(asset.price || "") || 0
             const fallbackCurrency = asset.currency || "EUR"
             const button = document.createElement("button")
-            button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}`
-            button.dataset.assetId = asset.id
+            button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}${isStale ? " stale" : ""}`
+            button.dataset.assetId    = asset.id
             button.dataset.assetOrder = String(asset.order ?? 0)
             button.draggable = true
             button.innerHTML = `
@@ -1238,15 +1250,18 @@ function getRowAnnualCostAmount(row, assetType = "") {
 }
 
 function getRowTotalCostForLot(row, assetType = "") {
-    const participaciones = parseParticipationNumber(row.participaciones)
     const capitalInvertidoBruto = parseLooseNumber(row.capitalInvertidoBruto || "")
-    const grossBasedCost = capitalInvertidoBruto !== null ? capitalInvertidoBruto : 0
-
-    if (participaciones <= 0) {
-        return grossBasedCost
+    if (capitalInvertidoBruto !== null && capitalInvertidoBruto > 0) {
+        return capitalInvertidoBruto
     }
-
-    return grossBasedCost
+    const participaciones = parseParticipationNumber(row.participaciones)
+    if (participaciones > 0) {
+        const precioParticipacion = parseLooseNumber(row.precioParticipacion || "")
+        if (precioParticipacion !== null && precioParticipacion > 0) {
+            return precioParticipacion * participaciones
+        }
+    }
+    return 0
 }
 
 async function convertCryptoRowMoneyToAssetCurrency(amount, row, assetCurrency) {
@@ -1497,9 +1512,7 @@ async function buildOverviewRow(asset) {
     const invertidoNeto = invertidoBruto - comisionesFiat
     const valorActual = parseLooseNumber(asset.price || "") || 0
     const netoActual = participaciones * valorActual
-    const displayPriceQuantity = remainingLots.reduce((total, lot) => total + (lot.priceQuantity ?? lot.remaining), 0)
-    const displayPriceCost = remainingLots.reduce((total, lot) => total + ((lot.displayUnitPrice ?? lot.unitCost) * (lot.priceQuantity ?? lot.remaining)), 0)
-    const promedioCompra = displayPriceQuantity > 0 ? displayPriceCost / displayPriceQuantity : 0
+    const promedioCompra = participaciones > 0 ? invertidoNeto / participaciones : 0
     const rendimiento = netoActual - invertidoNeto
 
     return {
@@ -1522,7 +1535,53 @@ async function buildOverviewRow(asset) {
     }
 }
 
+let _ovSortKey = "sidebarOrder"
+let _ovSortDir = "asc"
+let _ovRows = []
+
+function _ovSortRows(rows) {
+    return [...rows].sort((a, b) => {
+        let va = a[_ovSortKey] ?? 0
+        let vb = b[_ovSortKey] ?? 0
+        if (typeof va === "string") va = va.toLowerCase()
+        if (typeof vb === "string") vb = vb.toLowerCase()
+        if (va < vb) return _ovSortDir === "asc" ? -1 : 1
+        if (va > vb) return _ovSortDir === "asc" ? 1 : -1
+        return 0
+    })
+}
+
+function _ovUpdateSortArrows() {
+    document.querySelectorAll("#overviewTable .mThSort").forEach((th) => {
+        const arrow = th.querySelector(".mSortArrow")
+        if (!arrow) return
+        if (th.dataset.sortkey === _ovSortKey) {
+            arrow.textContent = _ovSortDir === "asc" ? " ▲" : " ▼"
+            th.classList.add("mThActive")
+        } else {
+            arrow.textContent = ""
+            th.classList.remove("mThActive")
+        }
+    })
+}
+
+function _ovBindSort() {
+    document.querySelectorAll("#overviewTable .mThSort").forEach((th) => {
+        th.addEventListener("click", () => {
+            const key = th.dataset.sortkey
+            if (_ovSortKey === key) {
+                _ovSortDir = _ovSortDir === "asc" ? "desc" : "asc"
+            } else {
+                _ovSortKey = key
+                _ovSortDir = key === "sidebarOrder" || key === "nombre" ? "asc" : "desc"
+            }
+            renderOverviewRows(_ovRows)
+        })
+    })
+}
+
 function renderOverviewRows(rows) {
+    _ovRows = rows
     const tableBody = document.getElementById("overviewTableBody")
     const emptyState = document.getElementById("overviewEmptyState")
 
@@ -1544,38 +1603,40 @@ function renderOverviewRows(rows) {
     }
 
     const OV_TYPE_COLORS = { cripto: "#f7931a", acciones: "#3a7bd5", etfs: "#2ecc71", comoditis: "#e0c068" }
+    const sorted = _ovSortRows(rows)
 
-    rows.forEach((row) => {
+    sorted.forEach((row, idx) => {
         const tr = document.createElement("tr")
         const yieldVal = row.overviewYieldValue ?? 0
-        const profitClass = yieldVal >= 0 ? "overviewProfitPositive" : "overviewProfitNegative"
-        const overviewCommissions = formatMoney(row.comisionesFiat ?? row.comisiones, row.overviewInvestedCurrency)
-
-        const typeColor = OV_TYPE_COLORS[row.assetType] || "#888"
-        const typeBadge = `<span class="ovTypeBadge" style="background:${typeColor}22;color:${typeColor};border-color:${typeColor}44">${row.tipo}</span>`
-
+        const rClass = yieldVal >= 0 ? "mCellPos" : "mCellNeg"
         const sign = yieldVal >= 0 ? "+" : ""
+        const overviewCommissions = formatMoney(row.comisionesFiat ?? row.comisiones, row.overviewInvestedCurrency)
+        const typeColor = OV_TYPE_COLORS[row.assetType] || "#888"
+        const typeBadge = `<span class="mTypeBadge" style="background:${typeColor}22;color:${typeColor};border-color:${typeColor}44">${row.tipo}</span>`
         const yieldEur = formatMoney(yieldVal, row.overviewInvestedCurrency)
         const yieldPct = row.invertidoNeto > 0
             ? sign + ((yieldVal / row.invertidoNeto) * 100).toFixed(2) + " %"
             : "—"
-        const rendCell = `<span class="${profitClass}">${sign}${yieldEur}</span><br><span class="${profitClass}" style="font-size:0.78rem;opacity:0.85">${yieldPct}</span>`
 
         tr.innerHTML = `
-            <td>${row.nombre}</td>
+            <td class="mTdRank">${idx + 1}</td>
+            <td class="mTdName">${row.nombre}</td>
             <td>${typeBadge}</td>
-            <td class="overviewNumericCell">${formatAssetParticipationValue(row.participaciones, row.assetType)}</td>
-            <td class="overviewNumericCell">${formatMoney(row.promedioCompra, row.currency)}</td>
-            <td class="overviewNumericCell overviewCurrentPriceCell">${formatMoney(row.overviewCurrentPrice ?? row.valorActual, row.currency)}</td>
-            <td class="overviewNumericCell">${formatMoney(row.invertidoBruto, row.overviewInvestedCurrency)}</td>
-            <td class="overviewNumericCell">${overviewCommissions}</td>
-            <td class="overviewNumericCell">${formatMoney(row.invertidoNeto, row.overviewInvestedCurrency)}</td>
-            <td class="overviewNumericCell">${formatMoney(row.overviewCurrentValue, row.overviewInvestedCurrency)}</td>
-            <td class="overviewNumericCell">${rendCell}</td>
+            <td>${formatAssetParticipationValue(row.participaciones, row.assetType)}</td>
+            <td>${formatMoney(row.promedioCompra, row.currency)}</td>
+            <td>${formatMoney(row.overviewCurrentPrice ?? row.valorActual, row.currency)}</td>
+            <td>${formatMoney(row.invertidoBruto, row.overviewInvestedCurrency)}</td>
+            <td>${overviewCommissions}</td>
+            <td>${formatMoney(row.invertidoNeto, row.overviewInvestedCurrency)}</td>
+            <td>${formatMoney(row.overviewCurrentValue, row.overviewInvestedCurrency)}</td>
+            <td class="${rClass}">${sign}${yieldEur}</td>
+            <td class="${rClass}">${yieldPct}</td>
         `
 
         tableBody.appendChild(tr)
     })
+
+    _ovUpdateSortArrows()
 }
 
 async function renderVistaGeneralTable() {
@@ -1584,6 +1645,9 @@ async function renderVistaGeneralTable() {
     if (!tableBody) {
         return
     }
+
+    _ovSortKey = "sidebarOrder"
+    _ovSortDir = "asc"
 
     try {
         const assets = await loadAssetsList()
@@ -1602,6 +1666,7 @@ async function renderVistaGeneralTable() {
         )
 
         renderOverviewRows(rows)
+        _ovBindSort()
     } catch (error) {
         console.error("Error cargando vista general:", error)
     }

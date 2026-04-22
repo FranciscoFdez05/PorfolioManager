@@ -32,14 +32,27 @@ document.addEventListener("DOMContentLoaded", async () => {
         searchAssetTickerEodhdButton
     )
     initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
+    await loadGlobalSettings()
     await refreshAssetsSidebar()
     await refreshTopDividendosIntereses()
 
     loadPage("vistaGeneral")
     refreshOverviewMarketData()
-
-    initBackupModal()
 })
+
+async function loadGlobalSettings() {
+    try {
+        const res  = await fetch("/api/settings")
+        const data = await res.json()
+        if (data.ok) {
+            window._settingsStaleHours = data.staleHours ?? 24
+            window._hiddenAssets       = new Set(data.hiddenAssets || [])
+        }
+    } catch {
+        window._settingsStaleHours = 24
+        window._hiddenAssets       = new Set()
+    }
+}
 
 let dividendosAutosaveTimeout = null
 let assetAutosaveTimeout = null
@@ -48,7 +61,7 @@ let assetModalState = null
 let confirmModalState = null
 let editAssetModalState = null
 let draggedAssetId = null
-const PAGE_HTML_VERSION = "20260420d"
+const PAGE_HTML_VERSION = "20260422f"
 
 function initSidePanel(toggleButton, sideWrapper) {
     if (!toggleButton || !sideWrapper) {
@@ -167,6 +180,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initMetricasLogic()
         } else if (page === "activos") {
             await initActivosPageLogic()
+        } else if (page === "ajustes") {
+            await initAjustesLogic()
         }
     } catch (error) {
         console.error(error)
@@ -335,108 +350,4 @@ async function refreshTopDividendosIntereses() {
     }
 }
 
-// --- Backup / Restore ---
-
-function initBackupModal() {
-    const openBtn = document.getElementById("openBackupModalBtn")
-    const overlay = document.getElementById("backupModalOverlay")
-    const closeBtn = document.getElementById("closeBackupModalBtn")
-    const createBtn = document.getElementById("createBackupBtn")
-    const statusMsg = document.getElementById("backupStatusMsg")
-    const backupList = document.getElementById("backupList")
-
-    if (!openBtn || !overlay) return
-
-    openBtn.addEventListener("click", () => {
-        overlay.classList.remove("hidden")
-        statusMsg.textContent = ""
-        statusMsg.className = "backupStatusMsg"
-        loadBackupList()
-    })
-
-    closeBtn.addEventListener("click", () => overlay.classList.add("hidden"))
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.classList.add("hidden") })
-
-    createBtn.addEventListener("click", async () => {
-        createBtn.disabled = true
-        statusMsg.textContent = "Creando backup..."
-        statusMsg.className = "backupStatusMsg"
-        try {
-            const res = await fetch("/api/backup", { method: "POST" })
-            const data = await res.json()
-            if (data.ok) {
-                statusMsg.textContent = `Backup creado: ${data.filename}`
-                renderBackupList(data.backups)
-            } else {
-                statusMsg.textContent = "Error al crear backup"
-                statusMsg.className = "backupStatusMsg error"
-            }
-        } catch {
-            statusMsg.textContent = "Error de red"
-            statusMsg.className = "backupStatusMsg error"
-        } finally {
-            createBtn.disabled = false
-        }
-    })
-
-    async function loadBackupList() {
-        backupList.innerHTML = '<span class="backupEmpty">Cargando...</span>'
-        try {
-            const res = await fetch("/api/backups")
-            const data = await res.json()
-            renderBackupList(data.backups || [])
-        } catch {
-            backupList.innerHTML = '<span class="backupEmpty">Error al cargar</span>'
-        }
-    }
-
-    function renderBackupList(backups) {
-        if (!backups.length) {
-            backupList.innerHTML = '<span class="backupEmpty">No hay backups disponibles</span>'
-            return
-        }
-        backupList.innerHTML = ""
-        backups.forEach((filename) => {
-            const item = document.createElement("div")
-            item.className = "backupItem"
-            const label = document.createElement("span")
-            label.className = "backupItemName"
-            label.textContent = filename.replace("portfolio_", "").replace(".db", "").replace(/_/g, " ")
-            const btn = document.createElement("button")
-            btn.className = "backupRestoreBtn"
-            btn.textContent = "Restaurar"
-            btn.addEventListener("click", () => restoreBackup(filename, btn, statusMsg))
-            item.appendChild(label)
-            item.appendChild(btn)
-            backupList.appendChild(item)
-        })
-    }
-
-    async function restoreBackup(filename, btn, statusMsg) {
-        if (!confirm(`¿Restaurar backup ${filename}? Se sobreescribirán todos los datos actuales.`)) return
-        btn.disabled = true
-        statusMsg.textContent = "Restaurando..."
-        statusMsg.className = "backupStatusMsg"
-        try {
-            const res = await fetch("/api/restore", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ filename })
-            })
-            const data = await res.json()
-            if (data.ok) {
-                statusMsg.textContent = "Restaurado. Recargando página..."
-                setTimeout(() => window.location.reload(), 1500)
-            } else {
-                statusMsg.textContent = data.error || "Error al restaurar"
-                statusMsg.className = "backupStatusMsg error"
-                btn.disabled = false
-            }
-        } catch {
-            statusMsg.textContent = "Error de red"
-            statusMsg.className = "backupStatusMsg error"
-            btn.disabled = false
-        }
-    }
-}
 

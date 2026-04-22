@@ -22,24 +22,22 @@
         <button id="refreshOverviewMarketBtn" class="primaryButton" type="button">Actualizar cotizaciones</button>
     </div>
 
-    <div class="overviewTableWrapper">
-        <table class="overviewTable">
-            <colgroup>
-                <col><col><col><col><col>
-                <col><col><col><col><col>
-            </colgroup>
+    <div class="metricasChartCard metricasTableCard">
+        <table class="metricasTable" id="overviewTable">
             <thead>
                 <tr>
-                    <th>Nombre</th>
-                    <th>Tipo</th>
-                    <th>Participaciones</th>
-                    <th>Promedio compra</th>
-                    <th>Valor actual</th>
-                    <th>Invertido bruto</th>
-                    <th>Comisiones</th>
-                    <th>Invertido neto</th>
-                    <th>Neto actual</th>
-                    <th>Rendimiento</th>
+                    <th class="mThSort" data-sortkey="sidebarOrder">#<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="nombre">Nombre<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="assetType">Tipo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="participaciones">Posición<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="promedioCompra">P. medio<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="overviewCurrentPrice">Valor actual<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="invertidoBruto">Inv. bruto<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="comisiones">Comis.<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="invertidoNeto">Inv. neto<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="overviewCurrentValue">Neto actual<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="overviewYieldValue">Rend. €<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="yieldPctVal">Rend. %<span class="mSortArrow"></span></th>
                 </tr>
             </thead>
             <tbody id="overviewTableBody"></tbody>
