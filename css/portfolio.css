@@ -3285,37 +3285,47 @@ body{
     background:#151f35;
 }
 
-#overviewTable th:nth-child(n+4),
-#overviewTable td:nth-child(n+4){
-    text-align:right;
-    font-variant-numeric:tabular-nums;
-}
-
-#overviewTable th:nth-child(1),
-#overviewTable td:nth-child(1){
-    text-align:center;
-    width:40px;
-    padding-left:8px;
-    padding-right:8px;
-}
-
-#overviewTable th:nth-child(2),
-#overviewTable td:nth-child(2){
-    text-align:left;
-    min-width:160px;
-}
-
-#overviewTable th:nth-child(3),
-#overviewTable td:nth-child(3){
-    text-align:left;
-}
-
+/* ── Vista General: alineación estilo CMC ── */
 #overviewTable th,
 #overviewTable td{
     white-space:nowrap;
-    padding:11px 14px;
-    font-size:0.83rem;
+    padding:13px 18px;
+    font-size:0.84rem;
     vertical-align:middle;
+    text-align:right;
+}
+
+/* col 1 – rank */
+#overviewTable th:nth-child(1),
+#overviewTable td:nth-child(1){
+    text-align:center;
+    padding-left:10px;
+    padding-right:10px;
+    width:44px;
+    min-width:44px;
+}
+
+/* col 2 – nombre */
+#overviewTable th:nth-child(2),
+#overviewTable td:nth-child(2){
+    text-align:left;
+    min-width:180px;
+    padding-left:20px;
+}
+
+/* col 3 – tipo (badge) */
+#overviewTable th:nth-child(3),
+#overviewTable td:nth-child(3){
+    text-align:left;
+    min-width:90px;
+}
+
+/* cols 4+ – numéricos */
+#overviewTable th:nth-child(n+4),
+#overviewTable td:nth-child(n+4){
+    font-variant-numeric:tabular-nums;
+    min-width:110px;
+    padding-right:18px;
 }
 
 #overviewTable{
@@ -3326,6 +3336,50 @@ body{
 .overviewPage .metricasTableCard{
     overflow:visible;
     overflow-x:auto;
+}
+
+/* ── Métricas tabla Posiciones: alineación estilo CMC ── */
+#metricasTopTable th,
+#metricasTopTable td{
+    white-space:nowrap;
+    padding:13px 18px;
+    font-size:0.84rem;
+    vertical-align:middle;
+    text-align:right;
+}
+
+#metricasTopTable th:nth-child(1),
+#metricasTopTable td:nth-child(1){
+    text-align:center;
+    padding-left:10px;
+    padding-right:10px;
+    width:44px;
+    min-width:44px;
+}
+
+#metricasTopTable th:nth-child(2),
+#metricasTopTable td:nth-child(2){
+    text-align:left;
+    min-width:180px;
+    padding-left:20px;
+}
+
+#metricasTopTable th:nth-child(3),
+#metricasTopTable td:nth-child(3){
+    text-align:left;
+    min-width:90px;
+}
+
+#metricasTopTable th:nth-child(n+4),
+#metricasTopTable td:nth-child(n+4){
+    font-variant-numeric:tabular-nums;
+    min-width:110px;
+    padding-right:18px;
+}
+
+#metricasTopTable{
+    width:max-content;
+    min-width:100%;
 }
 
 .mTdRank{
@@ -3401,6 +3455,11 @@ body{
     width:14px;
     font-size:0.7rem;
     color:#3a7bd5;
+}
+
+.mSortArrow:empty{
+    width:0;
+    overflow:hidden;
 }
 
 .metricasChartsGrid1{
