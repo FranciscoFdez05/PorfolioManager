@@ -2615,10 +2615,6 @@ function openAssetModal() {
     assetModalOverlay.classList.remove("hidden")
     assetModalState = { isOpen: true }
 
-    if (typeof _buildCustomSelect === "function" && !assetTypeSelect._csInit) {
-        _buildCustomSelect(assetTypeSelect)
-    }
-
     queueMicrotask(() => {
         assetTypeSelect.dispatchEvent(new Event("change", { bubbles: true }))
     })
