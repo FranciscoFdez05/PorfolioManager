@@ -966,14 +966,7 @@ body{
 }
 
 .assetRowModalOverlay{
-    position:fixed;
-    inset:0;
-    background:rgba(0,0,0,0.55);
-    backdrop-filter:blur(2px);
     z-index:20000;
-    display:flex;
-    align-items:center;
-    justify-content:center;
 }
 
 .assetRowModalOverlay.hidden{
@@ -981,17 +974,13 @@ body{
 }
 
 .assetRowModal{
-    background:#16263a;
-    border:1px solid #2d4059;
-    border-radius:16px;
     padding:0;
-    width:460px;
+    width:min(460px, 100%);
     max-width:96vw;
     max-height:88vh;
     display:flex;
     flex-direction:column;
     overflow:hidden;
-    box-shadow:0 24px 60px rgba(0,0,0,0.5);
     animation:rowModalIn 0.18s ease;
 }
 
@@ -1002,18 +991,16 @@ body{
 
 .assetRowModalTitle{
     font-size:15px;
-    font-weight:700;
-    color:#e2e8f0;
     margin:0;
-    padding:20px 24px 16px;
+    padding:18px 24px 16px;
     flex-shrink:0;
-    border-bottom:1px solid #1e3450;
+    border-bottom:1px solid #273246;
 }
 
 .assetRowModalFields{
     display:flex;
     flex-direction:column;
-    gap:10px;
+    gap:12px;
     overflow-y:auto;
     padding:16px 24px;
     flex:1;
@@ -1036,32 +1023,46 @@ body{
 
 .assetRowModalInput,
 .assetRowModalSelect{
-    background:#0d1e2e;
-    border:1px solid #2d4059;
+    height:36px;
+    background:#0d213f;
+    border:1px solid #466a9f;
     border-radius:8px;
-    color:#e2e8f0;
+    color:#ffffff;
     font-size:14px;
-    padding:9px 12px;
+    padding:0 12px;
     outline:none;
     width:100%;
     box-sizing:border-box;
     appearance:auto;
-    transition:border-color 0.15s;
+    transition:border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .assetRowModalInput:focus,
 .assetRowModalSelect:focus{
-    border-color:#3b82f6;
-    background:#0d1e2e;
+    border-color:#72a2ff;
+    background:#11294d;
+    box-shadow:0 0 0 3px rgba(114, 162, 255, 0.18);
 }
 
 .assetRowModalInput:-webkit-autofill,
 .assetRowModalInput:-webkit-autofill:hover,
 .assetRowModalInput:-webkit-autofill:focus,
 .assetRowModalInput:-webkit-autofill:active{
-    -webkit-box-shadow:0 0 0 1000px #0d1e2e inset !important;
-    -webkit-text-fill-color:#e2e8f0 !important;
-    caret-color:#e2e8f0;
+    -webkit-box-shadow:0 0 0 1000px #0d213f inset !important;
+    -webkit-text-fill-color:#ffffff !important;
+    caret-color:#ffffff;
+}
+
+.assetRowModal .csTrigger{
+    min-height:36px;
+    padding:0 12px;
+    font-size:14px;
+}
+
+.assetRowModal .csLabel{
+    display:flex;
+    align-items:center;
+    min-height:36px;
 }
 
 .assetRowModalFooter{
@@ -1070,50 +1071,21 @@ body{
     justify-content:flex-end;
     gap:10px;
     padding:14px 24px;
-    border-top:1px solid #1e3450;
+    border-top:1px solid #273246;
     flex-shrink:0;
-    background:#13202e;
+    background:#111827;
 }
 
-.assetRowModalFooter > .dangerButton{
+.assetRowModalDeleteBtn{
     margin-right:auto;
 }
 
 .assetRowModalSaveBtn{
-    background:#1d4ed8;
-    color:#ffffff;
-    border:1px solid #3b82f6;
-    border-radius:10px;
-    height:38px;
-    padding:0 20px;
-    font-weight:600;
-    font-size:14px;
-    cursor:pointer;
-    flex-shrink:0;
-    transition:background 0.15s;
-}
-
-.assetRowModalSaveBtn:hover{
-    background:#2563eb;
+    min-width:96px;
 }
 
 .assetRowModalCancelBtn{
-    background:transparent;
-    color:#94a3b8;
-    border:1px solid #334155;
-    border-radius:10px;
-    height:38px;
-    padding:0 20px;
-    font-weight:600;
-    font-size:14px;
-    cursor:pointer;
-    flex-shrink:0;
-    transition:background 0.15s, color 0.15s;
-}
-
-.assetRowModalCancelBtn:hover{
-    background:rgba(148,163,184,0.1);
-    color:#e2e8f0;
+    min-width:100px;
 }
 
 .overviewPage{
@@ -1294,6 +1266,36 @@ body{
 .operationsTable tbody td:last-child,
 .bonosTable tbody td:last-child{
     border-right:none;
+}
+
+.interesesTable .rowActionHeader,
+.dividendosTable .rowActionHeader{
+    width:80px;
+    min-width:80px;
+    padding:0 8px !important;
+    border-left:none !important;
+    border-right:none !important;
+    background:#0f1724 !important;
+}
+
+.interesesTable .rowActionsCell,
+.dividendosTable .rowActionsCell{
+    width:80px;
+    min-width:80px;
+}
+
+.ventasPageExpanded .operationsTable .rowActionHeader{
+    width:80px;
+    min-width:80px;
+    padding:0 8px !important;
+    border-left:none !important;
+    border-right:none !important;
+    background:#0f1724 !important;
+}
+
+.ventasPageExpanded .operationsTable .rowActionsCell{
+    width:80px;
+    min-width:80px;
 }
 
 .overviewTable tbody tr:hover td,
@@ -1541,7 +1543,7 @@ body{
 .assetModalInput,
 .assetModalSelect{
     width:100%;
-    height:40px;
+    height:38px;
     margin-bottom:18px;
     padding:0 12px;
     border:1px solid #466a9f;
@@ -1589,6 +1591,116 @@ body{
     color:#d7e3f6;
     font-size:15px;
     line-height:1.5;
+}
+
+.interesesCreateModal,
+.dividendosCreateModal{
+    width:min(420px, 100%);
+}
+
+.ventasCreateModal{
+    width:min(420px, 100%);
+}
+
+.dividendosCreateModal .csTrigger{
+    min-height:40px;
+    padding:0 12px;
+    font-size:15px;
+}
+
+.dividendosCreateModal .csLabel{
+    display:flex;
+    align-items:center;
+    min-height:40px;
+}
+
+.ventasCreateModal .csTrigger{
+    min-height:40px;
+    padding:0 12px;
+    font-size:15px;
+}
+
+.ventasCreateModal .csLabel{
+    display:flex;
+    align-items:center;
+    min-height:40px;
+}
+
+.ventasCreateModal > .assetModalLabel:not(:first-child){
+    margin-top:12px;
+}
+
+.ventasCreateModal > .assetModalSelect{
+    margin-bottom:6px;
+}
+
+.interesesModalActions,
+.dividendosModalActions,
+.ventasModalActions{
+    justify-content:flex-end;
+}
+
+.gastosCreateModal{
+    width:min(420px, 100%);
+}
+
+.gastosCreateModalWide{
+    width:min(760px, 100%);
+}
+
+.gastosCreateModalBody{
+    max-height:min(62vh, 620px);
+    overflow-y:auto;
+    padding-right:4px;
+}
+
+.gastosCreateModalField{
+    min-width:0;
+}
+
+.gastosCreateModalBody > .assetModalLabel:not(:first-child){
+    margin-top:12px;
+}
+
+.gastosCreateModalBody > .assetModalSelect{
+    margin-bottom:6px;
+}
+
+.gastosCreateModal .csTrigger{
+    min-height:40px;
+    padding:0 12px;
+    font-size:15px;
+}
+
+.gastosCreateModal .csLabel{
+    display:flex;
+    align-items:center;
+    min-height:40px;
+}
+
+.gastosCreateModalGrid{
+    display:grid;
+    gap:14px 16px;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+}
+
+.gastosCreateModalGridMonths{
+    margin-top:8px;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+}
+
+.gastosCreateModalFeedback{
+    margin:4px 0 0 0;
+    color:#93c5fd;
+    font-size:13px;
+}
+
+.gastosCreateModalFeedback.error{
+    color:#fca5a5;
+}
+
+.gastosCreateModalActions{
+    justify-content:flex-end;
 }
 
 /* ===== INTERESES ===== */
@@ -2999,10 +3111,24 @@ body{
     padding:9px 12px;
 }
 
+.gastosMovementsTable .rowActionHeader{
+    width:80px;
+    min-width:80px;
+    padding:0 8px !important;
+    border-left:none !important;
+    border-right:none !important;
+    background:#0f1724 !important;
+}
+
 .gastosMovementsTable tbody td{
     padding:6px 10px;
     height:38px;
     vertical-align:middle;
+}
+
+.gastosMovementsTable .rowActionsCell{
+    width:80px;
+    min-width:80px;
 }
 
 .gastosAnnualTable tbody tr:nth-child(odd) td,
@@ -4919,6 +5045,11 @@ html[data-theme="light"] .assetModalTitle{ color:#0f172a; }
 html[data-theme="light"] .assetModalLabel{ color:#475569; }
 html[data-theme="light"] .assetModalInput,
 html[data-theme="light"] .assetModalSelect{ background:#f8f9fa !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+html[data-theme="light"] .assetRowModalTitle{ border-color:#e2e8f0; }
+html[data-theme="light"] .assetRowModalLabel{ color:#64748b; }
+html[data-theme="light"] .assetRowModalInput,
+html[data-theme="light"] .assetRowModalSelect{ background:#f8f9fa !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+html[data-theme="light"] .assetRowModalFooter{ background:#ffffff; border-color:#e2e8f0; }
 
 html[data-theme="light"] .ajustesLayout{ background:#f0f2f5; }
 html[data-theme="light"] .ajustesSection{ background:#ffffff; border-color:#e2e8f0; }

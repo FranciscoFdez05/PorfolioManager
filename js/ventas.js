@@ -13,6 +13,16 @@ let ventasAssets = []
 let ventasAssetDetails = new Map()
 let ventasYears = []
 let currentVentasYear = null
+let ventasModalKeyHandler = null
+
+function escapeVentasHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+}
 
 async function loadVentasIndex() {
     const response = await fetch("/api/ventas")
@@ -138,10 +148,7 @@ function bindVentasEvents() {
     const saveButton = document.getElementById("saveVentasBtn")
     if (ventasBody && !ventasBody.dataset.bound) {
         ventasBody.dataset.bound = "true"
-        ventasBody.addEventListener("click", handleVentasClick)
-        ventasBody.addEventListener("change", handleVentasChange)
-        ventasBody.addEventListener("input", handleVentasInput)
-        ventasBody.addEventListener("blur", handleVentasBlur, true)
+        ventasBody.addEventListener("click", handleVentasActionClick)
     }
 
     if (addYearButton && !addYearButton.dataset.bound) {
@@ -194,10 +201,7 @@ function bindVentasEvents() {
     if (addButton && !addButton.dataset.bound) {
         addButton.dataset.bound = "true"
         addButton.addEventListener("click", () => {
-            syncVentasDataFromTable()
-            currentVentasData.rows.push(createEmptyVentaRow())
-            renderVentasTable()
-            scheduleVentasAutosave()
+            openVentasModal(-1)
         })
     }
 
@@ -214,6 +218,123 @@ function bindVentasEvents() {
         })
     }
 
+}
+
+function closeVentasModal() {
+    document.getElementById("ventasModalOverlay")?.remove()
+
+    if (ventasModalKeyHandler) {
+        document.removeEventListener("keydown", ventasModalKeyHandler)
+        ventasModalKeyHandler = null
+    }
+}
+
+function buildVentasAssetOptions(selectedAssetId) {
+    const selectedId = String(selectedAssetId || "")
+    const hasSelectedAsset = ventasAssets.some((asset) => asset.id === selectedId)
+    const currentLabel = selectedId && !hasSelectedAsset ? getVentasAssetName(selectedId) || selectedId : ""
+
+    return `
+        <option value="">Selecciona activo</option>
+        ${currentLabel ? `<option value="${escapeVentasHtml(selectedId)}" selected>${escapeVentasHtml(currentLabel)}</option>` : ""}
+        ${ventasAssets.map((asset) => `<option value="${escapeVentasHtml(asset.id)}"${asset.id === selectedId ? " selected" : ""}>${escapeVentasHtml(asset.name)}</option>`).join("")}
+    `
+}
+
+function openVentasModal(rowIndex = -1) {
+    closeVentasModal()
+
+    const rows = currentVentasData.rows || []
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? { ...rows[rowIndex] } : createEmptyVentaRow()
+
+    const overlay = document.createElement("div")
+    overlay.id = "ventasModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal ventasCreateModal"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle">${isEdit ? "Editar venta" : "Añadir venta"}</h3>
+        <label class="assetModalLabel" for="ventaFechaInput">Fecha venta</label>
+        <input id="ventaFechaInput" class="assetModalInput" type="text" value="${escapeVentasHtml(rowData.fecha || "")}" placeholder="dd-mm-aaaa">
+        <label class="assetModalLabel" for="ventaActivoInput">Activo</label>
+        <select id="ventaActivoInput" class="assetModalSelect">
+            ${buildVentasAssetOptions(rowData.assetId || "")}
+        </select>
+        <label class="assetModalLabel" for="ventaCantidadInput">Cantidad</label>
+        <input id="ventaCantidadInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasNumber(rowData.cantidad) || "")}" placeholder="0">
+        <label class="assetModalLabel" for="ventaValorInput">Valor de venta</label>
+        <input id="ventaValorInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasMoney(rowData.valorVenta) || "")}" placeholder="0,00">
+        <p class="gastosCreateModalFeedback hidden" id="ventasModalFeedback"></p>
+        <div class="assetModalActions ventasModalActions">
+            <button type="button" class="secondaryButton" id="ventasModalCancelBtn">Cancelar</button>
+            <button type="button" class="primaryButton" id="ventasModalSaveBtn" data-no-autohide="true">Guardar</button>
+        </div>
+    `
+
+    const setFeedback = (message = "", isError = false) => {
+        const node = modal.querySelector("#ventasModalFeedback")
+        if (!node) return
+        node.textContent = message
+        node.classList.toggle("hidden", !message)
+        node.classList.toggle("error", Boolean(message && isError))
+    }
+
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeVentasModal()
+    })
+
+    modal.querySelector("#ventasModalCancelBtn")?.addEventListener("click", closeVentasModal)
+    modal.querySelector("#ventasModalSaveBtn")?.addEventListener("click", async () => {
+        const fecha = modal.querySelector("#ventaFechaInput")?.value.trim() || ""
+        const assetId = modal.querySelector("#ventaActivoInput")?.value.trim() || ""
+        const cantidadRaw = modal.querySelector("#ventaCantidadInput")?.value.trim() || ""
+        const valorVentaRaw = modal.querySelector("#ventaValorInput")?.value.trim() || ""
+        const cantidad = cantidadRaw ? formatVentasNumber(cantidadRaw) : ""
+        const valorVenta = valorVentaRaw ? stripCurrencyText(formatVentasMoney(valorVentaRaw)) : ""
+
+        if (!fecha && !assetId && !cantidad && !valorVenta) {
+            setFeedback("Introduce al menos un dato.", true)
+            return
+        }
+
+        const nextRow = normalizeVentaRow({
+            id: rowData.id,
+            fecha,
+            assetId,
+            activo: getVentasAssetName(assetId),
+            cantidad,
+            valorVenta
+        })
+
+        if (isEdit) {
+            currentVentasData.rows[rowIndex] = nextRow
+        } else {
+            currentVentasData.rows.push(nextRow)
+        }
+
+        try {
+            renderVentasTable()
+            await persistVentasData()
+            closeVentasModal()
+        } catch (error) {
+            console.error(error)
+            setFeedback("No se pudo guardar.", true)
+        }
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    ventasModalKeyHandler = (event) => {
+        if (event.key === "Escape") closeVentasModal()
+    }
+    document.addEventListener("keydown", ventasModalKeyHandler)
+
+    modal.querySelector("input, select")?.focus()
 }
 
 async function renderVentasYear(year) {
@@ -520,8 +641,7 @@ function renderVentasTable() {
     if (!rows.length) {
         const emptyRow = document.createElement("tr")
         emptyRow.innerHTML = `
-            <td class="rowDeleteCell"></td>
-            <td colspan="14" class="operationsEmptyCell">Todavía no hay ventas registradas.</td>
+            <td colspan="15" class="operationsEmptyCell">Todavía no hay ventas registradas.</td>
         `
         ventasBody.appendChild(emptyRow)
         return
@@ -530,20 +650,24 @@ function renderVentasTable() {
     const computedMap = buildVentasComputedMap(rows)
 
     rows.forEach((row, index) => {
-        ventasBody.appendChild(buildVentaRow(row, computedMap.get(index) || createEmptyVentasComputed()))
+        ventasBody.appendChild(buildVentaRow(row, computedMap.get(index) || createEmptyVentasComputed(), index))
     })
 }
 
-function buildVentaRow(row, computed) {
+function buildVentaRow(row, computed, index) {
     const tr = document.createElement("tr")
     tr.dataset.ventaId = row.id
+    tr.dataset.fecha = String(row.fecha || "")
+    tr.dataset.assetId = String(row.assetId || "")
+    tr.dataset.activo = String(row.activo || "")
+    tr.dataset.cantidad = String(row.cantidad || "")
+    tr.dataset.valorVenta = String(row.valorVenta || "")
     tr.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
-        <td contenteditable="true" data-field="fecha">${row.fecha || ""}</td>
-        <td>${buildVentasAssetSelect(row.assetId)}</td>
-        <td contenteditable="true" data-field="cantidad">${formatVentasNumber(row.cantidad)}</td>
+        <td data-field="fecha">${row.fecha || ""}</td>
+        <td data-field="assetName">${getVentasAssetName(row.assetId) || row.activo || ""}</td>
+        <td data-field="cantidad">${formatVentasNumber(row.cantidad)}</td>
         <td class="rowTotal" data-field="valorCompra">${formatVentasMoney(computed.valorCompra)}</td>
-        <td contenteditable="true" data-field="valorVenta">${formatVentasMoney(row.valorVenta)}</td>
+        <td data-field="valorVenta">${formatVentasMoney(row.valorVenta)}</td>
         <td class="rowTotal" data-field="dineroDeclarar">${formatVentasTaxColumn(computed.dineroDeclarar)}</td>
         <td class="rowTotal" data-field="tramo1">${formatVentasTaxColumn(computed.tramo1)}</td>
         <td class="rowTotal" data-field="tramo2">${formatVentasTaxColumn(computed.tramo2)}</td>
@@ -553,6 +677,10 @@ function buildVentaRow(row, computed) {
         <td class="rowTotal" data-field="totalPagar">${formatVentasTaxColumn(computed.totalPagar)}</td>
         <td class="rowTotal" data-field="bruto">${formatVentasMoney(computed.bruto)}</td>
         <td class="rowTotal" data-field="neto">${formatVentasMoney(computed.neto)}</td>
+        <td class="rowActionsCell">
+            <button type="button" class="assetRowEditBtn ventasRowEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
+            <button type="button" class="assetRowDeleteBtn ventasRowDeleteBtn" data-row-index="${index}" title="Eliminar fila">✕</button>
+        </td>
     `
     return tr
 }
@@ -608,73 +736,49 @@ function formatVentasTaxColumn(value) {
     return formatMoney(parsedValue, "EUR")
 }
 
-function handleVentasInput(event) {
-    const row = event.target.closest("tr[data-venta-id]")
-
-    if (!row) {
+function handleVentasActionClick(event) {
+    const editButton = event.target.closest(".ventasRowEditBtn")
+    if (editButton) {
+        openVentasModal(Number(editButton.dataset.rowIndex))
         return
     }
 
-    scheduleVentasAutosave()
-}
-
-function handleVentasChange(event) {
-    const assetSelect = event.target.closest('select[data-field="assetId"]')
-
-    if (!assetSelect) {
-        return
-    }
-
-    const rowElement = assetSelect.closest("tr[data-venta-id]")
-
-    if (!rowElement) {
-        return
-    }
-
-    syncVentasDataFromTable()
-    renderVentasTable()
-    scheduleVentasAutosave()
-}
-
-function handleVentasBlur(event) {
-    const cell = event.target.closest('[contenteditable="true"]')
-
-    if (!cell) {
-        return
-    }
-
-    const field = cell.dataset.field
-
-    if (field === "cantidad") {
-        cell.textContent = formatVentasNumber(cell.textContent)
-    }
-
-    if (field === "valorVenta") {
-        cell.textContent = formatVentasMoney(cell.textContent)
-    }
-
-    syncVentasDataFromTable()
-    renderVentasTable()
-    scheduleVentasAutosave()
-}
-
-function handleVentasClick(event) {
-    const deleteButton = event.target.closest(".rowDeleteBtn")
-
+    const deleteButton = event.target.closest(".ventasRowDeleteBtn")
     if (!deleteButton) {
         return
     }
 
-    const row = deleteButton.closest("tr[data-venta-id]")
-    const rowId = row?.dataset.ventaId
+    const rowIndex = Number(deleteButton.dataset.rowIndex)
+    const row = currentVentasData.rows?.[rowIndex]
+    const isEmpty = !row || (!row.fecha && !row.assetId && parseLooseNumber(row.cantidad || "") === null && parseLooseNumber(row.valorVenta || "") === null)
 
-    if (!rowId) {
+    const removeRow = async () => {
+        currentVentasData.rows.splice(rowIndex, 1)
+        renderVentasTable()
+        await persistVentasData()
+    }
+
+    if (isEmpty) {
+        removeRow().catch((error) => {
+            console.error(error)
+            alert("No se pudo eliminar la fila.")
+        })
         return
     }
 
-    currentVentasData.rows = (currentVentasData.rows || []).filter((item) => item.id !== rowId)
-    renderVentasTable()
-    scheduleVentasAutosave()
+    openConfirmModal({
+        title: "Eliminar fila",
+        message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
+        confirmLabel: "Eliminar",
+        onConfirm: async () => {
+            try {
+                await removeRow()
+            } catch (error) {
+                console.error(error)
+                alert("No se pudo eliminar la fila.")
+            }
+        }
+    })
 }
 
 function stripVentasCurrencyOnFocus(event) {
@@ -689,21 +793,17 @@ function stripVentasCurrencyOnFocus(event) {
     })
 }
 
-document.addEventListener("focusin", stripVentasCurrencyOnFocus)
-
 function syncVentasDataFromTable() {
     const bodyRows = [...document.querySelectorAll("#ventasBody tr[data-venta-id]")]
 
     currentVentasData.rows = bodyRows.map((rowElement) => {
-        const assetId = rowElement.querySelector('select[data-field="assetId"]')?.value || ""
-
         return normalizeVentaRow({
             id: rowElement.dataset.ventaId,
-            fecha: rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
-            assetId,
-            activo: getVentasAssetName(assetId),
-            cantidad: rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || "",
-            valorVenta: stripCurrencyText(rowElement.querySelector('[data-field="valorVenta"]')?.textContent || "") || ""
+            fecha: rowElement.dataset.fecha || rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
+            assetId: rowElement.dataset.assetId || "",
+            activo: rowElement.dataset.activo || getVentasAssetName(rowElement.dataset.assetId || ""),
+            cantidad: rowElement.dataset.cantidad || rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || "",
+            valorVenta: stripCurrencyText(rowElement.dataset.valorVenta || rowElement.querySelector('[data-field="valorVenta"]')?.textContent || "") || ""
         })
     })
 }

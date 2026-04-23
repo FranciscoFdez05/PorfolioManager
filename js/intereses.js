@@ -90,6 +90,112 @@ function handleCellBlur(event) {
     }
 }
 
+let interesesModalKeyHandler = null
+
+function escapeInteresesHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+}
+
+function closeInteresesModal() {
+    document.getElementById("interesesModalOverlay")?.remove()
+
+    if (interesesModalKeyHandler) {
+        document.removeEventListener("keydown", interesesModalKeyHandler)
+        interesesModalKeyHandler = null
+    }
+}
+
+function openInteresesModal(rowIndex = -1) {
+    closeInteresesModal()
+
+    const rows = collectInteresesDataFromTable().rows
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? { ...rows[rowIndex] } : {}
+
+    const overlay = document.createElement("div")
+    overlay.id = "interesesModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal interesesCreateModal"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle">${isEdit ? "Editar interés" : "Añadir interés"}</h3>
+        <label class="assetModalLabel" for="interesFechaInput">Fecha</label>
+        <input id="interesFechaInput" class="assetModalInput" type="text" value="${escapeInteresesHtml(rowData.fecha || "")}" placeholder="dd-mm-aaaa">
+        <label class="assetModalLabel" for="interesAcumuladoInput">Acumulado</label>
+        <input id="interesAcumuladoInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeInteresesHtml(rowData.acumulado || "")}" placeholder="0,00">
+        <label class="assetModalLabel" for="interesImpuestosInput">Impuestos</label>
+        <input id="interesImpuestosInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeInteresesHtml(rowData.impuestos || "")}" placeholder="0,00">
+        <p class="gastosCreateModalFeedback hidden" id="interesesModalFeedback"></p>
+        <div class="assetModalActions interesesModalActions">
+            <button type="button" class="secondaryButton" id="interesesModalCancelBtn">Cancelar</button>
+            <button type="button" class="primaryButton" id="interesesModalSaveBtn" data-no-autohide="true">Guardar</button>
+        </div>
+    `
+
+    const feedback = () => modal.querySelector("#interesesModalFeedback")
+    const setFeedback = (message = "", isError = false) => {
+        const node = feedback()
+        if (!node) return
+        node.textContent = message
+        node.classList.toggle("hidden", !message)
+        node.classList.toggle("error", Boolean(message && isError))
+    }
+
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeInteresesModal()
+    })
+
+    modal.querySelector("#interesesModalCancelBtn")?.addEventListener("click", closeInteresesModal)
+    modal.querySelector("#interesesModalSaveBtn")?.addEventListener("click", async () => {
+        const fecha = modal.querySelector("#interesFechaInput")?.value.trim() || ""
+        const acumuladoRaw = modal.querySelector("#interesAcumuladoInput")?.value.trim() || ""
+        const impuestosRaw = modal.querySelector("#interesImpuestosInput")?.value.trim() || ""
+        const acumulado = acumuladoRaw ? formatCellEuroValue(acumuladoRaw) : ""
+        const impuestos = impuestosRaw ? formatCellEuroValue(impuestosRaw) : ""
+
+        if (!fecha && !acumulado && !impuestos) {
+            setFeedback("Introduce al menos un dato.", true)
+            return
+        }
+
+        const nextRows = [...rows]
+        const nextRow = { fecha, acumulado, impuestos }
+
+        if (isEdit) {
+            nextRows[rowIndex] = nextRow
+        } else {
+            nextRows.push(nextRow)
+        }
+
+        try {
+            renderRowsFromData({ rows: nextRows })
+            await saveInteresesDataToServer()
+            closeInteresesModal()
+        } catch (error) {
+            console.error(error)
+            setFeedback("No se pudo guardar.", true)
+        }
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    interesesModalKeyHandler = (event) => {
+        if (event.key === "Escape") closeInteresesModal()
+    }
+    document.addEventListener("keydown", interesesModalKeyHandler)
+
+    modal.querySelector("input")?.focus()
+}
+
 async function loadInteresesData() {
     try {
         const response = await fetch("/api/intereses")
@@ -127,15 +233,22 @@ function renderRowsFromData(interesesData) {
 
     const rows = Array.isArray(interesesData?.rows) ? interesesData.rows : []
 
-    rows.forEach((rowData) => {
+    rows.forEach((rowData, index) => {
         const rowElement = document.createElement("tr")
+        rowElement.dataset.rowIndex = String(index)
+        rowElement.dataset.fecha = String(rowData.fecha || "")
+        rowElement.dataset.acumulado = String(rowData.acumulado || "")
+        rowElement.dataset.impuestos = String(rowData.impuestos || "")
 
         rowElement.innerHTML = `
-            <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
-            <td contenteditable="true">${rowData.fecha || ""}</td>
-            <td contenteditable="true">${formatCellEuroValue(rowData.acumulado)}</td>
-            <td contenteditable="true">${formatCellEuroValue(rowData.impuestos)}</td>
+            <td data-field="fecha">${rowData.fecha || ""}</td>
+            <td data-field="acumulado">${formatCellEuroValue(rowData.acumulado)}</td>
+            <td data-field="impuestos">${formatCellEuroValue(rowData.impuestos)}</td>
             <td class="rowTotal">0,00 €</td>
+            <td class="rowActionsCell">
+                <button type="button" class="assetRowEditBtn interesesRowEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
+                <button type="button" class="assetRowDeleteBtn interesesRowDeleteBtn" data-row-index="${index}" title="Eliminar fila">✕</button>
+            </td>
         `
 
         interesesBody.appendChild(rowElement)
@@ -148,12 +261,10 @@ function collectInteresesDataFromTable() {
     const rowElements = [...document.querySelectorAll("#interesesBody tr")]
 
     const rows = rowElements.map((rowElement) => {
-        const cells = rowElement.querySelectorAll("td")
-
         return {
-            fecha: cells[1]?.textContent.trim() || "",
-            acumulado: cells[2]?.textContent.trim() || "",
-            impuestos: cells[3]?.textContent.trim() || ""
+            fecha: rowElement.dataset.fecha || rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
+            acumulado: rowElement.dataset.acumulado || rowElement.querySelector('[data-field="acumulado"]')?.textContent.trim() || "",
+            impuestos: rowElement.dataset.impuestos || rowElement.querySelector('[data-field="impuestos"]')?.textContent.trim() || ""
         }
     })
 
@@ -191,12 +302,12 @@ function updateTotals() {
 
     rowElements.forEach((rowElement) => {
         const cells = rowElement.querySelectorAll("td")
-        const acumulado = parseEuroNumber(cells[2]?.textContent || "")
-        const impuestos = parseEuroNumber(cells[3]?.textContent || "")
+        const acumulado = parseEuroNumber(cells[1]?.textContent || "")
+        const impuestos = parseEuroNumber(cells[2]?.textContent || "")
         const rowTotal = acumulado - impuestos
 
-        if (cells[4]) {
-            cells[4].textContent = formatEuro(rowTotal)
+        if (cells[3]) {
+            cells[3].textContent = formatEuro(rowTotal)
         }
 
         totalNeto += rowTotal
@@ -221,24 +332,53 @@ function updateTotals() {
 }
 
 function addNewInteresesRow() {
-    const interesesBody = document.getElementById("interesesBody")
+    openInteresesModal(-1)
+}
 
-    if (!interesesBody) {
+function handleInteresesRowActionClick(event) {
+    const editButton = event.target.closest(".interesesRowEditBtn")
+    if (editButton) {
+        openInteresesModal(Number(editButton.dataset.rowIndex))
         return
     }
 
-    const rowElement = document.createElement("tr")
+    const deleteButton = event.target.closest(".interesesRowDeleteBtn")
+    if (!deleteButton) {
+        return
+    }
 
-    rowElement.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
-        <td contenteditable="true">nuevo-mes</td>
-        <td contenteditable="true"></td>
-        <td contenteditable="true"></td>
-        <td class="rowTotal">0,00 €</td>
-    `
+    const rowIndex = Number(deleteButton.dataset.rowIndex)
+    const rows = collectInteresesDataFromTable().rows
+    const row = rows[rowIndex]
+    const isEmpty = !row || (!row.fecha && parseEuroNumber(row.acumulado || "") === 0 && parseEuroNumber(row.impuestos || "") === 0)
 
-    interesesBody.appendChild(rowElement)
-    updateTotals()
+    const removeRow = async () => {
+        rows.splice(rowIndex, 1)
+        renderRowsFromData({ rows })
+        await saveInteresesDataToServer()
+    }
+
+    if (isEmpty) {
+        removeRow().catch((error) => {
+            console.error(error)
+            alert("No se pudo eliminar la fila.")
+        })
+        return
+    }
+
+    openConfirmModal({
+        title: "Eliminar fila",
+        message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
+        confirmLabel: "Eliminar",
+        onConfirm: async () => {
+            try {
+                await removeRow()
+            } catch (error) {
+                console.error(error)
+                alert("No se pudo eliminar la fila.")
+            }
+        }
+    })
 }
 
 function exportInteresesJson() {

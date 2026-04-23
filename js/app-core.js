@@ -206,23 +206,20 @@ async function initInteresesLogic() {
     const addRowButton = document.getElementById("addRowBtn")
     const saveInteresesButton = document.getElementById("saveInteresesBtn")
 
-    if (interesesBody) {
-        interesesBody.addEventListener("input", () => {
-            updateTotals()
-        })
-
-        interesesBody.addEventListener("click", handleRowDeleteClick)
-        interesesBody.addEventListener("focus", handleCellFocus, true)
-        interesesBody.addEventListener("blur", handleCellBlur, true)
+    if (interesesBody && !interesesBody.dataset.bound) {
+        interesesBody.dataset.bound = "true"
+        interesesBody.addEventListener("click", handleInteresesRowActionClick)
     }
 
-    if (addRowButton) {
+    if (addRowButton && !addRowButton.dataset.bound) {
+        addRowButton.dataset.bound = "true"
         addRowButton.addEventListener("click", () => {
             addNewInteresesRow()
         })
     }
 
-    if (saveInteresesButton) {
+    if (saveInteresesButton && !saveInteresesButton.dataset.bound) {
+        saveInteresesButton.dataset.bound = "true"
         saveInteresesButton.addEventListener("click", async () => {
             try {
                 await saveInteresesDataToServer()
@@ -344,5 +341,4 @@ async function refreshTopDividendosIntereses() {
         console.error("Error actualizando métricas de dividendos/intereses:", error)
     }
 }
-
 

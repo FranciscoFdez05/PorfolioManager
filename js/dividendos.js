@@ -1,4 +1,14 @@
 let _dividendosAssets = []
+let dividendosModalKeyHandler = null
+
+function escapeDividendosHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+}
 
 function buildDividendosInstrumentoSelect(selectedName) {
     const exists = _dividendosAssets.some((a) => a.name === selectedName)
@@ -9,6 +19,126 @@ function buildDividendosInstrumentoSelect(selectedName) {
         `<option value="${a.name}"${a.name === selectedName ? " selected" : ""}>${a.name}</option>`
     ).join("")
     return `<select class="bonosTipoSelect">${extra}${opts}</select>`
+}
+
+function buildDividendosInstrumentoOptions(selectedName) {
+    const exists = _dividendosAssets.some((a) => a.name === selectedName)
+    const extra = (!exists && selectedName)
+        ? `<option value="${escapeDividendosHtml(selectedName)}" selected>${escapeDividendosHtml(selectedName)}</option>`
+        : ""
+    const opts = _dividendosAssets.map((a) =>
+        `<option value="${escapeDividendosHtml(a.name)}"${a.name === selectedName ? " selected" : ""}>${escapeDividendosHtml(a.name)}</option>`
+    ).join("")
+
+    return `<option value=""></option>${extra}${opts}`
+}
+
+function closeDividendosModal() {
+    document.getElementById("dividendosModalOverlay")?.remove()
+
+    if (dividendosModalKeyHandler) {
+        document.removeEventListener("keydown", dividendosModalKeyHandler)
+        dividendosModalKeyHandler = null
+    }
+}
+
+function openDividendosModal(rowIndex = -1) {
+    closeDividendosModal()
+
+    const rows = collectDividendosDataFromTable().rows
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? { ...rows[rowIndex] } : {}
+
+    const overlay = document.createElement("div")
+    overlay.id = "dividendosModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal dividendosCreateModal"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle">${isEdit ? "Editar dividendo" : "Añadir dividendo"}</h3>
+        <label class="assetModalLabel" for="dividendoFechaInput">Fecha</label>
+        <input id="dividendoFechaInput" class="assetModalInput" type="text" value="${escapeDividendosHtml(rowData.fecha || "")}" placeholder="dd-mm-aaaa">
+        <label class="assetModalLabel" for="dividendoInstrumentoInput">Instrumento</label>
+        <select id="dividendoInstrumentoInput" class="assetModalSelect">
+            ${buildDividendosInstrumentoOptions(rowData.instrumento || "")}
+        </select>
+        <label class="assetModalLabel" for="dividendoAccionesInput">Acciones</label>
+        <input id="dividendoAccionesInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeDividendosHtml(rowData.acciones || "")}" placeholder="0">
+        <label class="assetModalLabel" for="dividendoPorAccionInput">Dividendos / Acción</label>
+        <input id="dividendoPorAccionInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeDividendosHtml(rowData.dividendoAccion || "")}" placeholder="0,00">
+        <label class="assetModalLabel" for="dividendoImpuestosInput">Impuestos</label>
+        <input id="dividendoImpuestosInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeDividendosHtml(rowData.impuestos || "")}" placeholder="0,00">
+        <label class="assetModalLabel" for="dividendoTotalInput">Total</label>
+        <input id="dividendoTotalInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeDividendosHtml(rowData.total || "")}" placeholder="0,00">
+        <p class="gastosCreateModalFeedback hidden" id="dividendosModalFeedback"></p>
+        <div class="assetModalActions dividendosModalActions">
+            <button type="button" class="secondaryButton" id="dividendosModalCancelBtn">Cancelar</button>
+            <button type="button" class="primaryButton" id="dividendosModalSaveBtn" data-no-autohide="true">Guardar</button>
+        </div>
+    `
+
+    const setFeedback = (message = "", isError = false) => {
+        const node = modal.querySelector("#dividendosModalFeedback")
+        if (!node) return
+        node.textContent = message
+        node.classList.toggle("hidden", !message)
+        node.classList.toggle("error", Boolean(message && isError))
+    }
+
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeDividendosModal()
+    })
+
+    modal.querySelector("#dividendosModalCancelBtn")?.addEventListener("click", closeDividendosModal)
+    modal.querySelector("#dividendosModalSaveBtn")?.addEventListener("click", async () => {
+        const fecha = modal.querySelector("#dividendoFechaInput")?.value.trim() || ""
+        const instrumento = modal.querySelector("#dividendoInstrumentoInput")?.value.trim() || ""
+        const accionesRaw = modal.querySelector("#dividendoAccionesInput")?.value.trim() || ""
+        const dividendoAccionRaw = modal.querySelector("#dividendoPorAccionInput")?.value.trim() || ""
+        const impuestosRaw = modal.querySelector("#dividendoImpuestosInput")?.value.trim() || ""
+        const totalRaw = modal.querySelector("#dividendoTotalInput")?.value.trim() || ""
+
+        const acciones = accionesRaw ? formatShareQuantity(accionesRaw) : ""
+        const dividendoAccion = dividendoAccionRaw ? formatCellDollarValue(dividendoAccionRaw) : ""
+        const impuestos = impuestosRaw ? formatCellEuroValue(impuestosRaw) : ""
+        const total = totalRaw ? formatCellEuroValue(totalRaw) : ""
+
+        if (!fecha && !instrumento && !acciones && !dividendoAccion && !impuestos && !total) {
+            setFeedback("Introduce al menos un dato.", true)
+            return
+        }
+
+        const nextRows = [...rows]
+        const nextRow = { fecha, instrumento, acciones, dividendoAccion, impuestos, total }
+
+        if (isEdit) {
+            nextRows[rowIndex] = nextRow
+        } else {
+            nextRows.push(nextRow)
+        }
+
+        try {
+            renderDividendosRowsFromData({ rows: nextRows })
+            await saveDividendosDataToServer()
+            closeDividendosModal()
+        } catch (error) {
+            console.error(error)
+            setFeedback("No se pudo guardar.", true)
+        }
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    dividendosModalKeyHandler = (event) => {
+        if (event.key === "Escape") closeDividendosModal()
+    }
+    document.addEventListener("keydown", dividendosModalKeyHandler)
+
+    modal.querySelector("input, select")?.focus()
 }
 
 async function loadDividendosData() {
@@ -52,17 +182,27 @@ function renderDividendosRowsFromData(dividendosData) {
 
     const rows = Array.isArray(dividendosData?.rows) ? dividendosData.rows : []
 
-    rows.forEach((rowData) => {
+    rows.forEach((rowData, index) => {
         const rowElement = document.createElement("tr")
+        rowElement.dataset.rowIndex = String(index)
+        rowElement.dataset.fecha = String(rowData.fecha || "")
+        rowElement.dataset.instrumento = String(rowData.instrumento || "")
+        rowElement.dataset.acciones = String(rowData.acciones || "")
+        rowElement.dataset.dividendoAccion = String(rowData.dividendoAccion || "")
+        rowElement.dataset.impuestos = String(rowData.impuestos || "")
+        rowElement.dataset.total = String(rowData.total || "")
 
         rowElement.innerHTML = `
-            <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
-            <td contenteditable="true">${rowData.fecha || ""}</td>
-            <td>${buildDividendosInstrumentoSelect(rowData.instrumento || "")}</td>
-            <td contenteditable="true">${formatShareQuantity(rowData.acciones)}</td>
-            <td contenteditable="true">${formatCellDollarValue(rowData.dividendoAccion)}</td>
-            <td contenteditable="true">${formatCellEuroValue(rowData.impuestos)}</td>
-            <td contenteditable="true" class="rowTotal">${formatCellEuroValue(rowData.total)}</td>
+            <td data-field="fecha">${rowData.fecha || ""}</td>
+            <td data-field="instrumento">${rowData.instrumento || ""}</td>
+            <td data-field="acciones">${formatShareQuantity(rowData.acciones)}</td>
+            <td data-field="dividendoAccion">${formatCellDollarValue(rowData.dividendoAccion)}</td>
+            <td data-field="impuestos">${formatCellEuroValue(rowData.impuestos)}</td>
+            <td class="rowTotal">${formatCellEuroValue(rowData.total)}</td>
+            <td class="rowActionsCell">
+                <button type="button" class="assetRowEditBtn dividendosRowEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
+                <button type="button" class="assetRowDeleteBtn dividendosRowDeleteBtn" data-row-index="${index}" title="Eliminar fila">✕</button>
+            </td>
         `
 
         dividendosBody.appendChild(rowElement)
@@ -75,15 +215,13 @@ function collectDividendosDataFromTable() {
     const rowElements = [...document.querySelectorAll("#dividendosBody tr")]
 
     const rows = rowElements.map((rowElement) => {
-        const cells = rowElement.querySelectorAll("td")
-
         return {
-            fecha: cells[1]?.textContent.trim() || "",
-            instrumento: cells[2]?.querySelector("select")?.value || cells[2]?.textContent.trim() || "",
-            acciones: cells[3]?.textContent.trim() || "",
-            dividendoAccion: cells[4]?.textContent.trim() || "",
-            impuestos: cells[5]?.textContent.trim() || "",
-            total: cells[6]?.textContent.trim() || ""
+            fecha: rowElement.dataset.fecha || rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
+            instrumento: rowElement.dataset.instrumento || rowElement.querySelector('[data-field="instrumento"]')?.textContent.trim() || "",
+            acciones: rowElement.dataset.acciones || rowElement.querySelector('[data-field="acciones"]')?.textContent.trim() || "",
+            dividendoAccion: rowElement.dataset.dividendoAccion || rowElement.querySelector('[data-field="dividendoAccion"]')?.textContent.trim() || "",
+            impuestos: rowElement.dataset.impuestos || rowElement.querySelector('[data-field="impuestos"]')?.textContent.trim() || "",
+            total: rowElement.dataset.total || rowElement.querySelector(".rowTotal")?.textContent.trim() || ""
         }
     })
 
@@ -121,8 +259,8 @@ function updateDividendosTotals() {
 
     rowElements.forEach((rowElement) => {
         const cells = rowElement.querySelectorAll("td")
-        const impuestos = parseEuroNumber(cells[5]?.textContent || "")
-        const rowTotal = parseEuroNumber(cells[6]?.textContent || "")
+        const impuestos = parseEuroNumber(cells[4]?.textContent || "")
+        const rowTotal = parseEuroNumber(cells[5]?.textContent || "")
 
         totalNeto += rowTotal
         totalImpuestos += impuestos
@@ -146,26 +284,53 @@ function updateDividendosTotals() {
 }
 
 function addNewDividendosRow() {
-    const dividendosBody = document.getElementById("dividendosBody")
+    openDividendosModal(-1)
+}
 
-    if (!dividendosBody) {
+function handleDividendosRowActionClick(event) {
+    const editButton = event.target.closest(".dividendosRowEditBtn")
+    if (editButton) {
+        openDividendosModal(Number(editButton.dataset.rowIndex))
         return
     }
 
-    const rowElement = document.createElement("tr")
+    const deleteButton = event.target.closest(".dividendosRowDeleteBtn")
+    if (!deleteButton) {
+        return
+    }
 
-    rowElement.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
-        <td contenteditable="true"></td>
-        <td>${buildDividendosInstrumentoSelect("")}</td>
-        <td contenteditable="true"></td>
-        <td contenteditable="true"></td>
-        <td contenteditable="true"></td>
-        <td contenteditable="true" class="rowTotal"></td>
-    `
+    const rowIndex = Number(deleteButton.dataset.rowIndex)
+    const rows = collectDividendosDataFromTable().rows
+    const row = rows[rowIndex]
+    const isEmpty = !row || (!row.fecha && !row.instrumento && parseLooseNumber(row.acciones || "") === 0 && parseDollarNumber(row.dividendoAccion || "") === 0 && parseEuroNumber(row.impuestos || "") === 0 && parseEuroNumber(row.total || "") === 0)
 
-    dividendosBody.appendChild(rowElement)
-    updateDividendosTotals()
+    const removeRow = async () => {
+        rows.splice(rowIndex, 1)
+        renderDividendosRowsFromData({ rows })
+        await saveDividendosDataToServer()
+    }
+
+    if (isEmpty) {
+        removeRow().catch((error) => {
+            console.error(error)
+            alert("No se pudo eliminar la fila.")
+        })
+        return
+    }
+
+    openConfirmModal({
+        title: "Eliminar fila",
+        message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
+        confirmLabel: "Eliminar",
+        onConfirm: async () => {
+            try {
+                await removeRow()
+            } catch (error) {
+                console.error(error)
+                alert("No se pudo eliminar la fila.")
+            }
+        }
+    })
 }
 
 function exportDividendosJson() {

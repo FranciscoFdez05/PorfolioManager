@@ -224,32 +224,20 @@ async function initDividendosLogic() {
     const addRowButton = document.getElementById("addRowDividendoBtn")
     const saveDividendosButton = document.getElementById("saveDividendosBtn")
 
-    if (dividendosBody) {
-        dividendosBody.addEventListener("input", () => {
-            updateDividendosTotals()
-            scheduleDividendosAutosave()
-        })
-
-        dividendosBody.addEventListener("change", () => {
-            scheduleDividendosAutosave()
-        })
-
-        dividendosBody.addEventListener("click", handleRowDeleteClick)
-        dividendosBody.addEventListener("focus", handleCellFocus, true)
-        dividendosBody.addEventListener("blur", (event) => {
-            handleCellBlur(event)
-            scheduleDividendosAutosave()
-        }, true)
+    if (dividendosBody && !dividendosBody.dataset.bound) {
+        dividendosBody.dataset.bound = "true"
+        dividendosBody.addEventListener("click", handleDividendosRowActionClick)
     }
 
-    if (addRowButton) {
+    if (addRowButton && !addRowButton.dataset.bound) {
+        addRowButton.dataset.bound = "true"
         addRowButton.addEventListener("click", () => {
             addNewDividendosRow()
-            scheduleDividendosAutosave()
         })
     }
 
-    if (saveDividendosButton) {
+    if (saveDividendosButton && !saveDividendosButton.dataset.bound) {
+        saveDividendosButton.dataset.bound = "true"
         saveDividendosButton.addEventListener("click", async () => {
             try {
                 await saveDividendosDataToServer()
@@ -820,7 +808,15 @@ function _buildCustomSelect(select) {
         menu.style.left  = left + "px"
         menu.style.width = Math.max(width, 150) + "px"
 
-        const menuH = 220
+        const previousVisibility = menu.style.visibility
+        const previousDisplay = menu.style.display
+
+        menu.style.visibility = "hidden"
+        menu.style.display = "flex"
+        const menuH = Math.min(menu.scrollHeight, 220)
+        menu.style.visibility = previousVisibility
+        menu.style.display = previousDisplay
+
         const spaceBelow = window.innerHeight - bottom - 8
         if (spaceBelow < menuH && top >= menuH) {
             menu.style.top = (top - menuH) + "px"

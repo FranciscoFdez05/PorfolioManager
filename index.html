@@ -113,16 +113,26 @@
             <div class="navButtons">
                 <button class="navBtn active" data-page="vistaGeneral">Vista general</button>
 
-                <button class="navBtn" data-page="gastos">Gastos</button>
-                <button class="navBtn" data-page="ingresos">Ingresos</button>
+                <!-- <button class="navBtn" data-page="gastos">Gastos</button> -->
+                <!-- <button class="navBtn" data-page="ingresos">Ingresos</button> -->
+
+                <button class="navBtn" data-page="activos">Activos</button>
+                <button class="navBtn" data-page="ventas">Ventas</button>
+
+                <div class="navDropdown">
+                    <button class="navDropdownBtn" type="button">Gastos ▾</button>
+                    <div class="navDropdownMenu">                        
+                        <button class="navBtn navDropdownItem" data-page="gastos">Gastos</button>
+                        <button class="navBtn navDropdownItem" data-page="ingresos">Ingresos</button>
+                    </div>
+                </div>
+
 
                 <div class="navDropdown">
                     <button class="navDropdownBtn" type="button">Finanzas ▾</button>
-                    <div class="navDropdownMenu">
-                        <button class="navBtn navDropdownItem" data-page="activos">Activos</button>
+                    <div class="navDropdownMenu">                        
                         <button class="navBtn navDropdownItem" data-page="intereses">Intereses</button>
                         <button class="navBtn navDropdownItem" data-page="dividendos">Dividendos</button>
-                        <button class="navBtn navDropdownItem" data-page="ventas">Ventas</button>
                     </div>
                 </div>
 
@@ -217,7 +227,7 @@
         <input id="assetNameInput" class="assetModalInput" type="text" placeholder="Ej: Microsoft o Solana">
 
         <label class="assetModalLabel" for="assetTypeSelect">Tipo del activo</label>
-        <select id="assetTypeSelect" class="assetModalSelect">
+        <select id="assetTypeSelect" class="assetModalSelect" data-no-custom="true">
             <option value="cripto">Cripto</option>
             <option value="acciones">Acciones</option>
             <option value="etfs">ETFs</option>

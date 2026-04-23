@@ -2355,14 +2355,14 @@ function openAssetRowModal(rowIndex) {
 
     const overlay = document.createElement("div")
     overlay.id = "assetRowModalOverlay"
-    overlay.className = "assetRowModalOverlay"
+    overlay.className = "modalOverlay assetRowModalOverlay"
     overlay.dataset.rowIndex = isEdit ? String(rowIndex) : "-1"
 
     const modal = document.createElement("div")
-    modal.className = "assetRowModal"
+    modal.className = "assetModal assetRowModal"
 
     const title = document.createElement("h3")
-    title.className = "assetRowModalTitle"
+    title.className = "assetModalTitle assetRowModalTitle"
     title.textContent = isEdit ? "Editar operación" : "Añadir operación"
 
     const fields = document.createElement("div")
@@ -2372,9 +2372,9 @@ function openAssetRowModal(rowIndex) {
     const footer = document.createElement("div")
     footer.className = "assetRowModalFooter"
     footer.innerHTML = `
-        ${isEdit ? `<button type="button" id="assetRowModalDeleteBtn" style="background:#7f1d1d;color:#fca5a5;border:1px solid #b91c1c;border-radius:10px;height:38px;padding:0 16px;font-weight:600;font-size:14px;cursor:pointer;margin-right:auto;">Eliminar</button>` : ""}
-        <button type="button" id="assetRowModalCancelBtn" style="background:transparent;color:#94a3b8;border:1px solid #475569;border-radius:10px;height:38px;padding:0 20px;font-weight:600;font-size:14px;cursor:pointer;">Cancelar</button>
-        <button type="button" id="assetRowModalSaveBtn" data-no-autohide="true" style="background:#1d4ed8;color:#ffffff;border:1px solid #3b82f6;border-radius:10px;height:38px;padding:0 20px;font-weight:600;font-size:14px;cursor:pointer;">Guardar</button>
+        ${isEdit ? `<button type="button" id="assetRowModalDeleteBtn" class="dangerButton assetRowModalDeleteBtn">Eliminar</button>` : ""}
+        <button type="button" id="assetRowModalCancelBtn" class="secondaryButton assetRowModalCancelBtn">Cancelar</button>
+        <button type="button" id="assetRowModalSaveBtn" data-no-autohide="true" class="primaryButton assetRowModalSaveBtn">Guardar</button>
     `
 
     footer.querySelector("#assetRowModalSaveBtn").addEventListener("click", saveAssetRowFromModal)
@@ -2400,6 +2400,12 @@ function openAssetRowModal(rowIndex) {
     modal.appendChild(fields)
     modal.appendChild(footer)
     overlay.appendChild(modal)
+
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) {
+            closeAssetRowModal()
+        }
+    })
 
     document.body.appendChild(overlay)
 }
@@ -2601,12 +2607,22 @@ function openAssetModal() {
 
     assetNameInput.value = ""
     assetTypeSelect.value = "cripto"
+    assetTypeSelect.dispatchEvent(new Event("change", { bubbles: true }))
     assetTickerInput.value = ""
     assetTickerInput.dataset.marketProvider = "finnhub"
     setAssetSearchFeedback(assetSearchFeedback, "")
     renderMarketSearchResults(assetSearchResults, [], () => {})
     assetModalOverlay.classList.remove("hidden")
     assetModalState = { isOpen: true }
+
+    if (typeof _buildCustomSelect === "function" && !assetTypeSelect._csInit) {
+        _buildCustomSelect(assetTypeSelect)
+    }
+
+    queueMicrotask(() => {
+        assetTypeSelect.dispatchEvent(new Event("change", { bubbles: true }))
+    })
+
     assetNameInput.focus()
 }
 

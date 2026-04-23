@@ -22,6 +22,7 @@ let gastosAutosaveTimeout = null
 let gastosPersistenceBound = false
 let sharedGastosTypes = []
 let _gastosDataLoaded = false
+let gastosModalKeyHandler = null
 
 function sanitizeGastoTypeLabel(value) {
     return String(value || "").trim().replace(/\s+/g, " ")
@@ -33,6 +34,15 @@ function normalizeComparableGastoText(value) {
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
+}
+
+function escapeGastosHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
 }
 
 function ensureGastosDataShape(data) {
@@ -69,6 +79,223 @@ function ensureGastosDataShape(data) {
 
 function getAvailableGastosTypes() {
     return Array.isArray(sharedGastosTypes) ? sharedGastosTypes : []
+}
+
+function closeGastosCreateModal() {
+    document.getElementById("gastosCreateModalOverlay")?.remove()
+
+    if (gastosModalKeyHandler) {
+        document.removeEventListener("keydown", gastosModalKeyHandler)
+        gastosModalKeyHandler = null
+    }
+}
+
+function openGastosCreateModal({ title, bodyHtml, onSubmit, submitLabel = "Guardar", modalClass = "" }) {
+    closeGastosCreateModal()
+
+    const overlay = document.createElement("div")
+    overlay.id = "gastosCreateModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = `assetModal gastosCreateModal${modalClass ? ` ${modalClass}` : ""}`
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.setAttribute("aria-labelledby", "gastosCreateModalTitle")
+
+    modal.innerHTML = `
+        <h3 class="assetModalTitle" id="gastosCreateModalTitle">${escapeGastosHtml(title)}</h3>
+        <div class="gastosCreateModalBody">${bodyHtml}</div>
+        <p class="gastosCreateModalFeedback hidden" id="gastosCreateModalFeedback"></p>
+        <div class="assetModalActions gastosCreateModalActions">
+            <button type="button" class="secondaryButton" id="gastosCreateModalCancelBtn">Cancelar</button>
+            <button type="button" class="primaryButton" id="gastosCreateModalSaveBtn" data-no-autohide="true">${escapeGastosHtml(submitLabel)}</button>
+        </div>
+    `
+
+    const setFeedback = (message = "", isError = false) => {
+        const feedback = modal.querySelector("#gastosCreateModalFeedback")
+        if (!feedback) {
+            return
+        }
+
+        feedback.textContent = message
+        feedback.classList.toggle("hidden", !message)
+        feedback.classList.toggle("error", Boolean(message && isError))
+    }
+
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) {
+            closeGastosCreateModal()
+        }
+    })
+
+    modal.querySelector("#gastosCreateModalCancelBtn")?.addEventListener("click", closeGastosCreateModal)
+    modal.querySelector("#gastosCreateModalSaveBtn")?.addEventListener("click", async () => {
+        const getValue = (id) => modal.querySelector(`#${id}`)?.value ?? ""
+
+        try {
+            const shouldClose = await onSubmit({ getValue, setFeedback, modal })
+            if (shouldClose !== false) {
+                closeGastosCreateModal()
+            }
+        } catch (error) {
+            console.error(error)
+            setFeedback("No se pudo guardar.", true)
+        }
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    gastosModalKeyHandler = (event) => {
+        if (event.key === "Escape") {
+            closeGastosCreateModal()
+        }
+    }
+    document.addEventListener("keydown", gastosModalKeyHandler)
+
+    modal.querySelector("input, select")?.focus()
+}
+
+function openGastoTypeModal() {
+    openGastosCreateModal({
+        title: "Añadir gasto",
+        bodyHtml: `
+            <label class="assetModalLabel" for="gastosTipoModalInput">Nombre del gasto</label>
+            <input id="gastosTipoModalInput" class="assetModalInput" type="text" placeholder="Ej: Comidas/Cenas o Transporte">
+        `,
+        submitLabel: "Guardar",
+        onSubmit: async ({ getValue, setFeedback }) => {
+            const label = sanitizeGastoTypeLabel(getValue("gastosTipoModalInput"))
+
+            if (!label) {
+                setFeedback("Introduce un nombre para el gasto.", true)
+                return false
+            }
+
+            syncGastosDataFromTables()
+            sharedGastosTypes.push(label)
+            sharedGastosTypes = dedupeGastosTypes(sharedGastosTypes)
+            await persistSharedGastosTypes()
+            renderCurrentGastosView()
+            return true
+        }
+    })
+}
+
+function openMensualidadModal() {
+    const monthsHtml = GASTOS_MONTHS.map((month) => `
+        <div class="gastosCreateModalField">
+            <label class="assetModalLabel" for="gastosMensualidad-${month.key}">${month.label}</label>
+            <input id="gastosMensualidad-${month.key}" class="assetModalInput" type="text" inputmode="decimal" placeholder="0,00">
+        </div>
+    `).join("")
+
+    openGastosCreateModal({
+        title: "Añadir mensualidad",
+        modalClass: "gastosCreateModalWide",
+        bodyHtml: `
+            <div class="gastosCreateModalField">
+                <label class="assetModalLabel" for="gastosMensualidadNombre">Nombre</label>
+                <input id="gastosMensualidadNombre" class="assetModalInput" type="text" placeholder="Ej: Alquiler, Spotify o Gimnasio">
+            </div>
+            <div class="gastosCreateModalGrid gastosCreateModalGridMonths">
+                ${monthsHtml}
+            </div>
+        `,
+        submitLabel: "Guardar",
+        onSubmit: async ({ getValue, setFeedback }) => {
+            const nombreRaw = sanitizeGastoTypeLabel(getValue("gastosMensualidadNombre"))
+            const nombre = nombreRaw || "Mensualidad"
+            const meses = Object.fromEntries(
+                GASTOS_MONTHS.map((month) => {
+                    const rawValue = String(getValue(`gastosMensualidad-${month.key}`)).trim()
+                    return [month.key, rawValue ? formatCellEuroValue(rawValue) : ""]
+                })
+            )
+
+            const hasAnyAmount = GASTOS_MONTHS.some((month) => parseEuroNumber(meses[month.key]) !== 0)
+            if (!nombreRaw && !hasAnyAmount) {
+                setFeedback("Introduce al menos un dato para la mensualidad.", true)
+                return false
+            }
+
+            syncGastosDataFromTables()
+            currentGastosData.mensualidades.push({ nombre, meses })
+            renderCurrentGastosView()
+            await persistCurrentGastosData()
+            return true
+        }
+    })
+}
+
+function openGastoMovementModal(rowIndex = -1) {
+    const currentRows = currentGastosData?.months?.[currentGastosMonth]?.rows || []
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? { ...currentRows[rowIndex] } : {}
+    const availableTypes = getAvailableGastosTypes()
+    const typeOptions = availableTypes
+        .map((type) => {
+            const isSelected = normalizeComparableGastoText(rowData.tipo || "") === normalizeComparableGastoText(type)
+            return `<option value="${escapeGastosHtml(type)}"${isSelected ? " selected" : ""}>${escapeGastosHtml(type)}</option>`
+        })
+        .join("")
+
+    openGastosCreateModal({
+        title: isEdit ? "Editar gasto" : "Añadir gasto",
+        bodyHtml: `
+            <label class="assetModalLabel" for="gastosMovimientoFecha">Fecha</label>
+            <input id="gastosMovimientoFecha" class="assetModalInput" type="text" value="${escapeGastosHtml(rowData.fecha || "")}" placeholder="dd-mm-aaaa">
+
+            <label class="assetModalLabel" for="gastosMovimientoNombre">Nombre</label>
+            <input id="gastosMovimientoNombre" class="assetModalInput" type="text" value="${escapeGastosHtml(rowData.nombre || "")}" placeholder="Ej: Cena Mercadona">
+
+            <label class="assetModalLabel" for="gastosMovimientoTipo">Tipo</label>
+            <select id="gastosMovimientoTipo" class="assetModalSelect">
+                <option value=""></option>
+                ${typeOptions}
+            </select>
+
+            <label class="assetModalLabel" for="gastosMovimientoCantidad">Cantidad</label>
+            <input id="gastosMovimientoCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(rowData.cantidad || "")}" placeholder="0,00">
+        `,
+        submitLabel: "Guardar",
+        onSubmit: async ({ getValue, setFeedback }) => {
+            const fecha = String(getValue("gastosMovimientoFecha")).trim()
+            const nombre = String(getValue("gastosMovimientoNombre")).trim()
+            const tipo = normalizeGastoTipo(getValue("gastosMovimientoTipo"))
+            const cantidadRaw = String(getValue("gastosMovimientoCantidad")).trim()
+            const cantidad = cantidadRaw ? formatCellEuroValue(cantidadRaw) : ""
+
+            if (!fecha && !nombre && !tipo && !cantidad) {
+                setFeedback("Introduce al menos un dato para el gasto.", true)
+                return false
+            }
+
+            syncGastosDataFromTables()
+            if (!currentGastosData.months[currentGastosMonth]) {
+                currentGastosData.months[currentGastosMonth] = { rows: [] }
+            }
+
+            const nextRow = {
+                fecha,
+                nombre,
+                tipo,
+                cantidad
+            }
+
+            if (isEdit && currentGastosData.months[currentGastosMonth].rows[rowIndex]) {
+                currentGastosData.months[currentGastosMonth].rows[rowIndex] = nextRow
+            } else {
+                currentGastosData.months[currentGastosMonth].rows.push(nextRow)
+            }
+
+            renderCurrentGastosView()
+            await persistCurrentGastosData()
+            return true
+        }
+    })
 }
 
 async function loadGastosYears() {
@@ -189,24 +416,7 @@ async function initGastosLogic() {
 
     if (movementsBody && !movementsBody.dataset.bound) {
         movementsBody.dataset.bound = "true"
-        movementsBody.addEventListener("click", handleGastosDeleteClick)
-        movementsBody.addEventListener("change", handleGastosTypeChange)
-        movementsBody.addEventListener("blur", handleGastosMovementBlur, true)
-        movementsBody.addEventListener("keydown", (e) => {
-            if (e.key !== "Enter") return
-            const cell = e.target.closest('td[contenteditable="true"]')
-            if (!cell) return
-            e.preventDefault()
-            const row = cell.parentElement
-            const columnIndex = Array.from(row.children).indexOf(cell)
-            if (columnIndex === 4) {
-                const value = parseEuroNumber(cell.textContent)
-                cell.textContent = cell.textContent.trim() === "" ? "" : formatEuro(value)
-                syncGastosDataFromTables()
-                scheduleGastosAutosave()
-            }
-            cell.blur()
-        })
+        movementsBody.addEventListener("click", handleGastosMovementActionClick)
     }
 }
 
@@ -278,32 +488,21 @@ function bindGastosEvents() {
     if (addRowButton && !addRowButton.dataset.bound) {
         addRowButton.dataset.bound = "true"
         addRowButton.addEventListener("click", () => {
-            addNewGastoMovementRow()
-            scheduleGastosAutosave()
+            openGastoMovementModal()
         })
     }
 
     if (addMensualidadRowButton && !addMensualidadRowButton.dataset.bound) {
         addMensualidadRowButton.dataset.bound = "true"
         addMensualidadRowButton.addEventListener("click", () => {
-            syncGastosDataFromTables()
-            currentGastosData.mensualidades.push({
-                nombre: "Mensualidad",
-                meses: Object.fromEntries(GASTOS_MONTHS.map((month) => [month.key, ""]))
-            })
-            renderCurrentGastosView()
-            scheduleGastosAutosave()
+            openMensualidadModal()
         })
     }
 
     if (addGastoTypeRowButton && !addGastoTypeRowButton.dataset.bound) {
         addGastoTypeRowButton.dataset.bound = "true"
-        addGastoTypeRowButton.addEventListener("click", async () => {
-            syncGastosDataFromTables()
-            sharedGastosTypes.push("Gasto")
-            sharedGastosTypes = dedupeGastosTypes(sharedGastosTypes)
-            await persistSharedGastosTypes()
-            renderCurrentGastosView()
+        addGastoTypeRowButton.addEventListener("click", () => {
+            openGastoTypeModal()
         })
     }
 
@@ -605,8 +804,8 @@ function renderGastosMonthTable() {
 
     const rows = currentGastosData.months?.[currentGastosMonth]?.rows || []
 
-    rows.forEach((row) => {
-        body.appendChild(buildGastoMovementRow(row))
+    rows.forEach((row, index) => {
+        body.appendChild(buildGastoMovementRow(row, index))
     })
 
 }
@@ -616,12 +815,13 @@ function sortGastosByDate() {
     if (!body) return
     const rows = [...body.querySelectorAll("tr")]
     rows.sort((a, b) => {
-        const da = gastoParseDate(a.querySelectorAll("td")[2]?.textContent.trim())
-        const db = gastoParseDate(b.querySelectorAll("td")[2]?.textContent.trim())
+        const da = gastoParseDate(a.querySelector('[data-field="fecha"]')?.textContent.trim())
+        const db = gastoParseDate(b.querySelector('[data-field="fecha"]')?.textContent.trim())
         return da - db
     })
     rows.forEach((tr) => body.appendChild(tr))
     syncGastosDataFromTables()
+    renderCurrentGastosView()
     scheduleGastosAutosave()
 }
 
@@ -632,21 +832,23 @@ function gastoParseDate(str) {
     return Infinity
 }
 
-function buildGastoMovementRow(row = {}) {
+function buildGastoMovementRow(row = {}, rowIndex = -1) {
     const tr = document.createElement("tr")
-    const normalizedType = normalizeGastoTipo(row.tipo || "")
-    const availableTypes = getAvailableGastosTypes()
+    tr.dataset.rowIndex = String(rowIndex)
+    tr.dataset.fecha = String(row.fecha || "")
+    tr.dataset.nombre = String(row.nombre || "")
+    tr.dataset.tipo = String(normalizeGastoTipo(row.tipo || ""))
+    tr.dataset.cantidad = String(row.cantidad || "")
+
     tr.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">✕</button></td>
-        <td contenteditable="true">${row.fecha || ""}</td>
-        <td contenteditable="true">${row.nombre || ""}</td>
-        <td>
-            <select class="gastosTypeSelect">
-                <option value=""></option>
-                ${availableTypes.map((type) => `<option value="${type}"${normalizedType === type ? " selected" : ""}>${type}</option>`).join("")}
-            </select>
+        <td data-field="fecha">${row.fecha || ""}</td>
+        <td data-field="nombre">${row.nombre || ""}</td>
+        <td data-field="tipo">${normalizeGastoTipo(row.tipo || "")}</td>
+        <td data-field="cantidad">${formatCellEuroValue(row.cantidad || "")}</td>
+        <td class="rowActionsCell">
+            <button type="button" class="assetRowEditBtn gastosRowEditBtn" data-row-index="${rowIndex}" title="Editar fila">✎</button>
+            <button type="button" class="assetRowDeleteBtn gastosRowDeleteBtn" data-row-index="${rowIndex}" title="Eliminar fila">✕</button>
         </td>
-        <td contenteditable="true">${formatCellEuroValue(row.cantidad || "")}</td>
     `
     return tr
 }
@@ -660,16 +862,43 @@ function addNewGastoMovementRow() {
     body.appendChild(buildGastoMovementRow({}))
 }
 
-function handleGastosDeleteClick(event) {
-    const deleteButton = event.target.closest(".rowDeleteBtn")
+function handleGastosMovementActionClick(event) {
+    const editButton = event.target.closest(".gastosRowEditBtn")
+    if (editButton) {
+        const rowIndex = Number(editButton.dataset.rowIndex)
+        openGastoMovementModal(rowIndex)
+        return
+    }
+
+    const deleteButton = event.target.closest(".gastosRowDeleteBtn")
     if (!deleteButton) {
         return
     }
 
-    deleteButton.closest("tr")?.remove()
-    syncGastosDataFromTables()
-    renderCurrentGastosView()
-    scheduleGastosAutosave()
+    const rowIndex = Number(deleteButton.dataset.rowIndex)
+    const monthRows = currentGastosData?.months?.[currentGastosMonth]?.rows || []
+    const row = monthRows[rowIndex]
+    const isEmpty = !row || (!row.fecha && !row.nombre && !row.tipo && parseEuroNumber(row.cantidad || "") === 0)
+
+    const removeRow = () => {
+        monthRows.splice(rowIndex, 1)
+        renderCurrentGastosView()
+        scheduleGastosAutosave()
+    }
+
+    if (isEmpty) {
+        removeRow()
+        return
+    }
+
+    openConfirmModal({
+        title: "Eliminar fila",
+        message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
+        confirmLabel: "Eliminar",
+        onConfirm: async () => {
+            removeRow()
+        }
+    })
 }
 
 function handleGastosAnnualBlur(event) {
@@ -685,35 +914,6 @@ function handleGastosAnnualBlur(event) {
 
     syncGastosDataFromTables()
     renderGastosAnnualTable()
-    scheduleGastosAutosave()
-}
-
-function handleGastosMovementBlur(event) {
-    const cell = event.target.closest('td[contenteditable="true"]')
-    if (!cell) {
-        return
-    }
-
-    const row = cell.parentElement
-    const columnIndex = Array.from(row.children).indexOf(cell)
-
-    if (columnIndex === 4) {
-        const value = parseEuroNumber(cell.textContent)
-        cell.textContent = cell.textContent.trim() === "" ? "" : formatEuro(value)
-    }
-
-    syncGastosDataFromTables()
-    scheduleGastosAutosave()
-}
-
-function handleGastosTypeChange(event) {
-    const select = event.target.closest(".gastosTypeSelect")
-
-    if (!select) {
-        return
-    }
-
-    syncGastosDataFromTables()
     scheduleGastosAutosave()
 }
 
@@ -751,13 +951,11 @@ function syncGastosDataFromTables() {
             currentGastosData.months[currentGastosMonth] = { rows: [] }
         }
         currentGastosData.months[currentGastosMonth].rows = bodyRows.map((rowElement) => {
-            const cells = rowElement.querySelectorAll("td")
-            const tipo = normalizeGastoTipo(rowElement.querySelector(".gastosTypeSelect")?.value || "")
             return {
-                fecha: cells[1]?.textContent.trim() || "",
-                nombre: cells[2]?.textContent.trim() || "",
-                tipo,
-                cantidad: cells[4]?.textContent.trim() || ""
+                fecha: rowElement.dataset.fecha || rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
+                nombre: rowElement.dataset.nombre || rowElement.querySelector('[data-field="nombre"]')?.textContent.trim() || "",
+                tipo: normalizeGastoTipo(rowElement.dataset.tipo || rowElement.querySelector('[data-field="tipo"]')?.textContent.trim() || ""),
+                cantidad: rowElement.dataset.cantidad || rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || ""
             }
         }).filter((row) => row.fecha || row.nombre || row.tipo || parseEuroNumber(row.cantidad) !== 0)
     }
