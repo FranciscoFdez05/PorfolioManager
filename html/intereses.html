@@ -1,37 +1,37 @@
 <div class="interesesLayout">
-    <div class="interesesTableSection">
-        <div class="interesesTableWrapper">
-            <table class="interesesTable">
-                <thead>
-                    <tr>
-                        <th class="rowActionHeader"></th>
-                        <th>Fecha</th>
-                        <th>Acumulado</th>
-                        <th>Impuestos</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody id="interesesBody"></tbody>
-            </table>
-        </div>
-
-        <div class="interesesActions">
-            <button id="addRowBtn" class="primaryButton">Añadir fila</button>
-            <button id="saveInteresesBtn" class="primaryButton">Guardar</button>
-            <button id="exportJsonBtn" class="secondaryButton">Exportar JSON</button>
-            <button id="importJsonBtn" class="secondaryButton">Importar JSON</button>
-        </div>
+    <div class="interesesActions">
+        <button id="addRowBtn" class="primaryButton">Añadir fila</button>
+        <button id="saveInteresesBtn" class="primaryButton">Guardar</button>
     </div>
 
-    <div class="interesesSummarySection">
-        <div class="summaryCard">
-            <div class="summaryCardTitle">Total</div>
-            <div class="summaryCardValue" id="totalResumen">0,00 €</div>
+    <div class="interesesMainArea">
+        <div class="interesesTableSection">
+            <div class="interesesTableWrapper">
+                <table class="interesesTable">
+                    <thead>
+                        <tr>
+                            <th class="rowActionHeader"></th>
+                            <th>Fecha</th>
+                            <th>Acumulado</th>
+                            <th>Impuestos</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="interesesBody"></tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="summaryCard">
-            <div class="summaryCardTitle">Impuestos</div>
-            <div class="summaryCardValue" id="impuestosResumen">0,00 €</div>
+        <div class="interesesSummarySection">
+            <div class="summaryCard summaryCardTotal">
+                <div class="summaryCardTitle">Total</div>
+                <div class="summaryCardValue" id="totalResumen">0,00 €</div>
+            </div>
+
+            <div class="summaryCard summaryCardTax">
+                <div class="summaryCardTitle">Impuestos</div>
+                <div class="summaryCardValue" id="impuestosResumen">0,00 €</div>
+            </div>
         </div>
     </div>
 </div>

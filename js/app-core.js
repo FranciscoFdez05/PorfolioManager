@@ -120,6 +120,10 @@ function initNavigation(navButtons, contentArea) {
             const menu = btn.nextElementSibling
             const isOpen = menu.classList.contains("open")
             document.querySelectorAll(".navDropdownMenu.open").forEach((m) => m.classList.remove("open"))
+            document.querySelectorAll(".csMenu.csOpen").forEach((m) => {
+                m.classList.remove("csOpen")
+                m._csTrigger?.classList.remove("csOpen")
+            })
             if (!isOpen) menu.classList.add("open")
         })
     })
@@ -154,6 +158,7 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
         }
 
         const htmlContent = await response.text()
+        document.querySelectorAll(".csBodyMenu").forEach(m => m.remove())
         contentArea.innerHTML = htmlContent
 
         if (page === "vistaGeneral") {
@@ -199,8 +204,6 @@ async function initInteresesLogic() {
 
     const interesesBody = document.getElementById("interesesBody")
     const addRowButton = document.getElementById("addRowBtn")
-    const exportJsonButton = document.getElementById("exportJsonBtn")
-    const importJsonButton = document.getElementById("importJsonBtn")
     const saveInteresesButton = document.getElementById("saveInteresesBtn")
 
     if (interesesBody) {
@@ -216,18 +219,6 @@ async function initInteresesLogic() {
     if (addRowButton) {
         addRowButton.addEventListener("click", () => {
             addNewInteresesRow()
-        })
-    }
-
-    if (exportJsonButton) {
-        exportJsonButton.addEventListener("click", () => {
-            exportInteresesJson()
-        })
-    }
-
-    if (importJsonButton) {
-        importJsonButton.addEventListener("click", () => {
-            importInteresesJson()
         })
     }
 

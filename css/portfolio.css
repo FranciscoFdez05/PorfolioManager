@@ -44,20 +44,19 @@
 
 .csMenu{
     display:none;
-    position:absolute;
-    top:calc(100% + 4px);
-    left:0;
-    width:100%;
+    position:fixed;
     background:#0f1724;
     border:1px solid #334155;
     border-radius:8px;
     padding:4px;
-    z-index:500;
+    z-index:25000;
     flex-direction:column;
     gap:2px;
     box-shadow:0 8px 24px rgba(0,0,0,0.5);
     max-height:220px;
     overflow-y:auto;
+    scrollbar-width:thin;
+    scrollbar-color:#334155 transparent;
 }
 
 .csMenu.csOpen{ display:flex; }
@@ -65,13 +64,15 @@
 .csOption{
     padding:7px 12px;
     border-radius:6px;
+    background:#0f1724;
     color:#ccd6f6;
-    font-size:0.82rem;
+    font-size:13px;
     cursor:pointer;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
     transition:background .1s;
+    flex-shrink:0;
 }
 
 .csOption:hover{ background:#151f35; }
@@ -289,7 +290,7 @@ body{
     border:1px solid #334155;
     border-radius:8px;
     padding:4px;
-    z-index:200;
+    z-index:10000;
     width:100%;
     flex-direction:column;
     gap:2px;
@@ -908,10 +909,211 @@ body{
     box-shadow:inset 0 0 0 2px #3b82f6;
 }
 
+.assetAddRowHeaderBtn{
+    height:32px !important;
+    font-size:13px !important;
+    padding:0 14px !important;
+    margin-left:12px;
+}
+
 .assetActions{
     display:flex;
     gap:12px;
     flex-wrap:wrap;
+    margin-top:12px;
+}
+
+.rowActionsHeader{
+    width:80px;
+    min-width:80px;
+    border-left:none !important;
+}
+
+.rowActionsCell{
+    text-align:right;
+    white-space:nowrap;
+    padding:4px 8px !important;
+    border-left:none !important;
+}
+
+.assetRowEditBtn,
+.assetRowDeleteBtn{
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:15px;
+    padding:3px 6px;
+    border-radius:4px;
+    line-height:1;
+    transition:background 0.15s;
+}
+
+.assetRowEditBtn{
+    color:#60a5fa;
+}
+
+.assetRowEditBtn:hover{
+    background:rgba(96,165,250,0.15);
+}
+
+.assetRowDeleteBtn{
+    color:#f87171;
+    margin-left:4px;
+}
+
+.assetRowDeleteBtn:hover{
+    background:rgba(248,113,113,0.15);
+}
+
+.assetRowModalOverlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,0.55);
+    backdrop-filter:blur(2px);
+    z-index:20000;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.assetRowModalOverlay.hidden{
+    display:none;
+}
+
+.assetRowModal{
+    background:#16263a;
+    border:1px solid #2d4059;
+    border-radius:16px;
+    padding:0;
+    width:460px;
+    max-width:96vw;
+    max-height:88vh;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    box-shadow:0 24px 60px rgba(0,0,0,0.5);
+    animation:rowModalIn 0.18s ease;
+}
+
+@keyframes rowModalIn{
+    from{ opacity:0; transform:scale(0.96) translateY(8px); }
+    to{   opacity:1; transform:scale(1)    translateY(0);   }
+}
+
+.assetRowModalTitle{
+    font-size:15px;
+    font-weight:700;
+    color:#e2e8f0;
+    margin:0;
+    padding:20px 24px 16px;
+    flex-shrink:0;
+    border-bottom:1px solid #1e3450;
+}
+
+.assetRowModalFields{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    overflow-y:auto;
+    padding:16px 24px;
+    flex:1;
+    min-height:0;
+}
+
+.assetRowModalField{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+}
+
+.assetRowModalLabel{
+    font-size:11px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:#5b7fa6;
+}
+
+.assetRowModalInput,
+.assetRowModalSelect{
+    background:#0d1e2e;
+    border:1px solid #2d4059;
+    border-radius:8px;
+    color:#e2e8f0;
+    font-size:14px;
+    padding:9px 12px;
+    outline:none;
+    width:100%;
+    box-sizing:border-box;
+    appearance:auto;
+    transition:border-color 0.15s;
+}
+
+.assetRowModalInput:focus,
+.assetRowModalSelect:focus{
+    border-color:#3b82f6;
+    background:#0d1e2e;
+}
+
+.assetRowModalInput:-webkit-autofill,
+.assetRowModalInput:-webkit-autofill:hover,
+.assetRowModalInput:-webkit-autofill:focus,
+.assetRowModalInput:-webkit-autofill:active{
+    -webkit-box-shadow:0 0 0 1000px #0d1e2e inset !important;
+    -webkit-text-fill-color:#e2e8f0 !important;
+    caret-color:#e2e8f0;
+}
+
+.assetRowModalFooter{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:10px;
+    padding:14px 24px;
+    border-top:1px solid #1e3450;
+    flex-shrink:0;
+    background:#13202e;
+}
+
+.assetRowModalFooter > .dangerButton{
+    margin-right:auto;
+}
+
+.assetRowModalSaveBtn{
+    background:#1d4ed8;
+    color:#ffffff;
+    border:1px solid #3b82f6;
+    border-radius:10px;
+    height:38px;
+    padding:0 20px;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    flex-shrink:0;
+    transition:background 0.15s;
+}
+
+.assetRowModalSaveBtn:hover{
+    background:#2563eb;
+}
+
+.assetRowModalCancelBtn{
+    background:transparent;
+    color:#94a3b8;
+    border:1px solid #334155;
+    border-radius:10px;
+    height:38px;
+    padding:0 20px;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    flex-shrink:0;
+    transition:background 0.15s, color 0.15s;
+}
+
+.assetRowModalCancelBtn:hover{
+    background:rgba(148,163,184,0.1);
+    color:#e2e8f0;
 }
 
 .overviewPage{
@@ -1392,12 +1594,22 @@ body{
 /* ===== INTERESES ===== */
 
 .interesesLayout{
-    display:grid;
-    grid-template-columns:minmax(700px, 1fr) 280px;
-    column-gap:48px;
-    row-gap:24px;
-    align-items:start;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
     padding-right:18px;
+}
+
+.interesesMainArea{
+    display:grid;
+    grid-template-columns:1fr 220px;
+    column-gap:20px;
+    align-items:start;
+}
+
+.interesesActions{
+    display:flex;
+    gap:12px;
 }
 
 .interesesTableSection{
@@ -1476,12 +1688,6 @@ body{
     transform:translateY(-50%) scale(1.05);
 }
 
-.interesesActions{
-    display:flex;
-    gap:12px;
-    margin-top:16px;
-    flex-wrap:wrap;
-}
 
 .primaryButton,
 .secondaryButton,
@@ -1534,8 +1740,8 @@ body{
 .interesesSummarySection{
     display:flex;
     flex-direction:column;
-    gap:26px;
-    margin-right:18px;
+    gap:10px;
+    padding-top:42px;
     width:100%;
 }
 
@@ -1543,23 +1749,33 @@ body{
     width:100%;
     background:#111827;
     border:1px solid #273246;
-    border-radius:14px;
+    border-radius:12px;
     color:#ffffff;
+    padding:14px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
 }
 
 .summaryCardTitle{
-    text-align:center;
-    font-size:28px;
-    padding:16px 12px;
-    border-bottom:1px solid #273246;
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:#4a6080;
+    padding:0;
+    border:none;
 }
 
 .summaryCardValue{
-    text-align:center;
-    font-size:42px;
-    padding:26px 12px;
-    font-weight:500;
+    font-size:28px;
+    font-weight:700;
+    color:#ffffff;
+    padding:0;
 }
+
+.summaryCard.summaryCardTotal .summaryCardValue{ color:#34d399; }
+.summaryCard.summaryCardTax .summaryCardValue  { color:#fb923c; }
 
 .placeholderPage{
     padding:20px;
@@ -1915,7 +2131,7 @@ body{
 }
 
 @media (max-width:1280px){
-    .interesesLayout{
+    .interesesMainArea{
         grid-template-columns:1fr;
     }
 
@@ -1937,11 +2153,21 @@ body{
 /* ===== DIVIDENDOS ===== */
 
 .dividendosLayout{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+
+.dividendosMainArea{
     display:grid;
-    grid-template-columns:minmax(700px, 1fr) 280px;
-    column-gap:48px;
-    row-gap:24px;
+    grid-template-columns:1fr 220px;
+    column-gap:20px;
     align-items:start;
+}
+
+.dividendosActions{
+    display:flex;
+    gap:10px;
 }
 
 .dividendosTableSection{
@@ -1953,31 +2179,25 @@ body{
     padding-left:34px;
 }
 
-
 .dividendosTable thead th{
     position:sticky;
     top:0;
     z-index:2;
 }
 
-.dividendosActions{
-    display:flex;
-    gap:12px;
-    margin-top:16px;
-    flex-wrap:wrap;
-}
 
 .dividendosSummarySection{
     display:flex;
     flex-direction:column;
-    gap:26px;
-    margin-right:18px;
+    gap:10px;
+    padding-top:42px;
 }
 
 .dividendosCalBtn{
     width:100%;
-    padding:12px 8px;
-    font-size:0.95rem;
+    padding:10px 8px;
+    font-size:0.88rem;
+    border-radius:10px;
 }
 
 /* ===== OPERACIONES ===== */
@@ -2297,14 +2517,20 @@ body{
     min-width:1080px;
 }
 
+.stablecoinsPage .operationsTableWrapper{
+    max-height:calc(8 * 50px + 42px);
+    overflow-y:auto;
+}
+
 .stablecoinsHeaderPanel{
     border:1px solid #273246;
     background:#111827;
-    padding:12px 14px;
+    border-radius:10px;
+    padding:8px 12px;
     display:flex;
     justify-content:space-between;
-    align-items:flex-start;
-    gap:16px;
+    align-items:center;
+    gap:12px;
     flex-wrap:wrap;
 }
 
@@ -2346,18 +2572,18 @@ body{
 
 .stablecoinsSummary{
     display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
-    gap:12px;
+    grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+    gap:8px;
 }
 
 .stablecoinSummaryCard{
     border:1px solid #273246;
     background:#111827;
-    border-radius:14px;
-    padding:14px;
+    border-radius:10px;
+    padding:10px 12px;
     display:flex;
     flex-direction:column;
-    gap:10px;
+    gap:6px;
 }
 
 .stablecoinSummaryCard.disabled{
@@ -2367,36 +2593,36 @@ body{
 .stablecoinSummaryHeader{
     display:flex;
     justify-content:space-between;
-    gap:12px;
-    align-items:flex-start;
+    gap:8px;
+    align-items:center;
 }
 
 .stablecoinSummaryHeaderCopy{
     display:flex;
     flex-direction:column;
-    gap:4px;
+    gap:2px;
     min-width:0;
 }
 
 .stablecoinSummaryHeader h4{
     margin:0;
     color:#ffffff;
-    font-size:18px;
+    font-size:14px;
 }
 
 .stablecoinSummaryHeader span{
     color:#8aa3c7;
-    font-size:12px;
+    font-size:11px;
 }
 
 .stablecoinSummaryDeleteBtn{
-    width:32px;
-    height:32px;
+    width:22px;
+    height:22px;
     border:1px solid rgba(248, 113, 113, 0.45);
     border-radius:999px;
     background:rgba(127, 29, 29, 0.22);
     color:#fca5a5;
-    font-size:22px;
+    font-size:14px;
     line-height:1;
     cursor:pointer;
     flex:0 0 auto;
@@ -2412,16 +2638,16 @@ body{
 
 .stablecoinSummaryMain{
     color:#ffffff;
-    font-size:30px;
+    font-size:20px;
     font-weight:700;
 }
 
 .stablecoinSummaryMeta{
     display:flex;
     flex-direction:column;
-    gap:5px;
+    gap:3px;
     color:#8aa3c7;
-    font-size:12px;
+    font-size:11px;
 }
 
 .stablecoinsPage .assetSearchFeedback,
@@ -2879,6 +3105,8 @@ body{
     margin:0;
     flex:1 1 auto;
     overflow:hidden;
+    padding-top:3px;
+    margin-top:-3px;
 }
 
 .gastosMonthActions{
@@ -3032,7 +3260,7 @@ body{
 }
 
 @media (max-width:1280px){
-    .dividendosLayout{
+    .dividendosMainArea{
         grid-template-columns:1fr;
     }
 
@@ -3709,7 +3937,10 @@ body{
 }
 
 .activosFilterBtn{
-    padding:6px 16px;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:5px 13px 5px 10px;
     border:1px solid #1e2d45;
     border-radius:20px;
     background:transparent;
@@ -3719,17 +3950,44 @@ body{
     transition:background .15s,color .15s,border-color .15s;
 }
 
+.activosFilterBtn::before{
+    content:'';
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#2a3650;
+    flex-shrink:0;
+    transition:background .15s;
+}
+
+.activosFilterBtn[data-type="all"]::before{ display:none; }
+
+.activosFilterBtn[data-type="cripto"]::before   { background:#f7931a55; }
+.activosFilterBtn[data-type="acciones"]::before { background:#3a7bd555; }
+.activosFilterBtn[data-type="etfs"]::before     { background:#2ecc7155; }
+.activosFilterBtn[data-type="comoditis"]::before{ background:#e0c06855; }
+
 .activosFilterBtn:hover{
     background:#151f35;
     color:#ccd6f6;
 }
 
 .activosFilterBtn.active{
-    background:#1e2d45;
-    border-color:#3a7bd5;
+    background:#111827;
     color:#e5edf9;
     font-weight:600;
 }
+
+.activosFilterBtn[data-type="all"].active        { border-color:#3a7bd544; }
+.activosFilterBtn[data-type="cripto"].active     { border-color:#f7931a44; }
+.activosFilterBtn[data-type="acciones"].active   { border-color:#3a7bd544; }
+.activosFilterBtn[data-type="etfs"].active       { border-color:#2ecc7144; }
+.activosFilterBtn[data-type="comoditis"].active  { border-color:#e0c06844; }
+
+.activosFilterBtn[data-type="cripto"].active::before   { background:#f7931a; }
+.activosFilterBtn[data-type="acciones"].active::before { background:#3a7bd5; }
+.activosFilterBtn[data-type="etfs"].active::before     { background:#2ecc71; }
+.activosFilterBtn[data-type="comoditis"].active::before{ background:#e0c068; }
 
 .activosSearch{
     height:34px;
@@ -3966,26 +4224,60 @@ body{
 }
 
 .bonosFilterBtn{
-    background:#1a2236;
-    color:#8899bb;
-    border:1px solid #2a3550;
-    border-radius:6px;
-    padding:6px 14px;
-    font-size:0.85rem;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:5px 13px 5px 10px;
+    border:1px solid #1e2d45;
+    border-radius:20px;
+    background:transparent;
+    color:#7a8fb0;
+    font-size:0.82rem;
     cursor:pointer;
-    transition:all .15s;
+    transition:background .15s,color .15s,border-color .15s;
 }
 
+.bonosFilterBtn::before{
+    content:'';
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#2a3650;
+    flex-shrink:0;
+    transition:background .15s;
+}
+
+.bonosFilterBtn[data-tipo="all"]::before{ display:none; }
+
+/* Bonos */
+.bonosFilterBtn[data-tipo="gubernamental"]::before { background:#2ecc7155; }
+.bonosFilterBtn[data-tipo="corporativo"]::before   { background:#3a7bd555; }
+
+/* Renta Fija */
+.bonosFilterBtn[data-tipo="bancario"]::before      { background:#f7931a55; }
+.bonosFilterBtn[data-tipo="estatal"]::before       { background:#9b59b655; }
+
 .bonosFilterBtn:hover{
-    background:#223;
+    background:#151f35;
     color:#ccd6f6;
 }
 
 .bonosFilterBtn.active{
-    background:#1e3a5f;
-    color:#5b9cf6;
-    border-color:#3a7bd5;
+    background:#111827;
+    color:#e5edf9;
+    font-weight:600;
 }
+
+.bonosFilterBtn[data-tipo="all"].active          { border-color:#3a7bd544; }
+.bonosFilterBtn[data-tipo="gubernamental"].active { border-color:#2ecc7144; }
+.bonosFilterBtn[data-tipo="corporativo"].active   { border-color:#3a7bd544; }
+.bonosFilterBtn[data-tipo="bancario"].active      { border-color:#f7931a44; }
+.bonosFilterBtn[data-tipo="estatal"].active       { border-color:#9b59b644; }
+
+.bonosFilterBtn[data-tipo="gubernamental"].active::before { background:#2ecc71; }
+.bonosFilterBtn[data-tipo="corporativo"].active::before   { background:#3a7bd5; }
+.bonosFilterBtn[data-tipo="bancario"].active::before      { background:#f7931a; }
+.bonosFilterBtn[data-tipo="estatal"].active::before       { background:#9b59b6; }
 
 .bonosSummary{
     display:flex;
@@ -4496,12 +4788,16 @@ html[data-theme="black"] .navDropdownItem{ color:#e0e0e0; }
 html[data-theme="black"] .searchContainer input{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
 
 html[data-theme="black"] .sideWrapper,
-html[data-theme="black"] .sidePanel{ background:#000; border-color:#111; }
+html[data-theme="black"] .sidePanel{ background:#000; border-color:#111; color:#e0e0e0; }
+html[data-theme="black"] .assetToolbar{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .assetsList{ border-color:#1a1a1a; }
+html[data-theme="black"] .toggleButton{ background:#050505; color:#e0e0e0; box-shadow:0 0 0 1px #1a1a1a; }
+html[data-theme="black"] .toggleButton:hover{ background:#0a0a0a; box-shadow:0 0 0 1px #2a2a2a; }
 html[data-theme="black"] .assetBtn{ background:#0a0a0a; border-color:#1a1a1a; }
 html[data-theme="black"] .assetBtn:hover{ background:#111; border-color:#2a2a2a; }
 html[data-theme="black"] .assetBtnSymbol{ color:#f0f0f0; }
 html[data-theme="black"] .assetBtnName{ color:#888; }
-html[data-theme="black"] .assetDetailView{ background:#000; }
+html[data-theme="black"] .assetDetailView{ background:#000; border-color:#1a1a1a; }
 html[data-theme="black"] .detailStatCard{ background:#0a0a0a; border-color:#1a1a1a; }
 html[data-theme="black"] .detailHeader,
 html[data-theme="black"] .detailSub,
@@ -4568,8 +4864,10 @@ html[data-theme="light"] .navDropdownItem:hover{ background:#f1f5f9; }
 html[data-theme="light"] .searchContainer input{ background:#f1f5f9; border-color:#e2e8f0; color:#0f172a; }
 
 html[data-theme="light"] .sideWrapper,
-html[data-theme="light"] .sidePanel{ background:#ffffff; border-color:#e2e8f0; }
-html[data-theme="light"] .assetBtn{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .sidePanel{ background:#ffffff; border-color:#e2e8f0; color:#0f172a; }
+html[data-theme="light"] .assetToolbar{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .assetsList{ border-color:#e2e8f0; }
+html[data-theme="light"] .assetBtn{ background:#f8f9fa; border-color:#e2e8f0; color:#0f172a; }
 html[data-theme="light"] .assetBtn:hover{ background:#f1f5f9; border-color:#cbd5e1; }
 html[data-theme="light"] .assetBtn.selected{ background:#1d4ed8; border-color:#3b82f6; }
 html[data-theme="light"] .assetBtn.selected .assetBtnSymbol,
@@ -4578,15 +4876,16 @@ html[data-theme="light"] .assetBtn.selected .assetBtnPrice{ color:#fff; }
 html[data-theme="light"] .assetBtnSymbol{ color:#0f172a; }
 html[data-theme="light"] .assetBtnName{ color:#64748b; }
 html[data-theme="light"] .assetBtnPrice{ color:#1e293b; }
-html[data-theme="light"] .assetDetailView{ background:#ffffff; }
-html[data-theme="light"] .detailStatCard{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .assetDetailView{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .detailStatCard{ background:#ffffff; border-color:#e2e8f0; }
 html[data-theme="light"] .detailHeader{ color:#0f172a; }
 html[data-theme="light"] .detailSub,
 html[data-theme="light"] .detailMeta{ color:#64748b; }
 html[data-theme="light"] .detailPrice{ color:#0f172a; }
 html[data-theme="light"] .detailStatLabel{ color:#64748b; }
 html[data-theme="light"] .detailStatValue{ color:#0f172a; }
-html[data-theme="light"] .toggleButton{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .toggleButton{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; box-shadow:0 0 0 1px #e2e8f0; }
+html[data-theme="light"] .toggleButton:hover{ background:#e8edf5; box-shadow:0 0 0 1px #cbd5e1; }
 
 html[data-theme="light"] .mainContent,
 html[data-theme="light"] .contentArea{ background:#f0f2f5; color:#0f172a; }
@@ -4693,14 +4992,16 @@ html[data-theme="light"] .overviewFilterOption{ background:#f8fafc; border-color
 html[data-theme="light"] .overviewFilterOption:has(input:checked){ background:#f1f5f9; color:#1e293b; border-color:#cbd5e1; }
 html[data-theme="light"] .overviewFilterOption::before{ background:#cbd5e1; }
 html[data-theme="light"] .activosFilterBtn{ border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .activosFilterBtn::before{ background:#cbd5e1; }
 html[data-theme="light"] .activosFilterBtn:hover{ background:#f1f5f9; color:#1e293b; }
-html[data-theme="light"] .activosFilterBtn.active{ background:#e8edf5; border-color:#94a3b8; color:#1e293b; }
+html[data-theme="light"] .activosFilterBtn.active{ background:#f1f5f9; color:#1e293b; }
 html[data-theme="light"] .overviewTableWrapper{ background:#ffffff; }
 
 /* ── Light theme: Bonos / Renta Fija ── */
-html[data-theme="light"] .bonosFilterBtn{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
-html[data-theme="light"] .bonosFilterBtn:hover{ background:#e8edf5; color:#1e293b; }
-html[data-theme="light"] .bonosFilterBtn.active{ background:#dbeafe; color:#1d4ed8; border-color:#93c5fd; }
+html[data-theme="light"] .bonosFilterBtn{ border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .bonosFilterBtn::before{ background:#cbd5e1; }
+html[data-theme="light"] .bonosFilterBtn:hover{ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .bonosFilterBtn.active{ background:#f1f5f9; color:#1e293b; }
 html[data-theme="light"] .bonosSummaryCard{ background:#ffffff; border-color:#e2e8f0; }
 html[data-theme="light"] .bonosSummaryLabel{ color:#64748b; }
 html[data-theme="light"] .bonosSummaryValue{ color:#0f172a; }
@@ -4749,13 +5050,15 @@ html[data-theme="black"] .overviewFilterOption{ background:#050505; border-color
 html[data-theme="black"] .overviewFilterOption:has(input:checked){ background:#0a0a0a; color:#e0e0e0; }
 html[data-theme="black"] .overviewFilterOption::before{ background:#222; }
 html[data-theme="black"] .activosFilterBtn{ border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .activosFilterBtn::before{ background:#222; }
 html[data-theme="black"] .activosFilterBtn:hover{ background:#0a0a0a; color:#e0e0e0; }
-html[data-theme="black"] .activosFilterBtn.active{ background:#111; border-color:#333; color:#f0f0f0; }
+html[data-theme="black"] .activosFilterBtn.active{ background:#0a0a0a; color:#f0f0f0; }
 
 /* ── Black theme: Bonos / Renta Fija ── */
-html[data-theme="black"] .bonosFilterBtn{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
-html[data-theme="black"] .bonosFilterBtn:hover{ background:#111; color:#e0e0e0; }
-html[data-theme="black"] .bonosFilterBtn.active{ background:#111; color:#e0e0e0; border-color:#333; }
+html[data-theme="black"] .bonosFilterBtn{ border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .bonosFilterBtn::before{ background:#222; }
+html[data-theme="black"] .bonosFilterBtn:hover{ background:#0a0a0a; color:#e0e0e0; }
+html[data-theme="black"] .bonosFilterBtn.active{ background:#0a0a0a; color:#f0f0f0; }
 html[data-theme="black"] .bonosSummaryCard{ background:#0a0a0a; border-color:#1a1a1a; }
 html[data-theme="black"] .bonosSummaryLabel{ color:#666; }
 html[data-theme="black"] .bonosSummaryValue{ color:#f0f0f0; }
@@ -4844,3 +5147,19 @@ html[data-theme="black"] .avCardTicker{ color:#444; }
 html[data-theme="black"] .avCardMetrics{ border-top-color:#1a1a1a; }
 html[data-theme="black"] .avMetricLabel{ color:#555; }
 html[data-theme="black"] .avMetricValue{ color:#e0e0e0; }
+
+/* ── Light theme: Summary cards (Finanzas/Intereses) ── */
+html[data-theme="light"] .summaryCard{ background:#ffffff; border-color:#e2e8f0; color:#0f172a; }
+html[data-theme="light"] .summaryCardTitle{ border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .summaryCardValue{ color:#0f172a; }
+
+/* ── Black theme: Summary cards ── */
+html[data-theme="black"] .summaryCard{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .summaryCardTitle{ border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .summaryCardValue{ color:#f0f0f0; }
+
+/* ── Light theme: Gastos section/header rows ── */
+html[data-theme="light"] .gastosSectionRow td{ background:#1d4ed8 !important; border-color:#3b82f6; color:#ffffff !important; }
+
+/* ── Black theme: Gastos section/header rows ── */
+html[data-theme="black"] .gastosSectionRow td{ background:#0a0a0a !important; border-color:#3b82f6; color:#e0e0e0 !important; }

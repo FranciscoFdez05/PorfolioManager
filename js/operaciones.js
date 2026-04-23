@@ -311,8 +311,6 @@ function bindOperationsEvents() {
     const operationsBody = document.getElementById("operationsBody")
     const addButton = document.getElementById("addOperationRowBtn")
     const saveButton = document.getElementById("saveOperationsBtn")
-    const exportButton = document.getElementById("exportOperationsBtn")
-    const importButton = document.getElementById("importOperationsBtn")
     const filterInputs = document.querySelectorAll(".operationsFilters input[type='checkbox']")
 
     if (operationsBody && !operationsBody.dataset.bound) {
@@ -345,16 +343,6 @@ function bindOperationsEvents() {
                 alert("No se pudieron guardar las operaciones.")
             }
         })
-    }
-
-    if (exportButton && !exportButton.dataset.bound) {
-        exportButton.dataset.bound = "true"
-        exportButton.addEventListener("click", exportOperationsJson)
-    }
-
-    if (importButton && !importButton.dataset.bound) {
-        importButton.dataset.bound = "true"
-        importButton.addEventListener("click", importOperationsJson)
     }
 
     filterInputs.forEach((input) => {

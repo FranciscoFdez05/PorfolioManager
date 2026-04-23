@@ -1,41 +1,41 @@
 <div class="dividendosLayout">
-    <div class="dividendosTableSection">
-        <div class="dividendosTableWrapper">
-            <table class="dividendosTable">
-                <thead>
-                    <tr>
-                        <th class="rowActionHeader"></th>
-                        <th>Fecha</th>
-                        <th>Instrumento</th>
-                        <th>Acciones</th>
-                        <th>Dividendos / Acción</th>
-                        <th>Impuestos</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody id="dividendosBody"></tbody>
-            </table>
-        </div>
-
-        <div class="dividendosActions">
-            <button id="addRowDividendoBtn" class="primaryButton">Añadir fila</button>
-            <button id="saveDividendosBtn" class="primaryButton">Guardar</button>
-            <button id="exportDividendosJsonBtn" class="secondaryButton">Exportar JSON</button>
-            <button id="importDividendosJsonBtn" class="secondaryButton">Importar JSON</button>
-        </div>
+    <div class="dividendosActions">
+        <button id="addRowDividendoBtn" class="primaryButton">Añadir fila</button>
+        <button id="saveDividendosBtn" class="primaryButton">Guardar</button>
     </div>
 
-    <div class="dividendosSummarySection">
-        <button id="openCalendarioDividendosBtn" class="primaryButton dividendosCalBtn">Calendario Dividendos</button>
-
-        <div class="summaryCard">
-            <div class="summaryCardTitle">Total</div>
-            <div class="summaryCardValue" id="totalDividendosResumen">0,00 €</div>
+    <div class="dividendosMainArea">
+        <div class="dividendosTableSection">
+            <div class="dividendosTableWrapper">
+                <table class="dividendosTable">
+                    <thead>
+                        <tr>
+                            <th class="rowActionHeader"></th>
+                            <th>Fecha</th>
+                            <th>Instrumento</th>
+                            <th>Acciones</th>
+                            <th>Dividendos / Acción</th>
+                            <th>Impuestos</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dividendosBody"></tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="summaryCard">
-            <div class="summaryCardTitle">Impuestos</div>
-            <div class="summaryCardValue" id="impuestosDividendosResumen">0,00 €</div>
+        <div class="dividendosSummarySection">
+            <button id="openCalendarioDividendosBtn" class="primaryButton dividendosCalBtn">Calendario Dividendos</button>
+
+            <div class="summaryCard summaryCardTotal">
+                <div class="summaryCardTitle">Total dividendos</div>
+                <div class="summaryCardValue" id="totalDividendosResumen">0,00 €</div>
+            </div>
+
+            <div class="summaryCard summaryCardTax">
+                <div class="summaryCardTitle">Impuestos</div>
+                <div class="summaryCardValue" id="impuestosDividendosResumen">0,00 €</div>
+            </div>
         </div>
     </div>
 </div>

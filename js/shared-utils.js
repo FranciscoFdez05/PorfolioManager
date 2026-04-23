@@ -222,8 +222,6 @@ async function initDividendosLogic() {
 
     const dividendosBody = document.getElementById("dividendosBody")
     const addRowButton = document.getElementById("addRowDividendoBtn")
-    const exportJsonButton = document.getElementById("exportDividendosJsonBtn")
-    const importJsonButton = document.getElementById("importDividendosJsonBtn")
     const saveDividendosButton = document.getElementById("saveDividendosBtn")
 
     if (dividendosBody) {
@@ -248,18 +246,6 @@ async function initDividendosLogic() {
         addRowButton.addEventListener("click", () => {
             addNewDividendosRow()
             scheduleDividendosAutosave()
-        })
-    }
-
-    if (exportJsonButton) {
-        exportJsonButton.addEventListener("click", () => {
-            exportDividendosJson()
-        })
-    }
-
-    if (importJsonButton) {
-        importJsonButton.addEventListener("click", () => {
-            importDividendosJson()
         })
     }
 
@@ -815,13 +801,38 @@ function _buildCustomSelect(select) {
     trigger.appendChild(arrow)
 
     const menu = document.createElement("div")
-    menu.className = "csMenu"
+    menu.className = "csMenu csBodyMenu"
+    document.body.appendChild(menu)
 
     select.parentNode.insertBefore(wrapper, select)
     wrapper.appendChild(select)
     wrapper.appendChild(trigger)
-    wrapper.appendChild(menu)
     select.style.display = "none"
+
+    function positionMenu() {
+        const rect   = trigger.getBoundingClientRect()
+        const left   = Math.round(rect.left)
+        const width  = Math.round(rect.width)
+        const bottom = Math.round(rect.bottom)
+        const top    = Math.round(rect.top)
+
+        menu.style.position = "fixed"
+        menu.style.left  = left + "px"
+        menu.style.width = Math.max(width, 150) + "px"
+
+        const menuH = 220
+        const spaceBelow = window.innerHeight - bottom - 8
+        if (spaceBelow < menuH && top >= menuH) {
+            menu.style.top = (top - menuH) + "px"
+        } else {
+            menu.style.top = bottom + "px"
+        }
+    }
+
+    function closeMenu() {
+        menu.classList.remove("csOpen")
+        trigger.classList.remove("csOpen")
+    }
 
     function syncOptions() {
         menu.innerHTML = ""
@@ -837,8 +848,7 @@ function _buildCustomSelect(select) {
                 select.dispatchEvent(new Event("change", { bubbles: true }))
                 syncLabel()
                 syncOptions()
-                menu.classList.remove("csOpen")
-                trigger.classList.remove("csOpen")
+                closeMenu()
             })
             menu.appendChild(item)
         })
@@ -857,19 +867,22 @@ function _buildCustomSelect(select) {
         const isOpen = menu.classList.contains("csOpen")
         document.querySelectorAll(".csMenu.csOpen").forEach((m) => {
             m.classList.remove("csOpen")
-            m.previousElementSibling?.classList.remove("csOpen")
+            m._csTrigger?.classList.remove("csOpen")
         })
         if (!isOpen) {
             syncOptions()
+            positionMenu()
             menu.classList.add("csOpen")
             trigger.classList.add("csOpen")
         }
     })
 
-    document.addEventListener("click", () => {
-        menu.classList.remove("csOpen")
-        trigger.classList.remove("csOpen")
-    })
+    menu._csTrigger = trigger
+
+    document.addEventListener("click", closeMenu)
+    document.addEventListener("scroll", (e) => {
+        if (!menu.contains(e.target)) closeMenu()
+    }, true)
 
     select.addEventListener("change", () => {
         syncLabel()

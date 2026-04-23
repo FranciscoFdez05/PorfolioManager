@@ -136,9 +136,6 @@ function bindVentasEvents() {
     const deleteYearButton = document.getElementById("deleteVentasYearBtn")
     const addButton = document.getElementById("addVentaRowBtn")
     const saveButton = document.getElementById("saveVentasBtn")
-    const exportButton = document.getElementById("exportVentasBtn")
-    const importButton = document.getElementById("importVentasBtn")
-
     if (ventasBody && !ventasBody.dataset.bound) {
         ventasBody.dataset.bound = "true"
         ventasBody.addEventListener("click", handleVentasClick)
@@ -217,15 +214,6 @@ function bindVentasEvents() {
         })
     }
 
-    if (exportButton && !exportButton.dataset.bound) {
-        exportButton.dataset.bound = "true"
-        exportButton.addEventListener("click", exportVentasJson)
-    }
-
-    if (importButton && !importButton.dataset.bound) {
-        importButton.dataset.bound = "true"
-        importButton.addEventListener("click", importVentasJson)
-    }
 }
 
 async function renderVentasYear(year) {

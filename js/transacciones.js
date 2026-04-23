@@ -74,9 +74,6 @@ function bindTransaccionesEvents() {
     const body = document.getElementById("transaccionesBody")
     const addButton = document.getElementById("addTransaccionRowBtn")
     const saveButton = document.getElementById("saveTransaccionesBtn")
-    const exportButton = document.getElementById("exportTransaccionesBtn")
-    const importButton = document.getElementById("importTransaccionesBtn")
-
     if (body && !body.dataset.bound) {
         body.dataset.bound = "true"
         body.addEventListener("click", handleTransaccionesClick)
@@ -114,15 +111,6 @@ function bindTransaccionesEvents() {
         })
     }
 
-    if (exportButton && !exportButton.dataset.bound) {
-        exportButton.dataset.bound = "true"
-        exportButton.addEventListener("click", exportTransaccionesJson)
-    }
-
-    if (importButton && !importButton.dataset.bound) {
-        importButton.dataset.bound = "true"
-        importButton.addEventListener("click", importTransaccionesJson)
-    }
 }
 
 function createEmptyTransaccionRow() {

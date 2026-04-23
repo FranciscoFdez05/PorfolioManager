@@ -4,6 +4,7 @@ let externalTransaccionesRowsCache = []
 let externalOperacionesRowsCache = []
 let currentAssetPersistedOperationRows = []
 let currentAssetPersistedConversionRows = []
+let _assetDisplayRows = []
 
 async function fetchExchangeRateOnServer(sourceCurrency, targetCurrency) {
     const source = normalizeCurrencyCode(sourceCurrency)
@@ -1692,6 +1693,7 @@ function renderAssetTablePage(asset) {
                     <div class="assetTitleRow">
                         <h1 class="assetPageTitle">${asset.name || asset.symbol}</h1>
                         <button id="editAssetNameBtn" class="assetEditNameBtn" type="button" title="Editar nombre del activo" aria-label="Editar nombre del activo">✎</button>
+                        <button id="addAssetRowBtn" class="primaryButton assetAddRowHeaderBtn">Añadir fila</button>
                     </div>
                     <div class="assetPageSubtitle">${asset.name} · ${buildAssetTypeLabel(asset.type)}</div>
                 </div>
@@ -1716,11 +1718,11 @@ function renderAssetTablePage(asset) {
                 `}
             </div>
 
+
             <div class="assetTableWrapper">
                 <table class="assetOperationsTable">
                     <thead>
                         <tr>
-                            <th class="rowActionHeader"></th>
                             <th>Fecha operación</th>
                             <th>Tipo de operación</th>
                             ${isCrypto ? "<th>Exchange</th>" : ""}
@@ -1731,16 +1733,16 @@ function renderAssetTablePage(asset) {
                             ${isEtf ? "<th>Coste Anual</th>" : ""}
                             ${isCrypto ? "<th>Comisiones cripto</th><th>Comisiones fiat</th>" : "<th>Comisiones</th>"}
                             <th>Capital Invertido neto</th>
+                            <th class="rowActionsHeader"></th>
                         </tr>
                     </thead>
                     <tbody id="assetOperationsBody"></tbody>
                 </table>
             </div>
 
+
             <div class="assetActions">
                 <button id="refreshAssetMarketBtn" class="primaryButton">Actualizar cotización (${String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")).toUpperCase()})</button>
-                <button id="addAssetRowBtn" class="primaryButton">Añadir fila</button>
-                <button id="saveAssetBtn" class="secondaryButton">Guardar JSON</button>
                 <button id="deleteAssetBtn" class="dangerButton">Eliminar activo</button>
             </div>
         </section>
@@ -1753,6 +1755,7 @@ function renderAssetTablePage(asset) {
 }
 
 function renderAssetRows(rows) {
+    _assetDisplayRows = Array.isArray(rows) ? [...rows] : []
     const assetOperationsBody = document.getElementById("assetOperationsBody")
     const assetPage = document.querySelector(".assetTablePage")
     const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
@@ -1767,7 +1770,7 @@ function renderAssetRows(rows) {
 
     assetOperationsBody.innerHTML = ""
 
-    rows.forEach((rowData) => {
+    _assetDisplayRows.forEach((rowData, index) => {
         const rowElement = document.createElement("tr")
         const rowCurrency = normalizeAssetRowCurrency(rowData.currency, assetCurrency)
         const cryptoCommissionValue = parseLooseNumber(getCryptoRowCommissionCrypto(rowData)) ? formatAssetCommissionValue(getCryptoRowCommissionCrypto(rowData)) : ""
@@ -1775,31 +1778,24 @@ function renderAssetRows(rows) {
             getCryptoRowCommissionFiat(rowData),
             getAssetTableMoneyCurrency(assetType, "comisionesFiat", assetCurrency, assetPriceCurrency, rowCurrency)
         )
+        const moneyMono = (val, field) => formatCellMoneyValue(val, getAssetTableMoneyCurrency(assetType, field, assetCurrency, assetPriceCurrency, rowCurrency))
         rowElement.innerHTML = `
-            <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
-            <td contenteditable="true" data-field="fechaOperacion">${rowData.fechaOperacion || ""}</td>
-            <td>${buildAssetOperationTypeSelect(rowData.tipoOperacion, {
-                symbol: assetPage?.dataset.assetSymbol || "",
-                marketSymbol: assetPage?.dataset.assetMarketSymbol || assetPage?.dataset.assetFinnhubSymbol || ""
-            })}</td>
-            ${isCrypto ? `<td contenteditable="true" data-field="exchange">${rowData.exchange || ""}</td>` : ""}
-            <td contenteditable="true" data-field="participaciones">${formatAssetParticipationValue(rowData.participaciones, assetType)}</td>
-            <td contenteditable="true" data-field="precioParticipacion">${formatCellMoneyValue(rowData.precioParticipacion, getAssetTableMoneyCurrency(assetType, "precioParticipacion", assetCurrency, assetPriceCurrency, rowCurrency))}</td>
-            ${isCrypto ? `
-                <td>
-                    <select class="operationsSelect" data-field="currency" aria-label="Moneda fiat de la fila">
-                        <option value="EUR"${rowCurrency === "EUR" ? " selected" : ""}>EUR</option>
-                        <option value="USD"${rowCurrency === "USD" ? " selected" : ""}>USD</option>
-                    </select>
-                </td>
-            ` : ""}
-            <td contenteditable="true" data-field="capitalInvertidoBruto">${formatCellMoneyValue(rowData.capitalInvertidoBruto, getAssetTableMoneyCurrency(assetType, "capitalInvertidoBruto", assetCurrency, assetPriceCurrency, rowCurrency))}</td>
-            ${isEtf ? `<td contenteditable="true" data-field="costeAnual">${formatCellPercentValue(rowData.costeAnual)}</td>` : ""}
+            <td data-field="fechaOperacion">${rowData.fechaOperacion || ""}</td>
+            <td data-field="tipoOperacion">${rowData.tipoOperacion || "Compra"}</td>
+            ${isCrypto ? `<td data-field="exchange">${rowData.exchange || ""}</td>` : ""}
+            <td data-field="participaciones">${formatAssetParticipationValue(rowData.participaciones, assetType)}</td>
+            <td data-field="precioParticipacion">${moneyMono(rowData.precioParticipacion, "precioParticipacion")}</td>
+            ${isCrypto ? `<td data-field="currency">${rowCurrency}</td>` : ""}
+            <td data-field="capitalInvertidoBruto">${moneyMono(rowData.capitalInvertidoBruto, "capitalInvertidoBruto")}</td>
+            ${isEtf ? `<td data-field="costeAnual">${formatCellPercentValue(rowData.costeAnual)}</td>` : ""}
             ${isCrypto
-                ? `<td data-field="comisionesCripto"><input type="text" class="cryptoCommissionInput" inputmode="decimal" value="${cryptoCommissionValue}" placeholder="0,00000000" style="width:100%;background:transparent;border:none;color:inherit;font:inherit;padding:0;outline:none;"></td>
-            <td contenteditable="true" data-field="comisionesFiat">${cryptoFiatCommissionValue}</td>`
-                : `<td contenteditable="true" data-field="comisiones">${formatCellMoneyValue(rowData.comisiones, getAssetTableMoneyCurrency(assetType, "comisiones", assetCurrency, assetPriceCurrency, rowCurrency))}</td>`}
+                ? `<td data-field="comisionesCripto">${cryptoCommissionValue}</td><td data-field="comisionesFiat">${cryptoFiatCommissionValue}</td>`
+                : `<td data-field="comisiones">${moneyMono(rowData.comisiones, "comisiones")}</td>`}
             <td class="rowTotal">${formatMoney(0, getAssetTableMoneyCurrency(assetType, "capitalInvertidoNeto", assetCurrency, assetPriceCurrency, rowCurrency))}</td>
+            <td class="rowActionsCell">
+                <button type="button" class="assetRowEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
+                <button type="button" class="assetRowDeleteBtn" data-row-index="${index}" title="Eliminar fila">✕</button>
+            </td>
         `
         assetOperationsBody.appendChild(rowElement)
     })
@@ -1808,39 +1804,7 @@ function renderAssetRows(rows) {
 }
 
 function collectAssetRowsFromTable() {
-    const rowElements = [...document.querySelectorAll("#assetOperationsBody tr")]
-    const assetPage = document.querySelector(".assetTablePage")
-    const assetType = assetPage?.dataset.assetType || "acciones"
-    const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
-
-    return rowElements.map((rowElement) => {
-        const getFieldValue = (fieldName) => {
-            const fieldElement = rowElement.querySelector(`[data-field="${fieldName}"]`)
-            const inputElement = fieldElement?.querySelector("input")
-
-            if (inputElement) {
-                return inputElement.value.trim()
-            }
-
-            return fieldElement?.textContent.trim() || ""
-        }
-        const rowData = {
-            fechaOperacion: getFieldValue("fechaOperacion"),
-            tipoOperacion: rowElement.querySelector('select[data-field="tipoOperacion"]')?.value || "Compra",
-            exchange: getFieldValue("exchange"),
-            currency: normalizeAssetRowCurrency(rowElement.querySelector('select[data-field="currency"]')?.value, assetCurrency),
-            participaciones: getFieldValue("participaciones"),
-            precioParticipacion: getFieldValue("precioParticipacion"),
-            capitalInvertidoBruto: getFieldValue("capitalInvertidoBruto"),
-            costeAnual: getFieldValue("costeAnual"),
-            comisiones: getFieldValue("comisiones"),
-            comisionesFiat: getFieldValue("comisionesFiat"),
-            comisionesCripto: getFieldValue("comisionesCripto"),
-            comisionesSatoshis: getFieldValue("comisionesCripto")
-        }
-
-        return rowData
-    })
+    return _assetDisplayRows
 }
 
 function isPlaceholderValue(value, placeholders = []) {
@@ -2300,46 +2264,7 @@ async function submitEditAssetModal() {
 }
 
 function addNewAssetRow() {
-    const assetOperationsBody = document.getElementById("assetOperationsBody")
-    const assetPage = document.querySelector(".assetTablePage")
-    const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
-    const assetType = assetPage?.dataset.assetType || "acciones"
-    const isCrypto = isCryptoAssetType(assetType)
-    const isEtf = String(assetType || "").trim().toLowerCase() === "etfs"
-
-    if (!assetOperationsBody) {
-        return
-    }
-
-    const rowElement = document.createElement("tr")
-    rowElement.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
-        <td contenteditable="true" data-field="fechaOperacion"></td>
-        <td>${buildAssetOperationTypeSelect("Compra", {
-            symbol: assetPage.dataset.assetSymbol || "",
-            marketSymbol: assetPage.dataset.assetMarketSymbol || assetPage.dataset.assetFinnhubSymbol || ""
-        })}</td>
-        ${isCrypto ? '<td contenteditable="true" data-field="exchange"></td>' : ""}
-        <td contenteditable="true" data-field="participaciones"></td>
-        <td contenteditable="true" data-field="precioParticipacion"></td>
-        ${isCrypto ? `
-            <td>
-                <select class="operationsSelect" data-field="currency" aria-label="Moneda fiat de la fila">
-                    <option value="EUR"${assetCurrency === "EUR" ? " selected" : ""}>EUR</option>
-                    <option value="USD"${assetCurrency === "USD" ? " selected" : ""}>USD</option>
-                </select>
-            </td>
-        ` : ""}
-        <td contenteditable="true" data-field="capitalInvertidoBruto"></td>
-        ${isEtf ? '<td contenteditable="true" data-field="costeAnual"></td>' : ""}
-        ${isCrypto
-            ? '<td data-field="comisionesCripto"><input type="text" class="cryptoCommissionInput" inputmode="decimal" value="" placeholder="0,00000000" style="width:100%;background:transparent;border:none;color:inherit;font:inherit;padding:0;outline:none;"></td><td contenteditable="true" data-field="comisionesFiat"></td>'
-            : '<td contenteditable="true" data-field="comisiones"></td>'}
-        <td class="rowTotal">${formatMoney(0, assetCurrency)}</td>
-    `
-
-    assetOperationsBody.appendChild(rowElement)
-    updateAssetTableTotals()
+    openAssetRowModal(-1)
 }
 
 function scheduleAssetAutosave() {
@@ -2359,6 +2284,167 @@ function scheduleAssetAutosave() {
     }, 500)
 }
 
+function openAssetRowModal(rowIndex) {
+    document.getElementById("assetRowModalOverlay")?.remove()
+
+    const assetPage = document.querySelector(".assetTablePage")
+    const assetType = assetPage?.dataset.assetType || "acciones"
+    const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
+    const isCrypto = isCryptoAssetType(assetType)
+    const isEtf = String(assetType || "").trim().toLowerCase() === "etfs"
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? { ..._assetDisplayRows[rowIndex] } : {}
+    const tipoVal = rowData.tipoOperacion || "Compra"
+
+    const fieldsHtml = `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Fecha operación</label>
+            <input id="arModalFecha" class="assetRowModalInput" type="text" value="${rowData.fechaOperacion || ""}" placeholder="dd-mm-aaaa">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Tipo de operación</label>
+            <select id="arModalTipo" class="assetRowModalSelect">
+                <option value="Compra"${tipoVal === "Compra" ? " selected" : ""}>Compra</option>
+                <option value="Venta"${tipoVal === "Venta" ? " selected" : ""}>Venta</option>
+            </select>
+        </div>
+        ${isCrypto ? `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Exchange</label>
+            <input id="arModalExchange" class="assetRowModalInput" type="text" value="${rowData.exchange || ""}">
+        </div>` : ""}
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Participaciones</label>
+            <input id="arModalParticipaciones" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.participaciones || ""}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Precio participación</label>
+            <input id="arModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.precioParticipacion || ""}">
+        </div>
+        ${isCrypto ? `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Moneda fiat</label>
+            <select id="arModalCurrency" class="assetRowModalSelect">
+                <option value="EUR"${(rowData.currency || "EUR") === "EUR" ? " selected" : ""}>EUR</option>
+                <option value="USD"${(rowData.currency || "EUR") === "USD" ? " selected" : ""}>USD</option>
+            </select>
+        </div>` : ""}
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Capital invertido bruto</label>
+            <input id="arModalCapital" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.capitalInvertidoBruto || ""}">
+        </div>
+        ${isEtf ? `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Coste anual (%)</label>
+            <input id="arModalCosteAnual" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.costeAnual || ""}">
+        </div>` : ""}
+        ${isCrypto ? `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Comisiones cripto</label>
+            <input id="arModalComisionesCripto" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.comisionesCripto || rowData.comisionesSatoshis || ""}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Comisiones fiat</label>
+            <input id="arModalComisionesFiat" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.comisionesFiat || ""}">
+        </div>` : `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Comisiones</label>
+            <input id="arModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.comisiones || ""}">
+        </div>`}
+    `
+
+    const overlay = document.createElement("div")
+    overlay.id = "assetRowModalOverlay"
+    overlay.className = "assetRowModalOverlay"
+    overlay.dataset.rowIndex = isEdit ? String(rowIndex) : "-1"
+
+    const modal = document.createElement("div")
+    modal.className = "assetRowModal"
+
+    const title = document.createElement("h3")
+    title.className = "assetRowModalTitle"
+    title.textContent = isEdit ? "Editar operación" : "Añadir operación"
+
+    const fields = document.createElement("div")
+    fields.className = "assetRowModalFields"
+    fields.innerHTML = fieldsHtml
+
+    const footer = document.createElement("div")
+    footer.className = "assetRowModalFooter"
+    footer.innerHTML = `
+        ${isEdit ? `<button type="button" id="assetRowModalDeleteBtn" style="background:#7f1d1d;color:#fca5a5;border:1px solid #b91c1c;border-radius:10px;height:38px;padding:0 16px;font-weight:600;font-size:14px;cursor:pointer;margin-right:auto;">Eliminar</button>` : ""}
+        <button type="button" id="assetRowModalCancelBtn" style="background:transparent;color:#94a3b8;border:1px solid #475569;border-radius:10px;height:38px;padding:0 20px;font-weight:600;font-size:14px;cursor:pointer;">Cancelar</button>
+        <button type="button" id="assetRowModalSaveBtn" data-no-autohide="true" style="background:#1d4ed8;color:#ffffff;border:1px solid #3b82f6;border-radius:10px;height:38px;padding:0 20px;font-weight:600;font-size:14px;cursor:pointer;">Guardar</button>
+    `
+
+    footer.querySelector("#assetRowModalSaveBtn").addEventListener("click", saveAssetRowFromModal)
+    footer.querySelector("#assetRowModalCancelBtn").addEventListener("click", closeAssetRowModal)
+
+    if (isEdit) {
+        footer.querySelector("#assetRowModalDeleteBtn").addEventListener("click", () => {
+            openConfirmModal({
+                title: "Eliminar fila",
+                message: "¿Quieres eliminar esta operación?",
+                confirmLabel: "Eliminar",
+                onConfirm: async () => {
+                    _assetDisplayRows.splice(rowIndex, 1)
+                    renderAssetRows(_assetDisplayRows)
+                    scheduleAssetAutosave()
+                }
+            })
+            closeAssetRowModal()
+        })
+    }
+
+    modal.appendChild(title)
+    modal.appendChild(fields)
+    modal.appendChild(footer)
+    overlay.appendChild(modal)
+
+    document.body.appendChild(overlay)
+}
+
+function closeAssetRowModal() {
+    document.getElementById("assetRowModalOverlay")?.remove()
+}
+
+async function saveAssetRowFromModal() {
+    const overlay = document.getElementById("assetRowModalOverlay")
+    const assetPage = document.querySelector(".assetTablePage")
+    const assetType = assetPage?.dataset.assetType || "acciones"
+    const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
+    const isCrypto = isCryptoAssetType(assetType)
+    const isEtf = String(assetType || "").trim().toLowerCase() === "etfs"
+    const rowIndex = Number(overlay?.dataset.rowIndex ?? -1)
+
+    const g = (id) => document.getElementById(id)?.value.trim() || ""
+
+    const rowData = {
+        fechaOperacion: g("arModalFecha"),
+        tipoOperacion: g("arModalTipo") || "Compra",
+        exchange: isCrypto ? g("arModalExchange") : "",
+        currency: isCrypto ? (g("arModalCurrency") || assetCurrency) : assetCurrency,
+        participaciones: g("arModalParticipaciones"),
+        precioParticipacion: g("arModalPrecio"),
+        capitalInvertidoBruto: g("arModalCapital"),
+        costeAnual: isEtf ? g("arModalCosteAnual") : "",
+        comisiones: !isCrypto ? g("arModalComisiones") : "",
+        comisionesFiat: isCrypto ? g("arModalComisionesFiat") : "",
+        comisionesCripto: isCrypto ? g("arModalComisionesCripto") : "",
+        comisionesSatoshis: isCrypto ? g("arModalComisionesCripto") : ""
+    }
+
+    if (rowIndex >= 0) {
+        _assetDisplayRows[rowIndex] = rowData
+    } else {
+        _assetDisplayRows.push(rowData)
+    }
+
+    renderAssetRows(_assetDisplayRows)
+    closeAssetRowModal()
+    scheduleAssetAutosave()
+}
+
 function initAssetTableLogic(asset) {
     currentAssetId = asset.id
 
@@ -2367,35 +2453,47 @@ function initAssetTableLogic(asset) {
     const refreshAssetMarketButton = document.getElementById("refreshAssetMarketBtn")
     const toggleAssetCurrencyButton = document.getElementById("toggleAssetCurrencyBtn")
     const editAssetNameButton = document.getElementById("editAssetNameBtn")
-    const saveAssetButton = document.getElementById("saveAssetBtn")
     const deleteAssetButton = document.getElementById("deleteAssetBtn")
 
     if (assetOperationsBody) {
-        assetOperationsBody.addEventListener("input", () => {
-            updateAssetTableTotals()
-            scheduleAssetAutosave()
-        })
-        assetOperationsBody.addEventListener("change", (event) => {
-            const currencySelect = event.target.closest('select[data-field="currency"]')
-            if (currencySelect) {
-                updateAssetRowMoneyDisplays(currencySelect.closest("tr"))
-            }
-            updateAssetTableTotals()
-            scheduleAssetAutosave()
-        })
+        assetOperationsBody.addEventListener("click", (event) => {
+            const editBtn = event.target.closest(".assetRowEditBtn")
+            const deleteBtn = event.target.closest(".assetRowDeleteBtn")
 
-        assetOperationsBody.addEventListener("click", handleRowDeleteClick)
-        assetOperationsBody.addEventListener("focus", handleCellFocus, true)
-        assetOperationsBody.addEventListener("blur", (event) => {
-            handleCellBlur(event)
-            scheduleAssetAutosave()
-        }, true)
+            if (editBtn) {
+                const idx = Number(editBtn.dataset.rowIndex)
+                openAssetRowModal(idx)
+                return
+            }
+
+            if (deleteBtn) {
+                const idx = Number(deleteBtn.dataset.rowIndex)
+                const row = _assetDisplayRows[idx]
+                const isEmpty = !row || (!row.fechaOperacion && !row.participaciones && !row.capitalInvertidoBruto)
+
+                if (isEmpty) {
+                    _assetDisplayRows.splice(idx, 1)
+                    renderAssetRows(_assetDisplayRows)
+                    scheduleAssetAutosave()
+                } else {
+                    openConfirmModal({
+                        title: "Eliminar fila",
+                        message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
+                        confirmLabel: "Eliminar",
+                        onConfirm: async () => {
+                            _assetDisplayRows.splice(idx, 1)
+                            renderAssetRows(_assetDisplayRows)
+                            scheduleAssetAutosave()
+                        }
+                    })
+                }
+            }
+        })
     }
 
     if (addAssetRowButton) {
         addAssetRowButton.addEventListener("click", () => {
-            addNewAssetRow()
-            scheduleAssetAutosave()
+            openAssetRowModal(-1)
         })
     }
 
@@ -2440,14 +2538,6 @@ function initAssetTableLogic(asset) {
                 console.error(error)
                 alert("No se pudo actualizar el nombre del activo.")
             }
-        })
-    }
-
-    if (saveAssetButton) {
-        saveAssetButton.addEventListener("click", async () => {
-            await saveAssetDataToServer(buildCurrentAssetPayload())
-            await refreshAssetsSidebar(currentAssetId, false)
-            alert("JSON del activo guardado")
         })
     }
 

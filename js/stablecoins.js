@@ -261,8 +261,6 @@ function bindStablecoinsEvents() {
     const body = document.getElementById("stablecoinsBody")
     const addButton = document.getElementById("addStablecoinRowBtn")
     const saveButton = document.getElementById("saveStablecoinsBtn")
-    const exportButton = document.getElementById("exportStablecoinsBtn")
-    const importButton = document.getElementById("importStablecoinsBtn")
     const enabledMenu = document.getElementById("stablecoinsEnabledMenu")
     const summaryContainer = document.getElementById("stablecoinsSummary")
     const openModalButton = document.getElementById("openStablecoinModalBtn")
@@ -310,16 +308,6 @@ function bindStablecoinsEvents() {
                 alert("No se pudieron guardar las stablecoins.")
             }
         })
-    }
-
-    if (exportButton && !exportButton.dataset.bound) {
-        exportButton.dataset.bound = "true"
-        exportButton.addEventListener("click", exportStablecoinsJson)
-    }
-
-    if (importButton && !importButton.dataset.bound) {
-        importButton.dataset.bound = "true"
-        importButton.addEventListener("click", importStablecoinsJson)
     }
 
     if (openModalButton && !openModalButton.dataset.bound) {
