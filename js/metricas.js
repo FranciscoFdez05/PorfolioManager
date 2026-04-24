@@ -855,9 +855,100 @@ function mRenderGastosTipoChart(tipoData) {
         data: { labels: tipoLabels, datasets: [{ data: tipoValues, backgroundColor: tipoColors, borderColor: "#0b1120", borderWidth: 2, hoverOffset: 10 }] },
         options: {
             ...M_CHART_DEFAULTS, cutout: "55%",
+            onClick: (_e, elements) => {
+                if (!elements.length) return
+                openGastosTipoPopup(tipoLabels[elements[0].index])
+            },
             plugins: { ...M_CHART_DEFAULTS.plugins, legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" }, tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } } }
         }
     })
+    const canvas = document.getElementById("mChartGastosTipo")
+    if (canvas) canvas.style.cursor = "pointer"
+}
+
+function openGastosTipoPopup(tipoLabel) {
+    const cache = _mGastosChartsCache
+    if (!cache) return
+    const { yearData } = cache
+    const monthScope = _metricasGastosMonth === "all" ? M_GASTOS_KEYS : [_metricasGastosMonth]
+
+    const rows = []
+    if (tipoLabel === "Mensualidades") {
+        ;(yearData?.mensualidades || []).forEach((m) => {
+            monthScope.forEach((mk) => {
+                const val = parseEuroNumber(m.meses?.[mk] || "")
+                if (val > 0) rows.push({ fecha: "—", mes: M_GASTOS_LABELS[M_GASTOS_KEYS.indexOf(mk)] || mk, nombre: m.nombre || "—", cantidad: val })
+            })
+        })
+    } else {
+        monthScope.forEach((mk) => {
+            ;(yearData?.months?.[mk]?.rows || []).forEach((r) => {
+                if ((r.tipo || "Sin tipo").trim() === tipoLabel) {
+                    rows.push({ fecha: r.fecha || "—", mes: M_GASTOS_LABELS[M_GASTOS_KEYS.indexOf(mk)] || mk, nombre: r.nombre || "—", cantidad: parseEuroNumber(r.cantidad || "") })
+                }
+            })
+        })
+    }
+
+    document.getElementById("gastosTipoPopup")?.remove()
+
+    const mainContent = document.querySelector(".mainContent")
+    if (!mainContent) return
+    const rect = mainContent.getBoundingClientRect()
+    const total = rows.reduce((s, r) => s + r.cantidad, 0)
+
+    const tableRows = rows.map((r) => `
+        <tr>
+            <td>${r.fecha}</td>
+            <td>${r.mes}</td>
+            <td>${r.nombre}</td>
+            <td style="text-align:right">${formatEuro(r.cantidad)}</td>
+        </tr>`).join("")
+
+    const popupW = Math.round(rect.width  * 0.78)
+    const popupH = Math.round(rect.height * 0.65)
+    const popupL = rect.left + Math.round((rect.width  - popupW) / 2)
+    const popupT = rect.top  + Math.round((rect.height - popupH) / 2)
+
+    const backdrop = document.createElement("div")
+    backdrop.id = "gastosTipoBackdrop"
+    backdrop.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:899;`
+    backdrop.style.pointerEvents = "none"
+
+    const popup = document.createElement("div")
+    popup.id = "gastosTipoPopup"
+    popup.className = "gtPopup"
+    popup.style.cssText = `position:fixed;top:${popupT}px;left:${popupL}px;width:${popupW}px;height:${popupH}px;z-index:900;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.6);`
+    popup.innerHTML = `
+        <div class="gtPopupHeader">
+            <span class="gtPopupTitle">Gastos · ${tipoLabel}</span>
+            <span class="gtPopupTotal">Total: ${formatEuro(total)} · ${rows.length} movimientos</span>
+            <button class="gtPopupClose" id="gtPopupCloseBtn">✕</button>
+        </div>
+        <div class="gtPopupBody">
+            <table class="overviewTable gtPopupTable" id="gtPopupTable">
+                <thead>
+                    <tr>
+                        <th class="mThSort" data-sortkey="0">Fecha <span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="1">Mes <span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="2">Concepto <span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="3" style="text-align:right">Importe <span class="mSortArrow"></span></th>
+                    </tr>
+                </thead>
+                <tbody>${tableRows}
+                    <tr class="gtTotalRow">
+                        <td colspan="3"><strong>Total</strong></td>
+                        <td style="text-align:right"><strong>${formatEuro(total)}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>`
+
+    document.body.appendChild(backdrop)
+    document.body.appendChild(popup)
+    document.getElementById("gtPopupCloseBtn")?.addEventListener("click", () => { backdrop.remove(); popup.remove() })
+    const table = document.getElementById("gtPopupTable")
+    if (table) bindTableSort(table)
 }
 
 // ── top-positions table ────────────────────────────────────────────────────

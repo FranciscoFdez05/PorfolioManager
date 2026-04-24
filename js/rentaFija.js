@@ -42,51 +42,181 @@ function collectRentaFijaDataFromTable() {
     return {
         rows: rows.map((row) => {
             const cells = row.querySelectorAll("td")
-            const tipoSelect = cells[2]?.querySelector("select")
+            const tipoSelect = cells[1]?.querySelector("select")
             return {
-                fecha:            cells[1]?.textContent.trim() || "",
+                fecha:            cells[0]?.textContent.trim() || "",
                 tipo:             tipoSelect?.value || "bancario",
-                instrumento:      cells[3]?.textContent.trim() || "",
-                rentabilidad:     cells[4]?.textContent.trim() || "",
-                vencimiento:      cells[5]?.textContent.trim() || "",
-                invertido:        cells[6]?.textContent.trim() || "",
-                interesAcumulado: cells[7]?.textContent.trim() || "",
-                impuestos:        cells[8]?.textContent.trim() || "",
+                instrumento:      cells[2]?.textContent.trim() || "",
+                rentabilidad:     cells[3]?.textContent.trim() || "",
+                vencimiento:      cells[4]?.textContent.trim() || "",
+                invertido:        cells[5]?.textContent.trim() || "",
+                interesAcumulado: cells[6]?.textContent.trim() || "",
+                impuestos:        cells[7]?.textContent.trim() || "",
             }
         })
     }
 }
 
-function buildRentaFijaRow(rowData = {}) {
-    const tipo = rowData.tipo || "bancario"
-    const tr = document.createElement("tr")
-    tr.dataset.tipo = tipo
+function openRentaFijaEditModal(rowIndex = -1) {
+    const data = collectRentaFijaDataFromTable()
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? data.rows[rowIndex] : {}
 
-    tr.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
-        <td contenteditable="true">${rowData.fecha || ""}</td>
-        <td>
-            <select class="bonosTipoSelect">
-                <option value="bancario"${tipo === "bancario" ? " selected" : ""}>Bancario</option>
-                <option value="estatal"${tipo === "estatal" ? " selected" : ""}>Estatal</option>
-            </select>
-        </td>
-        <td contenteditable="true">${rowData.instrumento || ""}</td>
-        <td contenteditable="true">${rowData.rentabilidad || ""}</td>
-        <td contenteditable="true">${rowData.vencimiento || ""}</td>
-        <td contenteditable="true">${rowData.invertido ? formatCellEuroValue(rowData.invertido) : ""}</td>
-        <td contenteditable="true">${rowData.interesAcumulado ? formatCellEuroValue(rowData.interesAcumulado) : ""}</td>
-        <td contenteditable="true">${rowData.impuestos ? formatCellEuroValue(rowData.impuestos) : ""}</td>
-        <td class="bonosTotalCell">0,00 €</td>
+    // Crear overlay y modal
+    const overlay = document.createElement("div")
+    overlay.className = "modalOverlay"
+    overlay.style.zIndex = "20000"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal"
+    modal.innerHTML = `
+        <h3 class="assetModalTitle">${isEdit ? "Editar renta fija" : "Nueva renta fija"}</h3>
+
+        <label class="assetModalLabel" for="rfFechaInput">Fecha</label>
+        <input id="rfFechaInput" class="assetModalInput" type="text" value="${rowData.fecha || ""}" placeholder="dd-mm-aaaa">
+
+        <label class="assetModalLabel" for="rfTipoSelect">Tipo</label>
+        <select id="rfTipoSelect" class="assetModalSelect">
+            <option value="bancario"${(rowData.tipo || "bancario") === "bancario" ? " selected" : ""}>Bancario</option>
+            <option value="estatal"${rowData.tipo === "estatal" ? " selected" : ""}>Estatal</option>
+        </select>
+
+        <label class="assetModalLabel" for="rfInstrumentoInput">Instrumento</label>
+        <input id="rfInstrumentoInput" class="assetModalInput" type="text" value="${rowData.instrumento || ""}" placeholder="Ej: Depósito bancario">
+
+        <label class="assetModalLabel" for="rfRentabilidadInput">Rentabilidad</label>
+        <input id="rfRentabilidadInput" class="assetModalInput" type="text" value="${rowData.rentabilidad || ""}" placeholder="Ej: 2,5%">
+
+        <label class="assetModalLabel" for="rfVencimientoInput">Vencimiento</label>
+        <input id="rfVencimientoInput" class="assetModalInput" type="text" value="${rowData.vencimiento || ""}" placeholder="dd-mm-aaaa">
+
+        <label class="assetModalLabel" for="rfInvertidoInput">Invertido</label>
+        <input id="rfInvertidoInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.invertido ? formatCellEuroValue(rowData.invertido) : ""}" placeholder="0,00">
+
+        <label class="assetModalLabel" for="rfInteresInput">Interés acumulado</label>
+        <input id="rfInteresInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.interesAcumulado ? formatCellEuroValue(rowData.interesAcumulado) : ""}" placeholder="0,00">
+
+        <label class="assetModalLabel" for="rfImpuestosInput">Impuestos</label>
+        <input id="rfImpuestosInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.impuestos ? formatCellEuroValue(rowData.impuestos) : ""}" placeholder="0,00">
+
+        <div class="assetModalActions rentaFijaModalActions">
+            <button type="button" id="rfModalCancelBtn" class="cancelButton">Cancelar</button>
+            <button type="button" id="rfModalSaveBtn" class="primaryButton" data-no-autohide="true">Guardar</button>
+        </div>
     `
 
-    const tipoSelect = tr.querySelector(".bonosTipoSelect")
+    function closeModal() {
+        overlay.remove()
+    }
+
+    // Event listeners
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) {
+            // closeModal() // Deshabilitado para evitar cierre accidental
+        }
+    })
+
+    modal.querySelector("#rfModalCancelBtn").addEventListener("click", closeModal)
+    modal.querySelector("#rfModalSaveBtn").addEventListener("click", async () => {
+        const fecha = modal.querySelector("#rfFechaInput").value.trim()
+        const tipo = modal.querySelector("#rfTipoSelect").value
+        const instrumento = modal.querySelector("#rfInstrumentoInput").value.trim()
+        const rentabilidad = modal.querySelector("#rfRentabilidadInput").value.trim()
+        const vencimiento = modal.querySelector("#rfVencimientoInput").value.trim()
+        const invertidoRaw = modal.querySelector("#rfInvertidoInput").value.trim()
+        const interesRaw = modal.querySelector("#rfInteresInput").value.trim()
+        const impuestosRaw = modal.querySelector("#rfImpuestosInput").value.trim()
+
+        const invertido = invertidoRaw ? formatCellEuroValue(invertidoRaw) : ""
+        const interesAcumulado = interesRaw ? formatCellEuroValue(interesRaw) : ""
+        const impuestos = impuestosRaw ? formatCellEuroValue(impuestosRaw) : ""
+
+        if (isEdit) {
+            data.rows[rowIndex] = { fecha, tipo, instrumento, rentabilidad, vencimiento, invertido, interesAcumulado, impuestos }
+        } else {
+            data.rows.push({ fecha, tipo, instrumento, rentabilidad, vencimiento, invertido, interesAcumulado, impuestos })
+        }
+
+        renderRentaFijaTable(data)
+        await saveRentaFijaDataToServer()
+        closeModal()
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+}
+
+function buildRentaFijaRow(rowData, index) {
+    const tr = document.createElement("tr")
+    tr.dataset.tipo = rowData.tipo || "bancario"
+
+    const actionCell = document.createElement("td")
+    actionCell.className = "rowActionsCell"
+    actionCell.innerHTML = `
+        <button type="button" class="assetRowEditBtn rfRowEditBtn" title="Editar fila">✎</button>
+        <button type="button" class="assetRowDeleteBtn rfRowDeleteBtn" title="Eliminar fila">✕</button>
+    `
+    actionCell.querySelector(".rfRowEditBtn").addEventListener("click", () => openRentaFijaEditModal(index))
+    actionCell.querySelector(".rfRowDeleteBtn").addEventListener("click", () => {
+        openConfirmModal({
+            title: "Eliminar fila",
+            message: "¿Quieres eliminar esta fila?",
+            confirmLabel: "Eliminar",
+            onConfirm: async () => {
+                const data = collectRentaFijaDataFromTable()
+                data.rows.splice(index, 1)
+                renderRentaFijaTable(data)
+                await saveRentaFijaDataToServer()
+            }
+        })
+    })
+    const fechaCell = document.createElement("td")
+    fechaCell.textContent = rowData.fecha || ""
+    tr.appendChild(fechaCell)
+
+    const tipoCell = document.createElement("td")
+    const tipoSelect = document.createElement("select")
+    tipoSelect.innerHTML = `
+        <option value="bancario"${(rowData.tipo || "bancario") === "bancario" ? " selected" : ""}>Bancario</option>
+        <option value="estatal"${rowData.tipo === "estatal" ? " selected" : ""}>Estatal</option>
+    `
     tipoSelect.addEventListener("change", () => {
         tr.dataset.tipo = tipoSelect.value
-        applyRentaFijaFilter(_rfCurrentFilter)
-        updateRentaFijaTotals()
         scheduleRentaFijaAutosave()
+        applyRentaFijaFilter(_rfCurrentFilter)
     })
+    tipoCell.appendChild(tipoSelect)
+    tr.appendChild(tipoCell)
+
+    const instrumentoCell = document.createElement("td")
+    instrumentoCell.textContent = rowData.instrumento || ""
+    tr.appendChild(instrumentoCell)
+
+    const rentabilidadCell = document.createElement("td")
+    rentabilidadCell.textContent = rowData.rentabilidad || ""
+    tr.appendChild(rentabilidadCell)
+
+    const vencimientoCell = document.createElement("td")
+    vencimientoCell.textContent = rowData.vencimiento || ""
+    tr.appendChild(vencimientoCell)
+
+    const invertidoCell = document.createElement("td")
+    invertidoCell.textContent = rowData.invertido || ""
+    tr.appendChild(invertidoCell)
+
+    const interesCell = document.createElement("td")
+    interesCell.textContent = rowData.interesAcumulado || ""
+    tr.appendChild(interesCell)
+
+    const impuestosCell = document.createElement("td")
+    impuestosCell.textContent = rowData.impuestos || ""
+    tr.appendChild(impuestosCell)
+
+    const netoCell = document.createElement("td")
+    netoCell.textContent = formatEuro(parseEuroNumber(rowData.interesAcumulado || "") - parseEuroNumber(rowData.impuestos || ""))
+    tr.appendChild(netoCell)
+
+    tr.appendChild(actionCell)
 
     return tr
 }
@@ -96,7 +226,7 @@ function renderRentaFijaTable(data) {
     if (!tbody) return
     tbody.innerHTML = ""
     const rows = Array.isArray(data?.rows) ? data.rows : []
-    rows.forEach((rowData) => tbody.appendChild(buildRentaFijaRow(rowData)))
+    rows.forEach((rowData, index) => tbody.appendChild(buildRentaFijaRow(rowData, index)))
     updateRentaFijaTotals()
     applyRentaFijaFilter(_rfCurrentFilter)
 }
@@ -108,18 +238,18 @@ function updateRentaFijaTotals() {
 
     rows.forEach((row) => {
         const cells = row.querySelectorAll("td")
-        const interes   = parseEuroNumber(cells[7]?.textContent || "")
-        const impuestos = parseEuroNumber(cells[8]?.textContent || "")
-        const invertido = parseEuroNumber(cells[6]?.textContent || "")
+        const interes   = parseEuroNumber(cells[6]?.textContent || "")
+        const impuestos = parseEuroNumber(cells[7]?.textContent || "")
+        const invertido = parseEuroNumber(cells[5]?.textContent || "")
         const neto = interes - impuestos
 
-        if (cells[9]) cells[9].textContent = formatEuro(neto)
+        if (cells[8]) cells[8].textContent = formatEuro(neto)
 
         totalInteres   += interes
         totalImpuestos += impuestos
         totalInvertido += invertido
 
-        const tipo = row.dataset.tipo || cells[2]?.querySelector("select")?.value || "bancario"
+        const tipo = row.dataset.tipo || cells[1]?.querySelector("select")?.value || "bancario"
         if (tipo === "bancario") bancarioNeto += neto
         else estatalNeto += neto
     })
@@ -153,53 +283,14 @@ async function initRentaFijaLogic() {
     const tbody = document.getElementById("rentaFijaBody")
     if (tbody) {
         tbody.addEventListener("click", (e) => {
-            if (e.target.classList.contains("rowDeleteBtn")) {
-                e.target.closest("tr")?.remove()
-                updateRentaFijaTotals()
-                scheduleRentaFijaAutosave()
-            }
+            // Los botones de editar y eliminar se manejan en buildRentaFijaRow
         })
-
-        tbody.addEventListener("input", (e) => {
-            if (e.target.tagName === "TD") {
-                updateRentaFijaTotals()
-                scheduleRentaFijaAutosave()
-            }
-        })
-
-        tbody.addEventListener("focus", (e) => {
-            const cell = e.target
-            if (cell.tagName !== "TD") return
-            const col = cell.cellIndex
-            if (col === 6 || col === 7 || col === 8) {
-                const val = parseEuroNumber(cell.textContent)
-                if (cell.textContent.trim() !== "") cell.textContent = normalizeNumberForEdit(val)
-            }
-        }, true)
-
-        tbody.addEventListener("blur", (e) => {
-            const cell = e.target
-            if (cell.tagName !== "TD") return
-            const col = cell.cellIndex
-            if (col === 6 || col === 7 || col === 8) {
-                const val = parseEuroNumber(cell.textContent)
-                if (cell.textContent.trim() !== "") cell.textContent = formatEuro(val)
-                updateRentaFijaTotals()
-            }
-            scheduleRentaFijaAutosave()
-        }, true)
     }
 
     const addBtn = document.getElementById("rentaFijaAddBtn")
     if (addBtn) {
         addBtn.addEventListener("click", () => {
-            const tbody2 = document.getElementById("rentaFijaBody")
-            if (!tbody2) return
-            const row = buildRentaFijaRow({ tipo: _rfCurrentFilter === "all" ? "bancario" : _rfCurrentFilter })
-            tbody2.appendChild(row)
-            updateRentaFijaTotals()
-            applyRentaFijaFilter(_rfCurrentFilter)
-            scheduleRentaFijaAutosave()
+            openRentaFijaEditModal()
         })
     }
 

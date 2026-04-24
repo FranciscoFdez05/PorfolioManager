@@ -42,51 +42,181 @@ function collectBonosDataFromTable() {
     return {
         rows: rows.map((row) => {
             const cells = row.querySelectorAll("td")
-            const tipoSelect = cells[2]?.querySelector("select")
+            const tipoSelect = cells[1]?.querySelector("select")
             return {
-                fecha:            cells[1]?.textContent.trim() || "",
+                fecha:            cells[0]?.textContent.trim() || "",
                 tipo:             tipoSelect?.value || "gubernamental",
-                instrumento:      cells[3]?.textContent.trim() || "",
-                cupon:            cells[4]?.textContent.trim() || "",
-                vencimiento:      cells[5]?.textContent.trim() || "",
-                invertido:        cells[6]?.textContent.trim() || "",
-                interesAcumulado: cells[7]?.textContent.trim() || "",
-                impuestos:        cells[8]?.textContent.trim() || "",
+                instrumento:      cells[2]?.textContent.trim() || "",
+                cupon:            cells[3]?.textContent.trim() || "",
+                vencimiento:      cells[4]?.textContent.trim() || "",
+                invertido:        cells[5]?.textContent.trim() || "",
+                interesAcumulado: cells[6]?.textContent.trim() || "",
+                impuestos:        cells[7]?.textContent.trim() || "",
             }
         })
     }
 }
 
-function buildBonosRow(rowData = {}) {
-    const tipo = rowData.tipo || "gubernamental"
-    const tr = document.createElement("tr")
-    tr.dataset.tipo = tipo
+function openBonosEditModal(rowIndex = -1) {
+    const data = collectBonosDataFromTable()
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? data.rows[rowIndex] : {}
 
-    tr.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
-        <td contenteditable="true">${rowData.fecha || ""}</td>
-        <td>
-            <select class="bonosTipoSelect">
-                <option value="gubernamental"${tipo === "gubernamental" ? " selected" : ""}>Gubernamental</option>
-                <option value="corporativo"${tipo === "corporativo" ? " selected" : ""}>Corporativo</option>
-            </select>
-        </td>
-        <td contenteditable="true">${rowData.instrumento || ""}</td>
-        <td contenteditable="true">${rowData.cupon || ""}</td>
-        <td contenteditable="true">${rowData.vencimiento || ""}</td>
-        <td contenteditable="true">${rowData.invertido ? formatCellEuroValue(rowData.invertido) : ""}</td>
-        <td contenteditable="true">${rowData.interesAcumulado ? formatCellEuroValue(rowData.interesAcumulado) : ""}</td>
-        <td contenteditable="true">${rowData.impuestos ? formatCellEuroValue(rowData.impuestos) : ""}</td>
-        <td class="bonosTotalCell">0,00 €</td>
+    // Crear overlay y modal
+    const overlay = document.createElement("div")
+    overlay.className = "modalOverlay"
+    overlay.style.zIndex = "20000"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal"
+    modal.innerHTML = `
+        <h3 class="assetModalTitle">${isEdit ? "Editar bono" : "Nuevo bono"}</h3>
+
+        <label class="assetModalLabel" for="bonosFechaInput">Fecha</label>
+        <input id="bonosFechaInput" class="assetModalInput" type="text" value="${rowData.fecha || ""}" placeholder="dd-mm-aaaa">
+
+        <label class="assetModalLabel" for="bonosTipoSelect">Tipo</label>
+        <select id="bonosTipoSelect" class="assetModalSelect">
+            <option value="gubernamental"${(rowData.tipo || "gubernamental") === "gubernamental" ? " selected" : ""}>Gubernamental</option>
+            <option value="corporativo"${rowData.tipo === "corporativo" ? " selected" : ""}>Corporativo</option>
+        </select>
+
+        <label class="assetModalLabel" for="bonosInstrumentoInput">Instrumento</label>
+        <input id="bonosInstrumentoInput" class="assetModalInput" type="text" value="${rowData.instrumento || ""}" placeholder="Ej: Bonos del Estado">
+
+        <label class="assetModalLabel" for="bonosCuponInput">Cupón</label>
+        <input id="bonosCuponInput" class="assetModalInput" type="text" value="${rowData.cupon || ""}" placeholder="Ej: 3,5%">
+
+        <label class="assetModalLabel" for="bonosVencimientoInput">Vencimiento</label>
+        <input id="bonosVencimientoInput" class="assetModalInput" type="text" value="${rowData.vencimiento || ""}" placeholder="dd-mm-aaaa">
+
+        <label class="assetModalLabel" for="bonosInvertidoInput">Invertido</label>
+        <input id="bonosInvertidoInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.invertido ? formatCellEuroValue(rowData.invertido) : ""}" placeholder="0,00">
+
+        <label class="assetModalLabel" for="bonosInteresInput">Interés acumulado</label>
+        <input id="bonosInteresInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.interesAcumulado ? formatCellEuroValue(rowData.interesAcumulado) : ""}" placeholder="0,00">
+
+        <label class="assetModalLabel" for="bonosImpuestosInput">Impuestos</label>
+        <input id="bonosImpuestosInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.impuestos ? formatCellEuroValue(rowData.impuestos) : ""}" placeholder="0,00">
+
+        <div class="assetModalActions bonosModalActions">
+            <button type="button" id="bonosModalCancelBtn" class="cancelButton">Cancelar</button>
+            <button type="button" id="bonosModalSaveBtn" class="primaryButton" data-no-autohide="true">Guardar</button>
+        </div>
     `
 
-    const tipoSelect = tr.querySelector(".bonosTipoSelect")
+    function closeModal() {
+        overlay.remove()
+    }
+
+    // Event listeners
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) {
+            // closeModal() // Deshabilitado para evitar cierre accidental
+        }
+    })
+
+    modal.querySelector("#bonosModalCancelBtn").addEventListener("click", closeModal)
+    modal.querySelector("#bonosModalSaveBtn").addEventListener("click", async () => {
+        const fecha = modal.querySelector("#bonosFechaInput").value.trim()
+        const tipo = modal.querySelector("#bonosTipoSelect").value
+        const instrumento = modal.querySelector("#bonosInstrumentoInput").value.trim()
+        const cupon = modal.querySelector("#bonosCuponInput").value.trim()
+        const vencimiento = modal.querySelector("#bonosVencimientoInput").value.trim()
+        const invertidoRaw = modal.querySelector("#bonosInvertidoInput").value.trim()
+        const interesRaw = modal.querySelector("#bonosInteresInput").value.trim()
+        const impuestosRaw = modal.querySelector("#bonosImpuestosInput").value.trim()
+
+        const invertido = invertidoRaw ? formatCellEuroValue(invertidoRaw) : ""
+        const interesAcumulado = interesRaw ? formatCellEuroValue(interesRaw) : ""
+        const impuestos = impuestosRaw ? formatCellEuroValue(impuestosRaw) : ""
+
+        if (isEdit) {
+            data.rows[rowIndex] = { fecha, tipo, instrumento, cupon, vencimiento, invertido, interesAcumulado, impuestos }
+        } else {
+            data.rows.push({ fecha, tipo, instrumento, cupon, vencimiento, invertido, interesAcumulado, impuestos })
+        }
+
+        renderBonosTable(data)
+        await saveBonosDataToServer()
+        closeModal()
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+}
+
+function buildBonosRow(rowData, index) {
+    const tr = document.createElement("tr")
+    tr.dataset.tipo = rowData.tipo || "gubernamental"
+
+    const actionCell = document.createElement("td")
+    actionCell.className = "rowActionsCell"
+    actionCell.innerHTML = `
+        <button type="button" class="assetRowEditBtn bonosRowEditBtn" title="Editar fila">✎</button>
+        <button type="button" class="assetRowDeleteBtn bonosRowDeleteBtn" title="Eliminar fila">✕</button>
+    `
+    actionCell.querySelector(".bonosRowEditBtn").addEventListener("click", () => openBonosEditModal(index))
+    actionCell.querySelector(".bonosRowDeleteBtn").addEventListener("click", () => {
+        openConfirmModal({
+            title: "Eliminar fila",
+            message: "¿Quieres eliminar esta fila?",
+            confirmLabel: "Eliminar",
+            onConfirm: async () => {
+                const data = collectBonosDataFromTable()
+                data.rows.splice(index, 1)
+                renderBonosTable(data)
+                await saveBonosDataToServer()
+            }
+        })
+    })
+    const fechaCell = document.createElement("td")
+    fechaCell.textContent = rowData.fecha || ""
+    tr.appendChild(fechaCell)
+
+    const tipoCell = document.createElement("td")
+    const tipoSelect = document.createElement("select")
+    tipoSelect.innerHTML = `
+        <option value="gubernamental"${(rowData.tipo || "gubernamental") === "gubernamental" ? " selected" : ""}>Gubernamental</option>
+        <option value="corporativo"${rowData.tipo === "corporativo" ? " selected" : ""}>Corporativo</option>
+    `
     tipoSelect.addEventListener("change", () => {
         tr.dataset.tipo = tipoSelect.value
-        applyBonosFilter(_bonosCurrentFilter)
-        updateBonosTotals()
         scheduleBonosAutosave()
+        applyBonosFilter(_bonosCurrentFilter)
     })
+    tipoCell.appendChild(tipoSelect)
+    tr.appendChild(tipoCell)
+
+    const instrumentoCell = document.createElement("td")
+    instrumentoCell.textContent = rowData.instrumento || ""
+    tr.appendChild(instrumentoCell)
+
+    const cuponCell = document.createElement("td")
+    cuponCell.textContent = rowData.cupon || ""
+    tr.appendChild(cuponCell)
+
+    const vencimientoCell = document.createElement("td")
+    vencimientoCell.textContent = rowData.vencimiento || ""
+    tr.appendChild(vencimientoCell)
+
+    const invertidoCell = document.createElement("td")
+    invertidoCell.textContent = rowData.invertido || ""
+    tr.appendChild(invertidoCell)
+
+    const interesCell = document.createElement("td")
+    interesCell.textContent = rowData.interesAcumulado || ""
+    tr.appendChild(interesCell)
+
+    const impuestosCell = document.createElement("td")
+    impuestosCell.textContent = rowData.impuestos || ""
+    tr.appendChild(impuestosCell)
+
+    const netoCell = document.createElement("td")
+    netoCell.textContent = formatEuro(parseEuroNumber(rowData.interesAcumulado || "") - parseEuroNumber(rowData.impuestos || ""))
+    tr.appendChild(netoCell)
+
+    tr.appendChild(actionCell)
 
     return tr
 }
@@ -97,8 +227,8 @@ function renderBonosTable(data) {
 
     tbody.innerHTML = ""
     const rows = Array.isArray(data?.rows) ? data.rows : []
-    rows.forEach((rowData) => {
-        tbody.appendChild(buildBonosRow(rowData))
+    rows.forEach((rowData, index) => {
+        tbody.appendChild(buildBonosRow(rowData, index))
     })
 
     updateBonosTotals()
@@ -113,18 +243,18 @@ function updateBonosTotals() {
 
     rows.forEach((row) => {
         const cells = row.querySelectorAll("td")
-        const interes   = parseEuroNumber(cells[7]?.textContent || "")
-        const impuestos = parseEuroNumber(cells[8]?.textContent || "")
-        const invertido = parseEuroNumber(cells[6]?.textContent || "")
+        const interes   = parseEuroNumber(cells[6]?.textContent || "")
+        const impuestos = parseEuroNumber(cells[7]?.textContent || "")
+        const invertido = parseEuroNumber(cells[5]?.textContent || "")
         const neto = interes - impuestos
 
-        if (cells[9]) cells[9].textContent = formatEuro(neto)
+        if (cells[8]) cells[8].textContent = formatEuro(neto)
 
         totalInteres   += interes
         totalImpuestos += impuestos
         totalInvertido += invertido
 
-        const tipo = row.dataset.tipo || cells[2]?.querySelector("select")?.value || "gubernamental"
+        const tipo = row.dataset.tipo || cells[1]?.querySelector("select")?.value || "gubernamental"
         if (tipo === "gubernamental") gubNeto += neto
         else corpNeto += neto
     })
@@ -160,54 +290,14 @@ async function initBonosLogic() {
     const tbody = document.getElementById("bonosBody")
     if (tbody) {
         tbody.addEventListener("click", (e) => {
-            if (e.target.classList.contains("rowDeleteBtn")) {
-                e.target.closest("tr")?.remove()
-                updateBonosTotals()
-                scheduleBonosAutosave()
-            }
+            // Los botones de editar y eliminar se manejan en buildBonosRow
         })
-
-        tbody.addEventListener("input", (e) => {
-            const cell = e.target
-            if (cell.tagName === "TD") {
-                updateBonosTotals()
-                scheduleBonosAutosave()
-            }
-        })
-
-        tbody.addEventListener("focus", (e) => {
-            const cell = e.target
-            if (cell.tagName !== "TD") return
-            const col = cell.cellIndex
-            if (col === 6 || col === 7 || col === 8) {
-                const val = parseEuroNumber(cell.textContent)
-                if (cell.textContent.trim() !== "") cell.textContent = normalizeNumberForEdit(val)
-            }
-        }, true)
-
-        tbody.addEventListener("blur", (e) => {
-            const cell = e.target
-            if (cell.tagName !== "TD") return
-            const col = cell.cellIndex
-            if (col === 6 || col === 7 || col === 8) {
-                const val = parseEuroNumber(cell.textContent)
-                if (cell.textContent.trim() !== "") cell.textContent = formatEuro(val)
-                updateBonosTotals()
-            }
-            scheduleBonosAutosave()
-        }, true)
     }
 
     const addBtn = document.getElementById("bonosAddBtn")
     if (addBtn) {
         addBtn.addEventListener("click", () => {
-            const tbody2 = document.getElementById("bonosBody")
-            if (!tbody2) return
-            const row = buildBonosRow({ tipo: _bonosCurrentFilter === "all" ? "gubernamental" : _bonosCurrentFilter })
-            tbody2.appendChild(row)
-            updateBonosTotals()
-            applyBonosFilter(_bonosCurrentFilter)
-            scheduleBonosAutosave()
+            openBonosEditModal()
         })
     }
 

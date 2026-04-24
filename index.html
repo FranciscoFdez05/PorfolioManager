@@ -113,11 +113,7 @@
             <div class="navButtons">
                 <button class="navBtn active" data-page="vistaGeneral">Vista general</button>
 
-                <!-- <button class="navBtn" data-page="gastos">Gastos</button> -->
-                <!-- <button class="navBtn" data-page="ingresos">Ingresos</button> -->
-
                 <button class="navBtn" data-page="activos">Activos</button>
-                <button class="navBtn" data-page="ventas">Ventas</button>
 
                 <div class="navDropdown">
                     <button class="navDropdownBtn" type="button">Gastos ▾</button>
@@ -127,12 +123,12 @@
                     </div>
                 </div>
 
-
                 <div class="navDropdown">
                     <button class="navDropdownBtn" type="button">Finanzas ▾</button>
                     <div class="navDropdownMenu">                        
                         <button class="navBtn navDropdownItem" data-page="intereses">Intereses</button>
                         <button class="navBtn navDropdownItem" data-page="dividendos">Dividendos</button>
+                        <button class="navBtn navDropdownItem" data-page="ventas">Ventas</button>
                     </div>
                 </div>
 
@@ -156,6 +152,15 @@
                     </div>
                 </div>
 
+                <div class="navDropdown">
+                    <button class="navDropdownBtn" type="button">Trading ▾</button>
+                    <div class="navDropdownMenu">
+                        <button class="navBtn navDropdownItem" data-page="stablecoins">Stablecoins</button>
+                        <button class="navBtn navDropdownItem" data-page="Trading">Trading</button>
+
+                    </div>
+                </div>
+
                 <button class="navBtn" data-page="herramientas">Herramientas</button>
                 <button class="navBtn" data-page="metricas">Métricas</button>
                 <button class="navBtn" data-page="ajustes">⚙️</button>
@@ -170,6 +175,7 @@
 
     <!-- Menu lateral -->
     <div class="sideWrapper" id="sideWrapper">
+        <div class="sideResizeHandle" id="sideResizeHandle"></div>
         <button id="togglePanel" class="toggleButton">▶</button>
 
         <aside class="sidePanel" id="sidePanel">
@@ -180,7 +186,9 @@
 
             <div class="assetsList" id="assetsList"></div>
 
-            <div class="assetDetailView">
+            <div class="detailResizeHandle" id="detailResizeHandle"></div>
+
+            <div class="assetDetailView" id="assetDetailView">
                 <div class="detailHeader" id="detSymbol">---</div>
                 <div class="detailSub" id="detName">Selecciona un activo</div>
                 <div class="detailPrice" id="detPrice">0,00 €</div>
@@ -244,8 +252,8 @@
         <div id="assetSearchResults" class="assetSearchResults hidden"></div>
 
         <div class="assetModalActions">
+            <button id="cancelAssetModalBtn" class="cancelButton">Cancelar</button>
             <button id="confirmAssetModalBtn" class="primaryButton">Confirmar</button>
-            <button id="cancelAssetModalBtn" class="secondaryButton">Cancelar</button>
         </div>
     </div>
 </div>
@@ -257,7 +265,7 @@
 
         <div class="assetModalActions confirmModalActions">
             <button id="confirmModalAcceptBtn" class="dangerButton">Eliminar</button>
-            <button id="confirmModalCancelBtn" class="secondaryButton">Cancelar</button>
+            <button id="confirmModalCancelBtn" class="cancelButton">Cancelar</button>
         </div>
     </div>
 </div>
@@ -269,8 +277,8 @@
         <input id="editAssetNameInput" class="assetModalInput" type="text" placeholder="Nuevo nombre del activo">
 
         <div class="assetModalActions">
+            <button id="cancelEditAssetModalBtn" class="cancelButton">Cancelar</button>
             <button id="confirmEditAssetModalBtn" class="primaryButton">Confirmar</button>
-            <button id="cancelEditAssetModalBtn" class="secondaryButton">Cancelar</button>
         </div>
     </div>
 </div>

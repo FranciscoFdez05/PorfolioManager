@@ -40,7 +40,7 @@ async function initConversionesLogic() {
     if (addRowButton && !addRowButton.dataset.bound) {
         addRowButton.dataset.bound = "true"
         addRowButton.addEventListener("click", () => {
-            addConversionesRow()
+            openConversiónRowModal("")
         })
     }
 
@@ -57,14 +57,18 @@ async function initConversionesLogic() {
         body.addEventListener("input", scheduleConversionesAutosave)
         body.addEventListener("change", scheduleConversionesAutosave)
         body.addEventListener("click", (event) => {
-            const deleteButton = event.target.closest(".rowDeleteBtn")
-
-            if (!deleteButton) {
+            const editButton = event.target.closest(".conversionRowEditBtn")
+            if (editButton) {
+                openConversiónRowModal(editButton.dataset.rowId)
                 return
             }
 
-            deleteButton.closest("tr")?.remove()
-            scheduleConversionesAutosave()
+            const deleteButton = event.target.closest(".conversionRowDeleteBtn")
+            if (deleteButton) {
+                const row = deleteButton.closest("tr[data-row-id]")
+                row?.remove()
+                scheduleConversionesAutosave()
+            }
         })
     }
 
@@ -141,11 +145,14 @@ function buildConversionesRowElement(row = {}, asset = conversionesCurrentAsset)
     rowElement.dataset.rowId = String(row.id || createConversionRowId())
 
     rowElement.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td contenteditable="true" data-field="fecha">${row.fecha || ""}</td>
         <td contenteditable="true" data-field="par">${row.par || ""}</td>
         <td>${buildAssetConversionTypeSelect(row.tipo || "", asset || {})}</td>
         <td contenteditable="true" data-field="cantidad">${formatAssetParticipationValue(row.cantidad || "", "cripto")}</td>
+        <td class="rowActionsCell">
+            <button type="button" class="assetRowEditBtn conversionRowEditBtn" data-row-id="${rowElement.dataset.rowId}" title="Editar fila">✎</button>
+            <button type="button" class="assetRowDeleteBtn conversionRowDeleteBtn" data-row-id="${rowElement.dataset.rowId}" title="Eliminar fila">✕</button>
+        </td>
     `
 
     return rowElement
@@ -197,6 +204,133 @@ async function flushConversionesPendingChanges() {
     if (conversionesCurrentAsset) {
         await saveConversionesData(true)
     }
+}
+
+function openConversiónRowModal(rowId) {
+    document.getElementById("conversionRowModalOverlay")?.remove()
+
+    const rowElement = document.querySelector(`#conversionesBody tr[data-row-id="${rowId}"]`)
+    const isEdit = Boolean(rowElement)
+    const asset = conversionesCurrentAsset || {}
+    const rowData = isEdit ? {
+        fecha: rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
+        par: rowElement.querySelector('[data-field="par"]')?.textContent.trim() || "",
+        tipo: rowElement.querySelector('select[data-field="tipo"]')?.value || "",
+        cantidad: rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || ""
+    } : { fecha: "", par: "", tipo: "", cantidad: "" }
+
+    const baseSymbol = deriveAssetBaseSymbolFromData(asset)
+    const convertedInLabel = getConvertedInOperationLabel(baseSymbol)
+    const convertedOutLabel = getConvertedOutOperationLabel(baseSymbol)
+    const tipoNorm = String(rowData.tipo || "").trim().toLowerCase()
+    const selectedTipo = tipoNorm === convertedOutLabel.toLowerCase() ? convertedOutLabel : convertedInLabel
+
+    const fieldsHtml = `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Fecha</label>
+            <input id="cvModalFecha" class="assetRowModalInput" type="text" value="${rowData.fecha}" placeholder="dd-mm-aaaa">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Par</label>
+            <input id="cvModalPar" class="assetRowModalInput" type="text" value="${rowData.par}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Tipo</label>
+            <select id="cvModalTipo" class="assetRowModalSelect">
+                <option value="${convertedInLabel}"${selectedTipo === convertedInLabel ? " selected" : ""}>${convertedInLabel} (Comprar)</option>
+                <option value="${convertedOutLabel}"${selectedTipo === convertedOutLabel ? " selected" : ""}>${convertedOutLabel} (Vender)</option>
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Cantidad</label>
+            <input id="cvModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.cantidad}">
+        </div>
+    `
+
+    const overlay = document.createElement("div")
+    overlay.id = "conversionRowModalOverlay"
+    overlay.className = "modalOverlay assetRowModalOverlay"
+    overlay.dataset.rowId = rowId || ""
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal assetRowModal"
+
+    const titleEl = document.createElement("h3")
+    titleEl.className = "assetModalTitle assetRowModalTitle"
+    titleEl.textContent = isEdit ? "Editar conversión" : "Añadir conversión"
+
+    const fields = document.createElement("div")
+    fields.className = "assetRowModalFields"
+    fields.innerHTML = fieldsHtml
+
+    const footer = document.createElement("div")
+    footer.className = "assetRowModalFooter"
+    footer.innerHTML = `
+        ${isEdit ? `<button type="button" id="cvRowModalDeleteBtn" class="dangerButton assetRowModalDeleteBtn">Eliminar</button>` : ""}
+        <button type="button" id="cvRowModalCancelBtn" class="cancelButton">Cancelar</button>
+        <button type="button" id="cvRowModalSaveBtn" class="primaryButton" data-no-autohide="true">Guardar</button>
+    `
+
+    footer.querySelector("#cvRowModalSaveBtn").addEventListener("click", saveConversiónRowFromModal)
+    footer.querySelector("#cvRowModalCancelBtn").addEventListener("click", closeConversiónRowModal)
+
+    if (isEdit) {
+        footer.querySelector("#cvRowModalDeleteBtn").addEventListener("click", () => {
+            openConfirmModal({
+                title: "Eliminar fila",
+                message: "¿Quieres eliminar esta conversión?",
+                confirmLabel: "Eliminar",
+                onConfirm: () => {
+                    rowElement.remove()
+                    scheduleConversionesAutosave()
+                }
+            })
+            closeConversiónRowModal()
+        })
+    }
+
+    modal.appendChild(titleEl)
+    modal.appendChild(fields)
+    modal.appendChild(footer)
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+}
+
+function closeConversiónRowModal() {
+    document.getElementById("conversionRowModalOverlay")?.remove()
+}
+
+function saveConversiónRowFromModal() {
+    const overlay = document.getElementById("conversionRowModalOverlay")
+    const rowId = overlay?.dataset.rowId || ""
+    const g = (id) => document.getElementById(id)?.value ?? ""
+
+    const rowElement = document.querySelector(`#conversionesBody tr[data-row-id="${rowId}"]`)
+
+    if (rowElement) {
+        const fechaCell = rowElement.querySelector('[data-field="fecha"]')
+        const parCell = rowElement.querySelector('[data-field="par"]')
+        const tipoSelect = rowElement.querySelector('select[data-field="tipo"]')
+        const cantidadCell = rowElement.querySelector('[data-field="cantidad"]')
+        if (fechaCell) fechaCell.textContent = g("cvModalFecha")
+        if (parCell) parCell.textContent = g("cvModalPar")
+        if (tipoSelect) tipoSelect.value = g("cvModalTipo")
+        if (cantidadCell) cantidadCell.textContent = g("cvModalCantidad")
+    } else {
+        const body = document.getElementById("conversionesBody")
+        if (body && conversionesCurrentAsset) {
+            body.appendChild(buildConversionesRowElement({
+                id: rowId || createConversionRowId(),
+                fecha: g("cvModalFecha"),
+                par: g("cvModalPar"),
+                tipo: g("cvModalTipo"),
+                cantidad: g("cvModalCantidad")
+            }, conversionesCurrentAsset))
+        }
+    }
+
+    scheduleConversionesAutosave()
+    closeConversiónRowModal()
 }
 
 async function saveConversionesData(silent = false) {

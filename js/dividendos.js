@@ -75,7 +75,7 @@ function openDividendosModal(rowIndex = -1) {
         <input id="dividendoTotalInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeDividendosHtml(rowData.total || "")}" placeholder="0,00">
         <p class="gastosCreateModalFeedback hidden" id="dividendosModalFeedback"></p>
         <div class="assetModalActions dividendosModalActions">
-            <button type="button" class="secondaryButton" id="dividendosModalCancelBtn">Cancelar</button>
+            <button type="button" class="cancelButton" id="dividendosModalCancelBtn">Cancelar</button>
             <button type="button" class="primaryButton" id="dividendosModalSaveBtn" data-no-autohide="true">Guardar</button>
         </div>
     `
@@ -89,7 +89,9 @@ function openDividendosModal(rowIndex = -1) {
     }
 
     overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) closeDividendosModal()
+        if (event.target === overlay) {
+            // closeDividendosModal() // Deshabilitado para evitar cierre accidental
+        }
     })
 
     modal.querySelector("#dividendosModalCancelBtn")?.addEventListener("click", closeDividendosModal)

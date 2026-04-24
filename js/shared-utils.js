@@ -249,6 +249,9 @@ async function initDividendosLogic() {
     }
 
     initCalendarioDividendosButton()
+
+    const dividendosTable = document.querySelector(".dividendosTable")
+    if (dividendosTable) bindTableSort(dividendosTable)
 }
 
 document.addEventListener("keydown", (event) => {
@@ -579,27 +582,6 @@ function getVisibleAssetTable() {
     }) || null
 }
 
-function getAssetActionRow() {
-    return Array.from(document.querySelectorAll("button"))
-        .find((button) => button.textContent.trim().toLowerCase() === "guardar json")
-        ?.parentElement || null
-}
-
-function buildAssetRowsFromTable(table) {
-    const headerCells = Array.from(table.querySelectorAll("thead th"))
-    const headers = headerCells.map((cell) => (cell.textContent || "").trim()).filter(Boolean)
-    const rows = Array.from(table.querySelectorAll("tbody tr")).map((row) => {
-        const cells = Array.from(row.children).slice(-headers.length)
-        const rowData = {}
-        headers.forEach((header, index) => {
-            rowData[header] = (cells[index]?.textContent || "").trim()
-        })
-        return rowData
-    })
-
-    return { headers, rows }
-}
-
 function downloadJsonFile(filename, payload) {
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
@@ -610,161 +592,78 @@ function downloadJsonFile(filename, payload) {
     URL.revokeObjectURL(url)
 }
 
-function getCurrentAssetExportPayload() {
-    if (typeof buildCurrentAssetPayload === "function" && document.querySelector(".assetTablePage")) {
-        return buildCurrentAssetPayload()
+// ── Generic table sort ──────────────────────────────────────────────────────
+
+function bindTableSort(table) {
+    if (!table || table._sortBound) return
+    table._sortBound = true
+
+    let currentKey = null
+    let currentDir = "desc"
+
+    function cellText(row, colIdx) {
+        const cell = row.cells[colIdx]
+        if (!cell) return ""
+        const sel = cell.querySelector("select")
+        if (sel) return sel.value
+        return cell.textContent.trim()
     }
 
-    return null
-}
-
-function isAssetJsonPayload(payload) {
-    if (!payload || typeof payload !== "object") {
-        return false
-    }
-
-    return typeof payload.name === "string" &&
-        typeof payload.type === "string" &&
-        Array.isArray(payload.rows)
-}
-
-function exportCurrentAssetJson() {
-    const assetPayload = getCurrentAssetExportPayload()
-
-    if (assetPayload) {
-        const filenameBase = String(assetPayload.id || assetPayload.name || "activo").trim().toLowerCase() || "activo"
-        downloadJsonFile(`${filenameBase}.json`, assetPayload)
-        return
-    }
-
-    const table = getVisibleAssetTable()
-    if (!table) {
-        return
-    }
-
-    const title = document.querySelector("h1, h2")?.textContent?.trim() || "activo"
-    const payload = {
-        nombre: title,
-        ...buildAssetRowsFromTable(table)
-    }
-
-    downloadJsonFile(`${title.toLowerCase().replace(/\s+/g, "-") || "activo"}.json`, payload)
-}
-
-function importCurrentAssetJson() {
-    const input = document.createElement("input")
-    input.type = "file"
-    input.accept = "application/json,.json"
-    input.addEventListener("change", async () => {
-        const file = input.files?.[0]
-        if (!file) {
-            return
+    function toComparable(text) {
+        const dm = text.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/)
+        if (dm) {
+            const y = dm[3].length === 2 ? 2000 + +dm[3] : +dm[3]
+            return new Date(y, +dm[2] - 1, +dm[1]).getTime()
         }
+        const n = parseFloat(text.replace(/\./g, "").replace(",", ".").replace(/[^\d.-]/g, ""))
+        if (!isNaN(n)) return n
+        return text.toLowerCase()
+    }
 
-        const text = await file.text()
-        const payload = JSON.parse(text)
-        const currentAssetPayload = getCurrentAssetExportPayload()
-
-        if (currentAssetPayload) {
-            if (!isAssetJsonPayload(payload)) {
-                alert("El JSON no tiene el formato de un activo válido.")
-                return
-            }
-
-            const normalizedPayload = {
-                ...payload,
-                id: currentAssetPayload.id,
-                order: currentAssetPayload.order,
-                rows: Array.isArray(payload.rows) ? payload.rows : []
-            }
-
-            await saveAssetDataToServer(normalizedPayload)
-            const updatedAsset = await loadAssetData(normalizedPayload.id)
-            await updateAssetDetail(updatedAsset)
-            renderAssetTablePage(updatedAsset)
-            await refreshAssetsSidebar(updatedAsset.id, false)
-            return
-        }
-
-        const table = getVisibleAssetTable()
-        if (!table || !Array.isArray(payload.rows)) {
-            return
-        }
-
+    function doSort() {
+        if (currentKey === null) return
         const tbody = table.querySelector("tbody")
-        const headers = Array.from(table.querySelectorAll("thead th"))
-            .map((cell) => (cell.textContent || "").trim())
-            .filter(Boolean)
-
-        tbody.innerHTML = ""
-        payload.rows.forEach((rowData) => {
-            const row = document.createElement("tr")
-            const deleteCell = document.createElement("td")
-            deleteCell.innerHTML = '<button type="button" class="row-delete-btn">X</button>'
-            row.appendChild(deleteCell)
-
-            headers.forEach((header) => {
-                const cell = document.createElement("td")
-                cell.contentEditable = "true"
-                cell.textContent = rowData[header] || ""
-                row.appendChild(cell)
-            })
-
-            tbody.appendChild(row)
+        if (!tbody) return
+        const colIdx = Number(currentKey)
+        const rows = [...tbody.querySelectorAll("tr")]
+        rows.sort((a, b) => {
+            const av = toComparable(cellText(a, colIdx))
+            const bv = toComparable(cellText(b, colIdx))
+            if (av < bv) return currentDir === "asc" ? -1 : 1
+            if (av > bv) return currentDir === "asc" ? 1 : -1
+            return 0
         })
+        rows.forEach((r) => tbody.appendChild(r))
+        syncArrows()
+    }
 
-        const hiddenSaveButton = Array.from(document.querySelectorAll("button")).find(
-            (button) => button.dataset.assetHiddenSave === "true"
-        )
-        hiddenSaveButton?.click()
+    function syncArrows() {
+        table.querySelectorAll("th.mThSort").forEach((th) => {
+            const arrow = th.querySelector(".mSortArrow")
+            if (!arrow) return
+            if (th.dataset.sortkey === String(currentKey)) {
+                arrow.textContent = currentDir === "asc" ? " ▲" : " ▼"
+                th.classList.add("mThActive")
+            } else {
+                arrow.textContent = ""
+                th.classList.remove("mThActive")
+            }
+        })
+    }
+
+    table.querySelectorAll("th.mThSort").forEach((th) => {
+        th.addEventListener("click", () => {
+            const key = th.dataset.sortkey
+            if (currentKey === key) {
+                currentDir = currentDir === "asc" ? "desc" : "asc"
+            } else {
+                currentKey = key
+                currentDir = "desc"
+            }
+            doSort()
+        })
     })
-
-    input.click()
 }
-
-function enhanceAssetJsonActions() {
-    const actionRow = getAssetActionRow()
-    if (!actionRow) {
-        return
-    }
-
-    const saveButton = Array.from(actionRow.querySelectorAll("button")).find(
-        (button) => button.textContent.trim().toLowerCase() === "guardar json"
-    )
-
-    if (!saveButton) {
-        return
-    }
-
-    saveButton.style.display = "none"
-    saveButton.dataset.assetHiddenSave = "true"
-
-    if (!actionRow.querySelector('[data-asset-export="true"]')) {
-        const exportButton = document.createElement("button")
-        exportButton.type = "button"
-        exportButton.className = saveButton.className
-        exportButton.textContent = "Exportar JSON"
-        exportButton.dataset.assetExport = "true"
-        exportButton.addEventListener("click", exportCurrentAssetJson)
-        actionRow.insertBefore(exportButton, saveButton.nextSibling)
-
-        const importButton = document.createElement("button")
-        importButton.type = "button"
-        importButton.className = saveButton.className
-        importButton.textContent = "Importar JSON"
-        importButton.dataset.assetImport = "true"
-        importButton.addEventListener("click", importCurrentAssetJson)
-        actionRow.insertBefore(importButton, exportButton.nextSibling)
-    }
-}
-
-new MutationObserver(() => {
-    enhanceAssetJsonActions()
-}).observe(document.body, { childList: true, subtree: true })
-
-document.addEventListener("DOMContentLoaded", () => {
-    enhanceAssetJsonActions()
-})
 
 // ── Custom select dropdown ──────────────────────────────────────────────────
 

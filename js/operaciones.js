@@ -324,11 +324,7 @@ function bindOperationsEvents() {
     if (addButton && !addButton.dataset.bound) {
         addButton.dataset.bound = "true"
         addButton.addEventListener("click", () => {
-            syncOperationsDataFromTable()
-            currentOperationsData.rows.push(createEmptyOperationRow())
-            renderOperationsTable()
-            scheduleOperationsAssetRefresh()
-            scheduleOperationsAutosave()
+            openOperacionRowModal("")
         })
     }
 
@@ -512,7 +508,6 @@ function buildOperationRow(row) {
     const tr = document.createElement("tr")
     tr.dataset.operationId = normalizedRow.id
     tr.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td>${buildOperationAssetSelect(normalizedRow.assetId)}</td>
         <td contenteditable="true" data-field="fechaApertura">${normalizedRow.fechaApertura || ""}</td>
         <td>${buildOperationPairSelect(normalizedRow)}</td>
@@ -543,6 +538,10 @@ function buildOperationRow(row) {
             </select>
         </td>
         <td contenteditable="true" data-field="fechaCierre">${normalizedRow.fechaCierre || ""}</td>
+        <td class="rowActionsCell">
+            <button type="button" class="assetRowEditBtn operacionRowEditBtn" data-row-id="${normalizedRow.id}" title="Editar fila">✎</button>
+            <button type="button" class="assetRowDeleteBtn operacionRowDeleteBtn" data-row-id="${normalizedRow.id}" title="Eliminar fila">✕</button>
+        </td>
     `
     return tr
 }
@@ -789,38 +788,38 @@ function updateOperationRowTotalDisplay(row) {
 }
 
 function handleOperationsDeleteClick(event) {
-    const deleteButton = event.target.closest(".rowDeleteBtn")
-
-    if (!deleteButton) {
-        const priceCell = event.target.closest(".operationsPriceCell")
-        if (priceCell && !event.target.closest('[data-field="precioOrden"]')) {
-            const currencySelect = priceCell.querySelector('select[data-field="precioCurrency"]')
-            currencySelect?.focus()
-            currencySelect?.click()
-            return
-        }
-
-        const totalCell = event.target.closest(".operationsTotalCell")
-        if (totalCell && !event.target.closest('[data-field="total"]')) {
-            const currencySelect = totalCell.querySelector('select[data-field="currency"]')
-            currencySelect?.focus()
-            currencySelect?.click()
-        }
-
+    const editButton = event.target.closest(".operacionRowEditBtn")
+    if (editButton) {
+        syncOperationsDataFromTable()
+        openOperacionRowModal(editButton.dataset.rowId)
         return
     }
 
-    const row = deleteButton.closest("tr[data-operation-id]")
-    const rowId = row?.dataset.operationId
-
-    if (!rowId) {
+    const deleteButton = event.target.closest(".operacionRowDeleteBtn")
+    if (deleteButton) {
+        const rowId = deleteButton.dataset.rowId
+        if (!rowId) return
+        currentOperationsData.rows = (currentOperationsData.rows || []).filter((item) => item.id !== rowId)
+        renderOperationsTable()
+        scheduleOperationsAssetRefresh()
+        scheduleOperationsAutosave()
         return
     }
 
-    currentOperationsData.rows = (currentOperationsData.rows || []).filter((item) => item.id !== rowId)
-    renderOperationsTable()
-    scheduleOperationsAssetRefresh()
-    scheduleOperationsAutosave()
+    const priceCell = event.target.closest(".operationsPriceCell")
+    if (priceCell && !event.target.closest('[data-field="precioOrden"]')) {
+        const currencySelect = priceCell.querySelector('select[data-field="precioCurrency"]')
+        currencySelect?.focus()
+        currencySelect?.click()
+        return
+    }
+
+    const totalCell = event.target.closest(".operationsTotalCell")
+    if (totalCell && !event.target.closest('[data-field="total"]')) {
+        const currencySelect = totalCell.querySelector('select[data-field="currency"]')
+        currencySelect?.focus()
+        currencySelect?.click()
+    }
 }
 
 function stripMoneySymbolOnFocus(event) {
@@ -936,46 +935,180 @@ function bindOperationsPersistenceGuards() {
     })
 }
 
-function exportOperationsJson() {
-    syncOperationsDataFromTable()
-    downloadJsonFile("operaciones-spot.json", currentOperationsData)
-}
+function openOperacionRowModal(rowId) {
+    document.getElementById("operacionRowModalOverlay")?.remove()
 
-function importOperationsJson() {
-    const input = document.createElement("input")
-    input.type = "file"
-    input.accept = "application/json,.json"
-    input.addEventListener("change", async () => {
-        const file = input.files?.[0]
+    const rowIndex = (currentOperationsData.rows || []).findIndex((r) => r.id === rowId)
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? normalizeOperationRow({ ...currentOperationsData.rows[rowIndex] }) : createEmptyOperationRow()
 
-        if (!file) {
-            return
-        }
+    const assetOptions = operationsAssets.map((a) => `<option value="${a.id}"${rowData.assetId === a.id ? " selected" : ""}>${a.name}</option>`).join("")
+    const pairOptions = getOperationPairOptions(rowData.assetId)
+    const selectedPair = pairOptions.includes(rowData.par) ? rowData.par : (pairOptions[0] || "")
+    const pairOptionsHtml = pairOptions.length
+        ? pairOptions.map((p) => `<option value="${p}"${p === selectedPair ? " selected" : ""}>${p}</option>`).join("")
+        : `<option value="${rowData.par || ""}">${rowData.par || "Sin pares"}</option>`
 
-        const text = await file.text()
-        const payload = JSON.parse(text)
-        const rows = Array.isArray(payload.rows) ? payload.rows : []
-        currentOperationsData.rows = rows.map((row, index) => normalizeOperationRow({
-            id: String(row.id || `operacion-importada-${index + 1}`),
-            assetId: row.assetId || "",
-            activo: row.activo || "",
-            fechaApertura: row.fechaApertura || row.fecha || "",
-            par: row.par || "",
-            stablecoinSymbol: row.stablecoinSymbol || "",
-            orden: row.orden || "Compra",
-            precioOrden: row.precioOrden || row.precio || "",
-            precioCurrency: row.precioCurrency || "",
-            cantidad: row.cantidad || "",
-            comisionesCripto: row.comisionesCripto || row.comisiones || "",
-            total: row.total || "",
-            currency: row.currency || "",
-            estado: row.estado || "Activo",
-            fechaCierre: row.fechaCierre || ""
-        }, index))
-        renderOperationsTable()
-        scheduleOperationsAssetRefresh()
-        scheduleOperationsAutosave()
+    const fieldsHtml = `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Activo</label>
+            <select id="opModalAsset" class="assetRowModalSelect">
+                <option value=""></option>
+                ${assetOptions}
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Fecha apertura</label>
+            <input id="opModalFecha" class="assetRowModalInput" type="text" value="${rowData.fechaApertura || ""}" placeholder="dd-mm-aaaa">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Par</label>
+            <select id="opModalPar" class="assetRowModalSelect">
+                ${pairOptionsHtml}
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Orden</label>
+            <select id="opModalOrden" class="assetRowModalSelect">
+                ${OPERATION_ORDER_OPTIONS.map((o) => `<option value="${o}"${rowData.orden === o ? " selected" : ""}>${o}</option>`).join("")}
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Precio orden</label>
+            <input id="opModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.precioOrden || "")}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Moneda precio</label>
+            <select id="opModalPrecioCurrency" class="assetRowModalSelect">
+                ${OPERATION_CURRENCY_OPTIONS.map((c) => `<option value="${c}"${(rowData.precioCurrency || "USD") === c ? " selected" : ""}>${c}</option>`).join("")}
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Cantidad</label>
+            <input id="opModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.cantidad || ""}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Comisiones cripto</label>
+            <input id="opModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.comisionesCripto || ""}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Total</label>
+            <input id="opModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.total || "")}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Moneda total</label>
+            <select id="opModalCurrency" class="assetRowModalSelect">
+                ${OPERATION_CURRENCY_OPTIONS.map((c) => `<option value="${c}"${(rowData.currency || "USD") === c ? " selected" : ""}>${c}</option>`).join("")}
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Estado</label>
+            <select id="opModalEstado" class="assetRowModalSelect">
+                ${OPERATION_STATUS_OPTIONS.map((s) => `<option value="${s}"${rowData.estado === s ? " selected" : ""}>${s}</option>`).join("")}
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Fecha cierre</label>
+            <input id="opModalFechaCierre" class="assetRowModalInput" type="text" value="${rowData.fechaCierre || ""}" placeholder="dd-mm-aaaa">
+        </div>
+    `
+
+    const overlay = document.createElement("div")
+    overlay.id = "operacionRowModalOverlay"
+    overlay.className = "modalOverlay assetRowModalOverlay"
+    overlay.dataset.rowId = rowId || ""
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal assetRowModal"
+
+    const titleEl = document.createElement("h3")
+    titleEl.className = "assetModalTitle assetRowModalTitle"
+    titleEl.textContent = isEdit ? "Editar operación" : "Añadir operación"
+
+    const fields = document.createElement("div")
+    fields.className = "assetRowModalFields"
+    fields.innerHTML = fieldsHtml
+
+    const footer = document.createElement("div")
+    footer.className = "assetRowModalFooter"
+    footer.innerHTML = `
+        ${isEdit ? `<button type="button" id="opRowModalDeleteBtn" class="dangerButton assetRowModalDeleteBtn">Eliminar</button>` : ""}
+        <button type="button" id="opRowModalCancelBtn" class="cancelButton">Cancelar</button>
+        <button type="button" id="opRowModalSaveBtn" class="primaryButton" data-no-autohide="true">Guardar</button>
+    `
+
+    fields.querySelector("#opModalAsset").addEventListener("change", () => {
+        const assetId = fields.querySelector("#opModalAsset").value
+        const pairs = getOperationPairOptions(assetId)
+        const parSelect = fields.querySelector("#opModalPar")
+        parSelect.innerHTML = pairs.length
+            ? pairs.map((p) => `<option value="${p}">${p}</option>`).join("")
+            : `<option value="">Sin pares</option>`
     })
 
-    input.click()
+    footer.querySelector("#opRowModalSaveBtn").addEventListener("click", saveOperacionRowFromModal)
+    footer.querySelector("#opRowModalCancelBtn").addEventListener("click", closeOperacionRowModal)
+
+    if (isEdit) {
+        footer.querySelector("#opRowModalDeleteBtn").addEventListener("click", () => {
+            openConfirmModal({
+                title: "Eliminar fila",
+                message: "¿Quieres eliminar esta operación?",
+                confirmLabel: "Eliminar",
+                onConfirm: () => {
+                    currentOperationsData.rows = (currentOperationsData.rows || []).filter((r) => r.id !== rowId)
+                    renderOperationsTable()
+                    renderOperationsStablecoinPanel()
+                    scheduleOperationsAssetRefresh()
+                    scheduleOperationsAutosave()
+                }
+            })
+            closeOperacionRowModal()
+        })
+    }
+
+    modal.appendChild(titleEl)
+    modal.appendChild(fields)
+    modal.appendChild(footer)
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+}
+
+function closeOperacionRowModal() {
+    document.getElementById("operacionRowModalOverlay")?.remove()
+}
+
+function saveOperacionRowFromModal() {
+    const overlay = document.getElementById("operacionRowModalOverlay")
+    const rowId = overlay?.dataset.rowId || ""
+    const g = (id) => document.getElementById(id)?.value ?? ""
+
+    const rowData = normalizeOperationRow({
+        id: rowId || `operacion-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        assetId: g("opModalAsset"),
+        fechaApertura: g("opModalFecha"),
+        par: g("opModalPar"),
+        orden: g("opModalOrden"),
+        precioOrden: g("opModalPrecio"),
+        precioCurrency: g("opModalPrecioCurrency"),
+        cantidad: g("opModalCantidad"),
+        comisionesCripto: g("opModalComisiones"),
+        total: g("opModalTotal"),
+        currency: g("opModalCurrency"),
+        estado: g("opModalEstado"),
+        fechaCierre: g("opModalFechaCierre")
+    })
+
+    const rowIndex = (currentOperationsData.rows || []).findIndex((r) => r.id === rowId)
+    if (rowIndex >= 0) {
+        currentOperationsData.rows[rowIndex] = rowData
+    } else {
+        currentOperationsData.rows.push(rowData)
+    }
+
+    renderOperationsTable()
+    renderOperationsStablecoinPanel()
+    scheduleOperationsAssetRefresh()
+    scheduleOperationsAutosave()
+    closeOperacionRowModal()
 }

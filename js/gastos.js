@@ -108,7 +108,7 @@ function openGastosCreateModal({ title, bodyHtml, onSubmit, submitLabel = "Guard
         <div class="gastosCreateModalBody">${bodyHtml}</div>
         <p class="gastosCreateModalFeedback hidden" id="gastosCreateModalFeedback"></p>
         <div class="assetModalActions gastosCreateModalActions">
-            <button type="button" class="secondaryButton" id="gastosCreateModalCancelBtn">Cancelar</button>
+            <button type="button" class="cancelButton" id="gastosCreateModalCancelBtn">Cancelar</button>
             <button type="button" class="primaryButton" id="gastosCreateModalSaveBtn" data-no-autohide="true">${escapeGastosHtml(submitLabel)}</button>
         </div>
     `
@@ -126,7 +126,7 @@ function openGastosCreateModal({ title, bodyHtml, onSubmit, submitLabel = "Guard
 
     overlay.addEventListener("click", (event) => {
         if (event.target === overlay) {
-            closeGastosCreateModal()
+            // closeGastosCreateModal() // Deshabilitado para evitar cierre accidental
         }
     })
 
@@ -418,6 +418,9 @@ async function initGastosLogic() {
         movementsBody.dataset.bound = "true"
         movementsBody.addEventListener("click", handleGastosMovementActionClick)
     }
+
+    const gastosMovementsTable = document.querySelector(".gastosMovementsTable")
+    if (gastosMovementsTable) bindTableSort(gastosMovementsTable)
 }
 
 function bindGastosEvents() {

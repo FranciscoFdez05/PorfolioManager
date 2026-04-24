@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     initSidePanel(toggleButton, sideWrapper)
     initNavigation(navButtons, contentArea)
+    initResizeHandles()
     initAddAssetButton(addAssetButton, assetModalOverlay, assetNameInput, assetTypeSelect, assetTickerInput)
     initSidebarRefreshButton(refreshSidebarMarketButton)
     initAssetModal(
@@ -230,6 +231,8 @@ async function initInteresesLogic() {
         })
     }
 
+    const interesesTable = document.querySelector(".interesesTable")
+    if (interesesTable) bindTableSort(interesesTable)
 }
 
 
@@ -339,6 +342,80 @@ async function refreshTopDividendosIntereses() {
         set("topTotalRentaFija", totalRentaFija)
     } catch (error) {
         console.error("Error actualizando métricas de dividendos/intereses:", error)
+    }
+}
+
+function initResizeHandles() {
+    const SIDE_MIN = 220
+    const SIDE_MAX = 600
+    const DETAIL_MIN = 80
+    const DETAIL_MAX = 520
+
+    const sideWrapper    = document.getElementById("sideWrapper")
+    const sideHandle     = document.getElementById("sideResizeHandle")
+    const detailView     = document.getElementById("assetDetailView")
+    const detailHandle   = document.getElementById("detailResizeHandle")
+    const sidePanel      = document.getElementById("sidePanel")
+
+    if (sideWrapper && sideHandle) {
+        let startX, startW
+
+        sideHandle.addEventListener("mousedown", (e) => {
+            e.preventDefault()
+            startX = e.clientX
+            startW = sideWrapper.getBoundingClientRect().width
+            sideHandle.classList.add("dragging")
+            document.body.style.cursor = "col-resize"
+            document.body.style.userSelect = "none"
+
+            function onMove(e) {
+                const delta = startX - e.clientX
+                const newW  = Math.min(SIDE_MAX, Math.max(SIDE_MIN, startW + delta))
+                sideWrapper.style.width    = newW + "px"
+                sideWrapper.style.minWidth = newW + "px"
+            }
+
+            function onUp() {
+                sideHandle.classList.remove("dragging")
+                document.body.style.cursor = ""
+                document.body.style.userSelect = ""
+                document.removeEventListener("mousemove", onMove)
+                document.removeEventListener("mouseup", onUp)
+            }
+
+            document.addEventListener("mousemove", onMove)
+            document.addEventListener("mouseup", onUp)
+        })
+    }
+
+    if (detailView && detailHandle && sidePanel) {
+        let startY, startH
+
+        detailHandle.addEventListener("mousedown", (e) => {
+            e.preventDefault()
+            startY = e.clientY
+            startH = detailView.getBoundingClientRect().height
+            detailHandle.classList.add("dragging")
+            document.body.style.cursor = "row-resize"
+            document.body.style.userSelect = "none"
+
+            function onMove(e) {
+                const delta = startY - e.clientY
+                const newH  = Math.min(DETAIL_MAX, Math.max(DETAIL_MIN, startH + delta))
+                detailView.style.flex = `0 0 ${newH}px`
+            }
+
+            function onUp() {
+                detailHandle.classList.remove("dragging")
+                document.body.style.cursor = ""
+                document.body.style.userSelect = ""
+                document.removeEventListener("mousemove", onMove)
+                document.removeEventListener("mouseup", onUp)
+            }
+
+            document.addEventListener("mousemove", onMove)
+            document.addEventListener("mouseup", onUp)
+        })
     }
 }
 

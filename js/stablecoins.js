@@ -290,10 +290,7 @@ function bindStablecoinsEvents() {
     if (addButton && !addButton.dataset.bound) {
         addButton.dataset.bound = "true"
         addButton.addEventListener("click", () => {
-            syncStablecoinsDataFromTable()
-            currentStablecoinsData.rows.push(createEmptyStablecoinRow())
-            renderStablecoinsTable()
-            scheduleStablecoinsAutosave()
+            openStablecoinRowModal("")
         })
     }
 
@@ -538,7 +535,6 @@ function buildStablecoinRow(row) {
     const tr = document.createElement("tr")
     tr.dataset.stablecoinRowId = row.id
     tr.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td>
             <select class="operationsSelect" data-field="stablecoinSymbol">
                 ${symbolOptions.map((symbol) => `<option value="${symbol}"${row.stablecoinSymbol === symbol ? " selected" : ""}>${symbol}</option>`).join("")}
@@ -559,6 +555,10 @@ function buildStablecoinRow(row) {
         <td class="operationsPriceCell"><div contenteditable="true" data-field="precio">${formatOperationsMoney(row.precio, row.currency || "USD")}</div></td>
         <td class="operationsTotalCell"><div class="operationsTotalDisplay" contenteditable="true" data-field="total">${formatOperationsMoney(row.total, row.currency || "USD")}</div></td>
         <td contenteditable="true" data-field="nota">${row.nota || ""}</td>
+        <td class="rowActionsCell">
+            <button type="button" class="assetRowEditBtn stablecoinRowEditBtn" data-row-id="${row.id}" title="Editar fila">✎</button>
+            <button type="button" class="assetRowDeleteBtn stablecoinRowDeleteBtn" data-row-id="${row.id}" title="Eliminar fila">✕</button>
+        </td>
     `
     return tr
 }
@@ -691,18 +691,17 @@ function handleStablecoinsEnabledToggle(event) {
 }
 
 function handleStablecoinsDeleteClick(event) {
-    const deleteButton = event.target.closest(".rowDeleteBtn")
-
-    if (!deleteButton) {
+    const editButton = event.target.closest(".stablecoinRowEditBtn")
+    if (editButton) {
+        openStablecoinRowModal(editButton.dataset.rowId)
         return
     }
 
-    const row = deleteButton.closest("tr[data-stablecoin-row-id]")
-    const rowId = row?.dataset.stablecoinRowId
+    const deleteButton = event.target.closest(".stablecoinRowDeleteBtn")
+    if (!deleteButton) return
 
-    if (!rowId) {
-        return
-    }
+    const rowId = deleteButton.dataset.rowId
+    if (!rowId) return
 
     currentStablecoinsData.rows = (currentStablecoinsData.rows || []).filter((item) => item.id !== rowId)
     renderStablecoinsTable()
@@ -922,30 +921,136 @@ function bindStablecoinsPersistenceGuards() {
     })
 }
 
-function exportStablecoinsJson() {
-    syncStablecoinsDataFromTable()
-    downloadJsonFile("stablecoins.json", currentStablecoinsData)
+function openStablecoinRowModal(rowId) {
+    document.getElementById("stablecoinRowModalOverlay")?.remove()
+
+    const rowIndex = (currentStablecoinsData.rows || []).findIndex((r) => r.id === rowId)
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? { ...currentStablecoinsData.rows[rowIndex] } : createEmptyStablecoinRow()
+    const symbolOptions = getStablecoinRowSymbolOptions(rowData.stablecoinSymbol)
+
+    const fieldsHtml = `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Stablecoin</label>
+            <select id="scModalSymbol" class="assetRowModalSelect">
+                ${symbolOptions.map((s) => `<option value="${s}"${rowData.stablecoinSymbol === s ? " selected" : ""}>${s}</option>`).join("")}
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Fecha</label>
+            <input id="scModalFecha" class="assetRowModalInput" type="text" value="${rowData.fecha || ""}" placeholder="dd-mm-aaaa">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Tipo</label>
+            <select id="scModalTipo" class="assetRowModalSelect">
+                ${STABLECOIN_MOVEMENT_TYPES.map((t) => `<option value="${t}"${rowData.tipo === t ? " selected" : ""}>${t}</option>`).join("")}
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Divisa fiat</label>
+            <select id="scModalCurrency" class="assetRowModalSelect">
+                ${OPERATION_CURRENCY_OPTIONS.map((c) => `<option value="${c}"${(rowData.currency || "USD") === c ? " selected" : ""}>${c}</option>`).join("")}
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Cantidad</label>
+            <input id="scModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.cantidad || ""}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Precio unitario</label>
+            <input id="scModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.precio || "")}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Total fiat</label>
+            <input id="scModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.total || "")}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Nota</label>
+            <input id="scModalNota" class="assetRowModalInput" type="text" value="${rowData.nota || ""}">
+        </div>
+    `
+
+    const overlay = document.createElement("div")
+    overlay.id = "stablecoinRowModalOverlay"
+    overlay.className = "modalOverlay assetRowModalOverlay"
+    overlay.dataset.rowId = rowId || ""
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal assetRowModal"
+
+    const title = document.createElement("h3")
+    title.className = "assetModalTitle assetRowModalTitle"
+    title.textContent = isEdit ? "Editar movimiento" : "Añadir movimiento"
+
+    const fields = document.createElement("div")
+    fields.className = "assetRowModalFields"
+    fields.innerHTML = fieldsHtml
+
+    const footer = document.createElement("div")
+    footer.className = "assetRowModalFooter"
+    footer.innerHTML = `
+        ${isEdit ? `<button type="button" id="scRowModalDeleteBtn" class="dangerButton assetRowModalDeleteBtn">Eliminar</button>` : ""}
+        <button type="button" id="scRowModalCancelBtn" class="cancelButton">Cancelar</button>
+        <button type="button" id="scRowModalSaveBtn" class="primaryButton" data-no-autohide="true">Guardar</button>
+    `
+
+    footer.querySelector("#scRowModalSaveBtn").addEventListener("click", saveStablecoinRowFromModal)
+    footer.querySelector("#scRowModalCancelBtn").addEventListener("click", closeStablecoinRowModal)
+
+    if (isEdit) {
+        footer.querySelector("#scRowModalDeleteBtn").addEventListener("click", () => {
+            openConfirmModal({
+                title: "Eliminar fila",
+                message: "¿Quieres eliminar este movimiento?",
+                confirmLabel: "Eliminar",
+                onConfirm: () => {
+                    currentStablecoinsData.rows = (currentStablecoinsData.rows || []).filter((r) => r.id !== rowId)
+                    renderStablecoinsTable()
+                    renderStablecoinsSummary()
+                    scheduleStablecoinsAutosave()
+                }
+            })
+            closeStablecoinRowModal()
+        })
+    }
+
+    modal.appendChild(title)
+    modal.appendChild(fields)
+    modal.appendChild(footer)
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
 }
 
-function importStablecoinsJson() {
-    const input = document.createElement("input")
-    input.type = "file"
-    input.accept = "application/json,.json"
-    input.addEventListener("change", async () => {
-        const file = input.files?.[0]
+function closeStablecoinRowModal() {
+    document.getElementById("stablecoinRowModalOverlay")?.remove()
+}
 
-        if (!file) {
-            return
-        }
+function saveStablecoinRowFromModal() {
+    const overlay = document.getElementById("stablecoinRowModalOverlay")
+    const rowId = overlay?.dataset.rowId || ""
+    const g = (id) => document.getElementById(id)?.value ?? ""
 
-        const text = await file.text()
-        const payload = JSON.parse(text)
-        currentStablecoinsData = normalizeStablecoinsPayload(payload)
-        renderStablecoinsEnabledMenu()
-        renderStablecoinsSummary()
-        renderStablecoinsTable()
-        scheduleStablecoinsAutosave()
+    const rowData = normalizeStablecoinMovementRow({
+        id: rowId || `stablecoin-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        stablecoinSymbol: g("scModalSymbol"),
+        fecha: g("scModalFecha"),
+        tipo: g("scModalTipo"),
+        currency: g("scModalCurrency"),
+        cantidad: g("scModalCantidad"),
+        precio: g("scModalPrecio"),
+        total: g("scModalTotal"),
+        nota: g("scModalNota")
     })
 
-    input.click()
+    const rowIndex = (currentStablecoinsData.rows || []).findIndex((r) => r.id === rowId)
+    if (rowIndex >= 0) {
+        currentStablecoinsData.rows[rowIndex] = rowData
+    } else {
+        currentStablecoinsData.rows.push(rowData)
+    }
+
+    renderStablecoinsTable()
+    renderStablecoinsSummary()
+    scheduleStablecoinsAutosave()
+    closeStablecoinRowModal()
 }

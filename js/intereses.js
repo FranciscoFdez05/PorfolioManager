@@ -135,7 +135,7 @@ function openInteresesModal(rowIndex = -1) {
         <input id="interesImpuestosInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeInteresesHtml(rowData.impuestos || "")}" placeholder="0,00">
         <p class="gastosCreateModalFeedback hidden" id="interesesModalFeedback"></p>
         <div class="assetModalActions interesesModalActions">
-            <button type="button" class="secondaryButton" id="interesesModalCancelBtn">Cancelar</button>
+            <button type="button" class="cancelButton" id="interesesModalCancelBtn">Cancelar</button>
             <button type="button" class="primaryButton" id="interesesModalSaveBtn" data-no-autohide="true">Guardar</button>
         </div>
     `
@@ -150,7 +150,9 @@ function openInteresesModal(rowIndex = -1) {
     }
 
     overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) closeInteresesModal()
+        if (event.target === overlay) {
+            // closeInteresesModal() // Deshabilitado para evitar cierre accidental
+        }
     })
 
     modal.querySelector("#interesesModalCancelBtn")?.addEventListener("click", closeInteresesModal)

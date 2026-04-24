@@ -87,14 +87,8 @@ function bindTransaccionesEvents() {
     if (addButton && !addButton.dataset.bound) {
         addButton.dataset.bound = "true"
         addButton.addEventListener("click", () => {
-            if (!currentTransaccionAssetId) {
-                return
-            }
-
-            syncTransaccionesDataFromTable()
-            currentTransaccionesData.rows.push(createEmptyTransaccionRow())
-            renderTransaccionesTable()
-            scheduleTransaccionesAutosave()
+            if (!currentTransaccionAssetId) return
+            openTransaccionRowModal("")
         })
     }
 
@@ -261,7 +255,6 @@ function buildTransaccionRow(row) {
     const hashTransaccion = normalizeHashTransaccionValue(row.hashTransaccion || row.walletOrigen || "")
     tr.dataset.transaccionId = row.id
     tr.innerHTML = `
-        <td class="rowDeleteCell"><button type="button" class="rowDeleteBtn" title="Eliminar fila">X</button></td>
         <td contenteditable="true" data-field="fechaOperacion">${row.fechaOperacion || ""}</td>
         <td contenteditable="true" data-field="total">${formatTransaccionesNumber(row.total)}</td>
         <td contenteditable="true" data-field="comisionRed">${formatTransaccionesNumber(row.comisionRed)}</td>
@@ -269,6 +262,10 @@ function buildTransaccionRow(row) {
         <td contenteditable="true" data-field="walletDestino">${row.walletDestino || ""}</td>
         <td contenteditable="true" class="transaccionHashCell" data-field="hashTransaccion" data-full-value="${hashTransaccion}" title="Haz clic para copiar el hash completo">${formatHashTransaccionDisplay(hashTransaccion)}</td>
         <td contenteditable="true" data-field="nota">${row.nota || ""}</td>
+        <td class="rowActionsCell">
+            <button type="button" class="assetRowEditBtn transaccionRowEditBtn" data-row-id="${row.id}" title="Editar fila">✎</button>
+            <button type="button" class="assetRowDeleteBtn transaccionRowDeleteBtn" data-row-id="${row.id}" title="Eliminar fila">✕</button>
+        </td>
     `
     return tr
 }
@@ -356,18 +353,17 @@ async function copyHashTransaccionToClipboard(cell) {
 }
 
 function handleTransaccionesDeleteClick(event) {
-    const deleteButton = event.target.closest(".rowDeleteBtn")
-
-    if (!deleteButton) {
+    const editButton = event.target.closest(".transaccionRowEditBtn")
+    if (editButton) {
+        openTransaccionRowModal(editButton.dataset.rowId)
         return
     }
 
-    const row = deleteButton.closest("tr[data-transaccion-id]")
-    const rowId = row?.dataset.transaccionId
+    const deleteButton = event.target.closest(".transaccionRowDeleteBtn")
+    if (!deleteButton) return
 
-    if (!rowId) {
-        return
-    }
+    const rowId = deleteButton.dataset.rowId
+    if (!rowId) return
 
     currentTransaccionesData.rows = (currentTransaccionesData.rows || []).filter((item) => item.id !== rowId)
     renderTransaccionesTable()
@@ -479,56 +475,139 @@ function bindTransaccionesPersistenceGuards() {
     })
 }
 
-function exportTransaccionesJson() {
-    syncTransaccionesDataFromTable()
-    downloadJsonFile("transacciones.json", currentTransaccionesData)
-}
-
-function importTransaccionesJson() {
-    const input = document.createElement("input")
-    input.type = "file"
-    input.accept = "application/json,.json"
-    input.addEventListener("change", async () => {
-        const file = input.files?.[0]
-
-        if (!file) {
-            return
-        }
-
-        const text = await file.text()
-        const payload = JSON.parse(text)
-        const rows = Array.isArray(payload.rows) ? payload.rows : []
-        currentTransaccionesData.rows = rows.map((row, index) => ({
-            id: String(row.id || `transaccion-importada-${index + 1}`),
-            assetId: String(row.assetId || ""),
-            assetName: String(row.assetName || ""),
-            fechaOperacion: String(row.fechaOperacion || ""),
-            total: String(row.total || ""),
-            comisionRed: String(row.comisionRed || ""),
-            walletTipo: normalizeTransaccionWalletTipo(row.walletTipo || "entre_wallet"),
-            walletDestino: String(row.walletDestino || ""),
-            hashTransaccion: String(row.hashTransaccion || row.walletOrigen || ""),
-            nota: String(row.nota || "")
-        }))
-
-        const importedAssetIds = new Set(currentTransaccionesData.rows.map((row) => row.assetId).filter(Boolean))
-
-        if (!currentTransaccionAssetId || !importedAssetIds.has(currentTransaccionAssetId)) {
-            currentTransaccionAssetId = transaccionesCryptoAssets.find((asset) => importedAssetIds.has(asset.id))?.id || transaccionesCryptoAssets[0]?.id || null
-        }
-
-        renderTransaccionesAssetMenu()
-        renderTransaccionesTable()
-        scheduleTransaccionesAutosave()
-    })
-
-    input.click()
-}
-
 function getCurrentTransaccionesAsset() {
     return transaccionesCryptoAssets.find((asset) => asset.id === currentTransaccionAssetId) || null
 }
 
 function getCurrentAssetRows() {
     return (currentTransaccionesData.rows || []).filter((row) => row.assetId === currentTransaccionAssetId)
+}
+
+function openTransaccionRowModal(rowId) {
+    document.getElementById("transaccionRowModalOverlay")?.remove()
+
+    const rowIndex = (currentTransaccionesData.rows || []).findIndex((r) => r.id === rowId)
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? { ...currentTransaccionesData.rows[rowIndex] } : createEmptyTransaccionRow()
+
+    const walletOptions = TRANSACCION_WALLET_OPTIONS.map((opt) =>
+        `<option value="${opt.value}"${rowData.walletTipo === opt.value ? " selected" : ""}>${opt.label}</option>`
+    ).join("")
+
+    const fieldsHtml = `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Fecha operación</label>
+            <input id="txModalFecha" class="assetRowModalInput" type="text" value="${rowData.fechaOperacion || ""}" placeholder="dd-mm-aaaa">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Total cripto</label>
+            <input id="txModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.total || ""}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Comisión red</label>
+            <input id="txModalComision" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.comisionRed || ""}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Wallet</label>
+            <select id="txModalWalletTipo" class="assetRowModalSelect">
+                ${walletOptions}
+            </select>
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Wallet destino</label>
+            <input id="txModalWalletDestino" class="assetRowModalInput" type="text" value="${rowData.walletDestino || ""}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Hash transacción</label>
+            <input id="txModalHash" class="assetRowModalInput" type="text" value="${rowData.hashTransaccion || ""}">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Nota</label>
+            <input id="txModalNota" class="assetRowModalInput" type="text" value="${rowData.nota || ""}">
+        </div>
+    `
+
+    const overlay = document.createElement("div")
+    overlay.id = "transaccionRowModalOverlay"
+    overlay.className = "modalOverlay assetRowModalOverlay"
+    overlay.dataset.rowId = rowId || ""
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal assetRowModal"
+
+    const titleEl = document.createElement("h3")
+    titleEl.className = "assetModalTitle assetRowModalTitle"
+    titleEl.textContent = isEdit ? "Editar transacción" : "Añadir transacción"
+
+    const fields = document.createElement("div")
+    fields.className = "assetRowModalFields"
+    fields.innerHTML = fieldsHtml
+
+    const footer = document.createElement("div")
+    footer.className = "assetRowModalFooter"
+    footer.innerHTML = `
+        ${isEdit ? `<button type="button" id="txRowModalDeleteBtn" class="dangerButton assetRowModalDeleteBtn">Eliminar</button>` : ""}
+        <button type="button" id="txRowModalCancelBtn" class="cancelButton">Cancelar</button>
+        <button type="button" id="txRowModalSaveBtn" class="primaryButton" data-no-autohide="true">Guardar</button>
+    `
+
+    footer.querySelector("#txRowModalSaveBtn").addEventListener("click", saveTransaccionRowFromModal)
+    footer.querySelector("#txRowModalCancelBtn").addEventListener("click", closeTransaccionRowModal)
+
+    if (isEdit) {
+        footer.querySelector("#txRowModalDeleteBtn").addEventListener("click", () => {
+            openConfirmModal({
+                title: "Eliminar fila",
+                message: "¿Quieres eliminar esta transacción?",
+                confirmLabel: "Eliminar",
+                onConfirm: () => {
+                    currentTransaccionesData.rows = (currentTransaccionesData.rows || []).filter((r) => r.id !== rowId)
+                    renderTransaccionesTable()
+                    scheduleTransaccionesAutosave()
+                }
+            })
+            closeTransaccionRowModal()
+        })
+    }
+
+    modal.appendChild(titleEl)
+    modal.appendChild(fields)
+    modal.appendChild(footer)
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+}
+
+function closeTransaccionRowModal() {
+    document.getElementById("transaccionRowModalOverlay")?.remove()
+}
+
+function saveTransaccionRowFromModal() {
+    const overlay = document.getElementById("transaccionRowModalOverlay")
+    const rowId = overlay?.dataset.rowId || ""
+    const g = (id) => document.getElementById(id)?.value ?? ""
+    const selectedAsset = getCurrentTransaccionesAsset()
+
+    const rowData = {
+        id: rowId || `transaccion-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        assetId: currentTransaccionAssetId || "",
+        assetName: selectedAsset?.name || "",
+        fechaOperacion: g("txModalFecha"),
+        total: g("txModalTotal"),
+        comisionRed: g("txModalComision"),
+        walletTipo: normalizeTransaccionWalletTipo(g("txModalWalletTipo")),
+        walletDestino: g("txModalWalletDestino"),
+        hashTransaccion: normalizeHashTransaccionValue(g("txModalHash")),
+        nota: g("txModalNota")
+    }
+
+    const rowIndex = (currentTransaccionesData.rows || []).findIndex((r) => r.id === rowId)
+    if (rowIndex >= 0) {
+        currentTransaccionesData.rows[rowIndex] = rowData
+    } else {
+        currentTransaccionesData.rows.push(rowData)
+    }
+
+    renderTransaccionesTable()
+    scheduleTransaccionesAutosave()
+    closeTransaccionRowModal()
 }

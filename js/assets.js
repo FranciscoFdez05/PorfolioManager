@@ -552,34 +552,44 @@ async function renderAssetsList(assets) {
         try {
             const displayPrice    = await getAssetDisplayPriceValue(asset)
             const displayCurrency = asset.currency || "EUR"
+            const changePctStr    = String(asset.change || "").trim()
+            const changePct       = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
+            const changeAbs       = Math.abs(displayPrice * changePct / 100)
+            const changeSign      = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
+            const changeClass     = changePct < 0 ? "negative" : changePct > 0 ? "positive" : ""
+            const changeMoneyStr  = changePctStr ? `${changeSign}${formatMoney(changeAbs, displayCurrency)}` : "—"
             const button = document.createElement("button")
             button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}${isStale ? " stale" : ""}`
             button.dataset.assetId    = asset.id
             button.dataset.assetOrder = String(asset.order ?? 0)
             button.draggable = true
             button.innerHTML = `
-                <span class="assetBtnMain">
-                    <span class="assetBtnSymbol">${asset.symbol || asset.name}</span>
-                    <span class="assetBtnName">${asset.name || asset.symbol || "Activo"}</span>
-                </span>
+                <span class="assetBtnName">${asset.name || asset.symbol || "Activo"}</span>
                 <span class="assetBtnPrice">${formatMoney(displayPrice, displayCurrency)}</span>
+                <span class="assetBtnChange ${changeClass}">${changeMoneyStr}</span>
+                <span class="assetBtnChangePct ${changeClass}">${changePctStr || "—"}</span>
             `
             fragment.appendChild(button)
         } catch (error) {
             console.error(`No se pudo renderizar el precio del activo ${asset.name || asset.symbol || asset.id}:`, error)
             const fallbackPrice    = parseLooseNumber(asset.price || "") || 0
             const fallbackCurrency = asset.currency || "EUR"
+            const changePctStr     = String(asset.change || "").trim()
+            const changePct        = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
+            const changeAbs        = Math.abs(fallbackPrice * changePct / 100)
+            const changeSign       = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
+            const changeClass      = changePct < 0 ? "negative" : changePct > 0 ? "positive" : ""
+            const changeMoneyStr   = changePctStr ? `${changeSign}${formatMoney(changeAbs, fallbackCurrency)}` : "—"
             const button = document.createElement("button")
             button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}${isStale ? " stale" : ""}`
             button.dataset.assetId    = asset.id
             button.dataset.assetOrder = String(asset.order ?? 0)
             button.draggable = true
             button.innerHTML = `
-                <span class="assetBtnMain">
-                    <span class="assetBtnSymbol">${asset.symbol || asset.name}</span>
-                    <span class="assetBtnName">${asset.name || asset.symbol || "Activo"}</span>
-                </span>
+                <span class="assetBtnName">${asset.name || asset.symbol || "Activo"}</span>
                 <span class="assetBtnPrice">${formatMoney(fallbackPrice, fallbackCurrency)}</span>
+                <span class="assetBtnChange ${changeClass}">${changeMoneyStr}</span>
+                <span class="assetBtnChangePct ${changeClass}">${changePctStr || "—"}</span>
             `
             fragment.appendChild(button)
         }
@@ -2373,7 +2383,7 @@ function openAssetRowModal(rowIndex) {
     footer.className = "assetRowModalFooter"
     footer.innerHTML = `
         ${isEdit ? `<button type="button" id="assetRowModalDeleteBtn" class="dangerButton assetRowModalDeleteBtn">Eliminar</button>` : ""}
-        <button type="button" id="assetRowModalCancelBtn" class="secondaryButton assetRowModalCancelBtn">Cancelar</button>
+        <button type="button" id="assetRowModalCancelBtn" class="cancelButton assetRowModalCancelBtn">Cancelar</button>
         <button type="button" id="assetRowModalSaveBtn" data-no-autohide="true" class="primaryButton assetRowModalSaveBtn">Guardar</button>
     `
 

@@ -419,12 +419,16 @@ body{
 }
 
 .detailResizeHandle{
-    flex:0 0 2dvb;
+    position:absolute;
+    left:0;
+    top:0;
     width:100%;
+    height:5px;
     cursor:row-resize;
-    background:transparent;
-    transition:background 0.15s;
     z-index:10;
+    background:transparent;
+    margin-top:-5px;
+    transition:background 0.15s;
 }
 
 .detailResizeHandle:hover,
@@ -511,8 +515,7 @@ body{
     width:100%;
     display:grid;
     grid-template-columns:1fr auto auto auto;
-    grid-template-rows:auto;
-    gap:0 6px;
+    gap:0 8px;
     align-items:center;
     padding:9px 12px;
     border:none;
@@ -557,8 +560,6 @@ body{
 }
 
 .assetBtnName{
-    grid-column:1;
-    grid-row:1;
     font-size:12px;
     font-weight:600;
     color:#c8d6f0;
@@ -569,8 +570,6 @@ body{
 }
 
 .assetBtnPrice{
-    grid-column:2;
-    grid-row:1;
     font-size:12px;
     font-weight:700;
     color:#ffffff;
@@ -579,8 +578,6 @@ body{
 }
 
 .assetBtnChange{
-    grid-column:3;
-    grid-row:1;
     font-size:11px;
     color:#94a3b8;
     white-space:nowrap;
@@ -588,13 +585,11 @@ body{
 }
 
 .assetBtnChangePct{
-    grid-column:4;
-    grid-row:1;
     font-size:11px;
     color:#94a3b8;
     white-space:nowrap;
     text-align:right;
-    min-width:44px;
+    min-width:48px;
 }
 
 .assetBtnChange.positive,
@@ -603,6 +598,7 @@ body{
 .assetBtnChangePct.negative{ color:#f87171; }
 
 .assetDetailView{
+    position:relative;
     padding:14px 14px 12px 14px;
     display:flex;
     flex-direction:column;
@@ -610,8 +606,7 @@ body{
     border-top:1px solid #273246;
     background:#0f1724;
     flex:0 0 auto;
-    overflow-y:auto;
-    min-height:0;
+    overflow:hidden;
 }
 
 .detailHeader{
@@ -5457,67 +5452,3 @@ html[data-theme="light"] .gastosSectionRow td{ background:#1d4ed8 !important; bo
 
 /* ── Black theme: Gastos section/header rows ── */
 html[data-theme="black"] .gastosSectionRow td{ background:#0a0a0a !important; border-color:#3b82f6; color:#e0e0e0 !important; }
-
-/* ── Gastos tipo popup ── */
-.gtPopup{
-    background:#0b1120;
-    display:flex;
-    flex-direction:column;
-    overflow:hidden;
-}
-
-.gtPopupHeader{
-    display:flex;
-    align-items:center;
-    gap:14px;
-    padding:14px 20px;
-    border-bottom:1px solid #273246;
-    background:#0f1724;
-    flex-shrink:0;
-}
-
-.gtPopupTitle{
-    font-size:17px;
-    font-weight:700;
-    color:#e5edf9;
-}
-
-.gtPopupTotal{
-    font-size:13px;
-    color:#94a3b8;
-    margin-left:auto;
-}
-
-.gtPopupClose{
-    background:none;
-    border:1px solid #334155;
-    border-radius:6px;
-    color:#94a3b8;
-    cursor:pointer;
-    font-size:16px;
-    padding:2px 10px;
-    line-height:1.4;
-    transition:color 0.15s, border-color 0.15s;
-}
-
-.gtPopupClose:hover{
-    color:#f87171;
-    border-color:#f87171;
-}
-
-.gtPopupBody{
-    flex:1;
-    overflow:auto;
-    padding:0;
-}
-
-.gtPopupTable{
-    width:100%;
-}
-
-.gtTotalRow td{
-    background:#162235 !important;
-    border-top:2px solid #3b82f6;
-    color:#e5edf9;
-    font-weight:700;
-}

@@ -138,6 +138,9 @@ async function initVentasLogic() {
     renderVentasYearButtons()
     renderVentasTable()
     bindVentasEvents()
+
+    const ventasTable = document.getElementById("ventasBody")?.closest("table")
+    if (ventasTable) bindTableSort(ventasTable)
 }
 
 function bindVentasEvents() {
@@ -270,7 +273,7 @@ function openVentasModal(rowIndex = -1) {
         <input id="ventaValorInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasMoney(rowData.valorVenta) || "")}" placeholder="0,00">
         <p class="gastosCreateModalFeedback hidden" id="ventasModalFeedback"></p>
         <div class="assetModalActions ventasModalActions">
-            <button type="button" class="secondaryButton" id="ventasModalCancelBtn">Cancelar</button>
+            <button type="button" class="cancelButton" id="ventasModalCancelBtn">Cancelar</button>
             <button type="button" class="primaryButton" id="ventasModalSaveBtn" data-no-autohide="true">Guardar</button>
         </div>
     `
@@ -284,7 +287,9 @@ function openVentasModal(rowIndex = -1) {
     }
 
     overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) closeVentasModal()
+        if (event.target === overlay) {
+            // closeVentasModal() // Deshabilitado para evitar cierre accidental
+        }
     })
 
     modal.querySelector("#ventasModalCancelBtn")?.addEventListener("click", closeVentasModal)
@@ -898,30 +903,3 @@ function bindVentasPersistenceGuards() {
     })
 }
 
-function exportVentasJson() {
-    syncVentasDataFromTable()
-    downloadJsonFile(`ventas-${currentVentasYear}.json`, currentVentasData)
-}
-
-function importVentasJson() {
-    const input = document.createElement("input")
-    input.type = "file"
-    input.accept = "application/json,.json"
-    input.addEventListener("change", async () => {
-        const file = input.files?.[0]
-
-        if (!file) {
-            return
-        }
-
-        const text = await file.text()
-        const payload = JSON.parse(text)
-        const rows = Array.isArray(payload.rows) ? payload.rows : []
-        currentVentasData.year = currentVentasYear
-        currentVentasData.rows = rows.map(normalizeVentaRow)
-        renderVentasTable()
-        scheduleVentasAutosave()
-    })
-
-    input.click()
-}
