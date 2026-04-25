@@ -777,7 +777,8 @@ function renderIngresosMonthTable() {
     const body = document.getElementById("ingresosMovementsBody")
     if (!body || !currentIngresosData) return
     body.innerHTML = ""
-    const rows = currentIngresosData.months?.[currentIngresosMonth]?.rows || []
+    const rows = [...(currentIngresosData.months?.[currentIngresosMonth]?.rows || [])]
+        .sort((a, b) => ingresoParseDate(a.fecha) - ingresoParseDate(b.fecha))
     rows.forEach((row, index) => body.appendChild(buildIngresoMovementRow(row, index)))
 
     const total = rows.reduce((sum, row) => sum + parseEuroNumber(row.cantidad || ""), 0)

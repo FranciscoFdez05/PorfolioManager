@@ -5,6 +5,7 @@ from pathlib import Path
 _BASE_DIR = Path(__file__).resolve().parent.parent
 _DB_PATH = _BASE_DIR / "data" / "portfolio.db"
 _local = threading.local()
+_reset_generation = 0
 
 _SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -286,13 +287,25 @@ CREATE TABLE IF NOT EXISTS bonos (
 
 
 def get_db() -> sqlite3.Connection:
-    if not hasattr(_local, "conn") or _local.conn is None:
+    stale = (
+        not hasattr(_local, "conn")
+        or _local.conn is None
+        or getattr(_local, "_conn_gen", -1) < _reset_generation
+    )
+    if stale:
+        old = getattr(_local, "conn", None)
+        if old is not None:
+            try:
+                old.close()
+            except Exception:
+                pass
         _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.executescript(_SCHEMA)
         conn.commit()
         _local.conn = conn
+        _local._conn_gen = _reset_generation
     return _local.conn
 
 
@@ -304,6 +317,13 @@ def reset_db():
         except Exception:
             pass
         _local.conn = None
+
+
+def invalidate_all_connections():
+    """Force every thread to re-open a fresh connection on their next get_db() call."""
+    global _reset_generation
+    _reset_generation += 1
+    reset_db()
 
 
 def init_db():

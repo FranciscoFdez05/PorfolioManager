@@ -966,7 +966,8 @@ function renderGastosMonthTable() {
 
     body.innerHTML = ""
 
-    const rows = currentGastosData.months?.[currentGastosMonth]?.rows || []
+    const rows = [...(currentGastosData.months?.[currentGastosMonth]?.rows || [])]
+        .sort((a, b) => gastoParseDate(a.fecha) - gastoParseDate(b.fecha))
 
     rows.forEach((row, index) => {
         body.appendChild(buildGastoMovementRow(row, index))

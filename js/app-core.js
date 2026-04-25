@@ -70,7 +70,7 @@ let assetModalState = null
 let confirmModalState = null
 let editAssetModalState = null
 let draggedAssetId = null
-const PAGE_HTML_VERSION = "20260422i"
+const PAGE_HTML_VERSION = "20260425k"
 
 function initSidePanel(toggleButton, sideWrapper) {
     if (!toggleButton || !sideWrapper) {

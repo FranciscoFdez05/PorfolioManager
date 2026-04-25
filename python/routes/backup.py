@@ -1,4 +1,6 @@
+import json
 import re
+import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -7,9 +9,10 @@ from flask import Blueprint, jsonify, request
 
 backup_bp = Blueprint("backup", __name__)
 
-_BASE_DIR = Path(__file__).resolve().parent.parent.parent
-_DB_PATH = _BASE_DIR / "data" / "portfolio.db"
+_BASE_DIR   = Path(__file__).resolve().parent.parent.parent
+_DB_PATH    = _BASE_DIR / "data" / "portfolio.db"
 _BACKUP_DIR = _BASE_DIR / "data" / "backups"
+_AJUSTES_SRC = _BASE_DIR / "data" / "JSON" / "ajustes.json"
 _FILENAME_RE = re.compile(r'^portfolio_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.db$')
 
 
@@ -47,6 +50,11 @@ def createBackup():
     dst.close()
     src.close()
 
+    # Also save ajustes.json alongside the db backup
+    if _AJUSTES_SRC.exists():
+        ajustes_backup = _BACKUP_DIR / f"ajustes_{ts}.json"
+        shutil.copy2(_AJUSTES_SRC, ajustes_backup)
+
     return jsonify({"ok": True, "filename": filename, "backups": _list_backups()})
 
 
@@ -67,9 +75,8 @@ def restoreBackup():
     if not backup_path.exists():
         return jsonify({"ok": False, "error": "Backup no encontrado"}), 404
 
-    # Close the thread-local connection so next request gets a fresh one
-    from db import reset_db
-    reset_db()
+    from db import invalidate_all_connections
+    invalidate_all_connections()
 
     src = sqlite3.connect(str(backup_path))
     dst = sqlite3.connect(str(_DB_PATH))
@@ -78,6 +85,14 @@ def restoreBackup():
     dst.commit()
     dst.close()
     src.close()
+
+    # Restore ajustes.json if a matching snapshot exists
+    ts = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', filename)
+    if ts:
+        ajustes_backup = _BACKUP_DIR / f"ajustes_{ts.group(1)}.json"
+        if ajustes_backup.exists():
+            _AJUSTES_SRC.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ajustes_backup, _AJUSTES_SRC)
 
     return jsonify({"ok": True})
 
@@ -93,4 +108,12 @@ def deleteBackup(filename):
         return jsonify({"ok": False, "error": "Backup no encontrado"}), 404
 
     backup_path.unlink()
+
+    # Also remove matching ajustes snapshot if it exists
+    ts = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', filename)
+    if ts:
+        ajustes_snap = _BACKUP_DIR / f"ajustes_{ts.group(1)}.json"
+        if ajustes_snap.exists():
+            ajustes_snap.unlink()
+
     return jsonify({"ok": True, "backups": _list_backups()})

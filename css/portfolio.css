@@ -394,6 +394,8 @@ body{
     min-height:100%;
     padding:18px 18px 24px 18px;
     background:#0f1724;
+    display:flex;
+    flex-direction:column;
 }
 
 .sideWrapper{
@@ -2619,6 +2621,7 @@ tr.gastosTypeEmptySep td {
 }
 
 .ventasPageExpanded .operationsTableWrapper{
+    flex:1;
     max-height:calc(100vh - 293px);
 }
 
@@ -3227,6 +3230,7 @@ tr.gastosTypeEmptySep td {
     flex-direction:column;
     gap:18px;
     padding-right:18px;
+    flex:1;
 }
 
 .gastosYearBar{
@@ -3321,9 +3325,9 @@ tr.gastosTypeEmptySep td {
 }
 
 .gastosMovementsWrapper{
-    max-height:470px;
     overflow-y:auto;
     overflow-x:hidden;
+    max-height:498px;
 }
 
 .gastosAnnualWrapper::-webkit-scrollbar,
@@ -3377,7 +3381,15 @@ tr.gastosTypeEmptySep td {
     padding:6px 8px;
 }
 
-.gastosAnnualTable .rowActionHeader,
+.gastosAnnualTable .rowActionHeader{
+    width:96px;
+    min-width:96px;
+    padding:0 4px !important;
+    border-left:none !important;
+    border-right:none !important;
+    background:#0f1724 !important;
+}
+
 .gastosMovementsTable .rowActionHeader{
     width:68px;
     min-width:68px;
@@ -3388,8 +3400,8 @@ tr.gastosTypeEmptySep td {
 }
 
 .gastosAnnualTable .rowActionsCell{
-    width:68px;
-    min-width:68px;
+    width:96px;
+    min-width:96px;
 }
 
 .gastosMovementsTable tbody td{
@@ -3655,10 +3667,19 @@ tr.gastosTypeEmptySep td {
     font-weight:700;
 }
 
+.tableAddRowBar{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    padding:12px 14px;
+    border-top:1px solid #1e2d45;
+}
+
 .gastosActions{
     display:flex;
     gap:12px;
     flex-wrap:wrap;
+    margin-top:auto;
 }
 
 /* ── Ingresos page ──────────────────────────────────────────────────────── */
@@ -3668,6 +3689,7 @@ tr.gastosTypeEmptySep td {
     flex-direction:column;
     gap:18px;
     padding-right:18px;
+    flex:1;
 }
 
 .ingresosYearBar{
@@ -3780,9 +3802,9 @@ tr.gastosTypeEmptySep td {
 }
 
 .ingresosMovementsWrapper{
-    max-height:470px;
     overflow-y:auto;
     overflow-x:hidden;
+    max-height:498px;
 }
 
 .ingresosAnnualWrapper::-webkit-scrollbar,
@@ -3916,6 +3938,7 @@ tr.gastosTypeEmptySep td {
     display:flex;
     gap:12px;
     flex-wrap:wrap;
+    margin-top:auto;
 }
 
 .ingresosCreateModal{
