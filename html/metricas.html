@@ -5,10 +5,21 @@
         <div id="metricasLoading" class="metricasLoading">Cargando datos...</div>
     </div>
 
+    <div class="mNavBar" id="mNavBar">
+        <div class="mNavTabs">
+            <button class="mNavTab active" data-mcat="todo">Todo</button>
+            <button class="mNavTab" data-mcat="portfolio">Portfolio</button>
+            <button class="mNavTab" data-mcat="finanzas">Finanzas</button>
+            <button class="mNavTab" data-mcat="gastos">Gastos</button>
+            <button class="mNavTab" data-mcat="ingresos">Ingresos</button>
+        </div>
+        <input type="text" class="mNavSearch" id="mNavSearch" placeholder="Buscar sección...">
+    </div>
+
     <!-- KPI Cards -->
     <div class="metricasKpiSection">
 
-        <div class="metricasKpiGroup mkpiGroupPortfolio">
+        <div class="metricasKpiGroup mkpiGroupPortfolio" data-mcat="portfolio">
             <span class="metricasKpiGroupLabel">Portfolio</span>
             <div class="metricasKpiCards">
                 <div class="metricasKpiCard">
@@ -30,7 +41,7 @@
             </div>
         </div>
 
-        <div class="metricasKpiGroup mkpiGroupIngresos">
+        <div class="metricasKpiGroup mkpiGroupIngresos" data-mcat="finanzas">
             <span class="metricasKpiGroupLabel">Ingresos</span>
             <div class="metricasKpiCards">
                 <div class="metricasKpiCard">
@@ -44,7 +55,7 @@
             </div>
         </div>
 
-        <div class="metricasKpiGroup mkpiGroupBonos">
+        <div class="metricasKpiGroup mkpiGroupBonos" data-mcat="finanzas">
             <span class="metricasKpiGroupLabel">Bonos</span>
             <div class="metricasKpiCards">
                 <div class="metricasKpiCard">
@@ -62,7 +73,7 @@
             </div>
         </div>
 
-        <div class="metricasKpiGroup mkpiGroupRf">
+        <div class="metricasKpiGroup mkpiGroupRf" data-mcat="finanzas">
             <span class="metricasKpiGroupLabel">Renta Fija</span>
             <div class="metricasKpiCards">
                 <div class="metricasKpiCard">
@@ -80,7 +91,7 @@
             </div>
         </div>
 
-        <div class="metricasKpiGroup mkpiGroupGastos">
+        <div class="metricasKpiGroup mkpiGroupGastos" data-mcat="gastos">
             <span class="metricasKpiGroupLabel">Gastos</span>
             <div class="metricasKpiCards">
                 <div class="metricasKpiCard">
@@ -98,10 +109,33 @@
             </div>
         </div>
 
+        <div class="metricasKpiGroup mkpiGroupGastosTipos hidden" data-mcat="gastos" id="mkpiGroupGastosTipos">
+            <span class="metricasKpiGroupLabel">Gastos por tipo</span>
+            <div class="metricasKpiCards" id="mkpiGastosTiposCards"></div>
+        </div>
+
+        <div class="metricasKpiGroup mkpiGroupIngresosPersonales" data-mcat="ingresos">
+            <span class="metricasKpiGroupLabel">Ingresos personales</span>
+            <div class="metricasKpiCards">
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Total año</div>
+                    <div class="mkpiValue" id="mkpiIngresosTotal">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Recurrentes</div>
+                    <div class="mkpiValue" id="mkpiIngresosRecurrentes">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Movimientos</div>
+                    <div class="mkpiValue" id="mkpiIngresosMovimientos">---</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- -- Distribución --------------------------------------- -->
-    <div class="metricasSection">
+    <div class="metricasSection" id="mSectionDistribucion" data-mcat="portfolio">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Distribución del Portfolio</span>
             <div class="mToggleGroup">
@@ -141,7 +175,7 @@
     </div>
 
     <!-- -- Rendimiento ---------------------------------------- -->
-    <div class="metricasSection">
+    <div class="metricasSection" id="mSectionRendimiento" data-mcat="portfolio">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Rendimiento</span>
         </div>
@@ -162,19 +196,28 @@
     </div>
 
     <!-- -- Dividendos ----------------------------------------- -->
-    <div class="metricasSection" id="mSectionDividendos">
+    <div class="metricasSection" id="mSectionDividendos" data-mcat="finanzas">
         <div class="metricasSectionHeader">
-            <span class="metricasSectionTitle">Dividendos por instrumento</span>
+            <span class="metricasSectionTitle">Dividendos</span>
         </div>
-        <div class="metricasChartCard">
-            <div class="metricasChartWrap metricasChartDynamic" id="mChartDivWrap">
-                <canvas id="mChartDividendos"></canvas>
+        <div class="metricasChartsGrid2">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Por instrumento</div>
+                <div class="metricasChartWrap metricasChartDynamic" id="mChartDivWrap">
+                    <canvas id="mChartDividendos"></canvas>
+                </div>
+            </div>
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Distribución por acción</div>
+                <div class="metricasChartWrap" style="height:320px">
+                    <canvas id="mChartDividendosDonut"></canvas>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- -- Renta Fija ------------------------------------------- -->
-    <div class="metricasSection" id="mSectionRentaFija">
+    <div class="metricasSection" id="mSectionRentaFija" data-mcat="finanzas">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Renta Fija</span>
         </div>
@@ -195,7 +238,7 @@
     </div>
 
     <!-- -- Bonos ------------------------------------------------ -->
-    <div class="metricasSection" id="mSectionBonos">
+    <div class="metricasSection" id="mSectionBonos" data-mcat="finanzas">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Bonos</span>
         </div>
@@ -216,7 +259,7 @@
     </div>
 
     <!-- -- Gastos --------------------------------------------- -->
-    <div class="metricasSection" id="mSectionGastos">
+    <div class="metricasSection" id="mSectionGastos" data-mcat="gastos">
         <div class="metricasSectionHeader mGastosHeader">
             <div class="mGastosHeaderLeft">
                 <span class="metricasSectionTitle">Gastos</span>
@@ -242,8 +285,53 @@
         </div>
     </div>
 
+    <!-- -- Ingresos personales -------------------------------- -->
+    <div class="metricasSection" id="mSectionIngresos" data-mcat="ingresos">
+        <div class="metricasSectionHeader mIngresosHeader">
+            <div class="mIngresosHeaderLeft">
+                <span class="metricasSectionTitle">Ingresos</span>
+                <div class="mToggleGroup" id="mIngresosYearToggle"></div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid2">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle" id="mIngresosMesTitle">Ingresos por mes</div>
+                <div class="metricasChartWrap metricasChartDynamic" id="mChartIngresosMesWrap">
+                    <canvas id="mChartIngresosMes"></canvas>
+                </div>
+            </div>
+            <div class="metricasChartCard">
+                <div class="mActivosHeader">
+                    <div class="metricasChartTitle" id="mIngresosTipoTitle">Por tipo</div>
+                </div>
+                <div class="mIngresosMonthToggle" id="mIngresosMonthToggle"></div>
+                <div class="metricasChartWrap" style="height:300px">
+                    <canvas id="mChartIngresosTipo"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- -- Comparativa ingresos vs gastos --------------------- -->
+    <div class="metricasSection" id="mSectionComparativa" data-mcat="ingresos">
+        <div class="metricasSectionHeader mComparativaHeader">
+            <div class="mComparativaHeaderTop">
+                <span class="metricasSectionTitle">Comparativa mensual — Ingresos vs Gastos</span>
+                <div class="mToggleGroup" id="mComparativaYearToggle"></div>
+            </div>
+            <div class="mComparativaFiltros" id="mComparativaFiltros"></div>
+        </div>
+        <div class="metricasChartsGrid1">
+            <div class="metricasChartCard">
+                <div class="metricasChartWrap" style="height:320px">
+                    <canvas id="mChartComparativa"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- -- Tabla top activos ---------------------------------- -->
-    <div class="metricasSection">
+    <div class="metricasSection" id="mSectionPosiciones" data-mcat="portfolio">
         <div class="metricasSectionHeader">
             <span class="metricasSectionTitle">Posiciones</span>
         </div>

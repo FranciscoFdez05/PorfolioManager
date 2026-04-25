@@ -272,9 +272,6 @@ function bindStablecoinsEvents() {
     if (body && !body.dataset.bound) {
         body.dataset.bound = "true"
         body.addEventListener("click", handleStablecoinsDeleteClick)
-        body.addEventListener("change", handleStablecoinsChange)
-        body.addEventListener("input", handleStablecoinsInput)
-        body.addEventListener("blur", handleStablecoinsBlur, true)
     }
 
     if (enabledMenu && !enabledMenu.dataset.bound) {
@@ -531,30 +528,17 @@ function renderStablecoinsTable() {
 }
 
 function buildStablecoinRow(row) {
-    const symbolOptions = getStablecoinRowSymbolOptions(row.stablecoinSymbol)
     const tr = document.createElement("tr")
     tr.dataset.stablecoinRowId = row.id
     tr.innerHTML = `
-        <td>
-            <select class="operationsSelect" data-field="stablecoinSymbol">
-                ${symbolOptions.map((symbol) => `<option value="${symbol}"${row.stablecoinSymbol === symbol ? " selected" : ""}>${symbol}</option>`).join("")}
-            </select>
-        </td>
-        <td contenteditable="true" data-field="fecha">${row.fecha || ""}</td>
-        <td>
-            <select class="operationsSelect" data-field="tipo">
-                ${STABLECOIN_MOVEMENT_TYPES.map((option) => `<option value="${option}"${row.tipo === option ? " selected" : ""}>${option}</option>`).join("")}
-            </select>
-        </td>
-        <td>
-            <select class="operationsSelect" data-field="currency">
-                ${OPERATION_CURRENCY_OPTIONS.map((option) => `<option value="${option}"${(row.currency || "USD") === option ? " selected" : ""}>${option}</option>`).join("")}
-            </select>
-        </td>
-        <td contenteditable="true" data-field="cantidad">${formatStablecoinQuantity(row.cantidad)}</td>
-        <td class="operationsPriceCell"><div contenteditable="true" data-field="precio">${formatOperationsMoney(row.precio, row.currency || "USD")}</div></td>
-        <td class="operationsTotalCell"><div class="operationsTotalDisplay" contenteditable="true" data-field="total">${formatOperationsMoney(row.total, row.currency || "USD")}</div></td>
-        <td contenteditable="true" data-field="nota">${row.nota || ""}</td>
+        <td>${row.stablecoinSymbol || ""}</td>
+        <td>${row.fecha || ""}</td>
+        <td>${row.tipo || ""}</td>
+        <td>${row.currency || ""}</td>
+        <td>${formatStablecoinQuantity(row.cantidad)}</td>
+        <td>${formatOperationsMoney(row.precio, row.currency || "USD")}</td>
+        <td>${formatOperationsMoney(row.total, row.currency || "USD")}</td>
+        <td>${row.nota || ""}</td>
         <td class="rowActionsCell">
             <button type="button" class="assetRowEditBtn stablecoinRowEditBtn" data-row-id="${row.id}" title="Editar fila">✎</button>
             <button type="button" class="assetRowDeleteBtn stablecoinRowDeleteBtn" data-row-id="${row.id}" title="Eliminar fila">✕</button>
@@ -703,41 +687,21 @@ function handleStablecoinsDeleteClick(event) {
     const rowId = deleteButton.dataset.rowId
     if (!rowId) return
 
-    currentStablecoinsData.rows = (currentStablecoinsData.rows || []).filter((item) => item.id !== rowId)
-    renderStablecoinsTable()
-    renderStablecoinsSummary()
-    scheduleStablecoinsAutosave()
+    openConfirmModal({
+        title: "Eliminar fila",
+        message: "¿Quieres eliminar este movimiento?",
+        confirmLabel: "Eliminar",
+        onConfirm: () => {
+            currentStablecoinsData.rows = (currentStablecoinsData.rows || []).filter((item) => item.id !== rowId)
+            renderStablecoinsTable()
+            renderStablecoinsSummary()
+            scheduleStablecoinsAutosave()
+        }
+    })
 }
 
 function syncStablecoinsDataFromTable() {
-    const rowElements = [...document.querySelectorAll("#stablecoinsBody tr[data-stablecoin-row-id]")]
-    const rowsById = new Map((currentStablecoinsData.rows || []).map((row) => [row.id, row]))
-
-    rowElements.forEach((rowElement) => {
-        const rowId = rowElement.dataset.stablecoinRowId
-        const storedRow = rowsById.get(rowId)
-
-        if (!storedRow) {
-            return
-        }
-
-        const currency = rowElement.querySelector('select[data-field="currency"]')?.value || "USD"
-        rowsById.set(rowId, normalizeStablecoinMovementRow({
-            ...storedRow,
-            stablecoinSymbol: rowElement.querySelector('select[data-field="stablecoinSymbol"]')?.value || getEnabledStablecoinSymbols(currentStablecoinsData)[0] || getStablecoinCatalogSymbols(currentStablecoinsData)[0] || "",
-            fecha: rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
-            tipo: rowElement.querySelector('select[data-field="tipo"]')?.value || "Compra",
-            cantidad: rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || "",
-            precio: stripCurrencyText(rowElement.querySelector('[data-field="precio"]')?.textContent || "") || "",
-            total: stripCurrencyText(rowElement.querySelector('[data-field="total"]')?.textContent || "") || "",
-            currency,
-            nota: rowElement.querySelector('[data-field="nota"]')?.textContent.trim() || ""
-        }))
-    })
-
-    currentStablecoinsData.rows = (currentStablecoinsData.rows || []).map((row) => rowsById.get(row.id) || row)
-    currentStablecoinsData.enabledSymbols = getEnabledStablecoinSymbols(currentStablecoinsData)
-    currentStablecoinsData.catalog = getStablecoinCatalog(currentStablecoinsData)
+    // Table is display-only; data is managed directly in currentStablecoinsData.rows via the modal
 }
 
 function buildStablecoinsPayloadSnapshot() {

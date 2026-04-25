@@ -1,7 +1,13 @@
 let _metricasCharts = {}
+
+window._resizeChartsOnSidebarChange = function () {
+    Object.values(_metricasCharts).forEach((c) => { try { c.resize() } catch (_) {} })
+}
+
 let _metricasDisplayType = "doughnut"
 let _metricasDistMetric = "netoActualEur"
 let _metricasGastosMonth = "all"
+let _metricasIngresosMonth = "all"
 let _metricasPayload = null
 let _metricasSortKey = "netoActualEur"
 let _metricasSortDir = "desc"
@@ -103,12 +109,13 @@ async function buildMetricasPayload() {
         }
     }))
 
-    const [divResp, intResp, bonosResp, rfResp, gastosYearsResp] = await Promise.all([
+    const [divResp, intResp, bonosResp, rfResp, gastosYearsResp, ingresosYearsResp] = await Promise.all([
         fetch("/api/dividendos"),
         fetch("/api/intereses"),
         fetch("/api/bonos"),
         fetch("/api/rentafija"),
-        fetch("/api/gastos").catch(() => null)
+        fetch("/api/gastos").catch(() => null),
+        fetch("/api/ingresos").catch(() => null)
     ])
     const divData   = await divResp.json()
     const intData   = await intResp.json()
@@ -122,6 +129,13 @@ async function buildMetricasPayload() {
         ? await fetch(`/api/gastos/${latestYear}`).then((r) => r.json()).catch(() => null)
         : null
 
+    const ingresosYearsData = ingresosYearsResp ? await ingresosYearsResp.json().catch(() => ({ years: [] })) : { years: [] }
+    const ingresosYearsList = Array.isArray(ingresosYearsData.years) ? ingresosYearsData.years : []
+    const latestIngresosYear = ingresosYearsList[0] || null
+    const ingresosYearData  = latestIngresosYear
+        ? await fetch(`/api/ingresos/${latestIngresosYear}`).then((r) => r.json()).catch(() => null)
+        : null
+
     return {
         summaries,
         dividendos:      Array.isArray(divData.rows)   ? divData.rows   : [],
@@ -129,7 +143,9 @@ async function buildMetricasPayload() {
         bonos:           Array.isArray(bonosData.rows)  ? bonosData.rows : [],
         rentaFija:       Array.isArray(rfData.rows)     ? rfData.rows    : [],
         gastosYearsList,
-        gastosYearData
+        gastosYearData,
+        ingresosYearsList,
+        ingresosYearData
     }
 }
 
@@ -492,6 +508,16 @@ function mRenderDividendos(dividendos) {
             scales: { x: mAxisX(), y: mAxisY(12) }
         }
     })
+
+    const donutTotal = values.reduce((a, b) => a + b, 0)
+    mCreateChart("mChartDividendosDonut", {
+        type: "doughnut",
+        data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: "#0b1120", borderWidth: 2, hoverOffset: 10 }] },
+        options: {
+            ...M_CHART_DEFAULTS, cutout: "55%",
+            plugins: { ...M_CHART_DEFAULTS.plugins, legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" }, tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, donutTotal) } } }
+        }
+    })
 }
 
 // ── bonos charts ───────────────────────────────────────────────────────────
@@ -787,6 +813,8 @@ function mRenderGastosCharts(yearData, totalMes, totalTipo) {
         }
     })
 
+    mRenderGastosTiposKpi(totalTipo)
+
     // Right chart: by month selection
     if (_metricasGastosMonth === "all") {
         if (tipoTitle) tipoTitle.textContent = "Por tipo (anual)"
@@ -841,6 +869,31 @@ function mGastosTipoColor(label) {
     let hash = 0
     for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) & 0xfffff
     return M_GASTOS_TIPO_PALETTE[hash % M_GASTOS_TIPO_PALETTE.length]
+}
+
+function mNormTipo(s) {
+    return String(s || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+}
+
+function mRenderGastosTiposKpi(totalTipo) {
+    const container = document.getElementById("mkpiGastosTiposCards")
+    const group = document.getElementById("mkpiGroupGastosTipos")
+    if (!container || !group) return
+
+    const hidden = window._gastosHiddenTipos || []
+    const entries = Object.entries(totalTipo || {})
+        .filter(([tipo, v]) => v > 0 && !hidden.includes(mNormTipo(tipo)))
+        .sort((a, b) => b[1] - a[1])
+
+    if (!entries.length) { group.classList.add("hidden"); return }
+    group.classList.remove("hidden")
+    container.innerHTML = entries.map(([tipo, val]) =>
+        `<div class="metricasKpiCard"><div class="mkpiLabel">${escapeMetricasHtml(tipo)}</div><div class="mkpiValue">${formatEuro(val)}</div></div>`
+    ).join("")
+}
+
+function escapeMetricasHtml(s) {
+    return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
 }
 
 function mRenderGastosTipoChart(tipoData) {
@@ -1038,10 +1091,227 @@ function mBindTableSort(summaries) {
     })
 }
 
+function mRenderIngresos(ingresosYearData) {
+    const group = document.querySelector(".mkpiGroupIngresosPersonales")
+    if (!group) return
+
+    if (!ingresosYearData) {
+        mSetKpi("mkpiIngresosTotal",      "---")
+        mSetKpi("mkpiIngresosRecurrentes","---")
+        mSetKpi("mkpiIngresosMovimientos","---")
+        return
+    }
+
+    const M_ING_KEYS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
+
+    const totalRecurrentes = (ingresosYearData.recurrentes || []).reduce((s, row) =>
+        s + M_ING_KEYS.reduce((ms, k) => ms + parseEuroNumber(row.meses?.[k] || ""), 0), 0)
+
+    const totalMovimientos = Object.values(ingresosYearData.months || {}).reduce((s, monthData) =>
+        s + (monthData?.rows || []).reduce((ms, row) => ms + parseEuroNumber(row.cantidad || ""), 0), 0)
+
+    mSetKpi("mkpiIngresosTotal",       formatEuro(totalRecurrentes + totalMovimientos))
+    mSetKpi("mkpiIngresosRecurrentes", formatEuro(totalRecurrentes))
+    mSetKpi("mkpiIngresosMovimientos", formatEuro(totalMovimientos))
+}
+
+// ── ingresos charts ────────────────────────────────────────────────────────
+
+const M_ING_KEYS   = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
+const M_ING_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+
+function mComputeIngresosMonthly(ingresosYearData) {
+    const totals = Object.fromEntries(M_ING_KEYS.map(k => [k, 0]))
+    ;(ingresosYearData?.recurrentes || []).forEach(row => {
+        M_ING_KEYS.forEach(k => { totals[k] += parseEuroNumber(row.meses?.[k] || "") })
+    })
+    M_ING_KEYS.forEach(k => {
+        ;(ingresosYearData?.months?.[k]?.rows || []).forEach(row => {
+            totals[k] += parseEuroNumber(row.cantidad || "")
+        })
+    })
+    return totals
+}
+
+function mComputeIngresosTipo(ingresosYearData, monthKey) {
+    const totals = {}
+    if (monthKey === "all") {
+        ;(ingresosYearData?.recurrentes || []).forEach(row => {
+            const nombre = (row.nombre || "Recurrentes").trim()
+            const sub = M_ING_KEYS.reduce((s, k) => s + parseEuroNumber(row.meses?.[k] || ""), 0)
+            if (sub > 0) totals[nombre] = (totals[nombre] || 0) + sub
+        })
+        M_ING_KEYS.forEach(k => {
+            ;(ingresosYearData?.months?.[k]?.rows || []).forEach(row => {
+                const tipo = (row.tipo || "Sin tipo").trim()
+                const val = parseEuroNumber(row.cantidad || "")
+                if (val > 0) totals[tipo] = (totals[tipo] || 0) + val
+            })
+        })
+    } else {
+        ;(ingresosYearData?.recurrentes || []).forEach(row => {
+            const nombre = (row.nombre || "Recurrentes").trim()
+            const val = parseEuroNumber(row.meses?.[monthKey] || "")
+            if (val > 0) totals[nombre] = (totals[nombre] || 0) + val
+        })
+        ;(ingresosYearData?.months?.[monthKey]?.rows || []).forEach(row => {
+            const tipo = (row.tipo || "Sin tipo").trim()
+            const val = parseEuroNumber(row.cantidad || "")
+            if (val > 0) totals[tipo] = (totals[tipo] || 0) + val
+        })
+    }
+    return totals
+}
+
+function mRenderIngresosCharts(ingresosYearData) {
+    const totalMes  = mComputeIngresosMonthly(ingresosYearData)
+    const totalTipo = mComputeIngresosTipo(ingresosYearData, _metricasIngresosMonth)
+
+    const mesWrap = document.getElementById("mChartIngresosMesWrap")
+    if (mesWrap) mesWrap.style.height = "280px"
+
+    const mesValues = M_ING_KEYS.map(k => totalMes[k] || 0)
+    const mesColors = M_ING_LABELS.map((_, i) => M_PALETTE[i % M_PALETTE.length])
+    mCreateChart("mChartIngresosMes", {
+        type: "bar",
+        data: { labels: M_ING_LABELS, datasets: [{ label: "Ingresos (€)", data: mesValues, backgroundColor: mesColors.map(c => c + "bb"), borderColor: mesColors, borderWidth: 1, borderRadius: 4 }] },
+        options: {
+            ...M_CHART_DEFAULTS, indexAxis: "y",
+            plugins: { ...M_CHART_DEFAULTS.plugins, legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } } },
+            scales: { x: mAxisX(), y: mAxisY(11) }
+        }
+    })
+
+    const tipoEntries = Object.entries(totalTipo).sort((a, b) => b[1] - a[1])
+    if (tipoEntries.length) {
+        const tipoLabels = tipoEntries.map(([k]) => k)
+        const tipoValues = tipoEntries.map(([, v]) => v)
+        const tipoColors = tipoLabels.map((_, i) => M_PALETTE[i % M_PALETTE.length])
+        const tipoTotal  = tipoValues.reduce((a, b) => a + b, 0)
+        mCreateChart("mChartIngresosTipo", {
+            type: "doughnut",
+            data: { labels: tipoLabels, datasets: [{ data: tipoValues, backgroundColor: tipoColors, borderColor: "#0b1120", borderWidth: 2, hoverOffset: 10 }] },
+            options: {
+                ...M_CHART_DEFAULTS, cutout: "55%",
+                plugins: { ...M_CHART_DEFAULTS.plugins, legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" }, tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } } }
+            }
+        })
+    } else {
+        mDestroyChart("mChartIngresosTipo")
+    }
+}
+
+function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
+    const section = document.getElementById("mSectionIngresos")
+    if (!ingresosYearsList.length || !ingresosYearData) {
+        if (section) section.classList.add("hidden")
+        return
+    }
+    if (section) section.classList.remove("hidden")
+
+    const yearToggle = document.getElementById("mIngresosYearToggle")
+    if (yearToggle && !yearToggle.dataset.bound) {
+        yearToggle.dataset.bound = "true"
+        yearToggle.innerHTML = ingresosYearsList.map(y =>
+            `<button class="mToggleBtn${String(y) === String(ingresosYearData.year) ? " active" : ""}" data-ingresosyear="${y}">${y}</button>`
+        ).join("")
+        yearToggle.addEventListener("click", async (e) => {
+            const btn = e.target.closest("[data-ingresosyear]")
+            if (!btn) return
+            yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+            btn.classList.add("active")
+            _metricasIngresosMonth = "all"
+            const newData = await fetch(`/api/ingresos/${btn.dataset.ingresosyear}`).then(r => r.json()).catch(() => null)
+            if (newData) {
+                _metricasPayload.ingresosYearData = newData
+                const mt = document.getElementById("mIngresosMonthToggle")
+                if (mt) { mt.dataset.bound = ""; mt.innerHTML = "" }
+                mRenderIngresosSection(ingresosYearsList, newData)
+                mRenderComparativa(_metricasPayload.ingresosYearData, _metricasPayload.gastosYearData)
+            }
+        })
+    } else if (yearToggle) {
+        yearToggle.querySelectorAll(".mToggleBtn").forEach(b =>
+            b.classList.toggle("active", b.dataset.ingresosyear === String(ingresosYearData.year))
+        )
+    }
+
+    const monthToggle = document.getElementById("mIngresosMonthToggle")
+    const tipoTitle   = document.getElementById("mIngresosTipoTitle")
+    if (monthToggle && !monthToggle.dataset.bound) {
+        monthToggle.dataset.bound = "true"
+        const allBtn   = `<button class="mToggleBtn${_metricasIngresosMonth === "all" ? " active" : ""}" data-ingresosmonth="all">Todos</button>`
+        const monthBtns = M_ING_KEYS.map((k, i) =>
+            `<button class="mToggleBtn${_metricasIngresosMonth === k ? " active" : ""}" data-ingresosmonth="${k}">${M_ING_LABELS[i]}</button>`
+        ).join("")
+        monthToggle.innerHTML = allBtn + monthBtns
+        monthToggle.addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-ingresosmonth]")
+            if (!btn) return
+            monthToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+            btn.classList.add("active")
+            _metricasIngresosMonth = btn.dataset.ingresosmonth
+            if (tipoTitle) tipoTitle.textContent = _metricasIngresosMonth === "all" ? "Por tipo (anual)" : `Por tipo — ${M_ING_LABELS[M_ING_KEYS.indexOf(_metricasIngresosMonth)] || _metricasIngresosMonth}`
+            mRenderIngresosCharts(ingresosYearData)
+        })
+    } else if (monthToggle) {
+        monthToggle.querySelectorAll(".mToggleBtn").forEach(b =>
+            b.classList.toggle("active", b.dataset.ingresosmonth === _metricasIngresosMonth)
+        )
+    }
+
+    if (tipoTitle) tipoTitle.textContent = _metricasIngresosMonth === "all" ? "Por tipo (anual)" : `Por tipo — ${M_ING_LABELS[M_ING_KEYS.indexOf(_metricasIngresosMonth)] || _metricasIngresosMonth}`
+    mRenderIngresosCharts(ingresosYearData)
+}
+
+// ── comparativa ingresos vs gastos ─────────────────────────────────────────
+
+function mRenderComparativa(ingresosYearData, gastosYearData) {
+    const section = document.getElementById("mSectionComparativa")
+    if (!ingresosYearData && !gastosYearData) {
+        if (section) section.classList.add("hidden")
+        return
+    }
+    if (section) section.classList.remove("hidden")
+
+    const ingMonthly = M_ING_KEYS.map(k => {
+        let t = 0
+        ;(ingresosYearData?.recurrentes || []).forEach(r => { t += parseEuroNumber(r.meses?.[k] || "") })
+        ;(ingresosYearData?.months?.[k]?.rows || []).forEach(r => { t += parseEuroNumber(r.cantidad || "") })
+        return t
+    })
+
+    const gastosMonthly = M_GASTOS_KEYS.map(k => {
+        let t = 0
+        ;(gastosYearData?.mensualidades || []).forEach(r => { t += parseEuroNumber(r.meses?.[k] || "") })
+        ;(gastosYearData?.months?.[k]?.rows || []).forEach(r => { t += parseEuroNumber(r.cantidad || "") })
+        return t
+    })
+
+    const balance = ingMonthly.map((ing, i) => ing - gastosMonthly[i])
+
+    mCreateChart("mChartComparativa", {
+        type: "bar",
+        data: {
+            labels: M_ING_LABELS,
+            datasets: [
+                { label: "Ingresos", data: ingMonthly, backgroundColor: "#2ecc7188", borderColor: "#2ecc71", borderWidth: 1, borderRadius: 4 },
+                { label: "Gastos",   data: gastosMonthly, backgroundColor: "#e74c3c88", borderColor: "#e74c3c", borderWidth: 1, borderRadius: 4 },
+                { label: "Balance",  data: balance, backgroundColor: balance.map(v => v >= 0 ? "#3a7bd577" : "#e74c3c44"), borderColor: balance.map(v => v >= 0 ? "#3a7bd5" : "#e74c3c"), borderWidth: 1, borderRadius: 4, type: "bar" }
+            ]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            plugins: { ...M_CHART_DEFAULTS.plugins, tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}` } } },
+            scales: { x: mAxisX(), y: mAxisY() }
+        }
+    })
+}
+
 // ── main init ──────────────────────────────────────────────────────────────
 
 function mRenderAll(payload) {
-    const { summaries, dividendos, bonos, rentaFija, gastosYearsList, gastosYearData } = payload
+    const { summaries, dividendos, bonos, rentaFija, gastosYearsList, gastosYearData, ingresosYearsList, ingresosYearData } = payload
     const b = bonos || [], rf = rentaFija || []
     mRenderDistTipos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
     mRenderDistActivos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
@@ -1053,15 +1323,19 @@ function mRenderAll(payload) {
     mRenderRentaFijaTipos(rf)
     mRenderRentaFijaInst(rf)
     mRenderGastos(gastosYearsList || [], gastosYearData || null)
+    mRenderIngresos(ingresosYearData || null)
+    mRenderIngresosSection(ingresosYearsList || [], ingresosYearData || null)
+    mRenderComparativa(ingresosYearData || null, gastosYearData || null)
     mRenderTopTable(summaries)
 }
 
 async function initMetricasLogic() {
     Object.values(_metricasCharts).forEach((c) => c?.destroy())
     _metricasCharts = {}
-    _metricasDisplayType = window._metricasDisplayType ?? "doughnut"
-    _metricasDistMetric  = window._metricasDistMetric  ?? "netoActualEur"
-    _metricasGastosMonth = "all"
+    _metricasDisplayType  = window._metricasDisplayType ?? "doughnut"
+    _metricasDistMetric   = window._metricasDistMetric  ?? "netoActualEur"
+    _metricasGastosMonth  = "all"
+    _metricasIngresosMonth = "all"
     _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","bonos","rentaFija"])
     _metricasGastosTipoFilter = new Set()
     _mGastosChartsCache = null

@@ -15,6 +15,7 @@ _DEFAULTS = {
     "theme": "default",
     "metricasDisplayType": "doughnut",
     "metricasDistMetric": "netoActualEur",
+    "comparativaExcluded": [],
 }
 
 
@@ -84,6 +85,8 @@ def get_settings():
         "theme":               cfg.get("theme") or "default",
         "metricasDisplayType": cfg.get("metricasDisplayType") or "doughnut",
         "metricasDistMetric":  cfg.get("metricasDistMetric") or "netoActualEur",
+        "comparativaExcluded": cfg.get("comparativaExcluded") or [],
+        "gastosHiddenTipos":   cfg.get("gastosHiddenTipos") or [],
     })
 
 
@@ -123,6 +126,12 @@ def save_settings():
         cfg["metricasDisplayType"] = str(data["metricasDisplayType"]) if data["metricasDisplayType"] in {"doughnut", "bar"} else "doughnut"
     if "metricasDistMetric" in data:
         cfg["metricasDistMetric"] = str(data["metricasDistMetric"]) if data["metricasDistMetric"] in {"netoActualEur", "invertidoEur", "rendimientoEur"} else "netoActualEur"
+    if "comparativaExcluded" in data:
+        raw = data["comparativaExcluded"]
+        cfg["comparativaExcluded"] = [str(t) for t in raw if isinstance(t, str) and t.strip()] if isinstance(raw, list) else []
+    if "gastosHiddenTipos" in data:
+        raw = data["gastosHiddenTipos"]
+        cfg["gastosHiddenTipos"] = [str(t) for t in raw if isinstance(t, str) and t.strip()] if isinstance(raw, list) else []
 
     _write_ajustes(cfg)
     return jsonify({"ok": True})

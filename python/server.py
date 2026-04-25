@@ -9,6 +9,7 @@ from routes.activos import activos_bp
 from routes.ajustes import ajustes_bp
 from routes.backup import backup_bp
 from routes.gastos import gastos_bp
+from routes.ingresos import ingresos_bp
 from routes.market import market_bp
 from routes.operaciones import operaciones_bp
 from routes.registros import registros_bp
@@ -34,6 +35,7 @@ app.register_blueprint(activos_bp)
 app.register_blueprint(ajustes_bp)
 app.register_blueprint(backup_bp)
 app.register_blueprint(gastos_bp)
+app.register_blueprint(ingresos_bp)
 app.register_blueprint(market_bp)
 app.register_blueprint(operaciones_bp)
 app.register_blueprint(registros_bp)

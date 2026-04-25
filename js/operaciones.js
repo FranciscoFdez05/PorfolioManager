@@ -316,9 +316,6 @@ function bindOperationsEvents() {
     if (operationsBody && !operationsBody.dataset.bound) {
         operationsBody.dataset.bound = "true"
         operationsBody.addEventListener("click", handleOperationsDeleteClick)
-        operationsBody.addEventListener("change", handleOperationsSelectChange)
-        operationsBody.addEventListener("input", handleOperationsInput)
-        operationsBody.addEventListener("blur", handleOperationsBlur, true)
     }
 
     if (addButton && !addButton.dataset.bound) {
@@ -508,36 +505,16 @@ function buildOperationRow(row) {
     const tr = document.createElement("tr")
     tr.dataset.operationId = normalizedRow.id
     tr.innerHTML = `
-        <td>${buildOperationAssetSelect(normalizedRow.assetId)}</td>
-        <td contenteditable="true" data-field="fechaApertura">${normalizedRow.fechaApertura || ""}</td>
-        <td>${buildOperationPairSelect(normalizedRow)}</td>
-        <td>
-            <select class="operationsSelect" data-field="orden">
-                ${OPERATION_ORDER_OPTIONS.map((option) => `<option value="${option}"${normalizedRow.orden === option ? " selected" : ""}>${option}</option>`).join("")}
-            </select>
-        </td>
-        <td class="operationsPriceCell" data-field="precioOrdenCell">
-            <div contenteditable="true" data-field="precioOrden">${formatOperationsMoney(normalizedRow.precioOrden, normalizedRow.precioCurrency || "USD")}</div>
-            <select class="operationsSelect operationsCurrencySelectHidden" data-field="precioCurrency" aria-label="Moneda precio orden">
-                ${OPERATION_CURRENCY_OPTIONS.map((option) => `<option value="${option}"${(normalizedRow.precioCurrency || "USD") === option ? " selected" : ""}>${option === "EUR" ? "Euros" : "Dólares"}</option>`).join("")}
-            </select>
-        </td>
-        <td contenteditable="true" data-field="cantidad">${formatOperationsQuantity(normalizedRow.cantidad)}</td>
-        <td data-field="comisionesCriptoCell">
-            <input type="text" class="operationsCryptoCommissionInput" data-field="comisionesCripto" inputmode="decimal" value="${formatOperationsQuantity(normalizedRow.comisionesCripto)}" placeholder="0,00000000">
-        </td>
-        <td class="rowTotal operationsTotalCell" data-field="totalCell">
-            <div class="operationsTotalDisplay" contenteditable="true" data-field="total">${formatOperationsMoney(normalizedRow.total, normalizedRow.currency || "USD")}</div>
-            <select class="operationsSelect operationsCurrencySelectHidden" data-field="currency" aria-label="Moneda total">
-                ${OPERATION_CURRENCY_OPTIONS.map((option) => `<option value="${option}"${(normalizedRow.currency || "USD") === option ? " selected" : ""}>${option === "EUR" ? "Euros" : "Dólares"}</option>`).join("")}
-            </select>
-        </td>
-        <td>
-            <select class="operationsSelect" data-field="estado">
-                ${OPERATION_STATUS_OPTIONS.map((option) => `<option value="${option}"${normalizedRow.estado === option ? " selected" : ""}>${option}</option>`).join("")}
-            </select>
-        </td>
-        <td contenteditable="true" data-field="fechaCierre">${normalizedRow.fechaCierre || ""}</td>
+        <td>${normalizedRow.activo || ""}</td>
+        <td>${normalizedRow.fechaApertura || ""}</td>
+        <td>${normalizedRow.par || ""}</td>
+        <td>${normalizedRow.orden || ""}</td>
+        <td>${formatOperationsMoney(normalizedRow.precioOrden, normalizedRow.precioCurrency || "USD")}</td>
+        <td>${formatOperationsQuantity(normalizedRow.cantidad)}</td>
+        <td>${formatOperationsQuantity(normalizedRow.comisionesCripto)}</td>
+        <td>${formatOperationsMoney(normalizedRow.total, normalizedRow.currency || "USD")}</td>
+        <td>${normalizedRow.estado || ""}</td>
+        <td>${normalizedRow.fechaCierre || ""}</td>
         <td class="rowActionsCell">
             <button type="button" class="assetRowEditBtn operacionRowEditBtn" data-row-id="${normalizedRow.id}" title="Editar fila">✎</button>
             <button type="button" class="assetRowDeleteBtn operacionRowDeleteBtn" data-row-id="${normalizedRow.id}" title="Eliminar fila">✕</button>
@@ -799,80 +776,23 @@ function handleOperationsDeleteClick(event) {
     if (deleteButton) {
         const rowId = deleteButton.dataset.rowId
         if (!rowId) return
-        currentOperationsData.rows = (currentOperationsData.rows || []).filter((item) => item.id !== rowId)
-        renderOperationsTable()
-        scheduleOperationsAssetRefresh()
-        scheduleOperationsAutosave()
-        return
-    }
-
-    const priceCell = event.target.closest(".operationsPriceCell")
-    if (priceCell && !event.target.closest('[data-field="precioOrden"]')) {
-        const currencySelect = priceCell.querySelector('select[data-field="precioCurrency"]')
-        currencySelect?.focus()
-        currencySelect?.click()
-        return
-    }
-
-    const totalCell = event.target.closest(".operationsTotalCell")
-    if (totalCell && !event.target.closest('[data-field="total"]')) {
-        const currencySelect = totalCell.querySelector('select[data-field="currency"]')
-        currencySelect?.focus()
-        currencySelect?.click()
+        openConfirmModal({
+            title: "Eliminar fila",
+            message: "¿Quieres eliminar esta operación?",
+            confirmLabel: "Eliminar",
+            onConfirm: () => {
+                currentOperationsData.rows = (currentOperationsData.rows || []).filter((item) => item.id !== rowId)
+                renderOperationsTable()
+                scheduleOperationsAssetRefresh()
+                scheduleOperationsAutosave()
+            }
+        })
     }
 }
 
-function stripMoneySymbolOnFocus(event) {
-    const editableMoneyCell = event.target.closest('[contenteditable="true"][data-field="precioOrden"], [contenteditable="true"][data-field="total"]')
-
-    if (!editableMoneyCell) {
-        return
-    }
-
-    queueMicrotask(() => {
-        editableMoneyCell.textContent = stripCurrencyText(editableMoneyCell.textContent || "")
-    })
-}
-
-document.addEventListener("focusin", stripMoneySymbolOnFocus)
 
 function syncOperationsDataFromTable() {
-    const bodyRows = [...document.querySelectorAll("#operationsBody tr[data-operation-id]")]
-    const rowsById = new Map((currentOperationsData.rows || []).map((row) => [row.id, row]))
-
-    bodyRows.forEach((rowElement) => {
-        const rowId = rowElement.dataset.operationId
-        const storedRow = rowsById.get(rowId)
-
-        if (!storedRow) {
-            return
-        }
-
-        const assetId = rowElement.querySelector('select[data-field="assetId"]')?.value || ""
-        const asset = getOperationAssetById(assetId)
-        const pair = rowElement.querySelector('select[data-field="par"]')?.value || ""
-        const stablecoinSymbol = getOperationStablecoinSymbol({ par: pair })
-
-        rowsById.set(rowId, normalizeOperationRow({
-            ...storedRow,
-            assetId,
-            activo: asset?.name || "",
-            fechaApertura: rowElement.querySelector('[data-field="fechaApertura"]')?.textContent.trim() || "",
-            par: pair,
-            stablecoinSymbol,
-            orden: rowElement.querySelector('select[data-field="orden"]')?.value || "Compra",
-            precioOrden: stripCurrencyText(rowElement.querySelector('[data-field="precioOrden"]')?.textContent || "") || "",
-            precioCurrency: rowElement.querySelector('select[data-field="precioCurrency"]')?.value || "USD",
-            cantidad: rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || "",
-            comisionesCripto: rowElement.querySelector('input[data-field="comisionesCripto"]')?.value.trim() || "",
-            total: stripCurrencyText(rowElement.querySelector('[data-field="total"]')?.textContent || "") || "",
-            currency: rowElement.querySelector('select[data-field="currency"]')?.value || "USD",
-            estado: rowElement.querySelector('select[data-field="estado"]')?.value || "Activo",
-            fechaCierre: rowElement.querySelector('[data-field="fechaCierre"]')?.textContent.trim() || ""
-        }))
-    })
-
-    currentOperationsData.rows = (currentOperationsData.rows || []).map((row) => rowsById.get(row.id) || row)
+    // Table is display-only; data is managed directly in currentOperationsData.rows via the modal
 }
 
 function scheduleOperationsAutosave(delay = 500) {

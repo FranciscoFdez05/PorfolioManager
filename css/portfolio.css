@@ -1,3 +1,7 @@
+:root{
+    --sidebar-width:300px;
+}
+
 *{
     box-sizing:border-box;
     scrollbar-width:none;
@@ -384,7 +388,9 @@ body{
 }
 
 .contentArea{
+    width:100%;
     min-width:0;
+    box-sizing:border-box;
     min-height:100%;
     padding:18px 18px 24px 18px;
     background:#0f1724;
@@ -397,8 +403,9 @@ body{
     height:100vh;
     background:#0b1120;
     border-left:1px solid #1f2937;
-    overflow:visible;
+    overflow:hidden;
     flex-shrink:0;
+    transition:width 0.22s ease, min-width 0.22s ease, border-color 0.22s ease;
 }
 
 .sideResizeHandle{
@@ -419,7 +426,7 @@ body{
 }
 
 .detailResizeHandle{
-    flex:0 0 2dvb;
+    flex:0 0 2px;
     width:100%;
     cursor:row-resize;
     background:transparent;
@@ -444,18 +451,18 @@ body{
 }
 
 .sideWrapper.collapsed{
-    width:0;
-    min-width:0;
+    width:0 !important;
+    min-width:0 !important;
     border-left:none;
 }
 
 .sideWrapper.collapsed .sidePanel{
-    display:none;
+    pointer-events:none;
 }
 
 .toggleButton{
-    position:absolute;
-    left:-20px;
+    position:fixed;
+    right:0;
     top:50%;
     transform:translateY(-50%);
     width:24px;
@@ -465,13 +472,17 @@ body{
     background:#0f1724;
     color:#ffffff;
     cursor:pointer;
-    z-index:20;
+    z-index:200;
     display:flex;
     align-items:center;
     justify-content:center;
     padding:0;
     box-shadow:0 0 0 1px #273246;
-    transition:background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+    transition:right 0.22s ease, background 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
+}
+
+.sideWrapper:not(.collapsed) ~ .toggleButton{
+    right:calc(var(--sidebar-width) - 4px);
 }
 
 .toggleButton:hover{
@@ -1000,6 +1011,47 @@ body{
     border-left:none !important;
 }
 
+.gastosEyeBtn{
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:13px;
+    padding:2px 5px;
+    border-radius:4px;
+    line-height:1;
+    color:#6b7280;
+    opacity:0.5;
+    transition:opacity 0.15s, background 0.15s, color 0.15s;
+    margin-right:2px;
+    text-decoration: line-through;
+}
+
+.gastosEyeBtn.active{
+    color:#34d399;
+    opacity:1;
+    text-decoration: none;
+}
+
+.gastosEyeBtn:hover{
+    background:rgba(255,255,255,0.08);
+    opacity:0.75;
+}
+
+.gastosEyeBtn.active:hover{
+    background:rgba(52,211,153,0.12);
+    opacity:1;
+}
+
+tr.gastosTypeEmpty td:not(.rowActionsCell) {
+    color: #374151;
+}
+
+tr.gastosTypeEmptySep td {
+    padding: 4px 0;
+    border: none;
+    background: none;
+}
+
 .assetRowEditBtn,
 .assetRowDeleteBtn{
     background:none;
@@ -1339,7 +1391,7 @@ body{
     padding:0 8px !important;
     border-left:none !important;
     border-right:none !important;
-    background:#0f1724 !important;
+    background:#0d1525 !important;
 }
 
 .interesesTable .rowActionsCell,
@@ -1357,7 +1409,7 @@ body{
     padding:0 8px !important;
     border-left:none !important;
     border-right:none !important;
-    background:#0f1724 !important;
+    background:#0d1525 !important;
 }
 
 .ventasPageExpanded .operationsTable .rowActionsCell{
@@ -1811,14 +1863,37 @@ body{
 
 .interesesTableWrapper{
     position:relative;
-    padding-left:34px;
+    border:1px solid #1e2d45;
+    border-radius:10px;
+    overflow:auto;
 }
-
 
 .interesesTable thead th{
     position:sticky;
     top:0;
     z-index:2;
+    color:#7a8fb0;
+    font-size:0.75rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    background:#0d1525;
+    border-bottom:1px solid #1e2d45;
+    padding:10px 14px;
+}
+
+.interesesTable tbody td{
+    padding:10px 14px;
+    border-bottom:1px solid #1a2640;
+    color:#ccd6f6;
+    font-size:0.84rem;
+}
+
+.interesesTable tbody tr:nth-child(odd) td{
+    background:#0f1724;
+}
+
+.interesesTable tbody tr:hover td{
+    background:#162235 !important;
 }
 
 .rowTotal{
@@ -1947,15 +2022,14 @@ body{
     display:flex;
     flex-direction:column;
     gap:10px;
-    padding-top:42px;
     width:100%;
 }
 
 .summaryCard{
     width:100%;
     background:#111827;
-    border:1px solid #273246;
-    border-radius:12px;
+    border:1px solid #1e2d45;
+    border-radius:10px;
     color:#ffffff;
     padding:14px 16px;
     display:flex;
@@ -1968,13 +2042,13 @@ body{
     font-weight:700;
     text-transform:uppercase;
     letter-spacing:0.08em;
-    color:#4a6080;
+    color:#7a8fb0;
     padding:0;
     border:none;
 }
 
 .summaryCardValue{
-    font-size:28px;
+    font-size:26px;
     font-weight:700;
     color:#ffffff;
     padding:0;
@@ -2382,13 +2456,37 @@ body{
 
 .dividendosTableWrapper{
     position:relative;
-    padding-left:34px;
+    border:1px solid #1e2d45;
+    border-radius:10px;
+    overflow:auto;
 }
 
 .dividendosTable thead th{
     position:sticky;
     top:0;
     z-index:2;
+    color:#7a8fb0;
+    font-size:0.75rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    background:#0d1525;
+    border-bottom:1px solid #1e2d45;
+    padding:10px 14px;
+}
+
+.dividendosTable tbody td{
+    padding:10px 14px;
+    border-bottom:1px solid #1a2640;
+    color:#ccd6f6;
+    font-size:0.84rem;
+}
+
+.dividendosTable tbody tr:nth-child(odd) td{
+    background:#0f1724;
+}
+
+.dividendosTable tbody tr:hover td{
+    background:#162235 !important;
 }
 
 
@@ -2396,14 +2494,14 @@ body{
     display:flex;
     flex-direction:column;
     gap:10px;
-    padding-top:42px;
 }
 
 .dividendosCalBtn{
     width:100%;
     padding:10px 8px;
-    font-size:0.88rem;
+    font-size:0.85rem;
     border-radius:10px;
+    letter-spacing:.04em;
 }
 
 /* ===== OPERACIONES ===== */
@@ -2447,7 +2545,7 @@ body{
     display:flex;
     flex-wrap:wrap;
     gap:20px;
-    align-items:flex-start;
+    align-items:center;
     background:#0d1525;
     border:1px solid #1e2d45;
     border-radius:10px;
@@ -2488,15 +2586,44 @@ body{
     position:relative;
     max-height:calc(100vh - 315px);
     overflow:auto;
-    padding-left:34px;
+    border:1px solid #1e2d45;
+    border-radius:10px;
+}
+
+.operationsTable thead th{
+    position:sticky;
+    top:0;
+    z-index:2;
+    color:#7a8fb0;
+    font-size:0.75rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    background:#0d1525;
+    border-bottom:1px solid #1e2d45;
+    padding:10px 14px;
+}
+
+.operationsTable tbody td{
+    padding:10px 14px;
+    border-bottom:1px solid #1a2640;
+    color:#ccd6f6;
+    font-size:0.84rem;
+}
+
+.operationsTable tbody tr:nth-child(odd) td{
+    background:#0f1724;
+}
+
+.operationsTable tbody tr:hover td{
+    background:#162235 !important;
 }
 
 .ventasPageExpanded .operationsTableWrapper{
-    max-height:calc(100vh - 225px);
+    max-height:calc(100vh - 293px);
 }
 
 .operationsPageCompact .operationsTableWrapper{
-    max-height:calc(100vh - 300px);
+    max-height:calc(100vh - 313px);
 }
 
 .operationsTable{
@@ -2655,12 +2782,13 @@ body{
 .operationsPairsSummary{
     border:1px solid #273246;
     background:#111827;
-    padding:12px 16px;
-    border-radius:14px;
+    padding:8px 16px;
+    border-radius:10px;
     display:flex;
     align-items:center;
     justify-content:space-between;
     gap:16px;
+    margin-left:auto;
 }
 
 .operationsPairsSummaryLabel{
@@ -2987,42 +3115,46 @@ body{
 
 .transaccionesPageCompact .operationsTable{
     table-layout:fixed;
-    min-width:1380px;
+    width:auto;
+    min-width:100%;
 }
 
 .transaccionesPageCompact .operationsTable th:nth-child(1),
 .transaccionesPageCompact .operationsTable td:nth-child(1){
-    width:120px;
+    width:115px;
 }
 
 .transaccionesPageCompact .operationsTable th:nth-child(2),
 .transaccionesPageCompact .operationsTable td:nth-child(2){
-    width:130px;
+    width:120px;
 }
 
 .transaccionesPageCompact .operationsTable th:nth-child(3),
 .transaccionesPageCompact .operationsTable td:nth-child(3){
-    width:130px;
+    width:120px;
 }
 
 .transaccionesPageCompact .operationsTable th:nth-child(4),
 .transaccionesPageCompact .operationsTable td:nth-child(4){
-    width:148px;
+    width:110px;
 }
 
 .transaccionesPageCompact .operationsTable th:nth-child(5),
 .transaccionesPageCompact .operationsTable td:nth-child(5){
-    width:150px;
+    width:190px;
+    overflow:hidden;
+    white-space:nowrap;
+    text-overflow:ellipsis;
 }
 
 .transaccionesPageCompact .operationsTable th:nth-child(6),
 .transaccionesPageCompact .operationsTable td:nth-child(6){
-    width:340px;
+    width:180px;
 }
 
 .transaccionesPageCompact .operationsTable th:nth-child(7),
 .transaccionesPageCompact .operationsTable td:nth-child(7){
-    width:200px;
+    width:260px;
 }
 
 .transaccionesPageCompact .operationsTable th:nth-child(8),
@@ -3032,10 +3164,8 @@ body{
 }
 
 .transaccionesPageCompact .operationsTable td:nth-child(6){
-    word-break:normal;
     white-space:nowrap;
     overflow:hidden;
-    text-overflow:ellipsis;
 }
 
 .transaccionesPageCompact .operationsTable td:nth-child(7){
@@ -3113,9 +3243,15 @@ body{
     display:flex;
     align-items:center;
     flex-direction:row;
-    gap:12px;
+    gap:8px;
     margin-left:auto;
     flex:0 0 auto;
+}
+
+.gastosYearActions .dangerButton{
+    height:36px;
+    font-size:14px;
+    padding:0 12px;
 }
 
 .gastosMonthBar{
@@ -3137,15 +3273,15 @@ body{
 .gastosYearBtn,
 .gastosAddYearBtn,
 .gastosMonthTab{
-    min-width:92px;
-    height:44px;
-    padding:0 16px;
+    min-width:78px;
+    height:36px;
+    padding:0 12px;
     border:1px solid #334155;
     border-radius:8px;
     background:#0f1724;
     color:#ffffff;
     cursor:pointer;
-    font-size:16px;
+    font-size:14px;
     font-weight:700;
     transition:background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
@@ -3170,17 +3306,18 @@ body{
 }
 
 .gastosAddYearBtn{
-    min-width:52px;
-    font-size:34px;
+    min-width:36px;
+    font-size:22px;
     line-height:1;
+    padding:0 10px;
 }
 
 .gastosAnnualWrapper,
 .gastosMovementsWrapper{
-    border:none;
+    border:1px solid #273246;
+    border-radius:12px;
     background:#0f1724;
     scrollbar-width:none;
-    padding-left:34px;
 }
 
 .gastosMovementsWrapper{
@@ -3206,20 +3343,23 @@ body{
 
 .gastosAnnualTable thead th,
 .gastosMovementsTable thead th{
-    padding:10px 12px;
+    padding:8px 10px;
     background:#0f1724;
     color:#f8fbff;
-    font-size:14px;
+    font-size:13px;
     font-weight:700;
     text-align:left;
     border-right:none;
     border-bottom:1px solid #273246;
     white-space:nowrap;
+    position:sticky;
+    top:0;
+    z-index:2;
 }
 
-.gastosAnnualTable thead th{
-    padding:8px 10px;
-    font-size:13px;
+.gastosMovementsTable thead th{
+    padding:9px 12px;
+    font-size:14px;
 }
 
 .gastosAnnualTable tbody td,
@@ -3229,36 +3369,38 @@ body{
     border-bottom:1px solid #273246;
     background:#111827;
     color:#e6edf8;
-    font-size:14px;
+    font-size:13px;
+    vertical-align:middle;
 }
 
 .gastosAnnualTable tbody td{
     padding:6px 8px;
-    font-size:13px;
 }
 
-.gastosMovementsTable thead th{
-    padding:9px 12px;
-}
-
+.gastosAnnualTable .rowActionHeader,
 .gastosMovementsTable .rowActionHeader{
-    width:80px;
-    min-width:80px;
-    padding:0 8px !important;
+    width:68px;
+    min-width:68px;
+    padding:0 4px !important;
     border-left:none !important;
     border-right:none !important;
     background:#0f1724 !important;
 }
 
+.gastosAnnualTable .rowActionsCell{
+    width:68px;
+    min-width:68px;
+}
+
 .gastosMovementsTable tbody td{
     padding:6px 10px;
+    font-size:14px;
     height:38px;
-    vertical-align:middle;
 }
 
 .gastosMovementsTable .rowActionsCell{
-    width:80px;
-    min-width:80px;
+    width:68px;
+    min-width:68px;
 }
 
 .gastosAnnualTable tbody tr:nth-child(odd) td,
@@ -3266,9 +3408,9 @@ body{
     background:#111827;
 }
 
-.gastosAnnualTable tbody tr:hover td,
-.gastosMovementsTable tbody tr:hover td{
-    background:#1a3050 !important;
+.gastosMovementsTable tbody tr:hover td,
+.ingresosMovementsTable tbody tr:hover td{
+    background:#162033 !important;
 }
 
 .gastosAnnualTable tbody td[contenteditable="true"],
@@ -3327,25 +3469,29 @@ body{
 }
 
 .gastosSectionRow td{
-    background:#162235 !important;
-    border-top:1px solid #3b82f6;
-    border-bottom:1px solid #3b82f6;
-    color:#ffffff !important;
+    background:#0f1724 !important;
+    border-top:2px solid #273246;
+    border-bottom:1px solid #273246;
+    color:#93c5fd !important;
+    font-size:11px !important;
     font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.07em;
+    padding-top:12px !important;
+    padding-bottom:6px !important;
 }
 
 .gastosTotalRow td{
     font-weight:700;
+    background:#0d1929 !important;
+    border-top:1px solid #273246;
+    color:#f8fbff !important;
 }
 
 .gastosAnnualTable th:first-child,
 .gastosAnnualTable td:first-child{
-    width:0;
-}
-
-.gastosAnnualTable th:nth-child(2),
-.gastosAnnualTable td:nth-child(2){
     width:114px;
+    min-width:114px;
 }
 
 .gastosMonthHeader{
@@ -3497,9 +3643,9 @@ body{
 .gastosMonthActions .primaryButton,
 .gastosMonthActions .secondaryButton,
 .gastosMonthActions .dangerButton{
-    font-size:14px;
-    padding:6px 14px;
-    height:38px;
+    font-size:13px;
+    padding:0 12px;
+    height:34px;
     white-space:nowrap;
 }
 
@@ -3513,6 +3659,363 @@ body{
     display:flex;
     gap:12px;
     flex-wrap:wrap;
+}
+
+/* ── Ingresos page ──────────────────────────────────────────────────────── */
+
+.ingresosPage{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    padding-right:18px;
+}
+
+.ingresosYearBar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:8px 2px 2px 2px;
+    margin-bottom:4px;
+    width:100%;
+}
+
+.ingresosYearActions{
+    display:flex;
+    align-items:center;
+    flex-direction:row;
+    gap:8px;
+    margin-left:auto;
+    flex:0 0 auto;
+}
+
+.ingresosYearActions .dangerButton{
+    height:36px;
+    font-size:14px;
+    padding:0 12px;
+}
+
+.ingresosMonthBar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:8px;
+    width:100%;
+}
+
+.ingresosYearList{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    flex:1 1 auto;
+}
+
+.ingresosYearBtn,
+.ingresosAddYearBtn,
+.ingresosMonthTab{
+    min-width:78px;
+    height:36px;
+    padding:0 12px;
+    border:1px solid #334155;
+    border-radius:8px;
+    background:#0f1724;
+    color:#ffffff;
+    cursor:pointer;
+    font-size:14px;
+    font-weight:700;
+    transition:background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.ingresosYearBtn:hover,
+.ingresosAddYearBtn:hover,
+.ingresosMonthTab:hover{
+    background:#162033;
+    border-color:#475569;
+    transform:translateY(-1px);
+}
+
+.ingresosYearBtn.active,
+.ingresosMonthTab.active{
+    background:#1d4ed8;
+    border-color:#3b82f6;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+.ingresosYearBtn.yearViewActive{
+    box-shadow:inset 0 0 0 2px rgba(96,165,250,0.85);
+}
+
+.ingresosAddYearBtn{
+    min-width:36px;
+    font-size:22px;
+    line-height:1;
+    padding:0 10px;
+}
+
+.ingresosMonthTab{
+    min-width:auto;
+    height:38px;
+    font-size:14px;
+    font-weight:600;
+    padding:0 14px;
+}
+
+.ingresosMonthActions .primaryButton,
+.ingresosMonthActions .secondaryButton,
+.ingresosMonthActions .dangerButton{
+    font-size:13px;
+    padding:0 12px;
+    height:34px;
+    white-space:nowrap;
+}
+
+.ingresosAnnualWrapper,
+.ingresosMovementsWrapper{
+    border:1px solid #273246;
+    border-radius:12px;
+    background:#0f1724;
+    overflow:auto;
+    scrollbar-width:none;
+}
+
+.ingresosMovementsWrapper{
+    max-height:470px;
+    overflow-y:auto;
+    overflow-x:hidden;
+}
+
+.ingresosAnnualWrapper::-webkit-scrollbar,
+.ingresosMovementsWrapper::-webkit-scrollbar{
+    width:0;
+    height:0;
+}
+
+.ingresosAnnualTable,
+.ingresosMovementsTable{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+    background:#0f1724;
+    color:#e8eefc;
+}
+
+.ingresosAnnualTable thead th,
+.ingresosMovementsTable thead th{
+    padding:8px 10px;
+    background:#0f1724;
+    color:#f8fbff;
+    font-size:13px;
+    font-weight:700;
+    text-align:left;
+    border-right:none;
+    border-bottom:1px solid #273246;
+    white-space:nowrap;
+    position:sticky;
+    top:0;
+    z-index:2;
+}
+
+.ingresosMovementsTable thead th{
+    padding:9px 12px;
+    font-size:14px;
+}
+
+.ingresosAnnualTable tbody td,
+.ingresosMovementsTable tbody td{
+    padding:8px 10px;
+    border-right:none;
+    border-bottom:1px solid #273246;
+    background:#111827;
+    color:#e6edf8;
+    font-size:13px;
+    vertical-align:middle;
+}
+
+.ingresosAnnualTable tbody td{
+    white-space:nowrap;
+}
+
+.ingresosAnnualTable .rowActionHeader,
+.ingresosMovementsTable .rowActionHeader{
+    width:68px;
+    min-width:68px;
+    padding:0 4px !important;
+    border-left:none !important;
+    border-right:none !important;
+    background:#0f1724 !important;
+}
+
+.ingresosAnnualTable .rowActionsCell{
+    width:68px;
+    min-width:68px;
+}
+
+.ingresosMovementsTable tbody td{
+    padding:6px 10px;
+    font-size:14px;
+    height:38px;
+}
+
+.ingresosMovementsTable .rowActionsCell{
+    width:68px;
+    min-width:68px;
+}
+
+.ingresosAnnualTable tbody tr:nth-child(odd) td,
+.ingresosMovementsTable tbody tr:nth-child(odd) td{
+    background:#111827;
+}
+
+.ingresosMovementsTable{
+    width:100%;
+}
+
+
+.ingresosSectionRow td{
+    background:#0f1724 !important;
+    border-top:2px solid #273246;
+    border-bottom:1px solid #273246;
+    color:#93c5fd !important;
+    font-size:11px !important;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.07em;
+    padding-top:12px !important;
+    padding-bottom:6px !important;
+}
+
+.ingresosTotalRow td{
+    font-weight:700;
+    background:#0d1929 !important;
+    border-top:1px solid #273246;
+    color:#f8fbff !important;
+}
+
+.ingresosAnnualTable th:first-child,
+.ingresosAnnualTable td:first-child{
+    width:114px;
+    min-width:114px;
+}
+
+.ingresosMonthHeader{
+    padding:8px 2px;
+    color:#e5edf9;
+    font-size:18px;
+    font-weight:700;
+}
+
+.ingresosMonthTabs{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    flex:1 1 auto;
+}
+
+.ingresosActions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.ingresosCreateModal{
+    min-width:360px;
+    max-width:520px;
+}
+
+.ingresosCreateModalWide{
+    min-width:560px;
+    max-width:780px;
+}
+
+.ingresosCreateModalBody{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    margin:16px 0;
+}
+
+.ingresosCreateModalField{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
+
+.ingresosCreateModalBody > .assetModalLabel:not(:first-child){
+    margin-top:4px;
+}
+
+.ingresosCreateModalGrid{
+    display:grid;
+    gap:10px 16px;
+}
+
+.ingresosCreateModalGridMonths{
+    grid-template-columns:repeat(4, 1fr);
+}
+
+.ingresosCreateModalFeedback{
+    margin:4px 0 0 0;
+    font-size:13px;
+    color:#86efac;
+}
+
+.ingresosCreateModalFeedback.error{
+    color:#fca5a5;
+}
+
+.ingresosCreateModalActions{
+    margin-top:8px;
+}
+
+/* KPI group ingresos personales */
+.mkpiGroupIngresosPersonales .metricasKpiGroupLabel{
+    color:#4ade80;
+}
+
+.mkpiGroupIngresosPersonales .metricasKpiCard{
+    border-color:#1a3a2a;
+}
+
+/* Metricas ingresos section headers */
+.mIngresosHeader{ flex-wrap:nowrap; gap:12px; }
+.mIngresosHeaderLeft{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+
+.mIngresosMonthToggle{
+    display:flex;
+    flex-wrap:nowrap;
+    gap:3px;
+    margin-bottom:12px;
+    background:#0d1525;
+    border:1px solid #1e2d45;
+    border-radius:6px;
+    padding:3px;
+}
+
+.mIngresosMonthToggle .mToggleBtn{
+    flex:1;
+    text-align:center;
+    min-width:0;
+    font-size:0.76rem;
+    padding:5px 2px;
+    border-radius:4px;
+    border:none;
+    color:#6b7a99;
+    background:transparent;
+    cursor:pointer;
+    transition:background .15s, color .15s;
+    white-space:nowrap;
+}
+
+.mIngresosMonthToggle .mToggleBtn:hover:not(.active){
+    background:#151f35;
+    color:#aabbd8;
+}
+
+.mIngresosMonthToggle .mToggleBtn.active{
+    background:#1e2d45;
+    color:#e5edf9;
+    font-weight:600;
 }
 
 @media (max-width:1280px){
@@ -3685,6 +4188,9 @@ body{
 .metricasPage{
     padding:20px 24px 40px;
     max-width:1600px;
+    min-width:0;
+    width:100%;
+    box-sizing:border-box;
 }
 
 .metricasHeader{
@@ -3712,14 +4218,103 @@ body{
 
 .metricasLoading.hidden{ display:none; }
 
+/* ── Metricas nav bar ── */
+.mNavBar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+}
+
+.mNavTabs{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+}
+
+.mNavTab{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    background:transparent;
+    border:1px solid #2a3a5a;
+    color:#7a8fb0;
+    font-size:0.78rem;
+    font-weight:500;
+    padding:4px 12px 4px 10px;
+    border-radius:20px;
+    cursor:pointer;
+    transition:background .15s, color .15s, border-color .15s;
+    white-space:nowrap;
+}
+
+.mNavTab::before{
+    content:"";
+    display:inline-block;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    flex-shrink:0;
+    background:#4a5a7a;
+    transition:background .15s;
+}
+
+/* Dot colors per category */
+.mNavTab[data-mcat="todo"]::before       { background:#e5edf9; }
+.mNavTab[data-mcat="portfolio"]::before  { background:#3a7bd5; }
+.mNavTab[data-mcat="finanzas"]::before   { background:#2ecc71; }
+.mNavTab[data-mcat="gastos"]::before     { background:#e74c3c; }
+.mNavTab[data-mcat="ingresos"]::before   { background:#f39c12; }
+
+/* Border colors per category */
+.mNavTab[data-mcat="todo"]       { border-color:#3a4a6a; }
+.mNavTab[data-mcat="portfolio"]  { border-color:#1e3d6e; }
+.mNavTab[data-mcat="finanzas"]   { border-color:#1a4a30; }
+.mNavTab[data-mcat="gastos"]     { border-color:#4a1e1e; }
+.mNavTab[data-mcat="ingresos"]   { border-color:#4a3010; }
+
+.mNavTab:hover{
+    color:#c5d4e8;
+    background:#151f35;
+}
+
+.mNavTab.active{
+    color:#e5edf9;
+    font-weight:600;
+}
+.mNavTab[data-mcat="todo"].active       { background:#1e2d45; border-color:#3a4a6a; }
+.mNavTab[data-mcat="portfolio"].active  { background:#0e2040; border-color:#3a7bd5; }
+.mNavTab[data-mcat="finanzas"].active   { background:#0a2a1a; border-color:#2ecc71; }
+.mNavTab[data-mcat="gastos"].active     { background:#2a0e0e; border-color:#e74c3c; }
+.mNavTab[data-mcat="ingresos"].active   { background:#2a1a00; border-color:#f39c12; }
+
+.mNavSearch{
+    background:#0d1525;
+    border:1px solid #2a3a5a;
+    border-radius:20px;
+    color:#c5d4e8;
+    font-size:0.78rem;
+    padding:4px 14px;
+    outline:none;
+    transition:border-color .15s;
+    min-width:160px;
+}
+
+.mNavSearch::placeholder{ color:#4a5a7a; }
+.mNavSearch:focus{ border-color:#3a7bd5; }
+
+.mNavHidden{ display:none !important; }
+
 /* ── KPI row ── */
 .metricasKpiSection{
     display:flex;
     gap:12px;
-    flex-wrap:nowrap;
-    overflow-x:auto;
+    flex-wrap:wrap;
     margin-bottom:28px;
     align-items:flex-start;
+    width:100%;
+    min-width:0;
 }
 
 .metricasKpiGroup{
@@ -3767,6 +4362,26 @@ body{
 .mkpiGroupBonos     .metricasKpiCard{ border-top-color:#9b59b6; }
 .mkpiGroupRf        .metricasKpiCard{ border-top-color:#00bcd4; }
 .mkpiGroupGastos    .metricasKpiCard{ border-top-color:#e74c3c; }
+
+.mkpiGroupGastosTipos{
+    flex-shrink:1;
+    min-width:0;
+}
+.mkpiGroupGastosTipos .metricasKpiGroupLabel{
+    color:#f59e0b;
+}
+.mkpiGroupGastosTipos .metricasKpiCards{
+    flex-wrap:wrap;
+    gap:6px;
+}
+.mkpiGroupGastosTipos .metricasKpiCard{
+    border-top-color:#f59e0b;
+}
+.mkpiGroupGastosTipos .mkpiLabel{
+    white-space:normal;
+    word-break:break-word;
+    max-width:140px;
+}
 
 .mkpiLabel{
     font-size:0.73rem;
@@ -3890,6 +4505,8 @@ body{
     border:1px solid #1e2d45;
     border-radius:10px;
     padding:18px 20px;
+    min-width:0;
+    overflow:hidden;
 }
 
 .metricasTableCard{
@@ -3943,6 +4560,42 @@ body{
 
 .metricasChartWrap{
     position:relative;
+}
+
+/* ── Comparativa filter buttons ── */
+.mComparativaHeader{ flex-direction:column; align-items:flex-start; gap:8px; }
+.mComparativaHeaderTop{ display:flex; align-items:center; gap:12px; width:100%; }
+.mComparativaFiltros{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:5px;
+}
+.mComparativaFiltrosLabel{
+    font-size:0.72rem;
+    color:#5a7090;
+    white-space:nowrap;
+    margin-right:2px;
+}
+.mComparativaFiltroBtn{
+    background:#1e2d45;
+    border:1px solid #3a5580;
+    color:#e5edf9;
+    font-size:0.72rem;
+    padding:3px 9px;
+    border-radius:4px;
+    cursor:pointer;
+    transition:background .15s, color .15s, border-color .15s, opacity .15s;
+}
+.mComparativaFiltroBtn.excluded{
+    background:transparent;
+    border-color:#2a3a5a;
+    color:#5a7090;
+    text-decoration:line-through;
+    opacity:0.65;
+}
+.mComparativaFiltroBtn:hover{
+    border-color:#5580aa;
 }
 
 .metricasChartDynamic{
@@ -4578,40 +5231,44 @@ body{
 }
 
 .bonosTableWrapper{
+    position:relative;
+    max-height:calc(100vh - 290px);
     overflow:auto;
-    padding-left:34px;
+    border:1px solid #1e2d45;
+    border-radius:10px;
 }
 
 .bonosTable{
     width:100%;
     border-collapse:collapse;
-    table-layout:fixed;
-    background:#0f1724;
-    color:#e8eefc;
 }
 
 .bonosTable thead th{
-    padding:10px 12px;
-    background:#0f1724;
-    color:#f8fbff;
-    font-size:14px;
-    font-weight:700;
-    text-align:left;
-    border-bottom:1px solid #273246;
-    white-space:nowrap;
+    position:sticky;
+    top:0;
+    z-index:2;
+    color:#7a8fb0;
+    font-size:0.75rem;
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    background:#0d1525;
+    border-bottom:1px solid #1e2d45;
+    padding:10px 14px;
 }
 
 .bonosTable tbody td{
-    padding:10px 12px;
-    border-bottom:1px solid #273246;
-    background:#111827;
-    color:#e6edf8;
-    font-size:14px;
-    vertical-align:middle;
+    padding:10px 14px;
+    border-bottom:1px solid #1a2640;
+    color:#ccd6f6;
+    font-size:0.84rem;
+}
+
+.bonosTable tbody tr:nth-child(odd) td{
+    background:#0f1724;
 }
 
 .bonosTable tbody tr:hover td{
-    background:#162033;
+    background:#162235 !important;
 }
 
 .bonosTable td[contenteditable="true"]{
@@ -4620,18 +5277,10 @@ body{
 
 .bonosTable td[contenteditable="true"]:focus{
     outline:none;
-    background:#162033;
+    background:#162235;
+    box-shadow:inset 0 0 0 2px #3b82f6;
 }
 
-.bonosTipoSelect{
-    background:#1a2236;
-    color:#ccd6f6;
-    border:1px solid #2a3550;
-    border-radius:4px;
-    padding:3px 6px;
-    font-size:0.82rem;
-    cursor:pointer;
-}
 
 .bonosTotalCell{
     font-weight:600;
@@ -5226,6 +5875,15 @@ html[data-theme="light"] .mActivosFilterBtn.active{ background:#e8edf5; color:#1
 html[data-theme="light"] .mActivosFilterBtn:hover:not(.active){ background:#f1f5f9; color:#1e293b; }
 html[data-theme="light"] .metricasSectionTitle{ color:#0f172a; }
 html[data-theme="light"] .metricasSection{ color:#0f172a; }
+html[data-theme="light"] .mNavTab{ border-color:#cbd5e1; color:#475569; }
+html[data-theme="light"] .mNavTab:hover{ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .mNavTab[data-mcat="todo"].active       { background:#e8edf5; border-color:#94a3b8; color:#1e293b; }
+html[data-theme="light"] .mNavTab[data-mcat="portfolio"].active  { background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
+html[data-theme="light"] .mNavTab[data-mcat="finanzas"].active   { background:#dcfce7; border-color:#22c55e; color:#166534; }
+html[data-theme="light"] .mNavTab[data-mcat="gastos"].active     { background:#fee2e2; border-color:#ef4444; color:#991b1b; }
+html[data-theme="light"] .mNavTab[data-mcat="ingresos"].active   { background:#fef3c7; border-color:#f59e0b; color:#92400e; }
+html[data-theme="light"] .mNavSearch{ background:#ffffff; border-color:#cbd5e1; color:#1e293b; }
+html[data-theme="light"] .mNavSearch::placeholder{ color:#94a3b8; }
 
 /* ── Light theme: Gastos tabs & wrappers ── */
 html[data-theme="light"] .gastosYearBtn,
@@ -5237,7 +5895,7 @@ html[data-theme="light"] .gastosMonthTab:hover{ background:#e8edf5; border-color
 html[data-theme="light"] .gastosYearBtn.active,
 html[data-theme="light"] .gastosMonthTab.active{ background:#1d4ed8; border-color:#3b82f6; color:#fff; }
 html[data-theme="light"] .gastosAnnualWrapper,
-html[data-theme="light"] .gastosMovementsWrapper{ background:#ffffff; }
+html[data-theme="light"] .gastosMovementsWrapper{ background:#ffffff; border-color:#e2e8f0; }
 html[data-theme="light"] .gastosAnnualTable,
 html[data-theme="light"] .gastosMovementsTable{ background:#ffffff; color:#1e293b; }
 html[data-theme="light"] .gastosAnnualTable thead th,
@@ -5246,8 +5904,8 @@ html[data-theme="light"] .gastosAnnualTable tbody td,
 html[data-theme="light"] .gastosMovementsTable tbody td{ background:#ffffff; border-color:#e2e8f0; color:#1e293b; }
 html[data-theme="light"] .gastosAnnualTable tbody tr:nth-child(odd) td,
 html[data-theme="light"] .gastosMovementsTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
-html[data-theme="light"] .gastosAnnualTable tbody tr:hover td,
-html[data-theme="light"] .gastosMovementsTable tbody tr:hover td{ background:#f1f5f9 !important; }
+html[data-theme="light"] .gastosMovementsTable tbody tr:hover td,
+html[data-theme="light"] .ingresosMovementsTable tbody tr:hover td{ background:#f1f5f9 !important; }
 html[data-theme="light"] .gastosAnnualTable .totalRow td,
 html[data-theme="light"] .gastosMovementsTable .totalRow td{ background:#e8edf5; color:#0f172a; border-color:#cbd5e1; }
 html[data-theme="light"] .gastosAnnualTable .headerRow td{ background:#dbeafe; color:#1d4ed8; }
@@ -5273,12 +5931,11 @@ html[data-theme="light"] .bonosFilterBtn.active{ background:#f1f5f9; color:#1e29
 html[data-theme="light"] .bonosSummaryCard{ background:#ffffff; border-color:#e2e8f0; }
 html[data-theme="light"] .bonosSummaryLabel{ color:#64748b; }
 html[data-theme="light"] .bonosSummaryValue{ color:#0f172a; }
-html[data-theme="light"] .bonosTable,
-html[data-theme="light"] .bonosTableWrapper{ background:#ffffff; }
+html[data-theme="light"] .bonosTableWrapper{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .bonosTable{ background:#ffffff; }
 html[data-theme="light"] .bonosTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
 html[data-theme="light"] .bonosTable tbody td{ background:#ffffff; color:#1e293b; border-color:#e2e8f0; }
 html[data-theme="light"] .bonosTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
-html[data-theme="light"] .bonosTable tbody tr:nth-child(even) td{ background:#fafbfc; }
 html[data-theme="light"] .bonosPage{ color:#1e293b; }
 
 /* ── Black theme: Métricas ── */
@@ -5292,6 +5949,14 @@ html[data-theme="black"] .metricasChartTitle{ color:#666; }
 html[data-theme="black"] .mActivosFilterBtn{ border-color:#222; color:#555; }
 html[data-theme="black"] .mActivosFilterBtn.active{ background:#111; color:#e0e0e0; border-color:#333; }
 html[data-theme="black"] .mActivosFilterBtn:hover:not(.active){ background:#0f0f0f; color:#aaa; }
+html[data-theme="black"] .mNavTab{ border-color:#222; color:#555; }
+html[data-theme="black"] .mNavTab:hover{ background:#111; color:#aaa; }
+html[data-theme="black"] .mNavTab[data-mcat="todo"].active       { background:#111; border-color:#444; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="portfolio"].active  { background:#071020; border-color:#3a7bd5; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="finanzas"].active   { background:#051505; border-color:#2ecc71; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="gastos"].active     { background:#150505; border-color:#e74c3c; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="ingresos"].active   { background:#150d00; border-color:#f39c12; color:#e0e0e0; }
+html[data-theme="black"] .mNavSearch{ background:#0a0a0a; border-color:#222; color:#e0e0e0; }
 
 /* ── Black theme: Gastos tabs & wrappers ── */
 html[data-theme="black"] .gastosYearBtn,
@@ -5301,7 +5966,7 @@ html[data-theme="black"] .gastosYearBtn:hover,
 html[data-theme="black"] .gastosAddYearBtn:hover,
 html[data-theme="black"] .gastosMonthTab:hover{ background:#111; border-color:#2a2a2a; }
 html[data-theme="black"] .gastosAnnualWrapper,
-html[data-theme="black"] .gastosMovementsWrapper{ background:#000; }
+html[data-theme="black"] .gastosMovementsWrapper{ background:#000; border-color:#111; }
 html[data-theme="black"] .gastosAnnualTable,
 html[data-theme="black"] .gastosMovementsTable{ background:#000; color:#e0e0e0; }
 html[data-theme="black"] .gastosAnnualTable thead th,
@@ -5356,8 +6021,8 @@ html[data-theme="black"] .bonosSummaryLabel{ color:#666; }
     background-color: #d9534f;
 }
 html[data-theme="black"] .bonosSummaryValue{ color:#f0f0f0; }
-html[data-theme="black"] .bonosTable,
-html[data-theme="black"] .bonosTableWrapper{ background:#000; }
+html[data-theme="black"] .bonosTableWrapper{ background:#000; border-color:#1a1a1a; }
+html[data-theme="black"] .bonosTable{ background:#000; }
 html[data-theme="black"] .bonosTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
 html[data-theme="black"] .bonosTable tbody td{ color:#e0e0e0; border-color:#111; }
 

@@ -78,10 +78,6 @@ function bindTransaccionesEvents() {
         body.dataset.bound = "true"
         body.addEventListener("click", handleTransaccionesClick)
         body.addEventListener("click", handleTransaccionesDeleteClick)
-        body.addEventListener("change", handleTransaccionesChange)
-        body.addEventListener("input", handleTransaccionesInput)
-        body.addEventListener("focus", handleTransaccionesFocus, true)
-        body.addEventListener("blur", handleTransaccionesBlur, true)
     }
 
     if (addButton && !addButton.dataset.bound) {
@@ -253,15 +249,16 @@ function buildTransaccionWalletSelect(value) {
 function buildTransaccionRow(row) {
     const tr = document.createElement("tr")
     const hashTransaccion = normalizeHashTransaccionValue(row.hashTransaccion || row.walletOrigen || "")
+    const walletLabel = TRANSACCION_WALLET_OPTIONS.find((o) => o.value === normalizeTransaccionWalletTipo(row.walletTipo))?.label || row.walletTipo || ""
     tr.dataset.transaccionId = row.id
     tr.innerHTML = `
-        <td contenteditable="true" data-field="fechaOperacion">${row.fechaOperacion || ""}</td>
-        <td contenteditable="true" data-field="total">${formatTransaccionesNumber(row.total)}</td>
-        <td contenteditable="true" data-field="comisionRed">${formatTransaccionesNumber(row.comisionRed)}</td>
-        <td>${buildTransaccionWalletSelect(row.walletTipo)}</td>
-        <td contenteditable="true" data-field="walletDestino">${row.walletDestino || ""}</td>
-        <td contenteditable="true" class="transaccionHashCell" data-field="hashTransaccion" data-full-value="${hashTransaccion}" title="Haz clic para copiar el hash completo">${formatHashTransaccionDisplay(hashTransaccion)}</td>
-        <td contenteditable="true" data-field="nota">${row.nota || ""}</td>
+        <td>${row.fechaOperacion || ""}</td>
+        <td>${formatTransaccionesNumber(row.total)}</td>
+        <td>${formatTransaccionesNumber(row.comisionRed)}</td>
+        <td>${walletLabel}</td>
+        <td>${row.walletDestino || ""}</td>
+        <td class="transaccionHashCell" data-full-value="${hashTransaccion}" title="Haz clic para copiar el hash completo">${formatHashTransaccionDisplay(hashTransaccion)}</td>
+        <td>${row.nota || ""}</td>
         <td class="rowActionsCell">
             <button type="button" class="assetRowEditBtn transaccionRowEditBtn" data-row-id="${row.id}" title="Editar fila">✎</button>
             <button type="button" class="assetRowDeleteBtn transaccionRowDeleteBtn" data-row-id="${row.id}" title="Eliminar fila">✕</button>
@@ -365,9 +362,16 @@ function handleTransaccionesDeleteClick(event) {
     const rowId = deleteButton.dataset.rowId
     if (!rowId) return
 
-    currentTransaccionesData.rows = (currentTransaccionesData.rows || []).filter((item) => item.id !== rowId)
-    renderTransaccionesTable()
-    scheduleTransaccionesAutosave()
+    openConfirmModal({
+        title: "Eliminar fila",
+        message: "¿Quieres eliminar esta transacción?",
+        confirmLabel: "Eliminar",
+        onConfirm: () => {
+            currentTransaccionesData.rows = (currentTransaccionesData.rows || []).filter((item) => item.id !== rowId)
+            renderTransaccionesTable()
+            scheduleTransaccionesAutosave()
+        }
+    })
 }
 
 function handleTransaccionesClick(event) {
@@ -391,23 +395,7 @@ function handleTransaccionesFocus(event) {
 }
 
 function syncTransaccionesDataFromTable() {
-    const bodyRows = [...document.querySelectorAll("#transaccionesBody tr[data-transaccion-id]")]
-    const selectedAsset = getCurrentTransaccionesAsset()
-    const hiddenRows = (currentTransaccionesData.rows || []).filter((row) => row.assetId !== currentTransaccionAssetId)
-    const visibleRows = bodyRows.map((rowElement) => ({
-        id: rowElement.dataset.transaccionId || `transaccion-${Date.now()}`,
-        assetId: currentTransaccionAssetId || "",
-        assetName: selectedAsset?.name || "",
-        fechaOperacion: rowElement.querySelector('[data-field="fechaOperacion"]')?.textContent.trim() || "",
-        total: rowElement.querySelector('[data-field="total"]')?.textContent.trim() || "",
-        comisionRed: rowElement.querySelector('[data-field="comisionRed"]')?.textContent.trim() || "",
-        walletTipo: normalizeTransaccionWalletTipo(rowElement.querySelector('select[data-field="walletTipo"]')?.value || "entre_wallet"),
-        walletDestino: rowElement.querySelector('[data-field="walletDestino"]')?.textContent.trim() || "",
-        hashTransaccion: normalizeHashTransaccionValue(rowElement.querySelector('[data-field="hashTransaccion"]')?.dataset.fullValue || rowElement.querySelector('[data-field="hashTransaccion"]')?.textContent || ""),
-        nota: rowElement.querySelector('[data-field="nota"]')?.textContent.trim() || ""
-    }))
-
-    currentTransaccionesData.rows = [...hiddenRows, ...visibleRows]
+    // Table is display-only; data is managed directly in currentTransaccionesData.rows via the modal
 }
 
 function scheduleTransaccionesAutosave(delay = 500) {

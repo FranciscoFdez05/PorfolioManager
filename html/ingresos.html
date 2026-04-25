@@ -1,4 +1,63 @@
-<div class="placeholderPage">
-    <h2>Ingresos</h2>
-    <p>Contenido pendiente.</p>
-</div>
+<section class="ingresosPage">
+    <div class="ingresosYearBar">
+        <div class="ingresosYearList" id="ingresosYearList"></div>
+        <div class="ingresosYearActions">
+            <button id="deleteIngresosYearBtn" class="dangerButton" type="button">Eliminar año</button>
+            <button id="addIngresosYearBtn" class="ingresosAddYearBtn" type="button">+</button>
+        </div>
+    </div>
+
+    <div class="ingresosMonthBar">
+        <div class="ingresosMonthTabs" id="ingresosMonthTabs"></div>
+        <div class="ingresosMonthActions">
+            <button id="sortIngresosByDateBtn" class="secondaryButton hidden" type="button">Ordenar por fecha ↑</button>
+            <button id="addIngresoTypeRowBtn" class="secondaryButton" type="button">Añadir ingreso</button>
+            <button id="addRecurrenteRowBtn" class="primaryButton" type="button">Añadir recurrente</button>
+        </div>
+    </div>
+
+    <div class="ingresosAnnualWrapper" id="ingresosAnnualWrapper">
+        <table class="ingresosAnnualTable">
+            <thead>
+                <tr>
+                    <th id="ingresosAnnualYearLabel">2026</th>
+                    <th>Enero</th>
+                    <th>Febrero</th>
+                    <th>Marzo</th>
+                    <th>Abril</th>
+                    <th>Mayo</th>
+                    <th>Junio</th>
+                    <th>Julio</th>
+                    <th>Agosto</th>
+                    <th>Septiembre</th>
+                    <th>Octubre</th>
+                    <th>Noviembre</th>
+                    <th>Diciembre</th>
+                    <th class="rowActionHeader"></th>
+                </tr>
+            </thead>
+            <tbody id="ingresosAnnualBody"></tbody>
+        </table>
+    </div>
+
+    <div class="ingresosMonthHeader hidden" id="ingresosMonthHeader"></div>
+
+    <div class="ingresosMovementsWrapper hidden" id="ingresosMovementsWrapper">
+        <table class="ingresosMovementsTable">
+            <thead>
+                <tr>
+                    <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Nombre<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Tipo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3">Cantidad<span class="mSortArrow"></span></th>
+                    <th class="rowActionHeader"></th>
+                </tr>
+            </thead>
+            <tbody id="ingresosMovementsBody"></tbody>
+        </table>
+    </div>
+
+    <div class="ingresosActions hidden" id="ingresosActions">
+        <button id="addIngresoRowBtn" class="primaryButton" type="button">Añadir fila</button>
+    </div>
+</section>

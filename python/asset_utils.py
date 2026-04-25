@@ -3,7 +3,7 @@ import re
 
 ALLOWED_ASSET_TYPES = {"cripto", "acciones", "etfs", "comoditis"}
 ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd"}
-EODHD_EXCHANGE_CODES = {"XETRA", "PA", "LSE", "US", "SW", "AS", "MC", "MI", "DU", "BE", "F", "MU", "ST", "VI", "LS"}
+EODHD_EXCHANGE_CODES = {"XETRA", "PA", "LSE", "US", "SW", "AS", "MC", "MI", "DU", "BE", "F", "MU", "ST", "VI", "LS", "FOREX", "CC"}
 
 _MAX_NAME = 120
 _MAX_SYMBOL = 40

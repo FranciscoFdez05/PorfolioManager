@@ -42,10 +42,9 @@ function collectRentaFijaDataFromTable() {
     return {
         rows: rows.map((row) => {
             const cells = row.querySelectorAll("td")
-            const tipoSelect = cells[1]?.querySelector("select")
             return {
                 fecha:            cells[0]?.textContent.trim() || "",
-                tipo:             tipoSelect?.value || "bancario",
+                tipo:             row.dataset.tipo || "bancario",
                 instrumento:      cells[2]?.textContent.trim() || "",
                 rentabilidad:     cells[3]?.textContent.trim() || "",
                 vencimiento:      cells[4]?.textContent.trim() || "",
@@ -175,17 +174,8 @@ function buildRentaFijaRow(rowData, index) {
     tr.appendChild(fechaCell)
 
     const tipoCell = document.createElement("td")
-    const tipoSelect = document.createElement("select")
-    tipoSelect.innerHTML = `
-        <option value="bancario"${(rowData.tipo || "bancario") === "bancario" ? " selected" : ""}>Bancario</option>
-        <option value="estatal"${rowData.tipo === "estatal" ? " selected" : ""}>Estatal</option>
-    `
-    tipoSelect.addEventListener("change", () => {
-        tr.dataset.tipo = tipoSelect.value
-        scheduleRentaFijaAutosave()
-        applyRentaFijaFilter(_rfCurrentFilter)
-    })
-    tipoCell.appendChild(tipoSelect)
+    const tipoLabels = { bancario: "Bancario", estatal: "Estatal" }
+    tipoCell.textContent = tipoLabels[rowData.tipo] || rowData.tipo || "Bancario"
     tr.appendChild(tipoCell)
 
     const instrumentoCell = document.createElement("td")

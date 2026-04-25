@@ -181,6 +181,14 @@ def writeAssetFile(assetId, data):
     conn.commit()
 
 
+def _parse_num(value):
+    text = str(value or "").strip().replace(".", "").replace(",", ".")
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def listAssets():
     conn = get_db()
     rows = conn.execute(
@@ -188,9 +196,66 @@ def listAssets():
         "sort_order, price, currency, precio_currency, change, status, last_updated "
         "FROM activos ORDER BY sort_order, symbol"
     ).fetchall()
-    return [
-        {
-            "id": r["id"],
+
+    asset_rows = conn.execute(
+        "SELECT asset_id, tipo_operacion, participaciones, capital_invertido_bruto, "
+        "comisiones, comisiones_fiat FROM activo_rows"
+    ).fetchall()
+
+    op_rows = conn.execute(
+        "SELECT asset_id, orden, cantidad, comisiones_cripto, total "
+        "FROM activo_operation_rows WHERE estado = 'Completado'"
+    ).fetchall()
+
+    rows_by_asset = {}
+    for row in asset_rows:
+        rows_by_asset.setdefault(row["asset_id"], []).append(row)
+
+    op_rows_by_asset = {}
+    for row in op_rows:
+        op_rows_by_asset.setdefault(row["asset_id"], []).append(row)
+
+    result = []
+    for r in rows:
+        asset_id = r["id"]
+        is_crypto = str(r["type"] or "").strip().lower() == "cripto"
+        current_price = _parse_num(r["price"])
+
+        total_partic = 0.0
+        total_invertido = 0.0
+        total_comis = 0.0
+
+        for row in rows_by_asset.get(asset_id, []):
+            tipo = str(row["tipo_operacion"] or "").strip().lower()
+            partic = _parse_num(row["participaciones"])
+            capital = _parse_num(row["capital_invertido_bruto"])
+            comis = _parse_num(row["comisiones"])
+            comis_fiat = _parse_num(row["comisiones_fiat"])
+            if tipo == "venta":
+                total_partic -= partic
+            else:
+                total_partic += partic
+                total_invertido += capital
+                total_comis += comis_fiat if is_crypto else comis
+
+        for op in op_rows_by_asset.get(asset_id, []):
+            orden = str(op["orden"] or "").strip().lower()
+            cantidad = _parse_num(op["cantidad"])
+            comis_cripto = _parse_num(op["comisiones_cripto"])
+            total_fiat = _parse_num(op["total"])
+            if orden == "venta":
+                total_partic -= cantidad + comis_cripto
+            else:
+                total_partic += max(0.0, cantidad - comis_cripto)
+                total_invertido += total_fiat
+
+        inverted_neto = max(0.0, total_invertido - total_comis)
+        neto_actual = max(0.0, total_partic) * current_price
+        rdm = neto_actual - inverted_neto
+        rdm_pct = (rdm / inverted_neto * 100) if inverted_neto > 0 else 0.0
+
+        result.append({
+            "id": asset_id,
             "name": r["name"],
             "symbol": r["symbol"],
             "marketProvider": r["market_provider"],
@@ -204,9 +269,12 @@ def listAssets():
             "change": r["change"],
             "status": r["status"],
             "lastUpdated": r["last_updated"],
-        }
-        for r in rows
-    ]
+            "rendimiento": round(rdm, 2),
+            "invertidoNeto": round(inverted_neto, 2),
+            "rendimientoPct": round(rdm_pct, 2),
+        })
+
+    return result
 
 
 def updateAssetsOrder(ordered_ids):

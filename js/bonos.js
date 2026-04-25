@@ -42,10 +42,9 @@ function collectBonosDataFromTable() {
     return {
         rows: rows.map((row) => {
             const cells = row.querySelectorAll("td")
-            const tipoSelect = cells[1]?.querySelector("select")
             return {
                 fecha:            cells[0]?.textContent.trim() || "",
-                tipo:             tipoSelect?.value || "gubernamental",
+                tipo:             row.dataset.tipo || "gubernamental",
                 instrumento:      cells[2]?.textContent.trim() || "",
                 cupon:            cells[3]?.textContent.trim() || "",
                 vencimiento:      cells[4]?.textContent.trim() || "",
@@ -175,17 +174,8 @@ function buildBonosRow(rowData, index) {
     tr.appendChild(fechaCell)
 
     const tipoCell = document.createElement("td")
-    const tipoSelect = document.createElement("select")
-    tipoSelect.innerHTML = `
-        <option value="gubernamental"${(rowData.tipo || "gubernamental") === "gubernamental" ? " selected" : ""}>Gubernamental</option>
-        <option value="corporativo"${rowData.tipo === "corporativo" ? " selected" : ""}>Corporativo</option>
-    `
-    tipoSelect.addEventListener("change", () => {
-        tr.dataset.tipo = tipoSelect.value
-        scheduleBonosAutosave()
-        applyBonosFilter(_bonosCurrentFilter)
-    })
-    tipoCell.appendChild(tipoSelect)
+    const tipoLabels = { gubernamental: "Gubernamental", corporativo: "Corporativo" }
+    tipoCell.textContent = tipoLabels[rowData.tipo] || rowData.tipo || "Gubernamental"
     tr.appendChild(tipoCell)
 
     const instrumentoCell = document.createElement("td")

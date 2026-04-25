@@ -178,6 +178,42 @@ CREATE TABLE IF NOT EXISTS mensualidades (
     UNIQUE(year, nombre)
 );
 
+CREATE TABLE IF NOT EXISTS ingresos_tipos (
+    label TEXT PRIMARY KEY
+);
+
+CREATE TABLE IF NOT EXISTS ingresos_rows (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    year     TEXT NOT NULL,
+    month    TEXT NOT NULL,
+    fecha    TEXT NOT NULL DEFAULT '',
+    nombre   TEXT NOT NULL DEFAULT '',
+    tipo     TEXT NOT NULL DEFAULT '',
+    cantidad TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS ingresos_recurrentes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    year        TEXT NOT NULL,
+    nombre      TEXT NOT NULL,
+    enero       TEXT NOT NULL DEFAULT '',
+    febrero     TEXT NOT NULL DEFAULT '',
+    marzo       TEXT NOT NULL DEFAULT '',
+    abril       TEXT NOT NULL DEFAULT '',
+    mayo        TEXT NOT NULL DEFAULT '',
+    junio       TEXT NOT NULL DEFAULT '',
+    julio       TEXT NOT NULL DEFAULT '',
+    agosto      TEXT NOT NULL DEFAULT '',
+    septiembre  TEXT NOT NULL DEFAULT '',
+    octubre     TEXT NOT NULL DEFAULT '',
+    noviembre   TEXT NOT NULL DEFAULT '',
+    diciembre   TEXT NOT NULL DEFAULT '',
+    UNIQUE(year, nombre)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ingresos_rows_year_month ON ingresos_rows(year, month);
+CREATE INDEX IF NOT EXISTS idx_ingresos_recurrentes_year ON ingresos_recurrentes(year);
+
 CREATE TABLE IF NOT EXISTS ventas_years (
     year TEXT PRIMARY KEY
 );

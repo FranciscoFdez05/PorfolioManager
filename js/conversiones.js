@@ -66,8 +66,16 @@ async function initConversionesLogic() {
             const deleteButton = event.target.closest(".conversionRowDeleteBtn")
             if (deleteButton) {
                 const row = deleteButton.closest("tr[data-row-id]")
-                row?.remove()
-                scheduleConversionesAutosave()
+                if (!row) return
+                openConfirmModal({
+                    title: "Eliminar fila",
+                    message: "¿Quieres eliminar esta conversión?",
+                    confirmLabel: "Eliminar",
+                    onConfirm: () => {
+                        row.remove()
+                        scheduleConversionesAutosave()
+                    }
+                })
             }
         })
     }

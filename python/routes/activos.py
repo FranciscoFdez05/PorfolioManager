@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 
 from app_data import readFinnhubApiKey
 from asset_store import deleteAssetFile, getAssetFile, listAssets, readAssetFile, updateAssetsOrder, writeAssetFile
+from db import get_db
 from asset_utils import (
     createDefaultAssetPayload, inferMarketProviderFromSymbol,
     normalizeMarketProvider, sanitizeAssetPayload, sanitizeAssetType, slugify,
@@ -19,6 +20,78 @@ activos_bp = Blueprint("activos", __name__)
 @activos_bp.route("/api/activos", methods=["GET"])
 def getActivos():
     return jsonify({"assets": listAssets()})
+
+
+@activos_bp.route("/api/activos/rendimiento-batch", methods=["GET"])
+def getRendimientoBatch():
+    conn = get_db()
+    assets = conn.execute(
+        "SELECT id, price, currency, type FROM activos"
+    ).fetchall()
+
+    result = {}
+
+    for asset in assets:
+        asset_id = asset["id"]
+        asset_type = str(asset["type"] or "").strip().lower()
+        is_crypto = asset_type == "cripto"
+        current_price = parse_loose_number(str(asset["price"] or "")) or 0
+
+        rows = conn.execute(
+            "SELECT tipo_operacion, participaciones, capital_invertido_bruto, "
+            "comisiones, comisiones_fiat FROM activo_rows WHERE asset_id = ?",
+            (asset_id,)
+        ).fetchall()
+
+        op_rows = conn.execute(
+            "SELECT orden, cantidad, comisiones_cripto, total FROM activo_operation_rows "
+            "WHERE asset_id = ? AND estado = 'Completado'",
+            (asset_id,)
+        ).fetchall()
+
+        total_participaciones = 0.0
+        total_invertido_bruto = 0.0
+        total_comisiones_fiat = 0.0
+
+        for row in rows:
+            tipo = str(row["tipo_operacion"] or "").strip().lower()
+            partic = parse_loose_number(str(row["participaciones"] or "")) or 0
+            capital = parse_loose_number(str(row["capital_invertido_bruto"] or "")) or 0
+            comis = parse_loose_number(str(row["comisiones"] or "")) or 0
+            comis_fiat = parse_loose_number(str(row["comisiones_fiat"] or "")) or 0
+
+            if tipo == "venta":
+                total_participaciones -= partic
+            else:
+                total_participaciones += partic
+                total_invertido_bruto += capital
+                total_comisiones_fiat += comis_fiat if is_crypto else comis
+
+        for op in op_rows:
+            orden = str(op["orden"] or "").strip().lower()
+            cantidad = parse_loose_number(str(op["cantidad"] or "")) or 0
+            comis_cripto = parse_loose_number(str(op["comisiones_cripto"] or "")) or 0
+            total_fiat = parse_loose_number(str(op["total"] or "")) or 0
+
+            if orden == "venta":
+                total_participaciones -= cantidad + comis_cripto
+            else:
+                total_participaciones += max(0, cantidad - comis_cripto)
+                total_invertido_bruto += total_fiat
+
+        inverted_neto = max(0, total_invertido_bruto - total_comisiones_fiat)
+        neto_actual = max(0, total_participaciones) * current_price
+        rendimiento = neto_actual - inverted_neto
+        rendimiento_pct = (rendimiento / inverted_neto * 100) if inverted_neto > 0 else 0
+
+        result[asset_id] = {
+            "rendimiento": round(rendimiento, 2),
+            "invertidoNeto": round(inverted_neto, 2),
+            "rendimientoPct": round(rendimiento_pct, 2),
+            "netoActual": round(neto_actual, 2),
+        }
+
+    return jsonify(result)
 
 
 @activos_bp.route("/api/activos", methods=["POST"])

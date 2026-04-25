@@ -50,12 +50,16 @@ async function loadGlobalSettings() {
             window._hiddenAssets            = new Set(data.hiddenAssets || [])
             window._metricasDisplayType     = data.metricasDisplayType ?? "doughnut"
             window._metricasDistMetric      = data.metricasDistMetric  ?? "netoActualEur"
+            window._metricasComparativaExcluded = data.comparativaExcluded ?? []
+            window._gastosHiddenTipos       = data.gastosHiddenTipos ?? []
         }
     } catch {
         window._settingsStaleHours      = 24
         window._hiddenAssets            = new Set()
         window._metricasDisplayType     = "doughnut"
         window._metricasDistMetric      = "netoActualEur"
+        window._metricasComparativaExcluded = []
+        window._gastosHiddenTipos       = []
     }
 }
 
@@ -76,6 +80,12 @@ function initSidePanel(toggleButton, sideWrapper) {
     toggleButton.addEventListener("click", () => {
         sideWrapper.classList.toggle("collapsed")
         toggleButton.innerHTML = sideWrapper.classList.contains("collapsed") ? "◀" : "▶"
+    })
+
+    sideWrapper.addEventListener("transitionend", (e) => {
+        if (e.propertyName === "width" && typeof window._resizeChartsOnSidebarChange === "function") {
+            window._resizeChartsOnSidebarChange()
+        }
     })
 }
 
@@ -170,6 +180,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initDividendosLogic()
         } else if (page === "gastos") {
             await initGastosLogic()
+        } else if (page === "ingresos") {
+            await initIngresosLogic()
         } else if (page === "ventas") {
             await initVentasLogic()
         } else if (page === "stablecoins") {
@@ -373,6 +385,7 @@ function initResizeHandles() {
                 const newW  = Math.min(SIDE_MAX, Math.max(SIDE_MIN, startW + delta))
                 sideWrapper.style.width    = newW + "px"
                 sideWrapper.style.minWidth = newW + "px"
+                document.documentElement.style.setProperty("--sidebar-width", newW + "px")
             }
 
             function onUp() {

@@ -218,6 +218,13 @@ def fetch_quote(symbol, api_key, timeout=10):
     previous_close = _safe_float(payload.get("previousClose"), fallback=0.0)
     percent_change = _safe_float(payload.get("change_p"), fallback=0.0)
 
+    if abs(percent_change) < 1e-9 and previous_close > 0 and current_price > 0:
+        absolute_change = _safe_float(payload.get("change"), fallback=0.0)
+        if abs(absolute_change) > 1e-9:
+            percent_change = absolute_change / previous_close * 100
+        elif abs(current_price - previous_close) > 1e-9:
+            percent_change = (current_price - previous_close) / previous_close * 100
+
     if current_price <= 0:
         current_price = previous_close
 
