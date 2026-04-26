@@ -250,6 +250,18 @@ async function initDividendosLogic() {
 
     initCalendarioDividendosButton()
 
+    const addYearBtn = document.getElementById("addDividendosYearBtn")
+    if (addYearBtn && !addYearBtn.dataset.bound) {
+        addYearBtn.dataset.bound = "true"
+        addYearBtn.addEventListener("click", addDividendosYear)
+    }
+
+    const deleteYearBtn = document.getElementById("deleteDividendosYearBtn")
+    if (deleteYearBtn && !deleteYearBtn.dataset.bound) {
+        deleteYearBtn.dataset.bound = "true"
+        deleteYearBtn.addEventListener("click", deleteCurrentDividendosYear)
+    }
+
     const dividendosTable = document.querySelector(".dividendosTable")
     if (dividendosTable) bindTableSort(dividendosTable)
 }

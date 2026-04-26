@@ -91,6 +91,38 @@ function handleCellBlur(event) {
 }
 
 let interesesModalKeyHandler = null
+let _allInteresesRows = []
+let currentInteresesYear = null
+
+function parseInteresYear(fecha) {
+    const p = String(fecha || "").split("-")
+    if (p.length === 3) return p[2]   // dd-mm-yyyy
+    if (p.length === 2) return p[1]   // mm-yyyy
+    return null
+}
+
+function getInteresesYears(rows) {
+    const years = new Set()
+    rows.forEach(r => { const y = parseInteresYear(r.fecha); if (y) years.add(y) })
+    return [...years].sort((a, b) => Number(a) - Number(b))
+}
+
+function renderInteresesYearBar(years) {
+    const list = document.getElementById("interesesYearList")
+    if (!list) return
+    list.innerHTML = ""
+    years.forEach(year => {
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = `interesesYearBtn${year === currentInteresesYear ? " active" : ""}`
+        btn.textContent = year
+        btn.addEventListener("click", () => {
+            currentInteresesYear = year
+            renderFilteredIntereses()
+        })
+        list.appendChild(btn)
+    })
+}
 
 function escapeInteresesHtml(value) {
     return String(value || "")
@@ -110,12 +142,12 @@ function closeInteresesModal() {
     }
 }
 
-function openInteresesModal(rowIndex = -1) {
+function openInteresesModal(globalIndex = -1, defaultFecha = "") {
     closeInteresesModal()
 
-    const rows = collectInteresesDataFromTable().rows
-    const isEdit = rowIndex >= 0
-    const rowData = isEdit ? { ...rows[rowIndex] } : {}
+    const isEdit = globalIndex >= 0
+    const rowData = isEdit ? { ..._allInteresesRows[globalIndex] } : {}
+    if (!isEdit && defaultFecha) rowData.fecha = defaultFecha
 
     const overlay = document.createElement("div")
     overlay.id = "interesesModalOverlay"
@@ -168,17 +200,18 @@ function openInteresesModal(rowIndex = -1) {
             return
         }
 
-        const nextRows = [...rows]
         const nextRow = { fecha, acumulado, impuestos }
 
         if (isEdit) {
-            nextRows[rowIndex] = nextRow
+            _allInteresesRows[globalIndex] = nextRow
         } else {
-            nextRows.push(nextRow)
+            _allInteresesRows.push(nextRow)
+            const newYear = parseInteresYear(fecha)
+            if (newYear) currentInteresesYear = newYear
         }
 
         try {
-            renderRowsFromData({ rows: nextRows })
+            renderFilteredIntereses()
             await saveInteresesDataToServer()
             closeInteresesModal()
         } catch (error) {
@@ -225,34 +258,38 @@ async function renderInteresesTable() {
 }
 
 function renderRowsFromData(interesesData) {
-    const interesesBody = document.getElementById("interesesBody")
+    _allInteresesRows = Array.isArray(interesesData?.rows) ? interesesData.rows : []
 
-    if (!interesesBody) {
-        return
-    }
+    const years = getInteresesYears(_allInteresesRows)
+    if (!currentInteresesYear && years.length) currentInteresesYear = years[years.length - 1]
+    renderInteresesYearBar(years)
+    renderFilteredIntereses()
+}
+
+function renderFilteredIntereses() {
+    const interesesBody = document.getElementById("interesesBody")
+    if (!interesesBody) return
+
+    const years = getInteresesYears(_allInteresesRows)
+    renderInteresesYearBar(years)
+
+    const visible = currentInteresesYear
+        ? _allInteresesRows.map((r, i) => ({ r, i })).filter(({ r }) => parseInteresYear(r.fecha) === currentInteresesYear)
+        : _allInteresesRows.map((r, i) => ({ r, i }))
 
     interesesBody.innerHTML = ""
-
-    const rows = Array.isArray(interesesData?.rows) ? interesesData.rows : []
-
-    rows.forEach((rowData, index) => {
+    visible.forEach(({ r: rowData, i: globalIndex }) => {
         const rowElement = document.createElement("tr")
-        rowElement.dataset.rowIndex = String(index)
-        rowElement.dataset.fecha = String(rowData.fecha || "")
-        rowElement.dataset.acumulado = String(rowData.acumulado || "")
-        rowElement.dataset.impuestos = String(rowData.impuestos || "")
-
         rowElement.innerHTML = `
             <td data-field="fecha">${rowData.fecha || ""}</td>
             <td data-field="acumulado">${formatCellEuroValue(rowData.acumulado)}</td>
             <td data-field="impuestos">${formatCellEuroValue(rowData.impuestos)}</td>
             <td class="rowTotal">0,00 €</td>
             <td class="rowActionsCell">
-                <button type="button" class="assetRowEditBtn interesesRowEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
-                <button type="button" class="assetRowDeleteBtn interesesRowDeleteBtn" data-row-index="${index}" title="Eliminar fila">✕</button>
+                <button type="button" class="assetRowEditBtn interesesRowEditBtn" data-global-index="${globalIndex}" title="Editar fila">✎</button>
+                <button type="button" class="assetRowDeleteBtn interesesRowDeleteBtn" data-global-index="${globalIndex}" title="Eliminar fila">✕</button>
             </td>
         `
-
         interesesBody.appendChild(rowElement)
     })
 
@@ -260,28 +297,14 @@ function renderRowsFromData(interesesData) {
 }
 
 function collectInteresesDataFromTable() {
-    const rowElements = [...document.querySelectorAll("#interesesBody tr")]
-
-    const rows = rowElements.map((rowElement) => {
-        return {
-            fecha: rowElement.dataset.fecha || rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
-            acumulado: rowElement.dataset.acumulado || rowElement.querySelector('[data-field="acumulado"]')?.textContent.trim() || "",
-            impuestos: rowElement.dataset.impuestos || rowElement.querySelector('[data-field="impuestos"]')?.textContent.trim() || ""
-        }
-    })
-
-    return { rows }
+    return { rows: _allInteresesRows }
 }
 
 async function saveInteresesDataToServer() {
-    const data = collectInteresesDataFromTable()
-
     const response = await fetch("/api/intereses", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify(data)
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: _allInteresesRows })
     })
 
     if (!response.ok) {
@@ -334,29 +357,26 @@ function updateTotals() {
 }
 
 function addNewInteresesRow() {
-    openInteresesModal(-1)
+    openInteresesModal()
 }
 
 function handleInteresesRowActionClick(event) {
     const editButton = event.target.closest(".interesesRowEditBtn")
     if (editButton) {
-        openInteresesModal(Number(editButton.dataset.rowIndex))
+        openInteresesModal(Number(editButton.dataset.globalIndex))
         return
     }
 
     const deleteButton = event.target.closest(".interesesRowDeleteBtn")
-    if (!deleteButton) {
-        return
-    }
+    if (!deleteButton) return
 
-    const rowIndex = Number(deleteButton.dataset.rowIndex)
-    const rows = collectInteresesDataFromTable().rows
-    const row = rows[rowIndex]
+    const globalIndex = Number(deleteButton.dataset.globalIndex)
+    const row = _allInteresesRows[globalIndex]
     const isEmpty = !row || (!row.fecha && parseEuroNumber(row.acumulado || "") === 0 && parseEuroNumber(row.impuestos || "") === 0)
 
     const removeRow = async () => {
-        rows.splice(rowIndex, 1)
-        renderRowsFromData({ rows })
+        _allInteresesRows.splice(globalIndex, 1)
+        renderFilteredIntereses()
         await saveInteresesDataToServer()
     }
 
@@ -378,6 +398,34 @@ function handleInteresesRowActionClick(event) {
             } catch (error) {
                 console.error(error)
                 alert("No se pudo eliminar la fila.")
+            }
+        }
+    })
+}
+
+function addInteresesYear() {
+    const yearStr = prompt("Introduce el año (ej: 2027):")?.trim()
+    if (!yearStr || !/^\d{4}$/.test(yearStr)) return
+    openInteresesModal(-1, `01-${yearStr}`)
+}
+
+function deleteCurrentInteresesYear() {
+    if (!currentInteresesYear) return
+
+    openConfirmModal({
+        title: "Eliminar año",
+        message: `¿Eliminar todas las filas del año ${currentInteresesYear}?`,
+        confirmLabel: "Eliminar",
+        onConfirm: async () => {
+            try {
+                _allInteresesRows = _allInteresesRows.filter(r => parseInteresYear(r.fecha) !== currentInteresesYear)
+                const remaining = getInteresesYears(_allInteresesRows)
+                currentInteresesYear = remaining.length ? remaining[remaining.length - 1] : null
+                renderRowsFromData({ rows: _allInteresesRows })
+                await saveInteresesDataToServer()
+            } catch (error) {
+                console.error(error)
+                alert("No se pudo eliminar el año.")
             }
         }
     })

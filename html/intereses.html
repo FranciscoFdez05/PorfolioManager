@@ -1,6 +1,6 @@
 <div class="interesesLayout">
-    <div class="interesesActions">
-        <button id="addRowBtn" class="primaryButton">Añadir fila</button>
+    <div class="interesesYearBar">
+        <div class="interesesYearList" id="interesesYearList"></div>
     </div>
 
     <div class="interesesMainArea">
@@ -31,6 +31,14 @@
                 <div class="summaryCardTitle">Impuestos</div>
                 <div class="summaryCardValue" id="impuestosResumen">0,00 €</div>
             </div>
+        </div>
+    </div>
+
+    <div class="dividendosActions">
+        <button id="addRowBtn" class="primaryButton" type="button">Añadir fila</button>
+        <div style="margin-left:auto;display:flex;gap:10px">
+            <button id="addInteresesYearBtn" class="secondaryButton" type="button">+ Año</button>
+            <button id="deleteInteresesYearBtn" class="dangerButton" type="button">Eliminar año</button>
         </div>
     </div>
 </div>

@@ -13,6 +13,7 @@ let _metricasSortKey = "netoActualEur"
 let _metricasSortDir = "desc"
 let _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","bonos","rentaFija"])
 let _metricasGastosTipoFilter = new Set()
+let _metricasComparativaExclude = new Set()
 let _mGastosChartsCache = null
 
 const M_GASTOS_KEYS   = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
@@ -516,6 +517,218 @@ function mRenderDividendos(dividendos) {
         options: {
             ...M_CHART_DEFAULTS, cutout: "55%",
             plugins: { ...M_CHART_DEFAULTS.plugins, legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" }, tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, donutTotal) } } }
+        }
+    })
+}
+
+// ── dividendos mensuales ───────────────────────────────────────────────────
+
+let _metricasDivMensualYear = null
+
+function mRenderDivMensual(dividendos) {
+    const section = document.getElementById("mSectionDivMensual")
+    const rows = Array.isArray(dividendos) ? dividendos : []
+    if (!rows.length) { if (section) section.classList.add("hidden"); return }
+    if (section) section.classList.remove("hidden")
+
+    function dYear(fecha) { const p = String(fecha || "").split("-"); return p.length === 3 ? p[2] : null }
+    function dMonth(fecha) { const p = String(fecha || "").split("-"); return p.length === 3 ? parseInt(p[1]) - 1 : -1 }
+
+    const years = [...new Set(rows.map(r => dYear(r.fecha)).filter(Boolean))]
+        .sort((a, b) => Number(a) - Number(b))
+
+    if (!_metricasDivMensualYear || !years.includes(_metricasDivMensualYear))
+        _metricasDivMensualYear = years[years.length - 1] || null
+
+    const yearToggle = document.getElementById("mDivMensualYearToggle")
+    if (yearToggle) {
+        yearToggle.innerHTML = years.map(y =>
+            `<button class="mToggleBtn${y === _metricasDivMensualYear ? " active" : ""}" data-divmy="${y}">${y}</button>`
+        ).join("")
+        if (!yearToggle.dataset.bound) {
+            yearToggle.dataset.bound = "true"
+            yearToggle.addEventListener("click", (e) => {
+                const btn = e.target.closest("[data-divmy]")
+                if (!btn) return
+                yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+                btn.classList.add("active")
+                _metricasDivMensualYear = btn.dataset.divmy
+                mDrawDivMensualChart(rows, _metricasDivMensualYear, dYear, dMonth)
+            })
+        }
+    }
+
+    mDrawDivMensualChart(rows, _metricasDivMensualYear, dYear, dMonth)
+}
+
+function mDrawDivMensualChart(rows, year, dYear, dMonth) {
+    const yearRows = rows.filter(r => dYear(r.fecha) === year)
+    const stocks = [...new Set(yearRows.map(r => r.instrumento || "Desconocido"))].sort()
+
+    const monthData = {}
+    stocks.forEach(s => { monthData[s] = Array(12).fill(0) })
+    yearRows.forEach(r => {
+        const m = dMonth(r.fecha)
+        if (m < 0 || m > 11) return
+        const name = r.instrumento || "Desconocido"
+        monthData[name][m] += parseEuroNumber(r.total || "")
+    })
+
+    const labels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    const stockColors = stocks.map((_, i) => M_PALETTE[i % M_PALETTE.length])
+    const datasets = stocks.map((s, i) => ({
+        label: s,
+        data: monthData[s],
+        backgroundColor: "transparent",
+        borderWidth: 0,
+        stack: "div",
+        _color: stockColors[i]
+    }))
+
+    function drawRoundRect(ctx, x, y, w, h, r) {
+        r = Math.min(r, w / 2, h / 2)
+        ctx.beginPath()
+        ctx.moveTo(x + r, y)
+        ctx.lineTo(x + w - r, y)
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+        ctx.lineTo(x + w, y + h - r)
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+        ctx.lineTo(x + r, y + h)
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+        ctx.lineTo(x, y + r)
+        ctx.quadraticCurveTo(x, y, x + r, y)
+        ctx.closePath()
+    }
+
+    const SEG_GAP = 2
+
+    const divLabelPlugin = {
+        id: "divMensualLabels",
+        afterDatasetsDraw(chart) {
+            const ctx = chart.ctx
+            ctx.save()
+
+            // Clip to plot area only
+            const { top, bottom, left, right } = chart.chartArea
+            ctx.beginPath()
+            ctx.rect(left, top, right - left, bottom - top)
+            ctx.clip()
+
+            chart.data.datasets.forEach((dataset, di) => {
+                const meta = chart.getDatasetMeta(di)
+                if (meta.hidden) return
+                const color = dataset._color || "#888"
+
+                meta.data.forEach((bar, j) => {
+                    const val = dataset.data[j]
+                    if (!val || val <= 0) return
+
+                    const rawH = Math.abs(bar.height)
+                    const barW = bar.width || 40
+                    const segTop = Math.min(bar.y, bar.base)
+                    const w  = barW - 2
+                    const x  = bar.x - barW / 2 + 1
+                    const dY = segTop + SEG_GAP
+                    const dH = Math.max(rawH - SEG_GAP - 1, 2)
+
+                    ctx.fillStyle = color + "ee"
+                    drawRoundRect(ctx, x, dY, w, dH, 5)
+                    ctx.fill()
+
+                    if (dH < 14) return
+                    const fontSize = dH >= 40 ? 12 : dH >= 26 ? 10 : 8
+                    ctx.font = `bold ${fontSize}px sans-serif`
+                    ctx.textAlign = "center"
+                    ctx.textBaseline = "middle"
+
+                    const maxW = w - 8
+                    let txt = dataset.label
+                    if (ctx.measureText(txt).width > maxW) {
+                        txt = dataset.label.split(/[\s&]+/)[0]
+                        if (ctx.measureText(txt).width > maxW) {
+                            while (txt.length > 2 && ctx.measureText(txt + "…").width > maxW)
+                                txt = txt.slice(0, -1)
+                            txt += "…"
+                        }
+                    }
+
+                    ctx.shadowColor = "rgba(0,0,0,0.8)"
+                    ctx.shadowBlur   = 4
+                    ctx.fillStyle    = "#ffffff"
+                    ctx.fillText(txt, bar.x, dY + dH / 2)
+                    ctx.shadowBlur   = 0
+                })
+            })
+
+            ctx.restore()
+        }
+    }
+
+    // Register custom tooltip positioner centered on each bar segment
+    if (window.Chart && !Chart.Tooltip.positioners.segCenter) {
+        Chart.Tooltip.positioners.segCenter = function(elements, eventPos) {
+            if (!elements.length) return false
+            const el = elements[0].element
+            const cx = el.x
+            const cy = (el.y + el.base) / 2
+            // Place tooltip to the right of the bar, vertically centered
+            const barRight = cx + (el.width || 40) / 2
+            return { x: barRight, y: cy }
+        }
+    }
+
+    mCreateChart("mChartDivMensual", {
+        type: "bar",
+        data: { labels, datasets },
+        plugins: [divLabelPlugin],
+        options: {
+            ...M_CHART_DEFAULTS,
+            scales: {
+                x: { ...mAxisX(), stacked: true },
+                y: {
+                    stacked: true,
+                    ticks: { color: "#ccd6f6", callback: v => formatEuro(v) },
+                    grid: { color: "rgba(255,255,255,0.06)" }
+                }
+            },
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: {
+                    position: "top",
+                    labels: {
+                        color: "#ffffff", font: { size: 11 }, padding: 12, boxWidth: 12,
+                        generateLabels(chart) {
+                            return chart.data.datasets.map((ds, i) => ({
+                                text: ds.label,
+                                fillStyle: (ds._color || "#888") + "ee",
+                                strokeStyle: ds._color || "#888",
+                                fontColor: "#ffffff",
+                                lineWidth: 1,
+                                hidden: chart.getDatasetMeta(i).hidden,
+                                datasetIndex: i
+                            }))
+                        }
+                    }
+                },
+                tooltip: {
+                    position: "segCenter",
+                    xAlign: "left",
+                    yAlign: "center",
+                    callbacks: {
+                        label: (c) => c.raw > 0 ? ` ${c.dataset.label}: ${formatEuro(c.raw)}` : null,
+                        labelColor: (c) => ({
+                            borderColor: c.dataset._color || "#888",
+                            backgroundColor: (c.dataset._color || "#888") + "ee"
+                        }),
+                        footer: (items) => {
+                            const total = items.filter(i => i.raw > 0).reduce((s, i) => s + i.raw, 0)
+                            return total > 0 ? [`Total mes: ${formatEuro(total)}`] : []
+                        }
+                    }
+                }
+            },
+            barPercentage: 0.75,
+            categoryPercentage: 0.8
         }
     })
 }
@@ -1264,6 +1477,85 @@ function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
     mRenderIngresosCharts(ingresosYearData)
 }
 
+// ── intereses mensuales ────────────────────────────────────────────────────
+
+let _metricasInteresesYear = null
+
+function mRenderInteresesSection(interesRows) {
+    const section = document.getElementById("mSectionIntereses")
+    const rows = Array.isArray(interesRows) ? interesRows : []
+    if (!rows.length) { if (section) section.classList.add("hidden"); return }
+    if (section) section.classList.remove("hidden")
+
+    function intYear(fecha) {
+        const p = String(fecha || "").split("-")
+        return p.length === 3 ? p[2] : p.length === 2 ? p[1] : null
+    }
+    function intMonth(fecha) {
+        const p = String(fecha || "").split("-")
+        return p.length === 3 ? parseInt(p[1]) - 1 : p.length === 2 ? parseInt(p[0]) - 1 : -1
+    }
+
+    const years = [...new Set(rows.map(r => intYear(r.fecha)).filter(Boolean))].sort((a, b) => Number(a) - Number(b))
+    if (!_metricasInteresesYear || !years.includes(_metricasInteresesYear)) _metricasInteresesYear = years[years.length - 1] || null
+
+    const yearToggle = document.getElementById("mInteresesYearToggle")
+    if (yearToggle) {
+        yearToggle.innerHTML = years.map(y =>
+            `<button class="mToggleBtn${y === _metricasInteresesYear ? " active" : ""}" data-intano="${y}">${y}</button>`
+        ).join("")
+        if (!yearToggle.dataset.bound) {
+            yearToggle.dataset.bound = "true"
+            yearToggle.addEventListener("click", (e) => {
+                const btn = e.target.closest("[data-intano]")
+                if (!btn) return
+                yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+                btn.classList.add("active")
+                _metricasInteresesYear = btn.dataset.intano
+                mDrawInteresesChart(rows, _metricasInteresesYear, intYear, intMonth)
+            })
+        }
+    }
+
+    mDrawInteresesChart(rows, _metricasInteresesYear, intYear, intMonth)
+}
+
+function mDrawInteresesChart(rows, year, intYear, intMonth) {
+    const monthNet  = Array(12).fill(0)
+    const monthAcum = Array(12).fill(0)
+
+    rows.filter(r => intYear(r.fecha) === year).forEach(r => {
+        const m = intMonth(r.fecha)
+        if (m < 0 || m > 11) return
+        const acum = parseEuroNumber(r.acumulado || "")
+        const imp  = parseEuroNumber(r.impuestos || "")
+        monthAcum[m] += acum
+        monthNet[m]  += acum - imp
+    })
+
+    const labels = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+    const netColors = monthNet.map(v => v >= 0 ? "#2ecc71" : "#e74c3c")
+
+    mCreateChart("mChartIntereses", {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [
+                { label: "Acumulado", data: monthAcum, backgroundColor: "#3a7bd544", borderColor: "#3a7bd5", borderWidth: 1, borderRadius: 4 },
+                { label: "Neto",      data: monthNet,  backgroundColor: netColors.map(c => c + "bb"), borderColor: netColors, borderWidth: 1, borderRadius: 4 }
+            ]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}` } }
+            },
+            scales: { x: mAxisX(), y: mAxisY() }
+        }
+    })
+}
+
 // ── comparativa ingresos vs gastos ─────────────────────────────────────────
 
 function mRenderComparativa(ingresosYearData, gastosYearData) {
@@ -1274,6 +1566,54 @@ function mRenderComparativa(ingresosYearData, gastosYearData) {
     }
     if (section) section.classList.remove("hidden")
 
+    // Collect all tipos de gastos (movimientos rows)
+    const tiposSet = new Set()
+    Object.values(gastosYearData?.months || {}).forEach(monthData => {
+        ;(monthData?.rows || []).forEach(row => {
+            tiposSet.add((row.tipo || "Sin tipo").trim())
+        })
+    })
+    const hasMensualidades = (gastosYearData?.mensualidades || []).length > 0
+    if (hasMensualidades) tiposSet.add("Mensualidades")
+    const allTipos = [...tiposSet].sort()
+
+    // Render filter buttons
+    const filtrosEl = document.getElementById("mComparativaFiltros")
+    if (filtrosEl && !filtrosEl.dataset.bound) {
+        filtrosEl.dataset.bound = "true"
+        filtrosEl.innerHTML = allTipos.map(t =>
+            `<button class="mActivosFilterBtn${_metricasComparativaExclude.has(t) ? "" : " active"}" data-cmp-tipo="${t}">${t}</button>`
+        ).join("")
+        filtrosEl.addEventListener("click", e => {
+            const btn = e.target.closest("[data-cmp-tipo]")
+            if (!btn) return
+            const tipo = btn.dataset.cmpTipo
+            if (_metricasComparativaExclude.has(tipo)) {
+                _metricasComparativaExclude.delete(tipo)
+                btn.classList.add("active")
+            } else {
+                _metricasComparativaExclude.add(tipo)
+                btn.classList.remove("active")
+            }
+            mDrawComparativaChart(ingresosYearData, gastosYearData)
+            // Persist to settings
+            fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ comparativaExcluded: [..._metricasComparativaExclude] })
+            }).catch(() => {})
+        })
+    } else if (filtrosEl && filtrosEl.dataset.bound) {
+        // Update button states without rebinding
+        filtrosEl.querySelectorAll("[data-cmp-tipo]").forEach(btn => {
+            btn.classList.toggle("active", !_metricasComparativaExclude.has(btn.dataset.cmpTipo))
+        })
+    }
+
+    mDrawComparativaChart(ingresosYearData, gastosYearData)
+}
+
+function mDrawComparativaChart(ingresosYearData, gastosYearData) {
     const ingMonthly = M_ING_KEYS.map(k => {
         let t = 0
         ;(ingresosYearData?.recurrentes || []).forEach(r => { t += parseEuroNumber(r.meses?.[k] || "") })
@@ -1283,8 +1623,13 @@ function mRenderComparativa(ingresosYearData, gastosYearData) {
 
     const gastosMonthly = M_GASTOS_KEYS.map(k => {
         let t = 0
-        ;(gastosYearData?.mensualidades || []).forEach(r => { t += parseEuroNumber(r.meses?.[k] || "") })
-        ;(gastosYearData?.months?.[k]?.rows || []).forEach(r => { t += parseEuroNumber(r.cantidad || "") })
+        if (!_metricasComparativaExclude.has("Mensualidades"))
+            ;(gastosYearData?.mensualidades || []).forEach(r => { t += parseEuroNumber(r.meses?.[k] || "") })
+        ;(gastosYearData?.months?.[k]?.rows || []).forEach(row => {
+            const tipo = (row.tipo || "Sin tipo").trim()
+            if (!_metricasComparativaExclude.has(tipo))
+                t += parseEuroNumber(row.cantidad || "")
+        })
         return t
     })
 
@@ -1295,9 +1640,9 @@ function mRenderComparativa(ingresosYearData, gastosYearData) {
         data: {
             labels: M_ING_LABELS,
             datasets: [
-                { label: "Ingresos", data: ingMonthly, backgroundColor: "#2ecc7188", borderColor: "#2ecc71", borderWidth: 1, borderRadius: 4 },
+                { label: "Ingresos", data: ingMonthly,   backgroundColor: "#2ecc7188", borderColor: "#2ecc71", borderWidth: 1, borderRadius: 4 },
                 { label: "Gastos",   data: gastosMonthly, backgroundColor: "#e74c3c88", borderColor: "#e74c3c", borderWidth: 1, borderRadius: 4 },
-                { label: "Balance",  data: balance, backgroundColor: balance.map(v => v >= 0 ? "#3a7bd577" : "#e74c3c44"), borderColor: balance.map(v => v >= 0 ? "#3a7bd5" : "#e74c3c"), borderWidth: 1, borderRadius: 4, type: "bar" }
+                { label: "Balance",  data: balance, backgroundColor: balance.map(v => v >= 0 ? "#3a7bd577" : "#e74c3c44"), borderColor: balance.map(v => v >= 0 ? "#3a7bd5" : "#e74c3c"), borderWidth: 1, borderRadius: 4 }
             ]
         },
         options: {
@@ -1318,6 +1663,8 @@ function mRenderAll(payload) {
     mRenderRendTipos(summaries)
     mRenderRendActivos(summaries)
     mRenderDividendos(dividendos)
+    mRenderDivMensual(dividendos)
+    mRenderInteresesSection(payload.intereses)
     mRenderBonosTipos(b)
     mRenderBonosInst(b)
     mRenderRentaFijaTipos(rf)
@@ -1336,8 +1683,11 @@ async function initMetricasLogic() {
     _metricasDistMetric   = window._metricasDistMetric  ?? "netoActualEur"
     _metricasGastosMonth  = "all"
     _metricasIngresosMonth = "all"
+    _metricasInteresesYear = null
+    _metricasDivMensualYear = null
     _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","bonos","rentaFija"])
     _metricasGastosTipoFilter = new Set()
+    _metricasComparativaExclude = new Set(window._metricasComparativaExcluded || [])
     _mGastosChartsCache = null
     _metricasPayload = null
 
@@ -1392,6 +1742,48 @@ async function initMetricasLogic() {
                 mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
             })
         })
+
+        // ── nav tabs (multi-select) ───────────────────────────────────────
+        const navTabs   = document.querySelectorAll(".mNavTab")
+        const navSearch = document.getElementById("mNavSearch")
+        const todoTab   = document.querySelector(".mNavTab[data-mcat='todo']")
+        let _mActiveCats = new Set()
+
+        function mApplyNavFilter() {
+            const q = (navSearch?.value || "").toLowerCase().trim()
+            document.querySelectorAll(".metricasSection[data-mcat], .metricasKpiGroup[data-mcat]").forEach(el => {
+                const elCat      = el.dataset.mcat
+                const catMatch   = _mActiveCats.size === 0 || [..._mActiveCats].some(c => elCat === c)
+                const titleEl    = el.querySelector(".metricasSectionTitle,.metricasKpiGroupLabel")
+                const searchMatch = !q || (titleEl?.textContent || "").toLowerCase().includes(q)
+                el.style.display = catMatch && searchMatch ? "" : "none"
+            })
+            if (todoTab) todoTab.classList.toggle("active", _mActiveCats.size === 0)
+        }
+
+        navTabs.forEach(btn => {
+            btn.addEventListener("click", () => {
+                const mcat = btn.dataset.mcat
+                if (mcat === "todo") {
+                    _mActiveCats.clear()
+                    navTabs.forEach(b => b.classList.remove("active"))
+                    btn.classList.add("active")
+                } else {
+                    const cats = mcat.split(",").map(s => s.trim())
+                    const wasActive = cats.every(c => _mActiveCats.has(c))
+                    if (wasActive) {
+                        cats.forEach(c => _mActiveCats.delete(c))
+                    } else {
+                        cats.forEach(c => _mActiveCats.add(c))
+                    }
+                    btn.classList.toggle("active", !wasActive)
+                }
+                mApplyNavFilter()
+            })
+        })
+
+        if (navSearch) navSearch.addEventListener("input", mApplyNavFilter)
+
     } catch (err) {
         console.error("Error cargando métricas:", err)
         if (loading) loading.textContent = "Error al cargar los datos."

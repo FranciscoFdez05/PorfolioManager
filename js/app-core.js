@@ -70,7 +70,7 @@ let assetModalState = null
 let confirmModalState = null
 let editAssetModalState = null
 let draggedAssetId = null
-const PAGE_HTML_VERSION = "20260425k"
+const PAGE_HTML_VERSION = "20260426a"
 
 function initSidePanel(toggleButton, sideWrapper) {
     if (!toggleButton || !sideWrapper) {
@@ -213,11 +213,13 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
 }
 
 async function initInteresesLogic() {
+    currentInteresesYear = null
     await renderInteresesTable()
 
     const interesesBody = document.getElementById("interesesBody")
     const addRowButton = document.getElementById("addRowBtn")
-    const saveInteresesButton = document.getElementById("saveInteresesBtn")
+    const addYearButton = document.getElementById("addInteresesYearBtn")
+    const deleteYearButton = document.getElementById("deleteInteresesYearBtn")
 
     if (interesesBody && !interesesBody.dataset.bound) {
         interesesBody.dataset.bound = "true"
@@ -226,21 +228,17 @@ async function initInteresesLogic() {
 
     if (addRowButton && !addRowButton.dataset.bound) {
         addRowButton.dataset.bound = "true"
-        addRowButton.addEventListener("click", () => {
-            addNewInteresesRow()
-        })
+        addRowButton.addEventListener("click", () => addNewInteresesRow())
     }
 
-    if (saveInteresesButton && !saveInteresesButton.dataset.bound) {
-        saveInteresesButton.dataset.bound = "true"
-        saveInteresesButton.addEventListener("click", async () => {
-            try {
-                await saveInteresesDataToServer()
-                alert("Datos guardados en data/intereses.json")
-            } catch (error) {
-                alert("Error al guardar: " + error.message)
-            }
-        })
+    if (addYearButton && !addYearButton.dataset.bound) {
+        addYearButton.dataset.bound = "true"
+        addYearButton.addEventListener("click", addInteresesYear)
+    }
+
+    if (deleteYearButton && !deleteYearButton.dataset.bound) {
+        deleteYearButton.dataset.bound = "true"
+        deleteYearButton.addEventListener("click", deleteCurrentInteresesYear)
     }
 
     const interesesTable = document.querySelector(".interesesTable")

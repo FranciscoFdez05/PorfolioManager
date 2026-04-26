@@ -2960,6 +2960,18 @@ function avBuildCard(asset) {
     const rClass    = hasM ? (m.rendimientoEur >= 0 ? "avPos" : "avNeg") : ""
     const rendSign  = hasM ? (m.rendimientoEur >= 0 ? "+" : "") : ""
 
+    let lastUpdatedStr = "—"
+    if (asset.lastUpdated) {
+        const d = new Date(asset.lastUpdated)
+        if (!isNaN(d)) {
+            const hh = String(d.getHours()).padStart(2, "0")
+            const mm = String(d.getMinutes()).padStart(2, "0")
+            const dd = String(d.getDate()).padStart(2, "0")
+            const mo = String(d.getMonth() + 1).padStart(2, "0")
+            lastUpdatedStr = `${dd}/${mo} ${hh}:${mm}`
+        }
+    }
+
     const card = document.createElement("div")
     card.className = "avCard"
     card.dataset.assetId = asset.id
@@ -2992,6 +3004,7 @@ function avBuildCard(asset) {
                 <span class="avMetricValue ${rClass}">${hasM ? rendSign + formatEuro(m.rendimientoEur) + (m.invertidoEur > 0 ? "  (" + rendSign + ((m.rendimientoEur / m.invertidoEur) * 100).toFixed(2) + " %)" : "") : "—"}</span>
             </div>
         </div>
+        <div class="avCardUpdated">Actualizado: ${lastUpdatedStr}</div>
         <div class="avCardBar" style="background:${color}"></div>
     `
 

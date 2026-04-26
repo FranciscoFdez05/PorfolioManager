@@ -1845,6 +1845,7 @@ tr.gastosTypeEmptySep td {
     flex-direction:column;
     gap:12px;
     padding-right:18px;
+    flex:1;
 }
 
 .interesesMainArea{
@@ -1852,6 +1853,42 @@ tr.gastosTypeEmptySep td {
     grid-template-columns:1fr 220px;
     column-gap:20px;
     align-items:start;
+}
+
+.interesesYearBar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    padding:4px 2px;
+}
+
+.interesesYearList{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    flex:1 1 auto;
+}
+
+.interesesYearBtn{
+    min-width:68px;
+    height:34px;
+    padding:0 12px;
+    border:1px solid #334155;
+    border-radius:8px;
+    background:#0f1724;
+    color:#ffffff;
+    font-size:13px;
+    cursor:pointer;
+    transition:background 0.15s, border-color 0.15s;
+}
+
+.interesesYearBtn:hover{ background:#162235; border-color:#4a90d9; }
+.interesesYearBtn.active{ background:#1e3a5f; border-color:#3b82f6; color:#93c5fd; }
+
+.interesesYearActions{
+    display:flex;
+    gap:12px;
 }
 
 .interesesActions{
@@ -2438,6 +2475,7 @@ tr.gastosTypeEmptySep td {
     display:flex;
     flex-direction:column;
     gap:12px;
+    flex:1;
 }
 
 .dividendosMainArea{
@@ -2450,6 +2488,7 @@ tr.gastosTypeEmptySep td {
 .dividendosActions{
     display:flex;
     gap:10px;
+    margin-top:auto;
 }
 
 .dividendosTableSection{
@@ -2513,6 +2552,7 @@ tr.gastosTypeEmptySep td {
     flex-direction:column;
     gap:18px;
     padding-right:18px;
+    flex:1;
 }
 
 .operationsPageCompact{
@@ -2621,8 +2661,8 @@ tr.gastosTypeEmptySep td {
 }
 
 .ventasPageExpanded .operationsTableWrapper{
-    flex:1;
     max-height:calc(100vh - 293px);
+    height:auto;
 }
 
 .operationsPageCompact .operationsTableWrapper{
@@ -2765,6 +2805,7 @@ tr.gastosTypeEmptySep td {
     display:flex;
     gap:12px;
     flex-wrap:wrap;
+    margin-top:auto;
 }
 
 .operationsPageCompact .operationsActions{
@@ -4209,7 +4250,7 @@ tr.gastosTypeEmptySep td {
 /* ===== METRICAS ===== */
 
 .metricasPage{
-    padding:20px 24px 40px;
+    padding:8px 24px 40px;
     max-width:1600px;
     min-width:0;
     width:100%;
@@ -4220,7 +4261,7 @@ tr.gastosTypeEmptySep td {
     display:flex;
     align-items:center;
     gap:18px;
-    margin-bottom:22px;
+    margin-bottom:12px;
 }
 
 .metricasTitle{
@@ -4284,18 +4325,20 @@ tr.gastosTypeEmptySep td {
 }
 
 /* Dot colors per category */
-.mNavTab[data-mcat="todo"]::before       { background:#e5edf9; }
-.mNavTab[data-mcat="portfolio"]::before  { background:#3a7bd5; }
-.mNavTab[data-mcat="finanzas"]::before   { background:#2ecc71; }
-.mNavTab[data-mcat="gastos"]::before     { background:#e74c3c; }
-.mNavTab[data-mcat="ingresos"]::before   { background:#f39c12; }
+.mNavTab[data-mcat="todo"]::before              { background:#e5edf9; }
+.mNavTab[data-mcat="portfolio"]::before         { background:#3a7bd5; }
+.mNavTab[data-mcat="finanzas"]::before          { background:#2ecc71; }
+.mNavTab[data-mcat="gastos"]::before            { background:#e74c3c; }
+.mNavTab[data-mcat="ingresos"]::before          { background:#f39c12; }
+.mNavTab[data-mcat="gastos,ingresos"]::before   { background:linear-gradient(135deg,#e74c3c 50%,#f39c12 50%); }
 
 /* Border colors per category */
-.mNavTab[data-mcat="todo"]       { border-color:#3a4a6a; }
-.mNavTab[data-mcat="portfolio"]  { border-color:#1e3d6e; }
-.mNavTab[data-mcat="finanzas"]   { border-color:#1a4a30; }
-.mNavTab[data-mcat="gastos"]     { border-color:#4a1e1e; }
-.mNavTab[data-mcat="ingresos"]   { border-color:#4a3010; }
+.mNavTab[data-mcat="todo"]             { border-color:#3a4a6a; }
+.mNavTab[data-mcat="portfolio"]        { border-color:#1e3d6e; }
+.mNavTab[data-mcat="finanzas"]         { border-color:#1a4a30; }
+.mNavTab[data-mcat="gastos"]           { border-color:#4a1e1e; }
+.mNavTab[data-mcat="ingresos"]         { border-color:#4a3010; }
+.mNavTab[data-mcat="gastos,ingresos"]  { border-color:#4a2510; }
 
 .mNavTab:hover{
     color:#c5d4e8;
@@ -4306,11 +4349,12 @@ tr.gastosTypeEmptySep td {
     color:#e5edf9;
     font-weight:600;
 }
-.mNavTab[data-mcat="todo"].active       { background:#1e2d45; border-color:#3a4a6a; }
-.mNavTab[data-mcat="portfolio"].active  { background:#0e2040; border-color:#3a7bd5; }
-.mNavTab[data-mcat="finanzas"].active   { background:#0a2a1a; border-color:#2ecc71; }
-.mNavTab[data-mcat="gastos"].active     { background:#2a0e0e; border-color:#e74c3c; }
-.mNavTab[data-mcat="ingresos"].active   { background:#2a1a00; border-color:#f39c12; }
+.mNavTab[data-mcat="todo"].active              { background:#1e2d45; border-color:#3a4a6a; }
+.mNavTab[data-mcat="portfolio"].active         { background:#0e2040; border-color:#3a7bd5; }
+.mNavTab[data-mcat="finanzas"].active          { background:#0a2a1a; border-color:#2ecc71; }
+.mNavTab[data-mcat="gastos"].active            { background:#2a0e0e; border-color:#e74c3c; }
+.mNavTab[data-mcat="ingresos"].active          { background:#2a1a00; border-color:#f39c12; }
+.mNavTab[data-mcat="gastos,ingresos"].active   { background:#2a1200; border-color:#e8720e; color:#f5c89a; }
 
 .mNavSearch{
     background:#0d1525;
@@ -5045,7 +5089,7 @@ tr.gastosTypeEmptySep td {
 
 .avCardName{
     font-size:1rem;
-    color:#7a8fb0;
+    color:#e5edf9;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
@@ -5062,6 +5106,13 @@ tr.gastosTypeEmptySep td {
     font-size:0.72rem;
     color:#4a5a78;
     margin-top:2px;
+}
+
+.avCardUpdated{
+    font-size:0.68rem;
+    color:#3a4a68;
+    margin-top:8px;
+    text-align:left;
 }
 
 .avCardBar{
@@ -5900,11 +5951,12 @@ html[data-theme="light"] .metricasSectionTitle{ color:#0f172a; }
 html[data-theme="light"] .metricasSection{ color:#0f172a; }
 html[data-theme="light"] .mNavTab{ border-color:#cbd5e1; color:#475569; }
 html[data-theme="light"] .mNavTab:hover{ background:#f1f5f9; color:#1e293b; }
-html[data-theme="light"] .mNavTab[data-mcat="todo"].active       { background:#e8edf5; border-color:#94a3b8; color:#1e293b; }
-html[data-theme="light"] .mNavTab[data-mcat="portfolio"].active  { background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
-html[data-theme="light"] .mNavTab[data-mcat="finanzas"].active   { background:#dcfce7; border-color:#22c55e; color:#166534; }
-html[data-theme="light"] .mNavTab[data-mcat="gastos"].active     { background:#fee2e2; border-color:#ef4444; color:#991b1b; }
-html[data-theme="light"] .mNavTab[data-mcat="ingresos"].active   { background:#fef3c7; border-color:#f59e0b; color:#92400e; }
+html[data-theme="light"] .mNavTab[data-mcat="todo"].active              { background:#e8edf5; border-color:#94a3b8; color:#1e293b; }
+html[data-theme="light"] .mNavTab[data-mcat="portfolio"].active         { background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
+html[data-theme="light"] .mNavTab[data-mcat="finanzas"].active          { background:#dcfce7; border-color:#22c55e; color:#166534; }
+html[data-theme="light"] .mNavTab[data-mcat="gastos"].active            { background:#fee2e2; border-color:#ef4444; color:#991b1b; }
+html[data-theme="light"] .mNavTab[data-mcat="ingresos"].active          { background:#fef3c7; border-color:#f59e0b; color:#92400e; }
+html[data-theme="light"] .mNavTab[data-mcat="gastos,ingresos"].active   { background:#fff0e0; border-color:#e8720e; color:#92350e; }
 html[data-theme="light"] .mNavSearch{ background:#ffffff; border-color:#cbd5e1; color:#1e293b; }
 html[data-theme="light"] .mNavSearch::placeholder{ color:#94a3b8; }
 
@@ -5974,11 +6026,12 @@ html[data-theme="black"] .mActivosFilterBtn.active{ background:#111; color:#e0e0
 html[data-theme="black"] .mActivosFilterBtn:hover:not(.active){ background:#0f0f0f; color:#aaa; }
 html[data-theme="black"] .mNavTab{ border-color:#222; color:#555; }
 html[data-theme="black"] .mNavTab:hover{ background:#111; color:#aaa; }
-html[data-theme="black"] .mNavTab[data-mcat="todo"].active       { background:#111; border-color:#444; color:#e0e0e0; }
-html[data-theme="black"] .mNavTab[data-mcat="portfolio"].active  { background:#071020; border-color:#3a7bd5; color:#e0e0e0; }
-html[data-theme="black"] .mNavTab[data-mcat="finanzas"].active   { background:#051505; border-color:#2ecc71; color:#e0e0e0; }
-html[data-theme="black"] .mNavTab[data-mcat="gastos"].active     { background:#150505; border-color:#e74c3c; color:#e0e0e0; }
-html[data-theme="black"] .mNavTab[data-mcat="ingresos"].active   { background:#150d00; border-color:#f39c12; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="todo"].active              { background:#111; border-color:#444; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="portfolio"].active         { background:#071020; border-color:#3a7bd5; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="finanzas"].active          { background:#051505; border-color:#2ecc71; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="gastos"].active            { background:#150505; border-color:#e74c3c; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="ingresos"].active          { background:#150d00; border-color:#f39c12; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="gastos,ingresos"].active   { background:#130800; border-color:#e8720e; color:#e0c090; }
 html[data-theme="black"] .mNavSearch{ background:#0a0a0a; border-color:#222; color:#e0e0e0; }
 
 /* ── Black theme: Gastos tabs & wrappers ── */
@@ -6117,6 +6170,7 @@ html[data-theme="light"] .avCard:hover{ border-color:var(--av-color,#3a7bd5); }
 html[data-theme="light"] .avCardName{ color:#64748b; }
 html[data-theme="light"] .avCardPrice{ color:#0f172a; }
 html[data-theme="light"] .avCardTicker{ color:#94a3b8; }
+html[data-theme="light"] .avCardUpdated{ color:#b0bec5; }
 html[data-theme="light"] .avCardMetrics{ border-top-color:#e2e8f0; }
 html[data-theme="light"] .avMetricLabel{ color:#94a3b8; }
 html[data-theme="light"] .avMetricValue{ color:#1e293b; }
@@ -6126,6 +6180,7 @@ html[data-theme="black"] .avCard{ background:#0a0a0a; border-color:#1a1a1a; }
 html[data-theme="black"] .avCardName{ color:#666; }
 html[data-theme="black"] .avCardPrice{ color:#f0f0f0; }
 html[data-theme="black"] .avCardTicker{ color:#444; }
+html[data-theme="black"] .avCardUpdated{ color:#333; }
 html[data-theme="black"] .avCardMetrics{ border-top-color:#1a1a1a; }
 html[data-theme="black"] .avMetricLabel{ color:#555; }
 html[data-theme="black"] .avMetricValue{ color:#e0e0e0; }

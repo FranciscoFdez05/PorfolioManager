@@ -1,6 +1,6 @@
 <div class="dividendosLayout">
-    <div class="dividendosActions">
-        <button id="addRowDividendoBtn" class="primaryButton">Añadir fila</button>
+    <div class="interesesYearBar">
+        <div class="interesesYearList" id="dividendosYearList"></div>
     </div>
 
     <div class="dividendosMainArea">
@@ -35,6 +35,14 @@
                 <div class="summaryCardTitle">Impuestos</div>
                 <div class="summaryCardValue" id="impuestosDividendosResumen">0,00 €</div>
             </div>
+        </div>
+    </div>
+
+    <div class="dividendosActions">
+        <button id="addRowDividendoBtn" class="primaryButton" type="button">Añadir fila</button>
+        <div style="margin-left:auto;display:flex;gap:10px">
+            <button id="addDividendosYearBtn" class="secondaryButton" type="button">+ Año</button>
+            <button id="deleteDividendosYearBtn" class="dangerButton" type="button">Eliminar año</button>
         </div>
     </div>
 </div>

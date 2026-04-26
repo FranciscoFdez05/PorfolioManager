@@ -1,5 +1,37 @@
 let _dividendosAssets = []
 let dividendosModalKeyHandler = null
+let _allDividendosRows = []
+let currentDividendosYear = null
+
+function parseDividendoYear(fecha) {
+    const p = String(fecha || "").split("-")
+    if (p.length === 3) return p[2]
+    if (p.length === 2) return p[1]
+    return null
+}
+
+function getDividendosYears(rows) {
+    const years = new Set()
+    rows.forEach(r => { const y = parseDividendoYear(r.fecha); if (y) years.add(y) })
+    return [...years].sort((a, b) => Number(a) - Number(b))
+}
+
+function renderDividendosYearBar(years) {
+    const list = document.getElementById("dividendosYearList")
+    if (!list) return
+    list.innerHTML = ""
+    years.forEach(year => {
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = `interesesYearBtn${year === currentDividendosYear ? " active" : ""}`
+        btn.textContent = year
+        btn.addEventListener("click", () => {
+            currentDividendosYear = year
+            renderFilteredDividendos()
+        })
+        list.appendChild(btn)
+    })
+}
 
 function escapeDividendosHtml(value) {
     return String(value || "")
@@ -42,12 +74,12 @@ function closeDividendosModal() {
     }
 }
 
-function openDividendosModal(rowIndex = -1) {
+function openDividendosModal(globalIndex = -1, defaultFecha = "") {
     closeDividendosModal()
 
-    const rows = collectDividendosDataFromTable().rows
-    const isEdit = rowIndex >= 0
-    const rowData = isEdit ? { ...rows[rowIndex] } : {}
+    const isEdit = globalIndex >= 0
+    const rowData = isEdit ? { ..._allDividendosRows[globalIndex] } : {}
+    if (!isEdit && defaultFecha) rowData.fecha = defaultFecha
 
     const overlay = document.createElement("div")
     overlay.id = "dividendosModalOverlay"
@@ -113,17 +145,18 @@ function openDividendosModal(rowIndex = -1) {
             return
         }
 
-        const nextRows = [...rows]
         const nextRow = { fecha, instrumento, acciones, dividendoAccion, impuestos, total }
 
         if (isEdit) {
-            nextRows[rowIndex] = nextRow
+            _allDividendosRows[globalIndex] = nextRow
         } else {
-            nextRows.push(nextRow)
+            _allDividendosRows.push(nextRow)
+            const newYear = parseDividendoYear(fecha)
+            if (newYear) currentDividendosYear = newYear
         }
 
         try {
-            renderDividendosRowsFromData({ rows: nextRows })
+            renderFilteredDividendos()
             await saveDividendosDataToServer()
             closeDividendosModal()
         } catch (error) {
@@ -174,25 +207,29 @@ async function renderDividendosTable() {
 }
 
 function renderDividendosRowsFromData(dividendosData) {
-    const dividendosBody = document.getElementById("dividendosBody")
+    _allDividendosRows = Array.isArray(dividendosData?.rows) ? dividendosData.rows : []
 
-    if (!dividendosBody) {
-        return
-    }
+    const years = getDividendosYears(_allDividendosRows)
+    if (!currentDividendosYear && years.length) currentDividendosYear = years[years.length - 1]
+    renderDividendosYearBar(years)
+    renderFilteredDividendos()
+}
+
+function renderFilteredDividendos() {
+    const dividendosBody = document.getElementById("dividendosBody")
+    if (!dividendosBody) return
+
+    const years = getDividendosYears(_allDividendosRows)
+    renderDividendosYearBar(years)
+
+    const visible = currentDividendosYear
+        ? _allDividendosRows.map((r, i) => ({ r, i })).filter(({ r }) => parseDividendoYear(r.fecha) === currentDividendosYear)
+        : _allDividendosRows.map((r, i) => ({ r, i }))
 
     dividendosBody.innerHTML = ""
-
-    const rows = Array.isArray(dividendosData?.rows) ? dividendosData.rows : []
-
-    rows.forEach((rowData, index) => {
+    visible.forEach(({ r: rowData, i: globalIndex }) => {
         const rowElement = document.createElement("tr")
-        rowElement.dataset.rowIndex = String(index)
-        rowElement.dataset.fecha = String(rowData.fecha || "")
-        rowElement.dataset.instrumento = String(rowData.instrumento || "")
-        rowElement.dataset.acciones = String(rowData.acciones || "")
-        rowElement.dataset.dividendoAccion = String(rowData.dividendoAccion || "")
-        rowElement.dataset.impuestos = String(rowData.impuestos || "")
-        rowElement.dataset.total = String(rowData.total || "")
+        rowElement.dataset.globalIndex = String(globalIndex)
 
         rowElement.innerHTML = `
             <td data-field="fecha">${rowData.fecha || ""}</td>
@@ -202,11 +239,10 @@ function renderDividendosRowsFromData(dividendosData) {
             <td data-field="impuestos">${formatCellEuroValue(rowData.impuestos)}</td>
             <td class="rowTotal">${formatCellEuroValue(rowData.total)}</td>
             <td class="rowActionsCell">
-                <button type="button" class="assetRowEditBtn dividendosRowEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
-                <button type="button" class="assetRowDeleteBtn dividendosRowDeleteBtn" data-row-index="${index}" title="Eliminar fila">✕</button>
+                <button type="button" class="assetRowEditBtn dividendosRowEditBtn" data-global-index="${globalIndex}" title="Editar fila">✎</button>
+                <button type="button" class="assetRowDeleteBtn dividendosRowDeleteBtn" data-global-index="${globalIndex}" title="Eliminar fila">✕</button>
             </td>
         `
-
         dividendosBody.appendChild(rowElement)
     })
 
@@ -214,20 +250,7 @@ function renderDividendosRowsFromData(dividendosData) {
 }
 
 function collectDividendosDataFromTable() {
-    const rowElements = [...document.querySelectorAll("#dividendosBody tr")]
-
-    const rows = rowElements.map((rowElement) => {
-        return {
-            fecha: rowElement.dataset.fecha || rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
-            instrumento: rowElement.dataset.instrumento || rowElement.querySelector('[data-field="instrumento"]')?.textContent.trim() || "",
-            acciones: rowElement.dataset.acciones || rowElement.querySelector('[data-field="acciones"]')?.textContent.trim() || "",
-            dividendoAccion: rowElement.dataset.dividendoAccion || rowElement.querySelector('[data-field="dividendoAccion"]')?.textContent.trim() || "",
-            impuestos: rowElement.dataset.impuestos || rowElement.querySelector('[data-field="impuestos"]')?.textContent.trim() || "",
-            total: rowElement.dataset.total || rowElement.querySelector(".rowTotal")?.textContent.trim() || ""
-        }
-    })
-
-    return { rows }
+    return { rows: _allDividendosRows }
 }
 
 async function saveDividendosDataToServer() {
@@ -289,26 +312,51 @@ function addNewDividendosRow() {
     openDividendosModal(-1)
 }
 
+function addDividendosYear() {
+    const yearStr = prompt("Introduce el año (ej: 2027):")?.trim()
+    if (!yearStr || !/^\d{4}$/.test(yearStr)) return
+    openDividendosModal(-1, `01-01-${yearStr}`)
+}
+
+function deleteCurrentDividendosYear() {
+    if (!currentDividendosYear) return
+
+    openConfirmModal({
+        title: "Eliminar año",
+        message: `¿Eliminar todas las filas del año ${currentDividendosYear}?`,
+        confirmLabel: "Eliminar",
+        onConfirm: async () => {
+            try {
+                _allDividendosRows = _allDividendosRows.filter(r => parseDividendoYear(r.fecha) !== currentDividendosYear)
+                const remaining = getDividendosYears(_allDividendosRows)
+                currentDividendosYear = remaining.length ? remaining[remaining.length - 1] : null
+                renderFilteredDividendos()
+                await saveDividendosDataToServer()
+            } catch (error) {
+                console.error(error)
+                alert("No se pudo eliminar el año.")
+            }
+        }
+    })
+}
+
 function handleDividendosRowActionClick(event) {
     const editButton = event.target.closest(".dividendosRowEditBtn")
     if (editButton) {
-        openDividendosModal(Number(editButton.dataset.rowIndex))
+        openDividendosModal(Number(editButton.dataset.globalIndex))
         return
     }
 
     const deleteButton = event.target.closest(".dividendosRowDeleteBtn")
-    if (!deleteButton) {
-        return
-    }
+    if (!deleteButton) return
 
-    const rowIndex = Number(deleteButton.dataset.rowIndex)
-    const rows = collectDividendosDataFromTable().rows
-    const row = rows[rowIndex]
+    const globalIndex = Number(deleteButton.dataset.globalIndex)
+    const row = _allDividendosRows[globalIndex]
     const isEmpty = !row || (!row.fecha && !row.instrumento && parseLooseNumber(row.acciones || "") === 0 && parseDollarNumber(row.dividendoAccion || "") === 0 && parseEuroNumber(row.impuestos || "") === 0 && parseEuroNumber(row.total || "") === 0)
 
     const removeRow = async () => {
-        rows.splice(rowIndex, 1)
-        renderDividendosRowsFromData({ rows })
+        _allDividendosRows.splice(globalIndex, 1)
+        renderFilteredDividendos()
         await saveDividendosDataToServer()
     }
 
