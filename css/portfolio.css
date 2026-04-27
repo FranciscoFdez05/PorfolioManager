@@ -920,9 +920,18 @@ body{
 
 .conversionesTableWrapper{
     max-height:calc(100vh - 395px);
-    min-height:494px;
     overflow-y:auto;
     overflow-x:hidden;
+    scrollbar-width:none;
+    border:1px solid #1e2d45;
+    border-radius:10px;
+}
+
+
+.conversionesTable{
+    min-width:0;
+    width:100%;
+    table-layout:auto;
 }
 
 .assetTableWrapper::-webkit-scrollbar{
@@ -997,7 +1006,7 @@ body{
     display:flex;
     gap:12px;
     flex-wrap:wrap;
-    margin-top:12px;
+    margin-top:auto;
 }
 
 .rowActionsHeader{
@@ -1870,6 +1879,12 @@ tr.gastosTypeEmptySep td {
     flex:1 1 auto;
 }
 
+.interesesYearBarActions{
+    display:flex;
+    gap:8px;
+    flex-shrink:0;
+}
+
 .interesesYearBtn{
     min-width:68px;
     height:34px;
@@ -2264,6 +2279,33 @@ tr.gastosTypeEmptySep td {
 .hResultPositive{ color:#2ecc71; }
 .hResultNegative{ color:#e74c3c; }
 
+/* Ratio Oro/Plata */
+.hRatioFuenteMsg{
+    font-size:.82rem;
+    margin-bottom:.5rem;
+    min-height:1.2em;
+}
+.hRatioFuenteOk  { color:#2ecc71; }
+.hRatioFuenteWarn{ color:#f39c12; }
+
+.hRatioInterpretacion{
+    margin-top:1rem;
+    padding:.75rem 1rem;
+    border-radius:6px;
+    font-size:.9rem;
+    line-height:1.5;
+}
+.hRatioInfoPos{
+    background:#1a3a2a;
+    border-left:3px solid #2ecc71;
+    color:#a8e6c1;
+}
+.hRatioInfoNeg{
+    background:#3a1a1a;
+    border-left:3px solid #e74c3c;
+    color:#f0a0a0;
+}
+
 .herramientaChartWrap{
     height:300px;
     position:relative;
@@ -2445,7 +2487,6 @@ tr.gastosTypeEmptySep td {
 
     .conversionesTableWrapper{
         max-height:500px;
-        min-height:420px;
     }
 }
 
@@ -2557,6 +2598,7 @@ tr.gastosTypeEmptySep td {
 
 .operationsPageCompact{
     gap:12px;
+    flex:none;
 }
 
 .operationsHeader{
@@ -2667,6 +2709,7 @@ tr.gastosTypeEmptySep td {
 
 .operationsPageCompact .operationsTableWrapper{
     max-height:calc(100vh - 313px);
+    overflow-y:auto;
 }
 
 .operationsTable{
@@ -2808,9 +2851,6 @@ tr.gastosTypeEmptySep td {
     margin-top:auto;
 }
 
-.operationsPageCompact .operationsActions{
-    margin-top:-2px;
-}
 
 .operationsWorkspace{
     display:block;
@@ -2896,7 +2936,7 @@ tr.gastosTypeEmptySep td {
 }
 
 .stablecoinsPage .operationsTableWrapper{
-    max-height:calc(8 * 50px + 42px);
+    max-height:calc(9 * 41px + 42px);
     overflow-y:auto;
 }
 
@@ -3055,6 +3095,7 @@ tr.gastosTypeEmptySep td {
 
 .transaccionesPageCompact .operationsTableWrapper{
     max-height:calc(100vh - 325px);
+    overflow-y:auto;
 }
 
 .transaccionesAssetPanel{
@@ -5194,7 +5235,7 @@ tr.gastosTypeEmptySep td {
     flex-direction:column;
     gap:16px;
     padding:16px;
-    min-height:0;
+    flex:1;
 }
 
 .bonosToolbar{
@@ -5306,7 +5347,7 @@ tr.gastosTypeEmptySep td {
 
 .bonosTableWrapper{
     position:relative;
-    max-height:calc(100vh - 290px);
+    max-height:calc(11 * 41px + 42px);
     overflow:auto;
     border:1px solid #1e2d45;
     border-radius:10px;

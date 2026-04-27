@@ -1,8 +1,6 @@
 <div class="bonosPage">
 
     <div class="bonosToolbar">
-        <button id="bonosAddBtn" class="primaryButton">+ Añadir bono</button>
-
         <div class="bonosFilters" id="bonosFilters">
             <button class="bonosFilterBtn active" data-tipo="all">Todos</button>
             <button class="bonosFilterBtn" data-tipo="gubernamental">Gubernamentales</button>
@@ -43,15 +41,15 @@
         <table class="bonosTable">
             <thead>
                 <tr>
-                    <th>Fecha</th>
-                    <th>Tipo</th>
-                    <th>Instrumento</th>
-                    <th>Cupón %</th>
-                    <th>Vencimiento</th>
-                    <th>Invertido</th>
-                    <th>Interés acum.</th>
-                    <th>Impuestos</th>
-                    <th>Total neto</th>
+                    <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Tipo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Instrumento<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3">Cupón %<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="4">Vencimiento<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5">Invertido<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6">Interés acum.<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="7">Impuestos<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="8">Total neto<span class="mSortArrow"></span></th>
                     <th class="rowActionsCell"></th>
                 </tr>
             </thead>
@@ -59,6 +57,10 @@
         </table>
     </div>
 
-    <p class="bonosEmpty hidden" id="bonosEmpty">No hay bonos registrados. Añade uno con el botón superior.</p>
+    <p class="bonosEmpty hidden" id="bonosEmpty">No hay bonos registrados. Añade uno con el botón inferior.</p>
+
+    <div class="dividendosActions">
+        <button id="bonosAddBtn" class="primaryButton">+ Añadir bono</button>
+    </div>
 
 </div>

@@ -241,3 +241,45 @@ copy data\portfolio.db.bak data\portfolio.db
 ### Inspeccionar la base de datos manualmente
 
 Puedes abrir `data/portfolio.db` con cualquier cliente SQLite, por ejemplo [DB Browser for SQLite](https://sqlitebrowser.org/) (gratuito, multiplataforma).
+
+---
+
+## Changelog
+
+### 2026-04-27 — Mejoras de UI en módulo Cripto
+
+#### Botón "Añadir fila" anclado al fondo izquierdo
+- En las páginas **Stablecoins**, **Operaciones**, **Transacciones** y **Conversiones**, el botón "Añadir fila" se ha movido fuera del `<section>` como hijo directo de `#dynamicContent` (`display:flex; flex-direction:column; min-height:100%`). Con `margin-top:auto` queda anclado en la esquina inferior izquierda del viewport independientemente del número de filas.
+
+#### Borde dinámico de las secciones
+- Las secciones compactas (`.operationsPageCompact`) usan `flex:none` para ajustar su altura al contenido, eliminando el espacio vacío entre la tabla y el botón.
+- La tabla de Stablecoins limita el scroll a **9 filas visibles** (`max-height: calc(9 * 41px + 42px)`).
+
+#### Tabla de Conversiones rediseñada
+- Cambio de clase `assetOperationsTable` → `operationsTable` para heredar el estilo unificado (cabeceras en mayúsculas, fondo oscuro, sticky header, hover y filas alternas).
+- Borde redondeado (`border-radius:10px; border:1px solid #1e2d45`) igual al del resto de tablas.
+- Altura dinámica: eliminado `min-height` fijo del wrapper.
+- Las celdas **Fecha**, **Par** y **Cantidad** dejan de ser `contenteditable`; el campo **Tipo** pasa de `<select>` inline a texto plano con `data-value`. Todo se edita exclusivamente desde el modal (botón ✎).
+
+#### Ordenación por columna
+- Añadida ordenación ascendente/descendente al pulsar cualquier cabecera en: **Bonos**, **Renta Fija**, **Stablecoins**, **Operaciones**, **Transacciones** y **Conversiones**.
+- Reutiliza la función `bindTableSort()` de `shared-utils.js` (ya usada en Ventas y Vista General). Soporta fechas `dd-mm-aaaa`, números y texto. Las flechas ▲▼ indican la columna y dirección activas.
+
+### 2026-04-27 — Herramienta Ratio Oro/Plata
+
+Nueva calculadora en el módulo **Herramientas** que muestra cuántas onzas de plata son necesarias para comprar una onza de oro.
+
+#### Funcionamiento
+- Botón **"Cargar precios guardados"**: busca automáticamente en la cartera activos cuyo nombre o símbolo contenga `oro/gold/xau` y `plata/silver/xag`, rellena los inputs con sus precios actuales y calcula el ratio al instante.
+- Los precios también se pueden introducir manualmente para cualquier combinación de valores.
+
+#### Resultados mostrados
+| Campo | Descripción |
+|---|---|
+| Onzas de plata por 1 oz de oro | El ratio actual |
+| vs. media histórica (~50) | Desviación porcentual respecto a la media histórica del siglo XX |
+| Precio justo de la plata (ratio 50) | A qué precio debería cotizar la plata si el ratio fuera 50 |
+| Plata necesaria para 1 oz de oro | Ozs y valor en euros al precio actual |
+
+- Si el ratio está **por encima de 50** → la plata está relativamente barata frente al oro (banner verde).
+- Si el ratio está **por debajo de 50** → la plata está relativamente cara frente al oro (banner rojo).

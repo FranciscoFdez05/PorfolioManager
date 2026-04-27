@@ -914,6 +914,7 @@ function mComputeGastosData(yearData) {
             const val = parseEuroNumber(m.meses?.[k] || "")
             totalMes[k] += val
             totalMensualidades += val
+            if (val > 0) totalTipo["Mensualidades"] = (totalTipo["Mensualidades"] || 0) + val
         })
     })
 
@@ -965,6 +966,7 @@ function mRenderGastos(yearsList, yearData) {
                     const monthToggle = document.getElementById("mGastosMonthToggle")
                     if (monthToggle) { monthToggle.dataset.bound = ""; monthToggle.innerHTML = "" }
                     mRenderGastos(yearsList, newData)
+                    mRenderComparativa(_metricasPayload.ingresosYearData, newData)
                 }
             })
         } else {
@@ -1577,14 +1579,13 @@ function mRenderComparativa(ingresosYearData, gastosYearData) {
     if (hasMensualidades) tiposSet.add("Mensualidades")
     const allTipos = [...tiposSet].sort()
 
-    // Render filter buttons
+    // Render filter buttons — always rebuild so listener always sees current year data
     const filtrosEl = document.getElementById("mComparativaFiltros")
-    if (filtrosEl && !filtrosEl.dataset.bound) {
-        filtrosEl.dataset.bound = "true"
+    if (filtrosEl) {
         filtrosEl.innerHTML = allTipos.map(t =>
             `<button class="mActivosFilterBtn${_metricasComparativaExclude.has(t) ? "" : " active"}" data-cmp-tipo="${t}">${t}</button>`
         ).join("")
-        filtrosEl.addEventListener("click", e => {
+        filtrosEl.onclick = e => {
             const btn = e.target.closest("[data-cmp-tipo]")
             if (!btn) return
             const tipo = btn.dataset.cmpTipo
@@ -1595,19 +1596,13 @@ function mRenderComparativa(ingresosYearData, gastosYearData) {
                 _metricasComparativaExclude.add(tipo)
                 btn.classList.remove("active")
             }
-            mDrawComparativaChart(ingresosYearData, gastosYearData)
-            // Persist to settings
+            mDrawComparativaChart(_metricasPayload.ingresosYearData, _metricasPayload.gastosYearData)
             fetch("/api/settings", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ comparativaExcluded: [..._metricasComparativaExclude] })
             }).catch(() => {})
-        })
-    } else if (filtrosEl && filtrosEl.dataset.bound) {
-        // Update button states without rebinding
-        filtrosEl.querySelectorAll("[data-cmp-tipo]").forEach(btn => {
-            btn.classList.toggle("active", !_metricasComparativaExclude.has(btn.dataset.cmpTipo))
-        })
+        }
     }
 
     mDrawComparativaChart(ingresosYearData, gastosYearData)
@@ -1621,17 +1616,23 @@ function mDrawComparativaChart(ingresosYearData, gastosYearData) {
         return t
     })
 
-    const gastosMonthly = M_GASTOS_KEYS.map(k => {
-        let t = 0
-        if (!_metricasComparativaExclude.has("Mensualidades"))
-            ;(gastosYearData?.mensualidades || []).forEach(r => { t += parseEuroNumber(r.meses?.[k] || "") })
+    const gastosDetalle = M_GASTOS_KEYS.map(k => {
+        const detalle = {}
+        if (!_metricasComparativaExclude.has("Mensualidades")) {
+            const mens = (gastosYearData?.mensualidades || []).reduce((s, r) => s + parseEuroNumber(r.meses?.[k] || ""), 0)
+            if (mens > 0) detalle["Mensualidades"] = mens
+        }
         ;(gastosYearData?.months?.[k]?.rows || []).forEach(row => {
             const tipo = (row.tipo || "Sin tipo").trim()
-            if (!_metricasComparativaExclude.has(tipo))
-                t += parseEuroNumber(row.cantidad || "")
+            if (!_metricasComparativaExclude.has(tipo)) {
+                const val = parseEuroNumber(row.cantidad || "")
+                if (val > 0) detalle[tipo] = (detalle[tipo] || 0) + val
+            }
         })
-        return t
+        return detalle
     })
+
+    const gastosMonthly = gastosDetalle.map(d => Object.values(d).reduce((s, v) => s + v, 0))
 
     const balance = ingMonthly.map((ing, i) => ing - gastosMonthly[i])
 
@@ -1647,7 +1648,20 @@ function mDrawComparativaChart(ingresosYearData, gastosYearData) {
         },
         options: {
             ...M_CHART_DEFAULTS,
-            plugins: { ...M_CHART_DEFAULTS.plugins, tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}` } } },
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                tooltip: {
+                    callbacks: {
+                        label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}`,
+                        afterLabel: (c) => {
+                            if (c.dataset.label !== "Gastos") return []
+                            return Object.entries(gastosDetalle[c.dataIndex])
+                                .sort((a, b) => b[1] - a[1])
+                                .map(([tipo, val]) => `  · ${tipo}: ${formatEuro(val)}`)
+                        }
+                    }
+                }
+            },
             scales: { x: mAxisX(), y: mAxisY() }
         }
     })

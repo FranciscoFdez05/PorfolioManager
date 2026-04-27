@@ -470,6 +470,7 @@ function renderOperationsTable() {
     })
 
     renderOperationsStablecoinPanel()
+    bindTableSort(operationsBody.closest("table"))
 }
 
 function buildOperationAssetSelect(selectedAssetId) {

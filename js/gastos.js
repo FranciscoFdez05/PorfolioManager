@@ -628,7 +628,12 @@ function renderGastosAnnualTable() {
 
     const mensualidadesRow = document.createElement("tr")
     mensualidadesRow.className = "gastosSectionRow"
-    mensualidadesRow.innerHTML = `<td colspan="14">Mensualidades</td>`
+    const mensSectionHidden = isGastoTipoHidden("Mensualidades")
+    mensualidadesRow.innerHTML = `
+        <td colspan="13">Mensualidades</td>
+        <td class="rowActionsCell">
+            <button type="button" class="gastosEyeBtn${mensSectionHidden ? "" : " active"}" data-gastos-eye-mens="1" title="${mensSectionHidden ? "Mostrar en Métricas" : "Ocultar de Métricas"}">👁</button>
+        </td>`
     annualBody.appendChild(mensualidadesRow)
 
     currentGastosData.mensualidades.forEach((row, rowIndex) => {
@@ -811,6 +816,10 @@ function openGastoTypeRenameModal(rowIndex) {
 }
 
 function handleGastosEyeClick(event) {
+    if (event.target.closest("[data-gastos-eye-mens]")) {
+        toggleGastoTipoVisibility("Mensualidades").then(() => renderGastosAnnualTable())
+        return
+    }
     const eyeBtn = event.target.closest("[data-gastos-eye-type]")
     if (!eyeBtn) return
     const rowIndex = Number(eyeBtn.dataset.gastosEyeType)

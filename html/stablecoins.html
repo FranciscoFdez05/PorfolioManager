@@ -16,26 +16,26 @@
         <table class="operationsTable stablecoinsTable">
             <thead>
                 <tr>
-                    <th>Stablecoin</th>
-                    <th>Fecha</th>
-                    <th>Tipo</th>
-                    <th>Divisa fiat</th>
-                    <th>Cantidad</th>
-                    <th>Precio unitario</th>
-                    <th>Total fiat</th>
-                    <th>Nota</th>
+                    <th class="mThSort" data-sortkey="0">Stablecoin<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Fecha<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Tipo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3">Divisa fiat<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="4">Cantidad<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5">Precio unitario<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6">Total fiat<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="7">Nota<span class="mSortArrow"></span></th>
                     <th class="rowActionsCell"></th>
                 </tr>
             </thead>
             <tbody id="stablecoinsBody"></tbody>
         </table>
     </div>
-
-    <div class="operationsActions">
-        <button id="addStablecoinRowBtn" class="primaryButton" type="button">Añadir fila</button>
-        <button id="saveStablecoinsBtn" class="secondaryButton" type="button">Guardar</button>
-    </div>
 </section>
+
+<div class="operationsActions">
+    <button id="addStablecoinRowBtn" class="primaryButton" type="button">Añadir fila</button>
+    <button id="saveStablecoinsBtn" class="secondaryButton" type="button">Guardar</button>
+</div>
 
 <div class="modalOverlay hidden" id="stablecoinModalOverlay">
     <div class="assetModal stablecoinModal" role="dialog" aria-modal="true" aria-labelledby="stablecoinModalTitle">

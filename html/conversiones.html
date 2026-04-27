@@ -10,14 +10,14 @@
         </div>
     </div>
 
-    <div class="assetTableWrapper conversionesTableWrapper">
-        <table class="assetOperationsTable">
+    <div class="conversionesTableWrapper">
+        <table class="operationsTable conversionesTable">
             <thead>
                 <tr>
-                    <th>Fecha</th>
-                    <th>Par</th>
-                    <th>Tipo</th>
-                    <th>Cantidad</th>
+                    <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Par<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Tipo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3">Cantidad<span class="mSortArrow"></span></th>
                     <th class="rowActionsCell"></th>
                 </tr>
             </thead>
@@ -25,7 +25,8 @@
         </table>
     </div>
 
-    <div class="assetActions">
-        <button id="addConversionRowBtn" class="primaryButton" type="button">Añadir fila</button>
-    </div>
 </section>
+
+<div class="assetActions">
+    <button id="addConversionRowBtn" class="primaryButton" type="button">Añadir fila</button>
+</div>

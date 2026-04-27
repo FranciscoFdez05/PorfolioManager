@@ -14,13 +14,13 @@
         <table class="operationsTable">
             <thead>
                 <tr>
-                    <th>Fecha operación</th>
-                    <th>Total cripto</th>
-                    <th>Comisión red</th>
-                    <th>Wallet</th>
-                    <th>Wallet destino</th>
-                    <th>Hash transacción</th>
-                    <th>Nota</th>
+                    <th class="mThSort" data-sortkey="0">Fecha operación<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Total cripto<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Comisión red<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3">Wallet<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="4">Wallet destino<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5">Hash transacción<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6">Nota<span class="mSortArrow"></span></th>
                     <th class="rowActionsCell"></th>
                 </tr>
             </thead>
@@ -28,8 +28,9 @@
         </table>
     </div>
 
-    <div class="operationsActions">
-        <button id="addTransaccionRowBtn" class="primaryButton" type="button">Añadir fila</button>
-        <button id="saveTransaccionesBtn" class="secondaryButton" type="button">Guardar</button>
-    </div>
 </section>
+
+<div class="operationsActions">
+    <button id="addTransaccionRowBtn" class="primaryButton" type="button">Añadir fila</button>
+    <button id="saveTransaccionesBtn" class="secondaryButton" type="button">Guardar</button>
+</div>

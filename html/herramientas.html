@@ -7,6 +7,7 @@
         <button class="herramientaBtn" data-tool="regla72">Regla del 72</button>
         <button class="herramientaBtn" data-tool="cagr">CAGR</button>
         <button class="herramientaBtn" data-tool="rentDividendo">Rent. Dividendo</button>
+        <button class="herramientaBtn" data-tool="ratioOroPlata">Ratio Oro/Plata</button>
     </div>
 
     <div class="herramientasContent" id="herramientasContent">
@@ -285,6 +286,52 @@
                     </div>
                 </div>
 
+            </div>
+        </div>
+
+        <!-- ── Ratio Oro / Plata ──────────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolRatioOroPlata">
+            <h3 class="herramientaPanelTitle">Ratio Oro / Plata</h3>
+            <div class="herramientaBody">
+                <div class="herramientaInputs">
+                    <div class="hBtnRow" style="margin-bottom:.75rem">
+                        <button class="herramientaSecBtn" id="hRatioLoadBtn">Cargar precios guardados</button>
+                    </div>
+                    <div class="hRatioFuenteMsg" id="hRatioFuenteMsg"></div>
+                    <div class="herramientaField">
+                        <label>Precio del oro (€/oz)</label>
+                        <input type="number" id="hRatioPrecioOro" value="" min="0" step="0.01" placeholder="Introduce o carga precio">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Precio de la plata (€/oz)</label>
+                        <input type="number" id="hRatioPrecioPlata" value="" min="0" step="0.01" placeholder="Introduce o carga precio">
+                    </div>
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hRatioCalcBtn">Calcular</button>
+                        <button class="herramientaResetBtn" data-panel="toolRatioOroPlata">Reiniciar</button>
+                    </div>
+                </div>
+                <div class="herramientaResults hidden" id="hRatioResults">
+                    <div class="herramientaResultGrid">
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Onzas de plata por 1 oz de oro</div>
+                            <div class="hResultValue hResultPositive" id="hRatioValor">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Media histórica (~50)</div>
+                            <div class="hResultValue" id="hRatioVsHistorico">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Precio justo de la plata (a ratio 50)</div>
+                            <div class="hResultValue" id="hRatioPrecioJusto">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Plata necesaria para 1 oz de oro</div>
+                            <div class="hResultValue" id="hRatioPlataParaOro">---</div>
+                        </div>
+                    </div>
+                    <div class="hRatioInterpretacion" id="hRatioInterpretacion"></div>
+                </div>
             </div>
         </div>
 

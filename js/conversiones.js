@@ -146,6 +146,7 @@ function renderConversionesRows(rows, asset) {
     rows.forEach((row) => {
         body.appendChild(buildConversionesRowElement(row, asset))
     })
+    bindTableSort(body.closest("table"))
 }
 
 function buildConversionesRowElement(row = {}, asset = conversionesCurrentAsset) {
@@ -153,10 +154,10 @@ function buildConversionesRowElement(row = {}, asset = conversionesCurrentAsset)
     rowElement.dataset.rowId = String(row.id || createConversionRowId())
 
     rowElement.innerHTML = `
-        <td contenteditable="true" data-field="fecha">${row.fecha || ""}</td>
-        <td contenteditable="true" data-field="par">${row.par || ""}</td>
-        <td>${buildAssetConversionTypeSelect(row.tipo || "", asset || {})}</td>
-        <td contenteditable="true" data-field="cantidad">${formatAssetParticipationValue(row.cantidad || "", "cripto")}</td>
+        <td data-field="fecha">${row.fecha || ""}</td>
+        <td data-field="par">${row.par || ""}</td>
+        <td data-field="tipo" data-value="${row.tipo || ""}">${row.tipo || ""}</td>
+        <td data-field="cantidad">${formatAssetParticipationValue(row.cantidad || "", "cripto")}</td>
         <td class="rowActionsCell">
             <button type="button" class="assetRowEditBtn conversionRowEditBtn" data-row-id="${rowElement.dataset.rowId}" title="Editar fila">✎</button>
             <button type="button" class="assetRowDeleteBtn conversionRowDeleteBtn" data-row-id="${rowElement.dataset.rowId}" title="Eliminar fila">✕</button>
@@ -189,7 +190,7 @@ function collectConversionesRows() {
         id: rowElement.dataset.rowId || createConversionRowId(),
         fecha: rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
         par: rowElement.querySelector('[data-field="par"]')?.textContent.trim() || "",
-        tipo: rowElement.querySelector('select[data-field="tipo"]')?.value || getConvertedInOperationLabel(deriveAssetBaseSymbolFromData(conversionesCurrentAsset || {})),
+        tipo: rowElement.querySelector('[data-field="tipo"]')?.dataset.value || getConvertedInOperationLabel(deriveAssetBaseSymbolFromData(conversionesCurrentAsset || {})),
         cantidad: rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || ""
     })).filter((row) => {
         const quantity = parseLooseNumber(row.cantidad || "") || 0
@@ -223,7 +224,7 @@ function openConversiónRowModal(rowId) {
     const rowData = isEdit ? {
         fecha: rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
         par: rowElement.querySelector('[data-field="par"]')?.textContent.trim() || "",
-        tipo: rowElement.querySelector('select[data-field="tipo"]')?.value || "",
+        tipo: rowElement.querySelector('[data-field="tipo"]')?.dataset.value || "",
         cantidad: rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || ""
     } : { fecha: "", par: "", tipo: "", cantidad: "" }
 
@@ -318,11 +319,11 @@ function saveConversiónRowFromModal() {
     if (rowElement) {
         const fechaCell = rowElement.querySelector('[data-field="fecha"]')
         const parCell = rowElement.querySelector('[data-field="par"]')
-        const tipoSelect = rowElement.querySelector('select[data-field="tipo"]')
+        const tipoCell = rowElement.querySelector('[data-field="tipo"]')
         const cantidadCell = rowElement.querySelector('[data-field="cantidad"]')
         if (fechaCell) fechaCell.textContent = g("cvModalFecha")
         if (parCell) parCell.textContent = g("cvModalPar")
-        if (tipoSelect) tipoSelect.value = g("cvModalTipo")
+        if (tipoCell) { tipoCell.dataset.value = g("cvModalTipo"); tipoCell.textContent = g("cvModalTipo") }
         if (cantidadCell) cantidadCell.textContent = g("cvModalCantidad")
     } else {
         const body = document.getElementById("conversionesBody")

@@ -2959,6 +2959,7 @@ function avBuildCard(asset) {
     const hasM      = !!m
     const rClass    = hasM ? (m.rendimientoEur >= 0 ? "avPos" : "avNeg") : ""
     const rendSign  = hasM ? (m.rendimientoEur >= 0 ? "+" : "") : ""
+    const avgPriceStr = hasM && m.promedioCompra > 0 ? formatMoney(m.promedioCompra, m.currency || currency) : "—"
 
     let lastUpdatedStr = "—"
     if (asset.lastUpdated) {
@@ -2999,9 +3000,13 @@ function avBuildCard(asset) {
                 <span class="avMetricLabel">Valor actual</span>
                 <span class="avMetricValue">${hasM ? formatEuro(m.netoActualEur) : "—"}</span>
             </div>
-            <div class="avMetricItem avMetricItemWide">
+            <div class="avMetricItem">
+                <span class="avMetricLabel">P. medio compra</span>
+                <span class="avMetricValue">${avgPriceStr}</span>
+            </div>
+            <div class="avMetricItem">
                 <span class="avMetricLabel">Rendimiento</span>
-                <span class="avMetricValue ${rClass}">${hasM ? rendSign + formatEuro(m.rendimientoEur) + (m.invertidoEur > 0 ? "  (" + rendSign + ((m.rendimientoEur / m.invertidoEur) * 100).toFixed(2) + " %)" : "") : "—"}</span>
+                <span class="avMetricValue ${rClass}">${hasM ? rendSign + formatEuro(m.rendimientoEur) + (m.invertidoEur > 0 ? "<br><small>" + rendSign + ((m.rendimientoEur / m.invertidoEur) * 100).toFixed(2) + " %</small>" : "") : "—"}</span>
             </div>
         </div>
         <div class="avCardUpdated">Actualizado: ${lastUpdatedStr}</div>
@@ -3168,6 +3173,8 @@ async function avLoadMetrics() {
 
             const m = {
                 participaciones: row.participaciones,
+                promedioCompra:  row.promedioCompra,
+                currency:        row.currency,
                 netoActualEur:   euros.netoActualEur,
                 invertidoEur:    euros.invertidoNetoEur,
                 rendimientoEur:  euros.rendimientoEur
@@ -3179,19 +3186,17 @@ async function avLoadMetrics() {
 
             const rClass  = m.rendimientoEur >= 0 ? "avPos" : "avNeg"
             const sign    = m.rendimientoEur >= 0 ? "+" : ""
-            const rendPct = m.invertidoEur > 0
-                ? sign + ((m.rendimientoEur / m.invertidoEur) * 100).toFixed(2) + " %"
-                : "—"
-
-            const rendStr = sign + formatEuro(m.rendimientoEur) +
-                (m.invertidoEur > 0 ? "  (" + rendPct + ")" : "")
+            const rendStr = m.invertidoEur > 0
+                ? sign + formatEuro(m.rendimientoEur) + "<br><small>" + sign + ((m.rendimientoEur / m.invertidoEur) * 100).toFixed(2) + " %</small>"
+                : sign + formatEuro(m.rendimientoEur)
 
             const vals = cardEl.querySelectorAll(".avMetricValue")
-            if (vals.length >= 3) {
+            if (vals.length >= 4) {
                 vals[0].textContent = formatShareQuantity(m.participaciones)
                 vals[1].textContent = formatEuro(m.netoActualEur)
-                vals[2].textContent = rendStr
-                vals[2].className   = "avMetricValue " + rClass
+                vals[2].textContent = m.promedioCompra > 0 ? formatMoney(m.promedioCompra, m.currency) : "—"
+                vals[3].innerHTML   = rendStr
+                vals[3].className   = "avMetricValue " + rClass
             }
         } catch (e) {
             console.error("avLoadMetrics error", asset.id, e)

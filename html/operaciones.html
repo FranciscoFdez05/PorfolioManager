@@ -42,16 +42,16 @@
                 <table class="operationsTable">
                     <thead>
                         <tr>
-                            <th>Activo</th>
-                            <th>Fecha Apertura</th>
-                            <th>Par</th>
-                            <th>Orden</th>
-                            <th>Precio Orden</th>
-                            <th>Cantidad</th>
-                            <th>Comisiones</th>
-                            <th>Total</th>
-                            <th>Estado</th>
-                            <th>Fecha Cierre</th>
+                            <th class="mThSort" data-sortkey="0">Activo<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="1">Fecha Apertura<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="2">Par<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="3">Orden<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="4">Precio Orden<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="5">Cantidad<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="6">Comisiones<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="7">Total<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="8">Estado<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="9">Fecha Cierre<span class="mSortArrow"></span></th>
                             <th class="rowActionsCell"></th>
                         </tr>
                     </thead>
@@ -59,10 +59,11 @@
                 </table>
             </div>
 
-            <div class="operationsActions">
-                <button id="addOperationRowBtn" class="primaryButton" type="button">Añadir fila</button>
-                <button id="saveOperationsBtn" class="secondaryButton" type="button">Guardar</button>
-            </div>
         </div>
     </div>
 </section>
+
+<div class="operationsActions">
+    <button id="addOperationRowBtn" class="primaryButton" type="button">Añadir fila</button>
+    <button id="saveOperationsBtn" class="secondaryButton" type="button">Guardar</button>
+</div>

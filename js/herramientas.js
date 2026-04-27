@@ -57,6 +57,10 @@ async function initHerramientasLogic() {
     document.getElementById("hDivLoadBtn")?.addEventListener("click", hLoadDividendos)
     document.getElementById("hYieldCalcBtn")?.addEventListener("click", hCalcYield)
 
+    // ── Ratio Oro / Plata ──────────────────────────────────────────
+    document.getElementById("hRatioLoadBtn")?.addEventListener("click", hRatioLoadPrecios)
+    document.getElementById("hRatioCalcBtn")?.addEventListener("click", hCalcRatioOroPlata)
+
     // ── Enter para calcular ────────────────────────────────────────
     document.querySelectorAll(".herramientaPanel input").forEach((input) => {
         input.addEventListener("keydown", (e) => {
@@ -322,6 +326,101 @@ async function hLoadDividendos() {
     }
 
     if (btn) btn.textContent = "Actualizar"
+}
+
+// ── Ratio Oro / Plata ──────────────────────────────────────────────────────
+
+const ORO_KEYWORDS   = ["oro", "gold", "xau"]
+const PLATA_KEYWORDS = ["plata", "silver", "xag"]
+
+function _ratioMatchesMetal(asset, keywords) {
+    const haystack = ((asset.name || "") + " " + (asset.symbol || "")).toLowerCase()
+    return keywords.some((k) => haystack.includes(k))
+}
+
+async function hRatioLoadPrecios() {
+    const btn = document.getElementById("hRatioLoadBtn")
+    const msgEl = document.getElementById("hRatioFuenteMsg")
+    btn.textContent = "Cargando..."
+    btn.disabled = true
+    msgEl.textContent = ""
+    msgEl.className = "hRatioFuenteMsg"
+
+    try {
+        const res = await fetch("/api/activos")
+        if (!res.ok) throw new Error()
+        const { assets } = await res.json()
+
+        const oroAsset   = assets.find((a) => _ratioMatchesMetal(a, ORO_KEYWORDS))
+        const plataAsset = assets.find((a) => _ratioMatchesMetal(a, PLATA_KEYWORDS))
+
+        const msgs = []
+        if (oroAsset) {
+            const p = parseEuroNumber(oroAsset.price)
+            if (p > 0) {
+                document.getElementById("hRatioPrecioOro").value = p
+                msgs.push(`Oro: ${oroAsset.name} → ${formatEuro(p)}`)
+            }
+        }
+        if (plataAsset) {
+            const p = parseEuroNumber(plataAsset.price)
+            if (p > 0) {
+                document.getElementById("hRatioPrecioPlata").value = p
+                msgs.push(`Plata: ${plataAsset.name} → ${formatEuro(p)}`)
+            }
+        }
+
+        if (msgs.length === 0) {
+            msgEl.textContent = "No se encontraron activos de oro o plata en la cartera."
+            msgEl.className = "hRatioFuenteMsg hRatioFuenteWarn"
+        } else {
+            msgEl.textContent = msgs.join("  ·  ")
+            msgEl.className = "hRatioFuenteMsg hRatioFuenteOk"
+            if (msgs.length === 2) hCalcRatioOroPlata()
+        }
+    } catch {
+        msgEl.textContent = "Error al cargar los activos."
+        msgEl.className = "hRatioFuenteMsg hRatioFuenteWarn"
+    }
+
+    btn.textContent = "Cargar precios guardados"
+    btn.disabled = false
+}
+
+function hCalcRatioOroPlata() {
+    const precioOro   = parseFloat(document.getElementById("hRatioPrecioOro").value) || 0
+    const precioPlata = parseFloat(document.getElementById("hRatioPrecioPlata").value) || 0
+    if (precioOro <= 0 || precioPlata <= 0) return
+
+    const ratio        = precioOro / precioPlata
+    const mediaHist    = 50
+    const difVsHist    = ((ratio - mediaHist) / mediaHist) * 100
+    const precioJusto  = precioOro / mediaHist
+    const plataNecesaria = ratio
+
+    document.getElementById("hRatioValor").textContent =
+        ratio.toFixed(2) + " oz"
+
+    const vsEl = document.getElementById("hRatioVsHistorico")
+    vsEl.textContent = (difVsHist >= 0 ? "+" : "") + difVsHist.toFixed(1) + "% vs media"
+    vsEl.className = "hResultValue " + (difVsHist > 0 ? "hResultNegative" : "hResultPositive")
+
+    document.getElementById("hRatioPrecioJusto").textContent =
+        formatEuro(precioJusto) + "/oz"
+
+    document.getElementById("hRatioPlataParaOro").textContent =
+        plataNecesaria.toFixed(2) + " oz (" + formatEuro(plataNecesaria * precioPlata) + ")"
+
+    const interp = document.getElementById("hRatioInterpretacion")
+    if (ratio > mediaHist) {
+        interp.textContent = `El ratio está por encima de la media histórica (${ratio.toFixed(0)} vs ${mediaHist}). La plata está relativamente barata frente al oro.`
+        interp.className = "hRatioInterpretacion hRatioInfoPos"
+    } else {
+        interp.textContent = `El ratio está por debajo de la media histórica (${ratio.toFixed(0)} vs ${mediaHist}). La plata está relativamente cara frente al oro.`
+        interp.className = "hRatioInterpretacion hRatioInfoNeg"
+    }
+
+    document.getElementById("hRatioResults").classList.remove("hidden")
 }
 
 // ── Yield Manual ───────────────────────────────────────────────────────────

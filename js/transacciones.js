@@ -202,6 +202,7 @@ function renderTransaccionesTable() {
     })
 
     renderTransaccionesAssetMenu()
+    bindTableSort(body.closest("table"))
 }
 
 function normalizeHashTransaccionValue(value) {

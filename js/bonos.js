@@ -223,6 +223,7 @@ function renderBonosTable(data) {
 
     updateBonosTotals()
     applyBonosFilter(_bonosCurrentFilter)
+    bindTableSort(tbody.closest("table"))
 }
 
 function updateBonosTotals() {

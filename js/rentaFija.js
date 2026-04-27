@@ -219,6 +219,7 @@ function renderRentaFijaTable(data) {
     rows.forEach((rowData, index) => tbody.appendChild(buildRentaFijaRow(rowData, index)))
     updateRentaFijaTotals()
     applyRentaFijaFilter(_rfCurrentFilter)
+    bindTableSort(tbody.closest("table"))
 }
 
 function updateRentaFijaTotals() {

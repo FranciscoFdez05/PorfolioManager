@@ -525,6 +525,7 @@ function renderStablecoinsTable() {
     currentStablecoinsData.rows.forEach((row) => {
         body.appendChild(buildStablecoinRow(row))
     })
+    bindTableSort(body.closest("table"))
 }
 
 function buildStablecoinRow(row) {
