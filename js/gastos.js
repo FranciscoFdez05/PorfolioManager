@@ -24,6 +24,7 @@ let sharedGastosTypes = []
 let _gastosDataLoaded = false
 let gastosModalKeyHandler = null
 
+
 function isGastoTipoHidden(type) {
     const hidden = window._gastosHiddenTipos || []
     return hidden.includes(normalizeComparableGastoText(type))

@@ -325,6 +325,48 @@ async function initAjustesLogic() {
 
     loadBackupList()
 
+    // --- Peticiones API ---
+    const apiStatsListEl     = document.getElementById("ajustesApiStatsList")
+    const refreshApiStatsBtn = document.getElementById("ajustesRefreshApiStatsBtn")
+
+    async function loadApiStats() {
+        if (!apiStatsListEl) return
+        try {
+            const res  = await fetch("/api/stats/api-calls")
+            const data = await res.json()
+            if (!data.ok) throw new Error()
+            renderApiStats(data)
+        } catch {
+            if (apiStatsListEl) apiStatsListEl.innerHTML = '<span class="ajustesBackupEmpty">Error al cargar</span>'
+        }
+    }
+
+    function renderApiStats(data) {
+        if (!apiStatsListEl) return
+        const counts = data.counts || {}
+        const entries = Object.entries(counts).sort((a, b) => b[1] - a[1])
+        if (!entries.length) {
+            apiStatsListEl.innerHTML = '<span class="ajustesBackupEmpty">Sin peticiones hoy</span>'
+            return
+        }
+        apiStatsListEl.innerHTML = ""
+        entries.forEach(([provider, count]) => {
+            const row = document.createElement("div")
+            row.className = "ajustesApiStatsRow"
+            row.innerHTML = `<span class="ajustesApiStatsProvider">${provider}</span><span class="ajustesApiStatsCount">${count}</span>`
+            apiStatsListEl.appendChild(row)
+        })
+        const totalRow = document.createElement("div")
+        totalRow.className = "ajustesApiStatsRow ajustesApiStatsTotal"
+        totalRow.innerHTML = `<span class="ajustesApiStatsProvider">Total</span><span class="ajustesApiStatsCount">${data.total}</span>`
+        apiStatsListEl.appendChild(totalRow)
+    }
+
+    if (refreshApiStatsBtn) {
+        refreshApiStatsBtn.addEventListener("click", loadApiStats)
+    }
+    loadApiStats()
+
     // --- Tema ---
     initAjustesTema()
 

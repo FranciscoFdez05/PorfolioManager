@@ -3,6 +3,8 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
+from api_stats import get_today_stats
+
 ajustes_bp = Blueprint("ajustes", __name__)
 _BASE_DIR    = Path(__file__).resolve().parent.parent.parent
 _API_DIR     = _BASE_DIR / "API"
@@ -75,8 +77,6 @@ def get_settings():
     eodhd_raw   = _read_key_file(_API_DIR / "eodhd.key")
     return jsonify({
         "ok":             True,
-        "finnhubKey":     finnhub_raw,
-        "eodhdKeys":      eodhd_raw,
         "finnhubKeyCount": len([k for k in finnhub_raw.splitlines() if k.strip()]),
         "eodhdKeyCount":   len([k for k in eodhd_raw.splitlines() if k.strip()]),
         "autoBackupDays": int(cfg.get("autoBackupDays") or 0),
@@ -86,7 +86,9 @@ def get_settings():
         "metricasDisplayType": cfg.get("metricasDisplayType") or "doughnut",
         "metricasDistMetric":  cfg.get("metricasDistMetric") or "netoActualEur",
         "comparativaExcluded": cfg.get("comparativaExcluded") or [],
-        "gastosHiddenTipos":   cfg.get("gastosHiddenTipos") or [],
+        "gastosHiddenTipos":          cfg.get("gastosHiddenTipos") or [],
+        "gastosHiddenMensualidades":  cfg.get("gastosHiddenMensualidades") or [],
+        "metricasActivosHidden":      cfg.get("metricasActivosHidden") or [],
     })
 
 
@@ -102,6 +104,11 @@ def append_api_key():
         "finnhubKeys": len([k for k in _read_key_file(_API_DIR / "finnhub.key").splitlines() if k.strip()]),
         "eodhdKeys":   len([k for k in _read_key_file(_API_DIR / "eodhd.key").splitlines() if k.strip()]),
     })
+
+
+@ajustes_bp.route("/api/stats/api-calls", methods=["GET"])
+def get_api_call_stats():
+    return jsonify({"ok": True, **get_today_stats()})
 
 
 @ajustes_bp.route("/api/settings", methods=["POST"])
@@ -132,6 +139,12 @@ def save_settings():
     if "gastosHiddenTipos" in data:
         raw = data["gastosHiddenTipos"]
         cfg["gastosHiddenTipos"] = [str(t) for t in raw if isinstance(t, str) and t.strip()] if isinstance(raw, list) else []
+    if "gastosHiddenMensualidades" in data:
+        raw = data["gastosHiddenMensualidades"]
+        cfg["gastosHiddenMensualidades"] = [str(t) for t in raw if isinstance(t, str) and t.strip()] if isinstance(raw, list) else []
+    if "metricasActivosHidden" in data:
+        raw = data["metricasActivosHidden"]
+        cfg["metricasActivosHidden"] = [str(t) for t in raw if isinstance(t, str) and t.strip()] if isinstance(raw, list) else []
 
     _write_ajustes(cfg)
     return jsonify({"ok": True})

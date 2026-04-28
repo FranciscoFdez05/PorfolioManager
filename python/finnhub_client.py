@@ -7,6 +7,16 @@ from urllib.request import Request, urlopen
 import json
 import re
 
+from api_stats import record_api_call
+
+
+def _provider_from_url(url: str) -> str:
+    if "finnhub.io" in url:
+        return "Finnhub"
+    if "frankfurter.app" in url or "er-api.com" in url:
+        return "Tipo de cambio"
+    return "Otro"
+
 FINNHUB_QUOTE_URL = "https://finnhub.io/api/v1/quote"
 FINNHUB_SEARCH_URL = "https://finnhub.io/api/v1/search"
 FINNHUB_CRYPTO_SYMBOLS_URL = "https://finnhub.io/api/v1/crypto/symbol"
@@ -66,6 +76,7 @@ def _format_percent(value):
 
 
 def _fetch_json(url, params, timeout=10):
+    record_api_call(_provider_from_url(url))
     query = urlencode(params)
     request = Request(
         f"{url}?{query}",
@@ -80,6 +91,7 @@ def _fetch_json(url, params, timeout=10):
 
 
 def _fetch_json_absolute(url, timeout=10):
+    record_api_call(_provider_from_url(url))
     request = Request(
         url,
         headers={

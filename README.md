@@ -1,6 +1,57 @@
 # Portfolio Python
 
-Aplicación web local para seguimiento de una cartera de inversión: acciones, ETFs, criptomonedas y materias primas. Incluye módulos de gastos, ventas (cálculo de ganancias/pérdidas), intereses, dividendos, transacciones on-chain y stablecoins.
+Aplicación web local para el seguimiento integral de una cartera de inversión personal. Gestiona activos (acciones, ETFs, criptomonedas, materias primas, bonos e interés fijo), registra gastos e ingresos, calcula ganancias y pérdidas en ventas, consolida dividendos e intereses y ofrece un panel de métricas con gráficos interactivos. Todo corre en local sin dependencias de servicios en la nube; los únicos datos externos son las cotizaciones opcionales vía API.
+
+---
+
+## Módulos
+
+### Portfolio — Activos
+Cada activo (acción, ETF, cripto, materia prima, bono o interés fijo) tiene su propia ficha con:
+- Historial de compras/aportes con precio medio ponderado y coste total.
+- Precio de mercado actualizable manualmente o mediante API (Finnhub / EODHD).
+- Color personalizado, ticker de mercado y proveedor de datos configurables desde el botón **Editar**.
+- Posición actual, valor de mercado, rendimiento en euros y porcentaje.
+- **Vista general** en cuadrícula con tarjetas por activo, filtros por tipo y búsqueda por nombre.
+
+### Gastos & Ingresos
+- **Gastos anuales**: tabla mensual con categorías personalizables, mensualidades recurrentes y totales por columna. Botón 👁 por categoría y por el bloque de mensualidades para incluirlas o excluirlas de las métricas.
+- **Movimientos de gastos**: registro mensual de gastos individuales con importe, tipo y nota.
+- **Ingresos personales**: ingresos recurrentes (nómina, alquiler…) y movimientos puntuales por mes y año.
+
+### Renta — Dividendos, Intereses y Bonos
+- **Dividendos**: registro de cobros con fecha, importe bruto e impuestos; resumen anual.
+- **Intereses**: histórico de intereses cobrados por instrumento y año.
+- **Bonos / Interés Fijo**: tabla unificada con bonos gubernamentales, corporativos e interés fijo. Cupón, vencimiento, invertido, interés acumulado, impuestos y neto. Filtrables por tipo.
+
+### Cripto
+- **Stablecoins**: seguimiento de saldos y movimientos en stablecoins.
+- **Operaciones**: registro de trades abiertos con par, entrada y notas.
+- **Transacciones**: movimientos on-chain entre wallets y exchanges.
+- **Conversiones**: historial de conversiones entre criptomonedas.
+
+### Ventas
+Registro de ventas con cálculo automático de ganancia/pérdida (precio de venta vs. precio medio de compra), comisiones e impacto fiscal estimado.
+
+### Finanzas
+- **Vista General**: tabla resumen de todos los activos con ordenación por columna.
+- **Ingresos**: ingresos recurrentes y puntuales consolidados.
+
+### Métricas
+Panel de análisis con KPIs de portfolio, gastos e ingresos, y gráficos interactivos:
+- **Distribución por tipo** (donut/barras) y **por activo individual** con filtros de tipo persistentes.
+- **Comparativa de gastos vs. ingresos** mensual por año con exclusión de categorías.
+- Gráficos de dividendos, intereses, bonos y renta fija con desglose por instrumento.
+- Configuraciones (tipo de gráfico, métrica, activos ocultos) guardadas automáticamente.
+
+### Herramientas
+- **Ratio Oro/Plata**: calculadora con carga automática de precios desde la cartera.
+- Otras utilidades de análisis y conversión.
+
+### Ajustes
+- Gestión de claves API (Finnhub, EODHD).
+- Horas de caducidad de cotizaciones, backup y restauración de la base de datos.
+- Selector de tema (oscuro, claro, negro).
 
 ---
 
@@ -245,6 +296,27 @@ Puedes abrir `data/portfolio.db` con cualquier cliente SQLite, por ejemplo [DB B
 ---
 
 ## Changelog
+
+### 2026-04-28 — Mejoras de UI y unificación de Interés Fijo
+
+#### Ticker editable desde el modal de activo
+- El modal **Editar activo** incluye ahora un campo **Ticker de mercado** que permite cambiar el símbolo de cotización (`marketSymbol`) sin necesidad de recrear el activo. El valor se muestra pre-rellenado con el ticker actual y se guarda al confirmar.
+
+#### Círculo de color en las tarjetas de activo
+- Las tarjetas de la **vista general de activos** muestran un pequeño círculo con el color personalizado del activo en la esquina superior derecha, junto a los botones de editar y eliminar. El círculo aparece al pasar el cursor sobre la tarjeta y muestra un glow del mismo color al hacer hover sobre él.
+
+#### Botones de visibilidad en Gastos
+- Los botones 👁 (ocultar/mostrar en Métricas) se mantienen únicamente en la **fila de cabecera "Mensualidades"** y en las **filas de gastos por tipo**. Se eliminaron de las mensualidades individuales para reducir ruido visual.
+
+#### Unificación de Interés Fijo
+- Los tipos **"Interés Fijo Bancario"** y **"Interés Fijo Estatal"** se fusionaron en un único tipo **"Interés Fijo"** (`tipo = "if"`). El selector del modal de alta/edición pasa de dos opciones a una. Los registros existentes con `bancario` o `estatal` se migran automáticamente al guardar.
+- En **Métricas**, el grupo "Renta Fija" muestra solo la tarjeta **Neto** (se eliminaron "Bancario" y "Estatal"). El gráfico de tipos de renta fija muestra un único segmento "Interés Fijo".
+- Código muerto eliminado: `rentaFija.js` (308 líneas) y `rentaFija.html` vaciados; `rentaFijaModalActions` y reglas CSS de `bancario`/`estatal` en los filtros eliminadas.
+
+#### Filtros de activos en Métricas persistentes
+- Los botones de tipo (Cripto, Acciones, ETFs…) del gráfico **"Por activo individual"** en Métricas ahora persisten su estado. Al ocultar un tipo, la preferencia se guarda en `/api/settings` (`metricasActivosHidden`) y se restaura en la próxima visita.
+
+---
 
 ### 2026-04-28 — Color de activo en gráficos de dividendos
 

@@ -1973,8 +1973,7 @@ tr.gastosTypeEmptySep td {
     min-height:40px;
 }
 
-.bonosModalActions,
-.rentaFijaModalActions {
+.bonosModalActions {
     justify-content:flex-end;
 }
 
@@ -4624,7 +4623,7 @@ tr.gastosTypeEmptySep td {
 .mkpiGroupPortfolio .metricasKpiCard{ border-top-color:#3a7bd5; }
 .mkpiGroupIngresos  .metricasKpiCard{ border-top-color:#2ecc71; }
 .mkpiGroupBonos     .metricasKpiCard{ border-top-color:#9b59b6; }
-.mkpiGroupRf        .metricasKpiCard{ border-top-color:#00bcd4; }
+.mkpiGroupRf        .metricasKpiCard{ border-top-color:#9b59b6; }
 .mkpiGroupGastos    .metricasKpiCard{ border-top-color:#e74c3c; }
 
 .mkpiGroupGastosTipos{
@@ -5268,6 +5267,23 @@ tr.gastosTypeEmptySep td {
     transition:background .12s,color .12s,border-color .12s;
 }
 
+.avColorDot{
+    width:14px;
+    height:14px;
+    border-radius:50%;
+    flex-shrink:0;
+    align-self:center;
+    border:2px solid rgba(255,255,255,0.15);
+    box-shadow:0 0 0 0 transparent;
+    transition:box-shadow .15s, border-color .15s;
+    cursor:default;
+}
+
+.avColorDot:hover{
+    border-color:rgba(255,255,255,0.5);
+    box-shadow:0 0 7px 2px var(--dot-color, #888);
+}
+
 .avEditBtn:hover{
     background:#1e2d45;
     color:#3a7bd5;
@@ -5469,10 +5485,7 @@ tr.gastosTypeEmptySep td {
 /* Bonos */
 .bonosFilterBtn[data-tipo="gubernamental"]::before { background:#2ecc7155; }
 .bonosFilterBtn[data-tipo="corporativo"]::before   { background:#3a7bd555; }
-
-/* Renta Fija */
-.bonosFilterBtn[data-tipo="bancario"]::before      { background:#f7931a55; }
-.bonosFilterBtn[data-tipo="estatal"]::before       { background:#9b59b655; }
+.bonosFilterBtn[data-tipo="if"]::before            { background:#9b59b655; }
 
 .bonosFilterBtn:hover{
     background:#151f35;
@@ -5488,13 +5501,11 @@ tr.gastosTypeEmptySep td {
 .bonosFilterBtn[data-tipo="all"].active          { border-color:#3a7bd544; }
 .bonosFilterBtn[data-tipo="gubernamental"].active { border-color:#2ecc7144; }
 .bonosFilterBtn[data-tipo="corporativo"].active   { border-color:#3a7bd544; }
-.bonosFilterBtn[data-tipo="bancario"].active      { border-color:#f7931a44; }
-.bonosFilterBtn[data-tipo="estatal"].active       { border-color:#9b59b644; }
+.bonosFilterBtn[data-tipo="if"].active            { border-color:#9b59b644; }
 
 .bonosFilterBtn[data-tipo="gubernamental"].active::before { background:#2ecc71; }
 .bonosFilterBtn[data-tipo="corporativo"].active::before   { background:#3a7bd5; }
-.bonosFilterBtn[data-tipo="bancario"].active::before      { background:#f7931a; }
-.bonosFilterBtn[data-tipo="estatal"].active::before       { background:#9b59b6; }
+.bonosFilterBtn[data-tipo="if"].active::before            { background:#9b59b6; }
 
 .bonosSummary{
     display:flex;
@@ -5872,6 +5883,33 @@ tr.gastosTypeEmptySep td {
     margin-top:4px;
 }
 
+.ajustesApiStatsList{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    margin-top:4px;
+}
+
+.ajustesApiStatsRow{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:7px 12px;
+    background:#0a1120;
+    border:1px solid #1e2d45;
+    border-radius:8px;
+    font-size:0.875rem;
+}
+
+.ajustesApiStatsTotal{
+    border-color:#3b82f6;
+    background:#0d1a30;
+    font-weight:600;
+}
+
+.ajustesApiStatsProvider{ color:#94a3b8; }
+.ajustesApiStatsCount{ color:#e2e8f0; font-variant-numeric:tabular-nums; }
+
 .ajustesHiddenItem{
     display:flex;
     align-items:center;
@@ -6050,7 +6088,9 @@ html[data-theme="black"] .ajustesSectionTitle{ color:#f0f0f0; }
 html[data-theme="black"] .ajustesSectionDesc{ color:#666; }
 html[data-theme="black"] .ajustesLabel{ color:#888; }
 html[data-theme="black"] .ajustesBackupItem,
-html[data-theme="black"] .ajustesHiddenItem{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .ajustesHiddenItem,
+html[data-theme="black"] .ajustesApiStatsRow{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .ajustesApiStatsTotal{ background:#0a0a0a; border-color:#3b82f6; }
 html[data-theme="black"] .ajustesBackupName,
 html[data-theme="black"] .ajustesHiddenName{ color:#888; }
 
@@ -6154,7 +6194,11 @@ html[data-theme="light"] .ajustesLabel{ color:#475569; }
 html[data-theme="light"] .ajustesInput,
 html[data-theme="light"] .ajustesSelect{ background:#f8f9fa !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
 html[data-theme="light"] .ajustesBackupItem,
-html[data-theme="light"] .ajustesHiddenItem{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .ajustesHiddenItem,
+html[data-theme="light"] .ajustesApiStatsRow{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .ajustesApiStatsTotal{ background:#eff6ff; border-color:#3b82f6; }
+html[data-theme="light"] .ajustesApiStatsProvider{ color:#475569; }
+html[data-theme="light"] .ajustesApiStatsCount{ color:#0f172a; }
 html[data-theme="light"] .ajustesBackupName,
 html[data-theme="light"] .ajustesHiddenName{ color:#475569; }
 html[data-theme="light"] .ajustesSectionDesc code{ background:#f1f5f9; color:#475569; }

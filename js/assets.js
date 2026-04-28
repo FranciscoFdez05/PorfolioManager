@@ -1,3 +1,7 @@
+function escapeHtml(str) {
+    return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+}
+
 const exchangeRateCache = new Map()
 let externalVentasRowsCache = []
 let externalTransaccionesRowsCache = []
@@ -765,7 +769,7 @@ async function renderAssetsList(assets) {
             button.dataset.assetOrder = String(asset.order ?? 0)
             button.draggable = true
             button.innerHTML = `
-                <span class="assetBtnName">${asset.name || asset.symbol || "Activo"}</span>
+                <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}</span>
                 <span class="assetBtnPrice">${formatMoney(displayPrice, displayCurrency)}</span>
                 <span class="assetBtnChange ${changeClass}">${changeMoneyStr}</span>
                 <span class="assetBtnChangePct ${changeClass}">${changePctStr || "—"}</span>
@@ -787,7 +791,7 @@ async function renderAssetsList(assets) {
             button.dataset.assetOrder = String(asset.order ?? 0)
             button.draggable = true
             button.innerHTML = `
-                <span class="assetBtnName">${asset.name || asset.symbol || "Activo"}</span>
+                <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}</span>
                 <span class="assetBtnPrice">${formatMoney(fallbackPrice, fallbackCurrency)}</span>
                 <span class="assetBtnChange ${changeClass}">${changeMoneyStr}</span>
                 <span class="assetBtnChangePct ${changeClass}">${changePctStr || "—"}</span>
@@ -2459,15 +2463,18 @@ function openEditAssetModal(assetData = null) {
 
     const editAssetModalOverlay = document.getElementById("editAssetModalOverlay")
     const editAssetNameInput = document.getElementById("editAssetNameInput")
+    const editAssetTickerInput = document.getElementById("editAssetTickerInput")
     const assetPage = document.querySelector(".assetTablePage")
     const currentName = assetData?.name || assetPage?.dataset.assetName || document.getElementById("detName")?.textContent.trim() || ""
     const currentColor = assetData?.color || assetPage?.dataset.assetColor || ""
+    const currentTicker = assetData?.marketSymbol || assetData?.finnhubSymbol || assetPage?.dataset.assetMarketSymbol || assetPage?.dataset.assetFinnhubSymbol || ""
 
     if (!editAssetModalOverlay || !editAssetNameInput) {
         return
     }
 
     editAssetNameInput.value = currentName
+    if (editAssetTickerInput) editAssetTickerInput.value = currentTicker
     initColorPicker("editAssetColorPicker", "editAssetColorInput", currentColor)
     editAssetModalOverlay.classList.remove("hidden")
     editAssetModalState = { isOpen: true }
@@ -2504,13 +2511,15 @@ async function submitEditAssetModal() {
     const currentName = String(payload.name || "").trim()
     const trimmedName = editAssetNameInput.value.trim()
     const newColor = document.getElementById("editAssetColorInput")?.value || ""
+    const newTicker = (document.getElementById("editAssetTickerInput")?.value || "").trim().toUpperCase()
+    const currentTicker = String(payload.marketSymbol || payload.finnhubSymbol || "").trim().toUpperCase()
 
     if (!trimmedName) {
         editAssetNameInput.focus()
         return
     }
 
-    if (trimmedName === currentName && newColor === (payload.color || "")) {
+    if (trimmedName === currentName && newColor === (payload.color || "") && newTicker === currentTicker) {
         closeEditAssetModal()
         return
     }
@@ -2520,6 +2529,8 @@ async function submitEditAssetModal() {
 
     payload.name = trimmedName
     payload.color = newColor
+    payload.marketSymbol = newTicker
+    payload.finnhubSymbol = newTicker
 
     if (!currentSymbol || currentSymbol === generatedCurrentSymbol) {
         payload.symbol = createAssetSymbolFromName(trimmedName)
@@ -2534,7 +2545,7 @@ async function submitEditAssetModal() {
     const updatedAsset = await loadAssetData(currentAssetId)
     if (fromAvView) {
         const idx = _activosAllAssets.findIndex((a) => a.id === currentAssetId)
-        if (idx >= 0) _activosAllAssets[idx] = { ..._activosAllAssets[idx], name: updatedAsset.name, color: updatedAsset.color }
+        if (idx >= 0) _activosAllAssets[idx] = { ..._activosAllAssets[idx], name: updatedAsset.name, color: updatedAsset.color, marketSymbol: updatedAsset.marketSymbol, finnhubSymbol: updatedAsset.finnhubSymbol }
         avRenderGrid()
     } else {
         await updateAssetDetail(updatedAsset)
@@ -3251,10 +3262,12 @@ function avBuildCard(asset) {
     card.style.setProperty("--av-color", color)
     card.draggable = true
 
+    const assetColor = asset.color || ""
     card.innerHTML = `
         <div class="avCardTop">
             <span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span>
             <div class="avCardActions">
+                ${assetColor ? `<span class="avColorDot" style="background:${assetColor};--dot-color:${assetColor}" title="Color del activo"></span>` : ""}
                 <button type="button" class="avActionBtn avEditBtn" data-asset-id="${asset.id}" title="Editar nombre">✎</button>
                 <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">✕</button>
             </div>

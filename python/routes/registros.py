@@ -193,9 +193,11 @@ def saveRentaFija():
     sanitizedRows = []
 
     for row in rows:
-        tipo = str(row.get("tipo", "bancario")).strip().lower()
-        if tipo not in ("bancario", "estatal"):
-            tipo = "bancario"
+        tipo = str(row.get("tipo", "if")).strip().lower()
+        if tipo in ("bancario", "estatal"):
+            tipo = "if"
+        if tipo != "if":
+            tipo = "if"
         sanitizedRows.append({
             "fecha": str(row.get("fecha", "")).strip(),
             "tipo": tipo,

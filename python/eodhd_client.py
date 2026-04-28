@@ -5,6 +5,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
+from api_stats import record_api_call
+
 
 EODHD_SEARCH_URL = "https://eodhd.com/api/search"
 EODHD_REALTIME_URL = "https://eodhd.com/api/real-time"
@@ -17,6 +19,7 @@ PREFERRED_EXCHANGES_BY_TYPE = {
 
 
 def _fetch_json(url, params=None, timeout=10):
+    record_api_call("EODHD")
     query = urlencode(params or {})
     request_url = url if not query else f"{url}?{query}"
     request = Request(

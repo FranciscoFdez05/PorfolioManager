@@ -4,8 +4,7 @@ let _bonosAutosaveTimer = null
 const _TIPO_LABELS = {
     gubernamental: "Gubernamental",
     corporativo: "Corporativo",
-    bancario: "IF Bancario",
-    estatal: "IF Estatal",
+    if: "Interés Fijo",
 }
 
 const _CURRENCY_SYMBOLS = { EUR: "EUR €", USD: "USD $", GBP: "GBP £", CHF: "CHF ₣", JPY: "JPY ¥" }
@@ -30,7 +29,7 @@ async function loadAllBonosData() {
     const bonosRows = Array.isArray(bonosResp.rows) ? bonosResp.rows : []
     const rfRows = (Array.isArray(rfResp.rows) ? rfResp.rows : []).map(r => ({
         fecha:            r.fecha || "",
-        tipo:             r.tipo || "bancario",
+        tipo:             "if",
         currency:         r.currency || "EUR",
         instrumento:      r.instrumento || "",
         cupon:            r.rentabilidad || "",
@@ -48,7 +47,7 @@ async function saveAllBonosData() {
 
     const bonosRows = rows.filter(r => ["gubernamental", "corporativo"].includes(r.tipo))
     const rfRows = rows
-        .filter(r => ["bancario", "estatal"].includes(r.tipo))
+        .filter(r => r.tipo === "if")
         .map(r => ({
             fecha:            r.fecha,
             tipo:             r.tipo,
@@ -176,7 +175,7 @@ function updateBonosTotals() {
         totalInvertido += invertido
 
         const tipo = row.dataset.tipo || "gubernamental"
-        if (tipo === "bancario" || tipo === "estatal") ifNeto += neto
+        if (tipo === "if") ifNeto += neto
         else if (tipo === "corporativo") corpNeto += neto
         else gubNeto += neto
     })
@@ -201,7 +200,7 @@ function applyBonosFilter(tipo) {
         const rowTipo = row.dataset.tipo || ""
         let visible = false
         if (tipo === "all") visible = true
-        else if (tipo === "if") visible = rowTipo === "bancario" || rowTipo === "estatal"
+        else if (tipo === "if") visible = rowTipo === "if"
         else visible = rowTipo === tipo
         row.style.display = visible ? "" : "none"
     })
@@ -228,8 +227,7 @@ function openBonosEditModal(rowIndex = -1) {
         <select id="bonosTipoSelect" class="assetModalSelect">
             <option value="gubernamental"${(rowData.tipo || "gubernamental") === "gubernamental" ? " selected" : ""}>Bono Gubernamental</option>
             <option value="corporativo"${rowData.tipo === "corporativo" ? " selected" : ""}>Bono Corporativo</option>
-            <option value="bancario"${rowData.tipo === "bancario" ? " selected" : ""}>Interés Fijo Bancario</option>
-            <option value="estatal"${rowData.tipo === "estatal" ? " selected" : ""}>Interés Fijo Estatal</option>
+            <option value="if"${rowData.tipo === "if" ? " selected" : ""}>Interés Fijo</option>
         </select>
 
         <label class="assetModalLabel" for="bonosCurrencySelect">Moneda</label>

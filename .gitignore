@@ -2,8 +2,8 @@
 # DATA (mantener carpeta, ignorar contenido)
 # =========================
 data/*
-data/activos/*
-data/gastos/*
+data/backups/*
+data/JSON/*
 !data/.gitkeep
 
 # =========================
@@ -54,7 +54,6 @@ API/*.key
 # =========================
 .DS_Store
 Thumbs.db
-
 
 # =========================
 # Claude

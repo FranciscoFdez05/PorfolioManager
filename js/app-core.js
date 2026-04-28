@@ -51,7 +51,9 @@ async function loadGlobalSettings() {
             window._metricasDisplayType     = data.metricasDisplayType ?? "doughnut"
             window._metricasDistMetric      = data.metricasDistMetric  ?? "netoActualEur"
             window._metricasComparativaExcluded = data.comparativaExcluded ?? []
-            window._gastosHiddenTipos       = data.gastosHiddenTipos ?? []
+            window._gastosHiddenTipos           = data.gastosHiddenTipos ?? []
+            window._gastosHiddenMensualidades   = data.gastosHiddenMensualidades ?? []
+            window._metricasActivosHidden       = data.metricasActivosHidden ?? []
         }
     } catch {
         window._settingsStaleHours      = 24
@@ -59,7 +61,9 @@ async function loadGlobalSettings() {
         window._metricasDisplayType     = "doughnut"
         window._metricasDistMetric      = "netoActualEur"
         window._metricasComparativaExcluded = []
-        window._gastosHiddenTipos       = []
+        window._gastosHiddenTipos           = []
+        window._gastosHiddenMensualidades   = []
+        window._metricasActivosHidden       = []
     }
 }
 
