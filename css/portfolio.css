@@ -4603,7 +4603,8 @@ tr.gastosTypeEmptySep td {
 }
 
 .metricasKpiCard{
-    min-width:0;
+    flex:0 0 140px;
+    width:140px;
     background:#111827;
     border:1px solid #1e2d45;
     border-top:2px solid transparent;
@@ -4613,7 +4614,6 @@ tr.gastosTypeEmptySep td {
     flex-direction:column;
     gap:5px;
     transition:border-color .15s;
-    flex-shrink:0;
 }
 
 .metricasKpiCard:hover{
