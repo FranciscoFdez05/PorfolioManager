@@ -2,6 +2,12 @@ import re
 
 
 ALLOWED_ASSET_TYPES = {"cripto", "acciones", "etfs", "comoditis"}
+_HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
+
+
+def sanitize_color(value):
+    s = str(value or "").strip()
+    return s if _HEX_COLOR_RE.match(s) else ""
 ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd"}
 EODHD_EXCHANGE_CODES = {"XETRA", "PA", "LSE", "US", "SW", "AS", "MC", "MI", "DU", "BE", "F", "MU", "ST", "VI", "LS", "FOREX", "CC"}
 
@@ -79,6 +85,7 @@ def createDefaultAssetPayload(name, assetType, assetId=None):
         "change": "+0,00%",
         "status": "Mercado abierto",
         "lastUpdated": "",
+        "color": "",
         "operationRows": [],
         "conversionRows": [],
         "rows": [
@@ -225,6 +232,7 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "change": _trunc(requestData.get("change", "+0,00%"), _MAX_SHORT).strip() or "+0,00%",
         "status": _trunc(requestData.get("status", "Mercado abierto"), _MAX_TEXT).strip() or "Mercado abierto",
         "lastUpdated": _trunc(requestData.get("lastUpdated", ""), _MAX_TEXT).strip(),
+        "color": sanitize_color(requestData.get("color", "")),
         "operationRows": sanitizeAssetOperationRows(requestData.get("operationRows", [])),
         "conversionRows": sanitizeAssetConversionRows(
             requestData.get("conversionRows", []),

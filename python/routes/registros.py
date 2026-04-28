@@ -153,9 +153,13 @@ def saveBonos():
         tipo = str(row.get("tipo", "gubernamental")).strip().lower()
         if tipo not in ("gubernamental", "corporativo"):
             tipo = "gubernamental"
+        currency = str(row.get("currency", "EUR")).strip().upper()
+        if currency not in ("EUR", "USD", "GBP", "CHF", "JPY"):
+            currency = "EUR"
         sanitizedRows.append({
             "fecha": str(row.get("fecha", "")).strip(),
             "tipo": tipo,
+            "currency": currency,
             "instrumento": str(row.get("instrumento", "")).strip(),
             "cupon": str(row.get("cupon", "")).strip(),
             "vencimiento": str(row.get("vencimiento", "")).strip(),

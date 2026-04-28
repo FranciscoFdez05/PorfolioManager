@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS activos (
     precio_currency TEXT NOT NULL DEFAULT 'EUR',
     change          TEXT NOT NULL DEFAULT '+0,00%',
     status          TEXT NOT NULL DEFAULT 'Mercado abierto',
-    last_updated    TEXT NOT NULL DEFAULT ''
+    last_updated    TEXT NOT NULL DEFAULT '',
+    color           TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS activo_rows (
@@ -263,6 +264,7 @@ CREATE TABLE IF NOT EXISTS renta_fija (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     fecha             TEXT NOT NULL DEFAULT '',
     tipo              TEXT NOT NULL DEFAULT 'bancario',
+    currency          TEXT NOT NULL DEFAULT 'EUR',
     instrumento       TEXT NOT NULL DEFAULT '',
     rentabilidad      TEXT NOT NULL DEFAULT '',
     vencimiento       TEXT NOT NULL DEFAULT '',
@@ -275,6 +277,7 @@ CREATE TABLE IF NOT EXISTS bonos (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     fecha             TEXT NOT NULL DEFAULT '',
     tipo              TEXT NOT NULL DEFAULT 'gubernamental',
+    currency          TEXT NOT NULL DEFAULT 'EUR',
     instrumento       TEXT NOT NULL DEFAULT '',
     cupon             TEXT NOT NULL DEFAULT '',
     vencimiento       TEXT NOT NULL DEFAULT '',
@@ -284,6 +287,20 @@ CREATE TABLE IF NOT EXISTS bonos (
     nota              TEXT NOT NULL DEFAULT ''
 );
 """
+
+
+def _migrate(conn):
+    activos_cols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
+    if "color" not in activos_cols:
+        conn.execute("ALTER TABLE activos ADD COLUMN color TEXT NOT NULL DEFAULT ''")
+
+    bonos_cols = {row[1] for row in conn.execute("PRAGMA table_info(bonos)")}
+    if "currency" not in bonos_cols:
+        conn.execute("ALTER TABLE bonos ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'")
+
+    rf_cols = {row[1] for row in conn.execute("PRAGMA table_info(renta_fija)")}
+    if "currency" not in rf_cols:
+        conn.execute("ALTER TABLE renta_fija ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'")
 
 
 def get_db() -> sqlite3.Connection:
@@ -303,6 +320,7 @@ def get_db() -> sqlite3.Connection:
         conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.executescript(_SCHEMA)
+        _migrate(conn)
         conn.commit()
         _local.conn = conn
         _local._conn_gen = _reset_generation

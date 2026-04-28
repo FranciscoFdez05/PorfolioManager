@@ -288,13 +288,14 @@ def writeStablecoinsFile(data):
 def readRentaFijaFile():
     conn = get_db()
     rows = conn.execute(
-        "SELECT fecha, tipo, instrumento, rentabilidad, vencimiento, invertido, interes_acumulado, impuestos "
+        "SELECT fecha, tipo, currency, instrumento, rentabilidad, vencimiento, invertido, interes_acumulado, impuestos "
         "FROM renta_fija ORDER BY id"
     ).fetchall()
     return {"rows": [
         {
             "fecha": r["fecha"],
             "tipo": r["tipo"],
+            "currency": r["currency"],
             "instrumento": r["instrumento"],
             "rentabilidad": r["rentabilidad"],
             "vencimiento": r["vencimiento"],
@@ -310,12 +311,12 @@ def writeRentaFijaFile(data):
     conn = get_db()
     conn.execute("DELETE FROM renta_fija")
     conn.executemany(
-        "INSERT INTO renta_fija (fecha, tipo, instrumento, rentabilidad, vencimiento, invertido, interes_acumulado, impuestos) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO renta_fija (fecha, tipo, currency, instrumento, rentabilidad, vencimiento, invertido, interes_acumulado, impuestos) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
-            (r.get("fecha", ""), r.get("tipo", "bancario"), r.get("instrumento", ""),
-             r.get("rentabilidad", ""), r.get("vencimiento", ""), r.get("invertido", ""),
-             r.get("interesAcumulado", ""), r.get("impuestos", ""))
+            (r.get("fecha", ""), r.get("tipo", "bancario"), r.get("currency", "EUR"),
+             r.get("instrumento", ""), r.get("rentabilidad", ""), r.get("vencimiento", ""),
+             r.get("invertido", ""), r.get("interesAcumulado", ""), r.get("impuestos", ""))
             for r in data.get("rows", [])
         ]
     )
@@ -327,13 +328,14 @@ def writeRentaFijaFile(data):
 def readBonosFile():
     conn = get_db()
     rows = conn.execute(
-        "SELECT fecha, tipo, instrumento, cupon, vencimiento, invertido, interes_acumulado, impuestos, nota "
+        "SELECT fecha, tipo, currency, instrumento, cupon, vencimiento, invertido, interes_acumulado, impuestos, nota "
         "FROM bonos ORDER BY id"
     ).fetchall()
     return {"rows": [
         {
             "fecha": r["fecha"],
             "tipo": r["tipo"],
+            "currency": r["currency"],
             "instrumento": r["instrumento"],
             "cupon": r["cupon"],
             "vencimiento": r["vencimiento"],
@@ -350,12 +352,12 @@ def writeBonosFile(data):
     conn = get_db()
     conn.execute("DELETE FROM bonos")
     conn.executemany(
-        "INSERT INTO bonos (fecha, tipo, instrumento, cupon, vencimiento, invertido, interes_acumulado, impuestos, nota) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO bonos (fecha, tipo, currency, instrumento, cupon, vencimiento, invertido, interes_acumulado, impuestos, nota) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
-            (r.get("fecha", ""), r.get("tipo", "gubernamental"), r.get("instrumento", ""),
-             r.get("cupon", ""), r.get("vencimiento", ""), r.get("invertido", ""),
-             r.get("interesAcumulado", ""), r.get("impuestos", ""), r.get("nota", ""))
+            (r.get("fecha", ""), r.get("tipo", "gubernamental"), r.get("currency", "EUR"),
+             r.get("instrumento", ""), r.get("cupon", ""), r.get("vencimiento", ""),
+             r.get("invertido", ""), r.get("interesAcumulado", ""), r.get("impuestos", ""), r.get("nota", ""))
             for r in data.get("rows", [])
         ]
     )

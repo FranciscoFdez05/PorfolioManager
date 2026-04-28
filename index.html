@@ -98,7 +98,7 @@
                 </div>
 
                 <div class="metricBox">
-                    <span class="metricTitle">€ Renta Fija</span>
+                    <span class="metricTitle">€ Interés Fijo</span>
                     <span class="metricValue" id="topTotalRentaFija">0,00 €</span>
                 </div>
             </div>
@@ -128,15 +128,8 @@
                     <div class="navDropdownMenu">                        
                         <button class="navBtn navDropdownItem" data-page="intereses">Intereses</button>
                         <button class="navBtn navDropdownItem" data-page="dividendos">Dividendos</button>
+                        <button class="navBtn navDropdownItem" data-page="bonos">Renta Fija</button>
                         <button class="navBtn navDropdownItem" data-page="ventas">Ventas</button>
-                    </div>
-                </div>
-
-                <div class="navDropdown">
-                    <button class="navDropdownBtn" type="button">Renta ▾</button>
-                    <div class="navDropdownMenu">
-                        <button class="navBtn navDropdownItem" data-page="bonos">Bonos</button>
-                        <button class="navBtn navDropdownItem" data-page="rentaFija">Renta Fija</button>
                     </div>
                 </div>
 
@@ -251,6 +244,10 @@
         <div id="assetSearchFeedback" class="assetSearchFeedback hidden"></div>
         <div id="assetSearchResults" class="assetSearchResults hidden"></div>
 
+        <label class="assetModalLabel">Color del activo</label>
+        <div class="assetColorPicker" id="assetColorPicker"></div>
+        <input type="hidden" id="assetColorInput" value="">
+
         <div class="assetModalActions">
             <button id="cancelAssetModalBtn" class="cancelButton">Cancelar</button>
             <button id="confirmAssetModalBtn" class="primaryButton">Confirmar</button>
@@ -275,6 +272,10 @@
         <h3 class="assetModalTitle" id="editAssetModalTitle">Editar activo</h3>
         <label class="assetModalLabel" for="editAssetNameInput">Nombre del activo</label>
         <input id="editAssetNameInput" class="assetModalInput" type="text" placeholder="Nuevo nombre del activo">
+
+        <label class="assetModalLabel">Color del activo</label>
+        <div class="assetColorPicker" id="editAssetColorPicker"></div>
+        <input type="hidden" id="editAssetColorInput" value="">
 
         <div class="assetModalActions">
             <button id="cancelEditAssetModalBtn" class="cancelButton">Cancelar</button>
@@ -308,7 +309,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="js/app-core.js?v=20260426a"></script>
-<script src="js/assets.js?v=20260423j"></script>
+<script src="js/assets.js?v=20260428b"></script>
 <script src="js/intereses.js?v=20260426a"></script>
 <script src="js/dividendos.js?v=20260421a"></script>
 <script src="js/gastos.js?v=20260426a"></script>
@@ -320,7 +321,6 @@
 <script src="js/conversiones.js?v=20260401g"></script>
 <script src="js/herramientas.js?v=20260421b"></script>
 <script src="js/bonos.js?v=20260420a"></script>
-<script src="js/rentaFija.js?v=20260420a"></script>
 <script src="js/metricas.js?v=20260426a"></script>
 <script src="js/ajustes.js?v=20260422a"></script>
 <script src="js/shared-utils.js?v=20260423a"></script>

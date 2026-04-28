@@ -104,6 +104,7 @@ async function buildMetricasPayload() {
         return {
             name:           asset.name || asset.symbol || "Activo",
             type:           asset.type || "acciones",
+            color:          asset.color || "",
             netoActualEur:  euros.netoActualEur,
             invertidoEur:   euros.invertidoNetoEur,
             rendimientoEur: euros.rendimientoEur
@@ -323,13 +324,13 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
         ...Object.entries(rfMap).map(([name, val]) => ({ name, _val: val }))
     ]
     const allItems = [
-        ...summaries.filter((a) => _metricasActivosFilter.has(a.type)).map((a) => ({ name: a.name, _val: mDistAssetVal(a, metric) })),
+        ...summaries.filter((a) => _metricasActivosFilter.has(a.type)).map((a) => ({ name: a.name, _val: mDistAssetVal(a, metric), color: a.color || "" })),
         ...extras
     ].sort((a, b) => b._val - a._val)
 
     const labels = allItems.map((a) => a.name)
     const rawValues = allItems.map((a) => a._val)
-    const colors = labels.map((_, i) => M_PALETTE[i % M_PALETTE.length])
+    const colors = allItems.map((item, i) => item.color || M_PALETTE[i % M_PALETTE.length])
 
     if (displayType === "doughnut") {
         const values = rawValues.map((v) => Math.max(0, v))
@@ -463,7 +464,7 @@ function mRenderRendActivos(summaries) {
     })
 }
 
-function mRenderDividendos(dividendos) {
+function mRenderDividendos(dividendos, colorMap = {}) {
     const section = document.getElementById("mSectionDividendos")
     if (!dividendos.length) {
         if (section) section.classList.add("hidden")
@@ -480,7 +481,7 @@ function mRenderDividendos(dividendos) {
     const sorted = Object.entries(map).sort((a, b) => b[1] - a[1])
     const labels = sorted.map(([name]) => name)
     const values = sorted.map(([, v]) => v)
-    const colors = labels.map((_, i) => M_PALETTE[i % M_PALETTE.length])
+    const colors = labels.map((label, i) => colorMap[label] || M_PALETTE[i % M_PALETTE.length])
 
     const wrap = document.getElementById("mChartDivWrap")
     if (wrap) wrap.style.height = Math.max(180, sorted.length * 36 + 40) + "px"
@@ -525,7 +526,7 @@ function mRenderDividendos(dividendos) {
 
 let _metricasDivMensualYear = null
 
-function mRenderDivMensual(dividendos) {
+function mRenderDivMensual(dividendos, colorMap = {}) {
     const section = document.getElementById("mSectionDivMensual")
     const rows = Array.isArray(dividendos) ? dividendos : []
     if (!rows.length) { if (section) section.classList.add("hidden"); return }
@@ -553,15 +554,15 @@ function mRenderDivMensual(dividendos) {
                 yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasDivMensualYear = btn.dataset.divmy
-                mDrawDivMensualChart(rows, _metricasDivMensualYear, dYear, dMonth)
+                mDrawDivMensualChart(rows, _metricasDivMensualYear, dYear, dMonth, colorMap)
             })
         }
     }
 
-    mDrawDivMensualChart(rows, _metricasDivMensualYear, dYear, dMonth)
+    mDrawDivMensualChart(rows, _metricasDivMensualYear, dYear, dMonth, colorMap)
 }
 
-function mDrawDivMensualChart(rows, year, dYear, dMonth) {
+function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
     const yearRows = rows.filter(r => dYear(r.fecha) === year)
     const stocks = [...new Set(yearRows.map(r => r.instrumento || "Desconocido"))].sort()
 
@@ -575,7 +576,7 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth) {
     })
 
     const labels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-    const stockColors = stocks.map((_, i) => M_PALETTE[i % M_PALETTE.length])
+    const stockColors = stocks.map((s, i) => colorMap[s] || M_PALETTE[i % M_PALETTE.length])
     const datasets = stocks.map((s, i) => ({
         label: s,
         data: monthData[s],
@@ -1676,8 +1677,9 @@ function mRenderAll(payload) {
     mRenderDistActivos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
     mRenderRendTipos(summaries)
     mRenderRendActivos(summaries)
-    mRenderDividendos(dividendos)
-    mRenderDivMensual(dividendos)
+    const colorMap = Object.fromEntries(summaries.map(s => [s.name, s.color]).filter(([, c]) => c))
+    mRenderDividendos(dividendos, colorMap)
+    mRenderDivMensual(dividendos, colorMap)
     mRenderInteresesSection(payload.intereses)
     mRenderBonosTipos(b)
     mRenderBonosInst(b)

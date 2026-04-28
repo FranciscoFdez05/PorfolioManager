@@ -5,6 +5,147 @@ let externalOperacionesRowsCache = []
 let currentAssetPersistedOperationRows = []
 let currentAssetPersistedConversionRows = []
 let _assetDisplayRows = []
+let _assetSortKey = null
+let _assetSortDir = "asc"
+let _editingAsset = null
+
+const ASSET_COLOR_PALETTE = [
+    "#3a7bd5", "#f7931a", "#2ecc71", "#e74c3c", "#9b59b6",
+    "#1abc9c", "#e67e22", "#00bcd4", "#8bc34a", "#ff5722",
+    "#e91e63", "#673ab7", "#607d8b", "#f39c12", "#795548",
+    "#26c6da", "#66bb6a", "#ef5350", "#ab47bc", "#ffa726"
+]
+
+function _cpHsvToRgb(h, s, v) {
+    const i = Math.floor(h / 60) % 6
+    const f = h / 60 - Math.floor(h / 60)
+    const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s)
+    const [r, g, b] = [[v,t,p],[q,v,p],[p,v,t],[p,q,v],[t,p,v],[v,p,q]][i]
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)]
+}
+
+function _cpRgbToHex(r, g, b) {
+    return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("")
+}
+
+function _cpHexToHsv(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex)
+    if (!m) return null
+    const n = parseInt(m[1], 16)
+    const r = (n >> 16) / 255, g = ((n >> 8) & 0xff) / 255, b = (n & 0xff) / 255
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+    let h = 0
+    if (d) {
+        if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60
+        else if (max === g) h = ((b - r) / d + 2) * 60
+        else h = ((r - g) / d + 4) * 60
+    }
+    return [h, max ? d / max : 0, max]
+}
+
+function initColorPicker(pickerId, inputId, selectedColor) {
+    const container = document.getElementById(pickerId)
+    const input = document.getElementById(inputId)
+    if (!container || !input) return
+
+    const CW = 280, CH = 175
+
+    container.innerHTML = `
+        <canvas class="cpCanvas" width="${CW}" height="${CH}"></canvas>
+        <div class="cpHuebar"><input type="range" class="cpHueSlider" min="0" max="359" step="1" value="0"></div>
+        <div class="cpHexRow">
+            <span class="cpPreview"></span>
+            <span class="cpHash">#</span>
+            <input class="cpHexInput" type="text" maxlength="6" autocomplete="off" spellcheck="false">
+            <button type="button" class="cpRandomBtn" title="Color aleatorio">&#9684;</button>
+        </div>
+    `
+
+    const canvas = container.querySelector(".cpCanvas")
+    const ctx = canvas.getContext("2d")
+    const hueSlider = container.querySelector(".cpHueSlider")
+    const preview = container.querySelector(".cpPreview")
+    const hexInput = container.querySelector(".cpHexInput")
+
+    const parsed = _cpHexToHsv(selectedColor || "")
+    let h = parsed ? parsed[0] : 210
+    let s = parsed ? parsed[1] : 0.68
+    let v = parsed ? parsed[2] : 0.83
+
+    function draw() {
+        const gH = ctx.createLinearGradient(0, 0, CW, 0)
+        gH.addColorStop(0, "#fff")
+        gH.addColorStop(1, `hsl(${h},100%,50%)`)
+        ctx.fillStyle = gH
+        ctx.fillRect(0, 0, CW, CH)
+
+        const gV = ctx.createLinearGradient(0, 0, 0, CH)
+        gV.addColorStop(0, "rgba(0,0,0,0)")
+        gV.addColorStop(1, "rgba(0,0,0,1)")
+        ctx.fillStyle = gV
+        ctx.fillRect(0, 0, CW, CH)
+
+        const cx = s * CW, cy = (1 - v) * CH
+        ctx.beginPath()
+        ctx.arc(cx, cy, 7, 0, Math.PI * 2)
+        ctx.strokeStyle = "rgba(0,0,0,0.5)"
+        ctx.lineWidth = 2.5
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.arc(cx, cy, 6, 0, Math.PI * 2)
+        ctx.strokeStyle = "#fff"
+        ctx.lineWidth = 2
+        ctx.stroke()
+    }
+
+    function sync() {
+        const [r, g, b] = _cpHsvToRgb(h, s, v)
+        const hex = _cpRgbToHex(r, g, b)
+        input.value = hex
+        preview.style.backgroundColor = hex
+        hexInput.value = hex.slice(1).toUpperCase()
+    }
+
+    function pickXY(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect()
+        s = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+        v = Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height))
+        draw()
+        sync()
+    }
+
+    canvas.addEventListener("pointerdown", (e) => { canvas.setPointerCapture(e.pointerId); pickXY(e.clientX, e.clientY) })
+    canvas.addEventListener("pointermove", (e) => { if (e.buttons === 1) pickXY(e.clientX, e.clientY) })
+
+    hueSlider.value = Math.round(h)
+    hueSlider.addEventListener("input", () => { h = Number(hueSlider.value); draw(); sync() })
+
+    hexInput.addEventListener("input", () => {
+        const val = hexInput.value.replace(/[^0-9a-fA-F]/g, "").slice(0, 6)
+        if (hexInput.value !== val) hexInput.value = val
+        if (val.length === 6) {
+            const p = _cpHexToHsv("#" + val)
+            if (p) { [h, s, v] = p; hueSlider.value = Math.round(h); draw() }
+            input.value = "#" + val
+            preview.style.backgroundColor = "#" + val
+        }
+    })
+
+    const randomBtn = container.querySelector(".cpRandomBtn")
+    if (randomBtn) {
+        randomBtn.addEventListener("click", () => {
+            h = Math.random() * 360
+            s = 0.55 + Math.random() * 0.4
+            v = 0.65 + Math.random() * 0.3
+            hueSlider.value = Math.round(h)
+            draw()
+            sync()
+        })
+    }
+
+    draw()
+    sync()
+}
 
 async function fetchExchangeRateOnServer(sourceCurrency, targetCurrency) {
     const source = normalizeCurrencyCode(sourceCurrency)
@@ -146,13 +287,13 @@ async function deleteAssetOnServer(assetId) {
     }
 }
 
-async function createAssetOnServer(name, type, marketSymbol = "", marketProvider = "finnhub") {
+async function createAssetOnServer(name, type, marketSymbol = "", marketProvider = "finnhub", color = "") {
     const response = await fetch("/api/activos", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ name, type, marketSymbol, marketProvider, finnhubSymbol: marketSymbol })
+        body: JSON.stringify({ name, type, marketSymbol, marketProvider, finnhubSymbol: marketSymbol, color })
     })
 
     if (!response.ok) {
@@ -528,6 +669,66 @@ async function updateAssetDetail(asset) {
         const marketSymbol = asset.marketSymbol || asset.finnhubSymbol || "---"
         detFinnhub.textContent = `Ticker mercado: ${marketSymbol} · API: ${marketProvider}`
     }
+
+    renderAssetCompletedOperationsSection(asset)
+}
+
+function renderAssetCompletedOperationsSection(asset) {
+    const section = document.getElementById("assetCompletedOperationsSection")
+
+    if (!section) {
+        return
+    }
+
+    const completedOps = getCompletedOperationsCryptoImpact(asset)
+    const rows = completedOps.rows || []
+
+    if (!rows.length) {
+        section.innerHTML = ""
+        section.classList.add("hidden")
+        return
+    }
+
+    section.classList.remove("hidden")
+    const currency = normalizeCurrencyCode(asset.currency || "EUR")
+
+    const rowsHtml = rows.map((row) => {
+        const orden = String(row.orden || "").trim()
+        const ordenClass = orden.toLowerCase() === "venta" ? "opRowVenta" : "opRowCompra"
+        return `
+            <tr>
+                <td>${row.fechaApertura || ""}</td>
+                <td>${row.fechaCierre || ""}</td>
+                <td>${row.par || ""}</td>
+                <td class="${ordenClass}">${orden}</td>
+                <td>${formatOperationsMoney(row.precioOrden, row.precioCurrency || currency)}</td>
+                <td>${formatOperationsQuantity(row.cantidad)}</td>
+                <td>${formatOperationsQuantity(row.comisionesCripto)}</td>
+                <td>${formatOperationsMoney(row.total, row.currency || currency)}</td>
+            </tr>
+        `
+    }).join("")
+
+    section.innerHTML = `
+        <div class="assetCompletedOpsLabel">Operaciones completadas</div>
+        <div class="assetTableWrapper">
+            <table class="assetOperationsTable assetCompletedOpsTable">
+                <thead>
+                    <tr>
+                        <th>Fecha apertura</th>
+                        <th>Fecha cierre</th>
+                        <th>Par</th>
+                        <th>Orden</th>
+                        <th>Precio orden</th>
+                        <th>Cantidad</th>
+                        <th>Comisiones cripto</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+        </div>
+    `
 }
 
 async function renderAssetsList(assets) {
@@ -1683,6 +1884,50 @@ async function renderVistaGeneralTable() {
     }
 }
 
+function _assetSortRows(rows) {
+    if (!_assetSortKey) return rows.map((r, i) => ({ ...r, _origIdx: i }))
+    return rows.map((r, i) => ({ ...r, _origIdx: i })).sort((a, b) => {
+        let va = a[_assetSortKey] ?? ""
+        let vb = b[_assetSortKey] ?? ""
+        const na = parseFloat(String(va).replace(/\./g, "").replace(",", "."))
+        const nb = parseFloat(String(vb).replace(/\./g, "").replace(",", "."))
+        if (!isNaN(na) && !isNaN(nb)) { va = na; vb = nb }
+        else { va = String(va).toLowerCase(); vb = String(vb).toLowerCase() }
+        if (va < vb) return _assetSortDir === "asc" ? -1 : 1
+        if (va > vb) return _assetSortDir === "asc" ? 1 : -1
+        return 0
+    })
+}
+
+function _assetUpdateSortArrows() {
+    document.querySelectorAll(".assetOperationsTable .mThSort").forEach((th) => {
+        const arrow = th.querySelector(".mSortArrow")
+        if (!arrow) return
+        if (th.dataset.sortkey === _assetSortKey) {
+            arrow.textContent = _assetSortDir === "asc" ? " ▲" : " ▼"
+            th.classList.add("mThActive")
+        } else {
+            arrow.textContent = ""
+            th.classList.remove("mThActive")
+        }
+    })
+}
+
+function _assetBindSort() {
+    document.querySelectorAll(".assetOperationsTable .mThSort").forEach((th) => {
+        th.addEventListener("click", () => {
+            const key = th.dataset.sortkey
+            if (_assetSortKey === key) {
+                _assetSortDir = _assetSortDir === "asc" ? "desc" : "asc"
+            } else {
+                _assetSortKey = key
+                _assetSortDir = "asc"
+            }
+            renderAssetRows(_assetDisplayRows)
+        })
+    })
+}
+
 function renderAssetTablePage(asset) {
     const contentArea = document.getElementById("dynamicContent")
     const primaryRows = getPrimaryAssetRows(asset)
@@ -1692,12 +1937,15 @@ function renderAssetTablePage(asset) {
     const isCrypto = isCryptoAssetType(asset.type)
     const isEtf = String(asset.type || "").trim().toLowerCase() === "etfs"
 
+    _assetSortKey = null
+    _assetSortDir = "asc"
+
     if (!contentArea) {
         return
     }
 
     contentArea.innerHTML = `
-        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-price-currency="${asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-market-provider="${asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-market-symbol="${asset.marketSymbol || asset.finnhubSymbol || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}">
+        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-price-currency="${asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-market-provider="${asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-market-symbol="${asset.marketSymbol || asset.finnhubSymbol || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}" data-asset-color="${asset.color || ""}">
             <div class="assetPageHeader">
                 <div>
                     <div class="assetTitleRow">
@@ -1707,25 +1955,31 @@ function renderAssetTablePage(asset) {
                     </div>
                     <div class="assetPageSubtitle">${asset.name} · ${buildAssetTypeLabel(asset.type)}</div>
                 </div>
-                ${isCrypto ? `
-                    <div class="assetCurrencyPanel assetCurrencyPanelCrypto">
-                        <div class="assetCurrencyBlock">
-                            <div class="assetCurrencyLabel">Moneda menú lateral</div>
+                <div class="assetHeaderRight">
+                    <div class="assetHeaderActions">
+                        <button id="refreshAssetMarketBtn" class="primaryButton">Actualizar cotización (${String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")).toUpperCase()})</button>
+                        <button id="deleteAssetBtn" class="dangerButton">Eliminar activo</button>
+                    </div>
+                    ${isCrypto ? `
+                        <div class="assetCurrencyPanel assetCurrencyPanelCrypto">
+                            <div class="assetCurrencyBlock">
+                                <div class="assetCurrencyLabel">Moneda menú lateral</div>
+                                <div class="assetCurrencyCurrent">Actual: ${currentCurrency}</div>
+                                <button id="toggleAssetCurrencyBtn" class="secondaryButton assetCurrencyBtn" type="button" data-target-currency="${targetCurrency}">
+                                    Pasar a ${targetCurrency}
+                                </button>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="assetCurrencyPanel">
+                            <div class="assetCurrencyLabel">Moneda del activo</div>
                             <div class="assetCurrencyCurrent">Actual: ${currentCurrency}</div>
                             <button id="toggleAssetCurrencyBtn" class="secondaryButton assetCurrencyBtn" type="button" data-target-currency="${targetCurrency}">
                                 Pasar a ${targetCurrency}
                             </button>
                         </div>
-                    </div>
-                ` : `
-                    <div class="assetCurrencyPanel">
-                        <div class="assetCurrencyLabel">Moneda del activo</div>
-                        <div class="assetCurrencyCurrent">Actual: ${currentCurrency}</div>
-                        <button id="toggleAssetCurrencyBtn" class="secondaryButton assetCurrencyBtn" type="button" data-target-currency="${targetCurrency}">
-                            Pasar a ${targetCurrency}
-                        </button>
-                    </div>
-                `}
+                    `}
+                </div>
             </div>
 
 
@@ -1733,16 +1987,16 @@ function renderAssetTablePage(asset) {
                 <table class="assetOperationsTable">
                     <thead>
                         <tr>
-                            <th>Fecha operación</th>
-                            <th>Tipo de operación</th>
-                            ${isCrypto ? "<th>Exchange</th>" : ""}
-                            <th>Participaciones</th>
-                            <th>Precio Participación</th>
-                            ${isCrypto ? "<th>Moneda fiat</th>" : ""}
-                            <th>Capital Invertido bruto</th>
-                            ${isEtf ? "<th>Coste Anual</th>" : ""}
-                            ${isCrypto ? "<th>Comisiones cripto</th><th>Comisiones fiat</th>" : "<th>Comisiones</th>"}
-                            <th>Capital Invertido neto</th>
+                            <th class="mThSort" data-sortkey="fechaOperacion">Fecha operación<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="tipoOperacion">Tipo de operación<span class="mSortArrow"></span></th>
+                            ${isCrypto ? '<th class="mThSort" data-sortkey="exchange">Exchange<span class="mSortArrow"></span></th>' : ""}
+                            <th class="mThSort" data-sortkey="participaciones">Participaciones<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="precioParticipacion">Precio Participación<span class="mSortArrow"></span></th>
+                            ${isCrypto ? '<th class="mThSort" data-sortkey="currency">Moneda fiat<span class="mSortArrow"></span></th>' : ""}
+                            <th class="mThSort" data-sortkey="capitalInvertidoBruto">Capital Invertido bruto<span class="mSortArrow"></span></th>
+                            ${isEtf ? '<th class="mThSort" data-sortkey="costeAnual">Coste Anual<span class="mSortArrow"></span></th>' : ""}
+                            ${isCrypto ? '<th class="mThSort" data-sortkey="comisionesCripto">Comisiones cripto<span class="mSortArrow"></span></th><th class="mThSort" data-sortkey="comisionesFiat">Comisiones fiat<span class="mSortArrow"></span></th>' : '<th class="mThSort" data-sortkey="comisiones">Comisiones<span class="mSortArrow"></span></th>'}
+                            <th class="mThSort" data-sortkey="capitalInvertidoNeto">Capital Invertido neto<span class="mSortArrow"></span></th>
                             <th class="rowActionsHeader"></th>
                         </tr>
                     </thead>
@@ -1751,16 +2005,15 @@ function renderAssetTablePage(asset) {
             </div>
 
 
-            <div class="assetActions">
-                <button id="refreshAssetMarketBtn" class="primaryButton">Actualizar cotización (${String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")).toUpperCase()})</button>
-                <button id="deleteAssetBtn" class="dangerButton">Eliminar activo</button>
-            </div>
+            <div id="assetCompletedOperationsSection" class="hidden"></div>
         </section>
     `
 
     currentAssetPersistedOperationRows = Array.isArray(asset.operationRows) ? asset.operationRows : []
     currentAssetPersistedConversionRows = conversionRows
     renderAssetRows(primaryRows)
+    renderAssetCompletedOperationsSection(asset)
+    _assetBindSort()
     initAssetTableLogic(asset)
 }
 
@@ -1780,7 +2033,9 @@ function renderAssetRows(rows) {
 
     assetOperationsBody.innerHTML = ""
 
-    _assetDisplayRows.forEach((rowData, index) => {
+    const sortedRows = _assetSortRows(_assetDisplayRows)
+    sortedRows.forEach((rowData) => {
+        const index = rowData._origIdx
         const rowElement = document.createElement("tr")
         const rowCurrency = normalizeAssetRowCurrency(rowData.currency, assetCurrency)
         const cryptoCommissionValue = parseLooseNumber(getCryptoRowCommissionCrypto(rowData)) ? formatAssetCommissionValue(getCryptoRowCommissionCrypto(rowData)) : ""
@@ -1809,6 +2064,7 @@ function renderAssetRows(rows) {
         `
         assetOperationsBody.appendChild(rowElement)
     })
+    _assetUpdateSortArrows()
 
     updateAssetTableTotals()
 }
@@ -1956,6 +2212,7 @@ function buildCurrentAssetPayload() {
         change: assetPage?.dataset.assetChange || "+0,00%",
         status: assetPage?.dataset.assetStatus || "Mercado abierto",
         lastUpdated: assetPage?.dataset.assetLastUpdated || "",
+        color: assetPage?.dataset.assetColor || "",
         operationRows: currentAssetPersistedOperationRows,
         conversionRows: currentAssetPersistedConversionRows,
         order: Number(document.querySelector(`.assetBtn[data-asset-id="${currentAssetId}"]`)?.dataset.assetOrder || 0),
@@ -2193,21 +2450,25 @@ async function renameCurrentAsset() {
     openEditAssetModal()
 }
 
-function openEditAssetModal() {
+function openEditAssetModal(assetData = null) {
     if (!currentAssetId) {
         return
     }
 
+    _editingAsset = assetData
+
     const editAssetModalOverlay = document.getElementById("editAssetModalOverlay")
     const editAssetNameInput = document.getElementById("editAssetNameInput")
     const assetPage = document.querySelector(".assetTablePage")
-    const currentName = assetPage?.dataset.assetName || document.getElementById("detName")?.textContent.trim() || ""
+    const currentName = assetData?.name || assetPage?.dataset.assetName || document.getElementById("detName")?.textContent.trim() || ""
+    const currentColor = assetData?.color || assetPage?.dataset.assetColor || ""
 
     if (!editAssetModalOverlay || !editAssetNameInput) {
         return
     }
 
     editAssetNameInput.value = currentName
+    initColorPicker("editAssetColorPicker", "editAssetColorInput", currentColor)
     editAssetModalOverlay.classList.remove("hidden")
     editAssetModalState = { isOpen: true }
 
@@ -2239,16 +2500,17 @@ async function submitEditAssetModal() {
         return
     }
 
-    const payload = buildCurrentAssetPayload()
+    const payload = _editingAsset ? { ..._editingAsset } : buildCurrentAssetPayload()
     const currentName = String(payload.name || "").trim()
     const trimmedName = editAssetNameInput.value.trim()
+    const newColor = document.getElementById("editAssetColorInput")?.value || ""
 
     if (!trimmedName) {
         editAssetNameInput.focus()
         return
     }
 
-    if (trimmedName === currentName) {
+    if (trimmedName === currentName && newColor === (payload.color || "")) {
         closeEditAssetModal()
         return
     }
@@ -2257,6 +2519,7 @@ async function submitEditAssetModal() {
     const generatedCurrentSymbol = createAssetSymbolFromName(currentName)
 
     payload.name = trimmedName
+    payload.color = newColor
 
     if (!currentSymbol || currentSymbol === generatedCurrentSymbol) {
         payload.symbol = createAssetSymbolFromName(trimmedName)
@@ -2266,10 +2529,17 @@ async function submitEditAssetModal() {
     if (currentName !== trimmedName && typeof renameCalendarioAsset === "function") {
         await renameCalendarioAsset(currentName, trimmedName)
     }
+    const fromAvView = _editingAsset !== null
     closeEditAssetModal()
     const updatedAsset = await loadAssetData(currentAssetId)
-    await updateAssetDetail(updatedAsset)
-    renderAssetTablePage(updatedAsset)
+    if (fromAvView) {
+        const idx = _activosAllAssets.findIndex((a) => a.id === currentAssetId)
+        if (idx >= 0) _activosAllAssets[idx] = { ..._activosAllAssets[idx], name: updatedAsset.name, color: updatedAsset.color }
+        avRenderGrid()
+    } else {
+        await updateAssetDetail(updatedAsset)
+        renderAssetTablePage(updatedAsset)
+    }
     await refreshAssetsSidebar(currentAssetId, false)
 }
 
@@ -2622,6 +2892,7 @@ function openAssetModal() {
     assetTickerInput.dataset.marketProvider = "finnhub"
     setAssetSearchFeedback(assetSearchFeedback, "")
     renderMarketSearchResults(assetSearchResults, [], () => {})
+    initColorPicker("assetColorPicker", "assetColorInput", ASSET_COLOR_PALETTE[0])
     assetModalOverlay.classList.remove("hidden")
     assetModalState = { isOpen: true }
 
@@ -2718,6 +2989,7 @@ async function submitAssetModal() {
         marketSymbol,
         assetTickerInput.dataset.marketProvider || "finnhub"
     )
+    const color = document.getElementById("assetColorInput")?.value || ASSET_COLOR_PALETTE[0]
 
     if (!name) {
         setAssetSearchFeedback(assetSearchFeedback, "Introduce el nombre del activo.", true)
@@ -2739,7 +3011,7 @@ async function submitAssetModal() {
 
     try {
         setAssetSearchFeedback(assetSearchFeedback, "")
-        const response = await createAssetOnServer(name, type, marketSymbol, marketProvider)
+        const response = await createAssetOnServer(name, type, marketSymbol, marketProvider, color)
         const createdAsset = response.asset
         closeAssetModal()
         currentAssetId = createdAsset.id
@@ -3049,8 +3321,7 @@ async function avHandleCardClick(event) {
         const id = editBtn.dataset.assetId
         currentAssetId = id
         const fullAsset = await loadAssetData(id)
-        await updateAssetDetail(fullAsset)
-        openEditAssetModal()
+        openEditAssetModal(fullAsset)
         return
     }
 

@@ -5,7 +5,7 @@ from asset_store import deleteAssetFile, getAssetFile, listAssets, readAssetFile
 from db import get_db
 from asset_utils import (
     createDefaultAssetPayload, inferMarketProviderFromSymbol,
-    normalizeMarketProvider, sanitizeAssetPayload, sanitizeAssetType, slugify,
+    normalizeMarketProvider, sanitizeAssetPayload, sanitizeAssetType, sanitize_color, slugify,
 )
 from eodhd_client import fetch_quote as fetch_eodhd_quote
 from finnhub_client import convert_amount, convert_quote_currency, fetch_quote
@@ -122,6 +122,7 @@ def createActivo():
     payload["marketSymbol"] = marketSymbol
     payload["finnhubSymbol"] = marketSymbol
     payload["order"] = len(listAssets())
+    payload["color"] = sanitize_color(requestData.get("color", ""))
     writeAssetFile(assetId, payload)
 
     return jsonify({"ok": True, "asset": payload}), 201

@@ -246,6 +246,76 @@ Puedes abrir `data/portfolio.db` con cualquier cliente SQLite, por ejemplo [DB B
 
 ## Changelog
 
+### 2026-04-28 — Color de activo en gráficos de dividendos
+
+El color personalizado asignado a cada activo ahora se aplica de forma consistente en todos los apartados de métricas relacionados con dividendos.
+
+- **Distribución de dividendos por acción**: el gráfico de barras y el donut usan el color del activo correspondiente al instrumento. Si el activo no tiene color asignado, se mantiene el fallback a la paleta por índice.
+- **Dividendos por instrumento / Dividendos por mes**: el gráfico de barras apiladas asigna a cada serie (instrumento) su color de activo, tanto en la leyenda como en los tooltips y en el renderizado de segmentos.
+- Implementación: `mRenderAll` construye un `colorMap` (`nombre → color`) desde `summaries` y lo propaga a `mRenderDividendos` y `mRenderDivMensual`; este último lo pasa también al listener de cambio de año para que el color se mantenga al navegar entre años.
+
+#### Reorganización del header de activo
+
+- Los botones **"Actualizar cotización"** y **"Eliminar activo"** se han agrupado en un nuevo contenedor `.assetHeaderRight` junto al panel **"Pasar a EUR"**, quedando a su izquierda.
+- Antes, los botones de acción flotaban de forma independiente en el centro del header; ahora forman un bloque compacto alineado a la derecha junto al selector de moneda.
+
+---
+
+### 2026-04-28 — Módulo Interés Fijo / Bonos unificado
+
+#### Ventana única con tabla unificada
+- Eliminada la ventana **Renta Fija** como página independiente. Su contenido se integró como tipo dentro de la ventana **Interés Fijo** (antes llamada "Bonos").
+- El menú de navegación muestra una única entrada "Interés Fijo" bajo el desplegable "Renta".
+- La tabla es ahora única y contiene todos los instrumentos: bonos gubernamentales, bonos corporativos, interés fijo bancario e interés fijo estatal.
+- Los filtros de la barra de herramientas permiten ver **Todos / Interés Fijo / Corporativos / Gubernamentales**. El filtro "Interés Fijo" agrupa los tipos `bancario` y `estatal`.
+
+#### Campo Moneda
+- Nueva columna **Moneda** (EUR / USD / GBP / CHF / JPY) en la tabla y en el modal de alta/edición.
+- Persiste en base de datos (`bonos.currency`, `renta_fija.currency`) con migración automática en el arranque para tablas existentes.
+
+#### Totales por categoría
+- Las tarjetas de resumen muestran: Total neto, Interés acumulado, Impuestos, Invertido total, **Interés Fijo neto**, **Corporativos neto**, **Gubernamentales neto**.
+
+#### Backend
+- `/api/bonos` y `/api/rentafija` siguen existiendo como almacenes separados. El frontend los carga, fusiona para mostrar y los vuelve a separar por tipo al guardar.
+- Sanitización de `currency` en `registros.py` para ambas rutas POST (valores permitidos: `EUR`, `USD`, `GBP`, `CHF`, `JPY`).
+
+---
+
+### 2026-04-28 — Selector de color HSV en activos
+
+#### Nuevo color picker de canvas
+- Sustituida la paleta de swatches por un selector HSV completo: canvas de saturación/valor, slider de tono, campo hexadecimal con previsualización en tiempo real.
+- Botón **"Color aleatorio"** que genera un color vivo aleatorio (saturación 0,55–0,95, valor 0,65–0,95).
+- El selector funciona con Pointer Capture API para drag fluido sin listeners globales.
+
+#### Corrección de navegación en vista Activos
+- Al confirmar la edición de un activo desde las tarjetas de la vista **Activos**, la aplicación permanece en esa vista en lugar de navegar a la ficha del activo.
+- Si se edita desde la ficha del activo (panel lateral), el comportamiento anterior se conserva.
+
+---
+
+### 2026-04-27 — Color personalizado por activo
+
+Cada activo puede tener ahora un color propio que se mantiene consistente en todos los gráficos de métricas.
+
+#### Selector de color en los modales
+- **Modal "Nuevo activo"**: incluye una paleta de 20 colores seleccionables antes de confirmar la creación. El color elegido se guarda junto con el resto de metadatos del activo.
+- **Modal "Editar activo"**: muestra la paleta con el color actual del activo preseleccionado. Permite cambiar nombre y color en la misma acción; si ninguno cambia, el modal se cierra sin hacer ninguna petición al servidor.
+
+#### Persistencia
+- El campo `color` se almacena en el JSON del activo en `data/portfolio.db` y se incluye en todos los payloads de creación (`POST /api/activos`) y edición (`POST /api/activos/:id`).
+- `renderAssetTablePage` escribe el color en `data-asset-color` del elemento DOM para que `buildCurrentAssetPayload` lo recupere en el autosave.
+
+#### Reflejo en métricas
+- El gráfico **"Por activo individual"** usa el color guardado de cada activo. Si un activo no tiene color asignado, sigue tomando uno de la paleta por orden de índice (comportamiento anterior).
+- El color se propaga a través de `buildMetricasPayload` → `summaries[].color` → `mRenderDistActivos`.
+
+#### Corrección de la edición desde la vista Activos
+- El botón ✎ de las tarjetas de la vista **Activos** ahora pasa el objeto completo del activo a `openEditAssetModal`, evitando que el guardado sobreescriba las filas y operaciones del activo con valores vacíos.
+
+---
+
 ### 2026-04-27 — Mejoras de UI en módulo Cripto
 
 #### Botón "Añadir fila" anclado al fondo izquierdo

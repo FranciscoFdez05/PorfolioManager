@@ -3,10 +3,10 @@
     <div class="bonosToolbar">
         <div class="bonosFilters" id="bonosFilters">
             <button class="bonosFilterBtn active" data-tipo="all">Todos</button>
-            <button class="bonosFilterBtn" data-tipo="gubernamental">Gubernamentales</button>
+            <button class="bonosFilterBtn" data-tipo="if">Interés Fijo</button>
             <button class="bonosFilterBtn" data-tipo="corporativo">Corporativos</button>
+            <button class="bonosFilterBtn" data-tipo="gubernamental">Gubernamentales</button>
         </div>
-
         <button id="saveBonosBtn" class="primaryButton">Guardar</button>
     </div>
 
@@ -28,12 +28,16 @@
             <span class="bonosSummaryValue" id="bonosTotalInvertido">0,00 €</span>
         </div>
         <div class="bonosSummaryCard bonosSummaryGub">
-            <span class="bonosSummaryLabel">Gubernamentales neto</span>
-            <span class="bonosSummaryValue" id="bonosTotalGub">0,00 €</span>
+            <span class="bonosSummaryLabel">Interés Fijo neto</span>
+            <span class="bonosSummaryValue" id="bonosTotalIf">0,00 €</span>
         </div>
-        <div class="bonosSummaryCard bonosSummaryCorp">
+        <div class="bonosSummaryCard">
             <span class="bonosSummaryLabel">Corporativos neto</span>
             <span class="bonosSummaryValue" id="bonosTotalCorp">0,00 €</span>
+        </div>
+        <div class="bonosSummaryCard bonosSummaryCorp">
+            <span class="bonosSummaryLabel">Gubernamentales neto</span>
+            <span class="bonosSummaryValue" id="bonosTotalGub">0,00 €</span>
         </div>
     </div>
 
@@ -43,13 +47,14 @@
                 <tr>
                     <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
                     <th class="mThSort" data-sortkey="1">Tipo<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="2">Instrumento<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="3">Cupón %<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="4">Vencimiento<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="5">Invertido<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="6">Interés acum.<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="7">Impuestos<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="8">Total neto<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Moneda<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3">Instrumento<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="4">Cupón / Rend. %<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5">Vencimiento<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6">Invertido<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="7">Interés acum.<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="8">Impuestos<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="9">Total neto<span class="mSortArrow"></span></th>
                     <th class="rowActionsCell"></th>
                 </tr>
             </thead>
@@ -57,10 +62,10 @@
         </table>
     </div>
 
-    <p class="bonosEmpty hidden" id="bonosEmpty">No hay bonos registrados. Añade uno con el botón inferior.</p>
+    <p class="bonosEmpty hidden" id="bonosEmpty">No hay registros. Añade uno con el botón inferior.</p>
 
     <div class="dividendosActions">
-        <button id="bonosAddBtn" class="primaryButton">+ Añadir bono</button>
+        <button id="bonosAddBtn" class="primaryButton">+ Añadir</button>
     </div>
 
 </div>

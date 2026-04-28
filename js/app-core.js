@@ -196,8 +196,6 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initHerramientasLogic()
         } else if (page === "bonos") {
             await initBonosLogic()
-        } else if (page === "rentaFija") {
-            await initRentaFijaLogic()
         } else if (page === "metricas") {
             await initMetricasLogic()
         } else if (page === "activos") {
