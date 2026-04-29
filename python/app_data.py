@@ -240,11 +240,12 @@ def readStablecoinsFile():
             "cantidad": r["cantidad"],
             "precio": r["precio"],
             "total": r["total"],
+            "comisiones": r["comisiones"],
             "currency": r["currency"],
             "nota": r["nota"],
         }
         for r in conn.execute(
-            "SELECT id, stablecoin_symbol, fecha, tipo, cantidad, precio, total, currency, nota "
+            "SELECT id, stablecoin_symbol, fecha, tipo, cantidad, precio, total, comisiones, currency, nota "
             "FROM stablecoins_rows ORDER BY rowid"
         ).fetchall()
     ]
@@ -271,12 +272,12 @@ def writeStablecoinsFile(data):
     )
     conn.executemany(
         "INSERT INTO stablecoins_rows "
-        "(id, stablecoin_symbol, fecha, tipo, cantidad, precio, total, currency, nota) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(id, stablecoin_symbol, fecha, tipo, cantidad, precio, total, comisiones, currency, nota) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), r.get("stablecoinSymbol", ""), r.get("fecha", ""),
              r.get("tipo", "Compra"), r.get("cantidad", ""), r.get("precio", ""),
-             r.get("total", ""), r.get("currency", "USD"), r.get("nota", ""))
+             r.get("total", ""), r.get("comisiones", ""), r.get("currency", "USD"), r.get("nota", ""))
             for r in data.get("rows", [])
         ]
     )

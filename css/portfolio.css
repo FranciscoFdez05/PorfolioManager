@@ -231,7 +231,11 @@ body{
     font-weight:700;
     color:#ffffff;
     white-space:nowrap;
+    transition:color .2s;
 }
+
+.metricValue.metricPositive{ color:#2ecc71; }
+.metricValue.metricNegative{ color:#e74c3c; }
 
 .tabs{
     display:flex;
@@ -1018,14 +1022,47 @@ body{
     margin-left:12px;
 }
 
-.assetCompletedOpsLabel{
+.assetTabsContainer{
+    border:1px solid #1e2d45;
+    border-radius:8px;
+    overflow:hidden;
+}
+
+.assetTabsNav{
+    display:flex;
+    background:#0a1120;
+    border-bottom:1px solid #1e2d45;
+    padding:0 4px;
+}
+
+.assetTabBtn{
+    padding:9px 18px;
+    background:transparent;
+    color:#7b9bbf;
+    border:none;
+    border-bottom:2px solid transparent;
+    margin-bottom:-1px;
+    cursor:pointer;
     font-size:0.78rem;
     font-weight:600;
     letter-spacing:0.07em;
     text-transform:uppercase;
-    color:#7b9bbf;
-    margin-bottom:6px;
-    margin-top:18px;
+    transition:color 0.15s;
+    white-space:nowrap;
+}
+
+.assetTabBtn:hover{
+    color:#e8eefc;
+}
+
+.assetTabBtn.assetTabActive{
+    color:#72a2ff;
+    border-bottom-color:#72a2ff;
+}
+
+.assetTabPanel .assetTableWrapper{
+    border-radius:0;
+    max-height:540px;
 }
 
 .assetCompletedOpsTable td{
@@ -3087,11 +3124,13 @@ tr.gastosTypeEmptySep td {
 }
 
 .stablecoinsPage .operationsTable{
-    min-width:1080px;
+    width:auto;
+    min-width:100%;
 }
 
 .stablecoinsPage .operationsTableWrapper{
     max-height:calc(9 * 41px + 42px);
+    overflow-x:auto;
     overflow-y:auto;
 }
 
@@ -4799,27 +4838,89 @@ tr.gastosTypeEmptySep td {
 .mActivosFilterGroup{
     display:flex;
     flex-wrap:wrap;
-    gap:4px;
+    gap:5px;
 }
 .mActivosFilterBtn{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
     background:transparent;
     border:1px solid #2a3a5a;
     color:#7a8fb0;
-    font-size:0.72rem;
-    padding:3px 9px;
-    border-radius:4px;
+    font-size:0.78rem;
+    font-weight:500;
+    padding:4px 12px 4px 10px;
+    border-radius:20px;
     cursor:pointer;
-    transition:background .15s,color .15s;
+    transition:background .15s,color .15s,border-color .15s;
+    white-space:nowrap;
+}
+.mActivosFilterBtn::before{
+    content:"";
+    display:inline-block;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    flex-shrink:0;
+    background:#4a5a7a;
+    transition:background .15s;
+}
+/* Dot colors per asset type */
+.mActivosFilterBtn[data-atype="todos"]::before    { background:#e5edf9; }
+.mActivosFilterBtn[data-atype="cripto"]::before   { background:#f7931a; }
+.mActivosFilterBtn[data-atype="acciones"]::before { background:#3a7bd5; }
+.mActivosFilterBtn[data-atype="etfs"]::before     { background:#2ecc71; }
+.mActivosFilterBtn[data-atype="comoditis"]::before{ background:#e0c068; }
+.mActivosFilterBtn[data-atype="bonos"]::before    { background:#9b59b6; }
+.mActivosFilterBtn[data-atype="rentaFija"]::before{ background:#1abc9c; }
+/* Border colors per asset type */
+.mActivosFilterBtn[data-atype="todos"]    { border-color:#3a4a6a; }
+.mActivosFilterBtn[data-atype="cripto"]   { border-color:#5a3a10; }
+.mActivosFilterBtn[data-atype="acciones"] { border-color:#1e3d6e; }
+.mActivosFilterBtn[data-atype="etfs"]     { border-color:#1a4a30; }
+.mActivosFilterBtn[data-atype="comoditis"]{ border-color:#4a4010; }
+.mActivosFilterBtn[data-atype="bonos"]    { border-color:#3a1a5a; }
+.mActivosFilterBtn[data-atype="rentaFija"]{ border-color:#0e3a30; }
+.mActivosFilterBtn:hover{
+    color:#c5d4e8;
+    background:#151f35;
 }
 .mActivosFilterBtn.active{
-    background:#1e2d45;
     color:#e5edf9;
-    border-color:#3a5580;
+    font-weight:600;
 }
-.mActivosFilterBtn:hover:not(.active){
-    background:#151f35;
-    color:#aabbd8;
-}
+.mActivosFilterBtn[data-atype="todos"].active    { background:#1e2d45; border-color:#3a4a6a; }
+.mActivosFilterBtn[data-atype="cripto"].active   { background:#2a1800; border-color:#f7931a; }
+.mActivosFilterBtn[data-atype="acciones"].active { background:#0e2040; border-color:#3a7bd5; }
+.mActivosFilterBtn[data-atype="etfs"].active     { background:#0a2a1a; border-color:#2ecc71; }
+.mActivosFilterBtn[data-atype="comoditis"].active{ background:#2a2000; border-color:#e0c068; }
+.mActivosFilterBtn[data-atype="bonos"].active    { background:#1e0a30; border-color:#9b59b6; }
+.mActivosFilterBtn[data-atype="rentaFija"].active{ background:#051f1a; border-color:#1abc9c; }
+
+/* Dot colors — gasto categories */
+.mActivosFilterBtn[data-cmp-tipo="Café"]::before          { background:#c47a3a; }
+.mActivosFilterBtn[data-cmp-tipo="Comidas/Cenas"]::before { background:#e86c2c; }
+.mActivosFilterBtn[data-cmp-tipo="Compras"]::before       { background:#3a7bd5; }
+.mActivosFilterBtn[data-cmp-tipo="Gasoil"]::before        { background:#d4b44a; }
+.mActivosFilterBtn[data-cmp-tipo="Inversion"]::before     { background:#2ecc71; }
+.mActivosFilterBtn[data-cmp-tipo="Mensualidades"]::before { background:#9b59b6; }
+.mActivosFilterBtn[data-cmp-tipo="Otros"]::before         { background:#94a3b8; }
+/* Border colors — gasto categories */
+.mActivosFilterBtn[data-cmp-tipo="Café"]          { border-color:#5a3010; }
+.mActivosFilterBtn[data-cmp-tipo="Comidas/Cenas"] { border-color:#6a3010; }
+.mActivosFilterBtn[data-cmp-tipo="Compras"]       { border-color:#1e3d6e; }
+.mActivosFilterBtn[data-cmp-tipo="Gasoil"]        { border-color:#4a3a08; }
+.mActivosFilterBtn[data-cmp-tipo="Inversion"]     { border-color:#1a4a30; }
+.mActivosFilterBtn[data-cmp-tipo="Mensualidades"] { border-color:#3a1a5a; }
+.mActivosFilterBtn[data-cmp-tipo="Otros"]         { border-color:#3a4a5a; }
+/* Active state — gasto categories */
+.mActivosFilterBtn[data-cmp-tipo="Café"].active          { background:#2a1200; border-color:#c47a3a; }
+.mActivosFilterBtn[data-cmp-tipo="Comidas/Cenas"].active { background:#2a1000; border-color:#e86c2c; }
+.mActivosFilterBtn[data-cmp-tipo="Compras"].active       { background:#0e2040; border-color:#3a7bd5; }
+.mActivosFilterBtn[data-cmp-tipo="Gasoil"].active        { background:#221a00; border-color:#d4b44a; }
+.mActivosFilterBtn[data-cmp-tipo="Inversion"].active     { background:#0a2a1a; border-color:#2ecc71; }
+.mActivosFilterBtn[data-cmp-tipo="Mensualidades"].active { background:#1e0a30; border-color:#9b59b6; }
+.mActivosFilterBtn[data-cmp-tipo="Otros"].active         { background:#1a2030; border-color:#94a3b8; }
 
 .metricasChartWrap{
     position:relative;
@@ -6028,6 +6129,8 @@ html[data-theme="black"] .topBar{ background:#050505; border-color:#111; }
 html[data-theme="black"] .metricBox{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
 html[data-theme="black"] .metricTitle{ color:#888; }
 html[data-theme="black"] .metricValue{ color:#f0f0f0; }
+html[data-theme="black"] .metricValue.metricPositive{ color:#2ecc71; }
+html[data-theme="black"] .metricValue.metricNegative{ color:#e74c3c; }
 
 html[data-theme="black"] .tabs{ background:#000; border-color:#111; }
 html[data-theme="black"] .navBtn,
@@ -6106,6 +6209,8 @@ html[data-theme="light"] .topBar{ background:#ffffff; border-color:#e2e8f0; }
 html[data-theme="light"] .metricBox{ background:#f8f9fa; border-color:#e2e8f0; }
 html[data-theme="light"] .metricTitle{ color:#64748b; }
 html[data-theme="light"] .metricValue{ color:#0f172a; }
+html[data-theme="light"] .metricValue.metricPositive{ color:#16a34a; }
+html[data-theme="light"] .metricValue.metricNegative{ color:#dc2626; }
 
 html[data-theme="light"] .tabs{ background:#ffffff; border-color:#e2e8f0; }
 html[data-theme="light"] .navBtn,
@@ -6226,8 +6331,15 @@ html[data-theme="light"] .mkpiValue{ color:#0f172a; }
 html[data-theme="light"] .metricasChartCard{ background:#ffffff; border-color:#e2e8f0; }
 html[data-theme="light"] .metricasChartTitle{ color:#475569; }
 html[data-theme="light"] .mActivosFilterBtn{ border-color:#cbd5e1; color:#475569; }
-html[data-theme="light"] .mActivosFilterBtn.active{ background:#e8edf5; color:#1e293b; border-color:#94a3b8; }
-html[data-theme="light"] .mActivosFilterBtn:hover:not(.active){ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .mActivosFilterBtn:hover{ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .mActivosFilterBtn.active{ color:#1e293b; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="todos"].active    { background:#e8edf5; border-color:#94a3b8; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="cripto"].active   { background:#fff3e0; border-color:#f7931a; color:#7a3500; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="acciones"].active { background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="etfs"].active     { background:#dcfce7; border-color:#22c55e; color:#166534; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="comoditis"].active{ background:#fefce8; border-color:#d4a906; color:#713f12; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="bonos"].active    { background:#f3e8ff; border-color:#9b59b6; color:#5b21b6; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="rentaFija"].active{ background:#ccfbf1; border-color:#14b8a6; color:#0f5c50; }
 html[data-theme="light"] .metricasSectionTitle{ color:#0f172a; }
 html[data-theme="light"] .metricasSection{ color:#0f172a; }
 html[data-theme="light"] .mNavTab{ border-color:#cbd5e1; color:#475569; }
@@ -6307,8 +6419,15 @@ html[data-theme="black"] .mkpiValue{ color:#f0f0f0; }
 html[data-theme="black"] .metricasChartCard{ background:#0a0a0a; border-color:#1a1a1a; }
 html[data-theme="black"] .metricasChartTitle{ color:#666; }
 html[data-theme="black"] .mActivosFilterBtn{ border-color:#222; color:#555; }
-html[data-theme="black"] .mActivosFilterBtn.active{ background:#111; color:#e0e0e0; border-color:#333; }
-html[data-theme="black"] .mActivosFilterBtn:hover:not(.active){ background:#0f0f0f; color:#aaa; }
+html[data-theme="black"] .mActivosFilterBtn:hover{ background:#111; color:#aaa; }
+html[data-theme="black"] .mActivosFilterBtn.active{ color:#e0e0e0; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="todos"].active    { background:#111; border-color:#444; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="cripto"].active   { background:#180e00; border-color:#f7931a; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="acciones"].active { background:#071020; border-color:#3a7bd5; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="etfs"].active     { background:#051505; border-color:#2ecc71; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="comoditis"].active{ background:#150f00; border-color:#e0c068; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="bonos"].active    { background:#0f0518; border-color:#9b59b6; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="rentaFija"].active{ background:#021210; border-color:#1abc9c; }
 html[data-theme="black"] .mNavTab{ border-color:#222; color:#555; }
 html[data-theme="black"] .mNavTab:hover{ background:#111; color:#aaa; }
 html[data-theme="black"] .mNavTab[data-mcat="todo"].active              { background:#111; border-color:#444; color:#e0e0e0; }
@@ -6552,4 +6671,178 @@ html[data-theme="black"] .gastosSectionRow td{ background:#0a0a0a !important; bo
     border-top:2px solid #3b82f6;
     color:#e5edf9;
     font-weight:700;
+}
+
+/* ── Toggle ocultar dinero ── */
+.navMoneyToggleBtn{
+    height:34px;
+    width:34px;
+    padding:0;
+    border:1px solid #334155;
+    border-radius:8px;
+    background:#0f1724;
+    color:#e5edf9;
+    cursor:pointer;
+    font-size:16px;
+    flex-shrink:0;
+    transition:background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.navMoneyToggleBtn:hover{ background:#162033; border-color:#475569; }
+.navMoneyToggleBtn.money-hidden-active{ background:#1d4ed8; border-color:#3b82f6; }
+
+body.money-hidden .metricValue{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+body.money-hidden #overviewTableBody td:not(.mTdRank):not(.mTdName):not(:nth-child(3)):not(:nth-child(6)){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+body.money-hidden #detPosition,
+body.money-hidden #detInvested,
+body.money-hidden #detPnL,
+body.money-hidden #detAvgPrice,
+body.money-hidden #detFees{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* ── money-hidden: páginas adicionales ── */
+
+/* activos grid cards */
+body.money-hidden .avMetricValue{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* activo individual - tabla de operaciones */
+body.money-hidden [data-field="exchange"],
+body.money-hidden [data-field="currency"],
+body.money-hidden [data-field="costeAnual"],
+body.money-hidden [data-field="participaciones"],
+body.money-hidden [data-field="precioParticipacion"],
+body.money-hidden [data-field="capitalInvertidoBruto"],
+body.money-hidden [data-field="comisiones"],
+body.money-hidden [data-field="comisionesFiat"],
+body.money-hidden [data-field="comisionesCripto"],
+body.money-hidden .rowTotal{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* intereses: cols acumulado, impuestos, total */
+body.money-hidden #interesesBody td:nth-child(n+2):not(:last-child){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* dividendos: cols acciones, div/accion, impuestos, total */
+body.money-hidden #dividendosBody td:nth-child(n+3):not(:last-child){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* cards resumen (intereses y dividendos) */
+body.money-hidden .summaryCardValue{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* gastos - tabla anual (todos los meses) y movimientos (cantidad) */
+body.money-hidden #gastosAnnualBody td:not(:first-child):not(:last-child),
+body.money-hidden #gastosMovementsBody td:nth-child(4){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* ingresos - tabla anual y movimientos */
+body.money-hidden #ingresosAnnualBody td:not(:first-child):not(:last-child),
+body.money-hidden #ingresosMovementsBody td:nth-child(4){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* bonos - resumen y cols invertido, interés, impuestos, total neto */
+body.money-hidden .bonosSummaryValue{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+body.money-hidden #bonosBody td:nth-child(n+7):not(:last-child){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* ventas - cols desde coste fifo en adelante */
+body.money-hidden #ventasBody td:nth-child(n+4):not(:last-child){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* stablecoins - resumen y cols cantidad, precio, total, comisiones */
+body.money-hidden .stablecoinsSummary,
+body.money-hidden #stablecoinsBody td:nth-child(5),
+body.money-hidden #stablecoinsBody td:nth-child(6),
+body.money-hidden #stablecoinsBody td:nth-child(7),
+body.money-hidden #stablecoinsBody td:nth-child(8){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* operaciones (trading) - precio, cantidad, comisiones, total + saldo de pares */
+body.money-hidden #operationsBody td:nth-child(5),
+body.money-hidden #operationsBody td:nth-child(6),
+body.money-hidden #operationsBody td:nth-child(7),
+body.money-hidden #operationsBody td:nth-child(8),
+body.money-hidden .operationsPairsSummaryValues{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* transacciones - total cripto, comisión red */
+body.money-hidden #transaccionesBody td:nth-child(2),
+body.money-hidden #transaccionesBody td:nth-child(3){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* métricas - valores KPI */
+body.money-hidden .mkpiValue{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+/* métricas - gráficos (eje Y y valores dentro del canvas) */
+body.money-hidden .metricasChartWrap canvas{
+    filter:blur(7px);
+}
+/* métricas - tabla Posiciones */
+body.money-hidden #metricasTopBody td:nth-child(n+4){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+/* asset detail - ops spot completadas */
+body.money-hidden .assetCompletedOpsTable td:nth-child(5),
+body.money-hidden .assetCompletedOpsTable td:nth-child(6),
+body.money-hidden .assetCompletedOpsTable td:nth-child(7),
+body.money-hidden .assetCompletedOpsTable td:nth-child(8){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
 }

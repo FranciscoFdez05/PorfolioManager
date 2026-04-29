@@ -37,6 +37,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await refreshAssetsSidebar()
     await refreshTopDividendosIntereses()
 
+    initMoneyToggle()
     loadPage("vistaGeneral")
     refreshOverviewMarketData()
 })
@@ -350,8 +351,7 @@ async function refreshTopDividendosIntereses() {
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = formatEuro(val) }
         set("topTotalInteres", totalInteres)
         set("topTotalDividendos", totalDividendos)
-        set("topTotalBonos", totalBonos)
-        set("topTotalRentaFija", totalRentaFija)
+        set("topTotalRentaFija", totalBonos + totalRentaFija)
     } catch (error) {
         console.error("Error actualizando métricas de dividendos/intereses:", error)
     }
@@ -430,5 +430,24 @@ function initResizeHandles() {
             document.addEventListener("mouseup", onUp)
         })
     }
+}
+
+function initMoneyToggle() {
+    const btn = document.getElementById("toggleMoneyBtn")
+    if (!btn) return
+    const hidden = localStorage.getItem("moneyHidden") === "1"
+    if (hidden) {
+        document.body.classList.add("money-hidden")
+        btn.classList.add("money-hidden-active")
+        btn.title = "Mostrar valores"
+        btn.textContent = "🙈"
+    }
+    btn.addEventListener("click", () => {
+        const isHidden = document.body.classList.toggle("money-hidden")
+        btn.classList.toggle("money-hidden-active", isHidden)
+        btn.title = isHidden ? "Mostrar valores" : "Ocultar valores"
+        btn.textContent = isHidden ? "🙈" : "👁"
+        localStorage.setItem("moneyHidden", isHidden ? "1" : "0")
+    })
 }
 

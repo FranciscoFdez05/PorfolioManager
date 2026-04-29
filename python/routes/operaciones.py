@@ -233,6 +233,7 @@ def saveStablecoins():
             "cantidad": str(row.get("cantidad", "")).strip(),
             "precio": str(row.get("precio", "")).strip(),
             "total": str(row.get("total", "")).strip(),
+            "comisiones": str(row.get("comisiones", "")).strip(),
             "currency": currency,
             "nota": str(row.get("nota", "")).strip()
         })

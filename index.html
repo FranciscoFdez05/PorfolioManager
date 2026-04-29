@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Portfolio Manager</title>
-    <link rel="stylesheet" href="css/portfolio.css?v=20260426a">
+    <link rel="stylesheet" href="css/portfolio.css?v=20260429i">
     <script>
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
     </script>
@@ -93,12 +93,7 @@
                 </div>
 
                 <div class="metricBox">
-                    <span class="metricTitle">€ Bonos</span>
-                    <span class="metricValue" id="topTotalBonos">0,00 €</span>
-                </div>
-
-                <div class="metricBox">
-                    <span class="metricTitle">€ Interés Fijo</span>
+                    <span class="metricTitle">€ Renta Fija</span>
                     <span class="metricValue" id="topTotalRentaFija">0,00 €</span>
                 </div>
             </div>
@@ -157,6 +152,7 @@
                 <button class="navBtn" data-page="herramientas">Herramientas</button>
                 <button class="navBtn" data-page="metricas">Métricas</button>
                 <button class="navBtn" data-page="ajustes">⚙️</button>
+                <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores">👁</button>
             </div>
         </nav>
 
@@ -273,8 +269,14 @@
         <label class="assetModalLabel" for="editAssetNameInput">Nombre del activo</label>
         <input id="editAssetNameInput" class="assetModalInput" type="text" placeholder="Nuevo nombre del activo">
 
-        <label class="assetModalLabel" for="editAssetTickerInput">Ticker de mercado</label>
-        <input id="editAssetTickerInput" class="assetModalInput" type="text" placeholder="Ej: AAPL, NVDA, BTC-USD">
+        <label class="assetModalLabel" for="editAssetTickerInput">Ticker mercado</label>
+        <input id="editAssetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
+        <div class="assetSearchActions">
+            <button id="editSearchAssetTickerFinnhubBtn" class="secondaryButton" type="button">Buscar ticker Finnhub</button>
+            <button id="editSearchAssetTickerEodhdBtn" class="secondaryButton" type="button">Buscar ticker EODHD</button>
+        </div>
+        <div id="editAssetSearchFeedback" class="assetSearchFeedback hidden"></div>
+        <div id="editAssetSearchResults" class="assetSearchResults hidden"></div>
 
         <label class="assetModalLabel">Color del activo</label>
         <div class="assetColorPicker" id="editAssetColorPicker"></div>
@@ -311,7 +313,7 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="js/app-core.js?v=20260426a"></script>
+<script src="js/app-core.js?v=20260429a"></script>
 <script src="js/assets.js?v=20260428b"></script>
 <script src="js/intereses.js?v=20260426a"></script>
 <script src="js/dividendos.js?v=20260421a"></script>

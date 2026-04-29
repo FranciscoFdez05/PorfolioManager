@@ -81,6 +81,7 @@ function normalizeStablecoinMovementRow(row = {}) {
         cantidad: String(row.cantidad || ""),
         precio: String(row.precio || ""),
         total: String(row.total || ""),
+        comisiones: String(row.comisiones || ""),
         currency: currency === "EUR" ? "EUR" : "USD",
         nota: String(row.nota || "")
     }
@@ -172,7 +173,8 @@ function buildStablecoinBalanceSummary(stablecoinsPayload = currentStablecoinsDa
             manualExpenses: 0,
             operationsBuys: 0,
             operationsSales: 0,
-            available: 0
+            available: 0,
+            totalComisiones: 0
         }
     })
 
@@ -189,6 +191,9 @@ function buildStablecoinBalanceSummary(stablecoinsPayload = currentStablecoinsDa
         } else if (row.tipo === "Venta") {
             summary[symbol].manualExpenses += amount
         }
+
+        const comisiones = parseLooseNumber(row.comisiones) || 0
+        summary[symbol].totalComisiones += comisiones
     })
 
     ;(operationsRows || []).forEach((row) => {
@@ -439,6 +444,7 @@ function renderStablecoinsSummary() {
                 <span>Compras manuales: ${formatMoney(item.manualBuys, "USD")}</span>
                 <span>Ventas manuales: ${formatMoney(item.manualExpenses, "USD")}</span>
                 <span>Operaciones completadas: ${formatMoney(item.operationsBuys - item.operationsSales, "USD")}</span>
+                <span>Comisiones pagadas: ${formatMoney(item.totalComisiones, "USD")}</span>
             </div>
         `
         summaryContainer.appendChild(card)
@@ -539,6 +545,7 @@ function buildStablecoinRow(row) {
         <td>${formatStablecoinQuantity(row.cantidad)}</td>
         <td>${formatOperationsMoney(row.precio, row.currency || "USD")}</td>
         <td>${formatOperationsMoney(row.total, row.currency || "USD")}</td>
+        <td>${row.comisiones ? formatOperationsMoney(row.comisiones, row.currency || "USD") : ""}</td>
         <td>${row.nota || ""}</td>
         <td class="rowActionsCell">
             <button type="button" class="assetRowEditBtn stablecoinRowEditBtn" data-row-id="${row.id}" title="Editar fila">✎</button>
@@ -930,6 +937,10 @@ function openStablecoinRowModal(rowId) {
             <input id="scModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.total || "")}">
         </div>
         <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Comisiones</label>
+            <input id="scModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.comisiones || "")}">
+        </div>
+        <div class="assetRowModalField">
             <label class="assetRowModalLabel">Nota</label>
             <input id="scModalNota" class="assetRowModalInput" type="text" value="${rowData.nota || ""}">
         </div>
@@ -995,6 +1006,8 @@ function saveStablecoinRowFromModal() {
     const rowId = overlay?.dataset.rowId || ""
     const g = (id) => document.getElementById(id)?.value ?? ""
 
+    const rawComisiones = g("scModalComisiones")
+
     const rowData = normalizeStablecoinMovementRow({
         id: rowId || `stablecoin-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         stablecoinSymbol: g("scModalSymbol"),
@@ -1004,6 +1017,7 @@ function saveStablecoinRowFromModal() {
         cantidad: g("scModalCantidad"),
         precio: g("scModalPrecio"),
         total: g("scModalTotal"),
+        comisiones: rawComisiones,
         nota: g("scModalNota")
     })
 

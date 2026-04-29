@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS stablecoins_rows (
     cantidad         TEXT NOT NULL DEFAULT '',
     precio           TEXT NOT NULL DEFAULT '',
     total            TEXT NOT NULL DEFAULT '',
+    comisiones       TEXT NOT NULL DEFAULT '',
     currency         TEXT NOT NULL DEFAULT 'USD',
     nota             TEXT NOT NULL DEFAULT ''
 );
@@ -301,6 +302,10 @@ def _migrate(conn):
     rf_cols = {row[1] for row in conn.execute("PRAGMA table_info(renta_fija)")}
     if "currency" not in rf_cols:
         conn.execute("ALTER TABLE renta_fija ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'")
+
+    sc_rows_cols = {row[1] for row in conn.execute("PRAGMA table_info(stablecoins_rows)")}
+    if "comisiones" not in sc_rows_cols:
+        conn.execute("ALTER TABLE stablecoins_rows ADD COLUMN comisiones TEXT NOT NULL DEFAULT ''")
 
 
 def get_db() -> sqlite3.Connection:

@@ -679,21 +679,24 @@ async function updateAssetDetail(asset) {
 
 function renderAssetCompletedOperationsSection(asset) {
     const section = document.getElementById("assetCompletedOperationsSection")
+    const tabBtn = document.getElementById("completadasTabBtn")
 
-    if (!section) {
-        return
-    }
+    if (!section) return
 
     const completedOps = getCompletedOperationsCryptoImpact(asset)
     const rows = completedOps.rows || []
 
     if (!rows.length) {
         section.innerHTML = ""
-        section.classList.add("hidden")
+        if (tabBtn) tabBtn.classList.add("hidden")
         return
     }
 
-    section.classList.remove("hidden")
+    if (tabBtn) {
+        tabBtn.classList.remove("hidden")
+        tabBtn.textContent = `Operaciones Spot (${rows.length})`
+    }
+
     const currency = normalizeCurrencyCode(asset.currency || "EUR")
 
     const rowsHtml = rows.map((row) => {
@@ -714,7 +717,6 @@ function renderAssetCompletedOperationsSection(asset) {
     }).join("")
 
     section.innerHTML = `
-        <div class="assetCompletedOpsLabel">Operaciones completadas</div>
         <div class="assetTableWrapper">
             <table class="assetOperationsTable assetCompletedOpsTable">
                 <thead>
@@ -1081,27 +1083,34 @@ function createEmptyTopMetrics() {
     }
 }
 
-function updateTopMetricElement(elementId, value) {
+function updateTopMetricElement(elementId, value, colorize = false) {
     const element = document.getElementById(elementId)
-
-    if (element) {
-        element.textContent = value
+    if (!element) return
+    element.textContent = value
+    if (colorize) {
+        const isNegative = value.trim().startsWith('-')
+        const num = parseFloat(value.replace(/[^0-9.,-]/g, '').replace(',', '.'))
+        const isZero = isNaN(num) || num === 0
+        element.classList.toggle('metricPositive', !isNegative && !isZero)
+        element.classList.toggle('metricNegative', isNegative)
+    } else {
+        element.classList.remove('metricPositive', 'metricNegative')
     }
 }
 
 function applyTopPortfolioMetrics(metrics) {
     updateTopMetricElement("topTotalCuenta", formatEuro(metrics.totalCuenta))
-    updateTopMetricElement("topPorcentajeCuenta", formatPercent(calculateYieldPercent(metrics.invertido, metrics.rendimiento)))
+    updateTopMetricElement("topPorcentajeCuenta", formatPercent(calculateYieldPercent(metrics.invertido, metrics.rendimiento)), true)
     updateTopMetricElement("topInvertido", formatEuro(metrics.invertido))
     updateTopMetricElement("topRendimientoEuros", formatEuro(metrics.rendimiento))
 
-    updateTopMetricElement("topPorcentajeCripto", formatPercent(calculateYieldPercent(metrics.tipos.cripto.invertidoNeto, metrics.tipos.cripto.rendimiento)))
+    updateTopMetricElement("topPorcentajeCripto", formatPercent(calculateYieldPercent(metrics.tipos.cripto.invertidoNeto, metrics.tipos.cripto.rendimiento)), true)
     updateTopMetricElement("topEurosCripto", formatEuro(metrics.tipos.cripto.netoActual))
-    updateTopMetricElement("topPorcentajeAcciones", formatPercent(calculateYieldPercent(metrics.tipos.acciones.invertidoNeto, metrics.tipos.acciones.rendimiento)))
+    updateTopMetricElement("topPorcentajeAcciones", formatPercent(calculateYieldPercent(metrics.tipos.acciones.invertidoNeto, metrics.tipos.acciones.rendimiento)), true)
     updateTopMetricElement("topEurosAcciones", formatEuro(metrics.tipos.acciones.netoActual))
-    updateTopMetricElement("topPorcentajeEtf", formatPercent(calculateYieldPercent(metrics.tipos.etfs.invertidoNeto, metrics.tipos.etfs.rendimiento)))
+    updateTopMetricElement("topPorcentajeEtf", formatPercent(calculateYieldPercent(metrics.tipos.etfs.invertidoNeto, metrics.tipos.etfs.rendimiento)), true)
     updateTopMetricElement("topEurosEtf", formatEuro(metrics.tipos.etfs.netoActual))
-    updateTopMetricElement("topPorcentajeComoditis", formatPercent(calculateYieldPercent(metrics.tipos.comoditis.invertidoNeto, metrics.tipos.comoditis.rendimiento)))
+    updateTopMetricElement("topPorcentajeComoditis", formatPercent(calculateYieldPercent(metrics.tipos.comoditis.invertidoNeto, metrics.tipos.comoditis.rendimiento)), true)
     updateTopMetricElement("topEurosComoditis", formatEuro(metrics.tipos.comoditis.netoActual))
 }
 
@@ -1987,29 +1996,37 @@ function renderAssetTablePage(asset) {
             </div>
 
 
-            <div class="assetTableWrapper">
-                <table class="assetOperationsTable">
-                    <thead>
-                        <tr>
-                            <th class="mThSort" data-sortkey="fechaOperacion">Fecha operación<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="tipoOperacion">Tipo de operación<span class="mSortArrow"></span></th>
-                            ${isCrypto ? '<th class="mThSort" data-sortkey="exchange">Exchange<span class="mSortArrow"></span></th>' : ""}
-                            <th class="mThSort" data-sortkey="participaciones">Participaciones<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="precioParticipacion">Precio Participación<span class="mSortArrow"></span></th>
-                            ${isCrypto ? '<th class="mThSort" data-sortkey="currency">Moneda fiat<span class="mSortArrow"></span></th>' : ""}
-                            <th class="mThSort" data-sortkey="capitalInvertidoBruto">Capital Invertido bruto<span class="mSortArrow"></span></th>
-                            ${isEtf ? '<th class="mThSort" data-sortkey="costeAnual">Coste Anual<span class="mSortArrow"></span></th>' : ""}
-                            ${isCrypto ? '<th class="mThSort" data-sortkey="comisionesCripto">Comisiones cripto<span class="mSortArrow"></span></th><th class="mThSort" data-sortkey="comisionesFiat">Comisiones fiat<span class="mSortArrow"></span></th>' : '<th class="mThSort" data-sortkey="comisiones">Comisiones<span class="mSortArrow"></span></th>'}
-                            <th class="mThSort" data-sortkey="capitalInvertidoNeto">Capital Invertido neto<span class="mSortArrow"></span></th>
-                            <th class="rowActionsHeader"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="assetOperationsBody"></tbody>
-                </table>
+            <div class="assetTabsContainer">
+                <div class="assetTabsNav">
+                    <button class="assetTabBtn assetTabActive" data-tab="spot">Compras spot</button>
+                    <button class="assetTabBtn hidden" id="completadasTabBtn" data-tab="completadas">Operaciones Spot</button>
+                </div>
+                <div class="assetTabPanel" data-tab="spot">
+                    <div class="assetTableWrapper">
+                        <table class="assetOperationsTable">
+                            <thead>
+                                <tr>
+                                    <th class="mThSort" data-sortkey="fechaOperacion">Fecha operación<span class="mSortArrow"></span></th>
+                                    <th class="mThSort" data-sortkey="tipoOperacion">Tipo de operación<span class="mSortArrow"></span></th>
+                                    ${isCrypto ? '<th class="mThSort" data-sortkey="exchange">Exchange<span class="mSortArrow"></span></th>' : ""}
+                                    <th class="mThSort" data-sortkey="participaciones">Participaciones<span class="mSortArrow"></span></th>
+                                    <th class="mThSort" data-sortkey="precioParticipacion">Precio Participación<span class="mSortArrow"></span></th>
+                                    ${isCrypto ? '<th class="mThSort" data-sortkey="currency">Moneda fiat<span class="mSortArrow"></span></th>' : ""}
+                                    <th class="mThSort" data-sortkey="capitalInvertidoBruto">Capital Invertido bruto<span class="mSortArrow"></span></th>
+                                    ${isEtf ? '<th class="mThSort" data-sortkey="costeAnual">Coste Anual<span class="mSortArrow"></span></th>' : ""}
+                                    ${isCrypto ? '<th class="mThSort" data-sortkey="comisionesCripto">Comisiones cripto<span class="mSortArrow"></span></th><th class="mThSort" data-sortkey="comisionesFiat">Comisiones fiat<span class="mSortArrow"></span></th>' : '<th class="mThSort" data-sortkey="comisiones">Comisiones<span class="mSortArrow"></span></th>'}
+                                    <th class="mThSort" data-sortkey="capitalInvertidoNeto">Capital Invertido neto<span class="mSortArrow"></span></th>
+                                    <th class="rowActionsHeader"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="assetOperationsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="assetTabPanel hidden" data-tab="completadas">
+                    <div id="assetCompletedOperationsSection"></div>
+                </div>
             </div>
-
-
-            <div id="assetCompletedOperationsSection" class="hidden"></div>
         </section>
     `
 
@@ -2017,8 +2034,31 @@ function renderAssetTablePage(asset) {
     currentAssetPersistedConversionRows = conversionRows
     renderAssetRows(primaryRows)
     renderAssetCompletedOperationsSection(asset)
+    setupAssetTabs()
     _assetBindSort()
     initAssetTableLogic(asset)
+}
+
+function setupAssetTabs() {
+    const nav = document.querySelector(".assetTabsNav")
+    if (!nav) return
+
+    nav.addEventListener("click", (e) => {
+        const btn = e.target.closest(".assetTabBtn")
+        if (!btn || btn.classList.contains("hidden")) return
+
+        const tab = btn.dataset.tab
+        nav.querySelectorAll(".assetTabBtn").forEach(b => b.classList.remove("assetTabActive"))
+        btn.classList.add("assetTabActive")
+
+        document.querySelectorAll(".assetTabPanel[data-tab]").forEach(p => {
+            if (p.dataset.tab === tab) {
+                p.classList.remove("hidden")
+            } else {
+                p.classList.add("hidden")
+            }
+        })
+    })
 }
 
 function renderAssetRows(rows) {
@@ -3036,8 +3076,13 @@ async function submitAssetModal() {
 function initEditAssetModal() {
     const editAssetModalOverlay = document.getElementById("editAssetModalOverlay")
     const editAssetNameInput = document.getElementById("editAssetNameInput")
+    const editAssetTickerInput = document.getElementById("editAssetTickerInput")
     const confirmEditAssetModalButton = document.getElementById("confirmEditAssetModalBtn")
     const cancelEditAssetModalButton = document.getElementById("cancelEditAssetModalBtn")
+    const editSearchFinnhubButton = document.getElementById("editSearchAssetTickerFinnhubBtn")
+    const editSearchEodhdButton = document.getElementById("editSearchAssetTickerEodhdBtn")
+    const editAssetSearchFeedback = document.getElementById("editAssetSearchFeedback")
+    const editAssetSearchResults = document.getElementById("editAssetSearchResults")
 
     if (confirmEditAssetModalButton) {
         confirmEditAssetModalButton.addEventListener("click", async () => {
@@ -3076,6 +3121,49 @@ function initEditAssetModal() {
             if (event.target === editAssetModalOverlay) {
                 closeEditAssetModal()
             }
+        })
+    }
+
+    const runEditTickerSelection = (result, providerName) => {
+        if (editAssetTickerInput) {
+            editAssetTickerInput.value = result.symbol
+            editAssetTickerInput.dataset.marketProvider = String(result.provider || providerName).trim().toLowerCase()
+        }
+        setAssetSearchFeedback(editAssetSearchFeedback, `Ticker seleccionado (${providerName}): ${result.symbol}`)
+        renderMarketSearchResults(editAssetSearchResults, [], () => {})
+    }
+
+    if (editSearchFinnhubButton) {
+        editSearchFinnhubButton.addEventListener("click", async () => {
+            const typedTicker = editAssetTickerInput?.value.trim() || ""
+            const typedName = editAssetNameInput?.value.trim() || ""
+            const searchQuery = typedName || typedTicker
+
+            await handleFinnhubSearch({
+                query: searchQuery,
+                assetName: typedName,
+                assetType: "",
+                feedbackElement: editAssetSearchFeedback,
+                resultsElement: editAssetSearchResults,
+                onSelect: (result) => runEditTickerSelection(result, "Finnhub")
+            })
+        })
+    }
+
+    if (editSearchEodhdButton) {
+        editSearchEodhdButton.addEventListener("click", async () => {
+            const typedTicker = editAssetTickerInput?.value.trim() || ""
+            const typedName = editAssetNameInput?.value.trim() || ""
+            const searchQuery = typedName || typedTicker
+
+            await handleEodhdSearch({
+                query: searchQuery,
+                assetName: typedName,
+                assetType: "",
+                feedbackElement: editAssetSearchFeedback,
+                resultsElement: editAssetSearchResults,
+                onSelect: (result) => runEditTickerSelection(result, "EODHD")
+            })
         })
     }
 }

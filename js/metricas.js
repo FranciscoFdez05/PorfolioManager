@@ -208,8 +208,7 @@ function mUpdateKpis(payload) {
     const topSet2 = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
     topSet2("topTotalDividendos", formatEuro(totalDiv))
     topSet2("topTotalInteres",    formatEuro(totalInt))
-    topSet2("topTotalBonos",      formatEuro(bonosNeto))
-    topSet2("topTotalRentaFija",  formatEuro(rfNeto))
+    topSet2("topTotalRentaFija",  formatEuro(bonosNeto + rfNeto))
 }
 
 // ── charts ─────────────────────────────────────────────────────────────────
@@ -1721,22 +1720,58 @@ async function initMetricasLogic() {
         mRenderAll(_metricasPayload)
         mBindTableSort(_metricasPayload.summaries)
 
-        document.querySelectorAll(".mActivosFilterBtn").forEach((btn) => {
-            btn.classList.toggle("active", _metricasActivosFilter.has(btn.dataset.atype))
+        const _allTypes = ["cripto","acciones","etfs","comoditis","bonos","rentaFija"]
+        const _todosBtn = document.querySelector(".mActivosFilterBtn[data-atype='todos']")
+        const _specificBtns = [...document.querySelectorAll(".mActivosFilterBtn[data-atype]:not([data-atype='todos'])")]
+
+        function _mIsTodosMode() {
+            return _allTypes.every(t => _metricasActivosFilter.has(t))
+        }
+
+        function _mActivosApplyVisual() {
+            const todosMode = _mIsTodosMode()
+            if (_todosBtn) _todosBtn.classList.toggle("active", todosMode)
+            _specificBtns.forEach(b => {
+                b.classList.toggle("active", !todosMode && _metricasActivosFilter.has(b.dataset.atype))
+            })
+        }
+
+        function _mActivosSave() {
+            const hidden = _allTypes.filter(t => !_metricasActivosFilter.has(t))
+            window._metricasActivosHidden = hidden
+            fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ metricasActivosHidden: hidden }) }).catch(() => {})
+        }
+
+        function _mActivosRender() {
+            mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
+        }
+
+        _mActivosApplyVisual()
+
+        if (_todosBtn) {
+            _todosBtn.addEventListener("click", () => {
+                _allTypes.forEach(t => _metricasActivosFilter.add(t))
+                _mActivosApplyVisual()
+                _mActivosSave()
+                _mActivosRender()
+            })
+        }
+
+        _specificBtns.forEach(btn => {
             btn.addEventListener("click", () => {
                 const tipo = btn.dataset.atype
-                if (_metricasActivosFilter.has(tipo)) {
+                if (_mIsTodosMode()) {
+                    _metricasActivosFilter.clear()
+                    _metricasActivosFilter.add(tipo)
+                } else if (_metricasActivosFilter.has(tipo)) {
                     _metricasActivosFilter.delete(tipo)
-                    btn.classList.remove("active")
+                    if (_metricasActivosFilter.size === 0) _allTypes.forEach(t => _metricasActivosFilter.add(t))
                 } else {
                     _metricasActivosFilter.add(tipo)
-                    btn.classList.add("active")
                 }
-                const allTypes = ["cripto","acciones","etfs","comoditis","bonos","rentaFija"]
-                const hidden = allTypes.filter(t => !_metricasActivosFilter.has(t))
-                window._metricasActivosHidden = hidden
-                fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ metricasActivosHidden: hidden }) }).catch(() => {})
-                mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
+                _mActivosApplyVisual()
+                _mActivosSave()
+                _mActivosRender()
             })
         })
 
