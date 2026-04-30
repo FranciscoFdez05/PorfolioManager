@@ -208,6 +208,17 @@
                 <span class="metricasSectionTitle">Dividendos por mes</span>
                 <div class="mToggleGroup" id="mDivMensualYearToggle"></div>
             </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="mToggleBtn mDivMensualTablaBtn" id="mDivMensualTablaBtn" type="button">Ver tabla</button>
+                <button class="mToggleBtn mDivMensualTablaBtn" id="mDivMensualCalBtn" type="button">Calendario Dividendos</button>
+            </div>
+        </div>
+        <div id="mDivMensualTabla" class="mDivMensualTablaWrap hidden">
+            <table class="mDivMensualTable">
+                <thead id="mDivMensualTableHead"></thead>
+                <tbody id="mDivMensualTableBody"></tbody>
+                <tfoot id="mDivMensualTableFoot"></tfoot>
+            </table>
         </div>
         <div class="metricasChartsGrid1">
             <div class="metricasChartCard">

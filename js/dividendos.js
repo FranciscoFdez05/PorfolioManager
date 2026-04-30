@@ -573,6 +573,12 @@ async function openCalendarioDividendos() {
     const overlay = document.getElementById("calendarioDividendosOverlay")
     if (!overlay) return
 
+    const closeBtn = document.getElementById("closeCalendarioDividendosBtn")
+    if (closeBtn && !closeBtn.dataset.bound) {
+        closeBtn.dataset.bound = "true"
+        closeBtn.addEventListener("click", () => overlay.classList.add("hidden"))
+    }
+
     ;[_calendarioData, _calendarioAssets] = await Promise.all([
         loadCalendarioData(),
         loadCalendarioAssets()

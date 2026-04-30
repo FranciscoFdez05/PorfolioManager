@@ -4722,6 +4722,16 @@ tr.gastosTypeEmptySep td {
 
 .mGastosHeader{ flex-wrap:nowrap; gap:12px; }
 .mGastosHeaderLeft{ display:flex; align-items:center; gap:10px; flex-shrink:0; }
+
+.mDivMensualTablaBtn{ border:1px solid #1e2d45; border-radius:6px; font-size:12px; padding:5px 12px; }
+.mDivMensualTablaWrap{ overflow-x:auto; margin-bottom:16px; border:1px solid #1e2d45; border-radius:8px; }
+.mDivMensualTable{ width:100%; border-collapse:collapse; font-size:13px; }
+.mDivMensualTable th{ color:#7a8fb0; font-weight:600; padding:8px 12px; text-align:right; border-bottom:1px solid #1e2d45; white-space:nowrap; }
+.mDivMensualTable th:first-child{ text-align:left; }
+.mDivMensualTable td{ padding:6px 12px; text-align:right; border-bottom:1px solid rgba(30,45,69,0.5); color:#ccd6f6; }
+.mDivTabMes{ text-align:left !important; color:#7a8fb0; font-weight:500; }
+.mDivTabTotal{ color:#a8d8a8; font-weight:600; }
+.mDivTabFootCell{ border-top:1px solid #1e2d45; border-bottom:none; color:#e5edf9; font-weight:700; }
 .mGastosMonthToggle{
     display:flex;
     flex-wrap:nowrap;
@@ -6177,7 +6187,8 @@ html[data-theme="black"] select option{ background:#050505; color:#e0e0e0; }
 
 html[data-theme="black"] .assetModal,
 html[data-theme="black"] .calendarioModal,
-html[data-theme="black"] .backupModal{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .backupModal,
+html[data-theme="black"] .stablecoinModal{ background:#0a0a0a; border-color:#1a1a1a; }
 html[data-theme="black"] .assetModalTitle{ color:#f0f0f0; }
 html[data-theme="black"] .cpHexRow{ background:rgba(255,255,255,0.04); border-color:#222; }
 html[data-theme="black"] .cpHexInput{ color:#e0e0e0; }
@@ -6275,7 +6286,9 @@ html[data-theme="light"] select option{ background:#ffffff; color:#0f172a; }
 
 html[data-theme="light"] .modalOverlay{ background:rgba(0,0,0,0.4); }
 html[data-theme="light"] .assetModal,
-html[data-theme="light"] .calendarioModal{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .calendarioModal,
+html[data-theme="light"] .backupModal,
+html[data-theme="light"] .stablecoinModal{ background:#ffffff; border-color:#e2e8f0; }
 html[data-theme="light"] .assetModalTitle{ color:#0f172a; }
 html[data-theme="light"] .assetModalLabel{ color:#475569; }
 html[data-theme="light"] .cpHexRow{ background:#f1f5f9; border-color:#e2e8f0; }
@@ -6475,6 +6488,171 @@ html[data-theme="black"] .bonosFilterBtn.active{ background:#0a0a0a; color:#f0f0
 html[data-theme="black"] .bonosSummaryCard{ background:#0a0a0a; border-color:#1a1a1a; }
 html[data-theme="black"] .bonosSummaryLabel{ color:#666; }
 
+/* ── Black theme: navMoneyToggleBtn ── */
+html[data-theme="black"] .navMoneyToggleBtn{ background:#050505; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .navMoneyToggleBtn:hover{ background:#0a0a0a; border-color:#2a2a2a; }
+
+/* ── Light theme: navMoneyToggleBtn ── */
+html[data-theme="light"] .navMoneyToggleBtn{ background:#ffffff; border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .navMoneyToggleBtn:hover{ background:#f1f5f9; border-color:#cbd5e1; }
+
+/* ── Black theme: Stablecoins ── */
+html[data-theme="black"] .stablecoinsHeaderPanel{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .stablecoinSummaryCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .stablecoinSummaryHeader h4{ color:#f0f0f0; }
+html[data-theme="black"] .stablecoinSummaryHeader span,
+html[data-theme="black"] .stablecoinSummaryMeta{ color:#666; }
+html[data-theme="black"] .stablecoinSummaryMain{ color:#f0f0f0; }
+
+/* ── Light theme: Stablecoins ── */
+html[data-theme="light"] .stablecoinsHeaderPanel{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .stablecoinSummaryCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .stablecoinSummaryHeader h4{ color:#0f172a; }
+html[data-theme="light"] .stablecoinSummaryHeader span,
+html[data-theme="light"] .stablecoinSummaryMeta{ color:#64748b; }
+html[data-theme="light"] .stablecoinSummaryMain{ color:#0f172a; }
+
+/* ── Black theme: operationsPairsSummary ── */
+html[data-theme="black"] .operationsPairsSummary{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .operationsPairsSummaryLabel{ color:#555; }
+html[data-theme="black"] .operationsPairsSummaryItem{ color:#e0e0e0; }
+
+/* ── Light theme: operationsPairsSummary ── */
+html[data-theme="light"] .operationsPairsSummary{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .operationsPairsSummaryLabel{ color:#64748b; }
+html[data-theme="light"] .operationsPairsSummaryItem{ color:#1e293b; }
+
+/* ── Black theme: Transacciones asset panel ── */
+html[data-theme="black"] .transaccionesAssetPanel{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .transaccionesAssetPanelTitle{ color:#f0f0f0; }
+html[data-theme="black"] .transaccionesAssetBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .transaccionesAssetBtn:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .transaccionesAssetHint{ color:#888; }
+
+/* ── Light theme: Transacciones asset panel ── */
+html[data-theme="light"] .transaccionesAssetPanel{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .transaccionesAssetPanelTitle{ color:#0f172a; }
+html[data-theme="light"] .transaccionesAssetBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .transaccionesAssetBtn:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .transaccionesAssetHint{ color:#64748b; }
+
+/* ── Black theme: Gastos tipo popup ── */
+html[data-theme="black"] .gtPopup{ background:#0a0a0a; }
+html[data-theme="black"] .gtPopupHeader{ background:#050505; border-bottom-color:#1a1a1a; }
+html[data-theme="black"] .gtPopupTitle{ color:#f0f0f0; }
+html[data-theme="black"] .gtPopupTotal{ color:#888; }
+html[data-theme="black"] .gtPopupClose{ border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .gtTotalRow td{ background:#0a0a0a !important; color:#f0f0f0; border-top-color:#3b82f6; }
+
+/* ── Light theme: Gastos tipo popup ── */
+html[data-theme="light"] .gtPopup{ background:#ffffff; }
+html[data-theme="light"] .gtPopupHeader{ background:#f8f9fa; border-bottom-color:#e2e8f0; }
+html[data-theme="light"] .gtPopupTitle{ color:#0f172a; }
+html[data-theme="light"] .gtPopupTotal{ color:#64748b; }
+html[data-theme="light"] .gtPopupClose{ border-color:#e2e8f0; color:#64748b; }
+html[data-theme="light"] .gtTotalRow td{ background:#dbeafe !important; color:#1e293b; border-top-color:#3b82f6; }
+
+/* ── Black theme: Ingresos tabs & wrappers ── */
+html[data-theme="black"] .ingresosYearBtn,
+html[data-theme="black"] .ingresosAddYearBtn,
+html[data-theme="black"] .ingresosMonthTab{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .ingresosYearBtn:hover,
+html[data-theme="black"] .ingresosAddYearBtn:hover,
+html[data-theme="black"] .ingresosMonthTab:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .ingresosYearBtn.active,
+html[data-theme="black"] .ingresosMonthTab.active{ background:#1d4ed8; border-color:#3b82f6; color:#fff; }
+html[data-theme="black"] .ingresosAnnualWrapper,
+html[data-theme="black"] .ingresosMovementsWrapper{ background:#000; border-color:#111; }
+html[data-theme="black"] .ingresosAnnualTable,
+html[data-theme="black"] .ingresosMovementsTable{ background:#000; color:#e0e0e0; }
+html[data-theme="black"] .ingresosAnnualTable thead th,
+html[data-theme="black"] .ingresosMovementsTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] .ingresosAnnualTable tbody td,
+html[data-theme="black"] .ingresosMovementsTable tbody td{ background:#0a0a0a; border-color:#111; color:#e0e0e0; }
+html[data-theme="black"] .ingresosAnnualTable tbody tr:nth-child(odd) td,
+html[data-theme="black"] .ingresosMovementsTable tbody tr:nth-child(odd) td{ background:#050505; }
+html[data-theme="black"] .ingresosMovementsTable tbody tr:hover td{ background:#111 !important; }
+
+/* ── Light theme: Ingresos tabs & wrappers ── */
+html[data-theme="light"] .ingresosYearBtn,
+html[data-theme="light"] .ingresosAddYearBtn,
+html[data-theme="light"] .ingresosMonthTab{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .ingresosYearBtn:hover,
+html[data-theme="light"] .ingresosAddYearBtn:hover,
+html[data-theme="light"] .ingresosMonthTab:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .ingresosYearBtn.active,
+html[data-theme="light"] .ingresosMonthTab.active{ background:#1d4ed8; border-color:#3b82f6; color:#fff; }
+html[data-theme="light"] .ingresosAnnualWrapper,
+html[data-theme="light"] .ingresosMovementsWrapper{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .ingresosAnnualTable,
+html[data-theme="light"] .ingresosMovementsTable{ background:#ffffff; color:#1e293b; }
+html[data-theme="light"] .ingresosAnnualTable thead th,
+html[data-theme="light"] .ingresosMovementsTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] .ingresosAnnualTable tbody td,
+html[data-theme="light"] .ingresosMovementsTable tbody td{ background:#ffffff; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .ingresosAnnualTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .ingresosMovementsTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
+
+/* ── Black theme: Asset edit button & search results ── */
+html[data-theme="black"] .assetEditNameBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .assetEditNameBtn:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .assetSearchResultBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#f0f0f0; }
+html[data-theme="black"] .assetSearchResultBtn:hover{ background:#111; }
+html[data-theme="black"] .assetSearchResultSubtitle{ color:#888; }
+html[data-theme="black"] .assetSearchResultPrice{ color:#f0f0f0; }
+
+/* ── Light theme: Asset edit button & search results ── */
+html[data-theme="light"] .assetEditNameBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .assetEditNameBtn:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .assetSearchResultBtn{ background:#ffffff; border-color:#e2e8f0; color:#0f172a; }
+html[data-theme="light"] .assetSearchResultBtn:hover{ background:#f8faff; }
+html[data-theme="light"] .assetSearchResultSubtitle{ color:#64748b; }
+html[data-theme="light"] .assetSearchResultPrice{ color:#0f172a; }
+
+/* ── Black theme: Overview special cells ── */
+html[data-theme="black"] .overviewTable tbody td.overviewCurrentPriceCell,
+html[data-theme="black"] .overviewTable tbody td.overviewProfitPositive,
+html[data-theme="black"] .overviewTable tbody td.overviewProfitNegative{ background:#050505; }
+html[data-theme="black"] .overviewTable tbody tr:nth-child(odd) td.overviewCurrentPriceCell,
+html[data-theme="black"] .overviewTable tbody tr:nth-child(odd) td.overviewProfitPositive,
+html[data-theme="black"] .overviewTable tbody tr:nth-child(odd) td.overviewProfitNegative{ background:#000; }
+html[data-theme="black"] .overviewTable tbody tr:hover td.overviewCurrentPriceCell,
+html[data-theme="black"] .overviewTable tbody tr:hover td.overviewProfitPositive,
+html[data-theme="black"] .overviewTable tbody tr:hover td.overviewProfitNegative{ background:#0a0a0a; }
+html[data-theme="black"] .overviewEmpty{ background:#050505; border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .assetOperationsTable{ background:#000; color:#e0e0e0; }
+html[data-theme="black"] .assetOperationsTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] .assetOperationsTable tbody td{ background:#0a0a0a; border-color:#111; color:#e0e0e0; }
+html[data-theme="black"] .assetOperationsTable tbody tr:nth-child(odd) td{ background:#050505; }
+html[data-theme="black"] .assetOperationsTable tbody tr:hover td{ background:#111 !important; }
+
+/* ── Light theme: Overview special cells ── */
+html[data-theme="light"] .overviewTable tbody td.overviewCurrentPriceCell,
+html[data-theme="light"] .overviewTable tbody td.overviewProfitPositive,
+html[data-theme="light"] .overviewTable tbody td.overviewProfitNegative{ background:#ffffff; }
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td.overviewCurrentPriceCell,
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td.overviewProfitPositive,
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td.overviewProfitNegative{ background:#fafbfc; }
+html[data-theme="light"] .overviewTable tbody tr:hover td.overviewCurrentPriceCell,
+html[data-theme="light"] .overviewTable tbody tr:hover td.overviewProfitPositive,
+html[data-theme="light"] .overviewTable tbody tr:hover td.overviewProfitNegative{ background:#f1f5f9; }
+html[data-theme="light"] .overviewEmpty{ background:#f8faff; border-color:#cbd5e1; color:#64748b; }
+html[data-theme="light"] .assetOperationsTable{ background:#ffffff; color:#1e293b; }
+html[data-theme="light"] .assetOperationsTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] .assetOperationsTable tbody td{ background:#ffffff; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .assetOperationsTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
+html[data-theme="light"] .assetOperationsTable tbody tr:hover td{ background:#f1f5f9 !important; }
+
+/* ── Black theme: avActionBtn (botones editar/eliminar tarjeta activo) ── */
+html[data-theme="black"] .avActionBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .avEditBtn:hover{ background:#111; color:#3a7bd5; border-color:#3a7bd5; }
+html[data-theme="black"] .avDeleteBtn:hover{ background:#110505; color:#e74c3c; border-color:#e74c3c; }
+
+/* ── Light theme: avActionBtn (botones editar/eliminar tarjeta activo) ── */
+html[data-theme="light"] .avActionBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#94a3b8; }
+html[data-theme="light"] .avEditBtn:hover{ background:#dbeafe; color:#1d4ed8; border-color:#3b82f6; }
+html[data-theme="light"] .avDeleteBtn:hover{ background:#fee2e2; color:#dc2626; border-color:#fca5a5; }
+
 /* ── Row Actions ── */
 .rowActionsCell {
     width: 80px;
@@ -6525,6 +6703,7 @@ html[data-theme="light"] .overviewTable thead th,
 html[data-theme="light"] .interesesTable thead th,
 html[data-theme="light"] .dividendosTable thead th,
 html[data-theme="light"] .operationsTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] #overviewTable thead th{ background:#f1f5f9; color:#475569; }
 
 html[data-theme="light"] .overviewTable tbody td,
 html[data-theme="light"] .interesesTable tbody td,
@@ -6556,6 +6735,7 @@ html[data-theme="black"] .overviewTable thead th,
 html[data-theme="black"] .interesesTable thead th,
 html[data-theme="black"] .dividendosTable thead th,
 html[data-theme="black"] .operationsTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] #overviewTable thead th{ background:#0a0a0a; color:#888; }
 
 html[data-theme="black"] .overviewTable tbody td,
 html[data-theme="black"] .interesesTable tbody td,
@@ -6603,11 +6783,25 @@ html[data-theme="black"] .summaryCard{ background:#0a0a0a; border-color:#1a1a1a;
 html[data-theme="black"] .summaryCardTitle{ border-color:#1a1a1a; color:#888; }
 html[data-theme="black"] .summaryCardValue{ color:#f0f0f0; }
 
-/* ── Light theme: Gastos section/header rows ── */
+/* ── Light theme: Gastos / Ingresos section rows, totals & action header ── */
 html[data-theme="light"] .gastosSectionRow td{ background:#1d4ed8 !important; border-color:#3b82f6; color:#ffffff !important; }
+html[data-theme="light"] .ingresosSectionRow td{ background:#1d4ed8 !important; border-color:#3b82f6; color:#ffffff !important; }
+html[data-theme="light"] .gastosTotalRow td{ background:#dbeafe !important; border-color:#93c5fd; color:#1e3a8a !important; }
+html[data-theme="light"] .ingresosTotalRow td{ background:#dcfce7 !important; border-color:#86efac; color:#14532d !important; }
+html[data-theme="light"] .gastosAnnualTable .rowActionHeader,
+html[data-theme="light"] .gastosMovementsTable .rowActionHeader{ background:#f1f5f9 !important; }
+html[data-theme="light"] .ingresosAnnualTable .rowActionHeader,
+html[data-theme="light"] .ingresosMovementsTable .rowActionHeader{ background:#f1f5f9 !important; }
 
-/* ── Black theme: Gastos section/header rows ── */
+/* ── Black theme: Gastos / Ingresos section rows, totals & action header ── */
 html[data-theme="black"] .gastosSectionRow td{ background:#0a0a0a !important; border-color:#3b82f6; color:#e0e0e0 !important; }
+html[data-theme="black"] .ingresosSectionRow td{ background:#0a0a0a !important; border-color:#3b82f6; color:#e0e0e0 !important; }
+html[data-theme="black"] .gastosTotalRow td{ background:#050505 !important; border-color:#1a1a1a; color:#f0f0f0 !important; }
+html[data-theme="black"] .ingresosTotalRow td{ background:#050505 !important; border-color:#1a1a1a; color:#f0f0f0 !important; }
+html[data-theme="black"] .gastosAnnualTable .rowActionHeader,
+html[data-theme="black"] .gastosMovementsTable .rowActionHeader{ background:#0a0a0a !important; }
+html[data-theme="black"] .ingresosAnnualTable .rowActionHeader,
+html[data-theme="black"] .ingresosMovementsTable .rowActionHeader{ background:#0a0a0a !important; }
 
 /* ── Gastos tipo popup ── */
 .gtPopup{

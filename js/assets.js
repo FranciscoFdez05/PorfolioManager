@@ -449,6 +449,12 @@ function getTransaccionesCryptoImpact(asset) {
             return accumulator
         }
 
+        if (walletType === "entre_wallet") {
+            accumulator.quantityDelta -= networkFee
+            accumulator.commissionTotal += networkFee
+            return accumulator
+        }
+
         return accumulator
     }, { quantityDelta: 0, commissionTotal: 0 })
 
@@ -1124,12 +1130,16 @@ async function refreshTopPortfolioMetrics(assets = null) {
 
     const metrics = createEmptyTopMetrics()
     const fullAssets = await Promise.all(baseAssets.map((asset) => loadAssetData(asset.id)))
-    const metricSummaries = await Promise.all(fullAssets.map(async (asset) => {
+    const metricResults = await Promise.allSettled(fullAssets.map(async (asset) => {
         const summary = await buildOverviewRow(asset)
         const euroMetrics = await buildSummaryMetricsInEuros(summary)
 
         return { summary, euroMetrics }
     }))
+    metricResults
+        .filter((r) => r.status === "rejected")
+        .forEach((r) => console.error("Error calculando métricas de activo:", r.reason))
+    const metricSummaries = metricResults.filter((r) => r.status === "fulfilled").map((r) => r.value)
 
     metricSummaries.forEach(({ summary, euroMetrics }) => {
         metrics.totalCuenta += euroMetrics.netoActualEur
@@ -1644,7 +1654,12 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
             const quantity = parseLooseNumber(transaccionRow.total || "") || 0
             const networkFee = Math.max(0, parseLooseNumber(transaccionRow.comisionRed || "") || 0)
 
-            if (quantity <= 0 || walletType === "entre_wallet") {
+            if (quantity <= 0) {
+                continue
+            }
+
+            if (walletType === "entre_wallet") {
+                if (networkFee > 0) consumeAssetLots(lots, networkFee)
                 continue
             }
 
@@ -1883,17 +1898,27 @@ async function renderVistaGeneralTable() {
             return
         }
 
-        const fullAssets = await Promise.all(assets.map((asset) => loadAssetData(asset.id)))
-        const rows = await Promise.all(
+        const loadResults = await Promise.allSettled(assets.map((asset) => loadAssetData(asset.id)))
+        loadResults
+            .filter((r) => r.status === "rejected")
+            .forEach((r) => console.error("Error cargando datos de activo:", r.reason))
+        const fullAssets = loadResults.filter((r) => r.status === "fulfilled").map((r) => r.value)
+
+        const results = await Promise.allSettled(
             fullAssets
                 .filter((asset) => selectedTypes.has(asset.type))
                 .map((asset) => buildOverviewDisplayRow(asset))
         )
+        results
+            .filter((r) => r.status === "rejected")
+            .forEach((r) => console.error("Error procesando activo en vista general:", r.reason))
+        const rows = results.filter((r) => r.status === "fulfilled").map((r) => r.value)
 
         renderOverviewRows(rows)
         _ovBindSort()
     } catch (error) {
         console.error("Error cargando vista general:", error)
+        renderOverviewRows([])
     }
 }
 

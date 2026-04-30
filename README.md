@@ -297,6 +297,22 @@ Puedes abrir `data/portfolio.db` con cualquier cliente SQLite, por ejemplo [DB B
 
 ## Changelog
 
+### 2026-04-30 — Corrección de Vista General vacía (corrupción de índice SQLite)
+
+#### Problema
+La Vista General mostraba la tabla completamente vacía y las KPIs del encabezado aparecían como `---`, a pesar de que los activos existían y se mostraban correctamente en la barra lateral.
+
+#### Causa raíz
+El índice de clave primaria de la tabla `activos` en SQLite estaba corrupto (`wrong # of entries in index sqlite_autoindex_activos_1`). El activo **MSCI Emerging Markets** existía como fila en la tabla pero su entrada faltaba en el índice. Esto provocaba que cualquier consulta con `WHERE id = 'msci-emerging-markets'` devolviera vacío, mientras que un `SELECT *` sin filtro sí lo encontraba. Como resultado, el endpoint `/api/activos/msci-emerging-markets` respondía 404, y dado que el frontend usaba `Promise.all` para cargar todos los activos en paralelo, ese único fallo hacía que la carga completa fallara silenciosamente, dejando la tabla en blanco.
+
+#### Solución aplicada
+- **Base de datos**: `REINDEX activos` para reconstruir el índice corrupto, seguido de `VACUUM` para eliminar páginas huérfanas. La integridad quedó en `ok`.
+- **Frontend — resiliencia**: cambiado `Promise.all` por `Promise.allSettled` en `renderVistaGeneralTable` y `refreshTopPortfolioMetrics`. Ahora, si un activo falla al cargar o al procesar, los demás siguen mostrándose en lugar de bloquearse todos.
+- **Frontend — estado vacío**: el bloque `catch` de `renderVistaGeneralTable` ahora llama a `renderOverviewRows([])` para mostrar el mensaje de estado vacío en lugar de dejar la tabla en silencio.
+- **Cache busting**: actualizada la versión de `assets.js` a `20260430a` en `index.html` para forzar la recarga del fichero modificado en el navegador.
+
+---
+
 ### 2026-04-28 — Mejoras de UI y unificación de Interés Fijo
 
 #### Ticker editable desde el modal de activo

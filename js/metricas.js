@@ -548,11 +548,74 @@ function mRenderDivMensual(dividendos, colorMap = {}) {
                 btn.classList.add("active")
                 _metricasDivMensualYear = btn.dataset.divmy
                 mDrawDivMensualChart(rows, _metricasDivMensualYear, dYear, dMonth, colorMap)
+                mDrawDivMensualTabla(rows, _metricasDivMensualYear, dYear, dMonth)
             })
         }
     }
 
+    const calBtn = document.getElementById("mDivMensualCalBtn")
+    if (calBtn && !calBtn.dataset.bound) {
+        calBtn.dataset.bound = "true"
+        calBtn.addEventListener("click", () => {
+            if (typeof openCalendarioDividendos === "function") openCalendarioDividendos()
+        })
+    }
+
+    const tablaBtn = document.getElementById("mDivMensualTablaBtn")
+    if (tablaBtn && !tablaBtn.dataset.bound) {
+        tablaBtn.dataset.bound = "true"
+        tablaBtn.addEventListener("click", () => {
+            const wrap = document.getElementById("mDivMensualTabla")
+            if (!wrap) return
+            const visible = !wrap.classList.contains("hidden")
+            wrap.classList.toggle("hidden", visible)
+            tablaBtn.textContent = visible ? "Ver tabla" : "Ocultar tabla"
+            if (!visible) mDrawDivMensualTabla(rows, _metricasDivMensualYear, dYear, dMonth)
+        })
+    }
+
     mDrawDivMensualChart(rows, _metricasDivMensualYear, dYear, dMonth, colorMap)
+}
+
+function mDrawDivMensualTabla(rows, year, dYear, dMonth) {
+    const head = document.getElementById("mDivMensualTableHead")
+    const body = document.getElementById("mDivMensualTableBody")
+    const foot = document.getElementById("mDivMensualTableFoot")
+    if (!head || !body || !foot) return
+
+    const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    const yearRows = rows.filter(r => dYear(r.fecha) === year)
+    const stocks = [...new Set(yearRows.map(r => r.instrumento || "Desconocido"))].sort()
+
+    const monthData = {}
+    stocks.forEach(s => { monthData[s] = Array(12).fill(0) })
+    yearRows.forEach(r => {
+        const m = dMonth(r.fecha)
+        if (m < 0 || m > 11) return
+        monthData[r.instrumento || "Desconocido"][m] += parseEuroNumber(r.total || "")
+    })
+
+    const monthTotals = Array(12).fill(0)
+    stocks.forEach(s => monthData[s].forEach((v, i) => { monthTotals[i] += v }))
+
+    head.innerHTML = `<tr><th>Mes</th>${stocks.map(s => `<th>${s}</th>`).join("")}<th>Total</th></tr>`
+
+    body.innerHTML = MONTH_LABELS.map((label, i) => {
+        const rowTotal = stocks.reduce((t, s) => t + monthData[s][i], 0)
+        if (rowTotal === 0) return ""
+        const cells = stocks.map(s => {
+            const v = monthData[s][i]
+            return `<td>${v > 0 ? formatEuro(v) : ""}</td>`
+        }).join("")
+        return `<tr><td class="mDivTabMes">${label}</td>${cells}<td class="mDivTabTotal">${formatEuro(rowTotal)}</td></tr>`
+    }).join("")
+
+    const grandTotal = monthTotals.reduce((t, v) => t + v, 0)
+    const footCells = stocks.map(s => {
+        const t = monthData[s].reduce((a, b) => a + b, 0)
+        return `<td class="mDivTabFootCell">${t > 0 ? formatEuro(t) : ""}</td>`
+    }).join("")
+    foot.innerHTML = `<tr><td class="mDivTabMes mDivTabFootCell">Total</td>${footCells}<td class="mDivTabTotal mDivTabFootCell">${formatEuro(grandTotal)}</td></tr>`
 }
 
 function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
