@@ -944,9 +944,9 @@ body{
 
 .assetOperationsTable{
     width:100%;
-    min-width:0;
+    min-width:max-content;
     border-collapse:collapse;
-    table-layout:fixed;
+    table-layout:auto;
     background:#0f1724;
     color:#e8eefc;
 }
@@ -1065,8 +1065,30 @@ body{
     max-height:540px;
 }
 
-.assetCompletedOpsTable td{
+.assetCompletedOpsTable td,
+.assetTransaccionesTable td{
     font-size:0.82rem;
+    white-space:nowrap;
+}
+
+.assetTransaccionesTable thead th:nth-child(2),
+.assetTransaccionesTable thead th:nth-child(3),
+.assetTransaccionesTable tbody td:nth-child(2),
+.assetTransaccionesTable tbody td:nth-child(3){
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+}
+
+.assetCompletedOpsTable thead th:nth-child(4),
+.assetCompletedOpsTable thead th:nth-child(5),
+.assetCompletedOpsTable thead th:nth-child(6),
+.assetCompletedOpsTable thead th:nth-child(7),
+.assetCompletedOpsTable tbody td:nth-child(4),
+.assetCompletedOpsTable tbody td:nth-child(5),
+.assetCompletedOpsTable tbody td:nth-child(6),
+.assetCompletedOpsTable tbody td:nth-child(7){
+    text-align:right;
+    font-variant-numeric:tabular-nums;
 }
 
 .opRowCompra{
@@ -1355,7 +1377,8 @@ tr.gastosTypeEmptySep td {
 }
 
 /* colores por tipo (activo) */
-.overviewFilterOption:has(input[value="cripto"]:checked)::before  { background:#f7931a; }
+.overviewFilterOption:has(input[value="todos"]:checked)::before    { background:#8899bb; }
+.overviewFilterOption:has(input[value="cripto"]:checked)::before   { background:#f7931a; }
 .overviewFilterOption:has(input[value="acciones"]:checked)::before { background:#3a7bd5; }
 .overviewFilterOption:has(input[value="etfs"]:checked)::before     { background:#2ecc71; }
 .overviewFilterOption:has(input[value="comoditis"]:checked)::before{ background:#e0c068; }
@@ -1368,9 +1391,10 @@ tr.gastosTypeEmptySep td {
 }
 
 /* colores de borde por tipo (activo) */
-.overviewFilterOption:has(input[value="cripto"]:checked)  { border-color:#f7931a44; }
-.overviewFilterOption:has(input[value="acciones"]:checked){ border-color:#3a7bd544; }
-.overviewFilterOption:has(input[value="etfs"]:checked)    { border-color:#2ecc7144; }
+.overviewFilterOption:has(input[value="todos"]:checked)    { border-color:#8899bb44; }
+.overviewFilterOption:has(input[value="cripto"]:checked)   { border-color:#f7931a44; }
+.overviewFilterOption:has(input[value="acciones"]:checked) { border-color:#3a7bd544; }
+.overviewFilterOption:has(input[value="etfs"]:checked)     { border-color:#2ecc7144; }
 .overviewFilterOption:has(input[value="comoditis"]:checked){ border-color:#e0c06844; }
 
 /* operaciones crypto – dots */
@@ -1587,6 +1611,38 @@ tr.gastosTypeEmptySep td {
 
 .overviewTable thead th:nth-child(n+3){
     text-align:right;
+}
+
+.assetOperationsTable thead th[data-sortkey="currency"],
+.assetOperationsTable thead th[data-sortkey="participaciones"],
+.assetOperationsTable thead th[data-sortkey="precioParticipacion"],
+.assetOperationsTable thead th[data-sortkey="capitalInvertidoBruto"],
+.assetOperationsTable thead th[data-sortkey="costeAnual"],
+.assetOperationsTable thead th[data-sortkey="comisionesCripto"],
+.assetOperationsTable thead th[data-sortkey="comisionesFiat"],
+.assetOperationsTable thead th[data-sortkey="comisiones"],
+.assetOperationsTable thead th[data-sortkey="capitalInvertidoNeto"]{
+    text-align:right;
+}
+
+.assetOperationsTable tbody td[data-field="currency"],
+.assetOperationsTable tbody td[data-field="participaciones"],
+.assetOperationsTable tbody td[data-field="precioParticipacion"],
+.assetOperationsTable tbody td[data-field="capitalInvertidoBruto"],
+.assetOperationsTable tbody td[data-field="costeAnual"],
+.assetOperationsTable tbody td[data-field="comisionesFiat"],
+.assetOperationsTable tbody td[data-field="comisiones"],
+.assetOperationsTable tbody td.rowTotal{
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+}
+
+.assetOperationsTable tbody td[data-field="comisionesCripto"]{
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+    overflow:hidden;
+    max-width:120px;
 }
 
 .overviewTable tbody td:last-child{
@@ -7032,10 +7088,10 @@ body.money-hidden #metricasTopBody td:nth-child(n+4){
     pointer-events:none;
 }
 /* asset detail - ops spot completadas */
+body.money-hidden .assetCompletedOpsTable td:nth-child(4),
 body.money-hidden .assetCompletedOpsTable td:nth-child(5),
 body.money-hidden .assetCompletedOpsTable td:nth-child(6),
-body.money-hidden .assetCompletedOpsTable td:nth-child(7),
-body.money-hidden .assetCompletedOpsTable td:nth-child(8){
+body.money-hidden .assetCompletedOpsTable td:nth-child(7){
     filter:blur(7px);
     user-select:none;
     pointer-events:none;

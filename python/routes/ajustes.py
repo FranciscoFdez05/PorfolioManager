@@ -89,6 +89,7 @@ def get_settings():
         "gastosHiddenTipos":          cfg.get("gastosHiddenTipos") or [],
         "gastosHiddenMensualidades":  cfg.get("gastosHiddenMensualidades") or [],
         "metricasActivosHidden":      cfg.get("metricasActivosHidden") or [],
+        "sidebarCollapsed":           bool(cfg.get("sidebarCollapsed", False)),
     })
 
 
@@ -145,6 +146,8 @@ def save_settings():
     if "metricasActivosHidden" in data:
         raw = data["metricasActivosHidden"]
         cfg["metricasActivosHidden"] = [str(t) for t in raw if isinstance(t, str) and t.strip()] if isinstance(raw, list) else []
+    if "sidebarCollapsed" in data:
+        cfg["sidebarCollapsed"] = bool(data["sidebarCollapsed"])
 
     _write_ajustes(cfg)
     return jsonify({"ok": True})

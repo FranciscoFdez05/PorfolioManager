@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     )
     initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
     await loadGlobalSettings()
+    applySidebarState(sideWrapper, toggleButton)
     await refreshAssetsSidebar()
     await refreshTopDividendosIntereses()
 
@@ -55,6 +56,7 @@ async function loadGlobalSettings() {
             window._gastosHiddenTipos           = data.gastosHiddenTipos ?? []
             window._gastosHiddenMensualidades   = data.gastosHiddenMensualidades ?? []
             window._metricasActivosHidden       = data.metricasActivosHidden ?? []
+            window._sidebarCollapsed            = data.sidebarCollapsed ?? false
         }
     } catch {
         window._settingsStaleHours      = 24
@@ -65,6 +67,15 @@ async function loadGlobalSettings() {
         window._gastosHiddenTipos           = []
         window._gastosHiddenMensualidades   = []
         window._metricasActivosHidden       = []
+        window._sidebarCollapsed            = false
+    }
+}
+
+function applySidebarState(sideWrapper, toggleButton) {
+    if (!sideWrapper || !toggleButton) return
+    if (window._sidebarCollapsed) {
+        sideWrapper.classList.add("collapsed")
+        toggleButton.innerHTML = "◀"
     }
 }
 
@@ -84,7 +95,14 @@ function initSidePanel(toggleButton, sideWrapper) {
 
     toggleButton.addEventListener("click", () => {
         sideWrapper.classList.toggle("collapsed")
-        toggleButton.innerHTML = sideWrapper.classList.contains("collapsed") ? "◀" : "▶"
+        const collapsed = sideWrapper.classList.contains("collapsed")
+        toggleButton.innerHTML = collapsed ? "◀" : "▶"
+        window._sidebarCollapsed = collapsed
+        fetch("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sidebarCollapsed: collapsed })
+        }).catch(() => {})
     })
 
     sideWrapper.addEventListener("transitionend", (e) => {

@@ -219,6 +219,7 @@ async function buildOverviewDisplayRow(asset) {
 
     return {
         ...row,
+        id: asset.id,
         sidebarOrder: asset.order ?? 0,
         overviewInvestedCurrency: investedCurrency,
         overviewCurrentPrice: currentPriceDisplay,
@@ -711,13 +712,14 @@ function renderAssetCompletedOperationsSection(asset) {
         return `
             <tr>
                 <td>${row.fechaApertura || ""}</td>
-                <td>${row.fechaCierre || ""}</td>
                 <td>${row.par || ""}</td>
                 <td class="${ordenClass}">${orden}</td>
                 <td>${formatOperationsMoney(row.precioOrden, row.precioCurrency || currency)}</td>
                 <td>${formatOperationsQuantity(row.cantidad)}</td>
                 <td>${formatOperationsQuantity(row.comisionesCripto)}</td>
                 <td>${formatOperationsMoney(row.total, row.currency || currency)}</td>
+                <td>${row.estado || ""}</td>
+                <td>${row.fechaCierre || ""}</td>
             </tr>
         `
     }).join("")
@@ -728,13 +730,74 @@ function renderAssetCompletedOperationsSection(asset) {
                 <thead>
                     <tr>
                         <th>Fecha apertura</th>
-                        <th>Fecha cierre</th>
                         <th>Par</th>
                         <th>Orden</th>
                         <th>Precio orden</th>
                         <th>Cantidad</th>
                         <th>Comisiones cripto</th>
                         <th>Total</th>
+                        <th>Estado</th>
+                        <th>Fecha cierre</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+        </div>
+    `
+}
+
+function renderAssetTransaccionesSection(asset) {
+    const section = document.getElementById("assetTransaccionesSection")
+    const tabBtn = document.getElementById("transaccionesTabBtn")
+
+    if (!section) return
+
+    const impact = getTransaccionesCryptoImpact(asset)
+    const rows = impact.rows || []
+
+    if (!rows.length) {
+        section.innerHTML = ""
+        if (tabBtn) tabBtn.classList.add("hidden")
+        return
+    }
+
+    if (tabBtn) {
+        tabBtn.classList.remove("hidden")
+        tabBtn.textContent = `Transacciones (${rows.length})`
+    }
+
+    const walletLabels = { entre_wallet: "Entre wallet", recibida: "Recibida", enviada: "Enviada" }
+
+    const rowsHtml = rows.map((row) => {
+        const walletTipo = String(row.walletTipo || "").trim().toLowerCase()
+        const walletLabel = walletLabels[walletTipo] || row.walletTipo || ""
+        const hash = String(row.hashTransaccion || row.walletOrigen || "").trim()
+        const hashDisplay = hash.length > 12 ? hash.slice(0, 8) + "…" + hash.slice(-4) : hash
+        return `
+            <tr>
+                <td>${row.fechaOperacion || ""}</td>
+                <td>${formatTransaccionesNumber(row.total)}</td>
+                <td>${formatTransaccionesNumber(row.comisionRed)}</td>
+                <td>${walletLabel}</td>
+                <td>${row.walletDestino || ""}</td>
+                <td class="transaccionHashCell" title="${hash}">${hashDisplay}</td>
+                <td>${row.nota || ""}</td>
+            </tr>
+        `
+    }).join("")
+
+    section.innerHTML = `
+        <div class="assetTableWrapper">
+            <table class="assetOperationsTable assetTransaccionesTable">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Total</th>
+                        <th>Comisión red</th>
+                        <th>Tipo</th>
+                        <th>Wallet destino</th>
+                        <th>Hash</th>
+                        <th>Nota</th>
                     </tr>
                 </thead>
                 <tbody>${rowsHtml}</tbody>
@@ -1162,7 +1225,26 @@ async function initVistaGeneralLogic() {
 
     if (filtersContainer && !filtersContainer.dataset.bound) {
         filtersContainer.dataset.bound = "true"
-        filtersContainer.addEventListener("change", () => {
+        filtersContainer.addEventListener("change", (e) => {
+            const changed = e.target
+            const todosInput = filtersContainer.querySelector('input[value="todos"]')
+            const individualInputs = [...filtersContainer.querySelectorAll('input[type="checkbox"]:not([value="todos"])')]
+
+            if (changed.value === "todos") {
+                // Todos siempre activa todo (no se puede desmarcar directamente)
+                changed.checked = true
+                individualInputs.forEach((cb) => { cb.checked = true })
+            } else if (todosInput?.checked) {
+                // Había Todos activo → selección exclusiva del pulsado
+                todosInput.checked = false
+                individualInputs.forEach((cb) => { cb.checked = cb === changed })
+                changed.checked = true
+            } else {
+                // Toggle individual normal; si todos marcados → activar Todos
+                if (todosInput) {
+                    todosInput.checked = individualInputs.every((cb) => cb.checked)
+                }
+            }
             renderVistaGeneralTable()
         })
     }
@@ -1219,7 +1301,11 @@ function initSidebarRefreshButton(buttonElement) {
 }
 
 function getSelectedOverviewTypes() {
-    return [...document.querySelectorAll('#overviewFilters input[type="checkbox"]:checked')].map((input) => input.value)
+    const todosInput = document.querySelector('#overviewFilters input[value="todos"]')
+    if (todosInput?.checked) return ["cripto", "acciones", "etfs", "comoditis"]
+    return [...document.querySelectorAll('#overviewFilters input[type="checkbox"]:checked')]
+        .map((input) => input.value)
+        .filter((v) => v !== "todos")
 }
 
 function parseParticipationNumber(value) {
@@ -1873,6 +1959,14 @@ function renderOverviewRows(rows) {
             <td class="${rClass}">${yieldPct}</td>
         `
 
+        if (row.id) {
+            tr.style.cursor = "pointer"
+            tr.addEventListener("click", async () => {
+                clearNavSelection()
+                await selectAsset(row.id)
+            })
+        }
+
         tableBody.appendChild(tr)
     })
 
@@ -2025,6 +2119,7 @@ function renderAssetTablePage(asset) {
                 <div class="assetTabsNav">
                     <button class="assetTabBtn assetTabActive" data-tab="spot">Compras spot</button>
                     <button class="assetTabBtn hidden" id="completadasTabBtn" data-tab="completadas">Operaciones Spot</button>
+                    <button class="assetTabBtn hidden" id="transaccionesTabBtn" data-tab="transacciones">Transacciones</button>
                 </div>
                 <div class="assetTabPanel" data-tab="spot">
                     <div class="assetTableWrapper">
@@ -2037,10 +2132,10 @@ function renderAssetTablePage(asset) {
                                     <th class="mThSort" data-sortkey="participaciones">Participaciones<span class="mSortArrow"></span></th>
                                     <th class="mThSort" data-sortkey="precioParticipacion">Precio Participación<span class="mSortArrow"></span></th>
                                     ${isCrypto ? '<th class="mThSort" data-sortkey="currency">Moneda fiat<span class="mSortArrow"></span></th>' : ""}
-                                    <th class="mThSort" data-sortkey="capitalInvertidoBruto">Capital Invertido bruto<span class="mSortArrow"></span></th>
+                                    <th class="mThSort" data-sortkey="capitalInvertidoBruto">Invertido bruto<span class="mSortArrow"></span></th>
                                     ${isEtf ? '<th class="mThSort" data-sortkey="costeAnual">Coste Anual<span class="mSortArrow"></span></th>' : ""}
                                     ${isCrypto ? '<th class="mThSort" data-sortkey="comisionesCripto">Comisiones cripto<span class="mSortArrow"></span></th><th class="mThSort" data-sortkey="comisionesFiat">Comisiones fiat<span class="mSortArrow"></span></th>' : '<th class="mThSort" data-sortkey="comisiones">Comisiones<span class="mSortArrow"></span></th>'}
-                                    <th class="mThSort" data-sortkey="capitalInvertidoNeto">Capital Invertido neto<span class="mSortArrow"></span></th>
+                                    <th class="mThSort" data-sortkey="capitalInvertidoNeto">Invertido neto<span class="mSortArrow"></span></th>
                                     <th class="rowActionsHeader"></th>
                                 </tr>
                             </thead>
@@ -2051,6 +2146,9 @@ function renderAssetTablePage(asset) {
                 <div class="assetTabPanel hidden" data-tab="completadas">
                     <div id="assetCompletedOperationsSection"></div>
                 </div>
+                <div class="assetTabPanel hidden" data-tab="transacciones">
+                    <div id="assetTransaccionesSection"></div>
+                </div>
             </div>
         </section>
     `
@@ -2059,6 +2157,7 @@ function renderAssetTablePage(asset) {
     currentAssetPersistedConversionRows = conversionRows
     renderAssetRows(primaryRows)
     renderAssetCompletedOperationsSection(asset)
+    renderAssetTransaccionesSection(asset)
     setupAssetTabs()
     _assetBindSort()
     initAssetTableLogic(asset)

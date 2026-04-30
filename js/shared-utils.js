@@ -136,6 +136,7 @@ function normalizeAssetRowCurrency(currency, fallback = "EUR") {
 function getAssetRowCurrency(rowOrCell, fallback = getCurrentAssetCurrency()) {
     const rowElement = rowOrCell?.closest ? rowOrCell.closest("tr") : null
     const explicitCurrency = rowElement?.querySelector('select[data-field="currency"]')?.value
+        || rowElement?.querySelector('td[data-field="currency"]')?.textContent?.trim()
     return normalizeAssetRowCurrency(explicitCurrency, fallback)
 }
 
