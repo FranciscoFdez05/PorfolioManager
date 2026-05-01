@@ -90,9 +90,237 @@ function handleCellBlur(event) {
     }
 }
 
+// ===== CUENTAS REMUNERADAS =====
+
 let interesesModalKeyHandler = null
-let _allInteresesRows = []
+let _allCuentas = []         // [{ id, nombre, rows: [...] }]
+let currentCuentaId = null
+let _allInteresesRows = []   // referencia a la cuenta activa
 let currentInteresesYear = null
+
+function generateCuentaId() {
+    return "cuenta-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+}
+
+function getCurrentCuenta() {
+    return _allCuentas.find(c => c.id === currentCuentaId) || null
+}
+
+function syncRowsBackToCuenta() {
+    const cuenta = getCurrentCuenta()
+    if (cuenta) cuenta.rows = _allInteresesRows
+}
+
+// ----- Sidebar de cuentas -----
+
+function renderCuentasSidebar() {
+    const list = document.getElementById("cuentasList")
+    if (!list) return
+    list.innerHTML = ""
+
+    _allCuentas.forEach(cuenta => {
+        const item = document.createElement("div")
+        item.className = `cuentaItem${cuenta.id === currentCuentaId ? " active" : ""}`
+        item.dataset.cuentaId = cuenta.id
+        item.innerHTML = `
+            <span class="cuentaItemName" title="${escapeInteresesHtml(cuenta.nombre)}">${escapeInteresesHtml(cuenta.nombre)}</span>
+            <div class="cuentaItemActions">
+                <button type="button" class="cuentaItemRenameBtn" data-id="${cuenta.id}" title="Renombrar">✎</button>
+                <button type="button" class="cuentaItemDeleteBtn" data-id="${cuenta.id}" title="Eliminar">✕</button>
+            </div>
+        `
+        item.addEventListener("click", (e) => {
+            if (e.target.closest(".cuentaItemRenameBtn") || e.target.closest(".cuentaItemDeleteBtn")) return
+            selectCuenta(cuenta.id)
+        })
+        list.appendChild(item)
+    })
+}
+
+function selectCuenta(id) {
+    currentCuentaId = id
+    currentInteresesYear = null
+    const cuenta = getCurrentCuenta()
+    _allInteresesRows = cuenta ? cuenta.rows : []
+    renderCuentasSidebar()
+    const years = getInteresesYears(_allInteresesRows)
+    if (years.length) currentInteresesYear = years[years.length - 1]
+    renderInteresesYearBar(years)
+    renderFilteredIntereses()
+}
+
+function openInteresesErrorModal(message, error = null) {
+    const existingOverlay = document.getElementById("interesesErrorModalOverlay")
+    if (existingOverlay) existingOverlay.remove()
+
+    const detail = error instanceof Error ? error.message : (error ? String(error) : "")
+    const overlay = document.createElement("div")
+    overlay.id = "interesesErrorModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal interesesCreateModal"
+    modal.setAttribute("role", "alertdialog")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle" style="color:#f87171">Error</h3>
+        <p style="color:#cbd5e1;margin:0 0 8px">${escapeInteresesHtml(message)}</p>
+        ${detail ? `<p style="color:#64748b;font-size:11px;margin:0 0 12px;word-break:break-all">${escapeInteresesHtml(detail)}</p>` : ""}
+        <div class="assetModalActions interesesModalActions">
+            <button type="button" class="primaryButton" id="interesesErrorCloseBtn" data-no-autohide="true">Aceptar</button>
+        </div>
+    `
+
+    const close = () => overlay.remove()
+    modal.querySelector("#interesesErrorCloseBtn").addEventListener("click", close)
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close() })
+    document.addEventListener("keydown", function handler(e) {
+        if (e.key === "Escape" || e.key === "Enter") { close(); document.removeEventListener("keydown", handler) }
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+    modal.querySelector("button")?.focus()
+}
+
+function openCuentaNameModal({ title, defaultValue = "", onConfirm }) {
+    const existingOverlay = document.getElementById("cuentaNameModalOverlay")
+    if (existingOverlay) existingOverlay.remove()
+
+    const overlay = document.createElement("div")
+    overlay.id = "cuentaNameModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal interesesCreateModal"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle">${escapeInteresesHtml(title)}</h3>
+        <label class="assetModalLabel" for="cuentaNameInput">Nombre</label>
+        <input id="cuentaNameInput" class="assetModalInput" type="text" value="${escapeInteresesHtml(defaultValue)}" placeholder="Ej: ING, MyInvestor...">
+        <p class="gastosCreateModalFeedback hidden" id="cuentaNameFeedback"></p>
+        <div class="assetModalActions interesesModalActions">
+            <button type="button" class="cancelButton" id="cuentaNameCancelBtn">Cancelar</button>
+            <button type="button" class="primaryButton" id="cuentaNameConfirmBtn" data-no-autohide="true">Guardar</button>
+        </div>
+    `
+
+    const close = () => overlay.remove()
+
+    const doConfirm = () => {
+        const nombre = modal.querySelector("#cuentaNameInput")?.value.trim()
+        if (!nombre) {
+            const fb = modal.querySelector("#cuentaNameFeedback")
+            if (fb) { fb.textContent = "El nombre no puede estar vacío."; fb.classList.remove("hidden") }
+            return
+        }
+        close()
+        onConfirm(nombre)
+    }
+
+    modal.querySelector("#cuentaNameCancelBtn").addEventListener("click", close)
+    modal.querySelector("#cuentaNameConfirmBtn").addEventListener("click", doConfirm)
+    modal.querySelector("#cuentaNameInput").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") doConfirm()
+        if (e.key === "Escape") close()
+    })
+
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close() })
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+    modal.querySelector("#cuentaNameInput")?.focus()
+    modal.querySelector("#cuentaNameInput")?.select()
+}
+
+function addCuenta() {
+    openCuentaNameModal({
+        title: "Nueva cuenta remunerada",
+        onConfirm: async (nombre) => {
+            const newCuenta = { id: generateCuentaId(), nombre, rows: [] }
+            _allCuentas.push(newCuenta)
+            selectCuenta(newCuenta.id)
+            try {
+                await saveInteresesDataToServer()
+            } catch (error) {
+                console.error(error)
+                openInteresesErrorModal("No se pudo guardar la nueva cuenta.", error)
+            }
+        }
+    })
+}
+
+function renameCuenta(id) {
+    const cuenta = _allCuentas.find(c => c.id === id)
+    if (!cuenta) return
+    openCuentaNameModal({
+        title: "Renombrar cuenta",
+        defaultValue: cuenta.nombre,
+        onConfirm: async (nombre) => {
+            if (nombre === cuenta.nombre) return
+            cuenta.nombre = nombre
+            renderCuentasSidebar()
+            try {
+                await saveInteresesDataToServer()
+            } catch (error) {
+                console.error(error)
+                openInteresesErrorModal("No se pudo guardar el nombre.", error)
+            }
+        }
+    })
+}
+
+function deleteCuenta(id) {
+    const cuenta = _allCuentas.find(c => c.id === id)
+    if (!cuenta) return
+
+    openConfirmModal({
+        title: "Eliminar cuenta",
+        message: `¿Eliminar la cuenta "${cuenta.nombre}" y todos sus datos?`,
+        confirmLabel: "Eliminar",
+        onConfirm: async () => {
+            try {
+                _allCuentas = _allCuentas.filter(c => c.id !== id)
+                if (currentCuentaId === id) {
+                    currentCuentaId = _allCuentas.length ? _allCuentas[0].id : null
+                }
+                const newCuenta = getCurrentCuenta()
+                _allInteresesRows = newCuenta ? newCuenta.rows : []
+                currentInteresesYear = null
+                renderCuentasSidebar()
+                const years = getInteresesYears(_allInteresesRows)
+                if (years.length) currentInteresesYear = years[years.length - 1]
+                renderInteresesYearBar(years)
+                renderFilteredIntereses()
+                await saveInteresesDataToServer()
+            } catch (error) {
+                console.error(error)
+                openInteresesErrorModal("No se pudo eliminar la cuenta.", error)
+            }
+        }
+    })
+}
+
+function bindCuentasSidebarActions() {
+    const addBtn = document.getElementById("addCuentaBtn")
+    if (addBtn && !addBtn.dataset.bound) {
+        addBtn.dataset.bound = "true"
+        addBtn.addEventListener("click", addCuenta)
+    }
+
+    const list = document.getElementById("cuentasList")
+    if (list && !list.dataset.bound) {
+        list.dataset.bound = "true"
+        list.addEventListener("click", (e) => {
+            const renameBtn = e.target.closest(".cuentaItemRenameBtn")
+            if (renameBtn) { renameCuenta(renameBtn.dataset.id); return }
+
+            const deleteBtn = e.target.closest(".cuentaItemDeleteBtn")
+            if (deleteBtn) { deleteCuenta(deleteBtn.dataset.id); return }
+        })
+    }
+}
+
+// ----- Años -----
 
 function parseInteresYear(fecha) {
     const p = String(fecha || "").split("-")
@@ -133,6 +361,8 @@ function escapeInteresesHtml(value) {
         .replace(/'/g, "&#39;")
 }
 
+// ----- Modal añadir/editar fila -----
+
 function closeInteresesModal() {
     document.getElementById("interesesModalOverlay")?.remove()
 
@@ -172,9 +402,8 @@ function openInteresesModal(globalIndex = -1, defaultFecha = "") {
         </div>
     `
 
-    const feedback = () => modal.querySelector("#interesesModalFeedback")
     const setFeedback = (message = "", isError = false) => {
-        const node = feedback()
+        const node = modal.querySelector("#interesesModalFeedback")
         if (!node) return
         node.textContent = message
         node.classList.toggle("hidden", !message)
@@ -183,7 +412,7 @@ function openInteresesModal(globalIndex = -1, defaultFecha = "") {
 
     overlay.addEventListener("click", (event) => {
         if (event.target === overlay) {
-            // closeInteresesModal() // Deshabilitado para evitar cierre accidental
+            // cerrar deshabilitado para evitar pérdida accidental
         }
     })
 
@@ -231,6 +460,8 @@ function openInteresesModal(globalIndex = -1, defaultFecha = "") {
     modal.querySelector("input")?.focus()
 }
 
+// ----- Carga y render -----
+
 async function loadInteresesData() {
     try {
         const response = await fetch("/api/intereses")
@@ -241,8 +472,8 @@ async function loadInteresesData() {
 
         return await response.json()
     } catch (error) {
-        console.error("Error cargando intereses desde el backend:", error)
-        return { rows: [] }
+        console.error("Error cargando cuentas remuneradas desde el backend:", error)
+        return { cuentas: [] }
     }
 }
 
@@ -253,12 +484,41 @@ async function renderInteresesTable() {
         return
     }
 
-    const interesesData = await loadInteresesData()
-    renderRowsFromData(interesesData)
+    const data = await loadInteresesData()
+    loadCuentasFromData(data)
 }
 
+function loadCuentasFromData(data) {
+    _allCuentas = Array.isArray(data?.cuentas) ? data.cuentas : []
+
+    if (!currentCuentaId && _allCuentas.length) {
+        currentCuentaId = _allCuentas[0].id
+    } else if (currentCuentaId && !_allCuentas.find(c => c.id === currentCuentaId)) {
+        currentCuentaId = _allCuentas.length ? _allCuentas[0].id : null
+    }
+
+    const cuenta = getCurrentCuenta()
+    _allInteresesRows = cuenta ? cuenta.rows : []
+
+    renderCuentasSidebar()
+
+    const years = getInteresesYears(_allInteresesRows)
+    if (!currentInteresesYear && years.length) currentInteresesYear = years[years.length - 1]
+    renderInteresesYearBar(years)
+    renderFilteredIntereses()
+}
+
+// Compatibilidad con código existente que llama renderRowsFromData
 function renderRowsFromData(interesesData) {
-    _allInteresesRows = Array.isArray(interesesData?.rows) ? interesesData.rows : []
+    if (interesesData?.cuentas) {
+        loadCuentasFromData(interesesData)
+        return
+    }
+    // Datos legacy { rows: [...] } — asignar a cuenta actual
+    const rows = Array.isArray(interesesData?.rows) ? interesesData.rows : []
+    _allInteresesRows = rows
+    const cuenta = getCurrentCuenta()
+    if (cuenta) cuenta.rows = rows
 
     const years = getInteresesYears(_allInteresesRows)
     if (!currentInteresesYear && years.length) currentInteresesYear = years[years.length - 1]
@@ -296,15 +556,19 @@ function renderFilteredIntereses() {
     updateTotals()
 }
 
+// ----- Guardar -----
+
 function collectInteresesDataFromTable() {
-    return { rows: _allInteresesRows }
+    syncRowsBackToCuenta()
+    return { cuentas: _allCuentas }
 }
 
 async function saveInteresesDataToServer() {
+    syncRowsBackToCuenta()
     const response = await fetch("/api/intereses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: _allInteresesRows })
+        body: JSON.stringify({ cuentas: _allCuentas })
     })
 
     if (!response.ok) {
@@ -312,6 +576,8 @@ async function saveInteresesDataToServer() {
         throw new Error(`HTTP ${response.status}: ${errorText}`)
     }
 }
+
+// ----- Totales -----
 
 function updateTotals() {
     const interesesBody = document.getElementById("interesesBody")
@@ -356,7 +622,13 @@ function updateTotals() {
     }
 }
 
+// ----- Acciones de fila -----
+
 function addNewInteresesRow() {
+    if (!currentCuentaId) {
+        openInteresesErrorModal("Primero selecciona o crea una cuenta remunerada.")
+        return
+    }
     openInteresesModal()
 }
 
@@ -404,9 +676,17 @@ function handleInteresesRowActionClick(event) {
 }
 
 function addInteresesYear() {
-    const yearStr = prompt("Introduce el año (ej: 2027):")?.trim()
-    if (!yearStr || !/^\d{4}$/.test(yearStr)) return
-    openInteresesModal(-1, `01-${yearStr}`)
+    openCuentaNameModal({
+        title: "Añadir año",
+        defaultValue: String(new Date().getFullYear()),
+        onConfirm: (yearStr) => {
+            if (!/^\d{4}$/.test(yearStr)) {
+                openInteresesErrorModal("Año no válido. Introduce 4 dígitos (ej: 2027).")
+                return
+            }
+            openInteresesModal(-1, `01-${yearStr}`)
+        }
+    })
 }
 
 function deleteCurrentInteresesYear() {
@@ -419,17 +699,21 @@ function deleteCurrentInteresesYear() {
         onConfirm: async () => {
             try {
                 _allInteresesRows = _allInteresesRows.filter(r => parseInteresYear(r.fecha) !== currentInteresesYear)
+                syncRowsBackToCuenta()
                 const remaining = getInteresesYears(_allInteresesRows)
                 currentInteresesYear = remaining.length ? remaining[remaining.length - 1] : null
-                renderRowsFromData({ rows: _allInteresesRows })
+                renderInteresesYearBar(remaining)
+                renderFilteredIntereses()
                 await saveInteresesDataToServer()
             } catch (error) {
                 console.error(error)
-                alert("No se pudo eliminar el año.")
+                openInteresesErrorModal("No se pudo eliminar el año.", error)
             }
         }
     })
 }
+
+// ----- Import / Export -----
 
 function exportInteresesJson() {
     const data = collectInteresesDataFromTable()
@@ -439,7 +723,7 @@ function exportInteresesJson() {
     const downloadLink = document.createElement("a")
 
     downloadLink.href = dataUrl
-    downloadLink.download = "intereses.json"
+    downloadLink.download = "cuentas-remuneradas.json"
     document.body.appendChild(downloadLink)
     downloadLink.click()
     document.body.removeChild(downloadLink)
@@ -463,20 +747,18 @@ function importInteresesJson() {
             const fileText = await file.text()
             const parsedData = JSON.parse(fileText)
 
-            if (!parsedData || !Array.isArray(parsedData.rows)) {
-                alert("El JSON no tiene el formato esperado. Debe contener { rows: [...] }")
+            if (!parsedData || !Array.isArray(parsedData.cuentas)) {
+                openInteresesErrorModal('El JSON no tiene el formato esperado. Debe contener { cuentas: [...] }')
                 return
             }
 
-            renderRowsFromData(parsedData)
+            loadCuentasFromData(parsedData)
             await saveInteresesDataToServer()
-            alert("JSON importado y guardado en data/intereses.json")
         } catch (error) {
             console.error(error)
-            alert("No se pudo importar el JSON.")
+            openInteresesErrorModal("No se pudo importar el JSON.", error)
         }
     })
 
     inputFile.click()
 }
-

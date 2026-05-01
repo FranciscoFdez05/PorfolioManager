@@ -100,6 +100,20 @@ CREATE TABLE IF NOT EXISTS intereses (
     impuestos TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS cuentas_remuneradas (
+    id         TEXT PRIMARY KEY,
+    nombre     TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS intereses_v2 (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    cuenta_id TEXT NOT NULL REFERENCES cuentas_remuneradas(id) ON DELETE CASCADE,
+    fecha     TEXT NOT NULL DEFAULT '',
+    acumulado TEXT NOT NULL DEFAULT '',
+    impuestos TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS dividendos (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     fecha            TEXT NOT NULL DEFAULT '',

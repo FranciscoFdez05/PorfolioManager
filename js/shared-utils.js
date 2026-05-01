@@ -607,12 +607,23 @@ function downloadJsonFile(filename, payload) {
 
 // ── Generic table sort ──────────────────────────────────────────────────────
 
-function bindTableSort(table) {
+function bindTableSort(table, storageKey) {
     if (!table || table._sortBound) return
     table._sortBound = true
 
-    let currentKey = null
-    let currentDir = "desc"
+    const lsKey = storageKey ? `tableSort_${storageKey}` : null
+    let saved = null
+    if (lsKey) {
+        try { saved = JSON.parse(localStorage.getItem(lsKey)) } catch {}
+    }
+
+    let currentKey = saved?.key ?? null
+    let currentDir = saved?.dir ?? "desc"
+
+    function persist() {
+        if (!lsKey) return
+        try { localStorage.setItem(lsKey, JSON.stringify({ key: currentKey, dir: currentDir })) } catch {}
+    }
 
     function cellText(row, colIdx) {
         const cell = row.cells[colIdx]
@@ -673,9 +684,12 @@ function bindTableSort(table) {
                 currentKey = key
                 currentDir = "desc"
             }
+            persist()
             doSort()
         })
     })
+
+    if (currentKey !== null) doSort()
 }
 
 // ── Custom select dropdown ──────────────────────────────────────────────────

@@ -311,7 +311,8 @@ body{
     border-radius:8px;
     padding:4px;
     z-index:10000;
-    width:100%;
+    min-width:100%;
+    width:max-content;
     flex-direction:column;
     gap:2px;
 }
@@ -2095,7 +2096,7 @@ tr.gastosTypeEmptySep td {
     justify-content:flex-end;
 }
 
-/* ===== INTERESES ===== */
+/* ===== CUENTA REMUNERADA (ex Intereses) ===== */
 
 .interesesLayout{
     display:flex;
@@ -2104,6 +2105,84 @@ tr.gastosTypeEmptySep td {
     padding-right:18px;
     flex:1;
 }
+
+.cuentasBar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+.cuentasList{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    flex:1 1 auto;
+}
+
+.cuentasBarAddBtn{
+    background:none;
+    border:1px solid #334155;
+    color:#94a3b8;
+    border-radius:8px;
+    width:34px;
+    height:34px;
+    cursor:pointer;
+    font-size:18px;
+    line-height:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+    flex-shrink:0;
+    transition:border-color 0.15s, color 0.15s;
+}
+.cuentasBarAddBtn:hover{ border-color:#3b82f6; color:#60a5fa; }
+
+.cuentaItem{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    padding:0 12px;
+    height:34px;
+    cursor:pointer;
+    font-size:13px;
+    color:#ffffff;
+    border:1px solid #334155;
+    border-radius:8px;
+    background:#0f1724;
+    transition:background 0.15s, border-color 0.15s, color 0.15s;
+    user-select:none;
+    white-space:nowrap;
+}
+.cuentaItem:hover{ background:#162235; border-color:#4a90d9; }
+.cuentaItem.active{ background:#1e3a5f; border-color:#3b82f6; color:#93c5fd; }
+
+.cuentaItemName{ max-width:160px; overflow:hidden; text-overflow:ellipsis; }
+
+.cuentaItemActions{
+    display:none;
+    gap:2px;
+    flex-shrink:0;
+    margin-left:2px;
+}
+.cuentaItem:hover .cuentaItemActions,
+.cuentaItem.active .cuentaItemActions{ display:flex; }
+
+.cuentaItemRenameBtn,
+.cuentaItemDeleteBtn{
+    background:none;
+    border:none;
+    cursor:pointer;
+    font-size:10px;
+    padding:2px 3px;
+    border-radius:3px;
+    line-height:1;
+    color:#64748b;
+    transition:color 0.12s, background 0.12s;
+}
+.cuentaItemRenameBtn:hover{ color:#60a5fa; }
+.cuentaItemDeleteBtn:hover{ color:#f87171; }
 
 .interesesMainArea{
     display:grid;
@@ -4546,6 +4625,7 @@ tr.gastosTypeEmptySep td {
     min-width:0;
     width:100%;
     box-sizing:border-box;
+    margin:0 auto;
 }
 
 .metricasHeader{
@@ -6775,6 +6855,10 @@ html[data-theme="light"] .overviewTable tbody tr:hover td,
 html[data-theme="light"] .interesesTable tbody tr:hover td,
 html[data-theme="light"] .dividendosTable tbody tr:hover td,
 html[data-theme="light"] .operationsTable tbody tr:hover td{ background:#f1f5f9 !important; }
+
+html[data-theme="light"] .cuentaItem{ background:#f1f5f9; border-color:#e2e8f0; color:#374151; }
+html[data-theme="light"] .cuentaItem:hover{ background:#e2e8f0; border-color:#93c5fd; color:#1e3a8a; }
+html[data-theme="light"] .cuentaItem.active{ background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
 
 /* ── Black theme: shared table wrappers & specific td overrides (high-specificity) ── */
 html[data-theme="black"] .overviewTableWrapper,

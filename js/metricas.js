@@ -141,7 +141,10 @@ async function buildMetricasPayload() {
     return {
         summaries,
         dividendos:      Array.isArray(divData.rows)   ? divData.rows   : [],
-        intereses:       Array.isArray(intData.rows)    ? intData.rows   : [],
+        intereses:       Array.isArray(intData.cuentas)
+            ? intData.cuentas.flatMap(c => Array.isArray(c.rows) ? c.rows : [])
+            : (Array.isArray(intData.rows) ? intData.rows : []),
+        cuentasRemuneradas: Array.isArray(intData.cuentas) ? intData.cuentas : [],
         bonos:           Array.isArray(bonosData.rows)  ? bonosData.rows : [],
         rentaFija:       Array.isArray(rfData.rows)     ? rfData.rows    : [],
         gastosYearsList,
@@ -1548,20 +1551,25 @@ function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
 
 let _metricasInteresesYear = null
 
-function mRenderInteresesSection(interesRows) {
+const _CUENTA_COLORS = [
+    "#3a7bd5", "#2ecc71", "#e67e22", "#9b59b6", "#1abc9c",
+    "#e74c3c", "#f39c12", "#00cec9", "#fd79a8", "#6c5ce7"
+]
+
+function intYear(fecha) {
+    const p = String(fecha || "").split("-")
+    return p.length === 3 ? p[2] : p.length === 2 ? p[1] : null
+}
+function intMonth(fecha) {
+    const p = String(fecha || "").split("-")
+    return p.length === 3 ? parseInt(p[1]) - 1 : p.length === 2 ? parseInt(p[0]) - 1 : -1
+}
+
+function mRenderInteresesSection(interesRows, cuentas) {
     const section = document.getElementById("mSectionIntereses")
     const rows = Array.isArray(interesRows) ? interesRows : []
     if (!rows.length) { if (section) section.classList.add("hidden"); return }
     if (section) section.classList.remove("hidden")
-
-    function intYear(fecha) {
-        const p = String(fecha || "").split("-")
-        return p.length === 3 ? p[2] : p.length === 2 ? p[1] : null
-    }
-    function intMonth(fecha) {
-        const p = String(fecha || "").split("-")
-        return p.length === 3 ? parseInt(p[1]) - 1 : p.length === 2 ? parseInt(p[0]) - 1 : -1
-    }
 
     const years = [...new Set(rows.map(r => intYear(r.fecha)).filter(Boolean))].sort((a, b) => Number(a) - Number(b))
     if (!_metricasInteresesYear || !years.includes(_metricasInteresesYear)) _metricasInteresesYear = years[years.length - 1] || null
@@ -1579,28 +1587,40 @@ function mRenderInteresesSection(interesRows) {
                 yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasInteresesYear = btn.dataset.intano
-                mDrawInteresesChart(rows, _metricasInteresesYear, intYear, intMonth)
+                mDrawInteresesChart(cuentas, _metricasInteresesYear)
             })
         }
     }
 
-    mDrawInteresesChart(rows, _metricasInteresesYear, intYear, intMonth)
+    mDrawInteresesChart(cuentas, _metricasInteresesYear)
 }
 
-function mDrawInteresesChart(rows, year, intYear, intMonth) {
-    const monthNet  = Array(12).fill(0)
-    const monthAcum = Array(12).fill(0)
+function mDrawInteresesChart(cuentas, year) {
+    const labels = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+    const cuentasList = Array.isArray(cuentas) && cuentas.length ? cuentas : []
 
-    rows.filter(r => intYear(r.fecha) === year).forEach(r => {
-        const m = intMonth(r.fecha)
-        if (m < 0 || m > 11) return
-        const acum = parseEuroNumber(r.acumulado || "")
-        const imp  = parseEuroNumber(r.impuestos || "")
-        monthAcum[m] += acum
-        monthNet[m]  += acum - imp
+    // Por mes: totales y desglose por cuenta
+    const monthAcum = Array(12).fill(0)
+    const monthNet  = Array(12).fill(0)
+    // desglose[mes] = [{ nombre, acum, neto }]
+    const desglose  = Array.from({ length: 12 }, () => [])
+
+    cuentasList.forEach(cuenta => {
+        const cuentaRows = Array.isArray(cuenta.rows) ? cuenta.rows : []
+        cuentaRows.filter(r => intYear(r.fecha) === year).forEach(r => {
+            const m = intMonth(r.fecha)
+            if (m < 0 || m > 11) return
+            const acum = parseEuroNumber(r.acumulado || "")
+            const imp  = parseEuroNumber(r.impuestos || "")
+            const neto = acum - imp
+            monthAcum[m] += acum
+            monthNet[m]  += neto
+            const existing = desglose[m].find(d => d.nombre === cuenta.nombre)
+            if (existing) { existing.acum += acum; existing.neto += neto }
+            else desglose[m].push({ nombre: cuenta.nombre, acum, neto })
+        })
     })
 
-    const labels = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
     const netColors = monthNet.map(v => v >= 0 ? "#2ecc71" : "#e74c3c")
 
     mCreateChart("mChartIntereses", {
@@ -1616,7 +1636,17 @@ function mDrawInteresesChart(rows, year, intYear, intMonth) {
             ...M_CHART_DEFAULTS,
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
-                tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}` } }
+                tooltip: {
+                    callbacks: {
+                        label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}`,
+                        afterLabel: (c) => {
+                            const mes = c.dataIndex
+                            if (!desglose[mes] || !desglose[mes].length) return []
+                            const isAcum = c.datasetIndex === 0
+                            return desglose[mes].map(d => `  · ${d.nombre}: ${formatEuro(isAcum ? d.acum : d.neto)}`)
+                        }
+                    }
+                }
             },
             scales: { x: mAxisX(), y: mAxisY() }
         }
@@ -1744,7 +1774,7 @@ function mRenderAll(payload) {
     const colorMap = Object.fromEntries(summaries.map(s => [s.name, s.color]).filter(([, c]) => c))
     mRenderDividendos(dividendos, colorMap)
     mRenderDivMensual(dividendos, colorMap)
-    mRenderInteresesSection(payload.intereses)
+    mRenderInteresesSection(payload.intereses, payload.cuentasRemuneradas)
     mRenderBonosTipos(b)
     mRenderBonosInst(b)
     mRenderRentaFijaTipos(rf)

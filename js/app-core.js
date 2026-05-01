@@ -262,6 +262,8 @@ async function initInteresesLogic() {
         deleteYearButton.addEventListener("click", deleteCurrentInteresesYear)
     }
 
+    bindCuentasSidebarActions()
+
     const interesesTable = document.querySelector(".interesesTable")
     if (interesesTable) bindTableSort(interesesTable)
 }
@@ -354,7 +356,9 @@ async function refreshTopDividendosIntereses() {
             fetch("/api/rentafija").then((r) => r.json()).catch(() => ({ rows: [] }))
         ])
 
-        const totalInteres = (Array.isArray(interesesData?.rows) ? interesesData.rows : [])
+        const allInteresesRows = (Array.isArray(interesesData?.cuentas) ? interesesData.cuentas : [])
+            .flatMap(c => Array.isArray(c.rows) ? c.rows : [])
+        const totalInteres = allInteresesRows
             .reduce((sum, row) => sum + (parseEuroNumber(row.acumulado) - parseEuroNumber(row.impuestos)), 0)
 
         const totalDividendos = (Array.isArray(dividendosData?.rows) ? dividendosData.rows : [])

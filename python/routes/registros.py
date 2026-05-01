@@ -17,30 +17,37 @@ def getIntereses():
 def saveIntereses():
     requestData = request.get_json(silent=True)
 
-    if not requestData or "rows" not in requestData:
+    if not requestData or "cuentas" not in requestData:
         return jsonify({"ok": False, "error": "JSON inválido"}), 400
 
-    rows = requestData["rows"]
+    cuentas = requestData["cuentas"]
 
-    if not isinstance(rows, list):
-        return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+    if not isinstance(cuentas, list):
+        return jsonify({"ok": False, "error": "cuentas debe ser una lista"}), 400
 
-    sanitizedRows = []
+    sanitizedCuentas = []
 
-    for row in rows:
-        sanitizedRows.append({
-            "fecha": str(row.get("fecha", "")).strip(),
-            "acumulado": str(row.get("acumulado", "")).strip(),
-            "impuestos": str(row.get("impuestos", "")).strip()
+    for cuenta in cuentas:
+        sanitizedRows = []
+        for row in cuenta.get("rows", []):
+            sanitizedRows.append({
+                "fecha": str(row.get("fecha", "")).strip(),
+                "acumulado": str(row.get("acumulado", "")).strip(),
+                "impuestos": str(row.get("impuestos", "")).strip()
+            })
+        sanitizedCuentas.append({
+            "id": str(cuenta.get("id", "")).strip(),
+            "nombre": str(cuenta.get("nombre", "")).strip(),
+            "rows": sanitizedRows
         })
 
-    writeInteresesFile({"rows": sanitizedRows})
+    writeInteresesFile({"cuentas": sanitizedCuentas})
     return jsonify({"ok": True})
 
 
 @registros_bp.route("/api/intereses/reset", methods=["POST"])
 def resetIntereses():
-    writeInteresesFile({"rows": []})
+    writeInteresesFile({"cuentas": []})
     return jsonify({"ok": True})
 
 

@@ -23,23 +23,77 @@ def ensureDataFile():
     init_db()
 
 
-# --- Intereses ---
+# --- Cuentas Remuneradas (ex Intereses) ---
 
 def readInteresesFile():
     conn = get_db()
-    rows = conn.execute(
-        "SELECT fecha, acumulado, impuestos FROM intereses ORDER BY id"
+    cuentas = conn.execute(
+        "SELECT id, nombre FROM cuentas_remuneradas ORDER BY sort_order, rowid"
     ).fetchall()
-    return {"rows": [{"fecha": r["fecha"], "acumulado": r["acumulado"], "impuestos": r["impuestos"]} for r in rows]}
+
+    # Migración: si no hay cuentas_remuneradas pero sí filas antiguas, migrarlas
+    if not cuentas:
+        old_rows = conn.execute(
+            "SELECT fecha, acumulado, impuestos FROM intereses ORDER BY id"
+        ).fetchall()
+        if old_rows:
+            default_id = "cuenta-default"
+            conn.execute(
+                "INSERT OR IGNORE INTO cuentas_remuneradas (id, nombre, sort_order) VALUES (?, ?, ?)",
+                (default_id, "Cuenta principal", 0)
+            )
+            conn.executemany(
+                "INSERT INTO intereses_v2 (cuenta_id, fecha, acumulado, impuestos) VALUES (?, ?, ?, ?)",
+                [(default_id, r["fecha"], r["acumulado"], r["impuestos"]) for r in old_rows]
+            )
+            conn.execute("DELETE FROM intereses")
+            conn.commit()
+            cuentas = conn.execute(
+                "SELECT id, nombre FROM cuentas_remuneradas ORDER BY sort_order, rowid"
+            ).fetchall()
+
+    result = []
+    for c in cuentas:
+        filas = conn.execute(
+            "SELECT fecha, acumulado, impuestos FROM intereses_v2 WHERE cuenta_id = ? ORDER BY id",
+            (c["id"],)
+        ).fetchall()
+        result.append({
+            "id": c["id"],
+            "nombre": c["nombre"],
+            "rows": [{"fecha": r["fecha"], "acumulado": r["acumulado"], "impuestos": r["impuestos"]} for r in filas]
+        })
+
+    return {"cuentas": result}
 
 
 def writeInteresesFile(data):
     conn = get_db()
-    conn.execute("DELETE FROM intereses")
-    conn.executemany(
-        "INSERT INTO intereses (fecha, acumulado, impuestos) VALUES (?, ?, ?)",
-        [(r.get("fecha", ""), r.get("acumulado", ""), r.get("impuestos", "")) for r in data.get("rows", [])]
-    )
+    cuentas = data.get("cuentas", [])
+
+    existing_ids = {r["id"] for r in conn.execute("SELECT id FROM cuentas_remuneradas").fetchall()}
+    new_ids = {str(c.get("id", "")).strip() for c in cuentas}
+
+    for old_id in existing_ids - new_ids:
+        conn.execute("DELETE FROM cuentas_remuneradas WHERE id = ?", (old_id,))
+
+    for i, cuenta in enumerate(cuentas):
+        cid = str(cuenta.get("id", "")).strip()
+        nombre = str(cuenta.get("nombre", "")).strip()
+        if not cid:
+            continue
+        conn.execute(
+            "INSERT OR REPLACE INTO cuentas_remuneradas (id, nombre, sort_order) VALUES (?, ?, ?)",
+            (cid, nombre, i)
+        )
+        conn.execute("DELETE FROM intereses_v2 WHERE cuenta_id = ?", (cid,))
+        rows = cuenta.get("rows", [])
+        if rows:
+            conn.executemany(
+                "INSERT INTO intereses_v2 (cuenta_id, fecha, acumulado, impuestos) VALUES (?, ?, ?, ?)",
+                [(cid, r.get("fecha", ""), r.get("acumulado", ""), r.get("impuestos", "")) for r in rows]
+            )
+
     conn.commit()
 
 

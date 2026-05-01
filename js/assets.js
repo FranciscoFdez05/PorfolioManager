@@ -729,21 +729,22 @@ function renderAssetCompletedOperationsSection(asset) {
             <table class="assetOperationsTable assetCompletedOpsTable">
                 <thead>
                     <tr>
-                        <th>Fecha apertura</th>
-                        <th>Par</th>
-                        <th>Orden</th>
-                        <th>Precio orden</th>
-                        <th>Cantidad</th>
-                        <th>Comisiones cripto</th>
-                        <th>Total</th>
-                        <th>Estado</th>
-                        <th>Fecha cierre</th>
+                        <th class="mThSort" data-sortkey="0">Fecha apertura<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="1">Par<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="2">Orden<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="3">Precio orden<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="4">Cantidad<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="5">Comisiones cripto<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="6">Total<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="7">Estado<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="8">Fecha cierre<span class="mSortArrow"></span></th>
                     </tr>
                 </thead>
                 <tbody>${rowsHtml}</tbody>
             </table>
         </div>
     `
+    bindTableSort(section.querySelector("table"), "completedOps")
 }
 
 function renderAssetTransaccionesSection(asset) {
@@ -791,19 +792,20 @@ function renderAssetTransaccionesSection(asset) {
             <table class="assetOperationsTable assetTransaccionesTable">
                 <thead>
                     <tr>
-                        <th>Fecha</th>
-                        <th>Total</th>
-                        <th>Comisión red</th>
-                        <th>Tipo</th>
-                        <th>Wallet destino</th>
-                        <th>Hash</th>
-                        <th>Nota</th>
+                        <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="1">Total<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="2">Comisión red<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="3">Tipo<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="4">Wallet destino<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="5">Hash<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="6">Nota<span class="mSortArrow"></span></th>
                     </tr>
                 </thead>
                 <tbody>${rowsHtml}</tbody>
             </table>
         </div>
     `
+    bindTableSort(section.querySelector("table"), "transacciones")
 }
 
 async function renderAssetsList(assets) {
@@ -2055,6 +2057,7 @@ function _assetBindSort() {
                 _assetSortKey = key
                 _assetSortDir = "asc"
             }
+            try { localStorage.setItem("tableSort_comprasSpot", JSON.stringify({ key: _assetSortKey, dir: _assetSortDir })) } catch {}
             renderAssetRows(_assetDisplayRows)
         })
     })
@@ -2069,8 +2072,14 @@ function renderAssetTablePage(asset) {
     const isCrypto = isCryptoAssetType(asset.type)
     const isEtf = String(asset.type || "").trim().toLowerCase() === "etfs"
 
-    _assetSortKey = null
-    _assetSortDir = "asc"
+    try {
+        const _saved = JSON.parse(localStorage.getItem("tableSort_comprasSpot"))
+        _assetSortKey = _saved?.key ?? null
+        _assetSortDir = _saved?.dir ?? "asc"
+    } catch {
+        _assetSortKey = null
+        _assetSortDir = "asc"
+    }
 
     if (!contentArea) {
         return
