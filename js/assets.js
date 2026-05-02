@@ -1952,7 +1952,7 @@ function renderOverviewRows(rows) {
             <td>${typeBadge}</td>
             <td>${formatAssetParticipationValue(row.participaciones, row.assetType)}</td>
             <td>${formatMoney(row.promedioCompra, row.currency)}</td>
-            <td>${formatMoney(row.overviewCurrentPrice ?? row.valorActual, row.currency)}</td>
+            <td><strong>${formatMoney(row.overviewCurrentPrice ?? row.valorActual, row.currency)}</strong></td>
             <td>${formatMoney(row.invertidoBruto, row.overviewInvestedCurrency)}</td>
             <td>${overviewCommissions}</td>
             <td>${formatMoney(row.invertidoNeto, row.overviewInvestedCurrency)}</td>
