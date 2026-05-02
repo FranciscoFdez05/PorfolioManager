@@ -136,4 +136,5 @@ if __name__ == "__main__":
     ensureDataFile()
     _check_auto_backup()
     debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
-    app.run(host="127.0.0.1", port=5000, debug=debug_mode)
+    # 0.0.0.0 para que sea accesible desde la red (Docker o LAN)
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode)

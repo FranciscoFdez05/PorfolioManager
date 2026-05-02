@@ -441,3 +441,47 @@ Nueva calculadora en el módulo **Herramientas** que muestra cuántas onzas de p
 
 - Si el ratio está **por encima de 50** → la plata está relativamente barata frente al oro (banner verde).
 - Si el ratio está **por debajo de 50** → la plata está relativamente cara frente al oro (banner rojo).
+
+---
+
+## Docker (Ubuntu / Linux)
+
+Recomendado: **un solo contenedor** (API + estáticos) y montar volúmenes para persistencia.
+
+### Requisitos
+
+- Docker + Docker Compose plugin (`docker compose`)
+
+### Estructura (persistencia / claves)
+
+- `data/` → persistencia de `data/portfolio.db` y backups
+- `logs/` → logs en disco (opcional)
+- `API/` → claves locales (`API/finnhub.key`, `API/eodhd.key`, etc.). No se suben a GitHub y no entran en la imagen; se montan como volumen de solo lectura.
+
+### Lanzar con Docker Compose
+
+Desde la raíz del proyecto:
+
+```bash
+docker compose up -d --build
+```
+
+La app queda en:
+
+- En la propia máquina: `http://localhost:5000`
+- Desde tu red: `http://IP_DE_LA_MAQUINA:5000`
+
+Si usas firewall (Ubuntu):
+
+```bash
+sudo ufw allow 5000/tcp
+```
+
+### Ver logs y gestión
+
+```bash
+docker compose logs -f portfolio
+docker compose ps
+docker compose restart portfolio
+docker compose down
+```

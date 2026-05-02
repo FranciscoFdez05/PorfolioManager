@@ -1,0 +1,23 @@
+.git
+.gitignore
+.gitattributes
+.vscode
+.claude
+
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+.env
+.env.*
+!.env.example
+
+.venv/
+venv/
+
+logs/
+data/
+
+# Evitar que claves locales entren en la imagen
+API/*.key

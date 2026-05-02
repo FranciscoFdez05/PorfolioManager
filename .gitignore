@@ -9,10 +9,8 @@ data/JSON/*
 # =========================
 # LOGS
 # =========================
-log/*.log
-!log/logEvent.py
-!log/__init__.py
-!log/.gitkeep
+logs/*.log
+!logs/logEvent.py
 
 # =========================
 # PYTHON CACHE
