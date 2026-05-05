@@ -290,19 +290,43 @@ function hmEnsureTooltip(container) {
         const d = cell._hmData
         if (!d) return
 
-        const pctClass  = !d.hasValue || d.value === null ? "" : d.value < 0 ? "hmTipNeg" : d.value > 0 ? "hmTipPos" : ""
-        const moneyStr  = d.moneyChange !== null
-            ? `<span class="hmTipMoney ${pctClass}">${d.moneyChange >= 0 ? "+" : ""}${d.moneyChange.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</span>`
+        const pctClass = !d.hasValue || d.value === null ? "" : d.value < 0 ? "hmTipNeg" : d.value > 0 ? "hmTipPos" : ""
+
+        const fmtEur = (v) => v.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"
+        const fmtSigned = (v) => (v >= 0 ? "+" : "") + fmtEur(v)
+
+        // Price row
+        const priceNum = parseFloat(String(d.price || "").replace(",", "."))
+        const priceStr = !isNaN(priceNum) && priceNum > 0
+            ? `<span class="hmTipLabel">Precio</span><span class="hmTipVal">${hmFormatPrice(priceNum, d.currency)}</span>`
             : ""
-        const pctStr    = `<span class="hmTipPct ${pctClass}">${d.valueLabel}</span>`
+
+        // Cuenta rows (only when we hold the asset)
+        let cuentaRows = ""
+        if (d.hasCuenta && d.netoEur > 0) {
+            const ganancia = d.netoEur - d.invertidoEur
+            const ganClass = ganancia < 0 ? "hmTipNeg" : ganancia > 0 ? "hmTipPos" : ""
+            cuentaRows = `
+                <span class="hmTipLabel">Invertido</span><span class="hmTipVal">${fmtEur(d.invertidoEur)}</span>
+                <span class="hmTipLabel">Valor actual</span><span class="hmTipVal">${fmtEur(d.netoEur)}</span>
+                <span class="hmTipLabel">Ganancia</span><span class="hmTipVal ${ganClass}">${fmtSigned(ganancia)}</span>`
+        } else if (d.moneyChange !== null) {
+            cuentaRows = `<span class="hmTipLabel">Cambio</span><span class="hmTipVal ${pctClass}">${fmtSigned(d.moneyChange)}</span>`
+        }
+
+        // Rentabilidad row
+        const rentRow = d.hasValue && d.value !== null
+            ? `<span class="hmTipLabel">Rentab.</span><span class="hmTipVal ${pctClass}">${d.valueLabel}</span>`
+            : ""
 
         tip.innerHTML = `
             <div class="hmTipName">${d.name}</div>
-            <div class="hmTipRow">${pctStr}${moneyStr}</div>`
+            <div class="hmTipDivider"></div>
+            <div class="hmTipGrid">${priceStr}${cuentaRows}${rentRow}</div>`
 
         // Position: follow cursor, avoid edges
         const margin = 12
-        const tw = 180, th = 60
+        const tw = 215, th = d.hasCuenta && d.netoEur > 0 ? 148 : 90
         let lx = e.clientX + margin
         let ly = e.clientY + margin
         if (lx + tw > window.innerWidth)  lx = e.clientX - tw - margin
