@@ -1,7 +1,12 @@
+function escapeHtml(str) {
+    return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+}
+
 const STABLECOIN_MOVEMENT_TYPES = ["Compra", "Venta"]
 
 let currentStablecoinsData = { catalog: [], enabledSymbols: [], rows: [] }
 let currentStablecoinsOperationsRows = []
+let currentStablecoinsTransaccionesRows = []
 let stablecoinsAutosaveTimeout = null
 let stablecoinsPersistenceBound = false
 let stablecoinsPersistChain = Promise.resolve()
@@ -160,6 +165,79 @@ function getOperationStablecoinSymbol(row = {}) {
     return normalizeStablecoinSymbol(quoteSymbol)
 }
 
+function getStablecoinsLockedTotalsFromActiveBuys(operationsRows = [], options = {}) {
+    const excludeRowId = String(options.excludeRowId || "").trim()
+    const lockedTotals = {}
+
+    ;(operationsRows || []).forEach((row) => {
+        if (excludeRowId && String(row.id || "").trim() === excludeRowId) {
+            return
+        }
+
+        if (String(row.estado || "").trim() !== "Activo") {
+            return
+        }
+
+        if (String(row.orden || "").trim() !== "Compra") {
+            return
+        }
+
+        const symbol = getOperationStablecoinSymbol(row)
+        if (!symbol) {
+            return
+        }
+
+        const total = parseLooseNumber(row.total) || 0
+        if (total <= 0) {
+            return
+        }
+
+        lockedTotals[symbol] = (lockedTotals[symbol] || 0) + total
+    })
+
+    return lockedTotals
+}
+
+function getStablecoinSymbolFromTransaccionRow(row = {}) {
+    const assetId = String(row.assetId || "").trim()
+
+    if (!assetId.startsWith("stablecoin-")) {
+        return ""
+    }
+
+    return normalizeStablecoinSymbol(assetId.slice("stablecoin-".length))
+}
+
+function getStablecoinsNetworkFeesBySymbol(transaccionesRows = []) {
+    const totals = {}
+
+    ;(transaccionesRows || []).forEach((row) => {
+        if (typeof normalizeTransaccionWalletTipo !== "function") {
+            return
+        }
+
+        const walletType = normalizeTransaccionWalletTipo(row.walletTipo)
+
+        if (walletType !== "enviada" && walletType !== "entre_wallet") {
+            return
+        }
+
+        const symbol = getStablecoinSymbolFromTransaccionRow(row)
+        if (!symbol) {
+            return
+        }
+
+        const fee = Math.max(0, parseLooseNumber(row.comisionRed) || 0)
+        if (fee <= 0) {
+            return
+        }
+
+        totals[symbol] = (totals[symbol] || 0) + fee
+    })
+
+    return totals
+}
+
 function buildStablecoinBalanceSummary(stablecoinsPayload = currentStablecoinsData, operationsRows = currentStablecoinsOperationsRows) {
     const normalizedPayload = normalizeStablecoinsPayload(stablecoinsPayload)
     const summary = {}
@@ -173,6 +251,8 @@ function buildStablecoinBalanceSummary(stablecoinsPayload = currentStablecoinsDa
             manualExpenses: 0,
             operationsBuys: 0,
             operationsSales: 0,
+            balance: 0,
+            locked: 0,
             available: 0,
             totalComisiones: 0
         }
@@ -216,8 +296,14 @@ function buildStablecoinBalanceSummary(stablecoinsPayload = currentStablecoinsDa
         }
     })
 
+    const lockedTotals = getStablecoinsLockedTotalsFromActiveBuys(operationsRows || [])
+    const networkFeesTotals = getStablecoinsNetworkFeesBySymbol(currentStablecoinsTransaccionesRows || [])
+
     Object.values(summary).forEach((item) => {
-        item.available = item.manualBuys - item.manualExpenses - item.operationsBuys + item.operationsSales
+        item.balance = item.manualBuys - item.manualExpenses - item.operationsBuys + item.operationsSales
+        item.balance = item.balance - (networkFeesTotals[item.symbol] || 0)
+        item.locked = lockedTotals[item.symbol] || 0
+        item.available = Math.max(0, item.balance - item.locked)
     })
 
     return summary
@@ -247,13 +333,15 @@ function getStablecoinRowSymbolOptions(currentSymbol = "") {
 }
 
 async function initStablecoinsLogic() {
-    const [stablecoinsPayload, operationsPayload] = await Promise.all([
+    const [stablecoinsPayload, operationsPayload, transaccionesPayload] = await Promise.all([
         loadStablecoinsData(),
-        loadOperacionesData()
+        loadOperacionesData(),
+        (typeof loadTransaccionesData === "function" ? loadTransaccionesData() : Promise.resolve({ rows: [] }))
     ])
 
     currentStablecoinsData = normalizeStablecoinsPayload(stablecoinsPayload)
     currentStablecoinsOperationsRows = Array.isArray(operationsPayload?.rows) ? operationsPayload.rows : []
+    currentStablecoinsTransaccionesRows = Array.isArray(transaccionesPayload?.rows) ? transaccionesPayload.rows : []
     bindStablecoinsPersistenceGuards()
     window.flushPendingPageChanges = flushStablecoinsPendingChanges
     renderStablecoinsEnabledMenu()
@@ -435,14 +523,13 @@ function renderStablecoinsSummary() {
             <div class="stablecoinSummaryHeader">
                 <div class="stablecoinSummaryHeaderCopy">
                     <h4>${item.symbol}</h4>
-                    <span>Activo en pares</span>
+                    <span>Saldo disponible</span>
                 </div>
                 <button type="button" class="stablecoinSummaryDeleteBtn" data-symbol="${item.symbol}" title="Eliminar stablecoin">×</button>
             </div>
             <div class="stablecoinSummaryMain">${formatMoney(item.available, "USD")}</div>
             <div class="stablecoinSummaryMeta">
-                <span>Compras manuales: ${formatMoney(item.manualBuys, "USD")}</span>
-                <span>Ventas manuales: ${formatMoney(item.manualExpenses, "USD")}</span>
+                <span>Bloqueado en operaciones activas: ${formatMoney(item.locked, "USD")}</span>
                 <span>Operaciones completadas: ${formatMoney(item.operationsBuys - item.operationsSales, "USD")}</span>
                 <span>Comisiones pagadas: ${formatMoney(item.totalComisiones, "USD")}</span>
             </div>
@@ -546,7 +633,7 @@ function buildStablecoinRow(row) {
         <td>${formatOperationsMoney(row.precio, row.currency || "USD")}</td>
         <td>${formatOperationsMoney(row.total, row.currency || "USD")}</td>
         <td>${row.comisiones ? formatOperationsMoney(row.comisiones, row.currency || "USD") : ""}</td>
-        <td>${row.nota || ""}</td>
+        <td>${escapeHtml(row.nota || "")}</td>
         <td class="rowActionsCell">
             <button type="button" class="assetRowEditBtn stablecoinRowEditBtn" data-row-id="${row.id}" title="Editar fila">✎</button>
             <button type="button" class="assetRowDeleteBtn stablecoinRowDeleteBtn" data-row-id="${row.id}" title="Eliminar fila">✕</button>

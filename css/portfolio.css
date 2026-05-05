@@ -2003,6 +2003,7 @@ tr.gastosTypeEmptySep td {
     min-height:40px;
 }
 
+
 .ventasCreateModal .csTrigger{
     min-height:40px;
     padding:0 12px;
@@ -3222,6 +3223,14 @@ tr.gastosTypeEmptySep td {
     font-size:14px;
     font-weight:600;
     white-space:nowrap;
+}
+
+.operationsPairsSummaryHint{
+    font-size:12px;
+    font-weight:400;
+    opacity:0.75;
+    margin-left:6px;
+    display:inline-block;
 }
 
 .operationsStablecoinPanel,
@@ -7180,3 +7189,165 @@ body.money-hidden .assetCompletedOpsTable td:nth-child(7){
     user-select:none;
     pointer-events:none;
 }
+
+/* ── Heatmap ─────────────────────────────────────────────── */
+.heatmapPage{
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    min-height:0;
+    gap:8px;
+}
+.heatmapToolbar{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:6px;
+    flex-shrink:0;
+}
+/* Grupo genérico */
+.hmGroup{
+    display:flex;
+    gap:2px;
+    align-items:center;
+    background:#111827;
+    border:1px solid #1e293b;
+    border-radius:8px;
+    padding:3px;
+}
+.hmGroupBtn{
+    padding:4px 11px;
+    border-radius:6px;
+    border:none;
+    background:transparent;
+    color:#6b7280;
+    font-size:0.78rem;
+    font-weight:500;
+    cursor:pointer;
+    transition:background .13s,color .13s;
+    white-space:nowrap;
+    line-height:1.4;
+}
+.hmGroupBtn:hover{ background:#1e293b; color:#e2e8f0; }
+.hmGroupBtn.active{ background:#1d4ed8; color:#fff; font-weight:600; }
+
+/* Grupo toggle (Cuenta/Activos): activo en verde */
+.hmGroupToggle .hmGroupBtn.active{ background:#065f46; color:#6ee7b7; }
+
+/* Grupo multi-selección: activo en gris azulado */
+.hmGroupMulti .hmGroupBtn.active{ background:#1e3a5f; color:#93c5fd; font-weight:600; }
+/* "Todos" cuando está solo activo: más neutro */
+.hmGroupMulti .hmGroupBtn[data-type="all"].active{ background:#374151; color:#f3f4f6; }
+
+/* Grupo deshabilitado (periods cuando metric=cuenta) */
+.hmGroupDisabled{ opacity:.38; pointer-events:none; }
+
+/* Separador visual entre grupos */
+.hmGroupSep{
+    width:1px; height:22px;
+    background:#1e293b;
+    flex-shrink:0;
+}
+
+.heatmapWrapper{ flex:1; min-height:0; overflow:hidden; }
+.heatmapContainer{
+    position:relative;
+    width:100%;
+    height:calc(100vh - 200px);
+    min-height:360px;
+    overflow:hidden;
+}
+.heatmapLoading,.heatmapEmpty{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    color:#6b7280; font-size:1rem;
+}
+.heatmapCell{
+    position:absolute;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    overflow:hidden; border-radius:4px;
+    box-sizing:border-box; padding:4px;
+    cursor:default; transition:filter .15s;
+    border:1px solid rgba(0,0,0,.3);
+}
+.heatmapCell:hover{ filter:brightness(1.13); }
+.hmSymbol{
+    font-weight:700; line-height:1.1;
+    text-align:center; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+.hmPrice{
+    font-size:0.71em; opacity:.85; line-height:1.2;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+.hmValue{
+    font-size:0.71em; font-weight:600;
+    line-height:1.2; white-space:nowrap;
+}
+.hmValue.hmPos{ color:#bbf7d0; }
+.hmValue.hmNeg{ color:#fecaca; }
+.hmValue.hmNd { opacity:.55; }
+
+/* ── Tema light ── */
+html[data-theme="light"] .hmGroup{ background:#e8edf5; border-color:#d1d9e6; }
+html[data-theme="light"] .hmGroupBtn{ color:#64748b; }
+html[data-theme="light"] .hmGroupBtn:hover{ background:#dde4ef; color:#1e293b; }
+html[data-theme="light"] .hmGroupBtn.active{ background:#1d4ed8; color:#fff; }
+html[data-theme="light"] .hmGroupToggle .hmGroupBtn.active{ background:#065f46; color:#fff; }
+html[data-theme="light"] .hmGroupMulti .hmGroupBtn.active{ background:#1d4ed8; color:#fff; }
+html[data-theme="light"] .hmGroupMulti .hmGroupBtn[data-type="all"].active{ background:#334155; color:#fff; }
+html[data-theme="light"] .hmGroupSep{ background:#d1d9e6; }
+
+/* ── Tema black ── */
+html[data-theme="black"] .hmGroup{ background:#050505; border-color:#111; }
+html[data-theme="black"] .hmGroupBtn{ color:#4b5563; }
+html[data-theme="black"] .hmGroupBtn:hover{ background:#111; color:#d1d5db; }
+html[data-theme="black"] .heatmapContainer{ background:#050505; }
+
+/* ── Heatmap tooltip ── */
+.hmTooltip{
+    position:fixed;
+    z-index:9999;
+    pointer-events:none;
+    background:#0f172a;
+    border:1px solid #334155;
+    border-radius:10px;
+    padding:10px 14px;
+    min-width:160px;
+    box-shadow:0 8px 24px rgba(0,0,0,.55);
+    opacity:0;
+    transform:translateY(4px);
+    transition:opacity .12s ease, transform .12s ease;
+}
+.hmTooltip.hmTooltipVisible{
+    opacity:1;
+    transform:translateY(0);
+}
+.hmTipName{
+    font-size:0.82rem;
+    font-weight:600;
+    color:#cbd5e1;
+    margin-bottom:6px;
+    white-space:nowrap;
+}
+.hmTipRow{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+.hmTipPct{
+    font-size:1rem;
+    font-weight:700;
+    color:#94a3b8;
+}
+.hmTipMoney{
+    font-size:0.85rem;
+    font-weight:600;
+    color:#94a3b8;
+    opacity:.85;
+}
+.hmTipPos{ color:#4ade80; }
+.hmTipMoney.hmTipPos{ color:#86efac; }
+.hmTipNeg{ color:#f87171; }
+.hmTipMoney.hmTipNeg{ color:#fca5a5; }

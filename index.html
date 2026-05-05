@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Portfolio Manager</title>
-    <link rel="stylesheet" href="css/portfolio.css?v=20260429i">
+    <link rel="stylesheet" href="css/portfolio.css?v=20260504c">
     <script>
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
     </script>
@@ -108,7 +108,13 @@
             <div class="navButtons">
                 <button class="navBtn active" data-page="vistaGeneral">Vista general</button>
 
-                <button class="navBtn" data-page="activos">Activos</button>
+                <div class="navDropdown">
+                    <button class="navDropdownBtn" type="button">Activos ▾</button>
+                    <div class="navDropdownMenu">
+                        <button class="navBtn navDropdownItem" data-page="activos">Activos</button>
+                        <button class="navBtn navDropdownItem" data-page="heatmap">Mapas</button>
+                    </div>
+                </div>
 
                 <div class="navDropdown">
                     <button class="navDropdownBtn" type="button">Gastos ▾</button>
@@ -191,7 +197,7 @@
                         <span class="detailStatValue" id="detPosition">0</span>
                     </div>
                     <div class="detailStatCard">
-                        <span class="detailStatLabel">Invertido</span>
+                        <span class="detailStatLabel">Invertido bruto</span>
                         <span class="detailStatValue" id="detInvested">0,00 €</span>
                     </div>
                     <div class="detailStatCard">
@@ -329,5 +335,6 @@
 <script src="js/metricas.js?v=20260426a"></script>
 <script src="js/ajustes.js?v=20260422a"></script>
 <script src="js/shared-utils.js?v=20260423a"></script>
+<script src="js/heatmap.js?v=20260505b"></script>
 </body>
 </html>

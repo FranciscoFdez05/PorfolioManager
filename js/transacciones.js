@@ -48,7 +48,7 @@ async function initTransaccionesLogic() {
 
 async function loadTransaccionesCryptoAssets() {
     const assets = await loadAssetsList()
-    transaccionesCryptoAssets = assets
+    const cryptoAssets = assets
         .filter((asset) => String(asset?.type || "").trim().toLowerCase() === "cripto")
         .sort((firstAsset, secondAsset) => {
             const firstOrder = Number.isFinite(Number(firstAsset?.order)) ? Number(firstAsset.order) : Number.MAX_SAFE_INTEGER
@@ -60,6 +60,31 @@ async function loadTransaccionesCryptoAssets() {
 
             return String(firstAsset?.name || "").localeCompare(String(secondAsset?.name || ""), "es")
         })
+
+    const stablecoinAssets = []
+
+    if (typeof loadStablecoinsData === "function") {
+        try {
+            const stablecoinsPayload = await loadStablecoinsData()
+            const enabledSymbols = Array.isArray(stablecoinsPayload?.enabledSymbols) ? stablecoinsPayload.enabledSymbols : []
+
+            enabledSymbols
+                .map((symbol) => String(symbol || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, ""))
+                .filter(Boolean)
+                .forEach((symbol) => {
+                    stablecoinAssets.push({
+                        id: `stablecoin-${symbol}`,
+                        name: symbol,
+                        symbol,
+                        type: "stablecoin"
+                    })
+                })
+        } catch (error) {
+            console.warn("No se pudieron cargar las stablecoins para transacciones.", error)
+        }
+    }
+
+    transaccionesCryptoAssets = [...cryptoAssets, ...stablecoinAssets]
 
     const assetIds = new Set(transaccionesCryptoAssets.map((asset) => asset.id))
 
@@ -257,9 +282,9 @@ function buildTransaccionRow(row) {
         <td>${formatTransaccionesNumber(row.total)}</td>
         <td>${formatTransaccionesNumber(row.comisionRed)}</td>
         <td>${walletLabel}</td>
-        <td>${row.walletDestino || ""}</td>
-        <td class="transaccionHashCell" data-full-value="${hashTransaccion}" title="Haz clic para copiar el hash completo">${formatHashTransaccionDisplay(hashTransaccion)}</td>
-        <td>${row.nota || ""}</td>
+        <td>${escapeHtml(row.walletDestino || "")}</td>
+        <td class="transaccionHashCell" data-full-value="${escapeHtml(hashTransaccion)}" title="Haz clic para copiar el hash completo">${formatHashTransaccionDisplay(hashTransaccion)}</td>
+        <td>${escapeHtml(row.nota || "")}</td>
         <td class="rowActionsCell">
             <button type="button" class="assetRowEditBtn transaccionRowEditBtn" data-row-id="${row.id}" title="Editar fila">✎</button>
             <button type="button" class="assetRowDeleteBtn transaccionRowDeleteBtn" data-row-id="${row.id}" title="Eliminar fila">✕</button>

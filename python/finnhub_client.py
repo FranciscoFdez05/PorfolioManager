@@ -617,3 +617,33 @@ def search_symbol(query_text, api_key, timeout=10, limit=8, asset_name="", prefe
     merged_results = [item for _, item in ranked_results[:limit]]
 
     return enrich_search_results_with_quote(merged_results, api_key, timeout=timeout), None
+
+
+FINNHUB_STOCK_CANDLE_URL  = "https://finnhub.io/api/v1/stock/candle"
+FINNHUB_CRYPTO_CANDLE_URL = "https://finnhub.io/api/v1/crypto/candle"
+
+
+def fetch_candle_close(symbol, from_ts, to_ts, api_key, timeout=12):
+    """Return the first available daily closing price in [from_ts, to_ts]."""
+    if not symbol or not api_key:
+        return None, "Parámetros insuficientes"
+
+    normalized = str(symbol).strip().upper()
+    is_crypto = ":" in normalized
+    url = FINNHUB_CRYPTO_CANDLE_URL if is_crypto else FINNHUB_STOCK_CANDLE_URL
+
+    try:
+        data = _fetch_json(url, {
+            "symbol": normalized,
+            "resolution": "D",
+            "from": int(from_ts),
+            "to": int(to_ts),
+            "token": api_key,
+        }, timeout=timeout)
+
+        if data.get("s") == "ok" and data.get("c"):
+            return float(data["c"][0]), None
+
+        return None, f"Sin datos ({data.get('s', 'unknown')})"
+    except (HTTPError, URLError, Exception) as exc:
+        return None, str(exc)

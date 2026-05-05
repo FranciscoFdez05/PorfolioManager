@@ -173,6 +173,11 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
     }
 
     try {
+        if (typeof window._hmResizeCleanup === "function") {
+            window._hmResizeCleanup()
+            window._hmResizeCleanup = null
+        }
+
         if (typeof window.flushPendingPageChanges === "function") {
             try {
                 await window.flushPendingPageChanges()
@@ -223,6 +228,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initMetricasLogic()
         } else if (page === "activos") {
             await initActivosPageLogic()
+        } else if (page === "heatmap") {
+            await initHeatmapLogic()
         } else if (page === "ajustes") {
             await initAjustesLogic()
         }

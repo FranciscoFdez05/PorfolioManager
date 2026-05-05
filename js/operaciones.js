@@ -12,12 +12,14 @@ let currentOperationTypeFilter = new Set(OPERATION_ORDER_OPTIONS)
 let currentOperationStatusFilter = new Set(OPERATION_STATUS_OPTIONS)
 let operationsAssets = []
 let operationsStablecoinsData = { catalog: [], enabledSymbols: [], rows: [] }
+let operationsTransaccionesRows = []
 
 async function loadOperacionesDependencies() {
-    const [operationsResult, assetsResult, stablecoinsResult] = await Promise.allSettled([
+    const [operationsResult, assetsResult, stablecoinsResult, transaccionesResult] = await Promise.allSettled([
         loadOperacionesData(),
         loadOperationAssets(),
-        loadStablecoinsData()
+        loadStablecoinsData(),
+        (typeof loadTransaccionesData === "function" ? loadTransaccionesData() : Promise.resolve({ rows: [] }))
     ])
 
     if (operationsResult.status !== "fulfilled") {
@@ -34,10 +36,15 @@ async function loadOperacionesDependencies() {
         console.warn("No se pudieron cargar las stablecoins para operaciones. Se ocultaran los pares hasta que vuelvan a estar disponibles.", stablecoinsResult.reason)
     }
 
+    if (transaccionesResult.status !== "fulfilled") {
+        console.warn("No se pudieron cargar las transacciones para operaciones. El saldo no descontará comisiones de red.", transaccionesResult.reason)
+    }
+
     return {
         operationsPayload: operationsResult.value,
         assets: assetsResult.status === "fulfilled" ? assetsResult.value : [],
-        stablecoinsPayload: stablecoinsResult.status === "fulfilled" ? stablecoinsResult.value : { enabledSymbols: [], rows: [] }
+        stablecoinsPayload: stablecoinsResult.status === "fulfilled" ? stablecoinsResult.value : { enabledSymbols: [], rows: [] },
+        transaccionesPayload: transaccionesResult.status === "fulfilled" ? transaccionesResult.value : { rows: [] }
     }
 }
 
@@ -179,6 +186,80 @@ function getOperationStablecoinSymbol(row = {}) {
     return knownSymbols.includes(quoteSymbol) ? quoteSymbol : ""
 }
 
+function getOperationsStablecoinSymbolFromTransaccionRow(row = {}) {
+    const assetId = String(row.assetId || "").trim()
+
+    if (!assetId.startsWith("stablecoin-")) {
+        return ""
+    }
+
+    const symbol = assetId.slice("stablecoin-".length)
+    return getOperationKnownStablecoinSymbols().includes(symbol) ? symbol : ""
+}
+
+function getOperationsNetworkFeesByStablecoinSymbol(transaccionesRows = []) {
+    const totals = {}
+
+    ;(transaccionesRows || []).forEach((row) => {
+        if (typeof normalizeTransaccionWalletTipo !== "function") {
+            return
+        }
+
+        const walletType = normalizeTransaccionWalletTipo(row.walletTipo)
+
+        if (walletType !== "enviada" && walletType !== "entre_wallet") {
+            return
+        }
+
+        const symbol = getOperationsStablecoinSymbolFromTransaccionRow(row)
+        if (!symbol) {
+            return
+        }
+
+        const fee = Math.max(0, parseLooseNumber(row.comisionRed) || 0)
+        if (fee <= 0) {
+            return
+        }
+
+        totals[symbol] = (totals[symbol] || 0) + fee
+    })
+
+    return totals
+}
+
+function getOperationsLockedStablecoinTotalsFromActiveBuys(operationsRows = [], options = {}) {
+    const excludeRowId = String(options.excludeRowId || "").trim()
+    const lockedTotals = {}
+
+    ;(operationsRows || []).forEach((row) => {
+        if (excludeRowId && String(row.id || "").trim() === excludeRowId) {
+            return
+        }
+
+        if (String(row.estado || "").trim() !== "Activo") {
+            return
+        }
+
+        if (String(row.orden || "").trim() !== "Compra") {
+            return
+        }
+
+        const symbol = getOperationStablecoinSymbol(row)
+        if (!symbol) {
+            return
+        }
+
+        const total = parseLooseNumber(row.total) || 0
+        if (total <= 0) {
+            return
+        }
+
+        lockedTotals[symbol] = (lockedTotals[symbol] || 0) + total
+    })
+
+    return lockedTotals
+}
+
 function buildOperationsStablecoinBalanceSummary(stablecoinsPayload = operationsStablecoinsData, operationsRows = currentOperationsData.rows || []) {
     const normalizedPayload = normalizeOperationsStablecoinsPayload(stablecoinsPayload)
     const summary = {}
@@ -190,6 +271,8 @@ function buildOperationsStablecoinBalanceSummary(stablecoinsPayload = operations
             manualExpenses: 0,
             operationsBuys: 0,
             operationsSales: 0,
+            balance: 0,
+            locked: 0,
             available: 0
         }
     })
@@ -225,8 +308,14 @@ function buildOperationsStablecoinBalanceSummary(stablecoinsPayload = operations
         }
     })
 
+    const lockedTotals = getOperationsLockedStablecoinTotalsFromActiveBuys(operationsRows || [])
+    const networkFeesTotals = getOperationsNetworkFeesByStablecoinSymbol(operationsTransaccionesRows || [])
+
     Object.values(summary).forEach((item) => {
-        item.available = item.manualBuys - item.manualExpenses - item.operationsBuys + item.operationsSales
+        item.balance = item.manualBuys - item.manualExpenses - item.operationsBuys + item.operationsSales
+        item.balance = item.balance - (networkFeesTotals[item.symbol] || 0)
+        item.locked = lockedTotals[item.symbol] || 0
+        item.available = Math.max(0, item.balance - item.locked)
     })
 
     return summary
@@ -287,10 +376,11 @@ function normalizeOperationRow(row = {}, index = 0) {
 }
 
 async function initOperacionesLogic() {
-    const { operationsPayload, assets, stablecoinsPayload } = await loadOperacionesDependencies()
+    const { operationsPayload, assets, stablecoinsPayload, transaccionesPayload } = await loadOperacionesDependencies()
 
     operationsAssets = assets
     operationsStablecoinsData = normalizeOperationsStablecoinsPayload(stablecoinsPayload)
+    operationsTransaccionesRows = Array.isArray(transaccionesPayload?.rows) ? transaccionesPayload.rows : []
     currentOperationsData = {
         rows: Array.isArray(operationsPayload?.rows)
             ? operationsPayload.rows.map((row, index) => normalizeOperationRow(row, index))
@@ -434,10 +524,13 @@ function renderOperationsStablecoinPanel() {
     const items = Object.values(summary)
 
     panel.innerHTML = `
-        <span class="operationsPairsSummaryLabel">Par - saldo</span>
+        <span class="operationsPairsSummaryLabel">Par - saldo disponible</span>
         <div class="operationsPairsSummaryValues">
             ${items.map((item) => `
-                <span class="operationsPairsSummaryItem">${item.symbol} - ${formatMoney(item.available, "USD")}</span>
+                <span class="operationsPairsSummaryItem">
+                    ${item.symbol} ${formatMoney(item.available, "USD")}
+                    <span class="operationsPairsSummaryHint">(bloqueado ${formatMoney(item.locked, "USD")})</span>
+                </span>
             `).join("")}
         </div>
     `
@@ -1019,6 +1112,22 @@ function saveOperacionRowFromModal() {
         estado: g("opModalEstado"),
         fechaCierre: g("opModalFechaCierre")
     })
+
+    if (rowData.estado === "Activo" && rowData.orden === "Compra") {
+        const symbol = getOperationStablecoinSymbol(rowData)
+        const required = parseLooseNumber(rowData.total) || 0
+
+        if (symbol && required > 0) {
+            const operationsRowsWithoutCurrent = (currentOperationsData.rows || []).filter((r) => r.id !== rowId)
+            const summary = buildOperationsStablecoinBalanceSummary(operationsStablecoinsData, operationsRowsWithoutCurrent)
+            const available = summary[symbol]?.available ?? 0
+
+            if (required > available) {
+                alert(`Saldo insuficiente en ${symbol}. Disponible: ${formatMoney(available, "USD")} | Requerido: ${formatMoney(required, "USD")}`)
+                return
+            }
+        }
+    }
 
     const rowIndex = (currentOperationsData.rows || []).findIndex((r) => r.id === rowId)
     if (rowIndex >= 0) {

@@ -106,7 +106,7 @@ async function buildMetricasPayload() {
             type:           asset.type || "acciones",
             color:          asset.color || "",
             netoActualEur:  euros.netoActualEur,
-            invertidoEur:   euros.invertidoNetoEur,
+            invertidoEur:   euros.invertidoBrutoEur,
             rendimientoEur: euros.rendimientoEur
         }
     }))
@@ -601,7 +601,7 @@ function mDrawDivMensualTabla(rows, year, dYear, dMonth) {
     const monthTotals = Array(12).fill(0)
     stocks.forEach(s => monthData[s].forEach((v, i) => { monthTotals[i] += v }))
 
-    head.innerHTML = `<tr><th>Mes</th>${stocks.map(s => `<th>${s}</th>`).join("")}<th>Total</th></tr>`
+    head.innerHTML = `<tr><th>Mes</th>${stocks.map(s => `<th>${escapeMetricasHtml(s)}</th>`).join("")}<th>Total</th></tr>`
 
     body.innerHTML = MONTH_LABELS.map((label, i) => {
         const rowTotal = stocks.reduce((t, s) => t + monthData[s][i], 0)
@@ -1341,7 +1341,7 @@ function mRenderTopTable(summaries) {
         return `
         <tr>
             <td class="mTdRank">${idx + 1}</td>
-            <td class="mTdName">${a.name}</td>
+            <td class="mTdName">${escapeMetricasHtml(a.name)}</td>
             <td><span class="mTypeBadge" style="background:${typeColor}22;color:${typeColor};border-color:${typeColor}44">${typeLabel}</span></td>
             <td>${formatEuro(a.netoActualEur)}</td>
             <td>${formatEuro(a.invertidoEur)}</td>

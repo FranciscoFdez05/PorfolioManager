@@ -214,8 +214,8 @@ async function buildOverviewDisplayRow(asset) {
     const investedCurrency = row.currency
     const netoActualDisplay = row.netoActual
     const currentPriceDisplay = row.valorActual
-    const rendimientoDisplay = netoActualDisplay - row.invertidoNeto
-    const yieldPctVal = row.invertidoNeto > 0 ? (rendimientoDisplay / row.invertidoNeto) * 100 : 0
+    const rendimientoDisplay = netoActualDisplay - row.invertidoBruto
+    const yieldPctVal = row.invertidoBruto > 0 ? (rendimientoDisplay / row.invertidoBruto) * 100 : 0
 
     return {
         ...row,
@@ -230,17 +230,17 @@ async function buildOverviewDisplayRow(asset) {
 }
 
 async function buildSummaryMetricsInEuros(summary) {
-    const invertidoNetoEur = await convertAmountForDisplay(
-        summary.invertidoNeto,
+    const invertidoBrutoEur = await convertAmountForDisplay(
+        summary.invertidoBruto,
         summary.currency,
         "EUR"
     )
     const netoActualEur = await convertAmountForDisplay(summary.netoActual, summary.currency, "EUR")
-    const rendimientoEur = netoActualEur - invertidoNetoEur
+    const rendimientoEur = netoActualEur - invertidoBrutoEur
 
     return {
         netoActualEur,
-        invertidoNetoEur,
+        invertidoBrutoEur,
         rendimientoEur
     }
 }
@@ -621,6 +621,7 @@ async function updateAssetDetail(asset) {
     const detFinnhub = document.getElementById("detFinnhub")
     const summary = await buildOverviewRow(asset)
     const investedCurrency = summary.currency
+    const pnlBruto = summary.netoActual - summary.invertidoBruto
 
     if (detSymbol) {
         detSymbol.textContent = asset.symbol || "---"
@@ -636,7 +637,7 @@ async function updateAssetDetail(asset) {
     }
 
     if (detChange) {
-        const yieldPercent = calculateYieldPercent(summary.invertidoNeto, summary.rendimiento)
+        const yieldPercent = calculateYieldPercent(summary.invertidoBruto, pnlBruto)
         detChange.textContent = `Rendimiento: ${formatPercent(yieldPercent)}`
         detChange.classList.toggle("negative", yieldPercent < 0)
     }
@@ -653,12 +654,12 @@ async function updateAssetDetail(asset) {
     }
 
     if (detInvested) {
-        detInvested.textContent = formatMoney(summary.invertidoNeto, investedCurrency)
+        detInvested.textContent = formatMoney(summary.invertidoBruto, investedCurrency)
     }
 
     if (detPnL) {
-        detPnL.textContent = formatMoney(summary.rendimiento, summary.currency)
-        detPnL.classList.toggle("negative", summary.rendimiento < 0)
+        detPnL.textContent = formatMoney(pnlBruto, summary.currency)
+        detPnL.classList.toggle("negative", pnlBruto < 0)
     }
 
     if (detAvgPrice) {
@@ -711,15 +712,15 @@ function renderAssetCompletedOperationsSection(asset) {
         const ordenClass = orden.toLowerCase() === "venta" ? "opRowVenta" : "opRowCompra"
         return `
             <tr>
-                <td>${row.fechaApertura || ""}</td>
-                <td>${row.par || ""}</td>
-                <td class="${ordenClass}">${orden}</td>
+                <td>${escapeHtml(row.fechaApertura || "")}</td>
+                <td>${escapeHtml(row.par || "")}</td>
+                <td class="${ordenClass}">${escapeHtml(orden)}</td>
                 <td>${formatOperationsMoney(row.precioOrden, row.precioCurrency || currency)}</td>
                 <td>${formatOperationsQuantity(row.cantidad)}</td>
                 <td>${formatOperationsQuantity(row.comisionesCripto)}</td>
                 <td>${formatOperationsMoney(row.total, row.currency || currency)}</td>
-                <td>${row.estado || ""}</td>
-                <td>${row.fechaCierre || ""}</td>
+                <td>${escapeHtml(row.estado || "")}</td>
+                <td>${escapeHtml(row.fechaCierre || "")}</td>
             </tr>
         `
     }).join("")
@@ -771,7 +772,7 @@ function renderAssetTransaccionesSection(asset) {
 
     const rowsHtml = rows.map((row) => {
         const walletTipo = String(row.walletTipo || "").trim().toLowerCase()
-        const walletLabel = walletLabels[walletTipo] || row.walletTipo || ""
+        const walletLabel = walletLabels[walletTipo] || escapeHtml(row.walletTipo || "")
         const hash = String(row.hashTransaccion || row.walletOrigen || "").trim()
         const hashDisplay = hash.length > 12 ? hash.slice(0, 8) + "…" + hash.slice(-4) : hash
         return `
@@ -780,9 +781,9 @@ function renderAssetTransaccionesSection(asset) {
                 <td>${formatTransaccionesNumber(row.total)}</td>
                 <td>${formatTransaccionesNumber(row.comisionRed)}</td>
                 <td>${walletLabel}</td>
-                <td>${row.walletDestino || ""}</td>
-                <td class="transaccionHashCell" title="${hash}">${hashDisplay}</td>
-                <td>${row.nota || ""}</td>
+                <td>${escapeHtml(row.walletDestino || "")}</td>
+                <td class="transaccionHashCell" title="${escapeHtml(hash)}">${escapeHtml(hashDisplay)}</td>
+                <td>${escapeHtml(row.nota || "")}</td>
             </tr>
         `
     }).join("")
@@ -1146,10 +1147,10 @@ function createEmptyTopMetrics() {
         invertido: 0,
         rendimiento: 0,
         tipos: {
-            cripto: { netoActual: 0, invertidoNeto: 0, rendimiento: 0 },
-            acciones: { netoActual: 0, invertidoNeto: 0, rendimiento: 0 },
-            etfs: { netoActual: 0, invertidoNeto: 0, rendimiento: 0 },
-            comoditis: { netoActual: 0, invertidoNeto: 0, rendimiento: 0 }
+            cripto: { netoActual: 0, invertido: 0, rendimiento: 0 },
+            acciones: { netoActual: 0, invertido: 0, rendimiento: 0 },
+            etfs: { netoActual: 0, invertido: 0, rendimiento: 0 },
+            comoditis: { netoActual: 0, invertido: 0, rendimiento: 0 }
         }
     }
 }
@@ -1175,13 +1176,13 @@ function applyTopPortfolioMetrics(metrics) {
     updateTopMetricElement("topInvertido", formatEuro(metrics.invertido))
     updateTopMetricElement("topRendimientoEuros", formatEuro(metrics.rendimiento))
 
-    updateTopMetricElement("topPorcentajeCripto", formatPercent(calculateYieldPercent(metrics.tipos.cripto.invertidoNeto, metrics.tipos.cripto.rendimiento)), true)
+    updateTopMetricElement("topPorcentajeCripto", formatPercent(calculateYieldPercent(metrics.tipos.cripto.invertido, metrics.tipos.cripto.rendimiento)), true)
     updateTopMetricElement("topEurosCripto", formatEuro(metrics.tipos.cripto.netoActual))
-    updateTopMetricElement("topPorcentajeAcciones", formatPercent(calculateYieldPercent(metrics.tipos.acciones.invertidoNeto, metrics.tipos.acciones.rendimiento)), true)
+    updateTopMetricElement("topPorcentajeAcciones", formatPercent(calculateYieldPercent(metrics.tipos.acciones.invertido, metrics.tipos.acciones.rendimiento)), true)
     updateTopMetricElement("topEurosAcciones", formatEuro(metrics.tipos.acciones.netoActual))
-    updateTopMetricElement("topPorcentajeEtf", formatPercent(calculateYieldPercent(metrics.tipos.etfs.invertidoNeto, metrics.tipos.etfs.rendimiento)), true)
+    updateTopMetricElement("topPorcentajeEtf", formatPercent(calculateYieldPercent(metrics.tipos.etfs.invertido, metrics.tipos.etfs.rendimiento)), true)
     updateTopMetricElement("topEurosEtf", formatEuro(metrics.tipos.etfs.netoActual))
-    updateTopMetricElement("topPorcentajeComoditis", formatPercent(calculateYieldPercent(metrics.tipos.comoditis.invertidoNeto, metrics.tipos.comoditis.rendimiento)), true)
+    updateTopMetricElement("topPorcentajeComoditis", formatPercent(calculateYieldPercent(metrics.tipos.comoditis.invertido, metrics.tipos.comoditis.rendimiento)), true)
     updateTopMetricElement("topEurosComoditis", formatEuro(metrics.tipos.comoditis.netoActual))
 }
 
@@ -1208,12 +1209,12 @@ async function refreshTopPortfolioMetrics(assets = null) {
 
     metricSummaries.forEach(({ summary, euroMetrics }) => {
         metrics.totalCuenta += euroMetrics.netoActualEur
-        metrics.invertido += euroMetrics.invertidoNetoEur
+        metrics.invertido += euroMetrics.invertidoBrutoEur
         metrics.rendimiento += euroMetrics.rendimientoEur
 
         if (metrics.tipos[summary.assetType]) {
             metrics.tipos[summary.assetType].netoActual += euroMetrics.netoActualEur
-            metrics.tipos[summary.assetType].invertidoNeto += euroMetrics.invertidoNetoEur
+            metrics.tipos[summary.assetType].invertido += euroMetrics.invertidoBrutoEur
             metrics.tipos[summary.assetType].rendimiento += euroMetrics.rendimientoEur
         }
     })
@@ -1942,13 +1943,13 @@ function renderOverviewRows(rows) {
         const typeColor = OV_TYPE_COLORS[row.assetType] || "#888"
         const typeBadge = `<span class="mTypeBadge" style="background:${typeColor}22;color:${typeColor};border-color:${typeColor}44">${row.tipo}</span>`
         const yieldEur = formatMoney(yieldVal, row.overviewInvestedCurrency)
-        const yieldPct = row.invertidoNeto > 0
-            ? sign + ((yieldVal / row.invertidoNeto) * 100).toFixed(2) + " %"
+        const yieldPct = row.invertidoBruto > 0
+            ? sign + ((yieldVal / row.invertidoBruto) * 100).toFixed(2) + " %"
             : "—"
 
         tr.innerHTML = `
             <td class="mTdRank">${idx + 1}</td>
-            <td class="mTdName">${row.nombre}</td>
+            <td class="mTdName">${escapeHtml(row.nombre)}</td>
             <td>${typeBadge}</td>
             <td>${formatAssetParticipationValue(row.participaciones, row.assetType)}</td>
             <td>${formatMoney(row.promedioCompra, row.currency)}</td>
@@ -2090,11 +2091,11 @@ function renderAssetTablePage(asset) {
             <div class="assetPageHeader">
                 <div>
                     <div class="assetTitleRow">
-                        <h1 class="assetPageTitle">${asset.name || asset.symbol}</h1>
+                        <h1 class="assetPageTitle">${escapeHtml(asset.name || asset.symbol)}</h1>
                         <button id="editAssetNameBtn" class="assetEditNameBtn" type="button" title="Editar nombre del activo" aria-label="Editar nombre del activo">✎</button>
                         <button id="addAssetRowBtn" class="primaryButton assetAddRowHeaderBtn">Añadir fila</button>
                     </div>
-                    <div class="assetPageSubtitle">${asset.name} · ${buildAssetTypeLabel(asset.type)}</div>
+                    <div class="assetPageSubtitle">${escapeHtml(asset.name)} · ${buildAssetTypeLabel(asset.type)}</div>
                 </div>
                 <div class="assetHeaderRight">
                     <div class="assetHeaderActions">
@@ -2865,12 +2866,6 @@ function openAssetRowModal(rowIndex) {
     modal.appendChild(footer)
     overlay.appendChild(modal)
 
-    overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) {
-            closeAssetRowModal()
-        }
-    })
-
     document.body.appendChild(overlay)
 }
 
@@ -3493,8 +3488,8 @@ function avBuildCard(asset) {
                 <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">✕</button>
             </div>
         </div>
-        <div class="avCardSymbol">${asset.symbol || asset.name}</div>
-        <div class="avCardName">${asset.name || asset.symbol || "Activo"}</div>
+        <div class="avCardSymbol">${escapeHtml(asset.symbol || asset.name)}</div>
+        <div class="avCardName">${escapeHtml(asset.name || asset.symbol || "Activo")}</div>
         <div class="avCardPrice">${formatMoney(price, currency)}</div>
         <div class="avCardTicker">${ticker ? `${ticker}${provider ? " · " + provider : ""}` : "Sin ticker"}</div>
         <div class="avCardMetrics">
@@ -3681,7 +3676,7 @@ async function avLoadMetrics() {
                 promedioCompra:  row.promedioCompra,
                 currency:        row.currency,
                 netoActualEur:   euros.netoActualEur,
-                invertidoEur:    euros.invertidoNetoEur,
+                invertidoEur:    euros.invertidoBrutoEur,
                 rendimientoEur:  euros.rendimientoEur
             }
             asset._metrics = m
