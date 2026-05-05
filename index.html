@@ -242,12 +242,17 @@
         <div class="assetSearchActions">
             <button id="searchAssetTickerFinnhubBtn" class="secondaryButton" type="button">Buscar ticker Finnhub</button>
             <button id="searchAssetTickerEodhdBtn" class="secondaryButton" type="button">Buscar ticker EODHD</button>
+            <button id="searchAssetTickerYahooBtn" class="secondaryButton" type="button">Buscar ticker Yahoo Finance</button>
         </div>
         <div id="assetSearchFeedback" class="assetSearchFeedback hidden"></div>
         <div id="assetSearchResults" class="assetSearchResults hidden"></div>
 
-        <label class="assetModalLabel">Color del activo</label>
-        <div class="assetColorPicker" id="assetColorPicker"></div>
+        <button type="button" class="assetModalLabel cpToggleLabel" id="assetColorToggle">
+            <span>Color del activo</span>
+            <span class="cpToggleBadge" id="assetColorBadge"></span>
+            <span class="cpToggleArrow">▼</span>
+        </button>
+        <div class="assetColorPicker cpCollapsed" id="assetColorPicker"></div>
         <input type="hidden" id="assetColorInput" value="">
 
         <div class="assetModalActions">
@@ -280,12 +285,17 @@
         <div class="assetSearchActions">
             <button id="editSearchAssetTickerFinnhubBtn" class="secondaryButton" type="button">Buscar ticker Finnhub</button>
             <button id="editSearchAssetTickerEodhdBtn" class="secondaryButton" type="button">Buscar ticker EODHD</button>
+            <button id="editSearchAssetTickerYahooBtn" class="secondaryButton" type="button">Buscar ticker Yahoo Finance</button>
         </div>
         <div id="editAssetSearchFeedback" class="assetSearchFeedback hidden"></div>
         <div id="editAssetSearchResults" class="assetSearchResults hidden"></div>
 
-        <label class="assetModalLabel">Color del activo</label>
-        <div class="assetColorPicker" id="editAssetColorPicker"></div>
+        <button type="button" class="assetModalLabel cpToggleLabel" id="editAssetColorToggle">
+            <span>Color del activo</span>
+            <span class="cpToggleBadge" id="editAssetColorBadge"></span>
+            <span class="cpToggleArrow">▼</span>
+        </button>
+        <div class="assetColorPicker cpCollapsed" id="editAssetColorPicker"></div>
         <input type="hidden" id="editAssetColorInput" value="">
 
         <div class="assetModalActions">

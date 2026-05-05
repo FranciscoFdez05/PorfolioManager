@@ -47,7 +47,18 @@ function _cpHexToHsv(hex) {
     return [h, max ? d / max : 0, max]
 }
 
-function initColorPicker(pickerId, inputId, selectedColor) {
+function setupColorPickerToggle(toggleId, pickerId) {
+    const toggle = document.getElementById(toggleId)
+    const picker = document.getElementById(pickerId)
+    if (!toggle || !picker) return
+    toggle.addEventListener("click", () => {
+        const collapsed = picker.classList.contains("cpCollapsed")
+        picker.classList.toggle("cpCollapsed", !collapsed)
+        toggle.classList.toggle("open", collapsed)
+    })
+}
+
+function initColorPicker(pickerId, inputId, selectedColor, badgeId = null) {
     const container = document.getElementById(pickerId)
     const input = document.getElementById(inputId)
     if (!container || !input) return
@@ -108,6 +119,10 @@ function initColorPicker(pickerId, inputId, selectedColor) {
         input.value = hex
         preview.style.backgroundColor = hex
         hexInput.value = hex.slice(1).toUpperCase()
+        if (badgeId) {
+            const badge = document.getElementById(badgeId)
+            if (badge) badge.style.backgroundColor = hex
+        }
     }
 
     function pickXY(clientX, clientY) {
@@ -542,6 +557,29 @@ async function searchEodhdSymbolOnServer(query, { assetName = "", assetType = ""
     }
 
     const response = await fetch(`/api/eodhd/search?${params.toString()}`)
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
+}
+
+async function searchYahooSymbolOnServer(query, { assetName = "", assetType = "" } = {}) {
+    const params = new URLSearchParams({
+        q: query
+    })
+
+    if (assetName) {
+        params.set("assetName", assetName)
+    }
+
+    if (assetType) {
+        params.set("assetType", assetType)
+    }
+
+    const response = await fetch(`/api/yahoo/search?${params.toString()}`)
 
     if (!response.ok) {
         const errorText = await response.text()
@@ -2596,6 +2634,36 @@ async function handleEodhdSearch({ query, assetName = "", assetType = "", feedba
     }
 }
 
+async function handleYahooSearch({ query, assetName = "", assetType = "", feedbackElement, resultsElement, onSelect }) {
+    const normalizedQuery = String(query || "").trim()
+
+    if (!normalizedQuery) {
+        setAssetSearchFeedback(feedbackElement, "Escribe el nombre o ticker del activo.", true)
+        renderMarketSearchResults(resultsElement, [], onSelect)
+        return
+    }
+
+    setAssetSearchFeedback(feedbackElement, "Buscando ticker en Yahoo Finance...")
+
+    try {
+        const response = await searchYahooSymbolOnServer(normalizedQuery, { assetName, assetType })
+        const results = Array.isArray(response.results) ? response.results : []
+
+        if (!results.length) {
+            setAssetSearchFeedback(feedbackElement, "No se encontraron resultados en Yahoo Finance para esa búsqueda.", true)
+            renderMarketSearchResults(resultsElement, [], onSelect)
+            return
+        }
+
+        setAssetSearchFeedback(feedbackElement, "Selecciona el ticker correcto de Yahoo Finance.")
+        renderMarketSearchResults(resultsElement, results, onSelect)
+    } catch (error) {
+        console.error(error)
+        setAssetSearchFeedback(feedbackElement, extractApiErrorMessage(error), true)
+        renderMarketSearchResults(resultsElement, [], onSelect)
+    }
+}
+
 async function refreshCurrentAssetMarketData({ feedbackElement = null, successMessage = "" } = {}) {
     if (!currentAssetId) {
         return
@@ -2648,8 +2716,12 @@ function openEditAssetModal(assetData = null) {
     }
 
     editAssetNameInput.value = currentName
-    if (editAssetTickerInput) editAssetTickerInput.value = currentTicker
-    initColorPicker("editAssetColorPicker", "editAssetColorInput", currentColor)
+    if (editAssetTickerInput) {
+        editAssetTickerInput.value = currentTicker
+        delete editAssetTickerInput.dataset.marketProvider
+    }
+    initColorPicker("editAssetColorPicker", "editAssetColorInput", currentColor, "editAssetColorBadge")
+    setupColorPickerToggle("editAssetColorToggle", "editAssetColorPicker")
     editAssetModalOverlay.classList.remove("hidden")
     editAssetModalState = { isOpen: true }
 
@@ -2685,7 +2757,8 @@ async function submitEditAssetModal() {
     const currentName = String(payload.name || "").trim()
     const trimmedName = editAssetNameInput.value.trim()
     const newColor = document.getElementById("editAssetColorInput")?.value || ""
-    const newTicker = (document.getElementById("editAssetTickerInput")?.value || "").trim().toUpperCase()
+    const editTickerInput = document.getElementById("editAssetTickerInput")
+    const newTicker = (editTickerInput?.value || "").trim().toUpperCase()
     const currentTicker = String(payload.marketSymbol || payload.finnhubSymbol || "").trim().toUpperCase()
 
     if (!trimmedName) {
@@ -2705,6 +2778,10 @@ async function submitEditAssetModal() {
     payload.color = newColor
     payload.marketSymbol = newTicker
     payload.finnhubSymbol = newTicker
+    if (newTicker !== currentTicker) {
+        const explicitProvider = editTickerInput?.dataset.marketProvider
+        payload.marketProvider = explicitProvider || inferMarketProviderFromSymbol(newTicker, payload.marketProvider || "finnhub")
+    }
 
     if (!currentSymbol || currentSymbol === generatedCurrentSymbol) {
         payload.symbol = createAssetSymbolFromName(trimmedName)
@@ -3068,10 +3145,11 @@ function openAssetModal() {
     assetTypeSelect.value = "cripto"
     assetTypeSelect.dispatchEvent(new Event("change", { bubbles: true }))
     assetTickerInput.value = ""
-    assetTickerInput.dataset.marketProvider = "finnhub"
+    assetTickerInput.dataset.marketProvider = ""
     setAssetSearchFeedback(assetSearchFeedback, "")
     renderMarketSearchResults(assetSearchResults, [], () => {})
-    initColorPicker("assetColorPicker", "assetColorInput", ASSET_COLOR_PALETTE[0])
+    initColorPicker("assetColorPicker", "assetColorInput", ASSET_COLOR_PALETTE[0], "assetColorBadge")
+    setupColorPickerToggle("assetColorToggle", "assetColorPicker")
     assetModalOverlay.classList.remove("hidden")
     assetModalState = { isOpen: true }
 
@@ -3164,10 +3242,8 @@ async function submitAssetModal() {
     const name = assetNameInput.value.trim()
     const type = assetTypeSelect.value.trim()
     const marketSymbol = assetTickerInput.value.trim().toUpperCase()
-    const marketProvider = inferMarketProviderFromSymbol(
-        marketSymbol,
-        assetTickerInput.dataset.marketProvider || "finnhub"
-    )
+    const explicitProvider = assetTickerInput.dataset.marketProvider
+    const marketProvider = explicitProvider || inferMarketProviderFromSymbol(marketSymbol, "finnhub")
     const color = document.getElementById("assetColorInput")?.value || ASSET_COLOR_PALETTE[0]
 
     if (!name) {
@@ -3209,6 +3285,7 @@ function initEditAssetModal() {
     const cancelEditAssetModalButton = document.getElementById("cancelEditAssetModalBtn")
     const editSearchFinnhubButton = document.getElementById("editSearchAssetTickerFinnhubBtn")
     const editSearchEodhdButton = document.getElementById("editSearchAssetTickerEodhdBtn")
+    const editSearchYahooButton = document.getElementById("editSearchAssetTickerYahooBtn")
     const editAssetSearchFeedback = document.getElementById("editAssetSearchFeedback")
     const editAssetSearchResults = document.getElementById("editAssetSearchResults")
 
@@ -3244,13 +3321,6 @@ function initEditAssetModal() {
         })
     }
 
-    if (editAssetModalOverlay) {
-        editAssetModalOverlay.addEventListener("click", (event) => {
-            if (event.target === editAssetModalOverlay) {
-                closeEditAssetModal()
-            }
-        })
-    }
 
     const runEditTickerSelection = (result, providerName) => {
         if (editAssetTickerInput) {
@@ -3265,7 +3335,7 @@ function initEditAssetModal() {
         editSearchFinnhubButton.addEventListener("click", async () => {
             const typedTicker = editAssetTickerInput?.value.trim() || ""
             const typedName = editAssetNameInput?.value.trim() || ""
-            const searchQuery = typedName || typedTicker
+            const searchQuery = typedTicker || typedName
 
             await handleFinnhubSearch({
                 query: searchQuery,
@@ -3282,7 +3352,7 @@ function initEditAssetModal() {
         editSearchEodhdButton.addEventListener("click", async () => {
             const typedTicker = editAssetTickerInput?.value.trim() || ""
             const typedName = editAssetNameInput?.value.trim() || ""
-            const searchQuery = typedName || typedTicker
+            const searchQuery = typedTicker || typedName
 
             await handleEodhdSearch({
                 query: searchQuery,
@@ -3291,6 +3361,23 @@ function initEditAssetModal() {
                 feedbackElement: editAssetSearchFeedback,
                 resultsElement: editAssetSearchResults,
                 onSelect: (result) => runEditTickerSelection(result, "EODHD")
+            })
+        })
+    }
+
+    if (editSearchYahooButton) {
+        editSearchYahooButton.addEventListener("click", async () => {
+            const typedTicker = editAssetTickerInput?.value.trim() || ""
+            const typedName = editAssetNameInput?.value.trim() || ""
+            const searchQuery = typedTicker || typedName
+
+            await handleYahooSearch({
+                query: searchQuery,
+                assetName: typedName,
+                assetType: "",
+                feedbackElement: editAssetSearchFeedback,
+                resultsElement: editAssetSearchResults,
+                onSelect: (result) => runEditTickerSelection(result, "Yahoo Finance")
             })
         })
     }
@@ -3306,7 +3393,7 @@ function initAddAssetButton(addAssetButton) {
     })
 }
 
-function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect, assetTickerInput, searchAssetTickerFinnhubButton, searchAssetTickerEodhdButton) {
+function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect, assetTickerInput, searchAssetTickerFinnhubButton, searchAssetTickerEodhdButton, searchAssetTickerYahooButton) {
     const assetSearchFeedback = document.getElementById("assetSearchFeedback")
     const assetSearchResults = document.getElementById("assetSearchResults")
     initEditAssetModal()
@@ -3394,6 +3481,23 @@ function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetM
                 feedbackElement: assetSearchFeedback,
                 resultsElement: assetSearchResults,
                 onSelect: (result) => runTickerSelection(result, "EODHD")
+            })
+        })
+    }
+
+    if (searchAssetTickerYahooButton) {
+        searchAssetTickerYahooButton.addEventListener("click", async () => {
+            const typedTicker = assetTickerInput?.value.trim() || ""
+            const typedName = assetNameInput?.value.trim() || ""
+            const searchQuery = typedName || typedTicker
+
+            await handleYahooSearch({
+                query: searchQuery,
+                assetName: typedName,
+                assetType: assetTypeSelect?.value || "",
+                feedbackElement: assetSearchFeedback,
+                resultsElement: assetSearchResults,
+                onSelect: (result) => runTickerSelection(result, "Yahoo Finance")
             })
         })
     }
@@ -3491,7 +3595,7 @@ function avBuildCard(asset) {
         <div class="avCardSymbol">${escapeHtml(asset.symbol || asset.name)}</div>
         <div class="avCardName">${escapeHtml(asset.name || asset.symbol || "Activo")}</div>
         <div class="avCardPrice">${formatMoney(price, currency)}</div>
-        <div class="avCardTicker">${ticker ? `${ticker}${provider ? " · " + provider : ""}` : "Sin ticker"}</div>
+        <div class="avCardTicker">${provider || "Sin ticker"}</div>
         <div class="avCardMetrics">
             <div class="avMetricItem">
                 <span class="avMetricLabel">Posición</span>

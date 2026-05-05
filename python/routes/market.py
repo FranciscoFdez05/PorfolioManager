@@ -9,6 +9,7 @@ from asset_store import listAssets
 from eodhd_client import search_symbol as search_eodhd_symbol
 from finnhub_client import fetch_candle_close, fetch_exchange_rate, search_symbol
 from helpers import call_eodhd_with_fallbacks, is_temporary_service_error, normalize_currency_code, parse_loose_number
+from yahoo_finance_client import search_symbol as search_yahoo_symbol
 
 _hist_cache = {}   # {period: {"data": {...}, "ts": float}}
 _HIST_TTL   = 4 * 3600  # 4 horas
@@ -115,6 +116,20 @@ def searchEodhdSymbol():
 
     if error:
         statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    return jsonify({"ok": True, "results": results})
+
+
+@market_bp.route("/api/yahoo/search", methods=["GET"])
+def searchYahooSymbol():
+    query = str(request.args.get("q", "")).strip()
+    assetName = str(request.args.get("assetName", "")).strip()
+    assetType = str(request.args.get("assetType", "")).strip()
+    results, error = search_yahoo_symbol(query, asset_name=assetName, preferred_asset_type=assetType)
+
+    if error:
+        statusCode = 503 if is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})

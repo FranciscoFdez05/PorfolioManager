@@ -9,6 +9,7 @@ from asset_utils import (
 )
 from eodhd_client import fetch_quote as fetch_eodhd_quote
 from finnhub_client import convert_amount, convert_quote_currency, fetch_quote
+from yahoo_finance_client import fetch_quote as fetch_yahoo_quote
 from helpers import (
     call_eodhd_with_fallbacks, convert_asset_rows_currency, format_decimal,
     is_temporary_service_error, normalize_currency_code, parse_loose_number,
@@ -214,6 +215,8 @@ def refreshActivoMarketData(assetId):
 
     if marketProvider == "eodhd":
         quote, error = call_eodhd_with_fallbacks(lambda apiKey: fetch_eodhd_quote(marketSymbol, apiKey))
+    elif marketProvider == "yahoo":
+        quote, error = fetch_yahoo_quote(marketSymbol)
     else:
         apiKey = readFinnhubApiKey()
         quote, error = fetch_quote(marketSymbol, apiKey)

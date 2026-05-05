@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const assetTickerInput = document.getElementById("assetTickerInput")
     const searchAssetTickerFinnhubButton = document.getElementById("searchAssetTickerFinnhubBtn")
     const searchAssetTickerEodhdButton = document.getElementById("searchAssetTickerEodhdBtn")
+    const searchAssetTickerYahooButton = document.getElementById("searchAssetTickerYahooBtn")
     const confirmModalOverlay = document.getElementById("confirmModalOverlay")
     const confirmModalAcceptButton = document.getElementById("confirmModalAcceptBtn")
     const confirmModalCancelButton = document.getElementById("confirmModalCancelBtn")
@@ -30,7 +31,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         assetTypeSelect,
         assetTickerInput,
         searchAssetTickerFinnhubButton,
-        searchAssetTickerEodhdButton
+        searchAssetTickerEodhdButton,
+        searchAssetTickerYahooButton
     )
     initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
     await loadGlobalSettings()
