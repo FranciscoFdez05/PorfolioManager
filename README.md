@@ -16,7 +16,7 @@ Aplicación web **local** para el seguimiento de una cartera de inversión perso
 - **Herramientas** — utilidades varias
 - **Ajustes** — claves API, caducidad de cotizaciones, backup/restauración y tema
 
-Las cotizaciones se obtienen opcionalmente vía **Finnhub** y **EODHD** (basta con dejar los archivos de clave vacíos para funcionar sin ellas).
+Las cotizaciones se obtienen opcionalmente vía **Finnhub**, **EODHD** y **Yahoo Finance** (basta con dejar los archivos de clave vacíos para funcionar sin ellas).
 
 ---
 
@@ -76,7 +76,15 @@ Abre `http://localhost:5000`.
 
 ## Claves API (opcional)
 
-Crea el directorio `API/` y coloca los archivos de clave (una clave por archivo, sin saltos de línea extra):
+La aplicación soporta tres proveedores de cotizaciones:
+
+| Proveedor | Requiere clave | Archivo |
+|---|---|---|
+| **Yahoo Finance** | No — usa endpoints públicos | — |
+| **Finnhub** | Sí | `API/finnhub.key` |
+| **EODHD** | Sí | `API/eodhd.key` |
+
+Para usar Finnhub o EODHD, crea el directorio `API/` y coloca la clave en el archivo correspondiente (una clave por archivo, sin saltos de línea extra):
 
 ```
 API/
@@ -84,7 +92,9 @@ API/
 └── eodhd.key
 ```
 
-Sin estos archivos la aplicación funciona igualmente; solo no obtendrá cotizaciones en tiempo real.
+**Yahoo Finance** no requiere ningún archivo de clave: se puede seleccionar como proveedor en la ficha de cada activo y funciona directamente. También incluye búsqueda de ticker por nombre desde la interfaz de Ajustes de activo.
+
+Sin ningún archivo de clave la aplicación funciona igualmente; solo no obtendrá cotizaciones en tiempo real de Finnhub/EODHD.
 
 ---
 

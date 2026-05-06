@@ -1,7 +1,3 @@
-function escapeHtml(str) {
-    return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
-}
-
 const STABLECOIN_MOVEMENT_TYPES = ["Compra", "Venta"]
 
 let currentStablecoinsData = { catalog: [], enabledSymbols: [], rows: [] }

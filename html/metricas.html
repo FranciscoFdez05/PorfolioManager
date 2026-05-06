@@ -188,8 +188,13 @@
         <div class="metricasChartsGrid2">
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Por instrumento</div>
-                <div class="metricasChartWrap metricasChartDynamic" id="mChartDivWrap">
-                    <canvas id="mChartDividendos"></canvas>
+                <div class="metricasChartWrap metricasChartDivScroll" id="mChartDivWrap">
+                    <div id="mChartDivInner" style="position:relative">
+                        <canvas id="mChartDividendos"></canvas>
+                    </div>
+                    <div id="mChartDivAxisWrap" style="position:sticky;bottom:0;z-index:2;background:#111827">
+                        <canvas id="mChartDividendosAxis"></canvas>
+                    </div>
                 </div>
             </div>
             <div class="metricasChartCard">

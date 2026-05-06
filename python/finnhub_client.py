@@ -53,13 +53,7 @@ MARKET_SUFFIX_CURRENCIES = {
     ".L": "GBP",
 }
 SUPPORTED_DISPLAY_CURRENCIES = {"EUR", "USD"}
-SEARCH_QUERY_ALIASES = {
-    "tsmc": ["TSM", "Taiwan Semiconductor", "2330.TW"],
-    "tencent": ["0700.HK", "TCEHY", "Tencent Holdings"],
-    "universal": ["Universal Corp", "UVV"],
-    "universal corp": ["UVV", "Universal Corp"],
-    "universal music": ["Universal Music Group", "UMG.AS", "UMGNF"],
-}
+SEARCH_QUERY_ALIASES = {}
 PREFERRED_EXCHANGES_BY_TYPE = {
     "acciones": {"XNYS", "XNAS", "NYSE", "NASDAQ", "ARCX", "BATS", "XNCM"},
     "etfs": {"ARCX", "XNAS", "XNYS", "BATS", "NASDAQ", "NYSE"},

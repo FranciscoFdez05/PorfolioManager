@@ -12,6 +12,7 @@ let _assetDisplayRows = []
 let _assetSortKey = null
 let _assetSortDir = "asc"
 let _editingAsset = null
+let assetAutosaveTimeout = null
 
 const ASSET_COLOR_PALETTE = [
     "#3a7bd5", "#f7931a", "#2ecc71", "#e74c3c", "#9b59b6",
@@ -2760,13 +2761,16 @@ async function submitEditAssetModal() {
     const editTickerInput = document.getElementById("editAssetTickerInput")
     const newTicker = (editTickerInput?.value || "").trim().toUpperCase()
     const currentTicker = String(payload.marketSymbol || payload.finnhubSymbol || "").trim().toUpperCase()
+    const explicitProvider = editTickerInput?.dataset.marketProvider
+    const currentProvider = String(payload.marketProvider || "").trim().toLowerCase()
+    const providerChanged = !!explicitProvider && explicitProvider !== currentProvider
 
     if (!trimmedName) {
         editAssetNameInput.focus()
         return
     }
 
-    if (trimmedName === currentName && newColor === (payload.color || "") && newTicker === currentTicker) {
+    if (trimmedName === currentName && newColor === (payload.color || "") && newTicker === currentTicker && !providerChanged) {
         closeEditAssetModal()
         return
     }
@@ -2778,9 +2782,10 @@ async function submitEditAssetModal() {
     payload.color = newColor
     payload.marketSymbol = newTicker
     payload.finnhubSymbol = newTicker
-    if (newTicker !== currentTicker) {
-        const explicitProvider = editTickerInput?.dataset.marketProvider
-        payload.marketProvider = explicitProvider || inferMarketProviderFromSymbol(newTicker, payload.marketProvider || "finnhub")
+    if (explicitProvider) {
+        payload.marketProvider = explicitProvider
+    } else if (newTicker !== currentTicker) {
+        payload.marketProvider = inferMarketProviderFromSymbol(newTicker, payload.marketProvider || "finnhub")
     }
 
     if (!currentSymbol || currentSymbol === generatedCurrentSymbol) {

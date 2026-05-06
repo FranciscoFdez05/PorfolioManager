@@ -5169,6 +5169,19 @@ tr.gastosTypeEmptySep td {
     min-height:180px;
 }
 
+.metricasChartDivScroll{
+    min-height:180px;
+    overflow-y:auto;
+    overflow-x:hidden;
+    scrollbar-width:thin;
+    scrollbar-color:#2a3a5a transparent;
+}
+.metricasChartDivScroll::-webkit-scrollbar{ width:5px; }
+.metricasChartDivScroll::-webkit-scrollbar-thumb{ background:#2a3a5a; border-radius:3px; }
+#mChartDivAxisWrap{ background:#111827; }
+html[data-theme="light"] #mChartDivAxisWrap{ background:#ffffff; }
+html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
+
 /* ── Table ── */
 .metricasTable{
     width:100%;

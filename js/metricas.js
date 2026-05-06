@@ -26,6 +26,12 @@ const M_PALETTE = [
     "#26c6da", "#66bb6a", "#ef5350", "#ab47bc", "#ffa726"
 ]
 
+function mPaletteForName(name) {
+    let h = 0
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+    return M_PALETTE[h % M_PALETTE.length]
+}
+
 const M_TYPE_COLORS = {
     cripto:    "#f7931a",
     acciones:  "#3a7bd5",
@@ -477,10 +483,24 @@ function mRenderDividendos(dividendos, colorMap = {}) {
     const sorted = Object.entries(map).sort((a, b) => b[1] - a[1])
     const labels = sorted.map(([name]) => name)
     const values = sorted.map(([, v]) => v)
-    const colors = labels.map((label, i) => colorMap[label] || M_PALETTE[i % M_PALETTE.length])
+    const colors = labels.map((label) => colorMap[label] || mPaletteForName(label))
+
+    const ROW_H = 36
+    const MAX_ROWS = 9
+    // Altura del eje X (canvas sticky inferior). Si es muy baja, los ticks se recortan.
+    const AXIS_H = 86
+    const fullH = Math.max(MAX_ROWS * ROW_H, sorted.length * ROW_H)
+    const wrapH = Math.min(fullH, MAX_ROWS * ROW_H) + AXIS_H
+    const maxVal = values.length ? Math.max(...values) : 1
 
     const wrap = document.getElementById("mChartDivWrap")
-    if (wrap) wrap.style.height = Math.max(180, sorted.length * 36 + 40) + "px"
+    const inner = document.getElementById("mChartDivInner")
+    const axisWrap = document.getElementById("mChartDivAxisWrap")
+    if (wrap) wrap.style.height = wrapH + "px"
+    if (inner) inner.style.height = fullH + "px"
+    if (axisWrap) axisWrap.style.height = AXIS_H + "px"
+
+    mDestroyChart("mChartDividendosAxis")
 
     mCreateChart("mChartDividendos", {
         type: "bar",
@@ -497,14 +517,57 @@ function mRenderDividendos(dividendos, colorMap = {}) {
         },
         options: {
             ...M_CHART_DEFAULTS,
+            animation: { duration: 0 },
             indexAxis: "y",
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
                 legend: { display: false },
                 tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
             },
-            scales: { x: mAxisX(), y: mAxisY(12) }
+            scales: {
+                x: {
+                    ticks: { display: false },
+                    grid: { color: "rgba(255,255,255,0.06)" },
+                    border: { display: false },
+                    max: maxVal * 1.05,
+                    afterFit(scale) { scale.height = 0 }
+                },
+                y: mAxisY(12)
+            }
         }
+    })
+
+    requestAnimationFrame(() => {
+        const mainLeft = _metricasCharts["mChartDividendos"]?.chartArea?.left ?? 0
+        const mainRight = _metricasCharts["mChartDividendos"]?.chartArea?.right ?? 0
+        const canvasOffsetWidth = _metricasCharts["mChartDividendos"]?.canvas?.offsetWidth ?? 0
+        const rightPad = canvasOffsetWidth && mainRight ? Math.max(0, canvasOffsetWidth - mainRight) : 0
+
+        mCreateChart("mChartDividendosAxis", {
+            type: "bar",
+            data: { labels: [""], datasets: [{ data: [0], backgroundColor: "transparent", borderColor: "transparent", borderWidth: 0 }] },
+            options: {
+                ...M_CHART_DEFAULTS,
+                indexAxis: "y",
+                animation: { duration: 0 },
+                plugins: {
+                    ...M_CHART_DEFAULTS.plugins,
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                },
+                layout: { padding: { left: mainLeft, right: rightPad, top: 10, bottom: 18 } },
+                scales: {
+                    x: {
+                        ticks: { color: "#8899bb", maxTicksLimit: 7 },
+                        grid: { display: false },
+                        border: { display: false },
+                        min: 0,
+                        max: maxVal * 1.05
+                    },
+                    y: { display: false }
+                }
+            }
+        })
     })
 
     const donutTotal = values.reduce((a, b) => a + b, 0)
@@ -635,7 +698,7 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
     })
 
     const labels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-    const stockColors = stocks.map((s, i) => colorMap[s] || M_PALETTE[i % M_PALETTE.length])
+    const stockColors = stocks.map((s) => colorMap[s] || mPaletteForName(s))
     const datasets = stocks.map((s, i) => ({
         label: s,
         data: monthData[s],

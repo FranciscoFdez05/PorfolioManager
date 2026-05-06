@@ -33,22 +33,13 @@ function renderDividendosYearBar(years) {
     })
 }
 
-function escapeDividendosHtml(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;")
-}
-
 function buildDividendosInstrumentoSelect(selectedName) {
     const exists = _dividendosAssets.some((a) => a.name === selectedName)
     const extra  = (!exists && selectedName)
-        ? `<option value="${escapeDividendosHtml(selectedName)}" selected>${escapeDividendosHtml(selectedName)}</option>`
+        ? `<option value="${escapeHtml(selectedName)}" selected>${escapeHtml(selectedName)}</option>`
         : ""
     const opts = _dividendosAssets.map((a) =>
-        `<option value="${escapeDividendosHtml(a.name)}"${a.name === selectedName ? " selected" : ""}>${escapeDividendosHtml(a.name)}</option>`
+        `<option value="${escapeHtml(a.name)}"${a.name === selectedName ? " selected" : ""}>${escapeHtml(a.name)}</option>`
     ).join("")
     return `<select class="bonosTipoSelect">${extra}${opts}</select>`
 }
@@ -62,10 +53,10 @@ function buildDividendosCurrencyOptions(selected, defaultVal = "USD") {
 function buildDividendosInstrumentoOptions(selectedName) {
     const exists = _dividendosAssets.some((a) => a.name === selectedName)
     const extra = (!exists && selectedName)
-        ? `<option value="${escapeDividendosHtml(selectedName)}" selected>${escapeDividendosHtml(selectedName)}</option>`
+        ? `<option value="${escapeHtml(selectedName)}" selected>${escapeHtml(selectedName)}</option>`
         : ""
     const opts = _dividendosAssets.map((a) =>
-        `<option value="${escapeDividendosHtml(a.name)}"${a.name === selectedName ? " selected" : ""}>${escapeDividendosHtml(a.name)}</option>`
+        `<option value="${escapeHtml(a.name)}"${a.name === selectedName ? " selected" : ""}>${escapeHtml(a.name)}</option>`
     ).join("")
 
     return `<option value=""></option>${extra}${opts}`
@@ -98,27 +89,27 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
     modal.innerHTML = `
         <h3 class="assetModalTitle">${isEdit ? "Editar dividendo" : "Añadir dividendo"}</h3>
         <label class="assetModalLabel" for="dividendoFechaInput">Fecha</label>
-        <input id="dividendoFechaInput" class="assetModalInput" type="text" value="${escapeDividendosHtml(rowData.fecha || "")}" placeholder="dd-mm-aaaa">
+        <input id="dividendoFechaInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.fecha || "")}" placeholder="dd-mm-aaaa">
         <label class="assetModalLabel" for="dividendoInstrumentoInput">Instrumento</label>
         <select id="dividendoInstrumentoInput" class="assetModalSelect">
             ${buildDividendosInstrumentoOptions(rowData.instrumento || "")}
         </select>
         <label class="assetModalLabel" for="dividendoAccionesInput">Acciones</label>
-        <input id="dividendoAccionesInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeDividendosHtml(rowData.acciones || "")}" placeholder="0">
+        <input id="dividendoAccionesInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.acciones || "")}" placeholder="0">
         <label class="assetModalLabel" for="dividendoMonedaDividendoInput">Moneda dividendo</label>
         <select id="dividendoMonedaDividendoInput" class="assetModalSelect">
             ${buildDividendosCurrencyOptions(rowData.monedaDividendo, "USD")}
         </select>
         <label class="assetModalLabel" for="dividendoPorAccionInput">Dividendos / Acción</label>
-        <input id="dividendoPorAccionInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeDividendosHtml(rowData.dividendoAccion || "")}" placeholder="0,00">
+        <input id="dividendoPorAccionInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.dividendoAccion || "")}" placeholder="0,00">
         <label class="assetModalLabel" for="dividendoMonedaTotalInput">Moneda impuestos / total</label>
         <select id="dividendoMonedaTotalInput" class="assetModalSelect">
             ${buildDividendosCurrencyOptions(rowData.monedaTotal, "EUR")}
         </select>
         <label class="assetModalLabel" for="dividendoImpuestosInput">Impuestos</label>
-        <input id="dividendoImpuestosInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeDividendosHtml(rowData.impuestos || "")}" placeholder="0,00">
+        <input id="dividendoImpuestosInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.impuestos || "")}" placeholder="0,00">
         <label class="assetModalLabel" for="dividendoTotalInput">Total</label>
-        <input id="dividendoTotalInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeDividendosHtml(rowData.total || "")}" placeholder="0,00">
+        <input id="dividendoTotalInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.total || "")}" placeholder="0,00">
         <p class="gastosCreateModalFeedback hidden" id="dividendosModalFeedback"></p>
         <div class="assetModalActions dividendosModalActions">
             <button type="button" class="cancelButton" id="dividendosModalCancelBtn">Cancelar</button>
@@ -248,8 +239,8 @@ function renderFilteredDividendos() {
         rowElement.dataset.globalIndex = String(globalIndex)
 
         rowElement.innerHTML = `
-            <td data-field="fecha">${escapeDividendosHtml(rowData.fecha || "")}</td>
-            <td data-field="instrumento">${escapeDividendosHtml(rowData.instrumento || "")}</td>
+            <td data-field="fecha">${escapeHtml(rowData.fecha || "")}</td>
+            <td data-field="instrumento">${escapeHtml(rowData.instrumento || "")}</td>
             <td data-field="acciones">${formatShareQuantity(rowData.acciones)}</td>
             <td data-field="dividendoAccion">${formatCellDollarValue(rowData.dividendoAccion)}</td>
             <td data-field="impuestos">${formatCellEuroValue(rowData.impuestos)}</td>
@@ -514,14 +505,14 @@ function buildCalendarioCell(month, names, assets) {
 
     const tagsHtml = names.map((name) => `
         <div class="calTag">
-            <span class="calTagName">${escapeDividendosHtml(name)}</span>
+            <span class="calTagName">${escapeHtml(name)}</span>
             <button type="button" class="calTagRemove" data-month="${month}" data-name="${encodeURIComponent(name)}" title="Quitar">×</button>
         </div>
     `).join("")
 
     const optionsHtml = assets
         .filter((a) => a.type === "acciones" && !names.includes(a.name))
-        .map((a) => `<option value="${escapeDividendosHtml(a.name)}">${escapeDividendosHtml(a.name)}</option>`)
+        .map((a) => `<option value="${escapeHtml(a.name)}">${escapeHtml(a.name)}</option>`)
         .join("")
 
     return `

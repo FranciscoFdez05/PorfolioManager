@@ -82,7 +82,6 @@ function applySidebarState(sideWrapper, toggleButton) {
 }
 
 let dividendosAutosaveTimeout = null
-let assetAutosaveTimeout = null
 let currentAssetId = null
 let assetModalState = null
 let confirmModalState = null
