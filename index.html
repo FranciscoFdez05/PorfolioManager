@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Portfolio Manager</title>
-    <link rel="stylesheet" href="css/portfolio.css?v=20260504c">
+    <link rel="stylesheet" href="css/portfolio.css?v=20260508a">
     <script>
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
     </script>
@@ -268,6 +268,9 @@
         <div class="assetColorPicker cpCollapsed" id="assetColorPicker"></div>
         <input type="hidden" id="assetColorInput" value="">
 
+        <label class="assetModalLabel assetModalLabelSmall" for="assetTVTickerInput">Ticker TradingView <span class="assetModalLabelHint">(opcional, solo para el gráfico)</span></label>
+        <input id="assetTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: COMEX:GC1! o XAUUSD">
+
         <div class="assetModalActions">
             <button id="cancelAssetModalBtn" class="cancelButton">Cancelar</button>
             <button id="confirmAssetModalBtn" class="primaryButton">Confirmar</button>
@@ -310,6 +313,9 @@
         </button>
         <div class="assetColorPicker cpCollapsed" id="editAssetColorPicker"></div>
         <input type="hidden" id="editAssetColorInput" value="">
+
+        <label class="assetModalLabel assetModalLabelSmall" for="editAssetTVTickerInput">Ticker TradingView <span class="assetModalLabelHint">(opcional, solo para el gráfico)</span></label>
+        <input id="editAssetTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: COMEX:GC1! o XAUUSD">
 
         <div class="assetModalActions">
             <button id="cancelEditAssetModalBtn" class="cancelButton">Cancelar</button>

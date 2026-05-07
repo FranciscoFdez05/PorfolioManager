@@ -6,6 +6,7 @@ from db import get_db
 from asset_utils import (
     createDefaultAssetPayload, inferMarketProviderFromSymbol,
     normalizeMarketProvider, sanitizeAssetPayload, sanitizeAssetType, sanitize_color, slugify,
+    _MAX_TICKER, _trunc,
 )
 from eodhd_client import fetch_quote as fetch_eodhd_quote
 from finnhub_client import convert_amount, convert_quote_currency, fetch_quote
@@ -124,6 +125,7 @@ def createActivo():
     payload["finnhubSymbol"] = marketSymbol
     payload["order"] = len(listAssets())
     payload["color"] = sanitize_color(requestData.get("color", ""))
+    payload["tvSymbol"] = _trunc(str(requestData.get("tvSymbol", "")), _MAX_TICKER).strip()
     writeAssetFile(assetId, payload)
 
     return jsonify({"ok": True, "asset": payload}), 201
@@ -310,7 +312,6 @@ def changeActivoCurrency(assetId):
     writeAssetFile(assetId, assetData)
 
     return jsonify({"ok": True, "asset": assetData, "converted": True})
-
 
 @activos_bp.route("/api/activos/<assetId>", methods=["DELETE"])
 def deleteActivo(assetId):

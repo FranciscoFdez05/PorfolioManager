@@ -159,7 +159,13 @@ function initNavigation(navButtons, contentArea) {
                 m.classList.remove("csOpen")
                 m._csTrigger?.classList.remove("csOpen")
             })
-            if (!isOpen) menu.classList.add("open")
+            if (!isOpen) {
+                const rect = btn.getBoundingClientRect()
+                menu.style.top      = (rect.bottom + 4) + "px"
+                menu.style.left     = rect.left + "px"
+                menu.style.minWidth = rect.width + "px"
+                menu.classList.add("open")
+            }
         })
     })
 

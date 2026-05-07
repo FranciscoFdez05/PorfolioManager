@@ -233,6 +233,7 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "status": _trunc(requestData.get("status", "Mercado abierto"), _MAX_TEXT).strip() or "Mercado abierto",
         "lastUpdated": _trunc(requestData.get("lastUpdated", ""), _MAX_TEXT).strip(),
         "color": sanitize_color(requestData.get("color", "")),
+        "tvSymbol": _trunc(requestData.get("tvSymbol", ""), _MAX_TICKER).strip(),
         "operationRows": sanitizeAssetOperationRows(requestData.get("operationRows", [])),
         "conversionRows": sanitizeAssetConversionRows(
             requestData.get("conversionRows", []),

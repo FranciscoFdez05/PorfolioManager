@@ -308,13 +308,13 @@ async function deleteAssetOnServer(assetId) {
     }
 }
 
-async function createAssetOnServer(name, type, marketSymbol = "", marketProvider = "finnhub", color = "") {
+async function createAssetOnServer(name, type, marketSymbol = "", marketProvider = "finnhub", color = "", tvSymbol = "") {
     const response = await fetch("/api/activos", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ name, type, marketSymbol, marketProvider, finnhubSymbol: marketSymbol, color })
+        body: JSON.stringify({ name, type, marketSymbol, marketProvider, finnhubSymbol: marketSymbol, color, tvSymbol })
     })
 
     if (!response.ok) {
@@ -2126,7 +2126,7 @@ function renderAssetTablePage(asset) {
     }
 
     contentArea.innerHTML = `
-        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-price-currency="${asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-market-provider="${asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-market-symbol="${asset.marketSymbol || asset.finnhubSymbol || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}" data-asset-color="${asset.color || ""}">
+        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-price-currency="${asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-market-provider="${asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-market-symbol="${asset.marketSymbol || asset.finnhubSymbol || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}" data-asset-color="${asset.color || ""}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}">
             <div class="assetPageHeader">
                 <div>
                     <div class="assetTitleRow">
@@ -2430,6 +2430,7 @@ function buildCurrentAssetPayload() {
         status: assetPage?.dataset.assetStatus || "Mercado abierto",
         lastUpdated: assetPage?.dataset.assetLastUpdated || "",
         color: assetPage?.dataset.assetColor || "",
+        tvSymbol: assetPage?.dataset.assetTvSymbol || "",
         operationRows: currentAssetPersistedOperationRows,
         conversionRows: currentAssetPersistedConversionRows,
         order: Number(document.querySelector(`.assetBtn[data-asset-id="${currentAssetId}"]`)?.dataset.assetOrder || 0),
@@ -2721,6 +2722,12 @@ function openEditAssetModal(assetData = null) {
         editAssetTickerInput.value = currentTicker
         delete editAssetTickerInput.dataset.marketProvider
     }
+    const editTVTickerInput = document.getElementById("editAssetTVTickerInput")
+    if (editTVTickerInput) editTVTickerInput.value = decodeTVTicker(assetData?.tvSymbol || assetPage?.dataset.assetTvSymbol || "")
+    const editAssetSearchFeedback = document.getElementById("editAssetSearchFeedback")
+    const editAssetSearchResults = document.getElementById("editAssetSearchResults")
+    setAssetSearchFeedback(editAssetSearchFeedback, "")
+    renderMarketSearchResults(editAssetSearchResults, [], () => {})
     initColorPicker("editAssetColorPicker", "editAssetColorInput", currentColor, "editAssetColorBadge")
     setupColorPickerToggle("editAssetColorToggle", "editAssetColorPicker")
     editAssetModalOverlay.classList.remove("hidden")
@@ -2764,13 +2771,14 @@ async function submitEditAssetModal() {
     const explicitProvider = editTickerInput?.dataset.marketProvider
     const currentProvider = String(payload.marketProvider || "").trim().toLowerCase()
     const providerChanged = !!explicitProvider && explicitProvider !== currentProvider
+    const newTVTicker = decodeTVTicker(document.getElementById("editAssetTVTickerInput")?.value)
 
     if (!trimmedName) {
         editAssetNameInput.focus()
         return
     }
 
-    if (trimmedName === currentName && newColor === (payload.color || "") && newTicker === currentTicker && !providerChanged) {
+    if (trimmedName === currentName && newColor === (payload.color || "") && newTicker === currentTicker && !providerChanged && newTVTicker === (payload.tvSymbol || "")) {
         closeEditAssetModal()
         return
     }
@@ -2782,6 +2790,7 @@ async function submitEditAssetModal() {
     payload.color = newColor
     payload.marketSymbol = newTicker
     payload.finnhubSymbol = newTicker
+    payload.tvSymbol = newTVTicker
     if (explicitProvider) {
         payload.marketProvider = explicitProvider
     } else if (newTicker !== currentTicker) {
@@ -2801,8 +2810,8 @@ async function submitEditAssetModal() {
     const updatedAsset = await loadAssetData(currentAssetId)
     if (fromAvView) {
         const idx = _activosAllAssets.findIndex((a) => a.id === currentAssetId)
-        if (idx >= 0) _activosAllAssets[idx] = { ..._activosAllAssets[idx], name: updatedAsset.name, color: updatedAsset.color, marketSymbol: updatedAsset.marketSymbol, finnhubSymbol: updatedAsset.finnhubSymbol }
-        avRenderGrid()
+        if (idx >= 0) _activosAllAssets[idx] = { ..._activosAllAssets[idx], name: updatedAsset.name, color: updatedAsset.color, marketSymbol: updatedAsset.marketSymbol, finnhubSymbol: updatedAsset.finnhubSymbol, tvSymbol: updatedAsset.tvSymbol }
+        avRender()
     } else {
         await updateAssetDetail(updatedAsset)
         renderAssetTablePage(updatedAsset)
@@ -3151,6 +3160,8 @@ function openAssetModal() {
     assetTypeSelect.dispatchEvent(new Event("change", { bubbles: true }))
     assetTickerInput.value = ""
     assetTickerInput.dataset.marketProvider = ""
+    const tvTickerInput = document.getElementById("assetTVTickerInput")
+    if (tvTickerInput) tvTickerInput.value = ""
     setAssetSearchFeedback(assetSearchFeedback, "")
     renderMarketSearchResults(assetSearchResults, [], () => {})
     initColorPicker("assetColorPicker", "assetColorInput", ASSET_COLOR_PALETTE[0], "assetColorBadge")
@@ -3250,6 +3261,7 @@ async function submitAssetModal() {
     const explicitProvider = assetTickerInput.dataset.marketProvider
     const marketProvider = explicitProvider || inferMarketProviderFromSymbol(marketSymbol, "finnhub")
     const color = document.getElementById("assetColorInput")?.value || ASSET_COLOR_PALETTE[0]
+    const tvSymbol = decodeTVTicker(document.getElementById("assetTVTickerInput")?.value)
 
     if (!name) {
         setAssetSearchFeedback(assetSearchFeedback, "Introduce el nombre del activo.", true)
@@ -3271,7 +3283,7 @@ async function submitAssetModal() {
 
     try {
         setAssetSearchFeedback(assetSearchFeedback, "")
-        const response = await createAssetOnServer(name, type, marketSymbol, marketProvider, color)
+        const response = await createAssetOnServer(name, type, marketSymbol, marketProvider, color, tvSymbol)
         const createdAsset = response.asset
         closeAssetModal()
         currentAssetId = createdAsset.id
@@ -3543,6 +3555,7 @@ const AV_TYPE_LABELS = {
 let _activosAllAssets = []
 let _activosFilterType = "all"
 let _activosSearch = ""
+let _activosViewMode = localStorage.getItem("activosViewMode") || "cards"
 
 function avFilteredAssets() {
     return _activosAllAssets.filter((a) => {
@@ -3593,6 +3606,7 @@ function avBuildCard(asset) {
             <span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span>
             <div class="avCardActions">
                 ${assetColor ? `<span class="avColorDot" style="background:${assetColor};--dot-color:${assetColor}" title="Color del activo"></span>` : ""}
+                <button type="button" class="avActionBtn avChartBtn" data-asset-id="${asset.id}" title="Ver gráfico TradingView">⌁</button>
                 <button type="button" class="avActionBtn avEditBtn" data-asset-id="${asset.id}" title="Editar nombre">✎</button>
                 <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">✕</button>
             </div>
@@ -3640,6 +3654,87 @@ function avRenderGrid() {
     grid.appendChild(frag)
 }
 
+function avBuildTableRow(asset) {
+    const color     = AV_TYPE_COLORS[asset.type]  || "#888"
+    const typeLabel = AV_TYPE_LABELS[asset.type]  || asset.type || ""
+    const price     = parseLooseNumber(asset.price || "") || 0
+    const currency  = asset.currency || "EUR"
+    const provider  = String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "") || "").toUpperCase()
+
+    const m         = asset._metrics
+    const hasM      = !!m
+    const rClass    = hasM ? (m.rendimientoEur >= 0 ? "avPos" : "avNeg") : ""
+    const rendSign  = hasM ? (m.rendimientoEur >= 0 ? "+" : "") : ""
+    const avgPriceStr = hasM && m.promedioCompra > 0 ? formatMoney(m.promedioCompra, m.currency || currency) : "—"
+
+    let lastUpdatedStr = "—"
+    if (asset.lastUpdated) {
+        const d = new Date(asset.lastUpdated)
+        if (!isNaN(d)) {
+            const hh = String(d.getHours()).padStart(2, "0")
+            const mm = String(d.getMinutes()).padStart(2, "0")
+            const dd = String(d.getDate()).padStart(2, "0")
+            const mo = String(d.getMonth() + 1).padStart(2, "0")
+            lastUpdatedStr = `${dd}/${mo} ${hh}:${mm}`
+        }
+    }
+
+    const rendStr = hasM
+        ? (m.invertidoEur > 0
+            ? rendSign + formatEuro(m.rendimientoEur) + " <small>" + rendSign + ((m.rendimientoEur / m.invertidoEur) * 100).toFixed(2) + " %</small>"
+            : rendSign + formatEuro(m.rendimientoEur))
+        : "—"
+
+    const tr = document.createElement("tr")
+    tr.className = "avTableRow"
+    tr.dataset.assetId = asset.id
+    tr.innerHTML = `
+        <td><span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span></td>
+        <td class="avTrName">${asset.color ? `<span class="avColorDot avTrColorDot" style="background:${asset.color}" title="Color del activo"></span>` : ""}${escapeHtml(asset.name || asset.symbol || "Activo")}</td>
+        <td class="avTrPrice">${formatMoney(price, currency)}</td>
+        <td class="avTrProvider">${escapeHtml(provider || "—")}</td>
+        <td class="avTrPos">${hasM ? formatShareQuantity(m.participaciones) : "—"}</td>
+        <td class="avTrValor">${hasM ? formatEuro(m.netoActualEur) : "—"}</td>
+        <td class="avTrAvg">${avgPriceStr}</td>
+        <td class="avTrRend ${rClass}">${rendStr}</td>
+        <td class="avTrUpdated">${lastUpdatedStr}</td>
+        <td class="avTrActions">
+            <button type="button" class="avActionBtn avChartBtn" data-asset-id="${asset.id}" title="Ver gráfico">⌁</button>
+            <button type="button" class="avActionBtn avEditBtn" data-asset-id="${asset.id}" title="Editar">✎</button>
+            <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">✕</button>
+        </td>
+    `
+    return tr
+}
+
+function avRenderTable() {
+    const tbody = document.getElementById("activosTableBody")
+    const count = document.getElementById("activosCount")
+    if (!tbody) return
+
+    const filtered = avFilteredAssets()
+    if (count) count.textContent = `${filtered.length} activo${filtered.length !== 1 ? "s" : ""}`
+
+    tbody.innerHTML = ""
+    const frag = document.createDocumentFragment()
+    filtered.forEach((a) => frag.appendChild(avBuildTableRow(a)))
+    tbody.appendChild(frag)
+}
+
+function avRender() {
+    const gridEl = document.getElementById("activosGrid")
+    const tableWrap = document.getElementById("activosTableWrap")
+    if (_activosViewMode === "table") {
+        if (gridEl) gridEl.classList.add("hidden")
+        if (tableWrap) tableWrap.classList.remove("hidden")
+        avRenderTable()
+    } else {
+        if (tableWrap) tableWrap.classList.add("hidden")
+        if (gridEl) gridEl.classList.remove("hidden")
+        avRenderGrid()
+    }
+}
+
 async function avHandleCardClick(event) {
     const deleteBtn = event.target.closest(".avDeleteBtn")
     if (deleteBtn) {
@@ -3648,9 +3743,16 @@ async function avHandleCardClick(event) {
         openConfirmModal(`¿Eliminar "${asset?.name || id}"? Esta acción no se puede deshacer.`, async () => {
             await deleteAssetFromServer(id)
             _activosAllAssets = _activosAllAssets.filter((a) => a.id !== id)
-            avRenderGrid()
+            avRender()
             await refreshAssetsSidebar()
         })
+        return
+    }
+
+    const chartBtn = event.target.closest(".avChartBtn")
+    if (chartBtn) {
+        const asset = _activosAllAssets.find((a) => a.id === chartBtn.dataset.assetId)
+        if (asset) openTVChartModal(buildTVSymbol(asset), asset.symbol || asset.name)
         return
     }
 
@@ -3668,7 +3770,114 @@ async function avHandleCardClick(event) {
         const id = card.dataset.assetId
         clearNavSelection()
         await selectAsset(id)
+        return
     }
+
+    const tableRow = event.target.closest(".avTableRow")
+    if (tableRow && !event.target.closest(".avTrActions")) {
+        const id = tableRow.dataset.assetId
+        clearNavSelection()
+        await selectAsset(id)
+    }
+}
+
+function decodeTVTicker(raw) {
+    const s = (raw || "").trim()
+    if (!s) return ""
+    try { return decodeURIComponent(s) } catch (e) { return s }
+}
+
+function buildTVSymbol(asset) {
+    if (asset.tvSymbol && String(asset.tvSymbol).trim()) return decodeTVTicker(String(asset.tvSymbol).trim())
+
+    const mSym     = String(asset.marketSymbol || asset.finnhubSymbol || "").trim()
+    const uSym     = String(asset.symbol || asset.name || "").trim().toUpperCase()
+    const provider = String(asset.marketProvider || inferMarketProviderFromSymbol(mSym)).toLowerCase()
+    const upper    = mSym.toUpperCase()
+
+    if (provider === "yahoo") {
+        // Futuros de Yahoo → TradingView
+        const yFutures = {
+            "GC=F": "COMEX:GC1!", "SI=F": "COMEX:SI1!", "CL=F": "NYMEX:CL1!",
+            "NG=F": "NYMEX:NG1!", "HG=F": "COMEX:HG1!", "PL=F": "NYMEX:PL1!",
+            "PA=F": "NYMEX:PA1!", "ZC=F": "CBOT:ZC1!",  "ZW=F": "CBOT:ZW1!",
+            "ES=F": "CME:ES1!",   "NQ=F": "CME:NQ1!",   "YM=F": "CBOT:YM1!",
+        }
+        if (yFutures[upper]) return yFutures[upper]
+        // Crypto Yahoo: BTC-USD → BTCUSD
+        if (upper.endsWith("-USD")) return upper.replace("-USD", "USD")
+        if (upper.endsWith("-EUR")) return upper.replace("-EUR", "EUR")
+        if (upper.endsWith("-USDT")) return upper.replace("-USDT", "USDT")
+        return mSym || uSym
+    }
+
+    if (provider === "eodhd" && mSym.includes(".")) {
+        const parts    = mSym.split(".")
+        const sym      = parts[0]
+        const exchange = parts[parts.length - 1].toUpperCase()
+        // Crypto EODHD: BTC-USD.CC → BTCUSD
+        if (exchange === "CC") return sym.replace(/-USD$/, "USD").replace(/-EUR$/, "EUR").replace(/-/, "")
+        const tvEx = { US: "", XETRA: "XETRA", PA: "EURONEXT", LSE: "LSE", SW: "SIX",
+                        AS: "EURONEXT", MC: "BME", MI: "MIL", F: "FWB", DU: "XETRA", BE: "XETRA" }
+        const ex = tvEx[exchange]
+        if (ex === "") return sym
+        if (ex)       return `${ex}:${sym}`
+        return sym
+    }
+
+    if (provider === "finnhub") {
+        // Finnhub ya usa formato EXCHANGE:SYMBOL o solo SYMBOL
+        if (mSym.includes(":")) return mSym
+        return mSym || uSym
+    }
+
+    return uSym
+}
+
+function buildTVIframeUrl(tvSymbol) {
+    const isLight = document.documentElement.getAttribute("data-theme") === "light"
+    const theme = isLight ? "light" : "dark"
+    const toolbarbg = isLight ? "f1f5f9" : "111827"
+    const p = new URLSearchParams({
+        symbol: tvSymbol, interval: "D", theme,
+        style: "1", locale: "es",
+        hidesidetoolbar: "0", symboledit: "1", saveimage: "1",
+        toolbarbg,
+    })
+    return `https://www.tradingview.com/widgetembed/?${p.toString()}`
+}
+
+function openTVChartModal(tvSymbol, displayName) {
+    const existing = document.getElementById("tvChartOverlay")
+    if (existing) existing.remove()
+
+    const overlay = document.createElement("div")
+    overlay.id = "tvChartOverlay"
+    overlay.className = "tvChartOverlay"
+
+    overlay.innerHTML = `
+        <div class="tvChartModal">
+            <div class="tvChartModalHeader">
+                <span class="tvChartModalTitle">${escapeHtml(displayName || tvSymbol)}</span>
+                <span class="tvChartModalSym">${escapeHtml(tvSymbol)}</span>
+                <div class="tvChartHeaderSpacer"></div>
+                <button type="button" class="tvChartCloseBtn" title="Cerrar">✕</button>
+            </div>
+            <div class="tvChartIframeWrap">
+                <iframe src="${buildTVIframeUrl(tvSymbol)}" frameborder="0" allowtransparency="true" scrolling="no" allowfullscreen></iframe>
+            </div>
+        </div>
+    `
+
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay || e.target.closest(".tvChartCloseBtn")) overlay.remove()
+    })
+
+    document.addEventListener("keydown", function onEsc(e) {
+        if (e.key === "Escape") { overlay.remove(); document.removeEventListener("keydown", onEsc) }
+    })
+
+    document.body.appendChild(overlay)
 }
 
 async function initActivosPageLogic() {
@@ -3676,10 +3885,28 @@ async function initActivosPageLogic() {
     _activosFilterType = "all"
     _activosSearch = ""
 
-    avRenderGrid()
+    const viewToggle = document.getElementById("avViewToggle")
+    if (viewToggle) {
+        viewToggle.querySelectorAll(".avViewBtn").forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.view === _activosViewMode)
+        })
+        viewToggle.addEventListener("click", (e) => {
+            const btn = e.target.closest(".avViewBtn")
+            if (!btn) return
+            _activosViewMode = btn.dataset.view
+            localStorage.setItem("activosViewMode", _activosViewMode)
+            viewToggle.querySelectorAll(".avViewBtn").forEach((b) => b.classList.toggle("active", b === btn))
+            avRender()
+        })
+    }
+
+    avRender()
 
     const grid = document.getElementById("activosGrid")
     if (grid) grid.addEventListener("click", avHandleCardClick)
+
+    const tableWrap = document.getElementById("activosTableWrap")
+    if (tableWrap) tableWrap.addEventListener("click", avHandleCardClick)
 
     const filters = document.getElementById("activosFilters")
     if (filters) {
@@ -3689,7 +3916,7 @@ async function initActivosPageLogic() {
             filters.querySelectorAll(".activosFilterBtn").forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _activosFilterType = btn.dataset.type
-            avRenderGrid()
+            avRender()
         })
     }
 
@@ -3697,7 +3924,7 @@ async function initActivosPageLogic() {
     if (search) {
         search.addEventListener("input", () => {
             _activosSearch = search.value.trim()
-            avRenderGrid()
+            avRender()
         })
     }
 
@@ -3760,7 +3987,7 @@ function avInitDragDrop() {
                 const old = _activosAllAssets.find((o) => o.id === a.id)
                 if (old) a._metrics = old._metrics
             })
-            avRenderGrid()
+            avRender()
             avLoadMetrics()
         } catch (err) {
             console.error("avDrop error", err)
@@ -3790,22 +4017,38 @@ async function avLoadMetrics() {
             }
             asset._metrics = m
 
-            const cardEl = document.querySelector(`.avCard[data-asset-id="${asset.id}"]`)
-            if (!cardEl) return
-
             const rClass  = m.rendimientoEur >= 0 ? "avPos" : "avNeg"
             const sign    = m.rendimientoEur >= 0 ? "+" : ""
             const rendStr = m.invertidoEur > 0
                 ? sign + formatEuro(m.rendimientoEur) + "<br><small>" + sign + ((m.rendimientoEur / m.invertidoEur) * 100).toFixed(2) + " %</small>"
                 : sign + formatEuro(m.rendimientoEur)
 
-            const vals = cardEl.querySelectorAll(".avMetricValue")
-            if (vals.length >= 4) {
-                vals[0].textContent = formatShareQuantity(m.participaciones)
-                vals[1].textContent = formatEuro(m.netoActualEur)
-                vals[2].textContent = m.promedioCompra > 0 ? formatMoney(m.promedioCompra, m.currency) : "—"
-                vals[3].innerHTML   = rendStr
-                vals[3].className   = "avMetricValue " + rClass
+            const cardEl = document.querySelector(`.avCard[data-asset-id="${asset.id}"]`)
+            if (cardEl) {
+                const vals = cardEl.querySelectorAll(".avMetricValue")
+                if (vals.length >= 4) {
+                    vals[0].textContent = formatShareQuantity(m.participaciones)
+                    vals[1].textContent = formatEuro(m.netoActualEur)
+                    vals[2].textContent = m.promedioCompra > 0 ? formatMoney(m.promedioCompra, m.currency) : "—"
+                    vals[3].innerHTML   = rendStr
+                    vals[3].className   = "avMetricValue " + rClass
+                }
+            }
+
+            const trEl = document.querySelector(`.avTableRow[data-asset-id="${asset.id}"]`)
+            if (trEl) {
+                const rendTrStr = m.invertidoEur > 0
+                    ? sign + formatEuro(m.rendimientoEur) + " <small>" + sign + ((m.rendimientoEur / m.invertidoEur) * 100).toFixed(2) + " %</small>"
+                    : sign + formatEuro(m.rendimientoEur)
+                const avgStr = m.promedioCompra > 0 ? formatMoney(m.promedioCompra, m.currency) : "—"
+                const posEl  = trEl.querySelector(".avTrPos")
+                const valEl  = trEl.querySelector(".avTrValor")
+                const avgEl  = trEl.querySelector(".avTrAvg")
+                const rendEl = trEl.querySelector(".avTrRend")
+                if (posEl)  posEl.textContent  = formatShareQuantity(m.participaciones)
+                if (valEl)  valEl.textContent   = formatEuro(m.netoActualEur)
+                if (avgEl)  avgEl.textContent   = avgStr
+                if (rendEl) { rendEl.innerHTML = rendTrStr; rendEl.className = "avTrRend " + rClass }
             }
         } catch (e) {
             console.error("avLoadMetrics error", asset.id, e)

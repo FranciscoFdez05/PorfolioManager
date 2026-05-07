@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS activos (
     change          TEXT NOT NULL DEFAULT '+0,00%',
     status          TEXT NOT NULL DEFAULT 'Mercado abierto',
     last_updated    TEXT NOT NULL DEFAULT '',
-    color           TEXT NOT NULL DEFAULT ''
+    color           TEXT NOT NULL DEFAULT '',
+    tv_symbol       TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS activo_rows (
@@ -314,6 +315,8 @@ def _migrate(conn):
     activos_cols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
     if "color" not in activos_cols:
         conn.execute("ALTER TABLE activos ADD COLUMN color TEXT NOT NULL DEFAULT ''")
+    if "tv_symbol" not in activos_cols:
+        conn.execute("ALTER TABLE activos ADD COLUMN tv_symbol TEXT NOT NULL DEFAULT ''")
 
     bonos_cols = {row[1] for row in conn.execute("PRAGMA table_info(bonos)")}
     if "currency" not in bonos_cols:

@@ -11,8 +11,35 @@
         </div>
         <input type="text" class="activosSearch" id="activosSearch" placeholder="Buscar activo...">
         <span class="activosCount" id="activosCount"></span>
+        <div class="avViewToggle" id="avViewToggle">
+            <button class="avViewBtn active" data-view="cards" title="Vista tarjetas">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg>
+            </button>
+            <button class="avViewBtn" data-view="table" title="Vista tabla">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="2" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="6.75" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="11.5" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>
+            </button>
+        </div>
     </div>
 
     <div class="activosGrid" id="activosGrid"></div>
+    <div class="activosTableWrap hidden" id="activosTableWrap">
+        <table class="activosTable" id="activosTable">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Nombre</th>
+                    <th>Precio</th>
+                    <th>Provider</th>
+                    <th>Posición</th>
+                    <th>Valor actual</th>
+                    <th>P. medio compra</th>
+                    <th>Rendimiento</th>
+                    <th>Actualizado</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="activosTableBody"></tbody>
+        </table>
+    </div>
 
 </div>
