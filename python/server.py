@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask, abort, send_from_directory
 
 from app_data import baseDir, ensureDataFile
+from portfolios_manager import init_portfolios
 from routes.activos import activos_bp
 from routes.ajustes import ajustes_bp
 from routes.backup import backup_bp
@@ -12,10 +13,12 @@ from routes.gastos import gastos_bp
 from routes.ingresos import ingresos_bp
 from routes.market import market_bp
 from routes.operaciones import operaciones_bp
+from routes.portfolios import portfolios_bp
 from routes.registros import registros_bp
 from routes.ventas import ventas_bp
 
 load_dotenv()
+init_portfolios()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,6 +41,7 @@ app.register_blueprint(gastos_bp)
 app.register_blueprint(ingresos_bp)
 app.register_blueprint(market_bp)
 app.register_blueprint(operaciones_bp)
+app.register_blueprint(portfolios_bp)
 app.register_blueprint(registros_bp)
 app.register_blueprint(ventas_bp)
 

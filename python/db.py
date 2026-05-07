@@ -3,9 +3,15 @@ import threading
 from pathlib import Path
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
-_DB_PATH = _BASE_DIR / "data" / "portfolio.db"
+_DB_PATH = _BASE_DIR / "data" / "portfolio.db"  # overridden by portfolios_manager on startup
 _local = threading.local()
 _reset_generation = 0
+
+
+def set_active_db_path(path) -> None:
+    global _DB_PATH
+    _DB_PATH = Path(path)
+    invalidate_all_connections()
 
 _SCHEMA = """
 PRAGMA journal_mode=WAL;

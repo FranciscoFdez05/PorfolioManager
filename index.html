@@ -21,6 +21,18 @@
         <header class="topBar">
              <!-- <h2 class="brand">Portfolio</h2> -->
 
+            <div class="navDropdown portfolioSwitcherDrop" id="portfolioSwitcherDrop">
+                <button class="navDropdownBtn portfolioSwitcherBtn" id="portfolioSwitcherBtn" type="button">
+                    <span id="portfolioCurrentName">Portfolio</span> ▾
+                </button>
+                <div class="navDropdownMenu portfolioSwitcherMenu" id="portfolioSwitcherMenu">
+                    <div id="portfolioList"></div>
+                    <div class="portfolioMenuDivider"></div>
+                    <button class="portfolioNewBtn" id="portfolioNewBtn" type="button">+ Nuevo portfolio</button>
+                    <button class="portfolioNewBtn portfolioImportBtn" id="portfolioImportBtn" type="button">↑ Importar portfolio</button>
+                </div>
+            </div>
+
             <div class="metrics">
                 <div class="metricBox">
                     <span class="metricTitle">Total Cuenta</span>
@@ -159,6 +171,7 @@
                 <button class="navBtn" data-page="metricas">Métricas</button>
                 <button class="navBtn" data-page="ajustes">⚙️</button>
                 <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores">👁</button>
+
             </div>
         </nav>
 
@@ -328,6 +341,81 @@
 </div>
 
 
+<!-- Modal confirm genérico portfolios -->
+<div class="modalOverlay hidden" id="pConfirmOverlay">
+    <div class="assetModal" role="dialog" aria-modal="true">
+        <h3 class="assetModalTitle" id="pConfirmTitle"></h3>
+        <p class="assetModalMessage" id="pConfirmMsg"></p>
+        <div class="assetModalActions">
+            <button id="pConfirmCancel" class="cancelButton">Cancelar</button>
+            <button id="pConfirmOk" class="primaryButton" data-no-autohide="true"></button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal eliminar portfolio (3 pasos) -->
+<div class="modalOverlay hidden" id="pDeleteOverlay">
+    <div class="assetModal" role="dialog" aria-modal="true">
+        <!-- Paso 1 -->
+        <div id="pDelStep1">
+            <h3 class="assetModalTitle">Eliminar portfolio</h3>
+            <p class="assetModalMessage">¿Quieres eliminar el portfolio <strong id="pDelName1"></strong>?</p>
+            <div class="assetModalActions">
+                <button id="pDelCancel1" class="cancelButton">Cancelar</button>
+                <button id="pDelNext1" class="dangerButton">Sí, eliminar</button>
+            </div>
+        </div>
+        <!-- Paso 2 -->
+        <div id="pDelStep2" class="hidden">
+            <h3 class="assetModalTitle">¿Estás seguro?</h3>
+            <p class="assetModalMessage">Esta acción eliminará permanentemente el portfolio y <strong>todos sus datos</strong>. No se puede deshacer.</p>
+            <div class="assetModalActions">
+                <button id="pDelCancel2" class="cancelButton">Cancelar</button>
+                <button id="pDelNext2" class="dangerButton">Sí, estoy seguro</button>
+            </div>
+        </div>
+        <!-- Paso 3 -->
+        <div id="pDelStep3" class="hidden">
+            <h3 class="assetModalTitle">Confirmación final</h3>
+            <p class="assetModalMessage">Escribe <strong id="pDelNameConfirm"></strong> para confirmar la eliminación:</p>
+            <input id="pDelNameInput" class="assetModalInput" type="text" autocomplete="off">
+            <div class="assetModalActions">
+                <button id="pDelCancel3" class="cancelButton">Cancelar</button>
+                <button id="pDelConfirmFinal" class="dangerButton" disabled data-no-autohide="true">Eliminar definitivamente</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal importar portfolio -->
+<div class="modalOverlay hidden" id="portfolioImportModalOverlay">
+    <div class="assetModal" role="dialog" aria-modal="true">
+        <h3 class="assetModalTitle">Importar portfolio</h3>
+        <label class="assetModalLabel" for="portfolioImportName">Nombre del portfolio</label>
+        <input id="portfolioImportName" class="assetModalInput" type="text" placeholder="Ej: Portfolio importado">
+        <label class="assetModalLabel" for="portfolioImportFile">Fichero .db</label>
+        <input id="portfolioImportFile" class="portfolioFileInput" type="file" accept=".db">
+        <div id="portfolioImportStatus" class="portfolioImportStatus hidden"></div>
+        <div class="assetModalActions">
+            <button id="cancelPortfolioImportBtn" class="cancelButton">Cancelar</button>
+            <button id="confirmPortfolioImportBtn" class="primaryButton" data-no-autohide="true">Importar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal portfolio -->
+<div class="modalOverlay hidden" id="portfolioModalOverlay">
+    <div class="assetModal" role="dialog" aria-modal="true" aria-labelledby="portfolioModalTitle">
+        <h3 class="assetModalTitle" id="portfolioModalTitle">Nuevo portfolio</h3>
+        <label class="assetModalLabel" for="portfolioNameInput">Nombre del portfolio</label>
+        <input id="portfolioNameInput" class="assetModalInput" type="text" placeholder="Ej: Personal, Cripto, Jubilación...">
+        <div class="assetModalActions">
+            <button id="cancelPortfolioModalBtn" class="cancelButton">Cancelar</button>
+            <button id="confirmPortfolioModalBtn" class="primaryButton" data-no-autohide="true">Crear</button>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="js/app-core.js?v=20260429a"></script>
 <script src="js/assets.js?v=20260430a"></script>
@@ -346,5 +434,6 @@
 <script src="js/ajustes.js?v=20260422a"></script>
 <script src="js/shared-utils.js?v=20260423a"></script>
 <script src="js/heatmap.js?v=20260505b"></script>
+<script src="js/portfolios.js?v=20260507a"></script>
 </body>
 </html>
