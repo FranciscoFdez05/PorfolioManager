@@ -1,5 +1,20 @@
 :root{
     --sidebar-width:300px;
+    /* ── Paleta global ── */
+    --bg-app:#0b1120;
+    --bg-panel:#0f1724;
+    --bg-surface:#111827;
+    --bg-header:#0d1525;
+    --border-soft:#1e2d45;
+    --border-mid:#273246;
+    --border-hard:#334155;
+    --accent:#3b82f6;
+    --accent-dark:#1d4ed8;
+    --text-primary:#e5edf9;
+    --text-muted:#94a3b8;
+    --text-subtle:#ccd6f6;
+    --color-pos:#2ecc71;
+    --color-neg:#e74c3c;
 }
 
 *{
@@ -352,11 +367,6 @@ body{
     box-sizing:border-box;
     overflow:hidden;
     text-overflow:ellipsis;
-}
-
-.navBtn[data-page="ajustes"]{
-    width:34px;
-    padding:0;
 }
 
 .navBtn:hover{
@@ -1010,10 +1020,6 @@ body{
     font-size:14px;
 }
 
-.assetOperationsTable tbody tr:nth-child(odd) td{
-    background:#111827;
-}
-
 .assetOperationsTable tbody td:last-child{
     border-right:none;
 }
@@ -1113,14 +1119,12 @@ body{
 
 .assetHeaderRight{
     display:flex;
-    flex-direction:row;
     align-items:flex-start;
     gap:16px;
 }
 
 .assetHeaderActions{
     display:flex;
-    flex-direction:row;
     align-items:flex-start;
     gap:8px;
     align-self:flex-start;
@@ -1478,13 +1482,6 @@ tr.gastosTypeEmptySep td {
     border-bottom:1px solid #273246;
 }
 
-.overviewTable thead th:last-child,
-.interesesTable thead th:last-child,
-.dividendosTable thead th:last-child,
-.operationsTable thead th:last-child,
-.bonosTable thead th:last-child{
-    border-right:none;
-}
 
 .overviewTable tbody td,
 .interesesTable tbody td,
@@ -1499,21 +1496,7 @@ tr.gastosTypeEmptySep td {
     font-size:14px;
 }
 
-.overviewTable tbody tr:nth-child(odd) td,
-.interesesTable tbody tr:nth-child(odd) td,
-.dividendosTable tbody tr:nth-child(odd) td,
-.operationsTable tbody tr:nth-child(odd) td,
-.bonosTable tbody tr:nth-child(odd) td{
-    background:#111827;
-}
 
-.overviewTable tbody td:last-child,
-.interesesTable tbody td:last-child,
-.dividendosTable tbody td:last-child,
-.operationsTable tbody td:last-child,
-.bonosTable tbody td:last-child{
-    border-right:none;
-}
 
 .interesesTable .rowActionHeader,
 .dividendosTable .rowActionHeader{
@@ -1678,11 +1661,6 @@ tr.gastosTypeEmptySep td {
     font-weight:700;
 }
 
-.overviewTable tbody tr:nth-child(odd) td.overviewCurrentPriceCell,
-.overviewTable tbody tr:nth-child(odd) td.overviewProfitPositive,
-.overviewTable tbody tr:nth-child(odd) td.overviewProfitNegative{
-    background:#111827;
-}
 
 .overviewEmpty{
     margin:0;
@@ -2415,24 +2393,14 @@ tr.gastosTypeEmptySep td {
     transition:background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-.primaryButton{
-    background:#1d4ed8;
-    color:#ffffff;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
-}
-
-.primaryButton:hover{
-    background:#2563eb;
-    border-color:#60a5fa;
-    transform:translateY(-1px);
-}
-
+.primaryButton,
 .secondaryButton{
     background:#1d4ed8;
     color:#ffffff;
     box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
+.primaryButton:hover,
 .secondaryButton:hover{
     background:#2563eb;
     border-color:#60a5fa;
@@ -2540,6 +2508,7 @@ tr.gastosTypeEmptySep td {
 
 .herramientaPanel{ display:none; }
 .herramientaPanel.active{ display:block; }
+
 
 .herramientaPanelTitle{
     font-size:1rem;
@@ -3199,12 +3168,7 @@ tr.gastosTypeEmptySep td {
     color:#e6edf8;
 }
 
-.operationsTotalCell{
-    position:relative;
-    padding-top:8px !important;
-    padding-bottom:8px !important;
-}
-
+.operationsTotalCell,
 .operationsPriceCell{
     position:relative;
     padding-top:8px !important;
@@ -3308,27 +3272,6 @@ tr.gastosTypeEmptySep td {
     display:none !important;
 }
 
-.operationsStablecoinCardValue{
-    color:#ffffff;
-    font-size:26px;
-    font-weight:700;
-}
-
-.operationsStablecoinCardMeta{
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-    color:#8aa3c7;
-    font-size:12px;
-}
-
-.operationsStablecoinPanelFootnote{
-    margin:0;
-    color:#8aa3c7;
-    font-size:12px;
-    line-height:1.45;
-}
-
 .stablecoinsPage .operationsTable{
     width:auto;
     min-width:100%;
@@ -3364,7 +3307,6 @@ tr.gastosTypeEmptySep td {
 
 .stablecoinsHeaderTools{
     display:flex;
-    flex-direction:row;
     align-items:flex-end;
     gap:10px;
     justify-content:flex-end;
@@ -3728,7 +3670,6 @@ tr.gastosTypeEmptySep td {
 .gastosYearActions{
     display:flex;
     align-items:center;
-    flex-direction:row;
     gap:8px;
     margin-left:auto;
     flex:0 0 auto;
@@ -3897,10 +3838,6 @@ tr.gastosTypeEmptySep td {
     min-width:68px;
 }
 
-.gastosAnnualTable tbody tr:nth-child(odd) td,
-.gastosMovementsTable tbody tr:nth-child(odd) td{
-    background:#111827;
-}
 
 .gastosMovementsTable tbody tr:hover td,
 .ingresosMovementsTable tbody tr:hover td{
@@ -4187,7 +4124,6 @@ tr.gastosTypeEmptySep td {
 .ingresosYearActions{
     display:flex;
     align-items:center;
-    flex-direction:row;
     gap:8px;
     margin-left:auto;
     flex:0 0 auto;
@@ -4366,10 +4302,6 @@ tr.gastosTypeEmptySep td {
     min-width:68px;
 }
 
-.ingresosAnnualTable tbody tr:nth-child(odd) td,
-.ingresosMovementsTable tbody tr:nth-child(odd) td{
-    background:#111827;
-}
 
 .ingresosMovementsTable{
     width:100%;
@@ -6229,7 +6161,7 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     flex-direction:column;
     gap:6px;
     margin-top:4px;
-    max-height:126px;
+    max-height:180px;
     overflow-y:auto;
     scrollbar-width:thin;
     scrollbar-color:#1e2d45 transparent;

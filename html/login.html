@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Manager — Acceso</title>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{
+            background:#0b1120;
+            color:#e5edf9;
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+            min-height:100vh;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+        .loginCard{
+            background:#0f1724;
+            border:1px solid #1e2d45;
+            border-radius:16px;
+            padding:48px 44px 44px;
+            width:100%;
+            max-width:420px;
+            box-shadow:0 8px 40px rgba(0,0,0,.45);
+        }
+        .loginTitle{
+            font-size:1.5rem;
+            font-weight:600;
+            color:#ccd6f6;
+            margin-bottom:36px;
+            text-align:center;
+            letter-spacing:.3px;
+        }
+        .loginTitle span{
+            color:#3b82f6;
+        }
+        .field{
+            margin-bottom:24px;
+        }
+        label{
+            display:block;
+            font-size:0.78rem;
+            color:#94a3b8;
+            margin-bottom:8px;
+            text-transform:uppercase;
+            letter-spacing:.6px;
+        }
+        .inputRow{
+            display:flex;
+            gap:10px;
+            align-items:center;
+        }
+        input{
+            flex:1;
+            width:100%;
+            padding:12px 15px;
+            background:#111827;
+            border:1px solid #273246;
+            border-radius:9px;
+            color:#e5edf9;
+            font-size:0.95rem;
+            outline:none;
+            transition:border-color .15s;
+        }
+        input:focus{border-color:#3b82f6}
+        .toggleBtn{
+            height:44px;
+            width:44px;
+            background:#111827;
+            border:1px solid #273246;
+            border-radius:9px;
+            cursor:pointer;
+            font-size:17px;
+            color:#64748b;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            flex-shrink:0;
+            transition:border-color .15s, color .15s;
+        }
+        .toggleBtn:hover{border-color:#475569;color:#94a3b8}
+        button[type=submit]{
+            width:100%;
+            padding:13px;
+            background:#3b82f6;
+            color:#fff;
+            border:none;
+            border-radius:9px;
+            font-size:1rem;
+            font-weight:600;
+            cursor:pointer;
+            transition:background .15s;
+            margin-top:8px;
+        }
+        button[type=submit]:hover{background:#1d4ed8}
+        .loginError{
+            background:rgba(231,76,60,.15);
+            border:1px solid rgba(231,76,60,.4);
+            color:#e74c3c;
+            border-radius:9px;
+            padding:10px 14px;
+            font-size:0.85rem;
+            margin-bottom:24px;
+            text-align:center;
+        }
+    </style>
+</head>
+<body>
+<div class="loginCard">
+    <p class="loginTitle">Portfolio <span>Manager</span></p>
+    <!-- ERROR_PLACEHOLDER -->
+    <form method="POST">
+        <div class="field">
+            <label for="username">Usuario</label>
+            <input id="username" name="username" type="text" autocomplete="username" autofocus required>
+        </div>
+        <div class="field">
+            <label for="password">Contraseña</label>
+            <div class="inputRow">
+                <input id="password" name="password" type="password" autocomplete="current-password" required>
+                <button class="toggleBtn" type="button" onclick="var i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" title="Mostrar/ocultar">👁</button>
+            </div>
+        </div>
+        <button type="submit">Entrar</button>
+    </form>
+</div>
+</body>
+</html>

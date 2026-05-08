@@ -69,6 +69,7 @@ async function initHerramientasLogic() {
             }
         })
     })
+
 }
 
 // ── Reset ──────────────────────────────────────────────────────────────────
@@ -443,3 +444,4 @@ function hCalcYield() {
     document.getElementById("hYieldMensual").textContent = formatEuro(netoMensual)
     document.getElementById("hYieldResults").classList.remove("hidden")
 }
+

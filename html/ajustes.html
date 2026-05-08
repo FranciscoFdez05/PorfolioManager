@@ -64,6 +64,60 @@
             </div>
         </div>
 
+        <div class="ajustesSection" data-ajuste-id="creduser">
+            <button class="ajustesLockBtn" type="button" title="Bloquear/desbloquear posición">🔒</button>
+            <div class="ajustesSectionTitle">Cambiar nombre de usuario</div>
+            <div class="ajustesSectionDesc">Introduce tu contraseña actual para confirmar el cambio.</div>
+            <div class="ajustesField">
+                <label class="ajustesLabel" for="ajustesCredUserCurrentPwd">Contraseña actual</label>
+                <div class="ajustesInputRow">
+                    <input id="ajustesCredUserCurrentPwd" class="ajustesInput" type="password" placeholder="Contraseña actual…" autocomplete="current-password">
+                    <button class="ajustesToggleBtn" type="button" data-target="ajustesCredUserCurrentPwd" title="Mostrar/ocultar">👁</button>
+                </div>
+            </div>
+            <div class="ajustesField">
+                <label class="ajustesLabel" for="ajustesCredNewUser">Nuevo usuario</label>
+                <div class="ajustesInputRow">
+                    <input id="ajustesCredNewUser" class="ajustesInput" type="text" placeholder="Nuevo usuario…" autocomplete="off">
+                </div>
+            </div>
+            <div class="ajustesActions">
+                <button id="ajustesGuardarCredUserBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                <span id="ajustesCredUserMsg" class="ajustesStatusMsg"></span>
+            </div>
+        </div>
+
+        <div class="ajustesSection" data-ajuste-id="credpwd">
+            <button class="ajustesLockBtn" type="button" title="Bloquear/desbloquear posición">🔒</button>
+            <div class="ajustesSectionTitle">Cambiar contraseña</div>
+            <div class="ajustesSectionDesc">Introduce tu contraseña actual para confirmar el cambio.</div>
+            <div class="ajustesField">
+                <label class="ajustesLabel" for="ajustesCredPwdCurrentPwd">Contraseña actual</label>
+                <div class="ajustesInputRow">
+                    <input id="ajustesCredPwdCurrentPwd" class="ajustesInput" type="password" placeholder="Contraseña actual…" autocomplete="current-password">
+                    <button class="ajustesToggleBtn" type="button" data-target="ajustesCredPwdCurrentPwd" title="Mostrar/ocultar">👁</button>
+                </div>
+            </div>
+            <div class="ajustesField">
+                <label class="ajustesLabel" for="ajustesCredNewPwd">Nueva contraseña</label>
+                <div class="ajustesInputRow">
+                    <input id="ajustesCredNewPwd" class="ajustesInput" type="password" placeholder="Nueva contraseña…" autocomplete="new-password">
+                    <button class="ajustesToggleBtn" type="button" data-target="ajustesCredNewPwd" title="Mostrar/ocultar">👁</button>
+                </div>
+            </div>
+            <div class="ajustesField">
+                <label class="ajustesLabel" for="ajustesCredNewPwd2">Repetir nueva contraseña</label>
+                <div class="ajustesInputRow">
+                    <input id="ajustesCredNewPwd2" class="ajustesInput" type="password" placeholder="Repite la contraseña…" autocomplete="new-password">
+                    <button class="ajustesToggleBtn" type="button" data-target="ajustesCredNewPwd2" title="Mostrar/ocultar">👁</button>
+                </div>
+            </div>
+            <div class="ajustesActions">
+                <button id="ajustesGuardarCredPwdBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                <span id="ajustesCredPwdMsg" class="ajustesStatusMsg"></span>
+            </div>
+        </div>
+
         <div class="ajustesSection" data-ajuste-id="stale">
             <button class="ajustesLockBtn" type="button" title="Bloquear/desbloquear posición">🔒</button>
             <div class="ajustesSectionTitle">Umbral de cotizaciones</div>

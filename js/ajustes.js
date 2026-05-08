@@ -367,6 +367,86 @@ async function initAjustesLogic() {
     }
     loadApiStats()
 
+    // --- Cambiar nombre de usuario ---
+    const credUserCurrentPwd  = document.getElementById("ajustesCredUserCurrentPwd")
+    const credNewUser         = document.getElementById("ajustesCredNewUser")
+    const guardarCredUserBtn  = document.getElementById("ajustesGuardarCredUserBtn")
+    const credUserMsg         = document.getElementById("ajustesCredUserMsg")
+
+    if (guardarCredUserBtn) {
+        guardarCredUserBtn.addEventListener("click", async () => {
+            const currentPassword = credUserCurrentPwd?.value || ""
+            const newUsername     = credNewUser?.value.trim() || ""
+
+            if (!currentPassword) { showMsg(credUserMsg, "Introduce la contraseña actual", "error"); return }
+            if (!newUsername)     { showMsg(credUserMsg, "El usuario no puede estar vacío", "error"); return }
+
+            guardarCredUserBtn.disabled = true
+            showMsg(credUserMsg, "Guardando…", "")
+            try {
+                const res  = await fetch("/api/settings/credentials/username", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ currentPassword, newUsername })
+                })
+                const data = await res.json()
+                if (data.ok) {
+                    showMsg(credUserMsg, "Usuario actualizado", "ok")
+                    if (credUserCurrentPwd) credUserCurrentPwd.value = ""
+                    if (credNewUser)        credNewUser.value = ""
+                } else {
+                    showMsg(credUserMsg, data.error || "Error al guardar", "error")
+                }
+            } catch {
+                showMsg(credUserMsg, "Error de red", "error")
+            } finally {
+                guardarCredUserBtn.disabled = false
+            }
+        })
+    }
+
+    // --- Cambiar contraseña ---
+    const credPwdCurrentPwd  = document.getElementById("ajustesCredPwdCurrentPwd")
+    const credNewPwd         = document.getElementById("ajustesCredNewPwd")
+    const credNewPwd2        = document.getElementById("ajustesCredNewPwd2")
+    const guardarCredPwdBtn  = document.getElementById("ajustesGuardarCredPwdBtn")
+    const credPwdMsg         = document.getElementById("ajustesCredPwdMsg")
+
+    if (guardarCredPwdBtn) {
+        guardarCredPwdBtn.addEventListener("click", async () => {
+            const currentPassword = credPwdCurrentPwd?.value || ""
+            const newPassword     = credNewPwd?.value || ""
+            const newPassword2    = credNewPwd2?.value || ""
+
+            if (!currentPassword)              { showMsg(credPwdMsg, "Introduce la contraseña actual", "error"); return }
+            if (!newPassword)                  { showMsg(credPwdMsg, "La nueva contraseña no puede estar vacía", "error"); return }
+            if (newPassword !== newPassword2)  { showMsg(credPwdMsg, "Las contraseñas no coinciden", "error"); return }
+
+            guardarCredPwdBtn.disabled = true
+            showMsg(credPwdMsg, "Guardando…", "")
+            try {
+                const res  = await fetch("/api/settings/credentials/password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ currentPassword, newPassword })
+                })
+                const data = await res.json()
+                if (data.ok) {
+                    showMsg(credPwdMsg, "Contraseña actualizada", "ok")
+                    if (credPwdCurrentPwd) credPwdCurrentPwd.value = ""
+                    if (credNewPwd)        credNewPwd.value = ""
+                    if (credNewPwd2)       credNewPwd2.value = ""
+                } else {
+                    showMsg(credPwdMsg, data.error || "Error al guardar", "error")
+                }
+            } catch {
+                showMsg(credPwdMsg, "Error de red", "error")
+            } finally {
+                guardarCredPwdBtn.disabled = false
+            }
+        })
+    }
+
     // --- Tema ---
     initAjustesTema()
 

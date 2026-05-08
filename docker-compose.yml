@@ -7,4 +7,8 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./API:/app/API:ro
+      - ./html:/app/html:ro
+      - ./js:/app/js:ro
+      - ./css:/app/css:ro
+      - ./python:/app/python:ro
     restart: unless-stopped

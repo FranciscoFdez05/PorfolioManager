@@ -16,4 +16,4 @@ RUN mkdir -p /app/data /app/logs
 EXPOSE 5000
 
 # Flask app: python/server.py (no es un paquete); arrancamos desde /app/python
-CMD ["gunicorn", "--chdir", "python", "--bind", "0.0.0.0:5000", "--workers", "2", "--threads", "4", "--timeout", "120", "server:app"]
+CMD ["gunicorn", "--chdir", "python", "--bind", "0.0.0.0:5000", "--worker-class", "gthread", "--workers", "2", "--threads", "4", "--timeout", "120", "--keep-alive", "5", "server:app"]

@@ -151,3 +151,4 @@ def save_settings():
 
     _write_ajustes(cfg)
     return jsonify({"ok": True})
+

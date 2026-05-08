@@ -333,11 +333,24 @@ def _migrate(conn):
         conn.execute("ALTER TABLE stablecoins_rows ADD COLUMN comisiones TEXT NOT NULL DEFAULT ''")
 
 
+def _open_connection(db_path: Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(str(db_path), timeout=15)
+    conn.row_factory = sqlite3.Row
+    # Per-connection pragmas (these reset on every new connection)
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=10000")   # 10s antes de error "database is locked"
+    conn.execute("PRAGMA synchronous=NORMAL")   # mucho más rápido que FULL; seguro con WAL
+    conn.execute("PRAGMA cache_size=-8000")     # 8 MB de caché por conexión
+    conn.execute("PRAGMA temp_store=MEMORY")
+    return conn
+
+
 def get_db() -> sqlite3.Connection:
     stale = (
         not hasattr(_local, "conn")
         or _local.conn is None
         or getattr(_local, "_conn_gen", -1) < _reset_generation
+        or getattr(_local, "_conn_path", None) != str(_DB_PATH)
     )
     if stale:
         old = getattr(_local, "conn", None)
@@ -347,13 +360,21 @@ def get_db() -> sqlite3.Connection:
             except Exception:
                 pass
         _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        conn.executescript(_SCHEMA)
-        _migrate(conn)
-        conn.commit()
+        conn = _open_connection(_DB_PATH)
+
+        # Schema + migration corren solo una vez por proceso y por ruta de DB
+        db_key = str(_DB_PATH)
+        if db_key not in _initialized_paths:
+            with _init_lock:
+                if db_key not in _initialized_paths:
+                    conn.executescript(_SCHEMA)
+                    _migrate(conn)
+                    conn.commit()
+                    _initialized_paths.add(db_key)
+
         _local.conn = conn
         _local._conn_gen = _reset_generation
+        _local._conn_path = str(_DB_PATH)
     return _local.conn
 
 
@@ -372,6 +393,7 @@ def invalidate_all_connections():
     global _reset_generation
     _reset_generation += 1
     reset_db()
+    # No borramos _initialized_paths: el schema ya está aplicado en cada DB file.
 
 
 def init_db():
