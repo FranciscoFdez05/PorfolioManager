@@ -13,8 +13,118 @@ from portfolios_manager import (
     rename_portfolio,
     switch_portfolio,
 )
+from asset_utils import slugify
 
 portfolios_bp = Blueprint("portfolios", __name__)
+
+
+def _open_portfolio_db(db_file):
+    conn = sqlite3.connect(str(db_file), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
+    """Read a single asset from a given DB connection, returning camelCase data with prefixed IDs."""
+    safe_id = slugify(asset_id)
+    row = conn.execute(
+        "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
+        "sort_order, price, currency, precio_currency, change, status, last_updated, color, tv_symbol "
+        "FROM activos WHERE id = ?",
+        (safe_id,)
+    ).fetchone()
+    if row is None:
+        return None
+
+    prefixed_id = f"{pid}__{row['id']}"
+    result = {
+        "id": prefixed_id,
+        "originalId": row["id"],
+        "portfolioId": pid,
+        "portfolioName": portfolio_name,
+        "name": row["name"],
+        "symbol": row["symbol"],
+        "marketProvider": row["market_provider"],
+        "marketSymbol": row["market_symbol"],
+        "finnhubSymbol": row["finnhub_symbol"],
+        "type": row["type"],
+        "order": row["sort_order"],
+        "price": row["price"],
+        "currency": row["currency"],
+        "precioCurrency": row["precio_currency"],
+        "change": row["change"],
+        "status": row["status"],
+        "lastUpdated": row["last_updated"],
+        "color": row["color"],
+        "tvSymbol": row["tv_symbol"],
+    }
+
+    result["rows"] = [
+        {
+            "fechaOperacion": r["fecha_operacion"],
+            "tipoOperacion": r["tipo_operacion"],
+            "exchange": r["exchange"],
+            "currency": r["currency"],
+            "participaciones": r["participaciones"],
+            "precioParticipacion": r["precio_participacion"],
+            "capitalInvertidoBruto": r["capital_invertido_bruto"],
+            "costeAnual": r["coste_anual"],
+            "comisiones": r["comisiones"],
+            "comisionesFiat": r["comisiones_fiat"],
+            "comisionesCripto": r["comisiones_cripto"],
+            "comisionesSatoshis": r["comisiones_satoshis"],
+        }
+        for r in conn.execute(
+            "SELECT fecha_operacion, tipo_operacion, exchange, currency, participaciones, "
+            "precio_participacion, capital_invertido_bruto, coste_anual, comisiones, "
+            "comisiones_fiat, comisiones_cripto, comisiones_satoshis "
+            "FROM activo_rows WHERE asset_id = ? ORDER BY id",
+            (safe_id,)
+        ).fetchall()
+    ]
+
+    result["operationRows"] = [
+        {
+            "id": r["id"],
+            "assetId": prefixed_id,
+            "activo": r["activo"],
+            "fechaApertura": r["fecha_apertura"],
+            "par": r["par"],
+            "stablecoinSymbol": r["stablecoin_symbol"],
+            "orden": r["orden"],
+            "precioOrden": r["precio_orden"],
+            "precioCurrency": r["precio_currency"],
+            "cantidad": r["cantidad"],
+            "comisionesCripto": r["comisiones_cripto"],
+            "total": r["total"],
+            "currency": r["currency"],
+            "estado": r["estado"],
+            "fechaCierre": r["fecha_cierre"],
+        }
+        for r in conn.execute(
+            "SELECT id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
+            "precio_currency, cantidad, comisiones_cripto, total, currency, estado, fecha_cierre "
+            "FROM activo_operation_rows WHERE asset_id = ? ORDER BY rowid",
+            (safe_id,)
+        ).fetchall()
+    ]
+
+    result["conversionRows"] = [
+        {
+            "id": r["id"],
+            "fecha": r["fecha"],
+            "par": r["par"],
+            "tipo": r["tipo"],
+            "cantidad": r["cantidad"],
+        }
+        for r in conn.execute(
+            "SELECT id, fecha, par, tipo, cantidad FROM activo_conversion_rows "
+            "WHERE asset_id = ? ORDER BY rowid",
+            (safe_id,)
+        ).fetchall()
+    ]
+
+    return result
 
 
 @portfolios_bp.route("/api/portfolios", methods=["GET"])
@@ -142,3 +252,66 @@ def import_portfolio():
     _write_meta(meta)
 
     return jsonify({"ok": True, "id": pid})
+
+
+@portfolios_bp.route("/api/portfolios/all-assets", methods=["GET"])
+def all_portfolios_assets():
+    meta = get_portfolios()
+    result = []
+    for p in meta["portfolios"]:
+        db_file = _PORTFOLIOS_DIR / f"{p['id']}.db"
+        if not db_file.exists():
+            continue
+        conn = _open_portfolio_db(db_file)
+        try:
+            assets = conn.execute(
+                "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
+                "sort_order, price, currency, precio_currency, change, status, last_updated, color, tv_symbol "
+                "FROM activos ORDER BY sort_order"
+            ).fetchall()
+            for row in assets:
+                result.append({
+                    "id": f"{p['id']}__{row['id']}",
+                    "originalId": row["id"],
+                    "portfolioId": p["id"],
+                    "portfolioName": p["name"],
+                    "name": row["name"],
+                    "symbol": row["symbol"],
+                    "marketProvider": row["market_provider"],
+                    "marketSymbol": row["market_symbol"],
+                    "finnhubSymbol": row["finnhub_symbol"],
+                    "type": row["type"],
+                    "order": row["sort_order"],
+                    "price": row["price"],
+                    "currency": row["currency"],
+                    "precioCurrency": row["precio_currency"],
+                    "change": row["change"],
+                    "status": row["status"],
+                    "lastUpdated": row["last_updated"],
+                    "color": row["color"],
+                    "tvSymbol": row["tv_symbol"],
+                })
+        except Exception:
+            pass
+        finally:
+            conn.close()
+    return jsonify({"ok": True, "assets": result})
+
+
+@portfolios_bp.route("/api/portfolios/<pid>/activo/<asset_id>", methods=["GET"])
+def portfolio_activo(pid, asset_id):
+    meta = get_portfolios()
+    portfolio = next((p for p in meta["portfolios"] if p["id"] == pid), None)
+    if not portfolio:
+        return jsonify({"ok": False, "error": "Portfolio no encontrado"}), 404
+    db_file = _PORTFOLIOS_DIR / f"{pid}.db"
+    if not db_file.exists():
+        return jsonify({"ok": False, "error": "DB no encontrada"}), 404
+    conn = _open_portfolio_db(db_file)
+    try:
+        result = _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio["name"])
+        if result is None:
+            return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
+        return jsonify(result)
+    finally:
+        conn.close()

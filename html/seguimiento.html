@@ -1,0 +1,159 @@
+<div class="seguimientoPage">
+
+    <div class="activosToolbar">
+        <button id="seguimientoAddBtn" class="primaryButton">+ Añadir</button>
+        <div class="activosFilters" id="seguimientoFilters">
+            <button class="activosFilterBtn active" data-type="all">Todos</button>
+            <button class="activosFilterBtn" data-type="cripto">Cripto</button>
+            <button class="activosFilterBtn" data-type="acciones">Acciones</button>
+            <button class="activosFilterBtn" data-type="etfs">ETFs</button>
+            <button class="activosFilterBtn" data-type="comoditis">Comoditis</button>
+        </div>
+        <div class="activosFilters" id="seguimientoSourceFilters">
+            <button class="activosFilterBtn active" data-source="all">Todos</button>
+            <button class="activosFilterBtn" data-source="portfolio">Portfolio</button>
+            <button class="activosFilterBtn" data-source="nuevos">Nuevos</button>
+        </div>
+        <input type="text" class="activosSearch" id="seguimientoSearch" placeholder="Buscar activo...">
+        <span class="activosCount" id="seguimientoCount"></span>
+        <button id="segHiddenBtn" class="secondaryButton segHiddenToggleBtn" type="button" title="Gestionar activos ocultos" style="display:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>Ocultos <span id="segHiddenCount" class="segHiddenBadge">0</span>
+        </button>
+        <div class="avViewToggle" id="seguimientoViewToggle">
+            <button class="avViewBtn active" data-view="cards" title="Vista tarjetas">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg>
+            </button>
+            <button class="avViewBtn" data-view="table" title="Vista tabla">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="2" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="6.75" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="11.5" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="activosGrid" id="seguimientoGrid"></div>
+    <div class="activosTableWrap hidden" id="seguimientoTableWrap">
+        <table class="activosTable" id="seguimientoTable">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Nombre</th>
+                    <th>Ticker</th>
+                    <th>Precio</th>
+                    <th>Cambio día</th>
+                    <th>Cambio %</th>
+                    <th>Proveedor</th>
+                    <th>Origen</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="seguimientoTableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="modalOverlay hidden" id="seguimientoModalOverlay">
+        <div class="assetModal" role="dialog" aria-modal="true">
+            <h3 class="assetModalTitle">Añadir a Watchlist</h3>
+
+            <label class="assetModalLabel" for="seguimientoNombreInput">Nombre del activo</label>
+            <div class="segAutocompleteWrap">
+                <input id="seguimientoNombreInput" class="assetModalInput" type="text" placeholder="Ej: Apple, Bitcoin..." autocomplete="off">
+                <div id="seguimientoNombreSuggestions" class="segSuggestions hidden"></div>
+            </div>
+
+            <label class="assetModalLabel" for="seguimientoTypeSelect">Tipo</label>
+            <select id="seguimientoTypeSelect" class="assetModalSelect" data-no-custom="true">
+                <option value="acciones">Acciones</option>
+                <option value="cripto">Cripto</option>
+                <option value="etfs">ETFs</option>
+                <option value="comoditis">Comoditis</option>
+            </select>
+
+            <label class="assetModalLabel" for="seguimientoTickerInput">Ticker mercado <span class="assetModalLabelHint">(opcional)</span></label>
+            <input id="seguimientoTickerInput" class="assetModalInput" type="text" placeholder="Ej: AAPL, BTC...">
+            <div class="assetSearchActions">
+                <button id="segSearchFinnhubBtn" class="secondaryButton" type="button">Buscar Finnhub</button>
+                <button id="segSearchEodhdBtn" class="secondaryButton" type="button">Buscar EODHD</button>
+                <button id="segSearchYahooBtn" class="secondaryButton" type="button">Buscar Yahoo Finance</button>
+            </div>
+            <div id="segSearchFeedback" class="assetSearchFeedback hidden"></div>
+            <div id="segSearchResults" class="assetSearchResults hidden"></div>
+
+            <label class="assetModalLabel assetModalLabelSmall" for="seguimientoTVTickerInput">Ticker TradingView <span class="assetModalLabelHint">(opcional, para el gráfico)</span></label>
+            <input id="seguimientoTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: NASDAQ:AAPL, BINANCE:BTCUSDT...">
+
+            <div class="assetModalActions">
+                <button id="seguimientoCancelBtn" class="cancelButton" type="button">Cancelar</button>
+                <button id="seguimientoConfirmBtn" class="primaryButton" type="button">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modalOverlay hidden" id="segHiddenModalOverlay">
+        <div class="assetModal" role="dialog" aria-modal="true" style="max-width:480px;width:100%">
+            <h3 class="assetModalTitle">Activos ocultos de la watchlist</h3>
+            <p style="margin:0 0 16px;color:var(--text-secondary);font-size:0.88em">Activos del portfolio que están ocultos en la watchlist. Pulsa el ojo para mostrarlos de nuevo.</p>
+            <div id="segHiddenList" style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow-y:auto"></div>
+            <div class="assetModalActions" style="margin-top:20px">
+                <button id="segHiddenCloseBtn" class="cancelButton" type="button">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modalOverlay hidden" id="segDeleteTypeOverlay">
+        <div class="assetModal" role="dialog" aria-modal="true">
+            <h3 class="assetModalTitle">Confirmar eliminación</h3>
+            <p id="segDeleteTypeMsg" style="margin:0 0 12px;color:var(--text-secondary);font-size:0.92em;line-height:1.5"></p>
+            <input id="segDeleteTypeInput" class="assetModalInput" type="text" placeholder="Escribe el nombre en MAYÚSCULAS..." autocomplete="off">
+            <div class="assetModalActions">
+                <button id="segDeleteTypeCancelBtn" class="cancelButton" type="button">Cancelar</button>
+                <button id="segDeleteTypeOkBtn" class="dangerButton" type="button">Eliminar definitivamente</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modalOverlay hidden" id="segEditModalOverlay">
+        <div class="assetModal" role="dialog" aria-modal="true">
+            <h3 class="assetModalTitle" id="segEditModalTitle">Editar activo</h3>
+
+            <!-- Aviso para activos del portfolio -->
+            <div id="segEditPortfolioNotice" class="hidden">
+                <div class="segEditNoticeBox">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;color:#f39c12"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <p>Este activo pertenece al <strong>portfolio</strong>. Para editar su nombre, tipo o datos, ve a la sección <strong>Activos</strong>.</p>
+                </div>
+            </div>
+
+            <!-- Formulario solo para activos personalizados -->
+            <div id="segEditCustomForm">
+                <label class="assetModalLabel" for="segEditNombreInput">Nombre del activo</label>
+                <input id="segEditNombreInput" class="assetModalInput" type="text" placeholder="Ej: Apple, Bitcoin...">
+
+                <label class="assetModalLabel" for="segEditTypeSelect">Tipo</label>
+                <select id="segEditTypeSelect" class="assetModalSelect" data-no-custom="true">
+                    <option value="acciones">Acciones</option>
+                    <option value="cripto">Cripto</option>
+                    <option value="etfs">ETFs</option>
+                    <option value="comoditis">Comoditis</option>
+                </select>
+
+                <label class="assetModalLabel" for="segEditTickerInput">Ticker mercado <span class="assetModalLabelHint">(opcional)</span></label>
+                <input id="segEditTickerInput" class="assetModalInput" type="text" placeholder="Ej: AAPL, BTC...">
+                <div class="assetSearchActions">
+                    <button id="segEditSearchFinnhubBtn" class="secondaryButton" type="button">Buscar Finnhub</button>
+                    <button id="segEditSearchEodhdBtn" class="secondaryButton" type="button">Buscar EODHD</button>
+                    <button id="segEditSearchYahooBtn" class="secondaryButton" type="button">Buscar Yahoo Finance</button>
+                </div>
+                <div id="segEditSearchFeedback" class="assetSearchFeedback hidden"></div>
+                <div id="segEditSearchResults" class="assetSearchResults hidden"></div>
+
+                <label class="assetModalLabel assetModalLabelSmall" for="segEditTVTickerInput">Ticker TradingView <span class="assetModalLabelHint">(opcional, para el gráfico)</span></label>
+                <input id="segEditTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: NASDAQ:AAPL, BINANCE:BTCUSDT...">
+            </div>
+
+            <div class="assetModalActions">
+                <button id="segEditCancelBtn" class="cancelButton" type="button">Cancelar</button>
+                <button id="segEditConfirmBtn" class="primaryButton" type="button">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+</div>

@@ -214,6 +214,9 @@ function mUpdateKpis(payload) {
 
     mSetKpi("mkpiRentaFija", formatEuro(rfNeto))
 
+    const rfGroup = document.querySelector(".mkpiGroupRf")
+    if (rfGroup) rfGroup.classList.toggle("hidden", bonosRows.length === 0 && rfRows.length === 0)
+
     const topSet2 = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
     topSet2("topTotalDividendos", formatEuro(totalDiv))
     topSet2("topTotalInteres",    formatEuro(totalInt))
@@ -1061,11 +1064,14 @@ function mComputeGastosData(yearData) {
 
 function mRenderGastos(yearsList, yearData) {
     const section = document.getElementById("mSectionGastos")
+    const gastosKpiGroup = document.querySelector(".mkpiGroupGastos")
     if (!yearsList.length || !yearData) {
         if (section) section.classList.add("hidden")
+        if (gastosKpiGroup) gastosKpiGroup.classList.add("hidden")
         return
     }
     if (section) section.classList.remove("hidden")
+    if (gastosKpiGroup) gastosKpiGroup.classList.remove("hidden")
 
     const { totalMes, totalTipo, totalMensualidades, totalMovimientos } = mComputeGastosData(yearData)
     const totalGeneral = totalMensualidades + totalMovimientos
@@ -1549,11 +1555,14 @@ function mRenderIngresosCharts(ingresosYearData) {
 
 function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
     const section = document.getElementById("mSectionIngresos")
+    const ingresosKpiGroup = document.querySelector(".mkpiGroupIngresosPersonales")
     if (!ingresosYearsList.length || !ingresosYearData) {
         if (section) section.classList.add("hidden")
+        if (ingresosKpiGroup) ingresosKpiGroup.classList.add("hidden")
         return
     }
     if (section) section.classList.remove("hidden")
+    if (ingresosKpiGroup) ingresosKpiGroup.classList.remove("hidden")
 
     const yearToggle = document.getElementById("mIngresosYearToggle")
     if (yearToggle && !yearToggle.dataset.bound) {
@@ -1847,6 +1856,11 @@ function mRenderAll(payload) {
     mRenderIngresosSection(ingresosYearsList || [], ingresosYearData || null)
     mRenderComparativa(ingresosYearData || null, gastosYearData || null)
     mRenderTopTable(summaries)
+
+    const gastosEmpty = !gastosYearsList?.length || !gastosYearData
+    const ingresosEmpty = !ingresosYearsList?.length || !ingresosYearData
+    const gastosIngresosTab = document.querySelector(".mNavTab[data-mcat='gastos,ingresos']")
+    if (gastosIngresosTab) gastosIngresosTab.classList.toggle("hidden", gastosEmpty && ingresosEmpty)
 }
 
 async function initMetricasLogic() {

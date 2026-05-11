@@ -276,6 +276,21 @@ def changeActivoCurrency(assetId):
     if current_currency == target_currency:
         return jsonify({"ok": True, "asset": assetData, "converted": False})
 
+    # scope="moneda": convert only the price (market value), leave investment rows untouched
+    if scope == "moneda":
+        converted_price = parse_loose_number(assetData.get("price", ""))
+        if converted_price is not None:
+            converted_price, error = convert_amount(converted_price, current_currency, target_currency)
+            if error:
+                statusCode = 503 if is_temporary_service_error(error) else 400
+                return jsonify({"ok": False, "error": error}), statusCode
+            assetData["price"] = format_decimal(converted_price)
+        assetData["currency"] = target_currency
+        assetData["precioCurrency"] = target_currency
+        assetData["status"] = f"Moneda de cotización cambiada a {target_currency}"
+        writeAssetFile(assetId, assetData)
+        return jsonify({"ok": True, "asset": assetData, "converted": True})
+
     converted_price = parse_loose_number(assetData.get("price", ""))
 
     if converted_price is not None:
@@ -304,6 +319,7 @@ def changeActivoCurrency(assetId):
 
     assetData["currency"] = target_currency
     assetData["precioCurrency"] = target_currency
+    assetData["investedCurrency"] = target_currency
     assetData["status"] = (
         f"Moneda de visualización convertida de {current_currency} a {target_currency}"
         if is_crypto

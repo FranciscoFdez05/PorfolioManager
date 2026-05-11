@@ -227,7 +227,7 @@ async function getAssetDisplayPriceValue(asset) {
 
 async function buildOverviewDisplayRow(asset) {
     const row = await buildOverviewRow(asset)
-    const investedCurrency = row.currency
+    const investedCurrency = row.investedCurrency || row.currency
     const netoActualDisplay = row.netoActual
     const currentPriceDisplay = row.valorActual
     const rendimientoDisplay = netoActualDisplay - row.invertidoBruto
@@ -262,6 +262,12 @@ async function buildSummaryMetricsInEuros(summary) {
 }
 
 async function loadAssetsList() {
+    if (window._viewAllPortfolios) {
+        const response = await fetch("/api/portfolios/all-assets")
+        if (!response.ok) throw new Error("No se pudo cargar activos de todos los portfolios")
+        const data = await response.json()
+        return Array.isArray(data.assets) ? data.assets : []
+    }
     const response = await fetch("/api/activos")
 
     if (!response.ok) {
@@ -273,6 +279,14 @@ async function loadAssetsList() {
 }
 
 async function loadAssetData(assetId) {
+    if (window._viewAllPortfolios && String(assetId).includes("__")) {
+        const sep = assetId.indexOf("__")
+        const pid = assetId.slice(0, sep)
+        const origId = assetId.slice(sep + 2)
+        const response = await fetch(`/api/portfolios/${encodeURIComponent(pid)}/activo/${encodeURIComponent(origId)}`)
+        if (!response.ok) throw new Error("No se pudo cargar el activo")
+        return await response.json()
+    }
     const response = await fetch(`/api/activos/${assetId}`)
 
     if (!response.ok) {
@@ -306,6 +320,54 @@ async function deleteAssetOnServer(assetId) {
         const errorText = await response.text()
         throw new Error(`HTTP ${response.status}: ${errorText}`)
     }
+}
+
+function openDeleteTypeConfirm(assetName, onConfirmed) {
+    const overlay   = document.getElementById("deleteTypeOverlay")
+    const msg       = document.getElementById("deleteTypeMsg")
+    const input     = document.getElementById("deleteTypeInput")
+    const cancelBtn = document.getElementById("deleteTypeCancelBtn")
+    const okBtn     = document.getElementById("deleteTypeOkBtn")
+    if (!overlay || !input) return
+
+    const expected = assetName.toUpperCase()
+    msg.textContent = `Escribe "${expected}" para confirmar la eliminación definitiva.`
+    input.value = ""
+    input.style.borderColor = ""
+    overlay.classList.remove("hidden")
+    setTimeout(() => input.focus(), 50)
+
+    function doConfirm() {
+        if (input.value.trim() !== expected) {
+            input.style.borderColor = "var(--danger, #e74c3c)"
+            input.focus()
+            return
+        }
+        overlay.classList.add("hidden")
+        cleanup()
+        onConfirmed()
+    }
+
+    function doCancel() {
+        overlay.classList.add("hidden")
+        cleanup()
+    }
+
+    function onKey(e) {
+        if (e.key === "Enter") doConfirm()
+        if (e.key === "Escape") doCancel()
+    }
+
+    function cleanup() {
+        okBtn.removeEventListener("click", doConfirm)
+        cancelBtn.removeEventListener("click", doCancel)
+        input.removeEventListener("keydown", onKey)
+        input.style.borderColor = ""
+    }
+
+    okBtn.addEventListener("click", doConfirm)
+    cancelBtn.addEventListener("click", doCancel)
+    input.addEventListener("keydown", onKey)
 }
 
 async function createAssetOnServer(name, type, marketSymbol = "", marketProvider = "finnhub", color = "", tvSymbol = "") {
@@ -659,7 +721,7 @@ async function updateAssetDetail(asset) {
     const detStatus = document.getElementById("detStatus")
     const detFinnhub = document.getElementById("detFinnhub")
     const summary = await buildOverviewRow(asset)
-    const investedCurrency = summary.currency
+    const investedCurrency = summary.investedCurrency || summary.currency
     const pnlBruto = summary.netoActual - summary.invertidoBruto
 
     if (detSymbol) {
@@ -697,7 +759,7 @@ async function updateAssetDetail(asset) {
     }
 
     if (detPnL) {
-        detPnL.textContent = formatMoney(pnlBruto, summary.currency)
+        detPnL.textContent = formatMoney(pnlBruto, investedCurrency)
         detPnL.classList.toggle("negative", pnlBruto < 0)
     }
 
@@ -708,7 +770,7 @@ async function updateAssetDetail(asset) {
     if (detFees) {
         detFees.textContent = isCryptoAssetType(asset.type)
             ? formatAssetCommissionValue(summary.comisionesCripto)
-            : formatMoney(summary.comisiones, summary.currency)
+            : formatMoney(summary.comisiones, investedCurrency)
     }
 
     if (detStatus) {
@@ -855,7 +917,7 @@ async function renderAssetsList(assets) {
         return
     }
 
-    const hidden   = window._hiddenAssets instanceof Set ? window._hiddenAssets : new Set()
+    const hidden   = window._viewAllPortfolios ? new Set() : (window._hiddenAssets instanceof Set ? window._hiddenAssets : new Set())
     const staleMs  = ((window._settingsStaleHours ?? 24) > 0)
         ? (window._settingsStaleHours ?? 24) * 3600 * 1000
         : Infinity
@@ -867,6 +929,9 @@ async function renderAssetsList(assets) {
         const isStale = staleMs < Infinity && asset.lastUpdated
             ? (now - new Date(asset.lastUpdated).getTime()) > staleMs
             : false
+        const portfolioBadge = (window._viewAllPortfolios && asset.portfolioName)
+            ? `<span class="assetPortfolioBadge">${escapeHtml(asset.portfolioName)}</span>`
+            : ""
         try {
             const displayPrice    = await getAssetDisplayPriceValue(asset)
             const displayCurrency = asset.currency || "EUR"
@@ -880,9 +945,9 @@ async function renderAssetsList(assets) {
             button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}${isStale ? " stale" : ""}`
             button.dataset.assetId    = asset.id
             button.dataset.assetOrder = String(asset.order ?? 0)
-            button.draggable = true
+            button.draggable = !window._viewAllPortfolios
             button.innerHTML = `
-                <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}</span>
+                <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}${portfolioBadge}</span>
                 <span class="assetBtnPrice">${formatMoney(displayPrice, displayCurrency)}</span>
                 <span class="assetBtnChange ${changeClass}">${changeMoneyStr}</span>
                 <span class="assetBtnChangePct ${changeClass}">${changePctStr || "—"}</span>
@@ -902,9 +967,9 @@ async function renderAssetsList(assets) {
             button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}${isStale ? " stale" : ""}`
             button.dataset.assetId    = asset.id
             button.dataset.assetOrder = String(asset.order ?? 0)
-            button.draggable = true
+            button.draggable = !window._viewAllPortfolios
             button.innerHTML = `
-                <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}</span>
+                <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}${portfolioBadge}</span>
                 <span class="assetBtnPrice">${formatMoney(fallbackPrice, fallbackCurrency)}</span>
                 <span class="assetBtnChange ${changeClass}">${changeMoneyStr}</span>
                 <span class="assetBtnChangePct ${changeClass}">${changePctStr || "—"}</span>
@@ -917,7 +982,7 @@ async function renderAssetsList(assets) {
     assetsList.appendChild(fragment)
 
     initAssetSelector([...assetsList.querySelectorAll(".assetBtn")])
-    initAssetDragAndDrop(assetsList)
+    if (!window._viewAllPortfolios) initAssetDragAndDrop(assetsList)
 }
 
 async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTable = false) {
@@ -1861,7 +1926,8 @@ async function buildOverviewRow(asset) {
     const rows = Array.isArray(asset.rows) ? asset.rows : []
     const isCrypto = isCryptoAssetType(asset.type)
     const assetCurrency = normalizeCurrencyCode(asset.currency || "EUR")
-    const remainingLots = await buildRemainingAssetLots(asset, assetCurrency)
+    const investedCurrency = normalizeCurrencyCode(asset.investedCurrency || asset.currency || "EUR")
+    const remainingLots = await buildRemainingAssetLots(asset, investedCurrency)
     const rawParticipaciones = remainingLots.reduce((total, lot) => total + lot.remaining, 0)
     const completedOperationsImpact = getCompletedOperationsCryptoImpact(asset)
     const transaccionesImpact = getTransaccionesCryptoImpact(asset)
@@ -1874,13 +1940,20 @@ async function buildOverviewRow(asset) {
     const comisionesFiat = isCrypto
         ? (await Promise.all(rows.map(async (row) => {
             const feeAmount = parseLooseNumber(getCryptoRowCommissionFiat(row)) || 0
-            return await convertCryptoRowMoneyToAssetCurrency(feeAmount, row, assetCurrency)
+            return await convertCryptoRowMoneyToAssetCurrency(feeAmount, row, investedCurrency)
         }))).reduce((total, value) => total + value, 0)
         : rows.reduce((total, row) => total + (parseLooseNumber(row.comisiones || "") || 0), 0)
     const invertidoNeto = invertidoBruto - comisionesFiat
     const valorActual = parseLooseNumber(asset.price || "") || 0
-    const netoActual = participaciones * valorActual
-    const promedioCompra = participaciones > 0 ? invertidoNeto / participaciones : 0
+    const netoActualMarket = participaciones * valorActual
+    const netoActual = assetCurrency !== investedCurrency
+        ? await convertAmountForDisplay(netoActualMarket, assetCurrency, investedCurrency)
+        : netoActualMarket
+    const promedioCompra = participaciones > 0
+        ? assetCurrency !== investedCurrency
+            ? (await convertAmountForDisplay(invertidoNeto, investedCurrency, assetCurrency)) / participaciones
+            : invertidoNeto / participaciones
+        : 0
     const rendimiento = netoActual - invertidoNeto
 
     return {
@@ -1892,6 +1965,7 @@ async function buildOverviewRow(asset) {
         promedioCompra,
         valorActual,
         currency: assetCurrency,
+        investedCurrency,
         precioCurrency: assetCurrency,
         invertidoBruto,
         comisiones: comisionesFiat,
@@ -2128,41 +2202,73 @@ function renderAssetTablePage(asset) {
     contentArea.innerHTML = `
         <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-price-currency="${asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-market-provider="${asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-market-symbol="${asset.marketSymbol || asset.finnhubSymbol || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}" data-asset-color="${asset.color || ""}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}">
             <div class="assetPageHeader">
-                <div>
+                <div class="assetHeaderLeft">
                     <div class="assetTitleRow">
                         <h1 class="assetPageTitle">${escapeHtml(asset.name || asset.symbol)}</h1>
                         <button id="editAssetNameBtn" class="assetEditNameBtn" type="button" title="Editar nombre del activo" aria-label="Editar nombre del activo">✎</button>
-                        <button id="addAssetRowBtn" class="primaryButton assetAddRowHeaderBtn">Añadir fila</button>
                     </div>
                     <div class="assetPageSubtitle">${escapeHtml(asset.name)} · ${buildAssetTypeLabel(asset.type)}</div>
+                    <div class="assetValueRow">
+                        <span class="assetValueAmount" id="assetStatNetoActual">—</span>
+                    </div>
+                </div>
+                <div class="assetStatsPanel" id="assetStatsPanel">
+                    <div class="assetStatCard">
+                        <span class="assetStatLabel">Cantidad</span>
+                        <span class="assetStatValue" id="assetStatCantidad">—</span>
+                    </div>
+                    <div class="assetStatCard">
+                        <span class="assetStatLabel">Precio medio de compra</span>
+                        <span class="assetStatValue" id="assetStatPrecioMedio">—</span>
+                    </div>
+                    <div class="assetStatCard">
+                        <span class="assetStatLabel">Capital invertido</span>
+                        <span class="assetStatValue" id="assetStatInvertido">—</span>
+                    </div>
+                    <div class="assetStatCard">
+                        <span class="assetStatLabel">Ganancia / Pérdida Total</span>
+                        <div class="assetStatValueRow">
+                            <span class="assetStatValue" id="assetStatPnL">—</span>
+                            <span class="assetStatSub" id="assetStatPnLPct">—</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="assetHeaderRight">
-                    <div class="assetHeaderActions">
-                        <button id="refreshAssetMarketBtn" class="primaryButton">Actualizar cotización (${String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")).toUpperCase()})</button>
-                        <button id="deleteAssetBtn" class="dangerButton">Eliminar activo</button>
-                    </div>
-                    ${isCrypto ? `
-                        <div class="assetCurrencyPanel assetCurrencyPanelCrypto">
-                            <div class="assetCurrencyBlock">
-                                <div class="assetCurrencyLabel">Moneda menú lateral</div>
-                                <div class="assetCurrencyCurrent">Actual: ${currentCurrency}</div>
-                                <button id="toggleAssetCurrencyBtn" class="secondaryButton assetCurrencyBtn" type="button" data-target-currency="${targetCurrency}">
-                                    Pasar a ${targetCurrency}
-                                </button>
-                            </div>
-                        </div>
-                    ` : `
-                        <div class="assetCurrencyPanel">
-                            <div class="assetCurrencyLabel">Moneda del activo</div>
-                            <div class="assetCurrencyCurrent">Actual: ${currentCurrency}</div>
-                            <button id="toggleAssetCurrencyBtn" class="secondaryButton assetCurrencyBtn" type="button" data-target-currency="${targetCurrency}">
-                                Pasar a ${targetCurrency}
+                    <button id="addAssetRowBtn" class="primaryButton assetAddRowHeaderBtn"><span class="assetBtnIcon">+</span> Añadir fila</button>
+                    <div class="assetHeaderMenu">
+                        <button id="assetMenuBtn" class="assetMenuTrigger" type="button" aria-label="Más opciones">⋯</button>
+                        <div class="assetMenuDropdown" id="assetMenuDropdown">
+                            <button id="refreshAssetMarketBtn" class="assetMenuItem assetMenuItemRefresh" type="button">
+                                <span class="assetMenuIcon">↻</span>
+                                <span class="assetMenuText">Actualizar cotización <span class="assetBtnProvider">(${String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")).toUpperCase()})</span></span>
+                            </button>
+                            <div class="assetMenuGroupLabel">Cambiar moneda</div>
+                            <button id="changeCurrencyLabelEurBtn" class="assetMenuItem assetMenuItemSub" type="button" data-target-currency="EUR" data-scope="moneda" ${currentCurrency === "EUR" ? "disabled" : ""}>
+                                <span class="assetMenuIcon">⇄</span>
+                                <span class="assetMenuText">EUR${currentCurrency === "EUR" ? " <small>(actual)</small>" : ""}</span>
+                            </button>
+                            <button id="changeCurrencyLabelUsdBtn" class="assetMenuItem assetMenuItemSub" type="button" data-target-currency="USD" data-scope="moneda" ${currentCurrency === "USD" ? "disabled" : ""}>
+                                <span class="assetMenuIcon">⇄</span>
+                                <span class="assetMenuText">USD${currentCurrency === "USD" ? " <small>(actual)</small>" : ""}</span>
+                            </button>
+                            <div class="assetMenuGroupLabel">Convertir inversión</div>
+                            <button id="convertInversionEurBtn" class="assetMenuItem assetMenuItemSub" type="button" data-target-currency="EUR" data-scope="asset" ${currentCurrency === "EUR" ? "disabled" : ""}>
+                                <span class="assetMenuIcon">↕</span>
+                                <span class="assetMenuText">EUR${currentCurrency === "EUR" ? " <small>(actual)</small>" : ""}</span>
+                            </button>
+                            <button id="convertInversionUsdBtn" class="assetMenuItem assetMenuItemSub" type="button" data-target-currency="USD" data-scope="asset" ${currentCurrency === "USD" ? "disabled" : ""}>
+                                <span class="assetMenuIcon">↕</span>
+                                <span class="assetMenuText">USD${currentCurrency === "USD" ? " <small>(actual)</small>" : ""}</span>
+                            </button>
+                            <div class="assetMenuSep"></div>
+                            <button id="deleteAssetBtn" class="assetMenuItem assetMenuItemDanger" type="button">
+                                <span class="assetMenuIcon">🗑</span>
+                                <span class="assetMenuText">Eliminar activo</span>
                             </button>
                         </div>
-                    `}
+                    </div>
                 </div>
             </div>
-
 
             <div class="assetTabsContainer">
                 <div class="assetTabsNav">
@@ -3007,9 +3113,59 @@ function initAssetTableLogic(asset) {
     const assetOperationsBody = document.getElementById("assetOperationsBody")
     const addAssetRowButton = document.getElementById("addAssetRowBtn")
     const refreshAssetMarketButton = document.getElementById("refreshAssetMarketBtn")
-    const toggleAssetCurrencyButton = document.getElementById("toggleAssetCurrencyBtn")
+    const currencyActionButtons = document.querySelectorAll("[data-scope='moneda'], [data-scope='asset'][data-target-currency]")
     const editAssetNameButton = document.getElementById("editAssetNameBtn")
     const deleteAssetButton = document.getElementById("deleteAssetBtn")
+    const assetMenuBtn = document.getElementById("assetMenuBtn")
+    const assetMenuDropdown = document.getElementById("assetMenuDropdown")
+
+    if (assetMenuBtn && assetMenuDropdown) {
+        assetMenuBtn.addEventListener("click", (e) => {
+            e.stopPropagation()
+            const isOpen = assetMenuDropdown.classList.contains("open")
+            assetMenuDropdown.classList.toggle("open", !isOpen)
+            assetMenuBtn.classList.toggle("active", !isOpen)
+        })
+        assetMenuDropdown.addEventListener("click", () => {
+            assetMenuDropdown.classList.remove("open")
+            assetMenuBtn.classList.remove("active")
+        })
+        document.addEventListener("click", function closeMenu(e) {
+            if (!assetMenuBtn.contains(e.target) && !assetMenuDropdown.contains(e.target)) {
+                assetMenuDropdown.classList.remove("open")
+                assetMenuBtn.classList.remove("active")
+                document.removeEventListener("click", closeMenu)
+            }
+        })
+    }
+
+    buildOverviewRow(asset).then(summary => {
+        if (document.querySelector('.assetTablePage')?.dataset.assetId !== asset.id) return
+        const currency = summary.currency
+        const investedCurrency = summary.investedCurrency || currency
+        const pnl = summary.rendimiento
+        const pnlPct = summary.invertidoNeto > 0 ? (pnl / summary.invertidoNeto) * 100 : 0
+        const netoEl = document.getElementById("assetStatNetoActual")
+        const cantidadEl = document.getElementById("assetStatCantidad")
+        const precioMedioEl = document.getElementById("assetStatPrecioMedio")
+        const invertidoEl = document.getElementById("assetStatInvertido")
+        const pnlEl = document.getElementById("assetStatPnL")
+        const pnlPctEl = document.getElementById("assetStatPnLPct")
+        if (netoEl) netoEl.textContent = formatMoney(summary.netoActual, investedCurrency)
+        if (cantidadEl) cantidadEl.textContent = formatAssetParticipationValue(summary.participaciones, asset.type)
+        if (precioMedioEl) precioMedioEl.textContent = formatMoney(summary.promedioCompra, currency)
+        if (invertidoEl) invertidoEl.textContent = formatMoney(summary.invertidoNeto, investedCurrency)
+        if (pnlEl) {
+            pnlEl.textContent = (pnl >= 0 ? "+" : "") + formatMoney(pnl, investedCurrency)
+            pnlEl.classList.toggle("assetStatPositive", pnl > 0)
+            pnlEl.classList.toggle("assetStatNegative", pnl < 0)
+        }
+        if (pnlPctEl) {
+            pnlPctEl.textContent = (pnlPct >= 0 ? "▲ " : "▼ ") + Math.abs(pnlPct).toFixed(2) + "%"
+            pnlPctEl.classList.toggle("assetStatPositive", pnlPct > 0)
+            pnlPctEl.classList.toggle("assetStatNegative", pnlPct < 0)
+        }
+    })
 
     if (assetOperationsBody) {
         assetOperationsBody.addEventListener("click", (event) => {
@@ -3059,32 +3215,48 @@ function initAssetTableLogic(asset) {
         })
     }
 
-    if (toggleAssetCurrencyButton) {
-        toggleAssetCurrencyButton.addEventListener("click", async () => {
-            const targetCurrency = String(toggleAssetCurrencyButton.dataset.targetCurrency || "").trim().toUpperCase()
-            const originalLabel = toggleAssetCurrencyButton.textContent
+    async function handleCurrencyAction(btn) {
+        const targetCurrency = String(btn.dataset.targetCurrency || "").trim().toUpperCase()
+        const scope = String(btn.dataset.scope || "asset")
+        if (!targetCurrency) return
+        const originalHTML = btn.innerHTML
+        btn.disabled = true
+        btn.innerHTML = `<span class="assetMenuIcon">${scope === "moneda" ? "⇄" : "↕"}</span><span class="assetMenuText">Cambiando...</span>`
+        try {
+            await saveAssetDataToServer(buildCurrentAssetPayload())
+            const response = await changeAssetCurrencyOnServer(currentAssetId, targetCurrency, scope)
 
-            if (!targetCurrency) {
-                return
-            }
-
-            toggleAssetCurrencyButton.disabled = true
-            toggleAssetCurrencyButton.textContent = `Cambiando a ${targetCurrency}...`
-
-            try {
-                await saveAssetDataToServer(buildCurrentAssetPayload())
-                const response = await changeAssetCurrencyOnServer(currentAssetId, targetCurrency, "asset")
+            if (scope === "moneda") {
+                await updateAssetDetail(response.asset)
+                const assetPage = document.querySelector(".assetTablePage")
+                if (assetPage) {
+                    assetPage.dataset.assetCurrency = response.asset.currency || "EUR"
+                    assetPage.dataset.assetPriceCurrency = response.asset.currency || "EUR"
+                    assetPage.dataset.assetPrice = String(response.asset.price || "0,00")
+                }
+                document.querySelectorAll("[data-scope='moneda'][data-target-currency],[data-scope='asset'][data-target-currency]").forEach(b => {
+                    const isCurrent = b.dataset.targetCurrency === targetCurrency
+                    b.disabled = isCurrent
+                    const labelEl = b.querySelector(".assetMenuText")
+                    if (labelEl) labelEl.innerHTML = `${b.dataset.targetCurrency}${isCurrent ? " <small>(actual)</small>" : ""}`
+                })
+                await refreshAssetsSidebar(currentAssetId, false)
+            } else {
                 await updateAssetDetail(response.asset)
                 renderAssetTablePage(response.asset)
                 await refreshAssetsSidebar(currentAssetId, false)
-            } catch (error) {
-                console.error(error)
-                alert(extractApiErrorMessage(error))
-                toggleAssetCurrencyButton.disabled = false
-                toggleAssetCurrencyButton.textContent = originalLabel
             }
-        })
+        } catch (error) {
+            console.error(error)
+            alert(extractApiErrorMessage(error))
+            btn.disabled = false
+            btn.innerHTML = originalHTML
+        }
     }
+
+    currencyActionButtons.forEach(btn => {
+        btn.addEventListener("click", () => handleCurrencyAction(btn))
+    })
 
     if (editAssetNameButton) {
         editAssetNameButton.addEventListener("click", async () => {
@@ -3112,29 +3284,30 @@ function initAssetTableLogic(asset) {
                     parseLooseNumber(row.comisionesCripto) !== 0
             })
 
+            const detailAssetName = _activosAllAssets.find(a => a.id === currentAssetId)?.name || currentAssetId
             openConfirmModal({
                 title: "Eliminar activo",
                 message: hasContent
-                    ? "Este activo tiene contenido guardado. ¿Quieres eliminarlo igualmente?"
-                    : "¿Quieres eliminar este activo?",
-                confirmLabel: "Eliminar",
+                    ? `"${detailAssetName}" tiene contenido guardado. ¿Quieres eliminarlo igualmente?`
+                    : `¿Quieres eliminar "${detailAssetName}"?`,
+                confirmLabel: "Sí, eliminar",
                 confirmSide: "right",
-                onConfirm: async () => {
+                onConfirm: () => {
                     openConfirmModal({
-                        title: "Segunda verificación",
-                        message: "Esta acción eliminará el activo de forma definitiva. ¿Confirmas que quieres borrarlo?",
-                        confirmLabel: "Eliminar",
-                        confirmSide: "left",
-                        onConfirm: async () => {
-                            await deleteAssetOnServer(currentAssetId)
-                            currentAssetId = null
-                            const contentArea = document.getElementById("dynamicContent")
-
-                            if (contentArea) {
-                                contentArea.innerHTML = `<div class="placeholderPage">Activo eliminado.</div>`
-                            }
-
-                            await refreshAssetsSidebar(null, false)
+                        title: "¿Estás seguro?",
+                        message: `Esta acción eliminará "${detailAssetName}" de forma definitiva y no se puede deshacer.`,
+                        confirmLabel: "Sí, estoy seguro",
+                        confirmSide: "right",
+                        onConfirm: () => {
+                            openDeleteTypeConfirm(detailAssetName, async () => {
+                                await deleteAssetOnServer(currentAssetId)
+                                currentAssetId = null
+                                const contentArea = document.getElementById("dynamicContent")
+                                if (contentArea) {
+                                    contentArea.innerHTML = `<div class="placeholderPage">Activo eliminado.</div>`
+                                }
+                                await refreshAssetsSidebar(null, false)
+                            })
                         }
                     })
                 }
@@ -3606,7 +3779,6 @@ function avBuildCard(asset) {
             <span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span>
             <div class="avCardActions">
                 ${assetColor ? `<span class="avColorDot" style="background:${assetColor};--dot-color:${assetColor}" title="Color del activo"></span>` : ""}
-                <button type="button" class="avActionBtn avChartBtn" data-asset-id="${asset.id}" title="Ver gráfico TradingView">⌁</button>
                 <button type="button" class="avActionBtn avEditBtn" data-asset-id="${asset.id}" title="Editar nombre">✎</button>
                 <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">✕</button>
             </div>
@@ -3699,7 +3871,6 @@ function avBuildTableRow(asset) {
         <td class="avTrRend ${rClass}">${rendStr}</td>
         <td class="avTrUpdated">${lastUpdatedStr}</td>
         <td class="avTrActions">
-            <button type="button" class="avActionBtn avChartBtn" data-asset-id="${asset.id}" title="Ver gráfico">⌁</button>
             <button type="button" class="avActionBtn avEditBtn" data-asset-id="${asset.id}" title="Editar">✎</button>
             <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">✕</button>
         </td>
@@ -3740,19 +3911,29 @@ async function avHandleCardClick(event) {
     if (deleteBtn) {
         const id = deleteBtn.dataset.assetId
         const asset = _activosAllAssets.find((a) => a.id === id)
-        openConfirmModal(`¿Eliminar "${asset?.name || id}"? Esta acción no se puede deshacer.`, async () => {
-            await deleteAssetFromServer(id)
-            _activosAllAssets = _activosAllAssets.filter((a) => a.id !== id)
-            avRender()
-            await refreshAssetsSidebar()
+        const assetName = asset?.name || id
+        openConfirmModal({
+            title: "Eliminar activo",
+            message: `¿Quieres eliminar "${assetName}"?`,
+            confirmLabel: "Sí, eliminar",
+            confirmSide: "right",
+            onConfirm: () => {
+                openConfirmModal({
+                    title: "¿Estás seguro?",
+                    message: `Esta acción eliminará "${assetName}" de forma definitiva y no se puede deshacer.`,
+                    confirmLabel: "Sí, estoy seguro",
+                    confirmSide: "right",
+                    onConfirm: () => {
+                        openDeleteTypeConfirm(assetName, async () => {
+                            await deleteAssetOnServer(id)
+                            _activosAllAssets = _activosAllAssets.filter((a) => a.id !== id)
+                            avRender()
+                            await refreshAssetsSidebar()
+                        })
+                    }
+                })
+            }
         })
-        return
-    }
-
-    const chartBtn = event.target.closest(".avChartBtn")
-    if (chartBtn) {
-        const asset = _activosAllAssets.find((a) => a.id === chartBtn.dataset.assetId)
-        if (asset) openTVChartModal(buildTVSymbol(asset), asset.symbol || asset.name)
         return
     }
 
@@ -3767,17 +3948,15 @@ async function avHandleCardClick(event) {
 
     const card = event.target.closest(".avCard")
     if (card) {
-        const id = card.dataset.assetId
-        clearNavSelection()
-        await selectAsset(id)
+        const asset = _activosAllAssets.find((a) => a.id === card.dataset.assetId)
+        if (asset) openTVChartModal(buildTVSymbol(asset), asset.symbol || asset.name)
         return
     }
 
     const tableRow = event.target.closest(".avTableRow")
     if (tableRow && !event.target.closest(".avTrActions")) {
-        const id = tableRow.dataset.assetId
-        clearNavSelection()
-        await selectAsset(id)
+        const asset = _activosAllAssets.find((a) => a.id === tableRow.dataset.assetId)
+        if (asset) openTVChartModal(buildTVSymbol(asset), asset.symbol || asset.name)
     }
 }
 
@@ -3870,7 +4049,7 @@ function openTVChartModal(tvSymbol, displayName) {
     `
 
     overlay.addEventListener("click", (e) => {
-        if (e.target === overlay || e.target.closest(".tvChartCloseBtn")) overlay.remove()
+        if (e.target.closest(".tvChartCloseBtn")) overlay.remove()
     })
 
     document.addEventListener("keydown", function onEsc(e) {

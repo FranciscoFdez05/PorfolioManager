@@ -125,8 +125,17 @@ async function initPortfolioSwitcher() {
             if (!data.ok) return
             allPortfolios = data.portfolios
             activeId      = data.active
-            const active  = allPortfolios.find(p => p.id === activeId)
-            if (currentName) currentName.textContent = active ? active.name : "Portfolio"
+            window._activePortfolioId = activeId
+            if (window._viewAllPortfolios && allPortfolios.length >= 2) {
+                if (currentName) currentName.textContent = "Todos"
+            } else {
+                if (window._viewAllPortfolios) {
+                    localStorage.removeItem("viewAllPortfolios")
+                    window._viewAllPortfolios = false
+                }
+                const active  = allPortfolios.find(p => p.id === activeId)
+                if (currentName) currentName.textContent = active ? active.name : "Portfolio"
+            }
             renderList()
         } catch (_) {}
     }
@@ -134,9 +143,28 @@ async function initPortfolioSwitcher() {
     function renderList() {
         if (!listEl) return
         listEl.innerHTML = ""
+
+        // Opción "Todos" cuando hay 2 o más portfolios
+        if (allPortfolios.length >= 2) {
+            const todosRow = document.createElement("div")
+            todosRow.className = "portfolioMenuItem portfolioMenuItemTodos" + (window._viewAllPortfolios ? " portfolioMenuItemActive" : "")
+            const todosSpan = document.createElement("span")
+            todosSpan.className = "portfolioMenuItemName"
+            todosSpan.textContent = "Todos los portfolios"
+            todosSpan.style.cursor = "pointer"
+            todosSpan.addEventListener("click", () => {
+                closeMenu()
+                localStorage.setItem("viewAllPortfolios", "1")
+                window.location.reload()
+            })
+            todosRow.appendChild(todosSpan)
+            listEl.appendChild(todosRow)
+        }
+
         allPortfolios.forEach(p => {
+            const isActive = !window._viewAllPortfolios && p.id === activeId
             const row = document.createElement("div")
-            row.className = "portfolioMenuItem" + (p.id === activeId ? " portfolioMenuItemActive" : "")
+            row.className = "portfolioMenuItem" + (isActive ? " portfolioMenuItemActive" : "")
 
             const nameSpan = document.createElement("span")
             nameSpan.className = "portfolioMenuItemName"
@@ -186,10 +214,12 @@ async function initPortfolioSwitcher() {
 
             row.append(nameSpan, actions)
 
-            if (p.id !== activeId) {
+            if (!isActive) {
                 nameSpan.style.cursor = "pointer"
                 nameSpan.addEventListener("click", async () => {
                     closeMenu()
+                    localStorage.removeItem("viewAllPortfolios")
+                    window._viewAllPortfolios = false
                     await switchPortfolio(p.id)
                 })
             }

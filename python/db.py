@@ -376,3 +376,16 @@ def invalidate_all_connections():
 
 def init_db():
     get_db()
+
+
+def init_db_at_path(path) -> None:
+    """Create and initialize an empty DB at the given path without changing the active DB."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(p), check_same_thread=False)
+    try:
+        conn.executescript(_SCHEMA)
+        _migrate(conn)
+        conn.commit()
+    finally:
+        conn.close()

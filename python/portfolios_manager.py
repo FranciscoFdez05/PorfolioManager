@@ -78,6 +78,12 @@ def create_portfolio(name: str) -> str:
         counter += 1
 
     _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
+
+    from db import init_db_at_path
+    new_db = _PORTFOLIOS_DIR / f"{pid}.db"
+    new_db.unlink(missing_ok=True)
+    init_db_at_path(new_db)
+
     meta["portfolios"].append({"id": pid, "name": name})
     _write_meta(meta)
     return pid

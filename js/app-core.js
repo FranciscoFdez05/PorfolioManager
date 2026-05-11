@@ -89,6 +89,8 @@ let editAssetModalState = null
 let draggedAssetId = null
 const PAGE_HTML_VERSION = "20260426a"
 
+window._viewAllPortfolios = localStorage.getItem("viewAllPortfolios") === "1"
+
 function initSidePanel(toggleButton, sideWrapper) {
     if (!toggleButton || !sideWrapper) {
         return
@@ -125,6 +127,25 @@ function initAssetSelector(assetButtons) {
 
     assetButtons.forEach((button) => {
         button.addEventListener("click", async () => {
+            if (window._viewAllPortfolios) {
+                const prefixedId = button.dataset.assetId || ""
+                const sep = prefixedId.indexOf("__")
+                if (sep >= 0) {
+                    const pid = prefixedId.slice(0, sep)
+                    localStorage.removeItem("viewAllPortfolios")
+                    window._viewAllPortfolios = false
+                    try {
+                        const res = await fetch("/api/portfolios/switch", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ id: pid }),
+                        })
+                        const data = await res.json()
+                        if (data.ok) window.location.reload()
+                    } catch (_) {}
+                }
+                return
+            }
             clearNavSelection()
             await selectAsset(button.dataset.assetId || "")
         })
@@ -237,6 +258,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initActivosPageLogic()
         } else if (page === "heatmap") {
             await initHeatmapLogic()
+        } else if (page === "seguimiento") {
+            await initSeguimientoLogic()
         } else if (page === "ajustes") {
             await initAjustesLogic()
         }
