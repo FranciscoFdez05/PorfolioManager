@@ -42,12 +42,21 @@ app = Flask(
 
 _secret_key = os.environ.get("SECRET_KEY", "").strip()
 if not _secret_key:
-    logging.warning("SECRET_KEY no configurada; usando clave temporal (las sesiones no persistirán entre reinicios)")
+    logging.critical(
+        "SECRET_KEY no configurada. Se usará una clave temporal: las sesiones serán "
+        "inválidas entre reinicios y entre workers de Gunicorn (cada worker genera su "
+        "propia clave, lo que también impide descifrar auth.dat y puede degradar las "
+        "credenciales al estado sin acceso). Define SECRET_KEY en .env para producción."
+    )
     _secret_key = secrets.token_hex(32)
 app.secret_key = _secret_key
 
 # Limitar el tamaño de los cuerpos de petición a 5 MB para evitar agotamiento de memoria
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# SESSION_COOKIE_SECURE se activa solo cuando hay HTTPS (evita romper HTTP local)
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("HTTPS_ENABLED", "false").lower() == "true"
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(activos_bp)
@@ -172,10 +181,11 @@ def _check_auto_backup():
         logging.warning("Auto-backup fallido: %s", e)
 
 
-if __name__ == "__main__":
-    ensureDataFile()
-    _check_auto_backup()
-    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+# Inicialización al arrancar, tanto con Gunicorn como con el servidor de desarrollo
+ensureDataFile()
+_check_auto_backup()
 
+if __name__ == "__main__":
+    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     logging.info("HTTP — puerto 5000")
     app.run(host="0.0.0.0", port=5000, debug=debug_mode)

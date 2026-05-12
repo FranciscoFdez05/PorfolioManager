@@ -246,8 +246,10 @@ function renderFilteredDividendos() {
             <td data-field="impuestos">${formatCellEuroValue(rowData.impuestos)}</td>
             <td class="rowTotal">${formatCellEuroValue(rowData.total)}</td>
             <td class="rowActionsCell">
-                <button type="button" class="assetRowEditBtn dividendosRowEditBtn" data-global-index="${globalIndex}" title="Editar fila">✎</button>
-                <button type="button" class="assetRowDeleteBtn dividendosRowDeleteBtn" data-global-index="${globalIndex}" title="Eliminar fila">✕</button>
+                <div class="rowActionsBtns">
+                    <button type="button" class="assetRowEditBtn dividendosRowEditBtn avActionBtn avEditBtn" data-global-index="${globalIndex}" title="Editar fila">✎</button>
+                    <button type="button" class="assetRowDeleteBtn dividendosRowDeleteBtn avActionBtn avDeleteBtn" data-global-index="${globalIndex}" title="Eliminar fila">🗑️</button>
+                </div>
             </td>
         `
         dividendosBody.appendChild(rowElement)

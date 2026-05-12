@@ -159,8 +159,10 @@ function buildConversionesRowElement(row = {}, asset = conversionesCurrentAsset)
         <td data-field="tipo" data-value="${row.tipo || ""}">${row.tipo || ""}</td>
         <td data-field="cantidad">${formatAssetParticipationValue(row.cantidad || "", "cripto")}</td>
         <td class="rowActionsCell">
-            <button type="button" class="assetRowEditBtn conversionRowEditBtn" data-row-id="${rowElement.dataset.rowId}" title="Editar fila">✎</button>
-            <button type="button" class="assetRowDeleteBtn conversionRowDeleteBtn" data-row-id="${rowElement.dataset.rowId}" title="Eliminar fila">✕</button>
+            <div class="rowActionsBtns">
+                <button type="button" class="assetRowEditBtn conversionRowEditBtn avActionBtn avEditBtn" data-row-id="${rowElement.dataset.rowId}" title="Editar fila">✎</button>
+                <button type="button" class="assetRowDeleteBtn conversionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${rowElement.dataset.rowId}" title="Eliminar fila">🗑️</button>
+            </div>
         </td>
     `
 

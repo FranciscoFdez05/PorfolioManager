@@ -645,8 +645,10 @@ function renderGastosAnnualTable() {
                 <td>${formatCellEuroValue(row.meses?.[month.key] || "")}</td>
             `).join("")}
             <td class="rowActionsCell">
-                <button type="button" class="assetRowEditBtn gastosAnnualEditBtn" data-annual-edit-manual="${rowIndex}" title="Editar mensualidad">✎</button>
-                <button type="button" class="assetRowDeleteBtn" data-gastos-delete-manual-row="${rowIndex}" title="Eliminar mensualidad">✕</button>
+                <div class="rowActionsBtns">
+                    <button type="button" class="assetRowEditBtn gastosAnnualEditBtn avActionBtn avEditBtn" data-annual-edit-manual="${rowIndex}" title="Editar mensualidad">✎</button>
+                    <button type="button" class="assetRowDeleteBtn avActionBtn avDeleteBtn" data-gastos-delete-manual-row="${rowIndex}" title="Eliminar mensualidad">🗑️</button>
+                </div>
             </td>
         `
         annualBody.appendChild(tr)
@@ -686,9 +688,11 @@ function renderGastosAnnualTable() {
             <td>${escapeGastosHtml(type)}</td>
             ${GASTOS_MONTHS.map((month) => `<td>${expenseTotals[type][month.key] ? formatEuro(expenseTotals[type][month.key]) : "- €"}</td>`).join("")}
             <td class="rowActionsCell">
-                <button type="button" class="gastosEyeBtn${isHidden ? "" : " active"}" data-gastos-eye-type="${rowIndex}" title="${isHidden ? "Mostrar en Métricas" : "Ocultar de Métricas"}">👁</button>
-                <button type="button" class="assetRowEditBtn gastosAnnualEditBtn" data-annual-edit-type="${rowIndex}" title="Editar gasto">✎</button>
-                <button type="button" class="assetRowDeleteBtn" data-gastos-delete-type-row="${rowIndex}" title="Eliminar gasto">✕</button>
+                <div class="rowActionsBtns">
+                    <button type="button" class="gastosEyeBtn${isHidden ? "" : " active"}" data-gastos-eye-type="${rowIndex}" title="${isHidden ? "Mostrar en Métricas" : "Ocultar de Métricas"}">👁</button>
+                    <button type="button" class="assetRowEditBtn gastosAnnualEditBtn avActionBtn avEditBtn" data-annual-edit-type="${rowIndex}" title="Editar gasto">✎</button>
+                    <button type="button" class="assetRowDeleteBtn avActionBtn avDeleteBtn" data-gastos-delete-type-row="${rowIndex}" title="Eliminar gasto">🗑️</button>
+                </div>
             </td>
         `
         annualBody.appendChild(tr)
@@ -1027,8 +1031,10 @@ function buildGastoMovementRow(row = {}, rowIndex = -1) {
         <td data-field="tipo">${normalizeGastoTipo(row.tipo || "")}</td>
         <td data-field="cantidad">${formatCellEuroValue(row.cantidad || "")}</td>
         <td class="rowActionsCell">
-            <button type="button" class="assetRowEditBtn gastosRowEditBtn" data-row-index="${rowIndex}" title="Editar fila">✎</button>
-            <button type="button" class="assetRowDeleteBtn gastosRowDeleteBtn" data-row-index="${rowIndex}" title="Eliminar fila">✕</button>
+            <div class="rowActionsBtns">
+                <button type="button" class="assetRowEditBtn gastosRowEditBtn avActionBtn avEditBtn" data-row-index="${rowIndex}" title="Editar fila">✎</button>
+                <button type="button" class="assetRowDeleteBtn gastosRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${rowIndex}" title="Eliminar fila">🗑️</button>
+            </div>
         </td>
     `
     return tr

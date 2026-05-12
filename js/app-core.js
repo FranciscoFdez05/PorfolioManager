@@ -193,6 +193,31 @@ function initNavigation(navButtons, contentArea) {
     document.addEventListener("click", () => {
         document.querySelectorAll(".navDropdownMenu.open").forEach((m) => m.classList.remove("open"))
     })
+
+    const avTip = document.createElement("div")
+    avTip.className = "avTooltip"
+    document.body.appendChild(avTip)
+
+    document.addEventListener("mouseover", e => {
+        const btn = e.target.closest(".avActionBtn")
+        if (!btn) return
+        if (btn.hasAttribute("title")) {
+            btn.dataset.tip = btn.title
+            btn.removeAttribute("title")
+        }
+        const label = btn.dataset.tip
+        if (!label) return
+        avTip.textContent = label
+        const r = btn.getBoundingClientRect()
+        avTip.style.left = (r.left + r.width / 2) + "px"
+        avTip.style.top  = (r.top - 8) + "px"
+        avTip.classList.add("avTooltipVisible")
+    }, true)
+
+    document.addEventListener("mouseout", e => {
+        if (!e.target.closest(".avActionBtn")) return
+        avTip.classList.remove("avTooltipVisible")
+    }, true)
 }
 
 async function loadPage(page, contentArea = document.getElementById("dynamicContent")) {
@@ -227,6 +252,12 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
         const htmlContent = await response.text()
         document.querySelectorAll(".csBodyMenu").forEach(m => m.remove())
         contentArea.innerHTML = htmlContent
+
+        const mainContent = document.querySelector(".mainContent")
+        if (mainContent) {
+            const gridPages = ["activos", "seguimiento"]
+            mainContent.classList.toggle("gridPageActive", gridPages.includes(page))
+        }
 
         if (page === "vistaGeneral") {
             await initVistaGeneralLogic()

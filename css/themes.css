@@ -1,0 +1,1485 @@
+/* ============================================================
+   TEMAS
+   ============================================================ */
+
+/* --- Otra Oscura (negro puro) --- */
+html[data-theme="black"] body,
+html[data-theme="black"] .appContainer,
+html[data-theme="black"] .leftWrapper{ background:#000; }
+
+html[data-theme="black"] .topBar{ background:#050505; border-color:#111; }
+html[data-theme="black"] .metricBox{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .metricTitle{ color:#888; }
+html[data-theme="black"] .metricValue{ color:#f0f0f0; }
+html[data-theme="black"] .metricValue.metricPositive{ color:#2ecc71; }
+html[data-theme="black"] .metricValue.metricNegative{ color:#e74c3c; }
+
+html[data-theme="black"] .tabs{ background:#000; border-color:#111; }
+html[data-theme="black"] .navBtn,
+html[data-theme="black"] .navDropdownBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .navBtn:hover,
+html[data-theme="black"] .navDropdownBtn:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .navDropdownMenu{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .navDropdownItem{ color:#e0e0e0; }
+html[data-theme="black"] .searchContainer input{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+
+html[data-theme="black"] .sideWrapper,
+html[data-theme="black"] .sidePanel{ background:#000; border-color:#111; color:#e0e0e0; }
+html[data-theme="black"] .assetToolbar{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .assetsList{ border-color:#1a1a1a; }
+html[data-theme="black"] .toggleButton{ background:#050505; color:#e0e0e0; box-shadow:0 0 0 1px #1a1a1a; }
+html[data-theme="black"] .toggleButton:hover{ background:#0a0a0a; box-shadow:0 0 0 1px #2a2a2a; }
+html[data-theme="black"] .assetBtn{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .assetBtn:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .assetBtnName{ color:#f0f0f0; }
+html[data-theme="black"] .assetBtnChange{ color:#666; }
+html[data-theme="black"] .assetBtnChangePct{ color:#666; }
+html[data-theme="black"] .assetDetailView{ background:#000; border-color:#1a1a1a; }
+html[data-theme="black"] .detailStatCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .detailHeader,
+html[data-theme="black"] .detailSub,
+html[data-theme="black"] .detailPrice,
+html[data-theme="black"] .detailMeta,
+html[data-theme="black"] .detailStatLabel,
+html[data-theme="black"] .detailStatValue{ color:#e0e0e0; }
+
+html[data-theme="black"] .mainContent,
+html[data-theme="black"] .contentArea{ background:#000; color:#e0e0e0; }
+
+html[data-theme="black"] table{ background:#000; }
+html[data-theme="black"] th{ background:#0a0a0a; border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] td{ border-color:#111; color:#e0e0e0; }
+html[data-theme="black"] tr:hover td{ background:#0a0a0a !important; }
+html[data-theme="black"] tbody tr:nth-child(even) td{ background:#050505; }
+
+html[data-theme="black"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="black"] textarea{ background:#050505 !important; border-color:#1a1a1a !important; color:#e0e0e0 !important; }
+html[data-theme="black"] select{ background-color:#050505 !important; border-color:#1a1a1a !important; color:#e0e0e0 !important; }
+html[data-theme="black"] select option{ background:#050505; color:#e0e0e0; }
+
+html[data-theme="black"] .assetModal,
+html[data-theme="black"] .calendarioModal,
+html[data-theme="black"] .backupModal,
+html[data-theme="black"] .stablecoinModal{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .assetModalTitle{ color:#f0f0f0; }
+html[data-theme="black"] .cpHexRow{ background:rgba(255,255,255,0.04); border-color:#222; }
+html[data-theme="black"] .cpHexInput{ color:#e0e0e0; }
+
+html[data-theme="black"] .ajustesSection,
+html[data-theme="black"] .ajustesLayout{ background:#000; }
+html[data-theme="black"] .ajustesSection{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .ajustesInput,
+html[data-theme="black"] .ajustesSelect{ background:#050505; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .ajustesSectionTitle{ color:#f0f0f0; }
+html[data-theme="black"] .ajustesSectionDesc{ color:#666; }
+html[data-theme="black"] .ajustesLabel{ color:#888; }
+html[data-theme="black"] .ajustesBackupItem,
+html[data-theme="black"] .ajustesHiddenItem,
+html[data-theme="black"] .ajustesApiStatsRow{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .ajustesApiStatsTotal{ background:#0a0a0a; border-color:#3b82f6; }
+html[data-theme="black"] .ajustesBackupName,
+html[data-theme="black"] .ajustesHiddenName{ color:#888; }
+
+html[data-theme="black"] .secondaryButton{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .secondaryButton:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .dangerButton{ background:#1a0507; border-color:#3d0a10; color:#fca5a5; }
+html[data-theme="black"] .dangerButton:hover{ background:#220709; border-color:#5a1018; }
+html[data-theme="black"] .cancelButton{ background:#1a0507; border-color:#3d0a10; color:#fca5a5; }
+html[data-theme="black"] .cancelButton:hover{ background:#220709; border-color:#5a1018; }
+html[data-theme="black"] .navBackupBtn{ background:#050505; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .navBackupBtn:hover{ background:#0a0a0a; border-color:#2a2a2a; }
+
+/* --- Clara (blanco) --- */
+html[data-theme="light"] body,
+html[data-theme="light"] .appContainer,
+html[data-theme="light"] .leftWrapper{ background:#f0f2f5; color:#0f172a; }
+
+html[data-theme="light"] .topBar{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .metricBox{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .metricTitle{ color:#64748b; }
+html[data-theme="light"] .metricValue{ color:#0f172a; }
+html[data-theme="light"] .metricValue.metricPositive{ color:#16a34a; }
+html[data-theme="light"] .metricValue.metricNegative{ color:#dc2626; }
+
+html[data-theme="light"] .tabs{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .navBtn,
+html[data-theme="light"] .navDropdownBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .navBtn:hover,
+html[data-theme="light"] .navDropdownBtn:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .navBtn.active,
+html[data-theme="light"] .navDropdownBtn.active{ background:#1d4ed8; border-color:#3b82f6; color:#fff; }
+html[data-theme="light"] .navDropdownMenu{ background:#ffffff; border-color:#e2e8f0; box-shadow:0 4px 16px rgba(0,0,0,0.12); }
+html[data-theme="light"] .navDropdownItem{ color:#1e293b; }
+html[data-theme="light"] .navDropdownItem:hover{ background:#f1f5f9; }
+html[data-theme="light"] .searchContainer input{ background:#f1f5f9; border-color:#e2e8f0; color:#0f172a; }
+
+html[data-theme="light"] .sideWrapper,
+html[data-theme="light"] .sidePanel{ background:#ffffff; border-color:#e2e8f0; color:#0f172a; }
+html[data-theme="light"] .assetToolbar{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .assetsList{ border-color:#e2e8f0; }
+html[data-theme="light"] .assetBtn{ background:#f8f9fa; border-color:#e2e8f0; color:#0f172a; }
+html[data-theme="light"] .assetBtn:hover{ background:#f1f5f9; border-color:#cbd5e1; }
+html[data-theme="light"] .assetBtn.selected{ background:#1d4ed8; border-color:#3b82f6; }
+html[data-theme="light"] .assetBtn.selected .assetBtnName,
+html[data-theme="light"] .assetBtn.selected .assetBtnPrice{ color:#fff; }
+html[data-theme="light"] .assetBtnName{ color:#0f172a; }
+html[data-theme="light"] .assetBtnPrice{ color:#1e293b; }
+html[data-theme="light"] .assetBtnChange{ color:#64748b; }
+html[data-theme="light"] .assetBtnChangePct{ color:#64748b; }
+html[data-theme="light"] .assetDetailView{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .detailStatCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .detailHeader{ color:#0f172a; }
+html[data-theme="light"] .detailSub,
+html[data-theme="light"] .detailMeta{ color:#64748b; }
+html[data-theme="light"] .detailPrice{ color:#0f172a; }
+html[data-theme="light"] .detailStatLabel{ color:#64748b; }
+html[data-theme="light"] .detailStatValue{ color:#0f172a; }
+html[data-theme="light"] .toggleButton{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; box-shadow:0 0 0 1px #e2e8f0; }
+html[data-theme="light"] .toggleButton:hover{ background:#e8edf5; box-shadow:0 0 0 1px #cbd5e1; }
+
+html[data-theme="light"] .mainContent,
+html[data-theme="light"] .contentArea{ background:#f0f2f5; color:#0f172a; }
+
+html[data-theme="light"] table{ background:#ffffff; }
+html[data-theme="light"] th{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] td{ border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] tr:hover td{ background:#f1f5f9 !important; }
+html[data-theme="light"] tbody tr:nth-child(even) td{ background:#fafbfc; }
+
+html[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="light"] textarea{ background:#ffffff !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+html[data-theme="light"] .csTrigger{ background:#ffffff; border-color:#e2e8f0; color:#0f172a; }
+html[data-theme="light"] .csMenu{ background:#ffffff; border-color:#e2e8f0; box-shadow:0 4px 16px rgba(0,0,0,0.12); }
+html[data-theme="light"] .csOption{ color:#1e293b; }
+html[data-theme="light"] .csOption:hover{ background:#f1f5f9; }
+html[data-theme="light"] .csOption.csSelected{ background:#e8edf5; }
+html[data-theme="light"] .csArrow{ color:#94a3b8; }
+html[data-theme="black"] .csTrigger{ background:#050505; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .csMenu{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .csOption{ color:#e0e0e0; }
+html[data-theme="black"] .csOption:hover{ background:#0f0f0f; }
+html[data-theme="black"] .csOption.csSelected{ background:#111; }
+html[data-theme="light"] select{ background-color:#ffffff !important; border-color:#e2e8f0 !important; color:#0f172a !important; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%230f172a' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") !important; background-repeat:no-repeat !important; background-position:right 10px center !important; background-size:8px 5px !important; }
+html[data-theme="light"] select option{ background:#ffffff; color:#0f172a; }
+
+html[data-theme="light"] .modalOverlay{ background:rgba(0,0,0,0.4); }
+html[data-theme="light"] .assetModal,
+html[data-theme="light"] .calendarioModal,
+html[data-theme="light"] .backupModal,
+html[data-theme="light"] .stablecoinModal{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .assetModalTitle{ color:#0f172a; }
+html[data-theme="light"] .assetModalLabel{ color:#475569; }
+html[data-theme="light"] .cpHexRow{ background:#f1f5f9; border-color:#e2e8f0; }
+html[data-theme="light"] .cpHash{ color:#64748b; }
+html[data-theme="light"] .cpHexInput{ color:#0f172a; }
+html[data-theme="light"] .cpRandomBtn{ background:rgba(0,0,0,0.06); border-color:#e2e8f0; color:#64748b; }
+html[data-theme="light"] .cpRandomBtn:hover{ background:rgba(0,0,0,0.12); color:#334155; }
+html[data-theme="light"] .assetModalInput,
+html[data-theme="light"] .assetModalSelect{ background:#f8f9fa !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+html[data-theme="light"] .assetRowModalTitle{ border-color:#e2e8f0; }
+html[data-theme="light"] .assetRowModalLabel{ color:#64748b; }
+html[data-theme="light"] .assetRowModalInput,
+html[data-theme="light"] .assetRowModalSelect{ background:#f8f9fa !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+html[data-theme="light"] .assetRowModalFooter{ background:#ffffff; border-color:#e2e8f0; }
+
+html[data-theme="light"] .ajustesLayout{ background:#f0f2f5; }
+html[data-theme="light"] .ajustesSection{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .ajustesSectionTitle{ color:#0f172a; }
+html[data-theme="light"] .ajustesSectionDesc{ color:#64748b; }
+html[data-theme="light"] .ajustesLabel{ color:#475569; }
+html[data-theme="light"] .ajustesInput,
+html[data-theme="light"] .ajustesSelect{ background:#f8f9fa !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+html[data-theme="light"] .ajustesBackupItem,
+html[data-theme="light"] .ajustesHiddenItem,
+html[data-theme="light"] .ajustesApiStatsRow{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .ajustesApiStatsTotal{ background:#eff6ff; border-color:#3b82f6; }
+html[data-theme="light"] .ajustesApiStatsProvider{ color:#475569; }
+html[data-theme="light"] .ajustesApiStatsCount{ color:#0f172a; }
+html[data-theme="light"] .ajustesBackupName,
+html[data-theme="light"] .ajustesHiddenName{ color:#475569; }
+html[data-theme="light"] .ajustesSectionDesc code{ background:#f1f5f9; color:#475569; }
+
+html[data-theme="light"] .secondaryButton{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .secondaryButton:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .dangerButton{ background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
+html[data-theme="light"] .cancelButton{ background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
+html[data-theme="light"] .cancelButton:hover{ background:#fecaca; border-color:#f87171; }
+
+html[data-theme="light"] .pageTitle,
+html[data-theme="light"] h1, html[data-theme="light"] h2,
+html[data-theme="light"] h3, html[data-theme="light"] h4{ color:#0f172a; }
+
+html[data-theme="light"] .navBackupBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+
+/* ── Light theme: Métricas ── */
+html[data-theme="light"] .metricasPage{ background:#f0f2f5; }
+html[data-theme="light"] .metricasTitle{ color:#0f172a; }
+html[data-theme="light"] .metricasKpiGroupLabel{ color:#64748b; }
+html[data-theme="light"] .metricasKpiCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .metricasKpiCard:hover{ background:#f8faff; }
+html[data-theme="light"] .mkpiLabel{ color:#64748b; }
+html[data-theme="light"] .mkpiValue{ color:#0f172a; }
+html[data-theme="light"] .metricasChartCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .metricasChartTitle{ color:#475569; }
+html[data-theme="light"] .mActivosFilterBtn{ border-color:#cbd5e1; color:#475569; }
+html[data-theme="light"] .mActivosFilterBtn:hover{ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .mActivosFilterBtn.active{ color:#1e293b; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="todos"].active    { background:#e8edf5; border-color:#94a3b8; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="cripto"].active   { background:#fff3e0; border-color:#f7931a; color:#7a3500; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="acciones"].active { background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="etfs"].active     { background:#dcfce7; border-color:#22c55e; color:#166534; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="comoditis"].active{ background:#fefce8; border-color:#d4a906; color:#713f12; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="bonos"].active    { background:#f3e8ff; border-color:#9b59b6; color:#5b21b6; }
+html[data-theme="light"] .mActivosFilterBtn[data-atype="rentaFija"].active{ background:#ccfbf1; border-color:#14b8a6; color:#0f5c50; }
+html[data-theme="light"] .metricasSectionTitle{ color:#0f172a; }
+html[data-theme="light"] .metricasSection{ color:#0f172a; }
+html[data-theme="light"] .mNavTab{ border-color:#cbd5e1; color:#475569; }
+html[data-theme="light"] .mNavTab:hover{ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .mNavTab[data-mcat="todo"].active              { background:#e8edf5; border-color:#94a3b8; color:#1e293b; }
+html[data-theme="light"] .mNavTab[data-mcat="portfolio"].active         { background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
+html[data-theme="light"] .mNavTab[data-mcat="finanzas"].active          { background:#dcfce7; border-color:#22c55e; color:#166534; }
+html[data-theme="light"] .mNavTab[data-mcat="gastos"].active            { background:#fee2e2; border-color:#ef4444; color:#991b1b; }
+html[data-theme="light"] .mNavTab[data-mcat="ingresos"].active          { background:#fef3c7; border-color:#f59e0b; color:#92400e; }
+html[data-theme="light"] .mNavTab[data-mcat="gastos,ingresos"].active   { background:#fff0e0; border-color:#e8720e; color:#92350e; }
+html[data-theme="light"] .mNavSearch{ background:#ffffff; border-color:#cbd5e1; color:#1e293b; }
+html[data-theme="light"] .mNavSearch::placeholder{ color:#94a3b8; }
+
+/* ── Light theme: Gastos tabs & wrappers ── */
+html[data-theme="light"] .gastosYearBtn,
+html[data-theme="light"] .gastosAddYearBtn,
+html[data-theme="light"] .gastosMonthTab{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .gastosYearBtn:hover,
+html[data-theme="light"] .gastosAddYearBtn:hover,
+html[data-theme="light"] .gastosMonthTab:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .gastosYearBtn.active,
+html[data-theme="light"] .gastosMonthTab.active{ background:#1d4ed8; border-color:#3b82f6; color:#fff; }
+html[data-theme="light"] .gastosAnnualWrapper,
+html[data-theme="light"] .gastosMovementsWrapper{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .gastosAnnualTable,
+html[data-theme="light"] .gastosMovementsTable{ background:#ffffff; color:#1e293b; }
+html[data-theme="light"] .gastosAnnualTable thead th,
+html[data-theme="light"] .gastosMovementsTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] .gastosAnnualTable tbody td,
+html[data-theme="light"] .gastosMovementsTable tbody td{ background:#ffffff; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .gastosAnnualTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .gastosMovementsTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
+html[data-theme="light"] .gastosMovementsTable tbody tr:hover td,
+html[data-theme="light"] .ingresosMovementsTable tbody tr:hover td{ background:#f1f5f9 !important; }
+html[data-theme="light"] .gastosAnnualTable .totalRow td,
+html[data-theme="light"] .gastosMovementsTable .totalRow td{ background:#e8edf5; color:#0f172a; border-color:#cbd5e1; }
+html[data-theme="light"] .gastosAnnualTable .headerRow td{ background:#dbeafe; color:#1d4ed8; }
+html[data-theme="black"] .gastosAnnualTable .headerRow td{ background:#071020 !important; color:#7ab3f5; border-color:#1e4a8a; }
+html[data-theme="light"] .gastosMonthActions .primaryButton{ background:#1d4ed8; }
+html[data-theme="light"] .gastosEliminarAnoBtn,
+html[data-theme="light"] .gastosMonthActions .dangerButton{ background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
+
+/* ── Light theme: Vista General filters ── */
+html[data-theme="light"] .overviewFilterOption{ background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
+html[data-theme="light"] .overviewFilterOption:has(input:checked){ background:#f1f5f9; color:#1e293b; border-color:#cbd5e1; }
+html[data-theme="light"] .overviewFilterOption::before{ background:#cbd5e1; }
+html[data-theme="light"] .activosFilterBtn{ border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .activosFilterBtn::before{ background:#cbd5e1; }
+html[data-theme="light"] .activosFilterBtn:hover{ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .activosFilterBtn.active{ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .overviewTableWrapper{ background:#ffffff; }
+
+/* ── Light theme: Bonos / Renta Fija ── */
+html[data-theme="light"] .bonosFilterBtn{ border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .bonosFilterBtn::before{ background:#cbd5e1; }
+html[data-theme="light"] .bonosFilterBtn:hover{ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .bonosFilterBtn.active{ background:#f1f5f9; color:#1e293b; }
+html[data-theme="light"] .bonosSummaryCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .bonosSummaryLabel{ color:#64748b; }
+html[data-theme="light"] .bonosSummaryValue{ color:#0f172a; }
+html[data-theme="light"] .bonosTableWrapper{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .bonosTable{ background:#ffffff; }
+html[data-theme="light"] .bonosTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] .bonosTable tbody td{ background:#ffffff; color:#1e293b; border-color:#e2e8f0; }
+html[data-theme="light"] .bonosTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
+html[data-theme="light"] .bonosPage{ color:#1e293b; }
+html[data-theme="light"] .bonosTabs{ border-bottom-color:#e2e8f0; }
+html[data-theme="light"] .bonosTab{ color:#64748b; }
+html[data-theme="light"] .bonosTab:hover{ color:#334155; background:rgba(0,0,0,0.04); }
+html[data-theme="light"] .bonosTab.active{ color:#3b5bdb; border-bottom-color:#3b5bdb; background:rgba(59,91,219,0.06); }
+
+/* ── Black theme: Métricas ── */
+html[data-theme="black"] .metricasKpiCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .metricasKpiCard:hover{ background:#111; }
+html[data-theme="black"] .metricasKpiGroupLabel{ color:#555; }
+html[data-theme="black"] .mkpiLabel{ color:#555; }
+html[data-theme="black"] .mkpiValue{ color:#f0f0f0; }
+html[data-theme="black"] .metricasChartCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .metricasChartTitle{ color:#666; }
+html[data-theme="black"] .mActivosFilterBtn{ border-color:#222; color:#555; }
+html[data-theme="black"] .mActivosFilterBtn:hover{ background:#111; color:#aaa; }
+html[data-theme="black"] .mActivosFilterBtn.active{ color:#e0e0e0; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="todos"].active    { background:#111; border-color:#444; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="cripto"].active   { background:#180e00; border-color:#f7931a; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="acciones"].active { background:#071020; border-color:#3a7bd5; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="etfs"].active     { background:#051505; border-color:#2ecc71; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="comoditis"].active{ background:#150f00; border-color:#e0c068; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="bonos"].active    { background:#0f0518; border-color:#9b59b6; }
+html[data-theme="black"] .mActivosFilterBtn[data-atype="rentaFija"].active{ background:#021210; border-color:#1abc9c; }
+html[data-theme="black"] .mNavTab{ border-color:#222; color:#555; }
+html[data-theme="black"] .mNavTab:hover{ background:#111; color:#aaa; }
+html[data-theme="black"] .mNavTab[data-mcat="todo"].active              { background:#111; border-color:#444; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="portfolio"].active         { background:#071020; border-color:#3a7bd5; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="finanzas"].active          { background:#051505; border-color:#2ecc71; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="gastos"].active            { background:#150505; border-color:#e74c3c; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="ingresos"].active          { background:#150d00; border-color:#f39c12; color:#e0e0e0; }
+html[data-theme="black"] .mNavTab[data-mcat="gastos,ingresos"].active   { background:#130800; border-color:#e8720e; color:#e0c090; }
+html[data-theme="black"] .mNavSearch{ background:#0a0a0a; border-color:#222; color:#e0e0e0; }
+
+/* ── Light theme: Métricas toggles ── */
+html[data-theme="light"] .mToggleGroup{ background:#e8edf5; border-color:#d1d9e6; }
+html[data-theme="light"] .mToggleBtn,
+html[data-theme="light"] .mDistMetricBtn{ color:#64748b; }
+html[data-theme="light"] .mToggleBtn.active,
+html[data-theme="light"] .mDistMetricBtn.active{ background:#ffffff; color:#1e293b; }
+html[data-theme="light"] .mToggleBtn:hover:not(.active),
+html[data-theme="light"] .mDistMetricBtn:hover:not(.active){ background:#dde4ef; color:#334155; }
+
+/* ── Black theme: Métricas toggles ── */
+html[data-theme="black"] .mToggleGroup{ background:#050505; border-color:#111; }
+html[data-theme="black"] .mToggleBtn,
+html[data-theme="black"] .mDistMetricBtn{ color:#444; }
+html[data-theme="black"] .mToggleBtn.active,
+html[data-theme="black"] .mDistMetricBtn.active{ background:#111; color:#e0e0e0; }
+html[data-theme="black"] .mToggleBtn:hover:not(.active),
+html[data-theme="black"] .mDistMetricBtn:hover:not(.active){ background:#0a0a0a; color:#888; }
+
+/* ── Black theme: Gastos tabs & wrappers ── */
+html[data-theme="black"] .gastosYearBtn,
+html[data-theme="black"] .gastosAddYearBtn,
+html[data-theme="black"] .gastosMonthTab{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .gastosYearBtn:hover,
+html[data-theme="black"] .gastosAddYearBtn:hover,
+html[data-theme="black"] .gastosMonthTab:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .gastosAnnualWrapper,
+html[data-theme="black"] .gastosMovementsWrapper{ background:#000; border-color:#111; }
+html[data-theme="black"] .gastosAnnualTable,
+html[data-theme="black"] .gastosMovementsTable{ background:#000; color:#e0e0e0; }
+html[data-theme="black"] .gastosAnnualTable thead th,
+html[data-theme="black"] .gastosMovementsTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] .gastosAnnualTable tbody td,
+html[data-theme="black"] .gastosMovementsTable tbody td{ background:#0a0a0a; border-color:#111; color:#e0e0e0; }
+html[data-theme="black"] .gastosAnnualTable tbody tr:nth-child(odd) td,
+html[data-theme="black"] .gastosMovementsTable tbody tr:nth-child(odd) td{ background:#050505; }
+html[data-theme="black"] .gastosAnnualTable .totalRow td,
+html[data-theme="black"] .gastosMovementsTable .totalRow td{ background:#0a0a0a; color:#f0f0f0; border-color:#1a1a1a; }
+
+/* ── Black theme: Vista General filters ── */
+html[data-theme="black"] .overviewFilterOption{ background:#050505; border-color:#111; color:#555; }
+html[data-theme="black"] .overviewFilterOption:has(input:checked){ background:#0a0a0a; color:#e0e0e0; }
+html[data-theme="black"] .overviewFilterOption::before{ background:#222; }
+html[data-theme="black"] .activosFilterBtn{ border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .activosFilterBtn::before{ background:#222; }
+html[data-theme="black"] .activosFilterBtn:hover{ background:#0a0a0a; color:#e0e0e0; }
+html[data-theme="black"] .activosFilterBtn.active{ background:#0a0a0a; color:#f0f0f0; }
+
+/* ── Black theme: Bonos / Renta Fija ── */
+html[data-theme="black"] .bonosFilterBtn{ border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .bonosFilterBtn::before{ background:#222; }
+html[data-theme="black"] .bonosFilterBtn:hover{ background:#0a0a0a; color:#e0e0e0; }
+html[data-theme="black"] .bonosFilterBtn.active{ background:#0a0a0a; color:#f0f0f0; }
+html[data-theme="black"] .bonosSummaryCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .bonosSummaryLabel{ color:#666; }
+
+/* ── Black theme: navMoneyToggleBtn ── */
+html[data-theme="black"] .navMoneyToggleBtn{ background:#050505; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .navMoneyToggleBtn:hover{ background:#0a0a0a; border-color:#2a2a2a; }
+
+/* ── Light theme: navMoneyToggleBtn ── */
+html[data-theme="light"] .navMoneyToggleBtn{ background:#ffffff; border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .navMoneyToggleBtn:hover{ background:#f1f5f9; border-color:#cbd5e1; }
+
+/* ── Black theme: Stablecoins ── */
+html[data-theme="black"] .stablecoinsHeaderPanel{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .stablecoinSummaryCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .stablecoinSummaryHeader h4{ color:#f0f0f0; }
+html[data-theme="black"] .stablecoinSummaryHeader span,
+html[data-theme="black"] .stablecoinSummaryMeta{ color:#666; }
+html[data-theme="black"] .stablecoinSummaryMain{ color:#f0f0f0; }
+
+/* ── Light theme: Stablecoins ── */
+html[data-theme="light"] .stablecoinsHeaderPanel{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .stablecoinSummaryCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .stablecoinSummaryHeader h4{ color:#0f172a; }
+html[data-theme="light"] .stablecoinSummaryHeader span,
+html[data-theme="light"] .stablecoinSummaryMeta{ color:#64748b; }
+html[data-theme="light"] .stablecoinSummaryMain{ color:#0f172a; }
+
+/* ── Black theme: operationsPairsSummary ── */
+html[data-theme="black"] .operationsPairsSummary{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .operationsPairsSummaryLabel{ color:#555; }
+html[data-theme="black"] .operationsPairsSummaryItem{ color:#e0e0e0; }
+
+/* ── Light theme: operationsPairsSummary ── */
+html[data-theme="light"] .operationsPairsSummary{ background:#f8f9fa; border-color:#e2e8f0; }
+html[data-theme="light"] .operationsPairsSummaryLabel{ color:#64748b; }
+html[data-theme="light"] .operationsPairsSummaryItem{ color:#1e293b; }
+
+/* ── Black theme: Transacciones asset panel ── */
+html[data-theme="black"] .transaccionesAssetPanel{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .transaccionesAssetPanelTitle{ color:#f0f0f0; }
+html[data-theme="black"] .transaccionesAssetBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .transaccionesAssetBtn:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .transaccionesAssetHint{ color:#888; }
+
+/* ── Light theme: Transacciones asset panel ── */
+html[data-theme="light"] .transaccionesAssetPanel{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .transaccionesAssetPanelTitle{ color:#0f172a; }
+html[data-theme="light"] .transaccionesAssetBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .transaccionesAssetBtn:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .transaccionesAssetHint{ color:#64748b; }
+
+/* ── Black theme: Gastos tipo popup ── */
+html[data-theme="black"] .gtPopup{ background:#0a0a0a; }
+html[data-theme="black"] .gtPopupHeader{ background:#050505; border-bottom-color:#1a1a1a; }
+html[data-theme="black"] .gtPopupTitle{ color:#f0f0f0; }
+html[data-theme="black"] .gtPopupTotal{ color:#888; }
+html[data-theme="black"] .gtPopupClose{ border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .gtTotalRow td{ background:#0a0a0a !important; color:#f0f0f0; border-top-color:#3b82f6; }
+
+/* ── Light theme: Gastos tipo popup ── */
+html[data-theme="light"] .gtPopup{ background:#ffffff; }
+html[data-theme="light"] .gtPopupHeader{ background:#f8f9fa; border-bottom-color:#e2e8f0; }
+html[data-theme="light"] .gtPopupTitle{ color:#0f172a; }
+html[data-theme="light"] .gtPopupTotal{ color:#64748b; }
+html[data-theme="light"] .gtPopupClose{ border-color:#e2e8f0; color:#64748b; }
+html[data-theme="light"] .gtTotalRow td{ background:#dbeafe !important; color:#1e293b; border-top-color:#3b82f6; }
+
+/* ── Black theme: Ingresos tabs & wrappers ── */
+html[data-theme="black"] .ingresosYearBtn,
+html[data-theme="black"] .ingresosAddYearBtn,
+html[data-theme="black"] .ingresosMonthTab{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .ingresosYearBtn:hover,
+html[data-theme="black"] .ingresosAddYearBtn:hover,
+html[data-theme="black"] .ingresosMonthTab:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .ingresosYearBtn.active,
+html[data-theme="black"] .ingresosMonthTab.active{ background:#1d4ed8; border-color:#3b82f6; color:#fff; }
+html[data-theme="black"] .ingresosAnnualWrapper,
+html[data-theme="black"] .ingresosMovementsWrapper{ background:#000; border-color:#111; }
+html[data-theme="black"] .ingresosAnnualTable,
+html[data-theme="black"] .ingresosMovementsTable{ background:#000; color:#e0e0e0; }
+html[data-theme="black"] .ingresosAnnualTable thead th,
+html[data-theme="black"] .ingresosMovementsTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] .ingresosAnnualTable tbody td,
+html[data-theme="black"] .ingresosMovementsTable tbody td{ background:#0a0a0a; border-color:#111; color:#e0e0e0; }
+html[data-theme="black"] .ingresosAnnualTable tbody tr:nth-child(odd) td,
+html[data-theme="black"] .ingresosMovementsTable tbody tr:nth-child(odd) td{ background:#050505; }
+html[data-theme="black"] .ingresosMovementsTable tbody tr:hover td{ background:#111 !important; }
+
+/* ── Light theme: Ingresos tabs & wrappers ── */
+html[data-theme="light"] .ingresosYearBtn,
+html[data-theme="light"] .ingresosAddYearBtn,
+html[data-theme="light"] .ingresosMonthTab{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .ingresosYearBtn:hover,
+html[data-theme="light"] .ingresosAddYearBtn:hover,
+html[data-theme="light"] .ingresosMonthTab:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .ingresosYearBtn.active,
+html[data-theme="light"] .ingresosMonthTab.active{ background:#1d4ed8; border-color:#3b82f6; color:#fff; }
+html[data-theme="light"] .ingresosAnnualWrapper,
+html[data-theme="light"] .ingresosMovementsWrapper{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .ingresosAnnualTable,
+html[data-theme="light"] .ingresosMovementsTable{ background:#ffffff; color:#1e293b; }
+html[data-theme="light"] .ingresosAnnualTable thead th,
+html[data-theme="light"] .ingresosMovementsTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] .ingresosAnnualTable tbody td,
+html[data-theme="light"] .ingresosMovementsTable tbody td{ background:#ffffff; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .ingresosAnnualTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .ingresosMovementsTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
+
+/* ── Black theme: Asset edit button & search results ── */
+html[data-theme="black"] .assetEditNameBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .assetEditNameBtn:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .assetSearchResultBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#f0f0f0; }
+html[data-theme="black"] .assetSearchResultBtn:hover{ background:#111; }
+html[data-theme="black"] .assetSearchResultSubtitle{ color:#888; }
+html[data-theme="black"] .assetSearchResultPrice{ color:#f0f0f0; }
+
+/* ── Light theme: Asset edit button & search results ── */
+html[data-theme="light"] .assetEditNameBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .assetEditNameBtn:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .assetSearchResultBtn{ background:#ffffff; border-color:#e2e8f0; color:#0f172a; }
+html[data-theme="light"] .assetSearchResultBtn:hover{ background:#f8faff; }
+html[data-theme="light"] .assetSearchResultSubtitle{ color:#64748b; }
+html[data-theme="light"] .assetSearchResultPrice{ color:#0f172a; }
+
+/* ── Black theme: Overview special cells ── */
+html[data-theme="black"] .overviewTable tbody td.overviewCurrentPriceCell,
+html[data-theme="black"] .overviewTable tbody td.overviewProfitPositive,
+html[data-theme="black"] .overviewTable tbody td.overviewProfitNegative{ background:#050505; }
+html[data-theme="black"] .overviewTable tbody tr:nth-child(odd) td.overviewCurrentPriceCell,
+html[data-theme="black"] .overviewTable tbody tr:nth-child(odd) td.overviewProfitPositive,
+html[data-theme="black"] .overviewTable tbody tr:nth-child(odd) td.overviewProfitNegative{ background:#000; }
+html[data-theme="black"] .overviewTable tbody tr:hover td.overviewCurrentPriceCell,
+html[data-theme="black"] .overviewTable tbody tr:hover td.overviewProfitPositive,
+html[data-theme="black"] .overviewTable tbody tr:hover td.overviewProfitNegative{ background:#0a0a0a; }
+html[data-theme="black"] .overviewEmpty{ background:#050505; border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .assetOperationsTable{ background:#000; color:#e0e0e0; }
+html[data-theme="black"] .assetOperationsTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] .assetOperationsTable tbody td{ background:#0a0a0a; border-color:#111; color:#e0e0e0; }
+html[data-theme="black"] .assetOperationsTable tbody tr:nth-child(odd) td{ background:#050505; }
+html[data-theme="black"] .assetOperationsTable tbody tr:hover td{ background:#111 !important; }
+
+/* ── Light theme: Overview special cells ── */
+html[data-theme="light"] .overviewTable tbody td.overviewCurrentPriceCell,
+html[data-theme="light"] .overviewTable tbody td.overviewProfitPositive,
+html[data-theme="light"] .overviewTable tbody td.overviewProfitNegative{ background:#ffffff; }
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td.overviewCurrentPriceCell,
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td.overviewProfitPositive,
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td.overviewProfitNegative{ background:#fafbfc; }
+html[data-theme="light"] .overviewTable tbody tr:hover td.overviewCurrentPriceCell,
+html[data-theme="light"] .overviewTable tbody tr:hover td.overviewProfitPositive,
+html[data-theme="light"] .overviewTable tbody tr:hover td.overviewProfitNegative{ background:#f1f5f9; }
+html[data-theme="light"] .overviewEmpty{ background:#f8faff; border-color:#cbd5e1; color:#64748b; }
+html[data-theme="light"] .assetOperationsTable{ background:#ffffff; color:#1e293b; }
+html[data-theme="light"] .assetOperationsTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] .assetOperationsTable tbody td{ background:#ffffff; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .assetOperationsTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
+html[data-theme="light"] .assetOperationsTable tbody tr:hover td{ background:#f1f5f9 !important; }
+
+/* ── Black theme: avActionBtn (botones editar/eliminar tarjeta activo) ── */
+html[data-theme="black"] .avActionBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .avEditBtn:hover{ background:#111; color:#3a7bd5; border-color:#3a7bd5; }
+html[data-theme="black"] .avDeleteBtn:hover{ background:#110505; color:#e74c3c; border-color:#e74c3c; }
+html[data-theme="black"] .avChartBtn:hover{ background:#051011; color:#26a69a; border-color:#26a69a; }
+
+/* ── Light theme: avActionBtn (botones editar/eliminar tarjeta activo) ── */
+html[data-theme="light"] .avActionBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#94a3b8; }
+html[data-theme="light"] .avEditBtn:hover{ background:#dbeafe; color:#1d4ed8; border-color:#3b82f6; }
+html[data-theme="light"] .avDeleteBtn:hover{ background:#fee2e2; color:#dc2626; border-color:#fca5a5; }
+html[data-theme="light"] .avChartBtn:hover{ background:#e0f2f1; color:#00796b; border-color:#26a69a; }
+html[data-theme="light"] .avTooltip{ background:#f0f6ff; color:#1e3a5f; border-color:#cbd5e1; box-shadow:0 4px 12px rgba(0,0,0,.12); }
+
+/* ── TradingView Chart Popup ── */
+.tvChartOverlay{
+    position:fixed;
+    inset:0;
+    background:rgba(4,12,24,0.78);
+    z-index:9999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+    box-sizing:border-box;
+}
+
+.tvChartModal{
+    width:97vw;
+    max-width:1500px;
+    height:91vh;
+    background:#0b1120;
+    border:1px solid #1e2d45;
+    border-radius:10px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 20px 60px rgba(0,0,0,0.55);
+}
+
+.tvChartModalHeader{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:9px 14px;
+    background:#0f1724;
+    border-bottom:2px solid #1e2d45;
+    flex-shrink:0;
+}
+
+.tvChartHeaderSpacer{ flex:1; }
+
+.tvChartModalTitle{
+    font-size:.82rem;
+    font-weight:700;
+    color:#ccd6f6;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    white-space:nowrap;
+}
+
+.tvChartModalSym{
+    font-size:.7rem;
+    color:#4a5568;
+    font-family:monospace;
+    white-space:nowrap;
+}
+
+.tvChartCloseBtn{
+    background:none;
+    border:none;
+    color:#4a5568;
+    font-size:.95rem;
+    cursor:pointer;
+    padding:3px 7px;
+    border-radius:4px;
+    transition:color .12s, background .12s;
+    flex-shrink:0;
+}
+.tvChartCloseBtn:hover{ color:#e74c3c; background:rgba(231,76,60,.12); }
+
+.tvChartIframeWrap{
+    flex:1;
+    overflow:hidden;
+    min-height:0;
+}
+.tvChartIframeWrap iframe{
+    width:100%;
+    height:100%;
+    border:none;
+    display:block;
+}
+
+html[data-theme="light"] .tvChartModal{ background:#f1f5f9; border-color:#e2e8f0; }
+html[data-theme="light"] .tvChartModalHeader{ background:#e8edf5; border-color:#d1d9e6; }
+html[data-theme="light"] .tvChartModalTitle{ color:#1e293b; }
+html[data-theme="light"] .tvChartModalSym{ color:#94a3b8; }
+html[data-theme="light"] .tvChartCloseBtn{ color:#94a3b8; }
+
+html[data-theme="black"] .tvChartModal{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .tvChartModalHeader{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .tvChartModalTitle{ color:#aaa; }
+html[data-theme="black"] .tvChartModalSym{ color:#333; }
+html[data-theme="black"] .tvChartCloseBtn{ color:#333; }
+
+.avChartBtn:hover{ color:#26a69a; border-color:#26a69a; }
+
+/* ── Row Actions ── */
+.rowActionsCell {
+    width: 80px;
+    text-align: center;
+    padding: 4px;
+}
+
+.rowEditBtn, .rowDeleteBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 6px;
+    margin: 0 2px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.rowEditBtn:hover {
+    background-color: #3a7bd5;
+}
+
+.rowDeleteBtn:hover {
+    background-color: #d9534f;
+}
+html[data-theme="black"] .bonosSummaryValue{ color:#f0f0f0; }
+html[data-theme="black"] .bonosTabs{ border-bottom-color:#1a1a1a; }
+html[data-theme="black"] .bonosTab{ color:#555; }
+html[data-theme="black"] .bonosTab:hover{ color:#aaa; background:rgba(255,255,255,0.03); }
+html[data-theme="black"] .bonosTab.active{ color:#72a2ff; border-bottom-color:#72a2ff; background:rgba(114,162,255,0.05); }
+html[data-theme="black"] .bonosTableWrapper{ background:#000; border-color:#1a1a1a; }
+html[data-theme="black"] .bonosTable{ background:#000; }
+html[data-theme="black"] .bonosTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] .bonosTable tbody td{ color:#e0e0e0; border-color:#111; }
+
+/* ── Light theme: shared table wrappers & specific td overrides (high-specificity) ── */
+html[data-theme="light"] .overviewTableWrapper,
+html[data-theme="light"] .interesesTableWrapper,
+html[data-theme="light"] .dividendosTableWrapper,
+html[data-theme="light"] .operationsTableWrapper{ background:#ffffff; }
+
+html[data-theme="light"] .overviewTable,
+html[data-theme="light"] .interesesTable,
+html[data-theme="light"] .dividendosTable,
+html[data-theme="light"] .operationsTable{ background:#ffffff; color:#1e293b; }
+
+html[data-theme="light"] .overviewTable thead th,
+html[data-theme="light"] .interesesTable thead th,
+html[data-theme="light"] .dividendosTable thead th,
+html[data-theme="light"] .operationsTable thead th{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+html[data-theme="light"] #overviewTable thead th{ background:#f1f5f9; color:#475569; }
+
+html[data-theme="light"] .overviewTable tbody td,
+html[data-theme="light"] .interesesTable tbody td,
+html[data-theme="light"] .dividendosTable tbody td,
+html[data-theme="light"] .operationsTable tbody td{ background:#ffffff; color:#1e293b; border-color:#e2e8f0; }
+
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .interesesTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .dividendosTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .operationsTable tbody tr:nth-child(odd) td{ background:#fafbfc; }
+
+html[data-theme="light"] .overviewTable tbody tr:hover td,
+html[data-theme="light"] .interesesTable tbody tr:hover td,
+html[data-theme="light"] .dividendosTable tbody tr:hover td,
+html[data-theme="light"] .operationsTable tbody tr:hover td{ background:#f1f5f9 !important; }
+
+html[data-theme="light"] .cuentaItem{ background:#f1f5f9; border-color:#e2e8f0; color:#374151; }
+html[data-theme="light"] .cuentaItem:hover{ background:#e2e8f0; border-color:#93c5fd; color:#1e3a8a; }
+html[data-theme="light"] .cuentaItem.active{ background:#dbeafe; border-color:#3b82f6; color:#1e40af; }
+html[data-theme="black"] .cuentaItem{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .cuentaItem:hover{ background:#111; border-color:#3a7bd5; }
+html[data-theme="black"] .cuentaItem.active{ background:#071020; border-color:#3b82f6; color:#7ab3f5; }
+
+/* ── Black theme: shared table wrappers & specific td overrides (high-specificity) ── */
+html[data-theme="black"] .overviewTableWrapper,
+html[data-theme="black"] .interesesTableWrapper,
+html[data-theme="black"] .dividendosTableWrapper,
+html[data-theme="black"] .operationsTableWrapper{ background:#000; }
+
+html[data-theme="black"] .overviewTable,
+html[data-theme="black"] .interesesTable,
+html[data-theme="black"] .dividendosTable,
+html[data-theme="black"] .operationsTable{ background:#000; color:#e0e0e0; }
+
+html[data-theme="black"] .overviewTable thead th,
+html[data-theme="black"] .interesesTable thead th,
+html[data-theme="black"] .dividendosTable thead th,
+html[data-theme="black"] .operationsTable thead th{ background:#0a0a0a; color:#888; border-color:#1a1a1a; }
+html[data-theme="black"] #overviewTable thead th{ background:#0a0a0a; color:#888; }
+
+html[data-theme="black"] .overviewTable tbody td,
+html[data-theme="black"] .interesesTable tbody td,
+html[data-theme="black"] .dividendosTable tbody td,
+html[data-theme="black"] .operationsTable tbody td{ background:#0a0a0a; color:#e0e0e0; border-color:#111; }
+
+html[data-theme="black"] .overviewTable tbody tr:nth-child(odd) td,
+html[data-theme="black"] .interesesTable tbody tr:nth-child(odd) td,
+html[data-theme="black"] .dividendosTable tbody tr:nth-child(odd) td,
+html[data-theme="black"] .operationsTable tbody tr:nth-child(odd) td{ background:#050505; }
+
+html[data-theme="black"] .overviewTable tbody tr:hover td,
+html[data-theme="black"] .interesesTable tbody tr:hover td,
+html[data-theme="black"] .dividendosTable tbody tr:hover td,
+html[data-theme="black"] .operationsTable tbody tr:hover td{ background:#111 !important; }
+
+/* ── Light theme: Activos cards ── */
+html[data-theme="light"] .avCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .avCard:hover{ border-color:var(--av-color,#3a7bd5); }
+html[data-theme="light"] .avCardName{ color:#64748b; }
+html[data-theme="light"] .avCardPrice{ color:#0f172a; }
+html[data-theme="light"] .avCardTicker{ color:#94a3b8; }
+html[data-theme="light"] .avCardUpdated{ color:#b0bec5; }
+html[data-theme="light"] .avCardMetrics{ border-top-color:#e2e8f0; }
+html[data-theme="light"] .avMetricLabel{ color:#94a3b8; }
+html[data-theme="light"] .avMetricValue{ color:#1e293b; }
+html[data-theme="light"] .avViewToggle{ background:#f8fafc; border-color:#e2e8f0; }
+html[data-theme="light"] .avViewBtn{ color:#94a3b8; }
+html[data-theme="light"] .avViewBtn:hover{ background:#f1f5f9; color:#475569; }
+html[data-theme="light"] .avViewBtn.active{ background:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .activosTableWrap{ border-color:#e2e8f0; }
+html[data-theme="light"] .activosTable thead tr{ background:#f8fafc; }
+html[data-theme="light"] .activosTable th{ color:#94a3b8; border-bottom-color:#e2e8f0; }
+html[data-theme="light"] .avTableRow{ border-bottom-color:#f1f5f9; }
+html[data-theme="light"] .avTableRow:hover{ background:#f8fafc; }
+html[data-theme="light"] .activosTable td{ color:#64748b; }
+html[data-theme="light"] .avTrName{ color:#0f172a; }
+html[data-theme="light"] .avTrPrice{ color:#0f172a; }
+html[data-theme="light"] .avTrProvider{ color:#94a3b8; }
+html[data-theme="light"] .avTrUpdated{ color:#b0bec5; }
+
+/* ── Black theme: Activos cards ── */
+html[data-theme="black"] .avCard{ background:#0a0a0a; border-color:#1a1a1a; }
+html[data-theme="black"] .avCardName{ color:#666; }
+html[data-theme="black"] .avCardPrice{ color:#f0f0f0; }
+html[data-theme="black"] .avCardTicker{ color:#444; }
+html[data-theme="black"] .avCardUpdated{ color:#333; }
+html[data-theme="black"] .avCardMetrics{ border-top-color:#1a1a1a; }
+html[data-theme="black"] .avMetricLabel{ color:#555; }
+html[data-theme="black"] .avMetricValue{ color:#e0e0e0; }
+html[data-theme="black"] .avViewToggle{ background:#050505; border-color:#1a1a1a; }
+html[data-theme="black"] .avViewBtn{ color:#444; }
+html[data-theme="black"] .avViewBtn:hover{ background:#0a0a0a; color:#888; }
+html[data-theme="black"] .avViewBtn.active{ background:#111; color:#e0e0e0; }
+html[data-theme="black"] .activosTableWrap{ border-color:#1a1a1a; }
+html[data-theme="black"] .activosTable thead tr{ background:#050505; }
+html[data-theme="black"] .activosTable th{ color:#444; border-bottom-color:#1a1a1a; }
+html[data-theme="black"] .avTableRow{ border-bottom-color:#0a0a0a; }
+html[data-theme="black"] .avTableRow:hover{ background:#050505; }
+html[data-theme="black"] .activosTable td{ color:#666; }
+html[data-theme="black"] .avTrName{ color:#e0e0e0; }
+html[data-theme="black"] .avTrPrice{ color:#f0f0f0; }
+html[data-theme="black"] .avTrProvider{ color:#444; }
+html[data-theme="black"] .avTrUpdated{ color:#333; }
+
+/* ── Light theme: Summary cards (Finanzas/Intereses) ── */
+html[data-theme="light"] .summaryCard{ background:#ffffff; border-color:#e2e8f0; color:#0f172a; }
+html[data-theme="light"] .summaryCardTitle{ border-color:#e2e8f0; color:#475569; }
+html[data-theme="light"] .summaryCardValue{ color:#0f172a; }
+
+/* ── Black theme: Summary cards ── */
+html[data-theme="black"] .summaryCard{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .summaryCardTitle{ border-color:#1a1a1a; color:#888; }
+html[data-theme="black"] .summaryCardValue{ color:#f0f0f0; }
+
+/* ── Light theme: Gastos / Ingresos section rows, totals & action header ── */
+html[data-theme="light"] .gastosSectionRow td{ background:#1d4ed8 !important; border-color:#3b82f6; color:#ffffff !important; }
+html[data-theme="light"] .ingresosSectionRow td{ background:#1d4ed8 !important; border-color:#3b82f6; color:#ffffff !important; }
+html[data-theme="light"] .gastosTotalRow td{ background:#dbeafe !important; border-color:#93c5fd; color:#1e3a8a !important; }
+html[data-theme="light"] .ingresosTotalRow td{ background:#dcfce7 !important; border-color:#86efac; color:#14532d !important; }
+html[data-theme="light"] .gastosAnnualTable .rowActionHeader,
+html[data-theme="light"] .gastosMovementsTable .rowActionHeader{ background:#f1f5f9 !important; }
+html[data-theme="light"] .ingresosAnnualTable .rowActionHeader,
+html[data-theme="light"] .ingresosMovementsTable .rowActionHeader{ background:#f1f5f9 !important; }
+
+/* ── Black theme: Gastos / Ingresos section rows, totals & action header ── */
+html[data-theme="black"] .gastosSectionRow td{ background:#0a0a0a !important; border-color:#3b82f6; color:#e0e0e0 !important; }
+html[data-theme="black"] .ingresosSectionRow td{ background:#0a0a0a !important; border-color:#3b82f6; color:#e0e0e0 !important; }
+html[data-theme="black"] .gastosTotalRow td{ background:#050505 !important; border-color:#1a1a1a; color:#f0f0f0 !important; }
+html[data-theme="black"] .ingresosTotalRow td{ background:#050505 !important; border-color:#1a1a1a; color:#f0f0f0 !important; }
+html[data-theme="black"] .gastosAnnualTable .rowActionHeader,
+html[data-theme="black"] .gastosMovementsTable .rowActionHeader{ background:#0a0a0a !important; }
+html[data-theme="black"] .ingresosAnnualTable .rowActionHeader,
+html[data-theme="black"] .ingresosMovementsTable .rowActionHeader{ background:#0a0a0a !important; }
+
+/* ── Gastos tipo popup ── */
+.gtPopup{
+    background:#0b1120;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+}
+
+.gtPopupHeader{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:14px 20px;
+    border-bottom:1px solid #273246;
+    background:#0f1724;
+    flex-shrink:0;
+}
+
+.gtPopupTitle{
+    font-size:17px;
+    font-weight:700;
+    color:#e5edf9;
+}
+
+.gtPopupTotal{
+    font-size:13px;
+    color:#94a3b8;
+    margin-left:auto;
+}
+
+.gtPopupClose{
+    background:none;
+    border:1px solid #334155;
+    border-radius:6px;
+    color:#94a3b8;
+    cursor:pointer;
+    font-size:16px;
+    padding:2px 10px;
+    line-height:1.4;
+    transition:color 0.15s, border-color 0.15s;
+}
+
+.gtPopupClose:hover{
+    color:#f87171;
+    border-color:#f87171;
+}
+
+.gtPopupBody{
+    flex:1;
+    overflow:auto;
+    padding:0;
+}
+
+.gtPopupTable{
+    width:100%;
+}
+
+.gtTotalRow td{
+    background:#162235 !important;
+    border-top:2px solid #3b82f6;
+    color:#e5edf9;
+    font-weight:700;
+}
+
+/* ── Toggle ocultar dinero ── */
+.navMoneyToggleBtn{
+    height:34px;
+    width:34px;
+    padding:0;
+    border:1px solid #334155;
+    border-radius:8px;
+    background:#0f1724;
+    color:#e5edf9;
+    cursor:pointer;
+    font-size:16px;
+    flex-shrink:0;
+    transition:background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.navMoneyToggleBtn:hover{ background:#162033; border-color:#475569; }
+.navMoneyToggleBtn.money-hidden-active{ background:#1d4ed8; border-color:#3b82f6; }
+
+body.money-hidden .metricValue{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+body.money-hidden #overviewTableBody td:not(.mTdRank):not(.mTdName):not(:nth-child(3)):not(:nth-child(6)){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+body.money-hidden #detPosition,
+body.money-hidden #detInvested,
+body.money-hidden #detPnL,
+body.money-hidden #detAvgPrice,
+body.money-hidden #detFees,
+body.money-hidden #assetStatNetoActual,
+body.money-hidden #assetStatCantidad,
+body.money-hidden #assetStatPrecioMedio,
+body.money-hidden #assetStatInvertido,
+body.money-hidden #assetStatPnL,
+body.money-hidden #assetStatPnLPct{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* ── money-hidden: páginas adicionales ── */
+
+/* activos grid cards */
+body.money-hidden .avMetricValue{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* activo individual - tabla de operaciones */
+body.money-hidden [data-field="exchange"],
+body.money-hidden [data-field="currency"],
+body.money-hidden [data-field="costeAnual"],
+body.money-hidden [data-field="participaciones"],
+body.money-hidden [data-field="precioParticipacion"],
+body.money-hidden [data-field="capitalInvertidoBruto"],
+body.money-hidden [data-field="comisiones"],
+body.money-hidden [data-field="comisionesFiat"],
+body.money-hidden [data-field="comisionesCripto"],
+body.money-hidden .rowTotal{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* intereses: cols acumulado, impuestos, total */
+body.money-hidden #interesesBody td:nth-child(n+2):not(:last-child){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* dividendos: cols acciones, div/accion, impuestos, total */
+body.money-hidden #dividendosBody td:nth-child(n+3):not(:last-child){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* cards resumen (intereses y dividendos) */
+body.money-hidden .summaryCardValue{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* gastos - tabla anual (todos los meses) y movimientos (cantidad) */
+body.money-hidden #gastosAnnualBody td:not(:first-child):not(:last-child),
+body.money-hidden #gastosMovementsBody td:nth-child(4){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* ingresos - tabla anual y movimientos */
+body.money-hidden #ingresosAnnualBody td:not(:first-child):not(:last-child),
+body.money-hidden #ingresosMovementsBody td:nth-child(4){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* bonos - resumen y cols invertido, interés, impuestos, total neto */
+body.money-hidden .bonosSummaryValue{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+body.money-hidden #bonosBody td:nth-child(n+7):not(:last-child){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* ventas - cols desde coste fifo en adelante */
+body.money-hidden #ventasBody td:nth-child(n+4):not(:last-child){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* stablecoins - resumen y cols cantidad, precio, total, comisiones */
+body.money-hidden .stablecoinsSummary,
+body.money-hidden #stablecoinsBody td:nth-child(5),
+body.money-hidden #stablecoinsBody td:nth-child(6),
+body.money-hidden #stablecoinsBody td:nth-child(7),
+body.money-hidden #stablecoinsBody td:nth-child(8){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* operaciones (trading) - precio, cantidad, comisiones, total + saldo de pares */
+body.money-hidden #operationsBody td:nth-child(5),
+body.money-hidden #operationsBody td:nth-child(6),
+body.money-hidden #operationsBody td:nth-child(7),
+body.money-hidden #operationsBody td:nth-child(8),
+body.money-hidden .operationsPairsSummaryValues{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* transacciones - total cripto, comisión red */
+body.money-hidden #transaccionesBody td:nth-child(2),
+body.money-hidden #transaccionesBody td:nth-child(3){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* métricas - valores KPI */
+body.money-hidden .mkpiValue{
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+/* métricas - gráficos (eje Y y valores dentro del canvas) */
+body.money-hidden .metricasChartWrap canvas{
+    filter:blur(7px);
+}
+/* métricas - tabla Posiciones */
+body.money-hidden #metricasTopBody td:nth-child(n+4){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+/* asset detail - ops spot completadas */
+body.money-hidden .assetCompletedOpsTable td:nth-child(4),
+body.money-hidden .assetCompletedOpsTable td:nth-child(5),
+body.money-hidden .assetCompletedOpsTable td:nth-child(6),
+body.money-hidden .assetCompletedOpsTable td:nth-child(7){
+    filter:blur(7px);
+    user-select:none;
+    pointer-events:none;
+}
+
+/* ── Heatmap ─────────────────────────────────────────────── */
+.heatmapPage{
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    min-height:0;
+    gap:8px;
+}
+.heatmapToolbar{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:6px;
+    flex-shrink:0;
+}
+/* Grupo genérico */
+.hmGroup{
+    display:flex;
+    gap:2px;
+    align-items:center;
+    background:#111827;
+    border:1px solid #1e293b;
+    border-radius:8px;
+    padding:3px;
+}
+.hmGroupBtn{
+    padding:4px 11px;
+    border-radius:6px;
+    border:none;
+    background:transparent;
+    color:#6b7280;
+    font-size:0.78rem;
+    font-weight:500;
+    cursor:pointer;
+    transition:background .13s,color .13s;
+    white-space:nowrap;
+    line-height:1.4;
+}
+.hmGroupBtn:hover{ background:#1e293b; color:#e2e8f0; }
+.hmGroupBtn.active{ background:#1d4ed8; color:#fff; font-weight:600; }
+
+/* Grupo toggle (Cuenta/Activos): activo en verde */
+.hmGroupToggle .hmGroupBtn.active{ background:#065f46; color:#6ee7b7; }
+
+/* Grupo multi-selección: activo en gris azulado */
+.hmGroupMulti .hmGroupBtn.active{ background:#1e3a5f; color:#93c5fd; font-weight:600; }
+/* "Todos" cuando está solo activo: más neutro */
+.hmGroupMulti .hmGroupBtn[data-type="all"].active{ background:#374151; color:#f3f4f6; }
+
+/* Grupo deshabilitado (periods cuando metric=cuenta) */
+.hmGroupDisabled{ opacity:.38; pointer-events:none; }
+
+/* Separador visual entre grupos */
+.hmGroupSep{
+    width:1px; height:22px;
+    background:#1e293b;
+    flex-shrink:0;
+}
+
+.heatmapWrapper{ flex:1; min-height:0; overflow:hidden; }
+.heatmapContainer{
+    position:relative;
+    width:100%;
+    height:calc(100vh - 200px);
+    min-height:360px;
+    overflow:hidden;
+}
+.heatmapLoading,.heatmapEmpty{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    color:#6b7280; font-size:1rem;
+}
+.heatmapCell{
+    position:absolute;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    overflow:hidden; border-radius:4px;
+    box-sizing:border-box; padding:4px;
+    cursor:default; transition:filter .15s;
+    border:1px solid rgba(0,0,0,.3);
+}
+.heatmapCell:hover{ filter:brightness(1.13); }
+.hmSymbol{
+    font-weight:700; line-height:1.1;
+    text-align:center; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+.hmPrice{
+    font-size:0.71em; opacity:.85; line-height:1.2;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+.hmValue{
+    font-size:0.71em; font-weight:600;
+    line-height:1.2; white-space:nowrap;
+}
+.hmValue.hmPos{ color:#bbf7d0; }
+.hmValue.hmNeg{ color:#fecaca; }
+.hmValue.hmNd { opacity:.55; }
+
+/* ── Tema light ── */
+html[data-theme="light"] .hmGroup{ background:#e8edf5; border-color:#d1d9e6; }
+html[data-theme="light"] .hmGroupBtn{ color:#64748b; }
+html[data-theme="light"] .hmGroupBtn:hover{ background:#dde4ef; color:#1e293b; }
+html[data-theme="light"] .hmGroupBtn.active{ background:#1d4ed8; color:#fff; }
+html[data-theme="light"] .hmGroupToggle .hmGroupBtn.active{ background:#065f46; color:#fff; }
+html[data-theme="light"] .hmGroupMulti .hmGroupBtn.active{ background:#1d4ed8; color:#fff; }
+html[data-theme="light"] .hmGroupMulti .hmGroupBtn[data-type="all"].active{ background:#334155; color:#fff; }
+html[data-theme="light"] .hmGroupSep{ background:#d1d9e6; }
+
+/* ── Tema black ── */
+html[data-theme="black"] .hmGroup{ background:#050505; border-color:#111; }
+html[data-theme="black"] .hmGroupBtn{ color:#4b5563; }
+html[data-theme="black"] .hmGroupBtn:hover{ background:#111; color:#d1d5db; }
+html[data-theme="black"] .heatmapContainer{ background:#050505; }
+
+/* ── Heatmap tooltip ── */
+.hmTooltip{
+    position:fixed;
+    z-index:9999;
+    pointer-events:none;
+    background:#0f172a;
+    border:1px solid #334155;
+    border-radius:10px;
+    padding:10px 14px;
+    min-width:200px;
+    box-shadow:0 8px 24px rgba(0,0,0,.55);
+    opacity:0;
+    transform:translateY(4px);
+    transition:opacity .12s ease, transform .12s ease;
+}
+.hmTooltip.hmTooltipVisible{
+    opacity:1;
+    transform:translateY(0);
+}
+.hmTipName{
+    font-size:0.88rem;
+    font-weight:700;
+    color:#cbd5e1;
+    margin-bottom:6px;
+    white-space:nowrap;
+}
+.hmTipDivider{
+    height:1px;
+    background:#1e293b;
+    margin:6px 0;
+}
+.hmTipGrid{
+    display:grid;
+    grid-template-columns:auto auto;
+    row-gap:3px;
+    column-gap:14px;
+    align-items:center;
+}
+.hmTipLabel{
+    font-size:0.75rem;
+    color:#64748b;
+    white-space:nowrap;
+}
+.hmTipVal{
+    font-size:0.82rem;
+    font-weight:600;
+    color:#cbd5e1;
+    text-align:right;
+    white-space:nowrap;
+}
+.hmTipRow{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+.hmTipPct{
+    font-size:1rem;
+    font-weight:700;
+    color:#94a3b8;
+}
+.hmTipMoney{
+    font-size:0.85rem;
+    font-weight:600;
+    color:#94a3b8;
+    opacity:.85;
+}
+.hmTipPos{ color:#4ade80; }
+.hmTipMoney.hmTipPos{ color:#86efac; }
+.hmTipNeg{ color:#f87171; }
+.hmTipMoney.hmTipNeg{ color:#fca5a5; }
+.hmTipVal.hmTipPos{ color:#4ade80; }
+.hmTipVal.hmTipNeg{ color:#f87171; }
+
+/* ── Portfolio Switcher ───────────────────────────── */
+.portfolioSwitcherDrop{ position:relative; }
+.portfolioSwitcherBtn{
+    min-width:120px;
+    max-width:200px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    background:linear-gradient(135deg, #1a2e4a 0%, #0f1f35 100%);
+    border:1px solid #2d6abf;
+    border-left:3px solid #3b82f6;
+    color:#93c5fd;
+    font-weight:600;
+    letter-spacing:0.02em;
+    border-radius:8px;
+    box-shadow:0 0 0 1px rgba(59,130,246,0.15), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.portfolioSwitcherBtn:hover{
+    background:linear-gradient(135deg, #1e3a5f 0%, #142640 100%) !important;
+    border-color:#4f96f0 !important;
+    border-left-color:#60a5fa !important;
+    color:#bfdbfe !important;
+    box-shadow:0 0 0 2px rgba(59,130,246,0.2), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.portfolioSwitcherMenu{ min-width:200px; }
+.portfolioMenuItem{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:6px 12px;
+    font-size:0.82rem;
+    color:#c8d0dc;
+    border-radius:4px;
+    transition:background .15s;
+}
+.portfolioMenuItem:hover{ background:rgba(255,255,255,0.05); }
+.portfolioMenuItemActive{ color:#3b82f6; font-weight:600; }
+.portfolioMenuItemName{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.portfolioMenuItemActions{ display:flex; gap:4px; flex-shrink:0; }
+.portfolioActionBtn{
+    background:none;
+    border:none;
+    cursor:pointer;
+    padding:2px 4px;
+    font-size:0.75rem;
+    line-height:1;
+    opacity:0.5;
+    transition:opacity .15s;
+    border-radius:3px;
+}
+.portfolioActionBtn:hover{ opacity:1; background:rgba(255,255,255,0.1); }
+.portfolioDeleteBtn:hover{ background:rgba(239,68,68,0.2); }
+.portfolioMenuDivider{ height:1px; background:rgba(255,255,255,0.08); margin:6px 8px; }
+.portfolioMenuItemTodos{ border-bottom:1px solid rgba(255,255,255,0.08); margin-bottom:4px; }
+.portfolioMenuItemTodos .portfolioMenuItemName{ color:#8b9bb4; font-size:0.8rem; letter-spacing:0.03em; }
+.portfolioMenuItemTodos.portfolioMenuItemActive .portfolioMenuItemName{ color:#3b82f6; }
+.assetPortfolioBadge{ display:inline-block; margin-left:5px; padding:1px 5px; border-radius:4px; font-size:9px; font-weight:600; background:rgba(59,130,246,0.18); color:#7ab3f5; vertical-align:middle; white-space:nowrap; }
+.portfolioNewBtn{
+    width:100%;
+    background:none;
+    border:none;
+    color:#3b82f6;
+    font-size:0.82rem;
+    padding:7px 12px;
+    text-align:left;
+    cursor:pointer;
+    border-radius:4px;
+    transition:background .15s;
+}
+.portfolioNewBtn:hover{ background:rgba(59,130,246,0.1); }
+
+/* Temas */
+html[data-theme="black"] .portfolioMenuItem{ color:#c0c8d4; }
+html[data-theme="black"] .portfolioMenuItemActive{ color:#60a5fa; }
+html[data-theme="black"] .portfolioMenuDivider{ background:rgba(255,255,255,0.06); }
+html[data-theme="black"] .portfolioActionBtn:hover{ background:rgba(255,255,255,0.08); }
+html[data-theme="black"] .portfolioMenuItemTodos .portfolioMenuItemName{ color:#6b7a8e; }
+html[data-theme="black"] .portfolioMenuItemTodos.portfolioMenuItemActive .portfolioMenuItemName{ color:#60a5fa; }
+html[data-theme="black"] .assetPortfolioBadge{ background:rgba(96,165,250,0.15); color:#93c5fd; }
+
+html[data-theme="light"] .portfolioSwitcherBtn{
+    background:linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+    border-color:#93c5fd;
+    border-left:3px solid #3b82f6;
+    color:#1d4ed8;
+    box-shadow:0 0 0 1px rgba(59,130,246,0.12);
+}
+html[data-theme="light"] .portfolioSwitcherBtn:hover{
+    background:linear-gradient(135deg, #bfdbfe 0%, #dbeafe 100%) !important;
+    border-color:#60a5fa !important;
+    border-left-color:#2563eb !important;
+    color:#1e40af !important;
+}
+html[data-theme="light"] .portfolioSwitcherMenu{ background:#ffffff; border-color:#e2e8f0; box-shadow:0 4px 16px rgba(0,0,0,0.12); }
+html[data-theme="light"] .portfolioMenuItem{ color:#374151; }
+html[data-theme="light"] .portfolioMenuItem:hover{ background:#f1f5f9; }
+html[data-theme="light"] .portfolioMenuItemActive{ color:#1d4ed8; }
+html[data-theme="light"] .portfolioMenuDivider{ background:#e2e8f0; }
+html[data-theme="light"] .portfolioActionBtn:hover{ background:rgba(0,0,0,0.06); }
+html[data-theme="light"] .portfolioMenuItemTodos{ border-bottom-color:#e2e8f0; }
+html[data-theme="light"] .portfolioMenuItemTodos .portfolioMenuItemName{ color:#9ca3af; }
+html[data-theme="light"] .portfolioMenuItemTodos.portfolioMenuItemActive .portfolioMenuItemName{ color:#1d4ed8; }
+html[data-theme="light"] .assetPortfolioBadge{ background:rgba(29,78,216,0.1); color:#3b82f6; }
+html[data-theme="light"] .portfolioNewBtn{ color:#1d4ed8; }
+html[data-theme="light"] .portfolioNewBtn:hover{ background:rgba(29,78,216,0.08); }
+
+.portfolioImportBtn{ color:#94a3b8; }
+.portfolioImportBtn:hover{ background:rgba(148,163,184,0.1); }
+html[data-theme="light"] .portfolioImportBtn{ color:#64748b; }
+
+.portfolioFileInput{
+    width:100%;
+    padding:8px;
+    background:#1e2a3a;
+    border:1px solid #334155;
+    border-radius:6px;
+    color:#c8d0dc;
+    font-size:0.85rem;
+    margin-bottom:8px;
+    box-sizing:border-box;
+    cursor:pointer;
+}
+.portfolioFileInput::-webkit-file-upload-button{
+    background:#1d4ed8;
+    color:#fff;
+    border:none;
+    border-radius:4px;
+    padding:4px 10px;
+    cursor:pointer;
+    font-size:0.82rem;
+    margin-right:8px;
+}
+html[data-theme="light"] .portfolioFileInput{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="black"] .portfolioFileInput{ background:#050505; border-color:#1a1a1a; color:#e0e0e0; }
+
+.portfolioImportStatus{
+    font-size:0.82rem;
+    color:#f87171;
+    padding:4px 0;
+    margin-bottom:4px;
+}
+
+/* Botón deshabilitado en paso 3 */
+.dangerButton:disabled{
+    opacity:0.35;
+    cursor:not-allowed;
+}
+
+/* ── Responsive: tablet (≤1024px) ── */
+@media (max-width:1024px){
+    :root{ --sidebar-width:200px; }
+
+    .sideWrapper{
+        width:200px;
+        min-width:160px;
+    }
+
+    .searchContainer input{
+        width:120px;
+    }
+
+    .metricBox{
+        min-width:80px;
+        padding:6px 8px;
+    }
+
+    .metricValue{
+        font-size:13px;
+    }
+
+    .metricTitle{
+        font-size:9px;
+    }
+}
+
+/* ── Responsive: móvil / iPad mini portrait (≤768px) ── */
+@media (max-width:768px){
+    :root{ --sidebar-width:0px; }
+
+    .sideWrapper{
+        width:0 !important;
+        min-width:0 !important;
+        border-left:none;
+    }
+
+    .sideWrapper .sidePanel{
+        pointer-events:none;
+    }
+
+    .topBar{
+        flex-wrap:wrap;
+        gap:6px;
+    }
+
+    .metrics{
+        order:2;
+        width:100%;
+    }
+
+    .searchContainer input{
+        width:100px;
+    }
+
+    .navBtn,
+    .navDropdownBtn{
+        font-size:12px;
+        height:28px;
+        padding:0 8px;
+    }
+
+    .metricBox{
+        min-width:72px;
+        padding:4px 6px;
+    }
+
+    .metricValue{
+        font-size:12px;
+    }
+}

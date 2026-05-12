@@ -610,8 +610,10 @@ function buildOperationRow(row) {
         <td>${normalizedRow.estado || ""}</td>
         <td>${normalizedRow.fechaCierre || ""}</td>
         <td class="rowActionsCell">
-            <button type="button" class="assetRowEditBtn operacionRowEditBtn" data-row-id="${normalizedRow.id}" title="Editar fila">✎</button>
-            <button type="button" class="assetRowDeleteBtn operacionRowDeleteBtn" data-row-id="${normalizedRow.id}" title="Eliminar fila">✕</button>
+            <div class="rowActionsBtns">
+                <button type="button" class="assetRowEditBtn operacionRowEditBtn avActionBtn avEditBtn" data-row-id="${normalizedRow.id}" title="Editar fila">✎</button>
+                <button type="button" class="assetRowDeleteBtn operacionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${normalizedRow.id}" title="Eliminar fila">🗑️</button>
+            </div>
         </td>
     `
     return tr

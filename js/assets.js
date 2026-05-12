@@ -2161,7 +2161,7 @@ function _assetUpdateSortArrows() {
     })
 }
 
-function _assetBindSort() {
+function _assetBindSort(assetId) {
     document.querySelectorAll(".assetOperationsTable .mThSort").forEach((th) => {
         th.addEventListener("click", () => {
             const key = th.dataset.sortkey
@@ -2171,7 +2171,7 @@ function _assetBindSort() {
                 _assetSortKey = key
                 _assetSortDir = "asc"
             }
-            try { localStorage.setItem("tableSort_comprasSpot", JSON.stringify({ key: _assetSortKey, dir: _assetSortDir })) } catch {}
+            try { localStorage.setItem(`tableSort_${assetId}`, JSON.stringify({ key: _assetSortKey, dir: _assetSortDir })) } catch {}
             renderAssetRows(_assetDisplayRows)
         })
     })
@@ -2187,7 +2187,7 @@ function renderAssetTablePage(asset) {
     const isEtf = String(asset.type || "").trim().toLowerCase() === "etfs"
 
     try {
-        const _saved = JSON.parse(localStorage.getItem("tableSort_comprasSpot"))
+        const _saved = JSON.parse(localStorage.getItem(`tableSort_${asset.id}`))
         _assetSortKey = _saved?.key ?? null
         _assetSortDir = _saved?.dir ?? "asc"
     } catch {
@@ -2200,7 +2200,7 @@ function renderAssetTablePage(asset) {
     }
 
     contentArea.innerHTML = `
-        <section class="assetTablePage" data-asset-id="${asset.id}" data-asset-type="${asset.type}" data-asset-name="${asset.name}" data-asset-symbol="${asset.symbol}" data-asset-price="${asset.price || "0,00"}" data-asset-currency="${asset.currency || "EUR"}" data-asset-price-currency="${asset.currency || "EUR"}" data-asset-change="${asset.change || "+0,00%"}" data-asset-status="${asset.status || "Mercado abierto"}" data-asset-last-updated="${asset.lastUpdated || ""}" data-asset-market-provider="${asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-market-symbol="${asset.marketSymbol || asset.finnhubSymbol || ""}" data-asset-finnhub-symbol="${asset.finnhubSymbol || ""}" data-asset-color="${asset.color || ""}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}">
+        <section class="assetTablePage" data-asset-id="${escapeHtml(asset.id)}" data-asset-type="${escapeHtml(asset.type)}" data-asset-name="${escapeHtml(asset.name)}" data-asset-symbol="${escapeHtml(asset.symbol)}" data-asset-price="${escapeHtml(asset.price || "0,00")}" data-asset-currency="${escapeHtml(asset.currency || "EUR")}" data-asset-price-currency="${escapeHtml(asset.currency || "EUR")}" data-asset-change="${escapeHtml(asset.change || "+0,00%")}" data-asset-status="${escapeHtml(asset.status || "Mercado abierto")}" data-asset-last-updated="${escapeHtml(asset.lastUpdated || "")}" data-asset-market-provider="${escapeHtml(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || ""))}" data-asset-market-symbol="${escapeHtml(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-finnhub-symbol="${escapeHtml(asset.finnhubSymbol || "")}" data-asset-color="${escapeHtml(asset.color || "")}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}">
             <div class="assetPageHeader">
                 <div class="assetHeaderLeft">
                     <div class="assetTitleRow">
@@ -2234,7 +2234,7 @@ function renderAssetTablePage(asset) {
                     </div>
                 </div>
                 <div class="assetHeaderRight">
-                    <button id="addAssetRowBtn" class="primaryButton assetAddRowHeaderBtn"><span class="assetBtnIcon">+</span> Añadir fila</button>
+                    <button id="addAssetRowBtn" class="primaryButton assetAddRowHeaderBtn"><span class="assetBtnIcon">+</span> Añadir compra</button>
                     <div class="assetHeaderMenu">
                         <button id="assetMenuBtn" class="assetMenuTrigger" type="button" aria-label="Más opciones">⋯</button>
                         <div class="assetMenuDropdown" id="assetMenuDropdown">
@@ -2314,7 +2314,7 @@ function renderAssetTablePage(asset) {
     renderAssetCompletedOperationsSection(asset)
     renderAssetTransaccionesSection(asset)
     setupAssetTabs()
-    _assetBindSort()
+    _assetBindSort(asset.id)
     initAssetTableLogic(asset)
 }
 
@@ -2368,12 +2368,12 @@ function renderAssetRows(rows) {
         )
         const moneyMono = (val, field) => formatCellMoneyValue(val, getAssetTableMoneyCurrency(assetType, field, assetCurrency, assetPriceCurrency, rowCurrency))
         rowElement.innerHTML = `
-            <td data-field="fechaOperacion">${rowData.fechaOperacion || ""}</td>
-            <td data-field="tipoOperacion">${rowData.tipoOperacion || "Compra"}</td>
-            ${isCrypto ? `<td data-field="exchange">${rowData.exchange || ""}</td>` : ""}
+            <td data-field="fechaOperacion">${escapeHtml(rowData.fechaOperacion || "")}</td>
+            <td data-field="tipoOperacion">${escapeHtml(rowData.tipoOperacion || "Compra")}</td>
+            ${isCrypto ? `<td data-field="exchange">${escapeHtml(rowData.exchange || "")}</td>` : ""}
             <td data-field="participaciones">${formatAssetParticipationValue(rowData.participaciones, assetType)}</td>
             <td data-field="precioParticipacion">${moneyMono(rowData.precioParticipacion, "precioParticipacion")}</td>
-            ${isCrypto ? `<td data-field="currency">${rowCurrency}</td>` : ""}
+            ${isCrypto ? `<td data-field="currency">${escapeHtml(rowCurrency)}</td>` : ""}
             <td data-field="capitalInvertidoBruto">${moneyMono(rowData.capitalInvertidoBruto, "capitalInvertidoBruto")}</td>
             ${isEtf ? `<td data-field="costeAnual">${formatCellPercentValue(rowData.costeAnual)}</td>` : ""}
             ${isCrypto
@@ -2381,8 +2381,10 @@ function renderAssetRows(rows) {
                 : `<td data-field="comisiones">${moneyMono(rowData.comisiones, "comisiones")}</td>`}
             <td class="rowTotal">${formatMoney(0, getAssetTableMoneyCurrency(assetType, "capitalInvertidoNeto", assetCurrency, assetPriceCurrency, rowCurrency))}</td>
             <td class="rowActionsCell">
-                <button type="button" class="assetRowEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
-                <button type="button" class="assetRowDeleteBtn" data-row-index="${index}" title="Eliminar fila">✕</button>
+                <div class="rowActionsBtns">
+                    <button type="button" class="assetRowEditBtn avActionBtn avEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
+                    <button type="button" class="assetRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${index}" title="Eliminar fila">🗑️</button>
+                </div>
             </td>
         `
         assetOperationsBody.appendChild(rowElement)
@@ -2661,13 +2663,13 @@ function renderMarketSearchResults(container, results, onSelect) {
         const providerLabel = String(result.provider || "").trim().toUpperCase()
         const metaLabel = [providerLabel, result.type || "market", result.exchange || ""].filter(Boolean).join(" · ")
         button.innerHTML = `
-            <span class="assetSearchResultTitle">${displaySymbol}</span>
-            <span class="assetSearchResultSubtitle">${result.description}</span>
-            <span class="assetSearchResultMeta">${metaLabel}</span>
+            <span class="assetSearchResultTitle">${escapeHtml(displaySymbol)}</span>
+            <span class="assetSearchResultSubtitle">${escapeHtml(result.description)}</span>
+            <span class="assetSearchResultMeta">${escapeHtml(metaLabel)}</span>
             ${hasQuote ? `
                 <span class="assetSearchResultQuoteRow">
-                    <span class="assetSearchResultPrice">${result.price} ${result.currency || ""}</span>
-                    <span class="assetSearchResultChange ${quoteClass}">${changeValue}</span>
+                    <span class="assetSearchResultPrice">${escapeHtml(result.price)} ${escapeHtml(result.currency || "")}</span>
+                    <span class="assetSearchResultChange ${quoteClass}">${escapeHtml(changeValue)}</span>
                 </span>
             ` : `
                 <span class="assetSearchResultQuoteEmpty">Sin cotizacion disponible</span>
@@ -3780,7 +3782,7 @@ function avBuildCard(asset) {
             <div class="avCardActions">
                 ${assetColor ? `<span class="avColorDot" style="background:${assetColor};--dot-color:${assetColor}" title="Color del activo"></span>` : ""}
                 <button type="button" class="avActionBtn avEditBtn" data-asset-id="${asset.id}" title="Editar nombre">✎</button>
-                <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">✕</button>
+                <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">🗑️</button>
             </div>
         </div>
         <div class="avCardSymbol">${escapeHtml(asset.symbol || asset.name)}</div>
@@ -3872,7 +3874,7 @@ function avBuildTableRow(asset) {
         <td class="avTrUpdated">${lastUpdatedStr}</td>
         <td class="avTrActions">
             <button type="button" class="avActionBtn avEditBtn" data-asset-id="${asset.id}" title="Editar">✎</button>
-            <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">✕</button>
+            <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">🗑️</button>
         </td>
     `
     return tr

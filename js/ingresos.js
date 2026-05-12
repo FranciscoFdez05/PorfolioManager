@@ -510,8 +510,10 @@ function renderIngresosAnnualTable() {
                 <td>${formatCellEuroValue(row.meses?.[month.key] || "")}</td>
             `).join("")}
             <td class="rowActionsCell">
-                <button type="button" class="assetRowEditBtn ingresosAnnualEditBtn" data-annual-edit-manual="${rowIndex}" title="Editar recurrente">✎</button>
-                <button type="button" class="assetRowDeleteBtn" data-ingresos-delete-manual-row="${rowIndex}" title="Eliminar recurrente">✕</button>
+                <div class="rowActionsBtns">
+                    <button type="button" class="assetRowEditBtn ingresosAnnualEditBtn avActionBtn avEditBtn" data-annual-edit-manual="${rowIndex}" title="Editar recurrente">✎</button>
+                    <button type="button" class="assetRowDeleteBtn avActionBtn avDeleteBtn" data-ingresos-delete-manual-row="${rowIndex}" title="Eliminar recurrente">🗑️</button>
+                </div>
             </td>
         `
         annualBody.appendChild(tr)
@@ -540,8 +542,10 @@ function renderIngresosAnnualTable() {
             <td>${escapeIngresosHtml(type)}</td>
             ${INGRESOS_MONTHS.map((month) => `<td>${incomeTotals[type][month.key] ? formatEuro(incomeTotals[type][month.key]) : "- €"}</td>`).join("")}
             <td class="rowActionsCell">
-                <button type="button" class="assetRowEditBtn ingresosAnnualEditBtn" data-annual-edit-type="${rowIndex}" title="Editar ingreso">✎</button>
-                <button type="button" class="assetRowDeleteBtn" data-ingresos-delete-type-row="${rowIndex}" title="Eliminar ingreso">✕</button>
+                <div class="rowActionsBtns">
+                    <button type="button" class="assetRowEditBtn ingresosAnnualEditBtn avActionBtn avEditBtn" data-annual-edit-type="${rowIndex}" title="Editar ingreso">✎</button>
+                    <button type="button" class="assetRowDeleteBtn avActionBtn avDeleteBtn" data-ingresos-delete-type-row="${rowIndex}" title="Eliminar ingreso">🗑️</button>
+                </div>
             </td>
         `
         annualBody.appendChild(tr)
@@ -825,8 +829,10 @@ function buildIngresoMovementRow(row = {}, rowIndex = -1) {
         <td data-field="tipo">${normalizeIngresoTipo(row.tipo || "")}</td>
         <td data-field="cantidad">${formatCellEuroValue(row.cantidad || "")}</td>
         <td class="rowActionsCell">
-            <button type="button" class="assetRowEditBtn ingresosRowEditBtn" data-row-index="${rowIndex}" title="Editar fila">✎</button>
-            <button type="button" class="assetRowDeleteBtn ingresosRowDeleteBtn" data-row-index="${rowIndex}" title="Eliminar fila">✕</button>
+            <div class="rowActionsBtns">
+                <button type="button" class="assetRowEditBtn ingresosRowEditBtn avActionBtn avEditBtn" data-row-index="${rowIndex}" title="Editar fila">✎</button>
+                <button type="button" class="assetRowDeleteBtn ingresosRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${rowIndex}" title="Eliminar fila">🗑️</button>
+            </div>
         </td>
     `
     return tr

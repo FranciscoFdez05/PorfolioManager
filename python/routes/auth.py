@@ -3,7 +3,9 @@ import json
 import logging
 import os
 import re
+import secrets
 from pathlib import Path
+from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
@@ -16,7 +18,7 @@ auth_bp = Blueprint("auth", __name__)
 _BASE_DIR     = Path(__file__).resolve().parent.parent.parent
 _AUTH_FILE    = _BASE_DIR / "data" / "auth.dat"
 _ENV_FILE     = _BASE_DIR / ".env"
-_DEFAULT_HASH = generate_password_hash("admin", method="pbkdf2:sha256:600000")
+_DEFAULT_HASH = generate_password_hash(secrets.token_hex(32), method="pbkdf2:sha256:600000")
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +76,11 @@ def _load_credentials() -> tuple[str, str]:
         _save_credentials(u, h)
         return u, h
 
-    return "admin", _DEFAULT_HASH
+    logger.critical(
+        "No hay credenciales configuradas. Define LOGIN_USERNAME y LOGIN_PASSWORD_HASH "
+        "en el archivo .env, o usa el setup inicial. No se permitirá el acceso."
+    )
+    return "__no_user__", _DEFAULT_HASH
 
 
 def _save_credentials(username: str, password_hash: str) -> None:
@@ -118,7 +124,8 @@ def login():
             session["logged_in"] = True
             session.permanent = False
             next_url = request.args.get("next") or "/"
-            if not next_url.startswith("/") or next_url.startswith("//"):
+            parsed = urlparse(next_url)
+            if parsed.scheme or parsed.netloc:
                 next_url = "/"
             return redirect(next_url)
 

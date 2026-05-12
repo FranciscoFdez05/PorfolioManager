@@ -683,8 +683,10 @@ function buildVentaRow(row, computed, index) {
         <td class="rowTotal" data-field="bruto">${formatVentasMoney(computed.bruto)}</td>
         <td class="rowTotal" data-field="neto">${formatVentasMoney(computed.neto)}</td>
         <td class="rowActionsCell">
-            <button type="button" class="assetRowEditBtn ventasRowEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
-            <button type="button" class="assetRowDeleteBtn ventasRowDeleteBtn" data-row-index="${index}" title="Eliminar fila">✕</button>
+            <div class="rowActionsBtns">
+                <button type="button" class="assetRowEditBtn ventasRowEditBtn avActionBtn avEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
+                <button type="button" class="assetRowDeleteBtn ventasRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${index}" title="Eliminar fila">🗑️</button>
+            </div>
         </td>
     `
     return tr
