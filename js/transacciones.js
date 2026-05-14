@@ -199,35 +199,36 @@ function renderTransaccionesTable() {
 
     body.innerHTML = ""
 
+    const tableWrapper = document.getElementById("transaccionesTableWrapper")
+    const noAssetEl = document.getElementById("transaccionesNoAssetMsg")
+    const transaccionesEmptyEl = document.getElementById("transaccionesEmptyMsg")
+
     if (!currentTransaccionAssetId) {
-        const emptyRow = document.createElement("tr")
-        emptyRow.innerHTML = `
-            <td class="rowDeleteCell"></td>
-            <td colspan="7" class="operationsEmptyCell">Crea o selecciona una cripto para registrar transacciones.</td>
-        `
-        body.appendChild(emptyRow)
+        if (tableWrapper) tableWrapper.classList.add("hidden")
+        if (noAssetEl) noAssetEl.classList.remove("hidden")
+        if (transaccionesEmptyEl) transaccionesEmptyEl.classList.add("hidden")
         renderTransaccionesAssetMenu()
         return
     }
 
+    if (noAssetEl) noAssetEl.classList.add("hidden")
+
     const rows = getCurrentAssetRows()
 
     if (!rows.length) {
-        const emptyRow = document.createElement("tr")
-        emptyRow.innerHTML = `
-            <td class="rowDeleteCell"></td>
-            <td colspan="7" class="operationsEmptyCell">Todavía no hay transacciones registradas.</td>
-        `
-        body.appendChild(emptyRow)
+        if (tableWrapper) tableWrapper.classList.add("hidden")
+        if (transaccionesEmptyEl) transaccionesEmptyEl.classList.remove("hidden")
         return
     }
+    if (tableWrapper) tableWrapper.classList.remove("hidden")
+    if (transaccionesEmptyEl) transaccionesEmptyEl.classList.add("hidden")
 
     rows.forEach((row) => {
         body.appendChild(buildTransaccionRow(row))
     })
 
     renderTransaccionesAssetMenu()
-    bindTableSort(body.closest("table"))
+    bindTableSort(body.closest("table"), "transacciones")
 }
 
 function normalizeHashTransaccionValue(value) {

@@ -117,13 +117,14 @@ async function buildMetricasPayload() {
         }
     }))
 
-    const [divResp, intResp, bonosResp, rfResp, gastosYearsResp, ingresosYearsResp] = await Promise.all([
+    const [divResp, intResp, bonosResp, rfResp, gastosYearsResp, ingresosYearsResp, tradingResp] = await Promise.all([
         fetch("/api/dividendos"),
         fetch("/api/intereses"),
         fetch("/api/bonos"),
         fetch("/api/rentafija"),
         fetch("/api/gastos").catch(() => null),
-        fetch("/api/ingresos").catch(() => null)
+        fetch("/api/ingresos").catch(() => null),
+        fetch("/api/trading").catch(() => null)
     ])
     const divData   = await divResp.json()
     const intData   = await intResp.json()
@@ -144,6 +145,8 @@ async function buildMetricasPayload() {
         ? await fetch(`/api/ingresos/${latestIngresosYear}`).then((r) => r.json()).catch(() => null)
         : null
 
+    const tradingData = tradingResp ? await tradingResp.json().catch(() => ({ rows: [] })) : { rows: [] }
+
     return {
         summaries,
         dividendos:      Array.isArray(divData.rows)   ? divData.rows   : [],
@@ -156,7 +159,8 @@ async function buildMetricasPayload() {
         gastosYearsList,
         gastosYearData,
         ingresosYearsList,
-        ingresosYearData
+        ingresosYearData,
+        tradingRows: Array.isArray(tradingData.rows) ? tradingData.rows : []
     }
 }
 
@@ -180,7 +184,29 @@ function mSyncTopBar(summaries, rendimiento, invertido, totalCuenta) {
 }
 
 function mUpdateKpis(payload) {
-    const { summaries, dividendos, intereses, bonos, rentaFija } = payload
+    const { summaries, dividendos, intereses, bonos, rentaFija, tradingRows } = payload
+
+    const tRows = Array.isArray(tradingRows) ? tradingRows : []
+    if (tRows.length) {
+        const tProfits = tRows.filter((r) => r.resultado === "PROFIT").length
+        const tLosses  = tRows.filter((r) => r.resultado === "PÉRDIDA").length
+        const winRate  = tRows.length > 0 ? (tProfits / tRows.length) * 100 : 0
+        const gananciaTotal = tRows.reduce((s, r) => {
+            const v = parseFloat(String(r.ganancia || "").replace(",", ".").replace("%", ""))
+            return s + (isNaN(v) ? 0 : v)
+        }, 0)
+        const roiMedio = tRows.reduce((s, r) => {
+            const v = parseFloat(String(r.roi || "").replace(",", ".").replace("%", ""))
+            return s + (isNaN(v) ? 0 : v)
+        }, 0) / (tRows.length || 1)
+
+        mSetKpi("mkpiTradingTotal",    String(tRows.length))
+        mSetKpi("mkpiTradingProfits",  String(tProfits), "mPositive")
+        mSetKpi("mkpiTradingLosses",   String(tLosses),  "mNegative")
+        mSetKpi("mkpiTradingWinRate",  winRate.toFixed(1).replace(".", ",") + "%", winRate >= 50 ? "mPositive" : "mNegative")
+        mSetKpi("mkpiTradingGanancia", (gananciaTotal >= 0 ? "+" : "") + gananciaTotal.toFixed(2).replace(".", ",") + "%", gananciaTotal >= 0 ? "mPositive" : "mNegative")
+        mSetKpi("mkpiTradingRoiMedio", (roiMedio >= 0 ? "+" : "") + roiMedio.toFixed(1).replace(".", ",") + "%", roiMedio >= 0 ? "mPositive" : "mNegative")
+    }
 
     const totalCuenta  = summaries.reduce((s, a) => s + a.netoActualEur,  0)
     const invertido    = summaries.reduce((s, a) => s + a.invertidoEur,   0)
@@ -1064,14 +1090,14 @@ function mComputeGastosData(yearData) {
 
 function mRenderGastos(yearsList, yearData) {
     const section = document.getElementById("mSectionGastos")
-    const gastosKpiGroup = document.querySelector(".mkpiGroupGastos")
+    const gastosKpiRow = document.querySelector(".metricasKpiRow[data-mcat='gastos']")
     if (!yearsList.length || !yearData) {
         if (section) section.classList.add("hidden")
-        if (gastosKpiGroup) gastosKpiGroup.classList.add("hidden")
+        if (gastosKpiRow) gastosKpiRow.style.display = "none"
         return
     }
     if (section) section.classList.remove("hidden")
-    if (gastosKpiGroup) gastosKpiGroup.classList.remove("hidden")
+    if (gastosKpiRow) gastosKpiRow.style.display = ""
 
     const { totalMes, totalTipo, totalMensualidades, totalMovimientos } = mComputeGastosData(yearData)
     const totalGeneral = totalMensualidades + totalMovimientos
@@ -1353,7 +1379,7 @@ function openGastosTipoPopup(tipoLabel) {
     document.body.appendChild(popup)
     document.getElementById("gtPopupCloseBtn")?.addEventListener("click", () => { backdrop.remove(); popup.remove() })
     const table = document.getElementById("gtPopupTable")
-    if (table) bindTableSort(table)
+    if (table) bindTableSort(table, "metricasGt")
 }
 
 // ── top-positions table ────────────────────────────────────────────────────
@@ -1555,14 +1581,14 @@ function mRenderIngresosCharts(ingresosYearData) {
 
 function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
     const section = document.getElementById("mSectionIngresos")
-    const ingresosKpiGroup = document.querySelector(".mkpiGroupIngresosPersonales")
+    const ingresosKpiRow = document.querySelector(".metricasKpiRow[data-mcat='ingresos']")
     if (!ingresosYearsList.length || !ingresosYearData) {
         if (section) section.classList.add("hidden")
-        if (ingresosKpiGroup) ingresosKpiGroup.classList.add("hidden")
+        if (ingresosKpiRow) ingresosKpiRow.style.display = "none"
         return
     }
     if (section) section.classList.remove("hidden")
-    if (ingresosKpiGroup) ingresosKpiGroup.classList.remove("hidden")
+    if (ingresosKpiRow) ingresosKpiRow.style.display = ""
 
     const yearToggle = document.getElementById("mIngresosYearToggle")
     if (yearToggle && !yearToggle.dataset.bound) {
@@ -1750,18 +1776,18 @@ function mRenderComparativa(ingresosYearData, gastosYearData) {
     const filtrosEl = document.getElementById("mComparativaFiltros")
     if (filtrosEl) {
         filtrosEl.innerHTML = allTipos.map(t =>
-            `<button class="mActivosFilterBtn${_metricasComparativaExclude.has(t) ? "" : " active"}" data-cmp-tipo="${t}">${t}</button>`
+            `<label class="mActivosFilterBtn" data-cmp-tipo="${t}"><input type="checkbox"${_metricasComparativaExclude.has(t) ? "" : " checked"}><span>${t}</span></label>`
         ).join("")
-        filtrosEl.onclick = e => {
-            const btn = e.target.closest("[data-cmp-tipo]")
-            if (!btn) return
-            const tipo = btn.dataset.cmpTipo
-            if (_metricasComparativaExclude.has(tipo)) {
+        filtrosEl.onchange = e => {
+            const input = e.target
+            if (!input.matches('input[type="checkbox"]')) return
+            const label = input.closest("[data-cmp-tipo]")
+            if (!label) return
+            const tipo = label.dataset.cmpTipo
+            if (input.checked) {
                 _metricasComparativaExclude.delete(tipo)
-                btn.classList.add("active")
             } else {
                 _metricasComparativaExclude.add(tipo)
-                btn.classList.remove("active")
             }
             mDrawComparativaChart(_metricasPayload.ingresosYearData, _metricasPayload.gastosYearData)
             fetch("/api/settings", {
@@ -1803,6 +1829,8 @@ function mDrawComparativaChart(ingresosYearData, gastosYearData) {
 
     const balance = ingMonthly.map((ing, i) => ing - gastosMonthly[i])
 
+    mDrawComparativaLineChart(ingMonthly, gastosMonthly)
+
     mCreateChart("mChartComparativa", {
         type: "bar",
         data: {
@@ -1834,10 +1862,84 @@ function mDrawComparativaChart(ingresosYearData, gastosYearData) {
     })
 }
 
+function mDrawComparativaLineChart(ingMonthly, gastosMonthly) {
+    const labels = M_ING_LABELS
+
+    // find max visible month (last month with any data)
+    let lastIdx = -1
+    for (let i = 0; i < 12; i++) {
+        if (ingMonthly[i] > 0 || gastosMonthly[i] > 0) lastIdx = i
+    }
+    const visibleLabels   = lastIdx >= 0 ? labels.slice(0, lastIdx + 1)         : labels
+    const visibleIngresos = lastIdx >= 0 ? ingMonthly.slice(0, lastIdx + 1)     : ingMonthly
+    const visibleGastos   = lastIdx >= 0 ? gastosMonthly.slice(0, lastIdx + 1)  : gastosMonthly
+
+    mCreateChart("mChartComparativaLinea", {
+        type: "line",
+        data: {
+            labels: visibleLabels,
+            datasets: [
+                {
+                    label: "Ingresos",
+                    data: visibleIngresos,
+                    borderColor: "#2ecc71",
+                    backgroundColor: "rgba(46,204,113,0.12)",
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: "#2ecc71",
+                    tension: 0.35,
+                    fill: false
+                },
+                {
+                    label: "Gastos",
+                    data: visibleGastos,
+                    borderColor: "#e74c3c",
+                    backgroundColor: "rgba(231,76,60,0.12)",
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: "#e74c3c",
+                    tension: 0.35,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                tooltip: {
+                    callbacks: {
+                        label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}`,
+                        afterBody: (items) => {
+                            const ing = items.find(i => i.dataset.label === "Ingresos")?.raw ?? 0
+                            const gas = items.find(i => i.dataset.label === "Gastos")?.raw ?? 0
+                            const bal = ing - gas
+                            return [`Balance: ${formatEuro(bal)}`]
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: mAxisX(),
+                y: {
+                    ...mAxisY(),
+                    ticks: {
+                        color: "#8899bb",
+                        callback: (v) => formatEuro(v)
+                    }
+                }
+            }
+        }
+    })
+}
+
 // ── main init ──────────────────────────────────────────────────────────────
 
 function mRenderAll(payload) {
-    const { summaries, dividendos, bonos, rentaFija, gastosYearsList, gastosYearData, ingresosYearsList, ingresosYearData } = payload
+    const { summaries, dividendos, bonos, rentaFija, gastosYearsList, gastosYearData, ingresosYearsList, ingresosYearData, tradingRows } = payload
     const b = bonos || [], rf = rentaFija || []
     mRenderDistTipos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
     mRenderDistActivos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
@@ -1856,12 +1958,261 @@ function mRenderAll(payload) {
     mRenderIngresosSection(ingresosYearsList || [], ingresosYearData || null)
     mRenderComparativa(ingresosYearData || null, gastosYearData || null)
     mRenderTopTable(summaries)
+    mRenderTrading(tradingRows || [])
 
     const gastosEmpty = !gastosYearsList?.length || !gastosYearData
     const ingresosEmpty = !ingresosYearsList?.length || !ingresosYearData
     const gastosIngresosTab = document.querySelector(".mNavTab[data-mcat='gastos,ingresos']")
     if (gastosIngresosTab) gastosIngresosTab.classList.toggle("hidden", gastosEmpty && ingresosEmpty)
+    const tradingTab = document.querySelector(".mNavTab[data-mcat='trading']")
+    if (tradingTab) tradingTab.classList.toggle("hidden", !(tradingRows && tradingRows.length))
 }
+
+// ── Trading metrics ────────────────────────────────────────────────────────
+
+let _mTradingWinLossFilter = "todos"
+
+function mParseTradingPct(value) {
+    if (!value && value !== 0) return null
+    const n = parseFloat(String(value).replace(",", ".").replace("%", ""))
+    return isNaN(n) ? null : n
+}
+
+function mFmtTradingPct(value) {
+    const n = mParseTradingPct(value)
+    if (n === null) return "---"
+    return (n >= 0 ? "+" : "") + n.toFixed(2).replace(".", ",") + "%"
+}
+
+function mRenderTrading(rows) {
+    if (!rows.length) return
+
+    mRenderTradingDireccion(rows)
+    mRenderTradingWinLoss(rows, _mTradingWinLossFilter)
+    mRenderTradingRendimiento(rows)
+
+    const wlFilterEl = document.getElementById("mTradingWinLossFilter")
+    if (wlFilterEl && !wlFilterEl.dataset.bound) {
+        wlFilterEl.dataset.bound = "true"
+        const todosInput = wlFilterEl.querySelector('input[value="todos"]')
+        if (todosInput) todosInput.checked = true
+        wlFilterEl.addEventListener("change", (e) => {
+            const label = e.target.closest(".mActivosFilterBtn")
+            if (!label) return
+            _mTradingWinLossFilter = label.dataset.wlfilter
+            mRenderTradingWinLoss(rows, _mTradingWinLossFilter)
+        })
+    }
+}
+
+function mRenderTradingDireccion(rows) {
+    const longs  = rows.filter((r) => r.direccion === "LONG")
+    const shorts = rows.filter((r) => r.direccion === "SHORT")
+
+    mCreateChart("mChartTradingDireccion", {
+        type: "doughnut",
+        data: {
+            labels: ["LONG", "SHORT"],
+            datasets: [{
+                data: [longs.length, shorts.length],
+                backgroundColor: ["#2ecc71", "#e74c3c"],
+                borderColor: "#0b1120",
+                borderWidth: 3,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            cutout: "60%",
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                tooltip: { callbacks: { label: (c) => ` ${c.raw} trades (${rows.length > 0 ? ((c.raw / rows.length) * 100).toFixed(1) : 0}%)` } }
+            }
+        }
+    })
+
+    const statsEl = document.getElementById("mTradingDireccionStats")
+    if (!statsEl) return
+
+    function dirStats(subset, label, color) {
+        const profits = subset.filter((r) => r.resultado === "PROFIT")
+        const wr = subset.length > 0 ? (profits.length / subset.length * 100).toFixed(1) : "0.0"
+        const ganMedia = subset.length > 0
+            ? (subset.reduce((s, r) => s + (mParseTradingPct(r.ganancia) || 0), 0) / subset.length).toFixed(2)
+            : "0.00"
+        const roiMedia = subset.length > 0
+            ? (subset.reduce((s, r) => s + (mParseTradingPct(r.roi) || 0), 0) / subset.length).toFixed(1)
+            : "0.0"
+        return `
+            <tr>
+                <td><span class="tradingDirBadge tradingDir${label}" style="font-size:12px">${label}</span></td>
+                <td>${subset.length}</td>
+                <td class="${parseFloat(wr) >= 50 ? "tradingPos" : "tradingNeg"}">${wr}%</td>
+                <td class="${parseFloat(ganMedia) >= 0 ? "tradingPos" : "tradingNeg"}">${mFmtTradingPct(ganMedia)}</td>
+                <td class="${parseFloat(roiMedia) >= 0 ? "tradingPos" : "tradingNeg"}">${parseFloat(roiMedia) >= 0 ? "+" : ""}${roiMedia.replace(".", ",")}%</td>
+            </tr>
+        `
+    }
+
+    statsEl.innerHTML = `
+        <table class="mTradingTable">
+            <thead>
+                <tr>
+                    <th>Dirección</th>
+                    <th>Trades</th>
+                    <th>Win Rate</th>
+                    <th>Gan. media</th>
+                    <th>ROI medio</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${dirStats(longs, "LONG", "#2ecc71")}
+                ${dirStats(shorts, "SHORT", "#e74c3c")}
+            </tbody>
+        </table>
+    `
+}
+
+function mRenderTradingWinLoss(rows, filter = "todos") {
+    const filtered = filter === "LONG" ? rows.filter((r) => r.direccion === "LONG")
+                   : filter === "SHORT" ? rows.filter((r) => r.direccion === "SHORT")
+                   : rows
+
+    const profits  = filtered.filter((r) => r.resultado === "PROFIT").length
+    const perdidas = filtered.filter((r) => r.resultado === "PÉRDIDA").length
+
+    mCreateChart("mChartTradingWinLoss", {
+        type: "doughnut",
+        data: {
+            labels: ["Aciertos", "Fallos"],
+            datasets: [{
+                data: [profits, perdidas],
+                backgroundColor: ["#2ecc71cc", "#e74c3ccc"],
+                borderColor: ["#2ecc71", "#e74c3c"],
+                borderWidth: 2,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            cutout: "58%",
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                tooltip: { callbacks: { label: (c) => ` ${c.raw} (${filtered.length > 0 ? ((c.raw / filtered.length) * 100).toFixed(1) : 0}%)` } }
+            }
+        }
+    })
+
+    const mediaEl = document.getElementById("mTradingMediaTable")
+    if (!mediaEl) return
+
+    const profitRows  = filtered.filter((r) => r.resultado === "PROFIT")
+    const perdidaRows = filtered.filter((r) => r.resultado === "PÉRDIDA")
+
+    const avgGanProfit  = profitRows.length ? profitRows.reduce((s, r) => s + (mParseTradingPct(r.ganancia) || 0), 0) / profitRows.length : 0
+    const avgGanLoss    = perdidaRows.length ? perdidaRows.reduce((s, r) => s + (mParseTradingPct(r.ganancia) || 0), 0) / perdidaRows.length : 0
+    const avgRoiProfit  = profitRows.length ? profitRows.reduce((s, r) => s + (mParseTradingPct(r.roi) || 0), 0) / profitRows.length : 0
+    const avgRoiLoss    = perdidaRows.length ? perdidaRows.reduce((s, r) => s + (mParseTradingPct(r.roi) || 0), 0) / perdidaRows.length : 0
+
+    mediaEl.innerHTML = `
+        <table class="mTradingTable">
+            <thead>
+                <tr>
+                    <th>Resultado</th>
+                    <th>Trades</th>
+                    <th>Gan. media</th>
+                    <th>ROI medio</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="tradingResultBadge tradingProfit" style="font-size:12px">PROFIT</span></td>
+                    <td>${profitRows.length}</td>
+                    <td class="tradingPos">${mFmtTradingPct(avgGanProfit)}</td>
+                    <td class="tradingPos">${avgRoiProfit >= 0 ? "+" : ""}${avgRoiProfit.toFixed(1).replace(".", ",")}%</td>
+                </tr>
+                <tr>
+                    <td><span class="tradingResultBadge tradingPerdida" style="font-size:12px">PÉRDIDA</span></td>
+                    <td>${perdidaRows.length}</td>
+                    <td class="tradingNeg">${mFmtTradingPct(avgGanLoss)}</td>
+                    <td class="tradingNeg">${avgRoiLoss >= 0 ? "+" : ""}${avgRoiLoss.toFixed(1).replace(".", ",")}%</td>
+                </tr>
+            </tbody>
+        </table>
+    `
+}
+
+function mRenderTradingRendimiento(rows) {
+    const sorted = [...rows].sort((a, b) => {
+        const da = String(a.fecha || "").split(/[-/]/).reverse().join("")
+        const db = String(b.fecha || "").split(/[-/]/).reverse().join("")
+        return da.localeCompare(db)
+    })
+
+    let acumulado = 0
+    const labels = []
+    const data = []
+
+    sorted.forEach((r, i) => {
+        const val = mParseTradingPct(r.ganancia) || 0
+        acumulado += val
+        labels.push(r.fecha || `#${i + 1}`)
+        data.push(parseFloat(acumulado.toFixed(4)))
+    })
+
+    const positiveColor = "#2ecc71"
+    const negativeColor = "#e74c3c"
+
+    mCreateChart("mChartTradingRendimiento", {
+        type: "line",
+        data: {
+            labels,
+            datasets: [{
+                label: "Rendimiento neto acumulado (%)",
+                data,
+                borderColor: positiveColor,
+                backgroundColor: "rgba(46,204,113,0.08)",
+                borderWidth: 2,
+                pointRadius: data.length > 50 ? 0 : 3,
+                pointHoverRadius: 5,
+                tension: 0.35,
+                fill: true,
+                segment: {
+                    borderColor: (ctx) => ctx.p1.parsed.y >= 0 ? positiveColor : negativeColor
+                }
+            }]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (c) => ` ${c.raw >= 0 ? "+" : ""}${c.raw.toFixed(2).replace(".", ",")}%`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: "#8899bb", maxTicksLimit: 12, maxRotation: 45 },
+                    grid:  { color: "rgba(255,255,255,0.06)" }
+                },
+                y: {
+                    ticks: {
+                        color: "#ccd6f6",
+                        callback: (v) => (v >= 0 ? "+" : "") + v.toFixed(1) + "%"
+                    },
+                    grid: { color: "rgba(255,255,255,0.06)" }
+                }
+            }
+        }
+    })
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 
 async function initMetricasLogic() {
     Object.values(_metricasCharts).forEach((c) => c?.destroy())
@@ -1900,9 +2251,11 @@ async function initMetricasLogic() {
 
         function _mActivosApplyVisual() {
             const todosMode = _mIsTodosMode()
-            if (_todosBtn) _todosBtn.classList.toggle("active", todosMode)
+            const todosInput = _todosBtn?.querySelector("input")
+            if (todosInput) todosInput.checked = todosMode
             _specificBtns.forEach(b => {
-                b.classList.toggle("active", !todosMode && _metricasActivosFilter.has(b.dataset.atype))
+                const inp = b.querySelector("input")
+                if (inp) inp.checked = !todosMode && _metricasActivosFilter.has(b.dataset.atype)
             })
         }
 
@@ -1919,30 +2272,36 @@ async function initMetricasLogic() {
         _mActivosApplyVisual()
 
         if (_todosBtn) {
-            _todosBtn.addEventListener("click", () => {
-                _allTypes.forEach(t => _metricasActivosFilter.add(t))
-                _mActivosApplyVisual()
-                _mActivosSave()
-                _mActivosRender()
-            })
+            const todosInput = _todosBtn.querySelector("input")
+            if (todosInput) {
+                todosInput.addEventListener("change", () => {
+                    _allTypes.forEach(t => _metricasActivosFilter.add(t))
+                    _mActivosApplyVisual()
+                    _mActivosSave()
+                    _mActivosRender()
+                })
+            }
         }
 
         _specificBtns.forEach(btn => {
-            btn.addEventListener("click", () => {
-                const tipo = btn.dataset.atype
-                if (_mIsTodosMode()) {
-                    _metricasActivosFilter.clear()
-                    _metricasActivosFilter.add(tipo)
-                } else if (_metricasActivosFilter.has(tipo)) {
-                    _metricasActivosFilter.delete(tipo)
-                    if (_metricasActivosFilter.size === 0) _allTypes.forEach(t => _metricasActivosFilter.add(t))
-                } else {
-                    _metricasActivosFilter.add(tipo)
-                }
-                _mActivosApplyVisual()
-                _mActivosSave()
-                _mActivosRender()
-            })
+            const inp = btn.querySelector("input")
+            if (inp) {
+                inp.addEventListener("change", () => {
+                    const tipo = btn.dataset.atype
+                    if (_mIsTodosMode()) {
+                        _metricasActivosFilter.clear()
+                        _metricasActivosFilter.add(tipo)
+                    } else if (!inp.checked) {
+                        _metricasActivosFilter.delete(tipo)
+                        if (_metricasActivosFilter.size === 0) _allTypes.forEach(t => _metricasActivosFilter.add(t))
+                    } else {
+                        _metricasActivosFilter.add(tipo)
+                    }
+                    _mActivosApplyVisual()
+                    _mActivosSave()
+                    _mActivosRender()
+                })
+            }
         })
 
         const toggleBtns = document.querySelectorAll(".mToggleBtn[data-charttype]")
@@ -1973,46 +2332,53 @@ async function initMetricasLogic() {
             })
         })
 
-        // ── nav tabs (multi-select) ───────────────────────────────────────
-        const navTabs   = document.querySelectorAll(".mNavTab")
-        const navSearch = document.getElementById("mNavSearch")
-        const todoTab   = document.querySelector(".mNavTab[data-mcat='todo']")
+        // ── nav tabs (single-select) ─────────────────────────────────────
+        const navTabsContainer = document.querySelector(".mNavTabs")
+        const todoInput = navTabsContainer?.querySelector('.mNavTab[data-mcat="todo"] input')
         let _mActiveCats = new Set()
 
         function mApplyNavFilter() {
-            const q = (navSearch?.value || "").toLowerCase().trim()
-            document.querySelectorAll(".metricasSection[data-mcat], .metricasKpiGroup[data-mcat]").forEach(el => {
-                const elCat      = el.dataset.mcat
-                const catMatch   = _mActiveCats.size === 0 || [..._mActiveCats].some(c => elCat === c)
-                const titleEl    = el.querySelector(".metricasSectionTitle,.metricasKpiGroupLabel")
-                const searchMatch = !q || (titleEl?.textContent || "").toLowerCase().includes(q)
-                el.style.display = catMatch && searchMatch ? "" : "none"
+            document.querySelectorAll(".metricasSection[data-mcat], .metricasKpiRow[data-mcat]").forEach(el => {
+                const elCat    = el.dataset.mcat
+                const catMatch = _mActiveCats.size === 0 || [..._mActiveCats].some(c => elCat === c)
+                el.style.display = catMatch ? "" : "none"
             })
-            if (todoTab) todoTab.classList.toggle("active", _mActiveCats.size === 0)
         }
 
-        navTabs.forEach(btn => {
-            btn.addEventListener("click", () => {
-                const mcat = btn.dataset.mcat
-                if (mcat === "todo") {
-                    _mActiveCats.clear()
-                    navTabs.forEach(b => b.classList.remove("active"))
-                    btn.classList.add("active")
-                } else {
-                    const cats = mcat.split(",").map(s => s.trim())
-                    const wasActive = cats.every(c => _mActiveCats.has(c))
-                    if (wasActive) {
-                        cats.forEach(c => _mActiveCats.delete(c))
-                    } else {
-                        cats.forEach(c => _mActiveCats.add(c))
-                    }
-                    btn.classList.toggle("active", !wasActive)
-                }
+        navTabsContainer?.addEventListener("change", (e) => {
+            const input = e.target
+            if (!input.matches('input[type="checkbox"]')) return
+            const tab = input.closest(".mNavTab")
+            if (!tab) return
+            const mcat = tab.dataset.mcat
+            const allInputs = navTabsContainer.querySelectorAll(".mNavTab input")
+            if (mcat === "todo") {
+                if (!input.checked) input.checked = true
+                _mActiveCats.clear()
+                allInputs.forEach(i => { if (i !== input) i.checked = false })
                 mApplyNavFilter()
-            })
+            } else if (input.checked) {
+                allInputs.forEach(i => { if (i !== input) i.checked = false })
+                _mActiveCats = new Set(mcat.split(",").map(s => s.trim()))
+                mApplyNavFilter()
+                // scroll to first visible KPI row of this category
+                const firstCat = mcat.split(",")[0].trim()
+                const target   = document.querySelector(`.metricasKpiRow[data-mcat="${mcat}"]`)
+                              || document.querySelector(`.metricasKpiRow[data-mcat="${firstCat}"]`)
+                const scrollEl = document.querySelector(".mainContent")
+                if (target && scrollEl) {
+                    const navH = document.querySelector(".mNavBar")?.offsetHeight || 60
+                    const top  = target.getBoundingClientRect().top
+                               - scrollEl.getBoundingClientRect().top
+                               + scrollEl.scrollTop - navH - 8
+                    scrollEl.scrollTo({ top, behavior: "smooth" })
+                }
+            } else {
+                if (todoInput) todoInput.checked = true
+                _mActiveCats.clear()
+                mApplyNavFilter()
+            }
         })
-
-        if (navSearch) navSearch.addEventListener("input", mApplyNavFilter)
 
     } catch (err) {
         console.error("Error cargando métricas:", err)

@@ -178,9 +178,15 @@ async function initPortfolioSwitcher() {
             expBtn.className = "portfolioActionBtn"
             expBtn.title = "Exportar"
             expBtn.textContent = "⬇️"
-            expBtn.addEventListener("click", e => {
+            expBtn.addEventListener("click", async e => {
                 e.stopPropagation()
-                window.location.href = `/api/portfolios/${p.id}/export`
+                closeMenu()
+                const ok = await portfolioConfirm(
+                    "Exportar portfolio",
+                    `¿Descargar <strong>${p.name}</strong> como fichero <code>.db</code>?`,
+                    "Descargar"
+                )
+                if (ok) window.location.href = `/api/portfolios/${p.id}/export`
             })
             actions.appendChild(expBtn)
 
@@ -234,6 +240,10 @@ async function initPortfolioSwitcher() {
     }
 
     async function switchPortfolio(pid) {
+        if (typeof window.flushPendingPageChanges === "function") {
+            try { await window.flushPendingPageChanges() } catch (_) {}
+            window.flushPendingPageChanges = null
+        }
         try {
             const res  = await fetch("/api/portfolios/switch", {
                 method: "POST",
@@ -242,6 +252,9 @@ async function initPortfolioSwitcher() {
             })
             const data = await res.json()
             if (data.ok) {
+                if (typeof resetGastosStateForPortfolioSwitch === "function") {
+                    resetGastosStateForPortfolioSwitch()
+                }
                 window.location.reload()
             } else {
                 await portfolioConfirm("Error", data.error || "Error al cambiar portfolio", "Aceptar")

@@ -2008,6 +2008,28 @@ tr.gastosTypeEmptySep td {
 .assetModalLabelSmall{ margin-top:14px; font-size:12px; font-weight:600; color:#a0b4d0; }
 .assetModalLabelHint{ font-weight:400; color:#607080; margin-left:4px; }
 
+.assetModalCsTrigger{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    width:100%;
+    box-sizing:border-box;
+    height:38px;
+    margin-bottom:18px;
+    padding:0 12px;
+    border:1px solid #466a9f;
+    border-radius:4px;
+    background:#0d213f;
+    color:#ffffff;
+    font-size:15px;
+    cursor:pointer;
+    user-select:none;
+    transition:border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.assetModalCsTrigger:hover{ border-color:#5a82c0; }
+.assetModalCsTrigger.csOpen{ border-color:#72a2ff; background:#11294d; box-shadow:0 0 0 3px rgba(114,162,255,0.18); }
+
 .assetModalInput,
 .assetModalSelect{
     display:block;
@@ -2034,7 +2056,9 @@ tr.gastosTypeEmptySep td {
     background-size:8px 5px;
     cursor:pointer;
     padding-right:34px;
+    color-scheme:dark;
 }
+
 
 .assetModalInput::placeholder{
     color:#8fa8cc;

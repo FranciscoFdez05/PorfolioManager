@@ -22,10 +22,6 @@
                     <span>Activo</span>
                 </label>
                 <label class="overviewFilterOption operationsFilterOption">
-                    <input type="checkbox" value="Cerrado" data-filter-group="status" checked>
-                    <span>Cerrado</span>
-                </label>
-                <label class="overviewFilterOption operationsFilterOption">
                     <input type="checkbox" value="Completado" data-filter-group="status" checked>
                     <span>Completado</span>
                 </label>
@@ -35,32 +31,27 @@
         <div id="operationsPairsSummary" class="operationsPairsSummary hidden"></div>
     </div>
 
-    <div class="operationsWorkspace">
-        <div class="operationsMainColumn">
-
-            <div class="operationsTableWrapper">
-                <table class="operationsTable">
-                    <thead>
-                        <tr>
-                            <th class="mThSort" data-sortkey="0">Activo<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="1">Fecha Apertura<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="2">Par<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="3">Orden<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="4">Precio Orden<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="5">Cantidad<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="6">Comisiones<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="7">Total<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="8">Estado<span class="mSortArrow"></span></th>
-                            <th class="mThSort" data-sortkey="9">Fecha Cierre<span class="mSortArrow"></span></th>
-                            <th class="rowActionsCell"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="operationsBody"></tbody>
-                </table>
-            </div>
-
-        </div>
+    <div class="operationsTableWrapper">
+        <table class="operationsTable">
+            <thead>
+                <tr>
+                    <th class="mThSort" data-sortkey="0">Activo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Fecha Apertura<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Par<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3">Orden<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="4">Precio Orden<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5">Cantidad<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6">Comisiones<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="7">Total<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="8">Estado<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="9">Fecha Cierre<span class="mSortArrow"></span></th>
+                    <th class="rowActionsCell"></th>
+                </tr>
+            </thead>
+            <tbody id="operationsBody"></tbody>
+        </table>
     </div>
+    <p class="overviewEmpty hidden" id="operacionesEmptyMsg">No hay operaciones registradas.</p>
 </section>
 
 <div class="operationsActions">

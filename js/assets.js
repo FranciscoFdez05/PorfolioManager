@@ -246,12 +246,13 @@ async function buildOverviewDisplayRow(asset) {
 }
 
 async function buildSummaryMetricsInEuros(summary) {
+    const baseCurrency = summary.investedCurrency || summary.currency
     const invertidoBrutoEur = await convertAmountForDisplay(
         summary.invertidoBruto,
-        summary.currency,
+        baseCurrency,
         "EUR"
     )
-    const netoActualEur = await convertAmountForDisplay(summary.netoActual, summary.currency, "EUR")
+    const netoActualEur = await convertAmountForDisplay(summary.netoActual, baseCurrency, "EUR")
     const rendimientoEur = netoActualEur - invertidoBrutoEur
 
     return {
@@ -907,7 +908,7 @@ function renderAssetTransaccionesSection(asset) {
             </table>
         </div>
     `
-    bindTableSort(section.querySelector("table"), "transacciones")
+    bindTableSort(section.querySelector("table"), "assetTransacciones")
 }
 
 async function renderAssetsList(assets) {
@@ -1922,11 +1923,27 @@ function consumeAssetLots(lots, quantityToSell) {
     }
 }
 
+function _detectInvestedCurrencyFromRows(asset, fallback) {
+    if (!isCryptoAssetType(asset.type)) return fallback
+    const buyRows = getPrimaryAssetRows(asset).filter(
+        r => !String(r.tipoOperacion || "").toLowerCase().includes("venta")
+    )
+    if (!buyRows.length) return fallback
+    const freq = {}
+    buyRows.forEach(r => {
+        const c = normalizeAssetRowCurrency(r.currency, fallback)
+        freq[c] = (freq[c] || 0) + 1
+    })
+    return Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0]
+}
+
 async function buildOverviewRow(asset) {
     const rows = Array.isArray(asset.rows) ? asset.rows : []
     const isCrypto = isCryptoAssetType(asset.type)
     const assetCurrency = normalizeCurrencyCode(asset.currency || "EUR")
-    const investedCurrency = normalizeCurrencyCode(asset.investedCurrency || asset.currency || "EUR")
+    const investedCurrency = normalizeCurrencyCode(
+        asset.investedCurrency || _detectInvestedCurrencyFromRows(asset, assetCurrency)
+    )
     const remainingLots = await buildRemainingAssetLots(asset, investedCurrency)
     const rawParticipaciones = remainingLots.reduce((total, lot) => total + lot.remaining, 0)
     const completedOperationsImpact = getCompletedOperationsCryptoImpact(asset)
@@ -2205,7 +2222,6 @@ function renderAssetTablePage(asset) {
                 <div class="assetHeaderLeft">
                     <div class="assetTitleRow">
                         <h1 class="assetPageTitle">${escapeHtml(asset.name || asset.symbol)}</h1>
-                        <button id="editAssetNameBtn" class="assetEditNameBtn" type="button" title="Editar nombre del activo" aria-label="Editar nombre del activo">✎</button>
                     </div>
                     <div class="assetPageSubtitle">${escapeHtml(asset.name)} · ${buildAssetTypeLabel(asset.type)}</div>
                     <div class="assetValueRow">
@@ -2259,6 +2275,11 @@ function renderAssetTablePage(asset) {
                             <button id="convertInversionUsdBtn" class="assetMenuItem assetMenuItemSub" type="button" data-target-currency="USD" data-scope="asset" ${currentCurrency === "USD" ? "disabled" : ""}>
                                 <span class="assetMenuIcon">↕</span>
                                 <span class="assetMenuText">USD${currentCurrency === "USD" ? " <small>(actual)</small>" : ""}</span>
+                            </button>
+                            <div class="assetMenuSep"></div>
+                            <button id="editAssetNameBtn" class="assetMenuItem" type="button">
+                                <span class="assetMenuIcon">✎</span>
+                                <span class="assetMenuText">Editar nombre del activo</span>
                             </button>
                             <div class="assetMenuSep"></div>
                             <button id="deleteAssetBtn" class="assetMenuItem assetMenuItemDanger" type="button">
@@ -2316,6 +2337,13 @@ function renderAssetTablePage(asset) {
     setupAssetTabs()
     _assetBindSort(asset.id)
     initAssetTableLogic(asset)
+
+    const titleEl = document.querySelector(".assetPageTitle")
+    if (titleEl) {
+        titleEl.addEventListener("click", () => {
+            openTVChartModal(buildTVSymbol(asset), asset.symbol || asset.name)
+        })
+    }
 }
 
 function setupAssetTabs() {
@@ -3318,6 +3346,98 @@ function initAssetTableLogic(asset) {
     }
 }
 
+function initAssetTypeCustomSelect() {
+    const select = document.getElementById("assetTypeSelect")
+    if (!select || select._assetCsInit) return
+    select._assetCsInit = true
+
+    const wrapper = select.parentNode
+    select.style.display = "none"
+
+    const trigger = document.createElement("div")
+    trigger.className = "csTrigger assetModalCsTrigger"
+
+    const label = document.createElement("span")
+    label.className = "csLabel"
+
+    const arrow = document.createElement("span")
+    arrow.className = "csArrow"
+    arrow.textContent = "▾"
+
+    trigger.appendChild(label)
+    trigger.appendChild(arrow)
+    wrapper.insertBefore(trigger, select.nextSibling)
+
+    const menu = document.createElement("div")
+    menu.className = "csMenu"
+    document.body.appendChild(menu)
+
+    function syncLabel() {
+        const opt = select.options[select.selectedIndex]
+        label.textContent = opt ? opt.text : ""
+    }
+
+    function buildOptions() {
+        menu.innerHTML = ""
+        Array.from(select.options).forEach(opt => {
+            const item = document.createElement("div")
+            item.className = "csOption" + (opt.selected ? " csSelected" : "")
+            item.textContent = opt.text
+            item.addEventListener("mousedown", e => {
+                e.preventDefault()
+                select.value = opt.value
+                select.dispatchEvent(new Event("change", { bubbles: true }))
+                syncLabel()
+                closeMenu()
+            })
+            menu.appendChild(item)
+        })
+    }
+
+    function closeMenu() {
+        menu.classList.remove("csOpen")
+        trigger.classList.remove("csOpen")
+    }
+
+    function openMenu() {
+        buildOptions()
+        const rect = trigger.getBoundingClientRect()
+        menu.style.position = "fixed"
+        menu.style.left = Math.round(rect.left) + "px"
+        menu.style.width = Math.round(rect.width) + "px"
+        menu.style.visibility = "hidden"
+        menu.style.display = "flex"
+        const menuH = Math.min(menu.scrollHeight, 220)
+        menu.style.visibility = ""
+        menu.style.display = ""
+        const spaceBelow = window.innerHeight - rect.bottom - 8
+        menu.style.top = (spaceBelow >= menuH || rect.top < menuH)
+            ? Math.round(rect.bottom) + "px"
+            : Math.round(rect.top - menuH) + "px"
+        menu.classList.add("csOpen")
+        trigger.classList.add("csOpen")
+    }
+
+    trigger.addEventListener("click", e => {
+        e.stopPropagation()
+        if (menu.classList.contains("csOpen")) {
+            closeMenu()
+        } else {
+            openMenu()
+        }
+    })
+
+    document.addEventListener("click", closeMenu)
+
+    select.addEventListener("change", () => {
+        syncLabel()
+        buildOptions()
+    })
+
+    syncLabel()
+    buildOptions()
+}
+
 function openAssetModal() {
     const assetModalOverlay = document.getElementById("assetModalOverlay")
     const assetNameInput = document.getElementById("assetNameInput")
@@ -3343,6 +3463,7 @@ function openAssetModal() {
     setupColorPickerToggle("assetColorToggle", "assetColorPicker")
     assetModalOverlay.classList.remove("hidden")
     assetModalState = { isOpen: true }
+    requestAnimationFrame(() => initAssetTypeCustomSelect())
 
     queueMicrotask(() => {
         assetTypeSelect.dispatchEvent(new Event("change", { bubbles: true }))
@@ -3734,7 +3855,7 @@ let _activosViewMode = localStorage.getItem("activosViewMode") || "cards"
 
 function avFilteredAssets() {
     return _activosAllAssets.filter((a) => {
-        const matchType = _activosFilterType === "all" || a.type === _activosFilterType
+        const matchType = _activosFilterType === "all" || _activosFilterType.includes(a.type)
         const q = _activosSearch.toLowerCase()
         const matchSearch = !q
             || (a.name || "").toLowerCase().includes(q)
@@ -3822,7 +3943,15 @@ function avRenderGrid() {
     const filtered = avFilteredAssets()
     if (count) count.textContent = `${filtered.length} activo${filtered.length !== 1 ? "s" : ""}`
 
+    const activosGridEmpty = document.getElementById("activosGridEmpty")
     grid.innerHTML = ""
+
+    if (!filtered.length) {
+        if (activosGridEmpty) activosGridEmpty.classList.remove("hidden")
+        return
+    }
+
+    if (activosGridEmpty) activosGridEmpty.classList.add("hidden")
     const frag = document.createDocumentFragment()
     filtered.forEach((a) => frag.appendChild(avBuildCard(a)))
     grid.appendChild(frag)
@@ -3888,7 +4017,18 @@ function avRenderTable() {
     const filtered = avFilteredAssets()
     if (count) count.textContent = `${filtered.length} activo${filtered.length !== 1 ? "s" : ""}`
 
+    const activosTableEmpty = document.getElementById("activosTableEmpty")
+    const activosTableWrap = document.getElementById("activosTableWrap")
     tbody.innerHTML = ""
+
+    if (!filtered.length) {
+        if (activosTableEmpty) activosTableEmpty.classList.remove("hidden")
+        if (activosTableWrap) activosTableWrap.classList.add("hidden")
+        return
+    }
+
+    if (activosTableEmpty) activosTableEmpty.classList.add("hidden")
+    if (activosTableWrap) activosTableWrap.classList.remove("hidden")
     const frag = document.createDocumentFragment()
     filtered.forEach((a) => frag.appendChild(avBuildTableRow(a)))
     tbody.appendChild(frag)
@@ -3903,6 +4043,8 @@ function avRender() {
         avRenderTable()
     } else {
         if (tableWrap) tableWrap.classList.add("hidden")
+        const activosTableEmpty = document.getElementById("activosTableEmpty")
+        if (activosTableEmpty) activosTableEmpty.classList.add("hidden")
         if (gridEl) gridEl.classList.remove("hidden")
         avRenderGrid()
     }
@@ -4091,14 +4233,38 @@ async function initActivosPageLogic() {
 
     const filters = document.getElementById("activosFilters")
     if (filters) {
-        filters.addEventListener("click", (e) => {
-            const btn = e.target.closest(".activosFilterBtn")
-            if (!btn) return
-            filters.querySelectorAll(".activosFilterBtn").forEach((b) => b.classList.remove("active"))
-            btn.classList.add("active")
-            _activosFilterType = btn.dataset.type
-            avRender()
-        })
+        const todosInput = filters.querySelector('[data-type="all"] input')
+        const getIndividuals = () => [...filters.querySelectorAll('.activosFilterBtn:not([data-type="all"]) input')]
+        const syncFilterState = () => {
+            if (todosInput?.checked) {
+                _activosFilterType = "all"
+            } else {
+                const sel = getIndividuals().filter(cb => cb.checked).map(cb => cb.closest(".activosFilterBtn").dataset.type)
+                _activosFilterType = sel.length ? sel : "all"
+                if (!sel.length && todosInput) todosInput.checked = true
+            }
+        }
+        // reset to Todos on each init
+        if (todosInput) todosInput.checked = true
+        getIndividuals().forEach(cb => { cb.checked = true })
+        if (!filters.dataset.bound) {
+            filters.dataset.bound = "true"
+            filters.addEventListener("change", (e) => {
+                const changed = e.target
+                if (changed === todosInput) {
+                    changed.checked = true
+                    getIndividuals().forEach(cb => { cb.checked = true })
+                } else if (todosInput?.checked) {
+                    todosInput.checked = false
+                    getIndividuals().forEach(cb => { cb.checked = cb === changed })
+                    changed.checked = true
+                } else {
+                    if (todosInput) todosInput.checked = getIndividuals().every(cb => cb.checked)
+                }
+                syncFilterState()
+                avRender()
+            })
+        }
     }
 
     const search = document.getElementById("activosSearch")

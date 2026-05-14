@@ -22,6 +22,7 @@ from routes.gastos import gastos_bp
 from routes.ingresos import ingresos_bp
 from routes.market import market_bp
 from routes.operaciones import operaciones_bp
+from routes.trading import trading_bp
 from routes.portfolios import portfolios_bp
 from routes.registros import registros_bp
 from routes.ventas import ventas_bp
@@ -67,6 +68,7 @@ app.register_blueprint(ingresos_bp)
 app.register_blueprint(market_bp)
 app.register_blueprint(operaciones_bp)
 app.register_blueprint(portfolios_bp)
+app.register_blueprint(trading_bp)
 app.register_blueprint(registros_bp)
 app.register_blueprint(ventas_bp)
 

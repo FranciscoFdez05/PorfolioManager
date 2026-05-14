@@ -601,20 +601,20 @@ function renderStablecoinsTable() {
 
     body.innerHTML = ""
 
+    const stablecoinsEmptyEl = document.getElementById("stablecoinsEmptyMsg")
+    const stablecoinsTableWrapper = document.getElementById("stablecoinsTableWrapper")
     if (!(currentStablecoinsData.rows || []).length) {
-        const emptyRow = document.createElement("tr")
-        emptyRow.innerHTML = `
-            <td class="rowDeleteCell"></td>
-            <td colspan="8" class="operationsEmptyCell">Todavía no hay movimientos de stablecoins.</td>
-        `
-        body.appendChild(emptyRow)
+        if (stablecoinsEmptyEl) stablecoinsEmptyEl.classList.remove("hidden")
+        if (stablecoinsTableWrapper) stablecoinsTableWrapper.classList.add("hidden")
         return
     }
+    if (stablecoinsEmptyEl) stablecoinsEmptyEl.classList.add("hidden")
+    if (stablecoinsTableWrapper) stablecoinsTableWrapper.classList.remove("hidden")
 
     currentStablecoinsData.rows.forEach((row) => {
         body.appendChild(buildStablecoinRow(row))
     })
-    bindTableSort(body.closest("table"))
+    bindTableSort(body.closest("table"), "stablecoins")
 }
 
 function buildStablecoinRow(row) {

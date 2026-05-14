@@ -360,7 +360,7 @@ async function initIngresosLogic() {
     }
 
     const ingresosMovementsTable = document.querySelector(".ingresosMovementsTable")
-    if (ingresosMovementsTable) bindTableSort(ingresosMovementsTable)
+    if (ingresosMovementsTable) bindTableSort(ingresosMovementsTable, "ingresos")
 }
 
 function bindIngresosEvents() {

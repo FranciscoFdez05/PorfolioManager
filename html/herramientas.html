@@ -8,6 +8,7 @@
         <button class="herramientaBtn" data-tool="cagr">CAGR</button>
         <button class="herramientaBtn" data-tool="rentDividendo">Rent. Dividendo</button>
         <button class="herramientaBtn" data-tool="ratioOroPlata">Ratio Oro/Plata</button>
+        <button class="herramientaBtn" data-tool="ratioOroBtc">Oro / Bitcoin</button>
     </div>
 
     <div class="herramientasContent" id="herramientasContent">
@@ -296,6 +297,7 @@
                 <div class="herramientaInputs">
                     <div class="hBtnRow" style="margin-bottom:.75rem">
                         <button class="herramientaSecBtn" id="hRatioLoadBtn">Cargar precios guardados</button>
+                        <button class="herramientaSecBtn" id="hRatioEditHistBtn" onclick="hRatioAbrirEditor()">Ratio histórico: <span id="hRatioHistLabel">60</span></button>
                     </div>
                     <div class="hRatioFuenteMsg" id="hRatioFuenteMsg"></div>
                     <div class="herramientaField">
@@ -318,11 +320,11 @@
                             <div class="hResultValue hResultPositive" id="hRatioValor">---</div>
                         </div>
                         <div class="herramientaResultCard">
-                            <div class="hResultLabel">Media histórica (~50)</div>
+                            <div class="hResultLabel">Media histórica (~<span id="hRatioHistLabelResult">60</span>)</div>
                             <div class="hResultValue" id="hRatioVsHistorico">---</div>
                         </div>
                         <div class="herramientaResultCard">
-                            <div class="hResultLabel">Precio justo de la plata (a ratio 50)</div>
+                            <div class="hResultLabel">Precio justo de la plata (a ratio <span id="hRatioHistLabelJusto">60</span>)</div>
                             <div class="hResultValue" id="hRatioPrecioJusto">---</div>
                         </div>
                         <div class="herramientaResultCard">
@@ -335,5 +337,84 @@
             </div>
         </div>
 
+        <!-- ── Oro / Bitcoin ─────────────────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolRatioOroBtc">
+            <h3 class="herramientaPanelTitle">Oro / Bitcoin</h3>
+            <div class="herramientaBody">
+                <div class="herramientaInputs">
+                    <div class="hBtnRow" style="margin-bottom:.75rem">
+                        <button class="herramientaSecBtn" id="hOroBtcLoadBtn">Cargar precios guardados</button>
+                        <button class="herramientaSecBtn" id="hOroBtcEditHistBtn" onclick="hOroBtcAbrirEditor()">Ratio ref.: <span id="hOroBtcHistLabel">20</span> oz</button>
+                    </div>
+                    <div class="hRatioFuenteMsg" id="hOroBtcFuenteMsg"></div>
+                    <div class="herramientaField">
+                        <label>Precio del oro (<span class="hOroBtcMonedaLabel">moneda base</span>/oz)</label>
+                        <input type="number" id="hOroBtcPrecioOro" value="" min="0" step="0.01" placeholder="Introduce o carga precio">
+                    </div>
+                    <div class="herramientaField">
+                        <label>Precio de Bitcoin (<span class="hOroBtcMonedaLabel">moneda base</span>)</label>
+                        <input type="number" id="hOroBtcPrecioBtc" value="" min="0" step="0.01" placeholder="Introduce o carga precio">
+                    </div>
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hOroBtcCalcBtn">Calcular</button>
+                        <button class="herramientaResetBtn" data-panel="toolRatioOroBtc">Reiniciar</button>
+                    </div>
+                </div>
+                <div class="herramientaResults hidden" id="hOroBtcResults">
+                    <div class="herramientaResultGrid">
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Oz de oro por 1 BTC</div>
+                            <div class="hResultValue hResultPositive" id="hOroBtcValor">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Vs referencia (~<span id="hOroBtcHistLabelResult">20</span> oz)</div>
+                            <div class="hResultValue" id="hOroBtcVsRef">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">Precio justo BTC (a <span id="hOroBtcHistLabelJusto">20</span> oz de oro)</div>
+                            <div class="hResultValue" id="hOroBtcPrecioJusto">---</div>
+                        </div>
+                        <div class="herramientaResultCard">
+                            <div class="hResultLabel">BTC equivalente a 1 oz de oro</div>
+                            <div class="hResultValue" id="hOroBtcEquiv">---</div>
+                        </div>
+                    </div>
+                    <div class="hRatioInterpretacion" id="hOroBtcInterpretacion"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- ── Modal ratio histórico Oro/Plata ───────────────────────────────────── -->
+<div class="modalOverlay hidden" id="hRatioEditorOverlay">
+    <div class="assetModal" style="width:min(320px,100%)">
+        <h4 style="margin:0 0 14px;font-size:15px;font-weight:600">Ratio histórico de referencia</h4>
+        <p style="margin:0 0 14px;font-size:13px;color:var(--text-dim)">Introduce el ratio oro/plata que quieres usar como media histórica de referencia.</p>
+        <div class="herramientaField" style="margin-bottom:16px">
+            <label>Ratio histórico</label>
+            <input type="number" id="hRatioHistInput" min="1" step="1" value="60" placeholder="Ej: 60">
+        </div>
+        <div class="hBtnRow">
+            <button class="herramientaCalcBtn" data-no-autohide="true" onclick="hRatioGuardarHistorico()">Guardar</button>
+            <button class="herramientaResetBtn" onclick="hRatioCerrarEditor()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modal ratio referencia Oro/BTC ────────────────────────────────────── -->
+<div class="modalOverlay hidden" id="hOroBtcEditorOverlay">
+    <div class="assetModal" style="width:min(320px,100%)">
+        <h4 style="margin:0 0 14px;font-size:15px;font-weight:600">Ratio de referencia Oro/Bitcoin</h4>
+        <p style="margin:0 0 14px;font-size:13px;color:var(--text-dim)">Introduce cuántas onzas de oro equivalen a 1 BTC en tu referencia personal.</p>
+        <div class="herramientaField" style="margin-bottom:16px">
+            <label>Oz de oro por 1 BTC (referencia)</label>
+            <input type="number" id="hOroBtcHistInput" min="1" step="1" value="20" placeholder="Ej: 20">
+        </div>
+        <div class="hBtnRow">
+            <button class="herramientaCalcBtn" data-no-autohide="true" onclick="hOroBtcGuardarRef()">Guardar</button>
+            <button class="herramientaResetBtn" onclick="hOroBtcCerrarEditor()">Cancelar</button>
+        </div>
     </div>
 </div>

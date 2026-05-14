@@ -140,7 +140,7 @@ async function initVentasLogic() {
     bindVentasEvents()
 
     const ventasTable = document.getElementById("ventasBody")?.closest("table")
-    if (ventasTable) bindTableSort(ventasTable)
+    if (ventasTable) bindTableSort(ventasTable, "ventas")
 }
 
 function bindVentasEvents() {
@@ -643,14 +643,15 @@ function renderVentasTable() {
 
     const rows = currentVentasData.rows || []
 
+    const ventasEmptyEl = document.getElementById("ventasEmptyMsg")
+    const ventasTableWrapper = document.getElementById("ventasTableWrapper")
     if (!rows.length) {
-        const emptyRow = document.createElement("tr")
-        emptyRow.innerHTML = `
-            <td colspan="15" class="operationsEmptyCell">Todavía no hay ventas registradas.</td>
-        `
-        ventasBody.appendChild(emptyRow)
+        if (ventasEmptyEl) ventasEmptyEl.classList.remove("hidden")
+        if (ventasTableWrapper) ventasTableWrapper.classList.add("hidden")
         return
     }
+    if (ventasEmptyEl) ventasEmptyEl.classList.add("hidden")
+    if (ventasTableWrapper) ventasTableWrapper.classList.remove("hidden")
 
     const computedMap = buildVentasComputedMap(rows)
 

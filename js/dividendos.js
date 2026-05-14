@@ -234,6 +234,19 @@ function renderFilteredDividendos() {
         : _allDividendosRows.map((r, i) => ({ r, i }))
 
     dividendosBody.innerHTML = ""
+    const dividendosEmptyEl = document.getElementById("dividendosEmptyMsg")
+    const dividendosTableWrapper = document.querySelector(".dividendosTableWrapper")
+
+    if (!visible.length) {
+        if (dividendosEmptyEl) dividendosEmptyEl.classList.remove("hidden")
+        if (dividendosTableWrapper) dividendosTableWrapper.classList.add("hidden")
+        updateDividendosTotals()
+        return
+    }
+
+    if (dividendosEmptyEl) dividendosEmptyEl.classList.add("hidden")
+    if (dividendosTableWrapper) dividendosTableWrapper.classList.remove("hidden")
+
     visible.forEach(({ r: rowData, i: globalIndex }) => {
         const rowElement = document.createElement("tr")
         rowElement.dataset.globalIndex = String(globalIndex)

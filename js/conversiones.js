@@ -143,10 +143,19 @@ function renderConversionesRows(rows, asset) {
     }
 
     body.innerHTML = ""
+    const conversionesEmptyEl = document.getElementById("conversionesEmptyMsg")
+
+    if (!rows.length) {
+        if (conversionesEmptyEl) conversionesEmptyEl.classList.remove("hidden")
+        return
+    }
+
+    if (conversionesEmptyEl) conversionesEmptyEl.classList.add("hidden")
+
     rows.forEach((row) => {
         body.appendChild(buildConversionesRowElement(row, asset))
     })
-    bindTableSort(body.closest("table"))
+    bindTableSort(body.closest("table"), "conversiones")
 }
 
 function buildConversionesRowElement(row = {}, asset = conversionesCurrentAsset) {

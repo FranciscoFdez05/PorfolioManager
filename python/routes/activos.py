@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from app_data import readFinnhubApiKey
-from asset_store import deleteAssetFile, getAssetFile, listAssets, readAssetFile, updateAssetsOrder, writeAssetFile
+from asset_store import deleteAssetFile, getAssetFile, listAssets, readAssetFile, updateAssetMarketData, updateAssetsOrder, writeAssetFile
 from db import get_db
 from asset_utils import (
     createDefaultAssetPayload, inferMarketProviderFromSymbol,
@@ -242,7 +242,7 @@ def refreshActivoMarketData(assetId):
     assetData["change"] = quote["change"]
     assetData["status"] = quote["status"]
     assetData["lastUpdated"] = quote["lastUpdated"]
-    writeAssetFile(assetId, assetData)
+    updateAssetMarketData(assetId, assetData)
 
     return jsonify({"ok": True, "asset": assetData, "marketData": quote["marketData"]})
 

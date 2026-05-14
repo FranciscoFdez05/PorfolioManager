@@ -59,6 +59,9 @@ async function loadGlobalSettings() {
             window._gastosHiddenMensualidades   = data.gastosHiddenMensualidades ?? []
             window._metricasActivosHidden       = data.metricasActivosHidden ?? []
             window._sidebarCollapsed            = data.sidebarCollapsed ?? false
+            window._monedaBase                  = data.monedaBase ?? "EUR"
+            window._autoRefreshMinutes          = data.autoRefreshMinutes ?? 0
+            applyAutoRefresh(window._autoRefreshMinutes)
         }
     } catch {
         window._settingsStaleHours      = 24
@@ -70,7 +73,22 @@ async function loadGlobalSettings() {
         window._gastosHiddenMensualidades   = []
         window._metricasActivosHidden       = []
         window._sidebarCollapsed            = false
+        window._monedaBase                  = "EUR"
+        window._autoRefreshMinutes          = 0
     }
+}
+
+let _autoRefreshTimer = null
+function applyAutoRefresh(minutes) {
+    if (_autoRefreshTimer) {
+        clearInterval(_autoRefreshTimer)
+        _autoRefreshTimer = null
+    }
+    if (!minutes || minutes <= 0) return
+    _autoRefreshTimer = setInterval(async () => {
+        await refreshAssetsSidebar()
+        refreshOverviewMarketData()
+    }, minutes * 60 * 1000)
 }
 
 function applySidebarState(sideWrapper, toggleButton) {
@@ -277,6 +295,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initTransaccionesLogic()
         } else if (page === "operaciones") {
             await initOperacionesLogic()
+        } else if (page === "Trading") {
+            await initTradingJournalLogic()
         } else if (page === "conversiones") {
             await initConversionesLogic()
         } else if (page === "herramientas") {
@@ -333,7 +353,7 @@ async function initInteresesLogic() {
     bindCuentasSidebarActions()
 
     const interesesTable = document.querySelector(".interesesTable")
-    if (interesesTable) bindTableSort(interesesTable)
+    if (interesesTable) bindTableSort(interesesTable, "intereses")
 }
 
 

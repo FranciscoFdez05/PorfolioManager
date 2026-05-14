@@ -2,10 +2,10 @@
 
     <div class="bonosToolbar">
         <div class="bonosFilters" id="bonosFilters">
-            <button class="bonosFilterBtn active" data-tipo="all">Todos</button>
-            <button class="bonosFilterBtn" data-tipo="if">Interés Fijo</button>
-            <button class="bonosFilterBtn" data-tipo="corporativo">Corporativos</button>
-            <button class="bonosFilterBtn" data-tipo="gubernamental">Gubernamentales</button>
+            <label class="bonosFilterBtn" data-tipo="all"><input type="checkbox" checked><span>Todos</span></label>
+            <label class="bonosFilterBtn" data-tipo="if"><input type="checkbox" checked><span>Interés Fijo</span></label>
+            <label class="bonosFilterBtn" data-tipo="corporativo"><input type="checkbox" checked><span>Corporativos</span></label>
+            <label class="bonosFilterBtn" data-tipo="gubernamental"><input type="checkbox" checked><span>Gubernamentales</span></label>
         </div>
         <button id="saveBonosBtn" class="primaryButton">Guardar</button>
     </div>
@@ -41,7 +41,7 @@
         </div>
     </div>
 
-    <div class="bonosTableWrapper">
+    <div class="bonosTableWrapper" id="bonosTableWrapper">
         <table class="bonosTable">
             <thead>
                 <tr>
@@ -62,7 +62,7 @@
         </table>
     </div>
 
-    <p class="bonosEmpty hidden" id="bonosEmpty">No hay registros. Añade uno con el botón inferior.</p>
+    <p class="overviewEmpty hidden" id="bonosEmptyMsg">No hay bonos registrados.</p>
 
     <div class="dividendosActions">
         <button id="bonosAddBtn" class="primaryButton">+ Añadir</button>

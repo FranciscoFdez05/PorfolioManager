@@ -1,18 +1,44 @@
 :root{
     --sidebar-width:300px;
-    /* ── Paleta global ── */
+    /* ── Backgrounds ── */
     --bg-app:#0b1120;
     --bg-panel:#0f1724;
     --bg-surface:#111827;
+    --bg-elevated:#162235;
     --bg-header:#0d1525;
+    --bg-inset:#0a0f1c;
+
+    /* ── Borders ── */
+    --border-inset:#1f2937;
     --border-soft:#1e2d45;
     --border-mid:#273246;
     --border-hard:#334155;
+
+    /* ── Text ── */
+    --text-bright:#ffffff;
+    --text-primary:#e5edf9;
+    --text-subtle:#ccd6f6;
+    --text-muted:#94a3b8;
+    --text-dim:#64748b;
+
+    /* ── Buttons ── */
+    --btn-bg:#0f1724;
+    --btn-bg-hover:#162033;
+    --btn-border:#334155;
+    --btn-border-hover:#475569;
+    --btn-active-bg:#1d4ed8;
+    --btn-active-border:#3b82f6;
+    --btn-active-text:#ffffff;
+
+    /* ── Accent ── */
     --accent:#3b82f6;
     --accent-dark:#1d4ed8;
-    --text-primary:#e5edf9;
-    --text-muted:#94a3b8;
-    --text-subtle:#ccd6f6;
+    --accent-hover:#4a9eff;
+    --accent-glow:rgba(59,130,246,0.22);
+
+    /* ── Status ── */
     --color-pos:#2ecc71;
     --color-neg:#e74c3c;
+    --color-pos-bright:#4ade80;
+    --color-neg-bright:#f87171;
 }

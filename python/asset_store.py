@@ -103,6 +103,30 @@ def readAssetFile(assetId):
     return result
 
 
+def updateAssetMarketData(assetId, data):
+    """Actualiza solo los campos de mercado de un activo existente. No crea el activo si no existe."""
+    conn = get_db()
+    safe_id = slugify(assetId)
+    conn.execute(
+        "UPDATE activos SET "
+        "market_provider=?, market_symbol=?, finnhub_symbol=?, "
+        "price=?, currency=?, change=?, status=?, last_updated=? "
+        "WHERE id=?",
+        (
+            data.get("marketProvider", "finnhub"),
+            data.get("marketSymbol", data.get("finnhubSymbol", "")),
+            data.get("finnhubSymbol", data.get("marketSymbol", "")),
+            data.get("price", "0,00"),
+            data.get("currency", "EUR"),
+            data.get("change", "+0,00%"),
+            data.get("status", "Mercado abierto"),
+            data.get("lastUpdated", ""),
+            safe_id,
+        )
+    )
+    conn.commit()
+
+
 def writeAssetFile(assetId, data):
     conn = get_db()
     safe_id = slugify(assetId)

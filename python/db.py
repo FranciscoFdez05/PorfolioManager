@@ -15,6 +15,10 @@ def set_active_db_path(path) -> None:
     _DB_PATH = Path(path)
     invalidate_all_connections()
 
+
+def get_active_db_path() -> Path:
+    return _DB_PATH
+
 _SCHEMA = """
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
@@ -175,6 +179,10 @@ CREATE TABLE IF NOT EXISTS gastos_tipos (
     label TEXT PRIMARY KEY
 );
 
+CREATE TABLE IF NOT EXISTS gastos_years (
+    year TEXT PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS gastos_rows (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
     year     TEXT NOT NULL,
@@ -310,10 +318,46 @@ CREATE TABLE IF NOT EXISTS bonos (
     impuestos         TEXT NOT NULL DEFAULT '',
     nota              TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS trading (
+    id               TEXT PRIMARY KEY,
+    fecha            TEXT NOT NULL DEFAULT '',
+    tipo             TEXT NOT NULL DEFAULT 'SCALP',
+    moneda           TEXT NOT NULL DEFAULT '',
+    direccion        TEXT NOT NULL DEFAULT 'LONG',
+    resultado        TEXT NOT NULL DEFAULT 'PROFIT',
+    capital          TEXT NOT NULL DEFAULT '',
+    capital_currency TEXT NOT NULL DEFAULT 'EUR',
+    roi              TEXT NOT NULL DEFAULT '',
+    ganancia         TEXT NOT NULL DEFAULT '',
+    ganancia_neta    TEXT NOT NULL DEFAULT ''
+);
 """
 
 
 def _migrate(conn):
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS trading (
+            id               TEXT PRIMARY KEY,
+            fecha            TEXT NOT NULL DEFAULT '',
+            tipo             TEXT NOT NULL DEFAULT 'SCALP',
+            moneda           TEXT NOT NULL DEFAULT '',
+            direccion        TEXT NOT NULL DEFAULT 'LONG',
+            resultado        TEXT NOT NULL DEFAULT 'PROFIT',
+            capital          TEXT NOT NULL DEFAULT '',
+            capital_currency TEXT NOT NULL DEFAULT 'EUR',
+            roi              TEXT NOT NULL DEFAULT '',
+            ganancia         TEXT NOT NULL DEFAULT ''
+        );
+    """)
+    trading_cols = {row[1] for row in conn.execute("PRAGMA table_info(trading)")}
+    if "capital" not in trading_cols:
+        conn.execute("ALTER TABLE trading ADD COLUMN capital TEXT NOT NULL DEFAULT ''")
+    if "capital_currency" not in trading_cols:
+        conn.execute("ALTER TABLE trading ADD COLUMN capital_currency TEXT NOT NULL DEFAULT 'EUR'")
+    if "ganancia_neta" not in trading_cols:
+        conn.execute("ALTER TABLE trading ADD COLUMN ganancia_neta TEXT NOT NULL DEFAULT ''")
+
     activos_cols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
     if "color" not in activos_cols:
         conn.execute("ALTER TABLE activos ADD COLUMN color TEXT NOT NULL DEFAULT ''")
@@ -331,6 +375,14 @@ def _migrate(conn):
     sc_rows_cols = {row[1] for row in conn.execute("PRAGMA table_info(stablecoins_rows)")}
     if "comisiones" not in sc_rows_cols:
         conn.execute("ALTER TABLE stablecoins_rows ADD COLUMN comisiones TEXT NOT NULL DEFAULT ''")
+
+    # Backfill gastos_years from existing data in older DBs
+    conn.executescript("""
+        INSERT OR IGNORE INTO gastos_years (year)
+        SELECT DISTINCT year FROM gastos_rows
+        UNION
+        SELECT DISTINCT year FROM mensualidades;
+    """)
 
 
 def get_db() -> sqlite3.Connection:

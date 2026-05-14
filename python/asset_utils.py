@@ -149,7 +149,7 @@ def sanitizeAssetOperationRows(rows):
         if orden not in {"Compra", "Venta"}:
             orden = "Compra"
 
-        if estado not in {"Activo", "Cerrado", "Completado"}:
+        if estado not in {"Activo", "Completado"}:
             estado = "Activo"
 
         if currency not in {"EUR", "USD"}:

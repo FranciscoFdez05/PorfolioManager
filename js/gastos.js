@@ -22,6 +22,7 @@ let gastosAutosaveTimeout = null
 let gastosPersistenceBound = false
 let sharedGastosTypes = []
 let _gastosDataLoaded = false
+let _gastosHasPendingChanges = false
 let gastosModalKeyHandler = null
 
 
@@ -449,7 +450,7 @@ async function initGastosLogic() {
     }
 
     const gastosMovementsTable = document.querySelector(".gastosMovementsTable")
-    if (gastosMovementsTable) bindTableSort(gastosMovementsTable)
+    if (gastosMovementsTable) bindTableSort(gastosMovementsTable, "gastos")
 }
 
 function bindGastosEvents() {
@@ -554,6 +555,7 @@ function bindGastosEvents() {
 
 async function renderGastosYear(year) {
     _gastosDataLoaded = false
+    _gastosHasPendingChanges = false
     currentGastosData = ensureGastosDataShape(await loadGastosYear(year))
     currentGastosYear = currentGastosData.year
     _gastosDataLoaded = true
@@ -1147,6 +1149,7 @@ async function persistSharedGastosTypes() {
 }
 
 function scheduleGastosAutosave(delay = 500) {
+    _gastosHasPendingChanges = true
     window.clearTimeout(gastosAutosaveTimeout)
     gastosAutosaveTimeout = window.setTimeout(async () => {
         try {
@@ -1165,16 +1168,27 @@ async function persistCurrentGastosData(options = {}) {
     syncGastosDataFromTables()
     currentGastosData.gastosTipos = [...sharedGastosTypes]
     window.clearTimeout(gastosAutosaveTimeout)
+    gastosAutosaveTimeout = null
+    _gastosHasPendingChanges = false
     await persistSharedGastosTypes()
     await saveGastosYear(currentGastosYear, currentGastosData, options)
 }
 
 async function flushGastosPendingChanges() {
+    if (!_gastosHasPendingChanges) {
+        return
+    }
     if (!document.getElementById("gastosAnnualBody") && !document.getElementById("gastosMovementsBody")) {
         return
     }
 
     await persistCurrentGastosData({ keepalive: true })
+}
+
+function resetGastosStateForPortfolioSwitch() {
+    _gastosDataLoaded = false
+    _gastosHasPendingChanges = false
+    currentGastosData = null
 }
 
 function bindGastosPersistenceGuards() {
@@ -1185,7 +1199,7 @@ function bindGastosPersistenceGuards() {
     gastosPersistenceBound = true
 
     window.addEventListener("beforeunload", () => {
-        if (!currentGastosYear || !currentGastosData || !_gastosDataLoaded) {
+        if (!_gastosHasPendingChanges || !currentGastosYear || !currentGastosData || !_gastosDataLoaded) {
             return
         }
 
@@ -1196,7 +1210,7 @@ function bindGastosPersistenceGuards() {
     })
 
     document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState !== "hidden" || !currentGastosYear || !currentGastosData || !_gastosDataLoaded) {
+        if (!_gastosHasPendingChanges || document.visibilityState !== "hidden" || !currentGastosYear || !currentGastosData || !_gastosDataLoaded) {
             return
         }
 

@@ -17,6 +17,10 @@ async function initHerramientasLogic() {
             const toolId = "tool" + btn.dataset.tool.charAt(0).toUpperCase() + btn.dataset.tool.slice(1)
             const panel = document.getElementById(toolId)
             if (panel) { panel.classList.remove("hidden"); panel.classList.add("active") }
+            if (btn.dataset.tool === "ratioOroBtc") {
+                const mb = window._monedaBase || "EUR"
+                document.querySelectorAll(".hOroBtcMonedaLabel").forEach((el) => { el.textContent = mb })
+            }
         })
     })
 
@@ -60,6 +64,10 @@ async function initHerramientasLogic() {
     // ── Ratio Oro / Plata ──────────────────────────────────────────
     document.getElementById("hRatioLoadBtn")?.addEventListener("click", hRatioLoadPrecios)
     document.getElementById("hRatioCalcBtn")?.addEventListener("click", hCalcRatioOroPlata)
+
+    // ── Oro / Bitcoin ───────────────────────────────────────────────
+    document.getElementById("hOroBtcLoadBtn")?.addEventListener("click", hOroBtcLoadPrecios)
+    document.getElementById("hOroBtcCalcBtn")?.addEventListener("click", hCalcOroBtc)
 
     // ── Enter para calcular ────────────────────────────────────────
     document.querySelectorAll(".herramientaPanel input").forEach((input) => {
@@ -388,15 +396,38 @@ async function hRatioLoadPrecios() {
     btn.disabled = false
 }
 
+let _ratioHistorico = 60
+
+function hRatioAbrirEditor() {
+    document.getElementById("hRatioHistInput").value = _ratioHistorico
+    document.getElementById("hRatioEditorOverlay").classList.remove("hidden")
+    document.getElementById("hRatioHistInput").focus()
+}
+
+function hRatioCerrarEditor() {
+    document.getElementById("hRatioEditorOverlay").classList.add("hidden")
+}
+
+function hRatioGuardarHistorico() {
+    const v = parseFloat(document.getElementById("hRatioHistInput").value)
+    if (!v || v <= 0) return
+    _ratioHistorico = v
+    document.getElementById("hRatioHistLabel").textContent = v
+    document.getElementById("hRatioHistLabelResult").textContent = v
+    document.getElementById("hRatioHistLabelJusto").textContent = v
+    hRatioCerrarEditor()
+    hCalcRatioOroPlata()
+}
+
 function hCalcRatioOroPlata() {
     const precioOro   = parseFloat(document.getElementById("hRatioPrecioOro").value) || 0
     const precioPlata = parseFloat(document.getElementById("hRatioPrecioPlata").value) || 0
     if (precioOro <= 0 || precioPlata <= 0) return
 
-    const ratio        = precioOro / precioPlata
-    const mediaHist    = 50
-    const difVsHist    = ((ratio - mediaHist) / mediaHist) * 100
-    const precioJusto  = precioOro / mediaHist
+    const ratio          = precioOro / precioPlata
+    const mediaHist      = _ratioHistorico
+    const difVsHist      = ((ratio - mediaHist) / mediaHist) * 100
+    const precioJusto    = precioOro / mediaHist
     const plataNecesaria = ratio
 
     document.getElementById("hRatioValor").textContent =
@@ -443,5 +474,150 @@ function hCalcYield() {
     document.getElementById("hYieldNeto").textContent    = formatEuro(netoAnual)
     document.getElementById("hYieldMensual").textContent = formatEuro(netoMensual)
     document.getElementById("hYieldResults").classList.remove("hidden")
+}
+
+// ── Oro / Bitcoin ──────────────────────────────────────────────────────────
+
+const BTC_KEYWORDS = ["bitcoin", "btc"]
+
+let _oroBtcRef = 20
+
+function hOroBtcAbrirEditor() {
+    document.getElementById("hOroBtcHistInput").value = _oroBtcRef
+    document.getElementById("hOroBtcEditorOverlay").classList.remove("hidden")
+    document.getElementById("hOroBtcHistInput").focus()
+}
+
+function hOroBtcCerrarEditor() {
+    document.getElementById("hOroBtcEditorOverlay").classList.add("hidden")
+}
+
+function hOroBtcGuardarRef() {
+    const v = parseFloat(document.getElementById("hOroBtcHistInput").value)
+    if (!v || v <= 0) return
+    _oroBtcRef = v
+    document.getElementById("hOroBtcHistLabel").textContent = v
+    document.getElementById("hOroBtcHistLabelResult").textContent = v
+    document.getElementById("hOroBtcHistLabelJusto").textContent = v
+    hOroBtcCerrarEditor()
+    hCalcOroBtc()
+}
+
+async function hOroBtcLoadPrecios() {
+    const btn   = document.getElementById("hOroBtcLoadBtn")
+    const msgEl = document.getElementById("hOroBtcFuenteMsg")
+    btn.textContent = "Cargando..."
+    btn.disabled = true
+    msgEl.textContent = ""
+    msgEl.className = "hRatioFuenteMsg"
+
+    try {
+        const [activosRes] = await Promise.all([fetch("/api/activos")])
+        if (!activosRes.ok) throw new Error()
+        const { assets } = await activosRes.json()
+
+        const oroAsset = assets.find((a) => _ratioMatchesMetal(a, ORO_KEYWORDS))
+        const btcAsset = assets.find((a) => _ratioMatchesMetal(a, BTC_KEYWORDS))
+
+        if (!oroAsset && !btcAsset) {
+            msgEl.textContent = "No se encontraron activos de oro o Bitcoin en la cartera."
+            msgEl.className = "hRatioFuenteMsg hRatioFuenteWarn"
+            btn.textContent = "Cargar precios guardados"
+            btn.disabled = false
+            return
+        }
+
+        const monedaBase = window._monedaBase || "EUR"
+        const msgs = []
+        let precioOroFinal = 0
+        let precioBtcFinal = 0
+
+        // Precio oro → convertir a monedaBase si es necesario
+        if (oroAsset) {
+            let p = parseEuroNumber(oroAsset.price)
+            const oroCurrency = (oroAsset.currency || "EUR").toUpperCase()
+            if (p > 0) {
+                if (oroCurrency !== monedaBase) {
+                    const rateRes = await fetch(`/api/exchange-rate?from=${oroCurrency}&to=${monedaBase}`)
+                    const rateData = await rateRes.json()
+                    if (rateData.ok) p = p * rateData.rate
+                }
+                precioOroFinal = p
+                document.getElementById("hOroBtcPrecioOro").value = p.toFixed(2)
+                msgs.push(`Oro: ${oroAsset.name} → ${p.toFixed(2)} ${monedaBase} (original ${oroCurrency})`)
+            }
+        }
+
+        // Precio BTC → convertir a monedaBase si es necesario
+        if (btcAsset) {
+            let p = parseEuroNumber(btcAsset.price)
+            const btcCurrency = (btcAsset.currency || "USD").toUpperCase()
+            if (p > 0) {
+                if (btcCurrency !== monedaBase) {
+                    const rateRes = await fetch(`/api/exchange-rate?from=${btcCurrency}&to=${monedaBase}`)
+                    const rateData = await rateRes.json()
+                    if (rateData.ok) p = p * rateData.rate
+                }
+                precioBtcFinal = p
+                document.getElementById("hOroBtcPrecioBtc").value = p.toFixed(2)
+                msgs.push(`Bitcoin: ${btcAsset.name} → ${p.toFixed(2)} ${monedaBase} (original ${btcCurrency})`)
+            }
+        }
+
+        if (msgs.length === 0) {
+            msgEl.textContent = "No se pudieron obtener los precios."
+            msgEl.className = "hRatioFuenteMsg hRatioFuenteWarn"
+        } else {
+            msgEl.textContent = msgs.join("  ·  ")
+            msgEl.className = "hRatioFuenteMsg hRatioFuenteOk"
+            if (precioOroFinal > 0 && precioBtcFinal > 0) hCalcOroBtc()
+        }
+    } catch {
+        msgEl.textContent = "Error al cargar los activos."
+        msgEl.className = "hRatioFuenteMsg hRatioFuenteWarn"
+    }
+
+    btn.textContent = "Cargar precios guardados"
+    btn.disabled = false
+}
+
+function hCalcOroBtc() {
+    const precioOro = parseFloat(document.getElementById("hOroBtcPrecioOro").value) || 0
+    const precioBtc = parseFloat(document.getElementById("hOroBtcPrecioBtc").value) || 0
+    if (precioOro <= 0 || precioBtc <= 0) return
+
+    const monedaBase  = window._monedaBase || "EUR"
+    const simbolo     = monedaBase === "USD" ? "$" : "€"
+    const fmt         = (v) => simbolo + v.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+    const ratio       = precioBtc / precioOro
+    const ref         = _oroBtcRef
+    const difVsRef    = ((ratio - ref) / ref) * 100
+    const precioJusto = precioOro * ref
+    const btcPorOz    = precioOro / precioBtc
+
+    document.getElementById("hOroBtcValor").textContent =
+        ratio.toFixed(2) + " oz"
+
+    const vsEl = document.getElementById("hOroBtcVsRef")
+    vsEl.textContent = (difVsRef >= 0 ? "+" : "") + difVsRef.toFixed(1) + "% vs referencia"
+    vsEl.className = "hResultValue " + (difVsRef > 0 ? "hResultNegative" : "hResultPositive")
+
+    document.getElementById("hOroBtcPrecioJusto").textContent =
+        fmt(precioJusto) + "/" + monedaBase
+
+    document.getElementById("hOroBtcEquiv").textContent =
+        btcPorOz.toFixed(6) + " BTC (" + fmt(precioOro) + ")"
+
+    const interp = document.getElementById("hOroBtcInterpretacion")
+    if (ratio > ref) {
+        interp.textContent = `Bitcoin cotiza por encima de la referencia (${ratio.toFixed(1)} oz vs ${ref} oz de oro). Bitcoin está relativamente caro frente al oro.`
+        interp.className = "hRatioInterpretacion hRatioInfoNeg"
+    } else {
+        interp.textContent = `Bitcoin cotiza por debajo de la referencia (${ratio.toFixed(1)} oz vs ${ref} oz de oro). Bitcoin está relativamente barato frente al oro.`
+        interp.className = "hRatioInterpretacion hRatioInfoPos"
+    }
+
+    document.getElementById("hOroBtcResults").classList.remove("hidden")
 }
 

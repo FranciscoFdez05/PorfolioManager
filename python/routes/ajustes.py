@@ -4,6 +4,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from api_stats import get_today_stats
+from finnhub_client import fetch_exchange_rate
 
 ajustes_bp = Blueprint("ajustes", __name__)
 _BASE_DIR    = Path(__file__).resolve().parent.parent.parent
@@ -13,11 +14,13 @@ _AJUSTES_JSON = _BASE_DIR / "data" / "JSON" / "ajustes.json"
 _DEFAULTS = {
     "autoBackupDays": 0,
     "staleHours": 24,
+    "autoRefreshMinutes": 0,
     "hiddenAssets": [],
     "theme": "default",
     "metricasDisplayType": "doughnut",
     "metricasDistMetric": "netoActualEur",
     "comparativaExcluded": [],
+    "monedaBase": "EUR",
 }
 
 
@@ -79,8 +82,9 @@ def get_settings():
         "ok":             True,
         "finnhubKeyCount": len([k for k in finnhub_raw.splitlines() if k.strip()]),
         "eodhdKeyCount":   len([k for k in eodhd_raw.splitlines() if k.strip()]),
-        "autoBackupDays": int(cfg.get("autoBackupDays") or 0),
-        "staleHours":     int(cfg.get("staleHours") or 24),
+        "autoBackupDays":     int(cfg.get("autoBackupDays") or 0),
+        "staleHours":         int(cfg.get("staleHours") or 24),
+        "autoRefreshMinutes": int(cfg.get("autoRefreshMinutes") or 0),
         "hiddenAssets":        cfg.get("hiddenAssets") or [],
         "theme":               cfg.get("theme") or "default",
         "metricasDisplayType": cfg.get("metricasDisplayType") or "doughnut",
@@ -90,6 +94,7 @@ def get_settings():
         "gastosHiddenMensualidades":  cfg.get("gastosHiddenMensualidades") or [],
         "metricasActivosHidden":      cfg.get("metricasActivosHidden") or [],
         "sidebarCollapsed":           bool(cfg.get("sidebarCollapsed", False)),
+        "monedaBase":                 cfg.get("monedaBase") or "EUR",
     })
 
 
@@ -126,6 +131,8 @@ def save_settings():
         cfg["autoBackupDays"] = int(data["autoBackupDays"])
     if "staleHours" in data:
         cfg["staleHours"] = int(data["staleHours"])
+    if "autoRefreshMinutes" in data:
+        cfg["autoRefreshMinutes"] = int(data["autoRefreshMinutes"]) if int(data["autoRefreshMinutes"]) in {0, 1, 5, 15, 30, 60} else 0
     if "hiddenAssets" in data:
         cfg["hiddenAssets"] = [str(i) for i in data["hiddenAssets"] if i]
     if "theme" in data:
@@ -148,7 +155,21 @@ def save_settings():
         cfg["metricasActivosHidden"] = [str(t) for t in raw if isinstance(t, str) and t.strip()] if isinstance(raw, list) else []
     if "sidebarCollapsed" in data:
         cfg["sidebarCollapsed"] = bool(data["sidebarCollapsed"])
+    if "monedaBase" in data:
+        cfg["monedaBase"] = str(data["monedaBase"]) if str(data["monedaBase"]) in {"EUR", "USD"} else "EUR"
 
     _write_ajustes(cfg)
     return jsonify({"ok": True})
+
+
+@ajustes_bp.route("/api/exchange-rate", methods=["GET"])
+def get_exchange_rate():
+    source = str(request.args.get("from", "USD")).strip().upper()
+    target = str(request.args.get("to", "EUR")).strip().upper()
+    if source == target:
+        return jsonify({"ok": True, "rate": 1.0, "from": source, "to": target})
+    rate, error = fetch_exchange_rate(source, target)
+    if error:
+        return jsonify({"ok": False, "error": error}), 502
+    return jsonify({"ok": True, "rate": rate, "from": source, "to": target})
 

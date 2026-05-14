@@ -264,7 +264,7 @@ async function initDividendosLogic() {
     }
 
     const dividendosTable = document.querySelector(".dividendosTable")
-    if (dividendosTable) bindTableSort(dividendosTable)
+    if (dividendosTable) bindTableSort(dividendosTable, "dividendos")
 }
 
 document.addEventListener("keydown", (event) => {

@@ -3,11 +3,11 @@
     <div class="activosToolbar">
         <button id="activosAddBtn" class="primaryButton">+ Añadir activo</button>
         <div class="activosFilters" id="activosFilters">
-            <button class="activosFilterBtn active" data-type="all">Todos</button>
-            <button class="activosFilterBtn" data-type="cripto">Cripto</button>
-            <button class="activosFilterBtn" data-type="acciones">Acciones</button>
-            <button class="activosFilterBtn" data-type="etfs">ETFs</button>
-            <button class="activosFilterBtn" data-type="comoditis">Comoditis</button>
+            <label class="activosFilterBtn" data-type="all"><input type="checkbox" checked><span>Todos</span></label>
+            <label class="activosFilterBtn" data-type="cripto"><input type="checkbox" checked><span>Cripto</span></label>
+            <label class="activosFilterBtn" data-type="acciones"><input type="checkbox" checked><span>Acciones</span></label>
+            <label class="activosFilterBtn" data-type="etfs"><input type="checkbox" checked><span>ETFs</span></label>
+            <label class="activosFilterBtn" data-type="comoditis"><input type="checkbox" checked><span>Comoditis</span></label>
         </div>
         <input type="text" class="activosSearch" id="activosSearch" placeholder="Buscar activo...">
         <span class="activosCount" id="activosCount"></span>
@@ -22,6 +22,7 @@
     </div>
 
     <div class="activosGrid" id="activosGrid"></div>
+    <p class="overviewEmpty hidden" id="activosGridEmpty">No hay activos.</p>
     <div class="activosTableWrap hidden" id="activosTableWrap">
         <table class="activosTable" id="activosTable">
             <thead>
@@ -41,5 +42,6 @@
             <tbody id="activosTableBody"></tbody>
         </table>
     </div>
+    <p class="overviewEmpty hidden" id="activosTableEmpty">No hay activos.</p>
 
 </div>

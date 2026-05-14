@@ -33,7 +33,12 @@ async function initAjustesLogic() {
         btn.addEventListener("click", () => {
             const input = document.getElementById(btn.dataset.target)
             if (!input) return
-            input.type = input.type === "password" ? "text" : "password"
+            const showing = input.type === "password"
+            input.type = showing ? "text" : "password"
+            const eyeShow = btn.querySelector(".ajustesEyeShow")
+            const eyeHide = btn.querySelector(".ajustesEyeHide")
+            if (eyeShow) eyeShow.style.display = showing ? "none" : ""
+            if (eyeHide) eyeHide.style.display = showing ? "" : "none"
         })
     })
 
@@ -84,7 +89,13 @@ async function initAjustesLogic() {
     const guardarFreqBtn = document.getElementById("ajustesGuardarBackupFreqBtn")
     const backupFreqMsg  = document.getElementById("ajustesBackupFreqMsg")
 
-    if (autoBackupSel) autoBackupSel.value = String(settings.autoBackupDays ?? 0)
+    function setSelect(sel, value) {
+        if (!sel) return
+        sel.value = String(value)
+        sel.dispatchEvent(new Event("change", { bubbles: true }))
+    }
+
+    if (autoBackupSel) setSelect(autoBackupSel, settings.autoBackupDays ?? 0)
 
     if (guardarFreqBtn) {
         guardarFreqBtn.addEventListener("click", async () => {
@@ -106,12 +117,79 @@ async function initAjustesLogic() {
         })
     }
 
+    // --- Moneda base ---
+    const monedaBaseSel     = document.getElementById("ajustesMonedaBase")
+    const guardarMonedaBaseBtn = document.getElementById("ajustesGuardarMonedaBaseBtn")
+    const monedaBaseMsg     = document.getElementById("ajustesMonedaBaseMsg")
+
+    if (monedaBaseSel) setSelect(monedaBaseSel, settings.monedaBase ?? "EUR")
+
+    if (guardarMonedaBaseBtn) {
+        guardarMonedaBaseBtn.addEventListener("click", async () => {
+            guardarMonedaBaseBtn.disabled = true
+            showMsg(monedaBaseMsg, "Guardando…", "")
+            try {
+                const moneda = monedaBaseSel?.value ?? "EUR"
+                const res    = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ monedaBase: moneda })
+                })
+                const data = await res.json()
+                if (data.ok) {
+                    window._monedaBase = moneda
+                    showMsg(monedaBaseMsg, "Guardado", "ok")
+                } else {
+                    showMsg(monedaBaseMsg, "Error", "error")
+                }
+            } catch {
+                showMsg(monedaBaseMsg, "Error de red", "error")
+            } finally {
+                guardarMonedaBaseBtn.disabled = false
+            }
+        })
+    }
+
+    // --- Actualización automática ---
+    const autoRefreshSel     = document.getElementById("ajustesAutoRefresh")
+    const guardarAutoRefreshBtn = document.getElementById("ajustesGuardarAutoRefreshBtn")
+    const autoRefreshMsg     = document.getElementById("ajustesAutoRefreshMsg")
+
+    if (autoRefreshSel) setSelect(autoRefreshSel, window._autoRefreshMinutes ?? settings.autoRefreshMinutes ?? 0)
+
+    if (guardarAutoRefreshBtn) {
+        guardarAutoRefreshBtn.addEventListener("click", async () => {
+            guardarAutoRefreshBtn.disabled = true
+            showMsg(autoRefreshMsg, "Guardando…", "")
+            try {
+                const minutes = Number(autoRefreshSel?.value ?? 0)
+                const res = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ autoRefreshMinutes: minutes })
+                })
+                const data = await res.json()
+                if (data.ok) {
+                    window._autoRefreshMinutes = minutes
+                    applyAutoRefresh(minutes)
+                    showMsg(autoRefreshMsg, "Guardado", "ok")
+                } else {
+                    showMsg(autoRefreshMsg, "Error", "error")
+                }
+            } catch {
+                showMsg(autoRefreshMsg, "Error de red", "error")
+            } finally {
+                guardarAutoRefreshBtn.disabled = false
+            }
+        })
+    }
+
     // --- Umbral cotizaciones ---
     const staleSel     = document.getElementById("ajustesStaleHours")
     const guardarStaleBtn = document.getElementById("ajustesGuardarStaleBtn")
     const staleMsg     = document.getElementById("ajustesStaleMsg")
 
-    if (staleSel) staleSel.value = String(settings.staleHours ?? 24)
+    if (staleSel) setSelect(staleSel, settings.staleHours ?? 24)
 
     if (guardarStaleBtn) {
         guardarStaleBtn.addEventListener("click", async () => {
@@ -210,6 +288,15 @@ async function initAjustesLogic() {
         }
     }
 
+    function _backupDisplayName(filename) {
+        const isZip = filename.endsWith(".zip")
+        const base = filename
+            .replace(/^(backup|portfolio)_/, "")
+            .replace(/\.(zip|db)$/, "")
+            .replace(/_(\d{2})-(\d{2})-(\d{2})$/, " $1:$2:$3")
+        return isZip ? base : `${base} (legacy)`
+    }
+
     function renderBackups(backups) {
         if (!listEl) return
         if (!backups.length) {
@@ -222,12 +309,7 @@ async function initAjustesLogic() {
             item.className = "ajustesBackupItem"
             const label = document.createElement("span")
             label.className = "ajustesBackupName"
-            // "portfolio_DD-MM-YYYY_HH-MM-SS.db" → "DD-MM-YYYY HH:MM:SS"
-            const display = filename
-                .replace("portfolio_", "")
-                .replace(".db", "")
-                .replace(/_(\d{2})-(\d{2})-(\d{2})$/, " $1:$2:$3")
-            label.textContent = display
+            label.textContent = _backupDisplayName(filename)
             const restoreBtn = document.createElement("button")
             restoreBtn.className = "ajustesRestoreBtn"
             restoreBtn.textContent = "Restaurar"
@@ -245,7 +327,7 @@ async function initAjustesLogic() {
     }
 
     async function deleteBackup(filename, itemEl) {
-        const displayName = filename.replace("portfolio_", "").replace(".db", "").replace(/_(\d{2})-(\d{2})-(\d{2})$/, " $1:$2:$3")
+        const displayName = _backupDisplayName(filename)
         openConfirmModal({
             title: "Eliminar backup",
             message: `¿Eliminar la copia "${displayName}"? Esta acción no se puede deshacer.`,
@@ -270,7 +352,7 @@ async function initAjustesLogic() {
     }
 
     async function restoreBackup(filename, btn) {
-        const displayName = filename.replace("portfolio_", "").replace(".db", "").replace(/_(\d{2})-(\d{2})-(\d{2})$/, " $1:$2:$3")
+        const displayName = _backupDisplayName(filename)
         openConfirmModal({
             title: "Restaurar backup",
             message: `¿Restaurar "${displayName}"? Se sobreescribirán todos los datos actuales.`,
@@ -524,18 +606,17 @@ function initAjustesDragLock() {
 
     function applySection(sec) {
         const locked = isLocked(sec)
-        const btn = sec.querySelector(".ajustesLockBtn")
         sec.draggable = !locked
         sec.classList.toggle("ajustesUnlocked", !locked)
-        if (btn) btn.textContent = locked ? "🔒" : "🔓"
     }
 
     layout.querySelectorAll(".ajustesSection").forEach(applySection)
 
     // Toggle individual lock on click
     layout.addEventListener("click", (e) => {
-        if (!e.target.classList.contains("ajustesLockBtn")) return
-        const sec = e.target.closest(".ajustesSection")
+        const lockBtn = e.target.closest(".ajustesLockBtn")
+        if (!lockBtn) return
+        const sec = lockBtn.closest(".ajustesSection")
         if (!sec) return
         const id = sec.dataset.ajusteId
         locks[id] = !isLocked(sec)   // flip

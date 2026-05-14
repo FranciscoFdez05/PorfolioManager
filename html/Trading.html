@@ -1,5 +1,96 @@
-<section class="operationsPage operationsPageCompact">
-    <h2 class="pageTitle">Trading</h2>
-    <p class="overviewEmpty">Próximamente.</p>
+<section class="tradingPage">
+
+    <div class="tradingFilters">
+        <div class="tradingFilterGroup">
+            <span class="tradingFilterLabel">Tipo</span>
+            <div class="tradingFilterButtons">
+                <label class="overviewFilterOption tradingFilterOption">
+                    <input type="checkbox" value="SCALP" data-tfilter="tipo" checked>
+                    <span>SCALP</span>
+                </label>
+                <label class="overviewFilterOption tradingFilterOption">
+                    <input type="checkbox" value="SWING" data-tfilter="tipo" checked>
+                    <span>SWING</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="tradingFilterGroup">
+            <span class="tradingFilterLabel">Dirección</span>
+            <div class="tradingFilterButtons">
+                <label class="overviewFilterOption tradingFilterOption">
+                    <input type="checkbox" value="LONG" data-tfilter="direccion" checked>
+                    <span>LONG</span>
+                </label>
+                <label class="overviewFilterOption tradingFilterOption">
+                    <input type="checkbox" value="SHORT" data-tfilter="direccion" checked>
+                    <span>SHORT</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="tradingFilterGroup">
+            <span class="tradingFilterLabel">Resultado</span>
+            <div class="tradingFilterButtons">
+                <label class="overviewFilterOption tradingFilterOption">
+                    <input type="checkbox" value="PROFIT" data-tfilter="resultado" checked>
+                    <span>PROFIT</span>
+                </label>
+                <label class="overviewFilterOption tradingFilterOption">
+                    <input type="checkbox" value="PÉRDIDA" data-tfilter="resultado" checked>
+                    <span>PÉRDIDA</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="tradingFilterGroup tradingViewToggle">
+            <span class="tradingFilterLabel">Vista</span>
+            <div class="tradingFilterButtons">
+                <label class="overviewFilterOption tradingFilterOption">
+                    <input type="radio" name="tradingView" value="tabla" checked>
+                    <span>Tabla</span>
+                </label>
+                <label class="overviewFilterOption tradingFilterOption">
+                    <input type="radio" name="tradingView" value="hacienda">
+                    <span>Hacienda</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vista tabla general -->
+    <div id="tradingTableView">
+        <div class="tradingTableWrapper" id="tradingTableWrapper">
+            <table class="tradingTable">
+                <thead>
+                    <tr>
+                        <th class="mThSort tradingNumCol" data-sortkey="num">#<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="fecha">Fecha<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="tipo">Tipo<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="moneda">Moneda<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="direccion">Dirección<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="resultado">Resultado<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="roi">ROI<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="ganancia">Ganancia %<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="ganancia_neta">Ganancia neta<span class="mSortArrow"></span></th>
+                        <th class="rowActionsCell"></th>
+                    </tr>
+                </thead>
+                <tbody id="tradingBody"></tbody>
+            </table>
+        </div>
+        <p class="overviewEmpty hidden" id="tradingEmptyMsg">No hay trades registrados.</p>
+    </div>
+
+    <!-- Vista hacienda (por año) -->
+    <div id="tradingHaciendaView" class="hidden">
+        <div id="tradingHaciendaYearTabs" class="tradingHaciendaYearTabs"></div>
+        <div id="tradingHaciendaContent"></div>
+    </div>
+
 </section>
 
+<div class="tradingActions">
+    <button id="addTradingRowBtn" class="primaryButton" type="button">Añadir trade</button>
+    <button id="saveTradingBtn" class="secondaryButton" type="button">Guardar</button>
+</div>

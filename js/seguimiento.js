@@ -27,10 +27,11 @@ function segSaveCustomItems(items) {
 
 function segFilteredItems() {
     return _segAllItems.filter(item => {
-        const matchType = _segFilterType === "all" || item.type === _segFilterType
+        const matchType = _segFilterType === "all" || _segFilterType.includes(item.type)
         const matchSrc  = _segFilterSrc  === "all"
-            || (_segFilterSrc === "portfolio" && item._fromPortfolio)
-            || (_segFilterSrc === "nuevos"    && !item._fromPortfolio)
+            || (Array.isArray(_segFilterSrc)
+                ? (_segFilterSrc.includes("portfolio") && item._fromPortfolio) || (_segFilterSrc.includes("nuevos") && !item._fromPortfolio)
+                : (_segFilterSrc === "portfolio" && item._fromPortfolio) || (_segFilterSrc === "nuevos" && !item._fromPortfolio))
         const q = _segSearch.toLowerCase()
         const matchSearch = !q
             || (item.name   || "").toLowerCase().includes(q)
@@ -114,8 +115,20 @@ function segBuildCard(item) {
 
 function segRenderTable(filtered) {
     const tbody = document.getElementById("seguimientoTableBody")
+    const tableEmptyEl = document.getElementById("seguimientoTableEmpty")
+    const tableWrap = document.getElementById("seguimientoTableWrap")
     if (!tbody) return
 
+    tbody.innerHTML = ""
+
+    if (!filtered.length) {
+        if (tableWrap) tableWrap.classList.add("hidden")
+        if (tableEmptyEl) tableEmptyEl.classList.remove("hidden")
+        return
+    }
+
+    if (tableWrap) tableWrap.classList.remove("hidden")
+    if (tableEmptyEl) tableEmptyEl.classList.add("hidden")
     tbody.innerHTML = filtered.map(item => {
         const color     = AV_SEG_TYPE_COLORS[item.type] || "#888"
         const typeLabel = AV_SEG_TYPE_LABELS[item.type] || item.type || ""
@@ -345,13 +358,18 @@ function segRenderGrid() {
 
     grid.classList.remove("hidden")
     tableWrap?.classList.add("hidden")
+    const tableEmptyEl = document.getElementById("seguimientoTableEmpty")
+    if (tableEmptyEl) tableEmptyEl.classList.add("hidden")
+    const gridEmptyEl = document.getElementById("seguimientoGridEmpty")
+
+    grid.innerHTML = ""
 
     if (filtered.length === 0) {
-        grid.innerHTML = `<div class="seguimientoEmpty">No hay activos en seguimiento.</div>`
+        if (gridEmptyEl) gridEmptyEl.classList.remove("hidden")
         return
     }
 
-    grid.innerHTML = ""
+    if (gridEmptyEl) gridEmptyEl.classList.add("hidden")
     filtered.forEach(item => {
         const card = segBuildCard(item)
         card.querySelectorAll(".segHideBtn").forEach(btn => {
@@ -471,24 +489,74 @@ async function initSeguimientoLogic() {
     })
 
     // filtros de tipo
-    filtersEl?.addEventListener("click", (e) => {
-        const btn = e.target.closest(".activosFilterBtn")
-        if (!btn) return
-        filtersEl.querySelectorAll(".activosFilterBtn").forEach(b => b.classList.remove("active"))
-        btn.classList.add("active")
-        _segFilterType = btn.dataset.type || "all"
-        segRenderGrid()
-    })
+    if (filtersEl) {
+        const todosTInput = filtersEl.querySelector('[data-type="all"] input')
+        const getTypeIndividuals = () => [...filtersEl.querySelectorAll('.activosFilterBtn:not([data-type="all"]) input')]
+        const syncTypeState = () => {
+            if (todosTInput?.checked) {
+                _segFilterType = "all"
+            } else {
+                const sel = getTypeIndividuals().filter(cb => cb.checked).map(cb => cb.closest(".activosFilterBtn").dataset.type)
+                _segFilterType = sel.length ? sel : "all"
+                if (!sel.length && todosTInput) todosTInput.checked = true
+            }
+        }
+        if (todosTInput) todosTInput.checked = true
+        getTypeIndividuals().forEach(cb => { cb.checked = true })
+        if (!filtersEl.dataset.bound) {
+            filtersEl.dataset.bound = "true"
+            filtersEl.addEventListener("change", (e) => {
+                const changed = e.target
+                if (changed === todosTInput) {
+                    changed.checked = true
+                    getTypeIndividuals().forEach(cb => { cb.checked = true })
+                } else if (todosTInput?.checked) {
+                    todosTInput.checked = false
+                    getTypeIndividuals().forEach(cb => { cb.checked = cb === changed })
+                    changed.checked = true
+                } else {
+                    if (todosTInput) todosTInput.checked = getTypeIndividuals().every(cb => cb.checked)
+                }
+                syncTypeState()
+                segRenderGrid()
+            })
+        }
+    }
 
     // filtros de fuente (todos / portfolio / nuevos)
-    srcFiltersEl?.addEventListener("click", (e) => {
-        const btn = e.target.closest(".activosFilterBtn")
-        if (!btn) return
-        srcFiltersEl.querySelectorAll(".activosFilterBtn").forEach(b => b.classList.remove("active"))
-        btn.classList.add("active")
-        _segFilterSrc = btn.dataset.source || "all"
-        segRenderGrid()
-    })
+    if (srcFiltersEl) {
+        const todosSInput = srcFiltersEl.querySelector('[data-source="all"] input')
+        const getSrcIndividuals = () => [...srcFiltersEl.querySelectorAll('.activosFilterBtn:not([data-source="all"]) input')]
+        const syncSrcState = () => {
+            if (todosSInput?.checked) {
+                _segFilterSrc = "all"
+            } else {
+                const sel = getSrcIndividuals().filter(cb => cb.checked).map(cb => cb.closest(".activosFilterBtn").dataset.source)
+                _segFilterSrc = sel.length ? sel : "all"
+                if (!sel.length && todosSInput) todosSInput.checked = true
+            }
+        }
+        if (todosSInput) todosSInput.checked = true
+        getSrcIndividuals().forEach(cb => { cb.checked = true })
+        if (!srcFiltersEl.dataset.bound) {
+            srcFiltersEl.dataset.bound = "true"
+            srcFiltersEl.addEventListener("change", (e) => {
+                const changed = e.target
+                if (changed === todosSInput) {
+                    changed.checked = true
+                    getSrcIndividuals().forEach(cb => { cb.checked = true })
+                } else if (todosSInput?.checked) {
+                    todosSInput.checked = false
+                    getSrcIndividuals().forEach(cb => { cb.checked = cb === changed })
+                    changed.checked = true
+                } else {
+                    if (todosSInput) todosSInput.checked = getSrcIndividuals().every(cb => cb.checked)
+                }
+                syncSrcState()
+                segRenderGrid()
+            })
+        }
+    }
 
     // toggle vista cards / tabla
     viewToggle?.addEventListener("click", (e) => {

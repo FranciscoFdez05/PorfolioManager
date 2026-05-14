@@ -32,6 +32,94 @@ def _set_active(db_path: Path):
     set_active_db_path(db_path)
 
 
+def _migrate_legacy_gastos(active_db_path: Path):
+    """Copia datos de gastos de portfolio.db (legacy) al DB activo si el activo está vacío."""
+    if not _LEGACY_DB.exists():
+        return
+    try:
+        import sqlite3
+        src = sqlite3.connect(str(_LEGACY_DB))
+        src.row_factory = sqlite3.Row
+
+        # Comprobar si el legacy tiene mensualidades con valores o gastos
+        try:
+            has_mens = src.execute(
+                "SELECT 1 FROM mensualidades WHERE enero != '' OR febrero != '' LIMIT 1"
+            ).fetchone()
+            has_rows = src.execute("SELECT 1 FROM gastos_rows LIMIT 1").fetchone()
+        except Exception:
+            src.close()
+            return
+
+        if not has_mens and not has_rows:
+            src.close()
+            return
+
+        dst = sqlite3.connect(str(active_db_path))
+        try:
+            # Solo migrar si el activo NO tiene datos de gastos
+            empty_mens = dst.execute(
+                "SELECT 1 FROM mensualidades WHERE enero != '' OR febrero != '' LIMIT 1"
+            ).fetchone()
+            has_dst_rows = dst.execute("SELECT 1 FROM gastos_rows LIMIT 1").fetchone()
+            if empty_mens or has_dst_rows:
+                dst.close()
+                src.close()
+                return
+        except Exception:
+            dst.close()
+            src.close()
+            return
+
+        # Migrar mensualidades
+        dst.execute("DELETE FROM mensualidades")
+        src_mens = src.execute(
+            "SELECT year, nombre, enero, febrero, marzo, abril, mayo, junio, "
+            "julio, agosto, septiembre, octubre, noviembre, diciembre FROM mensualidades"
+        ).fetchall()
+        dst.executemany(
+            "INSERT INTO mensualidades (year, nombre, enero, febrero, marzo, abril, mayo, junio, "
+            "julio, agosto, septiembre, octubre, noviembre, diciembre) VALUES "
+            "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [(r["year"], r["nombre"], r["enero"], r["febrero"], r["marzo"], r["abril"],
+              r["mayo"], r["junio"], r["julio"], r["agosto"], r["septiembre"],
+              r["octubre"], r["noviembre"], r["diciembre"]) for r in src_mens]
+        )
+
+        # Migrar gastos_rows
+        dst.execute("DELETE FROM gastos_rows")
+        src_rows = src.execute(
+            "SELECT year, month, fecha, nombre, tipo, cantidad FROM gastos_rows"
+        ).fetchall()
+        dst.executemany(
+            "INSERT INTO gastos_rows (year, month, fecha, nombre, tipo, cantidad) VALUES (?, ?, ?, ?, ?, ?)",
+            [(r["year"], r["month"], r["fecha"], r["nombre"], r["tipo"], r["cantidad"]) for r in src_rows]
+        )
+
+        # Migrar gastos_tipos
+        dst.execute("DELETE FROM gastos_tipos")
+        src_tipos = src.execute("SELECT label FROM gastos_tipos").fetchall()
+        dst.executemany("INSERT OR IGNORE INTO gastos_tipos (label) VALUES (?)", [(r["label"],) for r in src_tipos])
+
+        # Asegurar que gastos_years tiene los años correctos
+        years = {r["year"] for r in src.execute("SELECT DISTINCT year FROM mensualidades").fetchall()}
+        try:
+            years |= {r["year"] for r in src.execute("SELECT DISTINCT year FROM gastos_rows").fetchall()}
+        except Exception:
+            pass
+        for y in years:
+            if y:
+                dst.execute("INSERT OR IGNORE INTO gastos_years (year) VALUES (?)", (y,))
+
+        dst.commit()
+        dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        dst.commit()
+        dst.close()
+        src.close()
+    except Exception as e:
+        print(f"[gastos migration] Aviso: {e}")
+
+
 def init_portfolios():
     """Llamado al arrancar el servidor. Migra el DB legacy si es necesario y activa el portfolio."""
     meta = _read_meta()
@@ -52,7 +140,9 @@ def init_portfolios():
 
     _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
     active_id = meta.get("active", "principal")
-    _set_active(_PORTFOLIOS_DIR / f"{active_id}.db")
+    active_db = _PORTFOLIOS_DIR / f"{active_id}.db"
+    _migrate_legacy_gastos(active_db)
+    _set_active(active_db)
     return meta
 
 

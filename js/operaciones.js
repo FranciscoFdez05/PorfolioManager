@@ -1,5 +1,5 @@
 const OPERATION_ORDER_OPTIONS = ["Compra", "Venta"]
-const OPERATION_STATUS_OPTIONS = ["Activo", "Cerrado", "Completado"]
+const OPERATION_STATUS_OPTIONS = ["Activo", "Completado"]
 const OPERATION_CURRENCY_OPTIONS = ["EUR", "USD"]
 const OPERATION_QUANTITY_DECIMALS = 8
 const OPERATION_COMMON_QUOTE_SYMBOL_OPTIONS = ["USDC", "USDT", "DAI", "FDUSD", "PYUSD", "TUSD", "USDE", "EURC", "USD", "EUR", "BUSD"]
@@ -547,23 +547,23 @@ function renderOperationsTable() {
 
     const rows = getFilteredOperationsRows()
 
+    const operacionesEmptyEl = document.getElementById("operacionesEmptyMsg")
+    const operationsTableWrapper = document.querySelector(".operationsTableWrapper")
     if (!rows.length) {
-        const emptyRow = document.createElement("tr")
-        emptyRow.innerHTML = `
-            <td class="rowDeleteCell"></td>
-            <td colspan="10" class="operationsEmptyCell">No hay operaciones para los filtros seleccionados.</td>
-        `
-        operationsBody.appendChild(emptyRow)
+        if (operacionesEmptyEl) operacionesEmptyEl.classList.remove("hidden")
+        if (operationsTableWrapper) operationsTableWrapper.classList.add("hidden")
         renderOperationsStablecoinPanel()
         return
     }
+    if (operacionesEmptyEl) operacionesEmptyEl.classList.add("hidden")
+    if (operationsTableWrapper) operationsTableWrapper.classList.remove("hidden")
 
     rows.forEach((row) => {
         operationsBody.appendChild(buildOperationRow(row))
     })
 
     renderOperationsStablecoinPanel()
-    bindTableSort(operationsBody.closest("table"))
+    bindTableSort(operationsBody.closest("table"), "operaciones")
 }
 
 function buildOperationAssetSelect(selectedAssetId) {

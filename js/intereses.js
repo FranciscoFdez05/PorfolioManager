@@ -538,6 +538,19 @@ function renderFilteredIntereses() {
         : _allInteresesRows.map((r, i) => ({ r, i }))
 
     interesesBody.innerHTML = ""
+    const interesesEmptyEl = document.getElementById("interesesEmptyMsg")
+    const interesesTableWrapper = document.querySelector(".interesesTableWrapper")
+
+    if (!visible.length) {
+        if (interesesEmptyEl) interesesEmptyEl.classList.remove("hidden")
+        if (interesesTableWrapper) interesesTableWrapper.classList.add("hidden")
+        updateTotals()
+        return
+    }
+
+    if (interesesEmptyEl) interesesEmptyEl.classList.add("hidden")
+    if (interesesTableWrapper) interesesTableWrapper.classList.remove("hidden")
+
     visible.forEach(({ r: rowData, i: globalIndex }) => {
         const rowElement = document.createElement("tr")
         rowElement.innerHTML = `

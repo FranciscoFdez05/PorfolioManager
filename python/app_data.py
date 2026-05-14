@@ -182,6 +182,47 @@ def writeOperacionesFile(data):
     conn.commit()
 
 
+# --- Trading Journal ---
+
+def readTradingFile():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, fecha, tipo, moneda, direccion, resultado, capital, capital_currency, roi, ganancia, ganancia_neta FROM trading ORDER BY rowid"
+    ).fetchall()
+    return {"rows": [
+        {
+            "id": r["id"],
+            "fecha": r["fecha"],
+            "tipo": r["tipo"],
+            "moneda": r["moneda"],
+            "direccion": r["direccion"],
+            "resultado": r["resultado"],
+            "capital": r["capital"],
+            "capital_currency": r["capital_currency"],
+            "roi": r["roi"],
+            "ganancia": r["ganancia"],
+            "ganancia_neta": r["ganancia_neta"],
+        }
+        for r in rows
+    ]}
+
+
+def writeTradingFile(data):
+    conn = get_db()
+    conn.execute("DELETE FROM trading")
+    conn.executemany(
+        "INSERT INTO trading (id, fecha, tipo, moneda, direccion, resultado, capital, capital_currency, roi, ganancia, ganancia_neta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (r.get("id", ""), r.get("fecha", ""), r.get("tipo", "SCALP"),
+             r.get("moneda", ""), r.get("direccion", "LONG"), r.get("resultado", "PROFIT"),
+             r.get("capital", ""), r.get("capital_currency", "EUR"), r.get("roi", ""), r.get("ganancia", ""),
+             r.get("ganancia_neta", ""))
+            for r in data.get("rows", [])
+        ]
+    )
+    conn.commit()
+
+
 # --- Transacciones ---
 
 def readTransaccionesFile():

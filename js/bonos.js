@@ -154,7 +154,7 @@ function renderBonosTable(data) {
 
     updateBonosTotals()
     applyBonosFilter(_bonosCurrentFilter)
-    bindTableSort(tbody.closest("table"))
+    if (rows.length) bindTableSort(tbody.closest("table"), "bonos")
 }
 
 function updateBonosTotals() {
@@ -192,18 +192,17 @@ function updateBonosTotals() {
     set("bonosTotalCorp",      corpNeto)
     set("bonosTotalGub",       gubNeto)
 
-    const emptyEl = document.getElementById("bonosEmpty")
-    if (emptyEl) emptyEl.classList.toggle("hidden", rows.length > 0)
+    const bonosEmptyEl = document.getElementById("bonosEmptyMsg")
+    const bonosTableWrapper = document.getElementById("bonosTableWrapper")
+    if (bonosEmptyEl) bonosEmptyEl.classList.toggle("hidden", rows.length > 0)
+    if (bonosTableWrapper) bonosTableWrapper.classList.toggle("hidden", rows.length === 0)
 }
 
 function applyBonosFilter(tipo) {
     _bonosCurrentFilter = tipo
     document.querySelectorAll("#bonosBody tr").forEach((row) => {
         const rowTipo = row.dataset.tipo || ""
-        let visible = false
-        if (tipo === "all") visible = true
-        else if (tipo === "if") visible = rowTipo === "if"
-        else visible = rowTipo === tipo
+        const visible = tipo === "all" || (Array.isArray(tipo) ? tipo.includes(rowTipo) : rowTipo === tipo)
         row.style.display = visible ? "" : "none"
     })
 }
@@ -311,11 +310,37 @@ async function initBonosLogic() {
         try { await saveAllBonosData() } catch (err) { console.error(err) }
     })
 
-    document.querySelectorAll("#bonosFilters .bonosFilterBtn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            document.querySelectorAll("#bonosFilters .bonosFilterBtn").forEach((b) => b.classList.remove("active"))
-            btn.classList.add("active")
-            applyBonosFilter(btn.dataset.tipo)
-        })
-    })
+    const bonosFiltersEl = document.getElementById("bonosFilters")
+    if (bonosFiltersEl) {
+        const todosInput = bonosFiltersEl.querySelector('[data-tipo="all"] input')
+        const getIndividuals = () => [...bonosFiltersEl.querySelectorAll('.bonosFilterBtn:not([data-tipo="all"]) input')]
+        const syncAndApply = () => {
+            if (todosInput?.checked) {
+                applyBonosFilter("all")
+            } else {
+                const sel = getIndividuals().filter(cb => cb.checked).map(cb => cb.closest(".bonosFilterBtn").dataset.tipo)
+                if (!sel.length && todosInput) todosInput.checked = true
+                applyBonosFilter(sel.length ? sel : "all")
+            }
+        }
+        if (todosInput) todosInput.checked = true
+        getIndividuals().forEach(cb => { cb.checked = true })
+        if (!bonosFiltersEl.dataset.bound) {
+            bonosFiltersEl.dataset.bound = "true"
+            bonosFiltersEl.addEventListener("change", (e) => {
+                const changed = e.target
+                if (changed === todosInput) {
+                    changed.checked = true
+                    getIndividuals().forEach(cb => { cb.checked = true })
+                } else if (todosInput?.checked) {
+                    todosInput.checked = false
+                    getIndividuals().forEach(cb => { cb.checked = cb === changed })
+                    changed.checked = true
+                } else {
+                    if (todosInput) todosInput.checked = getIndividuals().every(cb => cb.checked)
+                }
+                syncAndApply()
+            })
+        }
+    }
 }

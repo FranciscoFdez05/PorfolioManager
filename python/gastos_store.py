@@ -9,7 +9,7 @@ MONTH_KEYS = [
     "enero", "febrero", "marzo", "abril", "mayo", "junio",
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ]
-DEFAULT_MENSUALIDADES = ["iCloud", "Office", "Proton", "Spotify", "Rainbow", "ChatGPT", "AppleCare"]
+DEFAULT_MENSUALIDADES = []
 
 
 def normalize_year(year_value):
@@ -94,8 +94,6 @@ def sanitize_gastos_payload(payload, fallback_year=None):
         return None, "Año inválido"
 
     mensualidades = sanitize_mensualidades_rows(payload.get("mensualidades", []))
-    if not mensualidades:
-        mensualidades = create_default_gastos_year(year)["mensualidades"]
 
     gastos_tipos = sanitize_gastos_types(payload.get("gastosTipos", []))
     seen_tipos = {label.lower() for label in gastos_tipos}
@@ -139,11 +137,7 @@ def write_gastos_types(types):
 
 def list_gastos_years():
     conn = get_db()
-    rows = conn.execute(
-        "SELECT DISTINCT year FROM gastos_rows "
-        "UNION SELECT DISTINCT year FROM mensualidades "
-        "ORDER BY year"
-    ).fetchall()
+    rows = conn.execute("SELECT year FROM gastos_years ORDER BY year").fetchall()
     return [r["year"] for r in rows]
 
 
@@ -153,14 +147,7 @@ def read_gastos_year(year):
         return None
 
     conn = get_db()
-    has_rows = conn.execute(
-        "SELECT 1 FROM gastos_rows WHERE year = ? LIMIT 1", (normalized,)
-    ).fetchone()
-    has_mens = conn.execute(
-        "SELECT 1 FROM mensualidades WHERE year = ? LIMIT 1", (normalized,)
-    ).fetchone()
-
-    if not has_rows and not has_mens:
+    if not conn.execute("SELECT 1 FROM gastos_years WHERE year = ? LIMIT 1", (normalized,)).fetchone():
         return None
 
     mensualidades = [
@@ -202,6 +189,7 @@ def write_gastos_year(year, data):
         return
 
     conn = get_db()
+    conn.execute("INSERT OR IGNORE INTO gastos_years (year) VALUES (?)", (normalized,))
     conn.execute("DELETE FROM gastos_rows WHERE year = ?", (normalized,))
     conn.execute("DELETE FROM mensualidades WHERE year = ?", (normalized,))
 
@@ -252,7 +240,8 @@ def delete_gastos_year(year):
         return False
 
     conn = get_db()
-    r1 = conn.execute("DELETE FROM gastos_rows WHERE year = ?", (normalized,))
-    r2 = conn.execute("DELETE FROM mensualidades WHERE year = ?", (normalized,))
+    r = conn.execute("DELETE FROM gastos_years WHERE year = ?", (normalized,))
+    conn.execute("DELETE FROM gastos_rows WHERE year = ?", (normalized,))
+    conn.execute("DELETE FROM mensualidades WHERE year = ?", (normalized,))
     conn.commit()
-    return (r1.rowcount + r2.rowcount) > 0
+    return r.rowcount > 0
