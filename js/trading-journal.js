@@ -258,9 +258,13 @@ function buildTradingRow(row, num) {
         <td class="${gananciaNum !== null ? (gananciaNum >= 0 ? "tradingPos" : "tradingNeg") : ""}">${formatTradingPct(row.ganancia)}</td>
         <td class="${gNetaNum !== null ? (gNetaNum >= 0 ? "tradingPos" : "tradingNeg") : ""}">${gNetaFmt}</td>
         <td class="rowActionsCell">
-            <div class="rowActionsBtns">
-                <button type="button" class="assetRowEditBtn tradingRowEditBtn avActionBtn avEditBtn" data-trade-id="${row.id}" title="Editar">✎</button>
-                <button type="button" class="assetRowDeleteBtn tradingRowDeleteBtn avActionBtn avDeleteBtn" data-trade-id="${row.id}" title="Eliminar">🗑️</button>
+            <div class="rowMenu">
+                <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                <div class="rowMenuDropdown">
+                    <button type="button" class="rowMenuItem assetRowEditBtn tradingRowEditBtn avActionBtn avEditBtn" data-trade-id="${row.id}">Editar</button>
+                    <hr>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn tradingRowDeleteBtn avActionBtn avDeleteBtn" data-trade-id="${row.id}">Eliminar</button>
+                </div>
             </div>
         </td>
     `

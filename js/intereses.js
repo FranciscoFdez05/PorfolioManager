@@ -559,9 +559,13 @@ function renderFilteredIntereses() {
             <td data-field="impuestos">${formatCellEuroValue(rowData.impuestos)}</td>
             <td class="rowTotal">0,00 €</td>
             <td class="rowActionsCell">
-                <div class="rowActionsBtns">
-                    <button type="button" class="assetRowEditBtn interesesRowEditBtn avActionBtn avEditBtn" data-global-index="${globalIndex}" title="Editar fila">✎</button>
-                    <button type="button" class="assetRowDeleteBtn interesesRowDeleteBtn avActionBtn avDeleteBtn" data-global-index="${globalIndex}" title="Eliminar fila">🗑️</button>
+                <div class="rowMenu">
+                    <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                    <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem assetRowEditBtn interesesRowEditBtn avActionBtn avEditBtn" data-global-index="${globalIndex}">Editar</button>
+                        <hr>
+                        <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn interesesRowDeleteBtn avActionBtn avDeleteBtn" data-global-index="${globalIndex}">Eliminar</button>
+                    </div>
                 </div>
             </td>
         `

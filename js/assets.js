@@ -1324,6 +1324,7 @@ async function refreshTopPortfolioMetrics(assets = null) {
         }
     })
 
+    window._lastPortfolioMetrics = { totalCuenta: metrics.totalCuenta, invertido: metrics.invertido }
     applyTopPortfolioMetrics(metrics)
 }
 
@@ -2409,9 +2410,13 @@ function renderAssetRows(rows) {
                 : `<td data-field="comisiones">${moneyMono(rowData.comisiones, "comisiones")}</td>`}
             <td class="rowTotal">${formatMoney(0, getAssetTableMoneyCurrency(assetType, "capitalInvertidoNeto", assetCurrency, assetPriceCurrency, rowCurrency))}</td>
             <td class="rowActionsCell">
-                <div class="rowActionsBtns">
-                    <button type="button" class="assetRowEditBtn avActionBtn avEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
-                    <button type="button" class="assetRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${index}" title="Eliminar fila">🗑️</button>
+                <div class="rowMenu">
+                    <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                    <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem assetRowEditBtn avActionBtn avEditBtn" data-row-index="${index}">Editar</button>
+                        <hr>
+                        <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${index}">Eliminar</button>
+                    </div>
                 </div>
             </td>
         `

@@ -287,9 +287,13 @@ function buildTransaccionRow(row) {
         <td class="transaccionHashCell" data-full-value="${escapeHtml(hashTransaccion)}" title="Haz clic para copiar el hash completo">${formatHashTransaccionDisplay(hashTransaccion)}</td>
         <td>${escapeHtml(row.nota || "")}</td>
         <td class="rowActionsCell">
-            <div class="rowActionsBtns">
-                <button type="button" class="assetRowEditBtn transaccionRowEditBtn avActionBtn avEditBtn" data-row-id="${row.id}" title="Editar fila">✎</button>
-                <button type="button" class="assetRowDeleteBtn transaccionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${row.id}" title="Eliminar fila">🗑️</button>
+            <div class="rowMenu">
+                <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                <div class="rowMenuDropdown">
+                    <button type="button" class="rowMenuItem assetRowEditBtn transaccionRowEditBtn avActionBtn avEditBtn" data-row-id="${row.id}">Editar</button>
+                    <hr>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn transaccionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${row.id}">Eliminar</button>
+                </div>
             </div>
         </td>
     `

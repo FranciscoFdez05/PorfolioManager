@@ -117,6 +117,8 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
         </div>
     `
 
+    initSearchableSelect(modal.querySelector("#dividendoInstrumentoInput"))
+
     const setFeedback = (message = "", isError = false) => {
         const node = modal.querySelector("#dividendosModalFeedback")
         if (!node) return
@@ -259,9 +261,13 @@ function renderFilteredDividendos() {
             <td data-field="impuestos">${formatCellEuroValue(rowData.impuestos)}</td>
             <td class="rowTotal">${formatCellEuroValue(rowData.total)}</td>
             <td class="rowActionsCell">
-                <div class="rowActionsBtns">
-                    <button type="button" class="assetRowEditBtn dividendosRowEditBtn avActionBtn avEditBtn" data-global-index="${globalIndex}" title="Editar fila">✎</button>
-                    <button type="button" class="assetRowDeleteBtn dividendosRowDeleteBtn avActionBtn avDeleteBtn" data-global-index="${globalIndex}" title="Eliminar fila">🗑️</button>
+                <div class="rowMenu">
+                    <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                    <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem assetRowEditBtn dividendosRowEditBtn avActionBtn avEditBtn" data-global-index="${globalIndex}">Editar</button>
+                        <hr>
+                        <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn dividendosRowDeleteBtn avActionBtn avDeleteBtn" data-global-index="${globalIndex}">Eliminar</button>
+                    </div>
                 </div>
             </td>
         `

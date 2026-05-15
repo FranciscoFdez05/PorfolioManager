@@ -454,6 +454,18 @@ async function initGastosLogic() {
 }
 
 function bindGastosEvents() {
+    const menuTrigger = document.querySelector("#gastosActionsMenu .pageActionsMenuTrigger")
+    const menuDropdown = document.getElementById("gastosActionsDropdown")
+    if (menuTrigger && menuDropdown && !menuTrigger.dataset.bound) {
+        menuTrigger.dataset.bound = "true"
+        menuTrigger.addEventListener("click", (e) => {
+            e.stopPropagation()
+            menuDropdown.classList.toggle("open")
+        })
+        document.addEventListener("click", () => menuDropdown.classList.remove("open"))
+        menuDropdown.addEventListener("click", () => menuDropdown.classList.remove("open"))
+    }
+
     const addYearButton = document.getElementById("addGastosYearBtn")
     const deleteYearButton = document.getElementById("deleteGastosYearBtn")
     const addRowButton = document.getElementById("addGastoRowBtn")
@@ -635,7 +647,12 @@ function renderGastosAnnualTable() {
     mensualidadesRow.innerHTML = `
         <td colspan="13">Mensualidades</td>
         <td class="rowActionsCell">
-            <button type="button" class="gastosEyeBtn${mensSectionHidden ? "" : " active"}" data-gastos-eye-mens="1" title="${mensSectionHidden ? "Mostrar en Métricas" : "Ocultar de Métricas"}">👁</button>
+            <div class="rowMenu">
+                <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                <div class="rowMenuDropdown">
+                    <button type="button" class="rowMenuItem gastosEyeBtn${mensSectionHidden ? "" : " active"}" data-gastos-eye-mens="1">👁 ${mensSectionHidden ? "Mostrar" : "Ocultar"}</button>
+                </div>
+            </div>
         </td>`
     annualBody.appendChild(mensualidadesRow)
 
@@ -647,9 +664,13 @@ function renderGastosAnnualTable() {
                 <td>${formatCellEuroValue(row.meses?.[month.key] || "")}</td>
             `).join("")}
             <td class="rowActionsCell">
-                <div class="rowActionsBtns">
-                    <button type="button" class="assetRowEditBtn gastosAnnualEditBtn avActionBtn avEditBtn" data-annual-edit-manual="${rowIndex}" title="Editar mensualidad">✎</button>
-                    <button type="button" class="assetRowDeleteBtn avActionBtn avDeleteBtn" data-gastos-delete-manual-row="${rowIndex}" title="Eliminar mensualidad">🗑️</button>
+                <div class="rowMenu">
+                    <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                    <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem assetRowEditBtn gastosAnnualEditBtn" data-annual-edit-manual="${rowIndex}">Editar</button>
+                        <hr>
+                        <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-gastos-delete-manual-row="${rowIndex}">Eliminar</button>
+                    </div>
                 </div>
             </td>
         `
@@ -690,10 +711,14 @@ function renderGastosAnnualTable() {
             <td>${escapeGastosHtml(type)}</td>
             ${GASTOS_MONTHS.map((month) => `<td>${expenseTotals[type][month.key] ? formatEuro(expenseTotals[type][month.key]) : "- €"}</td>`).join("")}
             <td class="rowActionsCell">
-                <div class="rowActionsBtns">
-                    <button type="button" class="gastosEyeBtn${isHidden ? "" : " active"}" data-gastos-eye-type="${rowIndex}" title="${isHidden ? "Mostrar en Métricas" : "Ocultar de Métricas"}">👁</button>
-                    <button type="button" class="assetRowEditBtn gastosAnnualEditBtn avActionBtn avEditBtn" data-annual-edit-type="${rowIndex}" title="Editar gasto">✎</button>
-                    <button type="button" class="assetRowDeleteBtn avActionBtn avDeleteBtn" data-gastos-delete-type-row="${rowIndex}" title="Eliminar gasto">🗑️</button>
+                <div class="rowMenu">
+                    <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                    <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem gastosEyeBtn${isHidden ? "" : " active"}" data-gastos-eye-type="${rowIndex}">👁 ${isHidden ? "Mostrar" : "Ocultar"}</button>
+                        <button type="button" class="rowMenuItem assetRowEditBtn gastosAnnualEditBtn" data-annual-edit-type="${rowIndex}">Editar</button>
+                        <hr>
+                        <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-gastos-delete-type-row="${rowIndex}">Eliminar</button>
+                    </div>
                 </div>
             </td>
         `
@@ -1033,9 +1058,13 @@ function buildGastoMovementRow(row = {}, rowIndex = -1) {
         <td data-field="tipo">${normalizeGastoTipo(row.tipo || "")}</td>
         <td data-field="cantidad">${formatCellEuroValue(row.cantidad || "")}</td>
         <td class="rowActionsCell">
-            <div class="rowActionsBtns">
-                <button type="button" class="assetRowEditBtn gastosRowEditBtn avActionBtn avEditBtn" data-row-index="${rowIndex}" title="Editar fila">✎</button>
-                <button type="button" class="assetRowDeleteBtn gastosRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${rowIndex}" title="Eliminar fila">🗑️</button>
+            <div class="rowMenu">
+                <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                <div class="rowMenuDropdown">
+                    <button type="button" class="rowMenuItem assetRowEditBtn gastosRowEditBtn" data-row-index="${rowIndex}">Editar</button>
+                    <hr>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn gastosRowDeleteBtn" data-row-index="${rowIndex}">Eliminar</button>
+                </div>
             </div>
         </td>
     `

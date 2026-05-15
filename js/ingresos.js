@@ -364,6 +364,18 @@ async function initIngresosLogic() {
 }
 
 function bindIngresosEvents() {
+    const menuTrigger = document.querySelector("#ingresosActionsMenu .pageActionsMenuTrigger")
+    const menuDropdown = document.getElementById("ingresosActionsDropdown")
+    if (menuTrigger && menuDropdown && !menuTrigger.dataset.bound) {
+        menuTrigger.dataset.bound = "true"
+        menuTrigger.addEventListener("click", (e) => {
+            e.stopPropagation()
+            menuDropdown.classList.toggle("open")
+        })
+        document.addEventListener("click", () => menuDropdown.classList.remove("open"))
+        menuDropdown.addEventListener("click", () => menuDropdown.classList.remove("open"))
+    }
+
     const addYearButton = document.getElementById("addIngresosYearBtn")
     const deleteYearButton = document.getElementById("deleteIngresosYearBtn")
     const addRowButton = document.getElementById("addIngresoRowBtn")
@@ -510,9 +522,13 @@ function renderIngresosAnnualTable() {
                 <td>${formatCellEuroValue(row.meses?.[month.key] || "")}</td>
             `).join("")}
             <td class="rowActionsCell">
-                <div class="rowActionsBtns">
-                    <button type="button" class="assetRowEditBtn ingresosAnnualEditBtn avActionBtn avEditBtn" data-annual-edit-manual="${rowIndex}" title="Editar recurrente">✎</button>
-                    <button type="button" class="assetRowDeleteBtn avActionBtn avDeleteBtn" data-ingresos-delete-manual-row="${rowIndex}" title="Eliminar recurrente">🗑️</button>
+                <div class="rowMenu">
+                    <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                    <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem assetRowEditBtn ingresosAnnualEditBtn" data-annual-edit-manual="${rowIndex}">Editar</button>
+                        <hr>
+                        <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-ingresos-delete-manual-row="${rowIndex}">Eliminar</button>
+                    </div>
                 </div>
             </td>
         `
@@ -542,9 +558,13 @@ function renderIngresosAnnualTable() {
             <td>${escapeIngresosHtml(type)}</td>
             ${INGRESOS_MONTHS.map((month) => `<td>${incomeTotals[type][month.key] ? formatEuro(incomeTotals[type][month.key]) : "- €"}</td>`).join("")}
             <td class="rowActionsCell">
-                <div class="rowActionsBtns">
-                    <button type="button" class="assetRowEditBtn ingresosAnnualEditBtn avActionBtn avEditBtn" data-annual-edit-type="${rowIndex}" title="Editar ingreso">✎</button>
-                    <button type="button" class="assetRowDeleteBtn avActionBtn avDeleteBtn" data-ingresos-delete-type-row="${rowIndex}" title="Eliminar ingreso">🗑️</button>
+                <div class="rowMenu">
+                    <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                    <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem assetRowEditBtn ingresosAnnualEditBtn" data-annual-edit-type="${rowIndex}">Editar</button>
+                        <hr>
+                        <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-ingresos-delete-type-row="${rowIndex}">Eliminar</button>
+                    </div>
                 </div>
             </td>
         `
@@ -829,9 +849,13 @@ function buildIngresoMovementRow(row = {}, rowIndex = -1) {
         <td data-field="tipo">${normalizeIngresoTipo(row.tipo || "")}</td>
         <td data-field="cantidad">${formatCellEuroValue(row.cantidad || "")}</td>
         <td class="rowActionsCell">
-            <div class="rowActionsBtns">
-                <button type="button" class="assetRowEditBtn ingresosRowEditBtn avActionBtn avEditBtn" data-row-index="${rowIndex}" title="Editar fila">✎</button>
-                <button type="button" class="assetRowDeleteBtn ingresosRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${rowIndex}" title="Eliminar fila">🗑️</button>
+            <div class="rowMenu">
+                <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                <div class="rowMenuDropdown">
+                    <button type="button" class="rowMenuItem assetRowEditBtn ingresosRowEditBtn" data-row-index="${rowIndex}">Editar</button>
+                    <hr>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn ingresosRowDeleteBtn" data-row-index="${rowIndex}">Eliminar</button>
+                </div>
             </div>
         </td>
     `

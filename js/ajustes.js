@@ -150,39 +150,77 @@ async function initAjustesLogic() {
         })
     }
 
-    // --- Actualización automática ---
-    const autoRefreshSel     = document.getElementById("ajustesAutoRefresh")
-    const guardarAutoRefreshBtn = document.getElementById("ajustesGuardarAutoRefreshBtn")
-    const autoRefreshMsg     = document.getElementById("ajustesAutoRefreshMsg")
+    // --- Actualización de precios ---
+    const autoRefreshGrid = document.getElementById("ajustesRefreshGrid")
+    const autoRefreshMsg  = document.getElementById("ajustesAutoRefreshMsg")
 
-    if (autoRefreshSel) setSelect(autoRefreshSel, window._autoRefreshMinutes ?? settings.autoRefreshMinutes ?? 0)
-
-    if (guardarAutoRefreshBtn) {
-        guardarAutoRefreshBtn.addEventListener("click", async () => {
-            guardarAutoRefreshBtn.disabled = true
-            showMsg(autoRefreshMsg, "Guardando…", "")
-            try {
-                const minutes = Number(autoRefreshSel?.value ?? 0)
-                const res = await fetch("/api/settings", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ autoRefreshMinutes: minutes })
-                })
-                const data = await res.json()
-                if (data.ok) {
-                    window._autoRefreshMinutes = minutes
-                    applyAutoRefresh(minutes)
-                    showMsg(autoRefreshMsg, "Guardado", "ok")
-                } else {
-                    showMsg(autoRefreshMsg, "Error", "error")
-                }
-            } catch {
-                showMsg(autoRefreshMsg, "Error de red", "error")
-            } finally {
-                guardarAutoRefreshBtn.disabled = false
-            }
+    function setActiveRefreshBtn(minutes) {
+        autoRefreshGrid?.querySelectorAll(".ajustesRefreshBtn").forEach(btn => {
+            btn.classList.toggle("active", Number(btn.dataset.minutes) === Number(minutes))
         })
     }
+
+    setActiveRefreshBtn(window._autoRefreshMinutes ?? settings.autoRefreshMinutes ?? 0)
+
+    autoRefreshGrid?.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".ajustesRefreshBtn")
+        if (!btn) return
+        const minutes = Number(btn.dataset.minutes)
+        setActiveRefreshBtn(minutes)
+        try {
+            const res = await fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ autoRefreshMinutes: minutes })
+            })
+            const data = await res.json()
+            if (data.ok) {
+                window._autoRefreshMinutes = minutes
+                applyAutoRefresh(minutes)
+                showMsg(autoRefreshMsg, "Guardado", "ok")
+            } else {
+                showMsg(autoRefreshMsg, "Error", "error")
+            }
+        } catch {
+            showMsg(autoRefreshMsg, "Error de red", "error")
+        }
+    })
+
+    // --- Evolución del portfolio (snapshots) ---
+    const snapshotGrid = document.getElementById("ajustesSnapshotGrid")
+    const snapshotMsg  = document.getElementById("ajustesSnapshotMsg")
+
+    function setActiveSnapshotBtn(minutes) {
+        snapshotGrid?.querySelectorAll(".ajustesRefreshBtn").forEach(btn => {
+            btn.classList.toggle("active", Number(btn.dataset.minutes) === Number(minutes))
+        })
+    }
+
+    setActiveSnapshotBtn(window._snapshotMinutes ?? settings.snapshotMinutes ?? 60)
+
+    snapshotGrid?.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".ajustesRefreshBtn")
+        if (!btn) return
+        const minutes = Number(btn.dataset.minutes)
+        setActiveSnapshotBtn(minutes)
+        try {
+            const res = await fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ snapshotMinutes: minutes })
+            })
+            const data = await res.json()
+            if (data.ok) {
+                window._snapshotMinutes = minutes
+                applySnapshotSchedule(minutes)
+                showMsg(snapshotMsg, "Guardado", "ok")
+            } else {
+                showMsg(snapshotMsg, "Error", "error")
+            }
+        } catch {
+            showMsg(snapshotMsg, "Error de red", "error")
+        }
+    })
 
     // --- Umbral cotizaciones ---
     const staleSel     = document.getElementById("ajustesStaleHours")

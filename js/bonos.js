@@ -102,9 +102,13 @@ function buildBonosRow(rowData, index) {
     const actionCell = document.createElement("td")
     actionCell.className = "rowActionsCell"
     actionCell.innerHTML = `
-        <div class="rowActionsBtns">
-            <button type="button" class="assetRowEditBtn bonosRowEditBtn avActionBtn avEditBtn" title="Editar fila">✎</button>
-            <button type="button" class="assetRowDeleteBtn bonosRowDeleteBtn avActionBtn avDeleteBtn" title="Eliminar fila">🗑️</button>
+        <div class="rowMenu">
+            <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+            <div class="rowMenuDropdown">
+                <button type="button" class="rowMenuItem assetRowEditBtn bonosRowEditBtn avActionBtn avEditBtn">Editar</button>
+                <hr>
+                <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn bonosRowDeleteBtn avActionBtn avDeleteBtn">Eliminar</button>
+            </div>
         </div>
     `
     actionCell.querySelector(".bonosRowEditBtn").addEventListener("click", () => openBonosEditModal(index))

@@ -10,10 +10,13 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY . /app
 
-# Directorios esperados por la app (si no se montan como volumen)
-RUN mkdir -p /app/data /app/logs
+RUN apt-get update && apt-get install -y --no-install-recommends gosu \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd -r appgroup \
+ && useradd -r -g appgroup appuser \
+ && mkdir -p /app/data /app/logs \
+ && chmod +x /app/entrypoint.sh
 
 EXPOSE 5000
 
-# Flask app: python/server.py (no es un paquete); arrancamos desde /app/python
-CMD ["gunicorn", "--chdir", "python", "--bind", "0.0.0.0:5000", "--worker-class", "gthread", "--workers", "2", "--threads", "4", "--timeout", "120", "--keep-alive", "5", "server:app"]
+ENTRYPOINT ["/app/entrypoint.sh"]

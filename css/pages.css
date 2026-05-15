@@ -1187,7 +1187,7 @@
 .gastosPage{
     display:flex;
     flex-direction:column;
-    gap:18px;
+    gap:12px;
     padding-right:18px;
     flex:1;
 }
@@ -1197,8 +1197,8 @@
     align-items:center;
     justify-content:space-between;
     gap:16px;
-    padding:8px 2px 2px 2px;
-    margin-bottom:4px;
+    padding:8px 2px 0 2px;
+    margin-bottom:0;
     width:100%;
 }
 
@@ -1221,7 +1221,7 @@
     align-items:center;
     justify-content:space-between;
     gap:16px;
-    margin-bottom:8px;
+    margin-bottom:0;
     width:100%;
 }
 
@@ -1340,8 +1340,8 @@
 }
 
 .gastosAnnualTable .rowActionHeader{
-    width:96px;
-    min-width:96px;
+    width:40px;
+    min-width:40px;
     padding:0 4px !important;
     border-left:none !important;
     border-right:none !important;
@@ -1349,8 +1349,8 @@
 }
 
 .gastosMovementsTable .rowActionHeader{
-    width:68px;
-    min-width:68px;
+    width:40px;
+    min-width:40px;
     padding:0 4px !important;
     border-left:none !important;
     border-right:none !important;
@@ -1358,8 +1358,8 @@
 }
 
 .gastosAnnualTable .rowActionsCell{
-    width:96px;
-    min-width:96px;
+    width:40px;
+    min-width:40px;
 }
 
 .gastosMovementsTable tbody td{
@@ -1369,14 +1369,140 @@
 }
 
 .gastosMovementsTable .rowActionsCell{
-    width:68px;
-    min-width:68px;
+    width:40px;
+    min-width:40px;
 }
 
 
 .gastosMovementsTable tbody tr:hover td,
 .ingresosMovementsTable tbody tr:hover td{
     background:var(--btn-bg-hover) !important;
+}
+
+/* ── Row Menu (··· dropdown) ── */
+.rowMenu{
+    position:relative;
+    display:inline-block;
+}
+
+.rowMenuTrigger{
+    background:none;
+    border:none;
+    color:var(--text-muted, #888);
+    cursor:pointer;
+    font-size:16px;
+    font-weight:700;
+    letter-spacing:2px;
+    padding:4px 8px;
+    border-radius:5px;
+    line-height:1;
+    transition:background 0.15s, color 0.15s, transform 0.1s;
+    user-select:none;
+}
+
+.rowMenuTrigger:hover{
+    background:var(--btn-bg-hover);
+    color:var(--text-primary, #e6edf8);
+}
+
+.rowMenuTrigger:active{
+    transform:scale(0.92);
+}
+
+.rowMenuDropdown{
+    position:fixed;
+    z-index:9999;
+    background:var(--bg-elevated, #1a2030);
+    border:1px solid var(--border-color);
+    border-radius:8px;
+    overflow:hidden;
+    box-shadow:0 8px 28px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2);
+    min-width:130px;
+    padding:4px;
+    white-space:nowrap;
+    opacity:0;
+    visibility:hidden;
+    transform:translateY(-6px) scale(0.97);
+    transition:opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
+    pointer-events:none;
+}
+
+.rowMenuDropdown.open{
+    opacity:1;
+    visibility:visible;
+    transform:translateY(0) scale(1);
+    transition:opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0s;
+    pointer-events:auto;
+}
+
+
+.rowMenuDropdown hr{
+    margin:3px 0;
+    border:none;
+    border-top:1px solid var(--border-color);
+    opacity:0.5;
+}
+
+.rowMenuItem{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    width:100%;
+    background:none;
+    border:none;
+    color:var(--text-primary, #e6edf8);
+    cursor:pointer;
+    padding:8px 12px;
+    text-align:left;
+    font-size:13px;
+    font-weight:500;
+    letter-spacing:0.02em;
+    border-radius:5px;
+    transition:background 0.1s, color 0.1s;
+}
+
+.rowMenuItem:hover{
+    background:rgba(255,255,255,0.07);
+}
+
+.rowMenuItemDanger{
+    color:#e05252;
+}
+
+.rowMenuItemDanger:hover{
+    background:rgba(220,60,50,0.15);
+    color:#f07070;
+}
+
+.rowMenuDropdown .avActionBtn{
+    width:100% !important;
+    height:auto !important;
+    min-width:0 !important;
+    border:none !important;
+    border-radius:5px !important;
+    color:inherit !important;
+    font-size:13px !important;
+    justify-content:flex-start !important;
+    padding:8px 12px !important;
+    box-sizing:border-box !important;
+}
+
+.rowMenuDropdown .avActionBtn:not(:hover){
+    background:none !important;
+}
+
+.rowMenuDropdown .avEditBtn:hover,
+.rowMenuDropdown .avActionBtn.rowMenuItem:hover{
+    background:rgba(255,255,255,0.07) !important;
+    color:var(--text-primary, #e6edf8) !important;
+    border-color:transparent !important;
+}
+
+.rowMenuDropdown .avDeleteBtn:hover,
+.rowMenuDropdown .avActionBtn.rowMenuItemDanger:hover{
+    background:rgba(220,60,50,0.15) !important;
+    color:#f07070 !important;
+    border-color:transparent !important;
 }
 
 .gastosAnnualTable tbody td[contenteditable="true"],
@@ -1615,6 +1741,90 @@
     white-space:nowrap;
 }
 
+/* ── Menú de acciones "···" (gastos & ingresos) ─────────────── */
+.pageActionsMenu{
+    position:relative;
+    flex:0 0 auto;
+}
+
+.pageActionsMenuTrigger{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:36px;
+    height:36px;
+    padding:0;
+    border:1px solid var(--btn-border);
+    border-radius:8px;
+    background:var(--btn-bg);
+    color:var(--text-bright);
+    font-size:18px;
+    font-weight:700;
+    letter-spacing:1px;
+    cursor:pointer;
+    transition:background 0.15s, border-color 0.15s;
+}
+
+.pageActionsMenuTrigger:hover{
+    background:var(--btn-bg-hover);
+    border-color:var(--btn-border-hover);
+}
+
+.pageActionsDropdown{
+    position:absolute;
+    top:calc(100% + 6px);
+    right:0;
+    min-width:180px;
+    padding:6px;
+    border:1px solid var(--border-mid);
+    border-radius:10px;
+    background:var(--bg-surface);
+    box-shadow:0 8px 24px rgba(0,0,0,0.35);
+    z-index:200;
+    display:none;
+    flex-direction:column;
+    gap:2px;
+}
+
+.pageActionsDropdown.open{
+    display:flex;
+}
+
+.pageActionsItem{
+    display:block;
+    width:100%;
+    padding:8px 12px;
+    border:none;
+    border-radius:7px;
+    background:transparent;
+    color:var(--text-primary);
+    font-size:13px;
+    font-weight:500;
+    text-align:left;
+    cursor:pointer;
+    transition:background 0.12s;
+}
+
+.pageActionsItem:hover{
+    background:var(--btn-bg-hover);
+    color:var(--text-bright);
+}
+
+.pageActionsItemDanger{
+    color:#f87171;
+}
+
+.pageActionsItemDanger:hover{
+    background:rgba(239,68,68,0.12);
+    color:#f87171;
+}
+
+.pageActionsDivider{
+    height:1px;
+    background:var(--border-mid);
+    margin:4px 0;
+}
+
 .gastosMonthTitle{
     color:var(--text-primary);
     font-size:18px;
@@ -1641,7 +1851,7 @@
 .ingresosPage{
     display:flex;
     flex-direction:column;
-    gap:18px;
+    gap:12px;
     padding-right:18px;
     flex:1;
 }
@@ -1651,8 +1861,8 @@
     align-items:center;
     justify-content:space-between;
     gap:16px;
-    padding:8px 2px 2px 2px;
-    margin-bottom:4px;
+    padding:8px 2px 0 2px;
+    margin-bottom:0;
     width:100%;
 }
 
@@ -1675,7 +1885,7 @@
     align-items:center;
     justify-content:space-between;
     gap:16px;
-    margin-bottom:8px;
+    margin-bottom:0;
     width:100%;
 }
 
@@ -1813,8 +2023,8 @@
 
 .ingresosAnnualTable .rowActionHeader,
 .ingresosMovementsTable .rowActionHeader{
-    width:68px;
-    min-width:68px;
+    width:40px;
+    min-width:40px;
     padding:0 4px !important;
     border-left:none !important;
     border-right:none !important;
@@ -1822,8 +2032,8 @@
 }
 
 .ingresosAnnualTable .rowActionsCell{
-    width:68px;
-    min-width:68px;
+    width:40px;
+    min-width:40px;
 }
 
 .ingresosMovementsTable tbody td{
@@ -1833,8 +2043,8 @@
 }
 
 .ingresosMovementsTable .rowActionsCell{
-    width:68px;
-    min-width:68px;
+    width:40px;
+    min-width:40px;
 }
 
 
@@ -2440,6 +2650,18 @@
 .mToggleBtn:hover:not(.active), .mDistMetricBtn:hover:not(.active){
     background:#151f35;
     color:#aabbd8;
+}
+
+/* ── Evolución histórica ── */
+.mEvolucionEmpty{
+    padding:32px 20px;
+    text-align:center;
+    color:var(--text-subtle);
+    font-size:0.88rem;
+    background:var(--bg-surface);
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    margin-bottom:4px;
 }
 
 /* ── Chart cards ── */
@@ -4089,6 +4311,40 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 }
 
 .ajustesTemaBtn.active .ajustesTemaLabel{ color:var(--accent); }
+
+/* --- Refresh interval picker --- */
+.ajustesRefreshGrid{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    padding:16px 24px 16px;
+}
+
+.ajustesRefreshBtn{
+    padding:8px 16px;
+    border-radius:20px;
+    border:2px solid var(--border-soft);
+    background:var(--bg-inset);
+    color:var(--text-dim);
+    font-size:0.82rem;
+    font-weight:600;
+    cursor:pointer;
+    transition:border-color 0.15s, background 0.15s, box-shadow 0.15s, color 0.15s;
+    white-space:nowrap;
+}
+
+.ajustesRefreshBtn:hover{
+    border-color:var(--btn-border-hover);
+    background:var(--btn-bg-hover);
+    color:var(--text);
+}
+
+.ajustesRefreshBtn.active{
+    border-color:var(--accent);
+    background:rgba(59,130,246,0.1);
+    box-shadow:0 0 0 3px rgba(59,130,246,0.12);
+    color:var(--accent);
+}
 
 /* ── Trading Journal ────────────────────────────────────────────────────── */
 

@@ -25,6 +25,7 @@ from routes.operaciones import operaciones_bp
 from routes.trading import trading_bp
 from routes.portfolios import portfolios_bp
 from routes.registros import registros_bp
+from routes.snapshots import snapshots_bp
 from routes.ventas import ventas_bp
 
 load_dotenv()
@@ -70,6 +71,7 @@ app.register_blueprint(operaciones_bp)
 app.register_blueprint(portfolios_bp)
 app.register_blueprint(trading_bp)
 app.register_blueprint(registros_bp)
+app.register_blueprint(snapshots_bp)
 app.register_blueprint(ventas_bp)
 
 _PUBLIC_ENDPOINTS = {"auth.login", "auth.setup", "auth.logout", "static"}

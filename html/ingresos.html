@@ -1,9 +1,15 @@
 <section class="ingresosPage">
     <div class="ingresosYearBar">
         <div class="ingresosYearList" id="ingresosYearList"></div>
-        <div class="ingresosYearActions">
-            <button id="deleteIngresosYearBtn" class="dangerButton" type="button">Eliminar año</button>
-            <button id="addIngresosYearBtn" class="ingresosAddYearBtn" type="button">+</button>
+        <div class="pageActionsMenu" id="ingresosActionsMenu">
+            <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
+            <div class="pageActionsDropdown" id="ingresosActionsDropdown">
+                <button id="addIngresosYearBtn" class="pageActionsItem" type="button">Añadir año</button>
+                <button id="deleteIngresosYearBtn" class="pageActionsItem pageActionsItemDanger" type="button">Eliminar año</button>
+                <div class="pageActionsDivider"></div>
+                <button id="addIngresoTypeRowBtn" class="pageActionsItem" type="button">Añadir ingreso</button>
+                <button id="addRecurrenteRowBtn" class="pageActionsItem" type="button">Añadir recurrente</button>
+            </div>
         </div>
     </div>
 
@@ -11,8 +17,6 @@
         <div class="ingresosMonthTabs" id="ingresosMonthTabs"></div>
         <div class="ingresosMonthActions">
             <button id="sortIngresosByDateBtn" class="secondaryButton hidden" type="button">Ordenar por fecha ↑</button>
-            <button id="addIngresoTypeRowBtn" class="secondaryButton" type="button">Añadir ingreso</button>
-            <button id="addRecurrenteRowBtn" class="primaryButton" type="button">Añadir recurrente</button>
         </div>
     </div>
 

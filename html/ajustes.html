@@ -232,26 +232,47 @@
                     <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </div>
                 <div class="ajustesSectionHeaderText">
-                    <div class="ajustesSectionTitle">Actualización automática</div>
-                    <div class="ajustesSectionDesc">Refresca los datos del sidebar y la vista general automáticamente.</div>
+                    <div class="ajustesSectionTitle">Actualización de precios</div>
+                    <div class="ajustesSectionDesc">Frecuencia con la que se refrescan los precios del sidebar y la vista general.</div>
                 </div>
             </div>
             <div class="ajustesSectionDivider"></div>
-            <div class="ajustesField">
-                <label class="ajustesLabel" for="ajustesAutoRefresh">Intervalo</label>
-                <select id="ajustesAutoRefresh" class="ajustesSelect">
-                    <option value="0">Desactivado</option>
-                    <option value="1">Cada 1 minuto</option>
-                    <option value="5">Cada 5 minutos</option>
-                    <option value="15">Cada 15 minutos</option>
-                    <option value="30">Cada 30 minutos</option>
-                    <option value="60">Cada hora</option>
-                </select>
+            <div class="ajustesRefreshGrid" id="ajustesRefreshGrid">
+                <button class="ajustesRefreshBtn" data-minutes="0"  type="button">Off</button>
+                <button class="ajustesRefreshBtn" data-minutes="1"  type="button">1 min</button>
+                <button class="ajustesRefreshBtn" data-minutes="5"  type="button">5 min</button>
+                <button class="ajustesRefreshBtn" data-minutes="15" type="button">15 min</button>
+                <button class="ajustesRefreshBtn" data-minutes="30" type="button">30 min</button>
+                <button class="ajustesRefreshBtn" data-minutes="60" type="button">1 hora</button>
             </div>
-            <div class="ajustesActions">
-                <button id="ajustesGuardarAutoRefreshBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
-                <span id="ajustesAutoRefreshMsg" class="ajustesStatusMsg"></span>
+            <span id="ajustesAutoRefreshMsg" class="ajustesStatusMsg" style="padding:0 24px 12px;display:block;"></span>
+        </div>
+
+        <div class="ajustesSection" data-ajuste-id="snapshot">
+            <button class="ajustesLockBtn" type="button" title="Bloquear/desbloquear posición">
+                <svg class="ajustesLockIcon ajustesLockIconLocked" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="7" width="10" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <svg class="ajustesLockIcon ajustesLockIconUnlocked" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="7" width="10" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 7V5a3 3 0 0 1 6 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <div class="ajustesSectionHeader">
+                <div class="ajustesSectionIconWrap">
+                    <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 14l4-4 3 3 4-5 3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
+                </div>
+                <div class="ajustesSectionHeaderText">
+                    <div class="ajustesSectionTitle">Evolución del portfolio</div>
+                    <div class="ajustesSectionDesc">Cada cuánto se guarda un punto en el gráfico de evolución histórica.</div>
+                </div>
             </div>
+            <div class="ajustesSectionDivider"></div>
+            <div class="ajustesRefreshGrid" id="ajustesSnapshotGrid">
+                <button class="ajustesRefreshBtn" data-minutes="0"    type="button">Off</button>
+                <button class="ajustesRefreshBtn" data-minutes="5"    type="button">5 min</button>
+                <button class="ajustesRefreshBtn" data-minutes="15"   type="button">15 min</button>
+                <button class="ajustesRefreshBtn" data-minutes="30"   type="button">30 min</button>
+                <button class="ajustesRefreshBtn" data-minutes="60"   type="button">1 hora</button>
+                <button class="ajustesRefreshBtn" data-minutes="240"  type="button">4 horas</button>
+                <button class="ajustesRefreshBtn" data-minutes="1440" type="button">1 día</button>
+            </div>
+            <span id="ajustesSnapshotMsg" class="ajustesStatusMsg" style="padding:0 24px 12px;display:block;"></span>
         </div>
 
         <div class="ajustesSection" data-ajuste-id="stale">

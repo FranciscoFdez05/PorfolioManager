@@ -631,9 +631,13 @@ function buildStablecoinRow(row) {
         <td>${row.comisiones ? formatOperationsMoney(row.comisiones, row.currency || "USD") : ""}</td>
         <td>${escapeHtml(row.nota || "")}</td>
         <td class="rowActionsCell">
-            <div class="rowActionsBtns">
-                <button type="button" class="assetRowEditBtn stablecoinRowEditBtn avActionBtn avEditBtn" data-row-id="${row.id}" title="Editar fila">✎</button>
-                <button type="button" class="assetRowDeleteBtn stablecoinRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${row.id}" title="Eliminar fila">🗑️</button>
+            <div class="rowMenu">
+                <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                <div class="rowMenuDropdown">
+                    <button type="button" class="rowMenuItem assetRowEditBtn stablecoinRowEditBtn avActionBtn avEditBtn" data-row-id="${row.id}">Editar</button>
+                    <hr>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn stablecoinRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${row.id}">Eliminar</button>
+                </div>
             </div>
         </td>
     `

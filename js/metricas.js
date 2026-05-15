@@ -2251,6 +2251,7 @@ async function initMetricasLogic() {
         mUpdateKpis(_metricasPayload)
         mRenderAll(_metricasPayload)
         mBindTableSort(_metricasPayload.summaries)
+        mInitEvolucion()
 
         const _allTypes = ["cripto","acciones","etfs","comoditis","bonos","rentaFija"]
         const _todosBtn = document.querySelector(".mActivosFilterBtn[data-atype='todos']")
@@ -2395,4 +2396,168 @@ async function initMetricasLogic() {
         console.error("Error cargando métricas:", err)
         if (loading) loading.textContent = "Error al cargar los datos."
     }
+}
+
+// ── Evolución histórica del portfolio ──────────────────────────────────────
+
+let _evolucionRange = "1D"
+
+async function mRenderEvolucion(range) {
+    const empty = document.getElementById("mEvolucionEmpty")
+    const wrap  = document.getElementById("mEvolucionChartWrap")
+
+    let resp, data
+    try {
+        resp = await fetch(`/api/portfolio/history?range=${range}`)
+        data = await resp.json()
+    } catch (_) {
+        return
+    }
+
+    let points = Array.isArray(data.data) ? data.data : []
+
+    // Append live current values as the final point so the chart always ends
+    // matching the KPI cards (snapshots are saved periodically and may be stale).
+    if (_metricasPayload) {
+        const { summaries } = _metricasPayload
+        const liveValue    = summaries.reduce((s, a) => s + a.netoActualEur, 0)
+        const liveInvested = summaries.reduce((s, a) => s + a.invertidoEur, 0)
+        const nowTs = Math.floor(Date.now() / 1000)
+        const lastTs = points.length ? points[points.length - 1].ts : 0
+        // Replace last point if it's within 2 minutes, otherwise append
+        if (points.length && (nowTs - lastTs) < 120) {
+            points = [...points.slice(0, -1), { ts: nowTs, v: liveValue, i: liveInvested }]
+        } else {
+            points = [...points, { ts: nowTs, v: liveValue, i: liveInvested }]
+        }
+    }
+
+    if (points.length < 2) {
+        if (empty) empty.classList.remove("hidden")
+        if (wrap)  wrap.classList.add("hidden")
+        mDestroyChart("mChartEvolucion")
+        return
+    }
+
+    if (empty) empty.classList.add("hidden")
+    if (wrap)  wrap.classList.remove("hidden")
+
+    const values   = points.map(p => p.v)
+    const invested = points.map(p => p.i)
+    const span     = points.length > 1 ? (points[points.length - 1].ts - points[0].ts) : 0
+    const isLong   = span > 7 * 86400
+
+    // Round interval for axis labels so ticks land on clean boundaries
+    let roundSec
+    if      (span <= 86400)           roundSec = 300        // ≤1D  → cada 5 min
+    else if (span <= 31 * 86400)      roundSec = 21600      // ≤1M  → cada 6h
+    else if (span <= 365 * 86400)     roundSec = 86400      // ≤1A  → cada día
+    else                              roundSec = 7 * 86400  // >1A  → cada semana
+
+    const labels = points.map(p => {
+        const snap = Math.round(p.ts / roundSec) * roundSec
+        const d    = new Date(snap * 1000)
+        if (roundSec >= 86400)
+            return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", ...(roundSec >= 7 * 86400 ? { year: "2-digit" } : {}) })
+        return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" })
+               + " " + d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+    })
+
+    const first = values[0]
+    const last  = values[values.length - 1]
+    const isUp  = last >= first
+    const lineColor = isUp ? "#2ecc71" : "#e74c3c"
+    const fillColor = isUp ? "rgba(46,204,113,0.10)" : "rgba(231,76,60,0.10)"
+
+    const tooltipDates = points.map(p => {
+        const d = new Date(p.ts * 1000)
+        return d.toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    })
+
+    mCreateChart("mChartEvolucion", {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Valor total",
+                    data: values,
+                    borderColor: lineColor,
+                    backgroundColor: fillColor,
+                    borderWidth: 2,
+                    pointRadius: points.length <= 60 ? 3 : 0,
+                    pointHoverRadius: 5,
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: "Invertido",
+                    data: invested,
+                    borderColor: "rgba(100,130,200,0.7)",
+                    backgroundColor: "transparent",
+                    borderWidth: 1.5,
+                    borderDash: [5, 4],
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointStyle: "line",
+                    fill: false,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                legend: {
+                    labels: { color: "#ccd6f6", font: { size: 12 }, padding: 14, boxWidth: 30, usePointStyle: true }
+                },
+                tooltip: {
+                    callbacks: {
+                        title(items) {
+                            return tooltipDates[items[0].dataIndex] || ""
+                        },
+                        label(item) {
+                            return ` ${item.dataset.label}: ${formatEuro(item.parsed.y)}`
+                        },
+                        afterBody(items) {
+                            if (items.length < 2) return []
+                            const val  = items[0].parsed.y
+                            const inv  = items[1].parsed.y
+                            const rend = val - inv
+                            const pct  = inv > 0 ? ((rend / inv) * 100).toFixed(2) : "0,00"
+                            const sign = rend >= 0 ? "+" : ""
+                            return [` Rendimiento: ${sign}${formatEuro(rend)} (${sign}${pct.replace(".", ",")}%)`]
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: "#8899bb", maxTicksLimit: 8, maxRotation: 0 },
+                    grid:  { color: "rgba(255,255,255,0.06)" }
+                },
+                y: {
+                    ticks: { color: "#ccd6f6", callback: (v) => formatEuro(v) },
+                    grid:  { color: "rgba(255,255,255,0.06)" }
+                }
+            }
+        }
+    })
+}
+
+function mInitEvolucion() {
+    const rangeBtns = document.querySelectorAll(".mEvolucionRangeBtn")
+    rangeBtns.forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.range === _evolucionRange)
+        btn.addEventListener("click", () => {
+            rangeBtns.forEach(b => b.classList.remove("active"))
+            btn.classList.add("active")
+            _evolucionRange = btn.dataset.range
+            mRenderEvolucion(_evolucionRange)
+        })
+    })
+    mRenderEvolucion(_evolucionRange)
 }

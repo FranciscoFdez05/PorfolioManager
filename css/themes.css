@@ -190,6 +190,15 @@ html[data-theme="light"] .cpRandomBtn{ background:rgba(0,0,0,0.06); border-color
 html[data-theme="light"] .cpRandomBtn:hover{ background:rgba(0,0,0,0.12); color:#334155; }
 html[data-theme="light"] .assetModalInput,
 html[data-theme="light"] .assetModalSelect{ background:#f8f9fa !important; border-color:#e2e8f0 !important; color:#0f172a !important; }
+html[data-theme="light"] .searchableSelectTrigger{ background-color:#f8f9fa; border-color:#e2e8f0; color:#0f172a; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%23334155' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E"); }
+html[data-theme="light"] .searchableSelectTrigger:hover,html[data-theme="light"] .searchableSelectWrap.ssOpen .searchableSelectTrigger{ border-color:#3b82f6; background-color:#eff6ff; box-shadow:0 0 0 3px rgba(59,130,246,0.12); }
+html[data-theme="light"] .searchableSelectValue.empty{ color:#94a3b8; }
+html[data-theme="light"] .searchableSelectPanel{ background:#ffffff; border-color:#3b82f6; box-shadow:0 6px 20px rgba(0,0,0,0.15); }
+html[data-theme="light"] .searchableSelectSearch{ background:#f1f5f9; border-bottom-color:#e2e8f0; color:#0f172a; }
+html[data-theme="light"] .searchableSelectSearch::placeholder{ color:#94a3b8; }
+html[data-theme="light"] .searchableSelectItem{ color:#334155; }
+html[data-theme="light"] .searchableSelectItem:hover{ background:#eff6ff; color:#1e40af; }
+html[data-theme="light"] .searchableSelectItem.active{ color:#2563eb; background:#eff6ff; }
 html[data-theme="light"] .assetRowModalTitle{ border-color:#e2e8f0; }
 html[data-theme="light"] .assetRowModalLabel{ color:#64748b; }
 html[data-theme="light"] .assetRowModalInput,
@@ -208,6 +217,9 @@ html[data-theme="light"] .ajustesTemaBtn{ background:#f8f9fa; border-color:#e2e8
 html[data-theme="light"] .ajustesTemaBtn:hover{ background:#f0f2f5; border-color:#cbd5e1; }
 html[data-theme="light"] .ajustesTemaLabel{ color:#64748b; }
 html[data-theme="light"] .ajustesTemaBtn.active .ajustesTemaLabel{ color:#2563eb; }
+html[data-theme="light"] .ajustesRefreshBtn{ background:#f8f9fa; border-color:#e2e8f0; color:#64748b; }
+html[data-theme="light"] .ajustesRefreshBtn:hover{ background:#f0f2f5; border-color:#cbd5e1; color:#334155; }
+html[data-theme="light"] .ajustesRefreshBtn.active{ border-color:#3b82f6; background:#eff6ff; color:#2563eb; box-shadow:0 0 0 3px rgba(59,130,246,0.1); }
 html[data-theme="light"] .ajustesRestoreBtn{ border-color:#cbd5e1; color:#64748b; }
 html[data-theme="light"] .ajustesDeleteBackupBtn{ color:#94a3b8; }
 html[data-theme="light"] .ajustesSectionTitle{ color:#0f172a; }

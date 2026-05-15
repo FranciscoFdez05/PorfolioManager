@@ -42,7 +42,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     initMoneyToggle()
     loadPage("vistaGeneral")
-    refreshOverviewMarketData()
+    refreshOverviewMarketData().then(() => {
+        const m = window._lastPortfolioMetrics
+        const body = m ? JSON.stringify({ total_value: m.totalCuenta, total_invested: m.invertido }) : null
+        fetch("/api/portfolio/snapshot", {
+            method: "POST",
+            headers: body ? { "Content-Type": "application/json" } : {},
+            body
+        }).catch(() => {})
+    })
 })
 
 async function loadGlobalSettings() {
@@ -61,7 +69,9 @@ async function loadGlobalSettings() {
             window._sidebarCollapsed            = data.sidebarCollapsed ?? false
             window._monedaBase                  = data.monedaBase ?? "EUR"
             window._autoRefreshMinutes          = data.autoRefreshMinutes ?? 0
+            window._snapshotMinutes             = data.snapshotMinutes ?? 60
             applyAutoRefresh(window._autoRefreshMinutes)
+            applySnapshotSchedule(window._snapshotMinutes)
         }
     } catch {
         window._settingsStaleHours      = 24
@@ -75,20 +85,188 @@ async function loadGlobalSettings() {
         window._sidebarCollapsed            = false
         window._monedaBase                  = "EUR"
         window._autoRefreshMinutes          = 0
+        window._snapshotMinutes             = 60
     }
 }
 
 let _autoRefreshTimer = null
+let _autoRefreshInitTimer = null
 function applyAutoRefresh(minutes) {
-    if (_autoRefreshTimer) {
-        clearInterval(_autoRefreshTimer)
-        _autoRefreshTimer = null
-    }
+    if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null }
+    if (_autoRefreshInitTimer) { clearTimeout(_autoRefreshInitTimer); _autoRefreshInitTimer = null }
     if (!minutes || minutes <= 0) return
-    _autoRefreshTimer = setInterval(async () => {
+
+    const intervalMs = minutes * 60 * 1000
+
+    async function doRefresh() {
         await refreshAssetsSidebar()
-        refreshOverviewMarketData()
-    }, minutes * 60 * 1000)
+        await refreshOverviewMarketData()
+    }
+
+    const nowMs = Date.now()
+    const delayMs = Math.ceil(nowMs / intervalMs) * intervalMs - nowMs
+    _autoRefreshInitTimer = setTimeout(() => {
+        doRefresh()
+        _autoRefreshTimer = setInterval(doRefresh, intervalMs)
+    }, delayMs)
+}
+
+let _snapshotTimer = null
+let _snapshotInitTimer = null
+function applySnapshotSchedule(minutes) {
+    if (_snapshotTimer) { clearInterval(_snapshotTimer); _snapshotTimer = null }
+    if (_snapshotInitTimer) { clearTimeout(_snapshotInitTimer); _snapshotInitTimer = null }
+    if (!minutes || minutes <= 0) return
+
+    const intervalMs = minutes * 60 * 1000
+
+    async function doSnapshot() {
+        const m = window._lastPortfolioMetrics
+        const body = m ? JSON.stringify({ total_value: m.totalCuenta, total_invested: m.invertido }) : null
+        await fetch("/api/portfolio/snapshot", {
+            method: "POST",
+            headers: body ? { "Content-Type": "application/json" } : {},
+            body
+        }).catch(() => {})
+        if (typeof mRenderEvolucion === "function") {
+            const activeBtn = document.querySelector(".mEvolucionRangeBtn.active")
+            mRenderEvolucion(activeBtn ? activeBtn.dataset.range : "1D")
+        }
+    }
+
+    // Esperar al próximo límite alineado al reloj (XX:00, XX:15, XX:30…)
+    const nowMs = Date.now()
+    const delayMs = Math.ceil(nowMs / intervalMs) * intervalMs - nowMs
+    _snapshotInitTimer = setTimeout(() => {
+        doSnapshot()
+        _snapshotTimer = setInterval(doSnapshot, intervalMs)
+    }, delayMs)
+}
+
+function initSearchableSelect(selectEl) {
+    if (!selectEl) return
+    const allOptions = Array.from(selectEl.options)
+        .filter(o => o.value !== "")
+        .map(o => ({ value: o.value, text: o.text }))
+
+    // Wrapper replaces the select in the DOM
+    const wrapper = document.createElement("div")
+    wrapper.className = "searchableSelectWrap"
+    selectEl.parentNode.insertBefore(wrapper, selectEl)
+    selectEl.style.display = "none"
+    wrapper.appendChild(selectEl)
+
+    // Trigger div — looks like a <select>
+    const trigger = document.createElement("div")
+    trigger.className = "searchableSelectTrigger"
+    trigger.tabIndex = 0
+    wrapper.appendChild(trigger)
+
+    const triggerText = document.createElement("span")
+    triggerText.className = "searchableSelectValue"
+    trigger.appendChild(triggerText)
+
+    // Dropdown panel — hidden by default via inline style
+    const panel = document.createElement("div")
+    panel.className = "searchableSelectPanel"
+    panel.style.cssText = "display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;z-index:9999;"
+    wrapper.appendChild(panel)
+
+    // Search input inside the panel
+    const searchInput = document.createElement("input")
+    searchInput.type = "text"
+    searchInput.className = "searchableSelectSearch"
+    searchInput.placeholder = "Buscar…"
+    searchInput.autocomplete = "off"
+    searchInput.spellcheck = false
+    panel.appendChild(searchInput)
+
+    // List inside the panel
+    const list = document.createElement("div")
+    list.className = "searchableSelectList"
+    panel.appendChild(list)
+
+    // --- Helpers ---
+    function getSelectedText() {
+        const cur = allOptions.find(o => o.value === selectEl.value)
+        return cur ? cur.text : ""
+    }
+
+    function updateTrigger() {
+        const text = getSelectedText()
+        triggerText.textContent = text
+        triggerText.classList.toggle("empty", !text)
+    }
+
+    function renderList(q) {
+        const lower = q.toLowerCase()
+        const filtered = q ? allOptions.filter(o => o.text.toLowerCase().includes(lower)) : allOptions
+        list.innerHTML = ""
+        filtered.forEach(o => {
+            const item = document.createElement("div")
+            item.className = "searchableSelectItem" + (o.value === selectEl.value ? " active" : "")
+            item.textContent = o.text
+            item.dataset.value = o.value
+            list.appendChild(item)
+        })
+    }
+
+    function openPanel() {
+        panel.style.display = "block"
+        wrapper.classList.add("ssOpen")
+        searchInput.value = ""
+        renderList("")
+        searchInput.focus()
+        requestAnimationFrame(() => {
+            const active = list.querySelector(".active")
+            if (active) active.scrollIntoView({ block: "nearest" })
+        })
+    }
+
+    function closePanel() {
+        panel.style.display = "none"
+        wrapper.classList.remove("ssOpen")
+        searchInput.value = ""
+    }
+
+    function pickOption(value) {
+        selectEl.value = value
+        selectEl.dispatchEvent(new Event("change"))
+        updateTrigger()
+        closePanel()
+    }
+
+    // --- Init ---
+    updateTrigger()
+
+    // --- Events ---
+    trigger.addEventListener("click", () => wrapper.classList.contains("ssOpen") ? closePanel() : openPanel())
+    trigger.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPanel() }
+        if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+            openPanel()
+            searchInput.value = e.key
+            renderList(searchInput.value)
+            e.preventDefault()
+        }
+    })
+
+    searchInput.addEventListener("input", () => renderList(searchInput.value))
+
+    list.addEventListener("mousedown", (e) => {
+        const item = e.target.closest(".searchableSelectItem")
+        if (!item) return
+        e.preventDefault()
+        pickOption(item.dataset.value)
+    })
+
+    searchInput.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") { e.stopPropagation(); closePanel(); trigger.focus() }
+    })
+
+    document.addEventListener("mousedown", (e) => {
+        if (!wrapper.contains(e.target)) closePanel()
+    }, true)
 }
 
 function applySidebarState(sideWrapper, toggleButton) {
@@ -210,6 +388,38 @@ function initNavigation(navButtons, contentArea) {
 
     document.addEventListener("click", () => {
         document.querySelectorAll(".navDropdownMenu.open").forEach((m) => m.classList.remove("open"))
+        document.querySelectorAll(".rowMenuDropdown.open").forEach((m) => m.classList.remove("open"))
+    })
+
+    document.addEventListener("click", (e) => {
+        const trigger = e.target.closest(".rowMenuTrigger")
+        if (!trigger) return
+        e.stopPropagation()
+        const menu = trigger.nextElementSibling
+        if (!menu?.classList.contains("rowMenuDropdown")) return
+        const wasOpen = menu.classList.contains("open")
+        document.querySelectorAll(".rowMenuDropdown.open").forEach((m) => {
+            m.classList.remove("open")
+            m.style.top = ""
+            m.style.bottom = ""
+            m.style.left = ""
+            m.style.right = ""
+        })
+        if (!wasOpen) {
+            const rect = trigger.getBoundingClientRect()
+            const menuHeight = menu.offsetHeight || 90
+            const spaceBelow = window.innerHeight - rect.bottom
+            if (spaceBelow < menuHeight + 8) {
+                menu.style.bottom = (window.innerHeight - rect.top + 4) + "px"
+                menu.style.top = "auto"
+            } else {
+                menu.style.top = (rect.bottom + 4) + "px"
+                menu.style.bottom = "auto"
+            }
+            menu.style.right = (window.innerWidth - rect.right) + "px"
+            menu.style.left = "auto"
+            menu.classList.add("open")
+        }
     })
 
     const avTip = document.createElement("div")
@@ -564,4 +774,3 @@ function initMoneyToggle() {
         localStorage.setItem("moneyHidden", isHidden ? "1" : "0")
     })
 }
-

@@ -15,6 +15,7 @@ _DEFAULTS = {
     "autoBackupDays": 0,
     "staleHours": 24,
     "autoRefreshMinutes": 0,
+    "snapshotMinutes": 60,
     "hiddenAssets": [],
     "theme": "default",
     "metricasDisplayType": "doughnut",
@@ -85,6 +86,7 @@ def get_settings():
         "autoBackupDays":     int(cfg.get("autoBackupDays") or 0),
         "staleHours":         int(cfg.get("staleHours") or 24),
         "autoRefreshMinutes": int(cfg.get("autoRefreshMinutes") or 0),
+        "snapshotMinutes":    int(cfg.get("snapshotMinutes") or 60),
         "hiddenAssets":        cfg.get("hiddenAssets") or [],
         "theme":               cfg.get("theme") or "default",
         "metricasDisplayType": cfg.get("metricasDisplayType") or "doughnut",
@@ -133,6 +135,8 @@ def save_settings():
         cfg["staleHours"] = int(data["staleHours"])
     if "autoRefreshMinutes" in data:
         cfg["autoRefreshMinutes"] = int(data["autoRefreshMinutes"]) if int(data["autoRefreshMinutes"]) in {0, 1, 5, 15, 30, 60} else 0
+    if "snapshotMinutes" in data:
+        cfg["snapshotMinutes"] = int(data["snapshotMinutes"]) if int(data["snapshotMinutes"]) in {0, 5, 15, 30, 60, 240, 1440} else 60
     if "hiddenAssets" in data:
         cfg["hiddenAssets"] = [str(i) for i in data["hiddenAssets"] if i]
     if "theme" in data:

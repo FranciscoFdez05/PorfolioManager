@@ -40,6 +40,33 @@
         </div>
     </div>
 
+    <!-- -- Evolución histórica -------------------------------- -->
+    <div class="metricasSection" id="mSectionEvolucion" data-mcat="portfolio">
+        <div class="metricasSectionHeader">
+            <span class="metricasSectionTitle">Evolución del Portfolio</span>
+            <div class="mToggleGroup" id="mEvolucionRangeGroup">
+                <button class="mEvolucionRangeBtn mToggleBtn active" data-range="1D">1D</button>
+                <button class="mEvolucionRangeBtn mToggleBtn" data-range="1W">1S</button>
+                <button class="mEvolucionRangeBtn mToggleBtn" data-range="1M">1M</button>
+                <button class="mEvolucionRangeBtn mToggleBtn" data-range="3M">3M</button>
+                <button class="mEvolucionRangeBtn mToggleBtn" data-range="6M">6M</button>
+                <button class="mEvolucionRangeBtn mToggleBtn" data-range="1Y">1A</button>
+                <button class="mEvolucionRangeBtn mToggleBtn" data-range="YTD">YTD</button>
+                <button class="mEvolucionRangeBtn mToggleBtn" data-range="ALL">Todo</button>
+            </div>
+        </div>
+        <div id="mEvolucionEmpty" class="mEvolucionEmpty hidden">
+            <span>Aún no hay datos históricos. El portfolio se registra automáticamente en cada actualización de precios.</span>
+        </div>
+        <div class="metricasChartsGrid1" id="mEvolucionChartWrap">
+            <div class="metricasChartCard">
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartEvolucion"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- -- Distribución --------------------------------------- -->
     <div class="metricasSection" id="mSectionDistribucion" data-mcat="portfolio">
         <div class="metricasSectionHeader">

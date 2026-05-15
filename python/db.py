@@ -363,6 +363,14 @@ CREATE TABLE IF NOT EXISTS earn_rows (
     precio     TEXT NOT NULL DEFAULT '',
     nota       TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts             INTEGER NOT NULL,
+    total_value    REAL NOT NULL DEFAULT 0,
+    total_invested REAL NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_ts ON portfolio_snapshots(ts);
 """
 
 
@@ -406,6 +414,16 @@ def _migrate(conn):
     sc_rows_cols = {row[1] for row in conn.execute("PRAGMA table_info(stablecoins_rows)")}
     if "comisiones" not in sc_rows_cols:
         conn.execute("ALTER TABLE stablecoins_rows ADD COLUMN comisiones TEXT NOT NULL DEFAULT ''")
+
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts             INTEGER NOT NULL,
+            total_value    REAL NOT NULL DEFAULT 0,
+            total_invested REAL NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_ts ON portfolio_snapshots(ts);
+    """)
 
     # Backfill gastos_years from existing data in older DBs
     conn.executescript("""

@@ -7,9 +7,10 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-      - ./API:/app/API:ro
-      - ./html:/app/html:ro
-      - ./js:/app/js:ro
-      - ./css:/app/css:ro
-      - ./python:/app/python:ro
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/login')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

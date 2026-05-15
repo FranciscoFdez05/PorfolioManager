@@ -278,6 +278,8 @@ function openVentasModal(rowIndex = -1) {
         </div>
     `
 
+    initSearchableSelect(modal.querySelector("#ventaActivoInput"))
+
     const setFeedback = (message = "", isError = false) => {
         const node = modal.querySelector("#ventasModalFeedback")
         if (!node) return
@@ -684,9 +686,13 @@ function buildVentaRow(row, computed, index) {
         <td class="rowTotal" data-field="bruto">${formatVentasMoney(computed.bruto)}</td>
         <td class="rowTotal" data-field="neto">${formatVentasMoney(computed.neto)}</td>
         <td class="rowActionsCell">
-            <div class="rowActionsBtns">
-                <button type="button" class="assetRowEditBtn ventasRowEditBtn avActionBtn avEditBtn" data-row-index="${index}" title="Editar fila">✎</button>
-                <button type="button" class="assetRowDeleteBtn ventasRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${index}" title="Eliminar fila">🗑️</button>
+            <div class="rowMenu">
+                <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                <div class="rowMenuDropdown">
+                    <button type="button" class="rowMenuItem assetRowEditBtn ventasRowEditBtn avActionBtn avEditBtn" data-row-index="${index}">Editar</button>
+                    <hr>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn ventasRowDeleteBtn avActionBtn avDeleteBtn" data-row-index="${index}">Eliminar</button>
+                </div>
             </div>
         </td>
     `

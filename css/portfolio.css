@@ -2071,6 +2071,88 @@ tr.gastosTypeEmptySep td {
     box-shadow:0 0 0 3px rgba(114, 162, 255, 0.18);
 }
 
+/* --- Searchable select --- */
+.searchableSelectWrap{
+    position:relative;
+    margin-bottom:18px;
+}
+
+/* Trigger: same look as assetModalSelect */
+.searchableSelectTrigger{
+    display:flex;
+    align-items:center;
+    width:100%;
+    box-sizing:border-box;
+    height:38px;
+    padding:0 34px 0 12px;
+    border:1px solid #466a9f;
+    border-radius:4px;
+    background:#0d213f;
+    color:#ffffff;
+    font-size:15px;
+    cursor:pointer;
+    user-select:none;
+    transition:border-color 0.15s, box-shadow 0.15s, background 0.15s;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%23ffffff' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 10px center;
+    background-size:8px 5px;
+}
+.searchableSelectTrigger:hover,
+.searchableSelectWrap.ssOpen .searchableSelectTrigger{
+    border-color:#72a2ff;
+    background-color:#11294d;
+    box-shadow:0 0 0 3px rgba(114,162,255,0.18);
+}
+.searchableSelectValue{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.searchableSelectValue.empty{ color:#8fa8cc; }
+
+/* Dropdown panel — shown/hidden via JS inline style */
+.searchableSelectPanel{
+    background:#0d213f;
+    border:1px solid #72a2ff;
+    border-radius:6px;
+    box-shadow:0 6px 20px rgba(0,0,0,0.55);
+    overflow:hidden;
+}
+
+/* Search input inside panel */
+.searchableSelectSearch{
+    display:block;
+    width:100%;
+    box-sizing:border-box;
+    height:36px;
+    padding:0 12px;
+    border:none;
+    border-bottom:1px solid #1e3a5f;
+    background:#081828;
+    color:#e8f0ff;
+    font-size:13px;
+    outline:none;
+}
+.searchableSelectSearch::placeholder{ color:#5a7a9a; }
+
+/* Options list */
+.searchableSelectList{
+    max-height:200px;
+    overflow-y:auto;
+}
+.searchableSelectItem{
+    padding:9px 14px;
+    font-size:14px;
+    color:#c8d8f0;
+    cursor:pointer;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+.searchableSelectItem:hover{ background:#11294d; color:#ffffff; }
+.searchableSelectItem.active{ color:#72a2ff; background:rgba(114,162,255,0.1); }
+
 .segAutocompleteWrap{
     position:relative;
 }
@@ -5319,6 +5401,18 @@ html[data-theme="black"] .segHideBtn:hover{ background:#111; color:#f39c12; bord
     color:#aabbd8;
 }
 
+/* ── Evolución histórica ── */
+.mEvolucionEmpty{
+    padding:32px 20px;
+    text-align:center;
+    color:var(--text-subtle);
+    font-size:0.88rem;
+    background:var(--bg-surface);
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+    margin-bottom:4px;
+}
+
 /* ── Chart cards ── */
 .metricasChartsGrid2{
     display:grid;
@@ -6048,11 +6142,18 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 }
 
 .rowActionsCell .avEditBtn{ color:#60a5fa; }
+.rowActionsCell .rowMenuDropdown .avEditBtn{ color:inherit; }
 
 .rowActionsCell .avActionBtn{
     width:22px;
     height:22px;
     font-size:0.75rem;
+}
+.rowActionsCell .rowMenuDropdown .avActionBtn{
+    width:100% !important;
+    height:auto !important;
+    font-size:13px !important;
+    box-sizing:border-box !important;
 }
 
 .avColorDot{
@@ -6809,6 +6910,40 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 }
 
 .ajustesTemaBtn.active .ajustesTemaLabel{ color:#93c5fd; }
+
+/* --- Refresh interval picker --- */
+.ajustesRefreshGrid{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    padding:16px 24px 16px;
+}
+
+.ajustesRefreshBtn{
+    padding:8px 16px;
+    border-radius:20px;
+    border:2px solid #1e293b;
+    background:#0d1929;
+    color:#94a3b8;
+    font-size:0.82rem;
+    font-weight:600;
+    cursor:pointer;
+    transition:border-color 0.15s, background 0.15s, box-shadow 0.15s, color 0.15s;
+    white-space:nowrap;
+}
+
+.ajustesRefreshBtn:hover{
+    border-color:#334155;
+    background:#1e293b;
+    color:#e2e8f0;
+}
+
+.ajustesRefreshBtn.active{
+    border-color:#3b82f6;
+    background:rgba(59,130,246,0.1);
+    box-shadow:0 0 0 3px rgba(59,130,246,0.12);
+    color:#93c5fd;
+}
 
 /* ============================================================
    TEMAS

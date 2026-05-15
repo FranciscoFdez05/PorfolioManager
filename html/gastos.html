@@ -1,9 +1,15 @@
 <section class="gastosPage">
     <div class="gastosYearBar">
         <div class="gastosYearList" id="gastosYearList"></div>
-        <div class="gastosYearActions">
-            <button id="deleteGastosYearBtn" class="dangerButton" type="button">Eliminar año</button>
-            <button id="addGastosYearBtn" class="gastosAddYearBtn" type="button">+</button>
+        <div class="pageActionsMenu" id="gastosActionsMenu">
+            <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
+            <div class="pageActionsDropdown" id="gastosActionsDropdown">
+                <button id="addGastosYearBtn" class="pageActionsItem" type="button">Añadir año</button>
+                <button id="deleteGastosYearBtn" class="pageActionsItem pageActionsItemDanger" type="button">Eliminar año</button>
+                <div class="pageActionsDivider"></div>
+                <button id="addGastoTypeRowBtn" class="pageActionsItem" type="button">Añadir gasto</button>
+                <button id="addMensualidadRowBtn" class="pageActionsItem" type="button">Añadir mensualidad</button>
+            </div>
         </div>
     </div>
 
@@ -11,8 +17,6 @@
         <div class="gastosMonthTabs" id="gastosMonthTabs"></div>
         <div class="gastosMonthActions">
             <button id="sortGastosByDateBtn" class="secondaryButton hidden" type="button">Ordenar por fecha ↑</button>
-            <button id="addGastoTypeRowBtn" class="secondaryButton" type="button">Añadir gasto</button>
-            <button id="addMensualidadRowBtn" class="primaryButton" type="button">Añadir mensualidad</button>
         </div>
     </div>
 
