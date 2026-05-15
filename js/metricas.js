@@ -243,6 +243,9 @@ function mUpdateKpis(payload) {
     const rfGroup = document.querySelector(".mkpiGroupRf")
     if (rfGroup) rfGroup.classList.toggle("hidden", bonosRows.length === 0 && rfRows.length === 0)
 
+    const ingresosGroup = document.querySelector(".mkpiGroupIngresos")
+    if (ingresosGroup) ingresosGroup.classList.toggle("hidden", dividendos.length === 0 && intereses.length === 0)
+
     const topSet2 = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
     topSet2("topTotalDividendos", formatEuro(totalDiv))
     topSet2("topTotalInteres",    formatEuro(totalInt))
@@ -1985,7 +1988,15 @@ function mFmtTradingPct(value) {
 }
 
 function mRenderTrading(rows) {
-    if (!rows.length) return
+    const tradingSections = ["mSectionTradingDireccion", "mSectionTradingWinLoss", "mSectionTradingRendimiento"]
+    const tradingKpiRow   = document.querySelector(".metricasKpiRow[data-mcat='trading']")
+    if (!rows.length) {
+        tradingSections.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add("hidden") })
+        if (tradingKpiRow) tradingKpiRow.style.display = "none"
+        return
+    }
+    tradingSections.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove("hidden") })
+    if (tradingKpiRow) tradingKpiRow.style.display = ""
 
     mRenderTradingDireccion(rows)
     mRenderTradingWinLoss(rows, _mTradingWinLossFilter)

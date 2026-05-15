@@ -14,6 +14,22 @@ let operationsAssets = []
 let operationsStablecoinsData = { catalog: [], enabledSymbols: [], rows: [] }
 let operationsTransaccionesRows = []
 
+function showOperationsPopup(title, message, options = {}) {
+    const confirmLabel = String(options.confirmLabel || "OK")
+
+    if (typeof openConfirmModal === "function") {
+        openConfirmModal({
+            title: String(title || "Aviso"),
+            message: String(message || ""),
+            confirmLabel,
+            onConfirm: options.onConfirm
+        })
+        return
+    }
+
+    alert(`${title ? `${title}\n\n` : ""}${message || ""}`)
+}
+
 async function loadOperacionesDependencies() {
     const [operationsResult, assetsResult, stablecoinsResult, transaccionesResult] = await Promise.allSettled([
         loadOperacionesData(),
@@ -102,7 +118,7 @@ async function loadOperationAssets() {
 function deriveOperationAssetBaseSymbol(asset) {
     const marketSymbol = String(asset?.marketSymbol || "").trim().toUpperCase()
     const normalizedSymbol = String(asset?.symbol || asset?.name || "").trim().toUpperCase()
-    const knownQuoteSymbols = getOperationKnownStablecoinSymbols()
+    const knownQuoteSymbols = getOperationKnownQuoteSymbolsForAssetParsing()
 
     if (marketSymbol.includes(":")) {
         const symbolPart = marketSymbol.split(":").pop() || ""
@@ -157,7 +173,7 @@ function normalizeOperationsStablecoinsPayload(payload = {}) {
     }
 }
 
-function getOperationKnownStablecoinSymbols(payload = operationsStablecoinsData) {
+function getOperationKnownQuoteSymbolsForAssetParsing(payload = operationsStablecoinsData) {
     const normalized = normalizeOperationsStablecoinsPayload(payload)
     const symbols = [
         ...normalized.catalog.map((entry) => entry.symbol),
@@ -174,16 +190,16 @@ function getOperationsEnabledStablecoinSymbols() {
 
 function getOperationStablecoinSymbol(row = {}) {
     const explicitSymbol = String(row.stablecoinSymbol || "").trim().toUpperCase()
-    const knownSymbols = getOperationKnownStablecoinSymbols()
+    const enabledSymbols = getOperationsEnabledStablecoinSymbols()
 
-    if (knownSymbols.includes(explicitSymbol)) {
+    if (enabledSymbols.includes(explicitSymbol)) {
         return explicitSymbol
     }
 
     const pair = String(row.par || "").trim().toUpperCase()
     const quoteSymbol = pair.includes("/") ? pair.split("/").pop() : ""
 
-    return knownSymbols.includes(quoteSymbol) ? quoteSymbol : ""
+    return enabledSymbols.includes(quoteSymbol) ? quoteSymbol : ""
 }
 
 function getOperationsStablecoinSymbolFromTransaccionRow(row = {}) {
@@ -194,7 +210,7 @@ function getOperationsStablecoinSymbolFromTransaccionRow(row = {}) {
     }
 
     const symbol = assetId.slice("stablecoin-".length)
-    return getOperationKnownStablecoinSymbols().includes(symbol) ? symbol : ""
+    return getOperationsEnabledStablecoinSymbols().includes(symbol) ? symbol : ""
 }
 
 function getOperationsNetworkFeesByStablecoinSymbol(transaccionesRows = []) {
@@ -333,12 +349,19 @@ function findOperationAssetByName(name) {
 function getOperationPairOptions(assetId) {
     const asset = getOperationAssetById(assetId)
     const enabledStablecoins = getOperationsEnabledStablecoinSymbols()
+    const fiatCurrencies = OPERATION_CURRENCY_OPTIONS
+        .map((c) => String(c || "").trim().toUpperCase())
+        .filter(Boolean)
 
     if (!asset) {
         return []
     }
 
-    return enabledStablecoins.map((stablecoinSymbol) => `${asset.baseSymbol || asset.symbol}/${stablecoinSymbol}`)
+    const quoteSymbols = [...enabledStablecoins, ...fiatCurrencies]
+        .map((symbol) => String(symbol || "").trim().toUpperCase())
+        .filter((symbol, index, array) => symbol && array.indexOf(symbol) === index)
+
+    return quoteSymbols.map((quoteSymbol) => `${asset.baseSymbol || asset.symbol}/${quoteSymbol}`)
 }
 
 function normalizeOperationRow(row = {}, index = 0) {
@@ -349,12 +372,8 @@ function normalizeOperationRow(row = {}, index = 0) {
     const pairOptions = getOperationPairOptions(asset?.id || assetId)
     const defaultPair = stablecoinSymbol && asset ? `${asset.baseSymbol || asset.symbol}/${stablecoinSymbol}` : (pairOptions[0] || "")
     const pair = String(row.par || defaultPair || "").trim()
-    const priceCurrency = OPERATION_CURRENCY_OPTIONS.includes(String(row.precioCurrency || "").toUpperCase())
-        ? String(row.precioCurrency).toUpperCase()
-        : normalizeCurrencyCode(stablecoinSymbol || row.currency || "USD")
-    const currency = OPERATION_CURRENCY_OPTIONS.includes(String(row.currency || "").toUpperCase())
-        ? String(row.currency).toUpperCase()
-        : normalizeCurrencyCode(stablecoinSymbol || row.precioCurrency || "USD")
+    const quoteSymbol = pair.includes("/") ? pair.split("/").pop() : ""
+    const inferredCurrency = normalizeCurrencyCode(quoteSymbol || stablecoinSymbol || "USD")
 
     return {
         id: String(row.id || `operacion-${index + 1}`).trim() || `operacion-${index + 1}`,
@@ -362,14 +381,14 @@ function normalizeOperationRow(row = {}, index = 0) {
         activo: asset?.name || String(row.activo || "").trim(),
         fechaApertura: String(row.fechaApertura || row.fecha || "").trim(),
         par: pair,
-        stablecoinSymbol: stablecoinSymbol || (pair.includes("/") ? pair.split("/").pop() : ""),
+        stablecoinSymbol,
         orden: OPERATION_ORDER_OPTIONS.includes(String(row.orden || "").trim()) ? String(row.orden).trim() : "Compra",
         precioOrden: String(row.precioOrden || row.precio || "").trim(),
-        precioCurrency: priceCurrency,
+        precioCurrency: inferredCurrency,
         cantidad: String(row.cantidad || "").trim(),
         comisionesCripto: String(row.comisionesCripto || row.comisiones || "").trim(),
         total: String(row.total || "").trim(),
-        currency,
+        currency: inferredCurrency,
         estado: OPERATION_STATUS_OPTIONS.includes(String(row.estado || "").trim()) ? String(row.estado).trim() : "Activo",
         fechaCierre: String(row.fechaCierre || "").trim()
     }
@@ -420,10 +439,10 @@ function bindOperationsEvents() {
         saveButton.addEventListener("click", async () => {
             try {
                 await persistOperationsData()
-                alert("Datos guardados en data/operaciones.json")
+                showOperationsPopup("Guardado", "Datos guardados en data/operaciones.json")
             } catch (error) {
                 console.error(error)
-                alert("No se pudieron guardar las operaciones.")
+                showOperationsPopup("Error", "No se pudieron guardar las operaciones.")
             }
         })
     }
@@ -464,8 +483,9 @@ function createEmptyOperationRow() {
     const assetId = firstAsset?.id || ""
     const pairOptions = getOperationPairOptions(assetId)
     const pair = pairOptions[0] || ""
-    const stablecoinSymbol = pair ? pair.split("/").pop() : ""
-    const moneyCurrency = normalizeCurrencyCode(stablecoinSymbol || "USD")
+    const quoteSymbol = pair ? pair.split("/").pop() : ""
+    const stablecoinSymbol = getOperationStablecoinSymbol({ par: pair })
+    const moneyCurrency = normalizeCurrencyCode(quoteSymbol || stablecoinSymbol || "USD")
 
     return normalizeOperationRow({
         id: `operacion-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -994,12 +1014,6 @@ function openOperacionRowModal(rowId) {
             <input id="opModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.precioOrden || "")}">
         </div>
         <div class="assetRowModalField">
-            <label class="assetRowModalLabel">Moneda precio</label>
-            <select id="opModalPrecioCurrency" class="assetRowModalSelect">
-                ${OPERATION_CURRENCY_OPTIONS.map((c) => `<option value="${c}"${(rowData.precioCurrency || "USD") === c ? " selected" : ""}>${c}</option>`).join("")}
-            </select>
-        </div>
-        <div class="assetRowModalField">
             <label class="assetRowModalLabel">Cantidad</label>
             <input id="opModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.cantidad || ""}">
         </div>
@@ -1010,12 +1024,6 @@ function openOperacionRowModal(rowId) {
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Total</label>
             <input id="opModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.total || "")}">
-        </div>
-        <div class="assetRowModalField">
-            <label class="assetRowModalLabel">Moneda total</label>
-            <select id="opModalCurrency" class="assetRowModalSelect">
-                ${OPERATION_CURRENCY_OPTIONS.map((c) => `<option value="${c}"${(rowData.currency || "USD") === c ? " selected" : ""}>${c}</option>`).join("")}
-            </select>
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Estado</label>
@@ -1106,11 +1114,9 @@ function saveOperacionRowFromModal() {
         par: g("opModalPar"),
         orden: g("opModalOrden"),
         precioOrden: g("opModalPrecio"),
-        precioCurrency: g("opModalPrecioCurrency"),
         cantidad: g("opModalCantidad"),
         comisionesCripto: g("opModalComisiones"),
         total: g("opModalTotal"),
-        currency: g("opModalCurrency"),
         estado: g("opModalEstado"),
         fechaCierre: g("opModalFechaCierre")
     })
@@ -1125,7 +1131,10 @@ function saveOperacionRowFromModal() {
             const available = summary[symbol]?.available ?? 0
 
             if (required > available) {
-                alert(`Saldo insuficiente en ${symbol}. Disponible: ${formatMoney(available, "USD")} | Requerido: ${formatMoney(required, "USD")}`)
+                showOperationsPopup(
+                    "Saldo insuficiente",
+                    `Saldo insuficiente en ${symbol}. Disponible: ${formatMoney(available, "USD")} | Requerido: ${formatMoney(required, "USD")}`
+                )
                 return
             }
         }

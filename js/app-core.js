@@ -297,6 +297,10 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initOperacionesLogic()
         } else if (page === "Trading") {
             await initTradingJournalLogic()
+        } else if (page === "Staking") {
+            await initStakingLogic()
+        } else if (page === "Earn") {
+            await initEarnLogic()
         } else if (page === "conversiones") {
             await initConversionesLogic()
         } else if (page === "herramientas") {

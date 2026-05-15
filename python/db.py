@@ -332,6 +332,37 @@ CREATE TABLE IF NOT EXISTS trading (
     ganancia         TEXT NOT NULL DEFAULT '',
     ganancia_neta    TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS staking_criptos (
+    id         TEXT PRIMARY KEY,
+    nombre     TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS staking_rows (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    cripto_id TEXT NOT NULL REFERENCES staking_criptos(id) ON DELETE CASCADE,
+    fecha     TEXT NOT NULL DEFAULT '',
+    cantidad  TEXT NOT NULL DEFAULT '',
+    precio    TEXT NOT NULL DEFAULT '',
+    nota      TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS earn_criptos (
+    id         TEXT PRIMARY KEY,
+    nombre     TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS earn_rows (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    cripto_id  TEXT NOT NULL REFERENCES earn_criptos(id) ON DELETE CASCADE,
+    fecha      TEXT NOT NULL DEFAULT '',
+    plataforma TEXT NOT NULL DEFAULT '',
+    cantidad   TEXT NOT NULL DEFAULT '',
+    precio     TEXT NOT NULL DEFAULT '',
+    nota       TEXT NOT NULL DEFAULT ''
+);
 """
 
 

@@ -6202,7 +6202,6 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     display:flex;
     flex-direction:column;
     gap:14px;
-    padding:16px;
     flex:1;
 }
 

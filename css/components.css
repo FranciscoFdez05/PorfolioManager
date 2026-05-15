@@ -1434,6 +1434,13 @@ tr.gastosTypeEmptySep td {
     z-index:1000;
 }
 
+/* Confirm modal: place near top so it doesn't appear "below" content when a page is scrolled */
+#confirmModalOverlay{
+    align-items:flex-start;
+    padding-top:72px;
+    z-index:2000;
+}
+
 .assetModal{
     width:min(420px, 100%);
     max-height:calc(100vh - 60px);
@@ -2384,4 +2391,3 @@ html[data-theme="black"] .segHideBtn:hover{ background:#111; color:#f39c12; bord
     padding:20px;
     color:#ffffff;
 }
-

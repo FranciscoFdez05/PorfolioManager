@@ -1,5 +1,51 @@
-<section class="operationsPage operationsPageCompact">
-    <h2 class="pageTitle">Staking</h2>
-    <p class="overviewEmpty">Próximamente.</p>
-</section>
+<div class="interesesLayout stakingLayout">
+    <div class="cuentasBar">
+        <div class="cuentasList" id="stakingCriptosList"></div>
+        <button id="addStakingCriptoBtn" class="cuentasBarAddBtn" type="button" title="Añadir cripto">+</button>
+    </div>
 
+    <div class="interesesYearBar">
+        <div class="interesesYearList" id="stakingYearList"></div>
+        <div class="interesesYearBarActions">
+            <button id="addStakingYearBtn" class="secondaryButton" type="button">+ Año</button>
+            <button id="deleteStakingYearBtn" class="dangerButton" type="button">Eliminar año</button>
+        </div>
+    </div>
+
+    <div class="interesesMainArea">
+        <div class="interesesTableSection">
+            <div class="interesesTableWrapper" id="stakingTableWrapper">
+                <table class="interesesTable">
+                    <thead>
+                        <tr>
+                            <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="1">Cantidad cripto<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="2">Precio unitario<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="3">Total<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="4">Nota<span class="mSortArrow"></span></th>
+                            <th class="rowActionHeader"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="stakingBody"></tbody>
+                </table>
+            </div>
+            <p class="overviewEmpty hidden" id="stakingEmptyMsg">No hay registros de staking.</p>
+            <p class="overviewEmpty hidden" id="stakingNoAssetMsg">Crea o selecciona una cripto para registrar recompensas de staking.</p>
+        </div>
+
+        <div class="interesesSummarySection">
+            <div class="summaryCard summaryCardTotal">
+                <div class="summaryCardTitle">Total recompensas</div>
+                <div class="summaryCardValue" id="stakingTotalEur">0,00 €</div>
+            </div>
+            <div class="summaryCard summaryCardTax">
+                <div class="summaryCardTitle">Total cripto</div>
+                <div class="summaryCardValue" id="stakingTotalCripto">0,00</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dividendosActions">
+        <button id="addStakingRowBtn" class="primaryButton" type="button">Añadir fila</button>
+    </div>
+</div>

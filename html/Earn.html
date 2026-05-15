@@ -1,5 +1,52 @@
-<section class="operationsPage operationsPageCompact">
-    <h2 class="pageTitle">Earn</h2>
-    <p class="overviewEmpty">Próximamente.</p>
-</section>
+<div class="interesesLayout earnLayout">
+    <div class="cuentasBar">
+        <div class="cuentasList" id="earnCriptosList"></div>
+        <button id="addEarnCriptoBtn" class="cuentasBarAddBtn" type="button" title="Añadir cripto/producto">+</button>
+    </div>
 
+    <div class="interesesYearBar">
+        <div class="interesesYearList" id="earnYearList"></div>
+        <div class="interesesYearBarActions">
+            <button id="addEarnYearBtn" class="secondaryButton" type="button">+ Año</button>
+            <button id="deleteEarnYearBtn" class="dangerButton" type="button">Eliminar año</button>
+        </div>
+    </div>
+
+    <div class="interesesMainArea">
+        <div class="interesesTableSection">
+            <div class="interesesTableWrapper" id="earnTableWrapper">
+                <table class="interesesTable">
+                    <thead>
+                        <tr>
+                            <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="1">Plataforma<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="2">Cantidad cripto<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="3">Precio unitario<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="4">Total<span class="mSortArrow"></span></th>
+                            <th class="mThSort" data-sortkey="5">Nota<span class="mSortArrow"></span></th>
+                            <th class="rowActionHeader"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="earnBody"></tbody>
+                </table>
+            </div>
+            <p class="overviewEmpty hidden" id="earnEmptyMsg">No hay registros de earn.</p>
+            <p class="overviewEmpty hidden" id="earnNoAssetMsg">Crea o selecciona una cripto/producto para registrar recompensas de earn.</p>
+        </div>
+
+        <div class="interesesSummarySection">
+            <div class="summaryCard summaryCardTotal">
+                <div class="summaryCardTitle">Total recompensas</div>
+                <div class="summaryCardValue" id="earnTotalEur">0,00 €</div>
+            </div>
+            <div class="summaryCard summaryCardTax">
+                <div class="summaryCardTitle">Total cripto</div>
+                <div class="summaryCardValue" id="earnTotalCripto">0,00</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dividendosActions">
+        <button id="addEarnRowBtn" class="primaryButton" type="button">Añadir fila</button>
+    </div>
+</div>

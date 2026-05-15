@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, request
 
 from app_data import (
-    readBonosFile, readDividendoCalendar, readDividendosFile, readInteresesFile, readRentaFijaFile, readTransaccionesFile,
-    writeBonosFile, writeDividendoCalendar, writeDividendosFile, writeInteresesFile, writeRentaFijaFile, writeTransaccionesFile,
+    readBonosFile, readDividendoCalendar, readDividendosFile, readEarnFile, readInteresesFile, readRentaFijaFile, readStakingFile, readTransaccionesFile,
+    writeBonosFile, writeDividendoCalendar, writeDividendosFile, writeEarnFile, writeInteresesFile, writeRentaFijaFile, writeStakingFile, writeTransaccionesFile,
 )
 
 registros_bp = Blueprint("registros", __name__)
@@ -217,4 +217,69 @@ def saveRentaFija():
         })
 
     writeRentaFijaFile({"rows": sanitizedRows})
+    return jsonify({"ok": True})
+
+
+@registros_bp.route("/api/staking", methods=["GET"])
+def getStaking():
+    return jsonify(readStakingFile())
+
+
+@registros_bp.route("/api/staking", methods=["POST"])
+def saveStaking():
+    requestData = request.get_json(silent=True)
+    if not requestData or "criptos" not in requestData:
+        return jsonify({"ok": False, "error": "JSON inválido"}), 400
+    criptos = requestData["criptos"]
+    if not isinstance(criptos, list):
+        return jsonify({"ok": False, "error": "criptos debe ser una lista"}), 400
+    sanitizedCriptos = []
+    for cripto in criptos:
+        sanitizedRows = []
+        for row in cripto.get("rows", []):
+            sanitizedRows.append({
+                "fecha": str(row.get("fecha", "")).strip(),
+                "cantidad": str(row.get("cantidad", "")).strip(),
+                "precio": str(row.get("precio", "")).strip(),
+                "nota": str(row.get("nota", "")).strip(),
+            })
+        sanitizedCriptos.append({
+            "id": str(cripto.get("id", "")).strip(),
+            "nombre": str(cripto.get("nombre", "")).strip(),
+            "rows": sanitizedRows
+        })
+    writeStakingFile({"criptos": sanitizedCriptos})
+    return jsonify({"ok": True})
+
+
+@registros_bp.route("/api/earn", methods=["GET"])
+def getEarn():
+    return jsonify(readEarnFile())
+
+
+@registros_bp.route("/api/earn", methods=["POST"])
+def saveEarn():
+    requestData = request.get_json(silent=True)
+    if not requestData or "criptos" not in requestData:
+        return jsonify({"ok": False, "error": "JSON inválido"}), 400
+    criptos = requestData["criptos"]
+    if not isinstance(criptos, list):
+        return jsonify({"ok": False, "error": "criptos debe ser una lista"}), 400
+    sanitizedCriptos = []
+    for cripto in criptos:
+        sanitizedRows = []
+        for row in cripto.get("rows", []):
+            sanitizedRows.append({
+                "fecha": str(row.get("fecha", "")).strip(),
+                "plataforma": str(row.get("plataforma", "")).strip(),
+                "cantidad": str(row.get("cantidad", "")).strip(),
+                "precio": str(row.get("precio", "")).strip(),
+                "nota": str(row.get("nota", "")).strip(),
+            })
+        sanitizedCriptos.append({
+            "id": str(cripto.get("id", "")).strip(),
+            "nombre": str(cripto.get("nombre", "")).strip(),
+            "rows": sanitizedRows
+        })
+    writeEarnFile({"criptos": sanitizedCriptos})
     return jsonify({"ok": True})

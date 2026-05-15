@@ -460,6 +460,100 @@ def writeBonosFile(data):
     conn.commit()
 
 
+# --- Staking ---
+
+def readStakingFile():
+    conn = get_db()
+    criptos = conn.execute(
+        "SELECT id, nombre FROM staking_criptos ORDER BY sort_order, rowid"
+    ).fetchall()
+    result = []
+    for c in criptos:
+        filas = conn.execute(
+            "SELECT fecha, cantidad, precio, nota FROM staking_rows WHERE cripto_id = ? ORDER BY id",
+            (c["id"],)
+        ).fetchall()
+        result.append({
+            "id": c["id"],
+            "nombre": c["nombre"],
+            "rows": [{"fecha": r["fecha"], "cantidad": r["cantidad"], "precio": r["precio"], "nota": r["nota"]} for r in filas]
+        })
+    return {"criptos": result}
+
+
+def writeStakingFile(data):
+    conn = get_db()
+    criptos = data.get("criptos", [])
+    existing_ids = {r["id"] for r in conn.execute("SELECT id FROM staking_criptos").fetchall()}
+    new_ids = {str(c.get("id", "")).strip() for c in criptos}
+    for old_id in existing_ids - new_ids:
+        conn.execute("DELETE FROM staking_criptos WHERE id = ?", (old_id,))
+    for i, cripto in enumerate(criptos):
+        cid = str(cripto.get("id", "")).strip()
+        nombre = str(cripto.get("nombre", "")).strip()
+        if not cid:
+            continue
+        conn.execute(
+            "INSERT OR REPLACE INTO staking_criptos (id, nombre, sort_order) VALUES (?, ?, ?)",
+            (cid, nombre, i)
+        )
+        conn.execute("DELETE FROM staking_rows WHERE cripto_id = ?", (cid,))
+        for row in cripto.get("rows", []):
+            conn.execute(
+                "INSERT INTO staking_rows (cripto_id, fecha, cantidad, precio, nota) VALUES (?, ?, ?, ?, ?)",
+                (cid, str(row.get("fecha", "")), str(row.get("cantidad", "")),
+                 str(row.get("precio", "")), str(row.get("nota", "")))
+            )
+    conn.commit()
+
+
+# --- Earn ---
+
+def readEarnFile():
+    conn = get_db()
+    criptos = conn.execute(
+        "SELECT id, nombre FROM earn_criptos ORDER BY sort_order, rowid"
+    ).fetchall()
+    result = []
+    for c in criptos:
+        filas = conn.execute(
+            "SELECT fecha, plataforma, cantidad, precio, nota FROM earn_rows WHERE cripto_id = ? ORDER BY id",
+            (c["id"],)
+        ).fetchall()
+        result.append({
+            "id": c["id"],
+            "nombre": c["nombre"],
+            "rows": [{"fecha": r["fecha"], "plataforma": r["plataforma"], "cantidad": r["cantidad"], "precio": r["precio"], "nota": r["nota"]} for r in filas]
+        })
+    return {"criptos": result}
+
+
+def writeEarnFile(data):
+    conn = get_db()
+    criptos = data.get("criptos", [])
+    existing_ids = {r["id"] for r in conn.execute("SELECT id FROM earn_criptos").fetchall()}
+    new_ids = {str(c.get("id", "")).strip() for c in criptos}
+    for old_id in existing_ids - new_ids:
+        conn.execute("DELETE FROM earn_criptos WHERE id = ?", (old_id,))
+    for i, cripto in enumerate(criptos):
+        cid = str(cripto.get("id", "")).strip()
+        nombre = str(cripto.get("nombre", "")).strip()
+        if not cid:
+            continue
+        conn.execute(
+            "INSERT OR REPLACE INTO earn_criptos (id, nombre, sort_order) VALUES (?, ?, ?)",
+            (cid, nombre, i)
+        )
+        conn.execute("DELETE FROM earn_rows WHERE cripto_id = ?", (cid,))
+        for row in cripto.get("rows", []):
+            conn.execute(
+                "INSERT INTO earn_rows (cripto_id, fecha, plataforma, cantidad, precio, nota) VALUES (?, ?, ?, ?, ?, ?)",
+                (cid, str(row.get("fecha", "")), str(row.get("plataforma", "")),
+                 str(row.get("cantidad", "")), str(row.get("precio", "")), str(row.get("nota", "")))
+            )
+    conn.commit()
+
+
 # --- API keys (siguen leyendo de ficheros / env) ---
 
 def readFinnhubApiKey():
