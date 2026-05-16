@@ -8,10 +8,10 @@
     <meta http-equiv="Expires" content="0">
     <title>Portfolio Manager</title>
     <link rel="stylesheet" href="css/variables.css?v=20260511d">
-    <link rel="stylesheet" href="css/base.css?v=20260511d">
+    <link rel="stylesheet" href="css/base.css?v=20260516a">
     <link rel="stylesheet" href="css/components.css?v=20260514b">
-    <link rel="stylesheet" href="css/pages.css?v=20260514d">
-    <link rel="stylesheet" href="css/themes.css?v=20260515b">
+    <link rel="stylesheet" href="css/pages.css?v=20260516m">
+    <link rel="stylesheet" href="css/themes.css?v=20260516c">
     <script>
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
     </script>
@@ -173,7 +173,7 @@
             </div>
         </nav>
 
-        <main class="mainContent">
+        <main class="mainContent" id="mainContent">
             <section id="dynamicContent" class="contentArea"></section>
         </main>
     </div>
@@ -254,6 +254,7 @@
             <button id="searchAssetTickerFinnhubBtn" class="secondaryButton" type="button">Buscar ticker Finnhub</button>
             <button id="searchAssetTickerEodhdBtn" class="secondaryButton" type="button">Buscar ticker EODHD</button>
             <button id="searchAssetTickerYahooBtn" class="secondaryButton" type="button">Buscar ticker Yahoo Finance</button>
+            <button id="searchAssetTickerAlphaVantageBtn" class="secondaryButton" type="button">Buscar ticker Alpha Vantage</button>
         </div>
         <div id="assetSearchFeedback" class="assetSearchFeedback hidden"></div>
         <div id="assetSearchResults" class="assetSearchResults hidden"></div>
@@ -275,6 +276,7 @@
         </div>
     </div>
 </div>
+
 
 <div class="modalOverlay hidden" id="confirmModalOverlay">
     <div class="assetModal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
@@ -312,6 +314,7 @@
             <button id="editSearchAssetTickerFinnhubBtn" class="secondaryButton" type="button">Buscar ticker Finnhub</button>
             <button id="editSearchAssetTickerEodhdBtn" class="secondaryButton" type="button">Buscar ticker EODHD</button>
             <button id="editSearchAssetTickerYahooBtn" class="secondaryButton" type="button">Buscar ticker Yahoo Finance</button>
+            <button id="editSearchAssetTickerAlphaVantageBtn" class="secondaryButton" type="button">Buscar ticker Alpha Vantage</button>
         </div>
         <div id="editAssetSearchFeedback" class="assetSearchFeedback hidden"></div>
         <div id="editAssetSearchResults" class="assetSearchResults hidden"></div>
@@ -432,9 +435,726 @@
     </div>
 </div>
 
+<!-- ═══════════════════ SETTINGS OVERLAY ═══════════════════ -->
+<div class="sttOverlay hidden" id="sttOverlay">
+
+    <div class="sttSidebar">
+        <div class="sttSidebarHeader">
+            <span class="sttSidebarTitle">Ajustes</span>
+            <button class="sttCloseBtn" id="sttCloseBtn" type="button" aria-label="Cerrar ajustes">✕</button>
+        </div>
+        <nav class="sttNav">
+
+            <button class="sttNavBtn active" data-stt="apariencia" type="button">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 2v1.5M10 16.5V18M18 10h-1.5M3.5 10H2M15.657 4.343l-1.06 1.06M5.403 14.597l-1.06 1.06M15.657 15.657l-1.06-1.06M5.403 5.403l-1.06-1.06" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Apariencia
+            </button>
+
+            <button class="sttNavBtn" data-stt="cuenta" type="button">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 17c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Cuenta
+            </button>
+
+            <button class="sttNavBtn" data-stt="portfolio" type="button">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 5V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.5"/><path d="M2 9h16" stroke="currentColor" stroke-width="1.5"/></svg>
+                Portfolio
+            </button>
+
+            <button class="sttNavBtn" data-stt="automatizacion" type="button">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Automatización
+            </button>
+
+            <button class="sttNavBtn" data-stt="api" type="button">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 7.5a5 5 0 1 0-5 5 5 5 0 0 0 5-5ZM7.5 12.5 4 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 16h2v2H4v-2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                API
+            </button>
+
+            <button class="sttNavBtn" data-stt="datos" type="button">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h12a1 1 0 0 1 1 1v2H3V5a1 1 0 0 1 1-1ZM3 7h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 11h4M10 9v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Datos
+            </button>
+
+        </nav>
+    </div><!-- /.sttSidebar -->
+
+    <div class="sttContent">
+
+        <!-- ── Apariencia ── -->
+        <div class="sttPage active" id="sttPage-apariencia">
+            <h2 class="sttPageTitle">Apariencia</h2>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 2v1.5M10 16.5V18M18 10h-1.5M3.5 10H2M15.657 4.343l-1.06 1.06M5.403 14.597l-1.06 1.06M15.657 15.657l-1.06-1.06M5.403 5.403l-1.06-1.06" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Paleta de color</div>
+                        <div class="ajustesSectionDesc">Elige el tema visual de la aplicación.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesTemaGrid" id="ajustesTemaGrid">
+                    <button class="ajustesTemaBtn" data-theme="default" type="button">
+                        <span class="ajustesTemaPreview temaDefault"></span>
+                        <span class="ajustesTemaLabel">Noche Clara</span>
+                    </button>
+                    <button class="ajustesTemaBtn" data-theme="black" type="button">
+                        <span class="ajustesTemaPreview temaBlack"></span>
+                        <span class="ajustesTemaLabel">Oscuro</span>
+                    </button>
+                    <button class="ajustesTemaBtn" data-theme="light" type="button">
+                        <span class="ajustesTemaPreview temaLight"></span>
+                        <span class="ajustesTemaLabel">Claro</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="16" height="2.5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="8.75" width="16" height="2.5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="14.5" width="16" height="2.5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Densidad del sidebar</div>
+                        <div class="ajustesSectionDesc">Reduce el tamaño de los activos en la barra lateral para mostrar más en pantalla.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesRefreshGrid" id="ajustesDensidadGrid">
+                    <button class="ajustesRefreshBtn active" data-density="normal" type="button">Normal</button>
+                    <button class="ajustesRefreshBtn" data-density="compact" type="button">Compacto</button>
+                </div>
+                <span id="ajustesDensidadMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Privacidad al inicio</div>
+                        <div class="ajustesSectionDesc">Oculta automáticamente los valores monetarios cada vez que abres la aplicación.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Ocultar valores al iniciar
+                        <small>Equivale a pulsar el botón 👁 al abrir la app</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="ajustesOcultarInicio">
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 10h14M3 6h5M3 14h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 13l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Formato de números</div>
+                        <div class="ajustesSectionDesc">Separador decimal y de miles para todos los valores mostrados en la aplicación.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesRefreshGrid" id="ajustesNumLocaleGrid">
+                    <button class="ajustesRefreshBtn" data-locale="es-ES" type="button">1.234,56</button>
+                    <button class="ajustesRefreshBtn" data-locale="en-US" type="button">1,234.56</button>
+                    <button class="ajustesRefreshBtn" data-locale="fr-FR" type="button">1 234,56</button>
+                </div>
+                <span id="ajustesNumLocaleMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 8h16M6 2v2M14 2v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M6 12h2v2H6v-2Z" fill="currentColor"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Formato de fecha</div>
+                        <div class="ajustesSectionDesc">Orden en que se muestran día, mes y año.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesRefreshGrid" id="ajustesDateFmtGrid">
+                    <button class="ajustesRefreshBtn" data-fmt="DD/MM/YYYY" type="button">DD/MM/AAAA</button>
+                    <button class="ajustesRefreshBtn" data-fmt="MM/DD/YYYY" type="button">MM/DD/AAAA</button>
+                    <button class="ajustesRefreshBtn" data-fmt="YYYY-MM-DD" type="button">AAAA-MM-DD</button>
+                </div>
+                <span id="ajustesDateFmtMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
+            </div>
+        </div>
+
+        <!-- ── Cuenta ── -->
+        <div class="sttPage" id="sttPage-cuenta">
+            <h2 class="sttPageTitle">Cuenta</h2>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 17c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Cambiar nombre de usuario</div>
+                        <div class="ajustesSectionDesc">Introduce tu contraseña actual para confirmar el cambio.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesCredUserCurrentPwd">Contraseña actual</label>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesCredUserCurrentPwd" class="ajustesInput" type="password" placeholder="Contraseña actual…" autocomplete="current-password">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesCredUserCurrentPwd" title="Mostrar/ocultar">
+                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesCredNewUser">Nuevo usuario</label>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesCredNewUser" class="ajustesInput" type="text" placeholder="Nuevo usuario…" autocomplete="off">
+                    </div>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesGuardarCredUserBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                    <span id="ajustesCredUserMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="9" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14" r="1.5" fill="currentColor"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Cambiar contraseña</div>
+                        <div class="ajustesSectionDesc">Introduce tu contraseña actual para confirmar el cambio.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesCredPwdCurrentPwd">Contraseña actual</label>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesCredPwdCurrentPwd" class="ajustesInput" type="password" placeholder="Contraseña actual…" autocomplete="current-password">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesCredPwdCurrentPwd" title="Mostrar/ocultar">
+                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesCredNewPwd">Nueva contraseña</label>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesCredNewPwd" class="ajustesInput" type="password" placeholder="Nueva contraseña…" autocomplete="new-password">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesCredNewPwd" title="Mostrar/ocultar">
+                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesCredNewPwd2">Repetir nueva contraseña</label>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesCredNewPwd2" class="ajustesInput" type="password" placeholder="Repite la contraseña…" autocomplete="new-password">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesCredNewPwd2" title="Mostrar/ocultar">
+                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesGuardarCredPwdBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                    <span id="ajustesCredPwdMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3.5L16 2M6 3.5L4 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Bloqueo por inactividad</div>
+                        <div class="ajustesSectionDesc">Cierra la sesión automáticamente si no hay actividad durante el tiempo indicado.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesBloqueoInactividad">Tiempo hasta cierre de sesión</label>
+                    <select id="ajustesBloqueoInactividad" class="ajustesSelect" data-no-custom>
+                        <option value="0">Desactivado</option>
+                        <option value="15">15 minutos</option>
+                        <option value="30">30 minutos</option>
+                        <option value="60">1 hora</option>
+                        <option value="240">4 horas</option>
+                    </select>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesGuardarBloqueoBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                    <span id="ajustesBloqueoMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Portfolio ── -->
+        <div class="sttPage" id="sttPage-portfolio">
+            <h2 class="sttPageTitle">Portfolio</h2>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 5v10M7.5 7.5h4a1.5 1.5 0 0 1 0 3h-3a1.5 1.5 0 0 0 0 3H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Moneda base</div>
+                        <div class="ajustesSectionDesc">Moneda para conversiones en herramientas. Los activos conservan su moneda original.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesMonedaBase">Moneda base</label>
+                    <select id="ajustesMonedaBase" class="ajustesSelect" data-no-custom>
+                        <option value="EUR">EUR — Euro</option>
+                        <option value="USD">USD — Dólar estadounidense</option>
+                        <option value="GBP">GBP — Libra esterlina</option>
+                        <option value="CHF">CHF — Franco suizo</option>
+                        <option value="JPY">JPY — Yen japonés</option>
+                    </select>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesGuardarMonedaBaseBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                    <span id="ajustesMonedaBaseMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10h12M4 6h7M4 14h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="15.5" cy="14" r="1.2" fill="currentColor"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Decimales en precios</div>
+                        <div class="ajustesSectionDesc">Precisión de los precios de cotización por tipo de activo. Usa más decimales para criptomonedas de bajo precio.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesDecimalesTipos" id="ajustesDecimalesTipos">
+                    <div class="ajustesDectipo">
+                        <span class="ajustesDectipo-label">Acciones</span>
+                        <div class="ajustesRefreshGrid" data-tipo="acciones">
+                            <button class="ajustesRefreshBtn active" data-dec="2" type="button">2 dec.</button>
+                            <button class="ajustesRefreshBtn" data-dec="4" type="button">4 dec.</button>
+                        </div>
+                    </div>
+                    <div class="ajustesDectipo">
+                        <span class="ajustesDectipo-label">ETF</span>
+                        <div class="ajustesRefreshGrid" data-tipo="etfs">
+                            <button class="ajustesRefreshBtn active" data-dec="2" type="button">2 dec.</button>
+                            <button class="ajustesRefreshBtn" data-dec="4" type="button">4 dec.</button>
+                        </div>
+                    </div>
+                    <div class="ajustesDectipo">
+                        <span class="ajustesDectipo-label">Comoditis</span>
+                        <div class="ajustesRefreshGrid" data-tipo="comoditis">
+                            <button class="ajustesRefreshBtn active" data-dec="2" type="button">2 dec.</button>
+                            <button class="ajustesRefreshBtn" data-dec="4" type="button">4 dec.</button>
+                        </div>
+                    </div>
+                    <div class="ajustesDectipo">
+                        <span class="ajustesDectipo-label">Cripto</span>
+                        <div class="ajustesRefreshGrid" data-tipo="cripto">
+                            <button class="ajustesRefreshBtn active" data-dec="2" type="button">2 dec.</button>
+                            <button class="ajustesRefreshBtn" data-dec="4" type="button">4 dec.</button>
+                            <button class="ajustesRefreshBtn" data-dec="6" type="button">6 dec.</button>
+                            <button class="ajustesRefreshBtn" data-dec="8" type="button">8 dec.</button>
+                        </div>
+                    </div>
+                </div>
+                <span id="ajustesDecimalesMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Activos ocultos</div>
+                        <div class="ajustesSectionDesc">Los activos ocultos no aparecen en el sidebar pero sus datos se conservan.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesHiddenList" id="ajustesHiddenList">
+                    <span class="ajustesBackupEmpty">Cargando…</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Automatización ── -->
+        <div class="sttPage" id="sttPage-automatizacion">
+            <h2 class="sttPageTitle">Automatización</h2>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Actualización de precios</div>
+                        <div class="ajustesSectionDesc">Frecuencia con la que se refrescan los precios del sidebar y la vista general.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesRefreshGrid" id="ajustesRefreshGrid">
+                    <button class="ajustesRefreshBtn" data-minutes="0"  type="button">Off</button>
+                    <button class="ajustesRefreshBtn" data-minutes="1"  type="button">1 min</button>
+                    <button class="ajustesRefreshBtn" data-minutes="5"  type="button">5 min</button>
+                    <button class="ajustesRefreshBtn" data-minutes="15" type="button">15 min</button>
+                    <button class="ajustesRefreshBtn" data-minutes="30" type="button">30 min</button>
+                    <button class="ajustesRefreshBtn" data-minutes="60" type="button">1 hora</button>
+                </div>
+                <span id="ajustesAutoRefreshMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 14l4-4 3 3 4-5 3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Evolución del portfolio</div>
+                        <div class="ajustesSectionDesc">Cada cuánto se guarda un punto en el gráfico de evolución histórica.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesRefreshGrid" id="ajustesSnapshotGrid">
+                    <button class="ajustesRefreshBtn" data-minutes="0"    type="button">Off</button>
+                    <button class="ajustesRefreshBtn" data-minutes="5"    type="button">5 min</button>
+                    <button class="ajustesRefreshBtn" data-minutes="15"   type="button">15 min</button>
+                    <button class="ajustesRefreshBtn" data-minutes="30"   type="button">30 min</button>
+                    <button class="ajustesRefreshBtn" data-minutes="60"   type="button">1 hora</button>
+                    <button class="ajustesRefreshBtn" data-minutes="240"  type="button">4 horas</button>
+                    <button class="ajustesRefreshBtn" data-minutes="1440" type="button">1 día</button>
+                </div>
+                <span id="ajustesSnapshotMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M7 10l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Solo horario de mercado</div>
+                        <div class="ajustesSectionDesc">No actualiza precios de lunes a viernes entre las 22:00 y las 8:00, ni en fin de semana. Ahorra llamadas a la API.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Pausar actualización fuera de horario
+                        <small>Lunes–viernes 8:00–22:00. Configura qué tipos pausar abajo.</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="ajustesSoloMercado">
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesMercadoTipos" id="ajustesMercadoTipos">
+                    <div class="ajustesMercadoTiposLabel">Tipos afectados por la pausa:</div>
+                    <div class="ajustesDectipo">
+                        <span class="ajustesDectipo-label">Acciones<small>Mercado bursátil</small></span>
+                        <label class="ajustesSwitch">
+                            <input type="checkbox" id="soloMercadoAcciones" data-tipo="acciones">
+                            <span class="ajustesSwitchTrack"></span>
+                        </label>
+                    </div>
+                    <div class="ajustesDectipo">
+                        <span class="ajustesDectipo-label">ETF<small>Mercado bursátil</small></span>
+                        <label class="ajustesSwitch">
+                            <input type="checkbox" id="soloMercadoEtfs" data-tipo="etfs">
+                            <span class="ajustesSwitchTrack"></span>
+                        </label>
+                    </div>
+                    <div class="ajustesDectipo">
+                        <span class="ajustesDectipo-label">Comoditis<small>Mercado bursátil</small></span>
+                        <label class="ajustesSwitch">
+                            <input type="checkbox" id="soloMercadoComoditis" data-tipo="comoditis">
+                            <span class="ajustesSwitchTrack"></span>
+                        </label>
+                    </div>
+                    <div class="ajustesDectipo">
+                        <span class="ajustesDectipo-label">Cripto<small>Opera 24/7, sin pausa</small></span>
+                        <label class="ajustesSwitch">
+                            <input type="checkbox" id="soloMercadoCripto" data-tipo="cripto">
+                            <span class="ajustesSwitchTrack"></span>
+                        </label>
+                    </div>
+                </div>
+                <span id="ajustesSoloMercadoMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3v2M10 15v2M3 10H1M19 10h-2M4.93 4.93l1.41 1.41M13.66 13.66l1.41 1.41M4.93 15.07l1.41-1.41M13.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Umbral de cotizaciones</div>
+                        <div class="ajustesSectionDesc">Marca los precios del sidebar como desactualizados pasadas estas horas.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesStaleHours">Horas hasta desactualizado</label>
+                    <select id="ajustesStaleHours" class="ajustesSelect" data-no-custom>
+                        <option value="4">4 horas</option>
+                        <option value="8">8 horas</option>
+                        <option value="12">12 horas</option>
+                        <option value="24">24 horas</option>
+                        <option value="48">48 horas</option>
+                        <option value="0">Nunca</option>
+                    </select>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesGuardarStaleBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                    <span id="ajustesStaleMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── API ── -->
+        <div class="sttPage" id="sttPage-api">
+            <h2 class="sttPageTitle">API</h2>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 7.5a5 5 0 1 0-5 5 5 5 0 0 0 5-5ZM7.5 12.5 4 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 16h2v2H4v-2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Claves API</div>
+                        <div class="ajustesSectionDesc">Las claves se guardan en <code>API/finnhub.key</code>, <code>API/eodhd.key</code> y <code>API/alphavantage.key</code>.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <div class="ajustesLabelRow">
+                        <label class="ajustesLabel" for="ajustesFinnhubKey">Finnhub API Key</label>
+                        <span class="ajustesKeyStatus" id="ajustesFinnhubStatus"></span>
+                    </div>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesFinnhubKey" class="ajustesInput" type="password" placeholder="Nueva clave Finnhub…" autocomplete="off">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesFinnhubKey" title="Mostrar/ocultar">
+                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                        <button id="ajustesGuardarFinnhubBtn" class="ajustesAddBtn" type="button">Añadir</button>
+                    </div>
+                    <span id="ajustesFinnhubMsg" class="ajustesStatusMsg"></span>
+                </div>
+                <div class="ajustesField">
+                    <div class="ajustesLabelRow">
+                        <label class="ajustesLabel" for="ajustesEodhdKeys">EODHD API Key(s)</label>
+                        <span class="ajustesKeyStatus" id="ajustesEodhdStatus"></span>
+                    </div>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesEodhdKeys" class="ajustesInput" type="password" placeholder="Nueva clave EODHD…" autocomplete="off">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesEodhdKeys" title="Mostrar/ocultar">
+                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                        <button id="ajustesGuardarEodhdBtn" class="ajustesAddBtn" type="button">Añadir</button>
+                    </div>
+                    <span id="ajustesEodhdMsg" class="ajustesStatusMsg"></span>
+                </div>
+                <div class="ajustesField">
+                    <div class="ajustesLabelRow">
+                        <label class="ajustesLabel" for="ajustesAlphaVantageKeys">Alpha Vantage API Key(s)</label>
+                        <span class="ajustesKeyStatus" id="ajustesAlphaVantageStatus"></span>
+                    </div>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesAlphaVantageKeys" class="ajustesInput" type="password" placeholder="Nueva clave Alpha Vantage…" autocomplete="off">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesAlphaVantageKeys" title="Mostrar/ocultar">
+                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                        <button id="ajustesGuardarAlphaVantageBtn" class="ajustesAddBtn" type="button">Añadir</button>
+                    </div>
+                    <span id="ajustesAlphaVantageMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 14l4-4 3 3 4-5 3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Peticiones API hoy</div>
+                        <div class="ajustesSectionDesc">Llamadas a servicios externos desde que arrancó el servidor.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesApiStatsList" id="ajustesApiStatsList">
+                    <span class="ajustesBackupEmpty">Cargando…</span>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesRefreshApiStatsBtn" class="ajustesSecondaryBtn" type="button">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c2 0 3.7.9 4.8 2.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M13.5 2.5V5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Actualizar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Datos ── -->
+        <div class="sttPage" id="sttPage-datos">
+            <h2 class="sttPageTitle">Datos</h2>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3v10M6.5 9.5 10 13l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Exportar datos</div>
+                        <div class="ajustesSectionDesc">Descarga todos los datos del portfolio en formato JSON: activos, transacciones, historial y configuración.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesActions">
+                    <button id="ajustesExportJsonBtn" class="primaryButton" type="button">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3v8M5 7.5 8 10.5l3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        Exportar como JSON
+                    </button>
+                    <button id="ajustesExportZipBtn" class="secondaryButton" type="button">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 2h7l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7 6v5M5 9.5 7 11.5l2-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Exportar como ZIP
+                    </button>
+                    <span id="ajustesExportMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 6h10l-1 10H6L5 6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3 6h14M8 6V4h4v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 9v5M11 9v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Purgar historial antiguo</div>
+                        <div class="ajustesSectionDesc">Elimina snapshots del gráfico de evolución anteriores al período indicado para reducir el tamaño de la base de datos.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesPurgeDays">Eliminar snapshots anteriores a</label>
+                    <select id="ajustesPurgeDays" class="ajustesSelect" data-no-custom>
+                        <option value="0" selected>Nunca</option>
+                        <option value="30">30 días</option>
+                        <option value="90">90 días</option>
+                        <option value="180">6 meses</option>
+                        <option value="365">1 año</option>
+                    </select>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesPurgeBtn" class="dangerButton" type="button">Purgar historial</button>
+                    <span id="ajustesPurgeMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h12a1 1 0 0 1 1 1v2H3V5a1 1 0 0 1 1-1ZM3 7h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 11h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Límite de backups</div>
+                        <div class="ajustesSectionDesc">Número máximo de copias a conservar. Al crear una nueva se elimina automáticamente la más antigua si se supera el límite.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesMaxBackups">Máximo de copias guardadas</label>
+                    <select id="ajustesMaxBackups" class="ajustesSelect" data-no-custom>
+                        <option value="0">Sin límite</option>
+                        <option value="5">5 copias</option>
+                        <option value="10">10 copias</option>
+                        <option value="20">20 copias</option>
+                        <option value="50">50 copias</option>
+                    </select>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesGuardarMaxBackupsBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                    <span id="ajustesMaxBackupsMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c2 0 3.7.9 4.8 2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.5 2.5V5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10.5h10M5 13.5h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Auto-backup</div>
+                        <div class="ajustesSectionDesc">Copia de seguridad automática al arrancar el servidor si han pasado los días indicados.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesAutoBackup">Frecuencia</label>
+                    <select id="ajustesAutoBackup" class="ajustesSelect" data-no-custom>
+                        <option value="0">Desactivado</option>
+                        <option value="1">Cada día</option>
+                        <option value="3">Cada 3 días</option>
+                        <option value="7">Cada semana</option>
+                        <option value="14">Cada 2 semanas</option>
+                        <option value="30">Cada mes</option>
+                    </select>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesGuardarBackupFreqBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                    <span id="ajustesBackupFreqMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h12a1 1 0 0 1 1 1v2H3V5a1 1 0 0 1 1-1ZM3 7h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 11h4M10 9v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Copias de seguridad</div>
+                        <div class="ajustesSectionDesc">Crea o restaura una copia completa de la base de datos.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesActions">
+                    <button id="ajustesCrearBackupBtn" class="primaryButton" type="button">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3v8M4.5 7.5 8 11l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        Crear backup ahora
+                    </button>
+                    <span id="ajustesBackupMsg" class="ajustesStatusMsg"></span>
+                </div>
+                <div class="ajustesBackupList" id="ajustesBackupList">
+                    <span class="ajustesBackupEmpty">Cargando…</span>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /.sttContent -->
+</div><!-- /.sttOverlay -->
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="js/app-core.js?v=20260515b"></script>
-<script src="js/assets.js?v=20260511b"></script>
+<script src="js/app-core.js?v=20260516c"></script>
+<script src="js/assets.js?v=20260515d"></script>
 <script src="js/intereses.js?v=20260501a"></script>
 <script src="js/dividendos.js?v=20260421a"></script>
 <script src="js/gastos.js?v=20260426a"></script>
@@ -444,14 +1164,14 @@
 <script src="js/stablecoins.js?v=20260423a"></script>
 <script src="js/operaciones.js?v=20260514a"></script>
 <script src="js/trading-journal.js?v=20260514d"></script>
-<script src="js/staking.js?v=20260515a"></script>
-<script src="js/earn.js?v=20260515a"></script>
+<script src="js/staking.js?v=20260515b"></script>
+<script src="js/earn.js?v=20260515b"></script>
 <script src="js/conversiones.js?v=20260401g"></script>
 <script src="js/herramientas.js?v=20260508b"></script>
 <script src="js/bonos.js?v=20260420a"></script>
 <script src="js/metricas.js?v=20260426a"></script>
-<script src="js/ajustes.js?v=20260514b"></script>
-<script src="js/shared-utils.js?v=20260423a"></script>
+<script src="js/ajustes.js?v=20260516f"></script>
+<script src="js/shared-utils.js?v=20260516f"></script>
 <script src="js/heatmap.js?v=20260505b"></script>
 <script src="js/seguimiento.js?v=20260511c"></script>
 <script src="js/portfolios.js?v=20260511b"></script>

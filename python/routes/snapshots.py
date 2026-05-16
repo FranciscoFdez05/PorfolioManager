@@ -1,4 +1,5 @@
 import time
+import datetime
 
 from flask import Blueprint, jsonify, request
 
@@ -176,3 +177,18 @@ def get_history():
         for r in rows
     ]
     return jsonify({"ok": True, "range": range_param, "data": data})
+
+
+@snapshots_bp.route("/api/snapshots/purge", methods=["POST"])
+def purge_snapshots():
+    body = request.get_json(silent=True) or {}
+    days = int(body.get("days", 0))
+    if days == 0:
+        return jsonify({"ok": True, "deleted": 0})
+    if days not in {30, 90, 180, 365}:
+        return jsonify({"ok": False, "error": "Valor de días no permitido"}), 400
+    cutoff = int(time.time()) - days * 86400
+    conn = get_db()
+    cur = conn.execute("DELETE FROM portfolio_snapshots WHERE ts < ?", (cutoff,))
+    conn.commit()
+    return jsonify({"ok": True, "deleted": cur.rowcount})

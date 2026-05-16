@@ -30,15 +30,17 @@ function parseDollarNumber(value) {
     return Number.isNaN(parsedValue) ? 0 : parsedValue
 }
 
+function _nl() { return window._numLocale || "es-ES" }
+
 function formatEuro(value) {
-    return new Intl.NumberFormat("es-ES", {
+    return new Intl.NumberFormat(_nl(), {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     }).format(value) + " €"
 }
 
 function formatDollar(value) {
-    return new Intl.NumberFormat("es-ES", {
+    return new Intl.NumberFormat(_nl(), {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     }).format(value) + " $"
@@ -64,7 +66,7 @@ function normalizeCurrencyCode(currency) {
 
 function formatMoneyWithDecimals(value, currency = "EUR", decimals = 2) {
     const normalizedCurrency = normalizeCurrencyCode(currency)
-    const formattedNumber = new Intl.NumberFormat("es-ES", {
+    const formattedNumber = new Intl.NumberFormat(_nl(), {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
     }).format(value)
@@ -170,7 +172,7 @@ function formatShareQuantity(value, maxDecimals = 6) {
         return ""
     }
 
-    return parsedValue.toLocaleString("es-ES", {
+    return parsedValue.toLocaleString(_nl(), {
         minimumFractionDigits: 0,
         maximumFractionDigits: maxDecimals
     })
@@ -368,7 +370,7 @@ function formatSatoshis(value) {
         return ""
     }
 
-    return parsed.toLocaleString("es-ES", {
+    return parsed.toLocaleString(_nl(), {
         minimumFractionDigits: 8,
         maximumFractionDigits: 8
     })
@@ -378,7 +380,7 @@ function formatCellSatoshisValue(value) {
     const parsed = parseLooseNumber(value)
 
     if (parsed === null || String(value ?? "").trim() === "") {
-        return "0,00000000"
+        return (0).toLocaleString(_nl(), { minimumFractionDigits: 8, maximumFractionDigits: 8 })
     }
 
     return formatSatoshis(parsed)
@@ -388,10 +390,10 @@ function formatAssetCommissionValue(value, currency = "EUR") {
     const parsed = parseLooseNumber(value)
 
     if (parsed === null || String(value ?? "").trim() === "") {
-        return "0,00000000"
+        return (0).toLocaleString(_nl(), { minimumFractionDigits: 8, maximumFractionDigits: 8 })
     }
 
-    return parsed.toLocaleString("es-ES", {
+    return parsed.toLocaleString(_nl(), {
         minimumFractionDigits: 8,
         maximumFractionDigits: 12
     })
@@ -424,7 +426,7 @@ function formatDollarSafe(value) {
         return ""
     }
 
-    return `${parsed.toLocaleString("es-ES", {
+    return `${parsed.toLocaleString(_nl(), {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     })} $`
@@ -436,10 +438,22 @@ function formatEuroSafe(value) {
         return ""
     }
 
-    return `${parsed.toLocaleString("es-ES", {
+    return `${parsed.toLocaleString(_nl(), {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     })} €`
+}
+
+function fmtDate(date) {
+    const d = date instanceof Date ? date : new Date(date)
+    if (isNaN(d)) return ""
+    const dd   = String(d.getDate()).padStart(2, "0")
+    const mm   = String(d.getMonth() + 1).padStart(2, "0")
+    const yyyy = d.getFullYear()
+    const fmt  = window._dateFormat || "DD/MM/YYYY"
+    if (fmt === "MM/DD/YYYY") return `${mm}/${dd}/${yyyy}`
+    if (fmt === "YYYY-MM-DD") return `${yyyy}-${mm}-${dd}`
+    return `${dd}/${mm}/${yyyy}`
 }
 
 document.addEventListener("focusin", (event) => {
@@ -716,6 +730,10 @@ function _buildCustomSelect(select) {
 
     const menu = document.createElement("div")
     menu.className = "csMenu csBodyMenu"
+    menu.style.zIndex = "100000"
+    menu.style.display = "none"
+
+    menu.style.position = "fixed"
     document.body.appendChild(menu)
 
     select.parentNode.insertBefore(wrapper, select)
@@ -753,6 +771,7 @@ function _buildCustomSelect(select) {
 
     function closeMenu() {
         menu.classList.remove("csOpen")
+        menu.style.display = "none"
         trigger.classList.remove("csOpen")
     }
 
@@ -789,12 +808,14 @@ function _buildCustomSelect(select) {
         const isOpen = menu.classList.contains("csOpen")
         document.querySelectorAll(".csMenu.csOpen").forEach((m) => {
             m.classList.remove("csOpen")
+            m.style.display = "none"
             m._csTrigger?.classList.remove("csOpen")
         })
         if (!isOpen) {
             syncOptions()
             positionMenu()
             menu.classList.add("csOpen")
+            menu.style.display = "flex"
             trigger.classList.add("csOpen")
         }
     })
@@ -821,7 +842,7 @@ new MutationObserver((mutations) => {
     for (const m of mutations) {
         for (const node of m.addedNodes) {
             if (node.nodeType !== 1) continue
-            if (node.tagName === "SELECT" && !node.dataset.noCustom) _buildCustomSelect(node)
+            if (node.tagName === "SELECT" && !node.hasAttribute("data-no-custom")) _buildCustomSelect(node)
             node.querySelectorAll?.("select:not([data-no-custom])").forEach(_buildCustomSelect)
         }
     }

@@ -1,3 +1,135 @@
+// ── Settings Overlay ──────────────────────────────────────────────────────────
+
+let _sttInited = false
+
+function openSettingsModal() {
+    const overlay = document.getElementById("sttOverlay")
+    if (!overlay) return
+    overlay.classList.remove("hidden")
+
+    if (!_sttInited) {
+        _sttInited = true
+        _initSttShell()
+        initAjustesLogic()
+    }
+}
+
+function closeSettingsModal() {
+    const overlay = document.getElementById("sttOverlay")
+    if (!overlay) return
+    overlay.classList.add("hidden")
+}
+
+function _initSttShell() {
+    // Close button
+    document.getElementById("sttCloseBtn")?.addEventListener("click", closeSettingsModal)
+
+    // Escape key
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !document.getElementById("sttOverlay")?.classList.contains("hidden")) {
+            closeSettingsModal()
+        }
+    })
+
+    // Tab switching
+    document.querySelectorAll(".sttNavBtn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".sttNavBtn").forEach((b) => b.classList.remove("active"))
+            document.querySelectorAll(".sttPage").forEach((p) => p.classList.remove("active"))
+            btn.classList.add("active")
+            const page = document.getElementById("sttPage-" + btn.dataset.stt)
+            if (page) page.classList.add("active")
+        })
+    })
+}
+
+// ── Inline custom select for settings overlay ─────────────────────────────────
+
+function _buildInlineSelect(sel) {
+    if (sel._inlineInit) return
+    sel._inlineInit = true
+    sel._csInit = true
+
+    const wrapper = document.createElement("div")
+    wrapper.className = "ajustesDropWrapper"
+
+    const trigger = document.createElement("button")
+    trigger.type = "button"
+    trigger.className = "ajustesDropTrigger"
+
+    const labelEl = document.createElement("span")
+    labelEl.className = "ajustesDropLabel"
+
+    const arrowEl = document.createElement("span")
+    arrowEl.className = "ajustesDropArrow"
+    arrowEl.textContent = "▾"
+
+    trigger.appendChild(labelEl)
+    trigger.appendChild(arrowEl)
+
+    const menu = document.createElement("div")
+    menu.className = "ajustesDropMenu"
+    menu.style.display = "none"
+
+    wrapper.appendChild(trigger)
+    wrapper.appendChild(menu)
+
+    sel.parentNode.insertBefore(wrapper, sel)
+    wrapper.appendChild(sel)
+    sel.style.display = "none"
+
+    function syncLabel() {
+        const opt = sel.options[sel.selectedIndex]
+        labelEl.textContent = opt ? opt.text : ""
+    }
+
+    function buildOptions() {
+        menu.innerHTML = ""
+        Array.from(sel.options).forEach((opt) => {
+            const btn = document.createElement("button")
+            btn.type = "button"
+            btn.className = "ajustesDropOption" + (opt.value === sel.value ? " active" : "")
+            btn.textContent = opt.text
+            btn.addEventListener("click", () => {
+                sel.value = opt.value
+                sel.dispatchEvent(new Event("change", { bubbles: true }))
+                syncLabel()
+                close()
+            })
+            menu.appendChild(btn)
+        })
+    }
+
+    function open() {
+        buildOptions()
+        menu.style.display = "flex"
+        trigger.classList.add("open")
+    }
+
+    function close() {
+        menu.style.display = "none"
+        trigger.classList.remove("open")
+    }
+
+    trigger.addEventListener("click", (e) => {
+        e.stopPropagation()
+        const isOpen = menu.style.display !== "none"
+        document.querySelectorAll(".ajustesDropMenu").forEach((m) => {
+            m.style.display = "none"
+            m.previousElementSibling?.classList.remove("open")
+        })
+        if (!isOpen) open()
+    })
+
+    document.addEventListener("click", close)
+
+    sel.addEventListener("change", syncLabel)
+
+    syncLabel()
+}
+
+// ── Settings Logic ────────────────────────────────────────────────────────────
+
 async function initAjustesLogic() {
     let settings = {}
     try {
@@ -6,29 +138,9 @@ async function initAjustesLogic() {
         if (data.ok) settings = data
     } catch { /* ignore */ }
 
-    // --- API Keys ---
-    const finnhubInput      = document.getElementById("ajustesFinnhubKey")
-    const eodhdInput        = document.getElementById("ajustesEodhdKeys")
-    const finnhubStatus     = document.getElementById("ajustesFinnhubStatus")
-    const eodhdStatus       = document.getElementById("ajustesEodhdStatus")
-    const guardarFinnhubBtn = document.getElementById("ajustesGuardarFinnhubBtn")
-    const guardarEodhdBtn   = document.getElementById("ajustesGuardarEodhdBtn")
-    const finnhubMsg        = document.getElementById("ajustesFinnhubMsg")
-    const eodhdMsg          = document.getElementById("ajustesEodhdMsg")
+    document.querySelectorAll("#sttOverlay .ajustesSelect").forEach(_buildInlineSelect)
 
-    function setKeyStatus(el, count) {
-        if (!el) return
-        if (count > 0) {
-            el.textContent = `✓ ${count} clave${count > 1 ? "s" : ""}`
-            el.className = "ajustesKeyStatus ok"
-        } else {
-            el.textContent = "✗ No configurada"
-            el.className = "ajustesKeyStatus missing"
-        }
-    }
-    setKeyStatus(finnhubStatus, settings.finnhubKeyCount ?? (settings.finnhubKey ? 1 : 0))
-    setKeyStatus(eodhdStatus,   settings.eodhdKeyCount   ?? (settings.eodhdKeys  ? 1 : 0))
-
+    // --- Toggle eye buttons (show/hide password) ---
     document.querySelectorAll(".ajustesToggleBtn").forEach((btn) => {
         btn.addEventListener("click", () => {
             const input = document.getElementById(btn.dataset.target)
@@ -41,6 +153,40 @@ async function initAjustesLogic() {
             if (eyeHide) eyeHide.style.display = showing ? "" : "none"
         })
     })
+
+    // --- API Keys ---
+    const finnhubInput           = document.getElementById("ajustesFinnhubKey")
+    const eodhdInput             = document.getElementById("ajustesEodhdKeys")
+    const alphaVantageInput      = document.getElementById("ajustesAlphaVantageKeys")
+    const finnhubStatus          = document.getElementById("ajustesFinnhubStatus")
+    const eodhdStatus            = document.getElementById("ajustesEodhdStatus")
+    const alphaVantageStatus     = document.getElementById("ajustesAlphaVantageStatus")
+    const guardarFinnhubBtn      = document.getElementById("ajustesGuardarFinnhubBtn")
+    const guardarEodhdBtn        = document.getElementById("ajustesGuardarEodhdBtn")
+    const guardarAlphaVantageBtn = document.getElementById("ajustesGuardarAlphaVantageBtn")
+    const finnhubMsg             = document.getElementById("ajustesFinnhubMsg")
+    const eodhdMsg               = document.getElementById("ajustesEodhdMsg")
+    const alphaVantageMsg        = document.getElementById("ajustesAlphaVantageMsg")
+
+    function setKeyStatus(el, count) {
+        if (!el) return
+        if (count > 0) {
+            el.textContent = `✓ ${count} clave${count > 1 ? "s" : ""}`
+            el.className = "ajustesKeyStatus ok"
+        } else {
+            el.textContent = "✗ No configurada"
+            el.className = "ajustesKeyStatus missing"
+        }
+    }
+    setKeyStatus(finnhubStatus,      settings.finnhubKeyCount      ?? (settings.finnhubKey  ? 1 : 0))
+    setKeyStatus(eodhdStatus,        settings.eodhdKeyCount        ?? (settings.eodhdKeys   ? 1 : 0))
+    setKeyStatus(alphaVantageStatus, settings.alphaVantageKeyCount ?? 0)
+
+    const _keyCountMap = {
+        finnhubKey:       "finnhubKeys",
+        eodhdKeys:        "eodhdKeys",
+        alphaVantageKeys: "alphaVantageKeys",
+    }
 
     async function saveApiKey(fieldName, value, input, statusEl, msgEl, btn) {
         const trimmed = value.trim()
@@ -58,7 +204,8 @@ async function initAjustesLogic() {
             })
             const data = await res.json()
             if (data.ok) {
-                const count = fieldName === "finnhubKey" ? data.finnhubKeys : data.eodhdKeys
+                const countKey = _keyCountMap[fieldName]
+                const count = countKey ? data[countKey] : 1
                 showMsg(msgEl, "Añadida", "ok")
                 setKeyStatus(statusEl, count ?? 1)
                 input.value = ""
@@ -77,22 +224,26 @@ async function initAjustesLogic() {
             saveApiKey("finnhubKey", finnhubInput?.value || "", finnhubInput, finnhubStatus, finnhubMsg, guardarFinnhubBtn)
         )
     }
-
     if (guardarEodhdBtn) {
         guardarEodhdBtn.addEventListener("click", () =>
             saveApiKey("eodhdKeys", eodhdInput?.value || "", eodhdInput, eodhdStatus, eodhdMsg, guardarEodhdBtn)
         )
     }
+    if (guardarAlphaVantageBtn) {
+        guardarAlphaVantageBtn.addEventListener("click", () =>
+            saveApiKey("alphaVantageKeys", alphaVantageInput?.value || "", alphaVantageInput, alphaVantageStatus, alphaVantageMsg, guardarAlphaVantageBtn)
+        )
+    }
 
     // --- Auto-backup ---
-    const autoBackupSel = document.getElementById("ajustesAutoBackup")
+    const autoBackupSel  = document.getElementById("ajustesAutoBackup")
     const guardarFreqBtn = document.getElementById("ajustesGuardarBackupFreqBtn")
     const backupFreqMsg  = document.getElementById("ajustesBackupFreqMsg")
 
     function setSelect(sel, value) {
         if (!sel) return
         sel.value = String(value)
-        sel.dispatchEvent(new Event("change", { bubbles: true }))
+        sel.dispatchEvent(new Event("change", { bubbles: false }))
     }
 
     if (autoBackupSel) setSelect(autoBackupSel, settings.autoBackupDays ?? 0)
@@ -118,9 +269,9 @@ async function initAjustesLogic() {
     }
 
     // --- Moneda base ---
-    const monedaBaseSel     = document.getElementById("ajustesMonedaBase")
+    const monedaBaseSel        = document.getElementById("ajustesMonedaBase")
     const guardarMonedaBaseBtn = document.getElementById("ajustesGuardarMonedaBaseBtn")
-    const monedaBaseMsg     = document.getElementById("ajustesMonedaBaseMsg")
+    const monedaBaseMsg        = document.getElementById("ajustesMonedaBaseMsg")
 
     if (monedaBaseSel) setSelect(monedaBaseSel, settings.monedaBase ?? "EUR")
 
@@ -155,7 +306,7 @@ async function initAjustesLogic() {
     const autoRefreshMsg  = document.getElementById("ajustesAutoRefreshMsg")
 
     function setActiveRefreshBtn(minutes) {
-        autoRefreshGrid?.querySelectorAll(".ajustesRefreshBtn").forEach(btn => {
+        autoRefreshGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((btn) => {
             btn.classList.toggle("active", Number(btn.dataset.minutes) === Number(minutes))
         })
     }
@@ -191,7 +342,7 @@ async function initAjustesLogic() {
     const snapshotMsg  = document.getElementById("ajustesSnapshotMsg")
 
     function setActiveSnapshotBtn(minutes) {
-        snapshotGrid?.querySelectorAll(".ajustesRefreshBtn").forEach(btn => {
+        snapshotGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((btn) => {
             btn.classList.toggle("active", Number(btn.dataset.minutes) === Number(minutes))
         })
     }
@@ -223,9 +374,9 @@ async function initAjustesLogic() {
     })
 
     // --- Umbral cotizaciones ---
-    const staleSel     = document.getElementById("ajustesStaleHours")
+    const staleSel        = document.getElementById("ajustesStaleHours")
     const guardarStaleBtn = document.getElementById("ajustesGuardarStaleBtn")
-    const staleMsg     = document.getElementById("ajustesStaleMsg")
+    const staleMsg        = document.getElementById("ajustesStaleMsg")
 
     if (staleSel) setSelect(staleSel, settings.staleHours ?? 24)
 
@@ -262,8 +413,8 @@ async function initAjustesLogic() {
     async function renderHiddenAssets() {
         if (!hiddenListEl) return
         try {
-            const res    = await fetch("/api/activos")
-            const data   = await res.json()
+            const res     = await fetch("/api/activos")
+            const data    = await res.json()
             const activos = data.activos || []
             if (!activos.length) {
                 hiddenListEl.innerHTML = '<span class="ajustesBackupEmpty">No hay activos</span>'
@@ -463,7 +614,7 @@ async function initAjustesLogic() {
 
     function renderApiStats(data) {
         if (!apiStatsListEl) return
-        const counts = data.counts || {}
+        const counts  = data.counts || {}
         const entries = Object.entries(counts).sort((a, b) => b[1] - a[1])
         if (!entries.length) {
             apiStatsListEl.innerHTML = '<span class="ajustesBackupEmpty">Sin peticiones hoy</span>'
@@ -488,10 +639,10 @@ async function initAjustesLogic() {
     loadApiStats()
 
     // --- Cambiar nombre de usuario ---
-    const credUserCurrentPwd  = document.getElementById("ajustesCredUserCurrentPwd")
-    const credNewUser         = document.getElementById("ajustesCredNewUser")
-    const guardarCredUserBtn  = document.getElementById("ajustesGuardarCredUserBtn")
-    const credUserMsg         = document.getElementById("ajustesCredUserMsg")
+    const credUserCurrentPwd = document.getElementById("ajustesCredUserCurrentPwd")
+    const credNewUser        = document.getElementById("ajustesCredNewUser")
+    const guardarCredUserBtn = document.getElementById("ajustesGuardarCredUserBtn")
+    const credUserMsg        = document.getElementById("ajustesCredUserMsg")
 
     if (guardarCredUserBtn) {
         guardarCredUserBtn.addEventListener("click", async () => {
@@ -526,11 +677,11 @@ async function initAjustesLogic() {
     }
 
     // --- Cambiar contraseña ---
-    const credPwdCurrentPwd  = document.getElementById("ajustesCredPwdCurrentPwd")
-    const credNewPwd         = document.getElementById("ajustesCredNewPwd")
-    const credNewPwd2        = document.getElementById("ajustesCredNewPwd2")
-    const guardarCredPwdBtn  = document.getElementById("ajustesGuardarCredPwdBtn")
-    const credPwdMsg         = document.getElementById("ajustesCredPwdMsg")
+    const credPwdCurrentPwd = document.getElementById("ajustesCredPwdCurrentPwd")
+    const credNewPwd        = document.getElementById("ajustesCredNewPwd")
+    const credNewPwd2       = document.getElementById("ajustesCredNewPwd2")
+    const guardarCredPwdBtn = document.getElementById("ajustesGuardarCredPwdBtn")
+    const credPwdMsg        = document.getElementById("ajustesCredPwdMsg")
 
     if (guardarCredPwdBtn) {
         guardarCredPwdBtn.addEventListener("click", async () => {
@@ -538,9 +689,9 @@ async function initAjustesLogic() {
             const newPassword     = credNewPwd?.value || ""
             const newPassword2    = credNewPwd2?.value || ""
 
-            if (!currentPassword)              { showMsg(credPwdMsg, "Introduce la contraseña actual", "error"); return }
-            if (!newPassword)                  { showMsg(credPwdMsg, "La nueva contraseña no puede estar vacía", "error"); return }
-            if (newPassword !== newPassword2)  { showMsg(credPwdMsg, "Las contraseñas no coinciden", "error"); return }
+            if (!currentPassword)             { showMsg(credPwdMsg, "Introduce la contraseña actual", "error"); return }
+            if (!newPassword)                 { showMsg(credPwdMsg, "La nueva contraseña no puede estar vacía", "error"); return }
+            if (newPassword !== newPassword2) { showMsg(credPwdMsg, "Las contraseñas no coinciden", "error"); return }
 
             guardarCredPwdBtn.disabled = true
             showMsg(credPwdMsg, "Guardando…", "")
@@ -567,11 +718,330 @@ async function initAjustesLogic() {
         })
     }
 
+    // --- Densidad sidebar ---
+    const densidadGrid = document.getElementById("ajustesDensidadGrid")
+    const densidadMsg  = document.getElementById("ajustesDensidadMsg")
+    const _currentDensity = localStorage.getItem("portfolioDensity") || "normal"
+    function setActiveDensidadBtn(val) {
+        densidadGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
+            b.classList.toggle("active", b.dataset.density === val)
+        )
+    }
+    setActiveDensidadBtn(_currentDensity)
+    densidadGrid?.addEventListener("click", (e) => {
+        const btn = e.target.closest(".ajustesRefreshBtn")
+        if (!btn) return
+        const val = btn.dataset.density
+        setActiveDensidadBtn(val)
+        localStorage.setItem("portfolioDensity", val)
+        applyDensidadSidebar(val)
+        showMsg(densidadMsg, "Guardado", "ok")
+    })
+
+    // --- Ocultar valores al inicio ---
+    const ocultarInicioChk = document.getElementById("ajustesOcultarInicio")
+    if (ocultarInicioChk) {
+        ocultarInicioChk.checked = localStorage.getItem("portfolioOcultarInicio") === "1"
+        ocultarInicioChk.addEventListener("change", () => {
+            localStorage.setItem("portfolioOcultarInicio", ocultarInicioChk.checked ? "1" : "0")
+        })
+    }
+
+    // --- Decimales por tipo de activo ---
+    const decimalesMsg     = document.getElementById("ajustesDecimalesMsg")
+    const decimalesTipos   = document.getElementById("ajustesDecimalesTipos")
+    const _decKeyMap = {
+        acciones:  "precioDecimalesAcciones",
+        etfs:      "precioDecimalesEtf",
+        comoditis: "precioDecimalesComoditis",
+        cripto:    "precioDecimalesCripto",
+    }
+    function initDecimalesTipo(grid) {
+        const tipo   = grid.dataset.tipo
+        const key    = _decKeyMap[tipo]
+        if (!key) return
+        const saved  = settings[key] ?? 2
+        grid.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
+            b.classList.toggle("active", Number(b.dataset.dec) === saved)
+        )
+        grid.addEventListener("click", async (e) => {
+            const btn = e.target.closest(".ajustesRefreshBtn")
+            if (!btn) return
+            const dec = Number(btn.dataset.dec)
+            grid.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
+                b.classList.toggle("active", Number(b.dataset.dec) === dec)
+            )
+            try {
+                const res  = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ [key]: dec })
+                })
+                const data = await res.json()
+                if (data.ok) {
+                    window[`_precioDecimales_${tipo}`] = dec
+                    showMsg(decimalesMsg, "Guardado", "ok")
+                } else {
+                    showMsg(decimalesMsg, "Error", "error")
+                }
+            } catch {
+                showMsg(decimalesMsg, "Error de red", "error")
+            }
+        })
+    }
+    decimalesTipos?.querySelectorAll(".ajustesRefreshGrid[data-tipo]").forEach(initDecimalesTipo)
+
+    // --- Solo horario de mercado ---
+    const soloMercadoChk  = document.getElementById("ajustesSoloMercado")
+    const soloMercadoMsg  = document.getElementById("ajustesSoloMercadoMsg")
+    const mercadoTiposEl  = document.getElementById("ajustesMercadoTipos")
+    const _savedTipos     = settings.soloMercadoTipos ?? ["acciones", "etfs", "comoditis"]
+
+    if (soloMercadoChk) {
+        soloMercadoChk.checked = !!settings.soloHorarioMercado
+    }
+
+    // Init per-type checkboxes
+    mercadoTiposEl?.querySelectorAll("input[data-tipo]").forEach((chk) => {
+        chk.checked = _savedTipos.includes(chk.dataset.tipo)
+    })
+
+    async function _saveSoloMercado() {
+        const enabled = soloMercadoChk?.checked ?? false
+        const tipos   = [...(mercadoTiposEl?.querySelectorAll("input[data-tipo]:checked") || [])]
+            .map((c) => c.dataset.tipo)
+        try {
+            const res  = await fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ soloHorarioMercado: enabled, soloMercadoTipos: tipos })
+            })
+            const data = await res.json()
+            if (data.ok) {
+                window._soloHorarioMercado = enabled
+                window._soloMercadoTipos   = tipos
+                showMsg(soloMercadoMsg, "Guardado", "ok")
+            } else {
+                showMsg(soloMercadoMsg, "Error", "error")
+            }
+        } catch {
+            showMsg(soloMercadoMsg, "Error de red", "error")
+        }
+    }
+
+    soloMercadoChk?.addEventListener("change", _saveSoloMercado)
+    mercadoTiposEl?.querySelectorAll("input[data-tipo]").forEach((chk) =>
+        chk.addEventListener("change", _saveSoloMercado)
+    )
+
+    // --- Bloqueo por inactividad ---
+    const bloqueoSel        = document.getElementById("ajustesBloqueoInactividad")
+    const guardarBloqueoBtn = document.getElementById("ajustesGuardarBloqueoBtn")
+    const bloqueoMsg        = document.getElementById("ajustesBloqueoMsg")
+    if (bloqueoSel) setSelect(bloqueoSel, settings.bloqueoInactividad ?? 0)
+    if (guardarBloqueoBtn) {
+        guardarBloqueoBtn.addEventListener("click", async () => {
+            guardarBloqueoBtn.disabled = true
+            showMsg(bloqueoMsg, "Guardando…", "")
+            try {
+                const minutes = Number(bloqueoSel?.value ?? 0)
+                const res  = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ bloqueoInactividad: minutes })
+                })
+                const data = await res.json()
+                if (data.ok) {
+                    window._bloqueoInactividad = minutes
+                    applyBloqueoInactividad(minutes)
+                    showMsg(bloqueoMsg, "Guardado", "ok")
+                } else {
+                    showMsg(bloqueoMsg, "Error", "error")
+                }
+            } catch {
+                showMsg(bloqueoMsg, "Error de red", "error")
+            } finally {
+                guardarBloqueoBtn.disabled = false
+            }
+        })
+    }
+
+    // --- Exportar datos JSON ---
+    const exportJsonBtn = document.getElementById("ajustesExportJsonBtn")
+    const exportZipBtn  = document.getElementById("ajustesExportZipBtn")
+    const exportMsg     = document.getElementById("ajustesExportMsg")
+
+    async function _doExport(url, filename, btn) {
+        btn.disabled = true
+        showMsg(exportMsg, "Preparando…", "")
+        try {
+            const res = await fetch(url)
+            if (!res.ok) throw new Error()
+            const blob = await res.blob()
+            const a    = document.createElement("a")
+            a.href     = URL.createObjectURL(blob)
+            a.download = filename
+            a.click()
+            URL.revokeObjectURL(a.href)
+            showMsg(exportMsg, "Descargado", "ok")
+        } catch {
+            showMsg(exportMsg, "Error al exportar", "error")
+        } finally {
+            btn.disabled = false
+        }
+    }
+
+    if (exportJsonBtn) {
+        exportJsonBtn.addEventListener("click", () => {
+            const date = new Date().toISOString().slice(0, 10)
+            _doExport("/api/export/json", `portfolio-export-${date}.json`, exportJsonBtn)
+        })
+    }
+    if (exportZipBtn) {
+        exportZipBtn.addEventListener("click", () => {
+            const date = new Date().toISOString().slice(0, 10)
+            _doExport("/api/export/zip", `portfolio-export-${date}.zip`, exportZipBtn)
+        })
+    }
+
+    // --- Purgar snapshots ---
+    const purgeDaysSel = document.getElementById("ajustesPurgeDays")
+    const purgeBtn     = document.getElementById("ajustesPurgeBtn")
+    const purgeMsg     = document.getElementById("ajustesPurgeMsg")
+    if (purgeBtn) {
+        purgeBtn.addEventListener("click", () => {
+            const days = Number(purgeDaysSel?.value ?? 0)
+            if (days === 0) {
+                showMsg(purgeMsg, "Selecciona un período para purgar", "error")
+                return
+            }
+            const label = purgeDaysSel?.options[purgeDaysSel.selectedIndex]?.text || `${days} días`
+            openConfirmModal({
+                title: "Purgar historial",
+                message: `¿Eliminar todos los snapshots anteriores a ${label}? Esta acción no se puede deshacer.`,
+                confirmLabel: "Purgar",
+                onConfirm: async () => {
+                    purgeBtn.disabled = true
+                    showMsg(purgeMsg, "Purgando…", "")
+                    try {
+                        const res  = await fetch("/api/snapshots/purge", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ days })
+                        })
+                        const data = await res.json()
+                        if (data.ok) {
+                            showMsg(purgeMsg, `Eliminados ${data.deleted} snapshots`, "ok")
+                        } else {
+                            showMsg(purgeMsg, "Error al purgar", "error")
+                        }
+                    } catch {
+                        showMsg(purgeMsg, "Error de red", "error")
+                    } finally {
+                        purgeBtn.disabled = false
+                    }
+                }
+            })
+        })
+    }
+
+    // --- Formato de números ---
+    const numLocaleGrid = document.getElementById("ajustesNumLocaleGrid")
+    const numLocaleMsg  = document.getElementById("ajustesNumLocaleMsg")
+
+    function setActiveNumLocaleBtn(val) {
+        numLocaleGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
+            b.classList.toggle("active", b.dataset.locale === val)
+        )
+    }
+    setActiveNumLocaleBtn(settings.numLocale ?? "es-ES")
+
+    numLocaleGrid?.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".ajustesRefreshBtn")
+        if (!btn) return
+        const locale = btn.dataset.locale
+        setActiveNumLocaleBtn(locale)
+        try {
+            const res  = await fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ numLocale: locale })
+            })
+            const data = await res.json()
+            if (data.ok) {
+                window._numLocale = locale
+                showMsg(numLocaleMsg, "Guardado", "ok")
+            } else {
+                showMsg(numLocaleMsg, "Error", "error")
+            }
+        } catch {
+            showMsg(numLocaleMsg, "Error de red", "error")
+        }
+    })
+
+    // --- Formato de fecha ---
+    const dateFmtGrid = document.getElementById("ajustesDateFmtGrid")
+    const dateFmtMsg  = document.getElementById("ajustesDateFmtMsg")
+
+    function setActiveDateFmtBtn(val) {
+        dateFmtGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
+            b.classList.toggle("active", b.dataset.fmt === val)
+        )
+    }
+    setActiveDateFmtBtn(settings.dateFormat ?? "DD/MM/YYYY")
+
+    dateFmtGrid?.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".ajustesRefreshBtn")
+        if (!btn) return
+        const fmt = btn.dataset.fmt
+        setActiveDateFmtBtn(fmt)
+        try {
+            const res  = await fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ dateFormat: fmt })
+            })
+            const data = await res.json()
+            if (data.ok) {
+                window._dateFormat = fmt
+                showMsg(dateFmtMsg, "Guardado", "ok")
+            } else {
+                showMsg(dateFmtMsg, "Error", "error")
+            }
+        } catch {
+            showMsg(dateFmtMsg, "Error de red", "error")
+        }
+    })
+
+    // --- Límite de backups ---
+    const maxBackupsSel        = document.getElementById("ajustesMaxBackups")
+    const guardarMaxBackupsBtn = document.getElementById("ajustesGuardarMaxBackupsBtn")
+    const maxBackupsMsg        = document.getElementById("ajustesMaxBackupsMsg")
+
+    if (maxBackupsSel) setSelect(maxBackupsSel, settings.maxBackups ?? 0)
+
+    if (guardarMaxBackupsBtn) {
+        guardarMaxBackupsBtn.addEventListener("click", async () => {
+            guardarMaxBackupsBtn.disabled = true
+            showMsg(maxBackupsMsg, "Guardando…", "")
+            try {
+                const res  = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ maxBackups: Number(maxBackupsSel?.value ?? 0) })
+                })
+                const data = await res.json()
+                showMsg(maxBackupsMsg, data.ok ? "Guardado" : "Error", data.ok ? "ok" : "error")
+            } catch {
+                showMsg(maxBackupsMsg, "Error de red", "error")
+            } finally {
+                guardarMaxBackupsBtn.disabled = false
+            }
+        })
+    }
+
     // --- Tema ---
     initAjustesTema()
-
-    // --- Drag & lock ---
-    initAjustesDragLock()
 }
 
 function initAjustesTema() {
@@ -603,99 +1073,6 @@ function initAjustesTema() {
         const btn = e.target.closest(".ajustesTemaBtn")
         if (!btn) return
         applyTheme(btn.dataset.theme)
-    })
-}
-
-function initAjustesDragLock() {
-    const layout   = document.getElementById("ajustesLayout")
-    const colLeft  = document.getElementById("ajustesColLeft")
-    const colRight = document.getElementById("ajustesColRight")
-    if (!layout || !colLeft || !colRight) return
-
-    const LOCKS_KEY = "ajustesLocksV2"
-    const ORDER_KEY = "ajustesOrderV2"
-
-    // Load persisted locks (per section id)
-    let locks = {}
-    try { locks = JSON.parse(localStorage.getItem(LOCKS_KEY) || "{}") } catch { locks = {} }
-
-    // Apply saved column order
-    const savedOrder = JSON.parse(localStorage.getItem(ORDER_KEY) || "null")
-    if (savedOrder && savedOrder.left && savedOrder.right) {
-        savedOrder.left.forEach((id) => {
-            const el = layout.querySelector(`[data-ajuste-id="${id}"]`)
-            if (el) colLeft.appendChild(el)
-        })
-        savedOrder.right.forEach((id) => {
-            const el = layout.querySelector(`[data-ajuste-id="${id}"]`)
-            if (el) colRight.appendChild(el)
-        })
-    }
-
-    function saveOrder() {
-        const left  = [...colLeft.querySelectorAll(".ajustesSection")].map((s) => s.dataset.ajusteId)
-        const right = [...colRight.querySelectorAll(".ajustesSection")].map((s) => s.dataset.ajusteId)
-        localStorage.setItem(ORDER_KEY, JSON.stringify({ left, right }))
-    }
-
-    function isLocked(sec) {
-        return locks[sec.dataset.ajusteId] !== false
-    }
-
-    function applySection(sec) {
-        const locked = isLocked(sec)
-        sec.draggable = !locked
-        sec.classList.toggle("ajustesUnlocked", !locked)
-    }
-
-    layout.querySelectorAll(".ajustesSection").forEach(applySection)
-
-    // Toggle individual lock on click
-    layout.addEventListener("click", (e) => {
-        const lockBtn = e.target.closest(".ajustesLockBtn")
-        if (!lockBtn) return
-        const sec = lockBtn.closest(".ajustesSection")
-        if (!sec) return
-        const id = sec.dataset.ajusteId
-        locks[id] = !isLocked(sec)   // flip
-        localStorage.setItem(LOCKS_KEY, JSON.stringify(locks))
-        applySection(sec)
-    })
-
-    // Drag & drop (cross-column)
-    let dragSrc = null
-
-    layout.addEventListener("dragstart", (e) => {
-        const sec = e.target.closest(".ajustesSection")
-        if (!sec || isLocked(sec)) return
-        dragSrc = sec
-        sec.classList.add("ajustesDragging")
-        e.dataTransfer.effectAllowed = "move"
-    })
-
-    // Allow drop on both columns and their sections
-    ;[colLeft, colRight].forEach((col) => {
-        col.addEventListener("dragover", (e) => {
-            if (!dragSrc) return
-            e.preventDefault()
-            e.dataTransfer.dropEffect = "move"
-
-            const target = e.target.closest(".ajustesSection")
-            if (target && target !== dragSrc) {
-                const rect  = target.getBoundingClientRect()
-                const after = e.clientY > rect.top + rect.height / 2
-                col.insertBefore(dragSrc, after ? target.nextSibling : target)
-            } else if (!target) {
-                // Dropped onto empty col area — append
-                col.appendChild(dragSrc)
-            }
-        })
-    })
-
-    layout.addEventListener("dragend", () => {
-        if (dragSrc) dragSrc.classList.remove("ajustesDragging")
-        dragSrc = null
-        saveOrder()
     })
 }
 

@@ -4,11 +4,12 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
+from alpha_vantage_client import search_symbol as search_av_symbol
 from app_data import readFinnhubApiKey
 from asset_store import listAssets
 from eodhd_client import search_symbol as search_eodhd_symbol
 from finnhub_client import fetch_candle_close, fetch_exchange_rate, search_symbol
-from helpers import call_eodhd_with_fallbacks, is_temporary_service_error, normalize_currency_code, parse_loose_number
+from helpers import call_alpha_vantage_with_fallbacks, call_eodhd_with_fallbacks, is_temporary_service_error, normalize_currency_code, parse_loose_number
 from yahoo_finance_client import search_symbol as search_yahoo_symbol
 
 _hist_cache = {}   # {period: {"data": {...}, "ts": float}}
@@ -19,8 +20,12 @@ market_bp = Blueprint("market", __name__)
 
 @market_bp.route("/api/exchange-rate", methods=["GET"])
 def getExchangeRate():
-    source_currency = normalize_currency_code(request.args.get("source", ""), fallback="EUR")
-    target_currency = normalize_currency_code(request.args.get("target", ""), fallback=source_currency)
+    source_currency = normalize_currency_code(
+        request.args.get("source") or request.args.get("from", ""), fallback="EUR"
+    )
+    target_currency = normalize_currency_code(
+        request.args.get("target") or request.args.get("to", ""), fallback=source_currency
+    )
 
     if source_currency == target_currency:
         return jsonify({"ok": True, "source": source_currency, "target": target_currency, "rate": 1.0})
@@ -130,6 +135,22 @@ def searchYahooSymbol():
 
     if error:
         statusCode = 503 if is_temporary_service_error(error) else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    return jsonify({"ok": True, "results": results})
+
+
+@market_bp.route("/api/alphavantage/search", methods=["GET"])
+def searchAlphaVantageSymbol():
+    query = str(request.args.get("q", "")).strip()
+    assetName = str(request.args.get("assetName", "")).strip()
+    assetType = str(request.args.get("assetType", "")).strip()
+    results, error = call_alpha_vantage_with_fallbacks(
+        lambda apiKey: search_av_symbol(query, apiKey, asset_name=assetName, preferred_asset_type=assetType)
+    )
+
+    if error:
+        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})

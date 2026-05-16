@@ -8,11 +8,13 @@ from asset_utils import (
     normalizeMarketProvider, sanitizeAssetPayload, sanitizeAssetType, sanitize_color, slugify,
     _MAX_TICKER, _trunc,
 )
+from alpha_vantage_client import fetch_quote as fetch_av_quote
 from eodhd_client import fetch_quote as fetch_eodhd_quote
 from finnhub_client import convert_amount, convert_quote_currency, fetch_quote
 from yahoo_finance_client import fetch_quote as fetch_yahoo_quote
 from helpers import (
-    call_eodhd_with_fallbacks, convert_asset_rows_currency, format_decimal,
+    call_alpha_vantage_with_fallbacks, call_eodhd_with_fallbacks,
+    convert_asset_rows_currency, format_decimal,
     is_temporary_service_error, normalize_currency_code, parse_loose_number,
 )
 
@@ -219,6 +221,8 @@ def refreshActivoMarketData(assetId):
         quote, error = call_eodhd_with_fallbacks(lambda apiKey: fetch_eodhd_quote(marketSymbol, apiKey))
     elif marketProvider == "yahoo":
         quote, error = fetch_yahoo_quote(marketSymbol)
+    elif marketProvider == "alphavantage":
+        quote, error = call_alpha_vantage_with_fallbacks(lambda apiKey: fetch_av_quote(marketSymbol, apiKey))
     else:
         apiKey = readFinnhubApiKey()
         quote, error = fetch_quote(marketSymbol, apiKey)
@@ -335,3 +339,46 @@ def deleteActivo(assetId):
         return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
 
     return jsonify({"ok": True})
+
+
+@activos_bp.route("/api/metricas/inversiones", methods=["GET"])
+def getMetricasInversiones():
+    conn = get_db()
+
+    spot_rows = conn.execute(
+        "SELECT fecha_operacion, tipo_operacion, capital_invertido_bruto FROM activo_rows"
+    ).fetchall()
+
+    op_rows = conn.execute(
+        "SELECT fecha_apertura, orden, total FROM activo_operation_rows WHERE estado = 'Completado'"
+    ).fetchall()
+
+    by_month = {}
+    by_year = {}
+
+    for row in spot_rows:
+        tipo = str(row["tipo_operacion"] or "").strip().lower()
+        if tipo == "venta":
+            continue
+        parts = str(row["fecha_operacion"] or "").strip().split("-")
+        if len(parts) != 3:
+            continue
+        capital = parse_loose_number(str(row["capital_invertido_bruto"] or "")) or 0
+        month, year = parts[1].zfill(2), parts[2]
+        key = f"{year}-{month}"
+        by_month[key] = by_month.get(key, 0) + capital
+        by_year[year] = by_year.get(year, 0) + capital
+
+    for row in op_rows:
+        if str(row["orden"] or "").strip().lower() == "venta":
+            continue
+        parts = str(row["fecha_apertura"] or "").strip().split("-")
+        if len(parts) != 3:
+            continue
+        total = parse_loose_number(str(row["total"] or "")) or 0
+        month, year = parts[1].zfill(2), parts[2]
+        key = f"{year}-{month}"
+        by_month[key] = by_month.get(key, 0) + total
+        by_year[year] = by_year.get(year, 0) + total
+
+    return jsonify({"byMonth": by_month, "byYear": by_year})

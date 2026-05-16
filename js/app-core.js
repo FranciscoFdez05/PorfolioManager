@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchAssetTickerFinnhubButton = document.getElementById("searchAssetTickerFinnhubBtn")
     const searchAssetTickerEodhdButton = document.getElementById("searchAssetTickerEodhdBtn")
     const searchAssetTickerYahooButton = document.getElementById("searchAssetTickerYahooBtn")
+    const searchAssetTickerAlphaVantageButton = document.getElementById("searchAssetTickerAlphaVantageBtn")
     const confirmModalOverlay = document.getElementById("confirmModalOverlay")
     const confirmModalAcceptButton = document.getElementById("confirmModalAcceptBtn")
     const confirmModalCancelButton = document.getElementById("confirmModalCancelBtn")
@@ -32,9 +33,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         assetTickerInput,
         searchAssetTickerFinnhubButton,
         searchAssetTickerEodhdButton,
-        searchAssetTickerYahooButton
+        searchAssetTickerYahooButton,
+        searchAssetTickerAlphaVantageButton
     )
     initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
+    applyDensidadSidebar(localStorage.getItem("portfolioDensity") || "normal")
     await loadGlobalSettings()
     applySidebarState(sideWrapper, toggleButton)
     await refreshAssetsSidebar()
@@ -66,12 +69,23 @@ async function loadGlobalSettings() {
             window._gastosHiddenTipos           = data.gastosHiddenTipos ?? []
             window._gastosHiddenMensualidades   = data.gastosHiddenMensualidades ?? []
             window._metricasActivosHidden       = data.metricasActivosHidden ?? []
+            window._metricasSectionsCollapsed   = data.metricasSectionsCollapsed ?? []
             window._sidebarCollapsed            = data.sidebarCollapsed ?? false
             window._monedaBase                  = data.monedaBase ?? "EUR"
             window._autoRefreshMinutes          = data.autoRefreshMinutes ?? 0
             window._snapshotMinutes             = data.snapshotMinutes ?? 60
+            window._soloHorarioMercado          = data.soloHorarioMercado ?? false
+            window._soloMercadoTipos            = data.soloMercadoTipos ?? ["acciones", "etfs", "comoditis"]
+            window._bloqueoInactividad          = data.bloqueoInactividad ?? 0
+            window._precioDecimales_acciones    = data.precioDecimalesAcciones ?? 2
+            window._precioDecimales_etfs        = data.precioDecimalesEtf ?? 2
+            window._precioDecimales_comoditis   = data.precioDecimalesComoditis ?? 2
+            window._precioDecimales_cripto      = data.precioDecimalesCripto ?? 4
+            window._numLocale                   = data.numLocale ?? "es-ES"
+            window._dateFormat                  = data.dateFormat ?? "DD/MM/YYYY"
             applyAutoRefresh(window._autoRefreshMinutes)
             applySnapshotSchedule(window._snapshotMinutes)
+            applyBloqueoInactividad(window._bloqueoInactividad)
         }
     } catch {
         window._settingsStaleHours      = 24
@@ -82,10 +96,20 @@ async function loadGlobalSettings() {
         window._gastosHiddenTipos           = []
         window._gastosHiddenMensualidades   = []
         window._metricasActivosHidden       = []
+        window._metricasSectionsCollapsed   = []
         window._sidebarCollapsed            = false
         window._monedaBase                  = "EUR"
         window._autoRefreshMinutes          = 0
         window._snapshotMinutes             = 60
+        window._soloHorarioMercado          = false
+        window._soloMercadoTipos            = ["acciones", "etfs", "comoditis"]
+        window._bloqueoInactividad          = 0
+        window._precioDecimales_acciones    = 2
+        window._precioDecimales_etfs        = 2
+        window._precioDecimales_comoditis   = 2
+        window._precioDecimales_cripto      = 4
+        window._numLocale                   = "es-ES"
+        window._dateFormat                  = "DD/MM/YYYY"
     }
 }
 
@@ -98,7 +122,19 @@ function applyAutoRefresh(minutes) {
 
     const intervalMs = minutes * 60 * 1000
 
+    function _mercadoEstaAbierto() {
+        const now = new Date()
+        const day = now.getDay()
+        const hour = now.getHours()
+        if (day === 0 || day === 6) return false
+        return hour >= 8 && hour < 22
+    }
+
     async function doRefresh() {
+        if (window._soloHorarioMercado && !_mercadoEstaAbierto()) {
+            const tipos = window._soloMercadoTipos ?? ["acciones", "etfs", "comoditis"]
+            if (tipos.length > 0) return
+        }
         await refreshAssetsSidebar()
         await refreshOverviewMarketData()
     }
@@ -351,6 +387,14 @@ function initAssetSelector(assetButtons) {
 function initNavigation(navButtons, contentArea) {
     navButtons.forEach((button) => {
         button.addEventListener("click", () => {
+            const page = button.dataset.page
+
+            // Ajustes abre un overlay propio, sin cambiar de página
+            if (page === "ajustes") {
+                openSettingsModal()
+                return
+            }
+
             navButtons.forEach((item) => item.classList.remove("active"))
             document.querySelectorAll(".navDropdownBtn").forEach((b) => b.classList.remove("active"))
             button.classList.add("active")
@@ -361,7 +405,6 @@ function initNavigation(navButtons, contentArea) {
                 parentMenu.querySelector(".navDropdownMenu").classList.remove("open")
             }
 
-            const page = button.dataset.page
             loadPage(page, contentArea)
         })
     })
@@ -525,8 +568,6 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initHeatmapLogic()
         } else if (page === "seguimiento") {
             await initSeguimientoLogic()
-        } else if (page === "ajustes") {
-            await initAjustesLogic()
         }
     } catch (error) {
         console.error(error)
@@ -759,12 +800,16 @@ function initResizeHandles() {
 function initMoneyToggle() {
     const btn = document.getElementById("toggleMoneyBtn")
     if (!btn) return
-    const hidden = localStorage.getItem("moneyHidden") === "1"
+
+    const ocultarAlInicio = localStorage.getItem("portfolioOcultarInicio") === "1"
+    const hidden = ocultarAlInicio || localStorage.getItem("moneyHidden") === "1"
+
     if (hidden) {
         document.body.classList.add("money-hidden")
         btn.classList.add("money-hidden-active")
         btn.title = "Mostrar valores"
         btn.textContent = "🙈"
+        if (ocultarAlInicio) localStorage.setItem("moneyHidden", "1")
     }
     btn.addEventListener("click", () => {
         const isHidden = document.body.classList.toggle("money-hidden")
@@ -773,4 +818,31 @@ function initMoneyToggle() {
         btn.textContent = isHidden ? "🙈" : "👁"
         localStorage.setItem("moneyHidden", isHidden ? "1" : "0")
     })
+}
+
+function applyDensidadSidebar(val) {
+    if (val === "compact") {
+        document.documentElement.dataset.density = "compact"
+    } else {
+        delete document.documentElement.dataset.density
+    }
+}
+
+let _inactivityTimer = null
+function applyBloqueoInactividad(minutes) {
+    if (_inactivityTimer) { clearTimeout(_inactivityTimer); _inactivityTimer = null }
+    if (!minutes || minutes <= 0) return
+
+    const ms = minutes * 60 * 1000
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart"]
+
+    function resetTimer() {
+        if (_inactivityTimer) clearTimeout(_inactivityTimer)
+        _inactivityTimer = setTimeout(() => {
+            window.location.href = "/logout"
+        }, ms)
+    }
+
+    events.forEach((ev) => document.addEventListener(ev, resetTimer, { passive: true }))
+    resetTimer()
 }

@@ -102,7 +102,7 @@ def _score_result(item, normalized_query, normalized_asset_name="", preferred_as
 def _fetch_one_price(symbol, timeout=5):
     try:
         payload = _fetch_json(
-            f"{YAHOO_CHART_URL}/{quote(symbol)}",
+            f"{YAHOO_CHART_URL}/{quote(symbol, safe='=')}",
             {"range": "1d", "interval": "1d"},
             timeout=timeout,
         )
@@ -131,11 +131,51 @@ def _fetch_prices(symbols, timeout=8):
     return result
 
 
+_YAHOO_DIRECT_RE = re.compile(r"^[A-Z0-9^]{1,10}(=[XFx])?$", re.IGNORECASE)
+_FOREX_SUFFIX_RE = re.compile(r"^([A-Z]{3})([A-Z]{3})=X$", re.IGNORECASE)
+_PRECIOUS_METALS = {"XAU", "XAG", "XPT", "XPD"}
+_METAL_NAMES     = {"XAU": "Gold", "XAG": "Silver", "XPT": "Platinum", "XPD": "Palladium"}
+
+
+def _synthetic_yahoo_result(symbol, description, asset_type="forex", currency=""):
+    return {
+        "symbol":        symbol.upper(),
+        "displaySymbol": symbol.upper(),
+        "description":   description,
+        "type":          asset_type,
+        "exchange":      "Yahoo Finance",
+        "provider":      "yahoo",
+        "price":         "",
+        "currency":      currency.upper(),
+        "change":        "",
+    }
+
+
 def search_symbol(query_text, timeout=10, limit=8, asset_name="", preferred_asset_type=""):
-    normalized_query = str(query_text or "").strip()
+    normalized_query = str(query_text or "").strip().upper()
 
     if not normalized_query:
         return None, "Escribe un nombre o ticker para buscar"
+
+    # Forex pairs like XAUEUR=X, EURUSD=X — Yahoo search doesn't index these,
+    # but the chart API can fetch them directly.
+    m = _FOREX_SUFFIX_RE.match(normalized_query)
+    if m:
+        from_cur, to_cur = m.group(1).upper(), m.group(2).upper()
+        from_name = _METAL_NAMES.get(from_cur, from_cur)
+        to_name   = _METAL_NAMES.get(to_cur,   to_cur)
+        result = _synthetic_yahoo_result(
+            normalized_query,
+            f"{from_name} / {to_name}",
+            asset_type="forex",
+            currency=to_cur,
+        )
+        quote_data, _ = fetch_quote(normalized_query, timeout=timeout)
+        if quote_data:
+            result["price"]    = quote_data["price"]
+            result["change"]   = quote_data.get("change", "")
+            result["currency"] = quote_data.get("currency") or to_cur
+        return [result], None
 
     record_api_call("Yahoo Finance")
 
@@ -216,7 +256,7 @@ def fetch_quote(symbol, timeout=10):
 
     try:
         payload = _fetch_json(
-            f"{YAHOO_CHART_URL}/{quote(normalized_symbol)}",
+            f"{YAHOO_CHART_URL}/{quote(normalized_symbol, safe='=')}",
             {"range": "2d", "interval": "1d"},
             timeout=timeout,
         )

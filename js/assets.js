@@ -653,6 +653,22 @@ async function searchYahooSymbolOnServer(query, { assetName = "", assetType = ""
     return await response.json()
 }
 
+async function searchAlphaVantageSymbolOnServer(query, { assetName = "", assetType = "" } = {}) {
+    const params = new URLSearchParams({ q: query })
+
+    if (assetName) params.set("assetName", assetName)
+    if (assetType) params.set("assetType", assetType)
+
+    const response = await fetch(`/api/alphavantage/search?${params.toString()}`)
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
+}
+
 function extractApiErrorMessage(error) {
     const rawMessage = String(error?.message || "Error desconocido")
     const jsonStart = rawMessage.indexOf("{")
@@ -2807,6 +2823,36 @@ async function handleYahooSearch({ query, assetName = "", assetType = "", feedba
     }
 }
 
+async function handleAlphaVantageSearch({ query, assetName = "", assetType = "", feedbackElement, resultsElement, onSelect }) {
+    const normalizedQuery = String(query || "").trim()
+
+    if (!normalizedQuery) {
+        setAssetSearchFeedback(feedbackElement, "Escribe el nombre o ticker del activo.", true)
+        renderMarketSearchResults(resultsElement, [], onSelect)
+        return
+    }
+
+    setAssetSearchFeedback(feedbackElement, "Buscando ticker en Alpha Vantage...")
+
+    try {
+        const response = await searchAlphaVantageSymbolOnServer(normalizedQuery, { assetName, assetType })
+        const results = Array.isArray(response.results) ? response.results : []
+
+        if (!results.length) {
+            setAssetSearchFeedback(feedbackElement, "No se encontraron resultados en Alpha Vantage para esa búsqueda.", true)
+            renderMarketSearchResults(resultsElement, [], onSelect)
+            return
+        }
+
+        setAssetSearchFeedback(feedbackElement, "Selecciona el ticker correcto de Alpha Vantage.")
+        renderMarketSearchResults(resultsElement, results, onSelect)
+    } catch (error) {
+        console.error(error)
+        setAssetSearchFeedback(feedbackElement, extractApiErrorMessage(error), true)
+        renderMarketSearchResults(resultsElement, [], onSelect)
+    }
+}
+
 async function refreshCurrentAssetMarketData({ feedbackElement = null, successMessage = "" } = {}) {
     if (!currentAssetId) {
         return
@@ -3165,11 +3211,10 @@ function initAssetTableLogic(asset) {
             assetMenuDropdown.classList.remove("open")
             assetMenuBtn.classList.remove("active")
         })
-        document.addEventListener("click", function closeMenu(e) {
+        document.addEventListener("click", (e) => {
             if (!assetMenuBtn.contains(e.target) && !assetMenuDropdown.contains(e.target)) {
                 assetMenuDropdown.classList.remove("open")
                 assetMenuBtn.classList.remove("active")
-                document.removeEventListener("click", closeMenu)
             }
         })
     }
@@ -3516,7 +3561,20 @@ function closeConfirmModal() {
 
     confirmModalOverlay.classList.add("hidden")
     document.querySelector(".confirmModalActions")?.classList.remove("confirmPrimaryRight")
+    document.getElementById("confirmModalCancelBtn")?.classList.remove("hidden")
     confirmModalState = null
+}
+
+function showAlert(message, title = "Aviso") {
+    const cancelBtn = document.getElementById("confirmModalCancelBtn")
+    if (cancelBtn) cancelBtn.classList.add("hidden")
+    openConfirmModal({
+        title,
+        message,
+        confirmLabel: "Aceptar",
+        confirmSide: "right",
+        onConfirm: null,
+    })
 }
 
 function initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton) {
@@ -3604,6 +3662,7 @@ function initEditAssetModal() {
     const editSearchFinnhubButton = document.getElementById("editSearchAssetTickerFinnhubBtn")
     const editSearchEodhdButton = document.getElementById("editSearchAssetTickerEodhdBtn")
     const editSearchYahooButton = document.getElementById("editSearchAssetTickerYahooBtn")
+    const editSearchAlphaVantageButton = document.getElementById("editSearchAssetTickerAlphaVantageBtn")
     const editAssetSearchFeedback = document.getElementById("editAssetSearchFeedback")
     const editAssetSearchResults = document.getElementById("editAssetSearchResults")
 
@@ -3699,6 +3758,23 @@ function initEditAssetModal() {
             })
         })
     }
+
+    if (editSearchAlphaVantageButton) {
+        editSearchAlphaVantageButton.addEventListener("click", async () => {
+            const typedTicker = editAssetTickerInput?.value.trim() || ""
+            const typedName = editAssetNameInput?.value.trim() || ""
+            const searchQuery = typedTicker || typedName
+
+            await handleAlphaVantageSearch({
+                query: searchQuery,
+                assetName: typedName,
+                assetType: "",
+                feedbackElement: editAssetSearchFeedback,
+                resultsElement: editAssetSearchResults,
+                onSelect: (result) => runEditTickerSelection(result, "Alpha Vantage")
+            })
+        })
+    }
 }
 
 function initAddAssetButton(addAssetButton) {
@@ -3711,7 +3787,7 @@ function initAddAssetButton(addAssetButton) {
     })
 }
 
-function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect, assetTickerInput, searchAssetTickerFinnhubButton, searchAssetTickerEodhdButton, searchAssetTickerYahooButton) {
+function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetModalButton, assetNameInput, assetTypeSelect, assetTickerInput, searchAssetTickerFinnhubButton, searchAssetTickerEodhdButton, searchAssetTickerYahooButton, searchAssetTickerAlphaVantageButton) {
     const assetSearchFeedback = document.getElementById("assetSearchFeedback")
     const assetSearchResults = document.getElementById("assetSearchResults")
     initEditAssetModal()
@@ -3816,6 +3892,23 @@ function initAssetModal(assetModalOverlay, confirmAssetModalButton, cancelAssetM
                 feedbackElement: assetSearchFeedback,
                 resultsElement: assetSearchResults,
                 onSelect: (result) => runTickerSelection(result, "Yahoo Finance")
+            })
+        })
+    }
+
+    if (searchAssetTickerAlphaVantageButton) {
+        searchAssetTickerAlphaVantageButton.addEventListener("click", async () => {
+            const typedTicker = assetTickerInput?.value.trim() || ""
+            const typedName = assetNameInput?.value.trim() || ""
+            const searchQuery = typedName || typedTicker
+
+            await handleAlphaVantageSearch({
+                query: searchQuery,
+                assetName: typedName,
+                assetType: assetTypeSelect?.value || "",
+                feedbackElement: assetSearchFeedback,
+                resultsElement: assetSearchResults,
+                onSelect: (result) => runTickerSelection(result, "Alpha Vantage")
             })
         })
     }

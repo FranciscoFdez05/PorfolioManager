@@ -1,4 +1,4 @@
-from app_data import readEodhdApiKey, readRotatedEodhdApiKeys
+from app_data import readAlphaVantageApiKey, readEodhdApiKey, readRotatedAlphaVantageApiKeys, readRotatedEodhdApiKeys
 from asset_store import listAssets, readAssetFile, writeAssetFile
 from asset_utils import sanitizeAssetOperationRows, slugify
 from finnhub_client import convert_amount
@@ -43,6 +43,35 @@ def call_eodhd_with_fallbacks(callback):
         lastError = error
 
     return None, lastError or "Todas las API keys de EODHD han fallado"
+
+
+def call_alpha_vantage_with_fallbacks(callback):
+    apiKeys = readRotatedAlphaVantageApiKeys()
+
+    if not apiKeys:
+        legacyKey = readAlphaVantageApiKey()
+
+        if legacyKey:
+            apiKeys = [legacyKey]
+
+    if not apiKeys:
+        return None, "No se ha encontrado ninguna API key de Alpha Vantage"
+
+    lastError = None
+
+    for apiKey in apiKeys:
+        try:
+            result, error = callback(apiKey)
+        except Exception as exc:
+            result = None
+            error = str(exc)
+
+        if not error:
+            return result, None
+
+        lastError = error
+
+    return None, lastError or "Todas las API keys de Alpha Vantage han fallado"
 
 
 def parse_loose_number(value):

@@ -160,7 +160,7 @@ function addStakingCripto() {
                 await saveStakingToServer()
             } catch (error) {
                 console.error(error)
-                alert("No se pudo guardar la nueva cripto.")
+                showAlert("No se pudo guardar la nueva cripto.")
             }
         }
     })
@@ -180,7 +180,7 @@ function renameStakingCripto(id) {
                 await saveStakingToServer()
             } catch (error) {
                 console.error(error)
-                alert("No se pudo guardar el nombre.")
+                showAlert("No se pudo guardar el nombre.")
             }
         }
     })
@@ -210,7 +210,7 @@ function deleteStakingCripto(id) {
                 await saveStakingToServer()
             } catch (error) {
                 console.error(error)
-                alert("No se pudo eliminar la cripto.")
+                showAlert("No se pudo eliminar la cripto.")
             }
         }
     })
@@ -421,7 +421,7 @@ function updateStakingTotals() {
 
 function addStakingRow() {
     if (!stakingCurrentCriptoId) {
-        alert("Primero selecciona o crea una cripto de staking.")
+        showAlert("Primero selecciona o crea una cripto de staking.")
         return
     }
     openStakingModal()
@@ -448,7 +448,7 @@ function handleStakingRowActionClick(event) {
     }
 
     if (isEmpty) {
-        removeRow().catch(err => { console.error(err); alert("No se pudo eliminar la fila.") })
+        removeRow().catch(err => { console.error(err); showAlert("No se pudo eliminar la fila.") })
         return
     }
 
@@ -457,7 +457,7 @@ function handleStakingRowActionClick(event) {
         message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
         confirmLabel: "Eliminar",
         onConfirm: async () => {
-            try { await removeRow() } catch (err) { console.error(err); alert("No se pudo eliminar la fila.") }
+            try { await removeRow() } catch (err) { console.error(err); showAlert("No se pudo eliminar la fila.") }
         }
     })
 }
@@ -470,7 +470,7 @@ function addStakingYear() {
         defaultValue: String(new Date().getFullYear()),
         onConfirm: (yearStr) => {
             if (!/^\d{4}$/.test(yearStr)) {
-                alert("Año no válido. Introduce 4 dígitos (ej: 2027).")
+                showAlert("Año no válido. Introduce 4 dígitos (ej: 2027).")
                 return
             }
             openStakingModal(-1, `01-${yearStr}`)
@@ -495,7 +495,7 @@ function deleteCurrentStakingYear() {
                 await saveStakingToServer()
             } catch (error) {
                 console.error(error)
-                alert("No se pudo eliminar el año.")
+                showAlert("No se pudo eliminar el año.")
             }
         }
     })

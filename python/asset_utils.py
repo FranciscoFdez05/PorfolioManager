@@ -8,7 +8,7 @@ _HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 def sanitize_color(value):
     s = str(value or "").strip()
     return s if _HEX_COLOR_RE.match(s) else ""
-ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd", "yahoo"}
+ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd", "yahoo", "alphavantage"}
 EODHD_EXCHANGE_CODES = {"XETRA", "PA", "LSE", "US", "SW", "AS", "MC", "MI", "DU", "BE", "F", "MU", "ST", "VI", "LS", "FOREX", "CC"}
 
 _MAX_NAME = 120

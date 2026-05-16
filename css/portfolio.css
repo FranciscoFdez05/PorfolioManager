@@ -413,6 +413,7 @@ body{
     background:#0f1724;
 }
 
+
 .contentArea{
     width:100%;
     min-width:0;
@@ -5257,6 +5258,7 @@ html[data-theme="black"] .segHideBtn:hover{ background:#111; color:#f39c12; bord
 
 .mkpiGroupPortfolio .metricasKpiCard{ border-top-color:#3a7bd5; }
 .mkpiGroupIngresos  .metricasKpiCard{ border-top-color:#2ecc71; }
+.mkpiGroupPasivos   .metricasKpiCard{ border-top-color:#1abc9c; }
 .mkpiGroupBonos     .metricasKpiCard{ border-top-color:#9b59b6; }
 .mkpiGroupRf        .metricasKpiCard{ border-top-color:#9b59b6; }
 .mkpiGroupGastos    .metricasKpiCard{ border-top-color:#e74c3c; }

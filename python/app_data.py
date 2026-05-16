@@ -6,6 +6,7 @@ from db import get_db, init_db
 baseDir = Path(__file__).resolve().parent.parent
 apiDir = baseDir / "API"
 _eodhdKeyRotationIndex = 0
+_alphaVantageKeyRotationIndex = 0
 
 
 def _read_first_api_key(file_path):
@@ -573,6 +574,45 @@ def readEodhdApiKey():
         if first_key:
             return first_key
     return _read_first_api_key(apiDir / "eodhd.key")
+
+
+def readAlphaVantageApiKey():
+    env_keys = os.environ.get("ALPHA_VANTAGE_API_KEYS", "").strip()
+    if env_keys:
+        first_key = env_keys.split(",")[0].strip()
+        if first_key:
+            return first_key
+    return _read_first_api_key(apiDir / "alphavantage.key")
+
+
+def readAlphaVantageApiKeys():
+    env_keys_str = os.environ.get("ALPHA_VANTAGE_API_KEYS", "").strip()
+    if env_keys_str:
+        return [k.strip() for k in env_keys_str.split(",") if k.strip()]
+
+    keyFile = apiDir / "alphavantage.key"
+    if not keyFile.exists():
+        return []
+
+    seen = set()
+    apiKeys = []
+    with keyFile.open("r", encoding="utf-8") as file:
+        for line in file:
+            apiKey = line.strip()
+            if apiKey and not apiKey.startswith("#") and apiKey not in seen:
+                apiKeys.append(apiKey)
+                seen.add(apiKey)
+    return apiKeys
+
+
+def readRotatedAlphaVantageApiKeys():
+    global _alphaVantageKeyRotationIndex
+    apiKeys = readAlphaVantageApiKeys()
+    if not apiKeys:
+        return []
+    startIndex = _alphaVantageKeyRotationIndex % len(apiKeys)
+    _alphaVantageKeyRotationIndex = (startIndex + 1) % len(apiKeys)
+    return apiKeys[startIndex:] + apiKeys[:startIndex]
 
 
 def readEodhdApiKeys():

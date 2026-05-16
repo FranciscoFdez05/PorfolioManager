@@ -17,12 +17,28 @@ let _segFilterSrc   = "all"
 let _segSearch      = ""
 let _segViewMode    = localStorage.getItem("whitelistViewMode") || "cards"
 
+function _segPid() {
+    return window._activePortfolioId || "default"
+}
+
 function segLoadCustomItems() {
-    try { return JSON.parse(localStorage.getItem("seguimientoList") || "[]") }
-    catch { return [] }
+    const key    = `seguimientoList_${_segPid()}`
+    const legacy = "seguimientoList"
+    try {
+        const stored = localStorage.getItem(key)
+        if (stored !== null) return JSON.parse(stored)
+        // Migración desde clave sin namespace
+        const old = localStorage.getItem(legacy)
+        if (old) {
+            localStorage.setItem(key, old)
+            localStorage.removeItem(legacy)
+            return JSON.parse(old)
+        }
+        return []
+    } catch { return [] }
 }
 function segSaveCustomItems(items) {
-    localStorage.setItem("seguimientoList", JSON.stringify(items))
+    localStorage.setItem(`seguimientoList_${_segPid()}`, JSON.stringify(items))
 }
 
 function segFilteredItems() {
@@ -188,10 +204,23 @@ function segRenderTable(filtered) {
 }
 
 function segLoadHidden() {
-    try { return new Set(JSON.parse(localStorage.getItem("seguimientoHidden") || "[]")) } catch { return new Set() }
+    const key    = `seguimientoHidden_${_segPid()}`
+    const legacy = "seguimientoHidden"
+    try {
+        const stored = localStorage.getItem(key)
+        if (stored !== null) return new Set(JSON.parse(stored))
+        // Migración desde clave sin namespace
+        const old = localStorage.getItem(legacy)
+        if (old) {
+            localStorage.setItem(key, old)
+            localStorage.removeItem(legacy)
+            return new Set(JSON.parse(old))
+        }
+        return new Set()
+    } catch { return new Set() }
 }
 function segSaveHidden(set) {
-    localStorage.setItem("seguimientoHidden", JSON.stringify([...set]))
+    localStorage.setItem(`seguimientoHidden_${_segPid()}`, JSON.stringify([...set]))
 }
 
 function segHideItem(segId) {
@@ -420,7 +449,7 @@ function segMergeAndRender(portfolioAssets) {
         }))
 
     const hidden    = segLoadHidden()
-    const overrides = JSON.parse(localStorage.getItem("seguimientoOverrides") || "{}")
+    const overrides = JSON.parse(localStorage.getItem(`seguimientoOverrides_${_segPid()}`) || localStorage.getItem("seguimientoOverrides") || "{}")
 
     const portfolioItems = portfolioAssets
         .filter(a => !hidden.has(`portfolio_${a.id}`))
@@ -462,6 +491,7 @@ async function initSeguimientoLogic() {
     const segFinnhubBtn      = document.getElementById("segSearchFinnhubBtn")
     const segEodhdBtn        = document.getElementById("segSearchEodhdBtn")
     const segYahooBtn        = document.getElementById("segSearchYahooBtn")
+    const segAlphaVantageBtn = document.getElementById("segSearchAlphaVantageBtn")
     const segSearchFeedback  = document.getElementById("segSearchFeedback")
     const segSearchResults   = document.getElementById("segSearchResults")
 
@@ -738,6 +768,19 @@ async function initSeguimientoLogic() {
         })
     })
 
+    segAlphaVantageBtn?.addEventListener("click", async () => {
+        if (typeof handleAlphaVantageSearch !== "function") return
+        const query = nombreInput?.value.trim() || tickerInput?.value.trim() || ""
+        await handleAlphaVantageSearch({
+            query,
+            assetName: nombreInput?.value.trim() || "",
+            assetType: typeSelect?.value || "",
+            feedbackElement: segSearchFeedback,
+            resultsElement: segSearchResults,
+            onSelect: (r) => segTickerSelected(r, "Alpha Vantage")
+        })
+    })
+
     confirmBtn?.addEventListener("click", () => {
         const nombre = nombreInput?.value.trim()
         if (!nombre) { nombreInput?.focus(); return }
@@ -889,6 +932,18 @@ async function initSeguimientoLogic() {
             feedbackElement: editFeedback,
             resultsElement: editResults,
             onSelect: (r) => editTickerSelected(r, "Yahoo Finance")
+        })
+    })
+
+    document.getElementById("segEditSearchAlphaVantageBtn")?.addEventListener("click", async () => {
+        if (typeof handleAlphaVantageSearch !== "function") return
+        await handleAlphaVantageSearch({
+            query: editNombreInput?.value.trim() || editTickerInput?.value.trim() || "",
+            assetName: editNombreInput?.value.trim() || "",
+            assetType: editTypeSelect?.value || "",
+            feedbackElement: editFeedback,
+            resultsElement: editResults,
+            onSelect: (r) => editTickerSelected(r, "Alpha Vantage")
         })
     })
 }

@@ -8,6 +8,8 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
+from routes.ajustes import _read_ajustes
+
 backup_bp = Blueprint("backup", __name__)
 
 _BASE_DIR    = Path(__file__).resolve().parent.parent.parent
@@ -15,6 +17,7 @@ _BACKUP_DIR  = _BASE_DIR / "data" / "backups"
 _PORTFOLIOS_DIR = _BASE_DIR / "data" / "portfolios"
 _META_FILE   = _BASE_DIR / "data" / "portfolios.json"
 _AJUSTES_SRC = _BASE_DIR / "data" / "JSON" / "ajustes.json"
+_JSON_DIR    = _BASE_DIR / "data" / "JSON"
 
 _RE_ZIP = re.compile(r'^backup_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.zip$')
 _RE_DB  = re.compile(r'^portfolio_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.db$')
@@ -88,11 +91,23 @@ def createBackup():
         if _META_FILE.exists():
             zf.write(str(_META_FILE), "portfolios.json")
 
-        # Ajustes
+        # Ajustes globales
         if _AJUSTES_SRC.exists():
             zf.write(str(_AJUSTES_SRC), "ajustes.json")
 
-    return jsonify({"ok": True, "filename": filename, "backups": _list_backups()})
+        # Preferencias por-portfolio
+        if _JSON_DIR.exists():
+            for prefs_file in sorted(_JSON_DIR.glob("prefs_*.json")):
+                zf.write(str(prefs_file), f"prefs/{prefs_file.name}")
+
+    all_backups = _list_backups()
+    max_backups = int(_read_ajustes().get("maxBackups") or 0)
+    if max_backups > 0 and len(all_backups) > max_backups:
+        for old in all_backups[max_backups:]:
+            ((_BACKUP_DIR / old)).unlink(missing_ok=True)
+        all_backups = _list_backups()
+
+    return jsonify({"ok": True, "filename": filename, "backups": all_backups})
 
 
 @backup_bp.route("/api/backups", methods=["GET"])
@@ -143,6 +158,14 @@ def restoreBackup():
             if "ajustes.json" in names:
                 _AJUSTES_SRC.parent.mkdir(parents=True, exist_ok=True)
                 _AJUSTES_SRC.write_bytes(zf.read("ajustes.json"))
+
+            # Restaurar preferencias por-portfolio
+            for name in names:
+                if name.startswith("prefs/") and name.endswith(".json"):
+                    prefs_name = Path(name).name
+                    dst = _JSON_DIR / prefs_name
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    dst.write_bytes(zf.read(name))
 
         # Re-activar el portfolio que estaba activo en el backup
         try:
