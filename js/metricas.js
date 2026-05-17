@@ -20,6 +20,14 @@ let _mGastosChartsCache = null
 const M_GASTOS_KEYS   = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
 const M_GASTOS_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
 
+const _M_ES_MONTH_MAP = {
+    ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12,div:12,
+    enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,
+    septiembre:9,octubre:10,noviembre:11,diciembre:12
+}
+function mParseEsMonth(s) { return _M_ES_MONTH_MAP[String(s||"").toLowerCase()] || 0 }
+function mParseShortYear(y) { const n = parseInt(y); return isNaN(n) ? null : (n < 100 ? 2000 + n : n) }
+
 const M_PALETTE = [
     "#3a7bd5", "#f7931a", "#2ecc71", "#e74c3c", "#9b59b6",
     "#1abc9c", "#e67e22", "#00bcd4", "#8bc34a", "#ff5722",
@@ -260,7 +268,14 @@ function mUpdateKpis(payload) {
 
     // Media mensual y proyección anual — basadas en el rango temporal de dividendos
     const divDates = dividendos
-        .map(r => { const p = String(r.fecha || "").split("-"); return p.length === 3 ? new Date(`${p[2]}-${p[1]}-${p[0]}`) : null })
+        .map(r => {
+            const p = String(r.fecha || "").split("-")
+            if (p.length !== 3) return null
+            const mon = mParseEsMonth(p[1]) || parseInt(p[1])
+            const yr  = mParseShortYear(p[2])
+            if (!mon || !yr || mon < 1 || mon > 12) return null
+            return new Date(yr, mon - 1, parseInt(p[0]) || 1)
+        })
         .filter(Boolean).sort((a, b) => a - b)
     let pasivosPerMes = 0, pasivosPerAnio = 0
     if (divDates.length > 0) {
@@ -663,8 +678,18 @@ function mRenderDivMensual(dividendos, colorMap = {}) {
     if (!rows.length) { if (section) section.classList.add("hidden"); return }
     if (section) section.classList.remove("hidden")
 
-    function dYear(fecha) { const p = String(fecha || "").split("-"); return p.length === 3 ? p[2] : null }
-    function dMonth(fecha) { const p = String(fecha || "").split("-"); return p.length === 3 ? parseInt(p[1]) - 1 : -1 }
+    function dYear(fecha) {
+        const p = String(fecha || "").split("-")
+        if (p.length !== 3) return null
+        const yr = mParseShortYear(p[2])
+        return yr ? String(yr) : null
+    }
+    function dMonth(fecha) {
+        const p = String(fecha || "").split("-")
+        if (p.length !== 3) return -1
+        const mon = mParseEsMonth(p[1]) || parseInt(p[1])
+        return (mon >= 1 && mon <= 12) ? mon - 1 : -1
+    }
 
     const years = [...new Set(rows.map(r => dYear(r.fecha)).filter(Boolean))]
         .sort((a, b) => Number(a) - Number(b))
@@ -1699,11 +1724,19 @@ const _CUENTA_COLORS = [
 
 function intYear(fecha) {
     const p = String(fecha || "").split("-")
-    return p.length === 3 ? p[2] : p.length === 2 ? p[1] : null
+    const raw = p.length === 3 ? p[2] : p.length === 2 ? p[1] : null
+    if (!raw) return null
+    const yr = mParseShortYear(raw)
+    return yr ? String(yr) : null
 }
 function intMonth(fecha) {
     const p = String(fecha || "").split("-")
-    return p.length === 3 ? parseInt(p[1]) - 1 : p.length === 2 ? parseInt(p[0]) - 1 : -1
+    let s
+    if (p.length === 3) s = p[1]
+    else if (p.length === 2) s = p[0]
+    else return -1
+    const mon = mParseEsMonth(s) || parseInt(s)
+    return (mon >= 1 && mon <= 12) ? mon - 1 : -1
 }
 
 function mRenderInteresesSection(interesRows, cuentas) {
@@ -2336,21 +2369,30 @@ function mRenderPasivosCharts(dividendos, intereses) {
     dividendos.forEach(r => {
         const p = String(r.fecha || "").split("-")
         if (p.length !== 3) return
-        const key = `${p[2]}-${p[1].padStart(2, "0")}`
+        const mon = mParseEsMonth(p[1]) || parseInt(p[1])
+        const yr  = mParseShortYear(p[2])
+        if (!mon || !yr || mon < 1 || mon > 12) return
+        const key = `${yr}-${String(mon).padStart(2, "0")}`
         const val = parseEuroNumber(r.total || "")
         monthMap[key] = (monthMap[key] || 0) + val
-        yearMap[p[2]] = (yearMap[p[2]] || 0) + val
+        yearMap[String(yr)] = (yearMap[String(yr)] || 0) + val
     })
 
     ;(Array.isArray(intereses) ? intereses : []).forEach(r => {
         const p = String(r.fecha || "").split("-")
-        let key = null, yr = null
-        if (p.length === 3) { key = `${p[2]}-${p[1].padStart(2, "0")}`; yr = p[2] }
-        else if (p.length === 2) { key = `${p[1]}-${p[0].padStart(2, "0")}`; yr = p[1] }
-        if (!key) return
+        let mon, yr
+        if (p.length === 3) {
+            mon = mParseEsMonth(p[1]) || parseInt(p[1])
+            yr  = mParseShortYear(p[2])
+        } else if (p.length === 2) {
+            mon = mParseEsMonth(p[0]) || parseInt(p[0])
+            yr  = mParseShortYear(p[1])
+        }
+        if (!mon || !yr || mon < 1 || mon > 12) return
+        const key = `${yr}-${String(mon).padStart(2, "0")}`
         const val = parseEuroNumber(r.acumulado || "") - parseEuroNumber(r.impuestos || "")
         monthMap[key] = (monthMap[key] || 0) + val
-        if (yr) yearMap[yr] = (yearMap[yr] || 0) + val
+        yearMap[String(yr)] = (yearMap[String(yr)] || 0) + val
     })
 
     const hasData = Object.keys(monthMap).length > 0 || Object.keys(yearMap).length > 0

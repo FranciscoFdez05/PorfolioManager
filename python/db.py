@@ -448,8 +448,11 @@ def get_db() -> sqlite3.Connection:
             except Exception:
                 pass
         _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
+        conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False, timeout=10)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA cache_size=-8000")
         conn.executescript(_SCHEMA)
         _migrate(conn)
         conn.commit()

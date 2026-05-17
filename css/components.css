@@ -1434,11 +1434,11 @@ tr.gastosTypeEmptySep td {
     z-index:1000;
 }
 
-/* Confirm modal: place near top so it doesn't appear "below" content when a page is scrolled */
+/* Confirm modal: must appear above the Ajustes panel (sttOverlay z-index:9000) */
 #confirmModalOverlay{
     align-items:flex-start;
     padding-top:72px;
-    z-index:2000;
+    z-index:10000;
 }
 
 .assetModal{

@@ -4292,11 +4292,14 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 .ajustesDropArrow{ color:var(--text-dim); font-size:0.75rem; flex-shrink:0; transition:transform 0.15s; }
 .ajustesDropTrigger.open .ajustesDropArrow{ transform:rotate(180deg); }
 .ajustesDropMenu{
+    position:absolute;
+    top:calc(100% + 4px);
+    left:0;
     width:100%;
+    z-index:100;
     background:var(--bg-panel);
     border:1px solid var(--border-soft);
     border-radius:8px;
-    margin-top:4px;
     overflow:hidden;
     flex-direction:column;
     box-shadow:0 8px 24px rgba(0,0,0,0.45);
@@ -4887,9 +4890,15 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 
 .sttPage{
     display:none;
-    max-width:680px;
 }
-.sttPage.active{ display:block; }
+.sttPage.active{
+    display:block;
+    columns:2;
+    column-gap:20px;
+}
+.sttPage.active .sttPageTitle{
+    column-span:all;
+}
 
 .sttPageTitle{
     font-size:1.5rem;
@@ -4906,6 +4915,7 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 
 /* Gap between sections */
 .sttOverlay .ajustesSection{
+    break-inside:avoid;
     margin-bottom:20px;
 }
 .sttOverlay .ajustesSection:last-child{

@@ -916,9 +916,12 @@ async function initAjustesLogic() {
                 return
             }
             const label = purgeDaysSel?.options[purgeDaysSel.selectedIndex]?.text || `${days} días`
+            const message = days === -1
+                ? "¿Eliminar TODO el historial de snapshots? Esta acción no se puede deshacer."
+                : `¿Eliminar todos los snapshots anteriores a ${label}? Esta acción no se puede deshacer.`
             openConfirmModal({
                 title: "Purgar historial",
-                message: `¿Eliminar todos los snapshots anteriores a ${label}? Esta acción no se puede deshacer.`,
+                message,
                 confirmLabel: "Purgar",
                 onConfirm: async () => {
                     purgeBtn.disabled = true

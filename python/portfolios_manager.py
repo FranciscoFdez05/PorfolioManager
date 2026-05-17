@@ -1,11 +1,16 @@
 import json
 import re
 import shutil
+from datetime import datetime
 from pathlib import Path
+import logging
+
+log = logging.getLogger(__name__)
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
 _META_FILE = _BASE_DIR / "data" / "portfolios.json"
 _PORTFOLIOS_DIR = _BASE_DIR / "data" / "portfolios"
+_DELETED_DIR = _BASE_DIR / "data" / "deleted"
 _LEGACY_DB = _BASE_DIR / "data" / "portfolio.db"
 
 
@@ -20,7 +25,13 @@ def _read_meta():
 
 def _write_meta(data):
     _META_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _META_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp = _META_FILE.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(_META_FILE)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def _safe_id(name: str) -> str:
@@ -111,13 +122,40 @@ def _migrate_legacy_gastos(active_db_path: Path):
             if y:
                 dst.execute("INSERT OR IGNORE INTO gastos_years (year) VALUES (?)", (y,))
 
+        # Migrar ingresos si el activo no tiene ninguno
+        try:
+            has_ing = dst.execute("SELECT 1 FROM ingresos_rows LIMIT 1").fetchone()
+            if not has_ing:
+                src_ing = src.execute(
+                    "SELECT year, month, fecha, nombre, tipo, cantidad FROM ingresos_rows ORDER BY id"
+                ).fetchall()
+                dst.executemany(
+                    "INSERT INTO ingresos_rows (year, month, fecha, nombre, tipo, cantidad) VALUES (?,?,?,?,?,?)",
+                    [(r["year"], r["month"], r["fecha"], r["nombre"], r["tipo"], r["cantidad"]) for r in src_ing]
+                )
+                src_rec = src.execute(
+                    "SELECT year, nombre, enero, febrero, marzo, abril, mayo, junio, "
+                    "julio, agosto, septiembre, octubre, noviembre, diciembre FROM ingresos_recurrentes ORDER BY id"
+                ).fetchall()
+                dst.executemany(
+                    "INSERT OR IGNORE INTO ingresos_recurrentes "
+                    "(year,nombre,enero,febrero,marzo,abril,mayo,junio,julio,agosto,septiembre,octubre,noviembre,diciembre) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    [tuple(r) for r in src_rec]
+                )
+                src_tipos_ing = src.execute("SELECT label FROM ingresos_tipos").fetchall()
+                dst.executemany("INSERT OR IGNORE INTO ingresos_tipos (label) VALUES (?)", [(r["label"],) for r in src_tipos_ing])
+                log.info(f"[gastos migration] Ingresos migrados desde legacy: {len(src_ing)} filas")
+        except Exception as e:
+            log.warning(f"[gastos migration] No se pudieron migrar ingresos: {e}")
+
         dst.commit()
         dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         dst.commit()
         dst.close()
         src.close()
     except Exception as e:
-        print(f"[gastos migration] Aviso: {e}")
+        log.warning(f"[gastos migration] Aviso: {e}")
 
 
 def init_portfolios():
@@ -141,9 +179,35 @@ def init_portfolios():
     _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
     active_id = meta.get("active", "principal")
     active_db = _PORTFOLIOS_DIR / f"{active_id}.db"
+
+    # Si el DB activo no existe, intentar recuperarlo desde el backup más reciente
+    if not active_db.exists():
+        log.warning(f"[portfolios] DB activo no encontrado: {active_db.name}. Intentando recuperar.")
+        _recover_missing_db(active_db)
+
     _migrate_legacy_gastos(active_db)
+
+    from backup_manager import run_startup_backup
+    run_startup_backup(active_db)
+
     _set_active(active_db)
     return meta
+
+
+def _recover_missing_db(db_path: Path):
+    """Intenta recuperar un DB que no existe copiando desde el backup automático más reciente."""
+    from backup_manager import _BACKUP_DIR, check_integrity
+    pattern = f"{db_path.stem}_*.db"
+    candidates = sorted(_BACKUP_DIR.glob(pattern), reverse=True) if _BACKUP_DIR.exists() else []
+    for candidate in candidates:
+        if check_integrity(candidate):
+            try:
+                shutil.copy2(str(candidate), str(db_path))
+                log.info(f"[portfolios] DB recuperado desde: {candidate.name}")
+                return
+            except Exception as e:
+                log.error(f"[portfolios] Error copiando {candidate.name}: {e}")
+    log.warning(f"[portfolios] No se pudo recuperar {db_path.name}. Se creará vacío.")
 
 
 def get_portfolios():
@@ -202,7 +266,9 @@ def delete_portfolio(pid: str):
 
     db_file = _PORTFOLIOS_DIR / f"{pid}.db"
     if db_file.exists():
-        db_file.unlink()
+        _DELETED_DIR.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        shutil.move(str(db_file), str(_DELETED_DIR / f"{pid}_{ts}.db"))
 
 
 def rename_portfolio(pid: str, new_name: str):

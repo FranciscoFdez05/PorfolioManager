@@ -120,11 +120,12 @@ def save_snapshot():
     frontend_value    = body.get("total_value")
     frontend_invested = body.get("total_invested")
 
-    if frontend_value is not None and frontend_invested is not None:
-        total_value    = round(float(frontend_value), 2)
-        total_invested = round(float(frontend_invested), 2)
-    else:
-        total_value, total_invested = _compute_portfolio_totals()
+    if frontend_value is None or frontend_invested is None:
+        # Skip: frontend values not available yet; backend calc can diverge from frontend
+        return jsonify({"ok": True, "skipped": True})
+
+    total_value    = round(float(frontend_value), 2)
+    total_invested = round(float(frontend_invested), 2)
 
     conn.execute(
         "INSERT INTO portfolio_snapshots (ts, total_value, total_invested) VALUES (?, ?, ?)",
@@ -185,10 +186,14 @@ def purge_snapshots():
     days = int(body.get("days", 0))
     if days == 0:
         return jsonify({"ok": True, "deleted": 0})
+    conn = get_db()
+    if days == -1:
+        cur = conn.execute("DELETE FROM portfolio_snapshots")
+        conn.commit()
+        return jsonify({"ok": True, "deleted": cur.rowcount})
     if days not in {30, 90, 180, 365}:
         return jsonify({"ok": False, "error": "Valor de días no permitido"}), 400
     cutoff = int(time.time()) - days * 86400
-    conn = get_db()
     cur = conn.execute("DELETE FROM portfolio_snapshots WHERE ts < ?", (cutoff,))
     conn.commit()
     return jsonify({"ok": True, "deleted": cur.rowcount})
