@@ -385,13 +385,78 @@
     font-size:14px;
 }
 
+.cvStatsRow{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:12px;
+}
+
+.cvStatCard{
+    background:var(--bg-surface);
+    border:1px solid var(--border-soft);
+    border-radius:14px;
+    padding:16px 20px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+.cvStatLabel{
+    font-size:11px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--text-muted);
+}
+
+.cvStatValue{
+    font-size:22px;
+    font-weight:700;
+    color:var(--text-bright);
+    font-variant-numeric:tabular-nums;
+}
+
+.cvStatPos{ color:var(--color-pos); }
+.cvStatNeg{ color:var(--color-neg); }
+
+.cvTipoBadge{
+    display:inline-block;
+    padding:3px 10px;
+    border-radius:20px;
+    font-size:12px;
+    font-weight:600;
+    white-space:nowrap;
+    background:rgba(100,116,139,0.15);
+    color:var(--text-subtle);
+}
+
+.cvTipoBadgeIn{
+    background:rgba(46,204,113,0.13);
+    color:#4ade80;
+}
+
+.cvTipoBadgeOut{
+    background:rgba(231,76,60,0.13);
+    color:#f87171;
+}
+
 @media (max-width:1100px){
     .toolsHero{
         grid-template-columns:1fr;
     }
 
+    .cvStatsRow{
+        grid-template-columns:repeat(2,1fr);
+    }
+
     .conversionesTableWrapper{
         max-height:500px;
+    }
+}
+
+@media (max-width:600px){
+    .cvStatsRow{
+        grid-template-columns:1fr 1fr;
     }
 }
 
@@ -2167,11 +2232,11 @@
 .mIngresosMonthToggle{
     display:flex;
     flex-wrap:nowrap;
-    gap:3px;
+    gap:2px;
     margin-bottom:12px;
-    background:var(--bg-header);
+    background:var(--bg-inset);
     border:1px solid var(--border-soft);
-    border-radius:6px;
+    border-radius:10px;
     padding:3px;
 }
 
@@ -2180,25 +2245,27 @@
     text-align:center;
     min-width:0;
     font-size:0.76rem;
-    padding:5px 2px;
-    border-radius:4px;
+    padding:5px 4px;
+    border-radius:7px;
     border:none;
     color:#6b7a99;
+    font-weight:500;
     background:transparent;
     cursor:pointer;
-    transition:background .15s, color .15s;
+    transition:background .15s, color .15s, box-shadow .15s;
     white-space:nowrap;
 }
 
 .mIngresosMonthToggle .mToggleBtn:hover:not(.active){
-    background:#151f35;
+    background:rgba(255,255,255,0.05);
     color:#aabbd8;
 }
 
 .mIngresosMonthToggle .mToggleBtn.active{
-    background:var(--border-soft);
+    background:var(--bg-elevated,#1e2d4a);
     color:var(--text-primary);
     font-weight:600;
+    box-shadow:0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 @media (max-width:1280px){
@@ -2539,6 +2606,20 @@
 .mkpiGroupAnalisis   .metricasKpiCard{ border-top-color:#e67e22; }
 .mkpiGroupAnalisis   .metricasKpiGroupLabel{ color:#e67e22; }
 
+.mkpiGroupActivosRend{ flex-shrink:1; min-width:0; }
+.mkpiGroupActivosRend .metricasKpiGroupLabel{ color:#8899bb; }
+.mkpiGroupActivosRend .metricasKpiCards{ flex-wrap:wrap; gap:6px; }
+.mkpiLabelActivo{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:105px; }
+.mkpiSubValue{
+    font-size:0.78rem;
+    font-weight:600;
+    color:var(--text-dim);
+    white-space:nowrap;
+    margin-top:2px;
+}
+.mkpiSubValue.mPositive{ color:var(--color-pos); }
+.mkpiSubValue.mNegative{ color:var(--color-neg); }
+
 .mkpiLabel{
     font-size:0.73rem;
     text-transform:uppercase;
@@ -2629,11 +2710,11 @@
 .mGastosMonthToggle{
     display:flex;
     flex-wrap:nowrap;
-    gap:3px;
+    gap:2px;
     margin-bottom:12px;
-    background:var(--bg-header);
+    background:var(--bg-inset);
     border:1px solid var(--border-soft);
-    border-radius:6px;
+    border-radius:10px;
     padding:3px;
 }
 
@@ -2642,25 +2723,27 @@
     text-align:center;
     min-width:0;
     font-size:0.76rem;
-    padding:5px 2px;
-    border-radius:4px;
+    padding:5px 4px;
+    border-radius:7px;
     border:none;
     color:#6b7a99;
+    font-weight:500;
     background:transparent;
     cursor:pointer;
-    transition:background .15s, color .15s;
+    transition:background .15s, color .15s, box-shadow .15s;
     white-space:nowrap;
 }
 
 .mGastosMonthToggle .mToggleBtn:hover:not(.active){
-    background:#151f35;
+    background:rgba(255,255,255,0.05);
     color:#aabbd8;
 }
 
 .mGastosMonthToggle .mToggleBtn.active{
-    background:var(--border-soft);
+    background:var(--bg-elevated,#1e2d4a);
     color:var(--text-primary);
     font-weight:600;
+    box-shadow:0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 .metricasSectionTitle{
@@ -2691,29 +2774,35 @@
 /* ── Toggle ── */
 .mToggleGroup{
     display:flex;
-    background:var(--bg-header);
+    background:var(--bg-inset);
     border:1px solid var(--border-soft);
-    border-radius:8px;
-    overflow:hidden;
+    border-radius:10px;
+    padding:3px;
+    gap:2px;
 }
 
 .mToggleBtn, .mDistMetricBtn{
     background:transparent;
     border:none;
     color:#7a8fb0;
-    padding:7px 18px;
+    padding:6px 16px;
     font-size:0.82rem;
+    font-weight:500;
+    border-radius:7px;
     cursor:pointer;
-    transition:background .15s,color .15s;
+    transition:background .15s, color .15s, box-shadow .15s;
+    white-space:nowrap;
 }
 
 .mToggleBtn.active, .mDistMetricBtn.active{
-    background:var(--border-soft);
+    background:var(--bg-elevated,#1e2d4a);
     color:var(--text-primary);
+    font-weight:600;
+    box-shadow:0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 .mToggleBtn:hover:not(.active), .mDistMetricBtn:hover:not(.active){
-    background:#151f35;
+    background:rgba(255,255,255,0.05);
     color:#aabbd8;
 }
 
@@ -3135,7 +3224,8 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     flex-direction:column;
     min-height:0;
     flex:1 1 auto;
-    overflow:hidden;
+    overflow-y:auto;
+    overflow-x:hidden;
 }
 
 .seguimientoPage{
@@ -3144,7 +3234,8 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     flex-direction:column;
     min-height:0;
     flex:1 1 auto;
-    overflow:hidden;
+    overflow-y:auto;
+    overflow-x:hidden;
 }
 
 .activosToolbar{
@@ -3154,6 +3245,52 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     flex-wrap:wrap;
     margin-bottom:14px;
     flex:0 0 auto;
+}
+
+.filterDrop{
+    position:relative;
+    display:inline-flex;
+}
+.filterDropBtn{
+    height:30px;
+    padding:0 12px;
+    border:1px solid var(--btn-border);
+    border-radius:6px;
+    background:var(--btn-bg);
+    color:var(--text-primary);
+    cursor:pointer;
+    font-size:13px;
+    transition:background 0.15s,border-color 0.15s,color 0.15s;
+    white-space:nowrap;
+}
+.filterDropBtn:hover{
+    background:var(--btn-bg-hover);
+    border-color:var(--btn-border-hover);
+}
+.filterDropBtn.active{
+    border-color:var(--accent,#3a7bd5);
+    color:var(--accent,#3a7bd5);
+}
+.filterDropMenu{
+    display:none;
+    position:fixed;
+    background:var(--bg-surface);
+    border:1px solid var(--btn-border);
+    border-radius:8px;
+    padding:10px;
+    z-index:10001;
+    flex-direction:column;
+    gap:8px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.28);
+    min-width:max-content;
+}
+.filterDropMenu.open{
+    display:flex;
+}
+.filterDropSep{
+    height:1px;
+    background:var(--border-soft,#2a2a3a);
+    margin:2px 0;
 }
 
 .activosFilters{
@@ -3280,9 +3417,10 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 
 .activosPage .activosTableWrap,
 .seguimientoPage .activosTableWrap{
-    flex:1 1 auto;
+    flex:0 0 auto;
     min-height:0;
     max-height:none;
+    overflow-y:visible;
 }
 
 .activosTable{
@@ -3387,8 +3525,13 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     transform:translateY(-2px);
 }
 
-.avCard:hover .avCardActions{
+.avCard:hover .avCardActions,
+.avCardActions:has(.rowMenuDropdown.open){
     opacity:1;
+}
+
+.avCard:has(.rowMenuDropdown.open){
+    transform:none;
 }
 
 .avCardTop{
@@ -3790,7 +3933,7 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 
 .ajustesSection{
     break-inside:avoid;
-    margin-bottom:20px;
+    margin-bottom:16px;
     background:var(--bg-panel);
     border:1px solid var(--border-soft);
     border-radius:14px;
@@ -3798,6 +3941,7 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     display:flex;
     flex-direction:column;
     position:relative;
+    box-shadow:0 1px 4px rgba(0,0,0,0.18);
     transition:border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -3811,6 +3955,48 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     opacity:0.45;
     cursor:grabbing;
     box-shadow:0 8px 24px rgba(0,0,0,0.3);
+}
+
+.ajustesDragPlaceholder{
+    break-inside:avoid;
+    height:3px;
+    background:var(--accent);
+    border-radius:2px;
+    margin:8px 0;
+    pointer-events:none;
+    box-shadow:0 0 10px rgba(59,130,246,0.55);
+    flex-shrink:0;
+}
+
+/* Drag handle */
+.ajustesDragHandle{
+    flex-shrink:0;
+    margin-left:auto;
+    width:26px;
+    height:26px;
+    background:transparent;
+    border:none;
+    border-radius:6px;
+    cursor:grab;
+    opacity:0.2;
+    color:var(--text-muted);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+    transition:opacity 0.15s, background 0.15s;
+}
+.ajustesDragHandle:hover{
+    opacity:0.65;
+    background:var(--btn-bg-hover);
+}
+.ajustesDragHandle svg{
+    width:14px;
+    height:14px;
+    pointer-events:none;
+}
+.ajustesDragging .ajustesDragHandle{
+    cursor:grabbing;
 }
 
 /* Lock button */
@@ -3854,9 +4040,10 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     display:flex;
     align-items:center;
     gap:14px;
-    padding:14px 48px 14px 20px;
-    background:rgba(0,0,0,0.12);
+    padding:14px 48px 14px 18px;
+    background:rgba(0,0,0,0.14);
     border-radius:13px 13px 0 0;
+    border-bottom:1px solid rgba(255,255,255,0.03);
 }
 
 .ajustesSectionIconWrap{
@@ -3915,7 +4102,7 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 
 /* Section body */
 .ajustesSection > .ajustesField{
-    padding:14px 24px;
+    padding:14px 20px;
 }
 
 .ajustesSectionDivider + .ajustesField{
@@ -3928,7 +4115,7 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 }
 
 .ajustesSection > .ajustesActions{
-    padding:14px 24px 14px;
+    padding:16px 20px 16px;
 }
 
 .ajustesSection > .ajustesTemaGrid{
@@ -4093,17 +4280,23 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     gap:12px;
 }
 
-/* primaryButton inside ajustesActions needs svg */
-.ajustesActions .primaryButton{
+/* buttons inside ajustesActions — icon + text alignment */
+.ajustesActions .primaryButton,
+.ajustesActions .secondaryButton,
+.ajustesActions .dangerButton{
     display:inline-flex;
     align-items:center;
+    justify-content:center;
     gap:7px;
+    white-space:nowrap;
 }
 
 .ajustesActions .primaryButton svg,
-.ajustesActions .secondaryButton svg{
+.ajustesActions .secondaryButton svg,
+.ajustesActions .dangerButton svg{
     width:14px;
     height:14px;
+    flex-shrink:0;
 }
 
 .ajustesStatusMsg{
@@ -4892,12 +5085,17 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     display:none;
 }
 .sttPage.active{
-    display:block;
-    columns:2;
+    display:grid;
+    grid-template-columns:1fr 1fr;
     column-gap:20px;
 }
 .sttPage.active .sttPageTitle{
-    column-span:all;
+    grid-column:1 / -1;
+}
+.sttCol{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
 }
 
 .sttPageTitle{
@@ -4908,9 +5106,9 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     letter-spacing:-0.015em;
 }
 
-/* Remove lock-button right-padding inside the overlay */
+/* Drag handle is inline — reduce right padding */
 .sttOverlay .ajustesSectionHeader{
-    padding-right:24px;
+    padding-right:14px;
 }
 
 /* Gap between sections */

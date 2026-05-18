@@ -86,10 +86,18 @@ function segBuildCard(item) {
     }
 
     const sid = escapeHtml(item._segId || "")
-    const hideOrDeleteBtn = item._fromPortfolio
-        ? `<button type="button" class="avActionBtn segHideBtn" data-seg-id="${sid}" title="Ocultar de watchlist"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>`
-        : `<button type="button" class="avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${sid}" title="Eliminar">✕</button>`
-    const actionBtns = `<button type="button" class="avActionBtn avEditBtn segEditBtn" data-seg-id="${sid}" title="Editar">✎</button>${hideOrDeleteBtn}`
+    const hideOrDeleteItem = item._fromPortfolio
+        ? `<button type="button" class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${sid}">Ocultar</button>`
+        : `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${sid}">Eliminar</button>`
+    const actionBtns = `
+        <div class="rowMenu">
+            <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+            <div class="rowMenuDropdown">
+                <button type="button" class="rowMenuItem avActionBtn avEditBtn segEditBtn" data-seg-id="${sid}">Editar</button>
+                <hr>
+                ${hideOrDeleteItem}
+            </div>
+        </div>`
 
     const card = document.createElement("div")
     card.className = "avCard"
@@ -162,10 +170,18 @@ function segRenderTable(filtered) {
         const changePctDisp  = changePctStr || "—"
         const srcLabel       = item._fromPortfolio ? "Portfolio" : "Nuevo"
         const tsid       = escapeHtml(item._segId || "")
-        const tHideOrDel = item._fromPortfolio
-            ? `<button class="avActionBtn segHideBtn" data-seg-id="${tsid}" title="Ocultar de watchlist"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>`
-            : `<button class="avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${tsid}" title="Eliminar">✕</button>`
-        const removeCell = `<button class="avActionBtn avEditBtn segEditBtn" data-seg-id="${tsid}" title="Editar">✎</button>${tHideOrDel}`
+        const tHideOrDelItem = item._fromPortfolio
+            ? `<button class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${tsid}">Ocultar</button>`
+            : `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${tsid}">Eliminar</button>`
+        const removeCell = `
+            <div class="rowMenu">
+                <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                <div class="rowMenuDropdown">
+                    <button class="rowMenuItem avActionBtn avEditBtn segEditBtn" data-seg-id="${tsid}">Editar</button>
+                    <hr>
+                    ${tHideOrDelItem}
+                </div>
+            </div>`
 
         return `<tr class="avTableRow" data-seg-id="${escapeHtml(item._segId || "")}">
             <td><span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span></td>
@@ -175,7 +191,6 @@ function segRenderTable(filtered) {
             <td class="avTrRend ${changeClass}">${changeMoneyStr}</td>
             <td class="avTrRend ${changeClass}">${changePctDisp}</td>
             <td class="avTrProvider">${provider || "—"}</td>
-            <td class="avTrProvider">${srcLabel}</td>
             <td class="avTrActions">${removeCell}</td>
         </tr>`
     }).join("")
@@ -420,7 +435,7 @@ function segRenderGrid() {
             })
         })
         card.addEventListener("click", (e) => {
-            if (e.target.closest(".segRemoveBtn") || e.target.closest(".segEditBtn")) return
+            if (e.target.closest(".segRemoveBtn") || e.target.closest(".segEditBtn") || e.target.closest(".rowMenu")) return
             const tvSym = typeof buildTVSymbol === "function" ? buildTVSymbol(item) : (item.tvSymbol || item.marketSymbol || item.ticker || "")
             if (tvSym && typeof openTVChartModal === "function") openTVChartModal(tvSym, item.name || item.symbol)
         })
@@ -440,11 +455,15 @@ function segMergeAndRender(portfolioAssets) {
             name:           c.nombre,
             symbol:         c.ticker || c.nombre,
             ticker:         c.ticker || "",
+            marketSymbol:   c.ticker || "",
+            marketProvider: c.marketProvider || "",
+            tvSymbol:       c.tvSymbol       || "",
             type:           c.tipo || "acciones",
             notas:          c.notas || "",
-            price:          "",
-            currency:       "EUR",
-            change:         "",
+            price:          c.price          || "",
+            currency:       c.currency       || "EUR",
+            change:         c.change         || "",
+            lastUpdated:    c.lastUpdated     || null,
             _fromPortfolio: false
         }))
 
@@ -469,6 +488,31 @@ function segMergeAndRender(portfolioAssets) {
     _segAllItems = [...portfolioItems, ...customItems]
     segRenderGrid()
     segUpdateHiddenBtn()
+}
+
+async function segRefreshCustomPrices() {
+    const customs = segLoadCustomItems()
+    let updated = false
+    for (const item of customs) {
+        if (!item.ticker) continue
+        try {
+            const params = new URLSearchParams({ symbol: item.ticker })
+            if (item.marketProvider) params.set("provider", item.marketProvider)
+            const resp = await fetch(`/api/market/quote?${params}`)
+            if (!resp.ok) continue
+            const data = await resp.json()
+            if (!data.ok || !data.price) continue
+            item.price       = String(data.price)
+            item.change      = String(data.change ?? "")
+            item.currency    = data.currency || "EUR"
+            item.lastUpdated = data.lastUpdated || new Date().toISOString()
+            updated = true
+        } catch { /* ignore individual failures */ }
+    }
+    if (updated) {
+        segSaveCustomItems(customs)
+        segMergeAndRender(window._segPortfolioAssets || [])
+    }
 }
 
 async function initSeguimientoLogic() {
@@ -505,18 +549,45 @@ async function initSeguimientoLogic() {
         }
     } catch { /* sin conexión */ }
 
+    // restaurar filtros guardados
+    const _pid = _segPid()
+    try {
+        const st = localStorage.getItem(`seguimientoFilterType_${_pid}`)
+        const ss = localStorage.getItem(`seguimientoFilterSrc_${_pid}`)
+        if (st) _segFilterType = JSON.parse(st)
+        if (ss) _segFilterSrc  = JSON.parse(ss)
+    } catch { /* ignorar */ }
+
     // inicializar vista guardada
     viewToggle?.querySelectorAll(".avViewBtn").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.view === _segViewMode)
     })
 
     segMergeAndRender(portfolioAssets)
+    segRefreshCustomPrices()
 
     hiddenBtn?.addEventListener("click", segOpenHiddenModal)
     hiddenCloseBtn?.addEventListener("click", () => hiddenModalOverlay?.classList.add("hidden"))
     hiddenModalOverlay?.addEventListener("click", (e) => {
         if (e.target === hiddenModalOverlay) hiddenModalOverlay.classList.add("hidden")
     })
+
+    const updateSegFilterLabel = () => {
+        const btn = document.getElementById("seguimientoFilterDropBtn")
+        if (!btn) return
+        const filtersEl2   = document.getElementById("seguimientoFilters")
+        const srcFiltersEl2 = document.getElementById("seguimientoSourceFilters")
+        const typeTodos = filtersEl2?.querySelector('[data-type="all"] input')
+        const srcTodos  = srcFiltersEl2?.querySelector('[data-source="all"] input')
+        const typeParts = typeTodos?.checked ? [] :
+            [...(filtersEl2?.querySelectorAll('.activosFilterBtn:not([data-type="all"]) input') || [])]
+                .filter(cb => cb.checked).map(cb => cb.closest(".activosFilterBtn").querySelector("span").textContent)
+        const srcParts = srcTodos?.checked ? [] :
+            [...(srcFiltersEl2?.querySelectorAll('.activosFilterBtn:not([data-source="all"]) input') || [])]
+                .filter(cb => cb.checked).map(cb => cb.closest(".activosFilterBtn").querySelector("span").textContent)
+        const parts = [...typeParts, ...srcParts]
+        btn.textContent = (parts.length ? parts.join(", ") : "Todos") + " ▾"
+    }
 
     // filtros de tipo
     if (filtersEl) {
@@ -530,9 +601,18 @@ async function initSeguimientoLogic() {
                 _segFilterType = sel.length ? sel : "all"
                 if (!sel.length && todosTInput) todosTInput.checked = true
             }
+            localStorage.setItem(`seguimientoFilterType_${_segPid()}`, JSON.stringify(_segFilterType))
+            updateSegFilterLabel()
         }
-        if (todosTInput) todosTInput.checked = true
-        getTypeIndividuals().forEach(cb => { cb.checked = true })
+        if (_segFilterType === "all") {
+            if (todosTInput) todosTInput.checked = true
+            getTypeIndividuals().forEach(cb => { cb.checked = true })
+        } else {
+            if (todosTInput) todosTInput.checked = false
+            getTypeIndividuals().forEach(cb => {
+                cb.checked = _segFilterType.includes(cb.closest(".activosFilterBtn").dataset.type)
+            })
+        }
         if (!filtersEl.dataset.bound) {
             filtersEl.dataset.bound = "true"
             filtersEl.addEventListener("change", (e) => {
@@ -565,9 +645,18 @@ async function initSeguimientoLogic() {
                 _segFilterSrc = sel.length ? sel : "all"
                 if (!sel.length && todosSInput) todosSInput.checked = true
             }
+            localStorage.setItem(`seguimientoFilterSrc_${_segPid()}`, JSON.stringify(_segFilterSrc))
+            updateSegFilterLabel()
         }
-        if (todosSInput) todosSInput.checked = true
-        getSrcIndividuals().forEach(cb => { cb.checked = true })
+        if (_segFilterSrc === "all") {
+            if (todosSInput) todosSInput.checked = true
+            getSrcIndividuals().forEach(cb => { cb.checked = true })
+        } else {
+            if (todosSInput) todosSInput.checked = false
+            getSrcIndividuals().forEach(cb => {
+                cb.checked = _segFilterSrc.includes(cb.closest(".activosFilterBtn").dataset.source)
+            })
+        }
         if (!srcFiltersEl.dataset.bound) {
             srcFiltersEl.dataset.bound = "true"
             srcFiltersEl.addEventListener("change", (e) => {
@@ -587,6 +676,8 @@ async function initSeguimientoLogic() {
             })
         }
     }
+
+    updateSegFilterLabel()
 
     // toggle vista cards / tabla
     viewToggle?.addEventListener("click", (e) => {
@@ -692,6 +783,11 @@ async function initSeguimientoLogic() {
     nombreInput?.addEventListener("blur", () => setTimeout(segHideSuggestions, 150))
 
     // modal
+    function segClearSearch() {
+        if (segSearchFeedback) segSearchFeedback.classList.add("hidden")
+        if (segSearchResults)  { segSearchResults.classList.add("hidden"); segSearchResults.innerHTML = "" }
+    }
+
     function openModal() {
         if (!modalOverlay) return
         nombreInput.value  = ""
@@ -832,7 +928,9 @@ async function initSeguimientoLogic() {
             if (editModalTitle)    editModalTitle.textContent = allItem.name || allItem.symbol || "Activo del portfolio"
             if (editPortfolioNote) editPortfolioNote.classList.remove("hidden")
             if (editCustomForm)    editCustomForm.classList.add("hidden")
-            if (editConfirmBtn)    editConfirmBtn.style.display = "none"
+            if (editConfirmBtn)    { editConfirmBtn.removeAttribute("style"); editConfirmBtn.classList.remove("hidden") }
+            const rawTV = allItem.tvSymbol || ""
+            if (editTVInput) editTVInput.value = typeof decodeTVTicker === "function" ? decodeTVTicker(rawTV) : rawTV
         } else {
             const customs = segLoadCustomItems()
             const item = customs.find(c => c._segId === segId)
@@ -840,14 +938,15 @@ async function initSeguimientoLogic() {
             if (editModalTitle)    editModalTitle.textContent = "Editar activo"
             if (editPortfolioNote) editPortfolioNote.classList.add("hidden")
             if (editCustomForm)    editCustomForm.classList.remove("hidden")
-            if (editConfirmBtn)    editConfirmBtn.style.display = ""
+            if (editConfirmBtn)    { editConfirmBtn.removeAttribute("style"); editConfirmBtn.classList.remove("hidden") }
 
             editNombreInput.value = item.nombre || ""
             if (editTypeSelect) editTypeSelect.value = item.tipo || "acciones"
             editTickerInput.value = item.ticker || ""
             delete editTickerInput.dataset.marketProvider
             if (item.marketProvider) editTickerInput.dataset.marketProvider = item.marketProvider
-            if (editTVInput) editTVInput.value = item.tvSymbol || ""
+            const rawTV2 = item.tvSymbol || ""
+            if (editTVInput) editTVInput.value = typeof decodeTVTicker === "function" ? decodeTVTicker(rawTV2) : rawTV2
         }
 
         editOverlay.classList.remove("hidden")
@@ -863,7 +962,17 @@ async function initSeguimientoLogic() {
     editConfirmBtn?.addEventListener("click", () => {
         if (!_editingSegId) return
         const allItem = _segAllItems.find(i => i._segId === _editingSegId)
-        if (allItem?._fromPortfolio) return
+
+        if (allItem?._fromPortfolio) {
+            const tvVal = editTVInput?.value.trim() || ""
+            const overrides = JSON.parse(localStorage.getItem(`seguimientoOverrides_${_segPid()}`) || localStorage.getItem("seguimientoOverrides") || "{}")
+            overrides[_editingSegId] = { ...(overrides[_editingSegId] || {}), tvSymbol: tvVal }
+            localStorage.setItem(`seguimientoOverrides_${_segPid()}`, JSON.stringify(overrides))
+            _editingSegId = null
+            editOverlay?.classList.add("hidden")
+            segMergeAndRender(portfolioAssets)
+            return
+        }
 
         const nombre = editNombreInput?.value.trim()
         if (!nombre) { editNombreInput?.focus(); return }

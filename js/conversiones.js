@@ -147,6 +147,7 @@ function renderConversionesRows(rows, asset) {
 
     if (!rows.length) {
         if (conversionesEmptyEl) conversionesEmptyEl.classList.remove("hidden")
+        renderConversionesStats([], asset)
         return
     }
 
@@ -156,16 +157,26 @@ function renderConversionesRows(rows, asset) {
         body.appendChild(buildConversionesRowElement(row, asset))
     })
     bindTableSort(body.closest("table"), "conversiones")
+    renderConversionesStats(rows, asset)
 }
 
 function buildConversionesRowElement(row = {}, asset = conversionesCurrentAsset) {
     const rowElement = document.createElement("tr")
     rowElement.dataset.rowId = String(row.id || createConversionRowId())
 
+    const baseSymbol = deriveAssetBaseSymbolFromData(asset)
+    const convertedInLabel = getConvertedInOperationLabel(baseSymbol)
+    const isIn = row.tipo
+        ? String(row.tipo).toLowerCase() === convertedInLabel.toLowerCase()
+        : true
+    const tipoBadgeClass = row.tipo
+        ? (isIn ? "cvTipoBadge cvTipoBadgeIn" : "cvTipoBadge cvTipoBadgeOut")
+        : "cvTipoBadge"
+
     rowElement.innerHTML = `
         <td data-field="fecha">${row.fecha || ""}</td>
         <td data-field="par">${row.par || ""}</td>
-        <td data-field="tipo" data-value="${row.tipo || ""}">${row.tipo || ""}</td>
+        <td data-field="tipo" data-value="${row.tipo || ""}"><span class="${tipoBadgeClass}">${row.tipo || ""}</span></td>
         <td data-field="cantidad">${formatAssetParticipationValue(row.cantidad || "", "cripto")}</td>
         <td class="rowActionsCell">
             <div class="rowMenu">
@@ -180,6 +191,55 @@ function buildConversionesRowElement(row = {}, asset = conversionesCurrentAsset)
     `
 
     return rowElement
+}
+
+function renderConversionesStats(rows, asset) {
+    const statsRow = document.getElementById("cvStatsRow")
+    if (!statsRow) return
+
+    if (!rows.length || !asset) {
+        statsRow.classList.add("hidden")
+        return
+    }
+
+    statsRow.classList.remove("hidden")
+
+    const baseSymbol = deriveAssetBaseSymbolFromData(asset)
+    const convertedInLabel = getConvertedInOperationLabel(baseSymbol)
+
+    let totalIn = 0
+    let totalOut = 0
+
+    rows.forEach((row) => {
+        const qty = parseLooseNumber(row.cantidad || "") || 0
+        if (String(row.tipo || "").toLowerCase() === convertedInLabel.toLowerCase()) {
+            totalIn += qty
+        } else {
+            totalOut += qty
+        }
+    })
+
+    const net = totalIn - totalOut
+    const fmt = (n) => formatAssetParticipationValue(String(n), "cripto")
+
+    const totalEl = document.getElementById("cvStatTotal")
+    const inEl = document.getElementById("cvStatIn")
+    const outEl = document.getElementById("cvStatOut")
+    const netEl = document.getElementById("cvStatNet")
+
+    if (totalEl) totalEl.textContent = rows.length
+    if (inEl) inEl.textContent = fmt(totalIn)
+    if (outEl) outEl.textContent = fmt(totalOut)
+    if (netEl) {
+        netEl.textContent = (net >= 0 ? "+" : "−") + fmt(Math.abs(net))
+        netEl.className = "cvStatValue" + (net >= 0 ? " cvStatPos" : " cvStatNeg")
+    }
+}
+
+function liveUpdateConversionesStats() {
+    if (!conversionesCurrentAsset) return
+    const rows = collectConversionesRows()
+    renderConversionesStats(rows, conversionesCurrentAsset)
 }
 
 function addConversionesRow() {
@@ -214,6 +274,7 @@ function collectConversionesRows() {
 }
 
 function scheduleConversionesAutosave() {
+    liveUpdateConversionesStats()
     clearTimeout(conversionesAutosaveTimeout)
     conversionesAutosaveTimeout = setTimeout(() => {
         saveConversionesData(true).catch((error) => {
@@ -338,7 +399,15 @@ function saveConversiónRowFromModal() {
         const cantidadCell = rowElement.querySelector('[data-field="cantidad"]')
         if (fechaCell) fechaCell.textContent = g("cvModalFecha")
         if (parCell) parCell.textContent = g("cvModalPar")
-        if (tipoCell) { tipoCell.dataset.value = g("cvModalTipo"); tipoCell.textContent = g("cvModalTipo") }
+        if (tipoCell) {
+            const newTipo = g("cvModalTipo")
+            tipoCell.dataset.value = newTipo
+            const baseSymbol = deriveAssetBaseSymbolFromData(conversionesCurrentAsset || {})
+            const convertedInLabel = getConvertedInOperationLabel(baseSymbol)
+            const isIn = newTipo.toLowerCase() === convertedInLabel.toLowerCase()
+            const badgeClass = newTipo ? (isIn ? "cvTipoBadge cvTipoBadgeIn" : "cvTipoBadge cvTipoBadgeOut") : "cvTipoBadge"
+            tipoCell.innerHTML = `<span class="${badgeClass}">${newTipo}</span>`
+        }
         if (cantidadCell) cantidadCell.textContent = g("cvModalCantidad")
     } else {
         const body = document.getElementById("conversionesBody")

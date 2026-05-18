@@ -202,6 +202,12 @@ function getOperationStablecoinSymbol(row = {}) {
     return enabledSymbols.includes(quoteSymbol) ? quoteSymbol : ""
 }
 
+function getOperationFiatSymbol(row = {}) {
+    const pair = String(row.par || "").trim().toUpperCase()
+    const quoteSymbol = pair.includes("/") ? pair.split("/").pop() : ""
+    return OPERATION_CURRENCY_OPTIONS.map((c) => c.toUpperCase()).includes(quoteSymbol) ? quoteSymbol : ""
+}
+
 function getOperationsStablecoinSymbolFromTransaccionRow(row = {}) {
     const assetId = String(row.assetId || "").trim()
 
@@ -261,6 +267,39 @@ function getOperationsLockedStablecoinTotalsFromActiveBuys(operationsRows = [], 
         }
 
         const symbol = getOperationStablecoinSymbol(row)
+        if (!symbol) {
+            return
+        }
+
+        const total = parseLooseNumber(row.total) || 0
+        if (total <= 0) {
+            return
+        }
+
+        lockedTotals[symbol] = (lockedTotals[symbol] || 0) + total
+    })
+
+    return lockedTotals
+}
+
+function getOperationsLockedFiatTotalsFromActiveBuys(operationsRows = [], options = {}) {
+    const excludeRowId = String(options.excludeRowId || "").trim()
+    const lockedTotals = {}
+
+    ;(operationsRows || []).forEach((row) => {
+        if (excludeRowId && String(row.id || "").trim() === excludeRowId) {
+            return
+        }
+
+        if (String(row.estado || "").trim() !== "Activo") {
+            return
+        }
+
+        if (String(row.orden || "").trim() !== "Compra") {
+            return
+        }
+
+        const symbol = getOperationFiatSymbol(row)
         if (!symbol) {
             return
         }
@@ -533,7 +572,12 @@ function renderOperationsStablecoinPanel() {
 
     const enabledStablecoins = getOperationsEnabledStablecoinSymbols()
 
-    if (!enabledStablecoins.length) {
+    const fiatLocked = getOperationsLockedFiatTotalsFromActiveBuys(currentOperationsData.rows || [])
+    const fiatItems = Object.entries(fiatLocked)
+        .filter(([, locked]) => locked > 0)
+        .map(([symbol, locked]) => ({ symbol, locked }))
+
+    if (!enabledStablecoins.length && !fiatItems.length) {
         panel.innerHTML = ""
         panel.classList.add("hidden")
         return
@@ -541,15 +585,21 @@ function renderOperationsStablecoinPanel() {
 
     panel.classList.remove("hidden")
     const summary = buildOperationsStablecoinBalanceSummary(operationsStablecoinsData, currentOperationsData.rows || [])
-    const items = Object.values(summary)
+    const stablecoinItems = Object.values(summary)
 
     panel.innerHTML = `
         <span class="operationsPairsSummaryLabel">Par - saldo disponible</span>
         <div class="operationsPairsSummaryValues">
-            ${items.map((item) => `
+            ${stablecoinItems.map((item) => `
                 <span class="operationsPairsSummaryItem">
                     ${item.symbol} ${formatMoney(item.available, "USD")}
                     <span class="operationsPairsSummaryHint">(bloqueado ${formatMoney(item.locked, "USD")})</span>
+                </span>
+            `).join("")}
+            ${fiatItems.map((item) => `
+                <span class="operationsPairsSummaryItem">
+                    ${item.symbol}
+                    <span class="operationsPairsSummaryHint">(bloqueado ${formatMoney(item.locked, item.symbol)})</span>
                 </span>
             `).join("")}
         </div>

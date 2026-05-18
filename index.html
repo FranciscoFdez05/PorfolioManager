@@ -9,9 +9,9 @@
     <title>Portfolio Manager</title>
     <link rel="stylesheet" href="css/variables.css?v=20260511d">
     <link rel="stylesheet" href="css/base.css?v=20260516a">
-    <link rel="stylesheet" href="css/components.css?v=20260514b">
-    <link rel="stylesheet" href="css/pages.css?v=20260516m">
-    <link rel="stylesheet" href="css/themes.css?v=20260516c">
+    <link rel="stylesheet" href="css/components.css?v=20260517a">
+    <link rel="stylesheet" href="css/pages.css?v=20260518b">
+    <link rel="stylesheet" href="css/themes.css?v=20260518a">
     <script>
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
     </script>
@@ -1046,6 +1046,32 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 14V4M6.5 7.5 10 4l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Importar datos</div>
+                        <div class="ajustesSectionDesc">Restaura datos desde un archivo exportado. El JSON restaura configuración y datos del portfolio activo; el ZIP restaura además la base de datos completa.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesActions">
+                    <button id="ajustesImportJsonBtn" class="primaryButton" type="button">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 11V3M5 7.5 8 4.5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        Importar JSON
+                    </button>
+                    <button id="ajustesImportZipBtn" class="secondaryButton" type="button">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 2h7l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7 10V6M5 7.5 7 5.5l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Importar ZIP
+                    </button>
+                    <input id="ajustesImportJsonInput" type="file" accept=".json" style="display:none">
+                    <input id="ajustesImportZipInput" type="file" accept=".zip" style="display:none">
+                    <span id="ajustesImportMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
                         <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 6h10l-1 10H6L5 6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3 6h14M8 6V4h4v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 9v5M11 9v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
                     </div>
                     <div class="ajustesSectionHeaderText">
@@ -1155,7 +1181,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="js/app-core.js?v=20260516c"></script>
-<script src="js/assets.js?v=20260515d"></script>
+<script src="js/assets.js?v=20260518b"></script>
 <script src="js/intereses.js?v=20260501a"></script>
 <script src="js/dividendos.js?v=20260421a"></script>
 <script src="js/gastos.js?v=20260426a"></script>
@@ -1174,7 +1200,7 @@
 <script src="js/ajustes.js?v=20260517b"></script>
 <script src="js/shared-utils.js?v=20260516f"></script>
 <script src="js/heatmap.js?v=20260505b"></script>
-<script src="js/seguimiento.js?v=20260511c"></script>
+<script src="js/seguimiento.js?v=20260518c"></script>
 <script src="js/portfolios.js?v=20260511b"></script>
 </body>
 </html>

@@ -4,13 +4,14 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
-from alpha_vantage_client import search_symbol as search_av_symbol
+from alpha_vantage_client import fetch_quote as fetch_av_quote, search_symbol as search_av_symbol
 from app_data import readFinnhubApiKey
 from asset_store import listAssets
-from eodhd_client import search_symbol as search_eodhd_symbol
-from finnhub_client import fetch_candle_close, fetch_exchange_rate, search_symbol
+from asset_utils import inferMarketProviderFromSymbol, normalizeMarketProvider
+from eodhd_client import fetch_quote as fetch_eodhd_quote, search_symbol as search_eodhd_symbol
+from finnhub_client import fetch_candle_close, fetch_exchange_rate, fetch_quote as fetch_finnhub_quote, search_symbol
 from helpers import call_alpha_vantage_with_fallbacks, call_eodhd_with_fallbacks, is_temporary_service_error, normalize_currency_code, parse_loose_number
-from yahoo_finance_client import search_symbol as search_yahoo_symbol
+from yahoo_finance_client import fetch_quote as fetch_yahoo_quote, search_symbol as search_yahoo_symbol
 
 _hist_cache = {}   # {period: {"data": {...}, "ts": float}}
 _HIST_TTL   = 4 * 3600  # 4 horas
@@ -154,3 +155,35 @@ def searchAlphaVantageSymbol():
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})
+
+@market_bp.route("/api/market/quote", methods=["GET"])
+def getMarketQuote():
+    symbol = str(request.args.get("symbol", "")).strip().upper()
+    provider_raw = str(request.args.get("provider", "")).strip()
+
+    if not symbol:
+        return jsonify({"ok": False, "error": "symbol requerido"}), 400
+
+    provider = normalizeMarketProvider(provider_raw, fallback=inferMarketProviderFromSymbol(symbol))
+
+    if provider == "eodhd":
+        quote, error = call_eodhd_with_fallbacks(lambda apiKey: fetch_eodhd_quote(symbol, apiKey))
+    elif provider == "yahoo":
+        quote, error = fetch_yahoo_quote(symbol)
+    elif provider == "alphavantage":
+        quote, error = call_alpha_vantage_with_fallbacks(lambda apiKey: fetch_av_quote(symbol, apiKey))
+    else:
+        api_key = readFinnhubApiKey()
+        quote, error = fetch_finnhub_quote(symbol, api_key)
+
+    if error:
+        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    return jsonify({
+        "ok":          True,
+        "price":       quote.get("price"),
+        "change":      quote.get("change"),
+        "currency":    quote.get("currency", "EUR"),
+        "lastUpdated": quote.get("lastUpdated"),
+    })

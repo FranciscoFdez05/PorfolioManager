@@ -129,7 +129,10 @@ def serveStatic(path):
     if ext and ext not in _ALLOWED_EXTENSIONS:
         abort(404)
 
-    return send_from_directory(baseDir, normalized)
+    response = send_from_directory(baseDir, normalized)
+    if ext in (".js", ".css"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 def _check_auto_backup():

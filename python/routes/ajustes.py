@@ -328,4 +328,132 @@ def export_zip():
     )
 
 
+def _restore_tables_from_dict(conn, data: dict):
+    """Restaura tablas de la BD activa desde un dict de exportación."""
+    import sqlite3 as _sqlite3
+    tables = ["activos", "portfolio_snapshots", "dividendos", "gastos", "ingresos",
+              "ventas", "transacciones", "stablecoins", "operaciones", "bonos", "seguimiento"]
+    for table in tables:
+        if table not in data or not isinstance(data[table], list):
+            continue
+        rows = data[table]
+        if not rows:
+            conn.execute(f"DELETE FROM {table}")
+            continue
+        try:
+            actual_cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+            valid_cols  = [c for c in rows[0].keys() if c in actual_cols]
+            if not valid_cols:
+                continue
+            conn.execute(f"DELETE FROM {table}")
+            col_str      = ", ".join(f'"{c}"' for c in valid_cols)
+            placeholders = ", ".join("?" for _ in valid_cols)
+            conn.executemany(
+                f"INSERT OR IGNORE INTO {table} ({col_str}) VALUES ({placeholders})",
+                [[row.get(c) for c in valid_cols] for row in rows],
+            )
+        except Exception as e:
+            conn.rollback()
+            raise RuntimeError(f"Error restaurando {table}: {e}")
+    conn.commit()
+
+
+@ajustes_bp.route("/api/import/json", methods=["POST"])
+def import_json():
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "No se recibió ningún archivo"}), 400
+    try:
+        data = json.loads(f.read().decode("utf-8"))
+    except Exception:
+        return jsonify({"ok": False, "error": "Archivo JSON inválido"}), 400
+
+    if not isinstance(data, dict):
+        return jsonify({"ok": False, "error": "Formato de archivo incorrecto"}), 400
+
+    pid  = _active_portfolio_id()
+    conn = get_db()
+
+    if "ajustes" in data and isinstance(data["ajustes"], dict):
+        _write_ajustes(data["ajustes"])
+    if "portfolio_prefs" in data and isinstance(data["portfolio_prefs"], dict):
+        _write_prefs(pid, data["portfolio_prefs"])
+
+    try:
+        _restore_tables_from_dict(conn, data)
+    except RuntimeError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    return jsonify({"ok": True})
+
+
+@ajustes_bp.route("/api/import/zip", methods=["POST"])
+def import_zip():
+    import sqlite3 as _sqlite3
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "No se recibió ningún archivo"}), 400
+
+    raw_bytes = f.read()
+    try:
+        buf = io.BytesIO(raw_bytes)
+        with zipfile.ZipFile(buf, "r") as zf:
+            bad = zf.testzip()
+            if bad:
+                return jsonify({"ok": False, "error": f"ZIP corrupto: {bad}"}), 400
+            names = zf.namelist()
+    except zipfile.BadZipFile:
+        return jsonify({"ok": False, "error": "El archivo no es un ZIP válido"}), 400
+
+    pid      = _active_portfolio_id()
+    db_path  = get_active_db_path()
+    json_dir = _AJUSTES_JSON.parent
+
+    try:
+        buf = io.BytesIO(raw_bytes)
+        with zipfile.ZipFile(buf, "r") as zf:
+            names = zf.namelist()
+
+            # Buscar .db en la raíz del ZIP (export format: portfolio-{date}.db)
+            root_db = next((n for n in names if n.endswith(".db") and "/" not in n), None)
+
+            if root_db:
+                from db import invalidate_all_connections
+                raw_db = zf.read(root_db)
+                tmp    = db_path.parent / f"_import_tmp_{db_path.name}"
+                try:
+                    tmp.write_bytes(raw_db)
+                    invalidate_all_connections()
+                    src = _sqlite3.connect(str(tmp))
+                    dst = _sqlite3.connect(str(db_path))
+                    src.backup(dst)
+                    dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    dst.commit()
+                    dst.close()
+                    src.close()
+                finally:
+                    tmp.unlink(missing_ok=True)
+            else:
+                # Sin .db → restaurar desde el JSON interno
+                json_name = next((n for n in names if n.endswith(".json") and "export" in n and "/" not in n), None)
+                if json_name:
+                    data = json.loads(zf.read(json_name).decode("utf-8"))
+                    if isinstance(data, dict):
+                        conn = get_db()
+                        _restore_tables_from_dict(conn, data)
+
+            # Restaurar ajustes.json
+            if "ajustes.json" in names:
+                json_dir.mkdir(parents=True, exist_ok=True)
+                _AJUSTES_JSON.write_bytes(zf.read("ajustes.json"))
+
+            # Restaurar prefs por-portfolio
+            for name in names:
+                if name.startswith("prefs_") and name.endswith(".json") and "/" not in name:
+                    (json_dir / name).write_bytes(zf.read(name))
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    return jsonify({"ok": True})
 

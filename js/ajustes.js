@@ -41,6 +41,138 @@ function _initSttShell() {
             if (page) page.classList.add("active")
         })
     })
+
+    // Section drag-to-reorder
+    document.querySelectorAll(".sttPage").forEach(_initSectionDrag)
+
+    // Prevent "no-drop" cursor when hovering gaps/title inside the overlay
+    document.getElementById("sttOverlay")?.addEventListener("dragover", (e) => {
+        if (_dragSrc) e.preventDefault()
+    })
+}
+
+function _sectionTitle(el) {
+    return el.querySelector(".ajustesSectionTitle")?.textContent?.trim() || ""
+}
+
+function _saveSectionOrder(pageEl) {
+    const data = [...pageEl.querySelectorAll(":scope > .sttCol")].map((col) =>
+        [...col.querySelectorAll(":scope > .ajustesSection")].map(_sectionTitle).filter(Boolean)
+    )
+    localStorage.setItem("sttSectionOrder-" + pageEl.id, JSON.stringify(data))
+}
+
+const _dragPlaceholder = (() => {
+    const el = document.createElement("div")
+    el.className = "ajustesDragPlaceholder"
+    return el
+})()
+
+let _dragSrc = null
+
+const _HANDLE_SVG = `<svg viewBox="0 0 10 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="2.5" cy="2" r="1.5"/><circle cx="7.5" cy="2" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="14" r="1.5"/><circle cx="7.5" cy="14" r="1.5"/></svg>`
+
+function _buildPageColumns(pageEl) {
+    const sections = [...pageEl.querySelectorAll(":scope > .ajustesSection")]
+    const byTitle  = new Map(sections.map((s) => [_sectionTitle(s), s]))
+
+    const col0 = document.createElement("div")
+    col0.className = "sttCol"
+    const col1 = document.createElement("div")
+    col1.className = "sttCol"
+
+    const raw = localStorage.getItem("sttSectionOrder-" + pageEl.id)
+    if (raw) {
+        try {
+            const data = JSON.parse(raw)
+            if (Array.isArray(data[0])) {
+                const placed = new Set()
+                ;[data[0] || [], data[1] || []].forEach((titles, ci) => {
+                    const col = ci === 0 ? col0 : col1
+                    titles.forEach((t) => {
+                        const s = byTitle.get(t)
+                        if (s && !placed.has(t)) { col.appendChild(s); placed.add(t) }
+                    })
+                })
+                sections.filter((s) => !placed.has(_sectionTitle(s))).forEach((s, i) =>
+                    (i % 2 === 0 ? col0 : col1).appendChild(s)
+                )
+                pageEl.appendChild(col0)
+                pageEl.appendChild(col1)
+                return
+            }
+        } catch { /* ignore */ }
+    }
+
+    const mid = Math.ceil(sections.length / 2)
+    sections.forEach((s, i) => (i < mid ? col0 : col1).appendChild(s))
+    pageEl.appendChild(col0)
+    pageEl.appendChild(col1)
+}
+
+function _initColDrag(colEl, pageEl) {
+    colEl.querySelectorAll(":scope > .ajustesSection").forEach((sec) => {
+        const header = sec.querySelector(".ajustesSectionHeader")
+        if (!header || header.querySelector(".ajustesDragHandle")) return
+
+        const handle = document.createElement("button")
+        handle.type = "button"
+        handle.className = "ajustesDragHandle"
+        handle.title = "Arrastrar para reordenar"
+        handle.innerHTML = _HANDLE_SVG
+        header.appendChild(handle)
+
+        sec.setAttribute("draggable", "false")
+        handle.addEventListener("mousedown", () => sec.setAttribute("draggable", "true"))
+        handle.addEventListener("mouseup",   () => sec.setAttribute("draggable", "false"))
+
+        sec.addEventListener("dragstart", (e) => {
+            _dragSrc = sec
+            e.dataTransfer.effectAllowed = "move"
+            requestAnimationFrame(() => sec.classList.add("ajustesDragging"))
+        })
+
+        sec.addEventListener("dragend", () => {
+            sec.setAttribute("draggable", "false")
+            sec.classList.remove("ajustesDragging")
+            _dragPlaceholder.remove()
+            _dragSrc = null
+        })
+    })
+
+    colEl.addEventListener("dragover", (e) => {
+        if (!_dragSrc) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = "move"
+
+        const target = e.target.closest(".ajustesSection")
+        if (target && target !== _dragSrc && target.parentElement === colEl) {
+            const rect   = target.getBoundingClientRect()
+            const before = e.clientY < rect.top + rect.height / 2
+            if (before) target.before(_dragPlaceholder)
+            else        target.after(_dragPlaceholder)
+        } else if (!target || target === _dragSrc) {
+            const last = [...colEl.querySelectorAll(":scope > .ajustesSection")]
+                .filter((s) => s !== _dragSrc)
+                .pop()
+            if (last) last.after(_dragPlaceholder)
+            else colEl.prepend(_dragPlaceholder)
+        }
+    })
+
+    colEl.addEventListener("drop", (e) => {
+        if (!_dragSrc) return
+        e.preventDefault()
+        if (_dragPlaceholder.parentElement) {
+            _dragPlaceholder.replaceWith(_dragSrc)
+            _saveSectionOrder(pageEl)
+        }
+    })
+}
+
+function _initSectionDrag(pageEl) {
+    _buildPageColumns(pageEl)
+    pageEl.querySelectorAll(":scope > .sttCol").forEach((col) => _initColDrag(col, pageEl))
 }
 
 // ── Inline custom select for settings overlay ─────────────────────────────────
@@ -901,6 +1033,63 @@ async function initAjustesLogic() {
         exportZipBtn.addEventListener("click", () => {
             const date = new Date().toISOString().slice(0, 10)
             _doExport("/api/export/zip", `portfolio-export-${date}.zip`, exportZipBtn)
+        })
+    }
+
+    // --- Importar datos JSON / ZIP ---
+    const importJsonBtn   = document.getElementById("ajustesImportJsonBtn")
+    const importZipBtn    = document.getElementById("ajustesImportZipBtn")
+    const importJsonInput = document.getElementById("ajustesImportJsonInput")
+    const importZipInput  = document.getElementById("ajustesImportZipInput")
+    const importMsg       = document.getElementById("ajustesImportMsg")
+
+    async function _doImport(url, file, btn) {
+        btn.disabled = true
+        showMsg(importMsg, "Importando…", "")
+        try {
+            const form = new FormData()
+            form.append("file", file)
+            const res  = await fetch(url, { method: "POST", body: form })
+            const data = await res.json()
+            if (data.ok) {
+                showMsg(importMsg, "Importado correctamente", "ok")
+            } else {
+                showMsg(importMsg, data.error || "Error al importar", "error")
+            }
+        } catch {
+            showMsg(importMsg, "Error de red", "error")
+        } finally {
+            btn.disabled = false
+        }
+    }
+
+    if (importJsonBtn && importJsonInput) {
+        importJsonBtn.addEventListener("click", () => importJsonInput.click())
+        importJsonInput.addEventListener("change", () => {
+            const file = importJsonInput.files[0]
+            if (!file) return
+            importJsonInput.value = ""
+            openConfirmModal({
+                title: "Importar JSON",
+                message: "Esto sobreescribirá todos los datos y configuración del portfolio activo con el contenido del archivo. ¿Continuar?",
+                confirmLabel: "Importar",
+                onConfirm: () => _doImport("/api/import/json", file, importJsonBtn),
+            })
+        })
+    }
+
+    if (importZipBtn && importZipInput) {
+        importZipBtn.addEventListener("click", () => importZipInput.click())
+        importZipInput.addEventListener("change", () => {
+            const file = importZipInput.files[0]
+            if (!file) return
+            importZipInput.value = ""
+            openConfirmModal({
+                title: "Importar ZIP",
+                message: "Esto restaurará la base de datos completa y la configuración desde el archivo ZIP. Los datos actuales serán reemplazados. ¿Continuar?",
+                confirmLabel: "Importar",
+                onConfirm: () => _doImport("/api/import/zip", file, importZipBtn),
+            })
         })
     }
 

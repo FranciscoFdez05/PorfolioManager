@@ -11,7 +11,7 @@ let _metricasIngresosMonth = "all"
 let _metricasPayload = null
 let _metricasSortKey = "netoActualEur"
 let _metricasSortDir = "desc"
-let _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","bonos","rentaFija"])
+let _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","rentaFija"])
 let _metricasGastosTipoFilter = new Set()
 let _metricasComparativaExclude = new Set()
 let _metricasSectionsCollapsed = new Set()
@@ -236,6 +236,28 @@ function mUpdateKpis(payload) {
     mSetKpi("mkpiRendimiento", formatEuro(rendimiento), rendimiento >= 0 ? "mPositive" : "mNegative")
     mSetKpi("mkpiRendPct",     formatPercent(rendPct),  rendPct      >= 0 ? "mPositive" : "mNegative")
 
+    // ── Rendimiento por tipo de activo ───────────────────────────────
+    const activosRendContainer = document.getElementById("mkpiActivosRendCards")
+    if (activosRendContainer) {
+        const TYPE_ORDER = ["acciones", "etfs", "comoditis", "cripto"]
+        activosRendContainer.innerHTML = TYPE_ORDER.map(type => {
+            const group  = summaries.filter(s => s.type === type)
+            if (!group.length) return ""
+            const inv    = group.reduce((s, a) => s + a.invertidoEur,   0)
+            const rend   = group.reduce((s, a) => s + a.rendimientoEur, 0)
+            const pct    = inv > 0 ? (rend / inv) * 100 : 0
+            const cls    = pct >= 0 ? "mPositive" : "mNegative"
+            const color  = M_TYPE_COLORS[type]
+            const label  = M_TYPE_LABELS[type] || type
+            const pctStr = (pct >= 0 ? "+" : "") + pct.toFixed(2).replace(".", ",") + "%"
+            const eurStr = (rend >= 0 ? "+" : "") + formatEuro(rend)
+            return `<div class="metricasKpiCard mkpiCardActivo" style="border-top-color:${color}" title="${eurStr}">
+                <div class="mkpiLabel mkpiLabelActivo">${label}</div>
+                <div class="mkpiValue ${cls}">${pctStr}</div>
+            </div>`
+        }).join("")
+    }
+
     mSyncTopBar(summaries, rendimiento, invertido, totalCuenta)
     const bonosRows   = Array.isArray(bonos) ? bonos : []
     const bonosNeto   = bonosRows.reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
@@ -324,15 +346,14 @@ function mDistBonoVal(r, metric) {
 
 function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], metric = "netoActualEur") {
     const types  = ["cripto", "acciones", "etfs", "comoditis"]
-    const bonosTotal = bonos.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
-    const rfTotal    = rentaFija.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
-    const labels = [...types.map((t) => M_TYPE_LABELS[t]), "Bonos", "Renta Fija"]
+    const rfTotal = bonos.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
+                  + rentaFija.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
+    const labels = [...types.map((t) => M_TYPE_LABELS[t]), "Renta Fija"]
     const rawValues = [
         ...types.map((t) => summaries.filter((a) => a.type === t).reduce((s, a) => s + mDistAssetVal(a, metric), 0)),
-        bonosTotal,
         rfTotal
     ]
-    const colors = [...types.map((t) => M_TYPE_COLORS[t]), "#9b59b6", "#00bcd4"]
+    const colors = [...types.map((t) => M_TYPE_COLORS[t]), "#00bcd4"]
 
     if (displayType === "doughnut") {
         const values = rawValues.map((v) => Math.max(0, v))
@@ -390,7 +411,7 @@ function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], me
 
 function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], metric = "netoActualEur") {
     const bonosMap = {}
-    if (_metricasActivosFilter.has("bonos")) {
+    if (_metricasActivosFilter.has("rentaFija")) {
         bonos.forEach((r) => {
             const name = r.instrumento || "Bono"
             bonosMap[name] = (bonosMap[name] || 0) + mDistBonoVal(r, metric)
@@ -2754,7 +2775,7 @@ async function initMetricasLogic() {
     _metricasIngresosMonth = "all"
     _metricasInteresesYear = null
     _metricasDivMensualYear = null
-    const _allActivosTypes = ["cripto","acciones","etfs","comoditis","bonos","rentaFija"]
+    const _allActivosTypes = ["cripto","acciones","etfs","comoditis","rentaFija"]
     const _savedHidden = window._metricasActivosHidden || []
     _metricasActivosFilter = new Set(_allActivosTypes.filter(t => !_savedHidden.includes(t)))
     _metricasGastosTipoFilter = new Set()
@@ -2774,7 +2795,7 @@ async function initMetricasLogic() {
         mBindTableSort(_metricasPayload.summaries)
         mInitEvolucion()
 
-        const _allTypes = ["cripto","acciones","etfs","comoditis","bonos","rentaFija"]
+        const _allTypes = ["cripto","acciones","etfs","comoditis","rentaFija"]
         const _todosBtn = document.querySelector(".mActivosFilterBtn[data-atype='todos']")
         const _specificBtns = [...document.querySelectorAll(".mActivosFilterBtn[data-atype]:not([data-atype='todos'])")]
 

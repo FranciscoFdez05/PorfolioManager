@@ -42,7 +42,6 @@
                     <th>Cambio día</th>
                     <th>Cambio %</th>
                     <th>Proveedor</th>
-                    <th>Origen</th>
                     <th></th>
                 </tr>
             </thead>
@@ -148,14 +147,15 @@
                 </div>
                 <div id="segEditSearchFeedback" class="assetSearchFeedback hidden"></div>
                 <div id="segEditSearchResults" class="assetSearchResults hidden"></div>
-
-                <label class="assetModalLabel assetModalLabelSmall" for="segEditTVTickerInput">Ticker TradingView <span class="assetModalLabelHint">(opcional, para el gráfico)</span></label>
-                <input id="segEditTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: NASDAQ:AAPL, BINANCE:BTCUSDT...">
             </div>
+
+            <!-- Ticker TradingView: siempre visible (portfolio y custom) -->
+            <label class="assetModalLabel assetModalLabelSmall" for="segEditTVTickerInput">Ticker TradingView <span class="assetModalLabelHint">(opcional, para el gráfico)</span></label>
+            <input id="segEditTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: NASDAQ:AAPL, BINANCE:BTCUSDT...">
 
             <div class="assetModalActions">
                 <button id="segEditCancelBtn" class="cancelButton" type="button">Cancelar</button>
-                <button id="segEditConfirmBtn" class="primaryButton" type="button">Guardar</button>
+                <button id="segEditConfirmBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
             </div>
         </div>
     </div>

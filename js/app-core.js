@@ -429,6 +429,32 @@ function initNavigation(navButtons, contentArea) {
         })
     })
 
+    // filterDrop — delegated, works for dynamically loaded pages
+    document.addEventListener("click", (e) => {
+        if (e.target.closest(".filterDropMenu")) {
+            e.stopImmediatePropagation()
+            return
+        }
+        const fBtn = e.target.closest(".filterDropBtn")
+        if (fBtn) {
+            e.stopImmediatePropagation()
+            const drop = fBtn.closest(".filterDrop")
+            const menu = drop?.querySelector(".filterDropMenu")
+            if (!menu) return
+            const isOpen = menu.classList.contains("open")
+            document.querySelectorAll(".filterDropMenu.open").forEach(m => m.classList.remove("open"))
+            document.querySelectorAll(".navDropdownMenu.open").forEach(m => m.classList.remove("open"))
+            if (!isOpen) {
+                const rect = fBtn.getBoundingClientRect()
+                menu.style.top  = (rect.bottom + 4) + "px"
+                menu.style.left = rect.left + "px"
+                menu.classList.add("open")
+            }
+            return
+        }
+        document.querySelectorAll(".filterDropMenu.open").forEach(m => m.classList.remove("open"))
+    })
+
     document.addEventListener("click", () => {
         document.querySelectorAll(".navDropdownMenu.open").forEach((m) => m.classList.remove("open"))
         document.querySelectorAll(".rowMenuDropdown.open").forEach((m) => m.classList.remove("open"))

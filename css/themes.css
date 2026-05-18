@@ -332,6 +332,13 @@ html[data-theme="light"] .gastosMonthActions .primaryButton{ background:#1d4ed8;
 html[data-theme="light"] .gastosEliminarAnoBtn,
 html[data-theme="light"] .gastosMonthActions .dangerButton{ background:#fee2e2; border-color:#fca5a5; color:#dc2626; }
 
+/* ── Light theme: filterDrop ── */
+html[data-theme="light"] .filterDropBtn{ background:#f1f5f9; border-color:#e2e8f0; color:#1e293b; }
+html[data-theme="light"] .filterDropBtn:hover{ background:#e8edf5; border-color:#cbd5e1; }
+html[data-theme="light"] .filterDropBtn.active{ border-color:#3b82f6; color:#1d4ed8; }
+html[data-theme="light"] .filterDropMenu{ background:#ffffff; border-color:#e2e8f0; box-shadow:0 4px 16px rgba(0,0,0,0.12); }
+html[data-theme="light"] .filterDropSep{ background:#e2e8f0; }
+
 /* ── Light theme: Vista General filters ── */
 html[data-theme="light"] .overviewFilterOption,
 html[data-theme="light"] .activosFilterBtn,
@@ -434,6 +441,13 @@ html[data-theme="black"] .gastosAnnualTable tbody tr:nth-child(odd) td,
 html[data-theme="black"] .gastosMovementsTable tbody tr:nth-child(odd) td{ background:#131316; }
 html[data-theme="black"] .gastosAnnualTable .totalRow td,
 html[data-theme="black"] .gastosMovementsTable .totalRow td{ background:#17171b; color:#f0f0f4; border-color:#222228; }
+
+/* ── Black theme: filterDrop ── */
+html[data-theme="black"] .filterDropBtn{ background:#0a0a0a; border-color:#1a1a1a; color:#e0e0e0; }
+html[data-theme="black"] .filterDropBtn:hover{ background:#111; border-color:#2a2a2a; }
+html[data-theme="black"] .filterDropBtn.active{ border-color:#3a7bd5; color:#5a9bf5; }
+html[data-theme="black"] .filterDropMenu{ background:#0a0a0a; border-color:#1a1a1a; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+html[data-theme="black"] .filterDropSep{ background:#1a1a1a; }
 
 /* ── Black theme: Vista General filters ── */
 html[data-theme="black"] .overviewFilterOption,
@@ -891,6 +905,19 @@ html[data-theme="black"] .summaryCard{ background:#17171b; border-color:#222228;
 html[data-theme="black"] .summaryCardTitle{ border-color:#222228; color:#88889a; }
 html[data-theme="black"] .summaryCardValue{ color:#f0f0f4; }
 
+/* ── Light theme: Conversiones stat cards ── */
+html[data-theme="light"] .cvStatCard{ background:#ffffff; border-color:#e2e8f0; }
+html[data-theme="light"] .cvStatLabel{ color:#64748b; }
+html[data-theme="light"] .cvStatValue{ color:#0f172a; }
+html[data-theme="light"] .cvTipoBadge{ background:rgba(100,116,139,0.12); color:#475569; }
+html[data-theme="light"] .cvTipoBadgeIn{ background:rgba(22,163,74,0.1); color:#16a34a; }
+html[data-theme="light"] .cvTipoBadgeOut{ background:rgba(220,38,38,0.1); color:#dc2626; }
+
+/* ── Black theme: Conversiones stat cards ── */
+html[data-theme="black"] .cvStatCard{ background:#17171b; border-color:#222228; }
+html[data-theme="black"] .cvStatLabel{ color:#88889a; }
+html[data-theme="black"] .cvStatValue{ color:#f0f0f4; }
+
 /* ── Light theme: Gastos / Ingresos section rows, totals & action header ── */
 html[data-theme="light"] .gastosSectionRow td{ background:#1d4ed8 !important; border-color:#3b82f6; color:#ffffff !important; }
 html[data-theme="light"] .ingresosSectionRow td{ background:#1d4ed8 !important; border-color:#3b82f6; color:#ffffff !important; }
@@ -1058,7 +1085,8 @@ body.money-hidden #dividendosBody td:nth-child(n+3):not(:last-child){
 }
 
 /* cards resumen (intereses y dividendos) */
-body.money-hidden .summaryCardValue{
+body.money-hidden .summaryCardValue,
+body.money-hidden .cvStatValue{
     filter:blur(7px);
     user-select:none;
     pointer-events:none;

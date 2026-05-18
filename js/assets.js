@@ -1406,6 +1406,9 @@ async function refreshOverviewMarketData(buttonElement = null) {
 
         await refreshAssetsSidebar(currentAssetId, false)
         await renderVistaGeneralTable()
+        if (typeof segRefreshCustomPrices === "function") {
+            try { await segRefreshCustomPrices() } catch {}
+        }
     } finally {
         if (buttonElement) {
             buttonElement.disabled = false
@@ -4000,8 +4003,14 @@ function avBuildCard(asset) {
             <span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span>
             <div class="avCardActions">
                 ${assetColor ? `<span class="avColorDot" style="background:${assetColor};--dot-color:${assetColor}" title="Color del activo"></span>` : ""}
-                <button type="button" class="avActionBtn avEditBtn" data-asset-id="${asset.id}" title="Editar nombre">✎</button>
-                <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">🗑️</button>
+                <div class="rowMenu">
+                    <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                    <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem avActionBtn avEditBtn" data-asset-id="${asset.id}">Editar</button>
+                        <hr>
+                        <button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn" data-asset-id="${asset.id}">Eliminar</button>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="avCardSymbol">${escapeHtml(asset.symbol || asset.name)}</div>
@@ -4100,8 +4109,14 @@ function avBuildTableRow(asset) {
         <td class="avTrRend ${rClass}">${rendStr}</td>
         <td class="avTrUpdated">${lastUpdatedStr}</td>
         <td class="avTrActions">
-            <button type="button" class="avActionBtn avEditBtn" data-asset-id="${asset.id}" title="Editar">✎</button>
-            <button type="button" class="avActionBtn avDeleteBtn" data-asset-id="${asset.id}" title="Eliminar">🗑️</button>
+            <div class="rowMenu">
+                <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                <div class="rowMenuDropdown">
+                    <button type="button" class="rowMenuItem avActionBtn avEditBtn" data-asset-id="${asset.id}">Editar</button>
+                    <hr>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn" data-asset-id="${asset.id}">Eliminar</button>
+                </div>
+            </div>
         </td>
     `
     return tr
@@ -4187,6 +4202,8 @@ async function avHandleCardClick(event) {
         openEditAssetModal(fullAsset)
         return
     }
+
+    if (event.target.closest(".rowMenu")) return
 
     const card = event.target.closest(".avCard")
     if (card) {
@@ -4333,6 +4350,16 @@ async function initActivosPageLogic() {
     if (filters) {
         const todosInput = filters.querySelector('[data-type="all"] input')
         const getIndividuals = () => [...filters.querySelectorAll('.activosFilterBtn:not([data-type="all"]) input')]
+        const updateFilterLabel = () => {
+            const btn = document.getElementById("activosFilterDropBtn")
+            if (!btn) return
+            if (todosInput?.checked) {
+                btn.textContent = "Todos ▾"
+            } else {
+                const sel = getIndividuals().filter(cb => cb.checked).map(cb => cb.closest(".activosFilterBtn").querySelector("span").textContent)
+                btn.textContent = (sel.join(", ") || "Todos") + " ▾"
+            }
+        }
         const syncFilterState = () => {
             if (todosInput?.checked) {
                 _activosFilterType = "all"
@@ -4341,10 +4368,12 @@ async function initActivosPageLogic() {
                 _activosFilterType = sel.length ? sel : "all"
                 if (!sel.length && todosInput) todosInput.checked = true
             }
+            updateFilterLabel()
         }
         // reset to Todos on each init
         if (todosInput) todosInput.checked = true
         getIndividuals().forEach(cb => { cb.checked = true })
+        updateFilterLabel()
         if (!filters.dataset.bound) {
             filters.dataset.bound = "true"
             filters.addEventListener("change", (e) => {
