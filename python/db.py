@@ -371,6 +371,15 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
     total_invested REAL NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_ts ON portfolio_snapshots(ts);
+
+CREATE TABLE IF NOT EXISTS asset_snapshots (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts        INTEGER NOT NULL,
+    asset_id  TEXT NOT NULL,
+    price_eur REAL NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_asset_snapshots_ts ON asset_snapshots(ts);
+CREATE INDEX IF NOT EXISTS idx_asset_snapshots_asset_id_ts ON asset_snapshots(asset_id, ts);
 """
 
 
@@ -423,6 +432,15 @@ def _migrate(conn):
             total_invested REAL NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_ts ON portfolio_snapshots(ts);
+
+        CREATE TABLE IF NOT EXISTS asset_snapshots (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts        INTEGER NOT NULL,
+            asset_id  TEXT NOT NULL,
+            price_eur REAL NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_asset_snapshots_ts ON asset_snapshots(ts);
+        CREATE INDEX IF NOT EXISTS idx_asset_snapshots_asset_id_ts ON asset_snapshots(asset_id, ts);
     """)
 
     # Backfill gastos_years from existing data in older DBs

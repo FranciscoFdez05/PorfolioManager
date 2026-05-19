@@ -3052,21 +3052,41 @@ async function mRenderEvolucion(range) {
         return d.toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
     })
 
-    // Plugin crosshair: línea vertical + punto destacado al hacer hover
+    // Plugin crosshair: línea vertical + horizontal siguiendo el cursor
+    let _evolucionMouseY = null
     const crosshairPlugin = {
         id: "evolucionCrosshair",
+        afterInit(chart) {
+            chart.canvas.addEventListener("mousemove", (e) => {
+                const rect = chart.canvas.getBoundingClientRect()
+                _evolucionMouseY = e.clientY - rect.top
+                chart.draw()
+            })
+            chart.canvas.addEventListener("mouseleave", () => {
+                _evolucionMouseY = null
+                chart.draw()
+            })
+        },
         afterDraw(chart) {
             const { ctx, chartArea, tooltip } = chart
             if (!tooltip || !tooltip._active || !tooltip._active.length) return
             const x = tooltip._active[0].element.x
             ctx.save()
-            ctx.beginPath()
-            ctx.moveTo(x, chartArea.top)
-            ctx.lineTo(x, chartArea.bottom)
             ctx.lineWidth = 1
             ctx.strokeStyle = "rgba(200,210,255,0.25)"
             ctx.setLineDash([4, 4])
+            // Línea vertical
+            ctx.beginPath()
+            ctx.moveTo(x, chartArea.top)
+            ctx.lineTo(x, chartArea.bottom)
             ctx.stroke()
+            // Línea horizontal siguiendo el cursor real
+            if (_evolucionMouseY !== null && _evolucionMouseY >= chartArea.top && _evolucionMouseY <= chartArea.bottom) {
+                ctx.beginPath()
+                ctx.moveTo(chartArea.left, _evolucionMouseY)
+                ctx.lineTo(chartArea.right, _evolucionMouseY)
+                ctx.stroke()
+            }
             ctx.restore()
         }
     }

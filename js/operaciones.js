@@ -14,6 +14,7 @@ let operationsAssets = []
 let operationsStablecoinsData = { catalog: [], enabledSymbols: [], rows: [] }
 let operationsTransaccionesRows = []
 
+
 function showOperationsPopup(title, message, options = {}) {
     const confirmLabel = String(options.confirmLabel || "OK")
 
@@ -105,7 +106,11 @@ async function loadOperationAssets() {
             id: String(asset.id || "").trim(),
             name: String(asset.name || asset.symbol || "").trim(),
             symbol: String(asset.symbol || asset.name || "").trim().toUpperCase(),
-            marketSymbol: String(asset.marketSymbol || asset.finnhubSymbol || "").trim().toUpperCase()
+            marketSymbol: String(asset.marketSymbol || asset.finnhubSymbol || "").trim().toUpperCase(),
+            marketProvider: String(asset.marketProvider || "").trim().toLowerCase(),
+            price: asset.price ?? null,
+            currency: String(asset.currency || "EUR").trim(),
+            precioCurrency: String(asset.precioCurrency || asset.currency || "EUR").trim()
         }))
         .map((asset) => ({
             ...asset,
@@ -433,6 +438,15 @@ function normalizeOperationRow(row = {}, index = 0) {
     }
 }
 
+async function refreshOperationsTickerPrices() {
+    const operationsBody = document.getElementById("operationsBody")
+    if (!operationsBody) return
+    try {
+        operationsAssets = await loadOperationAssets()
+    } catch { /* mantener activos existentes */ }
+    operationsBody.querySelectorAll("tr[data-operation-id]").forEach((tr) => refreshOperationsRowPrice(tr))
+}
+
 async function initOperacionesLogic() {
     const { operationsPayload, assets, stablecoinsPayload, transaccionesPayload } = await loadOperacionesDependencies()
 
@@ -444,8 +458,8 @@ async function initOperacionesLogic() {
             ? operationsPayload.rows.map((row, index) => normalizeOperationRow(row, index))
             : []
     }
-    currentOperationTypeFilter = new Set(OPERATION_ORDER_OPTIONS)
-    currentOperationStatusFilter = new Set(OPERATION_STATUS_OPTIONS)
+    currentOperationTypeFilter = loadOperationsFilterState("type", OPERATION_ORDER_OPTIONS)
+    currentOperationStatusFilter = loadOperationsFilterState("status", OPERATION_STATUS_OPTIONS)
     bindOperationsPersistenceGuards()
     window.flushPendingPageChanges = flushOperationsPendingChanges
     renderOperationsFilterState()
@@ -503,6 +517,7 @@ function bindOperationsEvents() {
                 updateOperationsFilterSet(currentOperationStatusFilter, value, input.checked)
             }
 
+            saveOperationsFilterState()
             renderOperationsFilterState()
             renderOperationsTable()
         })
@@ -515,6 +530,24 @@ function updateOperationsFilterSet(targetSet, value, checked) {
     } else {
         targetSet.delete(value)
     }
+}
+
+function loadOperationsFilterState(group, defaults) {
+    try {
+        const raw = localStorage.getItem(`operationsFilter_${group}`)
+        if (raw) {
+            const parsed = JSON.parse(raw)
+            if (Array.isArray(parsed)) return new Set(parsed)
+        }
+    } catch { /* ignorar */ }
+    return new Set(defaults)
+}
+
+function saveOperationsFilterState() {
+    try {
+        localStorage.setItem("operationsFilter_type", JSON.stringify([...currentOperationTypeFilter]))
+        localStorage.setItem("operationsFilter_status", JSON.stringify([...currentOperationStatusFilter]))
+    } catch { /* ignorar */ }
 }
 
 function createEmptyOperationRow() {
@@ -632,8 +665,30 @@ function renderOperationsTable() {
         operationsBody.appendChild(buildOperationRow(row))
     })
 
+    rows.forEach((row) => {
+        const tr = operationsBody.querySelector(`tr[data-operation-id="${row.id}"]`)
+        if (tr) refreshOperationsRowPrice(tr)
+    })
+
     renderOperationsStablecoinPanel()
     bindTableSort(operationsBody.closest("table"), "operaciones")
+}
+
+function refreshOperationsRowPrice(tr) {
+    const priceEl = tr.querySelector(".operationsTickerPrice")
+    if (!priceEl) return
+    const rowId = tr.dataset.operationId
+    const rowData = (currentOperationsData.rows || []).find((r) => r.id === rowId)
+    if (!rowData) { priceEl.textContent = ""; return }
+    const asset = getOperationAssetById(rowData.assetId)
+    const price = parseLooseNumber(asset?.price)
+    if (!asset || price === null || price <= 0) {
+        priceEl.textContent = ""
+        priceEl.className = "operationsTickerPrice"
+        return
+    }
+    priceEl.textContent = formatMoney(price, asset.precioCurrency || asset.currency || "EUR")
+    priceEl.className = "operationsTickerPrice"
 }
 
 function buildOperationAssetSelect(selectedAssetId) {
@@ -672,6 +727,9 @@ function buildOperationRow(row) {
         <td>${normalizedRow.activo || ""}</td>
         <td>${normalizedRow.fechaApertura || ""}</td>
         <td>${normalizedRow.par || ""}</td>
+        <td class="operationsTickerCell">
+            <span class="operationsTickerPrice"></span>
+        </td>
         <td>${normalizedRow.orden || ""}</td>
         <td>${formatOperationsMoney(normalizedRow.precioOrden, normalizedRow.precioCurrency || "USD")}</td>
         <td>${formatOperationsQuantity(normalizedRow.cantidad)}</td>
@@ -1123,6 +1181,7 @@ function openOperacionRowModal(rowId) {
             ? pairs.map((p) => `<option value="${p}">${p}</option>`).join("")
             : `<option value="">Sin pares</option>`
     })
+
 
     footer.querySelector("#opRowModalSaveBtn").addEventListener("click", saveOperacionRowFromModal)
     footer.querySelector("#opRowModalCancelBtn").addEventListener("click", closeOperacionRowModal)

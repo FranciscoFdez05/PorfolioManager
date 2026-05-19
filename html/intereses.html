@@ -1,15 +1,19 @@
 <div class="interesesLayout">
     <div class="cuentasBar">
         <div class="cuentasList" id="cuentasList"></div>
-        <button id="addCuentaBtn" class="cuentasBarAddBtn" type="button" title="Añadir cuenta">+</button>
+        <div class="interesesMenuWrapper">
+            <button class="interesesMenuBtn" id="interesesMenuBtn" type="button" title="Acciones">···</button>
+            <div class="interesesMenuDropdown hidden" id="interesesMenuDropdown">
+                <button id="addInteresesYearBtn" class="interesesMenuOption" type="button">+ Añadir año</button>
+                <button id="deleteInteresesYearBtn" class="interesesMenuOption interesesMenuOptionDanger" type="button">Eliminar año</button>
+                <div class="interesesMenuDivider"></div>
+                <button id="addCuentaBtn" class="interesesMenuOption" type="button">+ Añadir cuenta remunerada</button>
+            </div>
+        </div>
     </div>
 
     <div class="interesesYearBar">
         <div class="interesesYearList" id="interesesYearList"></div>
-        <div class="interesesYearBarActions">
-            <button id="addInteresesYearBtn" class="secondaryButton" type="button">+ Año</button>
-            <button id="deleteInteresesYearBtn" class="dangerButton" type="button">Eliminar año</button>
-        </div>
     </div>
 
     <div class="interesesMainArea">
@@ -45,6 +49,6 @@
     </div>
 
     <div class="dividendosActions">
-        <button id="addRowBtn" class="primaryButton" type="button">Añadir fila</button>
+        <button id="addRowBtn" class="primaryButton" type="button">+ Añadir fila</button>
     </div>
 </div>

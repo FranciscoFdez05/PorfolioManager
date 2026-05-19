@@ -8,6 +8,7 @@ from alpha_vantage_client import fetch_quote as fetch_av_quote, search_symbol as
 from app_data import readFinnhubApiKey
 from asset_store import listAssets
 from asset_utils import inferMarketProviderFromSymbol, normalizeMarketProvider
+from db import get_db
 from eodhd_client import fetch_quote as fetch_eodhd_quote, search_symbol as search_eodhd_symbol
 from finnhub_client import fetch_candle_close, fetch_exchange_rate, fetch_quote as fetch_finnhub_quote, search_symbol
 from helpers import call_alpha_vantage_with_fallbacks, call_eodhd_with_fallbacks, is_temporary_service_error, normalize_currency_code, parse_loose_number
@@ -79,27 +80,57 @@ def getHistoricalChanges():
     from_ts = int(target.timestamp())
     to_ts   = from_ts + 10 * 86400
 
-    api_key = readFinnhubApiKey()
-    assets  = listAssets()
-
-    def fetch_one(asset):
-        symbol    = str(asset.get("marketSymbol") or asset.get("finnhubSymbol") or "").strip()
-        cur_price = parse_loose_number(str(asset.get("price") or ""))
-        if not symbol or not cur_price or cur_price <= 0:
-            return asset["id"], None
-        hist_price, _ = fetch_candle_close(symbol, from_ts, to_ts, api_key)
-        if hist_price and hist_price > 0:
-            return asset["id"], round((cur_price - hist_price) / hist_price * 100, 2)
-        return asset["id"], None
-
+    conn   = get_db()
     result = {}
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        futures = {pool.submit(fetch_one, a): a for a in assets
-                   if a.get("marketSymbol") or a.get("finnhubSymbol")}
-        for f in as_completed(futures):
-            asset_id, pct = f.result()
-            if pct is not None:
-                result[asset_id] = pct
+
+    # Snapshot más reciente por activo (valor actual)
+    latest: dict[str, float] = {}
+    for row in conn.execute(
+        "SELECT asset_id, price_eur FROM asset_snapshots "
+        "WHERE ts = (SELECT MAX(ts) FROM asset_snapshots)"
+    ).fetchall():
+        latest[row["asset_id"]] = row["price_eur"]
+
+    # Snapshot del periodo objetivo por activo (primer registro en la ventana)
+    past: dict[str, float] = {}
+    for row in conn.execute(
+        "SELECT asset_id, price_eur FROM asset_snapshots "
+        "WHERE ts BETWEEN ? AND ? ORDER BY ts ASC",
+        (from_ts, to_ts)
+    ).fetchall():
+        if row["asset_id"] not in past:
+            past[row["asset_id"]] = row["price_eur"]
+
+    assets_needing_api = []
+    for asset in listAssets():
+        aid  = asset["id"]
+        cur  = latest.get(aid)
+        prev = past.get(aid)
+        if cur and prev and prev > 0:
+            result[aid] = round((cur - prev) / prev * 100, 2)
+        elif asset.get("marketSymbol") or asset.get("finnhubSymbol"):
+            assets_needing_api.append(asset)
+
+    # Fallback a Finnhub para activos sin snapshots almacenados
+    if assets_needing_api:
+        api_key = readFinnhubApiKey()
+
+        def fetch_one(asset):
+            symbol    = str(asset.get("marketSymbol") or asset.get("finnhubSymbol") or "").strip()
+            cur_price = parse_loose_number(str(asset.get("price") or ""))
+            if not symbol or not cur_price or cur_price <= 0:
+                return asset["id"], None
+            hist_price, _ = fetch_candle_close(symbol, from_ts, to_ts, api_key)
+            if hist_price and hist_price > 0:
+                return asset["id"], round((cur_price - hist_price) / hist_price * 100, 2)
+            return asset["id"], None
+
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futures = {pool.submit(fetch_one, a): a for a in assets_needing_api}
+            for f in as_completed(futures):
+                asset_id, pct = f.result()
+                if pct is not None:
+                    result[asset_id] = pct
 
     _hist_cache[period] = {"data": result, "ts": time.time()}
     return jsonify({"ok": True, "data": result, "cached": False})

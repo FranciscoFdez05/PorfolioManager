@@ -304,7 +304,7 @@ function bindCuentasSidebarActions() {
     const addBtn = document.getElementById("addCuentaBtn")
     if (addBtn && !addBtn.dataset.bound) {
         addBtn.dataset.bound = "true"
-        addBtn.addEventListener("click", addCuenta)
+        addBtn.addEventListener("click", () => { if (typeof closeInteresesMenu === "function") closeInteresesMenu(); addCuenta() })
     }
 
     const list = document.getElementById("cuentasList")

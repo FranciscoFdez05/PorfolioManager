@@ -96,10 +96,10 @@ async function initTradingJournalLogic() {
             ? payload.rows.map((r) => normalizeTradingRow(r))
             : []
     }
-    _tFilterTipo = new Set(TRADING_TIPO_OPTIONS)
-    _tFilterDireccion = new Set(TRADING_DIRECCION_OPTIONS)
-    _tFilterResultado = new Set(TRADING_RESULTADO_OPTIONS)
-    _tView = "tabla"
+    _tFilterTipo = loadTradingFilterState("tipo", TRADING_TIPO_OPTIONS)
+    _tFilterDireccion = loadTradingFilterState("direccion", TRADING_DIRECCION_OPTIONS)
+    _tFilterResultado = loadTradingFilterState("resultado", TRADING_RESULTADO_OPTIONS)
+    _tView = loadTradingViewState()
     _tHaciendaYear = null
 
     bindTradingPersistenceGuards()
@@ -152,6 +152,7 @@ function bindTradingEvents() {
             } else if (group === "resultado") {
                 input.checked ? _tFilterResultado.add(value) : _tFilterResultado.delete(value)
             }
+            saveTradingFilterState()
             renderTradingView()
         })
     })
@@ -161,12 +162,41 @@ function bindTradingEvents() {
         input.dataset.bound = "true"
         input.addEventListener("change", () => {
             _tView = input.value
+            saveTradingFilterState()
             renderTradingView()
         })
     })
 }
 
 // ── Filters ────────────────────────────────────────────────────────────────
+
+function loadTradingFilterState(group, defaults) {
+    try {
+        const raw = localStorage.getItem(`tradingFilter_${group}`)
+        if (raw) {
+            const parsed = JSON.parse(raw)
+            if (Array.isArray(parsed)) return new Set(parsed)
+        }
+    } catch { /* ignorar */ }
+    return new Set(defaults)
+}
+
+function loadTradingViewState() {
+    try {
+        const raw = localStorage.getItem("tradingView")
+        if (raw === "tabla" || raw === "hacienda") return raw
+    } catch { /* ignorar */ }
+    return "tabla"
+}
+
+function saveTradingFilterState() {
+    try {
+        localStorage.setItem("tradingFilter_tipo", JSON.stringify([..._tFilterTipo]))
+        localStorage.setItem("tradingFilter_direccion", JSON.stringify([..._tFilterDireccion]))
+        localStorage.setItem("tradingFilter_resultado", JSON.stringify([..._tFilterResultado]))
+        localStorage.setItem("tradingView", _tView)
+    } catch { /* ignorar */ }
+}
 
 function renderTradingFilters() {
     document.querySelectorAll('.tradingFilters input[data-tfilter="tipo"]').forEach((inp) => {
@@ -177,6 +207,9 @@ function renderTradingFilters() {
     })
     document.querySelectorAll('.tradingFilters input[data-tfilter="resultado"]').forEach((inp) => {
         inp.checked = _tFilterResultado.has(inp.value)
+    })
+    document.querySelectorAll('input[name="tradingView"]').forEach((inp) => {
+        inp.checked = inp.value === _tView
     })
 }
 

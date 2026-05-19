@@ -110,14 +110,14 @@ def updateAssetMarketData(assetId, data):
     conn.execute(
         "UPDATE activos SET "
         "market_provider=?, market_symbol=?, finnhub_symbol=?, "
-        "price=?, currency=?, change=?, status=?, last_updated=? "
+        "price=?, precio_currency=?, change=?, status=?, last_updated=? "
         "WHERE id=?",
         (
             data.get("marketProvider", "finnhub"),
             data.get("marketSymbol", data.get("finnhubSymbol", "")),
             data.get("finnhubSymbol", data.get("marketSymbol", "")),
             data.get("price", "0,00"),
-            data.get("currency", "EUR"),
+            data.get("precioCurrency", data.get("currency", "EUR")),
             data.get("change", "+0,00%"),
             data.get("status", "Mercado abierto"),
             data.get("lastUpdated", ""),

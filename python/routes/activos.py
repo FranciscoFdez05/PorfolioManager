@@ -231,18 +231,20 @@ def refreshActivoMarketData(assetId):
         statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
-    target_currency = normalize_currency_code(assetData.get("currency", ""), fallback="EUR")
-    quote, error = convert_quote_currency(quote, target_currency)
-
-    if error:
-        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
-        return jsonify({"ok": False, "error": error}), statusCode
+    existing_precio_currency = normalize_currency_code(
+        assetData.get("precioCurrency") or assetData.get("currency") or "",
+        fallback=""
+    )
+    if existing_precio_currency and existing_precio_currency != normalize_currency_code(quote.get("currency", ""), fallback=""):
+        converted, conv_error = convert_quote_currency(quote, existing_precio_currency)
+        if not conv_error and converted:
+            quote = converted
 
     assetData["marketProvider"] = marketProvider
     assetData["marketSymbol"] = quote["symbol"]
     assetData["finnhubSymbol"] = quote["symbol"]
     assetData["price"] = quote["price"]
-    assetData["currency"] = quote["currency"]
+    assetData["precioCurrency"] = existing_precio_currency or quote["currency"]
     assetData["change"] = quote["change"]
     assetData["status"] = quote["status"]
     assetData["lastUpdated"] = quote["lastUpdated"]
@@ -270,6 +272,15 @@ def changeActivoCurrency(assetId):
         requestData.get("currency", ""),
         fallback=current_precio_currency if scope == "price" else current_currency
     )
+
+    if scope == "precio":
+        supported = {"EUR", "USD", "GBP", "CHF", "JPY"}
+        if target_currency not in supported:
+            return jsonify({"ok": False, "error": f"Moneda no soportada. Opciones: {', '.join(sorted(supported))}"}), 400
+        assetData["precioCurrency"] = target_currency
+        assetData["status"] = f"Moneda de cotización: {target_currency}"
+        writeAssetFile(assetId, assetData)
+        return jsonify({"ok": True, "asset": assetData, "converted": False})
 
     if target_currency not in {"EUR", "USD"}:
         return jsonify({"ok": False, "error": "Solo se permite cambiar entre EUR y USD"}), 400

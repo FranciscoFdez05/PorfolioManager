@@ -779,21 +779,18 @@ function renderCurrentIngresosView() {
     const actions = document.getElementById("ingresosActions")
     if (!annualWrapper || !movementsWrapper || !monthHeader || !actions) return
 
-    const sortBtn = document.getElementById("sortIngresosByDateBtn")
     if (currentIngresosView === "year") {
         renderIngresosAnnualTable()
         annualWrapper.classList.remove("hidden")
         movementsWrapper.classList.add("hidden")
         monthHeader.classList.add("hidden")
         actions.classList.add("hidden")
-        if (sortBtn) sortBtn.classList.add("hidden")
     } else {
         renderIngresosMonthTable()
         annualWrapper.classList.add("hidden")
         movementsWrapper.classList.remove("hidden")
         monthHeader.classList.remove("hidden")
         actions.classList.remove("hidden")
-        if (sortBtn) sortBtn.classList.remove("hidden")
     }
 }
 

@@ -12,8 +12,8 @@
 }
 .herramientaBtn{
     background:transparent;
-    border:1px solid #2a3a5a;
-    color:#7a8fb0;
+    border:1px solid var(--btn-border);
+    color:var(--text-muted);
     font-size:0.82rem;
     padding:7px 16px;
     border-radius:6px;
@@ -23,11 +23,11 @@
 .herramientaBtn.active{
     background:var(--border-soft);
     color:var(--text-primary);
-    border-color:#3a5580;
+    border-color:var(--btn-border-hover);
 }
 .herramientaBtn:hover:not(.active){
-    background:#151f35;
-    color:#aabbd8;
+    background:var(--btn-bg-hover);
+    color:var(--text-subtle);
 }
 
 .herramientaPanel{ display:none; }
@@ -116,9 +116,9 @@
     appearance:textfield;
 }
 .herramientaCalcBtn{
-    background:#1e3a6e;
-    border:1px solid #3a5580;
-    color:var(--text-subtle);
+    background:var(--btn-active-bg);
+    border:1px solid var(--btn-active-border);
+    color:var(--btn-active-text);
     font-size:0.85rem;
     font-weight:600;
     padding:9px 20px;
@@ -128,18 +128,18 @@
     align-self:flex-start;
     margin-top:4px;
 }
-.herramientaCalcBtn:hover{ background:#254a88; }
+.herramientaCalcBtn:hover{ background:#2563eb; }
 .herramientaSecBtn{
     background:transparent;
-    border:1px solid #2a3a5a;
-    color:#7a8fb0;
+    border:1px solid var(--btn-border);
+    color:var(--text-muted);
     font-size:0.82rem;
     padding:7px 14px;
     border-radius:6px;
     cursor:pointer;
     transition:background .15s,color .15s;
 }
-.herramientaSecBtn:hover{ background:#151f35; color:#aabbd8; }
+.herramientaSecBtn:hover{ background:var(--btn-bg-hover); color:var(--text-subtle); border-color:var(--btn-border-hover); }
 
 .herramientaResults{ flex:1; }
 .herramientaResultGrid{
@@ -253,14 +253,14 @@
 .hPrecioDeleteBtn{
     background:transparent;
     border:none;
-    color:#e74c3c;
+    color:var(--color-neg);
     cursor:pointer;
     font-size:0.8rem;
     padding:2px 6px;
     border-radius:4px;
     opacity:.7;
 }
-.hPrecioDeleteBtn:hover{ opacity:1; background:#1c1424; }
+.hPrecioDeleteBtn:hover{ opacity:1; background:rgba(231,76,60,0.08); }
 .hPrecioMedioActions{
     display:flex;
     gap:10px;
@@ -276,15 +276,15 @@
 }
 .herramientaResetBtn{
     background:transparent;
-    border:1px solid #3a2020;
-    color:#a06060;
+    border:1px solid rgba(231,76,60,0.25);
+    color:rgba(231,76,60,0.6);
     font-size:0.82rem;
     padding:7px 14px;
     border-radius:6px;
     cursor:pointer;
-    transition:background .15s,color .15s;
+    transition:background .15s,color .15s,border-color .15s;
 }
-.herramientaResetBtn:hover{ background:#1c0f0f; color:#e74c3c; border-color:#e74c3c; }
+.herramientaResetBtn:hover{ background:rgba(231,76,60,0.08); color:var(--color-neg); border-color:var(--color-neg); }
 
 /* Rent. Dividendo */
 .hDivSection{
@@ -678,7 +678,7 @@
 }
 
 .operationsTable{
-    min-width:1260px;
+    min-width:1400px;
 }
 
 .operationsTable thead th{
@@ -796,6 +796,35 @@
     transform:translateY(-50%);
     opacity:0;
     cursor:pointer;
+}
+
+.operationsTickerCell{
+    padding-top:10px !important;
+    padding-bottom:10px !important;
+    min-width:120px;
+}
+.operationsTickerPrice{
+    display:block;
+    font-size:0.85rem;
+    font-weight:700;
+    color:#e6edf8;
+    min-height:1em;
+    white-space:nowrap;
+    letter-spacing:0.01em;
+}
+.operationsTickerPrice.loading{
+    color:#6f86ab;
+    font-weight:400;
+    font-style:italic;
+    font-size:0.78rem;
+}
+.operationsTickerPrice.error{
+    color:#e05c5c;
+    font-size:0.72rem;
+    font-weight:400;
+}
+.operationsTickerHeader{
+    min-width:130px;
 }
 
 .operationsActions{
@@ -1255,6 +1284,7 @@
     gap:12px;
     padding-right:18px;
     flex:1;
+    margin-top:-6px;
 }
 
 .gastosYearBar{
@@ -1262,7 +1292,7 @@
     align-items:center;
     justify-content:space-between;
     gap:16px;
-    padding:8px 2px 0 2px;
+    padding:0 2px 0 2px;
     margin-bottom:0;
     width:100%;
 }
@@ -1288,13 +1318,25 @@
     gap:16px;
     margin-bottom:0;
     width:100%;
+    padding:0 2px;
+}
+
+.gastosMonthBarSpacer{
+    flex:0 0 36px;
+    width:36px;
 }
 
 .gastosYearList{
-    display:flex;
-    gap:12px;
-    flex-wrap:wrap;
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    gap:5px;
     flex:1 1 auto;
+}
+
+.gastosYearBtn,
+.gastosMonthTab{
+    flex:1;
+    text-align:center;
 }
 
 .gastosYearBtn,
@@ -1345,6 +1387,7 @@
     border-radius:12px;
     background:var(--bg-panel);
     scrollbar-width:none;
+    overflow-x:hidden;
 }
 
 .gastosMovementsWrapper{
@@ -1451,23 +1494,31 @@
 }
 
 .rowMenuTrigger{
-    background:none;
-    border:none;
-    color:var(--text-muted, #888);
-    cursor:pointer;
-    font-size:16px;
+    width:28px;
+    height:28px;
+    border-radius:7px;
+    background:var(--bg-elevated);
+    border:1px solid rgba(59,130,246,0.2);
+    color:var(--text-muted);
+    font-size:12px;
     font-weight:700;
     letter-spacing:2px;
-    padding:4px 8px;
-    border-radius:5px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:0;
     line-height:1;
-    transition:background 0.15s, color 0.15s, transform 0.1s;
+    box-shadow:0 1px 4px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.05);
+    transition:background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
     user-select:none;
 }
 
 .rowMenuTrigger:hover{
     background:var(--btn-bg-hover);
-    color:var(--text-primary, #e6edf8);
+    border-color:var(--accent);
+    color:var(--accent);
+    box-shadow:0 0 0 2px var(--accent-glow),0 2px 8px rgba(0,0,0,0.4);
 }
 
 .rowMenuTrigger:active{
@@ -1477,11 +1528,11 @@
 .rowMenuDropdown{
     position:fixed;
     z-index:9999;
-    background:var(--bg-elevated, #1a2030);
-    border:1px solid var(--border-color);
-    border-radius:8px;
+    background:var(--bg-surface);
+    border:1px solid var(--btn-border);
+    border-radius:10px;
     overflow:hidden;
-    box-shadow:0 8px 28px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow:0 8px 28px rgba(0,0,0,0.55);
     min-width:130px;
     padding:4px;
     white-space:nowrap;
@@ -1531,12 +1582,12 @@
 }
 
 .rowMenuItemDanger{
-    color:#e05252;
+    color:var(--color-neg-bright);
 }
 
 .rowMenuItemDanger:hover{
-    background:rgba(220,60,50,0.15);
-    color:#f07070;
+    background:rgba(231,76,60,0.12);
+    color:var(--color-neg-bright);
 }
 
 .rowMenuDropdown .avActionBtn{
@@ -1663,17 +1714,12 @@
     flex-wrap:nowrap;
     margin:0;
     flex:1 1 auto;
-    overflow:hidden;
     padding-top:3px;
     margin-top:-3px;
 }
 
 .gastosMonthActions{
-    display:flex;
-    align-items:center;
-    justify-content:flex-end;
-    flex:0 0 auto;
-    gap:6px;
+    display:none;
 }
 
 .gastosTypePanel{
@@ -1813,38 +1859,42 @@
 }
 
 .pageActionsMenuTrigger{
+    width:36px;
+    height:36px;
+    border-radius:8px;
+    background:var(--bg-elevated);
+    border:1px solid rgba(59,130,246,0.2);
+    color:var(--text-muted);
+    font-size:14px;
+    font-weight:700;
+    letter-spacing:2px;
+    cursor:pointer;
     display:flex;
     align-items:center;
     justify-content:center;
-    width:36px;
-    height:36px;
     padding:0;
-    border:1px solid var(--btn-border);
-    border-radius:8px;
-    background:var(--btn-bg);
-    color:var(--text-bright);
-    font-size:18px;
-    font-weight:700;
-    letter-spacing:1px;
-    cursor:pointer;
-    transition:background 0.15s, border-color 0.15s;
+    box-shadow:0 1px 4px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.05);
+    transition:background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+    flex-shrink:0;
 }
 
 .pageActionsMenuTrigger:hover{
     background:var(--btn-bg-hover);
-    border-color:var(--btn-border-hover);
+    border-color:var(--accent);
+    color:var(--accent);
+    box-shadow:0 0 0 2px var(--accent-glow),0 2px 8px rgba(0,0,0,0.4);
 }
 
 .pageActionsDropdown{
     position:absolute;
-    top:calc(100% + 6px);
+    top:calc(100% + 8px);
     right:0;
     min-width:180px;
     padding:6px;
-    border:1px solid var(--border-mid);
-    border-radius:10px;
+    border:1px solid var(--btn-border);
+    border-radius:12px;
     background:var(--bg-surface);
-    box-shadow:0 8px 24px rgba(0,0,0,0.35);
+    box-shadow:0 8px 28px rgba(0,0,0,0.55);
     z-index:200;
     display:none;
     flex-direction:column;
@@ -1853,6 +1903,7 @@
 
 .pageActionsDropdown.open{
     display:flex;
+    animation:assetMenuIn 0.15s ease;
 }
 
 .pageActionsItem{
@@ -1919,6 +1970,7 @@
     gap:12px;
     padding-right:18px;
     flex:1;
+    margin-top:-6px;
 }
 
 .ingresosYearBar{
@@ -1926,7 +1978,7 @@
     align-items:center;
     justify-content:space-between;
     gap:16px;
-    padding:8px 2px 0 2px;
+    padding:0 2px 0 2px;
     margin-bottom:0;
     width:100%;
 }
@@ -1952,13 +2004,29 @@
     gap:16px;
     margin-bottom:0;
     width:100%;
+    padding:0 2px;
+}
+
+.ingresosMonthActions{
+    display:none;
+}
+
+.ingresosMonthBarSpacer{
+    flex:0 0 36px;
+    width:36px;
 }
 
 .ingresosYearList{
-    display:flex;
-    gap:12px;
-    flex-wrap:wrap;
+    display:grid;
+    grid-template-columns:repeat(12,1fr);
+    gap:5px;
     flex:1 1 auto;
+}
+
+.ingresosYearBtn,
+.ingresosMonthTab{
+    flex:1;
+    text-align:center;
 }
 
 .ingresosYearBtn,
@@ -2248,7 +2316,7 @@
     padding:5px 4px;
     border-radius:7px;
     border:none;
-    color:#6b7a99;
+    color:var(--text-dim);
     font-weight:500;
     background:transparent;
     cursor:pointer;
@@ -2257,8 +2325,8 @@
 }
 
 .mIngresosMonthToggle .mToggleBtn:hover:not(.active){
-    background:rgba(255,255,255,0.05);
-    color:#aabbd8;
+    background:var(--btn-bg-hover);
+    color:var(--text-subtle);
 }
 
 .mIngresosMonthToggle .mToggleBtn.active{
@@ -2415,9 +2483,9 @@
 .calSelect:focus { outline: none; border-color: #3a7bd5; }
 
 .calAddBtn {
-    background: #3a7bd5;
-    border: none;
-    color: #fff;
+    background: var(--btn-active-bg);
+    border: 1px solid var(--btn-active-border);
+    color: var(--btn-active-text);
     font-size: 18px;
     line-height: 1;
     width: 28px;
@@ -2430,7 +2498,7 @@
     justify-content: center;
 }
 
-.calAddBtn:hover { background: #2a5ba5; }
+.calAddBtn:hover { background: #2563eb; }
 
 
 /* ===== METRICAS ===== */
@@ -2481,7 +2549,6 @@
     padding:10px 0;
     margin-bottom:14px;
     flex-wrap:wrap;
-    border-bottom:1px solid var(--border-soft);
 }
 
 .mNavTabs{
@@ -2726,7 +2793,7 @@
     padding:5px 4px;
     border-radius:7px;
     border:none;
-    color:#6b7a99;
+    color:var(--text-dim);
     font-weight:500;
     background:transparent;
     cursor:pointer;
@@ -2735,8 +2802,8 @@
 }
 
 .mGastosMonthToggle .mToggleBtn:hover:not(.active){
-    background:rgba(255,255,255,0.05);
-    color:#aabbd8;
+    background:var(--btn-bg-hover);
+    color:var(--text-subtle);
 }
 
 .mGastosMonthToggle .mToggleBtn.active{
@@ -2784,7 +2851,7 @@
 .mToggleBtn, .mDistMetricBtn{
     background:transparent;
     border:none;
-    color:#7a8fb0;
+    color:var(--text-dim);
     padding:6px 16px;
     font-size:0.82rem;
     font-weight:500;
@@ -2795,15 +2862,15 @@
 }
 
 .mToggleBtn.active, .mDistMetricBtn.active{
-    background:var(--bg-elevated,#1e2d4a);
+    background:var(--bg-elevated);
     color:var(--text-primary);
     font-weight:600;
     box-shadow:0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
 .mToggleBtn:hover:not(.active), .mDistMetricBtn:hover:not(.active){
-    background:rgba(255,255,255,0.05);
-    color:#aabbd8;
+    background:var(--btn-bg-hover);
+    color:var(--text-subtle);
 }
 
 /* ── Evolución histórica ── */
@@ -2950,7 +3017,7 @@
 }
 .mComparativaFiltroBtn{
     background:var(--border-soft);
-    border:1px solid #3a5580;
+    border:1px solid var(--btn-border-hover);
     color:var(--text-primary);
     font-size:0.72rem;
     padding:3px 9px;
@@ -2966,7 +3033,7 @@
     opacity:0.65;
 }
 .mComparativaFiltroBtn:hover{
-    border-color:#5580aa;
+    border-color:var(--accent);
 }
 
 .metricasChartDynamic{
@@ -3219,9 +3286,10 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 /* ===== ACTIVOS PAGE ===== */
 
 .activosPage{
-    padding:0 0 20px;
+    padding:0 0 0px;
     display:flex;
     flex-direction:column;
+    gap:14px;
     min-height:0;
     flex:1 1 auto;
     overflow-y:auto;
@@ -3229,9 +3297,10 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 }
 
 .seguimientoPage{
-    padding:0 0 20px;
+    padding:0 0 0px;
     display:flex;
     flex-direction:column;
+    gap:14px;
     min-height:0;
     flex:1 1 auto;
     overflow-y:auto;
@@ -3241,10 +3310,75 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 .activosToolbar{
     display:flex;
     align-items:center;
-    gap:14px;
+    justify-content:space-between;
+    gap:16px;
     flex-wrap:wrap;
-    margin-bottom:14px;
+    padding:2px 0 6px 0;
     flex:0 0 auto;
+}
+
+#activosAddBtn,
+#seguimientoAddBtn,
+#addAssetBtn,
+#refreshSidebarMarketBtn,
+#addAssetRowBtn,
+#addRowBtn,
+#addRowDividendoBtn,
+#bonosAddBtn,
+#addOperationRowBtn,
+#addStablecoinRowBtn,
+#addStakingRowBtn,
+#addEarnRowBtn,
+#addTradingRowBtn,
+#addVentaRowBtn,
+#addTransaccionRowBtn,
+#addConversionRowBtn,
+#addGastoRowBtn,
+#addIngresoRowBtn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    height:30px !important;
+    line-height:1;
+    padding:0 12px !important;
+    background:linear-gradient(135deg, #1a2e4a 0%, #0f1f35 100%) !important;
+    border:1px solid #2d6abf !important;
+    border-left:3px solid #3b82f6 !important;
+    border-radius:20px !important;
+    color:#93c5fd !important;
+    font-size:13px !important;
+    font-weight:600 !important;
+    letter-spacing:0.02em;
+    white-space:nowrap;
+    box-shadow:0 0 0 1px rgba(59,130,246,0.15), inset 0 1px 0 rgba(255,255,255,0.04) !important;
+    transform:none !important;
+    transition:background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+#activosAddBtn:hover,
+#seguimientoAddBtn:hover,
+#addAssetBtn:hover,
+#refreshSidebarMarketBtn:hover,
+#addAssetRowBtn:hover,
+#addRowBtn:hover,
+#addRowDividendoBtn:hover,
+#bonosAddBtn:hover,
+#addOperationRowBtn:hover,
+#addStablecoinRowBtn:hover,
+#addStakingRowBtn:hover,
+#addEarnRowBtn:hover,
+#addTradingRowBtn:hover,
+#addVentaRowBtn:hover,
+#addTransaccionRowBtn:hover,
+#addConversionRowBtn:hover,
+#addGastoRowBtn:hover,
+#addIngresoRowBtn:hover{
+    background:linear-gradient(135deg, #1e3a5f 0%, #142640 100%) !important;
+    border-color:#4f96f0 !important;
+    border-left-color:#60a5fa !important;
+    color:#bfdbfe !important;
+    transform:none !important;
+    box-shadow:0 0 0 2px rgba(59,130,246,0.2), inset 0 1px 0 rgba(255,255,255,0.06) !important;
 }
 
 .filterDrop{
@@ -3297,6 +3431,15 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     display:flex;
     gap:6px;
     flex-wrap:wrap;
+}
+
+.filtersDivider{
+    width:1px;
+    height:25px;
+    background:var(--border,#333);
+    align-self:center;
+    flex-shrink:0;
+    margin:0 2px;
 }
 
 /* activosFilterBtn — base visual heredado de overviewFilterOption (components.css) */
@@ -3397,8 +3540,8 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 }
 
 .avViewBtn:hover{
-    background:#151f35;
-    color:#a0aec0;
+    background:var(--btn-bg-hover);
+    color:var(--text-subtle);
 }
 
 .avViewBtn.active{
@@ -3418,9 +3561,9 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 .activosPage .activosTableWrap,
 .seguimientoPage .activosTableWrap{
     flex:0 0 auto;
-    min-height:0;
-    max-height:none;
-    overflow-y:visible;
+    max-height:calc(100vh - 245px);
+    overflow-y:auto;
+    overflow-x:auto;
 }
 
 .activosTable{
@@ -3431,6 +3574,7 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 
 .activosTable thead tr{
     background:var(--bg-header);
+    border-bottom:1px solid var(--border-soft);
 }
 
 .activosTable th{
@@ -3438,9 +3582,9 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     text-align:left;
     font-size:0.75rem;
     font-weight:600;
-    color:var(--text-dim);
+    color:#7a8fb0;
     text-transform:uppercase;
-    letter-spacing:.05em;
+    letter-spacing:.06em;
     white-space:nowrap;
     border-bottom:1px solid var(--border-soft);
     position:sticky;
@@ -3457,12 +3601,13 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 
 .avTableRow:last-child{ border-bottom:none; }
 
-.avTableRow:hover{ background:var(--bg-header); }
+.avTableRow:hover{ background:#151f35; }
 
 .activosTable td{
     padding:10px 14px;
-    color:var(--text-muted);
+    color:var(--text-subtle);
     white-space:nowrap;
+    vertical-align:middle;
 }
 
 .avTrName{ color:var(--text-primary); font-weight:500; }
@@ -3497,6 +3642,7 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     overflow-y:auto;
     overscroll-behavior:contain;
     scrollbar-width:none;
+    padding-top:10px;
 }
 
 .activosPage .activosGrid::-webkit-scrollbar,
@@ -3565,7 +3711,7 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     border:1px solid var(--border-soft);
     border-radius:6px;
     background:var(--bg-header);
-    color:#7a8fb0;
+    color:var(--text-muted);
     font-size:0.85rem;
     cursor:pointer;
     display:flex;
@@ -3625,15 +3771,15 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 }
 
 .avEditBtn:hover{
-    background:var(--border-soft);
-    color:#3a7bd5;
-    border-color:#3a7bd5;
+    background:var(--btn-bg-hover);
+    color:var(--accent);
+    border-color:var(--accent);
 }
 
 .avDeleteBtn:hover{
-    background:#2d1515;
-    color:#e74c3c;
-    border-color:#e74c3c;
+    background:rgba(231,76,60,0.1);
+    color:var(--color-neg);
+    border-color:var(--color-neg);
 }
 
 .avCardSymbol{
@@ -3773,9 +3919,9 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 .bonosTab:hover{ color:var(--text-subtle); background:rgba(255,255,255,0.05); }
 
 .bonosTab.active{
-    color:#72a2ff;
-    border-bottom-color:#72a2ff;
-    background:rgba(114,162,255,0.07);
+    color:var(--accent);
+    border-bottom-color:var(--accent);
+    background:rgba(59,130,246,0.07);
 }
 
 .bonosTabPanel{ display:flex; flex-direction:column; gap:16px; }

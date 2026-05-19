@@ -44,10 +44,14 @@ function segSaveCustomItems(items) {
 function segFilteredItems() {
     return _segAllItems.filter(item => {
         const matchType = _segFilterType === "all" || _segFilterType.includes(item.type)
-        const matchSrc  = _segFilterSrc  === "all"
+        const matchSrc  = _segFilterSrc === "all"
             || (Array.isArray(_segFilterSrc)
-                ? (_segFilterSrc.includes("portfolio") && item._fromPortfolio) || (_segFilterSrc.includes("nuevos") && !item._fromPortfolio)
-                : (_segFilterSrc === "portfolio" && item._fromPortfolio) || (_segFilterSrc === "nuevos" && !item._fromPortfolio))
+                ? (_segFilterSrc.includes("portfolio") && item._fromPortfolio)
+                  || (_segFilterSrc.includes("operaciones") && item._fromOperaciones)
+                  || (_segFilterSrc.includes("nuevos") && !item._fromPortfolio && !item._fromOperaciones)
+                : (_segFilterSrc === "portfolio" && item._fromPortfolio)
+                  || (_segFilterSrc === "operaciones" && item._fromOperaciones)
+                  || (_segFilterSrc === "nuevos" && !item._fromPortfolio && !item._fromOperaciones))
         const q = _segSearch.toLowerCase()
         const matchSearch = !q
             || (item.name   || "").toLowerCase().includes(q)
@@ -86,7 +90,7 @@ function segBuildCard(item) {
     }
 
     const sid = escapeHtml(item._segId || "")
-    const hideOrDeleteItem = item._fromPortfolio
+    const hideOrDeleteItem = (item._fromPortfolio || item._fromOperaciones)
         ? `<button type="button" class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${sid}">Ocultar</button>`
         : `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${sid}">Eliminar</button>`
     const actionBtns = `
@@ -309,7 +313,7 @@ function segOpenHiddenModal() {
 }
 
 function segRemoveItem(segId) {
-    if (segId.startsWith("portfolio_")) return
+    if (segId.startsWith("portfolio_") || segId.startsWith("operacion_")) return
 
     const item = _segAllItems.find(i => i._segId === segId)
     const itemName = item?.name || item?.symbol || segId
@@ -485,7 +489,10 @@ function segMergeAndRender(portfolioAssets) {
             }
         })
 
-    _segAllItems = [...portfolioItems, ...customItems]
+    const operacionesItems = (window._segOperacionesItems || [])
+        .filter(item => !hidden.has(item._segId))
+
+    _segAllItems = [...portfolioItems, ...operacionesItems, ...customItems]
     segRenderGrid()
     segUpdateHiddenBtn()
 }
@@ -504,7 +511,7 @@ async function segRefreshCustomPrices() {
             if (!data.ok || !data.price) continue
             item.price       = String(data.price)
             item.change      = String(data.change ?? "")
-            item.currency    = data.currency || "EUR"
+            item.currency    = data.precioCurrency || data.currency || "EUR"
             item.lastUpdated = data.lastUpdated || new Date().toISOString()
             updated = true
         } catch { /* ignore individual failures */ }
@@ -548,6 +555,42 @@ async function initSeguimientoLogic() {
             portfolioAssets = data.assets || data || []
         }
     } catch { /* sin conexión */ }
+
+    // cargar operaciones y construir items únicos por activo
+    try {
+        const opResp = await fetch("/api/operaciones")
+        if (opResp.ok) {
+            const opData = await opResp.json()
+            const opRows = opData.rows || []
+            const seenAssetIds = new Set()
+            window._segOperacionesItems = opRows
+                .filter(row => {
+                    if (!row.assetId || seenAssetIds.has(row.assetId)) return false
+                    seenAssetIds.add(row.assetId)
+                    return true
+                })
+                .flatMap(row => {
+                    const asset = portfolioAssets.find(a => a.id === row.assetId)
+                    if (!asset) return []
+                    return [{
+                        _segId:          `operacion_${asset.id}`,
+                        _fromOperaciones: true,
+                        _fromPortfolio:   false,
+                        name:            asset.name || asset.symbol || row.activo || "",
+                        symbol:          asset.symbol || asset.name || row.activo || "",
+                        ticker:          asset.marketSymbol || asset.finnhubSymbol || row.ticker || "",
+                        marketSymbol:    asset.marketSymbol || asset.finnhubSymbol || row.ticker || "",
+                        marketProvider:  asset.marketProvider || row.marketProvider || "finnhub",
+                        tvSymbol:        asset.tvSymbol || row.tvSymbol || "",
+                        type:            asset.type || "cripto",
+                        price:           String(asset.price || ""),
+                        currency:        asset.precioCurrency || asset.currency || "EUR",
+                        change:          String(asset.change || ""),
+                        lastUpdated:     asset.lastUpdated || null
+                    }]
+                })
+        }
+    } catch { window._segOperacionesItems = [] }
 
     // restaurar filtros guardados
     const _pid = _segPid()

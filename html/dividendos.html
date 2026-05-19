@@ -1,9 +1,12 @@
 <div class="dividendosLayout">
     <div class="interesesYearBar">
         <div class="interesesYearList" id="dividendosYearList"></div>
-        <div class="interesesYearBarActions">
-            <button id="addDividendosYearBtn" class="secondaryButton" type="button">+ Año</button>
-            <button id="deleteDividendosYearBtn" class="dangerButton" type="button">Eliminar año</button>
+        <div class="interesesMenuWrapper">
+            <button class="interesesMenuBtn" id="dividendosMenuBtn" type="button" title="Acciones">···</button>
+            <div class="interesesMenuDropdown hidden" id="dividendosMenuDropdown">
+                <button id="addDividendosYearBtn" class="interesesMenuOption" type="button">+ Añadir año</button>
+                <button id="deleteDividendosYearBtn" class="interesesMenuOption interesesMenuOptionDanger" type="button">Eliminar año</button>
+            </div>
         </div>
     </div>
 
@@ -44,6 +47,6 @@
     </div>
 
     <div class="dividendosActions">
-        <button id="addRowDividendoBtn" class="primaryButton" type="button">Añadir fila</button>
+        <button id="addRowDividendoBtn" class="primaryButton" type="button">+ Añadir fila</button>
     </div>
 </div>

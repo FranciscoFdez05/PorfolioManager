@@ -980,21 +980,18 @@ function renderCurrentGastosView() {
         return
     }
 
-    const sortBtn = document.getElementById("sortGastosByDateBtn")
     if (currentGastosView === "year") {
         renderGastosAnnualTable()
         annualWrapper.classList.remove("hidden")
         movementsWrapper.classList.add("hidden")
         monthHeader.classList.add("hidden")
         actions.classList.add("hidden")
-        if (sortBtn) sortBtn.classList.add("hidden")
     } else {
         renderGastosMonthTable()
         annualWrapper.classList.add("hidden")
         movementsWrapper.classList.remove("hidden")
         monthHeader.classList.remove("hidden")
         actions.classList.remove("hidden")
-        if (sortBtn) sortBtn.classList.remove("hidden")
     }
 }
 

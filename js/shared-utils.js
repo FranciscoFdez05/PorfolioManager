@@ -256,18 +256,39 @@ async function initDividendosLogic() {
     const addYearBtn = document.getElementById("addDividendosYearBtn")
     if (addYearBtn && !addYearBtn.dataset.bound) {
         addYearBtn.dataset.bound = "true"
-        addYearBtn.addEventListener("click", addDividendosYear)
+        addYearBtn.addEventListener("click", () => { closeDividendosMenu(); addDividendosYear() })
     }
 
     const deleteYearBtn = document.getElementById("deleteDividendosYearBtn")
     if (deleteYearBtn && !deleteYearBtn.dataset.bound) {
         deleteYearBtn.dataset.bound = "true"
-        deleteYearBtn.addEventListener("click", deleteCurrentDividendosYear)
+        deleteYearBtn.addEventListener("click", () => { closeDividendosMenu(); deleteCurrentDividendosYear() })
+    }
+
+    const divMenuBtn = document.getElementById("dividendosMenuBtn")
+    const divMenuDrop = document.getElementById("dividendosMenuDropdown")
+    if (divMenuBtn && divMenuDrop && !divMenuBtn.dataset.bound) {
+        divMenuBtn.dataset.bound = "true"
+        divMenuBtn.addEventListener("click", (e) => {
+            e.stopPropagation()
+            divMenuDrop.classList.toggle("hidden")
+        })
     }
 
     const dividendosTable = document.querySelector(".dividendosTable")
     if (dividendosTable) bindTableSort(dividendosTable, "dividendos")
 }
+
+function closeDividendosMenu() {
+    const d = document.getElementById("dividendosMenuDropdown")
+    if (d) d.classList.add("hidden")
+}
+
+document.addEventListener("click", (e) => {
+    if (!e.target.closest("#dividendosMenuBtn") && !e.target.closest("#dividendosMenuDropdown")) {
+        closeDividendosMenu()
+    }
+})
 
 document.addEventListener("keydown", (event) => {
     const editableCell = event.target.closest('td[contenteditable="true"]')

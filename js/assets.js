@@ -751,7 +751,7 @@ async function updateAssetDetail(asset) {
 
     if (detPrice) {
         const displayPrice = await getAssetDisplayPriceValue(asset)
-        detPrice.textContent = formatMoney(displayPrice, asset.currency || "EUR")
+        detPrice.textContent = formatMoney(displayPrice, asset.precioCurrency || asset.currency || "EUR")
     }
 
     if (detChange) {
@@ -951,7 +951,7 @@ async function renderAssetsList(assets) {
             : ""
         try {
             const displayPrice    = await getAssetDisplayPriceValue(asset)
-            const displayCurrency = asset.currency || "EUR"
+            const displayCurrency = asset.precioCurrency || asset.currency || "EUR"
             const changePctStr    = String(asset.change || "").trim()
             const changePct       = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
             const changeAbs       = Math.abs(displayPrice * changePct / 100)
@@ -973,7 +973,7 @@ async function renderAssetsList(assets) {
         } catch (error) {
             console.error(`No se pudo renderizar el precio del activo ${asset.name || asset.symbol || asset.id}:`, error)
             const fallbackPrice    = parseLooseNumber(asset.price || "") || 0
-            const fallbackCurrency = asset.currency || "EUR"
+            const fallbackCurrency = asset.precioCurrency || asset.currency || "EUR"
             const changePctStr     = String(asset.change || "").trim()
             const changePct        = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
             const changeAbs        = Math.abs(fallbackPrice * changePct / 100)
@@ -1408,6 +1408,9 @@ async function refreshOverviewMarketData(buttonElement = null) {
         await renderVistaGeneralTable()
         if (typeof segRefreshCustomPrices === "function") {
             try { await segRefreshCustomPrices() } catch {}
+        }
+        if (typeof refreshOperationsTickerPrices === "function") {
+            try { await refreshOperationsTickerPrices() } catch {}
         }
     } finally {
         if (buttonElement) {
@@ -1961,6 +1964,7 @@ async function buildOverviewRow(asset) {
     const rows = Array.isArray(asset.rows) ? asset.rows : []
     const isCrypto = isCryptoAssetType(asset.type)
     const assetCurrency = normalizeCurrencyCode(asset.currency || "EUR")
+    const priceCurrency = normalizeCurrencyCode(asset.precioCurrency || asset.currency || "EUR")
     const investedCurrency = normalizeCurrencyCode(
         asset.investedCurrency || _detectInvestedCurrencyFromRows(asset, assetCurrency)
     )
@@ -1983,12 +1987,12 @@ async function buildOverviewRow(asset) {
     const invertidoNeto = invertidoBruto - comisionesFiat
     const valorActual = parseLooseNumber(asset.price || "") || 0
     const netoActualMarket = participaciones * valorActual
-    const netoActual = assetCurrency !== investedCurrency
-        ? await convertAmountForDisplay(netoActualMarket, assetCurrency, investedCurrency)
+    const netoActual = priceCurrency !== investedCurrency
+        ? await convertAmountForDisplay(netoActualMarket, priceCurrency, investedCurrency)
         : netoActualMarket
     const promedioCompra = participaciones > 0
-        ? assetCurrency !== investedCurrency
-            ? (await convertAmountForDisplay(invertidoNeto, investedCurrency, assetCurrency)) / participaciones
+        ? priceCurrency !== investedCurrency
+            ? (await convertAmountForDisplay(invertidoNeto, investedCurrency, priceCurrency)) / participaciones
             : invertidoNeto / participaciones
         : 0
     const rendimiento = netoActual - invertidoNeto
@@ -2001,9 +2005,9 @@ async function buildOverviewRow(asset) {
         participaciones,
         promedioCompra,
         valorActual,
-        currency: assetCurrency,
+        currency: priceCurrency,
         investedCurrency,
-        precioCurrency: assetCurrency,
+        precioCurrency: priceCurrency,
         invertidoBruto,
         comisiones: comisionesFiat,
         comisionesFiat,
@@ -2237,7 +2241,7 @@ function renderAssetTablePage(asset) {
     }
 
     contentArea.innerHTML = `
-        <section class="assetTablePage" data-asset-id="${escapeHtml(asset.id)}" data-asset-type="${escapeHtml(asset.type)}" data-asset-name="${escapeHtml(asset.name)}" data-asset-symbol="${escapeHtml(asset.symbol)}" data-asset-price="${escapeHtml(asset.price || "0,00")}" data-asset-currency="${escapeHtml(asset.currency || "EUR")}" data-asset-price-currency="${escapeHtml(asset.currency || "EUR")}" data-asset-change="${escapeHtml(asset.change || "+0,00%")}" data-asset-status="${escapeHtml(asset.status || "Mercado abierto")}" data-asset-last-updated="${escapeHtml(asset.lastUpdated || "")}" data-asset-market-provider="${escapeHtml(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || ""))}" data-asset-market-symbol="${escapeHtml(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-finnhub-symbol="${escapeHtml(asset.finnhubSymbol || "")}" data-asset-color="${escapeHtml(asset.color || "")}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}">
+        <section class="assetTablePage" data-asset-id="${escapeHtml(asset.id)}" data-asset-type="${escapeHtml(asset.type)}" data-asset-name="${escapeHtml(asset.name)}" data-asset-symbol="${escapeHtml(asset.symbol)}" data-asset-price="${escapeHtml(asset.price || "0,00")}" data-asset-currency="${escapeHtml(asset.currency || "EUR")}" data-asset-price-currency="${escapeHtml(asset.precioCurrency || asset.currency || "EUR")}" data-asset-change="${escapeHtml(asset.change || "+0,00%")}" data-asset-status="${escapeHtml(asset.status || "Mercado abierto")}" data-asset-last-updated="${escapeHtml(asset.lastUpdated || "")}" data-asset-market-provider="${escapeHtml(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || ""))}" data-asset-market-symbol="${escapeHtml(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-finnhub-symbol="${escapeHtml(asset.finnhubSymbol || "")}" data-asset-color="${escapeHtml(asset.color || "")}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}">
             <div class="assetPageHeader">
                 <div class="assetHeaderLeft">
                     <div class="assetTitleRow">
@@ -2278,29 +2282,16 @@ function renderAssetTablePage(asset) {
                                 <span class="assetMenuIcon">↻</span>
                                 <span class="assetMenuText">Actualizar cotización <span class="assetBtnProvider">(${String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")).toUpperCase()})</span></span>
                             </button>
-                            <div class="assetMenuGroupLabel">Cambiar moneda</div>
-                            <button id="changeCurrencyLabelEurBtn" class="assetMenuItem assetMenuItemSub" type="button" data-target-currency="EUR" data-scope="moneda" ${currentCurrency === "EUR" ? "disabled" : ""}>
-                                <span class="assetMenuIcon">⇄</span>
-                                <span class="assetMenuText">EUR${currentCurrency === "EUR" ? " <small>(actual)</small>" : ""}</span>
-                            </button>
-                            <button id="changeCurrencyLabelUsdBtn" class="assetMenuItem assetMenuItemSub" type="button" data-target-currency="USD" data-scope="moneda" ${currentCurrency === "USD" ? "disabled" : ""}>
-                                <span class="assetMenuIcon">⇄</span>
-                                <span class="assetMenuText">USD${currentCurrency === "USD" ? " <small>(actual)</small>" : ""}</span>
-                            </button>
-                            <div class="assetMenuGroupLabel">Convertir inversión</div>
-                            <button id="convertInversionEurBtn" class="assetMenuItem assetMenuItemSub" type="button" data-target-currency="EUR" data-scope="asset" ${currentCurrency === "EUR" ? "disabled" : ""}>
-                                <span class="assetMenuIcon">↕</span>
-                                <span class="assetMenuText">EUR${currentCurrency === "EUR" ? " <small>(actual)</small>" : ""}</span>
-                            </button>
-                            <button id="convertInversionUsdBtn" class="assetMenuItem assetMenuItemSub" type="button" data-target-currency="USD" data-scope="asset" ${currentCurrency === "USD" ? "disabled" : ""}>
-                                <span class="assetMenuIcon">↕</span>
-                                <span class="assetMenuText">USD${currentCurrency === "USD" ? " <small>(actual)</small>" : ""}</span>
-                            </button>
-                            <div class="assetMenuSep"></div>
                             <button id="editAssetNameBtn" class="assetMenuItem" type="button">
                                 <span class="assetMenuIcon">✎</span>
                                 <span class="assetMenuText">Editar nombre del activo</span>
                             </button>
+                            <div class="assetMenuCurrencyRow" id="assetPriceCurrencyRow">
+                                <span class="assetMenuCurrencyLabel"><span class="assetMenuIcon">¤</span>Moneda de cotización</span>
+                                <span class="assetMenuCurrencyBtns">
+                                    ${["EUR","USD","GBP"].map(c => `<button class="assetCurrBtn${(asset.precioCurrency||asset.currency||"EUR")===c?" active":""}" data-currency="${c}">${c}</button>`).join("")}
+                                </span>
+                            </div>
                             <div class="assetMenuSep"></div>
                             <button id="deleteAssetBtn" class="assetMenuItem assetMenuItemDanger" type="button">
                                 <span class="assetMenuIcon">🗑</span>
@@ -2690,6 +2681,18 @@ function inferMarketProviderFromSymbol(symbol, fallback = "finnhub") {
     }
 
     return normalizedFallback || "finnhub"
+}
+
+function inferPriceCurrencyFromMarketSymbol(symbol) {
+    const s = String(symbol || "").trim().toUpperCase()
+    if (!s) return null
+    const base = s.includes(":") ? s.split(":").pop() : s
+    if (base.endsWith("EUR")) return "EUR"
+    if (base.endsWith("USD")) return "USD"
+    if (base.endsWith("GBP")) return "GBP"
+    if (base.endsWith("CHF")) return "CHF"
+    if (base.endsWith("JPY")) return "JPY"
+    return null
 }
 
 function renderMarketSearchResults(container, results, onSelect) {
@@ -3222,6 +3225,32 @@ function initAssetTableLogic(asset) {
         })
     }
 
+    document.querySelectorAll("#assetPriceCurrencyRow .assetCurrBtn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+            e.stopPropagation()
+            const currency = btn.dataset.currency
+            if (!currentAssetId) return
+            btn.disabled = true
+            const res = await fetch(`/api/activos/${currentAssetId}/currency`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ scope: "precio", currency })
+            })
+            const data = await res.json()
+            btn.disabled = false
+            if (!data.ok) return
+            document.querySelectorAll("#assetPriceCurrencyRow .assetCurrBtn").forEach(b => {
+                b.classList.toggle("active", b.dataset.currency === currency)
+            })
+            setTimeout(() => {
+                document.getElementById("assetMenuDropdown")?.classList.remove("open")
+                document.getElementById("assetMenuBtn")?.classList.remove("active")
+            }, 350)
+            const freshAsset = await loadAssetData(currentAssetId)
+            if (freshAsset) await updateAssetDetail(freshAsset)
+        })
+    })
+
     buildOverviewRow(asset).then(summary => {
         if (document.querySelector('.assetTablePage')?.dataset.assetId !== asset.id) return
         const currency = summary.currency
@@ -3314,7 +3343,7 @@ function initAssetTableLogic(asset) {
                 const assetPage = document.querySelector(".assetTablePage")
                 if (assetPage) {
                     assetPage.dataset.assetCurrency = response.asset.currency || "EUR"
-                    assetPage.dataset.assetPriceCurrency = response.asset.currency || "EUR"
+                    assetPage.dataset.assetPriceCurrency = response.asset.precioCurrency || response.asset.currency || "EUR"
                     assetPage.dataset.assetPrice = String(response.asset.price || "0,00")
                 }
                 document.querySelectorAll("[data-scope='moneda'][data-target-currency],[data-scope='asset'][data-target-currency]").forEach(b => {
@@ -3969,7 +3998,7 @@ function avBuildCard(asset) {
     const color     = AV_TYPE_COLORS[asset.type]  || "#888"
     const typeLabel = AV_TYPE_LABELS[asset.type]  || asset.type || ""
     const price     = parseLooseNumber(asset.price || "") || 0
-    const currency  = asset.currency || "EUR"
+    const currency  = asset.precioCurrency || asset.currency || "EUR"
     const provider  = String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "") || "").toUpperCase()
     const ticker    = asset.marketSymbol || asset.finnhubSymbol || ""
 
@@ -4068,7 +4097,7 @@ function avBuildTableRow(asset) {
     const color     = AV_TYPE_COLORS[asset.type]  || "#888"
     const typeLabel = AV_TYPE_LABELS[asset.type]  || asset.type || ""
     const price     = parseLooseNumber(asset.price || "") || 0
-    const currency  = asset.currency || "EUR"
+    const currency  = asset.precioCurrency || asset.currency || "EUR"
     const provider  = String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "") || "").toUpperCase()
 
     const m         = asset._metrics

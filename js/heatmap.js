@@ -131,7 +131,7 @@ async function hmLoadData() {
             }
         }))
 
-        _hmData = assets.map(asset => {
+        _hmData = window._hmData = assets.map(asset => {
             const cur = hmNormCur(asset.currency)
             const m   = asset._hmMetrics
 

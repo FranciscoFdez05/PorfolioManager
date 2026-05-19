@@ -1,3 +1,20 @@
+async function _postSnapshot() {
+    const m = window._lastPortfolioMetrics
+    if (!m) return
+    const payload = { total_value: m.totalCuenta, total_invested: m.invertido }
+    const hmData  = window._hmData
+    if (Array.isArray(hmData) && hmData.length) {
+        payload.assets = hmData
+            .filter(d => d.netoEur > 0)
+            .map(d => ({ id: d.id, v: d.netoEur }))
+    }
+    await fetch("/api/portfolio/snapshot", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload)
+    }).catch(() => {})
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
     const toggleButton = document.getElementById("togglePanel")
     const sideWrapper = document.getElementById("sideWrapper")
@@ -46,13 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initMoneyToggle()
     loadPage("vistaGeneral")
     refreshOverviewMarketData().then(() => {
-        const m = window._lastPortfolioMetrics
-        const body = m ? JSON.stringify({ total_value: m.totalCuenta, total_invested: m.invertido }) : null
-        fetch("/api/portfolio/snapshot", {
-            method: "POST",
-            headers: body ? { "Content-Type": "application/json" } : {},
-            body
-        }).catch(() => {})
+        _postSnapshot()
     })
 })
 
@@ -157,13 +168,7 @@ function applySnapshotSchedule(minutes) {
     const intervalMs = minutes * 60 * 1000
 
     async function doSnapshot() {
-        const m = window._lastPortfolioMetrics
-        const body = m ? JSON.stringify({ total_value: m.totalCuenta, total_invested: m.invertido }) : null
-        await fetch("/api/portfolio/snapshot", {
-            method: "POST",
-            headers: body ? { "Content-Type": "application/json" } : {},
-            body
-        }).catch(() => {})
+        await _postSnapshot()
         if (typeof mRenderEvolucion === "function") {
             const activeBtn = document.querySelector(".mEvolucionRangeBtn.active")
             mRenderEvolucion(activeBtn ? activeBtn.dataset.range : "1D")
@@ -623,12 +628,22 @@ async function initInteresesLogic() {
 
     if (addYearButton && !addYearButton.dataset.bound) {
         addYearButton.dataset.bound = "true"
-        addYearButton.addEventListener("click", addInteresesYear)
+        addYearButton.addEventListener("click", () => { closeInteresesMenu(); addInteresesYear() })
     }
 
     if (deleteYearButton && !deleteYearButton.dataset.bound) {
         deleteYearButton.dataset.bound = "true"
-        deleteYearButton.addEventListener("click", deleteCurrentInteresesYear)
+        deleteYearButton.addEventListener("click", () => { closeInteresesMenu(); deleteCurrentInteresesYear() })
+    }
+
+    const menuBtn = document.getElementById("interesesMenuBtn")
+    const menuDrop = document.getElementById("interesesMenuDropdown")
+    if (menuBtn && menuDrop && !menuBtn.dataset.bound) {
+        menuBtn.dataset.bound = "true"
+        menuBtn.addEventListener("click", (e) => {
+            e.stopPropagation()
+            menuDrop.classList.toggle("hidden")
+        })
     }
 
     bindCuentasSidebarActions()
@@ -637,6 +652,16 @@ async function initInteresesLogic() {
     if (interesesTable) bindTableSort(interesesTable, "intereses")
 }
 
+function closeInteresesMenu() {
+    const d = document.getElementById("interesesMenuDropdown")
+    if (d) d.classList.add("hidden")
+}
+
+document.addEventListener("click", (e) => {
+    if (!e.target.closest("#interesesMenuWrapper") && !e.target.closest("#interesesMenuBtn") && !e.target.closest("#interesesMenuDropdown")) {
+        closeInteresesMenu()
+    }
+})
 
 
 
@@ -761,26 +786,33 @@ function initResizeHandles() {
     const sidePanel      = document.getElementById("sidePanel")
 
     if (sideWrapper && sideHandle) {
-        let startX, startW
+        let startX, startW, rafId = null
 
         sideHandle.addEventListener("mousedown", (e) => {
             e.preventDefault()
             startX = e.clientX
             startW = sideWrapper.getBoundingClientRect().width
             sideHandle.classList.add("dragging")
+            sideWrapper.classList.add("is-resizing")
             document.body.style.cursor = "col-resize"
             document.body.style.userSelect = "none"
 
             function onMove(e) {
-                const delta = startX - e.clientX
-                const newW  = Math.min(SIDE_MAX, Math.max(SIDE_MIN, startW + delta))
-                sideWrapper.style.width    = newW + "px"
-                sideWrapper.style.minWidth = newW + "px"
-                document.documentElement.style.setProperty("--sidebar-width", newW + "px")
+                if (rafId) return
+                rafId = requestAnimationFrame(() => {
+                    const delta = startX - e.clientX
+                    const newW  = Math.min(SIDE_MAX, Math.max(SIDE_MIN, startW + delta))
+                    sideWrapper.style.width    = newW + "px"
+                    sideWrapper.style.minWidth = newW + "px"
+                    document.documentElement.style.setProperty("--sidebar-width", newW + "px")
+                    rafId = null
+                })
             }
 
             function onUp() {
+                if (rafId) { cancelAnimationFrame(rafId); rafId = null }
                 sideHandle.classList.remove("dragging")
+                sideWrapper.classList.remove("is-resizing")
                 document.body.style.cursor = ""
                 document.body.style.userSelect = ""
                 document.removeEventListener("mousemove", onMove)
