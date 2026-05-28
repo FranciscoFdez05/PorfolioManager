@@ -2,7 +2,7 @@ async function _postSnapshot() {
     const m = window._lastPortfolioMetrics
     if (!m) return
     const payload = { total_value: m.totalCuenta, total_invested: m.invertido }
-    const hmData  = window._hmData
+    const hmData  = window._hmData || window._assetsSnapshotData
     if (Array.isArray(hmData) && hmData.length) {
         payload.assets = hmData
             .filter(d => d.netoEur > 0)
@@ -172,6 +172,14 @@ function applySnapshotSchedule(minutes) {
         if (typeof mRenderEvolucion === "function") {
             const activeBtn = document.querySelector(".mEvolucionRangeBtn.active")
             mRenderEvolucion(activeBtn ? activeBtn.dataset.range : "1D")
+        }
+        if (typeof mRenderEvolucionTipos === "function") {
+            const activeRangeBtn = document.querySelector(".mEvolucionTiposRangeBtn.active")
+            const activeModeBtn  = document.querySelector(".mEvolucionTiposModeBtn.active")
+            mRenderEvolucionTipos(
+                activeRangeBtn ? activeRangeBtn.dataset.range : "1D",
+                activeModeBtn  ? activeModeBtn.dataset.mode   : "eur"
+            )
         }
     }
 

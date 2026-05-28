@@ -77,8 +77,9 @@ def getHistoricalChanges():
     else:
         target = now - timedelta(days=365)
 
-    from_ts = int(target.timestamp())
-    to_ts   = from_ts + 10 * 86400
+    from_ts    = int(target.timestamp())
+    safe_limit = int((now - timedelta(days=2)).timestamp())
+    to_ts      = min(from_ts + 10 * 86400, safe_limit)
 
     conn   = get_db()
     result = {}

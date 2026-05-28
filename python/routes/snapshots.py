@@ -95,6 +95,61 @@ def get_history():
     })
 
 
+@snapshots_bp.route("/api/portfolio/history/by-type", methods=["GET"])
+def get_history_by_type():
+    range_param = request.args.get("range", "1M")
+    now_ts      = int(time.time())
+
+    range_map = {
+        "1D": 86400, "1W": 7*86400, "1M": 30*86400,
+        "3M": 90*86400, "6M": 180*86400, "1Y": 365*86400,
+        "ALL": None, "YTD": None,
+    }
+    seconds = range_map.get(range_param, 30 * 86400)
+
+    conn = get_db()
+    if range_param == "YTD":
+        jan1 = int(datetime.datetime(datetime.datetime.now().year, 1, 1).timestamp())
+        rows = conn.execute(
+            """SELECT s.ts, a.type, SUM(s.price_eur) as v
+               FROM asset_snapshots s
+               JOIN activos a ON s.asset_id = a.id
+               WHERE s.ts >= ? AND a.type IS NOT NULL AND a.type != ''
+               GROUP BY s.ts, a.type
+               ORDER BY s.ts ASC""",
+            (jan1,)
+        ).fetchall()
+    elif seconds is None:
+        rows = conn.execute(
+            """SELECT s.ts, a.type, SUM(s.price_eur) as v
+               FROM asset_snapshots s
+               JOIN activos a ON s.asset_id = a.id
+               WHERE a.type IS NOT NULL AND a.type != ''
+               GROUP BY s.ts, a.type
+               ORDER BY s.ts ASC"""
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """SELECT s.ts, a.type, SUM(s.price_eur) as v
+               FROM asset_snapshots s
+               JOIN activos a ON s.asset_id = a.id
+               WHERE s.ts >= ? AND a.type IS NOT NULL AND a.type != ''
+               GROUP BY s.ts, a.type
+               ORDER BY s.ts ASC""",
+            (now_ts - seconds,)
+        ).fetchall()
+
+    ts_map = {}
+    for r in rows:
+        ts = r["ts"]
+        if ts not in ts_map:
+            ts_map[ts] = {}
+        ts_map[ts][r["type"]] = round(r["v"], 2)
+
+    data = [{"ts": ts, **types} for ts, types in sorted(ts_map.items())]
+    return jsonify({"ok": True, "range": range_param, "data": data})
+
+
 @snapshots_bp.route("/api/snapshots/purge", methods=["POST"])
 def purge_snapshots():
     body = request.get_json(silent=True) or {}

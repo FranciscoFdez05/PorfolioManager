@@ -2622,11 +2622,62 @@
     display:flex;
     flex-direction:column;
     gap:5px;
-    transition:border-color .15s;
+    transition:background .15s, transform .18s, box-shadow .18s, border-color .15s;
+    position:relative;
 }
 
 .metricasKpiCard:hover{
     background:#131f33;
+    transform:translateY(-2px);
+    box-shadow:0 8px 20px rgba(0,0,0,.45);
+    z-index:1;
+}
+
+/* Tooltip personalizado para activos (valor en €) */
+.mkpiCardActivo[data-kpi]::after{
+    content:attr(data-kpi);
+    position:absolute;
+    bottom:calc(100% + 7px);
+    left:50%;
+    transform:translateX(-50%) translateY(4px);
+    opacity:0;
+    pointer-events:none;
+    background:#0f1c2e;
+    border:1px solid rgba(100,160,255,.22);
+    border-radius:7px;
+    padding:5px 11px;
+    font-size:0.8rem;
+    font-weight:700;
+    letter-spacing:.02em;
+    color:#c8d8f0;
+    white-space:nowrap;
+    box-shadow:0 4px 14px rgba(0,0,0,.5);
+    transition:opacity .18s, transform .18s;
+    z-index:20;
+}
+
+.mkpiCardActivo[data-kpi]::before{
+    content:'';
+    position:absolute;
+    bottom:calc(100% + 2px);
+    left:50%;
+    transform:translateX(-50%) translateY(4px);
+    opacity:0;
+    pointer-events:none;
+    border:5px solid transparent;
+    border-top-color:#0f1c2e;
+    transition:opacity .18s, transform .18s;
+    z-index:21;
+}
+
+.mkpiCardActivo[data-kpi]:hover::after{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
+}
+
+.mkpiCardActivo[data-kpi]:hover::before{
+    opacity:1;
+    transform:translateX(-50%) translateY(0);
 }
 
 .mkpiGroupPortfolio .metricasKpiCard{ border-top-color:#3a7bd5; }

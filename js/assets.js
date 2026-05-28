@@ -801,6 +801,7 @@ async function updateAssetDetail(asset) {
     }
 
     renderAssetCompletedOperationsSection(asset)
+    renderAssetVentasSection(asset)
 }
 
 function renderAssetCompletedOperationsSection(asset) {
@@ -925,6 +926,64 @@ function renderAssetTransaccionesSection(asset) {
         </div>
     `
     bindTableSort(section.querySelector("table"), "assetTransacciones")
+}
+
+function renderAssetVentasSection(asset) {
+    const section = document.getElementById("assetVentasSection")
+    const tabBtn = document.getElementById("ventasTabBtn")
+
+    if (!section) return
+
+    const rows = getAssetVentasRows(asset)
+
+    if (!rows.length) {
+        section.innerHTML = ""
+        if (tabBtn) tabBtn.classList.add("hidden")
+        return
+    }
+
+    if (tabBtn) {
+        tabBtn.classList.remove("hidden")
+        tabBtn.textContent = `Ventas (${rows.length})`
+    }
+
+    const rowsHtml = rows.map((row) => {
+        const cantidad = row.cantidad ? parseLooseNumber(row.cantidad) : null
+        const cantidadFmt = cantidad !== null ? cantidad.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 8 }) : ""
+        return `
+            <tr>
+                <td>${escapeHtml(row.fecha || "")}</td>
+                <td>${escapeHtml(cantidadFmt)}</td>
+                <td class="rowTotal">${row.valorCompra ? formatMoney(parseLooseNumber(row.valorCompra), "EUR") : ""}</td>
+                <td>${row.valorVenta ? formatMoney(parseLooseNumber(row.valorVenta), "EUR") : ""}</td>
+                <td class="rowTotal">${row.bruto ? formatMoney(parseLooseNumber(row.bruto), "EUR") : ""}</td>
+                <td class="rowTotal">${row.dineroDeclarar ? formatMoney(parseLooseNumber(row.dineroDeclarar), "EUR") : ""}</td>
+                <td class="rowTotal">${row.totalPagar ? formatMoney(parseLooseNumber(row.totalPagar), "EUR") : ""}</td>
+                <td class="rowTotal">${row.neto ? formatMoney(parseLooseNumber(row.neto), "EUR") : ""}</td>
+            </tr>
+        `
+    }).join("")
+
+    section.innerHTML = `
+        <div class="assetTableWrapper">
+            <table class="assetOperationsTable assetVentasTable">
+                <thead>
+                    <tr>
+                        <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="1">Cantidad<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="2">Precio compra (FIFO)<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="3">Valor venta<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="4">Bruto<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="5">A declarar<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="6">Impuestos<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="7">Neto<span class="mSortArrow"></span></th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+        </div>
+    `
+    bindTableSort(section.querySelector("table"), "assetVentas")
 }
 
 async function renderAssetsList(assets) {
@@ -1321,7 +1380,7 @@ async function refreshTopPortfolioMetrics(assets = null) {
         const summary = await buildOverviewRow(asset)
         const euroMetrics = await buildSummaryMetricsInEuros(summary)
 
-        return { summary, euroMetrics }
+        return { summary, euroMetrics, assetId: asset.id }
     }))
     metricResults
         .filter((r) => r.status === "rejected")
@@ -1341,6 +1400,9 @@ async function refreshTopPortfolioMetrics(assets = null) {
     })
 
     window._lastPortfolioMetrics = { totalCuenta: metrics.totalCuenta, invertido: metrics.invertido }
+    window._assetsSnapshotData = metricSummaries
+        .filter(r => r.euroMetrics.netoActualEur > 0)
+        .map(r => ({ id: r.assetId, netoEur: r.euroMetrics.netoActualEur }))
     applyTopPortfolioMetrics(metrics)
 }
 
@@ -2307,6 +2369,7 @@ function renderAssetTablePage(asset) {
                     <button class="assetTabBtn assetTabActive" data-tab="spot">Compras spot</button>
                     <button class="assetTabBtn hidden" id="completadasTabBtn" data-tab="completadas">Operaciones Spot</button>
                     <button class="assetTabBtn hidden" id="transaccionesTabBtn" data-tab="transacciones">Transacciones</button>
+                    <button class="assetTabBtn hidden" id="ventasTabBtn" data-tab="ventas">Ventas</button>
                 </div>
                 <div class="assetTabPanel" data-tab="spot">
                     <div class="assetTableWrapper">
@@ -2336,6 +2399,9 @@ function renderAssetTablePage(asset) {
                 <div class="assetTabPanel hidden" data-tab="transacciones">
                     <div id="assetTransaccionesSection"></div>
                 </div>
+                <div class="assetTabPanel hidden" data-tab="ventas">
+                    <div id="assetVentasSection"></div>
+                </div>
             </div>
         </section>
     `
@@ -2345,6 +2411,7 @@ function renderAssetTablePage(asset) {
     renderAssetRows(primaryRows)
     renderAssetCompletedOperationsSection(asset)
     renderAssetTransaccionesSection(asset)
+    renderAssetVentasSection(asset)
     setupAssetTabs()
     _assetBindSort(asset.id)
     initAssetTableLogic(asset)

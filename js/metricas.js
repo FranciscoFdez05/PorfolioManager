@@ -45,14 +45,16 @@ const M_TYPE_COLORS = {
     cripto:    "#f7931a",
     acciones:  "#3a7bd5",
     etfs:      "#2ecc71",
-    comoditis: "#e0c068"
+    comoditis: "#e0c068",
+    rentaFija: "#00bcd4"
 }
 
 const M_TYPE_LABELS = {
     cripto:    "Cripto",
     acciones:  "Acciones",
     etfs:      "ETFs",
-    comoditis: "Comoditis"
+    comoditis: "Comoditis",
+    rentaFija: "Renta Fija"
 }
 
 const M_CHART_DEFAULTS = {
@@ -251,7 +253,7 @@ function mUpdateKpis(payload) {
             const label  = M_TYPE_LABELS[type] || type
             const pctStr = (pct >= 0 ? "+" : "") + pct.toFixed(2).replace(".", ",") + "%"
             const eurStr = (rend >= 0 ? "+" : "") + formatEuro(rend)
-            return `<div class="metricasKpiCard mkpiCardActivo" style="border-top-color:${color}" title="${eurStr}">
+            return `<div class="metricasKpiCard mkpiCardActivo" style="border-top-color:${color}" data-kpi="${eurStr}">
                 <div class="mkpiLabel mkpiLabelActivo">${label}</div>
                 <div class="mkpiValue ${cls}">${pctStr}</div>
             </div>`
@@ -2794,6 +2796,7 @@ async function initMetricasLogic() {
         mRenderAll(_metricasPayload)
         mBindTableSort(_metricasPayload.summaries)
         mInitEvolucion()
+        mInitEvolucionTipos()
 
         const _allTypes = ["cripto","acciones","etfs","comoditis","rentaFija"]
         const _todosBtn = document.querySelector(".mActivosFilterBtn[data-atype='todos']")
@@ -2973,8 +2976,10 @@ async function initMetricasLogic() {
 // ── Evolución histórica del portfolio ──────────────────────────────────────
 
 let _evolucionRange = "1D"
+let _evolucionMode  = "eur"
 
-async function mRenderEvolucion(range) {
+async function mRenderEvolucion(range, mode) {
+    mode = mode || _evolucionMode
     const empty = document.getElementById("mEvolucionEmpty")
     const wrap  = document.getElementById("mEvolucionChartWrap")
 
@@ -3024,6 +3029,13 @@ async function mRenderEvolucion(range) {
     const invested = points.map(p => p.i)
     const span     = points.length > 1 ? (points[points.length - 1].ts - points[0].ts) : 0
     const isLong   = span > 7 * 86400
+    const isPct    = (mode === "pct")
+
+    const dispValues   = isPct ? values.map((v, idx) => {
+        const inv = invested[idx] || 1
+        return +((( v - inv) / inv) * 100).toFixed(2)
+    }) : values
+    const dispInvested = isPct ? values.map(() => 0) : invested
 
     // Round interval for axis labels so ticks land on clean boundaries
     let roundSec
@@ -3045,6 +3057,11 @@ async function mRenderEvolucion(range) {
     function segmentColor(ctx) {
         const i = ctx.p1DataIndex
         return values[i] >= invested[i] ? "#2ecc71" : "#e74c3c"
+    }
+
+    function segmentColorPct(ctx) {
+        const i = ctx.p1DataIndex
+        return dispValues[i] >= dispInvested[i] ? "#2ecc71" : "#e74c3c"
     }
 
     const tooltipDates = points.map(p => {
@@ -3120,25 +3137,45 @@ async function mRenderEvolucion(range) {
         const pct   = inv > 0 ? ((rend / inv) * 100).toFixed(2) : "0.00"
         const sign  = rend >= 0 ? "+" : ""
         const rendColor = rend >= 0 ? "#2ecc71" : "#e74c3c"
+        const dotColor  = val >= inv ? "#2ecc71" : "#e74c3c"
 
-        const dotColor = val >= inv ? "#2ecc71" : "#e74c3c"
-
-        el.innerHTML = `
-            <div style="color:#8899bb;font-size:11px;margin-bottom:6px;font-weight:500">${tooltipDates[idx] || ""}</div>
-            <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
-                <span style="width:9px;height:9px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span>
-                <span style="color:#a0b0cc">Valor total</span>
-                <span style="margin-left:auto;font-weight:600;color:#e8eeff">${formatEuro(val)}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
-                <span style="width:9px;height:2px;background:rgba(100,130,200,0.7);flex-shrink:0;display:inline-block"></span>
-                <span style="color:#a0b0cc">Invertido</span>
-                <span style="margin-left:auto;font-weight:600;color:#e8eeff">${formatEuro(inv)}</span>
-            </div>
-            <div style="border-top:1px solid rgba(100,130,200,0.2);margin-top:6px;padding-top:5px;display:flex;align-items:center;gap:6px">
-                <span style="color:#a0b0cc">Rendimiento</span>
-                <span style="margin-left:auto;font-weight:700;color:${rendColor}">${sign}${formatEuro(rend)} (${sign}${pct.replace(".", ",")}%)</span>
-            </div>`
+        if (isPct) {
+            const vPct  = dispValues[idx]
+            const vSign = vPct >= 0 ? "+" : ""
+            el.innerHTML = `
+                <div style="color:#8899bb;font-size:11px;margin-bottom:6px;font-weight:500">${tooltipDates[idx] || ""}</div>
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
+                    <span style="width:9px;height:9px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span>
+                    <span style="color:#a0b0cc">Valor total</span>
+                    <span style="margin-left:auto;font-weight:600;color:${dotColor}">${vSign}${vPct.toFixed(2).replace(".", ",")}%</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
+                    <span style="width:9px;height:2px;background:rgba(100,130,200,0.7);flex-shrink:0;display:inline-block"></span>
+                    <span style="color:#a0b0cc">Invertido</span>
+                    <span style="margin-left:auto;font-weight:600;color:#e8eeff">0,00%</span>
+                </div>
+                <div style="border-top:1px solid rgba(100,130,200,0.2);margin-top:6px;padding-top:5px;display:flex;align-items:center;gap:6px">
+                    <span style="color:#a0b0cc">Rendimiento</span>
+                    <span style="margin-left:auto;font-weight:700;color:${rendColor}">${sign}${formatEuro(rend)} (${sign}${pct.replace(".", ",")}%)</span>
+                </div>`
+        } else {
+            el.innerHTML = `
+                <div style="color:#8899bb;font-size:11px;margin-bottom:6px;font-weight:500">${tooltipDates[idx] || ""}</div>
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
+                    <span style="width:9px;height:9px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span>
+                    <span style="color:#a0b0cc">Valor total</span>
+                    <span style="margin-left:auto;font-weight:600;color:#e8eeff">${formatEuro(val)}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
+                    <span style="width:9px;height:2px;background:rgba(100,130,200,0.7);flex-shrink:0;display:inline-block"></span>
+                    <span style="color:#a0b0cc">Invertido</span>
+                    <span style="margin-left:auto;font-weight:600;color:#e8eeff">${formatEuro(inv)}</span>
+                </div>
+                <div style="border-top:1px solid rgba(100,130,200,0.2);margin-top:6px;padding-top:5px;display:flex;align-items:center;gap:6px">
+                    <span style="color:#a0b0cc">Rendimiento</span>
+                    <span style="margin-left:auto;font-weight:700;color:${rendColor}">${sign}${formatEuro(rend)} (${sign}${pct.replace(".", ",")}%)</span>
+                </div>`
+        }
 
         // Posición relativa al canvas
         const canvasRect = chart.canvas.getBoundingClientRect()
@@ -3153,6 +3190,8 @@ async function mRenderEvolucion(range) {
         el.style.opacity = "1"
     }
 
+    const activeSegColor = isPct ? segmentColorPct : segmentColor
+
     mCreateChart("mChartEvolucion", {
         type: "line",
         data: {
@@ -3160,9 +3199,9 @@ async function mRenderEvolucion(range) {
             datasets: [
                 {
                     label: "Valor total",
-                    data: values,
-                    borderColor: segmentColor,
-                    segment: { borderColor: segmentColor },
+                    data: dispValues,
+                    borderColor: activeSegColor,
+                    segment: { borderColor: activeSegColor },
                     backgroundColor: "transparent",
                     borderWidth: 2,
                     pointRadius: points.length <= 60 ? 3 : 0,
@@ -3176,7 +3215,7 @@ async function mRenderEvolucion(range) {
                 },
                 {
                     label: "Invertido",
-                    data: invested,
+                    data: dispInvested,
                     borderColor: "rgba(100,130,200,0.7)",
                     backgroundColor: "transparent",
                     borderWidth: 1.5,
@@ -3222,8 +3261,13 @@ async function mRenderEvolucion(range) {
                     grid:  { color: "rgba(255,255,255,0.06)" }
                 },
                 y: {
-                    ticks: { color: "#ccd6f6", callback: (v) => formatEuro(v) },
-                    grid:  { color: "rgba(255,255,255,0.06)" }
+                    ticks: {
+                        color: "#ccd6f6",
+                        callback: isPct
+                            ? (v) => (v >= 0 ? "+" : "") + v.toFixed(1).replace(".", ",") + "%"
+                            : (v) => formatEuro(v)
+                    },
+                    grid: { color: "rgba(255,255,255,0.06)" }
                 }
             }
         },
@@ -3233,14 +3277,332 @@ async function mRenderEvolucion(range) {
 
 function mInitEvolucion() {
     const rangeBtns = document.querySelectorAll(".mEvolucionRangeBtn")
+    const modeBtns  = document.querySelectorAll(".mEvolucionModeBtn")
+
     rangeBtns.forEach(btn => {
         btn.classList.toggle("active", btn.dataset.range === _evolucionRange)
         btn.addEventListener("click", () => {
             rangeBtns.forEach(b => b.classList.remove("active"))
             btn.classList.add("active")
             _evolucionRange = btn.dataset.range
-            mRenderEvolucion(_evolucionRange)
+            const oldTip = document.getElementById("mEvolucionTooltip")
+            if (oldTip) oldTip.remove()
+            mRenderEvolucion(_evolucionRange, _evolucionMode)
         })
     })
-    mRenderEvolucion(_evolucionRange)
+
+    modeBtns.forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.mode === _evolucionMode)
+        btn.addEventListener("click", () => {
+            modeBtns.forEach(b => b.classList.remove("active"))
+            btn.classList.add("active")
+            _evolucionMode = btn.dataset.mode
+            const oldTip = document.getElementById("mEvolucionTooltip")
+            if (oldTip) oldTip.remove()
+            mRenderEvolucion(_evolucionRange, _evolucionMode)
+        })
+    })
+
+    mRenderEvolucion(_evolucionRange, _evolucionMode)
+}
+
+// ── Evolución por tipo de activo ───────────────────────────────────────────
+
+let _evolucionTiposRange = "1D"
+let _evolucionTiposMode  = "eur"
+
+async function mRenderEvolucionTipos(range, mode) {
+    const empty = document.getElementById("mEvolucionTiposEmpty")
+    const wrap  = document.getElementById("mEvolucionTiposChartWrap")
+
+    let resp, data
+    try {
+        resp = await fetch(`/api/portfolio/history/by-type?range=${range}`)
+        data = await resp.json()
+    } catch (_) {
+        return
+    }
+
+    let points = Array.isArray(data.data) ? data.data : []
+
+    // Añadir punto en vivo con valores actuales por tipo
+    if (_metricasPayload) {
+        const { summaries } = _metricasPayload
+        const liveByType = {}
+        summaries.forEach(a => {
+            if (a.type) liveByType[a.type] = (liveByType[a.type] || 0) + (a.netoActualEur || 0)
+        })
+        if (Object.keys(liveByType).length) {
+            const nowTs  = Math.floor(Date.now() / 1000)
+            const lastTs = points.length ? points[points.length - 1].ts : 0
+            const livePoint = { ts: nowTs, ...liveByType }
+            if (points.length && (nowTs - lastTs) < 120) {
+                points = [...points.slice(0, -1), livePoint]
+            } else {
+                points = [...points, livePoint]
+            }
+        }
+    }
+
+    const typeSet = new Set()
+    points.forEach(p => { Object.keys(p).forEach(k => { if (k !== "ts") typeSet.add(k) }) })
+    const types = [...typeSet]
+
+    if (types.length === 0) {
+        if (empty) empty.classList.remove("hidden")
+        if (wrap)  wrap.classList.add("hidden")
+        mDestroyChart("mChartEvolucionTipos")
+        const oldTip = document.getElementById("mEvolucionTiposTooltip")
+        if (oldTip) oldTip.remove()
+        return
+    }
+
+    // Si solo hay 1 punto (live), añadir un punto sintético al inicio del rango para mostrar línea plana
+    if (points.length === 1) {
+        const rangeMap = { "1D": 86400, "1W": 7*86400, "1M": 30*86400, "3M": 90*86400, "6M": 180*86400, "1Y": 365*86400, "ALL": 365*86400, "YTD": 365*86400 }
+        const rangeSpan = rangeMap[range] || 86400
+        const startTs = points[0].ts - rangeSpan
+        const { ts: _ts, ...typeVals } = points[0]
+        points = [{ ts: startTs, ...typeVals }, ...points]
+    }
+
+    if (empty) empty.classList.add("hidden")
+    if (wrap)  wrap.classList.remove("hidden")
+
+    const span = points.length > 1 ? (points[points.length - 1].ts - points[0].ts) : 0
+    let roundSec
+    if      (span <= 86400)           roundSec = 300
+    else if (span <= 31 * 86400)      roundSec = 21600
+    else if (span <= 365 * 86400)     roundSec = 86400
+    else                              roundSec = 7 * 86400
+
+    const labels = points.map(p => {
+        const snap = Math.round(p.ts / roundSec) * roundSec
+        const d    = new Date(snap * 1000)
+        if (roundSec >= 86400)
+            return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", ...(roundSec >= 7 * 86400 ? { year: "2-digit" } : {}) })
+        return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" })
+               + " " + d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+    })
+
+    const tooltipDates = points.map(p => {
+        const d = new Date(p.ts * 1000)
+        return d.toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    })
+
+    const isPct    = (mode === "pct")
+
+    const investedByType = {}
+    if (_metricasPayload) {
+        _metricasPayload.summaries.forEach(a => {
+            if (a.type) investedByType[a.type] = (investedByType[a.type] || 0) + (a.invertidoEur || 0)
+        })
+    }
+
+    // Sort types by last-point value descending so legend and tooltip match ranking
+    const lastPoint = points[points.length - 1]
+    types.sort((a, b) => {
+        const rawA = lastPoint?.[a] ?? null
+        const rawB = lastPoint?.[b] ?? null
+        if (rawA === null) return 1
+        if (rawB === null) return -1
+        const valA = isPct ? ((rawA - (investedByType[a] || 1)) / (investedByType[a] || 1)) * 100 : rawA
+        const valB = isPct ? ((rawB - (investedByType[b] || 1)) / (investedByType[b] || 1)) * 100 : rawB
+        return valB - valA
+    })
+
+    const datasets = types.map(type => {
+        const color = M_TYPE_COLORS[type] || mPaletteForName(type)
+        const label = M_TYPE_LABELS[type] || type
+
+        const values = points.map(p => {
+            const v = p[type] ?? null
+            if (v === null) return null
+            if (isPct) {
+                const base = investedByType[type] || 1
+                return +((( v - base) / base) * 100).toFixed(2)
+            }
+            return v
+        })
+
+        return {
+            label,
+            data: values,
+            borderColor: color,
+            backgroundColor: "transparent",
+            borderWidth: 2,
+            pointRadius: points.length <= 60 ? 2 : 0,
+            pointHoverRadius: 0,
+            tension: 0.3,
+            spanGaps: true
+        }
+    })
+
+    let _tiposMouseY = null
+    const crosshairPlugin = {
+        id: "tiposCrosshair",
+        afterInit(chart) {
+            chart.canvas.addEventListener("mousemove", (e) => {
+                const rect = chart.canvas.getBoundingClientRect()
+                _tiposMouseY = e.clientY - rect.top
+                chart.draw()
+            })
+            chart.canvas.addEventListener("mouseleave", () => {
+                _tiposMouseY = null
+                chart.draw()
+            })
+        },
+        afterDraw(chart) {
+            const { ctx, chartArea, tooltip } = chart
+            if (!tooltip || !tooltip._active || !tooltip._active.length) return
+            const x = tooltip._active[0].element.x
+            ctx.save()
+            ctx.lineWidth = 1
+            ctx.strokeStyle = "rgba(200,210,255,0.25)"
+            ctx.setLineDash([4, 4])
+            ctx.beginPath()
+            ctx.moveTo(x, chartArea.top)
+            ctx.lineTo(x, chartArea.bottom)
+            ctx.stroke()
+            if (_tiposMouseY !== null && _tiposMouseY >= chartArea.top && _tiposMouseY <= chartArea.bottom) {
+                ctx.beginPath()
+                ctx.moveTo(chartArea.left, _tiposMouseY)
+                ctx.lineTo(chartArea.right, _tiposMouseY)
+                ctx.stroke()
+            }
+            ctx.restore()
+        }
+    }
+
+    function tiposTooltipHandler(context) {
+        const { chart, tooltip } = context
+        let el = document.getElementById("mEvolucionTiposTooltip")
+        if (!el) {
+            el = document.createElement("div")
+            el.id = "mEvolucionTiposTooltip"
+            el.style.cssText = [
+                "position:absolute", "pointer-events:none", "z-index:99",
+                "background:#1a2235", "border:1px solid rgba(100,130,200,0.35)",
+                "border-radius:8px", "padding:10px 14px", "min-width:180px",
+                "box-shadow:0 4px 24px rgba(0,0,0,0.5)", "transition:opacity 0.12s",
+                "font-family:inherit", "font-size:12px", "color:#ccd6f6", "line-height:1.6"
+            ].join(";")
+            chart.canvas.parentElement.style.position = "relative"
+            chart.canvas.parentElement.appendChild(el)
+        }
+
+        if (tooltip.opacity === 0) { el.style.opacity = "0"; return }
+        if (!tooltip.dataPoints || !tooltip.dataPoints.length) return
+
+        const idx  = tooltip.dataPoints[0].dataIndex
+        const date = tooltipDates[idx]
+
+        let html = `<div style="font-size:11px;color:#8899bb;margin-bottom:6px">${date}</div>`
+        const tooltipTypes = [...types].sort((a, b) => {
+            const rawA = points[idx][a] ?? null
+            const rawB = points[idx][b] ?? null
+            if (rawA === null) return 1
+            if (rawB === null) return -1
+            const valA = isPct ? ((rawA - (investedByType[a] || 1)) / (investedByType[a] || 1)) * 100 : rawA
+            const valB = isPct ? ((rawB - (investedByType[b] || 1)) / (investedByType[b] || 1)) * 100 : rawB
+            return valB - valA
+        })
+        tooltipTypes.forEach(type => {
+            const v = points[idx][type] ?? null
+            if (v === null) return
+            const color = M_TYPE_COLORS[type] || mPaletteForName(type)
+            const lbl   = M_TYPE_LABELS[type] || type
+            let valStr
+            if (isPct) {
+                const base    = investedByType[type] || 1
+                const pctVal  = ((v - base) / base) * 100
+                const sign    = pctVal >= 0 ? "+" : ""
+                const clr     = pctVal >= 0 ? "#2ecc71" : "#e74c3c"
+                valStr = `<span style="color:${clr}">${sign}${pctVal.toFixed(2).replace(".", ",")}%</span>`
+            } else {
+                valStr = `<span style="color:#e8eeff">${formatEuro(v)}</span>`
+            }
+            html += `<div style="display:flex;align-items:center;gap:7px;margin-bottom:2px">
+                <span style="width:10px;height:2px;background:${color};flex-shrink:0;display:inline-block;border-radius:1px"></span>
+                <span style="color:#a0b0cc">${lbl}</span>
+                <span style="margin-left:auto">${valStr}</span>
+            </div>`
+        })
+
+        el.innerHTML = html
+
+        const elW  = 210
+        const xPos = tooltip.caretX
+        const left = xPos + elW + 10 > chart.chartArea.right ? xPos - elW - 12 : xPos + 12
+        el.style.left    = left + "px"
+        el.style.top     = (chart.chartArea.top + 8) + "px"
+        el.style.opacity = "1"
+    }
+
+    mCreateChart("mChartEvolucionTipos", {
+        type: "line",
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                legend: {
+                    labels: {
+                        color: "#ccd6f6", font: { size: 12 }, padding: 14,
+                        usePointStyle: true, pointStyle: "line"
+                    }
+                },
+                tooltip: { enabled: false, external: tiposTooltipHandler }
+            },
+            scales: {
+                x: {
+                    ticks: { color: "#8899bb", maxTicksLimit: 8, maxRotation: 0 },
+                    grid:  { color: "rgba(255,255,255,0.06)" }
+                },
+                y: {
+                    ticks: {
+                        color: "#ccd6f6",
+                        callback: isPct
+                            ? (v) => (v >= 0 ? "+" : "") + v.toFixed(1).replace(".", ",") + "%"
+                            : (v) => formatEuro(v)
+                    },
+                    grid: { color: "rgba(255,255,255,0.06)" }
+                }
+            }
+        },
+        plugins: [crosshairPlugin]
+    })
+}
+
+function mInitEvolucionTipos() {
+    const rangeBtns = document.querySelectorAll(".mEvolucionTiposRangeBtn")
+    const modeBtns  = document.querySelectorAll(".mEvolucionTiposModeBtn")
+
+    rangeBtns.forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.range === _evolucionTiposRange)
+        btn.addEventListener("click", () => {
+            rangeBtns.forEach(b => b.classList.remove("active"))
+            btn.classList.add("active")
+            _evolucionTiposRange = btn.dataset.range
+            const oldTip = document.getElementById("mEvolucionTiposTooltip")
+            if (oldTip) oldTip.remove()
+            mRenderEvolucionTipos(_evolucionTiposRange, _evolucionTiposMode)
+        })
+    })
+
+    modeBtns.forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.mode === _evolucionTiposMode)
+        btn.addEventListener("click", () => {
+            modeBtns.forEach(b => b.classList.remove("active"))
+            btn.classList.add("active")
+            _evolucionTiposMode = btn.dataset.mode
+            const oldTip = document.getElementById("mEvolucionTiposTooltip")
+            if (oldTip) oldTip.remove()
+            mRenderEvolucionTipos(_evolucionTiposRange, _evolucionTiposMode)
+        })
+    })
+
+    mRenderEvolucionTipos(_evolucionTiposRange, _evolucionTiposMode)
 }
