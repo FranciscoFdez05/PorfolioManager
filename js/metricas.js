@@ -3309,7 +3309,7 @@ function mInitEvolucion() {
 // ── Evolución por tipo de activo ───────────────────────────────────────────
 
 let _evolucionTiposRange = "1D"
-let _evolucionTiposMode  = "eur"
+let _evolucionTiposMode  = localStorage.getItem("evolucionTiposMode") || "eur"
 
 async function mRenderEvolucionTipos(range, mode) {
     const empty = document.getElementById("mEvolucionTiposEmpty")
@@ -3325,17 +3325,22 @@ async function mRenderEvolucionTipos(range, mode) {
 
     let points = Array.isArray(data.data) ? data.data : []
 
-    // Añadir punto en vivo con valores actuales por tipo
+    // Añadir punto en vivo con valores y coste actual por tipo
     if (_metricasPayload) {
         const { summaries } = _metricasPayload
         const liveByType = {}
+        const liveCostByType = {}
         summaries.forEach(a => {
-            if (a.type) liveByType[a.type] = (liveByType[a.type] || 0) + (a.netoActualEur || 0)
+            if (a.type) {
+                liveByType[a.type]     = (liveByType[a.type]     || 0) + (a.netoActualEur || 0)
+                liveCostByType[a.type] = (liveCostByType[a.type] || 0) + (a.invertidoEur  || 0)
+            }
         })
         if (Object.keys(liveByType).length) {
             const nowTs  = Math.floor(Date.now() / 1000)
             const lastTs = points.length ? points[points.length - 1].ts : 0
             const livePoint = { ts: nowTs, ...liveByType }
+            Object.keys(liveCostByType).forEach(t => { livePoint[`c_${t}`] = liveCostByType[t] })
             if (points.length && (nowTs - lastTs) < 120) {
                 points = [...points.slice(0, -1), livePoint]
             } else {
@@ -3345,8 +3350,17 @@ async function mRenderEvolucionTipos(range, mode) {
     }
 
     const typeSet = new Set()
-    points.forEach(p => { Object.keys(p).forEach(k => { if (k !== "ts") typeSet.add(k) }) })
+    points.forEach(p => { Object.keys(p).forEach(k => { if (k !== "ts" && !k.startsWith("c_")) typeSet.add(k) }) })
     const types = [...typeSet]
+
+    // Coste de fallback para snapshots antiguos sin cost_eur
+    const fallbackCost = {}
+    if (_metricasPayload) {
+        _metricasPayload.summaries.forEach(a => {
+            if (a.type) fallbackCost[a.type] = (fallbackCost[a.type] || 0) + (a.invertidoEur || 0)
+        })
+    }
+    const pointCost = (p, t) => { const c = p[`c_${t}`]; return (c && c > 0) ? c : (fallbackCost[t] || 0) }
 
     if (types.length === 0) {
         if (empty) empty.classList.remove("hidden")
@@ -3390,14 +3404,7 @@ async function mRenderEvolucionTipos(range, mode) {
         return d.toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
     })
 
-    const isPct    = (mode === "pct")
-
-    const investedByType = {}
-    if (_metricasPayload) {
-        _metricasPayload.summaries.forEach(a => {
-            if (a.type) investedByType[a.type] = (investedByType[a.type] || 0) + (a.invertidoEur || 0)
-        })
-    }
+    const isPct     = (mode === "pct")
 
     // Sort types by last-point value descending so legend and tooltip match ranking
     const lastPoint = points[points.length - 1]
@@ -3406,9 +3413,14 @@ async function mRenderEvolucionTipos(range, mode) {
         const rawB = lastPoint?.[b] ?? null
         if (rawA === null) return 1
         if (rawB === null) return -1
-        const valA = isPct ? ((rawA - (investedByType[a] || 1)) / (investedByType[a] || 1)) * 100 : rawA
-        const valB = isPct ? ((rawB - (investedByType[b] || 1)) / (investedByType[b] || 1)) * 100 : rawB
-        return valB - valA
+        if (isPct) {
+            const costA = pointCost(lastPoint, a) || 1
+            const costB = pointCost(lastPoint, b) || 1
+            const valA = ((rawA - costA) / costA) * 100
+            const valB = ((rawB - costB) / costB) * 100
+            return valB - valA
+        }
+        return rawB - rawA
     })
 
     const datasets = types.map(type => {
@@ -3419,8 +3431,9 @@ async function mRenderEvolucionTipos(range, mode) {
             const v = p[type] ?? null
             if (v === null) return null
             if (isPct) {
-                const base = investedByType[type] || 1
-                return +((( v - base) / base) * 100).toFixed(2)
+                const cost = pointCost(p, type)
+                if (cost === 0) return null
+                return +(((v - cost) / cost) * 100).toFixed(2)
             }
             return v
         })
@@ -3503,9 +3516,12 @@ async function mRenderEvolucionTipos(range, mode) {
             const rawB = points[idx][b] ?? null
             if (rawA === null) return 1
             if (rawB === null) return -1
-            const valA = isPct ? ((rawA - (investedByType[a] || 1)) / (investedByType[a] || 1)) * 100 : rawA
-            const valB = isPct ? ((rawB - (investedByType[b] || 1)) / (investedByType[b] || 1)) * 100 : rawB
-            return valB - valA
+            if (isPct) {
+                const costA = pointCost(points[idx], a) || 1
+                const costB = pointCost(points[idx], b) || 1
+                return ((rawB - costB) / costB) - ((rawA - costA) / costA)
+            }
+            return rawB - rawA
         })
         tooltipTypes.forEach(type => {
             const v = points[idx][type] ?? null
@@ -3514,10 +3530,11 @@ async function mRenderEvolucionTipos(range, mode) {
             const lbl   = M_TYPE_LABELS[type] || type
             let valStr
             if (isPct) {
-                const base    = investedByType[type] || 1
-                const pctVal  = ((v - base) / base) * 100
-                const sign    = pctVal >= 0 ? "+" : ""
-                const clr     = pctVal >= 0 ? "#2ecc71" : "#e74c3c"
+                const cost = pointCost(points[idx], type)
+                if (cost === 0) return
+                const pctVal = ((v - cost) / cost) * 100
+                const sign   = pctVal >= 0 ? "+" : ""
+                const clr    = pctVal >= 0 ? "#2ecc71" : "#e74c3c"
                 valStr = `<span style="color:${clr}">${sign}${pctVal.toFixed(2).replace(".", ",")}%</span>`
             } else {
                 valStr = `<span style="color:#e8eeff">${formatEuro(v)}</span>`
@@ -3598,6 +3615,7 @@ function mInitEvolucionTipos() {
             modeBtns.forEach(b => b.classList.remove("active"))
             btn.classList.add("active")
             _evolucionTiposMode = btn.dataset.mode
+            localStorage.setItem("evolucionTiposMode", _evolucionTiposMode)
             const oldTip = document.getElementById("mEvolucionTiposTooltip")
             if (oldTip) oldTip.remove()
             mRenderEvolucionTipos(_evolucionTiposRange, _evolucionTiposMode)

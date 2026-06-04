@@ -70,14 +70,20 @@ def saveDividendos():
 
     sanitizedRows = []
 
+    _valid_currencies = {"EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK",
+                          "HKD", "SGD", "MXN", "BRL", "INR", "CNY", "KRW", "TRY", "PLN", "CZK"}
     for row in rows:
+        md = str(row.get("monedaDividendo", "USD")).strip().upper()
+        mt = str(row.get("monedaTotal",     "EUR")).strip().upper()
         sanitizedRows.append({
             "fecha": str(row.get("fecha", "")).strip(),
             "instrumento": str(row.get("instrumento", "")).strip(),
             "acciones": str(row.get("acciones", "")).strip(),
             "dividendoAccion": str(row.get("dividendoAccion", "")).strip(),
             "impuestos": str(row.get("impuestos", "")).strip(),
-            "total": str(row.get("total", "")).strip()
+            "total": str(row.get("total", "")).strip(),
+            "monedaDividendo": md if md.isalpha() and 2 <= len(md) <= 5 else "USD",
+            "monedaTotal":     mt if mt.isalpha() and 2 <= len(mt) <= 5 else "EUR",
         })
 
     writeDividendosFile({"rows": sanitizedRows})

@@ -15,6 +15,14 @@ _API_DIR     = _BASE_DIR / "API"
 _AJUSTES_JSON = _BASE_DIR / "data" / "JSON" / "ajustes.json"
 
 # Claves globales (compartidas entre todos los portfolios)
+_FIAT_DEFAULTS = [
+    {"code": "EUR", "name": "Euro"},
+    {"code": "USD", "name": "Dólar estadounidense"},
+    {"code": "GBP", "name": "Libra esterlina"},
+    {"code": "CHF", "name": "Franco suizo"},
+    {"code": "JPY", "name": "Yen japonés"},
+]
+
 _GLOBAL_DEFAULTS = {
     "autoBackupDays": 0,
     "staleHours": 24,
@@ -23,6 +31,7 @@ _GLOBAL_DEFAULTS = {
     "theme": "default",
     "sidebarCollapsed": False,
     "monedaBase": "EUR",
+    "fiatCurrencies": _FIAT_DEFAULTS,
     "precioDecimalesAcciones": 2,
     "precioDecimalesEtf": 2,
     "precioDecimalesComoditis": 2,
@@ -216,8 +225,23 @@ def save_settings():
         gcfg["theme"] = str(data["theme"]) if data["theme"] in {"default", "black", "light"} else "default"
     if "sidebarCollapsed" in data:
         gcfg["sidebarCollapsed"] = bool(data["sidebarCollapsed"])
+    if "fiatCurrencies" in data:
+        raw = data["fiatCurrencies"]
+        if isinstance(raw, list):
+            validated = []
+            seen = set()
+            for item in raw:
+                if isinstance(item, dict):
+                    code = str(item.get("code", "")).strip().upper()
+                    name = str(item.get("name", "")).strip()
+                    if code and name and code.isalpha() and 2 <= len(code) <= 5 and code not in seen:
+                        validated.append({"code": code, "name": name})
+                        seen.add(code)
+            if validated:
+                gcfg["fiatCurrencies"] = validated
     if "monedaBase" in data:
-        gcfg["monedaBase"] = str(data["monedaBase"]) if str(data["monedaBase"]) in {"EUR", "USD", "GBP", "CHF", "JPY"} else "EUR"
+        valid_codes = {c["code"] for c in gcfg.get("fiatCurrencies", _FIAT_DEFAULTS)}
+        gcfg["monedaBase"] = str(data["monedaBase"]) if str(data["monedaBase"]) in valid_codes else "EUR"
     _VALID_DECS  = {2, 4, 6, 8}
     _VALID_TIPOS = {"acciones", "etfs", "comoditis", "cripto"}
     for _k in ("precioDecimalesAcciones", "precioDecimalesEtf", "precioDecimalesComoditis", "precioDecimalesCripto"):

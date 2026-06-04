@@ -4790,6 +4790,31 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     opacity:0.8;
 }
 
+.ajustesDivisaRemove{
+    font-size:0.78rem;
+    padding:0 11px;
+    height:26px;
+    border-radius:6px;
+    border:1px solid var(--border-soft);
+    background:transparent;
+    color:var(--text-dim);
+    cursor:pointer;
+    flex-shrink:0;
+    transition:background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.ajustesDivisaRemove:hover{
+    background:rgba(239,68,68,0.1);
+    border-color:rgba(239,68,68,0.35);
+    color:#ef4444;
+}
+
+.ajustesDivisaRemove:disabled{
+    opacity:0.3;
+    cursor:default;
+    pointer-events:none;
+}
+
 .assetBtn.stale .assetBtnPrice{ color:var(--text-dim); }
 .assetBtn.stale .assetBtnName{ color:var(--text-dim); }
 

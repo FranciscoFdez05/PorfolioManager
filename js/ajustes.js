@@ -270,6 +270,22 @@ async function initAjustesLogic() {
         if (data.ok) settings = data
     } catch { /* ignore */ }
 
+    // --- Populate monedaBase select from fiatCurrencies ---
+    const _fiatCurrencies = settings.fiatCurrencies || [
+        { code: "EUR", name: "Euro" },
+        { code: "USD", name: "Dólar estadounidense" },
+        { code: "GBP", name: "Libra esterlina" },
+        { code: "CHF", name: "Franco suizo" },
+        { code: "JPY", name: "Yen japonés" },
+    ]
+    window._fiatCurrencies = _fiatCurrencies.map((c) => c.code)
+    const _monedaBaseSel0 = document.getElementById("ajustesMonedaBase")
+    if (_monedaBaseSel0) {
+        _monedaBaseSel0.innerHTML = _fiatCurrencies
+            .map((c) => `<option value="${c.code}">${c.code} — ${c.name}</option>`)
+            .join("")
+    }
+
     document.querySelectorAll("#sttOverlay .ajustesSelect").forEach(_buildInlineSelect)
 
     // --- Toggle eye buttons (show/hide password) ---
@@ -430,6 +446,119 @@ async function initAjustesLogic() {
             } finally {
                 guardarMonedaBaseBtn.disabled = false
             }
+        })
+    }
+
+    // --- Divisas fiat ---
+    const divisasListEl  = document.getElementById("ajustesDivisasList")
+    const divisaCodeInp  = document.getElementById("ajustesDivisaCode")
+    const divisaNameInp  = document.getElementById("ajustesDivisaName")
+    const divisaAddBtn   = document.getElementById("ajustesDivisaAddBtn")
+    const divisaMsg      = document.getElementById("ajustesDivisaMsg")
+
+    let _divisas = [..._fiatCurrencies]
+
+    function _currentMonedaBase() {
+        return monedaBaseSel?.value || settings.monedaBase || "EUR"
+    }
+
+    function _rebuildMonedaBaseSelect() {
+        const sel = document.getElementById("ajustesMonedaBase")
+        if (!sel) return
+        const current = sel.value || _currentMonedaBase()
+        const wrapper = sel.closest(".ajustesDropWrapper")
+        if (wrapper) {
+            sel.innerHTML = _divisas.map((c) => `<option value="${c.code}">${c.code} — ${c.name}</option>`).join("")
+            sel.value = _divisas.find((c) => c.code === current) ? current : _divisas[0]?.code || "EUR"
+            wrapper.querySelector(".ajustesDropLabel").textContent =
+                sel.options[sel.selectedIndex]?.text || sel.value
+        } else {
+            sel.innerHTML = _divisas.map((c) => `<option value="${c.code}">${c.code} — ${c.name}</option>`).join("")
+            sel.value = _divisas.find((c) => c.code === current) ? current : _divisas[0]?.code || "EUR"
+        }
+        window._fiatCurrencies = _divisas.map((c) => c.code)
+    }
+
+    async function _saveDivisas() {
+        await fetch("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fiatCurrencies: _divisas }),
+        })
+    }
+
+    function _renderDivisas() {
+        if (!divisasListEl) return
+        if (_divisas.length === 0) {
+            divisasListEl.innerHTML = `<div class="ajustesBackupEmpty" style="padding:10px 24px">Sin divisas configuradas</div>`
+            return
+        }
+        const base = _currentMonedaBase()
+        divisasListEl.innerHTML = ""
+        _divisas.forEach((c) => {
+            const row = document.createElement("div")
+            row.className = "ajustesHiddenItem"
+            const label = document.createElement("span")
+            label.className = "ajustesHiddenName"
+            label.textContent = `${c.code} — ${c.name}`
+            const btn = document.createElement("button")
+            btn.type = "button"
+            btn.className = "ajustesDivisaRemove"
+            btn.textContent = "Eliminar"
+            btn.disabled = c.code === base
+            btn.title = c.code === base ? "Es la moneda base, cambia la moneda base primero" : `Eliminar ${c.code}`
+            btn.addEventListener("click", async () => {
+                _divisas = _divisas.filter((x) => x.code !== c.code)
+                _renderDivisas()
+                _rebuildMonedaBaseSelect()
+                await _saveDivisas()
+                showMsg(divisaMsg, `${c.code} eliminada`, "ok")
+            })
+            row.appendChild(label)
+            row.appendChild(btn)
+            divisasListEl.appendChild(row)
+        })
+    }
+
+    _renderDivisas()
+
+    if (divisaAddBtn) {
+        divisaAddBtn.addEventListener("click", async () => {
+            const code = (divisaCodeInp?.value || "").trim().toUpperCase()
+            const name = (divisaNameInp?.value || "").trim()
+            if (!code || !name) {
+                showMsg(divisaMsg, "Rellena el código y el nombre", "error")
+                return
+            }
+            if (!/^[A-Z]{2,5}$/.test(code)) {
+                showMsg(divisaMsg, "El código debe ser 2-5 letras (ej: SEK)", "error")
+                return
+            }
+            if (_divisas.some((c) => c.code === code)) {
+                showMsg(divisaMsg, `${code} ya existe`, "error")
+                return
+            }
+            _divisas.push({ code, name })
+            if (divisaCodeInp) divisaCodeInp.value = ""
+            if (divisaNameInp) divisaNameInp.value = ""
+            _renderDivisas()
+            _rebuildMonedaBaseSelect()
+            await _saveDivisas()
+            showMsg(divisaMsg, `${code} añadida`, "ok")
+        })
+    }
+
+    if (divisaCodeInp) {
+        divisaCodeInp.addEventListener("input", () => {
+            divisaCodeInp.value = divisaCodeInp.value.toUpperCase()
+        })
+        divisaCodeInp.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") divisaAddBtn?.click()
+        })
+    }
+    if (divisaNameInp) {
+        divisaNameInp.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") divisaAddBtn?.click()
         })
     }
 

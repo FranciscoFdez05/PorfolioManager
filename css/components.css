@@ -1611,7 +1611,9 @@ tr.gastosTypeEmptySep td {
 }
 
 .assetModalLabel{
-    display:block;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
     margin-bottom:8px;
     color:#d7e3f6;
     font-size:14px;
@@ -1620,6 +1622,7 @@ tr.gastosTypeEmptySep td {
 
 .assetModalLabelSmall{ margin-top:14px; font-size:12px; font-weight:600; color:#a0b4d0; }
 .assetModalLabelHint{ font-weight:400; color:#607080; margin-left:4px; }
+
 
 .assetModalCsTrigger{
     display:flex;

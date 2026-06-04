@@ -103,7 +103,7 @@ def writeInteresesFile(data):
 def readDividendosFile():
     conn = get_db()
     rows = conn.execute(
-        "SELECT fecha, instrumento, acciones, dividendo_accion, impuestos, total FROM dividendos ORDER BY id"
+        "SELECT fecha, instrumento, acciones, dividendo_accion, impuestos, total, moneda_dividendo, moneda_total FROM dividendos ORDER BY id"
     ).fetchall()
     return {"rows": [
         {
@@ -113,6 +113,8 @@ def readDividendosFile():
             "dividendoAccion": r["dividendo_accion"],
             "impuestos": r["impuestos"],
             "total": r["total"],
+            "monedaDividendo": r["moneda_dividendo"] if "moneda_dividendo" in r.keys() else "USD",
+            "monedaTotal": r["moneda_total"] if "moneda_total" in r.keys() else "EUR",
         }
         for r in rows
     ]}
@@ -122,10 +124,11 @@ def writeDividendosFile(data):
     conn = get_db()
     conn.execute("DELETE FROM dividendos")
     conn.executemany(
-        "INSERT INTO dividendos (fecha, instrumento, acciones, dividendo_accion, impuestos, total) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO dividendos (fecha, instrumento, acciones, dividendo_accion, impuestos, total, moneda_dividendo, moneda_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("fecha", ""), r.get("instrumento", ""), r.get("acciones", ""),
-             r.get("dividendoAccion", ""), r.get("impuestos", ""), r.get("total", ""))
+             r.get("dividendoAccion", ""), r.get("impuestos", ""), r.get("total", ""),
+             r.get("monedaDividendo", "USD"), r.get("monedaTotal", "EUR"))
             for r in data.get("rows", [])
         ]
     )

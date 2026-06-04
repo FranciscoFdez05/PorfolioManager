@@ -6,7 +6,7 @@ async function _postSnapshot() {
     if (Array.isArray(hmData) && hmData.length) {
         payload.assets = hmData
             .filter(d => d.netoEur > 0)
-            .map(d => ({ id: d.id, v: d.netoEur }))
+            .map(d => ({ id: d.id, v: d.netoEur, c: d.costEur ?? d.invertidoEur ?? 0 }))
     }
     await fetch("/api/portfolio/snapshot", {
         method:  "POST",
@@ -83,6 +83,8 @@ async function loadGlobalSettings() {
             window._metricasSectionsCollapsed   = data.metricasSectionsCollapsed ?? []
             window._sidebarCollapsed            = data.sidebarCollapsed ?? false
             window._monedaBase                  = data.monedaBase ?? "EUR"
+            window._fiatCurrencies              = (data.fiatCurrencies || []).map((c) => c.code).filter(Boolean)
+            if (!window._fiatCurrencies.length) window._fiatCurrencies = ["EUR", "USD", "GBP", "CHF", "JPY"]
             window._autoRefreshMinutes          = data.autoRefreshMinutes ?? 0
             window._snapshotMinutes             = data.snapshotMinutes ?? 60
             window._soloHorarioMercado          = data.soloHorarioMercado ?? false
@@ -110,6 +112,7 @@ async function loadGlobalSettings() {
         window._metricasSectionsCollapsed   = []
         window._sidebarCollapsed            = false
         window._monedaBase                  = "EUR"
+        window._fiatCurrencies              = ["EUR", "USD", "GBP", "CHF", "JPY"]
         window._autoRefreshMinutes          = 0
         window._snapshotMinutes             = 60
         window._soloHorarioMercado          = false
@@ -175,10 +178,9 @@ function applySnapshotSchedule(minutes) {
         }
         if (typeof mRenderEvolucionTipos === "function") {
             const activeRangeBtn = document.querySelector(".mEvolucionTiposRangeBtn.active")
-            const activeModeBtn  = document.querySelector(".mEvolucionTiposModeBtn.active")
             mRenderEvolucionTipos(
                 activeRangeBtn ? activeRangeBtn.dataset.range : "1D",
-                activeModeBtn  ? activeModeBtn.dataset.mode   : "eur"
+                localStorage.getItem("evolucionTiposMode") || "eur"
             )
         }
     }

@@ -45,9 +45,17 @@ function buildDividendosInstrumentoSelect(selectedName) {
 }
 
 function buildDividendosCurrencyOptions(selected, defaultVal = "USD") {
-    return ["USD", "EUR", "GBP", "CHF"].map(c =>
-        `<option value="${c}"${c === (selected || defaultVal) ? " selected" : ""}>${c}</option>`
+    const currencies = window._fiatCurrencies?.length
+        ? window._fiatCurrencies
+        : ["USD", "EUR", "GBP", "CHF", "JPY"]
+    const effective = selected || defaultVal
+    const opts = currencies.map(c =>
+        `<option value="${c}"${c === effective ? " selected" : ""}>${c}</option>`
     ).join("")
+    if (!currencies.includes(effective)) {
+        return `<option value="${escapeHtml(effective)}" selected>${escapeHtml(effective)}</option>` + opts
+    }
+    return opts
 }
 
 function buildDividendosInstrumentoOptions(selectedName) {
@@ -134,6 +142,7 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
     })
 
     modal.querySelector("#dividendosModalCancelBtn")?.addEventListener("click", closeDividendosModal)
+
     modal.querySelector("#dividendosModalSaveBtn")?.addEventListener("click", async () => {
         const fecha = modal.querySelector("#dividendoFechaInput")?.value.trim() || ""
         const instrumento = modal.querySelector("#dividendoInstrumentoInput")?.value.trim() || ""
@@ -253,13 +262,17 @@ function renderFilteredDividendos() {
         const rowElement = document.createElement("tr")
         rowElement.dataset.globalIndex = String(globalIndex)
 
+        const mdiv  = rowData.monedaDividendo || "USD"
+        const mtot  = rowData.monedaTotal    || "EUR"
+        rowElement.dataset.monedaDividendo = mdiv
+        rowElement.dataset.monedaTotal     = mtot
         rowElement.innerHTML = `
             <td data-field="fecha">${escapeHtml(rowData.fecha || "")}</td>
             <td data-field="instrumento">${escapeHtml(rowData.instrumento || "")}</td>
             <td data-field="acciones">${formatShareQuantity(rowData.acciones)}</td>
-            <td data-field="dividendoAccion">${formatCellDollarValue(rowData.dividendoAccion)}</td>
-            <td data-field="impuestos">${formatCellEuroValue(rowData.impuestos)}</td>
-            <td class="rowTotal">${formatCellEuroValue(rowData.total)}</td>
+            <td data-field="dividendoAccion">${formatCellMoneyValue(rowData.dividendoAccion, mdiv)}</td>
+            <td data-field="impuestos">${formatCellMoneyValue(rowData.impuestos, mtot)}</td>
+            <td class="rowTotal" data-moneda="${escapeHtml(mtot)}">${formatCellMoneyValue(rowData.total, mtot)}</td>
             <td class="rowActionsCell">
                 <div class="rowMenu">
                     <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
@@ -298,42 +311,50 @@ async function saveDividendosDataToServer() {
     }
 }
 
-function updateDividendosTotals() {
-    const dividendosBody = document.getElementById("dividendosBody")
+const _divRateCache = new Map()
 
-    if (!dividendosBody) {
-        return
+async function _getDivExchangeRate(from, to) {
+    if (from === to) return 1
+    const key = `${from}->${to}`
+    if (!_divRateCache.has(key)) {
+        _divRateCache.set(key, (async () => {
+            try {
+                const res = await fetch(`/api/exchange-rate?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+                const d = await res.json()
+                return d.ok && d.rate ? Number(d.rate) : 1
+            } catch { return 1 }
+        })())
     }
+    return _divRateCache.get(key)
+}
 
-    let totalNeto = 0
-    let totalImpuestos = 0
+async function updateDividendosTotals() {
+    const dividendosBody = document.getElementById("dividendosBody")
+    if (!dividendosBody) return
 
-    const rowElements = dividendosBody.querySelectorAll("tr")
+    const base = (window._monedaBase || "EUR").toUpperCase()
+    const rowElements = [...dividendosBody.querySelectorAll("tr")]
 
-    rowElements.forEach((rowElement) => {
+    const amounts = await Promise.all(rowElements.map(async (rowElement) => {
         const cells = rowElement.querySelectorAll("td")
-        const impuestos = parseLooseNumber(cells[4]?.textContent || "") ?? 0
-        const rowTotal = parseLooseNumber(cells[5]?.textContent || "") ?? 0
+        const monedaTotal = rowElement.dataset.monedaTotal || cells[5]?.dataset?.moneda || "EUR"
+        const impuestosRaw = parseLooseNumber(cells[4]?.textContent || "") ?? 0
+        const totalRaw     = parseLooseNumber(cells[5]?.textContent || "") ?? 0
+        const rate = await _getDivExchangeRate(monedaTotal.toUpperCase(), base)
+        return { total: totalRaw * rate, impuestos: impuestosRaw * rate }
+    }))
 
-        totalNeto += rowTotal
-        totalImpuestos += impuestos
-    })
+    const totalNeto     = amounts.reduce((s, x) => s + x.total, 0)
+    const totalImpuestos = amounts.reduce((s, x) => s + x.impuestos, 0)
 
-    const totalResumen = document.getElementById("totalDividendosResumen")
-    const impuestosResumen = document.getElementById("impuestosDividendosResumen")
+    const totalResumen      = document.getElementById("totalDividendosResumen")
+    const impuestosResumen  = document.getElementById("impuestosDividendosResumen")
     const topTotalDividendos = document.getElementById("topTotalDividendos")
 
-    if (totalResumen) {
-        totalResumen.textContent = formatEuro(totalNeto)
-    }
-
-    if (impuestosResumen) {
-        impuestosResumen.textContent = formatEuro(totalImpuestos)
-    }
-
-    if (topTotalDividendos) {
-        topTotalDividendos.textContent = formatEuro(totalNeto)
-    }
+    const fmt = (v) => formatMoney(v, base)
+    if (totalResumen)       totalResumen.textContent      = fmt(totalNeto)
+    if (impuestosResumen)   impuestosResumen.textContent  = fmt(totalImpuestos)
+    if (topTotalDividendos) topTotalDividendos.textContent = fmt(totalNeto)
 }
 
 function addNewDividendosRow() {

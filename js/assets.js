@@ -1402,7 +1402,7 @@ async function refreshTopPortfolioMetrics(assets = null) {
     window._lastPortfolioMetrics = { totalCuenta: metrics.totalCuenta, invertido: metrics.invertido }
     window._assetsSnapshotData = metricSummaries
         .filter(r => r.euroMetrics.netoActualEur > 0)
-        .map(r => ({ id: r.assetId, netoEur: r.euroMetrics.netoActualEur }))
+        .map(r => ({ id: r.assetId, netoEur: r.euroMetrics.netoActualEur, costEur: r.euroMetrics.invertidoBrutoEur || 0 }))
     applyTopPortfolioMetrics(metrics)
 }
 

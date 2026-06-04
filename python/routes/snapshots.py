@@ -50,10 +50,11 @@ def save_snapshot():
     for a in body.get("assets") or []:
         aid = a.get("id")
         v   = float(a.get("v") or 0)
+        c   = float(a.get("c") or 0)
         if aid and v > 0:
             conn.execute(
-                "INSERT INTO asset_snapshots (ts, asset_id, price_eur) VALUES (?, ?, ?)",
-                (now_ts, aid, round(v, 2))
+                "INSERT INTO asset_snapshots (ts, asset_id, price_eur, cost_eur) VALUES (?, ?, ?, ?)",
+                (now_ts, aid, round(v, 2), round(c, 2))
             )
 
     conn.commit()
@@ -108,43 +109,28 @@ def get_history_by_type():
     seconds = range_map.get(range_param, 30 * 86400)
 
     conn = get_db()
+    _SQL = """SELECT s.ts, a.type, SUM(s.price_eur) as v, SUM(s.cost_eur) as cost
+              FROM asset_snapshots s
+              JOIN activos a ON s.asset_id = a.id
+              WHERE {where} a.type IS NOT NULL AND a.type != ''
+              GROUP BY s.ts, a.type
+              ORDER BY s.ts ASC"""
+
     if range_param == "YTD":
         jan1 = int(datetime.datetime(datetime.datetime.now().year, 1, 1).timestamp())
-        rows = conn.execute(
-            """SELECT s.ts, a.type, SUM(s.price_eur) as v
-               FROM asset_snapshots s
-               JOIN activos a ON s.asset_id = a.id
-               WHERE s.ts >= ? AND a.type IS NOT NULL AND a.type != ''
-               GROUP BY s.ts, a.type
-               ORDER BY s.ts ASC""",
-            (jan1,)
-        ).fetchall()
+        rows = conn.execute(_SQL.format(where="s.ts >= ? AND"), (jan1,)).fetchall()
     elif seconds is None:
-        rows = conn.execute(
-            """SELECT s.ts, a.type, SUM(s.price_eur) as v
-               FROM asset_snapshots s
-               JOIN activos a ON s.asset_id = a.id
-               WHERE a.type IS NOT NULL AND a.type != ''
-               GROUP BY s.ts, a.type
-               ORDER BY s.ts ASC"""
-        ).fetchall()
+        rows = conn.execute(_SQL.format(where="")).fetchall()
     else:
-        rows = conn.execute(
-            """SELECT s.ts, a.type, SUM(s.price_eur) as v
-               FROM asset_snapshots s
-               JOIN activos a ON s.asset_id = a.id
-               WHERE s.ts >= ? AND a.type IS NOT NULL AND a.type != ''
-               GROUP BY s.ts, a.type
-               ORDER BY s.ts ASC""",
-            (now_ts - seconds,)
-        ).fetchall()
+        rows = conn.execute(_SQL.format(where="s.ts >= ? AND"), (now_ts - seconds,)).fetchall()
 
     ts_map = {}
     for r in rows:
         ts = r["ts"]
         if ts not in ts_map:
             ts_map[ts] = {}
-        ts_map[ts][r["type"]] = round(r["v"], 2)
+        ts_map[ts][r["type"]]          = round(r["v"], 2)
+        ts_map[ts][f"c_{r['type']}"]   = round(r["cost"] or 0, 2)
 
     data = [{"ts": ts, **types} for ts, types in sorted(ts_map.items())]
     return jsonify({"ok": True, "range": range_param, "data": data})

@@ -7,7 +7,24 @@ const _TIPO_LABELS = {
     if: "Interés Fijo",
 }
 
-const _CURRENCY_SYMBOLS = { EUR: "EUR €", USD: "USD $", GBP: "GBP £", CHF: "CHF ₣", JPY: "JPY ¥" }
+const _CURRENCY_SYMBOLS_BASE = { EUR: "EUR €", USD: "USD $", GBP: "GBP £", CHF: "CHF ₣", JPY: "JPY ¥" }
+function _getCurrencySymbols() {
+    const codes = window._fiatCurrencies?.length ? window._fiatCurrencies : Object.keys(_CURRENCY_SYMBOLS_BASE)
+    const result = {}
+    codes.forEach((c) => { result[c] = _CURRENCY_SYMBOLS_BASE[c] || c })
+    return result
+}
+const _CURRENCY_SYMBOLS = new Proxy({}, {
+    get(_, prop) {
+        return _getCurrencySymbols()[prop]
+    },
+    ownKeys() { return Object.keys(_getCurrencySymbols()) },
+    has(_, prop) { return prop in _getCurrencySymbols() },
+    getOwnPropertyDescriptor(_, prop) {
+        const v = _getCurrencySymbols()[prop]
+        return v !== undefined ? { value: v, writable: false, enumerable: true, configurable: true } : undefined
+    },
+})
 
 function scheduleBonosAutosave(delay = 600) {
     clearTimeout(_bonosAutosaveTimer)
@@ -237,11 +254,9 @@ function openBonosEditModal(rowIndex = -1) {
 
         <label class="assetModalLabel" for="bonosCurrencySelect">Moneda</label>
         <select id="bonosCurrencySelect" class="assetModalSelect">
-            <option value="EUR"${(rowData.currency || "EUR") === "EUR" ? " selected" : ""}>EUR €</option>
-            <option value="USD"${rowData.currency === "USD" ? " selected" : ""}>USD $</option>
-            <option value="GBP"${rowData.currency === "GBP" ? " selected" : ""}>GBP £</option>
-            <option value="CHF"${rowData.currency === "CHF" ? " selected" : ""}>CHF ₣</option>
-            <option value="JPY"${rowData.currency === "JPY" ? " selected" : ""}>JPY ¥</option>
+            ${Object.entries(_getCurrencySymbols()).map(([code, label]) =>
+                `<option value="${code}"${(rowData.currency || "EUR") === code ? " selected" : ""}>${label}</option>`
+            ).join("")}
         </select>
 
         <label class="assetModalLabel" for="bonosInstrumentoInput">Instrumento</label>

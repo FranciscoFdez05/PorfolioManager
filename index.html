@@ -720,17 +720,34 @@
                 <div class="ajustesSectionDivider"></div>
                 <div class="ajustesField">
                     <label class="ajustesLabel" for="ajustesMonedaBase">Moneda base</label>
-                    <select id="ajustesMonedaBase" class="ajustesSelect" data-no-custom>
-                        <option value="EUR">EUR — Euro</option>
-                        <option value="USD">USD — Dólar estadounidense</option>
-                        <option value="GBP">GBP — Libra esterlina</option>
-                        <option value="CHF">CHF — Franco suizo</option>
-                        <option value="JPY">JPY — Yen japonés</option>
-                    </select>
+                    <select id="ajustesMonedaBase" class="ajustesSelect" data-no-custom></select>
                 </div>
                 <div class="ajustesActions">
                     <button id="ajustesGuardarMonedaBaseBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
                     <span id="ajustesMonedaBaseMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 10h2m4 0h2M10 7v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Divisas fiat</div>
+                        <div class="ajustesSectionDesc">Monedas disponibles para activos, operaciones y conversiones.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesHiddenList" id="ajustesDivisasList"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel">Añadir divisa</label>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesDivisaCode" class="ajustesInput" type="text" placeholder="Código (SEK)" maxlength="5" style="width:130px;flex:none;text-transform:uppercase">
+                        <input id="ajustesDivisaName" class="ajustesInput" type="text" placeholder="Nombre (Corona sueca)">
+                        <button id="ajustesDivisaAddBtn" class="ajustesAddBtn" type="button">Añadir</button>
+                    </div>
+                    <span id="ajustesDivisaMsg" class="ajustesStatusMsg"></span>
                 </div>
             </div>
 

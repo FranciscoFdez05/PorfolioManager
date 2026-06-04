@@ -1,6 +1,20 @@
 const OPERATION_ORDER_OPTIONS = ["Compra", "Venta"]
 const OPERATION_STATUS_OPTIONS = ["Activo", "Completado"]
-const OPERATION_CURRENCY_OPTIONS = ["EUR", "USD"]
+function getOperationCurrencyOptions() {
+    return window._fiatCurrencies?.length ? window._fiatCurrencies : ["EUR", "USD", "GBP", "CHF", "JPY"]
+}
+const OPERATION_CURRENCY_OPTIONS = new Proxy([], {
+    get(_, prop) {
+        const arr = getOperationCurrencyOptions()
+        if (prop === "length") return arr.length
+        if (prop === "map") return arr.map.bind(arr)
+        if (prop === "filter") return arr.filter.bind(arr)
+        if (prop === "includes") return arr.includes.bind(arr)
+        if (prop === Symbol.iterator) return arr[Symbol.iterator].bind(arr)
+        if (typeof prop === "string" && !isNaN(prop)) return arr[Number(prop)]
+        return arr[prop]
+    }
+})
 const OPERATION_QUANTITY_DECIMALS = 8
 const OPERATION_COMMON_QUOTE_SYMBOL_OPTIONS = ["USDC", "USDT", "DAI", "FDUSD", "PYUSD", "TUSD", "USDE", "EURC", "USD", "EUR", "BUSD"]
 

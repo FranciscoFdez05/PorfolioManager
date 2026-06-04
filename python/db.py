@@ -412,6 +412,10 @@ def _migrate(conn):
     if "tv_symbol" not in activos_cols:
         conn.execute("ALTER TABLE activos ADD COLUMN tv_symbol TEXT NOT NULL DEFAULT ''")
 
+    asset_snap_cols = {row[1] for row in conn.execute("PRAGMA table_info(asset_snapshots)")}
+    if "cost_eur" not in asset_snap_cols:
+        conn.execute("ALTER TABLE asset_snapshots ADD COLUMN cost_eur REAL NOT NULL DEFAULT 0")
+
     bonos_cols = {row[1] for row in conn.execute("PRAGMA table_info(bonos)")}
     if "currency" not in bonos_cols:
         conn.execute("ALTER TABLE bonos ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'")
@@ -423,6 +427,12 @@ def _migrate(conn):
     sc_rows_cols = {row[1] for row in conn.execute("PRAGMA table_info(stablecoins_rows)")}
     if "comisiones" not in sc_rows_cols:
         conn.execute("ALTER TABLE stablecoins_rows ADD COLUMN comisiones TEXT NOT NULL DEFAULT ''")
+
+    div_cols = {row[1] for row in conn.execute("PRAGMA table_info(dividendos)")}
+    if "moneda_dividendo" not in div_cols:
+        conn.execute("ALTER TABLE dividendos ADD COLUMN moneda_dividendo TEXT NOT NULL DEFAULT 'USD'")
+    if "moneda_total" not in div_cols:
+        conn.execute("ALTER TABLE dividendos ADD COLUMN moneda_total TEXT NOT NULL DEFAULT 'EUR'")
 
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS portfolio_snapshots (
