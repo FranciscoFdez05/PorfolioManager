@@ -266,7 +266,8 @@ def all_portfolios_assets():
         try:
             assets = conn.execute(
                 "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
-                "sort_order, price, currency, precio_currency, change, status, last_updated, color, tv_symbol "
+                "sort_order, price, currency, precio_currency, change, status, last_updated, color, tv_symbol, "
+                "COALESCE(hidden, 0) as hidden "
                 "FROM activos ORDER BY sort_order"
             ).fetchall()
             for row in assets:
@@ -290,6 +291,7 @@ def all_portfolios_assets():
                     "lastUpdated": row["last_updated"],
                     "color": row["color"],
                     "tvSymbol": row["tv_symbol"],
+                    "hidden": bool(row["hidden"]),
                 })
         except Exception:
             pass

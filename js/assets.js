@@ -11,6 +11,7 @@ let currentAssetPersistedConversionRows = []
 let _assetDisplayRows = []
 let _assetSortKey = null
 let _assetSortDir = "asc"
+let _sidebarFilter = "portfolio"
 let _editingAsset = null
 let assetAutosaveTimeout = null
 
@@ -237,6 +238,7 @@ async function buildOverviewDisplayRow(asset) {
         ...row,
         id: asset.id,
         sidebarOrder: asset.order ?? 0,
+        hidden: asset.hidden ?? false,
         overviewInvestedCurrency: investedCurrency,
         overviewCurrentPrice: currentPriceDisplay,
         overviewCurrentValue: netoActualDisplay,
@@ -936,15 +938,20 @@ function renderAssetVentasSection(asset) {
 
     const rows = getAssetVentasRows(asset)
 
-    if (!rows.length) {
-        section.innerHTML = ""
-        if (tabBtn) tabBtn.classList.add("hidden")
-        return
-    }
-
     if (tabBtn) {
         tabBtn.classList.remove("hidden")
-        tabBtn.textContent = `Ventas (${rows.length})`
+        tabBtn.textContent = rows.length ? `Ventas (${rows.length})` : "Ventas"
+    }
+
+    if (!rows.length) {
+        section.innerHTML = `
+            <div class="assetVentasEmpty">
+                <p class="assetVentasEmptyText">No hay ventas registradas para este activo.</p>
+                <button class="primaryButton assetAddVentaBtn" id="assetAddVentaEmptyBtn">+ Añadir venta</button>
+            </div>
+        `
+        section.querySelector("#assetAddVentaEmptyBtn")?.addEventListener("click", () => openAssetAddVentaModal(asset))
+        return
     }
 
     const rowsHtml = rows.map((row) => {
@@ -965,6 +972,9 @@ function renderAssetVentasSection(asset) {
     }).join("")
 
     section.innerHTML = `
+        <div class="assetVentasHeader">
+            <button class="primaryButton assetAddVentaBtn" id="assetAddVentaTopBtn">+ Añadir venta</button>
+        </div>
         <div class="assetTableWrapper">
             <table class="assetOperationsTable assetVentasTable">
                 <thead>
@@ -983,7 +993,153 @@ function renderAssetVentasSection(asset) {
             </table>
         </div>
     `
+    section.querySelector("#assetAddVentaTopBtn")?.addEventListener("click", () => openAssetAddVentaModal(asset))
     bindTableSort(section.querySelector("table"), "assetVentas")
+}
+
+function openAssetAddVentaModal(asset) {
+    document.getElementById("assetAddVentaModalOverlay")?.remove()
+
+    const assetName = asset.name || asset.id || ""
+    const today = new Date()
+    const dd = String(today.getDate()).padStart(2, "0")
+    const mm = String(today.getMonth() + 1).padStart(2, "0")
+    const yyyy = today.getFullYear()
+    const todayStr = `${dd}-${mm}-${yyyy}`
+
+    const overlay = document.createElement("div")
+    overlay.id = "assetAddVentaModalOverlay"
+    overlay.className = "modalOverlay assetRowModalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal assetRowModal"
+
+    const title = document.createElement("h3")
+    title.className = "assetModalTitle assetRowModalTitle"
+    title.textContent = `Añadir venta · ${assetName}`
+
+    const fields = document.createElement("div")
+    fields.className = "assetRowModalFields"
+    fields.innerHTML = `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Fecha</label>
+            <input id="avModalFecha" class="assetRowModalInput" type="text" value="${todayStr}" placeholder="dd-mm-aaaa">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Cantidad</label>
+            <input id="avModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="0">
+        </div>
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Valor de venta (€)</label>
+            <input id="avModalValorVenta" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="0.00">
+        </div>
+        <div id="avModalFeedback" class="assetRowModalFeedback" style="display:none"></div>
+    `
+
+    const footer = document.createElement("div")
+    footer.className = "assetRowModalFooter"
+    footer.innerHTML = `
+        <button type="button" id="assetAddVentaCancelBtn" class="cancelButton assetRowModalCancelBtn">Cancelar</button>
+        <button type="button" id="assetAddVentaSaveBtn" class="primaryButton assetRowModalSaveBtn">Guardar venta</button>
+    `
+
+    modal.appendChild(title)
+    modal.appendChild(fields)
+    modal.appendChild(footer)
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    const close = () => overlay.remove()
+    footer.querySelector("#assetAddVentaCancelBtn").addEventListener("click", close)
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close() })
+
+    const saveBtn = footer.querySelector("#assetAddVentaSaveBtn")
+    const fechaInput = fields.querySelector("#avModalFecha")
+    const cantidadInput = fields.querySelector("#avModalCantidad")
+    const valorVentaInput = fields.querySelector("#avModalValorVenta")
+    const feedback = fields.querySelector("#avModalFeedback")
+
+    saveBtn.addEventListener("click", async () => {
+        const fecha = fechaInput.value.trim()
+        const cantidad = cantidadInput.value.trim()
+        const valorVenta = valorVentaInput.value.trim()
+
+        if (!fecha || !cantidad || !valorVenta) {
+            feedback.textContent = "Fecha, cantidad y valor de venta son obligatorios."
+            feedback.style.display = "block"
+            return
+        }
+
+        saveBtn.disabled = true
+        saveBtn.textContent = "Guardando..."
+
+        try {
+            await saveNewVentaFromAsset(asset, fecha, cantidad, valorVenta)
+            close()
+            await loadVentasRowsForAssets()
+            renderAssetVentasSection(asset)
+            const ventasPanel = document.querySelector('.assetTabPanel[data-tab="ventas"]')
+            const ventasTabBtn = document.getElementById("ventasTabBtn")
+            if (ventasPanel && ventasTabBtn) {
+                document.querySelectorAll(".assetTabPanel").forEach(p => p.classList.add("hidden"))
+                document.querySelectorAll(".assetTabBtn").forEach(b => b.classList.remove("assetTabActive"))
+                ventasPanel.classList.remove("hidden")
+                ventasTabBtn.classList.add("assetTabActive")
+            }
+        } catch (err) {
+            feedback.textContent = `Error al guardar: ${err.message}`
+            feedback.style.display = "block"
+            saveBtn.disabled = false
+            saveBtn.textContent = "Guardar venta"
+        }
+    })
+
+    fechaInput.focus()
+}
+
+async function saveNewVentaFromAsset(asset, fecha, cantidad, valorVenta) {
+    const yearMatch = fecha.match(/(\d{4})$/)
+    const year = yearMatch ? yearMatch[1] : String(new Date().getFullYear())
+
+    let yearData = null
+    const yearRes = await fetch(`/api/ventas/${year}`)
+    if (yearRes.ok) {
+        yearData = await yearRes.json()
+    } else {
+        const createRes = await fetch("/api/ventas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ year })
+        })
+        if (!createRes.ok) throw new Error("No se pudo crear el año de ventas")
+        yearData = (await createRes.json()).data || { year, rows: [] }
+    }
+
+    const existingRows = Array.isArray(yearData?.rows) ? yearData.rows : []
+    const newRow = {
+        id: `venta-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        fecha,
+        assetId: String(asset.id || ""),
+        activo: String(asset.name || asset.id || ""),
+        cantidad: String(cantidad),
+        valorVenta: String(valorVenta),
+        valorCompra: "",
+        dineroDeclarar: "",
+        bruto: "",
+        neto: "",
+        totalPagar: ""
+    }
+
+    const saveRes = await fetch(`/api/ventas/${year}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ year, rows: [...existingRows, newRow] })
+    })
+
+    if (!saveRes.ok) {
+        const text = await saveRes.text()
+        throw new Error(`HTTP ${saveRes.status}: ${text}`)
+    }
 }
 
 async function renderAssetsList(assets) {
@@ -998,7 +1154,10 @@ async function renderAssetsList(assets) {
         ? (window._settingsStaleHours ?? 24) * 3600 * 1000
         : Infinity
     const now      = Date.now()
-    const visible  = assets.filter((a) => !hidden.has(a.id))
+    let visible  = assets.filter((a) => !hidden.has(a.id))
+    if (_sidebarFilter === "portfolio") {
+        visible = visible.filter((a) => a.hasRows)
+    }
     const fragment = document.createDocumentFragment()
 
     for (const asset of visible) {
@@ -1019,8 +1178,13 @@ async function renderAssetsList(assets) {
             const changeMoneyStr  = changePctStr ? `${changeSign}${formatMoney(changeAbs, displayCurrency)}` : "—"
             const button = document.createElement("button")
             button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}${isStale ? " stale" : ""}`
-            button.dataset.assetId    = asset.id
-            button.dataset.assetOrder = String(asset.order ?? 0)
+            button.dataset.assetId        = asset.id
+            button.dataset.assetOrder     = String(asset.order ?? 0)
+            button.dataset.tvSymbol       = asset.tvSymbol || ""
+            button.dataset.marketSymbol   = asset.marketSymbol || asset.finnhubSymbol || ""
+            button.dataset.marketProvider = asset.marketProvider || ""
+            button.dataset.assetSymbol    = asset.symbol || ""
+            button.dataset.assetName      = asset.name || ""
             button.draggable = !window._viewAllPortfolios
             button.innerHTML = `
                 <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}${portfolioBadge}</span>
@@ -1041,8 +1205,13 @@ async function renderAssetsList(assets) {
             const changeMoneyStr   = changePctStr ? `${changeSign}${formatMoney(changeAbs, fallbackCurrency)}` : "—"
             const button = document.createElement("button")
             button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}${isStale ? " stale" : ""}`
-            button.dataset.assetId    = asset.id
-            button.dataset.assetOrder = String(asset.order ?? 0)
+            button.dataset.assetId        = asset.id
+            button.dataset.assetOrder     = String(asset.order ?? 0)
+            button.dataset.tvSymbol       = asset.tvSymbol || ""
+            button.dataset.marketSymbol   = asset.marketSymbol || asset.finnhubSymbol || ""
+            button.dataset.marketProvider = asset.marketProvider || ""
+            button.dataset.assetSymbol    = asset.symbol || ""
+            button.dataset.assetName      = asset.name || ""
             button.draggable = !window._viewAllPortfolios
             button.innerHTML = `
                 <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}${portfolioBadge}</span>
@@ -1406,9 +1575,22 @@ async function refreshTopPortfolioMetrics(assets = null) {
     applyTopPortfolioMetrics(metrics)
 }
 
+let _ovShowHidden = false
+
 async function initVistaGeneralLogic() {
     const filtersContainer = document.getElementById("overviewFilters")
     const refreshOverviewMarketButton = document.getElementById("refreshOverviewMarketBtn")
+    const showHiddenBtn = document.getElementById("overviewShowHiddenBtn")
+
+    if (showHiddenBtn && !showHiddenBtn.dataset.bound) {
+        showHiddenBtn.dataset.bound = "true"
+        showHiddenBtn.classList.toggle("active", _ovShowHidden)
+        showHiddenBtn.addEventListener("click", () => {
+            _ovShowHidden = !_ovShowHidden
+            showHiddenBtn.classList.toggle("active", _ovShowHidden)
+            renderVistaGeneralTable()
+        })
+    }
 
     if (filtersContainer && !filtersContainer.dataset.bound) {
         filtersContainer.dataset.bound = "true"
@@ -1480,6 +1662,21 @@ async function refreshOverviewMarketData(buttonElement = null) {
             buttonElement.textContent = originalLabel
         }
     }
+}
+
+function initSidebarFilterBar() {
+    const bar = document.getElementById("sidebarFilterBar")
+    if (!bar || bar.dataset.bound) return
+    bar.dataset.bound = "true"
+    bar.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".sidebarFilterBtn")
+        if (!btn) return
+        _sidebarFilter = btn.dataset.filter
+        bar.querySelectorAll(".sidebarFilterBtn").forEach((b) => b.classList.toggle("active", b === btn))
+        const assets = await loadAssetsList()
+        await renderAssetsList(assets)
+    })
+    bar.style.display = window._viewAllPortfolios ? "none" : ""
 }
 
 function initSidebarRefreshButton(buttonElement) {
@@ -2152,6 +2349,7 @@ function renderOverviewRows(rows) {
 
     sorted.forEach((row, idx) => {
         const tr = document.createElement("tr")
+        if (row._isOculto) tr.classList.add("overviewTrHidden")
         const yieldVal = row.overviewYieldValue ?? 0
         const rClass = yieldVal >= 0 ? "mCellPos" : "mCellNeg"
         const sign = yieldVal >= 0 ? "+" : ""
@@ -2225,7 +2423,14 @@ async function renderVistaGeneralTable() {
         results
             .filter((r) => r.status === "rejected")
             .forEach((r) => console.error("Error procesando activo en vista general:", r.reason))
-        const rows = results.filter((r) => r.status === "fulfilled").map((r) => r.value)
+        const allRows = results.filter((r) => r.status === "fulfilled").map((r) => r.value)
+
+        const rows = allRows
+            .map((r) => ({
+                ...r,
+                _isOculto: r.hidden || (r.participaciones === 0 && r.invertidoBruto === 0)
+            }))
+            .filter((r) => _ovShowHidden || !r._isOculto)
 
         renderOverviewRows(rows)
         _ovBindSort()
@@ -2369,7 +2574,7 @@ function renderAssetTablePage(asset) {
                     <button class="assetTabBtn assetTabActive" data-tab="spot">Compras spot</button>
                     <button class="assetTabBtn hidden" id="completadasTabBtn" data-tab="completadas">Operaciones Spot</button>
                     <button class="assetTabBtn hidden" id="transaccionesTabBtn" data-tab="transacciones">Transacciones</button>
-                    <button class="assetTabBtn hidden" id="ventasTabBtn" data-tab="ventas">Ventas</button>
+                    <button class="assetTabBtn" id="ventasTabBtn" data-tab="ventas">Ventas</button>
                 </div>
                 <div class="assetTabPanel" data-tab="spot">
                     <div class="assetTableWrapper">
@@ -4049,9 +4254,15 @@ let _activosAllAssets = []
 let _activosFilterType = "all"
 let _activosSearch = ""
 let _activosViewMode = localStorage.getItem("activosViewMode") || "cards"
+let _activosShowHidden = false
+
+function avIsOculto(a) {
+    return a.hidden || ((a.invertidoNeto ?? 1) === 0 && (a.rendimiento ?? 0) === 0)
+}
 
 function avFilteredAssets() {
     return _activosAllAssets.filter((a) => {
+        if (avIsOculto(a) && !_activosShowHidden) return false
         const matchType = _activosFilterType === "all" || _activosFilterType.includes(a.type)
         const q = _activosSearch.toLowerCase()
         const matchSearch = !q
@@ -4059,6 +4270,22 @@ function avFilteredAssets() {
             || (a.symbol || "").toLowerCase().includes(q)
         return matchType && matchSearch
     })
+}
+
+async function avToggleAssetHidden(assetId) {
+    const asset = _activosAllAssets.find((a) => a.id === assetId)
+    if (!asset) return
+    asset.hidden = !asset.hidden
+    try {
+        const full = await loadAssetData(assetId)
+        full.hidden = asset.hidden
+        await saveAssetDataToServer(full)
+    } catch (err) {
+        asset.hidden = !asset.hidden
+        console.error("Error guardando estado oculto:", err)
+        return
+    }
+    avRender()
 }
 
 function avBuildCard(asset) {
@@ -4088,7 +4315,7 @@ function avBuildCard(asset) {
     }
 
     const card = document.createElement("div")
-    card.className = "avCard"
+    card.className = `avCard${avIsOculto(asset) ? " avHidden" : ""}`
     card.dataset.assetId = asset.id
     card.style.setProperty("--av-color", color)
     card.draggable = true
@@ -4103,6 +4330,7 @@ function avBuildCard(asset) {
                     <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                     <div class="rowMenuDropdown">
                         <button type="button" class="rowMenuItem avActionBtn avEditBtn" data-asset-id="${asset.id}">Editar</button>
+                        <button type="button" class="rowMenuItem avActionBtn avHideBtn" data-asset-id="${asset.id}">${asset.hidden ? "Mostrar" : "Ocultar"}</button>
                         <hr>
                         <button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn" data-asset-id="${asset.id}">Eliminar</button>
                     </div>
@@ -4192,7 +4420,7 @@ function avBuildTableRow(asset) {
         : "—"
 
     const tr = document.createElement("tr")
-    tr.className = "avTableRow"
+    tr.className = `avTableRow${avIsOculto(asset) ? " avHidden" : ""}`
     tr.dataset.assetId = asset.id
     tr.innerHTML = `
         <td><span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span></td>
@@ -4209,6 +4437,7 @@ function avBuildTableRow(asset) {
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
                     <button type="button" class="rowMenuItem avActionBtn avEditBtn" data-asset-id="${asset.id}">Editar</button>
+                    <button type="button" class="rowMenuItem avActionBtn avHideBtn" data-asset-id="${asset.id}">${asset.hidden ? "Mostrar" : "Ocultar"}</button>
                     <hr>
                     <button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn" data-asset-id="${asset.id}">Eliminar</button>
                 </div>
@@ -4241,6 +4470,9 @@ function avRenderTable() {
     const frag = document.createDocumentFragment()
     filtered.forEach((a) => frag.appendChild(avBuildTableRow(a)))
     tbody.appendChild(frag)
+    const t = tbody.closest("table")
+    bindTableSort(t, "activosTable")
+    if (t._reSort) t._reSort()
 }
 
 function avRender() {
@@ -4287,6 +4519,12 @@ async function avHandleCardClick(event) {
                 })
             }
         })
+        return
+    }
+
+    const hideBtn = event.target.closest(".avHideBtn")
+    if (hideBtn) {
+        await avToggleAssetHidden(hideBtn.dataset.assetId)
         return
     }
 
@@ -4376,6 +4614,7 @@ function buildTVIframeUrl(tvSymbol) {
         symbol: tvSymbol, interval: "D", theme,
         style: "1", locale: "es",
         hidesidetoolbar: "0", symboledit: "1", saveimage: "1",
+        range: "12M",
         toolbarbg,
     })
     return `https://www.tradingview.com/widgetembed/?${p.toString()}`
@@ -4418,6 +4657,17 @@ async function initActivosPageLogic() {
     _activosAllAssets = await loadAssetsList()
     _activosFilterType = "all"
     _activosSearch = ""
+    _activosShowHidden = false
+
+    const showHiddenBtn = document.getElementById("activosShowHiddenBtn")
+    if (showHiddenBtn) {
+        showHiddenBtn.classList.toggle("active", _activosShowHidden)
+        showHiddenBtn.addEventListener("click", () => {
+            _activosShowHidden = !_activosShowHidden
+            showHiddenBtn.classList.toggle("active", _activosShowHidden)
+            avRender()
+        })
+    }
 
     const viewToggle = document.getElementById("avViewToggle")
     if (viewToggle) {

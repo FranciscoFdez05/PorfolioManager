@@ -724,6 +724,7 @@ function bindTableSort(table, storageKey) {
         })
     })
 
+    table._reSort = doSort
     if (currentKey !== null) doSort()
 }
 

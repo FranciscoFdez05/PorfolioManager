@@ -1,3 +1,36 @@
+.sidebarFilterBar{
+    display:flex;
+    gap:4px;
+    background:var(--bg-inset,#0d0d0d);
+    border-radius:8px;
+    padding:3px;
+}
+
+.sidebarFilterBtn{
+    flex:1;
+    padding:5px 0;
+    font-size:11px;
+    font-weight:500;
+    border:none;
+    border-radius:6px;
+    background:transparent;
+    color:var(--text-secondary);
+    cursor:pointer;
+    transition:background 0.15s,color 0.15s;
+    white-space:nowrap;
+}
+
+.sidebarFilterBtn:hover{
+    color:var(--text-primary);
+    background:var(--bg-surface);
+}
+
+.sidebarFilterBtn.active{
+    background:var(--bg-elevated,#1e1e1e);
+    color:var(--text-primary);
+    box-shadow:0 1px 3px rgba(0,0,0,0.35);
+}
+
 .assetsList{
     display:flex;
     flex-direction:column;
@@ -644,6 +677,33 @@
     max-height:563px;
 }
 
+.assetVentasEmpty{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    padding:48px 24px;
+    text-align:center;
+}
+
+.assetVentasEmptyText{
+    color:var(--text-muted);
+    font-size:14px;
+    margin:0;
+}
+
+.assetVentasHeader{
+    display:flex;
+    justify-content:flex-end;
+    padding:10px 12px 0;
+}
+
+.assetAddVentaBtn{
+    font-size:13px;
+    padding:6px 14px;
+}
+
 .assetCompletedOpsTable td,
 .assetTransaccionesTable td{
     font-size:0.82rem;
@@ -1083,6 +1143,12 @@ tr.gastosTypeEmptySep td {
     background:var(--bg-surface);
 }
 
+.assetRowModalFeedback{
+    color:var(--color-danger, #e05454);
+    font-size:13px;
+    padding:6px 0;
+}
+
 .assetRowModalDeleteBtn{
     margin-right:auto;
 }
@@ -1490,6 +1556,51 @@ tr.gastosTypeEmptySep td {
 
 .hidden{
     display:none !important;
+}
+
+.avShowHiddenBtn{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    padding:5px 10px;
+    border:1px solid var(--border-soft);
+    border-radius:6px;
+    background:var(--bg-surface);
+    color:var(--text-secondary,#aaa);
+    font-size:0.78rem;
+    cursor:pointer;
+    transition:border-color .15s,color .15s,background .15s;
+    white-space:nowrap;
+}
+.avShowHiddenBtn:hover{
+    border-color:var(--accent,#3a7bd5);
+    color:var(--accent,#3a7bd5);
+}
+.avShowHiddenBtn.active{
+    border-color:var(--accent,#3a7bd5);
+    background:var(--accent,#3a7bd5)22;
+    color:var(--accent,#3a7bd5);
+}
+
+.avCard.avHidden{
+    opacity:0.45;
+    filter:grayscale(0.4);
+}
+.avCard.avHidden:hover{
+    opacity:0.75;
+    filter:none;
+}
+.avTableRow.avHidden td{
+    opacity:0.45;
+}
+.avTableRow.avHidden:hover td{
+    opacity:0.8;
+}
+.overviewTrHidden td{
+    opacity:0.45;
+}
+.overviewTrHidden:hover td{
+    opacity:0.8;
 }
 
 .modalOverlay{

@@ -220,6 +220,9 @@ function segRenderTable(filtered) {
             if (tvSym && typeof openTVChartModal === "function") openTVChartModal(tvSym, item.name || item.symbol)
         })
     })
+    const t = tbody.closest("table")
+    bindTableSort(t, "seguimientoTable")
+    if (t._reSort) t._reSort()
 }
 
 function segLoadHidden() {

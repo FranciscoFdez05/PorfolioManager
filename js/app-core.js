@@ -41,6 +41,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initResizeHandles()
     initAddAssetButton(addAssetButton, assetModalOverlay, assetNameInput, assetTypeSelect, assetTickerInput)
     initSidebarRefreshButton(refreshSidebarMarketButton)
+    initSidebarFilterBar()
     initAssetModal(
         assetModalOverlay,
         confirmAssetModalButton,
@@ -393,8 +394,22 @@ function initAssetSelector(assetButtons) {
                 }
                 return
             }
-            clearNavSelection()
-            await selectAsset(button.dataset.assetId || "")
+            const assetId = button.dataset.assetId || ""
+            if (!assetId) return
+            currentAssetId = assetId
+            const assetData = await loadAssetData(assetId)
+            await updateAssetDetail(assetData)
+            await renderAssetsList(await loadAssetsList())
+            const assetForTV = {
+                tvSymbol:       button.dataset.tvSymbol       || "",
+                marketSymbol:   button.dataset.marketSymbol   || "",
+                finnhubSymbol:  button.dataset.marketSymbol   || "",
+                marketProvider: button.dataset.marketProvider || "",
+                symbol:         button.dataset.assetSymbol    || "",
+                name:           button.dataset.assetName      || "",
+            }
+            const tvSym = buildTVSymbol(assetForTV)
+            if (tvSym) openTVChartModal(tvSym, button.dataset.assetName || button.dataset.assetSymbol || "")
         })
     })
 }

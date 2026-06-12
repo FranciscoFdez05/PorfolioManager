@@ -411,6 +411,8 @@ def _migrate(conn):
         conn.execute("ALTER TABLE activos ADD COLUMN color TEXT NOT NULL DEFAULT ''")
     if "tv_symbol" not in activos_cols:
         conn.execute("ALTER TABLE activos ADD COLUMN tv_symbol TEXT NOT NULL DEFAULT ''")
+    if "hidden" not in activos_cols:
+        conn.execute("ALTER TABLE activos ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0")
 
     asset_snap_cols = {row[1] for row in conn.execute("PRAGMA table_info(asset_snapshots)")}
     if "cost_eur" not in asset_snap_cols:

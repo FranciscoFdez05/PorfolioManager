@@ -533,7 +533,9 @@ function mRenderRendTipos(summaries) {
 }
 
 function mRenderRendActivos(summaries) {
-    const sorted = [...summaries].sort((a, b) => b.rendimientoEur - a.rendimientoEur)
+    const sorted = [...summaries]
+        .filter((a) => a.invertidoEur !== 0 || a.rendimientoEur !== 0)
+        .sort((a, b) => b.rendimientoEur - a.rendimientoEur)
     const labels = sorted.map((a) => a.name)
     const values = sorted.map((a) => a.rendimientoEur)
     const colors = values.map((v) => (v >= 0 ? "#2ecc71cc" : "#e74c3ccc"))
