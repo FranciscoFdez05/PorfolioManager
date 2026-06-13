@@ -251,6 +251,7 @@ body{
 
 .metricValue.metricPositive{ color:#2ecc71; }
 .metricValue.metricNegative{ color:#e74c3c; }
+.metricBox.metricHidden{ display:none !important; }
 
 .tabs{
     display:flex;
@@ -875,14 +876,10 @@ body{
 }
 
 .assetSearchActions{
-    display:flex;
-    flex-wrap:wrap;
+    display:grid;
+    grid-template-columns:1fr 1fr;
     gap:10px;
     margin:-4px 0 10px 0;
-}
-
-.assetSearchActions .secondaryButton{
-    flex:1 1 180px;
 }
 
 .assetSearchFeedback{

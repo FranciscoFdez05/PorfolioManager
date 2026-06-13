@@ -1,3 +1,44 @@
+const _MODULE_PAGES = {
+    panelSuperior: [],
+    activos:      ["activos", "seguimiento", "heatmap"],
+    gastos:       ["gastos", "ingresos"],
+    finanzas:     ["intereses", "dividendos", "bonos", "ventas"],
+    cripto:       ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
+    herramientas: ["herramientas"],
+    metricas:     ["metricas"],
+}
+
+const _TOP_METRICS_DEFAULT_HIDDEN = new Set([
+    "topInvertido", "topNumActivos", "topStaking",
+    "topGastosAnio", "topIngresosAnio", "topTradingPnL"
+])
+
+function applyTopMetricsVisibility() {
+    const cfg = window._topMetricsConfig || {}
+    document.querySelectorAll(".metricBox[data-metric]").forEach((box) => {
+        const id = box.dataset.metric
+        const visible = id in cfg ? cfg[id] : !_TOP_METRICS_DEFAULT_HIDDEN.has(id)
+        box.classList.toggle("metricHidden", !visible)
+    })
+}
+
+function applyModulesVisibility() {
+    const cfg = window._modulosConfig || {}
+    for (const mod of Object.keys(_MODULE_PAGES)) {
+        const enabled = cfg[mod] !== false
+        document.querySelectorAll(`[data-module="${mod}"]`).forEach(el => {
+            el.style.display = enabled ? "" : "none"
+        })
+    }
+}
+
+function _pageModule(page) {
+    for (const [mod, pages] of Object.entries(_MODULE_PAGES)) {
+        if (pages.includes(page)) return mod
+    }
+    return null
+}
+
 async function _postSnapshot() {
     const m = window._lastPortfolioMetrics
     if (!m) return
@@ -57,6 +98,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
     applyDensidadSidebar(localStorage.getItem("portfolioDensity") || "normal")
     await loadGlobalSettings()
+    applyTopMetricsVisibility()
+    applyModulesVisibility()
     applySidebarState(sideWrapper, toggleButton)
     await refreshAssetsSidebar()
     await refreshTopDividendosIntereses()
@@ -82,6 +125,8 @@ async function loadGlobalSettings() {
             window._gastosHiddenMensualidades   = data.gastosHiddenMensualidades ?? []
             window._metricasActivosHidden       = data.metricasActivosHidden ?? []
             window._metricasSectionsCollapsed   = data.metricasSectionsCollapsed ?? []
+            window._topMetricsConfig            = data.topMetricsConfig ?? {}
+            window._modulosConfig               = data.modulosConfig ?? {}
             window._sidebarCollapsed            = data.sidebarCollapsed ?? false
             window._monedaBase                  = data.monedaBase ?? "EUR"
             window._fiatCurrencies              = (data.fiatCurrencies || []).map((c) => c.code).filter(Boolean)
@@ -125,6 +170,7 @@ async function loadGlobalSettings() {
         window._precioDecimales_cripto      = 4
         window._numLocale                   = "es-ES"
         window._dateFormat                  = "DD/MM/YYYY"
+        window._modulosConfig               = {}
     }
 }
 
@@ -767,12 +813,18 @@ function handleCellFocus(event) {
 }
 
 async function refreshTopDividendosIntereses() {
+    const _MONTH_KEYS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
     try {
-        const [interesesData, dividendosData, bonosResp, rfResp] = await Promise.all([
+        const year = new Date().getFullYear().toString()
+        const [interesesData, dividendosData, bonosResp, rfResp, gastosData, ingresosData, tradingData, stakingData] = await Promise.all([
             loadInteresesData(),
             loadDividendosData(),
             fetch("/api/bonos").then((r) => r.json()).catch(() => ({ rows: [] })),
-            fetch("/api/rentafija").then((r) => r.json()).catch(() => ({ rows: [] }))
+            fetch("/api/rentafija").then((r) => r.json()).catch(() => ({ rows: [] })),
+            fetch(`/api/gastos/${year}`).then((r) => r.json()).catch(() => null),
+            fetch(`/api/ingresos/${year}`).then((r) => r.json()).catch(() => null),
+            fetch("/api/trading").then((r) => r.json()).catch(() => ({ rows: [] })),
+            fetch("/api/staking").then((r) => r.json()).catch(() => ({ rows: [] })),
         ])
 
         const allInteresesRows = (Array.isArray(interesesData?.cuentas) ? interesesData.cuentas : [])
@@ -789,10 +841,42 @@ async function refreshTopDividendosIntereses() {
         const totalRentaFija = (Array.isArray(rfResp?.rows) ? rfResp.rows : [])
             .reduce((sum, r) => sum + parseEuroNumber(r.interesAcumulado) - parseEuroNumber(r.impuestos), 0)
 
-        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = formatEuro(val) }
-        set("topTotalInteres", totalInteres)
-        set("topTotalDividendos", totalDividendos)
-        set("topTotalRentaFija", totalBonos + totalRentaFija)
+        let totalGastos = 0
+        if (gastosData?.months) {
+            _MONTH_KEYS.forEach((m) => {
+                ;(gastosData.months[m]?.rows || []).forEach((r) => { totalGastos += parseEuroNumber(r.cantidad || "") })
+            })
+        }
+
+        let totalIngresos = 0
+        if (ingresosData?.months) {
+            _MONTH_KEYS.forEach((m) => {
+                ;(ingresosData.months[m]?.rows || []).forEach((r) => { totalIngresos += parseEuroNumber(r.cantidad || "") })
+            })
+        }
+
+        let totalTradingPnL = 0
+        ;(tradingData?.rows || []).forEach((r) => {
+            const val = parseFloat(String(r.ganancia_neta || "").replace(",", ".").trim())
+            if (!isNaN(val) && (r.capital_currency || "EUR") === "EUR") totalTradingPnL += val
+        })
+
+        let totalStaking = 0
+        ;(stakingData?.rows || []).forEach((r) => {
+            const qty = parseFloat(String(r.cantidad || "").replace(",", "."))
+            const precio = parseEuroNumber(r.precio || "")
+            if (!isNaN(qty)) totalStaking += qty * precio
+        })
+
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
+        set("topTotalInteres",    formatEuro(totalInteres))
+        set("topTotalDividendos", formatEuro(totalDividendos))
+        set("topTotalRentaFija",  formatEuro(totalBonos + totalRentaFija))
+        set("topGastosAnio",      formatEuro(totalGastos))
+        set("topIngresosAnio",    formatEuro(totalIngresos))
+        set("topTradingPnL",      (totalTradingPnL >= 0 ? "+" : "") + formatEuro(totalTradingPnL))
+        set("topStaking",         formatEuro(totalStaking))
+        applyTopMetricsVisibility()
     } catch (error) {
         console.error("Error actualizando métricas de dividendos/intereses:", error)
     }

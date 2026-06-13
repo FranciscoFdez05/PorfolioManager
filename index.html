@@ -8,7 +8,7 @@
     <meta http-equiv="Expires" content="0">
     <title>Portfolio Manager</title>
     <link rel="stylesheet" href="css/variables.css?v=20260511d">
-    <link rel="stylesheet" href="css/base.css?v=20260516a">
+    <link rel="stylesheet" href="css/base.css?v=20260613a">
     <link rel="stylesheet" href="css/components.css?v=20260517a">
     <link rel="stylesheet" href="css/pages.css?v=20260518b">
     <link rel="stylesheet" href="css/themes.css?v=20260518a">
@@ -37,80 +37,105 @@
                 </div>
             </div>
 
-            <div class="metrics">
-                <div class="metricBox">
+            <div class="metrics" data-module="panelSuperior">
+                <div class="metricBox" data-metric="topTotalCuenta">
                     <span class="metricTitle">Total Cuenta</span>
                     <span class="metricValue" id="topTotalCuenta">---</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topPorcentajeCuenta">
                     <span class="metricTitle">% cuenta</span>
                     <span class="metricValue" id="topPorcentajeCuenta">---</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topRendimientoEuros">
                     <span class="metricTitle">Rendimiento €</span>
                     <span class="metricValue" id="topRendimientoEuros">---</span>
                 </div>
 
-                <!-- <div class="metricBox">
+                <div class="metricBox" data-metric="topInvertido">
                     <span class="metricTitle">Invertido</span>
                     <span class="metricValue" id="topInvertido">---</span>
-                </div> -->
+                </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topNumActivos">
+                    <span class="metricTitle">Nº activos</span>
+                    <span class="metricValue" id="topNumActivos">---</span>
+                </div>
+
+                <div class="metricBox" data-metric="topPorcentajeAcciones">
                     <span class="metricTitle">% acciones</span>
                     <span class="metricValue" id="topPorcentajeAcciones">---</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topEurosAcciones">
                     <span class="metricTitle">€ acciones</span>
                     <span class="metricValue" id="topEurosAcciones">---</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topPorcentajeEtf">
                     <span class="metricTitle">% ETF</span>
                     <span class="metricValue" id="topPorcentajeEtf">---</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topEurosEtf">
                     <span class="metricTitle">€ ETF</span>
                     <span class="metricValue" id="topEurosEtf">---</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topPorcentajeComoditis">
                     <span class="metricTitle">% comoditis</span>
                     <span class="metricValue" id="topPorcentajeComoditis">---</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topEurosComoditis">
                     <span class="metricTitle">€ comoditis</span>
                     <span class="metricValue" id="topEurosComoditis">---</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topPorcentajeCripto">
                     <span class="metricTitle">% cripto</span>
                     <span class="metricValue" id="topPorcentajeCripto">---</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topEurosCripto">
                     <span class="metricTitle">€ cripto</span>
                     <span class="metricValue" id="topEurosCripto">---</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topTotalDividendos">
                     <span class="metricTitle">€ dividendos</span>
                     <span class="metricValue" id="topTotalDividendos">0,00 €</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topTotalInteres">
                     <span class="metricTitle">€ C. Rem.</span>
                     <span class="metricValue" id="topTotalInteres">0,00 €</span>
                 </div>
 
-                <div class="metricBox">
+                <div class="metricBox" data-metric="topTotalRentaFija">
                     <span class="metricTitle">€ Renta Fija</span>
                     <span class="metricValue" id="topTotalRentaFija">0,00 €</span>
+                </div>
+
+                <div class="metricBox" data-metric="topStaking">
+                    <span class="metricTitle">Staking €</span>
+                    <span class="metricValue" id="topStaking">0,00 €</span>
+                </div>
+
+                <div class="metricBox" data-metric="topGastosAnio">
+                    <span class="metricTitle">Gastos (año)</span>
+                    <span class="metricValue" id="topGastosAnio">0,00 €</span>
+                </div>
+
+                <div class="metricBox" data-metric="topIngresosAnio">
+                    <span class="metricTitle">Ingresos (año)</span>
+                    <span class="metricValue" id="topIngresosAnio">0,00 €</span>
+                </div>
+
+                <div class="metricBox" data-metric="topTradingPnL">
+                    <span class="metricTitle">Trading P&amp;L</span>
+                    <span class="metricValue" id="topTradingPnL">0,00 €</span>
                 </div>
             </div>
         </header>
@@ -125,26 +150,26 @@
             <div class="navButtons">
                 <button class="navBtn active" data-page="vistaGeneral">Vista general</button>
 
-                <div class="navDropdown">
+                <div class="navDropdown" data-module="activos">
                     <button class="navDropdownBtn" type="button">Activos ▾</button>
                     <div class="navDropdownMenu">
                         <button class="navBtn navDropdownItem" data-page="activos">Activos</button>
                         <button class="navBtn navDropdownItem" data-page="seguimiento">Watchlist</button>
-                        <button class="navBtn navDropdownItem" data-page="heatmap">Mapas</button>                       
+                        <button class="navBtn navDropdownItem" data-page="heatmap">Mapas</button>
                     </div>
                 </div>
 
-                <div class="navDropdown">
+                <div class="navDropdown" data-module="gastos">
                     <button class="navDropdownBtn" type="button">Gastos ▾</button>
-                    <div class="navDropdownMenu">                        
+                    <div class="navDropdownMenu">
                         <button class="navBtn navDropdownItem" data-page="gastos">Gastos</button>
                         <button class="navBtn navDropdownItem" data-page="ingresos">Ingresos</button>
                     </div>
                 </div>
 
-                <div class="navDropdown">
+                <div class="navDropdown" data-module="finanzas">
                     <button class="navDropdownBtn" type="button">Finanzas ▾</button>
-                    <div class="navDropdownMenu">                        
+                    <div class="navDropdownMenu">
                         <button class="navBtn navDropdownItem" data-page="intereses">Cuenta Remunerada</button>
                         <button class="navBtn navDropdownItem" data-page="dividendos">Dividendos</button>
                         <button class="navBtn navDropdownItem" data-page="bonos">Renta Fija</button>
@@ -152,7 +177,7 @@
                     </div>
                 </div>
 
-                <div class="navDropdown">
+                <div class="navDropdown" data-module="cripto">
                     <button class="navDropdownBtn" type="button">Cripto ▾</button>
                     <div class="navDropdownMenu">
                         <button class="navBtn navDropdownItem" data-page="stablecoins">Stablecoins</button>
@@ -165,8 +190,8 @@
                     </div>
                 </div>
 
-                <button class="navBtn" data-page="herramientas">Herramientas</button>
-                <button class="navBtn" data-page="metricas">Métricas</button>
+                <button class="navBtn" data-page="herramientas" data-module="herramientas">Herramientas</button>
+                <button class="navBtn" data-page="metricas" data-module="metricas">Métricas</button>
                 <button class="navBtn" data-page="ajustes">⚙️</button>
                 <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores">👁</button>
 
@@ -255,10 +280,10 @@
         <label class="assetModalLabel" for="assetTickerInput">Ticker mercado</label>
         <input id="assetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
         <div class="assetSearchActions">
-            <button id="searchAssetTickerFinnhubBtn" class="secondaryButton" type="button">Buscar ticker Finnhub</button>
-            <button id="searchAssetTickerEodhdBtn" class="secondaryButton" type="button">Buscar ticker EODHD</button>
-            <button id="searchAssetTickerYahooBtn" class="secondaryButton" type="button">Buscar ticker Yahoo Finance</button>
-            <button id="searchAssetTickerAlphaVantageBtn" class="secondaryButton" type="button">Buscar ticker Alpha Vantage</button>
+            <button id="searchAssetTickerFinnhubBtn" class="secondaryButton" type="button">Buscar Finnhub</button>
+            <button id="searchAssetTickerEodhdBtn" class="secondaryButton" type="button">Buscar EODHD</button>
+            <button id="searchAssetTickerYahooBtn" class="secondaryButton" type="button">Buscar Yahoo Finance</button>
+            <button id="searchAssetTickerAlphaVantageBtn" class="secondaryButton" type="button">Buscar Alpha Vantage</button>
         </div>
         <div id="assetSearchFeedback" class="assetSearchFeedback hidden"></div>
         <div id="assetSearchResults" class="assetSearchResults hidden"></div>
@@ -315,10 +340,10 @@
         <label class="assetModalLabel" for="editAssetTickerInput">Ticker mercado</label>
         <input id="editAssetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
         <div class="assetSearchActions">
-            <button id="editSearchAssetTickerFinnhubBtn" class="secondaryButton" type="button">Buscar ticker Finnhub</button>
-            <button id="editSearchAssetTickerEodhdBtn" class="secondaryButton" type="button">Buscar ticker EODHD</button>
-            <button id="editSearchAssetTickerYahooBtn" class="secondaryButton" type="button">Buscar ticker Yahoo Finance</button>
-            <button id="editSearchAssetTickerAlphaVantageBtn" class="secondaryButton" type="button">Buscar ticker Alpha Vantage</button>
+            <button id="editSearchAssetTickerFinnhubBtn" class="secondaryButton" type="button">Buscar Finnhub</button>
+            <button id="editSearchAssetTickerEodhdBtn" class="secondaryButton" type="button">Buscar EODHD</button>
+            <button id="editSearchAssetTickerYahooBtn" class="secondaryButton" type="button">Buscar Yahoo Finance</button>
+            <button id="editSearchAssetTickerAlphaVantageBtn" class="secondaryButton" type="button">Buscar Alpha Vantage</button>
         </div>
         <div id="editAssetSearchFeedback" class="assetSearchFeedback hidden"></div>
         <div id="editAssetSearchResults" class="assetSearchResults hidden"></div>
@@ -479,6 +504,11 @@
                 Datos
             </button>
 
+            <button class="sttNavBtn" data-stt="modulos" type="button">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                Módulos
+            </button>
+
         </nav>
     </div><!-- /.sttSidebar -->
 
@@ -593,6 +623,7 @@
                 </div>
                 <span id="ajustesDateFmtMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
             </div>
+
         </div>
 
         <!-- ── Cuenta ── -->
@@ -1197,12 +1228,127 @@
             </div>
         </div>
 
+        <!-- ── Módulos ── -->
+        <div class="sttPage" id="sttPage-modulos">
+            <h2 class="sttPageTitle">Módulos</h2>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Módulos visibles</div>
+                        <div class="ajustesSectionDesc">Activa o desactiva los módulos que aparecen en el menú superior. Los cambios se aplican de inmediato y persisten entre reinicios.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Panel de métricas superior
+                        <small>Barra con los valores totales del portfolio en la cabecera</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="moduloPanelSuperior" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Activos
+                        <small>Activos, Watchlist y Mapas de calor</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="moduloActivos" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Gastos
+                        <small>Gastos e Ingresos</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="moduloGastos" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Finanzas
+                        <small>Cuenta Remunerada, Dividendos, Renta Fija y Ventas</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="moduloFinanzas" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Cripto
+                        <small>Stablecoins, Operaciones, Transacciones, Conversiones, Trading, Staking y Earn</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="moduloCripto" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Herramientas
+                        <small>Calculadoras y utilidades</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="moduloHerramientas" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Métricas
+                        <small>Gráficos y análisis del portfolio</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="moduloMetricas" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="13" width="3" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="8" y="8" width="3" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="3" width="3" height="15" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Métricas del panel superior</div>
+                        <div class="ajustesSectionDesc">Elige qué métricas se muestran en la barra superior. Los cambios se aplican al instante.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div id="ajustesTopMetricsList"></div>
+            </div>
+        </div>
+
     </div><!-- /.sttContent -->
 </div><!-- /.sttOverlay -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="js/app-core.js?v=20260516c"></script>
-<script src="js/assets.js?v=20260518b"></script>
+<script src="js/app-core.js?v=20260613a"></script>
+<script src="js/assets.js?v=20260613a"></script>
 <script src="js/intereses.js?v=20260501a"></script>
 <script src="js/dividendos.js?v=20260421a"></script>
 <script src="js/gastos.js?v=20260426a"></script>
@@ -1218,7 +1364,7 @@
 <script src="js/herramientas.js?v=20260508b"></script>
 <script src="js/bonos.js?v=20260420a"></script>
 <script src="js/metricas.js?v=20260517a"></script>
-<script src="js/ajustes.js?v=20260517b"></script>
+<script src="js/ajustes.js?v=20260613a"></script>
 <script src="js/shared-utils.js?v=20260516f"></script>
 <script src="js/heatmap.js?v=20260505b"></script>
 <script src="js/seguimiento.js?v=20260518c"></script>

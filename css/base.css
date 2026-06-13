@@ -173,7 +173,7 @@ body{
     border-top:1px solid var(--border-inset);
     border-bottom:1px solid var(--border-inset);
     flex-wrap:nowrap;
-    overflow:visible;
+    overflow:hidden;
 }
 
 .brand{
@@ -188,6 +188,7 @@ body{
 
 .metrics{
     flex:1;
+    min-width:0;
     display:flex;
     justify-content:flex-start;
     align-items:center;
@@ -238,6 +239,7 @@ body{
 
 .metricValue.metricPositive{ color:var(--color-pos); }
 .metricValue.metricNegative{ color:var(--color-neg); }
+.metricBox.metricHidden{ display:none !important; }
 
 .tabs{
     display:flex;

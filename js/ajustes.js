@@ -2,7 +2,7 @@
 
 let _sttInited = false
 
-function openSettingsModal() {
+async function openSettingsModal() {
     const overlay = document.getElementById("sttOverlay")
     if (!overlay) return
     overlay.classList.remove("hidden")
@@ -10,7 +10,16 @@ function openSettingsModal() {
     if (!_sttInited) {
         _sttInited = true
         _initSttShell()
-        initAjustesLogic()
+        await initAjustesLogic()
+    } else {
+        try {
+            const res  = await fetch("/api/settings")
+            const data = await res.json()
+            if (data.ok) {
+                _syncModulosChecked(data.modulosConfig ?? {})
+                _syncTopMetricsChecked(data.topMetricsConfig ?? {})
+            }
+        } catch { /* ignore */ }
     }
 }
 
@@ -1363,6 +1372,12 @@ async function initAjustesLogic() {
 
     // --- Tema ---
     initAjustesTema()
+
+    // --- Módulos ---
+    _initModulosToggles(settings)
+
+    // --- Métricas del panel superior ---
+    _initTopMetricsToggles(settings)
 }
 
 function initAjustesTema() {
@@ -1403,5 +1418,153 @@ function showMsg(el, text, type) {
     el.className = "ajustesStatusMsg" + (type ? " " + type : "")
     if (type === "ok" || type === "error") {
         setTimeout(() => { if (el) el.textContent = "" }, 3000)
+    }
+}
+
+function _initTopMetricsToggles(settings) {
+    const ALL_TOP_METRICS = [
+        // Portfolio
+        { id: "topTotalCuenta",         label: "Total Cuenta",      group: "Portfolio" },
+        { id: "topPorcentajeCuenta",    label: "% Rendimiento",     group: "Portfolio" },
+        { id: "topRendimientoEuros",    label: "Rendimiento €",     group: "Portfolio" },
+        { id: "topInvertido",           label: "Capital Invertido", group: "Portfolio" },
+        { id: "topNumActivos",          label: "Nº Activos",        group: "Portfolio" },
+        // Por tipo
+        { id: "topPorcentajeAcciones",  label: "% Acciones",        group: "Por tipo" },
+        { id: "topEurosAcciones",       label: "€ Acciones",        group: "Por tipo" },
+        { id: "topPorcentajeEtf",       label: "% ETF",             group: "Por tipo" },
+        { id: "topEurosEtf",            label: "€ ETF",             group: "Por tipo" },
+        { id: "topPorcentajeComoditis", label: "% Comoditis",       group: "Por tipo" },
+        { id: "topEurosComoditis",      label: "€ Comoditis",       group: "Por tipo" },
+        { id: "topPorcentajeCripto",    label: "% Cripto",          group: "Por tipo" },
+        { id: "topEurosCripto",         label: "€ Cripto",          group: "Por tipo" },
+        // Finanzas
+        { id: "topTotalDividendos",     label: "€ Dividendos",      group: "Finanzas" },
+        { id: "topTotalInteres",        label: "€ C. Remunerada",   group: "Finanzas" },
+        { id: "topTotalRentaFija",      label: "€ Renta Fija",      group: "Finanzas" },
+        { id: "topStaking",             label: "Staking €",         group: "Finanzas" },
+        // Operaciones
+        { id: "topGastosAnio",          label: "Gastos (año)",      group: "Operaciones" },
+        { id: "topIngresosAnio",        label: "Ingresos (año)",    group: "Operaciones" },
+        { id: "topTradingPnL",          label: "Trading P&L",       group: "Operaciones" },
+    ]
+
+    const cfg = settings?.topMetricsConfig ?? window._topMetricsConfig ?? {}
+    window._topMetricsConfig = cfg
+    applyTopMetricsVisibility()
+
+    function _isVisible(id) {
+        return id in cfg ? cfg[id] : !_TOP_METRICS_DEFAULT_HIDDEN.has(id)
+    }
+
+    const container = document.getElementById("ajustesTopMetricsList")
+    if (!container) return
+    container.innerHTML = ""
+
+    let currentGroup = null
+    ALL_TOP_METRICS.forEach(({ id, label, group }, idx) => {
+        if (group !== currentGroup) {
+            currentGroup = group
+            if (idx > 0) {
+                const sep = document.createElement("div")
+                sep.className = "ajustesSectionDivider"
+                container.appendChild(sep)
+            }
+            const groupLabel = document.createElement("div")
+            groupLabel.className = "ajustesTopMetricGroup"
+            groupLabel.textContent = group
+            container.appendChild(groupLabel)
+        }
+
+        const row = document.createElement("div")
+        row.className = "ajustesSwitchRow"
+
+        const labelDiv = document.createElement("div")
+        labelDiv.className = "ajustesSwitchLabel"
+        labelDiv.textContent = label
+
+        const switchLabel = document.createElement("label")
+        switchLabel.className = "ajustesSwitch"
+
+        const chk = document.createElement("input")
+        chk.type = "checkbox"
+        chk.dataset.metricId = id
+        chk.checked = _isVisible(id)
+        chk.addEventListener("change", () => {
+            const updated = Object.assign({}, window._topMetricsConfig || {})
+            updated[id] = chk.checked
+            window._topMetricsConfig = updated
+            applyTopMetricsVisibility()
+            fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ topMetricsConfig: updated })
+            }).catch(() => {})
+        })
+
+        const track = document.createElement("span")
+        track.className = "ajustesSwitchTrack"
+
+        switchLabel.appendChild(chk)
+        switchLabel.appendChild(track)
+        row.appendChild(labelDiv)
+        row.appendChild(switchLabel)
+        container.appendChild(row)
+
+        if (idx < ALL_TOP_METRICS.length - 1 && ALL_TOP_METRICS[idx + 1].group === group) {
+            const div = document.createElement("div")
+            div.className = "ajustesSectionDivider"
+            container.appendChild(div)
+        }
+    })
+}
+
+const _MODULOS_MAP = {
+    moduloPanelSuperior: "panelSuperior",
+    moduloActivos:       "activos",
+    moduloGastos:        "gastos",
+    moduloFinanzas:      "finanzas",
+    moduloCripto:        "cripto",
+    moduloHerramientas:  "herramientas",
+    moduloMetricas:      "metricas",
+}
+
+function _syncModulosChecked(cfg) {
+    window._modulosConfig = cfg
+    for (const [id, mod] of Object.entries(_MODULOS_MAP)) {
+        const chk = document.getElementById(id)
+        if (chk) chk.checked = cfg[mod] !== false
+    }
+}
+
+function _syncTopMetricsChecked(cfg) {
+    window._topMetricsConfig = cfg
+    applyTopMetricsVisibility()
+    const container = document.getElementById("ajustesTopMetricsList")
+    if (!container) return
+    container.querySelectorAll("input[type=checkbox]").forEach((chk) => {
+        const id = chk.dataset.metricId
+        if (!id) return
+        chk.checked = id in cfg ? cfg[id] : !_TOP_METRICS_DEFAULT_HIDDEN.has(id)
+    })
+}
+
+function _initModulosToggles(settings) {
+    const cfg = settings?.modulosConfig ?? window._modulosConfig ?? {}
+    _syncModulosChecked(cfg)
+
+    for (const [id, mod] of Object.entries(_MODULOS_MAP)) {
+        const chk = document.getElementById(id)
+        if (!chk) continue
+        chk.addEventListener("change", () => {
+            window._modulosConfig = window._modulosConfig || {}
+            window._modulosConfig[mod] = chk.checked
+            applyModulesVisibility()
+            fetch("/api/settings", {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({ modulosConfig: window._modulosConfig }),
+            }).catch(() => {})
+        })
     }
 }

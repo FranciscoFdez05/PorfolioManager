@@ -46,12 +46,12 @@ function segFilteredItems() {
         const matchType = _segFilterType === "all" || _segFilterType.includes(item.type)
         const matchSrc  = _segFilterSrc === "all"
             || (Array.isArray(_segFilterSrc)
-                ? (_segFilterSrc.includes("portfolio") && item._fromPortfolio)
+                ? (_segFilterSrc.includes("portfolio") && item._fromPortfolio && !item._isWatchOnly)
                   || (_segFilterSrc.includes("operaciones") && item._fromOperaciones)
-                  || (_segFilterSrc.includes("nuevos") && !item._fromPortfolio && !item._fromOperaciones)
-                : (_segFilterSrc === "portfolio" && item._fromPortfolio)
+                  || (_segFilterSrc.includes("nuevos") && ((!item._fromPortfolio && !item._fromOperaciones) || item._isWatchOnly))
+                : (_segFilterSrc === "portfolio" && item._fromPortfolio && !item._isWatchOnly)
                   || (_segFilterSrc === "operaciones" && item._fromOperaciones)
-                  || (_segFilterSrc === "nuevos" && !item._fromPortfolio && !item._fromOperaciones))
+                  || (_segFilterSrc === "nuevos" && ((!item._fromPortfolio && !item._fromOperaciones) || item._isWatchOnly)))
         const q = _segSearch.toLowerCase()
         const matchSearch = !q
             || (item.name   || "").toLowerCase().includes(q)
@@ -90,9 +90,11 @@ function segBuildCard(item) {
     }
 
     const sid = escapeHtml(item._segId || "")
-    const hideOrDeleteItem = (item._fromPortfolio || item._fromOperaciones)
-        ? `<button type="button" class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${sid}">Ocultar</button>`
-        : `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${sid}">Eliminar</button>`
+    const hideOrDeleteItem = item._isWatchOnly
+        ? `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segWatchDeleteBtn" data-seg-id="${sid}">Eliminar</button>`
+        : (item._fromPortfolio || item._fromOperaciones)
+            ? `<button type="button" class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${sid}">Ocultar</button>`
+            : `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${sid}">Eliminar</button>`
     const actionBtns = `
         <div class="rowMenu">
             <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
@@ -131,7 +133,7 @@ function segBuildCard(item) {
             </div>
             <div class="avMetricItem">
                 <span class="avMetricLabel">Origen</span>
-                <span class="avMetricValue">${item._fromPortfolio ? "Portfolio" : "Nuevo"}</span>
+                <span class="avMetricValue">${item._fromPortfolio && !item._isWatchOnly ? "Portfolio" : "Nuevo"}</span>
             </div>
         </div>
         <div class="avCardUpdated">Actualizado: ${lastUpdatedStr}</div>
@@ -157,14 +159,13 @@ function segRenderTable(filtered) {
 
     if (tableWrap) tableWrap.classList.remove("hidden")
     if (tableEmptyEl) tableEmptyEl.classList.add("hidden")
-    tbody.innerHTML = filtered.map(item => {
+    function buildTableRow(item) {
         const color     = AV_SEG_TYPE_COLORS[item.type] || "#888"
         const typeLabel = AV_SEG_TYPE_LABELS[item.type] || item.type || ""
         const price     = parseLooseNumber(item.price || "") || 0
         const currency  = item.currency || "EUR"
         const provider  = String(item.marketProvider || "").toUpperCase()
         const ticker    = item.marketSymbol || item.finnhubSymbol || item.ticker || "—"
-
         const changePctStr   = String(item.change || "").trim()
         const changePct      = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
         const changeAbs      = price > 0 ? Math.abs(price * changePct / 100) : 0
@@ -172,11 +173,12 @@ function segRenderTable(filtered) {
         const changeClass    = changePct < 0 ? "avNeg" : changePct > 0 ? "avPos" : ""
         const changeMoneyStr = changePctStr ? `${changeSign}${formatMoney(changeAbs, currency)}` : "—"
         const changePctDisp  = changePctStr || "—"
-        const srcLabel       = item._fromPortfolio ? "Portfolio" : "Nuevo"
         const tsid       = escapeHtml(item._segId || "")
-        const tHideOrDelItem = item._fromPortfolio
-            ? `<button class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${tsid}">Ocultar</button>`
-            : `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${tsid}">Eliminar</button>`
+        const tHideOrDelItem = item._isWatchOnly
+            ? `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segWatchDeleteBtn" data-seg-id="${tsid}">Eliminar</button>`
+            : (item._fromPortfolio || item._fromOperaciones)
+                ? `<button class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${tsid}">Ocultar</button>`
+                : `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${tsid}">Eliminar</button>`
         const removeCell = `
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
@@ -186,7 +188,6 @@ function segRenderTable(filtered) {
                     ${tHideOrDelItem}
                 </div>
             </div>`
-
         return `<tr class="avTableRow" data-seg-id="${escapeHtml(item._segId || "")}">
             <td><span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span></td>
             <td class="avTrName">${escapeHtml(item.name || item.symbol || "—")}</td>
@@ -197,13 +198,31 @@ function segRenderTable(filtered) {
             <td class="avTrProvider">${provider || "—"}</td>
             <td class="avTrActions">${removeCell}</td>
         </tr>`
-    }).join("")
+    }
+
+    const portfolioGroup = filtered.filter(i => (i._fromPortfolio && !i._isWatchOnly) || i._fromOperaciones)
+    const customGroup    = filtered.filter(i => (!i._fromPortfolio && !i._fromOperaciones) || i._isWatchOnly)
+    const showSections   = portfolioGroup.length > 0 && customGroup.length > 0
+
+    if (showSections) {
+        const colSpan = 8
+        tbody.innerHTML =
+            `<tr class="segTableSectionRow"><td colspan="${colSpan}" class="segTableSectionHeader">Portfolio &amp; Operaciones</td></tr>` +
+            portfolioGroup.map(buildTableRow).join("") +
+            `<tr class="segTableSectionRow"><td colspan="${colSpan}" class="segTableSectionHeader">Lista de seguimiento</td></tr>` +
+            customGroup.map(buildTableRow).join("")
+    } else {
+        tbody.innerHTML = filtered.map(buildTableRow).join("")
+    }
 
     tbody.querySelectorAll(".segHideBtn").forEach(btn => {
         btn.addEventListener("click", () => segHideItem(btn.dataset.segId))
     })
     tbody.querySelectorAll(".segRemoveBtn").forEach(btn => {
         btn.addEventListener("click", () => segRemoveItem(btn.dataset.segId))
+    })
+    tbody.querySelectorAll(".segWatchDeleteBtn").forEach(btn => {
+        btn.addEventListener("click", () => segDeleteWatchAsset(btn.dataset.segId))
     })
 
     tbody.querySelectorAll(".segEditBtn").forEach(btn => {
@@ -340,6 +359,39 @@ function segRemoveItem(segId) {
     })
 }
 
+async function segDeleteWatchAsset(segId) {
+    const item = _segAllItems.find(i => i._segId === segId)
+    const itemName = item?.name || item?.symbol || segId
+    const assetId  = segId.startsWith("portfolio_") ? segId.slice("portfolio_".length) : segId
+
+    openConfirmModal({
+        title: "Eliminar activo",
+        message: `¿Quieres eliminar "${itemName}" del portfolio y la watchlist?`,
+        confirmLabel: "Sí, eliminar",
+        confirmSide: "right",
+        onConfirm: () => {
+            openConfirmModal({
+                title: "¿Estás seguro?",
+                message: `Esta acción eliminará "${itemName}" de forma definitiva. ¿Confirmas?`,
+                confirmLabel: "Sí, estoy seguro",
+                confirmSide: "right",
+                onConfirm: async () => {
+                    try {
+                        const resp = await fetch(`/api/activos/${encodeURIComponent(assetId)}`, { method: "DELETE" })
+                        if (!resp.ok) throw new Error(await resp.text())
+                        if (typeof refreshAssetsSidebar === "function") await refreshAssetsSidebar()
+                        segMergeAndRender(
+                            (window._segPortfolioAssets || []).filter(a => String(a.id) !== String(assetId))
+                        )
+                    } catch (e) {
+                        alert(`Error al eliminar: ${e.message}`)
+                    }
+                }
+            })
+        }
+    })
+}
+
 function segOpenDeleteTypeConfirm(segId, itemName) {
     const overlay    = document.getElementById("segDeleteTypeOverlay")
     const msg        = document.getElementById("segDeleteTypeMsg")
@@ -421,8 +473,8 @@ function segRenderGrid() {
     }
 
     if (gridEmptyEl) gridEmptyEl.classList.add("hidden")
-    filtered.forEach(item => {
-        const card = segBuildCard(item)
+
+    function wireCard(card, item) {
         card.querySelectorAll(".segHideBtn").forEach(btn => {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation()
@@ -433,6 +485,12 @@ function segRenderGrid() {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation()
                 segRemoveItem(btn.dataset.segId)
+            })
+        })
+        card.querySelectorAll(".segWatchDeleteBtn").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation()
+                segDeleteWatchAsset(btn.dataset.segId)
             })
         })
         card.querySelectorAll(".segEditBtn").forEach(btn => {
@@ -446,17 +504,41 @@ function segRenderGrid() {
             const tvSym = typeof buildTVSymbol === "function" ? buildTVSymbol(item) : (item.tvSymbol || item.marketSymbol || item.ticker || "")
             if (tvSym && typeof openTVChartModal === "function") openTVChartModal(tvSym, item.name || item.symbol)
         })
-        grid.appendChild(card)
-    })
+        return card
+    }
+
+    const portfolioGroup = filtered.filter(i => (i._fromPortfolio && !i._isWatchOnly) || i._fromOperaciones)
+    const customGroup    = filtered.filter(i => (!i._fromPortfolio && !i._fromOperaciones) || i._isWatchOnly)
+    const showSections   = portfolioGroup.length > 0 && customGroup.length > 0
+
+    if (showSections) {
+        const hPort = document.createElement("div")
+        hPort.className = "segSectionHeader"
+        hPort.textContent = "Portfolio & Operaciones"
+        grid.appendChild(hPort)
+        portfolioGroup.forEach(item => grid.appendChild(wireCard(segBuildCard(item), item)))
+
+        const hCustom = document.createElement("div")
+        hCustom.className = "segSectionHeader"
+        hCustom.textContent = "Lista de seguimiento"
+        grid.appendChild(hCustom)
+        customGroup.forEach(item => grid.appendChild(wireCard(segBuildCard(item), item)))
+    } else {
+        filtered.forEach(item => grid.appendChild(wireCard(segBuildCard(item), item)))
+    }
 }
 
 function segMergeAndRender(portfolioAssets) {
     window._segPortfolioAssets = portfolioAssets
     const customs = segLoadCustomItems()
+    const portfolioKeys = new Set([
+        ...portfolioAssets.map(a => (a.name   || "").toLowerCase()).filter(Boolean),
+        ...portfolioAssets.map(a => (a.symbol || "").toLowerCase()).filter(Boolean),
+    ])
     const portfolioNames = new Set(portfolioAssets.map(a => (a.name || "").toLowerCase()))
 
     const customItems = customs
-        .filter(c => !portfolioNames.has((c.nombre || "").toLowerCase()))
+        .filter(c => !portfolioKeys.has((c.nombre || "").toLowerCase()) && !portfolioKeys.has((c.ticker || "").toLowerCase()))
         .map(c => ({
             _segId:         c._segId,
             name:           c.nombre,
@@ -486,6 +568,7 @@ function segMergeAndRender(portfolioAssets) {
                 ...a,
                 _segId:         segId,
                 _fromPortfolio: true,
+                _isWatchOnly:   !a.hasRows,
                 tvSymbol:       ov.tvSymbol       ?? (a.tvSymbol || ""),
                 marketProvider: ov.marketProvider  ?? (a.marketProvider || ""),
                 marketSymbol:   ov.ticker          ?? (a.marketSymbol || a.finnhubSymbol || "")

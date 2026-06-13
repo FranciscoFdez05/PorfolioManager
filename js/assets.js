@@ -1157,6 +1157,8 @@ async function renderAssetsList(assets) {
     let visible  = assets.filter((a) => !hidden.has(a.id))
     if (_sidebarFilter === "portfolio") {
         visible = visible.filter((a) => a.hasRows)
+    } else if (_sidebarFilter === "watchlist") {
+        visible = visible.filter((a) => !a.hasRows)
     }
     const fragment = document.createDocumentFragment()
 
@@ -1524,6 +1526,8 @@ function applyTopPortfolioMetrics(metrics) {
     updateTopMetricElement("topPorcentajeCuenta", formatPercent(calculateYieldPercent(metrics.invertido, metrics.rendimiento)), true)
     updateTopMetricElement("topInvertido", formatEuro(metrics.invertido))
     updateTopMetricElement("topRendimientoEuros", formatEuro(metrics.rendimiento))
+    const numActivosEl = document.getElementById("topNumActivos")
+    if (numActivosEl && metrics.numActivos !== undefined) numActivosEl.textContent = metrics.numActivos
 
     updateTopMetricElement("topPorcentajeCripto", formatPercent(calculateYieldPercent(metrics.tipos.cripto.invertido, metrics.tipos.cripto.rendimiento)), true)
     updateTopMetricElement("topEurosCripto", formatEuro(metrics.tipos.cripto.netoActual))
@@ -1533,6 +1537,7 @@ function applyTopPortfolioMetrics(metrics) {
     updateTopMetricElement("topEurosEtf", formatEuro(metrics.tipos.etfs.netoActual))
     updateTopMetricElement("topPorcentajeComoditis", formatPercent(calculateYieldPercent(metrics.tipos.comoditis.invertido, metrics.tipos.comoditis.rendimiento)), true)
     updateTopMetricElement("topEurosComoditis", formatEuro(metrics.tipos.comoditis.netoActual))
+    if (typeof applyTopMetricsVisibility === "function") applyTopMetricsVisibility()
 }
 
 async function refreshTopPortfolioMetrics(assets = null) {
@@ -1568,6 +1573,7 @@ async function refreshTopPortfolioMetrics(assets = null) {
         }
     })
 
+    metrics.numActivos = baseAssets.length
     window._lastPortfolioMetrics = { totalCuenta: metrics.totalCuenta, invertido: metrics.invertido }
     window._assetsSnapshotData = metricSummaries
         .filter(r => r.euroMetrics.netoActualEur > 0)

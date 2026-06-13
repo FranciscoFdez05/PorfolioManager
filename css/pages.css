@@ -3925,6 +3925,35 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     cursor:grab;
 }
 
+/* ── Watchlist section headers ─────────────────────────────── */
+.segSectionHeader{
+    grid-column:1 / -1;
+    font-size:0.75rem;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--text-secondary);
+    padding:4px 2px 6px;
+    border-bottom:1px solid var(--border-soft);
+    margin-bottom:2px;
+}
+.segSectionHeader:not(:first-child){
+    margin-top:14px;
+}
+.segTableSectionRow td.segTableSectionHeader{
+    font-size:0.72rem;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--text-secondary);
+    padding:14px 10px 6px;
+    border-bottom:1px solid var(--border-soft);
+    pointer-events:none;
+}
+.segTableSectionRow:first-child td.segTableSectionHeader{
+    padding-top:6px;
+}
+
 .ovTypeBadge{
     display:inline-block;
     padding:2px 8px;
@@ -5454,6 +5483,15 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 }
 .ajustesSwitch input:checked + .ajustesSwitchTrack::after{
     transform:translateX(20px);
+}
+
+.ajustesTopMetricGroup{
+    padding:8px 24px 6px;
+    font-size:0.73rem;
+    font-weight:600;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--text-muted);
 }
 
 /* ── Compact sidebar density ─────────────────────────── */

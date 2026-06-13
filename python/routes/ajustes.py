@@ -54,6 +54,8 @@ _PORTFOLIO_DEFAULTS = {
     "metricasDisplayType": "doughnut",
     "metricasDistMetric": "netoActualEur",
     "metricasSectionsCollapsed": [],
+    "topMetricsConfig": {},
+    "modulosConfig": {},
 }
 
 _GLOBAL_KEYS    = set(_GLOBAL_DEFAULTS)
@@ -174,6 +176,8 @@ def get_settings():
         "metricasDisplayType":      pcfg.get("metricasDisplayType") or "doughnut",
         "metricasDistMetric":       pcfg.get("metricasDistMetric") or "netoActualEur",
         "metricasSectionsCollapsed": pcfg.get("metricasSectionsCollapsed") or [],
+        "topMetricsConfig":         pcfg.get("topMetricsConfig") or {},
+        "modulosConfig":            pcfg.get("modulosConfig") or {},
     })
 
 
@@ -277,6 +281,15 @@ def save_settings():
         if _list_key in data:
             raw = data[_list_key]
             pcfg[_list_key] = [str(t) for t in raw if isinstance(t, str) and t.strip()] if isinstance(raw, list) else []
+    if "topMetricsConfig" in data:
+        raw = data["topMetricsConfig"]
+        if isinstance(raw, dict):
+            pcfg["topMetricsConfig"] = {k: bool(v) for k, v in raw.items() if isinstance(k, str)}
+    _VALID_MODULOS = {"panelSuperior", "activos", "gastos", "finanzas", "cripto", "herramientas", "metricas"}
+    if "modulosConfig" in data:
+        raw = data["modulosConfig"]
+        if isinstance(raw, dict):
+            pcfg["modulosConfig"] = {k: bool(v) for k, v in raw.items() if k in _VALID_MODULOS}
 
     _write_ajustes(gcfg)
     _write_prefs(pid, pcfg)
