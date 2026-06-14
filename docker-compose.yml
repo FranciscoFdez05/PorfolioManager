@@ -1,5 +1,6 @@
 services:
-  portfolio:
+  porfoliopython:
+    container_name: porfoliopython
     build: .
     env_file: .env
     ports:
