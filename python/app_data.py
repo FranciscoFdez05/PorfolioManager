@@ -558,6 +558,49 @@ def writeEarnFile(data):
     conn.commit()
 
 
+# --- Private Market ---
+
+def readPrivateMarketFile():
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT fecha, tipo, nombre, gestor, vintage, currency, comprometido, llamado, distribuido, valor_actual, nota "
+        "FROM private_market ORDER BY id"
+    ).fetchall()
+    return {"rows": [
+        {
+            "fecha":        r["fecha"],
+            "tipo":         r["tipo"],
+            "nombre":       r["nombre"],
+            "gestor":       r["gestor"],
+            "vintage":      r["vintage"],
+            "currency":     r["currency"],
+            "comprometido": r["comprometido"],
+            "llamado":      r["llamado"],
+            "distribuido":  r["distribuido"],
+            "valorActual":  r["valor_actual"],
+            "nota":         r["nota"],
+        }
+        for r in rows
+    ]}
+
+
+def writePrivateMarketFile(data):
+    conn = get_db()
+    conn.execute("DELETE FROM private_market")
+    conn.executemany(
+        "INSERT INTO private_market (fecha, tipo, nombre, gestor, vintage, currency, comprometido, llamado, distribuido, valor_actual, nota) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (r.get("fecha", ""), r.get("tipo", "pe"), r.get("nombre", ""),
+             r.get("gestor", ""), r.get("vintage", ""), r.get("currency", "EUR"),
+             r.get("comprometido", ""), r.get("llamado", ""), r.get("distribuido", ""),
+             r.get("valorActual", ""), r.get("nota", ""))
+            for r in data.get("rows", [])
+        ]
+    )
+    conn.commit()
+
+
 # --- API keys (siguen leyendo de ficheros / env) ---
 
 def readFinnhubApiKey():

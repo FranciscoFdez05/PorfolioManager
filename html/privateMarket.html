@@ -1,0 +1,80 @@
+<div class="pmPage">
+
+    <div class="pmToolbar">
+        <div class="pmFilters" id="pmFilters">
+            <label class="pmFilterBtn" data-tipo="all"><input type="checkbox" checked><span>Todos</span></label>
+            <label class="pmFilterBtn" data-tipo="pe"><input type="checkbox" checked><span>Private Equity</span></label>
+            <label class="pmFilterBtn" data-tipo="vc"><input type="checkbox" checked><span>Venture Capital</span></label>
+            <label class="pmFilterBtn" data-tipo="credito"><input type="checkbox" checked><span>Crédito</span></label>
+            <label class="pmFilterBtn" data-tipo="inmobiliario"><input type="checkbox" checked><span>Inmobiliario</span></label>
+            <label class="pmFilterBtn" data-tipo="infraestructura"><input type="checkbox" checked><span>Infraestructura</span></label>
+            <label class="pmFilterBtn" data-tipo="otros"><input type="checkbox" checked><span>Otros</span></label>
+        </div>
+        <button id="savePmBtn" class="primaryButton">Guardar</button>
+    </div>
+
+    <div class="pmSummary">
+        <div class="pmSummaryCard">
+            <span class="pmSummaryLabel">Comprometido</span>
+            <span class="pmSummaryValue" id="pmTotalComprometido">0,00 €</span>
+        </div>
+        <div class="pmSummaryCard">
+            <span class="pmSummaryLabel">Llamado</span>
+            <span class="pmSummaryValue" id="pmTotalLlamado">0,00 €</span>
+        </div>
+        <div class="pmSummaryCard">
+            <span class="pmSummaryLabel">Distribuido</span>
+            <span class="pmSummaryValue" id="pmTotalDistribuido">0,00 €</span>
+        </div>
+        <div class="pmSummaryCard">
+            <span class="pmSummaryLabel">Valor actual</span>
+            <span class="pmSummaryValue" id="pmTotalValorActual">0,00 €</span>
+        </div>
+        <div class="pmSummaryCard pmSummaryCard--neto">
+            <span class="pmSummaryLabel">Neto (P&amp;L)</span>
+            <span class="pmSummaryValue" id="pmTotalNeto">0,00 €</span>
+        </div>
+        <div class="pmSummaryCard pmSummaryCard--tvpi">
+            <span class="pmSummaryLabel">TVPI</span>
+            <span class="pmSummaryValue" id="pmTvpi">—</span>
+        </div>
+        <div class="pmSummaryCard pmSummaryCard--mult">
+            <span class="pmSummaryLabel">DPI</span>
+            <span class="pmSummaryValue" id="pmDpi">—</span>
+        </div>
+        <div class="pmSummaryCard pmSummaryCard--mult">
+            <span class="pmSummaryLabel">RVPI</span>
+            <span class="pmSummaryValue" id="pmRvpi">—</span>
+        </div>
+    </div>
+
+    <div class="pmTableWrapper" id="pmTableWrapper">
+        <table class="pmTable">
+            <thead>
+                <tr>
+                    <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Tipo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Nombre<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3">Gestor<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="4">Vintage<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5">Moneda<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6">Comprometido<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="7">Llamado<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="8">Distribuido<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="9">Valor actual<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="10">Neto<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="11">TVPI<span class="mSortArrow"></span></th>
+                    <th class="rowActionsCell"></th>
+                </tr>
+            </thead>
+            <tbody id="pmBody"></tbody>
+        </table>
+    </div>
+
+    <p class="overviewEmpty hidden" id="pmEmptyMsg">No hay inversiones en mercado privado registradas.</p>
+
+    <div class="dividendosActions">
+        <button id="pmAddBtn" class="primaryButton">+ Añadir inversión</button>
+    </div>
+
+</div>

@@ -9,8 +9,8 @@
     <title>Portfolio Manager</title>
     <link rel="stylesheet" href="css/variables.css?v=20260511d">
     <link rel="stylesheet" href="css/base.css?v=20260613a">
-    <link rel="stylesheet" href="css/components.css?v=20260517a">
-    <link rel="stylesheet" href="css/pages.css?v=20260518b">
+    <link rel="stylesheet" href="css/components.css?v=20260614a">
+    <link rel="stylesheet" href="css/pages.css?v=20260614a">
     <link rel="stylesheet" href="css/themes.css?v=20260518a">
     <script>
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
@@ -123,6 +123,11 @@
                     <span class="metricValue" id="topStaking">0,00 €</span>
                 </div>
 
+                <div class="metricBox" data-metric="topMercadoPrivado">
+                    <span class="metricTitle">Mercado Privado</span>
+                    <span class="metricValue" id="topMercadoPrivado">0,00 €</span>
+                </div>
+
                 <div class="metricBox" data-metric="topGastosAnio">
                     <span class="metricTitle">Gastos (año)</span>
                     <span class="metricValue" id="topGastosAnio">0,00 €</span>
@@ -174,6 +179,7 @@
                         <button class="navBtn navDropdownItem" data-page="dividendos">Dividendos</button>
                         <button class="navBtn navDropdownItem" data-page="bonos">Renta Fija</button>
                         <button class="navBtn navDropdownItem" data-page="ventas">Ventas</button>
+                        <button class="navBtn navDropdownItem" data-page="privateMarket">Mercado Privado</button>
                     </div>
                 </div>
 
@@ -1369,5 +1375,6 @@
 <script src="js/heatmap.js?v=20260505b"></script>
 <script src="js/seguimiento.js?v=20260518c"></script>
 <script src="js/portfolios.js?v=20260511b"></script>
+<script src="js/private-market.js?v=20260614a"></script>
 </body>
 </html>

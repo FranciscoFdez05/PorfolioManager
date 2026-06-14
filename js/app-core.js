@@ -2,7 +2,7 @@ const _MODULE_PAGES = {
     panelSuperior: [],
     activos:      ["activos", "seguimiento", "heatmap"],
     gastos:       ["gastos", "ingresos"],
-    finanzas:     ["intereses", "dividendos", "bonos", "ventas"],
+    finanzas:     ["intereses", "dividendos", "bonos", "ventas", "privateMarket"],
     cripto:       ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
     herramientas: ["herramientas"],
     metricas:     ["metricas"],
@@ -10,7 +10,7 @@ const _MODULE_PAGES = {
 
 const _TOP_METRICS_DEFAULT_HIDDEN = new Set([
     "topInvertido", "topNumActivos", "topStaking",
-    "topGastosAnio", "topIngresosAnio", "topTradingPnL"
+    "topGastosAnio", "topIngresosAnio", "topTradingPnL", "topMercadoPrivado"
 ])
 
 function applyTopMetricsVisibility() {
@@ -670,6 +670,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initHeatmapLogic()
         } else if (page === "seguimiento") {
             await initSeguimientoLogic()
+        } else if (page === "privateMarket") {
+            await initPrivateMarketLogic()
         }
     } catch (error) {
         console.error(error)
@@ -816,7 +818,7 @@ async function refreshTopDividendosIntereses() {
     const _MONTH_KEYS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
     try {
         const year = new Date().getFullYear().toString()
-        const [interesesData, dividendosData, bonosResp, rfResp, gastosData, ingresosData, tradingData, stakingData] = await Promise.all([
+        const [interesesData, dividendosData, bonosResp, rfResp, gastosData, ingresosData, tradingData, stakingData, pmData] = await Promise.all([
             loadInteresesData(),
             loadDividendosData(),
             fetch("/api/bonos").then((r) => r.json()).catch(() => ({ rows: [] })),
@@ -825,6 +827,7 @@ async function refreshTopDividendosIntereses() {
             fetch(`/api/ingresos/${year}`).then((r) => r.json()).catch(() => null),
             fetch("/api/trading").then((r) => r.json()).catch(() => ({ rows: [] })),
             fetch("/api/staking").then((r) => r.json()).catch(() => ({ rows: [] })),
+            fetch("/api/privatemarket").then((r) => r.json()).catch(() => ({ rows: [] })),
         ])
 
         const allInteresesRows = (Array.isArray(interesesData?.cuentas) ? interesesData.cuentas : [])
@@ -868,6 +871,9 @@ async function refreshTopDividendosIntereses() {
             if (!isNaN(qty)) totalStaking += qty * precio
         })
 
+        const totalMercadoPrivado = (Array.isArray(pmData?.rows) ? pmData.rows : [])
+            .reduce((sum, r) => sum + parseEuroNumber(r.valorActual || ""), 0)
+
         const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
         set("topTotalInteres",    formatEuro(totalInteres))
         set("topTotalDividendos", formatEuro(totalDividendos))
@@ -876,6 +882,7 @@ async function refreshTopDividendosIntereses() {
         set("topIngresosAnio",    formatEuro(totalIngresos))
         set("topTradingPnL",      (totalTradingPnL >= 0 ? "+" : "") + formatEuro(totalTradingPnL))
         set("topStaking",         formatEuro(totalStaking))
+        set("topMercadoPrivado",  formatEuro(totalMercadoPrivado))
         applyTopMetricsVisibility()
     } catch (error) {
         console.error("Error actualizando métricas de dividendos/intereses:", error)

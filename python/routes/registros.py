@@ -1,8 +1,8 @@
 from flask import Blueprint, jsonify, request
 
 from app_data import (
-    readBonosFile, readDividendoCalendar, readDividendosFile, readEarnFile, readInteresesFile, readRentaFijaFile, readStakingFile, readTransaccionesFile,
-    writeBonosFile, writeDividendoCalendar, writeDividendosFile, writeEarnFile, writeInteresesFile, writeRentaFijaFile, writeStakingFile, writeTransaccionesFile,
+    readBonosFile, readDividendoCalendar, readDividendosFile, readEarnFile, readInteresesFile, readPrivateMarketFile, readRentaFijaFile, readStakingFile, readTransaccionesFile,
+    writeBonosFile, writeDividendoCalendar, writeDividendosFile, writeEarnFile, writeInteresesFile, writePrivateMarketFile, writeRentaFijaFile, writeStakingFile, writeTransaccionesFile,
 )
 
 registros_bp = Blueprint("registros", __name__)
@@ -223,6 +223,51 @@ def saveRentaFija():
         })
 
     writeRentaFijaFile({"rows": sanitizedRows})
+    return jsonify({"ok": True})
+
+
+@registros_bp.route("/api/privatemarket", methods=["GET"])
+def getPrivateMarket():
+    return jsonify(readPrivateMarketFile())
+
+
+@registros_bp.route("/api/privatemarket", methods=["POST"])
+def savePrivateMarket():
+    requestData = request.get_json(silent=True)
+
+    if not requestData or "rows" not in requestData:
+        return jsonify({"ok": False, "error": "JSON inválido"}), 400
+
+    rows = requestData["rows"]
+
+    if not isinstance(rows, list):
+        return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+
+    _VALID_TIPOS = {"pe", "vc", "credito", "inmobiliario", "infraestructura", "otros"}
+
+    sanitizedRows = []
+    for row in rows:
+        tipo = str(row.get("tipo", "pe")).strip().lower()
+        if tipo not in _VALID_TIPOS:
+            tipo = "otros"
+        currency = str(row.get("currency", "EUR")).strip().upper()
+        if not (currency.isalpha() and 2 <= len(currency) <= 5):
+            currency = "EUR"
+        sanitizedRows.append({
+            "fecha":        str(row.get("fecha", "")).strip(),
+            "tipo":         tipo,
+            "nombre":       str(row.get("nombre", "")).strip(),
+            "gestor":       str(row.get("gestor", "")).strip(),
+            "vintage":      str(row.get("vintage", "")).strip(),
+            "currency":     currency,
+            "comprometido": str(row.get("comprometido", "")).strip(),
+            "llamado":      str(row.get("llamado", "")).strip(),
+            "distribuido":  str(row.get("distribuido", "")).strip(),
+            "valorActual":  str(row.get("valorActual", "")).strip(),
+            "nota":         str(row.get("nota", "")).strip(),
+        })
+
+    writePrivateMarketFile({"rows": sanitizedRows})
     return jsonify({"ok": True})
 
 

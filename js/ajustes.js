@@ -1443,6 +1443,7 @@ function _initTopMetricsToggles(settings) {
         { id: "topTotalInteres",        label: "€ C. Remunerada",   group: "Finanzas" },
         { id: "topTotalRentaFija",      label: "€ Renta Fija",      group: "Finanzas" },
         { id: "topStaking",             label: "Staking €",         group: "Finanzas" },
+        { id: "topMercadoPrivado",      label: "Mercado Privado",   group: "Finanzas" },
         // Operaciones
         { id: "topGastosAnio",          label: "Gastos (año)",      group: "Operaciones" },
         { id: "topIngresosAnio",        label: "Ingresos (año)",    group: "Operaciones" },

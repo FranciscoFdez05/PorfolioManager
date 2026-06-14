@@ -364,6 +364,21 @@ CREATE TABLE IF NOT EXISTS earn_rows (
     nota       TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS private_market (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha        TEXT NOT NULL DEFAULT '',
+    tipo         TEXT NOT NULL DEFAULT 'pe',
+    nombre       TEXT NOT NULL DEFAULT '',
+    gestor       TEXT NOT NULL DEFAULT '',
+    vintage      TEXT NOT NULL DEFAULT '',
+    currency     TEXT NOT NULL DEFAULT 'EUR',
+    comprometido TEXT NOT NULL DEFAULT '',
+    llamado      TEXT NOT NULL DEFAULT '',
+    distribuido  TEXT NOT NULL DEFAULT '',
+    valor_actual TEXT NOT NULL DEFAULT '',
+    nota         TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS portfolio_snapshots (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     ts             INTEGER NOT NULL,
@@ -453,6 +468,23 @@ def _migrate(conn):
         );
         CREATE INDEX IF NOT EXISTS idx_asset_snapshots_ts ON asset_snapshots(ts);
         CREATE INDEX IF NOT EXISTS idx_asset_snapshots_asset_id_ts ON asset_snapshots(asset_id, ts);
+    """)
+
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS private_market (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha        TEXT NOT NULL DEFAULT '',
+            tipo         TEXT NOT NULL DEFAULT 'pe',
+            nombre       TEXT NOT NULL DEFAULT '',
+            gestor       TEXT NOT NULL DEFAULT '',
+            vintage      TEXT NOT NULL DEFAULT '',
+            currency     TEXT NOT NULL DEFAULT 'EUR',
+            comprometido TEXT NOT NULL DEFAULT '',
+            llamado      TEXT NOT NULL DEFAULT '',
+            distribuido  TEXT NOT NULL DEFAULT '',
+            valor_actual TEXT NOT NULL DEFAULT '',
+            nota         TEXT NOT NULL DEFAULT ''
+        );
     """)
 
     # Backfill gastos_years from existing data in older DBs

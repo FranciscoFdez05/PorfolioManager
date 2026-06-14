@@ -128,7 +128,7 @@ async function buildMetricasPayload() {
         }
     }))
 
-    const [divResp, intResp, bonosResp, rfResp, gastosYearsResp, ingresosYearsResp, tradingResp, snapshotResp, inversionesResp] = await Promise.all([
+    const [divResp, intResp, bonosResp, rfResp, gastosYearsResp, ingresosYearsResp, tradingResp, snapshotResp, inversionesResp, pmResp] = await Promise.all([
         fetch("/api/dividendos"),
         fetch("/api/intereses"),
         fetch("/api/bonos"),
@@ -137,7 +137,8 @@ async function buildMetricasPayload() {
         fetch("/api/ingresos").catch(() => null),
         fetch("/api/trading").catch(() => null),
         fetch("/api/portfolio/history?range=ALL").catch(() => null),
-        fetch("/api/metricas/inversiones").catch(() => null)
+        fetch("/api/metricas/inversiones").catch(() => null),
+        fetch("/api/privatemarket").catch(() => null),
     ])
     const divData   = await divResp.json()
     const intData   = await intResp.json()
@@ -161,6 +162,7 @@ async function buildMetricasPayload() {
     const tradingData     = tradingResp     ? await tradingResp.json().catch(() => ({ rows: [] })) : { rows: [] }
     const snapshotData    = snapshotResp    ? await snapshotResp.json().catch(() => ({ data: [] })) : { data: [] }
     const inversionesData = inversionesResp ? await inversionesResp.json().catch(() => ({ byMonth: {}, byYear: {} })) : { byMonth: {}, byYear: {} }
+    const pmData          = pmResp          ? await pmResp.json().catch(() => ({ rows: [] })) : { rows: [] }
 
     return {
         summaries,
@@ -171,6 +173,7 @@ async function buildMetricasPayload() {
         cuentasRemuneradas: Array.isArray(intData.cuentas) ? intData.cuentas : [],
         bonos:           Array.isArray(bonosData.rows)  ? bonosData.rows : [],
         rentaFija:       Array.isArray(rfData.rows)     ? rfData.rows    : [],
+        privateMarket:   Array.isArray(pmData.rows)     ? pmData.rows    : [],
         gastosYearsList,
         gastosYearData,
         ingresosYearsList,
@@ -201,7 +204,7 @@ function mSyncTopBar(summaries, rendimiento, invertido, totalCuenta) {
 }
 
 function mUpdateKpis(payload) {
-    const { summaries, dividendos, intereses, bonos, rentaFija, tradingRows } = payload
+    const { summaries, dividendos, intereses, bonos, rentaFija, privateMarket, tradingRows } = payload
 
     const tRows = Array.isArray(tradingRows) ? tradingRows : []
     if (tRows.length) {
@@ -281,6 +284,26 @@ function mUpdateKpis(payload) {
 
     const rfGroup = document.querySelector(".mkpiGroupRf")
     if (rfGroup) rfGroup.classList.toggle("hidden", bonosRows.length === 0 && rfRows.length === 0)
+
+    // ── Mercado Privado ───────────────────────────────────────────────
+    const pmRows        = Array.isArray(privateMarket) ? privateMarket : []
+    const pmLlamado     = pmRows.reduce((s, r) => s + parseEuroNumber(r.llamado     || ""), 0)
+    const pmDistribuido = pmRows.reduce((s, r) => s + parseEuroNumber(r.distribuido || ""), 0)
+    const pmValorActual = pmRows.reduce((s, r) => s + parseEuroNumber(r.valorActual || ""), 0)
+    const pmNeto        = pmDistribuido + pmValorActual - pmLlamado
+    const pmTvpi        = pmLlamado > 0 ? (pmDistribuido + pmValorActual) / pmLlamado : null
+    const pmDpi         = pmLlamado > 0 ? pmDistribuido / pmLlamado : null
+    const pmRvpi        = pmLlamado > 0 ? pmValorActual / pmLlamado : null
+    const fmtX = (v) => v !== null ? v.toFixed(2) + "x" : "—"
+    mSetKpi("mkpiPmLlamado",     formatEuro(pmLlamado))
+    mSetKpi("mkpiPmDistribuido", formatEuro(pmDistribuido))
+    mSetKpi("mkpiPmValorActual", formatEuro(pmValorActual))
+    mSetKpi("mkpiPmNeto",        formatEuro(pmNeto), pmNeto >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiPmTvpi",        fmtX(pmTvpi),  pmTvpi !== null && pmTvpi >= 1 ? "mPositive" : pmTvpi !== null ? "mNegative" : "")
+    mSetKpi("mkpiPmDpi",         fmtX(pmDpi))
+    mSetKpi("mkpiPmRvpi",        fmtX(pmRvpi))
+    const pmGroup = document.getElementById("mkpiGroupPm")
+    if (pmGroup) pmGroup.classList.toggle("hidden", pmRows.length === 0)
 
     const ingresosGroup = document.querySelector(".mkpiGroupIngresos")
     if (ingresosGroup) ingresosGroup.classList.toggle("hidden", dividendos.length === 0 && intereses.length === 0)

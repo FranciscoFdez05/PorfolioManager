@@ -1183,6 +1183,7 @@ tr.gastosTypeEmptySep td {
 .overviewFilterOption,
 .activosFilterBtn,
 .bonosFilterBtn,
+.pmFilterBtn,
 .mNavTab,
 .mActivosFilterBtn{
     display:inline-flex;
@@ -1204,6 +1205,7 @@ tr.gastosTypeEmptySep td {
 .overviewFilterOption input,
 .activosFilterBtn input,
 .bonosFilterBtn input,
+.pmFilterBtn input,
 .mNavTab input,
 .mActivosFilterBtn input{
     display:none;
@@ -1213,6 +1215,7 @@ tr.gastosTypeEmptySep td {
 .overviewFilterOption::before,
 .activosFilterBtn::before,
 .bonosFilterBtn::before,
+.pmFilterBtn::before,
 .mNavTab::before,
 .mActivosFilterBtn::before{
     content:"";
