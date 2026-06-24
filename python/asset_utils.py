@@ -88,22 +88,7 @@ def createDefaultAssetPayload(name, assetType, assetId=None):
         "color": "",
         "operationRows": [],
         "conversionRows": [],
-        "rows": [
-            {
-                "fechaOperacion": "",
-                "tipoOperacion": "Compra",
-                "exchange": "",
-                "currency": "EUR",
-                "participaciones": "",
-                "precioParticipacion": "",
-                "capitalInvertidoBruto": "",
-                "costeAnual": "",
-                "comisiones": "",
-                "comisionesFiat": "",
-                "comisionesCripto": "",
-                "comisionesSatoshis": ""
-            }
-        ]
+        "rows": []
     }
 
 

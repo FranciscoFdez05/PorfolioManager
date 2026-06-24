@@ -535,6 +535,7 @@ html[data-theme="black"] .gtPopupHeader{ background:#131316; border-bottom-color
 html[data-theme="black"] .gtPopupTitle{ color:#f0f0f4; }
 html[data-theme="black"] .gtPopupTotal{ color:#88889a; }
 html[data-theme="black"] .gtPopupClose{ border-color:#222228; color:#88889a; }
+html[data-theme="black"] .gtPopupSearch{ background:#0d0d10; border-color:#222228; color:#f0f0f4; }
 html[data-theme="black"] .gtTotalRow td{ background:#17171b !important; color:#f0f0f4; border-top-color:#3b82f6; }
 
 /* ── Light theme: Gastos tipo popup ── */
@@ -543,6 +544,8 @@ html[data-theme="light"] .gtPopupHeader{ background:#f8f9fa; border-bottom-color
 html[data-theme="light"] .gtPopupTitle{ color:#0f172a; }
 html[data-theme="light"] .gtPopupTotal{ color:#64748b; }
 html[data-theme="light"] .gtPopupClose{ border-color:#e2e8f0; color:#64748b; }
+html[data-theme="light"] .gtPopupSearch{ background:#ffffff; border-color:#e2e8f0; color:#0f172a; }
+html[data-theme="light"] .gtPopupSearch::placeholder{ color:#94a3b8; }
 html[data-theme="light"] .gtTotalRow td{ background:#dbeafe !important; color:#1e293b; border-top-color:#3b82f6; }
 
 /* ── Black theme: Ingresos tabs & wrappers ── */
@@ -986,6 +989,21 @@ html[data-theme="black"] .ingresosMovementsTable .rowActionHeader{ background:#1
     color:#f87171;
     border-color:#f87171;
 }
+
+.gtPopupSearch{
+    background:#1a2535;
+    border:1px solid #334155;
+    border-radius:7px;
+    color:#e5edf9;
+    font-size:13px;
+    outline:none;
+    padding:5px 12px;
+    width:220px;
+    transition:border-color 0.15s;
+}
+
+.gtPopupSearch::placeholder{ color:#4a5a74; }
+.gtPopupSearch:focus{ border-color:#3b82f6; }
 
 .gtPopupBody{
     flex:1;

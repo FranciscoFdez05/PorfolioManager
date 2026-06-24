@@ -1225,10 +1225,75 @@ async function renderAssetsList(assets) {
         }
     }
 
+    if (_sidebarFilter === "watchlist" && !window._viewAllPortfolios) {
+        const pid = window._activePortfolioId || "default"
+        let customSeg = []
+        try { customSeg = JSON.parse(localStorage.getItem(`seguimientoList_${pid}`) || "[]") } catch {}
+        const dbIds = new Set(visible.map(a => a.id))
+        const dbNames = new Set(visible.map(a => (a.name || "").toLowerCase()))
+        for (const item of customSeg) {
+            const nombre = (item.nombre || item.ticker || "").trim()
+            if (!nombre) continue
+            const slugId = nombre.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "activo"
+            if (dbIds.has(slugId) || dbNames.has(nombre.toLowerCase())) continue
+            const btn = document.createElement("button")
+            btn.className = "assetBtn assetBtnSegCustom"
+            btn.dataset.assetId        = ""
+            btn.dataset.assetName      = nombre
+            btn.dataset.tvSymbol       = item.tvSymbol || ""
+            btn.dataset.marketSymbol   = item.ticker || ""
+            btn.dataset.marketProvider = item.marketProvider || ""
+            btn.dataset.assetSymbol    = item.ticker || ""
+            btn.dataset.segSlugId      = slugId
+            btn.dataset.segTipo        = item.tipo || "acciones"
+            btn.draggable = false
+            btn.innerHTML = `
+                <span class="assetBtnName">${escapeHtml(nombre)}</span>
+                <span class="assetBtnPrice">—</span>
+                <span class="assetBtnChange">—</span>
+                <span class="assetBtnChangePct">—</span>
+            `
+            fragment.appendChild(btn)
+        }
+    }
+
     assetsList.innerHTML = ""
     assetsList.appendChild(fragment)
 
-    initAssetSelector([...assetsList.querySelectorAll(".assetBtn")])
+    initAssetSelector([...assetsList.querySelectorAll(".assetBtn:not(.assetBtnSegCustom)")])
+    assetsList.querySelectorAll(".assetBtnSegCustom").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const nombre  = btn.dataset.assetName || ""
+            const slugId  = btn.dataset.segSlugId || ""
+            const ticker  = btn.dataset.marketSymbol || ""
+            const tvSym   = btn.dataset.tvSymbol || ""
+            const tipo    = btn.dataset.segTipo || "acciones"
+            const provider = btn.dataset.marketProvider || "finnhub"
+            if (!nombre) return
+            let assetId = slugId
+            try {
+                const checkRes = await fetch(`/api/activos/${encodeURIComponent(slugId)}`)
+                if (!checkRes.ok) {
+                    const createRes = await fetch("/api/activos", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ name: nombre, type: tipo, marketSymbol: ticker, marketProvider: provider, tvSymbol: tvSym })
+                    })
+                    if (createRes.ok) {
+                        const d = await createRes.json()
+                        assetId = d.asset?.id || slugId
+                    }
+                }
+                currentAssetId = assetId
+                const assetData = await loadAssetData(assetId)
+                await updateAssetDetail(assetData)
+                await renderAssetsList(await loadAssetsList())
+                if (tvSym) openTVChartModal(tvSym, nombre)
+            } catch (err) {
+                console.error("Error abriendo activo de watchlist:", err)
+            }
+        })
+    })
     if (!window._viewAllPortfolios) initAssetDragAndDrop(assetsList)
 }
 

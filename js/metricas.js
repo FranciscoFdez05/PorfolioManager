@@ -596,6 +596,8 @@ function mRenderRendActivos(summaries) {
     })
 }
 
+let _metricasDivYear = null
+
 function mRenderDividendos(dividendos, colorMap = {}) {
     const section = document.getElementById("mSectionDividendos")
     if (!dividendos.length) {
@@ -604,8 +606,46 @@ function mRenderDividendos(dividendos, colorMap = {}) {
     }
     if (section) section.classList.remove("hidden")
 
+    function getYear(r) {
+        const p = String(r.fecha || "").split("-")
+        if (p.length !== 3) return null
+        const yr = mParseShortYear(p[2])
+        return yr ? String(yr) : null
+    }
+
+    const years = [...new Set(dividendos.map(getYear).filter(Boolean))].sort((a, b) => Number(a) - Number(b))
+    if (!_metricasDivYear || (!years.includes(_metricasDivYear) && _metricasDivYear !== "total"))
+        _metricasDivYear = years[years.length - 1] || "total"
+
+    const toggle = document.getElementById("mDivYearToggle")
+    if (toggle) {
+        const opts = [...years, "total"]
+        toggle.innerHTML = opts.map(y =>
+            `<button class="mToggleBtn${y === _metricasDivYear ? " active" : ""}" data-divy="${y}">${y === "total" ? "Total" : y}</button>`
+        ).join("")
+        if (!toggle.dataset.bound) {
+            toggle.dataset.bound = "true"
+            toggle.addEventListener("click", (e) => {
+                const btn = e.target.closest("[data-divy]")
+                if (!btn) return
+                toggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+                btn.classList.add("active")
+                _metricasDivYear = btn.dataset.divy
+                mDrawDividendosCharts(dividendos, colorMap, getYear)
+            })
+        }
+    }
+
+    mDrawDividendosCharts(dividendos, colorMap, getYear)
+}
+
+function mDrawDividendosCharts(dividendos, colorMap, getYear) {
+    const filtered = _metricasDivYear === "total"
+        ? dividendos
+        : dividendos.filter(r => getYear(r) === _metricasDivYear)
+
     const map = {}
-    dividendos.forEach((r) => {
+    filtered.forEach((r) => {
         const name = r.instrumento || "Desconocido"
         map[name] = (map[name] || 0) + parseEuroNumber(r.total || "")
     })
@@ -617,7 +657,6 @@ function mRenderDividendos(dividendos, colorMap = {}) {
 
     const ROW_H = 36
     const MAX_ROWS = 9
-    // Altura del eje X (canvas sticky inferior). Si es muy baja, los ticks se recortan.
     const AXIS_H = 58
     const fullH = Math.max(MAX_ROWS * ROW_H, sorted.length * ROW_H)
     const wrapH = Math.min(fullH, MAX_ROWS * ROW_H) + AXIS_H
@@ -834,12 +873,19 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
     const stocks = [...new Set(yearRows.map(r => r.instrumento || "Desconocido"))].sort()
 
     const monthData = {}
-    stocks.forEach(s => { monthData[s] = Array(12).fill(0) })
+    const monthDetails = {}
+    stocks.forEach(s => {
+        monthData[s] = Array(12).fill(0)
+        monthDetails[s] = Array.from({length:12}, () => ({ acciones: 0, impuestos: 0, xAccionStr: "" }))
+    })
     yearRows.forEach(r => {
         const m = dMonth(r.fecha)
         if (m < 0 || m > 11) return
         const name = r.instrumento || "Desconocido"
         monthData[name][m] += parseEuroNumber(r.total || "")
+        monthDetails[name][m].acciones  += parseFloat(String(r.acciones  || "").replace(",", ".")) || 0
+        monthDetails[name][m].impuestos += parseEuroNumber(r.impuestos || "")
+        if (r.dividendoAccion) monthDetails[name][m].xAccionStr = String(r.dividendoAccion).trim()
     })
 
     const labels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
@@ -850,7 +896,8 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
         backgroundColor: "transparent",
         borderWidth: 0,
         stack: "div",
-        _color: stockColors[i]
+        _color: stockColors[i],
+        _details: monthDetails[s]
     }))
 
     function drawRoundRect(ctx, x, y, w, h, r) {
@@ -983,15 +1030,27 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
                     xAlign: "left",
                     yAlign: "center",
                     callbacks: {
-                        label: (c) => c.raw > 0 ? ` ${c.dataset.label}: ${formatEuro(c.raw)}` : null,
+                        title: (items) => {
+                            if (!items.length) return ""
+                            const tp = items[0].chart.tooltip.dataPoints || items
+                            const total = tp.filter(i => i.raw > 0).reduce((s, i) => s + i.raw, 0)
+                            return `${items[0].label}  ·  Total: ${formatEuro(total)}`
+                        },
+                        label: (c) => {
+                            if (c.raw <= 0) return null
+                            const det = c.dataset._details?.[c.dataIndex] || {}
+                            const acc = det.acciones || 0
+                            const imp = det.impuestos || 0
+                            const lines = [` ${c.dataset.label}: ${formatEuro(c.raw)}`]
+                            if (acc > 0)           lines.push(`   Acciones: ${acc % 1 === 0 ? acc : acc.toFixed(4)}`)
+                            if (imp > 0)           lines.push(`   Impuestos: ${formatEuro(imp)}`)
+                            if (det.xAccionStr)    lines.push(`   Total/acción: ${det.xAccionStr}`)
+                            return lines
+                        },
                         labelColor: (c) => ({
                             borderColor: c.dataset._color || "#888",
                             backgroundColor: (c.dataset._color || "#888") + "ee"
-                        }),
-                        footer: (items) => {
-                            const total = items.filter(i => i.raw > 0).reduce((s, i) => s + i.raw, 0)
-                            return total > 0 ? [`Total mes: ${formatEuro(total)}`] : []
-                        }
+                        })
                     }
                 }
             },
@@ -999,6 +1058,92 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
             categoryPercentage: 0.8
         }
     })
+
+    // Tooltip on x-axis month labels
+    const chartInst = _metricasCharts["mChartDivMensual"]
+    const canvas = chartInst?.canvas
+    if (canvas) {
+        let _divTip = null
+        const getTip = () => {
+            if (!_divTip) {
+                _divTip = document.createElement("div")
+                _divTip.id = "mDivMensualAxisTip"
+                _divTip.style.cssText = "position:fixed;z-index:9999;pointer-events:none;background:#0f1724;border:1px solid #273246;border-radius:8px;padding:10px 14px;font-size:12px;color:#e5edf9;min-width:180px;box-shadow:0 4px 20px rgba(0,0,0,0.6);display:none;"
+                document.body.appendChild(_divTip)
+            }
+            return _divTip
+        }
+
+        canvas.addEventListener("mousemove", (e) => {
+            const chart = _metricasCharts["mChartDivMensual"]
+            if (!chart) return
+            const ca = chart.chartArea
+            const rect = canvas.getBoundingClientRect()
+            const mx = e.clientX - rect.left
+            const my = e.clientY - rect.top
+            const tip = getTip()
+
+            // Only trigger in the x-axis label zone (below chart area)
+            if (my < ca.bottom || my > rect.height || mx < ca.left || mx > ca.right) {
+                tip.style.display = "none"
+                return
+            }
+
+            // Find closest month index by x position
+            const scale = chart.scales.x
+            let bestIdx = -1, bestDist = Infinity
+            for (let i = 0; i < 12; i++) {
+                const px = scale.getPixelForValue(i)
+                const d = Math.abs(mx - px)
+                if (d < bestDist) { bestDist = d; bestIdx = i }
+            }
+            if (bestIdx < 0 || bestDist > (ca.right - ca.left) / 14) {
+                tip.style.display = "none"
+                return
+            }
+
+            const monthTotal = chart.data.datasets.reduce((s, ds) => {
+                const meta = chart.getDatasetMeta(chart.data.datasets.indexOf(ds))
+                if (meta.hidden) return s
+                return s + (ds.data[bestIdx] || 0)
+            }, 0)
+            if (monthTotal <= 0) { tip.style.display = "none"; return }
+
+            const lines = chart.data.datasets
+                .map((ds, di) => {
+                    const meta = chart.getDatasetMeta(di)
+                    if (meta.hidden) return null
+                    const v = ds.data[bestIdx] || 0
+                    if (v <= 0) return null
+                    const pct = ((v / monthTotal) * 100).toFixed(1)
+                    const col = (ds._color || "#888") + "ee"
+                    return `<div style="display:flex;align-items:center;gap:7px;margin-top:5px">` +
+                        `<span style="width:10px;height:10px;border-radius:3px;background:${col};flex-shrink:0"></span>` +
+                        `<span style="flex:1">${ds.label}</span>` +
+                        `<span style="font-weight:600;margin-left:8px">${formatEuro(v)}</span>` +
+                        `<span style="color:#94a3b8;min-width:44px;text-align:right">${pct}%</span>` +
+                        `</div>`
+                }).filter(Boolean).join("")
+
+            tip.innerHTML = `<div style="font-weight:700;font-size:13px;margin-bottom:4px;border-bottom:1px solid #273246;padding-bottom:6px">` +
+                `${labels[bestIdx]} · <span style="color:#3b82f6">${formatEuro(monthTotal)}</span></div>${lines}`
+            tip.style.display = "block"
+            const tw = tip.offsetWidth || 200
+            const th = tip.offsetHeight || 100
+            const vw = window.innerWidth, vh = window.innerHeight
+            let tx = e.clientX + 14, ty = e.clientY - th / 2
+            if (tx + tw > vw - 8) tx = e.clientX - tw - 14
+            if (ty < 8) ty = 8
+            if (ty + th > vh - 8) ty = vh - th - 8
+            tip.style.left = tx + "px"
+            tip.style.top  = ty + "px"
+        })
+
+        canvas.addEventListener("mouseleave", () => {
+            const tip = document.getElementById("mDivMensualAxisTip")
+            if (tip) tip.style.display = "none"
+        })
+    }
 }
 
 // ── bonos charts ───────────────────────────────────────────────────────────
@@ -1445,22 +1590,21 @@ function openGastosTipoPopup(tipoLabel) {
     const total = rows.reduce((s, r) => s + r.cantidad, 0)
 
     const tableRows = rows.map((r) => `
-        <tr>
+        <tr data-nombre="${(r.nombre||"").toLowerCase().replace(/"/g,"&quot;")}" data-cantidad="${r.cantidad}">
             <td>${r.fecha}</td>
             <td>${r.mes}</td>
             <td>${r.nombre}</td>
             <td style="text-align:right">${formatEuro(r.cantidad)}</td>
         </tr>`).join("")
 
-    const popupW = Math.round(rect.width  * 0.78)
-    const popupH = Math.round(rect.height * 0.65)
+    const popupW = Math.round(rect.width  * 0.92)
+    const popupH = Math.round(rect.height * 0.82)
     const popupL = rect.left + Math.round((rect.width  - popupW) / 2)
     const popupT = rect.top  + Math.round((rect.height - popupH) / 2)
 
     const backdrop = document.createElement("div")
     backdrop.id = "gastosTipoBackdrop"
-    backdrop.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:899;`
-    backdrop.style.pointerEvents = "none"
+    backdrop.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:899;cursor:default;`
 
     const popup = document.createElement("div")
     popup.id = "gastosTipoPopup"
@@ -1469,33 +1613,58 @@ function openGastosTipoPopup(tipoLabel) {
     popup.innerHTML = `
         <div class="gtPopupHeader">
             <span class="gtPopupTitle">Gastos · ${tipoLabel}</span>
-            <span class="gtPopupTotal">Total: ${formatEuro(total)} · ${rows.length} movimientos</span>
+            <input type="text" id="gtPopupSearch" class="gtPopupSearch" placeholder="Buscar concepto...">
+            <span class="gtPopupTotal" id="gtPopupTotalLabel">Total: ${formatEuro(total)} · ${rows.length} movimientos</span>
             <button class="gtPopupClose" id="gtPopupCloseBtn">✕</button>
         </div>
         <div class="gtPopupBody">
             <table class="overviewTable gtPopupTable" id="gtPopupTable">
+                <colgroup>
+                    <col style="width:130px">
+                    <col style="width:80px">
+                    <col>
+                    <col style="width:110px">
+                </colgroup>
                 <thead>
                     <tr>
                         <th class="mThSort" data-sortkey="0">Fecha <span class="mSortArrow"></span></th>
                         <th class="mThSort" data-sortkey="1">Mes <span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="2">Concepto <span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="2" style="text-align:left">Concepto <span class="mSortArrow"></span></th>
                         <th class="mThSort" data-sortkey="3" style="text-align:right">Importe <span class="mSortArrow"></span></th>
                     </tr>
                 </thead>
                 <tbody>${tableRows}
-                    <tr class="gtTotalRow">
+                    <tr class="gtTotalRow" id="gtTotalRow">
                         <td colspan="3"><strong>Total</strong></td>
-                        <td style="text-align:right"><strong>${formatEuro(total)}</strong></td>
+                        <td style="text-align:right" id="gtTotalCell"><strong>${formatEuro(total)}</strong></td>
                     </tr>
                 </tbody>
             </table>
         </div>`
 
+    const closePopup = () => { backdrop.remove(); popup.remove() }
+    backdrop.addEventListener("click", closePopup)
     document.body.appendChild(backdrop)
     document.body.appendChild(popup)
-    document.getElementById("gtPopupCloseBtn")?.addEventListener("click", () => { backdrop.remove(); popup.remove() })
+    document.getElementById("gtPopupCloseBtn")?.addEventListener("click", closePopup)
     const table = document.getElementById("gtPopupTable")
     if (table) bindTableSort(table, "metricasGt")
+
+    const searchInput = document.getElementById("gtPopupSearch")
+    if (searchInput) {
+        searchInput.addEventListener("input", () => {
+            const q = searchInput.value.trim().toLowerCase()
+            let filtTotal = 0, filtCount = 0
+            table?.querySelectorAll("tbody tr:not(.gtTotalRow)").forEach((tr) => {
+                const match = !q || (tr.dataset.nombre || "").includes(q)
+                tr.style.display = match ? "" : "none"
+                if (match) { filtTotal += parseFloat(tr.dataset.cantidad) || 0; filtCount++ }
+            })
+            document.getElementById("gtTotalCell").innerHTML = `<strong>${formatEuro(filtTotal)}</strong>`
+            document.getElementById("gtPopupTotalLabel").textContent = `Total: ${formatEuro(filtTotal)} · ${filtCount} movimientos`
+        })
+        searchInput.focus()
+    }
 }
 
 // ── top-positions table ────────────────────────────────────────────────────
@@ -2802,6 +2971,9 @@ async function initMetricasLogic() {
     _metricasIngresosMonth = "all"
     _metricasInteresesYear = null
     _metricasDivMensualYear = null
+    _metricasDivYear = null
+    const _divYearToggle = document.getElementById("mDivYearToggle")
+    if (_divYearToggle) _divYearToggle.dataset.bound = ""
     const _allActivosTypes = ["cripto","acciones","etfs","comoditis","rentaFija"]
     const _savedHidden = window._metricasActivosHidden || []
     _metricasActivosFilter = new Set(_allActivosTypes.filter(t => !_savedHidden.includes(t)))

@@ -246,7 +246,13 @@ def listAssets():
     for row in op_rows:
         op_rows_by_asset.setdefault(row["asset_id"], []).append(row)
 
-    assets_with_rows = set(rows_by_asset.keys()) | set(op_rows_by_asset.keys())
+    assets_with_rows = set()
+    for asset_id, asset_r in rows_by_asset.items():
+        if any(r["participaciones"] or r["capital_invertido_bruto"] for r in asset_r):
+            assets_with_rows.add(asset_id)
+    for asset_id, op_r in op_rows_by_asset.items():
+        if any(r["cantidad"] or r["total"] for r in op_r):
+            assets_with_rows.add(asset_id)
 
     result = []
     for r in rows:
