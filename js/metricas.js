@@ -128,7 +128,7 @@ async function buildMetricasPayload() {
         }
     }))
 
-    const [divResp, intResp, bonosResp, rfResp, gastosYearsResp, ingresosYearsResp, tradingResp, snapshotResp, inversionesResp, pmResp] = await Promise.all([
+    const [divResp, intResp, bonosResp, rfResp, gastosYearsResp, ingresosYearsResp, tradingResp, snapshotResp, inversionesResp, pmResp, settingsResp] = await Promise.all([
         fetch("/api/dividendos"),
         fetch("/api/intereses"),
         fetch("/api/bonos"),
@@ -139,6 +139,7 @@ async function buildMetricasPayload() {
         fetch("/api/portfolio/history?range=ALL").catch(() => null),
         fetch("/api/metricas/inversiones").catch(() => null),
         fetch("/api/privatemarket").catch(() => null),
+        fetch("/api/settings").catch(() => null),
     ])
     const divData   = await divResp.json()
     const intData   = await intResp.json()
@@ -163,6 +164,8 @@ async function buildMetricasPayload() {
     const snapshotData    = snapshotResp    ? await snapshotResp.json().catch(() => ({ data: [] })) : { data: [] }
     const inversionesData = inversionesResp ? await inversionesResp.json().catch(() => ({ byMonth: {}, byYear: {} })) : { byMonth: {}, byYear: {} }
     const pmData          = pmResp          ? await pmResp.json().catch(() => ({ rows: [] })) : { rows: [] }
+    const settingsData    = settingsResp    ? await settingsResp.json().catch(() => ({})) : {}
+    const ahorroConfig    = settingsData.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} }
 
     return {
         summaries,
@@ -180,7 +183,8 @@ async function buildMetricasPayload() {
         ingresosYearData,
         tradingRows:     Array.isArray(tradingData.rows) ? tradingData.rows : [],
         snapshotHistory: Array.isArray(snapshotData.data) ? snapshotData.data : [],
-        inversiones:     inversionesData
+        inversiones:     inversionesData,
+        ahorroConfig,
     }
 }
 
@@ -2362,7 +2366,10 @@ function mRenderRentabilidadAnual(snaps, currentValue) {
 
 // ── tasa de ahorro mensual ────────────────────────────────────────────────
 
-function mRenderAhorro(ingresosYearData, gastosYearData) {
+let _mAhorroPresupuestoMonth = "all"
+let _mPresupuestoRenderCtx   = null  // { ingresosYearData, gastosYearData, ahorroConfig, ingMonthlyArr }
+
+function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
     const section  = document.getElementById("mSectionAhorro")
     const kpiGroup = document.getElementById("mkpiGroupAhorro")
     const kpiSep   = document.getElementById("mkpiSepAhorro")
@@ -2397,12 +2404,34 @@ function mRenderAhorro(ingresosYearData, gastosYearData) {
         ? activeMeses.reduce((s, m) => s + m.tasa, 0) / activeMeses.length : 0
     const totalAhorro = ahorroMonthly.reduce((s, v) => s + v, 0)
 
+    const objAhorro = Number(ahorroConfig?.objetivoAhorro) || 30
+    const objText   = avgTasa >= objAhorro ? `${avgTasa.toFixed(1)}% — +${(avgTasa - objAhorro).toFixed(1)} pp sobre objetivo (${objAhorro}%)` : `${avgTasa.toFixed(1)}% — ${(avgTasa - objAhorro).toFixed(1)} pp bajo objetivo (${objAhorro}%)`
+
     mSetKpi("mkpiTasaAhorro",  formatPercent(avgTasa),   avgTasa    >= 0 ? "mPositive" : "mNegative")
     mSetKpi("mkpiAhorroTotal", formatEuro(totalAhorro),  totalAhorro >= 0 ? "mPositive" : "mNegative")
+
+    // KPI vs Objetivo — estructura visual separada
+    const tasaEl  = document.getElementById("mkpiAhorroObjetivoTasa")
+    const deltaEl = document.getElementById("mkpiAhorroObjetivoDelta")
+    const subEl   = document.getElementById("mkpiAhorroObjetivoSub")
+    if (tasaEl) {
+        const above     = avgTasa >= objAhorro
+        const diffPp    = avgTasa - objAhorro
+        tasaEl.textContent = avgTasa.toFixed(1) + "%"
+        tasaEl.className   = "mkpiValue " + (above ? "mPositive" : "mNegative")
+        if (deltaEl) {
+            deltaEl.textContent = (above ? "+" : "") + diffPp.toFixed(1) + " pp"
+            deltaEl.className   = "mkpiAhorroObjDelta " + (above ? "positive" : "negative")
+        }
+        if (subEl) {
+            subEl.textContent = (above ? "sobre" : "bajo") + " objetivo (" + objAhorro + "%)"
+        }
+    }
 
     const barColors  = ahorroMonthly.map(v => v >= 0 ? "#2ecc71aa" : "#e74c3caa")
     const barBorders = ahorroMonthly.map(v => v >= 0 ? "#2ecc71" : "#e74c3c")
     const lineData   = tasaMonthly.map(v => v !== null ? parseFloat(v.toFixed(1)) : null)
+    const objLine    = M_ING_LABELS.map(() => objAhorro)
 
     mCreateChart("mChartTasaAhorro", {
         type: "bar",
@@ -2430,6 +2459,18 @@ function mRenderAhorro(ingresosYearData, gastosYearData) {
                     tension: 0.35,
                     spanGaps: false,
                     yAxisID: "yPct"
+                },
+                {
+                    label: `Objetivo (${objAhorro}%)`,
+                    data: objLine,
+                    type: "line",
+                    borderColor: "rgba(251,191,36,0.7)",
+                    borderWidth: 1.5,
+                    borderDash: [5, 4],
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0,
+                    yAxisID: "yPct"
                 }
             ]
         },
@@ -2440,9 +2481,12 @@ function mRenderAhorro(ingresosYearData, gastosYearData) {
                 ...M_CHART_DEFAULTS.plugins,
                 tooltip: {
                     callbacks: {
-                        label: (c) => c.dataset.yAxisID === "yPct"
-                            ? ` Tasa: ${c.raw !== null ? c.raw.toFixed(1).replace(".", ",") + "%" : "---"}`
-                            : ` Ahorro: ${formatEuro(c.raw)}`
+                        label: (c) => {
+                            if (c.dataset.label?.startsWith("Objetivo")) return ` Objetivo: ${c.raw.toFixed(0)}%`
+                            return c.dataset.yAxisID === "yPct"
+                                ? ` Tasa: ${c.raw !== null ? c.raw.toFixed(1).replace(".", ",") + "%" : "---"}`
+                                : ` Ahorro: ${formatEuro(c.raw)}`
+                        }
                     }
                 }
             },
@@ -2463,6 +2507,181 @@ function mRenderAhorro(ingresosYearData, gastosYearData) {
             }
         }
     })
+
+    // ── Presupuesto por categoría ──────────────────────────────────────────
+    mRenderPresupuestoCategoria(ingresosYearData, gastosYearData, ahorroConfig, ingMonthly, gastosMonthly)
+}
+
+function mComputeGastosPorTipo(gastosYearData, monthKey) {
+    const totals = {}
+    const keys = monthKey === "all" ? M_GASTOS_KEYS : [monthKey]
+    keys.forEach(k => {
+        ;(gastosYearData?.months?.[k]?.rows || []).forEach(row => {
+            const tipo = (row.tipo || "Sin categoría").trim() || "Sin categoría"
+            totals[tipo] = (totals[tipo] || 0) + parseEuroNumber(row.cantidad || "")
+        })
+    })
+    return totals
+}
+
+function mRenderPresupuestoCategoria(ingresosYearData, gastosYearData, ahorroConfig, ingMonthlyArr, gastosMonthlyArr) {
+    const section = document.getElementById("mSectionPresupuesto")
+    if (!section) return
+
+    const presupuesto = ahorroConfig?.presupuesto || {}
+    const hasBudget   = Object.keys(presupuesto).length > 0
+
+    if (!hasBudget) {
+        section.classList.add("hidden")
+        return
+    }
+    section.classList.remove("hidden")
+
+    // Guardamos contexto para que el selector de mes siempre use datos actualizados
+    _mPresupuestoRenderCtx = { ingresosYearData, gastosYearData, ahorroConfig, ingMonthlyArr }
+
+    const monthToggle = document.getElementById("mPresupuestoMonthToggle")
+    if (monthToggle) {
+        monthToggle.innerHTML = [
+            `<button class="mToggleBtn${_mAhorroPresupuestoMonth === "all" ? " active" : ""}" data-pmes="all">Anual</button>`,
+            ...M_GASTOS_KEYS.map((k, i) => `<button class="mToggleBtn${_mAhorroPresupuestoMonth === k ? " active" : ""}" data-pmes="${k}">${M_GASTOS_LABELS[i]}</button>`)
+        ].join("")
+        if (!monthToggle.dataset.bound) {
+            monthToggle.dataset.bound = "true"
+            monthToggle.addEventListener("click", (e) => {
+                const btn = e.target.closest("[data-pmes]")
+                if (!btn || !_mPresupuestoRenderCtx) return
+                _mAhorroPresupuestoMonth = btn.dataset.pmes
+                monthToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.toggle("active", b.dataset.pmes === _mAhorroPresupuestoMonth))
+                const { ingresosYearData: iy, gastosYearData: gy, ahorroConfig: ac, ingMonthlyArr: im } = _mPresupuestoRenderCtx
+                mRenderPresupuestoCategoriaContent(iy, gy, ac, im)
+            })
+        }
+    }
+
+    mRenderPresupuestoCategoriaContent(ingresosYearData, gastosYearData, ahorroConfig, ingMonthlyArr)
+}
+
+function mRenderPresupuestoCategoriaContent(ingresosYearData, gastosYearData, ahorroConfig, ingMonthlyArr) {
+    const presupuesto = ahorroConfig?.presupuesto || {}
+    const month       = _mAhorroPresupuestoMonth
+
+    // Total ingresos del periodo seleccionado
+    let totalIngresos
+    if (month === "all") {
+        totalIngresos = ingMonthlyArr.reduce((s, v) => s + v, 0)
+    } else {
+        const idx = M_GASTOS_KEYS.indexOf(month)
+        totalIngresos = idx >= 0 ? (ingMonthlyArr[idx] || 0) : 0
+    }
+
+    const gastosPorTipo = mComputeGastosPorTipo(gastosYearData, month)
+
+    // Para el anual el objetivo es la suma de los 12 meses * %, pero si no hay datos de todos los meses
+    // usamos el total anual de ingresos
+    const objMultiplier = month === "all" ? 12 : 1
+
+    const tipos = [...new Set([...Object.keys(presupuesto), ...Object.keys(gastosPorTipo).filter(t => t !== "Sin categoría")])].sort()
+
+    if (tipos.length === 0) {
+        const list = document.getElementById("mPresupuestoList")
+        if (list) list.innerHTML = "<p class='mPresupuestoEmpty'>No hay datos de gastos con categoría.</p>"
+        return
+    }
+
+    // Preparar datos para el chart
+    const labels      = tipos
+    const objData     = tipos.map(t => {
+        const pct     = Number(presupuesto[t]) || 0
+        if (pct === 0 || totalIngresos === 0) return 0
+        return month === "all"
+            ? ingMonthlyArr.reduce((s, ing) => s + ing * (pct / 100), 0)
+            : totalIngresos * (pct / 100)
+    })
+    const realData    = tipos.map(t => gastosPorTipo[t] || 0)
+    const overBudget  = tipos.map((t, i) => {
+        const obj = objData[i]
+        return obj > 0 && realData[i] > obj * 1.001
+    })
+
+    mDestroyChart("mChartPresupuesto")
+
+    const list = document.getElementById("mPresupuestoList")
+    if (!list) return
+
+    list.innerHTML = tipos.map((tipo, i) => {
+        const realEur   = realData[i]
+        const objEur    = objData[i]
+        const hasObj    = objEur > 0
+        const over      = overBudget[i]
+        const realPct   = totalIngresos > 0 ? (realEur / totalIngresos) * 100 : 0
+        const objPct    = totalIngresos > 0 ? (objEur  / totalIngresos) * 100 : 0
+        const maxVal    = Math.max(realEur, objEur, 1)
+        const realFill  = Math.min((realEur / maxVal) * 100, 100)
+        const tgtFill   = hasObj ? Math.min((objEur / maxVal) * 100, 100) : null
+        const fillCls   = over ? " over" : hasObj ? " ok" : ""
+        const statusBadge = over
+            ? `<span class="mPresCatStatus over">⚠ Excedido</span>`
+            : hasObj ? `<span class="mPresCatStatus ok">✓ Dentro</span>` : ""
+        const tgtLine = tgtFill !== null
+            ? `<div class="mPresCatTargetLine" style="left:${tgtFill}%"></div>` : ""
+        return `
+        <div class="mPresCatRow${over ? " over" : ""}">
+            <div class="mPresCatTop">
+                <div class="mPresCatName">
+                    <span class="mPresCatTipo">${tipo}</span>
+                    ${statusBadge}
+                </div>
+                <div class="mPresCatNums">
+                    ${hasObj
+                        ? `<span class="mPresCatObj">Obj: ${formatEuro(objEur)} · ${objPct.toFixed(0)}%</span>`
+                        : `<span class="mPresCatNoObj">Sin objetivo</span>`}
+                    <span class="mPresCatReal">Real: <strong>${formatEuro(realEur)}</strong> <span class="mPresCatRealPct">(${realPct.toFixed(1)}%)</span></span>
+                </div>
+            </div>
+            <div class="mPresCatBarTrack">
+                <div class="mPresCatFill${fillCls}" style="width:${realFill}%">
+                    <span class="mPresCatBarLabel">${realPct.toFixed(1)}%</span>
+                </div>
+                ${tgtLine}
+            </div>
+        </div>`
+    }).join("")
+
+    // Tarjetas resumen de cumplimiento
+    const kpiCards = document.getElementById("mPresupuestoKpiCards")
+    if (kpiCards) {
+        const tiposConObj = tipos.filter(t => Number(presupuesto[t]) > 0)
+        const dentroObj   = tiposConObj.filter((t, i) => !overBudget[tipos.indexOf(t)])
+        const excedidos   = tiposConObj.filter((t, i) => overBudget[tipos.indexOf(t)])
+        const totalObjEur = objData.reduce((s, v) => s + v, 0)
+        const totalRealEur= realData.reduce((s, v) => s + v, 0)
+        const desviacion  = totalRealEur - totalObjEur
+
+        const cumplimientoRatio = tiposConObj.length > 0 ? Math.round(dentroObj.length / tiposConObj.length * 100) : 0
+        kpiCards.innerHTML = `
+            <div class="mPresKpiCard mPresKpiOk">
+                <div class="mPresKpiVal">${dentroObj.length}<span class="mPresKpiOf"> / ${tiposConObj.length}</span></div>
+                <div class="mPresKpiLab">Dentro del objetivo</div>
+            </div>
+            <div class="mPresKpiCard${excedidos.length > 0 ? " mPresKpiOver" : " mPresKpiOk"}">
+                <div class="mPresKpiVal">${excedidos.length}</div>
+                <div class="mPresKpiLab">Categorías excedidas</div>
+            </div>
+            <div class="mPresKpiCard">
+                <div class="mPresKpiVal">${formatEuro(totalObjEur)}</div>
+                <div class="mPresKpiLab">Presupuestado</div>
+            </div>
+            <div class="mPresKpiCard">
+                <div class="mPresKpiVal">${formatEuro(totalRealEur)}</div>
+                <div class="mPresKpiLab">Gastado en categorías</div>
+            </div>
+            <div class="mPresKpiCard${desviacion > 0 ? " mPresKpiOver" : " mPresKpiOk"}">
+                <div class="mPresKpiVal">${desviacion > 0 ? "+" : ""}${formatEuro(desviacion)}</div>
+                <div class="mPresKpiLab">Desviación</div>
+            </div>
+        `
+    }
 }
 
 // ── invertido por periodo ──────────────────────────────────────────────────
@@ -2695,7 +2914,7 @@ function mRenderAll(payload) {
     const liveValue = summaries.reduce((s, a) => s + a.netoActualEur, 0)
     mRenderConcentracion(summaries)
     mRenderRentabilidadAnual(snapshotHistory || [], liveValue)
-    mRenderAhorro(ingresosYearData || null, gastosYearData || null)
+    mRenderAhorro(ingresosYearData || null, gastosYearData || null, payload.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} })
 
     const gastosEmpty = !gastosYearsList?.length || !gastosYearData
     const ingresosEmpty = !ingresosYearsList?.length || !ingresosYearData

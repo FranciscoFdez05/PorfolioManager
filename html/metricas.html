@@ -586,8 +586,16 @@
                     <div class="mkpiValue" id="mkpiTasaAhorro">---</div>
                 </div>
                 <div class="metricasKpiCard">
-                    <div class="mkpiLabel">Ahorro total</div>
+                    <div class="mkpiLabel">Ahorro total año</div>
                     <div class="mkpiValue" id="mkpiAhorroTotal">---</div>
+                </div>
+                <div class="metricasKpiCard mkpiCardAhorroObjetivo" id="mkpiCardAhorroObjetivo">
+                    <div class="mkpiLabel">vs Objetivo</div>
+                    <div class="mkpiAhorroObjMain">
+                        <span class="mkpiValue" id="mkpiAhorroObjetivoTasa">---</span>
+                        <span class="mkpiAhorroObjDelta" id="mkpiAhorroObjetivoDelta"></span>
+                    </div>
+                    <div class="mkpiAhorroObjSub" id="mkpiAhorroObjetivoSub"></div>
                 </div>
             </div>
         </div>
@@ -648,7 +656,9 @@
     <!-- -- Tasa de ahorro mensual -------------------------------- -->
     <div class="metricasSection" id="mSectionAhorro" data-mcat="ingresos">
         <div class="metricasSectionHeader">
-            <span class="metricasSectionTitle">Tasa de Ahorro Mensual</span>
+            <div class="mGastosHeaderLeft">
+                <span class="metricasSectionTitle">Tasa de Ahorro Mensual</span>
+            </div>
         </div>
         <div class="metricasChartsGrid1">
             <div class="metricasChartCard">
@@ -657,6 +667,18 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- -- Presupuesto por categoría ----------------------------- -->
+    <div class="metricasSection hidden" id="mSectionPresupuesto" data-mcat="ingresos">
+        <div class="metricasSectionHeader mGastosHeader">
+            <div class="mGastosHeaderLeft">
+                <span class="metricasSectionTitle">Presupuesto por Categoría</span>
+                <div class="mToggleGroup mPresupuestoMonthToggle" id="mPresupuestoMonthToggle"></div>
+            </div>
+        </div>
+        <div class="mPresupuestoKpiCards" id="mPresupuestoKpiCards"></div>
+        <div class="mPresupuestoList" id="mPresupuestoList"></div>
     </div>
 
     <div class="metricasCatDivider" data-mcat="trading">

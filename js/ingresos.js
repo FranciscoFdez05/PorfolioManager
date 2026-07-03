@@ -826,6 +826,7 @@ function renderCurrentIngresosView() {
 
     if (currentIngresosView === "year") {
         renderIngresosAnnualTable()
+        renderIngresosKpiStrip()
         annualWrapper.classList.remove("hidden")
         movementsWrapper.classList.add("hidden")
         monthHeader.classList.add("hidden")
@@ -837,6 +838,46 @@ function renderCurrentIngresosView() {
         monthHeader.classList.remove("hidden")
         actions.classList.remove("hidden")
     }
+}
+
+function renderIngresosKpiStrip() {
+    const strip = document.getElementById("ingresosKpiStrip")
+    if (!strip || !currentIngresosData) return
+
+    const incomeTotals = buildMonthlyIncomeTotals()
+    const availableTypes = getAvailableIngresosTypes()
+
+    const monthTotals = INGRESOS_MONTHS.map((m) => {
+        const recTotal = (currentIngresosData.recurrentes || [])
+            .reduce((s, r) => s + parseEuroNumber(r.meses?.[m.key] || ""), 0)
+        const typesTotal = availableTypes.reduce((s, t) => s + (incomeTotals[t]?.[m.key] || 0), 0)
+        return { key: m.key, label: m.label, total: recTotal + typesTotal }
+    })
+
+    const totalAnio = monthTotals.reduce((s, m) => s + m.total, 0)
+    const nonZeroMonths = monthTotals.filter((m) => m.total > 0)
+    const promedio = nonZeroMonths.length > 0 ? totalAnio / nonZeroMonths.length : 0
+
+    const best = monthTotals.reduce((best, m) => m.total > best.total ? m : best, monthTotals[0])
+
+    const currentMonthKey = INGRESOS_MONTHS[new Date().getMonth()].key
+    const currentMonthLabel = INGRESOS_MONTHS[new Date().getMonth()].label
+    const mesActualData = monthTotals.find((m) => m.key === currentMonthKey)
+    const mesActual = mesActualData ? mesActualData.total : 0
+
+    const setKpi = (valId, val, subId, subText) => {
+        const el = document.getElementById(valId)
+        if (el) el.textContent = val
+        const sub = subId && document.getElementById(subId)
+        if (sub) sub.textContent = subText || ""
+    }
+
+    setKpi("ingresosKpiTotalAnio", formatEuro(totalAnio))
+    setKpi("ingresosKpiPromedio", formatEuro(promedio), null, "")
+    setKpi("ingresosKpiMejorMes", formatEuro(best.total), "ingresosKpiMejorMesLabel", best.label)
+    setKpi("ingresosKpiMesActual", formatEuro(mesActual), "ingresosKpiMesActualLabel", currentMonthLabel)
+
+    strip.classList.remove("hidden")
 }
 
 function renderIngresosMonthTable() {

@@ -24,11 +24,26 @@ let sharedGastosTypes = []
 let _gastosDataLoaded = false
 let _gastosHasPendingChanges = false
 let gastosModalKeyHandler = null
+let gastosMensualidadesCollapsed = false
 
 
 function isGastoTipoHidden(type) {
     const hidden = window._gastosHiddenTipos || []
     return hidden.includes(normalizeComparableGastoText(type))
+}
+
+async function persistGastosMensualidadesCollapsed(collapsed) {
+    const hidden = collapsed ? ["Mensualidades"] : []
+    window._gastosHiddenMensualidades = hidden
+    try {
+        await fetch("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ gastosHiddenMensualidades: hidden })
+        })
+    } catch (e) {
+        console.error("No se pudo guardar el estado de mensualidades:", e)
+    }
 }
 
 async function toggleGastoTipoVisibility(type) {
@@ -428,6 +443,7 @@ async function initGastosLogic() {
     currentGastosYear = gastosYears[0] || "2026"
     currentGastosMonth = "enero"
     currentGastosView = "year"
+    gastosMensualidadesCollapsed = (window._gastosHiddenMensualidades || []).includes("Mensualidades")
     bindGastosPersistenceGuards()
     window.flushPendingPageChanges = flushGastosPendingChanges
     await renderGastosYear(currentGastosYear)
@@ -441,6 +457,7 @@ async function initGastosLogic() {
         annualBody.addEventListener("click", handleGastosAnnualDeleteClick)
         annualBody.addEventListener("click", handleGastosAnnualEditClick)
         annualBody.addEventListener("click", handleGastosEyeClick)
+        annualBody.addEventListener("click", handleGastosMensualidadesToggleClick)
         annualBody.addEventListener("click", handleGastosAnnualMoveClick)
         annualBody.addEventListener("blur", handleGastosAnnualBlur, true)
     }
@@ -646,7 +663,7 @@ function renderGastosAnnualTable() {
     mensualidadesRow.className = "gastosSectionRow"
     const mensSectionHidden = isGastoTipoHidden("Mensualidades")
     mensualidadesRow.innerHTML = `
-        <td colspan="13">Mensualidades</td>
+        <td colspan="13" class="gastosSectionToggle" data-gastos-toggle-mens="1">${gastosMensualidadesCollapsed ? "▸" : "▾"} Mensualidades</td>
         <td class="rowActionsCell">
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
@@ -657,30 +674,32 @@ function renderGastosAnnualTable() {
         </td>`
     annualBody.appendChild(mensualidadesRow)
 
-    const totalMensualidades = currentGastosData.mensualidades.length
-    currentGastosData.mensualidades.forEach((row, rowIndex) => {
-        const tr = document.createElement("tr")
-        tr.innerHTML = `
-            <td>${escapeGastosHtml(row.nombre || "")}</td>
-            ${GASTOS_MONTHS.map((month) => `
-                <td>${formatCellEuroValue(row.meses?.[month.key] || "")}</td>
-            `).join("")}
-            <td class="rowActionsCell">
-                <div class="rowMenu">
-                    <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
-                    <div class="rowMenuDropdown">
-                        <button type="button" class="rowMenuItem" data-gastos-move-manual-row="${rowIndex}" data-gastos-move-dir="up" ${rowIndex === 0 ? "disabled" : ""}>▲ Subir</button>
-                        <button type="button" class="rowMenuItem" data-gastos-move-manual-row="${rowIndex}" data-gastos-move-dir="down" ${rowIndex === totalMensualidades - 1 ? "disabled" : ""}>▼ Bajar</button>
-                        <hr>
-                        <button type="button" class="rowMenuItem assetRowEditBtn gastosAnnualEditBtn" data-annual-edit-manual="${rowIndex}">Editar</button>
-                        <hr>
-                        <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-gastos-delete-manual-row="${rowIndex}">Eliminar</button>
+    if (!gastosMensualidadesCollapsed) {
+        const totalMensualidades = currentGastosData.mensualidades.length
+        currentGastosData.mensualidades.forEach((row, rowIndex) => {
+            const tr = document.createElement("tr")
+            tr.innerHTML = `
+                <td>${escapeGastosHtml(row.nombre || "")}</td>
+                ${GASTOS_MONTHS.map((month) => `
+                    <td>${formatCellEuroValue(row.meses?.[month.key] || "")}</td>
+                `).join("")}
+                <td class="rowActionsCell">
+                    <div class="rowMenu">
+                        <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                        <div class="rowMenuDropdown">
+                            <button type="button" class="rowMenuItem" data-gastos-move-manual-row="${rowIndex}" data-gastos-move-dir="up" ${rowIndex === 0 ? "disabled" : ""}>▲ Subir</button>
+                            <button type="button" class="rowMenuItem" data-gastos-move-manual-row="${rowIndex}" data-gastos-move-dir="down" ${rowIndex === totalMensualidades - 1 ? "disabled" : ""}>▼ Bajar</button>
+                            <hr>
+                            <button type="button" class="rowMenuItem assetRowEditBtn gastosAnnualEditBtn" data-annual-edit-manual="${rowIndex}">Editar</button>
+                            <hr>
+                            <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-gastos-delete-manual-row="${rowIndex}">Eliminar</button>
+                        </div>
                     </div>
-                </div>
-            </td>
-        `
-        annualBody.appendChild(tr)
-    })
+                </td>
+            `
+            annualBody.appendChild(tr)
+        })
+    }
 
     const mensualidadesTotalRow = document.createElement("tr")
     mensualidadesTotalRow.className = "gastosTotalRow"
@@ -854,6 +873,13 @@ function openGastoTypeRenameModal(rowIndex) {
             return true
         }
     })
+}
+
+function handleGastosMensualidadesToggleClick(event) {
+    if (!event.target.closest("[data-gastos-toggle-mens]")) return
+    gastosMensualidadesCollapsed = !gastosMensualidadesCollapsed
+    persistGastosMensualidadesCollapsed(gastosMensualidadesCollapsed)
+    renderGastosAnnualTable()
 }
 
 function handleGastosEyeClick(event) {

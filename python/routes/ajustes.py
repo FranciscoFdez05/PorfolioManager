@@ -56,6 +56,7 @@ _PORTFOLIO_DEFAULTS = {
     "metricasSectionsCollapsed": [],
     "topMetricsConfig": {},
     "modulosConfig": {},
+    "ahorroConfig": {"objetivoAhorro": 30, "presupuesto": {}},
 }
 
 _GLOBAL_KEYS    = set(_GLOBAL_DEFAULTS)
@@ -178,6 +179,7 @@ def get_settings():
         "metricasSectionsCollapsed": pcfg.get("metricasSectionsCollapsed") or [],
         "topMetricsConfig":         pcfg.get("topMetricsConfig") or {},
         "modulosConfig":            pcfg.get("modulosConfig") or {},
+        "ahorroConfig":             pcfg.get("ahorroConfig") or {"objetivoAhorro": 30, "presupuesto": {}},
     })
 
 
@@ -290,6 +292,25 @@ def save_settings():
         raw = data["modulosConfig"]
         if isinstance(raw, dict):
             pcfg["modulosConfig"] = {k: bool(v) for k, v in raw.items() if k in _VALID_MODULOS}
+    if "ahorroConfig" in data:
+        raw = data["ahorroConfig"]
+        if isinstance(raw, dict):
+            try:
+                obj = max(0.0, min(100.0, float(raw.get("objetivoAhorro", 30))))
+            except (ValueError, TypeError):
+                obj = 30.0
+            pres_raw = raw.get("presupuesto", {})
+            presupuesto = {}
+            if isinstance(pres_raw, dict):
+                for k, v in pres_raw.items():
+                    k_clean = str(k)[:80].strip()
+                    try:
+                        v_clean = max(0.0, min(100.0, float(v)))
+                    except (ValueError, TypeError):
+                        v_clean = 0.0
+                    if k_clean:
+                        presupuesto[k_clean] = v_clean
+            pcfg["ahorroConfig"] = {"objetivoAhorro": obj, "presupuesto": presupuesto}
 
     _write_ajustes(gcfg)
     _write_prefs(pid, pcfg)

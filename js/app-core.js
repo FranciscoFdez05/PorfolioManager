@@ -672,6 +672,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initSeguimientoLogic()
         } else if (page === "privateMarket") {
             await initPrivateMarketLogic()
+        } else if (page === "ahorro") {
+            await initAhorroLogic()
         }
     } catch (error) {
         console.error(error)
