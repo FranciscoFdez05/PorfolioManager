@@ -351,6 +351,7 @@ async function initIngresosLogic() {
         annualBody.dataset.bound = "true"
         annualBody.addEventListener("click", handleIngresosAnnualDeleteClick)
         annualBody.addEventListener("click", handleIngresosAnnualEditClick)
+        annualBody.addEventListener("click", handleIngresosAnnualMoveClick)
         annualBody.addEventListener("blur", handleIngresosAnnualBlur, true)
     }
 
@@ -514,6 +515,7 @@ function renderIngresosAnnualTable() {
     recurrentesRow.innerHTML = `<td colspan="14">Recurrentes</td>`
     annualBody.appendChild(recurrentesRow)
 
+    const totalRecurrentes = currentIngresosData.recurrentes.length
     currentIngresosData.recurrentes.forEach((row, rowIndex) => {
         const tr = document.createElement("tr")
         tr.innerHTML = `
@@ -525,6 +527,9 @@ function renderIngresosAnnualTable() {
                 <div class="rowMenu">
                     <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                     <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem" data-ingresos-move-manual-row="${rowIndex}" data-ingresos-move-dir="up" ${rowIndex === 0 ? "disabled" : ""}>▲ Subir</button>
+                        <button type="button" class="rowMenuItem" data-ingresos-move-manual-row="${rowIndex}" data-ingresos-move-dir="down" ${rowIndex === totalRecurrentes - 1 ? "disabled" : ""}>▼ Bajar</button>
+                        <hr>
                         <button type="button" class="rowMenuItem assetRowEditBtn ingresosAnnualEditBtn" data-annual-edit-manual="${rowIndex}">Editar</button>
                         <hr>
                         <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-ingresos-delete-manual-row="${rowIndex}">Eliminar</button>
@@ -552,6 +557,7 @@ function renderIngresosAnnualTable() {
     ingresosRow.innerHTML = `<td colspan="14">Ingresos</td>`
     annualBody.appendChild(ingresosRow)
 
+    const totalIngresosTypes = availableTypes.length
     availableTypes.forEach((type, rowIndex) => {
         const tr = document.createElement("tr")
         tr.innerHTML = `
@@ -561,6 +567,9 @@ function renderIngresosAnnualTable() {
                 <div class="rowMenu">
                     <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                     <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem" data-ingresos-move-type-row="${rowIndex}" data-ingresos-move-dir="up" ${rowIndex === 0 ? "disabled" : ""}>▲ Subir</button>
+                        <button type="button" class="rowMenuItem" data-ingresos-move-type-row="${rowIndex}" data-ingresos-move-dir="down" ${rowIndex === totalIngresosTypes - 1 ? "disabled" : ""}>▼ Bajar</button>
+                        <hr>
                         <button type="button" class="rowMenuItem assetRowEditBtn ingresosAnnualEditBtn" data-annual-edit-type="${rowIndex}">Editar</button>
                         <hr>
                         <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-ingresos-delete-type-row="${rowIndex}">Eliminar</button>
@@ -748,6 +757,42 @@ function handleIngresosAnnualDeleteClick(event) {
     }).catch((error) => {
         console.error(error)
         alert("No se pudo guardar la lista global de ingresos.")
+    })
+}
+
+function handleIngresosAnnualMoveClick(event) {
+    const moveManualBtn = event.target.closest("[data-ingresos-move-manual-row]")
+    if (moveManualBtn) {
+        const rowIndex = Number(moveManualBtn.dataset.ingresosMoveManualRow)
+        const dir = moveManualBtn.dataset.ingresosMoveDir
+        const arr = currentIngresosData.recurrentes
+        if (dir === "up" && rowIndex > 0) {
+            ;[arr[rowIndex - 1], arr[rowIndex]] = [arr[rowIndex], arr[rowIndex - 1]]
+        } else if (dir === "down" && rowIndex < arr.length - 1) {
+            ;[arr[rowIndex], arr[rowIndex + 1]] = [arr[rowIndex + 1], arr[rowIndex]]
+        } else {
+            return
+        }
+        renderCurrentIngresosView()
+        scheduleIngresosAutosave()
+        return
+    }
+
+    const moveTypeBtn = event.target.closest("[data-ingresos-move-type-row]")
+    if (!moveTypeBtn) return
+    const rowIndex = Number(moveTypeBtn.dataset.ingresosMoveTypeRow)
+    const dir = moveTypeBtn.dataset.ingresosMoveDir
+    if (dir === "up" && rowIndex > 0) {
+        ;[sharedIngresosTypes[rowIndex - 1], sharedIngresosTypes[rowIndex]] = [sharedIngresosTypes[rowIndex], sharedIngresosTypes[rowIndex - 1]]
+    } else if (dir === "down" && rowIndex < sharedIngresosTypes.length - 1) {
+        ;[sharedIngresosTypes[rowIndex], sharedIngresosTypes[rowIndex + 1]] = [sharedIngresosTypes[rowIndex + 1], sharedIngresosTypes[rowIndex]]
+    } else {
+        return
+    }
+    if (currentIngresosData) currentIngresosData.ingresosTipos = [...sharedIngresosTypes]
+    persistSharedIngresosTypes().then(() => {
+        renderCurrentIngresosView()
+        scheduleIngresosAutosave()
     })
 }
 

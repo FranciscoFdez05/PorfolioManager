@@ -441,6 +441,7 @@ async function initGastosLogic() {
         annualBody.addEventListener("click", handleGastosAnnualDeleteClick)
         annualBody.addEventListener("click", handleGastosAnnualEditClick)
         annualBody.addEventListener("click", handleGastosEyeClick)
+        annualBody.addEventListener("click", handleGastosAnnualMoveClick)
         annualBody.addEventListener("blur", handleGastosAnnualBlur, true)
     }
 
@@ -656,6 +657,7 @@ function renderGastosAnnualTable() {
         </td>`
     annualBody.appendChild(mensualidadesRow)
 
+    const totalMensualidades = currentGastosData.mensualidades.length
     currentGastosData.mensualidades.forEach((row, rowIndex) => {
         const tr = document.createElement("tr")
         tr.innerHTML = `
@@ -667,6 +669,9 @@ function renderGastosAnnualTable() {
                 <div class="rowMenu">
                     <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                     <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem" data-gastos-move-manual-row="${rowIndex}" data-gastos-move-dir="up" ${rowIndex === 0 ? "disabled" : ""}>▲ Subir</button>
+                        <button type="button" class="rowMenuItem" data-gastos-move-manual-row="${rowIndex}" data-gastos-move-dir="down" ${rowIndex === totalMensualidades - 1 ? "disabled" : ""}>▼ Bajar</button>
+                        <hr>
                         <button type="button" class="rowMenuItem assetRowEditBtn gastosAnnualEditBtn" data-annual-edit-manual="${rowIndex}">Editar</button>
                         <hr>
                         <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-gastos-delete-manual-row="${rowIndex}">Eliminar</button>
@@ -701,6 +706,7 @@ function renderGastosAnnualTable() {
         GASTOS_MONTHS.every((month) => !expenseTotals[type][month.key])
     )
 
+    const totalTypes = availableTypes.length
     const renderTypeRow = (type) => {
         const rowIndex = availableTypes.indexOf(type)
         const isHidden = isGastoTipoHidden(type)
@@ -714,6 +720,9 @@ function renderGastosAnnualTable() {
                 <div class="rowMenu">
                     <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                     <div class="rowMenuDropdown">
+                        <button type="button" class="rowMenuItem" data-gastos-move-type-row="${rowIndex}" data-gastos-move-dir="up" ${rowIndex === 0 ? "disabled" : ""}>▲ Subir</button>
+                        <button type="button" class="rowMenuItem" data-gastos-move-type-row="${rowIndex}" data-gastos-move-dir="down" ${rowIndex === totalTypes - 1 ? "disabled" : ""}>▼ Bajar</button>
+                        <hr>
                         <button type="button" class="rowMenuItem gastosEyeBtn${isHidden ? "" : " active"}" data-gastos-eye-type="${rowIndex}">👁 ${isHidden ? "Mostrar" : "Ocultar"}</button>
                         <button type="button" class="rowMenuItem assetRowEditBtn gastosAnnualEditBtn" data-annual-edit-type="${rowIndex}">Editar</button>
                         <hr>
@@ -941,6 +950,42 @@ function handleGastosAnnualDeleteClick(event) {
     }).catch((error) => {
         console.error(error)
         alert("No se pudo guardar la lista global de gastos.")
+    })
+}
+
+function handleGastosAnnualMoveClick(event) {
+    const moveManualBtn = event.target.closest("[data-gastos-move-manual-row]")
+    if (moveManualBtn) {
+        const rowIndex = Number(moveManualBtn.dataset.gastosMoveManualRow)
+        const dir = moveManualBtn.dataset.gastosMoveDir
+        const arr = currentGastosData.mensualidades
+        if (dir === "up" && rowIndex > 0) {
+            ;[arr[rowIndex - 1], arr[rowIndex]] = [arr[rowIndex], arr[rowIndex - 1]]
+        } else if (dir === "down" && rowIndex < arr.length - 1) {
+            ;[arr[rowIndex], arr[rowIndex + 1]] = [arr[rowIndex + 1], arr[rowIndex]]
+        } else {
+            return
+        }
+        renderCurrentGastosView()
+        scheduleGastosAutosave()
+        return
+    }
+
+    const moveTypeBtn = event.target.closest("[data-gastos-move-type-row]")
+    if (!moveTypeBtn) return
+    const rowIndex = Number(moveTypeBtn.dataset.gastosMoveTypeRow)
+    const dir = moveTypeBtn.dataset.gastosMoveDir
+    if (dir === "up" && rowIndex > 0) {
+        ;[sharedGastosTypes[rowIndex - 1], sharedGastosTypes[rowIndex]] = [sharedGastosTypes[rowIndex], sharedGastosTypes[rowIndex - 1]]
+    } else if (dir === "down" && rowIndex < sharedGastosTypes.length - 1) {
+        ;[sharedGastosTypes[rowIndex], sharedGastosTypes[rowIndex + 1]] = [sharedGastosTypes[rowIndex + 1], sharedGastosTypes[rowIndex]]
+    } else {
+        return
+    }
+    if (currentGastosData) currentGastosData.gastosTipos = [...sharedGastosTypes]
+    persistSharedGastosTypes().then(() => {
+        renderCurrentGastosView()
+        scheduleGastosAutosave()
     })
 }
 
