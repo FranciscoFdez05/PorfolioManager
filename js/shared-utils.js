@@ -762,6 +762,7 @@ function _buildCustomSelect(select) {
     wrapper.appendChild(select)
     wrapper.appendChild(trigger)
     select.style.display = "none"
+    trigger.tabIndex = 0
 
     function positionMenu() {
         const rect   = trigger.getBoundingClientRect()
@@ -795,6 +796,15 @@ function _buildCustomSelect(select) {
         menu.classList.remove("csOpen")
         menu.style.display = "none"
         trigger.classList.remove("csOpen")
+        menu.querySelectorAll(".csOption.csActive").forEach((o) => o.classList.remove("csActive"))
+    }
+
+    function chooseOption(opt) {
+        select.value = opt.value
+        select.dispatchEvent(new Event("change", { bubbles: true }))
+        syncLabel()
+        syncOptions()
+        closeMenu()
     }
 
     function syncOptions() {
@@ -807,11 +817,7 @@ function _buildCustomSelect(select) {
             item.textContent = opt.text
             item.addEventListener("mousedown", (e) => {
                 e.preventDefault()
-                select.value = opt.value
-                select.dispatchEvent(new Event("change", { bubbles: true }))
-                syncLabel()
-                syncOptions()
-                closeMenu()
+                chooseOption(opt)
             })
             menu.appendChild(item)
         })
@@ -843,6 +849,53 @@ function _buildCustomSelect(select) {
     })
 
     menu._csTrigger = trigger
+
+    let searchBuffer = ""
+    let searchTimer = null
+
+    function clearActive() {
+        menu.querySelectorAll(".csOption.csActive").forEach((o) => o.classList.remove("csActive"))
+    }
+
+    function jumpToSearch() {
+        if (!searchBuffer) return
+        const options = Array.from(menu.querySelectorAll(".csOption"))
+        const match = options.find((o) => o.textContent.trim().toLowerCase().startsWith(searchBuffer))
+        if (!match) return
+        clearActive()
+        match.classList.add("csActive")
+        match.scrollIntoView({ block: "nearest" })
+    }
+
+    trigger.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            if (!menu.classList.contains("csOpen")) {
+                trigger.click()
+                return
+            }
+            const active = menu.querySelector(".csOption.csActive")
+            if (active) {
+                const opt = Array.from(select.options).find((o) => o.value === active.dataset.val)
+                if (opt) chooseOption(opt)
+            }
+            return
+        }
+        if (e.key === "Escape") {
+            closeMenu()
+            return
+        }
+        if (e.key.length === 1 && /[a-z0-9]/i.test(e.key)) {
+            e.preventDefault()
+            if (!menu.classList.contains("csOpen")) {
+                trigger.click()
+            }
+            clearTimeout(searchTimer)
+            searchBuffer += e.key.toLowerCase()
+            jumpToSearch()
+            searchTimer = setTimeout(() => { searchBuffer = "" }, 800)
+        }
+    })
 
     document.addEventListener("click", closeMenu)
     document.addEventListener("scroll", (e) => {

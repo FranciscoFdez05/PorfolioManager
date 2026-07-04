@@ -61,7 +61,7 @@ def saveOperaciones():
         if orden not in {"Compra", "Venta"}:
             orden = "Compra"
 
-        if estado not in {"Activo", "Cerrado", "Completado"}:
+        if estado not in {"Activo", "Cerrado", "Completado", "Cancelado"}:
             estado = "Activo"
 
         currency = str(row.get("currency", "EUR")).strip().upper()

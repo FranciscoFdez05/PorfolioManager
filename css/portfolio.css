@@ -1631,6 +1631,7 @@ tr.gastosTypeEmptySep td {
 .overviewFilterOption:has(input[value="Activo"]:checked)::before    { background:#3a7bd5; }
 .overviewFilterOption:has(input[value="Cerrado"]:checked)::before   { background:#6b7a99; }
 .overviewFilterOption:has(input[value="Completado"]:checked)::before{ background:#27ae60; }
+.overviewFilterOption:has(input[value="Cancelado"]:checked)::before { background:#e74c3c; }
 
 /* operaciones crypto – bordes */
 .overviewFilterOption:has(input[value="Compra"]:checked)    { border-color:#2ecc7144; }
@@ -1638,6 +1639,7 @@ tr.gastosTypeEmptySep td {
 .overviewFilterOption:has(input[value="Activo"]:checked)    { border-color:#3a7bd544; }
 .overviewFilterOption:has(input[value="Cerrado"]:checked)   { border-color:#6b7a9944; }
 .overviewFilterOption:has(input[value="Completado"]:checked){ border-color:#27ae6044; }
+.overviewFilterOption:has(input[value="Cancelado"]:checked) { border-color:#e74c3c44; }
 
 .overviewFilterOption:hover{
     background:#151f35;

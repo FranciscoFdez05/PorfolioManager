@@ -180,12 +180,14 @@ html[data-theme="light"] .csMenu{ background:#ffffff; border-color:#e2e8f0; box-
 html[data-theme="light"] .csOption{ color:#1e293b; }
 html[data-theme="light"] .csOption:hover{ background:#f1f5f9; }
 html[data-theme="light"] .csOption.csSelected{ background:#e8edf5; }
+html[data-theme="light"] .csOption.csActive{ background:#dbe6fb; }
 html[data-theme="light"] .csArrow{ color:#94a3b8; }
 html[data-theme="black"] .csTrigger{ background:#131316; border-color:#222228; color:#dcdce8; }
 html[data-theme="black"] .csMenu{ background:#131316; border-color:#222228; }
 html[data-theme="black"] .csOption{ color:#dcdce8; }
 html[data-theme="black"] .csOption:hover{ background:#0f0f0f; }
 html[data-theme="black"] .csOption.csSelected{ background:#1e1e22; }
+html[data-theme="black"] .csOption.csActive{ background:#26344a; }
 html[data-theme="light"] select{ background-color:#ffffff !important; border-color:#e2e8f0 !important; color:#0f172a !important; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%230f172a' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") !important; background-repeat:no-repeat !important; background-position:right 10px center !important; background-size:8px 5px !important; }
 html[data-theme="light"] select option{ background:#ffffff; color:#0f172a; }
 

@@ -1,5 +1,5 @@
 const OPERATION_ORDER_OPTIONS = ["Compra", "Venta"]
-const OPERATION_STATUS_OPTIONS = ["Activo", "Completado"]
+const OPERATION_STATUS_OPTIONS = ["Activo", "Completado", "Cancelado"]
 function getOperationCurrencyOptions() {
     return window._fiatCurrencies?.length ? window._fiatCurrencies : ["EUR", "USD", "GBP", "CHF", "JPY"]
 }
@@ -604,8 +604,8 @@ function renderOperationsFilterState() {
 
 function getFilteredOperationsRows() {
     return (currentOperationsData.rows || []).filter((row) => {
-        const typeMatches = currentOperationTypeFilter.size === 0 || currentOperationTypeFilter.has(row.orden)
-        const statusMatches = currentOperationStatusFilter.size === 0 || currentOperationStatusFilter.has(row.estado)
+        const typeMatches = currentOperationTypeFilter.has(row.orden)
+        const statusMatches = currentOperationStatusFilter.has(row.estado)
         return typeMatches && statusMatches
     })
 }
@@ -1020,10 +1020,14 @@ function handleOperationsDeleteClick(event) {
         if (!rowId) return
         openConfirmModal({
             title: "Eliminar fila",
-            message: "¿Quieres eliminar esta operación?",
+            message: "¿Quieres eliminar esta operación? Pasará al estado Cancelado.",
             confirmLabel: "Eliminar",
             onConfirm: () => {
-                currentOperationsData.rows = (currentOperationsData.rows || []).filter((item) => item.id !== rowId)
+                const rows = currentOperationsData.rows || []
+                const targetIndex = rows.findIndex((item) => item.id === rowId)
+                if (targetIndex >= 0) {
+                    rows[targetIndex] = normalizeOperationRow({ ...rows[targetIndex], estado: "Cancelado" })
+                }
                 renderOperationsTable()
                 scheduleOperationsAssetRefresh()
                 scheduleOperationsAutosave()
@@ -1204,10 +1208,14 @@ function openOperacionRowModal(rowId) {
         footer.querySelector("#opRowModalDeleteBtn").addEventListener("click", () => {
             openConfirmModal({
                 title: "Eliminar fila",
-                message: "¿Quieres eliminar esta operación?",
+                message: "¿Quieres eliminar esta operación? Pasará al estado Cancelado.",
                 confirmLabel: "Eliminar",
                 onConfirm: () => {
-                    currentOperationsData.rows = (currentOperationsData.rows || []).filter((r) => r.id !== rowId)
+                    const rows = currentOperationsData.rows || []
+                    const targetIndex = rows.findIndex((r) => r.id === rowId)
+                    if (targetIndex >= 0) {
+                        rows[targetIndex] = normalizeOperationRow({ ...rows[targetIndex], estado: "Cancelado" })
+                    }
                     renderOperationsTable()
                     renderOperationsStablecoinPanel()
                     scheduleOperationsAssetRefresh()

@@ -90,6 +90,7 @@
 
 .csOption:hover{ background:#151f35; }
 .csOption.csSelected{ background:var(--border-soft); color:var(--text-primary); font-weight:500; }
+.csOption.csActive{ background:#1e3a5f; color:var(--text-primary); }
 
 /* ── Global select style ── */
 select{
