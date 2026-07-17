@@ -382,6 +382,7 @@ function bindIngresosEvents() {
     const addRowButton = document.getElementById("addIngresoRowBtn")
     const addRecurrenteRowButton = document.getElementById("addRecurrenteRowBtn")
     const addIngresoTypeRowButton = document.getElementById("addIngresoTypeRowBtn")
+    const exportButton = document.getElementById("downloadIngresosCsvBtn")
 
     if (addYearButton && !addYearButton.dataset.bound) {
         addYearButton.dataset.bound = "true"
@@ -450,6 +451,11 @@ function bindIngresosEvents() {
         addIngresoTypeRowButton.dataset.bound = "true"
         addIngresoTypeRowButton.addEventListener("click", () => openIngresoTypeModal())
     }
+
+    if (exportButton && !exportButton.dataset.bound) {
+        exportButton.dataset.bound = "true"
+        exportButton.addEventListener("click", downloadIngresosCsv)
+    }
 }
 
 async function renderIngresosYear(year) {
@@ -497,6 +503,54 @@ function buildMonthlyIncomeTotals() {
         })
     })
     return totals
+}
+
+function downloadIngresosCsv() {
+    if (!currentIngresosData) {
+        alert("No hay datos de ingresos para exportar.")
+        return
+    }
+
+    const rows = []
+    const incomeTotals = buildMonthlyIncomeTotals()
+    const availableTypes = getAvailableIngresosTypes()
+
+    if (currentIngresosView === "month") {
+        const monthRows = [...(currentIngresosData.months?.[currentIngresosMonth]?.rows || [])]
+            .sort((a, b) => ingresoParseDate(a.fecha) - ingresoParseDate(b.fecha))
+
+        monthRows.forEach((row) => {
+            rows.push({
+                Fecha: row.fecha || "",
+                Nombre: row.nombre || "",
+                Tipo: normalizeIngresoTipo(row.tipo || ""),
+                Cantidad: parseEuroNumber(row.cantidad || "")
+            })
+        })
+
+        const filename = `ingresos-${currentIngresosYear}-${currentIngresosMonth}.csv`
+        downloadCsvFile(filename, rows)
+        return
+    }
+
+    currentIngresosData.recurrentes.forEach((row) => {
+        const monthlyData = { Sección: "Recurrentes", Nombre: row.nombre || "" }
+        INGRESOS_MONTHS.forEach((month) => {
+            monthlyData[month.label] = parseEuroNumber(row.meses?.[month.key] || "")
+        })
+        rows.push(monthlyData)
+    })
+
+    availableTypes.forEach((type) => {
+        const monthlyData = { Sección: "Ingresos", Tipo: type }
+        INGRESOS_MONTHS.forEach((month) => {
+            monthlyData[month.label] = incomeTotals[type]?.[month.key] || 0
+        })
+        rows.push(monthlyData)
+    })
+
+    const filename = `ingresos-${currentIngresosYear}.csv`
+    downloadCsvFile(filename, rows)
 }
 
 function renderIngresosAnnualTable() {

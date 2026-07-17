@@ -1,7 +1,9 @@
+import configparser
 import logging
 import mimetypes
 import os
 import secrets
+from pathlib import Path
 
 mimetypes.add_type("text/css", ".css")
 mimetypes.add_type("application/javascript", ".js")
@@ -28,6 +30,34 @@ from routes.registros import registros_bp
 from routes.snapshots import snapshots_bp
 from routes.ventas import ventas_bp
 
+def _read_runtime_config():
+    config = configparser.ConfigParser()
+    config.read(baseDir / "config.ini", encoding="utf-8")
+
+    server_section = config["server"] if config.has_section("server") else {}
+
+    def _get_int(name, default):
+        value = server_section.get(name, str(default)).strip()
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    host = server_section.get("host", "0.0.0.0").strip() or "0.0.0.0"
+    port = _get_int("port", 5000)
+    debug_mode = server_section.get("debug", "false").strip().lower() in {"1", "true", "yes", "on"}
+    secret_key = (server_section.get("secret_key", "") or os.environ.get("SECRET_KEY", "")).strip()
+
+    return {
+        "host": host,
+        "port": port,
+        "debug": debug_mode,
+        "secret_key": secret_key,
+    }
+
+
+runtime_config = _read_runtime_config()
+
 load_dotenv()
 init_portfolios()
 
@@ -42,13 +72,15 @@ app = Flask(
     static_url_path=""
 )
 
-_secret_key = os.environ.get("SECRET_KEY", "").strip()
+_secret_key = runtime_config["secret_key"]
+if not _secret_key:
+    _secret_key = os.environ.get("SECRET_KEY", "").strip()
 if not _secret_key:
     logging.critical(
         "SECRET_KEY no configurada. Se usará una clave temporal: las sesiones serán "
         "inválidas entre reinicios y entre workers de Gunicorn (cada worker genera su "
         "propia clave, lo que también impide descifrar auth.dat y puede degradar las "
-        "credenciales al estado sin acceso). Define SECRET_KEY en .env para producción."
+        "credenciales al estado sin acceso). Define SECRET_KEY en .env o config.ini para producción."
     )
     _secret_key = secrets.token_hex(32)
 app.secret_key = _secret_key
@@ -193,6 +225,6 @@ ensureDataFile()
 _check_auto_backup()
 
 if __name__ == "__main__":
-    debug_mode = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
-    logging.info("HTTP — puerto 5000")
-    app.run(host="0.0.0.0", port=5000, debug=debug_mode)
+    debug_mode = runtime_config["debug"] or os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    logging.info("HTTP — puerto %s", runtime_config["port"])
+    app.run(host=runtime_config["host"], port=runtime_config["port"], debug=debug_mode)

@@ -490,6 +490,7 @@ function bindGastosEvents() {
     const addMensualidadRowButton = document.getElementById("addMensualidadRowBtn")
     const addGastoTypeRowButton = document.getElementById("addGastoTypeRowBtn")
     const saveButton = document.getElementById("saveGastosBtn")
+    const exportButton = document.getElementById("downloadGastosCsvBtn")
 
     if (addYearButton && !addYearButton.dataset.bound) {
         addYearButton.dataset.bound = "true"
@@ -581,6 +582,11 @@ function bindGastosEvents() {
             }
         })
     }
+
+    if (exportButton && !exportButton.dataset.bound) {
+        exportButton.dataset.bound = "true"
+        exportButton.addEventListener("click", downloadGastosCsv)
+    }
 }
 
 async function renderGastosYear(year) {
@@ -643,6 +649,54 @@ function buildMonthlyExpenseTotals() {
     })
 
     return totals
+}
+
+function downloadGastosCsv() {
+    if (!currentGastosData) {
+        alert("No hay datos de gastos para exportar.")
+        return
+    }
+
+    const rows = []
+    const expenseTotals = buildMonthlyExpenseTotals()
+    const availableTypes = getAvailableGastosTypes()
+
+    if (currentGastosView === "month") {
+        const monthRows = [...(currentGastosData.months?.[currentGastosMonth]?.rows || [])]
+            .sort((a, b) => gastoParseDate(a.fecha) - gastoParseDate(b.fecha))
+
+        monthRows.forEach((row) => {
+            rows.push({
+                Fecha: row.fecha || "",
+                Nombre: row.nombre || "",
+                Tipo: normalizeGastoTipo(row.tipo || ""),
+                Cantidad: parseEuroNumber(row.cantidad || "")
+            })
+        })
+
+        const filename = `gastos-${currentGastosYear}-${currentGastosMonth}.csv`
+        downloadCsvFile(filename, rows)
+        return
+    }
+
+    currentGastosData.mensualidades.forEach((row) => {
+        const monthlyData = { Sección: "Mensualidades", Nombre: row.nombre || "" }
+        GASTOS_MONTHS.forEach((month) => {
+            monthlyData[month.label] = parseEuroNumber(row.meses?.[month.key] || "")
+        })
+        rows.push(monthlyData)
+    })
+
+    availableTypes.forEach((type) => {
+        const monthlyData = { Sección: "Gastos", Tipo: type }
+        GASTOS_MONTHS.forEach((month) => {
+            monthlyData[month.label] = expenseTotals[type]?.[month.key] || 0
+        })
+        rows.push(monthlyData)
+    })
+
+    const filename = `gastos-${currentGastosYear}.csv`
+    downloadCsvFile(filename, rows)
 }
 
 function renderGastosAnnualTable() {

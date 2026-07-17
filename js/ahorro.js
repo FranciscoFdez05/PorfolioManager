@@ -368,7 +368,9 @@ function renderAhorroCategorias(gastosByTipo, totalIngresos, totalGastos) {
     const empty = document.getElementById("ahorroEmptyState")
     if (!list) return
 
-    const tipos = Object.keys(gastosByTipo).sort((a, b) => gastosByTipo[b] - gastosByTipo[a])
+    const presupuestoTipos = Object.keys(ahorroConfig.presupuesto || {}).filter((t) => Number(ahorroConfig.presupuesto[t]) > 0)
+    const tipos = [...new Set([...Object.keys(gastosByTipo), ...presupuestoTipos])]
+        .sort((a, b) => (gastosByTipo[b] || 0) - (gastosByTipo[a] || 0))
 
     if (tipos.length === 0 && totalIngresos === 0) {
         list.innerHTML = ""
@@ -416,8 +418,10 @@ function renderAhorroCategorias(gastosByTipo, totalIngresos, totalGastos) {
             ? `<span class="ahorroCatObjBadge${overBudget ? " over" : ""}">Obj: ${objPct.toFixed(0)}% · ${formatEuro(objEur)}</span>`
             : `<span class="ahorroCatObjBadgeEmpty">Sin objetivo</span>`
 
+        const excesoEur = overBudget ? realEur - objEur : 0
+
         const statusBadge = overBudget
-            ? `<span class="ahorroCatStatus over">⚠ Excedido</span>`
+            ? `<span class="ahorroCatStatus over">⚠ Excedido en ${formatEuro(excesoEur)}</span>`
             : hasObj
             ? `<span class="ahorroCatStatus ok">✓ Dentro</span>`
             : ""
@@ -523,6 +527,7 @@ function openAhorroConfigModal() {
             </div>
             ` : `<p class="ahorroModalHint ahorroModalNoTipos">Añade gastos con categorías para configurar el presupuesto por tipo.</p>`}
 
+            <p class="ahorroModalTotalPct" id="ahorroModalTotalPct"></p>
             <p class="ahorroModalFeedback hidden" id="ahorroModalFeedback"></p>
 
             <div class="assetModalActions">
@@ -537,8 +542,30 @@ function openAhorroConfigModal() {
     overlay.querySelector("#ahorroModalCancelBtn").addEventListener("click", closeAhorroConfigModal)
     overlay.querySelector("#ahorroModalSaveBtn").addEventListener("click", saveAhorroConfig)
 
+    overlay.querySelectorAll("#ahorroObjetivoInput, .ahorroModalInput[data-tipo]").forEach((input) => {
+        input.addEventListener("input", updateAhorroModalTotalPct)
+    })
+    updateAhorroModalTotalPct()
+
     ahorroConfigModalKeyHandler = (e) => { if (e.key === "Escape") closeAhorroConfigModal() }
     document.addEventListener("keydown", ahorroConfigModalKeyHandler)
+}
+
+function calcAhorroModalTotalPct() {
+    const objVal = parseFloat(document.getElementById("ahorroObjetivoInput")?.value) || 0
+    let categoriasPct = 0
+    document.querySelectorAll(".ahorroModalInput[data-tipo]").forEach((input) => {
+        categoriasPct += parseFloat(input.value) || 0
+    })
+    return objVal + categoriasPct
+}
+
+function updateAhorroModalTotalPct() {
+    const el = document.getElementById("ahorroModalTotalPct")
+    if (!el) return
+    const total = calcAhorroModalTotalPct()
+    el.textContent = `Total asignado: ${total.toFixed(1)}% de 100%`
+    el.classList.toggle("over", total > 100)
 }
 
 function closeAhorroConfigModal() {
@@ -573,6 +600,12 @@ async function saveAhorroConfig() {
             presupuesto[tipo] = Math.min(100, Math.max(0, val))
         }
     })
+
+    const totalAsignado = calcAhorroModalTotalPct()
+    if (totalAsignado > 100) {
+        setFeedback(`El objetivo de ahorro más los objetivos por categoría no pueden superar el 100% (actual: ${totalAsignado.toFixed(1)}%).`, true)
+        return
+    }
 
     const newConfig = { objetivoAhorro: objVal, presupuesto }
 

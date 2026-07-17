@@ -1652,6 +1652,7 @@ async function initVistaGeneralLogic() {
     const filtersContainer = document.getElementById("overviewFilters")
     const refreshOverviewMarketButton = document.getElementById("refreshOverviewMarketBtn")
     const showHiddenBtn = document.getElementById("overviewShowHiddenBtn")
+    const exportOverviewBtn = document.getElementById("downloadOverviewCsvBtn")
 
     if (showHiddenBtn && !showHiddenBtn.dataset.bound) {
         showHiddenBtn.dataset.bound = "true"
@@ -1694,6 +1695,11 @@ async function initVistaGeneralLogic() {
         refreshOverviewMarketButton.addEventListener("click", async () => {
             await refreshOverviewMarketData(refreshOverviewMarketButton)
         })
+    }
+
+    if (exportOverviewBtn && !exportOverviewBtn.dataset.bound) {
+        exportOverviewBtn.dataset.bound = "true"
+        exportOverviewBtn.addEventListener("click", downloadVistaGeneralCsv)
     }
 
     await renderVistaGeneralTable()
@@ -2351,6 +2357,33 @@ async function buildOverviewRow(asset) {
 let _ovSortKey = "sidebarOrder"
 let _ovSortDir = "asc"
 let _ovRows = []
+
+function downloadVistaGeneralCsv() {
+    if (!Array.isArray(_ovRows) || !_ovRows.length) {
+        alert("No hay activos para exportar.")
+        return
+    }
+
+    const rows = _ovRows.map((row) => ({
+        Nombre: row.nombre || "",
+        Tipo: row.tipo || "",
+        Posición: row.participaciones ?? "",
+        "P. medio": row.promedioCompra ?? "",
+        "Valor actual": row.overviewCurrentPrice ?? row.valorActual ?? "",
+        "Inv. bruto": row.invertidoBruto ?? "",
+        "Comis.": row.comisionesFiat ?? row.comisiones ?? "",
+        "Inv. neto": row.invertidoNeto ?? "",
+        "Neto actual": row.overviewCurrentValue ?? "",
+        "Rend. €": row.overviewYieldValue ?? row.rendimiento ?? "",
+        "Rend. %": row.invertidoBruto > 0 ? ((row.overviewYieldValue ?? row.rendimiento ?? 0) / row.invertidoBruto) * 100 : ""
+    }))
+
+    const filename = `vista-general-${new Date().toISOString().slice(0, 10)}.csv`
+    const exported = downloadCsvFile(filename, rows)
+    if (!exported) {
+        alert("No hay activos para exportar.")
+    }
+}
 
 function _ovSortRows(rows) {
     return [...rows].sort((a, b) => {

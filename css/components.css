@@ -1170,6 +1170,7 @@ tr.gastosTypeEmptySep td {
     flex-wrap:wrap;
     align-items:center;
     padding:2px 0 6px 0;
+    flex:1 1 auto;
 }
 
 .overviewFiltersBar{
@@ -1177,6 +1178,14 @@ tr.gastosTypeEmptySep td {
     align-items:center;
     justify-content:space-between;
     gap:16px;
+    flex-wrap:wrap;
+}
+
+.overviewActionsGroup{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-left:auto;
     flex-wrap:wrap;
 }
 
@@ -1560,20 +1569,25 @@ tr.gastosTypeEmptySep td {
 .avShowHiddenBtn{
     display:inline-flex;
     align-items:center;
+    justify-content:center;
     gap:5px;
-    padding:5px 10px;
+    min-height:38px;
+    padding:0 14px;
     border:1px solid var(--border-soft);
-    border-radius:6px;
+    border-radius:10px;
     background:var(--bg-surface);
     color:var(--text-secondary,#aaa);
     font-size:0.78rem;
+    font-weight:600;
     cursor:pointer;
-    transition:border-color .15s,color .15s,background .15s;
+    transition:border-color .15s,color .15s,background .15s,box-shadow .15s ease,transform .15s ease;
     white-space:nowrap;
 }
 .avShowHiddenBtn:hover{
     border-color:var(--accent,#3a7bd5);
     color:var(--accent,#3a7bd5);
+    box-shadow:0 4px 12px rgba(58,123,213,0.15);
+    transform:translateY(-1px);
 }
 .avShowHiddenBtn.active{
     border-color:var(--accent,#3a7bd5);

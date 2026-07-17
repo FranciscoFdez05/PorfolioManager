@@ -6580,4 +6580,12 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 }
 .ahorroModalFeedback.error{ color:#fca5a5; }
 .ahorroModalFeedback.hidden{ display:none; }
+.ahorroModalTotalPct{
+    font-size:0.82rem;
+    font-weight:600;
+    color:var(--text-secondary);
+    margin:10px 0 0;
+    text-align:right;
+}
+.ahorroModalTotalPct.over{ color:#fca5a5; }
 

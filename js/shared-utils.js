@@ -630,6 +630,37 @@ function getVisibleAssetTable() {
     }) || null
 }
 
+function downloadCsvFile(filename, rows, headers = null) {
+    if (!Array.isArray(rows) || !rows.length) {
+        return false
+    }
+
+    const csvHeaders = Array.isArray(headers) && headers.length
+        ? headers
+        : Object.keys(rows[0] || {})
+
+    const escapeCsvCell = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`
+    const normalizeRowValue = (value) => {
+        if (typeof value === "number") {
+            return Number.isFinite(value) ? value.toFixed(2) : String(value)
+        }
+        return value ?? ""
+    }
+
+    const csvBody = rows.map((row) => csvHeaders.map((header) => escapeCsvCell(normalizeRowValue(row[header]))).join(","))
+    const csv = [csvHeaders.map((header) => escapeCsvCell(header)).join(","), ...csvBody].join("\n")
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    return true
+}
+
 function downloadJsonFile(filename, payload) {
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
     const url = URL.createObjectURL(blob)
