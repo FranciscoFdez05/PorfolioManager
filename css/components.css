@@ -2237,6 +2237,161 @@ html[data-theme="black"] .segHideBtn:hover{ background:#111; color:#f39c12; bord
     grid-template-columns:repeat(3, minmax(0, 1fr));
 }
 
+/* ── Modal de mensualidades ─────────────────────────────────────── */
+
+.mensFormModal,
+.recFormModal{
+    width:min(720px, 100%);
+}
+
+.mensFormGrid,
+.recFormGrid{
+    display:grid;
+    gap:12px 16px;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+}
+
+.mensFormFieldWide,
+.recFormFieldWide{
+    grid-column:1 / -1;
+}
+
+.mensFormGrid .assetModalLabel,
+.recFormGrid .assetModalLabel{
+    display:block;
+    margin-bottom:5px;
+}
+
+.mensFormGrid .assetModalInput,
+.recFormGrid .assetModalInput,
+.mensFormGrid .assetModalSelect,
+.recFormGrid .assetModalSelect{
+    width:100%;
+    height:40px;
+    margin-bottom:0;
+}
+
+.mensFormGrid .csWrapper,
+.recFormGrid .csWrapper{
+    display:block;
+}
+
+.mensFormModal .mensFormGrid .csTrigger,
+.recFormModal .recFormGrid .csTrigger{
+    min-height:40px;
+    margin-bottom:0;
+    font-size:14px;
+}
+
+.mensFormModal .mensFormGrid .csLabel,
+.recFormModal .recFormGrid .csLabel{
+    min-height:40px;
+}
+
+.mensFormPreview,
+.recFormPreview{
+    margin:14px 0 0;
+    padding:9px 12px;
+    border:1px solid rgba(96,165,250,0.25);
+    border-radius:10px;
+    background:rgba(96,165,250,0.08);
+    color:#bfdbfe;
+    font-size:12.5px;
+}
+
+.mensFormMonths,
+.recFormMonths{
+    margin-top:16px;
+    padding-top:14px;
+    border-top:1px solid var(--border-mid);
+}
+
+.mensFormMonthsHead,
+.recFormMonthsHead{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+}
+
+.mensFormMonthsTitle,
+.recFormMonthsTitle{
+    color:var(--text-bright);
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:0.03em;
+    text-transform:uppercase;
+}
+
+.mensFormMonthsHint,
+.recFormMonthsHint{
+    margin:4px 0 12px;
+    color:var(--text-muted);
+    font-size:12px;
+}
+
+.mensGhostBtn,
+.recGhostBtn{
+    padding:5px 10px;
+    border:1px solid var(--btn-border);
+    border-radius:8px;
+    background:transparent;
+    color:#93c5fd;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    transition:background .15s ease, border-color .15s ease;
+}
+
+.mensGhostBtn:hover,
+.recGhostBtn:hover{
+    background:rgba(96,165,250,0.12);
+    border-color:rgba(96,165,250,0.45);
+}
+
+.mensMonthsGrid,
+.recMonthsGrid{
+    display:grid;
+    gap:8px 10px;
+    grid-template-columns:repeat(6, minmax(0, 1fr));
+}
+
+.mensMonthField,
+.recMonthField{
+    min-width:0;
+}
+
+.mensMonthLabel,
+.recMonthLabel{
+    display:block;
+    margin-bottom:3px;
+    color:var(--text-muted);
+    font-size:11px;
+    font-weight:600;
+}
+
+.mensMonthInput,
+.recMonthInput{
+    width:100%;
+    height:34px;
+    margin-bottom:0;
+    padding:0 8px;
+    font-size:12.5px;
+    text-align:right;
+}
+
+@media (max-width:640px){
+    .mensFormGrid,
+    .recFormGrid{
+        grid-template-columns:1fr;
+    }
+
+    .mensMonthsGrid,
+    .recMonthsGrid{
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+    }
+}
+
 .gastosCreateModalFeedback{
     margin:4px 0 0 0;
     color:#93c5fd;

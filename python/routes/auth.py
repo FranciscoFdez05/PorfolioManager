@@ -1,16 +1,18 @@
 import base64
+import hmac
 import json
 import logging
 import os
 import re
 import secrets
+import threading
+import time
 from pathlib import Path
-from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from flask import Blueprint, jsonify, redirect, request, session, url_for
+from flask import Blueprint, jsonify, make_response, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 auth_bp = Blueprint("auth", __name__)
@@ -21,6 +23,68 @@ _ENV_FILE     = _BASE_DIR / ".env"
 _DEFAULT_HASH = generate_password_hash(secrets.token_hex(32), method="pbkdf2:sha256:600000")
 
 logger = logging.getLogger(__name__)
+
+# ── Límite de intentos de login ───────────────────────────────────────────────
+# No había ninguno: se podía probar contraseñas de forma ilimitada contra /login.
+_MAX_ATTEMPTS   = 8
+_LOCKOUT_SECONDS = 300
+_attempts: dict[str, list] = {}   # ip -> [nº fallos, instante del último fallo]
+_attempts_lock = threading.Lock()
+
+
+def _client_ip() -> str:
+    return request.remote_addr or "desconocida"
+
+
+def _seconds_locked_out(ip: str) -> int:
+    """Segundos que quedan de bloqueo para esta IP, 0 si puede intentarlo."""
+    with _attempts_lock:
+        entry = _attempts.get(ip)
+        if not entry or entry[0] < _MAX_ATTEMPTS:
+            return 0
+        elapsed = time.monotonic() - entry[1]
+        if elapsed >= _LOCKOUT_SECONDS:
+            _attempts.pop(ip, None)
+            return 0
+        return int(_LOCKOUT_SECONDS - elapsed)
+
+
+def _record_failure(ip: str) -> None:
+    with _attempts_lock:
+        entry = _attempts.get(ip)
+        if entry and time.monotonic() - entry[1] < _LOCKOUT_SECONDS:
+            entry[0] += 1
+            entry[1] = time.monotonic()
+        else:
+            _attempts[ip] = [1, time.monotonic()]
+        # Evitar que el diccionario crezca sin límite con IPs falsificadas
+        if len(_attempts) > 1000:
+            cutoff = time.monotonic() - _LOCKOUT_SECONDS
+            for stale in [k for k, v in _attempts.items() if v[1] < cutoff]:
+                _attempts.pop(stale, None)
+
+
+def _clear_failures(ip: str) -> None:
+    with _attempts_lock:
+        _attempts.pop(ip, None)
+
+
+# Solo se admite como destino tras el login una ruta relativa de este host.
+# Lista blanca en vez de lista negra: comprobar scheme/netloc dejaba pasar
+# "/\evil.com", que los navegadores normalizan a "//evil.com" porque tratan la
+# barra invertida como separador en URLs http(s). El carácter "\" no está en el
+# conjunto permitido.
+_SAFE_NEXT_RE = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$")
+
+
+def _safe_next_url(next_url: str) -> str:
+    """Devuelve next_url si es una ruta interna segura, o '/' en caso contrario."""
+    if not next_url or not _SAFE_NEXT_RE.match(next_url):
+        return "/"
+    # "//host" y "/\host" son referencias protocol-relative: destino externo.
+    if next_url.startswith("//"):
+        return "/"
+    return next_url
 
 
 # ── Cifrado ───────────────────────────────────────────────────────────────────
@@ -114,29 +178,55 @@ _LOGIN_HTML = _BASE_DIR / "html" / "login.html"
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+    # Con la sesión ya iniciada no hay nada que pedir: al volver atrás desde la
+    # aplicación el navegador vuelve a solicitar /login (la respuesta se marca
+    # como no almacenable, ver más abajo) y aquí se devuelve a la app.
+    if session.get("logged_in"):
+        return redirect(_safe_next_url(request.args.get("next") or "/"))
+
     error = None
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
-        expected_user, password_hash = _load_credentials()
+        ip = _client_ip()
+        locked = _seconds_locked_out(ip)
+        if locked:
+            logger.warning("Login bloqueado por exceso de intentos desde %s", ip)
+            error = f"Demasiados intentos fallidos. Vuelve a intentarlo en {locked // 60 + 1} min."
+        else:
+            username = request.form.get("username", "").strip()
+            password = request.form.get("password", "")
+            expected_user, password_hash = _load_credentials()
 
-        if username == expected_user and check_password_hash(password_hash, password):
-            session["logged_in"] = True
-            session.permanent = False
-            next_url = request.args.get("next") or "/"
-            parsed = urlparse(next_url)
-            if parsed.scheme or parsed.netloc:
-                next_url = "/"
-            return redirect(next_url)
+            # compare_digest evita filtrar por tiempo la longitud del usuario.
+            # Se comparan bytes: con str lanza TypeError si el usuario enviado
+            # tiene caracteres no ASCII, lo que devolvía un 500 y además saltaba
+            # el registro del intento fallido.
+            user_ok = hmac.compare_digest(
+                username.encode("utf-8"), expected_user.encode("utf-8")
+            )
+            if user_ok and check_password_hash(password_hash, password):
+                _clear_failures(ip)
+                session.clear()
+                session["logged_in"] = True
+                session.permanent = False
+                return redirect(_safe_next_url(request.args.get("next") or "/"))
 
-        error = "Usuario o contraseña incorrectos"
+            _record_failure(ip)
+            logger.warning("Intento de login fallido desde %s", ip)
+            error = "Usuario o contraseña incorrectos"
 
     html = _LOGIN_HTML.read_text("utf-8")
     html = html.replace(
         "<!-- ERROR_PLACEHOLDER -->",
         f'<p class="loginError">{error}</p>' if error else "",
     )
-    return html
+    response = make_response(html)
+    # Sin esto el navegador guarda la página en su caché de historial (bfcache) y
+    # el botón "atrás" la muestra tal cual, sin preguntar al servidor, aunque la
+    # sesión ya esté iniciada. no-store desactiva esa caché: al volver atrás se
+    # repite la petición y la comprobación de arriba redirige a la aplicación.
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @auth_bp.route("/logout")

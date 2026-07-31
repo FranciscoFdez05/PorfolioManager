@@ -1697,6 +1697,25 @@
     padding-bottom:6px !important;
 }
 
+/* Fila de categoría "Mensualidades" dentro de la sección de gastos */
+.gastosCategoryRow td{
+    background:var(--bg-elevated) !important;
+    font-weight:700;
+    color:#f1f6ff !important;
+}
+
+.gastosCategoryRow .gastosSectionToggle{
+    color:#93c5fd !important;
+}
+
+.gastosMensualidadDetail td:first-child{
+    padding-left:20px !important;
+}
+
+.gastosMensualidadDetail td{
+    color:#c9d6ea;
+}
+
 .gastosTotalRow td{
     font-weight:700;
     background:#0d1929 !important;
@@ -1850,6 +1869,361 @@
     font-size:14px;
     font-weight:600;
     padding:0 14px;
+}
+
+/* ── Mensualidades ──────────────────────────────────────────────── */
+
+/* Vive en la barra de años, justo a la izquierda del menú "···".
+   Se encadenan las dos clases para ganar a las reglas de .gastosMonthTab /
+   .ingresosMonthTab que aparecen más abajo en el archivo. */
+.gastosMonthTab.gastosMensualidadesTab,
+.ingresosMonthTab.ingresosRecurrentesTab{
+    flex:0 0 auto;
+    height:36px;
+    min-width:132px;
+    padding:0 14px;
+    border-color:rgba(96,165,250,0.35);
+    color:#bfdbfe;
+}
+
+.gastosMonthTab.gastosMensualidadesTab.active,
+.ingresosMonthTab.ingresosRecurrentesTab.active{
+    background:var(--btn-active-bg);
+    border-color:rgba(96,165,250,0.85);
+    color:#e8f2ff;
+    box-shadow:inset 0 0 0 1px rgba(96,165,250,0.45);
+}
+
+.mensNameCell,
+.recNameCell{
+    line-height:1.15;
+}
+
+.mensNameMain,
+.recNameMain{
+    display:block;
+    font-weight:600;
+    color:var(--text-bright);
+}
+
+.mensNameMeta,
+.recNameMeta{
+    display:block;
+    margin-top:2px;
+    color:var(--text-muted);
+    font-size:11px;
+    letter-spacing:0.02em;
+}
+
+.mensNameNote,
+.recNameNote{
+    display:block;
+    margin-top:2px;
+    color:var(--text-muted);
+    font-size:11px;
+    font-style:italic;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.gastosMensualidadPaused td,
+.ingresosRecurrentePaused td{
+    opacity:0.55;
+}
+
+.mensPanel,
+.recPanel{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+
+.mensPanel.hidden,
+.recPanel.hidden{
+    display:none;
+}
+
+.mensSummary,
+.recSummary{
+    display:grid;
+    grid-template-columns:repeat(4, minmax(0, 1fr));
+    gap:12px;
+}
+
+.mensCard,
+.recCard{
+    padding:14px 16px;
+    border:1px solid var(--border-mid);
+    border-radius:12px;
+    background:var(--bg-panel);
+}
+
+.mensCardLabel,
+.recCardLabel{
+    margin:0;
+    color:var(--text-muted);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.07em;
+    text-transform:uppercase;
+}
+
+.mensCardValue,
+.recCardValue{
+    margin:6px 0 2px;
+    color:var(--text-bright);
+    font-size:22px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+}
+
+.mensCardHint,
+.recCardHint{
+    margin:0;
+    color:var(--text-muted);
+    font-size:12px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.mensToolbar,
+.recToolbar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.mensSearchInput,
+.recSearchInput{
+    flex:1 1 260px;
+    min-width:180px;
+    height:38px;
+    padding:0 14px;
+    border:1px solid var(--btn-border);
+    border-radius:10px;
+    background:var(--btn-bg);
+    color:var(--text-bright);
+    font-size:14px;
+    outline:none;
+}
+
+.mensSearchInput::placeholder,
+.recSearchInput::placeholder{
+    color:var(--text-muted);
+}
+
+.mensSearchInput:focus,
+.recSearchInput:focus{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(59,130,246,0.15);
+}
+
+.mensFilterGroup,
+.recFilterGroup{
+    display:flex;
+    gap:4px;
+    padding:3px;
+    border:1px solid var(--btn-border);
+    border-radius:10px;
+    background:var(--bg-panel);
+}
+
+.mensFilterChip,
+.recFilterChip{
+    height:30px;
+    padding:0 14px;
+    border:none;
+    border-radius:8px;
+    background:transparent;
+    color:var(--text-muted);
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+}
+
+.mensFilterChip:hover,
+.recFilterChip:hover{
+    color:var(--text-bright);
+}
+
+.mensFilterChip.active,
+.recFilterChip.active{
+    background:var(--btn-active-bg);
+    color:#e8f2ff;
+}
+
+.mensAddBtn,
+.recAddBtn{
+    height:38px;
+    margin-left:auto;
+    white-space:nowrap;
+}
+
+.mensTableWrapper,
+.recTableWrapper{
+    border:1px solid var(--border-mid);
+    border-radius:12px;
+    background:var(--bg-panel);
+    overflow:hidden;
+}
+
+.mensTable,
+.recTable{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+    background:var(--bg-panel);
+}
+
+.mensTable thead th,
+.recTable thead th{
+    padding:10px 12px;
+    background:var(--bg-panel);
+    color:#f8fbff;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.03em;
+    text-align:left;
+    border-bottom:1px solid var(--border-mid);
+    white-space:nowrap;
+}
+
+.mensTable tbody td,
+.recTable tbody td{
+    padding:10px 12px;
+    border-bottom:1px solid var(--border-mid);
+    background:var(--bg-surface);
+    color:#e6edf8;
+    font-size:13px;
+    vertical-align:middle;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.mensTable tbody tr:hover td,
+.recTable tbody tr:hover td{
+    background:var(--bg-elevated);
+}
+
+.mensTable .mensColName,
+.recTable .recColName{
+    width:24%;
+    white-space:normal;
+}
+
+.mensTable .rowActionHeader,
+.recTable .rowActionHeader,
+.mensTable .rowActionsCell,
+.recTable .rowActionsCell{
+    width:44px;
+    min-width:44px;
+    padding-left:4px;
+    padding-right:4px;
+}
+
+.mensRowPaused td,
+.recRowPaused td{
+    opacity:0.55;
+}
+
+.mensEmptyRow td,
+.recEmptyRow td{
+    padding:34px 16px;
+    color:var(--text-muted);
+    font-size:13px;
+    text-align:center;
+    white-space:normal;
+}
+
+.mensNextHint,
+.recNextHint{
+    margin-left:6px;
+    color:var(--text-muted);
+    font-size:11px;
+}
+
+.mensBadge,
+.recBadge{
+    display:inline-block;
+    padding:3px 9px;
+    border-radius:999px;
+    background:rgba(96,165,250,0.14);
+    color:#93c5fd;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.02em;
+}
+
+.mensBadge-anual,
+.recBadge-anual{
+    background:rgba(168,85,247,0.16);
+    color:#d8b4fe;
+}
+
+.mensBadge-semestral,
+.recBadge-semestral,
+.mensBadge-cuatrimestral,
+.recBadge-cuatrimestral{
+    background:rgba(45,212,191,0.14);
+    color:#5eead4;
+}
+
+.mensBadge-trimestral,
+.recBadge-trimestral,
+.mensBadge-bimestral,
+.recBadge-bimestral{
+    background:rgba(251,191,36,0.14);
+    color:#fcd34d;
+}
+
+.mensState,
+.recState{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.mensState::before,
+.recState::before{
+    content:"";
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:currentColor;
+}
+
+.mensStateActive,
+.recStateActive{
+    color:#4ade80;
+}
+
+.mensStatePaused,
+.recStatePaused{
+    color:#94a3b8;
+}
+
+.mensFootRow td,
+.recFootRow td{
+    padding:10px 12px;
+    background:#0d1929;
+    border-top:1px solid var(--border-mid);
+    color:#f8fbff;
+    font-size:13px;
+    font-weight:700;
+}
+
+@media (max-width:1200px){
+    .mensSummary,
+    .recSummary{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+    }
 }
 
 .gastosMonthActions .primaryButton,

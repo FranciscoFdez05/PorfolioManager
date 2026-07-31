@@ -1,4 +1,4 @@
-from db import get_db
+from db import get_db, transactional
 from asset_utils import inferMarketProviderFromSymbol, slugify
 
 
@@ -104,6 +104,7 @@ def readAssetFile(assetId):
     return result
 
 
+@transactional
 def updateAssetMarketData(assetId, data):
     """Actualiza solo los campos de mercado de un activo existente. No crea el activo si no existe."""
     conn = get_db()
@@ -128,6 +129,7 @@ def updateAssetMarketData(assetId, data):
     conn.commit()
 
 
+@transactional
 def writeAssetFile(assetId, data):
     conn = get_db()
     safe_id = slugify(assetId)
@@ -320,6 +322,7 @@ def listAssets():
     return result
 
 
+@transactional
 def updateAssetsOrder(ordered_ids):
     """Recibe una lista de asset IDs en el orden deseado y actualiza sort_order en bloque."""
     conn = get_db()
@@ -330,6 +333,7 @@ def updateAssetsOrder(ordered_ids):
     conn.commit()
 
 
+@transactional
 def deleteAssetFile(assetId):
     conn = get_db()
     safe_id = slugify(assetId)

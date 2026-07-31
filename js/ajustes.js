@@ -1244,7 +1244,7 @@ async function initAjustesLogic() {
             }
             const label = purgeDaysSel?.options[purgeDaysSel.selectedIndex]?.text || `${days} días`
             const message = days === -1
-                ? "¿Eliminar TODO el historial de snapshots? Esta acción no se puede deshacer."
+                ? "¿Eliminar TODO el historial de snapshots? Se guardará una copia en data/pre_restore/ antes de borrar."
                 : `¿Eliminar todos los snapshots anteriores a ${label}? Esta acción no se puede deshacer.`
             openConfirmModal({
                 title: "Purgar historial",
@@ -1254,16 +1254,20 @@ async function initAjustesLogic() {
                     purgeBtn.disabled = true
                     showMsg(purgeMsg, "Purgando…", "")
                     try {
+                        // El borrado total exige confirmación explícita en el servidor
+                        const payload = days === -1
+                            ? { days, confirm: "BORRAR TODO" }
+                            : { days }
                         const res  = await fetch("/api/snapshots/purge", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ days })
+                            body: JSON.stringify(payload)
                         })
                         const data = await res.json()
                         if (data.ok) {
                             showMsg(purgeMsg, `Eliminados ${data.deleted} snapshots`, "ok")
                         } else {
-                            showMsg(purgeMsg, "Error al purgar", "error")
+                            showMsg(purgeMsg, data.error || "Error al purgar", "error")
                         }
                     } catch {
                         showMsg(purgeMsg, "Error de red", "error")

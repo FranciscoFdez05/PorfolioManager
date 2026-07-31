@@ -49,7 +49,7 @@ def _migrate_legacy_gastos(active_db_path: Path):
         return
     try:
         import sqlite3
-        src = sqlite3.connect(str(_LEGACY_DB))
+        src = sqlite3.connect(str(_LEGACY_DB), timeout=15)
         src.row_factory = sqlite3.Row
 
         # Comprobar si el legacy tiene mensualidades con valores o gastos
@@ -66,7 +66,7 @@ def _migrate_legacy_gastos(active_db_path: Path):
             src.close()
             return
 
-        dst = sqlite3.connect(str(active_db_path))
+        dst = sqlite3.connect(str(active_db_path), timeout=15)
         try:
             # Solo migrar si el activo NO tiene datos de gastos
             empty_mens = dst.execute(
@@ -168,7 +168,10 @@ def init_portfolios():
         default_db = _PORTFOLIOS_DIR / f"{default_id}.db"
 
         if _LEGACY_DB.exists() and not default_db.exists():
-            shutil.copy2(str(_LEGACY_DB), str(default_db))
+            # API de backup de SQLite: incluye el WAL pendiente, cosa que una
+            # copia de fichero simple podría perder.
+            from backup_manager import _checkpoint_and_copy
+            _checkpoint_and_copy(_LEGACY_DB, default_db)
 
         meta = {
             "active": default_id,
@@ -196,13 +199,13 @@ def init_portfolios():
 
 def _recover_missing_db(db_path: Path):
     """Intenta recuperar un DB que no existe copiando desde el backup automático más reciente."""
-    from backup_manager import _BACKUP_DIR, check_integrity
-    pattern = f"{db_path.stem}_*.db"
-    candidates = sorted(_BACKUP_DIR.glob(pattern), reverse=True) if _BACKUP_DIR.exists() else []
+    from backup_manager import _BACKUP_DIR, _dated_backups, _remove_wal_sidecars, check_integrity
+    candidates = list(reversed(_dated_backups(db_path.stem))) if _BACKUP_DIR.exists() else []
     for candidate in candidates:
         if check_integrity(candidate):
             try:
                 shutil.copy2(str(candidate), str(db_path))
+                _remove_wal_sidecars(db_path)
                 log.info(f"[portfolios] DB recuperado desde: {candidate.name}")
                 return
             except Exception as e:
@@ -249,26 +252,50 @@ def switch_portfolio(pid: str):
     if pid not in ids:
         raise ValueError(f"Portfolio '{pid}' no encontrado")
 
+    db_path = _portfolio_db_path(pid)
     meta["active"] = pid
     _write_meta(meta)
-    _set_active(_PORTFOLIOS_DIR / f"{pid}.db")
+    _set_active(db_path)
+
+
+def _portfolio_db_path(pid: str) -> Path:
+    """Ruta del .db de un portfolio, verificando que no se escape del directorio.
+
+    delete_portfolio construía _PORTFOLIOS_DIR / f"{pid}.db" con un pid sin
+    validar; un pid como '../portfolio' apuntaba a data/portfolio.db y lo movía
+    a data/deleted/.
+    """
+    if not re.fullmatch(r"[a-z0-9_-]{1,64}", pid or ""):
+        raise ValueError(f"Portfolio '{pid}' no encontrado")
+    path = (_PORTFOLIOS_DIR / f"{pid}.db").resolve()
+    if path.parent != _PORTFOLIOS_DIR.resolve():
+        raise ValueError(f"Portfolio '{pid}' no encontrado")
+    return path
 
 
 def delete_portfolio(pid: str):
     meta = get_portfolios()
+    if pid not in {p["id"] for p in meta["portfolios"]}:
+        raise ValueError(f"Portfolio '{pid}' no encontrado")
     if meta["active"] == pid:
         raise ValueError("No puedes eliminar el portfolio activo")
     if len(meta["portfolios"]) <= 1:
         raise ValueError("Debe existir al menos un portfolio")
 
+    db_file = _portfolio_db_path(pid)
+
     meta["portfolios"] = [p for p in meta["portfolios"] if p["id"] != pid]
     _write_meta(meta)
 
-    db_file = _PORTFOLIOS_DIR / f"{pid}.db"
     if db_file.exists():
         _DELETED_DIR.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Mover en lugar de borrar: el .db queda recuperable en data/deleted/
         shutil.move(str(db_file), str(_DELETED_DIR / f"{pid}_{ts}.db"))
+        for suffix in ("-wal", "-shm"):
+            sidecar = Path(str(db_file) + suffix)
+            if sidecar.exists():
+                shutil.move(str(sidecar), str(_DELETED_DIR / f"{pid}_{ts}.db{suffix}"))
 
 
 def rename_portfolio(pid: str, new_name: str):

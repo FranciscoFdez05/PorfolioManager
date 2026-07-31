@@ -1,6 +1,7 @@
 <section class="ingresosPage">
     <div class="ingresosYearBar">
         <div class="ingresosYearList" id="ingresosYearList"></div>
+        <button class="ingresosMonthTab ingresosRecurrentesTab" id="ingresosRecurrentesTabBtn" type="button">Recurrentes</button>
         <div class="pageActionsMenu" id="ingresosActionsMenu">
             <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
             <div class="pageActionsDropdown" id="ingresosActionsDropdown">
@@ -8,7 +9,7 @@
                 <button id="deleteIngresosYearBtn" class="pageActionsItem pageActionsItemDanger" type="button">Eliminar año</button>
                 <div class="pageActionsDivider"></div>
                 <button id="addIngresoTypeRowBtn" class="pageActionsItem" type="button">Añadir ingreso</button>
-                <button id="addRecurrenteRowBtn" class="pageActionsItem" type="button">Añadir recurrente</button>
+                <button id="addRecurrenteRowBtn" class="pageActionsItem" type="button">Añadir ganancia recurrente</button>
                 <button id="downloadIngresosCsvBtn" class="pageActionsItem" type="button">Descargar CSV</button>
             </div>
         </div>
@@ -50,6 +51,40 @@
     <div class="ingresosMonthBar">
         <div class="ingresosMonthTabs" id="ingresosMonthTabs"></div>
     </div>
+
+    <section class="recPanel hidden" id="ingresosRecurrentesWrapper">
+        <div class="recSummary" id="recSummary"></div>
+
+        <div class="recToolbar">
+            <input id="recSearchInput" class="recSearchInput" type="search" placeholder="Buscar por nombre o categoría…" autocomplete="off">
+            <div class="recFilterGroup" id="recFilterGroup">
+                <button type="button" class="recFilterChip active" data-rec-filter="todas">Todas</button>
+                <button type="button" class="recFilterChip" data-rec-filter="activas">Activas</button>
+                <button type="button" class="recFilterChip" data-rec-filter="pausadas">Pausadas</button>
+            </div>
+            <button id="recAddBtn" class="primaryButton recAddBtn" type="button">+ Nueva ganancia recurrente</button>
+        </div>
+
+        <div class="recTableWrapper">
+            <table class="recTable">
+                <thead>
+                    <tr>
+                        <th class="recColName">Concepto</th>
+                        <th>Importe</th>
+                        <th>Frecuencia</th>
+                        <th>Cobro</th>
+                        <th>Próximo cobro</th>
+                        <th>Ingreso mensual</th>
+                        <th>Ingreso anual</th>
+                        <th>Estado</th>
+                        <th class="rowActionHeader"></th>
+                    </tr>
+                </thead>
+                <tbody id="recTableBody"></tbody>
+                <tfoot id="recTableFoot"></tfoot>
+            </table>
+        </div>
+    </section>
 
     <div class="ingresosAnnualWrapper" id="ingresosAnnualWrapper">
         <table class="ingresosAnnualTable">

@@ -1,6 +1,7 @@
 <section class="gastosPage">
     <div class="gastosYearBar">
         <div class="gastosYearList" id="gastosYearList"></div>
+        <button class="gastosMonthTab gastosMensualidadesTab" id="gastosMensualidadesTabBtn" type="button">Mensualidades</button>
         <div class="pageActionsMenu" id="gastosActionsMenu">
             <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
             <div class="pageActionsDropdown" id="gastosActionsDropdown">
@@ -17,6 +18,40 @@
     <div class="gastosMonthBar">
         <div class="gastosMonthTabs" id="gastosMonthTabs"></div>
     </div>
+
+    <section class="mensPanel hidden" id="gastosMensualidadesWrapper">
+        <div class="mensSummary" id="mensSummary"></div>
+
+        <div class="mensToolbar">
+            <input id="mensSearchInput" class="mensSearchInput" type="search" placeholder="Buscar por nombre o categoría…" autocomplete="off">
+            <div class="mensFilterGroup" id="mensFilterGroup">
+                <button type="button" class="mensFilterChip active" data-mens-filter="todas">Todas</button>
+                <button type="button" class="mensFilterChip" data-mens-filter="activas">Activas</button>
+                <button type="button" class="mensFilterChip" data-mens-filter="pausadas">Pausadas</button>
+            </div>
+            <button id="mensAddBtn" class="primaryButton mensAddBtn" type="button">+ Nueva mensualidad</button>
+        </div>
+
+        <div class="mensTableWrapper">
+            <table class="mensTable">
+                <thead>
+                    <tr>
+                        <th class="mensColName">Servicio</th>
+                        <th>Importe</th>
+                        <th>Frecuencia</th>
+                        <th>Renovación</th>
+                        <th>Próximo cobro</th>
+                        <th>Coste mensual</th>
+                        <th>Coste anual</th>
+                        <th>Estado</th>
+                        <th class="rowActionHeader"></th>
+                    </tr>
+                </thead>
+                <tbody id="mensTableBody"></tbody>
+                <tfoot id="mensTableFoot"></tfoot>
+            </table>
+        </div>
+    </section>
 
     <div class="gastosAnnualWrapper" id="gastosAnnualWrapper">
         <table class="gastosAnnualTable">

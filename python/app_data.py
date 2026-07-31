@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
 
-from db import get_db, init_db
+from db import get_db, init_db, transactional
+from secret_store import read_secret_lines
 
 baseDir = Path(__file__).resolve().parent.parent
 apiDir = baseDir / "API"
@@ -9,15 +10,20 @@ _eodhdKeyRotationIndex = 0
 _alphaVantageKeyRotationIndex = 0
 
 
+def _read_api_keys(file_path):
+    """Claves del fichero, sin duplicados. Descifra si está en formato cifrado."""
+    seen = set()
+    apiKeys = []
+    for apiKey in read_secret_lines(file_path):
+        if apiKey not in seen:
+            apiKeys.append(apiKey)
+            seen.add(apiKey)
+    return apiKeys
+
+
 def _read_first_api_key(file_path):
-    if not file_path.exists():
-        return None
-    with file_path.open("r", encoding="utf-8") as file:
-        for line in file:
-            apiKey = line.strip()
-            if apiKey and not apiKey.startswith("#"):
-                return apiKey
-    return None
+    apiKeys = _read_api_keys(file_path)
+    return apiKeys[0] if apiKeys else None
 
 
 def ensureDataFile():
@@ -26,6 +32,7 @@ def ensureDataFile():
 
 # --- Cuentas Remuneradas (ex Intereses) ---
 
+@transactional
 def readInteresesFile():
     conn = get_db()
     cuentas = conn.execute(
@@ -68,6 +75,7 @@ def readInteresesFile():
     return {"cuentas": result}
 
 
+@transactional
 def writeInteresesFile(data):
     conn = get_db()
     cuentas = data.get("cuentas", [])
@@ -120,6 +128,7 @@ def readDividendosFile():
     ]}
 
 
+@transactional
 def writeDividendosFile(data):
     conn = get_db()
     conn.execute("DELETE FROM dividendos")
@@ -166,6 +175,7 @@ def readOperacionesFile():
     ]}
 
 
+@transactional
 def writeOperacionesFile(data):
     conn = get_db()
     conn.execute("DELETE FROM operaciones")
@@ -211,6 +221,7 @@ def readTradingFile():
     ]}
 
 
+@transactional
 def writeTradingFile(data):
     conn = get_db()
     conn.execute("DELETE FROM trading")
@@ -252,6 +263,7 @@ def readTransaccionesFile():
     ]}
 
 
+@transactional
 def writeTransaccionesFile(data):
     conn = get_db()
     conn.execute("DELETE FROM transacciones")
@@ -292,6 +304,7 @@ def readDividendoCalendar():
     return {"calendar": calendar}
 
 
+@transactional
 def writeDividendoCalendar(data):
     conn = get_db()
     calendar = data.get("calendar", {})
@@ -351,6 +364,7 @@ def readStablecoinsFile():
     return {"catalog": catalog, "enabledSymbols": enabled, "rows": rows}
 
 
+@transactional
 def writeStablecoinsFile(data):
     conn = get_db()
     conn.execute("DELETE FROM stablecoins_catalog")
@@ -407,6 +421,7 @@ def readRentaFijaFile():
     ]}
 
 
+@transactional
 def writeRentaFijaFile(data):
     conn = get_db()
     conn.execute("DELETE FROM renta_fija")
@@ -448,6 +463,7 @@ def readBonosFile():
     ]}
 
 
+@transactional
 def writeBonosFile(data):
     conn = get_db()
     conn.execute("DELETE FROM bonos")
@@ -485,6 +501,7 @@ def readStakingFile():
     return {"criptos": result}
 
 
+@transactional
 def writeStakingFile(data):
     conn = get_db()
     criptos = data.get("criptos", [])
@@ -532,6 +549,7 @@ def readEarnFile():
     return {"criptos": result}
 
 
+@transactional
 def writeEarnFile(data):
     conn = get_db()
     criptos = data.get("criptos", [])
@@ -584,6 +602,7 @@ def readPrivateMarketFile():
     ]}
 
 
+@transactional
 def writePrivateMarketFile(data):
     conn = get_db()
     conn.execute("DELETE FROM private_market")
@@ -636,19 +655,7 @@ def readAlphaVantageApiKeys():
     if env_keys_str:
         return [k.strip() for k in env_keys_str.split(",") if k.strip()]
 
-    keyFile = apiDir / "alphavantage.key"
-    if not keyFile.exists():
-        return []
-
-    seen = set()
-    apiKeys = []
-    with keyFile.open("r", encoding="utf-8") as file:
-        for line in file:
-            apiKey = line.strip()
-            if apiKey and not apiKey.startswith("#") and apiKey not in seen:
-                apiKeys.append(apiKey)
-                seen.add(apiKey)
-    return apiKeys
+    return _read_api_keys(apiDir / "alphavantage.key")
 
 
 def readRotatedAlphaVantageApiKeys():
@@ -666,19 +673,7 @@ def readEodhdApiKeys():
     if env_keys_str:
         return [k.strip() for k in env_keys_str.split(",") if k.strip()]
 
-    eodhdKeyFile = apiDir / "eodhd.key"
-    if not eodhdKeyFile.exists():
-        return []
-
-    seen = set()
-    apiKeys = []
-    with eodhdKeyFile.open("r", encoding="utf-8") as file:
-        for line in file:
-            apiKey = line.strip()
-            if apiKey and not apiKey.startswith("#") and apiKey not in seen:
-                apiKeys.append(apiKey)
-                seen.add(apiKey)
-    return apiKeys
+    return _read_api_keys(apiDir / "eodhd.key")
 
 
 def readRotatedEodhdApiKeys():

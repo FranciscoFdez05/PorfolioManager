@@ -1,4 +1,4 @@
-from db import get_db
+from db import get_db, transactional
 from gastos_store import normalize_year
 
 _MAX_SHORT = 30
@@ -92,6 +92,7 @@ def read_ventas_year(year):
     }
 
 
+@transactional
 def write_ventas_year(year, data):
     normalized = normalize_year(year)
     if not normalized:
@@ -118,6 +119,7 @@ def write_ventas_year(year, data):
     conn.commit()
 
 
+@transactional
 def delete_ventas_year(year):
     normalized = normalize_year(year)
     if not normalized:
@@ -130,6 +132,7 @@ def delete_ventas_year(year):
     return result.rowcount > 0
 
 
+@transactional
 def migrate_legacy_ventas_if_needed(default_year):
     """En la versión SQLite no hay ficheros legacy que migrar.
     Si no hay ningún año crea uno vacío con el año por defecto.

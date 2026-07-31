@@ -1,6 +1,11 @@
+import functools
+import logging
 import sqlite3
 import threading
+from contextlib import contextmanager
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
 _DB_PATH = _BASE_DIR / "data" / "portfolio.db"  # overridden by portfolios_manager on startup
@@ -209,6 +214,13 @@ CREATE TABLE IF NOT EXISTS mensualidades (
     octubre     TEXT NOT NULL DEFAULT '',
     noviembre   TEXT NOT NULL DEFAULT '',
     diciembre   TEXT NOT NULL DEFAULT '',
+    categoria   TEXT NOT NULL DEFAULT '',
+    importe     TEXT NOT NULL DEFAULT '',
+    frecuencia  TEXT NOT NULL DEFAULT 'mensual',
+    dia_cobro   TEXT NOT NULL DEFAULT '',
+    mes_inicio  TEXT NOT NULL DEFAULT 'enero',
+    activa      INTEGER NOT NULL DEFAULT 1,
+    nota        TEXT NOT NULL DEFAULT '',
     UNIQUE(year, nombre)
 );
 
@@ -242,6 +254,13 @@ CREATE TABLE IF NOT EXISTS ingresos_recurrentes (
     octubre     TEXT NOT NULL DEFAULT '',
     noviembre   TEXT NOT NULL DEFAULT '',
     diciembre   TEXT NOT NULL DEFAULT '',
+    categoria   TEXT NOT NULL DEFAULT '',
+    importe     TEXT NOT NULL DEFAULT '',
+    frecuencia  TEXT NOT NULL DEFAULT 'mensual',
+    dia_cobro   TEXT NOT NULL DEFAULT '',
+    mes_inicio  TEXT NOT NULL DEFAULT 'enero',
+    activa      INTEGER NOT NULL DEFAULT 1,
+    nota        TEXT NOT NULL DEFAULT '',
     UNIQUE(year, nombre)
 );
 
@@ -445,6 +464,22 @@ def _migrate(conn):
     if "comisiones" not in sc_rows_cols:
         conn.execute("ALTER TABLE stablecoins_rows ADD COLUMN comisiones TEXT NOT NULL DEFAULT ''")
 
+    # Mensualidades (gastos) e ingresos recurrentes comparten los mismos campos.
+    _RECURRENTE_COLS = (
+        ("categoria",  "TEXT NOT NULL DEFAULT ''"),
+        ("importe",    "TEXT NOT NULL DEFAULT ''"),
+        ("frecuencia", "TEXT NOT NULL DEFAULT 'mensual'"),
+        ("dia_cobro",  "TEXT NOT NULL DEFAULT ''"),
+        ("mes_inicio", "TEXT NOT NULL DEFAULT 'enero'"),
+        ("activa",     "INTEGER NOT NULL DEFAULT 1"),
+        ("nota",       "TEXT NOT NULL DEFAULT ''"),
+    )
+    for table in ("mensualidades", "ingresos_recurrentes"):
+        existing_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for column, definition in _RECURRENTE_COLS:
+            if column not in existing_cols:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
     div_cols = {row[1] for row in conn.execute("PRAGMA table_info(dividendos)")}
     if "moneda_dividendo" not in div_cols:
         conn.execute("ALTER TABLE dividendos ADD COLUMN moneda_dividendo TEXT NOT NULL DEFAULT 'USD'")
@@ -509,18 +544,75 @@ def get_db() -> sqlite3.Connection:
                 old.close()
             except Exception:
                 pass
+        _local.conn = None
         _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False, timeout=10)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA busy_timeout=5000")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA cache_size=-8000")
-        conn.executescript(_SCHEMA)
-        _migrate(conn)
-        conn.commit()
+        try:
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA busy_timeout=5000")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA cache_size=-8000")
+            db_key = str(_DB_PATH)
+            # Schema + migración solo una vez por BD y bajo lock: evita que dos
+            # hilos ejecuten ALTER TABLE a la vez sobre el mismo fichero.
+            with _init_lock:
+                if db_key not in _initialized_paths:
+                    conn.executescript(_SCHEMA)
+                    _migrate(conn)
+                    conn.commit()
+                    _initialized_paths.add(db_key)
+                else:
+                    conn.execute("PRAGMA foreign_keys=ON")
+        except Exception:
+            conn.close()
+            raise
         _local.conn = conn
         _local._conn_gen = _reset_generation
-    return _local.conn
+
+    conn = _local.conn
+    # Red de seguridad: si una escritura anterior falló a medio camino, su
+    # transacción (con DELETEs ya aplicados) sigue abierta. Sin este rollback,
+    # el siguiente commit() de cualquier otra operación la confirmaría y se
+    # perderían datos de forma silenciosa.
+    if conn.in_transaction:
+        log.warning("[db] Transacción huérfana detectada; ejecutando rollback preventivo")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+    return conn
+
+
+@contextmanager
+def transaction():
+    """Contexto transaccional: commit al salir con éxito, rollback si hay excepción."""
+    conn = get_db()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+
+
+def transactional(func):
+    """Garantiza rollback si la función de escritura falla a medio camino."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            conn = getattr(_local, "conn", None)
+            if conn is not None and conn.in_transaction:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            raise
+    return wrapper
 
 
 def reset_db():
@@ -537,6 +629,10 @@ def invalidate_all_connections():
     """Force every thread to re-open a fresh connection on their next get_db() call."""
     global _reset_generation
     _reset_generation += 1
+    # El contenido del fichero puede haber cambiado (restore/switch), así que
+    # la próxima conexión debe volver a aplicar schema + migraciones.
+    with _init_lock:
+        _initialized_paths.clear()
     reset_db()
 
 
@@ -548,7 +644,7 @@ def init_db_at_path(path) -> None:
     """Create and initialize an empty DB at the given path without changing the active DB."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(p), check_same_thread=False)
+    conn = sqlite3.connect(str(p), check_same_thread=False, timeout=15)
     try:
         conn.executescript(_SCHEMA)
         _migrate(conn)

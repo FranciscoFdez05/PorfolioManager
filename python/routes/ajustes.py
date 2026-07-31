@@ -1,5 +1,9 @@
 import io
 import json
+import logging
+import os
+import re
+import tempfile
 import zipfile
 import datetime
 from pathlib import Path
@@ -8,6 +12,9 @@ from flask import Blueprint, jsonify, request, Response
 
 from api_stats import get_today_stats
 from db import get_db, get_active_db_path
+from secret_store import read_secret_lines, write_secret_lines
+
+log = logging.getLogger(__name__)
 
 ajustes_bp = Blueprint("ajustes", __name__)
 _BASE_DIR    = Path(__file__).resolve().parent.parent.parent
@@ -84,11 +91,29 @@ def _read_ajustes():
         return dict(_GLOBAL_DEFAULTS)
 
 
+def _atomic_write_json(path: Path, data) -> None:
+    """Escribe JSON de forma atómica y durable: tmp → fsync → rename.
+
+    write_text() directo truncaba el fichero antes de escribirlo: un fallo a
+    mitad dejaba un JSON inválido y _read_ajustes/_read_prefs caen al valor por
+    defecto en silencio, es decir, todos los ajustes perdidos sin aviso.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(data, indent=2, ensure_ascii=False)
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_name, str(path))
+    except Exception:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+
+
 def _write_ajustes(data):
-    _AJUSTES_JSON.parent.mkdir(parents=True, exist_ok=True)
-    _AJUSTES_JSON.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    _atomic_write_json(_AJUSTES_JSON, data)
 
 
 def _read_prefs(portfolio_id: str) -> dict:
@@ -97,44 +122,54 @@ def _read_prefs(portfolio_id: str) -> dict:
         # Migración: extraer claves por-portfolio desde ajustes.json si existen
         try:
             raw = json.loads(_AJUSTES_JSON.read_text("utf-8")) if _AJUSTES_JSON.exists() else {}
-            migrated = {k: raw[k] for k in _PORTFOLIO_KEYS if k in raw}
+            migrated = {k: raw[k] for k in _PORTFOLIO_KEYS if isinstance(raw, dict) and k in raw}
             return {**_PORTFOLIO_DEFAULTS, **migrated}
         except Exception:
             pass
         return dict(_PORTFOLIO_DEFAULTS)
     try:
         stored = json.loads(path.read_text("utf-8"))
-        return {**_PORTFOLIO_DEFAULTS, **stored}
+        if not isinstance(stored, dict):
+            return dict(_PORTFOLIO_DEFAULTS)
+        # Filtrar a las claves conocidas, igual que _read_ajustes: un prefs
+        # importado podía inyectar claves arbitrarias que luego se reescriben.
+        return {**_PORTFOLIO_DEFAULTS, **{k: v for k, v in stored.items() if k in _PORTFOLIO_KEYS}}
     except Exception:
         return dict(_PORTFOLIO_DEFAULTS)
 
 
 def _write_prefs(portfolio_id: str, data: dict):
-    path = _prefs_path(portfolio_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    _atomic_write_json(_prefs_path(portfolio_id), data)
+
+
+def _as_int(value, default, allowed=None):
+    """int() tolerante. Un valor no numérico en ajustes.json (o en el JSON de un
+    import) reventaba GET /api/settings con un 500 permanente que dejaba la app
+    inutilizable, porque no había forma de corregir el ajuste desde la UI."""
+    try:
+        result = int(value)
+    except (TypeError, ValueError):
+        return default
+    if allowed is not None and result not in allowed:
+        return default
+    return result
 
 
 def _read_key_file(path):
-    if not path.exists():
-        return ""
-    lines = [l.strip() for l in path.read_text("utf-8").splitlines()
-             if l.strip() and not l.startswith("#")]
-    return "\n".join(lines)
+    """Claves del fichero, descifrando si está en formato cifrado."""
+    return "\n".join(read_secret_lines(path))
 
 
 def _write_key_file(path, value):
-    path.parent.mkdir(exist_ok=True)
-    path.write_text(value.strip() + "\n", encoding="utf-8")
+    write_secret_lines(path, str(value).splitlines())
 
 
 def _append_key_file(path, value):
-    path.parent.mkdir(exist_ok=True)
-    existing = [k for k in _read_key_file(path).splitlines() if k.strip()]
-    new_key = value.strip()
+    existing = read_secret_lines(path)
+    new_key = str(value).strip()
     if new_key and new_key not in existing:
         existing.append(new_key)
-    path.write_text("\n".join(existing) + "\n", encoding="utf-8")
+    write_secret_lines(path, existing)
 
 
 @ajustes_bp.route("/api/settings", methods=["GET"])
@@ -151,23 +186,23 @@ def get_settings():
         "eodhdKeyCount":         len([k for k in eodhd_raw.splitlines() if k.strip()]),
         "alphaVantageKeyCount":  len([k for k in alphavantage_raw.splitlines() if k.strip()]),
         # Globales
-        "autoBackupDays":        int(gcfg.get("autoBackupDays") or 0),
-        "staleHours":            int(gcfg.get("staleHours") or 24),
-        "autoRefreshMinutes":    int(gcfg.get("autoRefreshMinutes") or 0),
-        "snapshotMinutes":       int(gcfg.get("snapshotMinutes") or 60),
+        "autoBackupDays":        _as_int(gcfg.get("autoBackupDays"), 0),
+        "staleHours":            _as_int(gcfg.get("staleHours"), 24),
+        "autoRefreshMinutes":    _as_int(gcfg.get("autoRefreshMinutes"), 0),
+        "snapshotMinutes":       _as_int(gcfg.get("snapshotMinutes"), 60),
         "theme":                 gcfg.get("theme") or "default",
         "sidebarCollapsed":      bool(gcfg.get("sidebarCollapsed", False)),
         "monedaBase":            gcfg.get("monedaBase") or "EUR",
-        "precioDecimalesAcciones":  int(gcfg.get("precioDecimalesAcciones") or 2),
-        "precioDecimalesEtf":       int(gcfg.get("precioDecimalesEtf") or 2),
-        "precioDecimalesComoditis": int(gcfg.get("precioDecimalesComoditis") or 2),
-        "precioDecimalesCripto":    int(gcfg.get("precioDecimalesCripto") or 4),
+        "precioDecimalesAcciones":  _as_int(gcfg.get("precioDecimalesAcciones"), 2),
+        "precioDecimalesEtf":       _as_int(gcfg.get("precioDecimalesEtf"), 2),
+        "precioDecimalesComoditis": _as_int(gcfg.get("precioDecimalesComoditis"), 2),
+        "precioDecimalesCripto":    _as_int(gcfg.get("precioDecimalesCripto"), 4),
         "soloHorarioMercado":       bool(gcfg.get("soloHorarioMercado", False)),
         "soloMercadoTipos":         gcfg.get("soloMercadoTipos") or ["acciones", "etfs", "comoditis"],
-        "bloqueoInactividad":       int(gcfg.get("bloqueoInactividad") or 0),
+        "bloqueoInactividad":       _as_int(gcfg.get("bloqueoInactividad"), 0),
         "numLocale":                gcfg.get("numLocale") or "es-ES",
         "dateFormat":               gcfg.get("dateFormat") or "DD/MM/YYYY",
-        "maxBackups":               int(gcfg.get("maxBackups") or 0),
+        "maxBackups":               _as_int(gcfg.get("maxBackups"), 0),
         # Por-portfolio
         "hiddenAssets":             pcfg.get("hiddenAssets") or [],
         "comparativaExcluded":      pcfg.get("comparativaExcluded") or [],
@@ -214,19 +249,23 @@ def save_settings():
         _write_key_file(_API_DIR / "finnhub.key", str(data["finnhubKey"]).strip())
     if data.get("eodhdKeys"):
         _write_key_file(_API_DIR / "eodhd.key", str(data["eodhdKeys"]).strip())
+    # Faltaba: /api/settings/apikey sí permitía añadir claves de Alpha Vantage,
+    # pero guardarlas desde la pantalla de ajustes las descartaba en silencio.
+    if data.get("alphaVantageKeys"):
+        _write_key_file(_API_DIR / "alphavantage.key", str(data["alphaVantageKeys"]).strip())
 
     gcfg = _read_ajustes()
     pcfg = _read_prefs(pid)
 
     # ── Globales ──────────────────────────────────────────
     if "autoBackupDays" in data:
-        gcfg["autoBackupDays"] = int(data["autoBackupDays"])
+        gcfg["autoBackupDays"] = max(0, min(365, _as_int(data["autoBackupDays"], 0)))
     if "staleHours" in data:
-        gcfg["staleHours"] = int(data["staleHours"])
+        gcfg["staleHours"] = max(1, min(8760, _as_int(data["staleHours"], 24)))
     if "autoRefreshMinutes" in data:
-        gcfg["autoRefreshMinutes"] = int(data["autoRefreshMinutes"]) if int(data["autoRefreshMinutes"]) in {0, 1, 5, 15, 30, 60} else 0
+        gcfg["autoRefreshMinutes"] = _as_int(data["autoRefreshMinutes"], 0, {0, 1, 5, 15, 30, 60})
     if "snapshotMinutes" in data:
-        gcfg["snapshotMinutes"] = int(data["snapshotMinutes"]) if int(data["snapshotMinutes"]) in {0, 5, 15, 30, 60, 240, 1440} else 60
+        gcfg["snapshotMinutes"] = _as_int(data["snapshotMinutes"], 60, {0, 5, 15, 30, 60, 240, 1440})
     if "theme" in data:
         gcfg["theme"] = str(data["theme"]) if data["theme"] in {"default", "black", "light"} else "default"
     if "sidebarCollapsed" in data:
@@ -252,25 +291,20 @@ def save_settings():
     _VALID_TIPOS = {"acciones", "etfs", "comoditis", "cripto"}
     for _k in ("precioDecimalesAcciones", "precioDecimalesEtf", "precioDecimalesComoditis", "precioDecimalesCripto"):
         if _k in data:
-            try:
-                v = int(data[_k])
-                gcfg[_k] = v if v in _VALID_DECS else 2
-            except (ValueError, TypeError):
-                pass
+            gcfg[_k] = _as_int(data[_k], 2, _VALID_DECS)
     if "soloHorarioMercado" in data:
         gcfg["soloHorarioMercado"] = bool(data["soloHorarioMercado"])
     if "soloMercadoTipos" in data:
         raw = data["soloMercadoTipos"]
         gcfg["soloMercadoTipos"] = [t for t in raw if t in _VALID_TIPOS] if isinstance(raw, list) else []
     if "bloqueoInactividad" in data:
-        gcfg["bloqueoInactividad"] = int(data["bloqueoInactividad"]) if int(data["bloqueoInactividad"]) in {0, 15, 30, 60, 240} else 0
+        gcfg["bloqueoInactividad"] = _as_int(data["bloqueoInactividad"], 0, {0, 15, 30, 60, 240})
     if "numLocale" in data:
         gcfg["numLocale"] = str(data["numLocale"]) if data["numLocale"] in {"es-ES", "en-US", "fr-FR"} else "es-ES"
     if "dateFormat" in data:
         gcfg["dateFormat"] = str(data["dateFormat"]) if data["dateFormat"] in {"DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"} else "DD/MM/YYYY"
     if "maxBackups" in data:
-        v = int(data["maxBackups"])
-        gcfg["maxBackups"] = v if v in {0, 5, 10, 20, 50} else 0
+        gcfg["maxBackups"] = _as_int(data["maxBackups"], 0, {0, 5, 10, 20, 50})
 
     # ── Por-portfolio ────────────────────────────────────
     if "hiddenAssets" in data:
@@ -317,24 +351,59 @@ def save_settings():
     return jsonify({"ok": True})
 
 
+# Los nombres de tabla se interpolan en las consultas de export/import porque
+# SQLite no admite parametrizar identificadores. Se restringen a un patrón
+# seguro: una BD subida por /api/portfolios/import podría traer una tabla con
+# comillas o corchetes en el nombre y romper el entrecomillado.
+_SAFE_TABLE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+# Nombres de fichero de prefs admisibles al importar un zip (mismo patrón que
+# usa el restore de backups en routes/backup.py)
+_RE_SAFE_PREFS_NAME = re.compile(r"^prefs_[A-Za-z0-9_-]{1,64}\.json$")
+
+
+def _real_tables(conn) -> list:
+    """Tablas de datos que existen realmente en la BD activa, en orden estable."""
+    nombres = [
+        r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' "
+            "AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        ).fetchall()
+    ]
+    seguras = [n for n in nombres if _SAFE_TABLE_RE.match(n)]
+    for descartada in set(nombres) - set(seguras):
+        log.warning("[export] Tabla con nombre no admitido, se omite: %r", descartada)
+    return seguras
+
+
+def _build_export(conn, pid: str) -> dict:
+    """Volcado completo de la BD activa.
+
+    Antes se exportaba una lista fija de 11 nombres de los que 4 ni existían
+    ('gastos', 'ingresos', 'stablecoins', 'seguimiento'), y quedaban fuera
+    tablas con todos los movimientos: activo_rows, activo_operation_rows,
+    gastos_rows, mensualidades, ingresos_rows, intereses_v2, staking_rows,
+    earn_rows, trading, renta_fija, private_market… El "export completo" perdía
+    casi todos los datos. Ahora se enumera el esquema real.
+    """
+    export = {
+        "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "version": 3,
+        "ajustes": _read_ajustes(),
+        "portfolio_prefs": _read_prefs(pid),
+        "tables": {},
+    }
+    for table in _real_tables(conn):
+        rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
+        export["tables"][table] = [dict(r) for r in rows]
+    return export
+
+
 @ajustes_bp.route("/api/export/json", methods=["GET"])
 def export_json():
     pid  = _active_portfolio_id()
     conn = get_db()
-    export = {
-        "exported_at": datetime.datetime.utcnow().isoformat() + "Z",
-        "version": 1,
-        "ajustes": _read_ajustes(),
-        "portfolio_prefs": _read_prefs(pid),
-        "activos": [dict(r) for r in conn.execute("SELECT * FROM activos ORDER BY sort_order, rowid").fetchall()],
-        "portfolio_snapshots": [dict(r) for r in conn.execute("SELECT * FROM portfolio_snapshots ORDER BY ts").fetchall()],
-    }
-    for table in ("dividendos", "gastos", "ingresos", "ventas", "transacciones",
-                  "stablecoins", "operaciones", "bonos", "seguimiento"):
-        try:
-            export[table] = [dict(r) for r in conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()]
-        except Exception:
-            export[table] = []
+    export = _build_export(conn, pid)
 
     payload = json.dumps(export, ensure_ascii=False, indent=2)
     return Response(
@@ -348,30 +417,20 @@ def export_json():
 def export_zip():
     pid  = _active_portfolio_id()
     conn = get_db()
-    export = {
-        "exported_at": datetime.datetime.utcnow().isoformat() + "Z",
-        "version": 1,
-        "ajustes": _read_ajustes(),
-        "portfolio_prefs": _read_prefs(pid),
-        "activos": [dict(r) for r in conn.execute("SELECT * FROM activos ORDER BY sort_order, rowid").fetchall()],
-        "portfolio_snapshots": [dict(r) for r in conn.execute("SELECT * FROM portfolio_snapshots ORDER BY ts").fetchall()],
-    }
-    for table in ("dividendos", "gastos", "ingresos", "ventas", "transacciones",
-                  "stablecoins", "operaciones", "bonos", "seguimiento"):
-        try:
-            export[table] = [dict(r) for r in conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()]
-        except Exception:
-            export[table] = []
+    export = _build_export(conn, pid)
 
     json_bytes = json.dumps(export, ensure_ascii=False, indent=2).encode("utf-8")
 
     buf = io.BytesIO()
-    date_str = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+    date_str = datetime.datetime.now().strftime("%Y-%m-%d")
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(f"portfolio-export-{date_str}.json", json_bytes)
         db_path = get_active_db_path()
         if db_path.exists():
-            zf.write(str(db_path), f"portfolio-{date_str}.db")
+            # Copia vía API de backup: zf.write() del .db en caliente puede
+            # capturar páginas a medias y dejar en el zip una BD corrupta,
+            # porque los cambios recientes viven aún en el fichero -wal.
+            zf.writestr(f"portfolio-{date_str}.db", _consistent_db_bytes(db_path))
         if _AJUSTES_JSON.exists():
             zf.write(str(_AJUSTES_JSON), "ajustes.json")
         prefs_file = _prefs_path(pid)
@@ -386,34 +445,93 @@ def export_zip():
     )
 
 
-def _restore_tables_from_dict(conn, data: dict):
-    """Restaura tablas de la BD activa desde un dict de exportación."""
+def _consistent_db_bytes(db_path) -> bytes:
+    """Bytes de una copia consistente del .db (incluye el WAL pendiente)."""
     import sqlite3 as _sqlite3
-    tables = ["activos", "portfolio_snapshots", "dividendos", "gastos", "ingresos",
-              "ventas", "transacciones", "stablecoins", "operaciones", "bonos", "seguimiento"]
-    for table in tables:
-        if table not in data or not isinstance(data[table], list):
-            continue
-        rows = data[table]
-        if not rows:
-            conn.execute(f"DELETE FROM {table}")
-            continue
-        try:
-            actual_cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
-            valid_cols  = [c for c in rows[0].keys() if c in actual_cols]
+    tmp = db_path.parent / f"_tmp_export_{db_path.name}"
+    src = dst = None
+    try:
+        src = _sqlite3.connect(str(db_path), timeout=10)
+        dst = _sqlite3.connect(str(tmp), timeout=10)
+        src.backup(dst)
+        dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        dst.commit()
+        dst.close()
+        dst = None
+        src.close()
+        src = None
+        return tmp.read_bytes()
+    finally:
+        for conn in (dst, src):
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+        tmp.unlink(missing_ok=True)
+        for suffix in ("-wal", "-shm"):
+            Path(str(tmp) + suffix).unlink(missing_ok=True)
+
+
+def _restore_tables_from_dict(conn, data: dict):
+    """Restaura tablas de la BD activa desde un dict de exportación.
+
+    Todo ocurre en UNA transacción: si algo falla se revierte por completo. La
+    versión anterior ejecutaba 'DELETE FROM gastos' (tabla inexistente) fuera de
+    su try/except, así que importar el propio export siempre lanzaba
+    OperationalError con las tablas ya vaciadas dentro de una transacción
+    abierta que nadie revertía.
+    """
+    tables_payload = data.get("tables")
+    if not isinstance(tables_payload, dict):
+        # Formato legacy: las tablas eran claves de primer nivel
+        tables_payload = {k: v for k, v in data.items() if isinstance(v, list)}
+
+    existing = set(_real_tables(conn))
+    skipped = [name for name in tables_payload if name not in existing]
+    if skipped:
+        log.warning("[import] Tablas del fichero que no existen en el esquema, ignoradas: %s",
+                    ", ".join(sorted(skipped)))
+
+    targets = [t for t in sorted(tables_payload)
+               if t in existing and isinstance(tables_payload[t], list)]
+
+    try:
+        # Aplaza la verificación de FK al commit, para poder insertar hijos antes
+        # que padres sin violar las referencias.
+        conn.execute("PRAGMA defer_foreign_keys=ON")
+
+        # Pasada 1: vaciar TODO antes de insertar nada. Intercalar DELETE e
+        # INSERT perdía datos: activo_rows se insertaba antes del
+        # 'DELETE FROM activos' (orden alfabético) y el ON DELETE CASCADE de
+        # activos borraba las filas recién insertadas. defer_foreign_keys no
+        # evita eso: aplaza la comprobación de constraints, no las acciones
+        # CASCADE.
+        for table in targets:
+            conn.execute(f'DELETE FROM "{table}"')
+
+        # Pasada 2: insertar
+        for table in targets:
+            rows = tables_payload[table]
+            if not rows or not isinstance(rows[0], dict):
+                continue
+            actual_cols = {r[1] for r in conn.execute(f'PRAGMA table_info("{table}")').fetchall()}
+            valid_cols = [c for c in rows[0].keys() if c in actual_cols]
             if not valid_cols:
                 continue
-            conn.execute(f"DELETE FROM {table}")
             col_str      = ", ".join(f'"{c}"' for c in valid_cols)
             placeholders = ", ".join("?" for _ in valid_cols)
             conn.executemany(
-                f"INSERT OR IGNORE INTO {table} ({col_str}) VALUES ({placeholders})",
-                [[row.get(c) for c in valid_cols] for row in rows],
+                f'INSERT OR IGNORE INTO "{table}" ({col_str}) VALUES ({placeholders})',
+                [[row.get(c) for c in valid_cols] for row in rows if isinstance(row, dict)],
             )
-        except Exception as e:
+        conn.commit()
+    except Exception as e:
+        try:
             conn.rollback()
-            raise RuntimeError(f"Error restaurando {table}: {e}")
-    conn.commit()
+        except Exception:
+            pass
+        raise RuntimeError(f"Error restaurando datos: {e}")
 
 
 @ajustes_bp.route("/api/import/json", methods=["POST"])
@@ -482,8 +600,8 @@ def import_zip():
                 try:
                     tmp.write_bytes(raw_db)
                     invalidate_all_connections()
-                    src = _sqlite3.connect(str(tmp))
-                    dst = _sqlite3.connect(str(db_path))
+                    src = _sqlite3.connect(str(tmp), timeout=15)
+                    dst = _sqlite3.connect(str(db_path), timeout=15)
                     src.backup(dst)
                     dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
                     dst.commit()
@@ -505,10 +623,17 @@ def import_zip():
                 json_dir.mkdir(parents=True, exist_ok=True)
                 _AJUSTES_JSON.write_bytes(zf.read("ajustes.json"))
 
-            # Restaurar prefs por-portfolio
+            # Restaurar prefs por-portfolio. El nombre se reduce a su parte
+            # final y se valida contra un patrón: comprobar solo que no hubiera
+            # "/" dejaba pasar entradas como "prefs_..\..\algo.json", que en
+            # Windows escriben fuera de data/JSON (allí "\" sí separa rutas).
             for name in names:
-                if name.startswith("prefs_") and name.endswith(".json") and "/" not in name:
-                    (json_dir / name).write_bytes(zf.read(name))
+                prefs_name = Path(name).name
+                if _RE_SAFE_PREFS_NAME.match(prefs_name):
+                    json_dir.mkdir(parents=True, exist_ok=True)
+                    (json_dir / prefs_name).write_bytes(zf.read(name))
+                elif prefs_name.startswith("prefs_"):
+                    log.warning("[import] Entrada de prefs ignorada por nombre inseguro: %r", name)
 
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500

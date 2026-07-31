@@ -7,6 +7,7 @@ Backup automático de la base de datos activa.
 - Mantiene los últimos MAX_BACKUPS backups diarios
 """
 import json
+import re
 import sqlite3
 import shutil
 import logging
@@ -28,28 +29,65 @@ def _backup_name(db_path: Path) -> str:
     return f"{db_path.stem}_{today}.db"
 
 
+def _dated_backups(db_stem: str):
+    """Backups diarios de ESTE portfolio, ordenados de más antiguo a más reciente.
+
+    No se puede usar glob(f"{stem}_*.db"): el patrón de 'principal' también casa
+    con 'principal_recovered_2026-07-30.db' y con los volcados
+    'principal_CORRUPTED_*.db'. Esa colisión hacía que la rotación borrase el
+    backup recién creado del portfolio activo (ordenaba antes que los
+    '_recovered_') y que la restauración eligiese la copia de otro portfolio.
+    """
+    pattern = re.compile(rf"^{re.escape(db_stem)}_(\d{{4}}-\d{{2}}-\d{{2}})\.db$")
+    matches = []
+    for path in _BACKUP_DIR.glob(f"{db_stem}_*.db"):
+        m = pattern.match(path.name)
+        if m:
+            matches.append((m.group(1), path))
+    return [path for _, path in sorted(matches)]
+
+
+def _remove_wal_sidecars(db_path: Path):
+    """Elimina ficheros -wal/-shm obsoletos. Imprescindible tras sustituir un .db:
+    un WAL viejo se re-aplicaría sobre la BD restaurada y la corrompería."""
+    for suffix in ("-wal", "-shm"):
+        sidecar = Path(str(db_path) + suffix)
+        try:
+            sidecar.unlink(missing_ok=True)
+        except Exception as e:
+            log.warning(f"[backup] No se pudo eliminar {sidecar.name}: {e}")
+
+
 def check_integrity(db_path: Path) -> bool:
     """Devuelve True si la BD pasa integrity_check y foreign_key_check."""
+    conn = None
     try:
-        conn = sqlite3.connect(str(db_path))
+        conn = sqlite3.connect(str(db_path), timeout=15)
         result = conn.execute("PRAGMA integrity_check").fetchone()
         if not (result and result[0] == "ok"):
-            conn.close()
             return False
         fk_errors = conn.execute("PRAGMA foreign_key_check").fetchall()
-        conn.close()
         return len(fk_errors) == 0
     except Exception as e:
         log.error(f"[backup] Error comprobando integridad de {db_path.name}: {e}")
         return False
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def _rotate(db_stem: str):
     """Elimina backups automáticos más antiguos que MAX_BACKUPS."""
-    pattern = f"{db_stem}_*.db"
-    backups = sorted(_BACKUP_DIR.glob(pattern))
+    backups = _dated_backups(db_stem)
+    today_name = f"{db_stem}_{datetime.now().strftime('%Y-%m-%d')}.db"
     while len(backups) > MAX_BACKUPS:
         oldest = backups.pop(0)
+        # Salvaguarda: nunca borrar el backup de hoy, es el único fresco.
+        if oldest.name == today_name:
+            continue
         try:
             oldest.unlink()
             log.info(f"[backup] Eliminado backup antiguo: {oldest.name}")
@@ -58,19 +96,35 @@ def _rotate(db_stem: str):
 
 
 def _checkpoint_and_copy(db_path: Path, backup_path: Path):
-    """Checkpoint WAL y copia atómica (tmp → rename) al destino."""
-    try:
-        conn = sqlite3.connect(str(db_path))
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        conn.close()
-    except Exception:
-        pass
+    """Copia consistente vía API de backup de SQLite (incluye WAL pendiente)
+    a un temporal y rename atómico al destino."""
     tmp = backup_path.with_suffix(".tmp")
+    src = dst = None
     try:
-        shutil.copy2(str(db_path), str(tmp))
+        src = sqlite3.connect(str(db_path), timeout=15)
+        dst = sqlite3.connect(str(tmp), timeout=15)
+        src.backup(dst)
+        dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        dst.commit()
+        dst.close()
+        dst = None
+        src.close()
+        src = None
         tmp.replace(backup_path)
+        _remove_wal_sidecars(tmp)
     except Exception:
+        if dst is not None:
+            try:
+                dst.close()
+            except Exception:
+                pass
+        if src is not None:
+            try:
+                src.close()
+            except Exception:
+                pass
         tmp.unlink(missing_ok=True)
+        _remove_wal_sidecars(tmp)
         raise
 
 
@@ -171,14 +225,14 @@ def _backup_config(dest: Path):
 
 def _restore_from_latest_auto_backup(db_path: Path):
     """Restaura db_path desde el backup automático válido más reciente."""
-    pattern = f"{db_path.stem}_*.db"
-    candidates = sorted(_BACKUP_DIR.glob(pattern), reverse=True)
+    candidates = list(reversed(_dated_backups(db_path.stem)))
     for candidate in candidates:
         if check_integrity(candidate):
             try:
                 corrupted_copy = _BACKUP_DIR / f"{db_path.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
                 shutil.copy2(str(db_path), str(corrupted_copy))
                 shutil.copy2(str(candidate), str(db_path))
+                _remove_wal_sidecars(db_path)
                 log.info(f"[backup] Restaurado desde backup automático: {candidate.name}")
                 return
             except Exception as e:
@@ -189,8 +243,9 @@ def _restore_from_latest_auto_backup(db_path: Path):
 def _ensure_daily_snapshot(db_path: Path):
     """Si no existe snapshot del día actual, duplica el último con timestamp de hoy."""
     import time
+    conn = None
     try:
-        conn = sqlite3.connect(str(db_path))
+        conn = sqlite3.connect(str(db_path), timeout=15)
         conn.row_factory = sqlite3.Row
         now_ts = int(time.time())
         today_start = now_ts - (now_ts % 86400)
@@ -208,9 +263,14 @@ def _ensure_daily_snapshot(db_path: Path):
                 )
                 conn.commit()
                 log.info(f"[backup] Snapshot diario insertado para {db_path.name}")
-        conn.close()
     except Exception as e:
         log.warning(f"[backup] No se pudo insertar snapshot diario: {e}")
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def _emergency_repair(db_path: Path) -> bool:
@@ -218,19 +278,20 @@ def _emergency_repair(db_path: Path) -> bool:
     repair_path = db_path.with_suffix(".repair.db")
     corrupted_backup = _BACKUP_DIR / f"{db_path.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
     try:
-        src = sqlite3.connect(str(db_path))
+        src = sqlite3.connect(str(db_path), timeout=15)
         dump = list(src.iterdump())
         src.close()
 
         if repair_path.exists():
             repair_path.unlink()
-        dst = sqlite3.connect(str(repair_path))
+        dst = sqlite3.connect(str(repair_path), timeout=15)
         dst.executescript("\n".join(dump))
         dst.close()
 
         if check_integrity(repair_path):
             shutil.copy2(str(db_path), str(corrupted_backup))
             shutil.move(str(repair_path), str(db_path))
+            _remove_wal_sidecars(db_path)
             log.info(f"[backup] Reparación automática OK. Corrupta guardada en {corrupted_backup.name}")
             return True
         else:

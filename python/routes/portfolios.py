@@ -1,6 +1,8 @@
-import shutil
+import io
+import os
 import sqlite3
 import tempfile
+from pathlib import Path
 
 from flask import Blueprint, jsonify, request, send_file
 
@@ -19,9 +21,27 @@ portfolios_bp = Blueprint("portfolios", __name__)
 
 
 def _open_portfolio_db(db_file):
-    conn = sqlite3.connect(str(db_file), check_same_thread=False)
+    conn = sqlite3.connect(str(db_file), check_same_thread=False, timeout=15)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _sqlite_backup(src_path: Path, dst_path: Path):
+    """Copia consistente de un .db (incluye el WAL pendiente)."""
+    src = dst = None
+    try:
+        src = sqlite3.connect(str(src_path), timeout=15)
+        dst = sqlite3.connect(str(dst_path), timeout=15)
+        src.backup(dst)
+        dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        dst.commit()
+    finally:
+        for conn in (dst, src):
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 
 def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
@@ -195,13 +215,23 @@ def export_portfolio(pid):
     safe_name = _safe_id(portfolio["name"]) or pid
     download_name = f"portfolio_{safe_name}.db"
 
-    # Enviar una copia para no bloquear el fichero activo
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
-    tmp.close()
-    shutil.copy2(str(db_file), tmp.name)
+    # Copia consistente en memoria: shutil.copy2 del .db en caliente puede dejar
+    # fuera lo que aún está en el -wal, y el NamedTemporaryFile(delete=False)
+    # anterior nunca se borraba, acumulando una copia completa de la BD en el
+    # directorio temporal en cada exportación.
+    from backup_manager import _remove_wal_sidecars
+    tmp_path = Path(tempfile.gettempdir()) / f"_export_{pid}_{os.getpid()}.db"
+    try:
+        _sqlite_backup(db_file, tmp_path)
+        payload = tmp_path.read_bytes()
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"No se pudo exportar: {e}"}), 500
+    finally:
+        tmp_path.unlink(missing_ok=True)
+        _remove_wal_sidecars(tmp_path)
 
     return send_file(
-        tmp.name,
+        io.BytesIO(payload),
         mimetype="application/octet-stream",
         as_attachment=True,
         download_name=download_name,
@@ -236,16 +266,40 @@ def import_portfolio():
 
     _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
     dest = _PORTFOLIOS_DIR / f"{pid}.db"
-    file.save(str(dest))
-
-    # Verificar integridad básica
+    # Guardar en temporal y validar antes de publicarlo como portfolio: escribir
+    # directamente en dest dejaba un .db corrupto en data/portfolios si la
+    # validación fallaba y el unlink no llegaba a ejecutarse.
+    tmp_dest = _PORTFOLIOS_DIR / f"_import_tmp_{pid}.db"
     try:
-        conn = sqlite3.connect(str(dest))
-        conn.execute("PRAGMA integrity_check")
-        conn.close()
-    except Exception:
-        dest.unlink(missing_ok=True)
-        return jsonify({"ok": False, "error": "La base de datos importada está corrupta"}), 400
+        file.save(str(tmp_dest))
+
+        # Verificar integridad de verdad: antes se ejecutaba el PRAGMA pero
+        # nunca se miraba el resultado, así que cualquier BD que se pudiera
+        # abrir se aceptaba aunque integrity_check devolviese errores.
+        conn = None
+        try:
+            conn = sqlite3.connect(str(tmp_dest), timeout=15)
+            result = conn.execute("PRAGMA integrity_check").fetchone()
+            if not result or result[0] != "ok":
+                return jsonify({"ok": False, "error": "La base de datos importada está corrupta"}), 400
+            if not conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='activos'"
+            ).fetchone():
+                return jsonify({"ok": False, "error": "El fichero no es un portfolio de esta aplicación"}), 400
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+        tmp_dest.replace(dest)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"No se pudo importar: {e}"}), 400
+    finally:
+        tmp_dest.unlink(missing_ok=True)
+        for suffix in ("-wal", "-shm"):
+            Path(str(tmp_dest) + suffix).unlink(missing_ok=True)
 
     meta["portfolios"].append({"id": pid, "name": name})
     from portfolios_manager import _write_meta

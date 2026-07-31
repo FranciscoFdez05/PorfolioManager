@@ -1,4 +1,4 @@
-from db import get_db
+from db import get_db, transactional
 
 _MAX_LABEL = 80
 _MAX_NAME = 120
@@ -10,6 +10,35 @@ MONTH_KEYS = [
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ]
 DEFAULT_MENSUALIDADES = []
+
+# Cada frecuencia indica cada cuántos meses se renueva el cargo.
+FRECUENCIAS = {
+    "mensual": 1,
+    "bimestral": 2,
+    "trimestral": 3,
+    "cuatrimestral": 4,
+    "semestral": 6,
+    "anual": 12,
+}
+DEFAULT_FRECUENCIA = "mensual"
+
+
+def normalize_frecuencia(value):
+    text = str(value or "").strip().lower()
+    return text if text in FRECUENCIAS else DEFAULT_FRECUENCIA
+
+
+def normalize_mes(value):
+    text = str(value or "").strip().lower()
+    return text if text in MONTH_KEYS else MONTH_KEYS[0]
+
+
+def normalize_dia_cobro(value):
+    text = str(value or "").strip()
+    if not text.isdigit():
+        return ""
+    day = int(text)
+    return str(day) if 1 <= day <= 31 else ""
 
 
 def normalize_year(year_value):
@@ -60,9 +89,31 @@ def sanitize_mensualidades_rows(rows):
         return []
     if len(rows) > 100:
         rows = rows[:100]
+
+    # La tabla exige (year, nombre) único: se desduplican los nombres repetidos
+    # en vez de dejar que el INSERT falle y se pierda todo el guardado.
+    seen = set()
+
+    def unique_name(value):
+        base = str(value or "")[:_MAX_NAME].strip() or "Mensualidad"
+        name = base
+        suffix = 2
+        while name.lower() in seen:
+            name = f"{base} ({suffix})"[:_MAX_NAME]
+            suffix += 1
+        seen.add(name.lower())
+        return name
+
     return [
         {
-            "nombre": str(row.get("nombre", ""))[:_MAX_NAME].strip() or "Mensualidad",
+            "nombre": unique_name(row.get("nombre", "")),
+            "categoria": str(row.get("categoria", ""))[:_MAX_LABEL].strip(),
+            "importe": str(row.get("importe", ""))[:_MAX_SHORT].strip(),
+            "frecuencia": normalize_frecuencia(row.get("frecuencia")),
+            "diaCobro": normalize_dia_cobro(row.get("diaCobro")),
+            "mesInicio": normalize_mes(row.get("mesInicio")),
+            "activa": bool(row.get("activa", True)),
+            "nota": str(row.get("nota", ""))[:_MAX_NOTA].strip(),
             "meses": {
                 month: str(row.get("meses", {}).get(month, ""))[:_MAX_SHORT].strip()
                 for month in MONTH_KEYS
@@ -127,6 +178,7 @@ def read_gastos_types():
     return [r["label"] for r in conn.execute("SELECT label FROM gastos_tipos ORDER BY rowid").fetchall()]
 
 
+@transactional
 def write_gastos_types(types):
     conn = get_db()
     sanitized = sanitize_gastos_types(types)
@@ -153,11 +205,19 @@ def read_gastos_year(year):
     mensualidades = [
         {
             "nombre": r["nombre"],
+            "categoria": r["categoria"],
+            "importe": r["importe"],
+            "frecuencia": normalize_frecuencia(r["frecuencia"]),
+            "diaCobro": normalize_dia_cobro(r["dia_cobro"]),
+            "mesInicio": normalize_mes(r["mes_inicio"]),
+            "activa": bool(r["activa"]),
+            "nota": r["nota"],
             "meses": {month: r[month] for month in MONTH_KEYS},
         }
         for r in conn.execute(
             "SELECT nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
-            "septiembre, octubre, noviembre, diciembre "
+            "septiembre, octubre, noviembre, diciembre, "
+            "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota "
             "FROM mensualidades WHERE year = ? ORDER BY id",
             (normalized,)
         ).fetchall()
@@ -183,6 +243,7 @@ def read_gastos_year(year):
     }
 
 
+@transactional
 def write_gastos_year(year, data):
     normalized = normalize_year(year)
     if not normalized:
@@ -196,8 +257,9 @@ def write_gastos_year(year, data):
     conn.executemany(
         "INSERT INTO mensualidades "
         "(year, nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
-        "septiembre, octubre, noviembre, diciembre) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "septiembre, octubre, noviembre, diciembre, "
+        "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (normalized, m.get("nombre", ""),
              m.get("meses", {}).get("enero", ""), m.get("meses", {}).get("febrero", ""),
@@ -205,7 +267,13 @@ def write_gastos_year(year, data):
              m.get("meses", {}).get("mayo", ""), m.get("meses", {}).get("junio", ""),
              m.get("meses", {}).get("julio", ""), m.get("meses", {}).get("agosto", ""),
              m.get("meses", {}).get("septiembre", ""), m.get("meses", {}).get("octubre", ""),
-             m.get("meses", {}).get("noviembre", ""), m.get("meses", {}).get("diciembre", ""))
+             m.get("meses", {}).get("noviembre", ""), m.get("meses", {}).get("diciembre", ""),
+             m.get("categoria", ""), m.get("importe", ""),
+             normalize_frecuencia(m.get("frecuencia")),
+             normalize_dia_cobro(m.get("diaCobro")),
+             normalize_mes(m.get("mesInicio")),
+             1 if m.get("activa", True) else 0,
+             m.get("nota", ""))
             for m in data.get("mensualidades", [])
         ]
     )
@@ -234,6 +302,7 @@ def write_gastos_year(year, data):
     conn.commit()
 
 
+@transactional
 def delete_gastos_year(year):
     normalized = normalize_year(year)
     if not normalized:

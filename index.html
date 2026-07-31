@@ -9,12 +9,14 @@
     <title>Portfolio Manager</title>
     <link rel="stylesheet" href="css/variables.css?v=20260511d">
     <link rel="stylesheet" href="css/base.css?v=20260613a">
-    <link rel="stylesheet" href="css/components.css?v=20260614a">
-    <link rel="stylesheet" href="css/pages.css?v=20260614a">
+    <link rel="stylesheet" href="css/components.css?v=20260730b">
+    <link rel="stylesheet" href="css/pages.css?v=20260730e">
     <link rel="stylesheet" href="css/themes.css?v=20260518a">
     <script>
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
     </script>
+    <!-- Debe ir antes que cualquier script que llame a fetch() -->
+    <script src="js/csrf.js?v=20260730a"></script>
 </head>
 <body>
 
@@ -1354,12 +1356,12 @@
 </div><!-- /.sttOverlay -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="js/app-core.js?v=20260613a"></script>
+<script src="js/app-core.js?v=20260730d"></script>
 <script src="js/assets.js?v=20260613a"></script>
 <script src="js/intereses.js?v=20260501a"></script>
 <script src="js/dividendos.js?v=20260421a"></script>
-<script src="js/gastos.js?v=20260426a"></script>
-<script src="js/ingresos.js?v=20260426a"></script>
+<script src="js/gastos.js?v=20260730e"></script>
+<script src="js/ingresos.js?v=20260730d"></script>
 <script src="js/ventas.js?v=20260423a"></script>
 <script src="js/transacciones.js?v=20260423a"></script>
 <script src="js/stablecoins.js?v=20260423a"></script>
