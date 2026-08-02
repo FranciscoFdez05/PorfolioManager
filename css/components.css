@@ -89,20 +89,23 @@
     cursor:grab;
 }
 
+/* Hueco: muestra en vivo la posición final del activo mientras se arrastra */
 .assetBtn.dragging{
-    opacity:0.45;
     cursor:grabbing;
-    background:var(--bg-surface);
+    background:var(--bg-elevated);
     border-bottom-color:transparent;
     border-radius:10px;
-    box-shadow:inset 0 0 0 1px var(--btn-border);
+    box-shadow:inset 0 0 0 2px var(--accent);
+    opacity:1;
 }
 
-.assetBtn.dragOver{
-    background:var(--bg-surface);
-    border-bottom-color:transparent;
-    border-radius:10px;
-    box-shadow:inset 0 0 0 1px var(--accent);
+.assetBtn.dragging > *{
+    opacity:0.5;
+}
+
+.assetBtn.dragging .assetBtnName{
+    opacity:0.85;
+    font-weight:600;
 }
 
 .assetBtn:hover{

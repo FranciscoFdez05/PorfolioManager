@@ -384,7 +384,17 @@ async function createAssetOnServer(name, type, marketSymbol = "", marketProvider
 
     if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        let serverMessage = ""
+
+        try {
+            serverMessage = JSON.parse(errorText)?.error || ""
+        } catch {
+            serverMessage = ""
+        }
+
+        const error = new Error(serverMessage || `HTTP ${response.status}: ${errorText}`)
+        error.serverMessage = serverMessage
+        throw error
     }
 
     return await response.json()
@@ -1411,107 +1421,158 @@ async function refreshOverviewIfVisible() {
 }
 
 function initAssetDragAndDrop(assetsList) {
-    const assetButtons = [...assetsList.querySelectorAll(".assetBtn")]
+    const assetButtons = [...assetsList.querySelectorAll(".assetBtn:not(.assetBtnSegCustom)")]
 
     assetButtons.forEach((button) => {
+        if (!button.draggable) {
+            return
+        }
+
         button.addEventListener("dragstart", (event) => {
             draggedAssetId = button.dataset.assetId || null
-            button.classList.add("dragging")
 
-            if (event.dataTransfer) {
-                event.dataTransfer.effectAllowed = "move"
-                event.dataTransfer.setData("text/plain", draggedAssetId || "")
-            }
-        })
-
-        button.addEventListener("dragend", () => {
-            button.classList.remove("dragging")
-            clearAssetDragState()
-            draggedAssetId = null
-        })
-
-        button.addEventListener("dragover", (event) => {
-            if (!draggedAssetId || draggedAssetId === button.dataset.assetId) {
-                return
-            }
-
-            event.preventDefault()
-            button.classList.add("dragOver")
-        })
-
-        button.addEventListener("dragleave", () => {
-            button.classList.remove("dragOver")
-        })
-
-        button.addEventListener("drop", async (event) => {
-            event.preventDefault()
-
-            const targetAssetId = button.dataset.assetId || ""
-
-            button.classList.remove("dragOver")
-
-            if (!draggedAssetId || !targetAssetId || draggedAssetId === targetAssetId) {
-                return
-            }
-
-            try {
-                await handleAssetDropReorder(draggedAssetId, targetAssetId, event.clientY)
-            } catch (error) {
-                console.error(error)
-                alert("No se pudo reordenar el activo.")
-            } finally {
-                clearAssetDragState()
-                draggedAssetId = null
-            }
-        })
-    })
-
-    if (!assetsList.dataset.dragBound) {
-        assetsList.dataset.dragBound = "true"
-        assetsList.addEventListener("dragover", (event) => {
             if (!draggedAssetId) {
                 return
             }
 
-            event.preventDefault()
-        })
-    }
-}
+            if (event.dataTransfer) {
+                event.dataTransfer.effectAllowed = "move"
+                event.dataTransfer.setData("text/plain", draggedAssetId)
+            }
 
-function clearAssetDragState() {
-    document.querySelectorAll(".assetBtn.dragOver, .assetBtn.dragging").forEach((button) => {
-        button.classList.remove("dragOver", "dragging")
+            // El estilo de hueco se aplica tras generar la imagen de arrastre
+            requestAnimationFrame(() => button.classList.add("dragging"))
+        })
+
+        button.addEventListener("dragend", () => {
+            const wasDropped = assetsList.dataset.dragDropped === "true"
+            delete assetsList.dataset.dragDropped
+            button.classList.remove("dragging")
+            draggedAssetId = null
+
+            if (!wasDropped) {
+                // Arrastre cancelado: se restaura el orden real desde el servidor
+                refreshAssetsSidebar(currentAssetId, false).catch((error) => console.error(error))
+            }
+        })
+    })
+
+    if (assetsList.dataset.dragBound === "true") {
+        return
+    }
+
+    assetsList.dataset.dragBound = "true"
+
+    assetsList.addEventListener("dragover", (event) => {
+        const dragged = assetsList.querySelector(".assetBtn.dragging")
+
+        if (!draggedAssetId || !dragged) {
+            return
+        }
+
+        event.preventDefault()
+
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move"
+        }
+
+        moveDraggedAssetPreview(assetsList, dragged, findAssetListDropReference(assetsList, dragged, event.clientY))
+    })
+
+    assetsList.addEventListener("drop", async (event) => {
+        const dragged = assetsList.querySelector(".assetBtn.dragging")
+
+        if (!draggedAssetId || !dragged) {
+            return
+        }
+
+        event.preventDefault()
+        assetsList.dataset.dragDropped = "true"
+
+        const movedAssetId = draggedAssetId
+
+        try {
+            await commitAssetOrderFromDom(assetsList, ".assetBtn:not(.assetBtnSegCustom)", movedAssetId)
+            await refreshAssetsSidebar(currentAssetId, false)
+        } catch (error) {
+            console.error(error)
+            alert("No se pudo reordenar el activo.")
+            await refreshAssetsSidebar(currentAssetId, false).catch(() => {})
+        }
     })
 }
 
-async function handleAssetDropReorder(sourceAssetId, targetAssetId, pointerY) {
+// Devuelve el elemento delante del cual debe colocarse el activo arrastrado (null = al final)
+function findAssetListDropReference(assetsList, dragged, pointerY) {
+    const buttons = [...assetsList.querySelectorAll(".assetBtn:not(.assetBtnSegCustom)")]
+        .filter((button) => button !== dragged && button.dataset.assetId)
+
+    for (const button of buttons) {
+        const rect = button.getBoundingClientRect()
+
+        if (pointerY < rect.top + (rect.height / 2)) {
+            return button
+        }
+    }
+
+    return assetsList.querySelector(".assetBtnSegCustom")
+}
+
+// Reubica en vivo el elemento arrastrado para que se vea dónde va a quedar
+function moveDraggedAssetPreview(container, dragged, reference) {
+    if (reference === dragged) {
+        return
+    }
+
+    if (!reference) {
+        if (container.lastElementChild !== dragged) {
+            container.appendChild(dragged)
+        }
+
+        return
+    }
+
+    if (reference.previousElementSibling !== dragged) {
+        container.insertBefore(dragged, reference)
+    }
+}
+
+// Traslada el orden visible del DOM al orden completo de activos y lo guarda
+async function commitAssetOrderFromDom(container, selector, movedAssetId) {
+    const visibleIds = [...container.querySelectorAll(selector)]
+        .map((element) => element.dataset.assetId)
+        .filter(Boolean)
+    const movedIndex = visibleIds.indexOf(movedAssetId)
+
+    if (movedIndex === -1) {
+        throw new Error("No se encontró el activo para reordenar")
+    }
+
+    const previousId = movedIndex > 0 ? visibleIds[movedIndex - 1] : null
+    const nextId = movedIndex < visibleIds.length - 1 ? visibleIds[movedIndex + 1] : null
+
     const assets = await loadAssetsList()
     const orderedIds = assets.map((asset) => asset.id)
-    const sourceIndex = orderedIds.indexOf(sourceAssetId)
-    const targetIndex = orderedIds.indexOf(targetAssetId)
+    const sourceIndex = orderedIds.indexOf(movedAssetId)
 
-    if (sourceIndex === -1 || targetIndex === -1) {
+    if (sourceIndex === -1) {
         throw new Error("No se encontró el activo para reordenar")
     }
 
     orderedIds.splice(sourceIndex, 1)
 
-    const targetButton = document.querySelector(`.assetBtn[data-asset-id="${targetAssetId}"]`)
-    const targetRect = targetButton?.getBoundingClientRect()
-    const insertAfterTarget = Boolean(targetRect && pointerY > targetRect.top + (targetRect.height / 2))
-    let insertIndex = targetIndex
+    let insertIndex = orderedIds.length
 
-    if (insertAfterTarget) {
-        insertIndex += 1
+    if (previousId && orderedIds.indexOf(previousId) !== -1) {
+        insertIndex = orderedIds.indexOf(previousId) + 1
+    } else if (nextId && orderedIds.indexOf(nextId) !== -1) {
+        insertIndex = orderedIds.indexOf(nextId)
+    } else if (!previousId) {
+        insertIndex = 0
     }
 
-    if (sourceIndex < targetIndex) {
-        insertIndex -= 1
-    }
-
-    orderedIds.splice(Math.max(0, insertIndex), 0, sourceAssetId)
+    orderedIds.splice(insertIndex, 0, movedAssetId)
     await saveAssetOrderOnServer(orderedIds)
-    await refreshAssetsSidebar(currentAssetId, false)
 }
 
 function buildAssetTypeLabel(assetType) {
@@ -3614,7 +3675,10 @@ function initAssetTableLogic(asset) {
             })
             const data = await res.json()
             btn.disabled = false
-            if (!data.ok) return
+            if (!data.ok) {
+                alert(data.error || "No se pudo cambiar la moneda de cotización")
+                return
+            }
             document.querySelectorAll("#assetPriceCurrencyRow .assetCurrBtn").forEach(b => {
                 b.classList.toggle("active", b.dataset.currency === currency)
             })
@@ -4057,7 +4121,8 @@ async function submitAssetModal() {
         await refreshAssetsSidebar(createdAsset.id, true)
     } catch (error) {
         console.error(error)
-        setAssetSearchFeedback(assetSearchFeedback, "No se pudo crear el activo.", true)
+        const detail = error?.serverMessage ? ` ${error.serverMessage}.` : ""
+        setAssetSearchFeedback(assetSearchFeedback, `No se pudo crear el activo.${detail}`, true)
     }
 }
 
@@ -4862,63 +4927,79 @@ async function initActivosPageLogic() {
 
 function avInitDragDrop() {
     const grid = document.getElementById("activosGrid")
-    if (!grid) return
+    if (!grid || grid.dataset.dragBound === "true") return
+    grid.dataset.dragBound = "true"
 
     let avDraggedId = null
+    let avDropped = false
 
     grid.addEventListener("dragstart", (e) => {
         const card = e.target.closest(".avCard")
-        if (!card) return
+        if (!card || !card.dataset.assetId) return
         avDraggedId = card.dataset.assetId
         draggedAssetId = avDraggedId
-        card.classList.add("avDragging")
+        avDropped = false
         if (e.dataTransfer) {
             e.dataTransfer.effectAllowed = "move"
             e.dataTransfer.setData("text/plain", avDraggedId)
         }
+        // El estilo de hueco se aplica tras generar la imagen de arrastre
+        requestAnimationFrame(() => card.classList.add("avDragging"))
     })
 
     grid.addEventListener("dragend", (e) => {
         const card = e.target.closest(".avCard")
         if (card) card.classList.remove("avDragging")
-        grid.querySelectorAll(".avDragOver").forEach((c) => c.classList.remove("avDragOver"))
         avDraggedId = null
         draggedAssetId = null
+        // Arrastre cancelado: se restaura el orden real
+        if (!avDropped) avRenderGrid()
+        avDropped = false
     })
 
     grid.addEventListener("dragover", (e) => {
+        const dragged = grid.querySelector(".avCard.avDragging")
+        if (!avDraggedId || !dragged) return
         e.preventDefault()
-        const card = e.target.closest(".avCard")
-        if (!card || !avDraggedId || card.dataset.assetId === avDraggedId) return
-        grid.querySelectorAll(".avDragOver").forEach((c) => c.classList.remove("avDragOver"))
-        card.classList.add("avDragOver")
-    })
-
-    grid.addEventListener("dragleave", (e) => {
-        const card = e.target.closest(".avCard")
-        if (card) card.classList.remove("avDragOver")
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move"
+        moveDraggedAssetPreview(grid, dragged, avFindDropReference(grid, dragged, e.clientX, e.clientY))
     })
 
     grid.addEventListener("drop", async (e) => {
+        const dragged = grid.querySelector(".avCard.avDragging")
+        if (!avDraggedId || !dragged) return
         e.preventDefault()
-        const targetCard = e.target.closest(".avCard")
-        if (!targetCard || !avDraggedId || targetCard.dataset.assetId === avDraggedId) return
-        targetCard.classList.remove("avDragOver")
+        avDropped = true
+        const movedAssetId = avDraggedId
         try {
-            await handleAssetDropReorder(avDraggedId, targetCard.dataset.assetId, e.clientY)
+            await commitAssetOrderFromDom(grid, ".avCard", movedAssetId)
+            const metricsById = new Map(_activosAllAssets.map((a) => [a.id, a._metrics]))
             _activosAllAssets = await loadAssetsList()
             _activosAllAssets.forEach((a) => {
-                const old = _activosAllAssets.find((o) => o.id === a.id)
-                if (old) a._metrics = old._metrics
+                const metrics = metricsById.get(a.id)
+                if (metrics) a._metrics = metrics
             })
             avRender()
             avLoadMetrics()
         } catch (err) {
             console.error("avDrop error", err)
+            avRenderGrid()
         }
-        avDraggedId = null
-        draggedAssetId = null
     })
+}
+
+// Devuelve la tarjeta delante de la cual debe colocarse la arrastrada (null = al final)
+function avFindDropReference(grid, dragged, pointerX, pointerY) {
+    const cards = [...grid.querySelectorAll(".avCard")].filter((card) => card !== dragged && card.dataset.assetId)
+
+    for (const card of cards) {
+        const rect = card.getBoundingClientRect()
+
+        if (pointerY > rect.bottom) continue
+        if (pointerY < rect.top || pointerX < rect.left + (rect.width / 2)) return card
+    }
+
+    return null
 }
 
 async function avLoadMetrics() {

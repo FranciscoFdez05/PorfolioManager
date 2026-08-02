@@ -277,10 +277,28 @@ def changeActivoCurrency(assetId):
         supported = {"EUR", "USD", "GBP", "CHF", "JPY"}
         if target_currency not in supported:
             return jsonify({"ok": False, "error": f"Moneda no soportada. Opciones: {', '.join(sorted(supported))}"}), 400
+
+        if current_precio_currency == target_currency:
+            assetData["precioCurrency"] = target_currency
+            writeAssetFile(assetId, assetData)
+            return jsonify({"ok": True, "asset": assetData, "converted": False})
+
+        # Convert the stored quote, not just its label: the price must really be in target_currency
+        converted_price = parse_loose_number(assetData.get("price", ""))
+
+        if converted_price is not None:
+            converted_price, error = convert_amount(converted_price, current_precio_currency, target_currency)
+
+            if error:
+                statusCode = 503 if is_temporary_service_error(error) else 400
+                return jsonify({"ok": False, "error": error}), statusCode
+
+            assetData["price"] = format_decimal(converted_price)
+
         assetData["precioCurrency"] = target_currency
-        assetData["status"] = f"Moneda de cotización: {target_currency}"
+        assetData["status"] = f"Moneda de cotización: {current_precio_currency}->{target_currency}"
         writeAssetFile(assetId, assetData)
-        return jsonify({"ok": True, "asset": assetData, "converted": False})
+        return jsonify({"ok": True, "asset": assetData, "converted": True})
 
     if target_currency not in {"EUR", "USD"}:
         return jsonify({"ok": False, "error": "Solo se permite cambiar entre EUR y USD"}), 400
