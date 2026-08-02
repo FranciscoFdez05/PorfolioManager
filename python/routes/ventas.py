@@ -1,10 +1,15 @@
 from flask import Blueprint, jsonify, request
 
-from gastos_store import normalize_year
-from ventas_store import (
-    create_default_ventas_year, delete_ventas_year, list_ventas_years,
-    migrate_legacy_ventas_if_needed, read_all_ventas_rows, read_ventas_year,
-    sanitize_ventas_payload, write_ventas_year,
+from stores.gastos_store import normalize_year
+from stores.ventas_store import (
+    create_default_ventas_year,
+    delete_ventas_year,
+    list_ventas_years,
+    migrate_legacy_ventas_if_needed,
+    read_all_ventas_rows,
+    read_ventas_year,
+    sanitize_ventas_payload,
+    write_ventas_year,
 )
 
 ventas_bp = Blueprint("ventas", __name__)

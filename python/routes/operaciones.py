@@ -2,8 +2,8 @@ import re
 
 from flask import Blueprint, jsonify, request
 
-from app_data import readOperacionesFile, readStablecoinsFile, writeOperacionesFile, writeStablecoinsFile
-from helpers import sync_completed_operations_into_assets
+from stores.app_data import readOperacionesFile, readStablecoinsFile, writeOperacionesFile, writeStablecoinsFile
+from stores.helpers import sync_completed_operations_into_assets
 
 operaciones_bp = Blueprint("operaciones", __name__)
 
@@ -131,7 +131,7 @@ def getStablecoins():
         catalog = [entry for entry in catalog if entry]
         data = {
             "catalog": catalog,
-            "enabledSymbols": migrated_symbols if not enabled_symbols else enabled_symbols,
+            "enabledSymbols": enabled_symbols or migrated_symbols,
             "rows": rows
         }
         writeStablecoinsFile(data)

@@ -1,16 +1,17 @@
 import json
+import logging
 import re
 import shutil
 import sqlite3
 import threading
 import zipfile
-import logging
 from datetime import datetime
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from backup_manager import _remove_wal_sidecars
+from admin.backup_manager import _remove_wal_sidecars
+from core.paths import BASE_DIR
 from routes.ajustes import _read_ajustes
 
 log = logging.getLogger(__name__)
@@ -22,12 +23,11 @@ _BACKUP_LOCK = threading.Lock()
 
 backup_bp = Blueprint("backup", __name__)
 
-_BASE_DIR    = Path(__file__).resolve().parent.parent.parent
-_BACKUP_DIR  = _BASE_DIR / "data" / "backups"
-_PORTFOLIOS_DIR = _BASE_DIR / "data" / "portfolios"
-_META_FILE   = _BASE_DIR / "data" / "portfolios.json"
-_AJUSTES_SRC = _BASE_DIR / "data" / "JSON" / "ajustes.json"
-_JSON_DIR    = _BASE_DIR / "data" / "JSON"
+_BACKUP_DIR  = BASE_DIR / "data" / "backups"
+_PORTFOLIOS_DIR = BASE_DIR / "data" / "portfolios"
+_META_FILE   = BASE_DIR / "data" / "portfolios.json"
+_AJUSTES_SRC = BASE_DIR / "data" / "JSON" / "ajustes.json"
+_JSON_DIR    = BASE_DIR / "data" / "JSON"
 
 _RE_ZIP = re.compile(r'^backup_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.zip$')
 _RE_DB  = re.compile(r'^portfolio_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.db$')
@@ -88,7 +88,7 @@ def _safety_copy_before_restore() -> Path | None:
     if not _PORTFOLIOS_DIR.exists():
         return None
     ts = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-    dest_dir = _BASE_DIR / "data" / "pre_restore" / ts
+    dest_dir = BASE_DIR / "data" / "pre_restore" / ts
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
         for db_file in sorted(_PORTFOLIOS_DIR.glob("*.db")):
@@ -130,7 +130,7 @@ def _checkpoint_active_db():
     esté en el fichero .db.
     """
     try:
-        from db import get_db
+        from core.db import get_db
         conn = get_db()
         conn.commit()
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
@@ -273,7 +273,7 @@ def _restore_locked():
 
     safety_dir = _safety_copy_before_restore()
 
-    from db import invalidate_all_connections
+    from core.db import invalidate_all_connections
     invalidate_all_connections()
 
     try:
@@ -362,14 +362,14 @@ def _restore_locked():
 
             # Re-activar el portfolio que estaba activo en el backup
             try:
-                from portfolios_manager import init_portfolios
+                from admin.portfolios_manager import init_portfolios
                 init_portfolios()
             except Exception:
                 pass
 
         else:
             # Formato legacy .db: restaura solo el portfolio activo
-            from db import get_active_db_path
+            from core.db import get_active_db_path
             active_db = get_active_db_path()
             _sqlite_copy(backup_path, active_db)
             _remove_wal_sidecars(active_db)

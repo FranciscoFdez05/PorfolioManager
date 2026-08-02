@@ -7,7 +7,6 @@ import re
 import secrets
 import threading
 import time
-from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
@@ -15,11 +14,11 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from flask import Blueprint, jsonify, make_response, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from core.paths import BASE_DIR, HTML_DIR
+
 auth_bp = Blueprint("auth", __name__)
 
-_BASE_DIR     = Path(__file__).resolve().parent.parent.parent
-_AUTH_FILE    = _BASE_DIR / "data" / "auth.dat"
-_ENV_FILE     = _BASE_DIR / ".env"
+_AUTH_FILE    = BASE_DIR / "data" / "auth.dat"
 _DEFAULT_HASH = generate_password_hash(secrets.token_hex(32), method="pbkdf2:sha256:600000")
 
 logger = logging.getLogger(__name__)
@@ -157,23 +156,9 @@ def _save_credentials(username: str, password_hash: str) -> None:
         _AUTH_FILE.write_bytes(payload)
 
 
-def _update_env_key(key: str, value: str) -> None:
-    """Actualiza o inserta una clave en .env (solo para SECRET_KEY)."""
-    if not _ENV_FILE.exists():
-        return
-    content = _ENV_FILE.read_text("utf-8")
-    pattern = re.compile(rf"^{re.escape(key)}\s*=.*$", re.MULTILINE)
-    new_line = f"{key}={value}"
-    if pattern.search(content):
-        content = pattern.sub(new_line, content)
-    else:
-        content = content.rstrip("\n") + f"\n{new_line}\n"
-    _ENV_FILE.write_text(content, "utf-8")
-
-
 # ── Rutas ─────────────────────────────────────────────────────────────────────
 
-_LOGIN_HTML = _BASE_DIR / "html" / "login.html"
+_LOGIN_HTML = HTML_DIR / "sesion" / "login.html"
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -244,7 +229,7 @@ def change_username():
     if not new_username:
         return jsonify({"ok": False, "error": "El nuevo usuario no puede estar vacío"}), 400
 
-    current_user, password_hash = _load_credentials()
+    _current_user, password_hash = _load_credentials()
     if not check_password_hash(password_hash, current_password):
         return jsonify({"ok": False, "error": "Contraseña actual incorrecta"}), 400
 

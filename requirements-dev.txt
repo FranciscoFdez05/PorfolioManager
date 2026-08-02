@@ -1,0 +1,6 @@
+# Dependencias solo de desarrollo/CI. La imagen Docker instala únicamente
+# requirements.txt, así que nada de esto llega a producción.
+-r requirements.txt
+
+pytest>=8.3.0
+ruff>=0.8.0

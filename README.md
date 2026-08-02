@@ -164,6 +164,73 @@ cp data/portfolios/principal.db data/portfolios/principal.db.bak
 
 ---
 
+## Desarrollo
+
+```bash
+pip install -r requirements-dev.txt
+
+pytest              # suite completa
+pytest -m "not network"   # lo que corre en CI
+ruff check .        # lint
+ruff check . --fix  # correcciones automáticas
+```
+
+La configuración de pytest y ruff está en `pyproject.toml`. Los tests **nunca tocan `data/`**: usan una BD temporal vía `set_active_db_path()` y no importan `server`, porque ese módulo inicializa los portfolios reales al importarse.
+
+`.github/workflows/ci.yml` ejecuta lint + tests en Python 3.11/3.12/3.13 y comprueba que la imagen Docker construye.
+
+### Estructura del proyecto
+
+```
+python/
+  server.py          arranque de Flask, rutas estáticas, CSRF y sesión
+  core/              infraestructura: paths, db, errors, validation, secret_store
+  stores/            acceso a datos y sanitización por dominio
+  providers/         clientes de cotizaciones + http/text comunes + api_stats
+  admin/             portfolios, backups y credenciales
+  routes/            un blueprint por área de la API
+
+js/
+  core/              csrf, api, dom, app-core, shared-utils
+  cartera/           assets, portfolios, private-market
+  finanzas/          gastos, ingresos, ahorro, ventas, dividendos, intereses, bonos
+  cripto/            stablecoins, operaciones, transacciones, conversiones,
+                     staking, earn, trading-journal
+  analisis/          metricas, seguimiento, heatmap, herramientas
+  ajustes/           ajustes
+
+html/                fragmentos de página, con las mismas carpetas que js/
+                     (+ sesion/ para login, setup y el overlay de ajustes)
+css/                 variables, base, components, pages, themes
+```
+
+`python/` es la raíz de importación (`gunicorn --chdir python server:app`), así que los paquetes se importan como `from core.db import …`, `from stores.gastos_store import …`.
+
+**Rutas del sistema de ficheros:** todas salen de `core/paths.py` (`BASE_DIR`, `DATA_DIR`, `API_DIR`, `HTML_DIR`…). Ningún módulo debe recalcular la raíz con `Path(__file__).parent.parent`: esa cuenta depende de la profundidad del fichero y se rompe al mover nada de sitio.
+
+**Fragmentos HTML:** `loadPage()` resuelve la carpeta con el mapa `_PAGE_DIRS` de `js/core/app-core.js`. Al añadir una página nueva dentro de una subcarpeta hay que registrarla ahí; si no aparece en el mapa se busca en la raíz de `html/`.
+
+### Piezas transversales del backend
+
+| Módulo | Responsabilidad |
+|---|---|
+| `core/errors.py` | Excepciones de negocio (`ValidationError`, `NotFoundError`, `ConflictError`, `UpstreamError`) y manejadores globales. Todo lo que cuelga de `/api/` responde JSON `{ok:false, error, requestId}`, incluso ante un fallo no previsto, y el detalle interno solo va al log. |
+| `core/validation.py` | Normalización de la entrada de las rutas (`as_text`, `as_number`, `as_year`, `as_rows`, `one_of`…) con límites de longitud y de número de filas. |
+| `core/paths.py` | Única fuente de verdad de las rutas del proyecto. |
+| `providers/` | Capa común de los cuatro clientes de cotizaciones: `http.py` (reintentos con backoff, `Retry-After`, tope de tamaño de respuesta, JSON malformado tratado como error de red) y `text.py` (formato numérico y normalización de símbolos). |
+
+Cada respuesta lleva la cabecera `X-Request-Id`; ese mismo identificador aparece en el log y en el cuerpo del error, así que un fallo reportado por el usuario se localiza buscando esa cadena en `logs/`.
+
+### Piezas transversales del frontend
+
+| Fichero | Responsabilidad |
+|---|---|
+| `js/core/csrf.js` | Envuelve `fetch` para adjuntar la cabecera CSRF. Debe cargarse el primero. |
+| `js/core/api.js` | `Api.get/post/put/del`: timeout, reintento de las lecturas, mensaje de error real del servidor y redirección al login cuando caduca la sesión (esto último se aplica también a las llamadas a `fetch` sin migrar). |
+| `js/core/dom.js` | `escapeHtml`, constructores de nodos (`el`, `setText`, `clearNode`) y avisos no bloqueantes (`showToast`, `showError`). |
+
+---
+
 ## Licencia
 
 Consulta el archivo [LICENSE](LICENSE).

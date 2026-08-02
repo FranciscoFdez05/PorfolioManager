@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-from app_data import readTradingFile, writeTradingFile
+from stores.app_data import readTradingFile, writeTradingFile
 
 trading_bp = Blueprint("trading", __name__)
 

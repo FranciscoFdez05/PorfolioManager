@@ -1,0 +1,68 @@
+[project]
+name = "porfoliopython"
+version = "1.0.0"
+description = "Seguimiento local de una cartera de inversión personal (Flask + SQLite)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# El código vive en python/ y se importa de forma plana (`from app_data import …`),
+# igual que hace gunicorn con --chdir python. Sin esto los tests no resolverían
+# los módulos.
+pythonpath = ["python"]
+addopts = "-q --strict-markers"
+filterwarnings = ["error::DeprecationWarning"]
+markers = [
+    "network: pruebas que salen a internet (desactivadas en CI)",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = [".claude", "data", "logs", "API"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes: nombres sin definir, imports sin usar
+    "W",    # warnings
+    "I",    # orden de imports
+    "B",    # bugbear: fallos reales (mutables por defecto, except inútiles…)
+    "UP",   # pyupgrade
+    "C4",   # comprehensions
+    "SIM",  # simplificaciones
+    "RUF",  # reglas propias de ruff
+]
+ignore = [
+    # El proyecto usa camelCase en las funciones de rutas y stores por
+    # coherencia con el frontend; renombrarlo sería un cambio masivo sin valor.
+    "N802", "N803", "N806",
+    # `except Exception` es deliberado en los puntos donde un fallo de un
+    # proveedor externo no debe tumbar la petición completa.
+    "BLE001",
+    # La longitud de línea la decide `ruff format`, no el linter: marcar aquí
+    # tablas de datos y literales largos solo genera ruido.
+    "E501",
+    # `try/except: pass` explícito se lee mejor que contextlib.suppress en las
+    # limpiezas de conexiones y ficheros temporales de este código.
+    "SIM105",
+    "SIM108",  # el ternario no siempre es más legible aquí
+    # Los `if` anidados de las funciones de puntuación de símbolos expresan
+    # niveles de decisión distintos; colapsarlos los hace ilegibles.
+    "SIM102",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# server.py registra los tipos MIME antes de importar Flask a propósito: si se
+# importa primero, Werkzeug cachea el mapa de mimetypes de Windows y sirve los
+# .js con el Content-Type equivocado.
+"python/server.py" = ["E402"]
+# Los tests declaran conjuntos de opciones como atributos de clase.
+"tests/*" = ["RUF012"]
+
+[tool.ruff.lint.isort]
+# Sin esto, los imports con alias (`from market import fetch_json,
+# format_decimal as _format_decimal`) se parten en un bloque `from market
+# import (...)` por cada alias.
+combine-as-imports = true
+known-first-party = ["admin", "core", "providers", "routes", "server", "stores"]

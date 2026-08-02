@@ -3,7 +3,6 @@ import logging
 import mimetypes
 import os
 import secrets
-from pathlib import Path
 
 mimetypes.add_type("text/css", ".css")
 mimetypes.add_type("application/javascript", ".js")
@@ -14,8 +13,9 @@ mimetypes.add_type("font/woff2", ".woff2")
 from dotenv import load_dotenv
 from flask import Flask, abort, redirect, request, send_from_directory, session, url_for
 
-from app_data import baseDir, ensureDataFile
-from portfolios_manager import init_portfolios
+from admin.portfolios_manager import init_portfolios
+from core.errors import register_error_handlers
+from core.paths import API_DIR, BACKUPS_DIR, BASE_DIR, DATA_DIR
 from routes.activos import activos_bp
 from routes.ajustes import ajustes_bp
 from routes.auth import auth_bp
@@ -24,15 +24,17 @@ from routes.gastos import gastos_bp
 from routes.ingresos import ingresos_bp
 from routes.market import market_bp
 from routes.operaciones import operaciones_bp
-from routes.trading import trading_bp
 from routes.portfolios import portfolios_bp
 from routes.registros import registros_bp
 from routes.snapshots import snapshots_bp
+from routes.trading import trading_bp
 from routes.ventas import ventas_bp
+from stores.app_data import ensureDataFile
+
 
 def _read_runtime_config():
     config = configparser.ConfigParser()
-    config.read(baseDir / "config.ini", encoding="utf-8")
+    config.read(BASE_DIR / "config.ini", encoding="utf-8")
 
     server_section = config["server"] if config.has_section("server") else {}
 
@@ -104,6 +106,11 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 # SESSION_COOKIE_SECURE se activa solo cuando hay HTTPS (evita romper HTTP local)
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("HTTPS_ENABLED", "false").lower() == "true"
+
+# Antes que los blueprints, para que el request id ya esté disponible en los
+# before_request de CSRF y de login (así sus warnings se pueden correlacionar
+# con la respuesta que recibió el navegador).
+register_error_handlers(app)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(activos_bp)
@@ -231,7 +238,7 @@ def add_security_headers(response):
 
 @app.route("/")
 def serveIndex():
-    response = send_from_directory(baseDir, "index.html")
+    response = send_from_directory(BASE_DIR, "index.html")
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -259,7 +266,7 @@ def serveStatic(path):
     if ext not in _ALLOWED_EXTENSIONS:
         abort(404)
 
-    response = send_from_directory(baseDir, normalized)
+    response = send_from_directory(BASE_DIR, normalized)
     if ext in (".js", ".css"):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -271,7 +278,7 @@ def _check_auto_backup():
     import sqlite3
     from datetime import datetime, timedelta
 
-    ajustes_path = baseDir / "data" / "JSON" / "ajustes.json"
+    ajustes_path = DATA_DIR / "JSON" / "ajustes.json"
     days = 0
     try:
         if ajustes_path.exists():
@@ -285,12 +292,12 @@ def _check_auto_backup():
     # La BD activa, NO data/portfolio.db: ese fichero es el legacy congelado en
     # el momento de la migración a multi-portfolio. Apuntar ahí generaba
     # backups de datos obsoletos que, al restaurarlos, sobrescribían la BD real.
-    from db import get_active_db_path
+    from core.db import get_active_db_path
     db_path = get_active_db_path()
     if not db_path.exists():
         return
 
-    backups_dir = baseDir / "data" / "backups"
+    backups_dir = BACKUPS_DIR
     filename_re = re.compile(r'^portfolio_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.db$')
     if backups_dir.exists():
         candidates = sorted(
@@ -340,10 +347,10 @@ def _check_auto_backup():
 
 def _encrypt_api_keys_at_rest():
     """Cifra los API/*.key que sigan en texto plano de instalaciones previas."""
-    from secret_store import migrate_plaintext_if_needed
+    from core.secret_store import migrate_plaintext_if_needed
     for name in ("finnhub.key", "eodhd.key", "alphavantage.key", "twelvedata.key"):
         try:
-            migrate_plaintext_if_needed(baseDir / "API" / name)
+            migrate_plaintext_if_needed(API_DIR / name)
         except Exception as e:
             logging.warning("No se pudo cifrar %s: %s", name, e)
 

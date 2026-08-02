@@ -16,7 +16,11 @@
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
     </script>
     <!-- Debe ir antes que cualquier script que llame a fetch() -->
-    <script src="js/csrf.js?v=20260730a"></script>
+    <script src="js/core/csrf.js?v=20260730a"></script>
+    <!-- api.js envuelve fetch DESPUÉS de csrf.js (sesión caducada, timeouts);
+         dom.js expone escapeHtml y los helpers que usan todos los módulos. -->
+    <script src="js/core/api.js?v=20260802a"></script>
+    <script src="js/core/dom.js?v=20260802a"></script>
 </head>
 <body>
 
@@ -1356,29 +1360,29 @@
 </div><!-- /.sttOverlay -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="js/app-core.js?v=20260730d"></script>
-<script src="js/assets.js?v=20260802a"></script>
-<script src="js/intereses.js?v=20260501a"></script>
-<script src="js/dividendos.js?v=20260421a"></script>
-<script src="js/gastos.js?v=20260730e"></script>
-<script src="js/ingresos.js?v=20260730d"></script>
-<script src="js/ventas.js?v=20260423a"></script>
-<script src="js/transacciones.js?v=20260423a"></script>
-<script src="js/stablecoins.js?v=20260423a"></script>
-<script src="js/operaciones.js?v=20260514a"></script>
-<script src="js/trading-journal.js?v=20260514d"></script>
-<script src="js/staking.js?v=20260515b"></script>
-<script src="js/earn.js?v=20260515b"></script>
-<script src="js/conversiones.js?v=20260401g"></script>
-<script src="js/herramientas.js?v=20260508b"></script>
-<script src="js/bonos.js?v=20260420a"></script>
-<script src="js/metricas.js?v=20260517a"></script>
-<script src="js/ajustes.js?v=20260613a"></script>
-<script src="js/shared-utils.js?v=20260516f"></script>
-<script src="js/heatmap.js?v=20260505b"></script>
-<script src="js/seguimiento.js?v=20260518c"></script>
-<script src="js/portfolios.js?v=20260511b"></script>
-<script src="js/private-market.js?v=20260614a"></script>
-<script src="js/ahorro.js?v=20260703a"></script>
+<script src="js/core/app-core.js?v=20260730d"></script>
+<script src="js/cartera/assets.js?v=20260802b"></script>
+<script src="js/finanzas/intereses.js?v=20260501a"></script>
+<script src="js/finanzas/dividendos.js?v=20260802b"></script>
+<script src="js/finanzas/gastos.js?v=20260802b"></script>
+<script src="js/finanzas/ingresos.js?v=20260802b"></script>
+<script src="js/finanzas/ventas.js?v=20260423a"></script>
+<script src="js/cripto/transacciones.js?v=20260423a"></script>
+<script src="js/cripto/stablecoins.js?v=20260802b"></script>
+<script src="js/cripto/operaciones.js?v=20260802b"></script>
+<script src="js/cripto/trading-journal.js?v=20260802b"></script>
+<script src="js/cripto/staking.js?v=20260515b"></script>
+<script src="js/cripto/earn.js?v=20260515b"></script>
+<script src="js/cripto/conversiones.js?v=20260802b"></script>
+<script src="js/analisis/herramientas.js?v=20260508b"></script>
+<script src="js/finanzas/bonos.js?v=20260802b"></script>
+<script src="js/analisis/metricas.js?v=20260517a"></script>
+<script src="js/ajustes/ajustes.js?v=20260613a"></script>
+<script src="js/core/shared-utils.js?v=20260516f"></script>
+<script src="js/analisis/heatmap.js?v=20260505b"></script>
+<script src="js/analisis/seguimiento.js?v=20260518c"></script>
+<script src="js/cartera/portfolios.js?v=20260511b"></script>
+<script src="js/cartera/private-market.js?v=20260614a"></script>
+<script src="js/finanzas/ahorro.js?v=20260703a"></script>
 </body>
 </html>

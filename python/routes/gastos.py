@@ -1,9 +1,16 @@
 from flask import Blueprint, jsonify, request
 
-from gastos_store import (
-    create_default_gastos_year, delete_gastos_year, list_gastos_years,
-    normalize_year, read_gastos_types, read_gastos_year, sanitize_gastos_payload,
-    sanitize_gastos_types, write_gastos_types, write_gastos_year,
+from stores.gastos_store import (
+    create_default_gastos_year,
+    delete_gastos_year,
+    list_gastos_years,
+    normalize_year,
+    read_gastos_types,
+    read_gastos_year,
+    sanitize_gastos_payload,
+    sanitize_gastos_types,
+    write_gastos_types,
+    write_gastos_year,
 )
 
 gastos_bp = Blueprint("gastos", __name__)

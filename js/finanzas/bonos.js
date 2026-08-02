@@ -1,0 +1,353 @@
+let _bonosCurrentFilter = "all"
+let _bonosAutosaveTimer = null
+
+const _TIPO_LABELS = {
+    gubernamental: "Gubernamental",
+    corporativo: "Corporativo",
+    if: "Interés Fijo",
+}
+
+const _CURRENCY_SYMBOLS_BASE = { EUR: "EUR €", USD: "USD $", GBP: "GBP £", CHF: "CHF ₣", JPY: "JPY ¥" }
+function _getCurrencySymbols() {
+    const codes = window._fiatCurrencies?.length ? window._fiatCurrencies : Object.keys(_CURRENCY_SYMBOLS_BASE)
+    const result = {}
+    codes.forEach((c) => { result[c] = _CURRENCY_SYMBOLS_BASE[c] || c })
+    return result
+}
+const _CURRENCY_SYMBOLS = new Proxy({}, {
+    get(_, prop) {
+        return _getCurrencySymbols()[prop]
+    },
+    ownKeys() { return Object.keys(_getCurrencySymbols()) },
+    has(_, prop) { return prop in _getCurrencySymbols() },
+    getOwnPropertyDescriptor(_, prop) {
+        const v = _getCurrencySymbols()[prop]
+        return v !== undefined ? { value: v, writable: false, enumerable: true, configurable: true } : undefined
+    },
+})
+
+async function loadAllBonosData() {
+    const [bonosResp, rfResp] = await Promise.all([
+        fetch("/api/bonos").then(r => r.json()).catch(() => ({ rows: [] })),
+        fetch("/api/rentafija").then(r => r.json()).catch(() => ({ rows: [] }))
+    ])
+    const bonosRows = Array.isArray(bonosResp.rows) ? bonosResp.rows : []
+    const rfRows = (Array.isArray(rfResp.rows) ? rfResp.rows : []).map(r => ({
+        fecha:            r.fecha || "",
+        tipo:             "if",
+        currency:         r.currency || "EUR",
+        instrumento:      r.instrumento || "",
+        cupon:            r.rentabilidad || "",
+        vencimiento:      r.vencimiento || "",
+        invertido:        r.invertido || "",
+        interesAcumulado: r.interesAcumulado || "",
+        impuestos:        r.impuestos || "",
+        nota:             "",
+    }))
+    return { rows: [...bonosRows, ...rfRows] }
+}
+
+async function saveAllBonosData() {
+    const rows = collectAllDataFromTable()
+
+    const bonosRows = rows.filter(r => ["gubernamental", "corporativo"].includes(r.tipo))
+    const rfRows = rows
+        .filter(r => r.tipo === "if")
+        .map(r => ({
+            fecha:            r.fecha,
+            tipo:             r.tipo,
+            currency:         r.currency,
+            instrumento:      r.instrumento,
+            rentabilidad:     r.cupon,
+            vencimiento:      r.vencimiento,
+            invertido:        r.invertido,
+            interesAcumulado: r.interesAcumulado,
+            impuestos:        r.impuestos,
+        }))
+
+    const [res1, res2] = await Promise.all([
+        fetch("/api/bonos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rows: bonosRows })
+        }),
+        fetch("/api/rentafija", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rows: rfRows })
+        })
+    ])
+    if (!res1.ok) throw new Error(`Bonos: HTTP ${res1.status}`)
+    if (!res2.ok) throw new Error(`RentaFija: HTTP ${res2.status}`)
+}
+
+function collectAllDataFromTable() {
+    return [...document.querySelectorAll("#bonosBody tr")].map((row) => {
+        const cells = row.querySelectorAll("td")
+        return {
+            fecha:            cells[0]?.textContent.trim() || "",
+            tipo:             row.dataset.tipo || "gubernamental",
+            currency:         row.dataset.currency || "EUR",
+            instrumento:      cells[3]?.textContent.trim() || "",
+            cupon:            cells[4]?.textContent.trim() || "",
+            vencimiento:      cells[5]?.textContent.trim() || "",
+            invertido:        cells[6]?.textContent.trim() || "",
+            interesAcumulado: cells[7]?.textContent.trim() || "",
+            impuestos:        cells[8]?.textContent.trim() || "",
+            nota:             "",
+        }
+    })
+}
+
+function buildBonosRow(rowData, index) {
+    const tr = document.createElement("tr")
+    tr.dataset.tipo = rowData.tipo || "gubernamental"
+    tr.dataset.currency = rowData.currency || "EUR"
+
+    const actionCell = document.createElement("td")
+    actionCell.className = "rowActionsCell"
+    actionCell.innerHTML = `
+        <div class="rowMenu">
+            <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+            <div class="rowMenuDropdown">
+                <button type="button" class="rowMenuItem assetRowEditBtn bonosRowEditBtn avActionBtn avEditBtn">Editar</button>
+                <hr>
+                <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn bonosRowDeleteBtn avActionBtn avDeleteBtn">Eliminar</button>
+            </div>
+        </div>
+    `
+    actionCell.querySelector(".bonosRowEditBtn").addEventListener("click", () => openBonosEditModal(index))
+    actionCell.querySelector(".bonosRowDeleteBtn").addEventListener("click", () => {
+        openConfirmModal({
+            title: "Eliminar fila",
+            message: "¿Quieres eliminar esta fila?",
+            confirmLabel: "Eliminar",
+            onConfirm: async () => {
+                const rows = collectAllDataFromTable()
+                rows.splice(index, 1)
+                renderBonosTable({ rows })
+                await saveAllBonosData()
+            }
+        })
+    })
+
+    const currency = rowData.currency || "EUR"
+    const cellsData = [
+        rowData.fecha || "",
+        _TIPO_LABELS[rowData.tipo] || rowData.tipo || "",
+        _CURRENCY_SYMBOLS[currency] || currency,
+        rowData.instrumento || "",
+        rowData.cupon || "",
+        rowData.vencimiento || "",
+        rowData.invertido || "",
+        rowData.interesAcumulado || "",
+        rowData.impuestos || "",
+        formatEuro(parseEuroNumber(rowData.interesAcumulado || "") - parseEuroNumber(rowData.impuestos || "")),
+    ]
+    cellsData.forEach((text) => {
+        const td = document.createElement("td")
+        td.textContent = text
+        tr.appendChild(td)
+    })
+    tr.appendChild(actionCell)
+    return tr
+}
+
+function renderBonosTable(data) {
+    const tbody = document.getElementById("bonosBody")
+    if (!tbody) return
+
+    tbody.innerHTML = ""
+    const rows = Array.isArray(data?.rows) ? data.rows : []
+    rows.forEach((rowData, index) => tbody.appendChild(buildBonosRow(rowData, index)))
+
+    updateBonosTotals()
+    applyBonosFilter(_bonosCurrentFilter)
+    if (rows.length) bindTableSort(tbody.closest("table"), "bonos")
+}
+
+function updateBonosTotals() {
+    const rows = [...document.querySelectorAll("#bonosBody tr")]
+
+    let totalInteres = 0, totalImpuestos = 0, totalInvertido = 0
+    let ifNeto = 0, corpNeto = 0, gubNeto = 0
+
+    rows.forEach((row) => {
+        const cells = row.querySelectorAll("td")
+        const interes   = parseEuroNumber(cells[7]?.textContent || "")
+        const impuestos = parseEuroNumber(cells[8]?.textContent || "")
+        const invertido = parseEuroNumber(cells[6]?.textContent || "")
+        const neto = interes - impuestos
+
+        if (cells[9]) cells[9].textContent = formatEuro(neto)
+
+        totalInteres   += interes
+        totalImpuestos += impuestos
+        totalInvertido += invertido
+
+        const tipo = row.dataset.tipo || "gubernamental"
+        if (tipo === "if") ifNeto += neto
+        else if (tipo === "corporativo") corpNeto += neto
+        else gubNeto += neto
+    })
+
+    const totalNeto = totalInteres - totalImpuestos
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = formatEuro(val) }
+    set("bonosTotalNeto",      totalNeto)
+    set("bonosTotalInteres",   totalInteres)
+    set("bonosTotalImpuestos", totalImpuestos)
+    set("bonosTotalInvertido", totalInvertido)
+    set("bonosTotalIf",        ifNeto)
+    set("bonosTotalCorp",      corpNeto)
+    set("bonosTotalGub",       gubNeto)
+
+    const bonosEmptyEl = document.getElementById("bonosEmptyMsg")
+    const bonosTableWrapper = document.getElementById("bonosTableWrapper")
+    if (bonosEmptyEl) bonosEmptyEl.classList.toggle("hidden", rows.length > 0)
+    if (bonosTableWrapper) bonosTableWrapper.classList.toggle("hidden", rows.length === 0)
+}
+
+function applyBonosFilter(tipo) {
+    _bonosCurrentFilter = tipo
+    document.querySelectorAll("#bonosBody tr").forEach((row) => {
+        const rowTipo = row.dataset.tipo || ""
+        const visible = tipo === "all" || (Array.isArray(tipo) ? tipo.includes(rowTipo) : rowTipo === tipo)
+        row.style.display = visible ? "" : "none"
+    })
+}
+
+function openBonosEditModal(rowIndex = -1) {
+    const rows = collectAllDataFromTable()
+    const isEdit = rowIndex >= 0
+    const rowData = isEdit ? rows[rowIndex] : {}
+
+    const overlay = document.createElement("div")
+    overlay.className = "modalOverlay"
+    overlay.style.zIndex = "20000"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal"
+    modal.innerHTML = `
+        <h3 class="assetModalTitle">${isEdit ? "Editar registro" : "Nuevo registro"}</h3>
+
+        <label class="assetModalLabel" for="bonosFechaInput">Fecha</label>
+        <input id="bonosFechaInput" class="assetModalInput" type="text" value="${rowData.fecha || ""}" placeholder="dd-mm-aaaa">
+
+        <label class="assetModalLabel" for="bonosTipoSelect">Tipo</label>
+        <select id="bonosTipoSelect" class="assetModalSelect">
+            <option value="gubernamental"${(rowData.tipo || "gubernamental") === "gubernamental" ? " selected" : ""}>Bono Gubernamental</option>
+            <option value="corporativo"${rowData.tipo === "corporativo" ? " selected" : ""}>Bono Corporativo</option>
+            <option value="if"${rowData.tipo === "if" ? " selected" : ""}>Interés Fijo</option>
+        </select>
+
+        <label class="assetModalLabel" for="bonosCurrencySelect">Moneda</label>
+        <select id="bonosCurrencySelect" class="assetModalSelect">
+            ${Object.entries(_getCurrencySymbols()).map(([code, label]) =>
+                `<option value="${code}"${(rowData.currency || "EUR") === code ? " selected" : ""}>${label}</option>`
+            ).join("")}
+        </select>
+
+        <label class="assetModalLabel" for="bonosInstrumentoInput">Instrumento</label>
+        <input id="bonosInstrumentoInput" class="assetModalInput" type="text" value="${rowData.instrumento || ""}" placeholder="Ej: Bonos del Estado">
+
+        <label class="assetModalLabel" for="bonosCuponInput">Cupón / Rentabilidad</label>
+        <input id="bonosCuponInput" class="assetModalInput" type="text" value="${rowData.cupon || ""}" placeholder="Ej: 3,5%">
+
+        <label class="assetModalLabel" for="bonosVencimientoInput">Vencimiento</label>
+        <input id="bonosVencimientoInput" class="assetModalInput" type="text" value="${rowData.vencimiento || ""}" placeholder="dd-mm-aaaa">
+
+        <label class="assetModalLabel" for="bonosInvertidoInput">Invertido</label>
+        <input id="bonosInvertidoInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.invertido ? formatCellEuroValue(rowData.invertido) : ""}" placeholder="0,00">
+
+        <label class="assetModalLabel" for="bonosInteresInput">Interés acumulado</label>
+        <input id="bonosInteresInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.interesAcumulado ? formatCellEuroValue(rowData.interesAcumulado) : ""}" placeholder="0,00">
+
+        <label class="assetModalLabel" for="bonosImpuestosInput">Impuestos</label>
+        <input id="bonosImpuestosInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.impuestos ? formatCellEuroValue(rowData.impuestos) : ""}" placeholder="0,00">
+
+        <div class="assetModalActions bonosModalActions">
+            <button type="button" id="bonosModalCancelBtn" class="cancelButton">Cancelar</button>
+            <button type="button" id="bonosModalSaveBtn" class="primaryButton" data-no-autohide="true">Guardar</button>
+        </div>
+    `
+
+    const closeModal = () => overlay.remove()
+    modal.querySelector("#bonosModalCancelBtn").addEventListener("click", closeModal)
+    modal.querySelector("#bonosModalSaveBtn").addEventListener("click", async () => {
+        const fecha           = modal.querySelector("#bonosFechaInput").value.trim()
+        const tipo            = modal.querySelector("#bonosTipoSelect").value
+        const currency        = modal.querySelector("#bonosCurrencySelect").value
+        const instrumento     = modal.querySelector("#bonosInstrumentoInput").value.trim()
+        const cupon           = modal.querySelector("#bonosCuponInput").value.trim()
+        const vencimiento     = modal.querySelector("#bonosVencimientoInput").value.trim()
+        const invertidoRaw    = modal.querySelector("#bonosInvertidoInput").value.trim()
+        const interesRaw      = modal.querySelector("#bonosInteresInput").value.trim()
+        const impuestosRaw    = modal.querySelector("#bonosImpuestosInput").value.trim()
+
+        const invertido        = invertidoRaw ? formatCellEuroValue(invertidoRaw) : ""
+        const interesAcumulado = interesRaw   ? formatCellEuroValue(interesRaw)   : ""
+        const impuestos        = impuestosRaw ? formatCellEuroValue(impuestosRaw) : ""
+
+        const newRow = { fecha, tipo, currency, instrumento, cupon, vencimiento, invertido, interesAcumulado, impuestos, nota: "" }
+
+        if (isEdit) {
+            rows[rowIndex] = newRow
+        } else {
+            rows.push(newRow)
+        }
+
+        renderBonosTable({ rows })
+        await saveAllBonosData()
+        closeModal()
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+}
+
+async function initBonosLogic() {
+    _bonosCurrentFilter = "all"
+
+    const allData = await loadAllBonosData()
+    renderBonosTable(allData)
+
+    document.getElementById("bonosAddBtn")?.addEventListener("click", () => openBonosEditModal())
+
+    document.getElementById("saveBonosBtn")?.addEventListener("click", async () => {
+        try { await saveAllBonosData() } catch (err) { console.error(err) }
+    })
+
+    const bonosFiltersEl = document.getElementById("bonosFilters")
+    if (bonosFiltersEl) {
+        const todosInput = bonosFiltersEl.querySelector('[data-tipo="all"] input')
+        const getIndividuals = () => [...bonosFiltersEl.querySelectorAll('.bonosFilterBtn:not([data-tipo="all"]) input')]
+        const syncAndApply = () => {
+            if (todosInput?.checked) {
+                applyBonosFilter("all")
+            } else {
+                const sel = getIndividuals().filter(cb => cb.checked).map(cb => cb.closest(".bonosFilterBtn").dataset.tipo)
+                if (!sel.length && todosInput) todosInput.checked = true
+                applyBonosFilter(sel.length ? sel : "all")
+            }
+        }
+        if (todosInput) todosInput.checked = true
+        getIndividuals().forEach(cb => { cb.checked = true })
+        if (!bonosFiltersEl.dataset.bound) {
+            bonosFiltersEl.dataset.bound = "true"
+            bonosFiltersEl.addEventListener("change", (e) => {
+                const changed = e.target
+                if (changed === todosInput) {
+                    changed.checked = true
+                    getIndividuals().forEach(cb => { cb.checked = true })
+                } else if (todosInput?.checked) {
+                    todosInput.checked = false
+                    getIndividuals().forEach(cb => { cb.checked = cb === changed })
+                    changed.checked = true
+                } else {
+                    if (todosInput) todosInput.checked = getIndividuals().every(cb => cb.checked)
+                }
+                syncAndApply()
+            })
+        }
+    }
+}

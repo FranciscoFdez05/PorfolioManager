@@ -1,9 +1,16 @@
 from flask import Blueprint, jsonify, request
 
-from ingresos_store import (
-    create_default_ingresos_year, delete_ingresos_year, list_ingresos_years,
-    normalize_year, read_ingresos_types, read_ingresos_year, sanitize_ingresos_payload,
-    sanitize_ingresos_types, write_ingresos_types, write_ingresos_year,
+from stores.ingresos_store import (
+    create_default_ingresos_year,
+    delete_ingresos_year,
+    list_ingresos_years,
+    normalize_year,
+    read_ingresos_types,
+    read_ingresos_year,
+    sanitize_ingresos_payload,
+    sanitize_ingresos_types,
+    write_ingresos_types,
+    write_ingresos_year,
 )
 
 ingresos_bp = Blueprint("ingresos", __name__)

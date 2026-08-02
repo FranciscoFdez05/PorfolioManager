@@ -1,11 +1,11 @@
+import datetime
 import json
 import logging
 import time
-import datetime
 
 from flask import Blueprint, jsonify, request
 
-from db import get_db, transaction
+from core.db import get_db, transaction
 from routes.ajustes import _read_ajustes
 
 log = logging.getLogger(__name__)
@@ -165,7 +165,7 @@ def get_history_by_type():
 
 def _safety_copy_snapshots():
     """Vuelca los snapshots a JSON antes de un borrado destructivo."""
-    from db import get_active_db_path
+    from core.db import get_active_db_path
     try:
         conn = get_db()
         rows = conn.execute(

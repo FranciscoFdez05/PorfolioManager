@@ -1,3 +1,4 @@
+import datetime
 import io
 import json
 import logging
@@ -5,21 +6,20 @@ import os
 import re
 import tempfile
 import zipfile
-import datetime
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request, Response
+from flask import Blueprint, Response, jsonify, request
 
-from api_stats import get_today_stats
-from db import get_db, get_active_db_path
-from secret_store import read_secret_lines, write_secret_lines
+from core.db import get_active_db_path, get_db
+from core.paths import BASE_DIR
+from core.secret_store import read_secret_lines, write_secret_lines
+from providers.api_stats import get_today_stats
 
 log = logging.getLogger(__name__)
 
 ajustes_bp = Blueprint("ajustes", __name__)
-_BASE_DIR    = Path(__file__).resolve().parent.parent.parent
-_API_DIR     = _BASE_DIR / "API"
-_AJUSTES_JSON = _BASE_DIR / "data" / "JSON" / "ajustes.json"
+_API_DIR     = BASE_DIR / "API"
+_AJUSTES_JSON = BASE_DIR / "data" / "JSON" / "ajustes.json"
 
 # Claves globales (compartidas entre todos los portfolios)
 _FIAT_DEFAULTS = [
@@ -78,7 +78,7 @@ def _active_portfolio_id() -> str:
 
 
 def _prefs_path(portfolio_id: str) -> Path:
-    return _BASE_DIR / "data" / "JSON" / f"prefs_{portfolio_id}.json"
+    return BASE_DIR / "data" / "JSON" / f"prefs_{portfolio_id}.json"
 
 
 def _read_ajustes():
@@ -387,7 +387,7 @@ def _build_export(conn, pid: str) -> dict:
     casi todos los datos. Ahora se enumera el esquema real.
     """
     export = {
-        "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "exported_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "version": 3,
         "ajustes": _read_ajustes(),
         "portfolio_prefs": _read_prefs(pid),
@@ -409,7 +409,7 @@ def export_json():
     return Response(
         payload,
         mimetype="application/json",
-        headers={"Content-Disposition": f"attachment; filename=portfolio-export.json"}
+        headers={"Content-Disposition": "attachment; filename=portfolio-export.json"}
     )
 
 
@@ -516,7 +516,7 @@ def _restore_tables_from_dict(conn, data: dict):
             if not rows or not isinstance(rows[0], dict):
                 continue
             actual_cols = {r[1] for r in conn.execute(f'PRAGMA table_info("{table}")').fetchall()}
-            valid_cols = [c for c in rows[0].keys() if c in actual_cols]
+            valid_cols = [c for c in rows[0] if c in actual_cols]
             if not valid_cols:
                 continue
             col_str      = ", ".join(f'"{c}"' for c in valid_cols)
@@ -531,7 +531,7 @@ def _restore_tables_from_dict(conn, data: dict):
             conn.rollback()
         except Exception:
             pass
-        raise RuntimeError(f"Error restaurando datos: {e}")
+        raise RuntimeError(f"Error restaurando datos: {e}") from e
 
 
 @ajustes_bp.route("/api/import/json", methods=["POST"])
@@ -581,7 +581,6 @@ def import_zip():
     except zipfile.BadZipFile:
         return jsonify({"ok": False, "error": "El archivo no es un ZIP válido"}), 400
 
-    pid      = _active_portfolio_id()
     db_path  = get_active_db_path()
     json_dir = _AJUSTES_JSON.parent
 
@@ -594,7 +593,7 @@ def import_zip():
             root_db = next((n for n in names if n.endswith(".db") and "/" not in n), None)
 
             if root_db:
-                from db import invalidate_all_connections
+                from core.db import invalidate_all_connections
                 raw_db = zf.read(root_db)
                 tmp    = db_path.parent / f"_import_tmp_{db_path.name}"
                 try:

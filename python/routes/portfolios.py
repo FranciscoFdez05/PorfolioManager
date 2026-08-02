@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request, send_file
 
-from portfolios_manager import (
+from admin.portfolios_manager import (
     _PORTFOLIOS_DIR,
     _safe_id,
     create_portfolio,
@@ -15,7 +15,7 @@ from portfolios_manager import (
     rename_portfolio,
     switch_portfolio,
 )
-from asset_utils import slugify
+from stores.asset_utils import slugify
 
 portfolios_bp = Blueprint("portfolios", __name__)
 
@@ -219,7 +219,7 @@ def export_portfolio(pid):
     # fuera lo que aún está en el -wal, y el NamedTemporaryFile(delete=False)
     # anterior nunca se borraba, acumulando una copia completa de la BD en el
     # directorio temporal en cada exportación.
-    from backup_manager import _remove_wal_sidecars
+    from admin.backup_manager import _remove_wal_sidecars
     tmp_path = Path(tempfile.gettempdir()) / f"_export_{pid}_{os.getpid()}.db"
     try:
         _sqlite_backup(db_file, tmp_path)
@@ -302,7 +302,7 @@ def import_portfolio():
             Path(str(tmp_dest) + suffix).unlink(missing_ok=True)
 
     meta["portfolios"].append({"id": pid, "name": name})
-    from portfolios_manager import _write_meta
+    from admin.portfolios_manager import _write_meta
     _write_meta(meta)
 
     return jsonify({"ok": True, "id": pid})

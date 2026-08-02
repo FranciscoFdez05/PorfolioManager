@@ -4,15 +4,26 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
-from alpha_vantage_client import fetch_quote as fetch_av_quote, search_symbol as search_av_symbol
-from app_data import readFinnhubApiKey
-from asset_store import listAssets
-from asset_utils import inferMarketProviderFromSymbol, normalizeMarketProvider
-from db import get_db
-from eodhd_client import fetch_quote as fetch_eodhd_quote, search_symbol as search_eodhd_symbol
-from finnhub_client import fetch_candle_close, fetch_exchange_rate, fetch_quote as fetch_finnhub_quote, search_symbol
-from helpers import call_alpha_vantage_with_fallbacks, call_eodhd_with_fallbacks, is_temporary_service_error, normalize_currency_code, parse_loose_number
-from yahoo_finance_client import fetch_quote as fetch_yahoo_quote, search_symbol as search_yahoo_symbol
+from core.db import get_db
+from providers.alpha_vantage_client import fetch_quote as fetch_av_quote, search_symbol as search_av_symbol
+from providers.eodhd_client import fetch_quote as fetch_eodhd_quote, search_symbol as search_eodhd_symbol
+from providers.finnhub_client import (
+    fetch_candle_close,
+    fetch_exchange_rate,
+    fetch_quote as fetch_finnhub_quote,
+    search_symbol,
+)
+from providers.yahoo_finance_client import fetch_quote as fetch_yahoo_quote, search_symbol as search_yahoo_symbol
+from stores.app_data import readFinnhubApiKey
+from stores.asset_store import listAssets
+from stores.asset_utils import inferMarketProviderFromSymbol, normalizeMarketProvider
+from stores.helpers import (
+    call_alpha_vantage_with_fallbacks,
+    call_eodhd_with_fallbacks,
+    is_temporary_service_error,
+    normalize_currency_code,
+    parse_loose_number,
+)
 
 _hist_cache = {}   # {period: {"data": {...}, "ts": float}}
 _HIST_TTL   = 4 * 3600  # 4 horas

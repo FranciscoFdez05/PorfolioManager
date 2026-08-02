@@ -1,8 +1,24 @@
 from flask import Blueprint, jsonify, request
 
-from app_data import (
-    readBonosFile, readDividendoCalendar, readDividendosFile, readEarnFile, readInteresesFile, readPrivateMarketFile, readRentaFijaFile, readStakingFile, readTransaccionesFile,
-    writeBonosFile, writeDividendoCalendar, writeDividendosFile, writeEarnFile, writeInteresesFile, writePrivateMarketFile, writeRentaFijaFile, writeStakingFile, writeTransaccionesFile,
+from stores.app_data import (
+    readBonosFile,
+    readDividendoCalendar,
+    readDividendosFile,
+    readEarnFile,
+    readInteresesFile,
+    readPrivateMarketFile,
+    readRentaFijaFile,
+    readStakingFile,
+    readTransaccionesFile,
+    writeBonosFile,
+    writeDividendoCalendar,
+    writeDividendosFile,
+    writeEarnFile,
+    writeInteresesFile,
+    writePrivateMarketFile,
+    writeRentaFijaFile,
+    writeStakingFile,
+    writeTransaccionesFile,
 )
 
 registros_bp = Blueprint("registros", __name__)
