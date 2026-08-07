@@ -721,10 +721,12 @@
 .assetCompletedOpsTable thead th:nth-child(5),
 .assetCompletedOpsTable thead th:nth-child(6),
 .assetCompletedOpsTable thead th:nth-child(7),
+.assetCompletedOpsTable thead th:nth-child(8),
 .assetCompletedOpsTable tbody td:nth-child(4),
 .assetCompletedOpsTable tbody td:nth-child(5),
 .assetCompletedOpsTable tbody td:nth-child(6),
-.assetCompletedOpsTable tbody td:nth-child(7){
+.assetCompletedOpsTable tbody td:nth-child(7),
+.assetCompletedOpsTable tbody td:nth-child(8){
     text-align:right;
     font-variant-numeric:tabular-nums;
 }
@@ -1494,6 +1496,19 @@ tr.gastosTypeEmptySep td {
     text-align:right;
 }
 
+/* Columnas de dinero / numéricas: las detecta refreshTableNumericAlignment() */
+table th.numCol,
+table td.numCell{
+    text-align:right;
+    font-variant-numeric:tabular-nums;
+}
+
+table td.numCell input,
+table td.numCell textarea,
+table td.numCell [contenteditable="true"]{
+    text-align:right;
+}
+
 .assetOperationsTable thead th[data-sortkey="currency"],
 .assetOperationsTable thead th[data-sortkey="participaciones"],
 .assetOperationsTable thead th[data-sortkey="precioParticipacion"],
@@ -1631,9 +1646,9 @@ tr.gastosTypeEmptySep td {
 }
 
 /* Confirm modal: must appear above the Ajustes panel (sttOverlay z-index:9000) */
+/* El padding lo ajusta alignConfirmModalToContent() para centrarlo sobre #dynamicContent */
 #confirmModalOverlay{
-    align-items:flex-start;
-    padding-top:72px;
+    align-items:center;
     z-index:10000;
 }
 

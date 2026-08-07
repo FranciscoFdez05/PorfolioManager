@@ -1482,7 +1482,7 @@ function renderIngresosMonthTable() {
     const totalTr = document.createElement("tr")
     totalTr.className = "ingresosTotalRow"
     totalTr.dataset.isTotal = "true"
-    totalTr.innerHTML = `<td colspan="3">Total</td><td>${formatEuro(total)}</td><td class="rowActionsCell"></td>`
+    totalTr.innerHTML = `<td colspan="3">Total</td><td class="numCell">${formatEuro(total)}</td><td class="rowActionsCell"></td>`
     body.appendChild(totalTr)
 }
 

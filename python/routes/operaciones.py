@@ -85,6 +85,7 @@ def saveOperaciones():
             "precioCurrency": precio_currency,
             "cantidad": str(row.get("cantidad", "")).strip(),
             "comisionesCripto": str(row.get("comisionesCripto", row.get("comisiones", ""))).strip(),
+            "comisionesFiat": str(row.get("comisionesFiat", "")).strip(),
             "total": str(row.get("total", "")).strip(),
             "currency": currency,
             "estado": estado,

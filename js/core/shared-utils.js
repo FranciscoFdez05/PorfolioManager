@@ -669,6 +669,113 @@ function bindTableSort(table, storageKey) {
     if (currentKey !== null) doSort()
 }
 
+// ── Alineación automática de columnas de dinero / numéricas ─────────────────
+
+// Importes ("1.234,56 €"), porcentajes ("+4,01 %") y cantidades ("0,00466667",
+// "0,00010000 BTC"). Las fechas ("05-08-2026") no encajan a propósito.
+const NUMERIC_TABLE_CELL_PATTERN = /^[\u2248~]?\s*[-+]?\s*[\u20ac$]?\s*\d[\d.\u00a0\u202f ]*(?:,\d+)?\s*(?:%|\u20ac|\$|[A-Z]{2,6})?$/
+
+function getNumericTableCellText(cell) {
+    const field = cell.querySelector("input, textarea")
+
+    if (field) {
+        return String(field.value || "").trim()
+    }
+
+    if (cell.querySelector("select, button, a")) {
+        return ""
+    }
+
+    // Celdas con varias líneas (importe + detalle): decide la primera.
+    return (cell.firstElementChild || cell).textContent.trim()
+}
+
+function refreshTableNumericAlignment(table) {
+    if (!table) {
+        return
+    }
+
+    const headerRows = table.tHead ? Array.from(table.tHead.rows) : []
+    const headerRow = headerRows[headerRows.length - 1] || null
+    const headerCells = headerRow ? Array.from(headerRow.cells) : []
+    const headerUsable = headerCells.length > 0 && !headerCells.some((cell) => cell.colSpan > 1)
+    const bodyRows = Array.from(table.tBodies).flatMap((tbody) => Array.from(tbody.rows))
+    const columnCount = headerUsable ? headerCells.length : (bodyRows[0]?.cells.length || 0)
+
+    if (!columnCount) {
+        return
+    }
+
+    const dataRows = bodyRows.filter((row) =>
+        row.cells.length === columnCount && !Array.from(row.cells).some((cell) => cell.colSpan > 1)
+    )
+
+    for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+        let filledCells = 0
+        let numericCells = 0
+
+        dataRows.forEach((row) => {
+            const text = getNumericTableCellText(row.cells[columnIndex])
+
+            if (!text) {
+                return
+            }
+
+            filledCells += 1
+
+            if (NUMERIC_TABLE_CELL_PATTERN.test(text)) {
+                numericCells += 1
+            }
+        })
+
+        const isNumericColumn = numericCells > 0 && numericCells >= filledCells * 0.6
+
+        if (headerUsable) {
+            headerCells[columnIndex].classList.toggle("numCol", isNumericColumn)
+        }
+
+        dataRows.forEach((row) => {
+            row.cells[columnIndex].classList.toggle("numCell", isNumericColumn)
+        })
+    }
+}
+
+function refreshNumericTableAlignment(root = document) {
+    root.querySelectorAll?.("table").forEach(refreshTableNumericAlignment)
+}
+
+let numericAlignmentScheduled = false
+
+function scheduleNumericTableAlignment() {
+    if (numericAlignmentScheduled) {
+        return
+    }
+
+    numericAlignmentScheduled = true
+    requestAnimationFrame(() => {
+        numericAlignmentScheduled = false
+        refreshNumericTableAlignment()
+    })
+}
+
+// Solo observamos childList: las clases que añadimos son mutaciones de
+// atributo, así que el observer no se dispara a sí mismo.
+new MutationObserver((mutations) => {
+    const touchesTable = mutations.some((mutation) =>
+        mutation.target.closest?.("table") ||
+        Array.from(mutation.addedNodes).some((node) =>
+            node.nodeType === 1 && (node.matches?.("table, thead, tbody, tr, td, th") || node.querySelector?.("table"))
+        )
+    )
+
+    if (touchesTable) {
+        scheduleNumericTableAlignment()
+    }
+}).observe(document.body, { childList: true, subtree: true })
+
+document.addEventListener("DOMContentLoaded", scheduleNumericTableAlignment)
+scheduleNumericTableAlignment()
+
 // ── Custom select dropdown ──────────────────────────────────────────────────
 
 function _buildCustomSelect(select) {

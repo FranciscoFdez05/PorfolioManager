@@ -400,7 +400,7 @@ let assetModalState = null
 let confirmModalState = null
 let editAssetModalState = null
 let draggedAssetId = null
-const PAGE_HTML_VERSION = "20260802a"
+const PAGE_HTML_VERSION = "20260805a"
 
 window._viewAllPortfolios = localStorage.getItem("viewAllPortfolios") === "1"
 

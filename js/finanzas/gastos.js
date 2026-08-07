@@ -1004,11 +1004,6 @@ function renderGastosAnnualTable() {
         getMensualidadesCategoryTotal(month.key, expenseTotals)
     ]))
 
-    const gastosRow = document.createElement("tr")
-    gastosRow.className = "gastosSectionRow"
-    gastosRow.innerHTML = `<td colspan="14">Gastos</td>`
-    annualBody.appendChild(gastosRow)
-
     const mensualidadesRow = document.createElement("tr")
     mensualidadesRow.className = "gastosCategoryRow"
     const mensSectionHidden = isGastoTipoHidden(MENSUALIDADES_CATEGORIA)
@@ -1063,6 +1058,12 @@ function renderGastosAnnualTable() {
             annualBody.appendChild(tr)
         })
     }
+
+    // La cabecera "Gastos" va debajo del bloque de mensualidades y encima de los tipos.
+    const gastosRow = document.createElement("tr")
+    gastosRow.className = "gastosSectionRow"
+    gastosRow.innerHTML = `<td colspan="14">Gastos</td>`
+    annualBody.appendChild(gastosRow)
 
     const typesWithData = visibleTypes.filter((type) =>
         GASTOS_MONTHS.some((month) => expenseTotals[type][month.key] > 0)
@@ -1659,7 +1660,7 @@ function renderGastosMonthTable() {
     const totalTr = document.createElement("tr")
     totalTr.className = "gastosTotalRow"
     totalTr.dataset.isTotal = "true"
-    totalTr.innerHTML = `<td colspan="3">Total</td><td>${formatEuro(total)}</td><td class="rowActionsCell"></td>`
+    totalTr.innerHTML = `<td colspan="3">Total</td><td class="numCell">${formatEuro(total)}</td><td class="rowActionsCell"></td>`
     body.appendChild(totalTr)
 }
 

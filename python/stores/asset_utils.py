@@ -154,6 +154,7 @@ def sanitizeAssetOperationRows(rows):
             "precioCurrency": precio_currency,
             "cantidad": _trunc(row.get("cantidad", ""), _MAX_SHORT).strip(),
             "comisionesCripto": _trunc(row.get("comisionesCripto", row.get("comisiones", "")), _MAX_SHORT).strip(),
+            "comisionesFiat": _trunc(row.get("comisionesFiat", ""), _MAX_SHORT).strip(),
             "total": _trunc(row.get("total", ""), _MAX_SHORT).strip(),
             "currency": currency,
             "estado": estado,

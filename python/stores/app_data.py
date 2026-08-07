@@ -152,7 +152,7 @@ def readOperacionesFile():
     conn = get_db()
     rows = conn.execute(
         "SELECT id, asset_id, activo, fecha_apertura, par, stablecoin_symbol, orden, "
-        "precio_orden, precio_currency, cantidad, comisiones_cripto, total, currency, estado, fecha_cierre "
+        "precio_orden, precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre "
         "FROM operaciones ORDER BY rowid"
     ).fetchall()
     return {"rows": [
@@ -168,6 +168,7 @@ def readOperacionesFile():
             "precioCurrency": r["precio_currency"],
             "cantidad": r["cantidad"],
             "comisionesCripto": r["comisiones_cripto"],
+            "comisionesFiat": r["comisiones_fiat"],
             "total": r["total"],
             "currency": r["currency"],
             "estado": r["estado"],
@@ -184,13 +185,14 @@ def writeOperacionesFile(data):
     conn.executemany(
         "INSERT INTO operaciones "
         "(id, asset_id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
-        "precio_currency, cantidad, comisiones_cripto, total, currency, estado, fecha_cierre) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), r.get("assetId", ""), r.get("activo", ""),
              r.get("fechaApertura", ""), r.get("par", ""), r.get("stablecoinSymbol", ""),
              r.get("orden", "Compra"), r.get("precioOrden", ""), r.get("precioCurrency", "EUR"),
-             r.get("cantidad", ""), r.get("comisionesCripto", ""), r.get("total", ""),
+             r.get("cantidad", ""), r.get("comisionesCripto", ""), r.get("comisionesFiat", ""),
+             r.get("total", ""),
              r.get("currency", "EUR"), r.get("estado", "Activo"), r.get("fechaCierre", ""))
             for r in data.get("rows", [])
         ]

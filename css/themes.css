@@ -1199,7 +1199,8 @@ body.money-hidden #metricasTopBody td:nth-child(n+4){
 body.money-hidden .assetCompletedOpsTable td:nth-child(4),
 body.money-hidden .assetCompletedOpsTable td:nth-child(5),
 body.money-hidden .assetCompletedOpsTable td:nth-child(6),
-body.money-hidden .assetCompletedOpsTable td:nth-child(7){
+body.money-hidden .assetCompletedOpsTable td:nth-child(7),
+body.money-hidden .assetCompletedOpsTable td:nth-child(8){
     filter:blur(7px);
     user-select:none;
     pointer-events:none;

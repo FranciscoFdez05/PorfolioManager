@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS activo_operation_rows (
     precio_currency  TEXT NOT NULL DEFAULT 'EUR',
     cantidad         TEXT NOT NULL DEFAULT '',
     comisiones_cripto TEXT NOT NULL DEFAULT '',
+    comisiones_fiat  TEXT NOT NULL DEFAULT '',
     total            TEXT NOT NULL DEFAULT '',
     currency         TEXT NOT NULL DEFAULT 'EUR',
     estado           TEXT NOT NULL DEFAULT 'Activo',
@@ -106,6 +107,7 @@ CREATE TABLE IF NOT EXISTS operaciones (
     precio_currency  TEXT NOT NULL DEFAULT 'EUR',
     cantidad         TEXT NOT NULL DEFAULT '',
     comisiones_cripto TEXT NOT NULL DEFAULT '',
+    comisiones_fiat  TEXT NOT NULL DEFAULT '',
     total            TEXT NOT NULL DEFAULT '',
     currency         TEXT NOT NULL DEFAULT 'EUR',
     estado           TEXT NOT NULL DEFAULT 'Activo',
@@ -460,6 +462,11 @@ def _migrate(conn):
     rf_cols = {row[1] for row in conn.execute("PRAGMA table_info(renta_fija)")}
     if "currency" not in rf_cols:
         conn.execute("ALTER TABLE renta_fija ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'")
+
+    for table in ("operaciones", "activo_operation_rows"):
+        operation_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if "comisiones_fiat" not in operation_cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN comisiones_fiat TEXT NOT NULL DEFAULT ''")
 
     sc_rows_cols = {row[1] for row in conn.execute("PRAGMA table_info(stablecoins_rows)")}
     if "comisiones" not in sc_rows_cols:

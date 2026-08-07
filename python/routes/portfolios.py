@@ -116,6 +116,7 @@ def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
             "precioCurrency": r["precio_currency"],
             "cantidad": r["cantidad"],
             "comisionesCripto": r["comisiones_cripto"],
+            "comisionesFiat": r["comisiones_fiat"],
             "total": r["total"],
             "currency": r["currency"],
             "estado": r["estado"],
@@ -123,7 +124,7 @@ def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
         }
         for r in conn.execute(
             "SELECT id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
-            "precio_currency, cantidad, comisiones_cripto, total, currency, estado, fecha_cierre "
+            "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre "
             "FROM activo_operation_rows WHERE asset_id = ? ORDER BY rowid",
             (safe_id,)
         ).fetchall()

@@ -166,6 +166,7 @@ def build_completed_operations_by_asset(rows):
             "precioCurrency": str(row.get("precioCurrency", row.get("currency", "EUR"))).strip().upper(),
             "cantidad": str(row.get("cantidad", "")).strip(),
             "comisionesCripto": str(row.get("comisionesCripto", row.get("comisiones", ""))).strip(),
+            "comisionesFiat": str(row.get("comisionesFiat", "")).strip(),
             "total": str(row.get("total", "")).strip(),
             "currency": str(row.get("currency", "EUR")).strip().upper(),
             "estado": "Completado",

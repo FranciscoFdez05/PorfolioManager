@@ -705,6 +705,44 @@
     line-height:1.2;
 }
 
+/* Anchos por columna: con table-layout:fixed, sin esto las 13 columnas se
+   repartían por igual y las cabeceras largas quedaban cortadas. */
+.cryptoOperationsTable{
+    min-width:1420px;
+}
+
+.cryptoOperationsTable thead th,
+.cryptoOperationsTable tbody td{
+    padding-left:10px;
+    padding-right:10px;
+}
+
+.cryptoOperationsTable thead th:nth-child(1){ width:100px; }  /* Activo */
+.cryptoOperationsTable thead th:nth-child(2){ width:125px; }  /* Fecha apertura */
+.cryptoOperationsTable thead th:nth-child(3){ width:120px; }  /* Par */
+.cryptoOperationsTable thead th:nth-child(4){ width:120px; }  /* Precio actual */
+.cryptoOperationsTable thead th:nth-child(5){ width:85px; }   /* Orden */
+.cryptoOperationsTable thead th:nth-child(6){ width:115px; }  /* Precio orden */
+.cryptoOperationsTable thead th:nth-child(7){ width:105px; }  /* Cantidad */
+.cryptoOperationsTable thead th:nth-child(8){ width:100px; }  /* Total */
+.cryptoOperationsTable thead th:nth-child(9){ width:145px; }  /* Comisiones cripto */
+.cryptoOperationsTable thead th:nth-child(10){ width:115px; } /* Comisiones € */
+.cryptoOperationsTable thead th:nth-child(11){ width:100px; } /* Estado */
+.cryptoOperationsTable thead th:nth-child(12){ width:110px; } /* Fecha cierre */
+
+.operationsTable td[data-field="comisionesCripto"] .operationsFeeAmount{
+    display:block;
+    line-height:1.2;
+    white-space:nowrap;
+}
+
+.operationsTable td[data-field="comisionesCripto"] .operationsFeeHint{
+    display:block;
+    font-size:11px;
+    color:var(--text-muted);
+    line-height:1.2;
+}
+
 .operationsTable td[data-field="comisionesCriptoCell"]{
     padding-top:8px !important;
     padding-bottom:8px !important;
@@ -1427,6 +1465,13 @@
     font-size:14px;
 }
 
+/* La cabecera de una columna numérica sigue a sus celdas (ver .numCol/.numCell) */
+.gastosAnnualTable thead th.numCol,
+.gastosMovementsTable thead th.numCol{
+    text-align:right;
+}
+
+
 .gastosAnnualTable tbody td,
 .gastosMovementsTable tbody td{
     padding:8px 10px;
@@ -1440,6 +1485,19 @@
 
 .gastosAnnualTable tbody td{
     padding:6px 8px;
+}
+
+/* Mismo alto para todas las filas: las mensualidades ocupan dos líneas
+   (nombre + frecuencia) y las de tipo de gasto solo una. */
+.gastosAnnualTable tbody tr:not(.gastosSectionRow) td{
+    height:42px;
+}
+
+/* Todas las columnas de mes a la derecha, aunque el mes esté vacío ("- €") y
+   la detección automática de columnas numéricas no lo marque como numérico. */
+.gastosAnnualTable thead th:not(:first-child):not(.rowActionHeader),
+.gastosAnnualTable tbody td:not(:first-child):not(.rowActionsCell){
+    text-align:right;
 }
 
 .gastosAnnualTable .rowActionHeader{
@@ -1474,6 +1532,23 @@
 .gastosMovementsTable .rowActionsCell{
     width:40px;
     min-width:40px;
+}
+
+/* Columnas compactas y agrupadas a la izquierda: la de acciones absorbe el
+   ancho sobrante del panel en lugar de repartirlo entre todas (table-layout:fixed). */
+.gastosMovementsTable thead th:nth-child(1),
+.gastosMovementsTable tbody td:nth-child(1){ width:170px; }
+.gastosMovementsTable thead th:nth-child(2),
+.gastosMovementsTable tbody td:nth-child(2){ width:360px; }
+.gastosMovementsTable thead th:nth-child(3),
+.gastosMovementsTable tbody td:nth-child(3){ width:260px; }
+.gastosMovementsTable thead th:nth-child(4),
+.gastosMovementsTable tbody td:nth-child(4){ width:180px; }
+
+.gastosMovementsTable thead th.rowActionHeader,
+.gastosMovementsTable tbody td.rowActionsCell{
+    width:auto;
+    text-align:right;
 }
 
 
@@ -2517,6 +2592,13 @@
     font-size:14px;
 }
 
+/* La cabecera de una columna numérica sigue a sus celdas (ver .numCol/.numCell) */
+.ingresosAnnualTable thead th.numCol,
+.ingresosMovementsTable thead th.numCol{
+    text-align:right;
+}
+
+
 .ingresosAnnualTable tbody td,
 .ingresosMovementsTable tbody td{
     padding:8px 10px;
@@ -2530,6 +2612,19 @@
 
 .ingresosAnnualTable tbody td{
     white-space:nowrap;
+}
+
+/* Mismo alto para todas las filas: las recurrentes ocupan dos líneas
+   (nombre + frecuencia) y las de tipo de ingreso solo una. */
+.ingresosAnnualTable tbody tr:not(.ingresosSectionRow) td{
+    height:42px;
+}
+
+/* Todas las columnas de mes a la derecha, aunque el mes esté vacío ("- €") y
+   la detección automática de columnas numéricas no lo marque como numérico. */
+.ingresosAnnualTable thead th:not(:first-child):not(.rowActionHeader),
+.ingresosAnnualTable tbody td:not(:first-child):not(.rowActionsCell){
+    text-align:right;
 }
 
 .ingresosAnnualTable .rowActionHeader,
@@ -2561,6 +2656,23 @@
 
 .ingresosMovementsTable{
     width:100%;
+}
+
+/* Columnas compactas y agrupadas a la izquierda: la de acciones absorbe el
+   ancho sobrante del panel en lugar de repartirlo entre todas (table-layout:fixed). */
+.ingresosMovementsTable thead th:nth-child(1),
+.ingresosMovementsTable tbody td:nth-child(1){ width:170px; }
+.ingresosMovementsTable thead th:nth-child(2),
+.ingresosMovementsTable tbody td:nth-child(2){ width:360px; }
+.ingresosMovementsTable thead th:nth-child(3),
+.ingresosMovementsTable tbody td:nth-child(3){ width:260px; }
+.ingresosMovementsTable thead th:nth-child(4),
+.ingresosMovementsTable tbody td:nth-child(4){ width:180px; }
+
+.ingresosMovementsTable thead th.rowActionHeader,
+.ingresosMovementsTable tbody td.rowActionsCell{
+    width:auto;
+    text-align:right;
 }
 
 

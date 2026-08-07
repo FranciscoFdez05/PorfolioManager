@@ -161,6 +161,13 @@ function getOperationStablecoinSymbol(row = {}) {
     return normalizeStablecoinSymbol(quoteSymbol)
 }
 
+function getStablecoinsLockedQuoteAmount(row = {}) {
+    const total = parseLooseNumber(row.total) || 0
+    const commission = Math.max(0, parseLooseNumber(row.comisionesFiat) || 0)
+
+    return total + commission
+}
+
 function getStablecoinsLockedTotalsFromActiveBuys(operationsRows = [], options = {}) {
     const excludeRowId = String(options.excludeRowId || "").trim()
     const lockedTotals = {}
@@ -183,12 +190,12 @@ function getStablecoinsLockedTotalsFromActiveBuys(operationsRows = [], options =
             return
         }
 
-        const total = parseLooseNumber(row.total) || 0
-        if (total <= 0) {
+        const locked = getStablecoinsLockedQuoteAmount(row)
+        if (locked <= 0) {
             return
         }
 
-        lockedTotals[symbol] = (lockedTotals[symbol] || 0) + total
+        lockedTotals[symbol] = (lockedTotals[symbol] || 0) + locked
     })
 
     return lockedTotals

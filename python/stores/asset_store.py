@@ -73,6 +73,7 @@ def readAssetFile(assetId):
             "precioCurrency": r["precio_currency"],
             "cantidad": r["cantidad"],
             "comisionesCripto": r["comisiones_cripto"],
+            "comisionesFiat": r["comisiones_fiat"],
             "total": r["total"],
             "currency": r["currency"],
             "estado": r["estado"],
@@ -80,7 +81,7 @@ def readAssetFile(assetId):
         }
         for r in conn.execute(
             "SELECT id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
-            "precio_currency, cantidad, comisiones_cripto, total, currency, estado, fecha_cierre "
+            "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre "
             "FROM activo_operation_rows WHERE asset_id = ? ORDER BY rowid",
             (safe_id,)
         ).fetchall()
@@ -188,13 +189,14 @@ def writeAssetFile(assetId, data):
     conn.executemany(
         "INSERT INTO activo_operation_rows "
         "(id, asset_id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
-        "precio_currency, cantidad, comisiones_cripto, total, currency, estado, fecha_cierre) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), safe_id, r.get("activo", ""), r.get("fechaApertura", ""),
              r.get("par", ""), r.get("stablecoinSymbol", ""), r.get("orden", "Compra"),
              r.get("precioOrden", ""), r.get("precioCurrency", "EUR"), r.get("cantidad", ""),
-             r.get("comisionesCripto", ""), r.get("total", ""), r.get("currency", "EUR"),
+             r.get("comisionesCripto", ""), r.get("comisionesFiat", ""),
+             r.get("total", ""), r.get("currency", "EUR"),
              r.get("estado", "Activo"), r.get("fechaCierre", ""))
             for r in data.get("operationRows", [])
         ]

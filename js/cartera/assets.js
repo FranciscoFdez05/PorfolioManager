@@ -847,7 +847,8 @@ function renderAssetCompletedOperationsSection(asset) {
                 <td class="${ordenClass}">${escapeHtml(orden)}</td>
                 <td>${formatOperationsMoney(row.precioOrden, row.precioCurrency || currency)}</td>
                 <td>${formatOperationsQuantity(row.cantidad)}</td>
-                <td>${formatOperationsQuantity(row.comisionesCripto)}</td>
+                <td data-field="comisionesCripto">${formatOperationsQuantity(row.comisionesCripto)}</td>
+                <td data-field="comisionesFiat">${formatOperationsMoney(row.comisionesFiat, "EUR")}</td>
                 <td>${formatOperationsMoney(row.total, row.currency || currency)}</td>
                 <td>${escapeHtml(row.estado || "")}</td>
                 <td>${escapeHtml(row.fechaCierre || "")}</td>
@@ -866,9 +867,10 @@ function renderAssetCompletedOperationsSection(asset) {
                         <th class="mThSort" data-sortkey="3">Precio orden<span class="mSortArrow"></span></th>
                         <th class="mThSort" data-sortkey="4">Cantidad<span class="mSortArrow"></span></th>
                         <th class="mThSort" data-sortkey="5">Comisiones cripto<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="6">Total<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="7">Estado<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="8">Fecha cierre<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="6">Comisiones €<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="7">Total<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="8">Estado<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="9">Fecha cierre<span class="mSortArrow"></span></th>
                     </tr>
                 </thead>
                 <tbody>${rowsHtml}</tbody>
@@ -3762,6 +3764,35 @@ function closeAssetModal() {
     assetModalState = null
 }
 
+// Centra el diálogo sobre el área de contenido (#dynamicContent) manteniendo el fondo a pantalla completa.
+function alignConfirmModalToContent() {
+    const confirmModalOverlay = document.getElementById("confirmModalOverlay")
+    const contentArea = document.getElementById("dynamicContent")
+
+    if (!confirmModalOverlay || confirmModalOverlay.classList.contains("hidden")) {
+        return
+    }
+
+    if (!contentArea) {
+        confirmModalOverlay.style.padding = ""
+        return
+    }
+
+    const rect = contentArea.getBoundingClientRect()
+
+    if (rect.width <= 0 || rect.height <= 0) {
+        confirmModalOverlay.style.padding = ""
+        return
+    }
+
+    const top = Math.max(0, rect.top)
+    const right = Math.max(0, window.innerWidth - rect.right)
+    const bottom = Math.max(0, window.innerHeight - rect.bottom)
+    const left = Math.max(0, rect.left)
+
+    confirmModalOverlay.style.padding = `${top}px ${right}px ${bottom}px ${left}px`
+}
+
 function openConfirmModal({ title = "Confirmar acción", message = "¿Seguro que quieres continuar?", confirmLabel = "Confirmar", onConfirm, confirmSide = "left" }) {
     const confirmModalOverlay = document.getElementById("confirmModalOverlay")
     const confirmModalTitle = document.getElementById("confirmModalTitle")
@@ -3778,6 +3809,7 @@ function openConfirmModal({ title = "Confirmar acción", message = "¿Seguro que
     confirmModalAcceptButton.textContent = confirmLabel
     confirmModalActions.classList.toggle("confirmPrimaryRight", confirmSide === "right")
     confirmModalOverlay.classList.remove("hidden")
+    alignConfirmModalToContent()
     confirmModalState = { onConfirm }
 }
 
@@ -3789,6 +3821,7 @@ function closeConfirmModal() {
     }
 
     confirmModalOverlay.classList.add("hidden")
+    confirmModalOverlay.style.padding = ""
     document.querySelector(".confirmModalActions")?.classList.remove("confirmPrimaryRight")
     document.getElementById("confirmModalCancelBtn")?.classList.remove("hidden")
     confirmModalState = null
@@ -3831,6 +3864,8 @@ function initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirm
             }
         })
     }
+
+    window.addEventListener("resize", alignConfirmModalToContent)
 }
 
 async function submitAssetModal() {

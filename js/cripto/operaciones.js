@@ -268,6 +268,13 @@ function getOperationsNetworkFeesByStablecoinSymbol(transaccionesRows = []) {
     return totals
 }
 
+function getOperationLockedQuoteAmount(row = {}) {
+    const total = parseLooseNumber(row.total) || 0
+    const commission = Math.max(0, parseLooseNumber(row.comisionesFiat) || 0)
+
+    return total + commission
+}
+
 function getOperationsLockedStablecoinTotalsFromActiveBuys(operationsRows = [], options = {}) {
     const excludeRowId = String(options.excludeRowId || "").trim()
     const lockedTotals = {}
@@ -290,12 +297,12 @@ function getOperationsLockedStablecoinTotalsFromActiveBuys(operationsRows = [], 
             return
         }
 
-        const total = parseLooseNumber(row.total) || 0
-        if (total <= 0) {
+        const locked = getOperationLockedQuoteAmount(row)
+        if (locked <= 0) {
             return
         }
 
-        lockedTotals[symbol] = (lockedTotals[symbol] || 0) + total
+        lockedTotals[symbol] = (lockedTotals[symbol] || 0) + locked
     })
 
     return lockedTotals
@@ -323,12 +330,12 @@ function getOperationsLockedFiatTotalsFromActiveBuys(operationsRows = [], option
             return
         }
 
-        const total = parseLooseNumber(row.total) || 0
-        if (total <= 0) {
+        const locked = getOperationLockedQuoteAmount(row)
+        if (locked <= 0) {
             return
         }
 
-        lockedTotals[symbol] = (lockedTotals[symbol] || 0) + total
+        lockedTotals[symbol] = (lockedTotals[symbol] || 0) + locked
     })
 
     return lockedTotals
@@ -445,6 +452,7 @@ function normalizeOperationRow(row = {}, index = 0) {
         precioCurrency: inferredCurrency,
         cantidad: String(row.cantidad || "").trim(),
         comisionesCripto: String(row.comisionesCripto || row.comisiones || "").trim(),
+        comisionesFiat: String(row.comisionesFiat || "").trim(),
         total: String(row.total || "").trim(),
         currency: inferredCurrency,
         estado: OPERATION_STATUS_OPTIONS.includes(String(row.estado || "").trim()) ? String(row.estado).trim() : "Activo",
@@ -585,6 +593,7 @@ function createEmptyOperationRow() {
         precioCurrency: moneyCurrency,
         cantidad: "",
         comisionesCripto: "",
+        comisionesFiat: "",
         total: "",
         currency: moneyCurrency,
         estado: "Activo",
@@ -719,8 +728,9 @@ function buildOperationRow(row) {
         <td>${normalizedRow.orden || ""}</td>
         <td>${formatOperationsMoney(normalizedRow.precioOrden, normalizedRow.precioCurrency || "USD")}</td>
         <td>${formatOperationsQuantity(normalizedRow.cantidad)}</td>
-        <td>${formatOperationsQuantity(normalizedRow.comisionesCripto)}</td>
         <td>${formatOperationsMoney(normalizedRow.total, normalizedRow.currency || "USD")}</td>
+        <td data-field="comisionesCripto">${formatOperationsCryptoCommissionCell(normalizedRow)}</td>
+        <td data-field="comisionesFiat">${formatOperationsMoney(normalizedRow.comisionesFiat, "EUR")}</td>
         <td>${normalizedRow.estado || ""}</td>
         <td>${normalizedRow.fechaCierre || ""}</td>
         <td class="rowActionsCell">
@@ -765,6 +775,36 @@ function formatOperationsQuantity(value) {
         minimumFractionDigits: OPERATION_QUANTITY_DECIMALS,
         maximumFractionDigits: OPERATION_QUANTITY_DECIMALS
     })
+}
+
+function getOperationBaseSymbol(row = {}) {
+    const pair = String(row.par || "").trim().toUpperCase()
+
+    if (pair.includes("/")) {
+        return pair.split("/")[0]
+    }
+
+    const asset = getOperationAssetById(row.assetId)
+    return String(asset?.baseSymbol || asset?.symbol || "").trim().toUpperCase()
+}
+
+function formatOperationsCryptoCommissionCell(row = {}) {
+    const formattedAmount = formatOperationsQuantity(row.comisionesCripto)
+
+    if (!formattedAmount) {
+        return ""
+    }
+
+    const amount = parseLooseNumber(row.comisionesCripto) || 0
+    const symbol = getOperationBaseSymbol(row)
+    const asset = getOperationAssetById(row.assetId)
+    const price = parseLooseNumber(asset?.price)
+    const priceCurrency = asset?.precioCurrency || asset?.currency || "EUR"
+    const hint = amount > 0 && price !== null && price > 0
+        ? `<span class="operationsFeeHint">≈ ${formatMoney(amount * price, priceCurrency)}</span>`
+        : ""
+
+    return `<span class="operationsFeeAmount">${formattedAmount}${symbol ? ` ${symbol}` : ""}</span>${hint}`
 }
 
 function formatOperationsMoney(value, currency = "EUR") {
@@ -923,6 +963,10 @@ function openOperacionRowModal(rowId) {
             <input id="opModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.comisionesCripto || ""}">
         </div>
         <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Comisiones €</label>
+            <input id="opModalComisionesFiat" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.comisionesFiat || "")}">
+        </div>
+        <div class="assetRowModalField">
             <label class="assetRowModalLabel">Total</label>
             <input id="opModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.total || "")}">
         </div>
@@ -1022,6 +1066,7 @@ function saveOperacionRowFromModal() {
         precioOrden: g("opModalPrecio"),
         cantidad: g("opModalCantidad"),
         comisionesCripto: g("opModalComisiones"),
+        comisionesFiat: g("opModalComisionesFiat"),
         total: g("opModalTotal"),
         estado: g("opModalEstado"),
         fechaCierre: g("opModalFechaCierre")
