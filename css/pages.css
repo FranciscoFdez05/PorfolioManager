@@ -1484,12 +1484,14 @@
 }
 
 .gastosAnnualTable tbody td{
-    padding:6px 8px;
+    padding:5px 8px;
 }
 
-/* Mismo alto para todas las filas: las mensualidades ocupan dos líneas
-   (nombre + frecuencia) y las de tipo de gasto solo una. */
-.gastosAnnualTable tbody tr:not(.gastosSectionRow) td{
+/* Mismo alto para todas las filas, cabeceras de sección incluidas: las
+   mensualidades ocupan dos líneas (nombre + frecuencia) y las de tipo de gasto
+   solo una. El padding se queda corto a propósito para que el contenido más
+   alto quepa dentro de los 42px y ninguna fila crezca por encima. */
+.gastosAnnualTable tbody tr td{
     height:42px;
 }
 
@@ -1768,8 +1770,6 @@
     font-weight:700;
     text-transform:uppercase;
     letter-spacing:0.07em;
-    padding-top:12px !important;
-    padding-bottom:6px !important;
 }
 
 /* Fila de categoría "Mensualidades" dentro de la sección de gastos */
@@ -2612,11 +2612,13 @@
 
 .ingresosAnnualTable tbody td{
     white-space:nowrap;
+    padding:5px 8px;
 }
 
-/* Mismo alto para todas las filas: las recurrentes ocupan dos líneas
-   (nombre + frecuencia) y las de tipo de ingreso solo una. */
-.ingresosAnnualTable tbody tr:not(.ingresosSectionRow) td{
+/* Mismo alto para todas las filas, cabeceras de sección incluidas: las
+   recurrentes ocupan dos líneas (nombre + frecuencia) y las de tipo de ingreso
+   solo una. */
+.ingresosAnnualTable tbody tr td{
     height:42px;
 }
 
@@ -2685,8 +2687,6 @@
     font-weight:700;
     text-transform:uppercase;
     letter-spacing:0.07em;
-    padding-top:12px !important;
-    padding-bottom:6px !important;
 }
 
 .ingresosTotalRow td{

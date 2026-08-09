@@ -20,9 +20,11 @@ from routes.activos import activos_bp
 from routes.ajustes import ajustes_bp
 from routes.auth import auth_bp
 from routes.backup import backup_bp
+from routes.categorias import categorias_bp
 from routes.gastos import gastos_bp
 from routes.ingresos import ingresos_bp
 from routes.market import market_bp
+from routes.movimientos import movimientos_bp
 from routes.operaciones import operaciones_bp
 from routes.portfolios import portfolios_bp
 from routes.registros import registros_bp
@@ -116,9 +118,11 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(activos_bp)
 app.register_blueprint(ajustes_bp)
 app.register_blueprint(backup_bp)
+app.register_blueprint(categorias_bp)
 app.register_blueprint(gastos_bp)
 app.register_blueprint(ingresos_bp)
 app.register_blueprint(market_bp)
+app.register_blueprint(movimientos_bp)
 app.register_blueprint(operaciones_bp)
 app.register_blueprint(portfolios_bp)
 app.register_blueprint(trading_bp)
@@ -127,6 +131,19 @@ app.register_blueprint(snapshots_bp)
 app.register_blueprint(ventas_bp)
 
 _PUBLIC_ENDPOINTS = {"auth.login", "auth.setup", "auth.logout"}
+# Endpoints del Atajo de iOS. No pueden usar la sesión ni el token CSRF (un
+# Atajo no mantiene cookies), así que quedan fuera de require_login y de
+# verify_csrf y se autentican por su cuenta: filtro de IP en core/red_local.py
+# más firma HMAC en core/firma_hmac.py, ambos aplicados dentro de cada vista.
+# Se mantienen aparte de _PUBLIC_ENDPOINTS para que quede explícito que estas
+# rutas no son públicas, solo se protegen de otra forma.
+_ATAJO_ENDPOINTS = {
+    "movimientos.createMovimiento",
+    "movimientos.getCategorias",
+    "movimientos.getPortfoliosLista",
+    "movimientos.prepararMovimiento",
+    "movimientos.firmarTexto",
+}
 # Extensiones que la página de login necesita antes de autenticarse. Solo se
 # aceptan bajo los directorios de _PUBLIC_DIRS: cualquier otra ruta con estas
 # extensiones sigue exigiendo sesión.
@@ -161,7 +178,7 @@ def verify_csrf():
         return
     # El login es la única entrada sin sesión previa; lo protege el propio
     # formulario junto al límite de intentos por IP.
-    if request.endpoint in _PUBLIC_ENDPOINTS:
+    if request.endpoint in _PUBLIC_ENDPOINTS or request.endpoint in _ATAJO_ENDPOINTS:
         return
     if not session.get("logged_in"):
         # Sin sesión no hay nada que proteger; require_login responde 401.
@@ -206,7 +223,7 @@ def enforce_body_limit():
 
 @app.before_request
 def require_login():
-    if request.endpoint in _PUBLIC_ENDPOINTS:
+    if request.endpoint in _PUBLIC_ENDPOINTS or request.endpoint in _ATAJO_ENDPOINTS:
         return
     # Assets del login (CSS/JS/imágenes/fuentes), restringidos a sus directorios
     normalized_path = request.path.lstrip("/").replace("\\", "/")

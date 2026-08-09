@@ -2888,6 +2888,139 @@ function mRenderPasivosCharts(dividendos, intereses) {
 
 // ── main init ──────────────────────────────────────────────────────────────
 
+// ── ocultado de apartados sin datos ────────────────────────────────────────
+//
+// La página monta todos los apartados siempre y cada render decide si enseña un
+// aviso de "no hay datos". Con una cartera recién creada eso deja una pantalla
+// llena de tarjetas vacías, así que después de pintar se hace una pasada que
+// esconde lo que no tiene nada que enseñar.
+//
+// La pasada solo añade "hidden", nunca lo quita: los apartados que ya se ocultan
+// por su propia lógica (trading sin operaciones, renta fija sin filas…) deben
+// quedarse como están.
+
+// Estos dos se piden al servidor por rango después de la pasada, así que se
+// gestionan aparte en mRenderAll: si se ocultaran por "no tener gráfico todavía"
+// desaparecerían aunque sí hubiera histórico.
+const _M_SECCIONES_ASINCRONAS = new Set(["mSectionEvolucion", "mSectionEvolucionTipos"])
+
+function _mChartConDatos(canvas) {
+    const chart = _metricasCharts[canvas?.id]
+    if (!chart) return false
+
+    return (chart.data?.datasets || []).some((ds) => (ds.data || []).some((punto) => {
+        const valor  = punto && typeof punto === "object" ? (punto.y ?? punto.v ?? punto.r) : punto
+        const numero = Number(valor)
+        return Number.isFinite(numero) && numero !== 0
+    }))
+}
+
+function _mContenedorConDatos(el) {
+    const canvases = [...el.querySelectorAll("canvas")]
+    const hayTabla = Boolean(el.querySelector("table"))
+
+    // Sin gráficos ni tablas no hay forma de medirlo: se deja visible.
+    if (!canvases.length && !hayTabla) {
+        return true
+    }
+
+    return el.querySelectorAll("tbody tr").length > 0 || canvases.some(_mChartConDatos)
+}
+
+// "---", "0,00 €", "0,00 %" o "0" son la forma que tiene la página de decir que
+// no hay dato, así que una fila donde todo sea eso no aporta nada.
+function _mValorKpiVacio(texto) {
+    // Se busca el número dentro del texto en vez de limpiar símbolos uno a uno:
+    // los KPIs llevan sufijos de todo tipo ("1,25x" del TVPI, "3 ops"…) y con un
+    // replace se acababa colando un NaN que contaba como dato.
+    const numero = String(texto || "").match(/-?\d[\d.,]*/)
+    if (!numero) {
+        return true
+    }
+
+    return Number(numero[0].replace(/\./g, "").replace(",", ".")) === 0
+}
+
+function _mElementoVisible(el) {
+    return !el.classList.contains("hidden") && el.style.display !== "none"
+}
+
+function _mCategoriaConContenido(cat) {
+    const elementos = document.querySelectorAll(
+        `.metricasSection[data-mcat="${cat}"], .metricasKpiRow[data-mcat="${cat}"]`
+    )
+    return [...elementos].some(_mElementoVisible)
+}
+
+function mOcultarApartadosSinDatos() {
+    document.querySelectorAll(".metricasSection").forEach((seccion) => {
+        if (_M_SECCIONES_ASINCRONAS.has(seccion.id)) {
+            return
+        }
+
+        const tarjetas = [...seccion.querySelectorAll(".metricasChartCard")]
+        tarjetas.forEach((tarjeta) => {
+            if (!_mContenedorConDatos(tarjeta)) tarjeta.classList.add("hidden")
+        })
+
+        const medibles = tarjetas.length ? tarjetas : [seccion]
+        if (medibles.every((el) => !_mContenedorConDatos(el))) {
+            seccion.classList.add("hidden")
+        }
+    })
+
+    // Grupos de KPIs que se rellenan por JS y se quedan sin tarjetas.
+    document.querySelectorAll(".metricasKpiGroup").forEach((grupo) => {
+        const cards = grupo.querySelector(".metricasKpiCards")
+        if (!cards || cards.children.length) {
+            return
+        }
+
+        grupo.classList.add("hidden")
+        const separador = grupo.previousElementSibling
+        if (separador?.classList.contains("metricasKpiGroupSep")) {
+            separador.classList.add("hidden")
+        }
+    })
+
+    // Separadores verticales que se quedan colgando entre grupos ocultos.
+    document.querySelectorAll(".metricasKpiGroupSep").forEach((sep) => {
+        const anterior = sep.previousElementSibling
+        const siguiente = sep.nextElementSibling
+        if (!anterior || !siguiente || !_mElementoVisible(anterior) || !_mElementoVisible(siguiente)) {
+            sep.classList.add("hidden")
+        }
+    })
+
+    // Filas de KPIs en las que todo vale cero o "---". Solo cuentan los grupos
+    // que siguen visibles: los que la propia página ya ha escondido por no tener
+    // datos no deben mantener viva la fila entera.
+    document.querySelectorAll(".metricasKpiRow[data-mcat]").forEach((fila) => {
+        const grupos = [...fila.querySelectorAll(".metricasKpiGroup")]
+        const visibles = grupos.length ? grupos.filter(_mElementoVisible) : [fila]
+        const valores = visibles.flatMap((grupo) => [...grupo.querySelectorAll(".mkpiValue")])
+
+        if (!valores.length || valores.every((el) => _mValorKpiVacio(el.textContent))) {
+            fila.classList.add("hidden")
+        }
+    })
+
+    // Y por último la categoría entera: si no queda nada visible dentro, sobran
+    // su separador y su pestaña del filtro superior.
+    document.querySelectorAll(".metricasCatDivider[data-mcat]").forEach((divisor) => {
+        if (!_mCategoriaConContenido(divisor.dataset.mcat)) {
+            divisor.classList.add("hidden")
+        }
+    })
+
+    document.querySelectorAll(".mNavTab[data-mcat]").forEach((pestana) => {
+        const cats = pestana.dataset.mcat.split(",").map((cat) => cat.trim())
+        if (cats[0] !== "todo" && !cats.some(_mCategoriaConContenido)) {
+            pestana.classList.add("hidden")
+        }
+    })
+}
+
 function mRenderAll(payload) {
     const { summaries, dividendos, bonos, rentaFija, gastosYearsList, gastosYearData, ingresosYearsList, ingresosYearData, tradingRows, snapshotHistory, inversiones } = payload
     const b = bonos || [], rf = rentaFija || []
@@ -2922,6 +3055,12 @@ function mRenderAll(payload) {
     if (gastosIngresosTab) gastosIngresosTab.classList.toggle("hidden", gastosEmpty && ingresosEmpty)
     const tradingTab = document.querySelector(".mNavTab[data-mcat='trading']")
     if (tradingTab) tradingTab.classList.toggle("hidden", !(tradingRows && tradingRows.length))
+
+    // Sin ningún snapshot guardado no hay histórico que graficar en ningún
+    // rango, así que las dos secciones de evolución sobran enteras.
+    if (!snapshotHistory?.length) {
+        _M_SECCIONES_ASINCRONAS.forEach((id) => document.getElementById(id)?.classList.add("hidden"))
+    }
 }
 
 // ── Trading metrics ────────────────────────────────────────────────────────
@@ -3211,6 +3350,7 @@ async function initMetricasLogic() {
         mUpdateKpis(_metricasPayload)
         mRenderAll(_metricasPayload)
         mBindTableSort(_metricasPayload.summaries)
+        mOcultarApartadosSinDatos()
         mInitEvolucion()
         mInitEvolucionTipos()
 

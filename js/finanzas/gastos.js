@@ -1075,12 +1075,16 @@ function renderGastosAnnualTable() {
     // Los índices de las acciones apuntan a la lista completa de tipos guardados.
     const storedTypes = getAvailableGastosTypes()
     const totalTypes = storedTypes.length
-    const renderTypeRow = (type) => {
+    const renderTypeRow = (type, posicion) => {
         const rowIndex = storedTypes.indexOf(type)
         const isHidden = isGastoTipoHidden(type)
         const isEmpty = GASTOS_MONTHS.every((month) => !expenseTotals[type][month.key])
         const tr = document.createElement("tr")
         if (isEmpty) tr.classList.add("gastosTypeEmpty")
+        // La primera categoría vacía marca el corte con las que sí tienen datos.
+        // Es un borde y no una fila separadora: la tabla fuerza 42px de alto a
+        // todas sus filas, así que una fila vacía se vería como un hueco roto.
+        if (isEmpty && posicion === 0) tr.classList.add("gastosTypeEmptyFirst")
         tr.innerHTML = `
             <td>${escapeGastosHtml(type)}</td>
             ${GASTOS_MONTHS.map((month) => `<td>${expenseTotals[type][month.key] ? formatEuro(expenseTotals[type][month.key]) : "- €"}</td>`).join("")}
@@ -1104,13 +1108,7 @@ function renderGastosAnnualTable() {
 
     typesWithData.forEach(renderTypeRow)
 
-    if (typesEmpty.length) {
-        const sepRow = document.createElement("tr")
-        sepRow.className = "gastosTypeEmptySep"
-        sepRow.innerHTML = `<td colspan="14"></td>`
-        annualBody.appendChild(sepRow)
-        typesEmpty.forEach(renderTypeRow)
-    }
+    typesEmpty.forEach(renderTypeRow)
 
     // Las mensualidades son una categoría más, así que el total del año ya las incluye.
     const grandTotalRow = document.createElement("tr")
@@ -1466,7 +1464,12 @@ function renderMensualidadesTable() {
         return
     }
 
-    body.innerHTML = items.map(({ row, index }) => {
+    body.innerHTML = items.map(({ row, index }, position) => {
+        // Se intercambia con el vecino VISIBLE, no con el contiguo del array:
+        // con un filtro activo, mover contra una fila oculta parecería que el
+        // botón no hace nada.
+        const prevIndex = position > 0 ? items[position - 1].index : null
+        const nextIndex = position < items.length - 1 ? items[position + 1].index : null
         const anual = getMensualidadAnnualCost(row)
         const frecuencia = getMensualidadFrecuencia(row.frecuencia)
         const next = getMensualidadNextCharge(row)
@@ -1495,6 +1498,8 @@ function renderMensualidadesTable() {
                         <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                         <div class="rowMenuDropdown">
                             <button type="button" class="rowMenuItem" data-mens-edit="${index}">Editar</button>
+                            <button type="button" class="rowMenuItem" data-mens-move="${index}" data-mens-swap="${prevIndex ?? ""}" ${prevIndex === null ? "disabled" : ""}>▲ Subir</button>
+                            <button type="button" class="rowMenuItem" data-mens-move="${index}" data-mens-swap="${nextIndex ?? ""}" ${nextIndex === null ? "disabled" : ""}>▼ Bajar</button>
                             <button type="button" class="rowMenuItem" data-mens-toggle="${index}">${row.activa ? "Pausar" : "Reactivar"}</button>
                             <button type="button" class="rowMenuItem" data-mens-duplicate="${index}">Duplicar</button>
                             <hr>
@@ -1522,6 +1527,23 @@ function handleMensualidadesActionClick(event) {
     const editBtn = event.target.closest("[data-mens-edit]")
     if (editBtn) {
         openMensualidadFormModal(Number(editBtn.dataset.mensEdit))
+        return
+    }
+
+    const moveBtn = event.target.closest("[data-mens-move]")
+    if (moveBtn) {
+        const from = Number(moveBtn.dataset.mensMove)
+        const to = Number(moveBtn.dataset.mensSwap)
+        const rows = currentGastosData?.mensualidades
+
+        // dataset.mensSwap va vacío en los extremos de la lista visible.
+        if (!Array.isArray(rows) || !Number.isInteger(to) || !rows[from] || !rows[to]) {
+            return
+        }
+
+        ;[rows[from], rows[to]] = [rows[to], rows[from]]
+        renderCurrentGastosView()
+        scheduleGastosAutosave()
         return
     }
 
@@ -1695,9 +1717,9 @@ function buildGastoMovementRow(row = {}, rowIndex = -1) {
     tr.dataset.cantidad = String(row.cantidad || "")
 
     tr.innerHTML = `
-        <td data-field="fecha">${row.fecha || ""}</td>
-        <td data-field="nombre">${row.nombre || ""}</td>
-        <td data-field="tipo">${normalizeGastoTipo(row.tipo || "")}</td>
+        <td data-field="fecha">${escapeGastosHtml(row.fecha || "")}</td>
+        <td data-field="nombre">${escapeGastosHtml(row.nombre || "")}</td>
+        <td data-field="tipo">${escapeGastosHtml(normalizeGastoTipo(row.tipo || ""))}</td>
         <td data-field="cantidad">${formatCellEuroValue(row.cantidad || "")}</td>
         <td class="rowActionsCell">
             <div class="rowMenu">

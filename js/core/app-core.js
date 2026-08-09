@@ -26,6 +26,7 @@ function pageHtmlPath(page) {
 
 const _MODULE_PAGES = {
     panelSuperior: [],
+    vistaGeneral: ["vistaGeneral"],
     activos:      ["activos", "seguimiento", "heatmap"],
     gastos:       ["gastos", "ingresos"],
     finanzas:     ["intereses", "dividendos", "bonos", "ventas", "privateMarket"],
@@ -48,6 +49,46 @@ function applyTopMetricsVisibility() {
     })
 }
 
+function moduloDePagina(page) {
+    return Object.keys(_MODULE_PAGES).find((mod) => _MODULE_PAGES[mod].includes(page))
+}
+
+function paginaVisible(page) {
+    const mod = moduloDePagina(page)
+    // Las páginas sin módulo (ajustes) siempre están disponibles.
+    return !mod || (window._modulosConfig || {})[mod] !== false
+}
+
+// Primera pestaña activa según el orden de la barra de navegación. Se usa al
+// arrancar y al apagar el módulo de la página que se está viendo: si "Vista
+// general" está desactivada la app tiene que abrir otra cosa, no quedarse en
+// una página que ya no se puede alcanzar desde el menú.
+function primeraPaginaVisible() {
+    const botones = document.querySelectorAll(".navButtons [data-page]")
+
+    for (const boton of botones) {
+        const page = boton.dataset.page
+        if (page !== "ajustes" && paginaVisible(page)) {
+            return page
+        }
+    }
+
+    return null
+}
+
+function activarBotonNav(page) {
+    document.querySelectorAll(".navBtn").forEach((item) => item.classList.remove("active"))
+    document.querySelectorAll(".navDropdownBtn").forEach((item) => item.classList.remove("active"))
+
+    const boton = document.querySelector(`.navButtons [data-page="${page}"]`)
+    if (!boton) {
+        return
+    }
+
+    boton.classList.add("active")
+    boton.closest(".navDropdown")?.querySelector(".navDropdownBtn")?.classList.add("active")
+}
+
 function applyModulesVisibility() {
     const cfg = window._modulosConfig || {}
     for (const mod of Object.keys(_MODULE_PAGES)) {
@@ -55,6 +96,16 @@ function applyModulesVisibility() {
         document.querySelectorAll(`[data-module="${mod}"]`).forEach(el => {
             el.style.display = enabled ? "" : "none"
         })
+    }
+
+    // Si se acaba de apagar el módulo de la página abierta, hay que moverse.
+    const actual = window._paginaActual
+    if (actual && !paginaVisible(actual)) {
+        const destino = primeraPaginaVisible()
+        if (destino) {
+            activarBotonNav(destino)
+            loadPage(destino)
+        }
     }
 }
 
@@ -124,7 +175,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     await refreshTopDividendosIntereses()
 
     initMoneyToggle()
-    loadPage("vistaGeneral")
+
+    const paginaInicial = primeraPaginaVisible()
+    if (paginaInicial) {
+        activarBotonNav(paginaInicial)
+        loadPage(paginaInicial)
+    }
+
     refreshOverviewMarketData().then(() => {
         _postSnapshot()
     })
@@ -616,6 +673,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
     if (!contentArea) {
         return
     }
+
+    window._paginaActual = page
 
     try {
         if (typeof window._hmResizeCleanup === "function") {

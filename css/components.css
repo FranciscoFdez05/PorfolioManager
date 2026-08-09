@@ -998,10 +998,9 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     color: #374151;
 }
 
-tr.gastosTypeEmptySep td {
-    padding: 4px 0;
-    border: none;
-    background: none;
+/* Corte entre las categorías con movimientos y las que están a cero. */
+.gastosAnnualTable tbody tr.gastosTypeEmptyFirst td {
+    border-top: 2px solid var(--border-mid);
 }
 
 .assetRowEditBtn,
@@ -2850,4 +2849,144 @@ html[data-theme="black"] .segHideBtn:hover{ background:#111; color:#f39c12; bord
 
 @container assetList (min-width:480px){
     .assetBtn{ gap:0 16px; padding:12px 22px; }
+}
+
+/* ── Panel de categorías (gastos e ingresos) ──────────────────────────────── */
+/* Reúne en un modal las dos listas de categorías, que antes solo se podían
+   gestionar por separado desde el menú de fila de cada tabla anual. */
+
+.categoriasModal{
+    width:min(760px, 100%);
+}
+
+.catColumns{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+    gap:18px;
+    margin-bottom:14px;
+}
+
+.catColumnTitle{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin:0 0 8px 0;
+    color:var(--text-subtle);
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+}
+
+.catCount{
+    padding:1px 7px;
+    border-radius:10px;
+    background:var(--bg-inset);
+    color:var(--text-muted);
+    font-size:12px;
+    letter-spacing:0;
+}
+
+.catList{
+    max-height:46vh;
+    margin:0;
+    padding:0;
+    overflow-y:auto;
+    list-style:none;
+}
+
+.catRow{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    padding:3px 0;
+}
+
+.catRowEmpty,
+.catHint{
+    padding:6px 0;
+    color:var(--text-dim);
+    font-size:13px;
+}
+
+.catRowReadonly .catName{
+    flex:1;
+    padding:0 10px;
+    color:var(--text-primary);
+    font-size:14px;
+    line-height:32px;
+}
+
+.catInput{
+    flex:1;
+    min-width:0;
+    box-sizing:border-box;
+    height:34px;
+    padding:0 10px;
+    border:1px solid var(--border-mid);
+    border-radius:4px;
+    background:var(--bg-inset);
+    color:var(--text-bright);
+    font-size:14px;
+    outline:none;
+}
+
+.catInput:focus{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-glow);
+}
+
+/* Número de movimientos que usan la categoría en el año cargado: es lo que
+   explica por qué el botón de eliminar está deshabilitado. */
+.catUso{
+    min-width:22px;
+    color:var(--text-dim);
+    font-size:12px;
+    text-align:center;
+}
+
+.catIconBtn{
+    flex:none;
+    width:28px;
+    height:28px;
+    padding:0;
+    border:1px solid var(--btn-border);
+    border-radius:4px;
+    background:var(--btn-bg);
+    color:var(--text-muted);
+    font-size:12px;
+    line-height:1;
+    cursor:pointer;
+}
+
+.catIconBtn:hover:not(:disabled){
+    border-color:var(--btn-border-hover);
+    background:var(--btn-bg-hover);
+    color:var(--text-bright);
+}
+
+.catIconBtn:disabled{
+    opacity:0.35;
+    cursor:not-allowed;
+}
+
+.catIconBtnDanger:hover:not(:disabled){
+    border-color:var(--color-neg);
+    color:var(--color-neg-bright);
+}
+
+.catAddBtn{
+    width:100%;
+    margin-top:8px;
+    padding:7px 10px;
+    border:1px dashed var(--border-hard);
+    border-radius:4px;
+    background:transparent;
+    color:var(--text-muted);
+    font-size:13px;
+    cursor:pointer;
+}
+
+.catAddBtn:hover{
+    border-color:var(--accent);
+    color:var(--text-bright);
 }

@@ -1517,9 +1517,9 @@ function buildIngresoMovementRow(row = {}, rowIndex = -1) {
     tr.dataset.cantidad = String(row.cantidad || "")
 
     tr.innerHTML = `
-        <td data-field="fecha">${row.fecha || ""}</td>
-        <td data-field="nombre">${row.nombre || ""}</td>
-        <td data-field="tipo">${normalizeIngresoTipo(row.tipo || "")}</td>
+        <td data-field="fecha">${escapeIngresosHtml(row.fecha || "")}</td>
+        <td data-field="nombre">${escapeIngresosHtml(row.nombre || "")}</td>
+        <td data-field="tipo">${escapeIngresosHtml(normalizeIngresoTipo(row.tipo || ""))}</td>
         <td data-field="cantidad">${formatCellEuroValue(row.cantidad || "")}</td>
         <td class="rowActionsCell">
             <div class="rowMenu">

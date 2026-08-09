@@ -15,6 +15,7 @@ Aplicación web **local** para el seguimiento de una cartera de inversión perso
 - **Métricas** — KPIs y gráficos interactivos
 - **Herramientas** — utilidades varias
 - **Ajustes** — claves API, caducidad de cotizaciones, backup/restauración y tema
+- **Atajo de iOS** — alta rápida de gastos e ingresos desde el Centro de Control, restringida a la LAN y a WireGuard ([guía](docs/atajo-ios.md))
 
 Las cotizaciones se obtienen opcionalmente vía **Finnhub**, **EODHD**, **Yahoo Finance** y **Alpha Vantage** (basta con dejar los archivos de clave vacíos para funcionar sin ellas).
 
@@ -136,6 +137,121 @@ Los `API/*.key` se guardan cifrados (Fernet con clave derivada de `SECRET_KEY`) 
 
 ---
 
+## Atajo de iOS — apuntar gastos desde el móvil
+
+Añadido opcional para dar de alta un gasto o un ingreso desde el Centro de Control del iPhone, sin abrir la web. Escribe en las mismas tablas que la aplicación, así que lo apuntado desde el móvil aparece en la pestaña de Gastos o Ingresos como cualquier otra fila. La web app funciona exactamente igual con esto activado o desactivado.
+
+Solo se aceptan peticiones desde la LAN y desde el túnel de WireGuard, firmadas con HMAC-SHA256.
+
+### 1. Generar la clave de firma
+
+Hay que hacerlo **en la máquina donde corre el servidor**, no en la de desarrollo: la clave se cifra con la `SECRET_KEY` de ese `.env` y se lee desde ahí.
+
+```bash
+# Con Docker (lo habitual)
+docker compose exec -u appuser porfoliopython python tools/generar_clave_movimientos.py
+
+# Sin Docker
+python tools/generar_clave_movimientos.py
+```
+
+Escribe `API/movimientos.key`, ignorado por git y cifrado con `SECRET_KEY` igual que las claves de los proveedores. Sin este paso los endpoints responden `503`.
+
+> El `-u appuser` importa: el contenedor sirve la app como `appuser` y el fichero se crea con permisos `600`. Generado como root, gunicorn no podría leerlo hasta el siguiente reinicio (el `entrypoint.sh` hace `chown` de `API/` al arrancar).
+
+### 2. Ajustar las redes permitidas
+
+En `config.ini`, sección `[atajo]`:
+
+```ini
+[atajo]
+activado = true
+redes_permitidas = 192.168.1.0/24, 10.0.0.0/24
+tolerancia_segundos = 60
+max_texto_firma = 8192
+fichero_clave = API/movimientos.key
+```
+
+El primer rango es tu LAN; el segundo, el de WireGuard — ajústalo al `Address` de tu interfaz `wg0`. Reinicia el servidor tras generar la clave.
+
+### 3. Averiguar la dirección del servidor
+
+El Atajo necesita una IP y un puerto. El puerto es el de `[server] port` (5000 por defecto).
+
+```bash
+# En el servidor (Linux / Banana Pi)
+ip -4 addr show | grep inet
+
+# En el servidor (Windows)
+ipconfig
+
+# La IP del túnel de WireGuard
+wg show
+```
+
+De ahí salen dos direcciones: la de la LAN (`192.168.1.X`) y la del túnel (`10.0.0.X`).
+
+> **Recomendación:** usa la IP de WireGuard en el Atajo y deja el túnel en modo *On-Demand* en el iPhone. Así funciona un único Atajo tanto en casa como fuera, sin tener que mantener dos versiones ni cambiar la URL al salir.
+
+### 4. Comprobar la conexión desde el iPhone
+
+Con el móvil en la misma Wi-Fi (o con WireGuard conectado), abre en Safari:
+
+```
+http://192.168.1.X:5000/api/categorias
+```
+
+| Lo que ves | Qué significa |
+|---|---|
+| Un JSON con `categorias` | Todo correcto, ya puedes montar el Atajo |
+| `403 Origen no autorizado` | La IP del móvil no cae en `redes_permitidas` |
+| `404 Recurso no encontrado` | `activado = false` en `config.ini` |
+| No carga nada | Cortafuegos del servidor, IP equivocada, o WireGuard desconectado |
+
+**Si sale `403`, la respuesta te dice con qué IP te ve el servidor** — no hay que adivinarla ni entrar por SSH:
+
+```json
+{ "ok": false, "error": "Origen no autorizado", "ip": "10.6.0.2" }
+```
+
+Añade esa IP (o su rango) a `redes_permitidas`. Haz la prueba **dos veces, una por Wi-Fi y otra con la VPN conectada**: según si el túnel enmascara o enruta el tráfico, el móvil puede aparecer con su IP del túnel o con la del router, y así configuras los dos rangos de una vez. La misma información queda en el log:
+
+```bash
+docker compose logs --tail=20 porfoliopython | grep red_local
+```
+
+Este endpoint es el que hace que el Atajo no tenga ninguna categoría escrita a mano dentro: las pide aquí cada vez que se ejecuta, así que una categoría nueva creada desde la web aparece sola en el móvil.
+
+### 5. Montar el Atajo
+
+Los pasos concretos, con los nombres de cada acción de la app Atajos, están en **[docs/atajo-ios.md](docs/atajo-ios.md)**. El flujo es:
+
+```
+Elegir del menú (Gasto / Ingreso)
+        ↓
+GET  /api/categorias        → Elegir de la lista
+        ↓
+Pedir concepto e importe
+        ↓
+Construir el JSON en una acción "Texto"
+        ↓
+POST /api/firmar            → devuelve firma + timestamp
+        ↓
+POST /api/movimiento        → cabeceras X-Signature y X-Timestamp
+```
+
+`/api/firmar` existe porque la acción nativa *Hash* de Atajos no admite HMAC con clave: la firma la calcula el servidor. De paso pone su propio reloj, así que el Atajo no tiene que calcular ningún epoch ni preocuparse por el desfase horario.
+
+### 6. Añadirlo al Centro de Control
+
+Centro de Control → `+` arriba a la izquierda → **Añadir un control** → busca *Atajo* → elige el tuyo. También se puede asignar al botón de Acción (Ajustes → Botón de Acción → Atajo).
+
+### Desactivarlo
+
+`activado = false` en `[atajo]`. Los tres endpoints pasan a responder `404` y la web app no se entera.
+
+---
+
 ## Base de datos y backups
 
 - **BD activa:** `data/portfolios/<id>.db` (una por portfolio; `data/portfolio.db` es solo el fichero heredado de versiones anteriores)
@@ -217,6 +333,8 @@ css/                 variables, base, components, pages, themes
 | `core/errors.py` | Excepciones de negocio (`ValidationError`, `NotFoundError`, `ConflictError`, `UpstreamError`) y manejadores globales. Todo lo que cuelga de `/api/` responde JSON `{ok:false, error, requestId}`, incluso ante un fallo no previsto, y el detalle interno solo va al log. |
 | `core/validation.py` | Normalización de la entrada de las rutas (`as_text`, `as_number`, `as_year`, `as_rows`, `one_of`…) con límites de longitud y de número de filas. |
 | `core/paths.py` | Única fuente de verdad de las rutas del proyecto. |
+| `core/config_ini.py` | Lectura de `config.ini` con caché por mtime y prioridad entorno → fichero → defecto. Los ajustes viven en el `.ini`, no como constantes repartidas por el código. |
+| `core/red_local.py` + `core/firma_hmac.py` | Autenticación de los endpoints que no pueden usar la sesión de la web app (el Atajo de iOS): filtro de IP por CIDR y firma HMAC-SHA256 sobre timestamp + cuerpo crudo. Se configuran en `[atajo]` de `config.ini`. Ver [docs/atajo-ios.md](docs/atajo-ios.md). |
 | `providers/` | Capa común de los cuatro clientes de cotizaciones: `http.py` (reintentos con backoff, `Retry-After`, tope de tamaño de respuesta, JSON malformado tratado como error de red) y `text.py` (formato numérico y normalización de símbolos). |
 
 Cada respuesta lleva la cabecera `X-Request-Id`; ese mismo identificador aparece en el log y en el cuerpo del error, así que un fallo reportado por el usuario se localiza buscando esa cadena en `logs/`.

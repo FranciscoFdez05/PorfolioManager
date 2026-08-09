@@ -592,6 +592,49 @@ def get_db() -> sqlite3.Connection:
 
 
 @contextmanager
+def open_db_at(path):
+    """Conexión de un solo uso a un .db concreto, sin tocar la BD activa.
+
+    Los endpoints del Atajo pueden apuntar a cualquier portfolio, y no pueden
+    hacerlo con set_active_db_path(): esa función cambia la variable global del
+    proceso, así que le cambiaría la base de datos por debajo a la sesión web
+    que hubiera abierta en ese momento. Aquí se abre, se usa y se cierra.
+
+    Commit al salir con éxito y rollback si hay excepción, igual que
+    transaction(). El esquema se aplica la primera vez que el proceso toca ese
+    fichero, para que un portfolio creado con una versión anterior no falle por
+    una tabla que aún no existía.
+    """
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(p), check_same_thread=False, timeout=10)
+
+    try:
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA foreign_keys=ON")
+
+        db_key = str(p)
+        with _init_lock:
+            if db_key not in _initialized_paths:
+                conn.executescript(_SCHEMA)
+                _migrate(conn)
+                conn.commit()
+                _initialized_paths.add(db_key)
+
+        yield conn
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+
+
+@contextmanager
 def transaction():
     """Contexto transaccional: commit al salir con éxito, rollback si hay excepción."""
     conn = get_db()

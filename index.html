@@ -9,7 +9,7 @@
     <title>Portfolio Manager</title>
     <link rel="stylesheet" href="css/variables.css?v=20260511d">
     <link rel="stylesheet" href="css/base.css?v=20260613a">
-    <link rel="stylesheet" href="css/components.css?v=20260805a">
+    <link rel="stylesheet" href="css/components.css?v=20260808a">
     <link rel="stylesheet" href="css/pages.css?v=20260805a">
     <link rel="stylesheet" href="css/themes.css?v=20260805a">
     <script>
@@ -159,7 +159,7 @@
             </div> -->
 
             <div class="navButtons">
-                <button class="navBtn active" data-page="vistaGeneral">Vista general</button>
+                <button class="navBtn active" data-page="vistaGeneral" data-module="vistaGeneral">Vista general</button>
 
                 <div class="navDropdown" data-module="activos">
                     <button class="navDropdownBtn" type="button">Activos ▾</button>
@@ -1271,6 +1271,18 @@
 
                 <div class="ajustesSwitchRow">
                     <div class="ajustesSwitchLabel">
+                        Vista general
+                        <small>Resumen del portfolio y sus activos</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="moduloVistaGeneral" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
                         Activos
                         <small>Activos, Watchlist y Mapas de calor</small>
                     </div>
@@ -1366,6 +1378,7 @@
 <script src="js/finanzas/dividendos.js?v=20260802b"></script>
 <script src="js/finanzas/gastos.js?v=20260802b"></script>
 <script src="js/finanzas/ingresos.js?v=20260802b"></script>
+<script src="js/finanzas/categorias.js?v=20260808a"></script>
 <script src="js/finanzas/ventas.js?v=20260423a"></script>
 <script src="js/cripto/transacciones.js?v=20260423a"></script>
 <script src="js/cripto/stablecoins.js?v=20260802b"></script>

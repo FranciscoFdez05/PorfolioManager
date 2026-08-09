@@ -189,7 +189,24 @@ def init_portfolios():
         log.warning(f"[portfolios] DB activo no encontrado: {active_db.name}. Intentando recuperar.")
         _recover_missing_db(active_db)
 
-    _migrate_legacy_gastos(active_db)
+    # La migración del legacy solo tiene sentido una vez, y solo hacia el
+    # portfolio que se creó a partir de data/portfolio.db.
+    #
+    # Antes se ejecutaba en cada arranque contra el portfolio ACTIVO, fuera cual
+    # fuera. Como solo copia si el destino está vacío, un portfolio nuevo y
+    # recién creado cumplía la condición: bastaba con activarlo y reiniciar para
+    # que se le volcaran dentro los gastos, mensualidades, categorías e ingresos
+    # del legacy. El usuario veía "mezclados" dos portfolios que nunca había
+    # relacionado.
+    legacy_id = (meta.get("portfolios") or [{}])[0].get("id")
+
+    if not meta.get("legacyMigrated"):
+        if active_id == legacy_id:
+            _migrate_legacy_gastos(active_db)
+        # Se marca hecha en cualquier caso: es un paso de actualización de una
+        # sola vez, no algo que deba reevaluarse en cada arranque.
+        meta["legacyMigrated"] = True
+        _write_meta(meta)
 
     from admin.backup_manager import run_startup_backup
     run_startup_backup(active_db)
@@ -272,6 +289,58 @@ def _portfolio_db_path(pid: str) -> Path:
     if path.parent != _PORTFOLIOS_DIR.resolve():
         raise ValueError(f"Portfolio '{pid}' no encontrado")
     return path
+
+
+def get_active_portfolio_id():
+    """Id del portfolio activo, o None si el fichero de metadatos aún no existe."""
+    meta = get_portfolios()
+    return (meta or {}).get("active")
+
+
+def find_portfolio_id(valor: str):
+    """Id de un portfolio a partir de su id o de su nombre visible.
+
+    Aceptar el nombre le ahorra al Atajo de iOS dos acciones y una traducción
+    id↔nombre que era la parte más frágil de montar: puede enseñar la lista de
+    nombres y mandar directamente el que elija el usuario.
+
+    Devuelve None si no coincide con ninguno.
+    """
+    texto = str(valor or "").strip()
+
+    if not texto:
+        return None
+
+    portfolios = (get_portfolios() or {}).get("portfolios", [])
+
+    # El id manda: si alguien llamara "test2" a un portfolio cuyo id es otro, la
+    # coincidencia exacta de id sigue ganando.
+    for portfolio in portfolios:
+        if portfolio.get("id") == texto:
+            return portfolio["id"]
+
+    objetivo = texto.casefold()
+    for portfolio in portfolios:
+        if str(portfolio.get("name", "")).strip().casefold() == objetivo:
+            return portfolio["id"]
+
+    return None
+
+
+def get_portfolio_db_path(pid: str) -> Path:
+    """Ruta del .db de un portfolio existente.
+
+    Lo usan los endpoints del Atajo para escribir en el portfolio que elija el
+    usuario sin cambiar el activo del proceso. Se comprueba contra los
+    metadatos, no solo contra el sistema de ficheros, para que un pid válido de
+    formato pero inexistente no acabe creando una base de datos vacía.
+    """
+    meta = get_portfolios()
+
+    if pid not in {p["id"] for p in (meta or {}).get("portfolios", [])}:
+        raise ValueError(f"Portfolio '{pid}' no encontrado")
+
+    return _portfolio_db_path(pid)
 
 
 def delete_portfolio(pid: str):

@@ -321,7 +321,10 @@ def save_settings():
         raw = data["topMetricsConfig"]
         if isinstance(raw, dict):
             pcfg["topMetricsConfig"] = {k: bool(v) for k, v in raw.items() if isinstance(k, str)}
-    _VALID_MODULOS = {"panelSuperior", "activos", "gastos", "finanzas", "cripto", "herramientas", "metricas"}
+    _VALID_MODULOS = {
+        "panelSuperior", "vistaGeneral", "activos", "gastos",
+        "finanzas", "cripto", "herramientas", "metricas",
+    }
     if "modulosConfig" in data:
         raw = data["modulosConfig"]
         if isinstance(raw, dict):

@@ -1526,6 +1526,7 @@ function _initTopMetricsToggles(settings) {
 
 const _MODULOS_MAP = {
     moduloPanelSuperior: "panelSuperior",
+    moduloVistaGeneral:  "vistaGeneral",
     moduloActivos:       "activos",
     moduloGastos:        "gastos",
     moduloFinanzas:      "finanzas",
