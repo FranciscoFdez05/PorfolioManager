@@ -1,16 +1,14 @@
-const SALES_TAX_BRACKETS = [
-    { key: "tramo1", limit: 6000, rate: 0.19 },
-    { key: "tramo2", limit: 50000, rate: 0.21 },
-    { key: "tramo3", limit: 200000, rate: 0.23 },
-    { key: "tramo4", limit: 300000, rate: 0.27 },
-    { key: "tramo5", limit: Number.POSITIVE_INFINITY, rate: 0.28 }
-]
+// Esta página ya no calcula nada fiscal. El coste FIFO, la ganancia, los
+// tramos y la cuota los devuelve el servidor (`/api/ventas`), que es quien
+// tiene el histórico completo de todos los ejercicios. Antes se calculaban
+// aquí con los datos del año abierto en pantalla, y eso hacía imposible un
+// FIFO correcto: los lotes ya consumidos por ventas de otros años volvían a
+// estar disponibles. Lo único que se manda al guardar son los datos de hecho
+// de cada venta.
 
-let currentVentasData = { rows: [] }
-let ventasAutosaveTimeout = null
+let currentVentasData = { rows: [], resumen: null, incidencias: [] }
 let ventasPersistenceBound = false
 let ventasAssets = []
-let ventasAssetDetails = new Map()
 let ventasYears = []
 let currentVentasYear = null
 let ventasModalKeyHandler = null
@@ -61,6 +59,10 @@ async function createVentasYear(year) {
     return await response.json()
 }
 
+// El servidor rechaza con 400 y un `details` por fila cuando hay datos que no
+// puede colocar en la línea temporal (fecha ilegible, cantidad cero, activo
+// borrado). Se convierte en un Error con el detalle legible para poder
+// enseñarlo en el modal en vez de un "no se pudo guardar" a secas.
 async function saveVentasData(year, payload, options = {}) {
     const response = await fetch(`/api/ventas/${year}`, {
         method: "POST",
@@ -71,10 +73,18 @@ async function saveVentasData(year, payload, options = {}) {
         keepalive: Boolean(options.keepalive)
     })
 
+    const data = await response.json().catch(() => null)
+
     if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        const detalle = Array.isArray(data?.details)
+            ? data.details.map((item) => `Fila ${item.fila}: ${item.mensaje}`).join("\n")
+            : ""
+        const error = new Error(data?.error || `HTTP ${response.status}`)
+        error.detalle = detalle
+        throw error
     }
+
+    return data
 }
 
 async function deleteVentasYearRequest(year) {
@@ -90,6 +100,9 @@ async function deleteVentasYearRequest(year) {
     return await response.json()
 }
 
+// Solo hacen falta el id y el nombre de cada activo, para el desplegable. La
+// versión anterior descargaba además la ficha completa de todos los activos
+// (una petición por activo) para reconstruir los lotes en el navegador.
 async function loadVentasAssets() {
     const response = await fetch("/api/activos")
 
@@ -99,23 +112,6 @@ async function loadVentasAssets() {
 
     const payload = await response.json()
     ventasAssets = Array.isArray(payload?.assets) ? payload.assets : []
-
-    const details = await Promise.all(
-        ventasAssets.map(async (asset) => {
-            const assetResponse = await fetch(`/api/activos/${asset.id}`)
-
-            if (!assetResponse.ok) {
-                return null
-            }
-
-            return await assetResponse.json()
-        })
-    )
-
-    ventasAssetDetails = new Map()
-    details.filter(Boolean).forEach((asset) => {
-        ventasAssetDetails.set(asset.id, asset)
-    })
 }
 
 async function initVentasLogic() {
@@ -126,12 +122,7 @@ async function initVentasLogic() {
 
     ventasYears = Array.isArray(ventasIndex?.years) ? ventasIndex.years : []
     currentVentasYear = ventasYears[0] || "2026"
-    const ventasPayload = await loadVentasYear(currentVentasYear)
-
-    currentVentasData = {
-        year: ventasPayload?.year || currentVentasYear,
-        rows: Array.isArray(ventasPayload?.rows) ? ventasPayload.rows.map(normalizeVentaRow) : []
-    }
+    applyVentasPayload(await loadVentasYear(currentVentasYear))
 
     bindVentasPersistenceGuards()
     window.flushPendingPageChanges = flushVentasPendingChanges
@@ -141,6 +132,16 @@ async function initVentasLogic() {
 
     const ventasTable = document.getElementById("ventasBody")?.closest("table")
     if (ventasTable) bindTableSort(ventasTable, "ventas")
+}
+
+function applyVentasPayload(payload) {
+    currentVentasYear = payload?.year || currentVentasYear
+    currentVentasData = {
+        year: currentVentasYear,
+        rows: Array.isArray(payload?.rows) ? payload.rows.map(normalizeVentaRow) : [],
+        resumen: payload?.resumen || null,
+        incidencias: Array.isArray(payload?.incidencias) ? payload.incidencias : []
+    }
 }
 
 function bindVentasEvents() {
@@ -187,7 +188,7 @@ function bindVentasEvents() {
                 onConfirm: async () => {
                     openConfirmModal({
                         title: "Segunda verificación",
-                        message: `Esta acción borrará definitivamente el año ${currentVentasYear}. ¿Confirmas que quieres eliminarlo?`,
+                        message: `Esta acción borrará definitivamente el año ${currentVentasYear}. Las ventas de ese ejercicio dejarán de consumir lotes, así que el coste FIFO de los años siguientes se recalculará. ¿Confirmas?`,
                         confirmLabel: "Eliminar",
                         confirmSide: "left",
                         onConfirm: async () => {
@@ -213,10 +214,10 @@ function bindVentasEvents() {
         saveButton.addEventListener("click", async () => {
             try {
                 await persistVentasData()
-                alert(`Datos guardados en ventas/ventas${currentVentasYear}.json`)
+                alert(`Ventas de ${currentVentasYear} guardadas.`)
             } catch (error) {
                 console.error(error)
-                alert("No se pudieron guardar las ventas.")
+                alert(error.detalle || "No se pudieron guardar las ventas.")
             }
         })
     }
@@ -269,8 +270,11 @@ function openVentasModal(rowIndex = -1) {
         </select>
         <label class="assetModalLabel" for="ventaCantidadInput">Cantidad</label>
         <input id="ventaCantidadInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasNumber(rowData.cantidad) || "")}" placeholder="0">
-        <label class="assetModalLabel" for="ventaValorInput">Valor de venta</label>
+        <label class="assetModalLabel" for="ventaValorInput">Valor de venta (por unidad)</label>
         <input id="ventaValorInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasMoney(rowData.valorVenta) || "")}" placeholder="0,00">
+        <label class="assetModalLabel" for="ventaComisionInput">Comisión de la venta</label>
+        <input id="ventaComisionInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasMoney(rowData.comisionVenta) || "")}" placeholder="0,00">
+        <p class="assetModalHint">Los gastos de la venta minoran el valor de transmisión (art. 35.2 LIRPF).</p>
         <p class="gastosCreateModalFeedback hidden" id="ventasModalFeedback"></p>
         <div class="assetModalActions ventasModalActions">
             <button type="button" class="cancelButton" id="ventasModalCancelBtn">Cancelar</button>
@@ -300,11 +304,14 @@ function openVentasModal(rowIndex = -1) {
         const assetId = modal.querySelector("#ventaActivoInput")?.value.trim() || ""
         const cantidadRaw = modal.querySelector("#ventaCantidadInput")?.value.trim() || ""
         const valorVentaRaw = modal.querySelector("#ventaValorInput")?.value.trim() || ""
+        const comisionRaw = modal.querySelector("#ventaComisionInput")?.value.trim() || ""
         const cantidad = cantidadRaw ? formatVentasNumber(cantidadRaw) : ""
         const valorVenta = valorVentaRaw ? stripCurrencyText(formatVentasMoney(valorVentaRaw)) : ""
+        const comisionVenta = comisionRaw ? stripCurrencyText(formatVentasMoney(comisionRaw)) : ""
 
-        if (!fecha && !assetId && !cantidad && !valorVenta) {
-            setFeedback("Introduce al menos un dato.", true)
+        // El servidor valida de verdad; aquí solo se evita el viaje inútil.
+        if (!fecha || !assetId || !cantidad || !valorVenta) {
+            setFeedback("Fecha, activo, cantidad y valor de venta son obligatorios.", true)
             return
         }
 
@@ -314,8 +321,11 @@ function openVentasModal(rowIndex = -1) {
             assetId,
             activo: getVentasAssetName(assetId),
             cantidad,
-            valorVenta
+            valorVenta,
+            comisionVenta
         })
+
+        const previas = currentVentasData.rows.map((row) => ({ ...row }))
 
         if (isEdit) {
             currentVentasData.rows[rowIndex] = nextRow
@@ -324,12 +334,15 @@ function openVentasModal(rowIndex = -1) {
         }
 
         try {
-            renderVentasTable()
             await persistVentasData()
+            renderVentasTable()
             closeVentasModal()
         } catch (error) {
             console.error(error)
-            setFeedback("No se pudo guardar.", true)
+            // El guardado se rechazó entero, así que la fila tampoco puede
+            // quedarse en pantalla: se deshace el cambio local.
+            currentVentasData.rows = previas
+            setFeedback(error.detalle || error.message || "No se pudo guardar.", true)
         }
     })
 
@@ -345,12 +358,7 @@ function openVentasModal(rowIndex = -1) {
 }
 
 async function renderVentasYear(year) {
-    const payload = await loadVentasYear(year)
-    currentVentasYear = payload?.year || year
-    currentVentasData = {
-        year: currentVentasYear,
-        rows: Array.isArray(payload?.rows) ? payload.rows.map(normalizeVentaRow) : []
-    }
+    applyVentasPayload(await loadVentasYear(year))
     renderVentasYearButtons()
     renderVentasTable()
 }
@@ -370,7 +378,15 @@ function renderVentasYearButtons() {
         button.className = `gastosYearBtn${year === currentVentasYear ? " active" : ""}`
         button.textContent = year
         button.addEventListener("click", async () => {
-            await persistVentasData()
+            try {
+                // El guardado puede rechazarse si alguna fila del año actual
+                // tiene datos imposibles; cambiar de año entonces las perdería.
+                await persistVentasData()
+            } catch (error) {
+                console.error(error)
+                alert(error.detalle || "No se pudo guardar el año actual, así que no se cambia de ejercicio.")
+                return
+            }
             await renderVentasYear(year)
         })
         list.appendChild(button)
@@ -384,21 +400,26 @@ function createEmptyVentaRow() {
         assetId: "",
         activo: "",
         cantidad: "",
-        valorVenta: ""
+        valorVenta: "",
+        comisionVenta: ""
     })
 }
 
+// Conserva los campos calculados que vengan del servidor, pero nunca los
+// inventa: si no están, la fila se pinta vacía hasta el siguiente guardado.
 function normalizeVentaRow(row = {}) {
     const assetId = String(row.assetId || getVentasAssetIdByName(row.activo) || "")
     const activo = String(row.activo || getVentasAssetName(assetId) || "")
 
     return {
+        ...row,
         id: String(row.id || `venta-${Date.now()}`),
         fecha: String(row.fecha || ""),
         assetId,
         activo,
         cantidad: String(row.cantidad || ""),
-        valorVenta: String(row.valorVenta || row.precioVenta || row.valor_venta || "")
+        valorVenta: String(row.valorVenta || ""),
+        comisionVenta: String(row.comisionVenta || "")
     }
 }
 
@@ -411,227 +432,6 @@ function getVentasAssetIdByName(assetName) {
 function getVentasAssetName(assetId) {
     const asset = ventasAssets.find((item) => item.id === assetId)
     return asset?.name || ""
-}
-
-function parseSalesDate(value) {
-    const text = String(value || "").trim()
-
-    if (!text) {
-        return Number.POSITIVE_INFINITY
-    }
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-        return new Date(`${text}T00:00:00`).getTime()
-    }
-
-    const match = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/)
-
-    if (!match) {
-        return Number.POSITIVE_INFINITY
-    }
-
-    const [, day, month, year] = match
-    return new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T00:00:00`).getTime()
-}
-
-function buildBaseAssetLots(assetId) {
-    const asset = ventasAssetDetails.get(assetId)
-
-    if (!asset) {
-        return []
-    }
-
-    const rows = Array.isArray(asset.rows) ? [...asset.rows] : []
-    rows.sort((left, right) => parseSalesDate(left.fechaOperacion) - parseSalesDate(right.fechaOperacion))
-
-    const lots = []
-
-    rows.forEach((row) => {
-        const operationType = String(row.tipoOperacion || "").trim().toLowerCase()
-        const quantity = parseLooseNumber(row.participaciones)
-
-        if (!quantity || quantity <= 0) {
-            return
-        }
-
-        if (operationType === "compra") {
-            const assetType = String(asset.type || "").trim().toLowerCase()
-            const grossInvested = parseLooseNumber(row.capitalInvertidoBruto)
-            const commissions = parseLooseNumber(row.comisiones)
-            const fallbackPrice = parseLooseNumber(row.precioParticipacion)
-            const usesExplicitUnitPrice = assetType !== "cripto"
-            const priceBasedCost = fallbackPrice !== null ? (fallbackPrice * quantity) + (commissions || 0) : null
-            const grossBasedCost = grossInvested !== null ? grossInvested + (commissions || 0) : null
-            const totalCost = usesExplicitUnitPrice
-                ? (priceBasedCost ?? grossBasedCost ?? 0)
-                : (grossBasedCost ?? priceBasedCost ?? 0)
-
-            lots.push({
-                date: parseSalesDate(row.fechaOperacion),
-                remaining: quantity,
-                totalCost,
-                unitCost: quantity > 0 ? totalCost / quantity : 0
-            })
-            return
-        }
-
-        if (operationType === "venta") {
-            consumeLots(lots, quantity)
-        }
-    })
-
-    return lots
-}
-
-function consumeLots(lots, quantityToSell) {
-    let remainingToSell = quantityToSell
-    let totalCost = 0
-    const availableBeforeSale = lots.reduce((sum, lot) => sum + lot.remaining, 0)
-
-    for (const lot of lots) {
-        if (remainingToSell <= 0) {
-            break
-        }
-
-        const quantityFromLot = Math.min(lot.remaining, remainingToSell)
-
-        if (quantityFromLot <= 0) {
-            continue
-        }
-
-        totalCost += quantityFromLot * lot.unitCost
-        lot.remaining -= quantityFromLot
-        remainingToSell -= quantityFromLot
-    }
-
-    return {
-        availableBeforeSale,
-        totalCost,
-        remainingToSell
-    }
-}
-
-function buildVentasComputedMap(rows) {
-    const computedMap = new Map()
-    const lotsByAsset = new Map()
-
-    ventasAssets.forEach((asset) => {
-        lotsByAsset.set(asset.id, buildBaseAssetLots(asset.id))
-    })
-
-    const indexedRows = rows.map((row, index) => ({ row, index }))
-    indexedRows.sort((left, right) => {
-        const dateDiff = parseSalesDate(left.row.fecha) - parseSalesDate(right.row.fecha)
-        return dateDiff !== 0 ? dateDiff : left.index - right.index
-    })
-
-    indexedRows.forEach(({ row, index }) => {
-        const computed = getVentaComputedValues(row, lotsByAsset)
-        computedMap.set(index, computed)
-    })
-
-    return computedMap
-}
-
-function getVentaComputedValues(row, lotsByAsset) {
-    const quantity = parseLooseNumber(row.cantidad)
-    const salePrice = parseLooseNumber(row.valorVenta)
-    const hasCoreValues = row.assetId || quantity !== null || salePrice !== null
-
-    if (!hasCoreValues) {
-        return createEmptyVentasComputed()
-    }
-
-    if (!row.assetId || quantity === null || quantity <= 0) {
-        return createEmptyVentasComputed()
-    }
-
-    const assetLots = lotsByAsset.get(row.assetId)
-
-    if (!assetLots) {
-        return createEmptyVentasComputed()
-    }
-
-    const { availableBeforeSale, totalCost, remainingToSell } = consumeLots(assetLots, quantity)
-
-    if (remainingToSell > 0) {
-        return {
-            ...createEmptyVentasComputed(),
-            stockDisponible: availableBeforeSale,
-            valorCompra: totalCost > 0 ? totalCost / (quantity - remainingToSell) : null,
-            bruto: salePrice === null ? null : quantity * salePrice
-        }
-    }
-
-    const averagePurchasePrice = quantity > 0 ? totalCost / quantity : 0
-    const bruto = salePrice === null ? null : quantity * salePrice
-    const dineroDeclarar = bruto === null ? null : Math.max(bruto - totalCost, 0)
-    const tramoTaxes = dineroDeclarar === null
-        ? { tramo1: null, tramo2: null, tramo3: null, tramo4: null, tramo5: null }
-        : splitAmountAcrossBrackets(dineroDeclarar)
-    const totalPagar = dineroDeclarar === null
-        ? null
-        : Object.values(tramoTaxes).reduce((sum, value) => sum + value, 0)
-    const neto = bruto === null || totalPagar === null ? null : bruto - totalPagar
-
-    return {
-        stockDisponible: availableBeforeSale,
-        valorCompra: averagePurchasePrice,
-        dineroDeclarar,
-        tramo1: tramoTaxes.tramo1,
-        tramo2: tramoTaxes.tramo2,
-        tramo3: tramoTaxes.tramo3,
-        tramo4: tramoTaxes.tramo4,
-        tramo5: tramoTaxes.tramo5,
-        totalPagar,
-        bruto,
-        neto
-    }
-}
-
-function createEmptyVentasComputed() {
-    return {
-        stockDisponible: null,
-        valorCompra: null,
-        dineroDeclarar: null,
-        tramo1: null,
-        tramo2: null,
-        tramo3: null,
-        tramo4: null,
-        tramo5: null,
-        totalPagar: null,
-        bruto: null,
-        neto: null
-    }
-}
-
-function splitAmountAcrossBrackets(amount) {
-    const taxes = {
-        tramo1: 0,
-        tramo2: 0,
-        tramo3: 0,
-        tramo4: 0,
-        tramo5: 0
-    }
-
-    let remaining = Math.max(amount || 0, 0)
-    let previousLimit = 0
-
-    SALES_TAX_BRACKETS.forEach((bracket) => {
-        if (remaining <= 0) {
-            return
-        }
-
-        const taxableBase = bracket.limit === Number.POSITIVE_INFINITY
-            ? remaining
-            : Math.min(remaining, bracket.limit - previousLimit)
-
-        taxes[bracket.key] = taxableBase * bracket.rate
-        remaining -= taxableBase
-        previousLimit = bracket.limit
-    })
-
-    return taxes
 }
 
 function renderVentasTable() {
@@ -650,41 +450,118 @@ function renderVentasTable() {
     if (!rows.length) {
         if (ventasEmptyEl) ventasEmptyEl.classList.remove("hidden")
         if (ventasTableWrapper) ventasTableWrapper.classList.add("hidden")
+        renderVentasResumen()
         return
     }
     if (ventasEmptyEl) ventasEmptyEl.classList.add("hidden")
     if (ventasTableWrapper) ventasTableWrapper.classList.remove("hidden")
 
-    const computedMap = buildVentasComputedMap(rows)
-
     rows.forEach((row, index) => {
-        ventasBody.appendChild(buildVentaRow(row, computedMap.get(index) || createEmptyVentasComputed(), index))
+        ventasBody.appendChild(buildVentaRow(row, index))
     })
+
+    renderVentasResumen()
 }
 
-function buildVentaRow(row, computed, index) {
+// El resumen es la cifra que de verdad se declara: la escala del ahorro es
+// anual y progresiva, así que la suma de las columnas de una fila sola no
+// significa nada por sí misma.
+function renderVentasResumen() {
+    const contenedor = document.getElementById("ventasResumen")
+
+    if (!contenedor) {
+        return
+    }
+
+    const resumen = currentVentasData.resumen
+
+    if (!resumen) {
+        contenedor.innerHTML = ""
+        contenedor.classList.add("hidden")
+        return
+    }
+
+    contenedor.classList.remove("hidden")
+
+    const dato = (etiqueta, valor, titulo = "") => `
+        <div class="ventasResumenItem"${titulo ? ` title="${escapeVentasHtml(titulo)}"` : ""}>
+            <span class="ventasResumenLabel">${escapeVentasHtml(etiqueta)}</span>
+            <span class="ventasResumenValor">${formatVentasMoney(valor) || "- €"}</span>
+        </div>
+    `
+
+    const opcionales = []
+
+    if (parseLooseNumber(resumen.compensadoAnteriores)) {
+        opcionales.push(dato(
+            "Compensado de años anteriores", resumen.compensadoAnteriores,
+            "Saldo negativo de ejercicios previos aplicado a la base de este año (art. 49.1.b LIRPF)."
+        ))
+    }
+    if (parseLooseNumber(resumen.pendienteCompensar)) {
+        opcionales.push(dato(
+            "Pendiente de compensar", resumen.pendienteCompensar,
+            "Saldo negativo que queda vivo para los próximos ejercicios (máximo cuatro)."
+        ))
+    }
+    if (parseLooseNumber(resumen.perdidasNoComputables)) {
+        opcionales.push(dato(
+            "Pérdidas bloqueadas por recompra", resumen.perdidasNoComputables,
+            "Minusvalías no computables este año por la regla de antiaplicación (art. 33.5 LIRPF). Se imputarán al transmitir los valores recomprados."
+        ))
+    }
+
+    contenedor.innerHTML = `
+        <h4 class="ventasResumenTitulo">Ejercicio ${escapeVentasHtml(resumen.year)} · base del ahorro</h4>
+        <div class="ventasResumenGrid">
+            ${dato("Ganancias", resumen.ganancias)}
+            ${dato("Pérdidas", resumen.perdidas)}
+            ${dato("Saldo", resumen.saldo)}
+            ${dato("Base gravada", resumen.base)}
+            ${dato("Cuota", resumen.cuota)}
+            ${opcionales.join("")}
+        </div>
+        <p class="ventasResumenNota">
+            Cálculo por FIFO sobre el histórico completo. No contempla la compensación
+            con rendimientos del capital mobiliario, la exención por reinversión ni los
+            coeficientes de abatimiento anteriores a 1994.
+        </p>
+    `
+}
+
+function buildVentaRow(row, index) {
     const tr = document.createElement("tr")
+    // Único dato que hace falta en el DOM: el id, para poder recuperar el
+    // orden después de que el usuario ordene por una columna.
     tr.dataset.ventaId = row.id
-    tr.dataset.fecha = String(row.fecha || "")
-    tr.dataset.assetId = String(row.assetId || "")
-    tr.dataset.activo = String(row.activo || "")
-    tr.dataset.cantidad = String(row.cantidad || "")
-    tr.dataset.valorVenta = String(row.valorVenta || "")
+
+    if (row.incidencia) {
+        tr.classList.add("ventasRowIncidencia")
+        tr.title = row.mensaje || ""
+    }
+
+    const avisos = []
+    if (row.notaAntiaplicacion) avisos.push(row.notaAntiaplicacion)
+    if (parseLooseNumber(row.perdidaDiferidaLiberada)) {
+        avisos.push(`Incluye ${formatVentasMoney(row.perdidaDiferidaLiberada)} de pérdida aplazada que se imputa en esta venta.`)
+    }
+
     tr.innerHTML = `
-        <td data-field="fecha">${row.fecha || ""}</td>
-        <td data-field="assetName">${getVentasAssetName(row.assetId) || row.activo || ""}</td>
+        <td data-field="fecha">${escapeVentasHtml(row.fecha || "")}${row.incidencia ? ' <span class="ventasIncidenciaMarca" title="Revisa esta fila">!</span>' : ""}</td>
+        <td data-field="assetName">${escapeVentasHtml(getVentasAssetName(row.assetId) || row.activo || "")}</td>
         <td data-field="cantidad">${formatVentasNumber(row.cantidad)}</td>
-        <td class="rowTotal" data-field="valorCompra">${formatVentasMoney(computed.valorCompra)}</td>
+        <td class="rowTotal" data-field="valorCompra" title="${escapeVentasHtml(describirLotes(row.lotes))}">${formatVentasMoney(row.valorCompra)}</td>
         <td data-field="valorVenta">${formatVentasMoney(row.valorVenta)}</td>
-        <td class="rowTotal" data-field="dineroDeclarar">${formatVentasTaxColumn(computed.dineroDeclarar)}</td>
-        <td class="rowTotal" data-field="tramo1">${formatVentasTaxColumn(computed.tramo1)}</td>
-        <td class="rowTotal" data-field="tramo2">${formatVentasTaxColumn(computed.tramo2)}</td>
-        <td class="rowTotal" data-field="tramo3">${formatVentasTaxColumn(computed.tramo3)}</td>
-        <td class="rowTotal" data-field="tramo4">${formatVentasTaxColumn(computed.tramo4)}</td>
-        <td class="rowTotal" data-field="tramo5">${formatVentasTaxColumn(computed.tramo5)}</td>
-        <td class="rowTotal" data-field="totalPagar">${formatVentasTaxColumn(computed.totalPagar)}</td>
-        <td class="rowTotal" data-field="bruto">${formatVentasMoney(computed.bruto)}</td>
-        <td class="rowTotal" data-field="neto">${formatVentasMoney(computed.neto)}</td>
+        <td data-field="comisionVenta">${formatVentasMoney(row.comisionVenta)}</td>
+        <td class="rowTotal" data-field="dineroDeclarar"${avisos.length ? ` title="${escapeVentasHtml(avisos.join(" "))}"` : ""}>${formatVentasTaxColumn(row.dineroDeclarar)}${avisos.length ? " *" : ""}</td>
+        <td class="rowTotal" data-field="tramo1">${formatVentasTaxColumn(row.tramo1)}</td>
+        <td class="rowTotal" data-field="tramo2">${formatVentasTaxColumn(row.tramo2)}</td>
+        <td class="rowTotal" data-field="tramo3">${formatVentasTaxColumn(row.tramo3)}</td>
+        <td class="rowTotal" data-field="tramo4">${formatVentasTaxColumn(row.tramo4)}</td>
+        <td class="rowTotal" data-field="tramo5">${formatVentasTaxColumn(row.tramo5)}</td>
+        <td class="rowTotal" data-field="totalPagar">${formatVentasTaxColumn(row.totalPagar)}</td>
+        <td class="rowTotal" data-field="bruto">${formatVentasMoney(row.bruto)}</td>
+        <td class="rowTotal" data-field="neto">${formatVentasMoney(row.neto)}</td>
         <td class="rowActionsCell">
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
@@ -697,6 +574,18 @@ function buildVentaRow(row, computed, index) {
         </td>
     `
     return tr
+}
+
+// La traza de lotes es lo que hace defendible el FIFO ante una comprobación:
+// de qué compras concretas salió el coste de esta venta.
+function describirLotes(lotes) {
+    if (!Array.isArray(lotes) || !lotes.length) {
+        return ""
+    }
+
+    return "Lotes consumidos (FIFO):\n" + lotes
+        .map((lote) => `${formatVentasNumber(lote.cantidad)} ud. de la compra de ${lote.fecha} a ${formatVentasMoney(lote.costeUnitario)} = ${formatVentasMoney(lote.coste)}`)
+        .join("\n")
 }
 
 function formatVentasNumber(value) {
@@ -754,8 +643,8 @@ function handleVentasActionClick(event) {
 
     const removeRow = async () => {
         currentVentasData.rows.splice(rowIndex, 1)
-        renderVentasTable()
         await persistVentasData()
+        renderVentasTable()
     }
 
     if (isEmpty) {
@@ -768,75 +657,70 @@ function handleVentasActionClick(event) {
 
     openConfirmModal({
         title: "Eliminar fila",
-        message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
+        message: "Esta fila tiene contenido. Al borrarla, sus participaciones vuelven a la cartera y el coste FIFO de las ventas posteriores se recalculará. ¿Quieres eliminarla?",
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {
                 await removeRow()
             } catch (error) {
                 console.error(error)
-                alert("No se pudo eliminar la fila.")
+                alert(error.detalle || "No se pudo eliminar la fila.")
             }
         }
     })
 }
 
+// La tabla se puede reordenar pulsando en una cabecera, y ese orden es el que
+// se guarda. Solo se reordena: los valores salen de `currentVentasData.rows`,
+// no del DOM. Leerlos del DOM —como hacía la versión anterior— perdía la fila
+// que acababa de añadirse por el modal, porque todavía no estaba pintada.
 function syncVentasDataFromTable() {
-    const bodyRows = [...document.querySelectorAll("#ventasBody tr[data-venta-id]")]
-
-    currentVentasData.rows = bodyRows.map((rowElement) => {
-        return normalizeVentaRow({
-            id: rowElement.dataset.ventaId,
-            fecha: rowElement.dataset.fecha || rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
-            assetId: rowElement.dataset.assetId || "",
-            activo: rowElement.dataset.activo || getVentasAssetName(rowElement.dataset.assetId || ""),
-            cantidad: rowElement.dataset.cantidad || rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || "",
-            valorVenta: stripCurrencyText(rowElement.dataset.valorVenta || rowElement.querySelector('[data-field="valorVenta"]')?.textContent || "") || ""
-        })
+    const posiciones = new Map()
+    document.querySelectorAll("#ventasBody tr[data-venta-id]").forEach((elemento, indice) => {
+        posiciones.set(elemento.dataset.ventaId, indice)
     })
-}
 
-function serializeVentasMoney(value) {
-    const parsedValue = parseLooseNumber(value)
-
-    if (parsedValue === null) {
-        return ""
+    if (!posiciones.size) {
+        return
     }
 
-    return parsedValue.toFixed(2).replace(".", ",")
+    currentVentasData.rows = currentVentasData.rows
+        .map((row, indice) => ({
+            row,
+            // Las filas todavía sin pintar se quedan al final, en su orden.
+            posicion: posiciones.has(row.id) ? posiciones.get(row.id) : posiciones.size + indice
+        }))
+        .sort((izquierda, derecha) => izquierda.posicion - derecha.posicion)
+        .map(({ row }) => row)
 }
 
 async function persistVentasData(options = {}) {
     syncVentasDataFromTable()
-    const computedMap = buildVentasComputedMap(currentVentasData.rows)
 
-    currentVentasData.rows = currentVentasData.rows.map((row, index) => {
-        const computed = computedMap.get(index) || createEmptyVentasComputed()
-
-        return {
-            ...row,
+    const payload = {
+        year: currentVentasYear,
+        rows: currentVentasData.rows.map((row) => ({
+            id: row.id,
+            fecha: row.fecha,
+            assetId: row.assetId,
             activo: getVentasAssetName(row.assetId),
-            valorCompra: serializeVentasMoney(computed.valorCompra),
-            dineroDeclarar: serializeVentasMoney(computed.dineroDeclarar),
-            tramo1: serializeVentasMoney(computed.tramo1),
-            tramo2: serializeVentasMoney(computed.tramo2),
-            tramo3: serializeVentasMoney(computed.tramo3),
-            tramo4: serializeVentasMoney(computed.tramo4),
-            tramo5: serializeVentasMoney(computed.tramo5),
-            totalPagar: serializeVentasMoney(computed.totalPagar),
-            bruto: serializeVentasMoney(computed.bruto),
-            neto: serializeVentasMoney(computed.neto)
-        }
-    })
+            cantidad: row.cantidad,
+            valorVenta: row.valorVenta,
+            comisionVenta: row.comisionVenta
+        }))
+    }
 
-    currentVentasData.year = currentVentasYear
+    const respuesta = await saveVentasData(currentVentasYear, payload, options)
 
-    window.clearTimeout(ventasAutosaveTimeout)
-    await saveVentasData(currentVentasYear, currentVentasData, options)
+    if (respuesta?.rows) {
+        applyVentasPayload(respuesta)
+    }
 
     if (!options.keepalive) {
         await refreshAssetsSidebar(currentAssetId, false)
     }
+
+    return respuesta
 }
 
 async function flushVentasPendingChanges() {
@@ -874,4 +758,3 @@ function bindVentasPersistenceGuards() {
         })
     })
 }
-

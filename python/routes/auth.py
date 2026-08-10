@@ -14,19 +14,19 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from flask import Blueprint, jsonify, make_response, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from core.paths import BASE_DIR, HTML_DIR
+from core import settings
+from core.paths import AUTH_FILE as _AUTH_FILE, LOGIN_HTML
 
 auth_bp = Blueprint("auth", __name__)
 
-_AUTH_FILE    = BASE_DIR / "data" / "auth.dat"
-_DEFAULT_HASH = generate_password_hash(secrets.token_hex(32), method="pbkdf2:sha256:600000")
+_DEFAULT_HASH = generate_password_hash(secrets.token_hex(32), method=settings.metodoHashPassword())
 
 logger = logging.getLogger(__name__)
 
 # ── Límite de intentos de login ───────────────────────────────────────────────
-# No había ninguno: se podía probar contraseñas de forma ilimitada contra /login.
-_MAX_ATTEMPTS   = 8
-_LOCKOUT_SECONDS = 300
+# No había ninguno: se podía probar contraseñas de forma ilimitada contra
+# /login. El número de intentos y la duración del bloqueo salen de [seguridad]
+# en config.ini: endurecerlos no debería obligar a tocar código.
 _attempts: dict[str, list] = {}   # ip -> [nº fallos, instante del último fallo]
 _attempts_lock = threading.Lock()
 
@@ -37,28 +37,30 @@ def _client_ip() -> str:
 
 def _seconds_locked_out(ip: str) -> int:
     """Segundos que quedan de bloqueo para esta IP, 0 si puede intentarlo."""
+    lockout = settings.bloqueoSegundos()
     with _attempts_lock:
         entry = _attempts.get(ip)
-        if not entry or entry[0] < _MAX_ATTEMPTS:
+        if not entry or entry[0] < settings.maxIntentosLogin():
             return 0
         elapsed = time.monotonic() - entry[1]
-        if elapsed >= _LOCKOUT_SECONDS:
+        if elapsed >= lockout:
             _attempts.pop(ip, None)
             return 0
-        return int(_LOCKOUT_SECONDS - elapsed)
+        return int(lockout - elapsed)
 
 
 def _record_failure(ip: str) -> None:
+    lockout = settings.bloqueoSegundos()
     with _attempts_lock:
         entry = _attempts.get(ip)
-        if entry and time.monotonic() - entry[1] < _LOCKOUT_SECONDS:
+        if entry and time.monotonic() - entry[1] < lockout:
             entry[0] += 1
             entry[1] = time.monotonic()
         else:
             _attempts[ip] = [1, time.monotonic()]
         # Evitar que el diccionario crezca sin límite con IPs falsificadas
-        if len(_attempts) > 1000:
-            cutoff = time.monotonic() - _LOCKOUT_SECONDS
+        if len(_attempts) > settings.maxIpsVigiladas():
+            cutoff = time.monotonic() - lockout
             for stale in [k for k, v in _attempts.items() if v[1] < cutoff]:
                 _attempts.pop(stale, None)
 
@@ -158,8 +160,6 @@ def _save_credentials(username: str, password_hash: str) -> None:
 
 # ── Rutas ─────────────────────────────────────────────────────────────────────
 
-_LOGIN_HTML = HTML_DIR / "sesion" / "login.html"
-
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
@@ -199,7 +199,7 @@ def login():
             logger.warning("Intento de login fallido desde %s", ip)
             error = "Usuario o contraseña incorrectos"
 
-    html = _LOGIN_HTML.read_text("utf-8")
+    html = LOGIN_HTML.read_text("utf-8")
     html = html.replace(
         "<!-- ERROR_PLACEHOLDER -->",
         f'<p class="loginError">{error}</p>' if error else "",
@@ -250,6 +250,6 @@ def change_password():
     if not check_password_hash(password_hash, current_password):
         return jsonify({"ok": False, "error": "Contraseña actual incorrecta"}), 400
 
-    new_hash = generate_password_hash(new_password, method="pbkdf2:sha256:600000")
+    new_hash = generate_password_hash(new_password, method=settings.metodoHashPassword())
     _save_credentials(current_user, new_hash)
     return jsonify({"ok": True})

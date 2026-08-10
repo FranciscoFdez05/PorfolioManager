@@ -4,6 +4,7 @@ from datetime import datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 
+from core import settings
 from providers import (
     fetch_json,
     format_decimal as _format_decimal,
@@ -15,6 +16,9 @@ from providers.api_stats import record_api_call
 YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
 
+# Yahoo responde 403 a los User-Agent que no parecen un navegador, así que este
+# cliente no usa el de [proveedores] user_agent: no es un ajuste de despliegue,
+# es un requisito del proveedor.
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Accept": "application/json",
@@ -31,7 +35,7 @@ _TYPE_MAP = {
 }
 
 
-def _fetch_json(url, params=None, timeout=10):
+def _fetch_json(url, params=None, timeout=None):
     # Yahoo no tiene API key ni cuota documentada: las llamadas se contabilizan
     # en las funciones públicas para no inflar el contador con los reintentos.
     return fetch_json(url, params, timeout=timeout, headers=_HEADERS)
@@ -86,7 +90,7 @@ def _score_result(item, normalized_query, normalized_asset_name="", preferred_as
     return score
 
 
-def _fetch_one_price(symbol, timeout=5):
+def _fetch_one_price(symbol, timeout=None):
     try:
         payload = _fetch_json(
             f"{YAHOO_CHART_URL}/{quote(symbol, safe='=')}",
@@ -105,11 +109,14 @@ def _fetch_one_price(symbol, timeout=5):
         return symbol.upper(), {}
 
 
-def _fetch_prices(symbols, timeout=8):
+def _fetch_prices(symbols, timeout=None):
     if not symbols:
         return {}
     result = {}
-    with ThreadPoolExecutor(max_workers=min(len(symbols), 6)) as pool:
+    # El paralelismo se acota por [mercado] max_peticiones_paralelas: subirlo
+    # acelera el refresco pero agota antes la cuota del proveedor.
+    workers = min(len(symbols), settings.maxPeticionesParalelas())
+    with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(_fetch_one_price, s, timeout): s for s in symbols}
         for f in as_completed(futures):
             sym, data = f.result()
@@ -138,7 +145,7 @@ def _synthetic_yahoo_result(symbol, description, asset_type="forex", currency=""
     }
 
 
-def search_symbol(query_text, timeout=10, limit=8, asset_name="", preferred_asset_type=""):
+def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_asset_type=""):
     normalized_query = str(query_text or "").strip().upper()
 
     if not normalized_query:
@@ -233,7 +240,7 @@ def search_symbol(query_text, timeout=10, limit=8, asset_name="", preferred_asse
     return top_results, None
 
 
-def fetch_quote(symbol, timeout=10):
+def fetch_quote(symbol, timeout=None):
     normalized_symbol = str(symbol or "").strip().upper()
 
     if not normalized_symbol:

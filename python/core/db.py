@@ -5,11 +5,13 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
-from core.paths import BASE_DIR
+from core import settings
+from core.paths import LEGACY_DB
 
 log = logging.getLogger(__name__)
 
-_DB_PATH = BASE_DIR / "data" / "portfolio.db"  # overridden by portfolios_manager on startup
+# Punto de partida antes de que portfolios_manager fije la BD activa al arrancar.
+_DB_PATH = LEGACY_DB
 _local = threading.local()
 _reset_generation = 0
 _initialized_paths: set = set()  # DB paths that have already had schema + migration applied
@@ -283,6 +285,7 @@ CREATE TABLE IF NOT EXISTS ventas (
     cantidad       TEXT NOT NULL DEFAULT '',
     valor_compra   TEXT NOT NULL DEFAULT '',
     valor_venta    TEXT NOT NULL DEFAULT '',
+    comision_venta TEXT NOT NULL DEFAULT '',
     dinero_declarar TEXT NOT NULL DEFAULT '',
     tramo1         TEXT NOT NULL DEFAULT '',
     tramo2         TEXT NOT NULL DEFAULT '',
@@ -488,6 +491,12 @@ def _migrate(conn):
             if column not in existing_cols:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
+    # Los gastos de la venta minoran el valor de transmisión (art. 35.2 LIRPF);
+    # sin esta columna la ganancia declarada salía inflada.
+    ventas_cols = {row[1] for row in conn.execute("PRAGMA table_info(ventas)")}
+    if "comision_venta" not in ventas_cols:
+        conn.execute("ALTER TABLE ventas ADD COLUMN comision_venta TEXT NOT NULL DEFAULT ''")
+
     div_cols = {row[1] for row in conn.execute("PRAGMA table_info(dividendos)")}
     if "moneda_dividendo" not in div_cols:
         conn.execute("ALTER TABLE dividendos ADD COLUMN moneda_dividendo TEXT NOT NULL DEFAULT 'USD'")
@@ -554,10 +563,10 @@ def get_db() -> sqlite3.Connection:
                 pass
         _local.conn = None
         _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False, timeout=10)
+        conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False, timeout=settings.dbTimeout())
         try:
             conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA busy_timeout=5000")
+            conn.execute(f"PRAGMA busy_timeout={settings.dbBusyTimeoutMs()}")
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA cache_size=-8000")
             db_key = str(_DB_PATH)
@@ -607,11 +616,11 @@ def open_db_at(path):
     """
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(p), check_same_thread=False, timeout=10)
+    conn = sqlite3.connect(str(p), check_same_thread=False, timeout=settings.dbTimeout())
 
     try:
         conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute(f"PRAGMA busy_timeout={settings.dbBusyTimeoutMs()}")
         conn.execute("PRAGMA foreign_keys=ON")
 
         db_key = str(p)
@@ -695,7 +704,7 @@ def init_db_at_path(path) -> None:
     """Create and initialize an empty DB at the given path without changing the active DB."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(p), check_same_thread=False, timeout=15)
+    conn = sqlite3.connect(str(p), check_same_thread=False, timeout=settings.backupSqliteTimeout())
     try:
         conn.executescript(_SCHEMA)
         _migrate(conn)

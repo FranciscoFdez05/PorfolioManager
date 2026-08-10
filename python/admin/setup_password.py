@@ -12,10 +12,8 @@ import secrets
 
 from werkzeug.security import generate_password_hash
 
-from core.paths import BASE_DIR
-
-AUTH_FILE  = BASE_DIR / "data" / "auth.dat"
-ENV_FILE   = BASE_DIR / ".env"
+from core import settings
+from core.paths import AUTH_FILE, ENV_FILE
 
 
 def _update_env(key: str, value: str):
@@ -43,7 +41,7 @@ def main():
             break
         print("Las contraseñas no coinciden, intenta de nuevo.\n")
 
-    password_hash = generate_password_hash(pwd, method="pbkdf2:sha256:600000")
+    password_hash = generate_password_hash(pwd, method=settings.metodoHashPassword())
     secret_key    = secrets.token_hex(32)
 
     AUTH_FILE.parent.mkdir(parents=True, exist_ok=True)

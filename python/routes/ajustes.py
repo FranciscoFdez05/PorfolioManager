@@ -10,16 +10,15 @@ from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, request
 
+from core import settings
 from core.db import get_active_db_path, get_db
-from core.paths import BASE_DIR
+from core.paths import AJUSTES_JSON as _AJUSTES_JSON, API_DIR as _API_DIR, JSON_DIR
 from core.secret_store import read_secret_lines, write_secret_lines
 from providers.api_stats import get_today_stats
 
 log = logging.getLogger(__name__)
 
 ajustes_bp = Blueprint("ajustes", __name__)
-_API_DIR     = BASE_DIR / "API"
-_AJUSTES_JSON = BASE_DIR / "data" / "JSON" / "ajustes.json"
 
 # Claves globales (compartidas entre todos los portfolios)
 _FIAT_DEFAULTS = [
@@ -30,11 +29,16 @@ _FIAT_DEFAULTS = [
     {"code": "JPY", "name": "Yen japonés"},
 ]
 
+# Expuesto aparte porque routes/snapshots.py necesita el mismo valor cuando
+# ajustes.json no trae uno legible, y duplicarlo dejaba los dos sitios libres
+# para divergir.
+DEFAULT_SNAPSHOT_MINUTES = 60
+
 _GLOBAL_DEFAULTS = {
     "autoBackupDays": 0,
     "staleHours": 24,
     "autoRefreshMinutes": 0,
-    "snapshotMinutes": 60,
+    "snapshotMinutes": DEFAULT_SNAPSHOT_MINUTES,
     "theme": "default",
     "sidebarCollapsed": False,
     "monedaBase": "EUR",
@@ -57,6 +61,7 @@ _PORTFOLIO_DEFAULTS = {
     "comparativaExcluded": [],
     "gastosHiddenTipos": [],
     "gastosHiddenMensualidades": [],
+    "gastosMostrarPausadas": False,
     "metricasActivosHidden": [],
     "metricasDisplayType": "doughnut",
     "metricasDistMetric": "netoActualEur",
@@ -78,7 +83,7 @@ def _active_portfolio_id() -> str:
 
 
 def _prefs_path(portfolio_id: str) -> Path:
-    return BASE_DIR / "data" / "JSON" / f"prefs_{portfolio_id}.json"
+    return JSON_DIR / f"prefs_{portfolio_id}.json"
 
 
 def _read_ajustes():
@@ -208,6 +213,7 @@ def get_settings():
         "comparativaExcluded":      pcfg.get("comparativaExcluded") or [],
         "gastosHiddenTipos":        pcfg.get("gastosHiddenTipos") or [],
         "gastosHiddenMensualidades": pcfg.get("gastosHiddenMensualidades") or [],
+        "gastosMostrarPausadas":    bool(pcfg.get("gastosMostrarPausadas", False)),
         "metricasActivosHidden":    pcfg.get("metricasActivosHidden") or [],
         "metricasDisplayType":      pcfg.get("metricasDisplayType") or "doughnut",
         "metricasDistMetric":       pcfg.get("metricasDistMetric") or "netoActualEur",
@@ -317,6 +323,8 @@ def save_settings():
         if _list_key in data:
             raw = data[_list_key]
             pcfg[_list_key] = [str(t) for t in raw if isinstance(t, str) and t.strip()] if isinstance(raw, list) else []
+    if "gastosMostrarPausadas" in data:
+        pcfg["gastosMostrarPausadas"] = bool(data["gastosMostrarPausadas"])
     if "topMetricsConfig" in data:
         raw = data["topMetricsConfig"]
         if isinstance(raw, dict):
@@ -454,8 +462,8 @@ def _consistent_db_bytes(db_path) -> bytes:
     tmp = db_path.parent / f"_tmp_export_{db_path.name}"
     src = dst = None
     try:
-        src = _sqlite3.connect(str(db_path), timeout=10)
-        dst = _sqlite3.connect(str(tmp), timeout=10)
+        src = _sqlite3.connect(str(db_path), timeout=settings.dbTimeout())
+        dst = _sqlite3.connect(str(tmp), timeout=settings.dbTimeout())
         src.backup(dst)
         dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         dst.commit()
@@ -602,8 +610,8 @@ def import_zip():
                 try:
                     tmp.write_bytes(raw_db)
                     invalidate_all_connections()
-                    src = _sqlite3.connect(str(tmp), timeout=15)
-                    dst = _sqlite3.connect(str(db_path), timeout=15)
+                    src = _sqlite3.connect(str(tmp), timeout=settings.backupSqliteTimeout())
+                    dst = _sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
                     src.backup(dst)
                     dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
                     dst.commit()

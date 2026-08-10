@@ -1312,8 +1312,8 @@ function renderRecurrentesTable() {
     foot.innerHTML = `
         <tr class="recFootRow">
             <td colspan="5">Total (${items.length} ${items.length === 1 ? "ganancia" : "ganancias"})</td>
-            <td>${formatEuro(visibleMensual)}</td>
-            <td>${formatEuro(visibleAnual)}</td>
+            <td class="numCell">${formatEuro(visibleMensual)}</td>
+            <td class="numCell">${formatEuro(visibleAnual)}</td>
             <td colspan="2"></td>
         </tr>
     `

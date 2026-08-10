@@ -10,8 +10,9 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 
+from core import settings
 from providers import http as market_http
-from providers.http import MAX_RESPONSE_BYTES, ProviderResponseError, build_url, fetch_json
+from providers.http import ProviderResponseError, build_url, fetch_json
 
 
 class FakeResponse(io.BytesIO):
@@ -95,7 +96,7 @@ def test_respeta_retry_after_acotado(monkeypatch, sin_esperas):
     guion(monkeypatch, http_error(429, retry_after=60), json_response({"ok": 1}))
     assert fetch_json("http://api.test/quote") == {"ok": 1}
     # 60 s pedidos por el proveedor, pero el usuario está esperando: se acota.
-    assert sin_esperas[0] <= market_http.MAX_RETRY_AFTER
+    assert sin_esperas[0] <= settings.proveedorMaxRetryAfter()
 
 
 def test_agota_los_reintentos_y_propaga_el_error_original(monkeypatch):
@@ -130,7 +131,7 @@ def test_respuesta_vacia_es_error(monkeypatch):
 
 
 def test_respuesta_demasiado_grande_se_corta(monkeypatch):
-    enorme = b'{"a":"' + b"x" * (MAX_RESPONSE_BYTES + 10) + b'"}'
+    enorme = b'{"a":"' + b"x" * (settings.proveedorMaxRespuestaBytes() + 10) + b'"}'
     guion(monkeypatch, *(FakeResponse(enorme) for _ in range(3)))
     with pytest.raises(ProviderResponseError):
         fetch_json("http://api.test/quote")

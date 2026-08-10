@@ -11,7 +11,15 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from admin.backup_manager import _remove_wal_sidecars
-from core.paths import BASE_DIR
+from core import settings
+from core.paths import (
+    AJUSTES_JSON as _AJUSTES_SRC,
+    BACKUPS_DIR as _BACKUP_DIR,
+    DATA_DIR,
+    JSON_DIR as _JSON_DIR,
+    PORTFOLIOS_DIR as _PORTFOLIOS_DIR,
+    PORTFOLIOS_META_FILE as _META_FILE,
+)
 from routes.ajustes import _read_ajustes
 
 log = logging.getLogger(__name__)
@@ -23,11 +31,6 @@ _BACKUP_LOCK = threading.Lock()
 
 backup_bp = Blueprint("backup", __name__)
 
-_BACKUP_DIR  = BASE_DIR / "data" / "backups"
-_PORTFOLIOS_DIR = BASE_DIR / "data" / "portfolios"
-_META_FILE   = BASE_DIR / "data" / "portfolios.json"
-_AJUSTES_SRC = BASE_DIR / "data" / "JSON" / "ajustes.json"
-_JSON_DIR    = BASE_DIR / "data" / "JSON"
 
 _RE_ZIP = re.compile(r'^backup_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.zip$')
 _RE_DB  = re.compile(r'^portfolio_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.db$')
@@ -63,9 +66,9 @@ def _list_backups():
 def _sqlite_copy(src_path: Path, dst_path: Path):
     src = dst = None
     try:
-        src = sqlite3.connect(str(src_path), timeout=15)
-        dst = sqlite3.connect(str(dst_path), timeout=15)
-        dst.execute("PRAGMA busy_timeout=15000")
+        src = sqlite3.connect(str(src_path), timeout=settings.backupSqliteTimeout())
+        dst = sqlite3.connect(str(dst_path), timeout=settings.backupSqliteTimeout())
+        dst.execute(f"PRAGMA busy_timeout={settings.backupSqliteTimeout() * 1000}")
         src.backup(dst)
         dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         dst.commit()
@@ -88,7 +91,7 @@ def _safety_copy_before_restore() -> Path | None:
     if not _PORTFOLIOS_DIR.exists():
         return None
     ts = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-    dest_dir = BASE_DIR / "data" / "pre_restore" / ts
+    dest_dir = DATA_DIR / "pre_restore" / ts
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
         for db_file in sorted(_PORTFOLIOS_DIR.glob("*.db")):
@@ -142,7 +145,7 @@ def _export_snapshots_json(db_path: Path) -> str:
     """Lee todos los snapshots del DB y los devuelve como JSON string."""
     conn = None
     try:
-        conn = sqlite3.connect(str(db_path), timeout=15)
+        conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT ts, total_value, total_invested FROM portfolio_snapshots ORDER BY ts ASC"
@@ -340,7 +343,7 @@ def _restore_locked():
                             snap_data = json.loads(zf.read(name).decode("utf-8"))
                             if not isinstance(snap_data, list) or not snap_data:
                                 continue
-                            conn = sqlite3.connect(str(db_path), timeout=15)
+                            conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
                             has_rows = conn.execute(
                                 "SELECT 1 FROM portfolio_snapshots LIMIT 1"
                             ).fetchone()

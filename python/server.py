@@ -1,4 +1,3 @@
-import configparser
 import logging
 import mimetypes
 import os
@@ -14,8 +13,9 @@ from dotenv import load_dotenv
 from flask import Flask, abort, redirect, request, send_from_directory, session, url_for
 
 from admin.portfolios_manager import init_portfolios
+from core import settings
 from core.errors import register_error_handlers
-from core.paths import API_DIR, BACKUPS_DIR, BASE_DIR, DATA_DIR
+from core.paths import AJUSTES_JSON, API_DIR, BACKUPS_DIR, BASE_DIR
 from routes.activos import activos_bp
 from routes.ajustes import ajustes_bp
 from routes.auth import auth_bp
@@ -33,47 +33,20 @@ from routes.trading import trading_bp
 from routes.ventas import ventas_bp
 from stores.app_data import ensureDataFile
 
-
-def _read_runtime_config():
-    config = configparser.ConfigParser()
-    config.read(BASE_DIR / "config.ini", encoding="utf-8")
-
-    server_section = config["server"] if config.has_section("server") else {}
-
-    def _get_int(name, default):
-        value = server_section.get(name, str(default)).strip()
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return default
-
-    host = server_section.get("host", "0.0.0.0").strip() or "0.0.0.0"
-    port = _get_int("port", 5000)
-    env_port = os.environ.get("PORT", "").strip()
-    if env_port:
-        try:
-            port = int(env_port)
-        except ValueError:
-            pass
-    debug_mode = server_section.get("debug", "false").strip().lower() in {"1", "true", "yes", "on"}
-
-    return {
-        "host": host,
-        "port": port,
-        "debug": debug_mode,
-    }
-
-
+# .env antes que nada: los ajustes admiten override por variable de entorno, y
+# esas variables se definen aquí. Cargarlo después haría que los overrides de
+# .env no se vieran.
 load_dotenv()
-runtime_config = _read_runtime_config()
 
 # Configurar logging ANTES de init_portfolios(): esa llamada verifica la
 # integridad de la BD, puede repararla o restaurarla desde un backup, y todos
 # esos mensajes se perdían porque el logging aún no estaba inicializado.
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
-)
+logging.basicConfig(level=settings.nivelLog(), format=settings.formatoLog())
+
+# Deja constancia en el log de con qué configuración arranca el proceso y avisa
+# de los valores dudosos (fuera de rango, mal escritos, combinaciones que no
+# funcionan). No aborta el arranque: los valores ya vienen acotados.
+settings.registrarConfiguracion()
 
 init_portfolios()
 
@@ -95,19 +68,18 @@ if not _secret_key:
     _secret_key = secrets.token_hex(32)
 app.secret_key = _secret_key
 
-# Límite general de 5 MB para no agotar memoria. Los endpoints de importación y
-# restauración necesitan más: un export JSON completo del portfolio ya ronda los
-# 25 MB, así que con el tope de 5 MB aplicado a todo era imposible reimportar un
-# backup propio (413 Request Entity Too Large).
-_MAX_BODY_DEFAULT = 5 * 1024 * 1024
-_MAX_BODY_UPLOAD = 256 * 1024 * 1024
+# Límite general (por defecto 5 MB) para no agotar memoria. Los endpoints de
+# importación y restauración necesitan más: un export JSON completo del
+# portfolio ya ronda los 25 MB, así que con el tope general aplicado a todo era
+# imposible reimportar un backup propio (413 Request Entity Too Large). Ambos
+# topes salen de [server] en config.ini.
 _UPLOAD_PATHS = ("/api/import/json", "/api/import/zip", "/api/portfolios/import")
 
-app.config["MAX_CONTENT_LENGTH"] = _MAX_BODY_UPLOAD
+app.config["MAX_CONTENT_LENGTH"] = settings.maxSubidaBytes()
 app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SAMESITE"] = settings.cookieSameSite()
 # SESSION_COOKIE_SECURE se activa solo cuando hay HTTPS (evita romper HTTP local)
-app.config["SESSION_COOKIE_SECURE"] = os.environ.get("HTTPS_ENABLED", "false").lower() == "true"
+app.config["SESSION_COOKIE_SECURE"] = settings.httpsActivado()
 
 # Antes que los blueprints, para que el request id ya esté disponible en los
 # before_request de CSRF y de login (así sus warnings se pueden correlacionar
@@ -201,7 +173,7 @@ def set_csrf_cookie(response):
             _CSRF_COOKIE,
             _current_csrf_token(),
             httponly=False,          # el JS debe poder leerla para reenviarla
-            samesite="Lax",
+            samesite=app.config["SESSION_COOKIE_SAMESITE"],
             secure=app.config["SESSION_COOKIE_SECURE"],
         )
     return response
@@ -217,7 +189,7 @@ def enforce_body_limit():
     if request.path in _UPLOAD_PATHS:
         return
     length = request.content_length
-    if length is not None and length > _MAX_BODY_DEFAULT:
+    if length is not None and length > settings.maxCuerpoBytes():
         abort(413)
 
 
@@ -295,7 +267,7 @@ def _check_auto_backup():
     import sqlite3
     from datetime import datetime, timedelta
 
-    ajustes_path = DATA_DIR / "JSON" / "ajustes.json"
+    ajustes_path = AJUSTES_JSON
     days = 0
     try:
         if ajustes_path.exists():
@@ -341,8 +313,8 @@ def _check_auto_backup():
         # Escribir a temporal y renombrar: si el proceso muere a mitad, no queda
         # un portfolio_*.db truncado que luego se ofrezca como restaurable.
         tmp_path = backups_dir / f"_tmp_portfolio_{ts}.db"
-        src = sqlite3.connect(str(db_path), timeout=10)
-        dst = sqlite3.connect(str(tmp_path), timeout=10)
+        src = sqlite3.connect(str(db_path), timeout=settings.dbTimeout())
+        dst = sqlite3.connect(str(tmp_path), timeout=settings.dbTimeout())
         src.backup(dst)
         dst.close()
         dst = None
@@ -363,13 +335,22 @@ def _check_auto_backup():
 
 
 def _encrypt_api_keys_at_rest():
-    """Cifra los API/*.key que sigan en texto plano de instalaciones previas."""
+    """Cifra los API/*.key que sigan en texto plano de instalaciones previas.
+
+    Se recorre el directorio en vez de una lista fija de nombres: así un
+    proveedor nuevo queda cubierto sin tener que acordarse de añadirlo aquí, que
+    es justo el descuido que dejaría una clave sin cifrar.
+    """
     from core.secret_store import migrate_plaintext_if_needed
-    for name in ("finnhub.key", "eodhd.key", "alphavantage.key", "twelvedata.key"):
+
+    if not API_DIR.is_dir():
+        return
+
+    for path in sorted(API_DIR.glob("*.key")):
         try:
-            migrate_plaintext_if_needed(API_DIR / name)
+            migrate_plaintext_if_needed(path)
         except Exception as e:
-            logging.warning("No se pudo cifrar %s: %s", name, e)
+            logging.warning("No se pudo cifrar %s: %s", path.name, e)
 
 
 # Inicialización al arrancar, tanto con Gunicorn como con el servidor de desarrollo
@@ -378,6 +359,7 @@ _encrypt_api_keys_at_rest()
 _check_auto_backup()
 
 if __name__ == "__main__":
-    debug_mode = runtime_config["debug"] or os.environ.get("FLASK_DEBUG", "false").lower() == "true"
-    logging.info("HTTP — puerto %s", runtime_config["port"])
-    app.run(host=runtime_config["host"], port=runtime_config["port"], debug=debug_mode)
+    # Servidor de desarrollo. En Docker manda gunicorn (ver entrypoint.sh), que
+    # lee los mismos valores de config.ini.
+    logging.info("HTTP — %s:%s", settings.host(), settings.puerto())
+    app.run(host=settings.host(), port=settings.puerto(), debug=settings.modoDebug())

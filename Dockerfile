@@ -17,6 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends gosu \
  && mkdir -p /app/data /app/logs /app/API \
  && chmod +x /app/entrypoint.sh
 
+# Solo documentativo: el puerto real sale de [server] port en config.ini y lo
+# aplican entrypoint.sh (dentro) y docker-compose.yml (en el mapeo).
 EXPOSE 5000
 
 ENTRYPOINT ["/app/entrypoint.sh"]

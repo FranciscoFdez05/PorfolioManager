@@ -55,7 +55,7 @@ def _is_forex_pair(symbol):
     return from_cur != to_cur
 
 
-def _fetch_json(params, timeout=10):
+def _fetch_json(params, timeout=None):
     return fetch_json(AV_BASE_URL, params, timeout=timeout, provider="Alpha Vantage")
 
 
@@ -134,7 +134,7 @@ def _synthetic_forex_result(from_cur, to_cur):
     }
 
 
-def search_symbol(query_text, api_key, timeout=10, limit=8, asset_name="", preferred_asset_type=""):
+def search_symbol(query_text, api_key, timeout=None, limit=8, asset_name="", preferred_asset_type=""):
     normalized_query = str(query_text or "").strip()
 
     if not normalized_query:
@@ -203,7 +203,7 @@ def search_symbol(query_text, api_key, timeout=10, limit=8, asset_name="", prefe
     return [item for _, item in ranked_results[:limit]], None
 
 
-def _fetch_forex_quote(from_cur, to_cur, api_key, timeout=10):
+def _fetch_forex_quote(from_cur, to_cur, api_key, timeout=None):
     try:
         payload = _fetch_json({
             "function": "CURRENCY_EXCHANGE_RATE",
@@ -244,7 +244,7 @@ def _fetch_forex_quote(from_cur, to_cur, api_key, timeout=10):
     }, None
 
 
-def fetch_quote(symbol, api_key, timeout=10):
+def fetch_quote(symbol, api_key, timeout=None):
     normalized_symbol = str(symbol or "").strip().upper()
 
     if not normalized_symbol:

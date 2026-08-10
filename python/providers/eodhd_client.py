@@ -21,7 +21,7 @@ PREFERRED_EXCHANGES_BY_TYPE = {
 }
 
 
-def _fetch_json(url, params=None, timeout=10):
+def _fetch_json(url, params=None, timeout=None):
     return fetch_json(url, params, timeout=timeout, provider="EODHD")
 
 
@@ -87,7 +87,7 @@ def _score_result(item, normalized_query, normalized_asset_name="", preferred_as
     return score
 
 
-def search_symbol(query_text, api_key, timeout=10, limit=8, asset_name="", preferred_asset_type=""):
+def search_symbol(query_text, api_key, timeout=None, limit=8, asset_name="", preferred_asset_type=""):
     normalized_query = str(query_text or "").strip()
 
     if not normalized_query:
@@ -156,7 +156,7 @@ def search_symbol(query_text, api_key, timeout=10, limit=8, asset_name="", prefe
     return [item for _, item in ranked_results[:limit]], None
 
 
-def fetch_quote(symbol, api_key, timeout=10):
+def fetch_quote(symbol, api_key, timeout=None):
     normalized_symbol = str(symbol or "").strip().upper()
 
     if not normalized_symbol:

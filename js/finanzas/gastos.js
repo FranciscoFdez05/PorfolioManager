@@ -25,6 +25,9 @@ let _gastosDataLoaded = false
 let _gastosHasPendingChanges = false
 let gastosModalKeyHandler = null
 let gastosMensualidadesCollapsed = false
+// Las mensualidades pausadas se ocultan en la tabla anual salvo que se active
+// la opción del menú de la categoría (sus importes siguen contando en el total).
+let gastosMostrarPausadas = false
 let mensualidadesFilter = "todas"
 let mensualidadesSearch = ""
 
@@ -50,7 +53,6 @@ function normalizeMensualidad(row = {}) {
 
     return {
         nombre: String(row.nombre || ""),
-        categoria: String(row.categoria || ""),
         importe: String(row.importe || ""),
         frecuencia: getMensualidadFrecuencia(row.frecuencia).key,
         diaCobro: normalizeMensualidadDia(row.diaCobro),
@@ -70,15 +72,26 @@ function getMensualidades() {
     return (currentGastosData?.mensualidades || []).map(normalizeMensualidad)
 }
 
-// Reparte el importe por los meses del año según la frecuencia (desde enero).
-function computeMensualidadMeses(importeRaw, frecuenciaKey) {
+// Reparte el importe por los meses del año según la frecuencia, empezando en
+// el mes indicado: los anteriores quedan vacíos porque la suscripción aún no
+// existía.
+function computeMensualidadMeses(importeRaw, frecuenciaKey, startIndex = 0) {
     const step = getMensualidadFrecuencia(frecuenciaKey).meses
     const value = String(importeRaw || "").trim() ? formatCellEuroValue(importeRaw) : ""
+    const from = Math.min(Math.max(startIndex, 0), GASTOS_MONTHS.length - 1)
 
     return Object.fromEntries(GASTOS_MONTHS.map((month, index) => {
-        const isCharged = value && index % step === 0
+        const isCharged = value && index >= from && (index - from) % step === 0
         return [month.key, isCharged ? value : ""]
     }))
+}
+
+// Mes en el que empieza a cobrarse una mensualidad nueva: si el año mostrado es
+// el actual, el mes en curso (no se cobró antes de darla de alta); en cualquier
+// otro año, enero.
+function getMensualidadDefaultStartIndex(year = currentGastosYear) {
+    const today = new Date()
+    return Number(year) === today.getFullYear() ? today.getMonth() : 0
 }
 
 // Importe de un cargo. Si no está guardado, se usa el del último mes cobrado,
@@ -176,6 +189,19 @@ async function persistGastosMensualidadesCollapsed(collapsed) {
         })
     } catch (e) {
         console.error("No se pudo guardar el estado de mensualidades:", e)
+    }
+}
+
+async function persistGastosMostrarPausadas(mostrar) {
+    window._gastosMostrarPausadas = mostrar
+    try {
+        await fetch("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ gastosMostrarPausadas: mostrar })
+        })
+    } catch (e) {
+        console.error("No se pudo guardar la visibilidad de mensualidades pausadas:", e)
     }
 }
 
@@ -375,10 +401,6 @@ function buildMensualidadFormHtml(row) {
         .map((day) => `<option value="${day}"${String(day) === row.diaCobro ? " selected" : ""}>Día ${day}</option>`)
         .join("")
 
-    const categoriaOptions = getAvailableGastosTypes()
-        .map((type) => `<option value="${escapeGastosHtml(type)}"></option>`)
-        .join("")
-
     const monthsHtml = GASTOS_MONTHS.map((month) => `
         <div class="mensMonthField">
             <label class="mensMonthLabel" for="gastosMensualidad-${month.key}">${month.label}</label>
@@ -393,12 +415,6 @@ function buildMensualidadFormHtml(row) {
                 <label class="assetModalLabel" for="gastosMensualidadNombre">Nombre del servicio</label>
                 <input id="gastosMensualidadNombre" class="assetModalInput" type="text"
                        value="${escapeGastosHtml(row.nombre || "")}" placeholder="Ej: Alquiler, Spotify o Gimnasio">
-            </div>
-            <div class="gastosCreateModalField">
-                <label class="assetModalLabel" for="gastosMensualidadCategoria">Categoría</label>
-                <input id="gastosMensualidadCategoria" class="assetModalInput" type="text" list="gastosMensualidadCategoriaList"
-                       value="${escapeGastosHtml(row.categoria || "")}" placeholder="Opcional">
-                <datalist id="gastosMensualidadCategoriaList">${categoriaOptions}</datalist>
             </div>
             <div class="gastosCreateModalField">
                 <label class="assetModalLabel" for="gastosMensualidadImporte">Importe por cargo</label>
@@ -443,7 +459,7 @@ function buildMensualidadFormHtml(row) {
     `
 }
 
-function bindMensualidadFormModal(modal, { autoFill }) {
+function bindMensualidadFormModal(modal, { autoFill, startIndex }) {
     const importeInput = modal.querySelector("#gastosMensualidadImporte")
     const frecuenciaSelect = modal.querySelector("#gastosMensualidadFrecuencia")
     const diaSelect = modal.querySelector("#gastosMensualidadDia")
@@ -468,7 +484,7 @@ function bindMensualidadFormModal(modal, { autoFill }) {
     }
 
     const refillMonths = ({ force = false } = {}) => {
-        const computed = computeMensualidadMeses(importeInput.value, frecuenciaSelect.value)
+        const computed = computeMensualidadMeses(importeInput.value, frecuenciaSelect.value, startIndex)
         monthInputs.forEach((input) => {
             if (!force && input.dataset.mensDirty === "true") {
                 return
@@ -514,13 +530,17 @@ function openMensualidadFormModal(rowIndex = -1) {
     }
 
     const row = normalizeMensualidad(existing || {})
+    // Al editar se respeta el mes en el que ya empezaban los cargos, para que
+    // "Recalcular desde el importe" no invente cobros anteriores al alta.
+    const charged = getMensualidadChargedMonths(row)
+    const startIndex = charged.length ? charged[0].index : getMensualidadDefaultStartIndex()
 
     openGastosCreateModal({
         title: isEdit ? "Editar mensualidad" : "Nueva mensualidad",
         modalClass: "gastosCreateModalWide mensFormModal",
         bodyHtml: buildMensualidadFormHtml(row),
         submitLabel: isEdit ? "Guardar cambios" : "Añadir mensualidad",
-        onReady: (modal) => bindMensualidadFormModal(modal, { autoFill: !isEdit }),
+        onReady: (modal) => bindMensualidadFormModal(modal, { autoFill: !isEdit, startIndex }),
         onSubmit: async ({ getValue, setFeedback, modal }) => {
             const nombre = sanitizeGastoTypeLabel(getValue("gastosMensualidadNombre"))
             const meses = Object.fromEntries(
@@ -554,7 +574,6 @@ function openMensualidadFormModal(rowIndex = -1) {
             const importeRaw = String(getValue("gastosMensualidadImporte")).trim()
             const nextRow = {
                 nombre,
-                categoria: sanitizeGastoTypeLabel(getValue("gastosMensualidadCategoria")),
                 importe: importeRaw ? formatCellEuroValue(importeRaw) : "",
                 frecuencia: getMensualidadFrecuencia(getValue("gastosMensualidadFrecuencia")).key,
                 diaCobro: normalizeMensualidadDia(getValue("gastosMensualidadDia")),
@@ -706,6 +725,7 @@ async function initGastosLogic() {
     mensualidadesFilter = "todas"
     mensualidadesSearch = ""
     gastosMensualidadesCollapsed = (window._gastosHiddenMensualidades || []).includes("Mensualidades")
+    gastosMostrarPausadas = Boolean(window._gastosMostrarPausadas)
     bindGastosPersistenceGuards()
     window.flushPendingPageChanges = flushGastosPendingChanges
     await renderGastosYear(currentGastosYear)
@@ -947,7 +967,6 @@ function downloadGastosCsv() {
             const anual = getMensualidadAnnualCost(row)
             rows.push({
                 Nombre: row.nombre,
-                Categoría: row.categoria,
                 Importe: getMensualidadCargo(row),
                 Frecuencia: getMensualidadFrecuencia(row.frecuencia).short,
                 "Día de renovación": row.diaCobro,
@@ -1004,6 +1023,9 @@ function renderGastosAnnualTable() {
         getMensualidadesCategoryTotal(month.key, expenseTotals)
     ]))
 
+    const pausadasCount = currentGastosData.mensualidades
+        .filter((rawRow) => !normalizeMensualidad(rawRow).activa).length
+
     const mensualidadesRow = document.createElement("tr")
     mensualidadesRow.className = "gastosCategoryRow"
     const mensSectionHidden = isGastoTipoHidden(MENSUALIDADES_CATEGORIA)
@@ -1015,6 +1037,7 @@ function renderGastosAnnualTable() {
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
                     <button type="button" class="rowMenuItem gastosEyeBtn${mensSectionHidden ? "" : " active"}" data-gastos-eye-mens="1">👁 ${mensSectionHidden ? "Mostrar" : "Ocultar"}</button>
+                    <button type="button" class="rowMenuItem" data-gastos-toggle-pausadas="1"${pausadasCount ? "" : " disabled"}>${gastosMostrarPausadas ? "🚫" : "⏸"} ${gastosMostrarPausadas ? "Ocultar" : "Mostrar"} pausadas${pausadasCount ? ` (${pausadasCount})` : ""}</button>
                 </div>
             </div>
         </td>`
@@ -1024,6 +1047,9 @@ function renderGastosAnnualTable() {
         const totalMensualidades = currentGastosData.mensualidades.length
         currentGastosData.mensualidades.forEach((rawRow, rowIndex) => {
             const row = normalizeMensualidad(rawRow)
+            if (!row.activa && !gastosMostrarPausadas) {
+                return
+            }
             const meta = [
                 getMensualidadFrecuencia(row.frecuencia).short,
                 row.diaCobro ? `día ${row.diaCobro}` : ""
@@ -1039,7 +1065,7 @@ function renderGastosAnnualTable() {
                     <span class="mensNameMeta">${escapeGastosHtml(meta)}${row.activa ? "" : " · pausada"}</span>
                 </td>
                 ${GASTOS_MONTHS.map((month) => `
-                    <td>${formatCellEuroValue(row.meses?.[month.key] || "")}</td>
+                    <td>${formatEuro(parseEuroNumber(row.meses?.[month.key] || ""))}</td>
                 `).join("")}
                 <td class="rowActionsCell">
                     <div class="rowMenu">
@@ -1181,6 +1207,12 @@ function handleGastosMensualidadesToggleClick(event) {
 }
 
 function handleGastosEyeClick(event) {
+    if (event.target.closest("[data-gastos-toggle-pausadas]")) {
+        gastosMostrarPausadas = !gastosMostrarPausadas
+        persistGastosMostrarPausadas(gastosMostrarPausadas)
+        renderGastosAnnualTable()
+        return
+    }
     if (event.target.closest("[data-gastos-eye-mens]")) {
         toggleGastoTipoVisibility("Mensualidades").then(() => renderGastosAnnualTable())
         return
@@ -1440,7 +1472,7 @@ function getFilteredMensualidades() {
                 return true
             }
 
-            return normalizeComparableGastoText(`${row.nombre} ${row.categoria}`).includes(search)
+            return normalizeComparableGastoText(row.nombre).includes(search)
         })
 }
 
@@ -1483,7 +1515,6 @@ function renderMensualidadesTable() {
             <tr class="${row.activa ? "" : "mensRowPaused"}">
                 <td class="mensColName">
                     <span class="mensNameMain">${escapeGastosHtml(row.nombre)}</span>
-                    ${row.categoria ? `<span class="mensNameMeta">${escapeGastosHtml(row.categoria)}</span>` : ""}
                     ${row.nota ? `<span class="mensNameNote" title="${escapeGastosHtml(row.nota)}">${escapeGastosHtml(row.nota)}</span>` : ""}
                 </td>
                 <td>${cargo ? formatEuro(cargo) : "—"}</td>
@@ -1516,8 +1547,8 @@ function renderMensualidadesTable() {
     foot.innerHTML = `
         <tr class="mensFootRow">
             <td colspan="5">Total (${items.length} ${items.length === 1 ? "mensualidad" : "mensualidades"})</td>
-            <td>${formatEuro(visibleMensual)}</td>
-            <td>${formatEuro(visibleAnual)}</td>
+            <td class="numCell">${formatEuro(visibleMensual)}</td>
+            <td class="numCell">${formatEuro(visibleAnual)}</td>
             <td colspan="2"></td>
         </tr>
     `

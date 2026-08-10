@@ -2167,6 +2167,14 @@
     white-space:nowrap;
 }
 
+/* La cabecera de una columna numérica sigue a sus celdas (ver .numCol/.numCell).
+   Sin esto la regla de arriba (misma especificidad, hoja posterior) dejaría el
+   título a la izquierda mientras los importes van a la derecha. */
+.mensTable thead th.numCol,
+.recTable thead th.numCol{
+    text-align:right;
+}
+
 .mensTable tbody td,
 .recTable tbody td{
     padding:10px 12px;
@@ -7083,3 +7091,75 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 }
 .ahorroModalTotalPct.over{ color:#fca5a5; }
 
+
+/* ── Ventas: resumen fiscal e incidencias ──
+   La escala del ahorro es anual, así que la cifra que se declara vive en este
+   bloque y no en la suma de una fila. Las incidencias se marcan en la propia
+   tabla para que una fila descuadrada no pase por buena. */
+.ventasResumen{
+    margin:14px 0 0;
+    padding:14px 16px;
+    background:var(--bg-panel);
+    border:1px solid var(--border-soft);
+    border-radius:10px;
+}
+.ventasResumen.hidden{ display:none; }
+.ventasResumenTitulo{
+    margin:0 0 10px;
+    font-size:0.85rem;
+    font-weight:600;
+    color:var(--text-muted);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+}
+.ventasResumenGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:10px 18px;
+}
+.ventasResumenItem{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+}
+.ventasResumenLabel{
+    font-size:0.76rem;
+    color:var(--text-dim);
+}
+.ventasResumenValor{
+    font-size:1rem;
+    font-weight:600;
+    color:var(--text-primary);
+    font-variant-numeric:tabular-nums;
+}
+.ventasResumenNota{
+    margin:12px 0 0;
+    font-size:0.74rem;
+    line-height:1.45;
+    color:var(--text-dim);
+}
+
+.operationsTable tbody tr.ventasRowIncidencia td{
+    background:rgba(231,76,60,0.10) !important;
+}
+.ventasIncidenciaMarca{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:16px;
+    height:16px;
+    margin-left:4px;
+    border-radius:50%;
+    background:var(--color-neg);
+    color:#fff;
+    font-size:0.7rem;
+    font-weight:700;
+    cursor:help;
+}
+
+.assetModalHint{
+    margin:6px 0 0;
+    font-size:0.74rem;
+    line-height:1.4;
+    color:var(--text-dim);
+}

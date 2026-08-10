@@ -5,14 +5,16 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from core.paths import BASE_DIR
+from core import settings
+from core.paths import (
+    DELETED_DIR as _DELETED_DIR,
+    LEGACY_DB as _LEGACY_DB,
+    PORTFOLIOS_DIR as _PORTFOLIOS_DIR,
+    PORTFOLIOS_META_FILE as _META_FILE,
+)
 
 log = logging.getLogger(__name__)
 
-_META_FILE = BASE_DIR / "data" / "portfolios.json"
-_PORTFOLIOS_DIR = BASE_DIR / "data" / "portfolios"
-_DELETED_DIR = BASE_DIR / "data" / "deleted"
-_LEGACY_DB = BASE_DIR / "data" / "portfolio.db"
 
 
 def _read_meta():
@@ -50,7 +52,7 @@ def _migrate_legacy_gastos(active_db_path: Path):
         return
     try:
         import sqlite3
-        src = sqlite3.connect(str(_LEGACY_DB), timeout=15)
+        src = sqlite3.connect(str(_LEGACY_DB), timeout=settings.backupSqliteTimeout())
         src.row_factory = sqlite3.Row
 
         # Comprobar si el legacy tiene mensualidades con valores o gastos
@@ -67,7 +69,7 @@ def _migrate_legacy_gastos(active_db_path: Path):
             src.close()
             return
 
-        dst = sqlite3.connect(str(active_db_path), timeout=15)
+        dst = sqlite3.connect(str(active_db_path), timeout=settings.backupSqliteTimeout())
         try:
             # Solo migrar si el activo NO tiene datos de gastos
             empty_mens = dst.execute(

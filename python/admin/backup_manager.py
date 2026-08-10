@@ -4,7 +4,7 @@ Backup automático de la base de datos activa.
 - Si la BD está dañada: intenta reparar; si falla, restaura desde el backup más reciente
 - Crea backup diario de TODOS los portfolios (no solo el activo)
 - Incluye portfolios.json y JSONs de configuración en el backup diario
-- Mantiene los últimos MAX_BACKUPS backups diarios
+- Mantiene los últimos [backups] max_copias backups diarios (config.ini)
 """
 import json
 import logging
@@ -14,13 +14,13 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from core.paths import BASE_DIR
-
-_BACKUP_DIR     = BASE_DIR / "data" / "backups" / "auto"
-_PORTFOLIOS_DIR = BASE_DIR / "data" / "portfolios"
-_META_FILE      = BASE_DIR / "data" / "portfolios.json"
-_JSON_DIR       = BASE_DIR / "data" / "JSON"
-MAX_BACKUPS = 14
+from core import settings
+from core.paths import (
+    AUTO_BACKUPS_DIR as _BACKUP_DIR,
+    JSON_DIR as _JSON_DIR,
+    PORTFOLIOS_DIR as _PORTFOLIOS_DIR,
+    PORTFOLIOS_META_FILE as _META_FILE,
+)
 
 log = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def check_integrity(db_path: Path) -> bool:
     """Devuelve True si la BD pasa integrity_check y foreign_key_check."""
     conn = None
     try:
-        conn = sqlite3.connect(str(db_path), timeout=15)
+        conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
         result = conn.execute("PRAGMA integrity_check").fetchone()
         if not (result and result[0] == "ok"):
             return False
@@ -81,10 +81,10 @@ def check_integrity(db_path: Path) -> bool:
 
 
 def _rotate(db_stem: str):
-    """Elimina backups automáticos más antiguos que MAX_BACKUPS."""
+    """Elimina los backups automáticos que sobran, según [backups] max_copias."""
     backups = _dated_backups(db_stem)
     today_name = f"{db_stem}_{datetime.now().strftime('%Y-%m-%d')}.db"
-    while len(backups) > MAX_BACKUPS:
+    while len(backups) > settings.maxCopiasBackup():
         oldest = backups.pop(0)
         # Salvaguarda: nunca borrar el backup de hoy, es el único fresco.
         if oldest.name == today_name:
@@ -102,8 +102,8 @@ def _checkpoint_and_copy(db_path: Path, backup_path: Path):
     tmp = backup_path.with_suffix(".tmp")
     src = dst = None
     try:
-        src = sqlite3.connect(str(db_path), timeout=15)
-        dst = sqlite3.connect(str(tmp), timeout=15)
+        src = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
+        dst = sqlite3.connect(str(tmp), timeout=settings.backupSqliteTimeout())
         src.backup(dst)
         dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         dst.commit()
@@ -216,7 +216,7 @@ def _backup_config(dest: Path):
 
     # Rotar config backups
     config_backups = sorted(_BACKUP_DIR.glob("config_*.json"))
-    while len(config_backups) > MAX_BACKUPS:
+    while len(config_backups) > settings.maxCopiasBackup():
         oldest = config_backups.pop(0)
         try:
             oldest.unlink()
@@ -246,7 +246,7 @@ def _ensure_daily_snapshot(db_path: Path):
     import time
     conn = None
     try:
-        conn = sqlite3.connect(str(db_path), timeout=15)
+        conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
         conn.row_factory = sqlite3.Row
         now_ts = int(time.time())
         today_start = now_ts - (now_ts % 86400)
@@ -279,13 +279,13 @@ def _emergency_repair(db_path: Path) -> bool:
     repair_path = db_path.with_suffix(".repair.db")
     corrupted_backup = _BACKUP_DIR / f"{db_path.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
     try:
-        src = sqlite3.connect(str(db_path), timeout=15)
+        src = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
         dump = list(src.iterdump())
         src.close()
 
         if repair_path.exists():
             repair_path.unlink()
-        dst = sqlite3.connect(str(repair_path), timeout=15)
+        dst = sqlite3.connect(str(repair_path), timeout=settings.backupSqliteTimeout())
         dst.executescript("\n".join(dump))
         dst.close()
 

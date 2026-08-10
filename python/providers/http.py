@@ -26,28 +26,24 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from core import settings
 from providers.api_stats import record_api_call
 
 log = logging.getLogger(__name__)
 
-DEFAULT_USER_AGENT = "PortfolioPython/1.0"
-DEFAULT_HEADERS = {
-    "User-Agent": DEFAULT_USER_AGENT,
-    "Accept": "application/json",
-}
-
-# 8 MB: el mayor payload legítimo son los catálogos de símbolos de Finnhub
-# (unos 2 MB); el resto son cotizaciones de pocos KB.
-MAX_RESPONSE_BYTES = 8 * 1024 * 1024
-
-DEFAULT_RETRIES = 2
-DEFAULT_BACKOFF = 0.4
-MAX_BACKOFF = 4.0
-# Tope al Retry-After: los proveedores gratuitos llegan a pedir 60 s y el
-# usuario está esperando delante de la pantalla.
-MAX_RETRY_AFTER = 5.0
+# Los parámetros de red (timeout, reintentos, backoff, tope de respuesta,
+# User-Agent) salen de la sección [proveedores] de config.ini. Ajustar la
+# paciencia con un proveedor lento no debería exigir tocar este fichero ni
+# reconstruir la imagen.
 
 _RETRYABLE_STATUS = {408, 425, 429, 500, 502, 503, 504}
+
+
+def _headers_base():
+    return {
+        "User-Agent": settings.proveedorUserAgent(),
+        "Accept": "application/json",
+    }
 
 
 class ProviderError(URLError):
@@ -72,10 +68,12 @@ class ProviderResponseError(ProviderError):
 
 def _sleep_for(attempt: int, retry_after: float | None) -> float:
     if retry_after is not None:
-        return min(retry_after, MAX_RETRY_AFTER)
+        # Tope al Retry-After: los proveedores gratuitos llegan a pedir 60 s y
+        # el usuario está esperando delante de la pantalla.
+        return min(retry_after, settings.proveedorMaxRetryAfter())
     # Backoff exponencial con jitter: evita que los refrescos de varios activos
     # reintenten todos en el mismo instante y vuelvan a saturar al proveedor.
-    base = min(DEFAULT_BACKOFF * (2 ** attempt), MAX_BACKOFF)
+    base = min(settings.proveedorBackoffInicial() * (2 ** attempt), settings.proveedorBackoffMaximo())
     return base * (0.5 + random.random() / 2)
 
 
@@ -91,10 +89,14 @@ def _parse_retry_after(error: HTTPError):
 
 
 def _read_json(response, url: str):
-    payload = response.read(MAX_RESPONSE_BYTES + 1)
-    if len(payload) > MAX_RESPONSE_BYTES:
+    # El mayor payload legítimo son los catálogos de símbolos de Finnhub (unos
+    # 2 MB); el resto son cotizaciones de pocos KB. El tope protege la memoria
+    # del proceso cuando varios activos se refrescan a la vez.
+    maximo = settings.proveedorMaxRespuestaBytes()
+    payload = response.read(maximo + 1)
+    if len(payload) > maximo:
         raise ProviderResponseError(
-            f"Respuesta demasiado grande (> {MAX_RESPONSE_BYTES // (1024 * 1024)} MB)"
+            f"Respuesta demasiado grande (> {maximo // (1024 * 1024)} MB)"
         )
     if not payload:
         raise ProviderResponseError("El proveedor devolvió una respuesta vacía")
@@ -111,18 +113,27 @@ def build_url(url: str, params=None) -> str:
     return f"{url}?{query}" if query else url
 
 
-def fetch_json(url, params=None, *, timeout=10, provider=None, headers=None,
-               retries=DEFAULT_RETRIES):
+def fetch_json(url, params=None, *, timeout=None, provider=None, headers=None,
+               retries=None):
     """GET + parseo JSON con reintentos.
 
     `provider` es la etiqueta con la que se contabiliza la llamada en las
     estadísticas de uso de API (pantalla de Ajustes). Se registra una vez por
     intento porque cada intento consume cuota real.
+
+    `timeout` y `retries` a None (lo habitual) usan los valores de
+    [proveedores] en config.ini; pasarlos explícitamente es para el caso puntual
+    de una llamada que sabe que necesita otra cosa.
     """
     request_url = build_url(url, params)
-    request_headers = dict(DEFAULT_HEADERS)
+    request_headers = _headers_base()
     if headers:
         request_headers.update(headers)
+
+    if timeout is None:
+        timeout = settings.proveedorTimeout()
+    if retries is None:
+        retries = settings.proveedorReintentos()
 
     attempts = max(1, int(retries) + 1)
     last_error = None

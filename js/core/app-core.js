@@ -199,6 +199,7 @@ async function loadGlobalSettings() {
             window._metricasComparativaExcluded = data.comparativaExcluded ?? []
             window._gastosHiddenTipos           = data.gastosHiddenTipos ?? []
             window._gastosHiddenMensualidades   = data.gastosHiddenMensualidades ?? []
+            window._gastosMostrarPausadas       = data.gastosMostrarPausadas ?? false
             window._metricasActivosHidden       = data.metricasActivosHidden ?? []
             window._metricasSectionsCollapsed   = data.metricasSectionsCollapsed ?? []
             window._topMetricsConfig            = data.topMetricsConfig ?? {}
@@ -230,6 +231,7 @@ async function loadGlobalSettings() {
         window._metricasComparativaExcluded = []
         window._gastosHiddenTipos           = []
         window._gastosHiddenMensualidades   = []
+        window._gastosMostrarPausadas       = false
         window._metricasActivosHidden       = []
         window._metricasSectionsCollapsed   = []
         window._sidebarCollapsed            = false

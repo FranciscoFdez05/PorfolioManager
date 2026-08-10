@@ -20,25 +20,24 @@ import logging
 
 from flask import jsonify, request
 
-from core.config_ini import obtenerBooleano, obtenerLista
+from core import settings
 
 log = logging.getLogger(__name__)
 
 SECCION = "atajo"
 
-# Último recurso si config.ini no existe o no trae la sección. El valor
-# operativo es el de config.ini; esto solo evita que una instalación a medio
-# configurar arranque sin ningún rango definido.
-REDES_POR_DEFECTO = ("192.168.1.0/24", "10.0.0.0/24")
-
 
 def atajoActivado():
-    return obtenerBooleano(SECCION, "activado", True, env="MOVIMIENTOS_ACTIVADO")
+    return settings.obtener("atajo.activado")
 
 
 def leerRedesPermitidas():
-    """Devuelve la lista de redes permitidas ya parseadas."""
-    crudas = obtenerLista(SECCION, "redes_permitidas", REDES_POR_DEFECTO, env="MOVIMIENTOS_REDES_PERMITIDAS")
+    """Devuelve la lista de redes permitidas ya parseadas.
+
+    Dejar `redes_permitidas =` vacío en config.ini devuelve una lista vacía, no
+    los rangos por defecto: el decorador de abajo lo traduce en rechazar todo.
+    """
+    crudas = settings.obtener("atajo.redes_permitidas")
     redes = []
 
     for texto in crudas:

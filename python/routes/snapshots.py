@@ -5,21 +5,27 @@ import time
 
 from flask import Blueprint, jsonify, request
 
+from core import settings
 from core.db import get_db, transaction
-from routes.ajustes import _read_ajustes
+from routes.ajustes import DEFAULT_SNAPSHOT_MINUTES, _read_ajustes
 
 log = logging.getLogger(__name__)
 
 snapshots_bp = Blueprint("snapshots", __name__)
 
-_MIN_INTERVAL = 60
 
 def _interval_seconds() -> int:
+    """Intervalo entre snapshots: lo que pida Ajustes, con un suelo del config.
+
+    El intervalo es una preferencia del usuario (Ajustes), pero el suelo es un
+    ajuste de despliegue: protege la BD de que un valor demasiado bajo llene la
+    tabla de snapshots.
+    """
     try:
-        minutes = int(_read_ajustes().get("snapshotMinutes") or 60)
+        minutes = int(_read_ajustes().get("snapshotMinutes") or DEFAULT_SNAPSHOT_MINUTES)
     except (TypeError, ValueError):
-        minutes = 60
-    return max(_MIN_INTERVAL, minutes * 60)
+        minutes = DEFAULT_SNAPSHOT_MINUTES
+    return max(settings.snapshotIntervaloMinimo(), minutes * 60)
 
 def _same_bucket(ts_a: int, ts_b: int, interval: int) -> bool:
     return ts_a // interval == ts_b // interval

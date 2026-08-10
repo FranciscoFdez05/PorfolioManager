@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
+from core import settings
 from core.db import get_db
 from providers.alpha_vantage_client import fetch_quote as fetch_av_quote, search_symbol as search_av_symbol
 from providers.eodhd_client import fetch_quote as fetch_eodhd_quote, search_symbol as search_eodhd_symbol
@@ -26,7 +27,6 @@ from stores.helpers import (
 )
 
 _hist_cache = {}   # {period: {"data": {...}, "ts": float}}
-_HIST_TTL   = 4 * 3600  # 4 horas
 
 market_bp = Blueprint("market", __name__)
 
@@ -74,8 +74,11 @@ def getHistoricalChanges():
     if period not in ("semana", "mes", "ytd", "anyo"):
         return jsonify({"ok": False, "error": "Periodo inválido"}), 400
 
+    # TTL 0 en [mercado] historico_ttl_segundos desactiva la caché: útil para
+    # depurar sin tener que esperar a que caduque.
+    ttl = settings.historicoTtlSegundos()
     cached = _hist_cache.get(period)
-    if cached and time.time() - cached["ts"] < _HIST_TTL:
+    if ttl > 0 and cached and time.time() - cached["ts"] < ttl:
         return jsonify({"ok": True, "data": cached["data"], "cached": True})
 
     now = datetime.utcnow()
@@ -137,7 +140,7 @@ def getHistoricalChanges():
                 return asset["id"], round((cur_price - hist_price) / hist_price * 100, 2)
             return asset["id"], None
 
-        with ThreadPoolExecutor(max_workers=6) as pool:
+        with ThreadPoolExecutor(max_workers=settings.maxPeticionesParalelas()) as pool:
             futures = {pool.submit(fetch_one, a): a for a in assets_needing_api}
             for f in as_completed(futures):
                 asset_id, pct = f.result()

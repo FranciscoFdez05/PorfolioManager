@@ -15,13 +15,14 @@ from admin.portfolios_manager import (
     rename_portfolio,
     switch_portfolio,
 )
+from core import settings
 from stores.asset_utils import slugify
 
 portfolios_bp = Blueprint("portfolios", __name__)
 
 
 def _open_portfolio_db(db_file):
-    conn = sqlite3.connect(str(db_file), check_same_thread=False, timeout=15)
+    conn = sqlite3.connect(str(db_file), check_same_thread=False, timeout=settings.backupSqliteTimeout())
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -30,8 +31,8 @@ def _sqlite_backup(src_path: Path, dst_path: Path):
     """Copia consistente de un .db (incluye el WAL pendiente)."""
     src = dst = None
     try:
-        src = sqlite3.connect(str(src_path), timeout=15)
-        dst = sqlite3.connect(str(dst_path), timeout=15)
+        src = sqlite3.connect(str(src_path), timeout=settings.backupSqliteTimeout())
+        dst = sqlite3.connect(str(dst_path), timeout=settings.backupSqliteTimeout())
         src.backup(dst)
         dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         dst.commit()
@@ -279,7 +280,7 @@ def import_portfolio():
         # abrir se aceptaba aunque integrity_check devolviese errores.
         conn = None
         try:
-            conn = sqlite3.connect(str(tmp_dest), timeout=15)
+            conn = sqlite3.connect(str(tmp_dest), timeout=settings.backupSqliteTimeout())
             result = conn.execute("PRAGMA integrity_check").fetchone()
             if not result or result[0] != "ok":
                 return jsonify({"ok": False, "error": "La base de datos importada está corrupta"}), 400

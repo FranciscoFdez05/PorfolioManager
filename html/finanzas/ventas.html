@@ -14,17 +14,18 @@
                     <th class="mThSort" data-sortkey="0">Fecha Venta<span class="mSortArrow"></span></th>
                     <th class="mThSort" data-sortkey="1">Activo<span class="mSortArrow"></span></th>
                     <th class="mThSort" data-sortkey="2">Cantidad<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="3">Coste FIFO unitario<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3" title="Coste medio de los lotes consumidos por FIFO. Pasa el ratón por encima de la celda para ver de qué compras salió.">Coste FIFO unitario<span class="mSortArrow"></span></th>
                     <th class="mThSort" data-sortkey="4">Valor de venta<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="5">Dinero a declarar<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="6">Tramo 1 (19%)<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="7">Tramo 2 (21%)<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="8">Tramo 3 (23%)<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="9">Tramo 4 (27%)<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="10">Tramo 5 (28%)<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="11">Total a pagar<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="12">Bruto<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="13">Neto<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5" title="Gastos de la venta. Minoran el valor de transmisión (art. 35.2 LIRPF).">Comisión<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6" title="Ganancia o pérdida patrimonial de la venta, ya ajustada por la regla de antiaplicación.">Dinero a declarar<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="7">Tramo 1 (19%)<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="8">Tramo 2 (21%)<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="9">Tramo 3 (23%)<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="10">Tramo 4 (27%)<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="11">Tramo 5 (28%)<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="12" title="Parte que le toca a esta venta de la cuota anual. La escala del ahorro es anual y progresiva: se calcula una vez sobre el saldo del ejercicio y se reparte entre las ventas en orden cronológico.">Total a pagar<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="13">Bruto<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="14">Neto<span class="mSortArrow"></span></th>
                     <th class="rowActionHeader"></th>
                 </tr>
             </thead>
@@ -32,6 +33,8 @@
         </table>
     </div>
     <p class="overviewEmpty hidden" id="ventasEmptyMsg">No hay ventas registradas.</p>
+
+    <div class="ventasResumen hidden" id="ventasResumen"></div>
 
     <div class="operationsActions">
         <button id="addVentaRowBtn" class="primaryButton" type="button">+ Añadir fila</button>

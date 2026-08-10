@@ -61,11 +61,11 @@ PREFERRED_EXCHANGES_BY_TYPE = {
 }
 
 
-def _fetch_json(url, params, timeout=10):
+def _fetch_json(url, params, timeout=None):
     return fetch_json(url, params, timeout=timeout, provider=_provider_from_url(url))
 
 
-def _fetch_json_absolute(url, timeout=10):
+def _fetch_json_absolute(url, timeout=None):
     return fetch_json(url, timeout=timeout, provider=_provider_from_url(url))
 
 
@@ -164,7 +164,7 @@ def _extract_code_candidates(query_text, remote_results):
     return candidates
 
 
-def _get_cached_symbols(symbol_type, exchange, url, api_key, timeout=10):
+def _get_cached_symbols(symbol_type, exchange, url, api_key, timeout=None):
     cache_key = (symbol_type, exchange)
 
     if cache_key in SYMBOL_CACHE:
@@ -269,7 +269,7 @@ def _score_local_symbol(item, normalized_query, candidate_codes, normalized_asse
     return score
 
 
-def _search_local_symbols(query_text, remote_results, api_key, timeout=10, limit=8, asset_name="", preferred_asset_type=""):
+def _search_local_symbols(query_text, remote_results, api_key, timeout=None, limit=8, asset_name="", preferred_asset_type=""):
     normalized_query = _normalize_text(query_text)
     normalized_asset_name = _normalize_text(asset_name)
     candidate_codes = _extract_code_candidates(query_text, remote_results)
@@ -323,7 +323,7 @@ def infer_currency_from_symbol(symbol, fallback="USD"):
     return fallback
 
 
-def fetch_quote(symbol, api_key, timeout=10):
+def fetch_quote(symbol, api_key, timeout=None):
     normalized_symbol = str(symbol or "").strip().upper()
 
     if not normalized_symbol:
@@ -364,7 +364,7 @@ def fetch_quote(symbol, api_key, timeout=10):
     }, None
 
 
-def fetch_exchange_rate(source_currency, target_currency, timeout=10):
+def fetch_exchange_rate(source_currency, target_currency, timeout=None):
     source = _normalize_currency_code(source_currency)
     target = _normalize_currency_code(target_currency)
 
@@ -412,7 +412,7 @@ def fetch_exchange_rate(source_currency, target_currency, timeout=10):
     return rate, None
 
 
-def convert_amount(value, source_currency, target_currency, timeout=10):
+def convert_amount(value, source_currency, target_currency, timeout=None):
     rate, error = fetch_exchange_rate(source_currency, target_currency, timeout=timeout)
 
     if error:
@@ -421,7 +421,7 @@ def convert_amount(value, source_currency, target_currency, timeout=10):
     return float(value) * rate, None
 
 
-def convert_quote_currency(quote, target_currency, timeout=10):
+def convert_quote_currency(quote, target_currency, timeout=None):
     if not quote:
         return None, "No hay cotización para convertir"
 
@@ -465,7 +465,7 @@ def convert_quote_currency(quote, target_currency, timeout=10):
     return converted_quote, None
 
 
-def enrich_search_results_with_quote(results, api_key, timeout=10):
+def enrich_search_results_with_quote(results, api_key, timeout=None):
     enriched_results = []
 
     for item in results:
@@ -482,7 +482,7 @@ def enrich_search_results_with_quote(results, api_key, timeout=10):
     return enriched_results
 
 
-def search_symbol(query_text, api_key, timeout=10, limit=8, asset_name="", preferred_asset_type=""):
+def search_symbol(query_text, api_key, timeout=None, limit=8, asset_name="", preferred_asset_type=""):
     normalized_query = str(query_text or "").strip()
 
     if not normalized_query:
@@ -580,7 +580,7 @@ FINNHUB_STOCK_CANDLE_URL  = "https://finnhub.io/api/v1/stock/candle"
 FINNHUB_CRYPTO_CANDLE_URL = "https://finnhub.io/api/v1/crypto/candle"
 
 
-def fetch_candle_close(symbol, from_ts, to_ts, api_key, timeout=12):
+def fetch_candle_close(symbol, from_ts, to_ts, api_key, timeout=None):
     """Return the first available daily closing price in [from_ts, to_ts]."""
     if not symbol or not api_key:
         return None, "Parámetros insuficientes"

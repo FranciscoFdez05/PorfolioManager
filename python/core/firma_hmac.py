@@ -26,8 +26,8 @@ import logging
 import os
 import time
 
-from core.config_ini import obtenerEntero, obtenerTexto
-from core.paths import BASE_DIR
+from core import settings
+from core.paths import rutaDesdeBase
 from core.secret_store import read_secret_lines
 
 log = logging.getLogger(__name__)
@@ -36,12 +36,6 @@ SECCION = "atajo"
 ENV_CLAVE = "MOVIMIENTOS_SECRET_KEY"
 CABECERA_FIRMA = "X-Signature"
 CABECERA_TIMESTAMP = "X-Timestamp"
-
-# Último recurso si config.ini no existe o no trae la sección; el valor
-# operativo es el de config.ini.
-FICHERO_CLAVE_POR_DEFECTO = "API/movimientos.key"
-TOLERANCIA_POR_DEFECTO = 60
-MAX_TEXTO_POR_DEFECTO = 8192
 
 
 class ErrorFirma(Exception):
@@ -54,27 +48,20 @@ class ErrorFirma(Exception):
 
 
 def rutaFicheroClave():
-    relativa = obtenerTexto(SECCION, "fichero_clave", FICHERO_CLAVE_POR_DEFECTO, env="MOVIMIENTOS_FICHERO_CLAVE")
-    return BASE_DIR / relativa
+    return rutaDesdeBase(settings.obtener("atajo.fichero_clave"))
 
 
 def toleranciaSegundos():
     """Margen a cada lado del reloj del servidor, en segundos.
 
-    El mínimo de 1 evita que un 0 en config.ini deje la ventana tan cerrada que
-    ninguna petición llegue nunca a tiempo.
+    El mínimo declarado en el catálogo evita que un 0 en config.ini deje la
+    ventana tan cerrada que ninguna petición llegue nunca a tiempo.
     """
-    return obtenerEntero(
-        SECCION, "tolerancia_segundos", TOLERANCIA_POR_DEFECTO,
-        env="MOVIMIENTOS_TOLERANCIA_SEGUNDOS", minimo=1,
-    )
+    return settings.obtener("atajo.tolerancia_segundos")
 
 
 def maxTextoFirma():
-    return obtenerEntero(
-        SECCION, "max_texto_firma", MAX_TEXTO_POR_DEFECTO,
-        env="MOVIMIENTOS_MAX_TEXTO_FIRMA", minimo=1,
-    )
+    return settings.obtener("atajo.max_texto_firma")
 
 
 def obtenerClaveSecreta():

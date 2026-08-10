@@ -32,6 +32,18 @@ run_py() {
     fi
 }
 
+run_py_file() {
+    # Igual que run_py pero ejecutando un script del repositorio, con sus
+    # argumentos. Se usa para leer la configuración con la misma capa que la app.
+    script="$1"
+    shift
+    if [ -n "$PY_CMD" ]; then
+        "$PY_CMD" "$script" "$@"
+    else
+        docker run --rm -v "$PWD:/w" -w /w python:3.12-slim python "$script" "$@"
+    fi
+}
+
 env_get() {
     # Valor de una clave en .env (vacío si no está)
     [ -f .env ] || return 0
@@ -99,12 +111,18 @@ if [ -z "$(env_get LOGIN_PASSWORD_HASH)" ] && [ ! -f data/auth.dat ]; then
             exit 1
         fi
 
-        export PW
+        # Las iteraciones salen de [seguridad] hash_iteraciones, para que el
+        # hash del primer arranque use el mismo coste que los que genere luego
+        # la aplicación al cambiar la contraseña desde Ajustes.
+        ITERACIONES=$(run_py_file tools/leer_ajuste.py seguridad.hash_iteraciones) || ITERACIONES=""
+        [ -n "$ITERACIONES" ] || ITERACIONES=600000
+
+        export PW ITERACIONES
         HASH=$(run_py "
 import hashlib, os, secrets
 pw = os.environ['PW'].encode()
 salt = secrets.token_hex(8)
-it = 600000
+it = int(os.environ['ITERACIONES'])
 print('pbkdf2:sha256:%d\$%s\$%s' % (
     it, salt, hashlib.pbkdf2_hmac('sha256', pw, salt.encode(), it).hex()))
 ")
@@ -120,7 +138,12 @@ print('pbkdf2:sha256:%d\$%s\$%s' % (
 fi
 
 # ── 4. Puerto ─────────────────────────────────────────────────────────────────
-PORT=$(run_py "import configparser;c=configparser.ConfigParser();c.read('config.ini');print(c.getint('server','port',fallback=5000))")
+# Se lee con la misma capa de configuración que usa la aplicación
+# (tools/leer_ajuste.py), no con un configparser aparte: así el puerto del mapeo
+# de Docker respeta la prioridad entorno → config.ini → defecto y queda validado
+# igual que dentro del contenedor.
+PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
+[ -n "$PORT" ] || PORT=5000
 export PORT
 
 # ── 5. Arranque ───────────────────────────────────────────────────────────────
