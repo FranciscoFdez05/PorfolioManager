@@ -659,6 +659,21 @@
     font-size:0.84rem;
 }
 
+.operationsTable tbody td.operationsYearHeader{
+    padding:14px 14px 6px;
+    color:var(--text-secondary);
+    font-size:0.72rem;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    background:var(--bg-header);
+    border-bottom:1px solid var(--border-soft);
+}
+
+.operationsYearRow:first-child td.operationsYearHeader{
+    padding-top:8px;
+}
+
 .operationsTable tbody tr:nth-child(odd) td{
     background:var(--bg-panel);
 }
@@ -3226,6 +3241,8 @@
 .mkpiGroupAhorro     .metricasKpiGroupLabel{ color:#3a7bd5; }
 .mkpiGroupAnalisis   .metricasKpiCard{ border-top-color:#e67e22; }
 .mkpiGroupAnalisis   .metricasKpiGroupLabel{ color:#e67e22; }
+.mkpiGroupAnual      .metricasKpiCard{ border-top-color:#e8720e; }
+.mkpiGroupAnual      .metricasKpiGroupLabel{ color:#e8720e; }
 
 .mkpiGroupActivosRend{ flex-shrink:1; min-width:0; }
 .mkpiGroupActivosRend .metricasKpiGroupLabel{ color:#8899bb; }
@@ -3639,6 +3656,17 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
 
 .metricasTable tbody tr:hover{
     background:#151f35;
+}
+
+.metricasTable tfoot tr{
+    background:var(--bg-header);
+    border-top:1px solid var(--border-soft);
+}
+
+.metricasTable tfoot td{
+    font-weight:700;
+    color:var(--text-primary);
+    border-bottom:none;
 }
 
 /* ── Vista General: alineación estilo CMC ── */
@@ -6147,9 +6175,19 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     color:var(--text-muted);
 }
 
+/* Grupo de opciones deshabilitado (p. ej. intervalo de rotación sin activar) */
+.ajustesDisabledGroup{
+    opacity:0.4;
+    pointer-events:none;
+    filter:grayscale(0.5);
+}
+
 /* ── Compact sidebar density ─────────────────────────── */
 [data-density="compact"] .assetBtn{
-    padding:5px 12px;
+    padding:5px 12px 5px 14px;
+}
+[data-density="compact"] .assetsListHeader{
+    padding:4px 12px;
 }
 [data-density="compact"] .assetBtnName{
     font-size:11px;
@@ -6161,17 +6199,6 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     font-size:10px;
 }
 
-/* ── Métricas: presupuesto por categoría ── */
-.mPresupuestoMonthToggle{
-    display:flex;
-    flex-wrap:wrap;
-    gap:3px;
-}
-.mPresupuestoEmpty{
-    color:var(--text-dim);
-    font-size:0.85rem;
-    padding:12px 0;
-}
 .mkpiAhorroObjMain{
     display:flex;
     align-items:center;
@@ -6202,180 +6229,6 @@ html[data-theme="black"] #mChartDivAxisWrap{ background:#0a0a0a; }
     color:var(--text-muted);
     margin-top:2px;
     line-height:1.2;
-}
-
-/* KPI cards presupuesto */
-.mPresupuestoKpiCards{
-    display:flex;
-    flex-wrap:wrap;
-    gap:10px;
-    margin-bottom:16px;
-}
-.mPresKpiCard{
-    flex:1;
-    min-width:120px;
-    background:var(--bg-elevated);
-    border:1px solid var(--border-soft);
-    border-radius:10px;
-    padding:12px 16px;
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-}
-.mPresKpiCard.mPresKpiOk{
-    border-color:rgba(74,222,128,.3);
-    background:rgba(74,222,128,.05);
-}
-.mPresKpiCard.mPresKpiOver{
-    border-color:rgba(248,113,113,.3);
-    background:rgba(248,113,113,.05);
-}
-.mPresKpiVal{
-    font-size:1.15rem;
-    font-weight:700;
-    color:var(--text-primary);
-    line-height:1;
-}
-.mPresKpiCard.mPresKpiOk .mPresKpiVal{ color:#4ade80; }
-.mPresKpiCard.mPresKpiOver .mPresKpiVal{ color:#f87171; }
-.mPresKpiOf{
-    font-size:0.78rem;
-    font-weight:400;
-    color:var(--text-muted);
-}
-.mPresKpiLab{
-    font-size:0.73rem;
-    color:var(--text-muted);
-    text-transform:uppercase;
-    letter-spacing:.04em;
-}
-
-/* Lista de categorías presupuesto en métricas */
-.mPresupuestoList{
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-}
-.mPresCatRow{
-    display:flex;
-    flex-direction:column;
-    gap:7px;
-    padding:12px 14px;
-    background:var(--bg-elevated);
-    border:1px solid var(--border-soft);
-    border-radius:10px;
-    transition:border-color .2s;
-}
-.mPresCatRow.over{
-    border-color:rgba(248,113,113,.35);
-    background:rgba(248,113,113,.04);
-}
-.mPresCatTop{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    flex-wrap:wrap;
-}
-.mPresCatName{
-    display:flex;
-    align-items:center;
-    gap:8px;
-}
-.mPresCatTipo{
-    font-size:0.9rem;
-    font-weight:600;
-    color:var(--text-primary);
-}
-.mPresCatStatus{
-    font-size:0.7rem;
-    font-weight:700;
-    padding:2px 7px;
-    border-radius:99px;
-    white-space:nowrap;
-}
-.mPresCatStatus.ok{ background:rgba(74,222,128,.15); color:#4ade80; }
-.mPresCatStatus.over{ background:rgba(248,113,113,.15); color:#f87171; }
-.mPresCatNums{
-    display:flex;
-    align-items:center;
-    gap:12px;
-    flex-shrink:0;
-}
-.mPresCatObj{
-    font-size:0.76rem;
-    font-weight:600;
-    color:var(--text-dim);
-}
-.mPresCatNoObj{
-    font-size:0.74rem;
-    color:var(--text-dim);
-    opacity:.6;
-}
-.mPresCatReal{
-    font-size:0.84rem;
-    font-weight:600;
-    color:var(--text-subtle);
-}
-.mPresCatReal strong{ color:var(--text-primary); font-weight:700; }
-.mPresCatRealPct{ color:var(--text-muted); font-weight:400; }
-.mPresCatBarTrack{
-    position:relative;
-    height:16px;
-    background:var(--bg-inset);
-    border-radius:8px;
-    border:1px solid var(--border-mid);
-    overflow:visible;
-    box-shadow:inset 0 1px 4px rgba(0,0,0,.25);
-}
-.mPresCatFill{
-    position:absolute;
-    left:0;top:0;bottom:0;
-    border-radius:7px;
-    background:linear-gradient(90deg,#1e3a5f,#2563eb,#60a5fa);
-    transition:width .4s ease;
-    max-width:100%;
-    display:flex;
-    align-items:center;
-    overflow:hidden;
-    box-shadow:0 0 10px rgba(96,165,250,.2);
-}
-.mPresCatFill.ok{
-    background:linear-gradient(90deg,#14532d,#16a34a,#4ade80);
-    box-shadow:0 0 10px rgba(74,222,128,.2);
-}
-.mPresCatFill.over{
-    background:linear-gradient(90deg,#450a0a,#b91c1c,#f87171);
-    box-shadow:0 0 10px rgba(248,113,113,.2);
-}
-.mPresCatBarLabel{
-    position:absolute;
-    right:7px;
-    font-size:0.7rem;
-    font-weight:700;
-    color:rgba(255,255,255,.88);
-    text-shadow:0 1px 3px rgba(0,0,0,.5);
-    pointer-events:none;
-    white-space:nowrap;
-}
-.mPresCatTargetLine{
-    position:absolute;
-    top:-5px;bottom:-5px;
-    width:2px;
-    background:rgba(255,255,255,.8);
-    border-radius:2px;
-    transform:translateX(-1px);
-    box-shadow:0 0 6px rgba(255,255,255,.5);
-}
-.mPresCatTargetLine::after{
-    content:'';
-    position:absolute;
-    top:-4px;left:50%;
-    transform:translateX(-50%);
-    width:6px;height:6px;
-    background:white;
-    border-radius:50%;
-    box-shadow:0 0 5px rgba(255,255,255,.7);
 }
 
 /* ══════════════════════════════════════════════════════

@@ -6,11 +6,11 @@ window._resizeChartsOnSidebarChange = function () {
 
 let _metricasDisplayType = "doughnut"
 let _metricasDistMetric = "netoActualEur"
-let _metricasGastosMonth = "all"
-let _metricasIngresosMonth = "all"
+let _metricasGastosMonth = getChartPref("metricasGastosMonth", "all")
+let _metricasIngresosMonth = getChartPref("metricasIngresosMonth", "all")
 let _metricasPayload = null
-let _metricasSortKey = "netoActualEur"
-let _metricasSortDir = "desc"
+let _metricasSortKey = getChartPref("metricasSortKey", "netoActualEur")
+let _metricasSortDir = getChartPref("metricasSortDir", "desc")
 let _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","rentaFija"])
 let _metricasGastosTipoFilter = new Set()
 let _metricasComparativaExclude = new Set()
@@ -148,17 +148,45 @@ async function buildMetricasPayload() {
 
     const gastosYearsData = gastosYearsResp ? await gastosYearsResp.json().catch(() => ({ years: [] })) : { years: [] }
     const gastosYearsList = Array.isArray(gastosYearsData.years) ? gastosYearsData.years : []
-    const latestYear      = gastosYearsList[0] || null
-    const gastosYearData  = latestYear
-        ? await fetch(`/api/gastos/${latestYear}`).then((r) => r.json()).catch(() => null)
+    // Si el usuario dejó seleccionado otro año, se carga ese en vez del último.
+    const prefGastosYear  = getChartPref("metricasGastosYear", null)
+    const gastosYear      = gastosYearsList.map(String).includes(String(prefGastosYear))
+        ? prefGastosYear
+        : (gastosYearsList[0] || null)
+    const gastosYearData  = gastosYear
+        ? await fetch(`/api/gastos/${gastosYear}`).then((r) => r.json()).catch(() => null)
         : null
 
     const ingresosYearsData = ingresosYearsResp ? await ingresosYearsResp.json().catch(() => ({ years: [] })) : { years: [] }
     const ingresosYearsList = Array.isArray(ingresosYearsData.years) ? ingresosYearsData.years : []
-    const latestIngresosYear = ingresosYearsList[0] || null
-    const ingresosYearData  = latestIngresosYear
-        ? await fetch(`/api/ingresos/${latestIngresosYear}`).then((r) => r.json()).catch(() => null)
+    const prefIngresosYear = getChartPref("metricasIngresosYear", null)
+    const ingresosYear     = ingresosYearsList.map(String).includes(String(prefIngresosYear))
+        ? prefIngresosYear
+        : (ingresosYearsList[0] || null)
+    const ingresosYearData  = ingresosYear
+        ? await fetch(`/api/ingresos/${ingresosYear}`).then((r) => r.json()).catch(() => null)
         : null
+
+    // Resumen anual: hacen falta todos los años, no solo el seleccionado en los
+    // toggles. Se reaprovecha el año ya descargado para no pedirlo dos veces.
+    const anualYears = [...new Set([...gastosYearsList, ...ingresosYearsList].map(Number))]
+        .filter((y) => Number.isFinite(y))
+        .sort((a, b) => a - b)
+    const anualData = await Promise.all(anualYears.map(async (y) => {
+        const [gastos, ingresos] = await Promise.all([
+            gastosYearsList.map(String).includes(String(y))
+                ? (String(y) === String(gastosYear)
+                    ? gastosYearData
+                    : fetch(`/api/gastos/${y}`).then((r) => r.json()).catch(() => null))
+                : null,
+            ingresosYearsList.map(String).includes(String(y))
+                ? (String(y) === String(ingresosYear)
+                    ? ingresosYearData
+                    : fetch(`/api/ingresos/${y}`).then((r) => r.json()).catch(() => null))
+                : null,
+        ])
+        return { year: y, gastosData: gastos, ingresosData: ingresos }
+    }))
 
     const tradingData     = tradingResp     ? await tradingResp.json().catch(() => ({ rows: [] })) : { rows: [] }
     const snapshotData    = snapshotResp    ? await snapshotResp.json().catch(() => ({ data: [] })) : { data: [] }
@@ -181,6 +209,7 @@ async function buildMetricasPayload() {
         gastosYearData,
         ingresosYearsList,
         ingresosYearData,
+        anualData,
         tradingRows:     Array.isArray(tradingData.rows) ? tradingData.rows : [],
         snapshotHistory: Array.isArray(snapshotData.data) ? snapshotData.data : [],
         inversiones:     inversionesData,
@@ -600,7 +629,7 @@ function mRenderRendActivos(summaries) {
     })
 }
 
-let _metricasDivYear = null
+let _metricasDivYear = getChartPref("metricasDivYear", null)
 
 function mRenderDividendos(dividendos, colorMap = {}) {
     const section = document.getElementById("mSectionDividendos")
@@ -635,6 +664,7 @@ function mRenderDividendos(dividendos, colorMap = {}) {
                 toggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasDivYear = btn.dataset.divy
+                setChartPref("metricasDivYear", _metricasDivYear)
                 mDrawDividendosCharts(dividendos, colorMap, getYear)
             })
         }
@@ -759,9 +789,9 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
 
 // ── dividendos mensuales ───────────────────────────────────────────────────
 
-let _metricasDivMensualYear = null
-let _metricasPasivosYear = null
-let _metricasInvertidoYear = null
+let _metricasDivMensualYear = getChartPref("metricasDivMensualYear", null)
+let _metricasPasivosYear = getChartPref("metricasPasivosYear", null)
+let _metricasInvertidoYear = getChartPref("metricasInvertidoYear", null)
 
 function mRenderDivMensual(dividendos, colorMap = {}) {
     const section = document.getElementById("mSectionDivMensual")
@@ -801,6 +831,7 @@ function mRenderDivMensual(dividendos, colorMap = {}) {
                 yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasDivMensualYear = btn.dataset.divmy
+                setChartPref("metricasDivMensualYear", _metricasDivMensualYear)
                 mDrawDivMensualChart(rows, _metricasDivMensualYear, dYear, dMonth, colorMap)
                 mDrawDivMensualTabla(rows, _metricasDivMensualYear, dYear, dMonth)
             })
@@ -1385,6 +1416,8 @@ function mRenderGastos(yearsList, yearData) {
                 yearToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasGastosMonth = "all"
+                setChartPref("metricasGastosMonth", _metricasGastosMonth)
+                setChartPref("metricasGastosYear", btn.dataset.gastosyear)
                 const newData = await fetch(`/api/gastos/${btn.dataset.gastosyear}`).then((r) => r.json()).catch(() => null)
                 if (newData) {
                     _metricasPayload.gastosYearData = newData
@@ -1416,6 +1449,7 @@ function mRenderGastos(yearsList, yearData) {
             monthToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _metricasGastosMonth = btn.dataset.gastosmonth
+            setChartPref("metricasGastosMonth", _metricasGastosMonth)
             mRenderGastosCharts(yearData, totalMes, totalTipo)
         })
     } else if (monthToggle) {
@@ -1753,6 +1787,8 @@ function mBindTableSort(summaries) {
                 _metricasSortKey = key
                 _metricasSortDir = "desc"
             }
+            setChartPref("metricasSortKey", _metricasSortKey)
+            setChartPref("metricasSortDir", _metricasSortDir)
             mRenderTopTable(summaries)
         })
     })
@@ -1891,6 +1927,8 @@ function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
             yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
             btn.classList.add("active")
             _metricasIngresosMonth = "all"
+            setChartPref("metricasIngresosMonth", _metricasIngresosMonth)
+            setChartPref("metricasIngresosYear", btn.dataset.ingresosyear)
             const newData = await fetch(`/api/ingresos/${btn.dataset.ingresosyear}`).then(r => r.json()).catch(() => null)
             if (newData) {
                 _metricasPayload.ingresosYearData = newData
@@ -1921,6 +1959,7 @@ function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
             monthToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
             btn.classList.add("active")
             _metricasIngresosMonth = btn.dataset.ingresosmonth
+            setChartPref("metricasIngresosMonth", _metricasIngresosMonth)
             if (tipoTitle) tipoTitle.textContent = _metricasIngresosMonth === "all" ? "Por tipo (anual)" : `Por tipo — ${M_ING_LABELS[M_ING_KEYS.indexOf(_metricasIngresosMonth)] || _metricasIngresosMonth}`
             mRenderIngresosCharts(ingresosYearData)
         })
@@ -1936,7 +1975,7 @@ function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
 
 // ── intereses mensuales ────────────────────────────────────────────────────
 
-let _metricasInteresesYear = null
+let _metricasInteresesYear = getChartPref("metricasInteresesYear", null)
 
 const _CUENTA_COLORS = [
     "#3a7bd5", "#2ecc71", "#e67e22", "#9b59b6", "#1abc9c",
@@ -1982,6 +2021,7 @@ function mRenderInteresesSection(interesRows, cuentas) {
                 yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasInteresesYear = btn.dataset.intano
+                setChartPref("metricasInteresesYear", _metricasInteresesYear)
                 mDrawInteresesChart(cuentas, _metricasInteresesYear)
             })
         }
@@ -2366,9 +2406,6 @@ function mRenderRentabilidadAnual(snaps, currentValue) {
 
 // ── tasa de ahorro mensual ────────────────────────────────────────────────
 
-let _mAhorroPresupuestoMonth = "all"
-let _mPresupuestoRenderCtx   = null  // { ingresosYearData, gastosYearData, ahorroConfig, ingMonthlyArr }
-
 function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
     const section  = document.getElementById("mSectionAhorro")
     const kpiGroup = document.getElementById("mkpiGroupAhorro")
@@ -2507,180 +2544,328 @@ function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
             }
         }
     })
-
-    // ── Presupuesto por categoría ──────────────────────────────────────────
-    mRenderPresupuestoCategoria(ingresosYearData, gastosYearData, ahorroConfig, ingMonthly, gastosMonthly)
 }
 
-function mComputeGastosPorTipo(gastosYearData, monthKey) {
-    const totals = {}
-    const keys = monthKey === "all" ? M_GASTOS_KEYS : [monthKey]
-    keys.forEach(k => {
-        ;(gastosYearData?.months?.[k]?.rows || []).forEach(row => {
-            const tipo = (row.tipo || "Sin categoría").trim() || "Sin categoría"
-            totals[tipo] = (totals[tipo] || 0) + parseEuroNumber(row.cantidad || "")
-        })
-    })
-    return totals
+// ── estadísticas anuales: gastado vs ahorrado ─────────────────────────────
+
+let _metricasAnualMode = getChartPref("metricasAnualMode", "eur")
+let _mAnualResumenCache = []
+
+function mComputeResumenAnual(anualData) {
+    return (anualData || []).map(({ year, gastosData, ingresosData }) => {
+        const { totalMes } = mComputeGastosData(gastosData)
+        const gastado  = M_GASTOS_KEYS.reduce((s, k) => s + (totalMes[k] || 0), 0)
+        const ingMes   = mComputeIngresosMonthly(ingresosData)
+        const ingresos = M_ING_KEYS.reduce((s, k) => s + (ingMes[k] || 0), 0)
+        const ahorrado = ingresos - gastado
+        return {
+            year,
+            ingresos,
+            gastado,
+            ahorrado,
+            tasa:     ingresos > 0 ? (ahorrado / ingresos) * 100 : null,
+            pctGasto: ingresos > 0 ? (gastado  / ingresos) * 100 : null
+        }
+    }).filter(r => r.ingresos > 0 || r.gastado > 0)
 }
 
-function mRenderPresupuestoCategoria(ingresosYearData, gastosYearData, ahorroConfig, ingMonthlyArr, gastosMonthlyArr) {
-    const section = document.getElementById("mSectionPresupuesto")
-    if (!section) return
+function mRenderAnual(anualData) {
+    const section = document.getElementById("mSectionAnual")
+    const kpiRow  = document.getElementById("mkpiRowAnual")
 
-    const presupuesto = ahorroConfig?.presupuesto || {}
-    const hasBudget   = Object.keys(presupuesto).length > 0
+    const resumen = mComputeResumenAnual(anualData)
+    _mAnualResumenCache = resumen
 
-    if (!hasBudget) {
-        section.classList.add("hidden")
+    // Se oculta con "hidden" y no con style.display porque el filtro de
+    // categorías de la barra superior reescribe el display de estas filas.
+    if (!resumen.length) {
+        if (section) section.classList.add("hidden")
+        if (kpiRow)  kpiRow.classList.add("hidden")
         return
     }
-    section.classList.remove("hidden")
+    if (section) section.classList.remove("hidden")
+    if (kpiRow)  kpiRow.classList.remove("hidden")
 
-    // Guardamos contexto para que el selector de mes siempre use datos actualizados
-    _mPresupuestoRenderCtx = { ingresosYearData, gastosYearData, ahorroConfig, ingMonthlyArr }
+    const totalIngresos = resumen.reduce((s, r) => s + r.ingresos, 0)
+    const totalGastado  = resumen.reduce((s, r) => s + r.gastado,  0)
+    const totalAhorrado = totalIngresos - totalGastado
+    const tasaGlobal    = totalIngresos > 0 ? (totalAhorrado / totalIngresos) * 100 : 0
+    const mediaAhorro   = totalAhorrado / resumen.length
+    const mejor         = resumen.reduce((best, r) => (best === null || r.ahorrado > best.ahorrado ? r : best), null)
 
-    const monthToggle = document.getElementById("mPresupuestoMonthToggle")
-    if (monthToggle) {
-        monthToggle.innerHTML = [
-            `<button class="mToggleBtn${_mAhorroPresupuestoMonth === "all" ? " active" : ""}" data-pmes="all">Anual</button>`,
-            ...M_GASTOS_KEYS.map((k, i) => `<button class="mToggleBtn${_mAhorroPresupuestoMonth === k ? " active" : ""}" data-pmes="${k}">${M_GASTOS_LABELS[i]}</button>`)
-        ].join("")
-        if (!monthToggle.dataset.bound) {
-            monthToggle.dataset.bound = "true"
-            monthToggle.addEventListener("click", (e) => {
-                const btn = e.target.closest("[data-pmes]")
-                if (!btn || !_mPresupuestoRenderCtx) return
-                _mAhorroPresupuestoMonth = btn.dataset.pmes
-                monthToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.toggle("active", b.dataset.pmes === _mAhorroPresupuestoMonth))
-                const { ingresosYearData: iy, gastosYearData: gy, ahorroConfig: ac, ingMonthlyArr: im } = _mPresupuestoRenderCtx
-                mRenderPresupuestoCategoriaContent(iy, gy, ac, im)
+    mSetKpi("mkpiAnualGastado",     formatEuro(totalGastado))
+    mSetKpi("mkpiAnualAhorrado",    formatEuro(totalAhorrado), totalAhorrado >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiAnualTasaGlobal",  formatPercent(tasaGlobal), tasaGlobal    >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiAnualMediaAhorro", formatEuro(mediaAhorro),   mediaAhorro   >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiAnualMejorAnio",   mejor ? `${mejor.year} · ${formatEuro(mejor.ahorrado)}` : "---",
+        mejor && mejor.ahorrado >= 0 ? "mPositive" : "mNegative")
+
+    // Toggle € / %
+    const modeGroup = document.getElementById("mAnualModeGroup")
+    if (modeGroup) {
+        modeGroup.querySelectorAll(".mAnualModeBtn").forEach(b =>
+            b.classList.toggle("active", b.dataset.anualmode === _metricasAnualMode))
+        if (!modeGroup.dataset.bound) {
+            modeGroup.dataset.bound = "true"
+            modeGroup.addEventListener("click", (e) => {
+                const btn = e.target.closest("[data-anualmode]")
+                if (!btn) return
+                _metricasAnualMode = btn.dataset.anualmode
+                setChartPref("metricasAnualMode", _metricasAnualMode)
+                modeGroup.querySelectorAll(".mAnualModeBtn").forEach(b =>
+                    b.classList.toggle("active", b.dataset.anualmode === _metricasAnualMode))
+                mDrawAnualBarras(_mAnualResumenCache)
             })
         }
     }
 
-    mRenderPresupuestoCategoriaContent(ingresosYearData, gastosYearData, ahorroConfig, ingMonthlyArr)
+    mDrawAnualBarras(resumen)
+    mDrawAnualReparto(totalGastado, totalAhorrado)
+    mDrawAnualAcumulado(resumen)
+    mRenderAnualTabla(resumen, { totalIngresos, totalGastado, totalAhorrado, tasaGlobal })
 }
 
-function mRenderPresupuestoCategoriaContent(ingresosYearData, gastosYearData, ahorroConfig, ingMonthlyArr) {
-    const presupuesto = ahorroConfig?.presupuesto || {}
-    const month       = _mAhorroPresupuestoMonth
+function mDrawAnualBarras(resumen) {
+    const labels  = resumen.map(r => String(r.year))
+    const titleEl = document.getElementById("mAnualBarrasTitle")
+    const esPct   = _metricasAnualMode === "pct"
+    if (titleEl) titleEl.textContent = esPct
+        ? "Reparto de los ingresos por año (%)"
+        : "Gastado y ahorrado por año (€)"
 
-    // Total ingresos del periodo seleccionado
-    let totalIngresos
-    if (month === "all") {
-        totalIngresos = ingMonthlyArr.reduce((s, v) => s + v, 0)
-    } else {
-        const idx = M_GASTOS_KEYS.indexOf(month)
-        totalIngresos = idx >= 0 ? (ingMonthlyArr[idx] || 0) : 0
+    const gastado  = resumen.map(r => esPct ? (r.pctGasto !== null ? parseFloat(r.pctGasto.toFixed(1)) : null) : r.gastado)
+    const ahorrado = resumen.map(r => esPct ? (r.tasa     !== null ? parseFloat(r.tasa.toFixed(1))     : null) : r.ahorrado)
+
+    // En % las dos barras se apilan porque juntas son el 100 % de los ingresos.
+    // En € van una al lado de otra: apiladas, el ahorro arrancaba a la altura
+    // del gasto y no había forma de leer su importe de un vistazo.
+    const barraComun = {
+        borderWidth: 1,
+        borderRadius: 4,
+        maxBarThickness: 90,
+        // Con un solo año las barras quedarían en los extremos del hueco: se
+        // estrecha la categoría para que el par salga junto y centrado.
+        categoryPercentage: 0.6,
+        barPercentage: 0.92,
+        ...(esPct ? { stack: "anual" } : {}),
+        yAxisID: esPct ? "y" : "yEur"
     }
 
-    const gastosPorTipo = mComputeGastosPorTipo(gastosYearData, month)
+    const datasets = [
+        {
+            ...barraComun,
+            label: esPct ? "Gastado (%)" : "Gastado",
+            data: gastado,
+            backgroundColor: "#e74c3c88",
+            borderColor: "#e74c3c"
+        },
+        {
+            ...barraComun,
+            label: esPct ? "Ahorrado (%)" : "Ahorrado",
+            data: ahorrado,
+            backgroundColor: ahorrado.map(v => (v ?? 0) >= 0 ? "#2ecc7188" : "#c0392b88"),
+            borderColor: ahorrado.map(v => (v ?? 0) >= 0 ? "#2ecc71" : "#c0392b")
+        }
+    ]
 
-    // Para el anual el objetivo es la suma de los 12 meses * %, pero si no hay datos de todos los meses
-    // usamos el total anual de ingresos
-    const objMultiplier = month === "all" ? 12 : 1
+    if (!esPct) {
+        datasets.push({
+            label: "Tasa de ahorro (%)",
+            data: resumen.map(r => r.tasa !== null ? parseFloat(r.tasa.toFixed(1)) : null),
+            type: "line",
+            borderColor: "#3a7bd5",
+            backgroundColor: "rgba(58,123,213,0.08)",
+            borderWidth: 2,
+            pointRadius: 4,
+            pointBackgroundColor: "#3a7bd5",
+            tension: 0.35,
+            spanGaps: false,
+            yAxisID: "yPct"
+        })
+    }
 
-    const tipos = [...new Set([...Object.keys(presupuesto), ...Object.keys(gastosPorTipo).filter(t => t !== "Sin categoría")])].sort()
+    const scales = esPct
+        ? {
+            x: { ...mAxisX(), stacked: true },
+            y: {
+                stacked: true,
+                ticks: { color: "#ccd6f6", callback: v => v.toFixed(0) + "%" },
+                grid: { color: "rgba(255,255,255,0.06)" }
+            }
+        }
+        : {
+            x: mAxisX(),
+            yEur: {
+                type: "linear",
+                position: "left",
+                ticks: { color: "#ccd6f6", callback: v => formatEuro(v) },
+                grid: { color: "rgba(255,255,255,0.06)" }
+            },
+            yPct: {
+                type: "linear",
+                position: "right",
+                ticks: { color: "#8899bb", callback: v => v.toFixed(0) + "%" },
+                grid: { display: false }
+            }
+        }
 
-    if (tipos.length === 0) {
-        const list = document.getElementById("mPresupuestoList")
-        if (list) list.innerHTML = "<p class='mPresupuestoEmpty'>No hay datos de gastos con categoría.</p>"
+    mCreateChart("mChartAnualBarras", {
+        type: "bar",
+        data: { labels, datasets },
+        options: {
+            ...M_CHART_DEFAULTS,
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                tooltip: {
+                    callbacks: {
+                        label: (c) => {
+                            if (c.raw === null) return ` ${c.dataset.label}: ---`
+                            if (esPct || c.dataset.yAxisID === "yPct")
+                                return ` ${c.dataset.label}: ${c.raw.toFixed(1).replace(".", ",")}%`
+                            return ` ${c.dataset.label}: ${formatEuro(c.raw)}`
+                        },
+                        afterBody: (items) => {
+                            const r = resumen[items[0]?.dataIndex]
+                            if (!r) return []
+                            return [`Ingresos: ${formatEuro(r.ingresos)}`]
+                        }
+                    }
+                }
+            },
+            scales
+        }
+    })
+}
+
+function mDrawAnualReparto(totalGastado, totalAhorrado) {
+    // Un donut no sabe representar un ahorro negativo, así que en ese caso se
+    // enseña la comparación como barras.
+    if (totalAhorrado < 0) {
+        mCreateChart("mChartAnualReparto", {
+            type: "bar",
+            data: {
+                labels: ["Gastado", "Ahorrado"],
+                datasets: [{
+                    label: "Acumulado",
+                    data: [totalGastado, totalAhorrado],
+                    backgroundColor: ["#e74c3c88", "#c0392b88"],
+                    borderColor: ["#e74c3c", "#c0392b"],
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                ...M_CHART_DEFAULTS,
+                plugins: {
+                    ...M_CHART_DEFAULTS.plugins,
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
+                },
+                scales: { x: mAxisX(), y: { ...mAxisY(), ticks: { color: "#ccd6f6", callback: v => formatEuro(v) } } }
+            }
+        })
         return
     }
 
-    // Preparar datos para el chart
-    const labels      = tipos
-    const objData     = tipos.map(t => {
-        const pct     = Number(presupuesto[t]) || 0
-        if (pct === 0 || totalIngresos === 0) return 0
-        return month === "all"
-            ? ingMonthlyArr.reduce((s, ing) => s + ing * (pct / 100), 0)
-            : totalIngresos * (pct / 100)
+    const total = totalGastado + totalAhorrado
+    mCreateChart("mChartAnualReparto", {
+        type: "doughnut",
+        data: {
+            labels: ["Gastado", "Ahorrado"],
+            datasets: [{
+                data: [totalGastado, totalAhorrado],
+                backgroundColor: ["#e74c3c", "#2ecc71"],
+                borderColor: "#0b1120",
+                borderWidth: 2,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            cutout: "55%",
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, total) } }
+            }
+        }
     })
-    const realData    = tipos.map(t => gastosPorTipo[t] || 0)
-    const overBudget  = tipos.map((t, i) => {
-        const obj = objData[i]
-        return obj > 0 && realData[i] > obj * 1.001
+}
+
+function mDrawAnualAcumulado(resumen) {
+    let acc = 0
+    const data = resumen.map(r => { acc += r.ahorrado; return parseFloat(acc.toFixed(2)) })
+
+    mCreateChart("mChartAnualAcumulado", {
+        type: "line",
+        data: {
+            labels: resumen.map(r => String(r.year)),
+            datasets: [{
+                label: "Ahorro acumulado",
+                data,
+                borderColor: "#2ecc71",
+                backgroundColor: "rgba(46,204,113,0.12)",
+                borderWidth: 2.5,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                pointBackgroundColor: "#2ecc71",
+                tension: 0.35,
+                fill: true
+            }]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (c) => ` Acumulado: ${formatEuro(c.raw)}`,
+                        afterLabel: (c) => [` Ahorro del año: ${formatEuro(resumen[c.dataIndex].ahorrado)}`]
+                    }
+                }
+            },
+            scales: {
+                x: mAxisX(),
+                y: { ...mAxisY(), ticks: { color: "#ccd6f6", callback: v => formatEuro(v) } }
+            }
+        }
     })
+}
 
-    mDestroyChart("mChartPresupuesto")
+function mRenderAnualTabla(resumen, totales) {
+    const body = document.getElementById("mAnualTableBody")
+    const foot = document.getElementById("mAnualTableFoot")
+    if (!body) return
 
-    const list = document.getElementById("mPresupuestoList")
-    if (!list) return
+    const anioActual = new Date().getFullYear()
 
-    list.innerHTML = tipos.map((tipo, i) => {
-        const realEur   = realData[i]
-        const objEur    = objData[i]
-        const hasObj    = objEur > 0
-        const over      = overBudget[i]
-        const realPct   = totalIngresos > 0 ? (realEur / totalIngresos) * 100 : 0
-        const objPct    = totalIngresos > 0 ? (objEur  / totalIngresos) * 100 : 0
-        const maxVal    = Math.max(realEur, objEur, 1)
-        const realFill  = Math.min((realEur / maxVal) * 100, 100)
-        const tgtFill   = hasObj ? Math.min((objEur / maxVal) * 100, 100) : null
-        const fillCls   = over ? " over" : hasObj ? " ok" : ""
-        const statusBadge = over
-            ? `<span class="mPresCatStatus over">⚠ Excedido</span>`
-            : hasObj ? `<span class="mPresCatStatus ok">✓ Dentro</span>` : ""
-        const tgtLine = tgtFill !== null
-            ? `<div class="mPresCatTargetLine" style="left:${tgtFill}%"></div>` : ""
+    body.innerHTML = resumen.map(r => {
+        const cls = r.ahorrado >= 0 ? "mCellPos" : "mCellNeg"
         return `
-        <div class="mPresCatRow${over ? " over" : ""}">
-            <div class="mPresCatTop">
-                <div class="mPresCatName">
-                    <span class="mPresCatTipo">${tipo}</span>
-                    ${statusBadge}
-                </div>
-                <div class="mPresCatNums">
-                    ${hasObj
-                        ? `<span class="mPresCatObj">Obj: ${formatEuro(objEur)} · ${objPct.toFixed(0)}%</span>`
-                        : `<span class="mPresCatNoObj">Sin objetivo</span>`}
-                    <span class="mPresCatReal">Real: <strong>${formatEuro(realEur)}</strong> <span class="mPresCatRealPct">(${realPct.toFixed(1)}%)</span></span>
-                </div>
-            </div>
-            <div class="mPresCatBarTrack">
-                <div class="mPresCatFill${fillCls}" style="width:${realFill}%">
-                    <span class="mPresCatBarLabel">${realPct.toFixed(1)}%</span>
-                </div>
-                ${tgtLine}
-            </div>
-        </div>`
+        <tr>
+            <td class="mTdName">${r.year}${r.year === anioActual ? " (YTD)" : ""}</td>
+            <td>${formatEuro(r.ingresos)}</td>
+            <td>${formatEuro(r.gastado)}</td>
+            <td class="${cls}">${formatEuro(r.ahorrado)}</td>
+            <td>${r.pctGasto !== null ? formatPercent(r.pctGasto) : "---"}</td>
+            <td class="${cls}">${r.tasa !== null ? formatPercent(r.tasa) : "---"}</td>
+        </tr>`
     }).join("")
 
-    // Tarjetas resumen de cumplimiento
-    const kpiCards = document.getElementById("mPresupuestoKpiCards")
-    if (kpiCards) {
-        const tiposConObj = tipos.filter(t => Number(presupuesto[t]) > 0)
-        const dentroObj   = tiposConObj.filter((t, i) => !overBudget[tipos.indexOf(t)])
-        const excedidos   = tiposConObj.filter((t, i) => overBudget[tipos.indexOf(t)])
-        const totalObjEur = objData.reduce((s, v) => s + v, 0)
-        const totalRealEur= realData.reduce((s, v) => s + v, 0)
-        const desviacion  = totalRealEur - totalObjEur
-
-        const cumplimientoRatio = tiposConObj.length > 0 ? Math.round(dentroObj.length / tiposConObj.length * 100) : 0
-        kpiCards.innerHTML = `
-            <div class="mPresKpiCard mPresKpiOk">
-                <div class="mPresKpiVal">${dentroObj.length}<span class="mPresKpiOf"> / ${tiposConObj.length}</span></div>
-                <div class="mPresKpiLab">Dentro del objetivo</div>
-            </div>
-            <div class="mPresKpiCard${excedidos.length > 0 ? " mPresKpiOver" : " mPresKpiOk"}">
-                <div class="mPresKpiVal">${excedidos.length}</div>
-                <div class="mPresKpiLab">Categorías excedidas</div>
-            </div>
-            <div class="mPresKpiCard">
-                <div class="mPresKpiVal">${formatEuro(totalObjEur)}</div>
-                <div class="mPresKpiLab">Presupuestado</div>
-            </div>
-            <div class="mPresKpiCard">
-                <div class="mPresKpiVal">${formatEuro(totalRealEur)}</div>
-                <div class="mPresKpiLab">Gastado en categorías</div>
-            </div>
-            <div class="mPresKpiCard${desviacion > 0 ? " mPresKpiOver" : " mPresKpiOk"}">
-                <div class="mPresKpiVal">${desviacion > 0 ? "+" : ""}${formatEuro(desviacion)}</div>
-                <div class="mPresKpiLab">Desviación</div>
-            </div>
-        `
+    if (foot) {
+        const cls = totales.totalAhorrado >= 0 ? "mCellPos" : "mCellNeg"
+        const pctGasto = totales.totalIngresos > 0 ? (totales.totalGastado / totales.totalIngresos) * 100 : null
+        foot.innerHTML = `
+        <tr>
+            <td class="mTdName">Total</td>
+            <td>${formatEuro(totales.totalIngresos)}</td>
+            <td>${formatEuro(totales.totalGastado)}</td>
+            <td class="${cls}">${formatEuro(totales.totalAhorrado)}</td>
+            <td>${pctGasto !== null ? formatPercent(pctGasto) : "---"}</td>
+            <td class="${cls}">${formatPercent(totales.tasaGlobal)}</td>
+        </tr>`
     }
 }
 
@@ -2738,6 +2923,7 @@ function mRenderInvertidoPeriodo(invData) {
                 yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasInvertidoYear = btn.dataset.invyr
+                setChartPref("metricasInvertidoYear", _metricasInvertidoYear)
                 mDrawInvertidoMesChart(monthMap, _metricasInvertidoYear)
             })
         }
@@ -2853,6 +3039,7 @@ function mRenderPasivosCharts(dividendos, intereses) {
                 yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasPasivosYear = btn.dataset.pasmy
+                setChartPref("metricasPasivosYear", _metricasPasivosYear)
                 mDrawPasivosMesChart(monthMap, _metricasPasivosYear)
             })
         }
@@ -3048,6 +3235,7 @@ function mRenderAll(payload) {
     mRenderConcentracion(summaries)
     mRenderRentabilidadAnual(snapshotHistory || [], liveValue)
     mRenderAhorro(ingresosYearData || null, gastosYearData || null, payload.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} })
+    mRenderAnual(payload.anualData || [])
 
     const gastosEmpty = !gastosYearsList?.length || !gastosYearData
     const ingresosEmpty = !ingresosYearsList?.length || !ingresosYearData
@@ -3065,7 +3253,7 @@ function mRenderAll(payload) {
 
 // ── Trading metrics ────────────────────────────────────────────────────────
 
-let _mTradingWinLossFilter = "todos"
+let _mTradingWinLossFilter = getChartPref("mTradingWinLossFilter", "todos")
 
 function mParseTradingPct(value) {
     if (!value && value !== 0) return null
@@ -3100,12 +3288,20 @@ function mRenderTrading(rows) {
     const wlFilterEl = document.getElementById("mTradingWinLossFilter")
     if (wlFilterEl && !wlFilterEl.dataset.bound) {
         wlFilterEl.dataset.bound = "true"
-        const todosInput = wlFilterEl.querySelector('input[value="todos"]')
-        if (todosInput) todosInput.checked = true
+        // Marca el filtro guardado; si ya no existe, vuelve a "todos".
+        const savedLabel  = wlFilterEl.querySelector(`.mActivosFilterBtn[data-wlfilter="${_mTradingWinLossFilter}"]`)
+        const savedInput  = savedLabel?.querySelector("input")
+        const todosInput  = wlFilterEl.querySelector('input[value="todos"]')
+        if (savedInput) savedInput.checked = true
+        else {
+            _mTradingWinLossFilter = "todos"
+            if (todosInput) todosInput.checked = true
+        }
         wlFilterEl.addEventListener("change", (e) => {
             const label = e.target.closest(".mActivosFilterBtn")
             if (!label) return
             _mTradingWinLossFilter = label.dataset.wlfilter
+            setChartPref("mTradingWinLossFilter", _mTradingWinLossFilter)
             mRenderTradingWinLoss(rows, _mTradingWinLossFilter)
         })
     }
@@ -3325,11 +3521,17 @@ async function initMetricasLogic() {
     _metricasCharts = {}
     _metricasDisplayType  = window._metricasDisplayType ?? "doughnut"
     _metricasDistMetric   = window._metricasDistMetric  ?? "netoActualEur"
-    _metricasGastosMonth  = "all"
-    _metricasIngresosMonth = "all"
-    _metricasInteresesYear = null
-    _metricasDivMensualYear = null
-    _metricasDivYear = null
+    // Selecciones del usuario: se recuperan de las preferencias guardadas. Cada
+    // sección valida después el año/mes contra los que existan en sus datos.
+    _metricasGastosMonth    = getChartPref("metricasGastosMonth", "all")
+    _metricasIngresosMonth  = getChartPref("metricasIngresosMonth", "all")
+    _metricasInteresesYear  = getChartPref("metricasInteresesYear", null)
+    _metricasDivMensualYear = getChartPref("metricasDivMensualYear", null)
+    _metricasDivYear        = getChartPref("metricasDivYear", null)
+    _metricasInvertidoYear  = getChartPref("metricasInvertidoYear", null)
+    _metricasPasivosYear    = getChartPref("metricasPasivosYear", null)
+    _metricasSortKey        = getChartPref("metricasSortKey", "netoActualEur")
+    _metricasSortDir        = getChartPref("metricasSortDir", "desc")
     const _divYearToggle = document.getElementById("mDivYearToggle")
     if (_divYearToggle) _divYearToggle.dataset.bound = ""
     const _allActivosTypes = ["cripto","acciones","etfs","comoditis","rentaFija"]
@@ -3450,6 +3652,10 @@ async function initMetricasLogic() {
         const todoInput = navTabsContainer?.querySelector('.mNavTab[data-mcat="todo"] input')
         let _mActiveCats = new Set()
 
+        function mSaveNavCat(mcat) {
+            setChartPref("metricasNavCat", mcat || null)
+        }
+
         function mApplyNavFilter() {
             document.querySelectorAll(".metricasSection[data-mcat], .metricasKpiRow[data-mcat], .metricasCatDivider[data-mcat]").forEach(el => {
                 const elCat    = el.dataset.mcat
@@ -3469,10 +3675,12 @@ async function initMetricasLogic() {
                 if (!input.checked) input.checked = true
                 _mActiveCats.clear()
                 allInputs.forEach(i => { if (i !== input) i.checked = false })
+                mSaveNavCat(null)
                 mApplyNavFilter()
             } else if (input.checked) {
                 allInputs.forEach(i => { if (i !== input) i.checked = false })
                 _mActiveCats = new Set(mcat.split(",").map(s => s.trim()))
+                mSaveNavCat(mcat)
                 mApplyNavFilter()
                 // scroll to first visible KPI row of this category
                 const firstCat = mcat.split(",")[0].trim()
@@ -3489,9 +3697,24 @@ async function initMetricasLogic() {
             } else {
                 if (todoInput) todoInput.checked = true
                 _mActiveCats.clear()
+                mSaveNavCat(null)
                 mApplyNavFilter()
             }
         })
+
+        // Restaurar la categoría que el usuario dejó seleccionada (sin scroll:
+        // al entrar en la página se empieza arriba).
+        const _savedNavCat = getChartPref("metricasNavCat", null)
+        const _savedNavTab = _savedNavCat
+            ? navTabsContainer?.querySelector(`.mNavTab[data-mcat="${_savedNavCat}"] input`)
+            : null
+        if (_savedNavTab) {
+            navTabsContainer.querySelectorAll(".mNavTab input").forEach(i => { i.checked = i === _savedNavTab })
+            _mActiveCats = new Set(_savedNavCat.split(",").map(s => s.trim()))
+            mApplyNavFilter()
+        } else if (_savedNavCat) {
+            mSaveNavCat(null)
+        }
 
         // ── section collapse ────────────────────────────────────────────────
         function _mSectionContentEls(sec) {
@@ -3531,8 +3754,8 @@ async function initMetricasLogic() {
 
 // ── Evolución histórica del portfolio ──────────────────────────────────────
 
-let _evolucionRange = "1D"
-let _evolucionMode  = "eur"
+let _evolucionRange = getChartPref("evolucionRange", "1D")
+let _evolucionMode  = getChartPref("evolucionMode", "eur")
 
 async function mRenderEvolucion(range, mode) {
     mode = mode || _evolucionMode
@@ -3841,6 +4064,7 @@ function mInitEvolucion() {
             rangeBtns.forEach(b => b.classList.remove("active"))
             btn.classList.add("active")
             _evolucionRange = btn.dataset.range
+            setChartPref("evolucionRange", _evolucionRange)
             const oldTip = document.getElementById("mEvolucionTooltip")
             if (oldTip) oldTip.remove()
             mRenderEvolucion(_evolucionRange, _evolucionMode)
@@ -3853,6 +4077,7 @@ function mInitEvolucion() {
             modeBtns.forEach(b => b.classList.remove("active"))
             btn.classList.add("active")
             _evolucionMode = btn.dataset.mode
+            setChartPref("evolucionMode", _evolucionMode)
             const oldTip = document.getElementById("mEvolucionTooltip")
             if (oldTip) oldTip.remove()
             mRenderEvolucion(_evolucionRange, _evolucionMode)
@@ -3864,8 +4089,10 @@ function mInitEvolucion() {
 
 // ── Evolución por tipo de activo ───────────────────────────────────────────
 
-let _evolucionTiposRange = "1D"
-let _evolucionTiposMode  = localStorage.getItem("evolucionTiposMode") || "eur"
+let _evolucionTiposRange = getChartPref("evolucionTiposRange", "1D")
+// El modo vivía en su propia clave de localStorage; se migra a las preferencias
+// de gráficos para no perder la elección de quien ya la tenía guardada.
+let _evolucionTiposMode  = getChartPref("evolucionTiposMode", localStorage.getItem("evolucionTiposMode") || "eur")
 
 async function mRenderEvolucionTipos(range, mode) {
     const empty = document.getElementById("mEvolucionTiposEmpty")
@@ -4159,6 +4386,7 @@ function mInitEvolucionTipos() {
             rangeBtns.forEach(b => b.classList.remove("active"))
             btn.classList.add("active")
             _evolucionTiposRange = btn.dataset.range
+            setChartPref("evolucionTiposRange", _evolucionTiposRange)
             const oldTip = document.getElementById("mEvolucionTiposTooltip")
             if (oldTip) oldTip.remove()
             mRenderEvolucionTipos(_evolucionTiposRange, _evolucionTiposMode)
@@ -4171,7 +4399,7 @@ function mInitEvolucionTipos() {
             modeBtns.forEach(b => b.classList.remove("active"))
             btn.classList.add("active")
             _evolucionTiposMode = btn.dataset.mode
-            localStorage.setItem("evolucionTiposMode", _evolucionTiposMode)
+            setChartPref("evolucionTiposMode", _evolucionTiposMode)
             const oldTip = document.getElementById("mEvolucionTiposTooltip")
             if (oldTip) oldTip.remove()
             mRenderEvolucionTipos(_evolucionTiposRange, _evolucionTiposMode)

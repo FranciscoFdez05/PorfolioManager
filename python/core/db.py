@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS activos (
     sort_order      INTEGER NOT NULL DEFAULT 0,
     price           TEXT NOT NULL DEFAULT '0,00',
     currency        TEXT NOT NULL DEFAULT 'EUR',
-    precio_currency TEXT NOT NULL DEFAULT 'EUR',
     change          TEXT NOT NULL DEFAULT '+0,00%',
     status          TEXT NOT NULL DEFAULT 'Mercado abierto',
     last_updated    TEXT NOT NULL DEFAULT '',
@@ -538,6 +537,21 @@ def _migrate(conn):
             nota         TEXT NOT NULL DEFAULT ''
         );
     """)
+
+    # Un activo tiene UNA moneda. Mientras hubo dos columnas (`currency` para lo
+    # invertido y `precio_currency` para la cotización) podían divergir y la
+    # misma fila salía con el precio en euros y el invertido en dólares.
+    if "precio_currency" in activos_cols:
+        # Sin compras anotadas manda la de cotización (es lo que se ve); con
+        # compras manda la del capital invertido, porque las filas están en esa
+        # moneda y el precio se reconvierte solo en el siguiente refresco.
+        conn.execute("""
+            UPDATE activos SET currency = precio_currency
+            WHERE currency <> precio_currency
+              AND id NOT IN (SELECT DISTINCT asset_id FROM activo_rows)
+              AND id NOT IN (SELECT DISTINCT asset_id FROM activo_operation_rows)
+        """)
+        conn.execute("ALTER TABLE activos DROP COLUMN precio_currency")
 
     # Backfill gastos_years from existing data in older DBs
     conn.executescript("""

@@ -314,7 +314,7 @@ function isCryptoAssetType(assetType) {
     return String(assetType || "").trim().toLowerCase() === "cripto"
 }
 
-function getAssetTableMoneyCurrency(assetType, fieldName, assetCurrency = "EUR", priceCurrency = assetCurrency, rowCurrency = "") {
+function getAssetTableMoneyCurrency(assetType, fieldName, assetCurrency = "EUR", rowCurrency = "") {
     if (isCryptoAssetType(assetType) && ["precioParticipacion", "capitalInvertidoBruto", "comisiones", "comisionesFiat", "capitalInvertidoNeto"].includes(fieldName)) {
         return normalizeAssetRowCurrency(rowCurrency, assetCurrency)
     }
@@ -620,20 +620,43 @@ function bindTableSort(table, storageKey) {
         return text.toLowerCase()
     }
 
+    // Las tablas que se dividen en secciones (por año, por ejemplo) meten filas
+    // de cabecera con .tableGroupRow. Cada cabecera abre un grupo y la
+    // ordenación se aplica dentro de él, para que ordenar no desmonte la
+    // división. Sin cabeceras hay un único grupo: la tabla entera.
+    function groupRows(tbody) {
+        const groups = [{ header: null, rows: [] }]
+
+        for (const row of tbody.querySelectorAll("tr")) {
+            if (row.classList.contains("tableGroupRow")) {
+                groups.push({ header: row, rows: [] })
+            } else {
+                groups[groups.length - 1].rows.push(row)
+            }
+        }
+
+        return groups
+    }
+
     function doSort() {
         if (currentKey === null) return
         const tbody = table.querySelector("tbody")
         if (!tbody) return
         const colIdx = Number(currentKey)
-        const rows = [...tbody.querySelectorAll("tr")]
-        rows.sort((a, b) => {
+        const compare = (a, b) => {
             const av = toComparable(cellText(a, colIdx))
             const bv = toComparable(cellText(b, colIdx))
             if (av < bv) return currentDir === "asc" ? -1 : 1
             if (av > bv) return currentDir === "asc" ? 1 : -1
             return 0
+        }
+
+        groupRows(tbody).forEach((group) => {
+            group.rows.sort(compare)
+            if (group.header) tbody.appendChild(group.header)
+            group.rows.forEach((row) => tbody.appendChild(row))
         })
-        rows.forEach((r) => tbody.appendChild(r))
+
         syncArrows()
     }
 
@@ -700,13 +723,16 @@ function refreshTableNumericAlignment(table) {
     const headerCells = headerRow ? Array.from(headerRow.cells) : []
     const headerUsable = headerCells.length > 0 && !headerCells.some((cell) => cell.colSpan > 1)
     const bodyRows = Array.from(table.tBodies).flatMap((tbody) => Array.from(tbody.rows))
-    const columnCount = headerUsable ? headerCells.length : (bodyRows[0]?.cells.length || 0)
+    // La fila de totales del pie es una fila de datos más: sin ella, un tfoot
+    // con las mismas columnas que el cuerpo se quedaba alineado a la izquierda.
+    const footRows = table.tFoot ? Array.from(table.tFoot.rows) : []
+    const columnCount = headerUsable ? headerCells.length : ((bodyRows[0] || footRows[0])?.cells.length || 0)
 
     if (!columnCount) {
         return
     }
 
-    const dataRows = bodyRows.filter((row) =>
+    const dataRows = [...bodyRows, ...footRows].filter((row) =>
         row.cells.length === columnCount && !Array.from(row.cells).some((cell) => cell.colSpan > 1)
     )
 

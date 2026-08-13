@@ -38,6 +38,8 @@ from stores.helpers import (
 
 activos_bp = Blueprint("activos", __name__)
 
+SUPPORTED_ASSET_CURRENCIES = {"EUR", "USD", "GBP", "CHF", "JPY"}
+
 
 @activos_bp.route("/api/activos", methods=["GET"])
 def getActivos():
@@ -249,12 +251,9 @@ def refreshActivoMarketData(assetId):
         statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
-    existing_precio_currency = normalize_currency_code(
-        assetData.get("precioCurrency") or assetData.get("currency") or "",
-        fallback=""
-    )
-    if existing_precio_currency and existing_precio_currency != normalize_currency_code(quote.get("currency", ""), fallback=""):
-        converted, conv_error = convert_quote_currency(quote, existing_precio_currency)
+    asset_currency = normalize_currency_code(assetData.get("currency") or "", fallback="")
+    if asset_currency and asset_currency != normalize_currency_code(quote.get("currency", ""), fallback=""):
+        converted, conv_error = convert_quote_currency(quote, asset_currency)
         if not conv_error and converted:
             quote = converted
 
@@ -262,7 +261,7 @@ def refreshActivoMarketData(assetId):
     assetData["marketSymbol"] = quote["symbol"]
     assetData["finnhubSymbol"] = quote["symbol"]
     assetData["price"] = quote["price"]
-    assetData["precioCurrency"] = existing_precio_currency or quote["currency"]
+    assetData["currency"] = asset_currency or quote["currency"]
     assetData["change"] = quote["change"]
     assetData["status"] = quote["status"]
     assetData["lastUpdated"] = quote["lastUpdated"]
@@ -273,74 +272,30 @@ def refreshActivoMarketData(assetId):
 
 @activos_bp.route("/api/activos/<assetId>/currency", methods=["POST"])
 def changeActivoCurrency(assetId):
+    """Cambia la única moneda del activo: convierte precio y capital invertido.
+
+    Un activo tiene una sola moneda, así que el cambio arrastra todo lo que
+    está denominado en ella; si no, quedarían cifras de monedas distintas
+    mezcladas en la misma fila.
+    """
     assetData = readAssetFile(assetId)
 
     if assetData is None:
         return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
 
     requestData = request.get_json(silent=True) or {}
-    scope = str(requestData.get("scope", "asset")).strip().lower()
     is_crypto = str(assetData.get("type", "")).strip().lower() == "cripto"
     current_currency = normalize_currency_code(assetData.get("currency", ""), fallback="EUR")
-    current_precio_currency = normalize_currency_code(
-        assetData.get("precioCurrency", assetData.get("currency", "")),
-        fallback=current_currency
-    )
-    target_currency = normalize_currency_code(
-        requestData.get("currency", ""),
-        fallback=current_precio_currency if scope == "price" else current_currency
-    )
+    target_currency = normalize_currency_code(requestData.get("currency", ""), fallback=current_currency)
 
-    if scope == "precio":
-        supported = {"EUR", "USD", "GBP", "CHF", "JPY"}
-        if target_currency not in supported:
-            return jsonify({"ok": False, "error": f"Moneda no soportada. Opciones: {', '.join(sorted(supported))}"}), 400
-
-        if current_precio_currency == target_currency:
-            assetData["precioCurrency"] = target_currency
-            writeAssetFile(assetId, assetData)
-            return jsonify({"ok": True, "asset": assetData, "converted": False})
-
-        # Convert the stored quote, not just its label: the price must really be in target_currency
-        converted_price = parse_loose_number(assetData.get("price", ""))
-
-        if converted_price is not None:
-            converted_price, error = convert_amount(converted_price, current_precio_currency, target_currency)
-
-            if error:
-                statusCode = 503 if is_temporary_service_error(error) else 400
-                return jsonify({"ok": False, "error": error}), statusCode
-
-            assetData["price"] = format_decimal(converted_price)
-
-        assetData["precioCurrency"] = target_currency
-        assetData["status"] = f"Moneda de cotización: {current_precio_currency}->{target_currency}"
-        writeAssetFile(assetId, assetData)
-        return jsonify({"ok": True, "asset": assetData, "converted": True})
-
-    if target_currency not in {"EUR", "USD"}:
-        return jsonify({"ok": False, "error": "Solo se permite cambiar entre EUR y USD"}), 400
-
-    if scope == "price":
-        return jsonify({"ok": False, "error": "La moneda separada del precio ya no se usa en criptos"}), 400
+    if target_currency not in SUPPORTED_ASSET_CURRENCIES:
+        return jsonify({
+            "ok": False,
+            "error": f"Moneda no soportada. Opciones: {', '.join(sorted(SUPPORTED_ASSET_CURRENCIES))}"
+        }), 400
 
     if current_currency == target_currency:
         return jsonify({"ok": True, "asset": assetData, "converted": False})
-
-    # scope="moneda": convert only the price (market value), leave investment rows untouched
-    if scope == "moneda":
-        converted_price = parse_loose_number(assetData.get("price", ""))
-        if converted_price is not None:
-            converted_price, error = convert_amount(converted_price, current_currency, target_currency)
-            if error:
-                statusCode = 503 if is_temporary_service_error(error) else 400
-                return jsonify({"ok": False, "error": error}), statusCode
-            assetData["price"] = format_decimal(converted_price)
-        assetData["currency"] = target_currency
-        assetData["precioCurrency"] = target_currency
-        assetData["status"] = f"Moneda de cotización cambiada a {target_currency}"
-        writeAssetFile(assetId, assetData)
-        return jsonify({"ok": True, "asset": assetData, "converted": True})
 
     converted_price = parse_loose_number(assetData.get("price", ""))
 
@@ -353,6 +308,8 @@ def changeActivoCurrency(assetId):
 
         assetData["price"] = format_decimal(converted_price)
 
+    # Las filas de cripto llevan su propia moneda por compra (se compró en EUR o
+    # en USD y así queda registrado); las demás están todas en la del activo.
     if not is_crypto:
         converted_rows, error = convert_asset_rows_currency(
             assetData.get("rows", []),
@@ -369,13 +326,7 @@ def changeActivoCurrency(assetId):
         assetData["rows"] = converted_rows
 
     assetData["currency"] = target_currency
-    assetData["precioCurrency"] = target_currency
-    assetData["investedCurrency"] = target_currency
-    assetData["status"] = (
-        f"Moneda de visualización convertida de {current_currency} a {target_currency}"
-        if is_crypto
-        else f"Activo convertido de {current_currency} a {target_currency}"
-    )
+    assetData["status"] = f"Activo convertido de {current_currency} a {target_currency}"
     writeAssetFile(assetId, assetData)
 
     return jsonify({"ok": True, "asset": assetData, "converted": True})

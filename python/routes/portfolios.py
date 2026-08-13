@@ -50,7 +50,7 @@ def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
     safe_id = slugify(asset_id)
     row = conn.execute(
         "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
-        "sort_order, price, currency, precio_currency, change, status, last_updated, color, tv_symbol "
+        "sort_order, price, currency, change, status, last_updated, color, tv_symbol "
         "FROM activos WHERE id = ?",
         (safe_id,)
     ).fetchone()
@@ -72,7 +72,6 @@ def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
         "order": row["sort_order"],
         "price": row["price"],
         "currency": row["currency"],
-        "precioCurrency": row["precio_currency"],
         "change": row["change"],
         "status": row["status"],
         "lastUpdated": row["last_updated"],
@@ -322,7 +321,7 @@ def all_portfolios_assets():
         try:
             assets = conn.execute(
                 "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
-                "sort_order, price, currency, precio_currency, change, status, last_updated, color, tv_symbol, "
+                "sort_order, price, currency, change, status, last_updated, color, tv_symbol, "
                 "COALESCE(hidden, 0) as hidden "
                 "FROM activos ORDER BY sort_order"
             ).fetchall()
@@ -341,7 +340,6 @@ def all_portfolios_assets():
                     "order": row["sort_order"],
                     "price": row["price"],
                     "currency": row["currency"],
-                    "precioCurrency": row["precio_currency"],
                     "change": row["change"],
                     "status": row["status"],
                     "lastUpdated": row["last_updated"],

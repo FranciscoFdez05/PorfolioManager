@@ -9,9 +9,9 @@
     <title>Portfolio Manager</title>
     <link rel="stylesheet" href="css/variables.css?v=20260511d">
     <link rel="stylesheet" href="css/base.css?v=20260613a">
-    <link rel="stylesheet" href="css/components.css?v=20260808a">
-    <link rel="stylesheet" href="css/pages.css?v=20260809a">
-    <link rel="stylesheet" href="css/themes.css?v=20260805a">
+    <link rel="stylesheet" href="css/components.css?v=20260813a">
+    <link rel="stylesheet" href="css/pages.css?v=20260813c">
+    <link rel="stylesheet" href="css/themes.css?v=20260813a">
     <script>
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
     </script>
@@ -182,6 +182,7 @@
                 <div class="navDropdown" data-module="finanzas">
                     <button class="navDropdownBtn" type="button">Finanzas ▾</button>
                     <div class="navDropdownMenu">
+                        <button class="navBtn navDropdownItem" data-page="operacionesBolsa">Operaciones</button>
                         <button class="navBtn navDropdownItem" data-page="intereses">Cuenta Remunerada</button>
                         <button class="navBtn navDropdownItem" data-page="dividendos">Dividendos</button>
                         <button class="navBtn navDropdownItem" data-page="bonos">Renta Fija</button>
@@ -223,12 +224,27 @@
 
         <aside class="sidePanel" id="sidePanel">
             <div class="assetToolbar">
-                <button id="addAssetBtn" class="primaryButton assetAddBtn">Añadir activo</button>
-                <button id="refreshSidebarMarketBtn" class="primaryButton assetAddBtn" type="button">Actualizar cotizaciones</button>
+                <div class="assetToolbarActions">
+                    <button id="addAssetBtn" class="primaryButton assetAddBtn" title="Añadir activo">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                        <span>Añadir activo</span>
+                    </button>
+                    <button id="refreshSidebarMarketBtn" class="primaryButton assetAddBtn assetRefreshBtn" type="button" title="Actualizar cotizaciones">
+                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13 2.5V5h-2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span>Actualizar cotizaciones</span>
+                    </button>
+                </div>
                 <div class="sidebarFilterBar" id="sidebarFilterBar">
                     <button class="sidebarFilterBtn active" data-filter="portfolio" type="button">Portfolio</button>
                     <button class="sidebarFilterBtn" data-filter="watchlist" type="button">Watchlist</button>
                 </div>
+            </div>
+
+            <div class="assetsListHeader" aria-hidden="true">
+                <span>Activo</span>
+                <span>Precio</span>
+                <span>Var.</span>
+                <span>%</span>
             </div>
 
             <div class="assetsList" id="assetsList"></div>
@@ -236,8 +252,13 @@
             <div class="detailResizeHandle" id="detailResizeHandle"></div>
 
             <div class="assetDetailView" id="assetDetailView">
-                <div class="detailHeader" id="detSymbol">---</div>
-                <div class="detailSub" id="detName">Selecciona un activo</div>
+                <div class="detailRotationBar" id="detailRotationBar" aria-hidden="true"><span></span></div>
+                <div class="detailTop">
+                    <div class="detailIdentity">
+                        <div class="detailHeader" id="detSymbol">---</div>
+                        <div class="detailSub" id="detName">Selecciona un activo</div>
+                    </div>
+                </div>
                 <div class="detailPrice" id="detPrice">0,00 €</div>
                 <div class="detailChange" id="detChange">---</div>
                 <div class="detailStats">
@@ -574,6 +595,36 @@
                     <button class="ajustesRefreshBtn" data-density="compact" type="button">Compacto</button>
                 </div>
                 <span id="ajustesDensidadMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3.5a6.5 6.5 0 1 1-6.14 4.36" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M3.2 4.2v3.2h3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 6.6V10l2.3 1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Rotación del detalle de activo</div>
+                        <div class="ajustesSectionDesc">Cambia automáticamente el activo mostrado en el panel de detalle del sidebar. Se pausa al pasar el ratón por el sidebar.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Activar rotación automática
+                        <small>Recorre en bucle los activos visibles del sidebar</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="ajustesRotacionActiva">
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesRefreshGrid" id="ajustesRotacionGrid">
+                    <button class="ajustesRefreshBtn" data-rotation="5" type="button">5 s</button>
+                    <button class="ajustesRefreshBtn active" data-rotation="10" type="button">10 s</button>
+                    <button class="ajustesRefreshBtn" data-rotation="15" type="button">15 s</button>
+                    <button class="ajustesRefreshBtn" data-rotation="30" type="button">30 s</button>
+                </div>
+                <span id="ajustesRotacionMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
             </div>
 
             <div class="ajustesSection">
@@ -1308,7 +1359,7 @@
                 <div class="ajustesSwitchRow">
                     <div class="ajustesSwitchLabel">
                         Finanzas
-                        <small>Cuenta Remunerada, Dividendos, Renta Fija y Ventas</small>
+                        <small>Operaciones, Cuenta Remunerada, Dividendos, Renta Fija y Ventas</small>
                     </div>
                     <label class="ajustesSwitch">
                         <input type="checkbox" id="moduloFinanzas" checked>
@@ -1372,7 +1423,7 @@
 </div><!-- /.sttOverlay -->
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="js/core/app-core.js?v=20260809a"></script>
+<script src="js/core/app-core.js?v=20260813a"></script>
 <script src="js/cartera/assets.js?v=20260805a"></script>
 <script src="js/finanzas/intereses.js?v=20260501a"></script>
 <script src="js/finanzas/dividendos.js?v=20260802b"></script>
@@ -1382,16 +1433,16 @@
 <script src="js/finanzas/ventas.js?v=20260423a"></script>
 <script src="js/cripto/transacciones.js?v=20260423a"></script>
 <script src="js/cripto/stablecoins.js?v=20260802b"></script>
-<script src="js/cripto/operaciones.js?v=20260805a"></script>
+<script src="js/cripto/operaciones.js?v=20260813b"></script>
 <script src="js/cripto/trading-journal.js?v=20260802b"></script>
 <script src="js/cripto/staking.js?v=20260515b"></script>
 <script src="js/cripto/earn.js?v=20260515b"></script>
 <script src="js/cripto/conversiones.js?v=20260802b"></script>
-<script src="js/analisis/herramientas.js?v=20260508b"></script>
+<script src="js/analisis/herramientas.js?v=20260812a"></script>
 <script src="js/finanzas/bonos.js?v=20260802b"></script>
-<script src="js/analisis/metricas.js?v=20260517a"></script>
-<script src="js/ajustes/ajustes.js?v=20260613a"></script>
-<script src="js/core/shared-utils.js?v=20260805a"></script>
+<script src="js/analisis/metricas.js?v=20260813a"></script>
+<script src="js/ajustes/ajustes.js?v=20260813a"></script>
+<script src="js/core/shared-utils.js?v=20260813b"></script>
 <script src="js/analisis/heatmap.js?v=20260505b"></script>
 <script src="js/analisis/seguimiento.js?v=20260518c"></script>
 <script src="js/cartera/portfolios.js?v=20260511b"></script>

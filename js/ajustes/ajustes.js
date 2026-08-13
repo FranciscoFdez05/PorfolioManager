@@ -1008,6 +1008,42 @@ async function initAjustesLogic() {
         showMsg(densidadMsg, "Guardado", "ok")
     })
 
+    // --- Rotación del detalle de activo ---
+    const rotacionChk  = document.getElementById("ajustesRotacionActiva")
+    const rotacionGrid = document.getElementById("ajustesRotacionGrid")
+    const rotacionMsg  = document.getElementById("ajustesRotacionMsg")
+
+    function setActiveRotacionBtn(val) {
+        rotacionGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
+            b.classList.toggle("active", b.dataset.rotation === String(val))
+        )
+    }
+
+    if (rotacionChk) {
+        const rotacionActiva   = localStorage.getItem("assetRotationEnabled") === "1"
+        const rotacionSegundos = localStorage.getItem("assetRotationSeconds") || "10"
+        rotacionChk.checked = rotacionActiva
+        setActiveRotacionBtn(rotacionSegundos)
+        rotacionGrid?.classList.toggle("ajustesDisabledGroup", !rotacionActiva)
+
+        rotacionChk.addEventListener("change", () => {
+            localStorage.setItem("assetRotationEnabled", rotacionChk.checked ? "1" : "0")
+            rotacionGrid?.classList.toggle("ajustesDisabledGroup", !rotacionChk.checked)
+            applyAssetRotation()
+            showMsg(rotacionMsg, rotacionChk.checked ? "Rotación activada" : "Rotación desactivada", "ok")
+        })
+    }
+
+    rotacionGrid?.addEventListener("click", (e) => {
+        const btn = e.target.closest(".ajustesRefreshBtn")
+        if (!btn) return
+        const val = btn.dataset.rotation
+        setActiveRotacionBtn(val)
+        localStorage.setItem("assetRotationSeconds", val)
+        applyAssetRotation()
+        showMsg(rotacionMsg, `Cambio cada ${val} s`, "ok")
+    })
+
     // --- Ocultar valores al inicio ---
     const ocultarInicioChk = document.getElementById("ajustesOcultarInicio")
     if (ocultarInicioChk) {

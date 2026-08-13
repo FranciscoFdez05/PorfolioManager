@@ -1,0 +1,66 @@
+<section class="operationsPage operationsPageCompact">
+    <div class="operationsFilters">
+        <div class="operationsFilterGroup">
+            <span class="operationsFilterLabel">Tipo</span>
+            <div class="operationsFilterButtons" id="operationsTypeFilters">
+                <label class="overviewFilterOption operationsFilterOption">
+                    <input type="checkbox" value="Compra" data-filter-group="type" checked>
+                    <span>Compra</span>
+                </label>
+                <label class="overviewFilterOption operationsFilterOption">
+                    <input type="checkbox" value="Venta" data-filter-group="type" checked>
+                    <span>Venta</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="operationsFilterGroup">
+            <span class="operationsFilterLabel">Estado</span>
+            <div class="operationsFilterButtons" id="operationsStatusFilters">
+                <label class="overviewFilterOption operationsFilterOption">
+                    <input type="checkbox" value="Activo" data-filter-group="status" checked>
+                    <span>Activo</span>
+                </label>
+                <label class="overviewFilterOption operationsFilterOption">
+                    <input type="checkbox" value="Completado" data-filter-group="status" checked>
+                    <span>Completado</span>
+                </label>
+                <label class="overviewFilterOption operationsFilterOption">
+                    <input type="checkbox" value="Cancelado" data-filter-group="status" checked>
+                    <span>Cancelado</span>
+                </label>
+            </div>
+        </div>
+
+        <div id="operationsPairsSummary" class="operationsPairsSummary hidden"></div>
+    </div>
+
+    <div class="operationsTableWrapper">
+        <table class="operationsTable cryptoOperationsTable">
+            <thead>
+                <tr>
+                    <th class="mThSort" data-sortkey="0">Activo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Fecha Apertura<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Par<span class="mSortArrow"></span></th>
+                    <th class="mThSort operationsTickerHeader" data-sortkey="3">Precio Actual<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="4">Orden<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5">Precio Orden<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6">Cantidad<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="7">Total<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="8">Comisiones títulos<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="9">Comisiones €<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="10">Estado<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="11">Fecha Cierre<span class="mSortArrow"></span></th>
+                    <th class="rowActionsCell"></th>
+                </tr>
+            </thead>
+            <tbody id="operationsBody"></tbody>
+        </table>
+    </div>
+    <p class="overviewEmpty hidden" id="operacionesEmptyMsg">No hay operaciones registradas.</p>
+</section>
+
+<div class="operationsActions">
+    <button id="addOperationRowBtn" class="primaryButton" type="button">+ Añadir fila</button>
+    <button id="saveOperationsBtn" class="secondaryButton" type="button">Guardar</button>
+</div>

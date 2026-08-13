@@ -9,10 +9,12 @@ import pytest
 
 from stores.asset_utils import (
     ALLOWED_ASSET_TYPES,
+    normalizeAssetCurrency,
     createAssetSymbol,
     inferMarketProviderFromSymbol,
     normalizeMarketProvider,
     sanitize_color,
+    sanitizeAssetPayload,
     sanitizeAssetRows,
     sanitizeAssetType,
     slugify,
@@ -179,3 +181,29 @@ class TestSanitizeGastosTypes:
 
     def test_tope(self):
         assert len(sanitize_gastos_types([f"t{i}" for i in range(300)])) == 200
+
+
+class TestMonedaDelActivo:
+    """El activo tiene UNA moneda: la del precio y la de lo invertido.
+
+    Cuando hubo dos campos podían divergir y la misma fila salía con el precio
+    en euros y el invertido en dólares.
+    """
+
+    def test_el_payload_guarda_una_sola_moneda(self):
+        payload, error = sanitizeAssetPayload({"name": "Bitcoin", "type": "cripto", "currency": "EUR", "rows": []})
+        assert error is None
+        assert payload["currency"] == "EUR"
+        assert "precioCurrency" not in payload
+
+    def test_cliente_antiguo_que_solo_manda_precio_currency(self):
+        payload, error = sanitizeAssetPayload({"name": "Bitcoin", "type": "cripto", "precioCurrency": "usd", "rows": []})
+        assert error is None
+        assert payload["currency"] == "USD"
+
+    def test_currency_manda_sobre_la_heredada(self):
+        assert normalizeAssetCurrency({"currency": "EUR", "precioCurrency": "USD"}) == "EUR"
+
+    @pytest.mark.parametrize("raw", ["", "   ", "1234", "e", None])
+    def test_valores_invalidos_caen_al_fallback(self, raw):
+        assert normalizeAssetCurrency({"currency": raw}) == "EUR"

@@ -8,7 +8,7 @@ def readAssetFile(assetId):
 
     row = conn.execute(
         "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
-        "sort_order, price, currency, precio_currency, change, status, last_updated, color, tv_symbol, hidden "
+        "sort_order, price, currency, change, status, last_updated, color, tv_symbol, hidden "
         "FROM activos WHERE id = ?",
         (safe_id,)
     ).fetchone()
@@ -27,7 +27,6 @@ def readAssetFile(assetId):
         "order": row["sort_order"],
         "price": row["price"],
         "currency": row["currency"],
-        "precioCurrency": row["precio_currency"],
         "change": row["change"],
         "status": row["status"],
         "lastUpdated": row["last_updated"],
@@ -113,14 +112,14 @@ def updateAssetMarketData(assetId, data):
     conn.execute(
         "UPDATE activos SET "
         "market_provider=?, market_symbol=?, finnhub_symbol=?, "
-        "price=?, precio_currency=?, change=?, status=?, last_updated=? "
+        "price=?, currency=?, change=?, status=?, last_updated=? "
         "WHERE id=?",
         (
             data.get("marketProvider", "finnhub"),
             data.get("marketSymbol", data.get("finnhubSymbol", "")),
             data.get("finnhubSymbol", data.get("marketSymbol", "")),
             data.get("price", "0,00"),
-            data.get("precioCurrency", data.get("currency", "EUR")),
+            data.get("currency", "EUR"),
             data.get("change", "+0,00%"),
             data.get("status", "Mercado abierto"),
             data.get("lastUpdated", ""),
@@ -138,13 +137,13 @@ def writeAssetFile(assetId, data):
     conn.execute(
         "INSERT INTO activos "
         "(id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, sort_order, "
-        "price, currency, precio_currency, change, status, last_updated, color, tv_symbol, hidden) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "price, currency, change, status, last_updated, color, tv_symbol, hidden) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(id) DO UPDATE SET "
         "name=excluded.name, symbol=excluded.symbol, market_provider=excluded.market_provider, "
         "market_symbol=excluded.market_symbol, finnhub_symbol=excluded.finnhub_symbol, "
         "type=excluded.type, sort_order=excluded.sort_order, price=excluded.price, "
-        "currency=excluded.currency, precio_currency=excluded.precio_currency, "
+        "currency=excluded.currency, "
         "change=excluded.change, status=excluded.status, last_updated=excluded.last_updated, "
         "color=excluded.color, tv_symbol=excluded.tv_symbol, hidden=excluded.hidden",
         (
@@ -158,7 +157,6 @@ def writeAssetFile(assetId, data):
             data.get("order", 0),
             data.get("price", "0,00"),
             data.get("currency", "EUR"),
-            data.get("precioCurrency", "EUR"),
             data.get("change", "+0,00%"),
             data.get("status", "Mercado abierto"),
             data.get("lastUpdated", ""),
@@ -228,7 +226,7 @@ def listAssets():
     conn = get_db()
     rows = conn.execute(
         "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
-        "sort_order, price, currency, precio_currency, change, status, last_updated, color, tv_symbol, hidden "
+        "sort_order, price, currency, change, status, last_updated, color, tv_symbol, hidden "
         "FROM activos ORDER BY sort_order, symbol"
     ).fetchall()
 
@@ -308,7 +306,6 @@ def listAssets():
             "order": r["sort_order"],
             "price": r["price"],
             "currency": r["currency"],
-            "precioCurrency": r["precio_currency"],
             "change": r["change"],
             "status": r["status"],
             "lastUpdated": r["last_updated"],

@@ -597,7 +597,7 @@ async function segRefreshCustomPrices() {
             if (!data.ok || !data.price) continue
             item.price       = String(data.price)
             item.change      = String(data.change ?? "")
-            item.currency    = data.precioCurrency || data.currency || "EUR"
+            item.currency    = data.currency || "EUR"
             item.lastUpdated = data.lastUpdated || new Date().toISOString()
             updated = true
         } catch { /* ignore individual failures */ }
@@ -670,7 +670,7 @@ async function initSeguimientoLogic() {
                         tvSymbol:        asset.tvSymbol || row.tvSymbol || "",
                         type:            asset.type || "cripto",
                         price:           String(asset.price || ""),
-                        currency:        asset.precioCurrency || asset.currency || "EUR",
+                        currency:        asset.currency || "EUR",
                         change:          String(asset.change || ""),
                         lastUpdated:     asset.lastUpdated || null
                     }]

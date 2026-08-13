@@ -669,16 +669,86 @@
         </div>
     </div>
 
-    <!-- -- Presupuesto por categoría ----------------------------- -->
-    <div class="metricasSection hidden" id="mSectionPresupuesto" data-mcat="ingresos">
-        <div class="metricasSectionHeader mGastosHeader">
-            <div class="mGastosHeaderLeft">
-                <span class="metricasSectionTitle">Presupuesto por Categoría</span>
-                <div class="mToggleGroup mPresupuestoMonthToggle" id="mPresupuestoMonthToggle"></div>
+    <!-- ── Resumen anual KPIs ── -->
+    <div class="metricasKpiRow" data-mcat="ingresos" id="mkpiRowAnual">
+        <div class="metricasKpiGroup mkpiGroupAnual" id="mkpiGroupAnual">
+            <span class="metricasKpiGroupLabel">Resumen anual</span>
+            <div class="metricasKpiCards">
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Gastado acumulado</div>
+                    <div class="mkpiValue" id="mkpiAnualGastado">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Ahorrado acumulado</div>
+                    <div class="mkpiValue" id="mkpiAnualAhorrado">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Tasa ahorro global</div>
+                    <div class="mkpiValue" id="mkpiAnualTasaGlobal">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Media ahorro/año</div>
+                    <div class="mkpiValue" id="mkpiAnualMediaAhorro">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Mejor año</div>
+                    <div class="mkpiValue" id="mkpiAnualMejorAnio">---</div>
+                </div>
             </div>
         </div>
-        <div class="mPresupuestoKpiCards" id="mPresupuestoKpiCards"></div>
-        <div class="mPresupuestoList" id="mPresupuestoList"></div>
+    </div>
+
+    <!-- -- Estadísticas anuales: gastado vs ahorrado ------------- -->
+    <div class="metricasSection" id="mSectionAnual" data-mcat="ingresos">
+        <div class="metricasSectionHeader">
+            <div class="mGastosHeaderLeft">
+                <span class="metricasSectionTitle">Estadísticas anuales — Gastado vs Ahorrado</span>
+                <div class="mToggleGroup" id="mAnualModeGroup">
+                    <button class="mAnualModeBtn mToggleBtn active" data-anualmode="eur">€</button>
+                    <button class="mAnualModeBtn mToggleBtn" data-anualmode="pct">%</button>
+                </div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid1">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle" id="mAnualBarrasTitle">Gastado y ahorrado por año</div>
+                <div class="metricasChartWrap" style="height:320px">
+                    <canvas id="mChartAnualBarras"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid2" style="margin-top:12px">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Reparto acumulado</div>
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartAnualReparto"></canvas>
+                </div>
+            </div>
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Ahorro acumulado</div>
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartAnualAcumulado"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid1" style="margin-top:12px">
+            <div class="metricasChartCard metricasTableCard">
+                <table class="metricasTable" id="mAnualTable">
+                    <thead>
+                        <tr>
+                            <th>Año</th>
+                            <th>Ingresos</th>
+                            <th>Gastado</th>
+                            <th>Ahorrado</th>
+                            <th>% Gastado</th>
+                            <th>Tasa ahorro</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mAnualTableBody"></tbody>
+                    <tfoot id="mAnualTableFoot"></tfoot>
+                </table>
+            </div>
+        </div>
     </div>
 
     <div class="metricasCatDivider" data-mcat="trading">

@@ -32,6 +32,20 @@ def createAssetSymbol(name):
     return cleaned[:24] or "ACTIVO"
 
 
+def normalizeAssetCurrency(assetData, fallback="EUR"):
+    """La moneda del activo: una sola, la del precio y la de lo invertido.
+
+    Acepta `precioCurrency` como entrada porque clientes viejos (y copias de
+    seguridad previas a la unificación) todavía la mandan, pero el activo
+    guarda un único campo: tener dos permitía que divergieran y que la misma
+    fila saliera con el precio en euros y el invertido en dólares.
+    """
+    raw = assetData.get("currency") or assetData.get("precioCurrency") or fallback
+    normalized = _trunc(raw, 10).strip().upper()
+
+    return normalized if normalized.isalpha() and 2 <= len(normalized) <= 5 else fallback
+
+
 def sanitizeAssetType(assetType):
     normalized = slugify(assetType).replace("-", "")
 
@@ -80,7 +94,6 @@ def createDefaultAssetPayload(name, assetType, assetId=None):
         "order": 0,
         "price": "0,00",
         "currency": "EUR",
-        "precioCurrency": "EUR",
         "change": "+0,00%",
         "status": "Mercado abierto",
         "lastUpdated": "",
@@ -212,8 +225,7 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "type": assetType,
         "order": int(requestData.get("order", 0) or 0),
         "price": _trunc(requestData.get("price", "0,00"), _MAX_SHORT).strip(),
-        "currency": _trunc(requestData.get("currency", "EUR"), 10).strip() or "EUR",
-        "precioCurrency": _trunc(requestData.get("precioCurrency", requestData.get("currency", "EUR")), 10).strip() or "EUR",
+        "currency": normalizeAssetCurrency(requestData),
         "change": _trunc(requestData.get("change", "+0,00%"), _MAX_SHORT).strip() or "+0,00%",
         "status": _trunc(requestData.get("status", "Mercado abierto"), _MAX_TEXT).strip() or "Mercado abierto",
         "lastUpdated": _trunc(requestData.get("lastUpdated", ""), _MAX_TEXT).strip(),
@@ -226,9 +238,6 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         ),
         "rows": sanitizeAssetRows(rows)
     }
-
-    if assetType == "cripto":
-        payload["precioCurrency"] = payload["currency"]
 
     payload["marketProvider"] = normalizeMarketProvider(
         requestData.get("marketProvider", ""),

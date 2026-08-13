@@ -8,6 +8,13 @@ from stores.helpers import sync_completed_operations_into_assets
 operaciones_bp = Blueprint("operaciones", __name__)
 
 
+def _sanitize_operation_currency(value):
+    """Las divisas de las operaciones no se limitan a EUR/USD: la lista de fiat
+    es configurable en ajustes y las de bolsa pueden ir en GBP, CHF o JPY."""
+    code = str(value or "").strip().upper()
+    return code if code.isalpha() and 2 <= len(code) <= 5 else "EUR"
+
+
 def _normalize_stablecoin_symbol(value):
     return re.sub(r"[^A-Z0-9]", "", str(value or "").strip().upper())
 
@@ -64,14 +71,8 @@ def saveOperaciones():
         if estado not in {"Activo", "Cerrado", "Completado", "Cancelado"}:
             estado = "Activo"
 
-        currency = str(row.get("currency", "EUR")).strip().upper()
-        precio_currency = str(row.get("precioCurrency", "EUR")).strip().upper()
-
-        if currency not in {"EUR", "USD"}:
-            currency = "EUR"
-
-        if precio_currency not in {"EUR", "USD"}:
-            precio_currency = "EUR"
+        currency = _sanitize_operation_currency(row.get("currency", "EUR"))
+        precio_currency = _sanitize_operation_currency(row.get("precioCurrency", "EUR"))
 
         sanitizedRows.append({
             "id": str(row.get("id", f"operacion-{index + 1}")).strip() or f"operacion-{index + 1}",

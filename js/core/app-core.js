@@ -8,7 +8,7 @@ const _PAGE_DIRS = {
 
     gastos: "finanzas", ingresos: "finanzas", ahorro: "finanzas",
     ventas: "finanzas", dividendos: "finanzas", intereses: "finanzas",
-    bonos: "finanzas", rentaFija: "finanzas",
+    bonos: "finanzas", rentaFija: "finanzas", operacionesBolsa: "finanzas",
 
     stablecoins: "cripto", operaciones: "cripto", transacciones: "cripto",
     conversiones: "cripto", Staking: "cripto", Earn: "cripto", Trading: "cripto",
@@ -24,12 +24,44 @@ function pageHtmlPath(page) {
     return dir ? `./html/${dir}/${page}.html` : `./html/${page}.html`
 }
 
+// ── Preferencias de visualización de los gráficos ─────────────────────────
+// Rango, modo, año, mes o filtro que el usuario elige en cada gráfico. Se
+// guardan en un único objeto de localStorage para que la vista se conserve al
+// recargar o al volver a la página, en lugar de reiniciarse al valor por
+// defecto. Quien lee una preferencia debe validarla contra las opciones reales
+// disponibles (los años, por ejemplo, cambian según los datos).
+const _CHART_PREFS_KEY = "chartViewPrefs"
+let _chartPrefsCache = null
+
+function _chartPrefsAll() {
+    if (!_chartPrefsCache) {
+        try { _chartPrefsCache = JSON.parse(localStorage.getItem(_CHART_PREFS_KEY)) || {} }
+        catch { _chartPrefsCache = {} }
+    }
+    return _chartPrefsCache
+}
+
+function getChartPref(key, fallback = null) {
+    const value = _chartPrefsAll()[key]
+    return value === undefined || value === null ? fallback : value
+}
+
+function setChartPref(key, value) {
+    const prefs = _chartPrefsAll()
+    if (value === undefined || value === null) delete prefs[key]
+    else prefs[key] = value
+    try { localStorage.setItem(_CHART_PREFS_KEY, JSON.stringify(prefs)) } catch {}
+}
+
+window.getChartPref = getChartPref
+window.setChartPref = setChartPref
+
 const _MODULE_PAGES = {
     panelSuperior: [],
     vistaGeneral: ["vistaGeneral"],
     activos:      ["activos", "seguimiento", "heatmap"],
     gastos:       ["gastos", "ingresos"],
-    finanzas:     ["intereses", "dividendos", "bonos", "ventas", "privateMarket"],
+    finanzas:     ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
     cripto:       ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
     herramientas: ["herramientas"],
     metricas:     ["metricas"],
@@ -175,6 +207,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await refreshTopDividendosIntereses()
 
     initMoneyToggle()
+    applyAssetRotation()
 
     const paginaInicial = primeraPaginaVisible()
     if (paginaInicial) {
@@ -304,8 +337,8 @@ function applySnapshotSchedule(minutes) {
         if (typeof mRenderEvolucionTipos === "function") {
             const activeRangeBtn = document.querySelector(".mEvolucionTiposRangeBtn.active")
             mRenderEvolucionTipos(
-                activeRangeBtn ? activeRangeBtn.dataset.range : "1D",
-                localStorage.getItem("evolucionTiposMode") || "eur"
+                activeRangeBtn ? activeRangeBtn.dataset.range : getChartPref("evolucionTiposRange", "1D"),
+                getChartPref("evolucionTiposMode", "eur")
             )
         }
     }
@@ -459,7 +492,7 @@ let assetModalState = null
 let confirmModalState = null
 let editAssetModalState = null
 let draggedAssetId = null
-const PAGE_HTML_VERSION = "20260805a"
+const PAGE_HTML_VERSION = "20260813a"
 
 window._viewAllPortfolios = localStorage.getItem("viewAllPortfolios") === "1"
 
@@ -524,6 +557,7 @@ function initAssetSelector(assetButtons) {
             const assetData = await loadAssetData(assetId)
             await updateAssetDetail(assetData)
             await renderAssetsList(await loadAssetsList())
+            restartAssetRotationBar()
             const assetForTV = {
                 tvSymbol:       button.dataset.tvSymbol       || "",
                 marketSymbol:   button.dataset.marketSymbol   || "",
@@ -730,6 +764,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initTransaccionesLogic()
         } else if (page === "operaciones") {
             await initOperacionesLogic()
+        } else if (page === "operacionesBolsa") {
+            await initOperacionesBolsaLogic()
         } else if (page === "Trading") {
             await initTradingJournalLogic()
         } else if (page === "Staking") {
@@ -1003,6 +1039,105 @@ function applyDensidadSidebar(val) {
         document.documentElement.dataset.density = "compact"
     } else {
         delete document.documentElement.dataset.density
+    }
+}
+
+/* --- Rotación automática del detalle de activo --- */
+let _assetRotationTimer  = null
+let _assetRotationBusy   = false
+let _assetRotationBound  = false
+
+function getAssetRotationConfig() {
+    const seconds = Number(localStorage.getItem("assetRotationSeconds"))
+    return {
+        enabled: localStorage.getItem("assetRotationEnabled") === "1",
+        seconds: Number.isFinite(seconds) && seconds >= 3 ? seconds : 10
+    }
+}
+
+function applyAssetRotation() {
+    const { enabled, seconds } = getAssetRotationConfig()
+
+    if (_assetRotationTimer) {
+        clearInterval(_assetRotationTimer)
+        _assetRotationTimer = null
+    }
+
+    document.body.classList.toggle("asset-rotation-on", enabled)
+    document.documentElement.style.setProperty("--rotation-duration", `${seconds}s`)
+
+    if (!enabled) {
+        document.body.classList.remove("asset-rotation-paused")
+        return
+    }
+
+    initAssetRotationPause()
+    restartAssetRotationBar()
+    _assetRotationTimer = setInterval(() => {
+        rotateAssetDetailStep().catch((error) => console.error("Rotación de activos:", error))
+    }, seconds * 1000)
+}
+
+function initAssetRotationPause() {
+    if (_assetRotationBound) return
+    _assetRotationBound = true
+
+    const sidePanel = document.getElementById("sidePanel")
+    if (!sidePanel) return
+
+    sidePanel.addEventListener("mouseenter", () => document.body.classList.add("asset-rotation-paused"))
+    sidePanel.addEventListener("mouseleave", () => document.body.classList.remove("asset-rotation-paused"))
+}
+
+function isAssetRotationBlocked() {
+    if (document.hidden) return true
+    if (document.body.classList.contains("asset-rotation-paused")) return true
+    if (document.getElementById("sideWrapper")?.classList.contains("collapsed")) return true
+    if (document.querySelector(".modalOverlay:not(.hidden)")) return true
+    // La ficha de un activo trabaja sobre currentAssetId: no lo cambiamos bajo los pies del usuario.
+    if (document.querySelector(".assetTablePage")) return true
+    return false
+}
+
+function restartAssetRotationBar() {
+    const bar = document.getElementById("detailRotationBar")?.firstElementChild
+    if (!bar) return
+    bar.style.animation = "none"
+    void bar.offsetWidth
+    bar.style.animation = ""
+}
+
+async function rotateAssetDetailStep() {
+    const blocked = isAssetRotationBlocked()
+    document.body.classList.toggle("asset-rotation-halted", blocked)
+    if (_assetRotationBusy || blocked) return
+
+    const buttons = [...document.querySelectorAll("#assetsList .assetBtn:not(.assetBtnSegCustom)")]
+        .filter((button) => button.dataset.assetId)
+
+    if (buttons.length < 2) return
+
+    const currentIndex = buttons.findIndex((button) => button.dataset.assetId === currentAssetId)
+    const nextButton   = buttons[(currentIndex + 1) % buttons.length]
+    const nextAssetId  = nextButton.dataset.assetId
+
+    _assetRotationBusy = true
+    try {
+        const assetData = await loadAssetData(nextAssetId)
+        currentAssetId = nextAssetId
+        await updateAssetDetail(assetData)
+        buttons.forEach((button) => button.classList.toggle("selected", button === nextButton))
+        nextButton.scrollIntoView({ block: "nearest" })
+
+        const detailView = document.getElementById("assetDetailView")
+        if (detailView) {
+            detailView.classList.remove("detailFadeIn")
+            void detailView.offsetWidth
+            detailView.classList.add("detailFadeIn")
+        }
+        restartAssetRotationBar()
+    } finally {
+        _assetRotationBusy = false
     }
 }
 

@@ -18,6 +18,29 @@ const OPERATION_CURRENCY_OPTIONS = new Proxy([], {
 const OPERATION_QUANTITY_DECIMALS = 8
 const OPERATION_COMMON_QUOTE_SYMBOL_OPTIONS = ["USDC", "USDT", "DAI", "FDUSD", "PYUSD", "TUSD", "USDE", "EURC", "USD", "EUR", "BUSD"]
 
+// La misma tabla de operaciones sirve para cripto y para bolsa: cambia el tipo
+// de activo elegible, si los pares admiten stablecoins y los decimales con los
+// que se muestra la cantidad. Las filas se guardan todas juntas en
+// /api/operaciones y cada página filtra las suyas por el tipo del activo.
+const OPERATION_SCOPES = {
+    cripto: {
+        assetTypes: ["cripto"],
+        useStablecoins: true,
+        quantityDecimals: OPERATION_QUANTITY_DECIMALS
+    },
+    bolsa: {
+        assetTypes: ["acciones", "etfs", "comoditis"],
+        useStablecoins: false,
+        quantityDecimals: 4
+    }
+}
+
+let operationsScope = "cripto"
+
+function getOperationsScopeConfig() {
+    return OPERATION_SCOPES[operationsScope] || OPERATION_SCOPES.cripto
+}
+
 let currentOperationsData = { rows: [] }
 let operationsAutosaveTimeout = null
 let operationsAssetRefreshTimeout = null
@@ -122,9 +145,9 @@ async function loadOperationAssets() {
             symbol: String(asset.symbol || asset.name || "").trim().toUpperCase(),
             marketSymbol: String(asset.marketSymbol || asset.finnhubSymbol || "").trim().toUpperCase(),
             marketProvider: String(asset.marketProvider || "").trim().toLowerCase(),
+            type: String(asset.type || "").trim().toLowerCase(),
             price: asset.price ?? null,
-            currency: String(asset.currency || "EUR").trim(),
-            precioCurrency: String(asset.precioCurrency || asset.currency || "EUR").trim()
+            currency: String(asset.currency || "EUR").trim()
         }))
         .map((asset) => ({
             ...asset,
@@ -204,6 +227,10 @@ function getOperationKnownQuoteSymbolsForAssetParsing(payload = operationsStable
 }
 
 function getOperationsEnabledStablecoinSymbols() {
+    if (!getOperationsScopeConfig().useStablecoins) {
+        return []
+    }
+
     return normalizeOperationsStablecoinsPayload(operationsStablecoinsData).enabledSymbols
 }
 
@@ -411,6 +438,28 @@ function findOperationAssetByName(name) {
     return operationsAssets.find((asset) => asset.name.toLowerCase() === normalizedName || asset.symbol.toLowerCase() === normalizedName) || null
 }
 
+// Un activo sin tipo (o una fila cuyo activo ya no existe) cuenta como cripto:
+// todas las operaciones guardadas antes de separar bolsa y cripto lo eran.
+function isOperationAssetInScope(asset) {
+    const assetType = String(asset?.type || "").trim().toLowerCase() || "cripto"
+    return getOperationsScopeConfig().assetTypes.includes(assetType)
+}
+
+function getScopedOperationAssets() {
+    return operationsAssets.filter(isOperationAssetInScope)
+}
+
+function isOperationRowInScope(row = {}) {
+    const asset = getOperationAssetById(row.assetId) || findOperationAssetByName(row.activo)
+    return isOperationAssetInScope(asset)
+}
+
+// currentOperationsData guarda las filas de las dos páginas (así al guardar no
+// se pierden las de la otra); todo lo que calcula saldos usa solo las del ámbito.
+function getScopedOperationRows() {
+    return (currentOperationsData.rows || []).filter((row) => isOperationRowInScope(row))
+}
+
 function getOperationPairOptions(assetId) {
     const asset = getOperationAssetById(assetId)
     const enabledStablecoins = getOperationsEnabledStablecoinSymbols()
@@ -470,6 +519,16 @@ async function refreshOperationsTickerPrices() {
 }
 
 async function initOperacionesLogic() {
+    await initOperationsPage("cripto")
+}
+
+async function initOperacionesBolsaLogic() {
+    await initOperationsPage("bolsa")
+}
+
+async function initOperationsPage(scope) {
+    operationsScope = OPERATION_SCOPES[scope] ? scope : "cripto"
+
     const { operationsPayload, assets, stablecoinsPayload, transaccionesPayload } = await loadOperacionesDependencies()
 
     operationsAssets = assets
@@ -554,9 +613,13 @@ function updateOperationsFilterSet(targetSet, value, checked) {
     }
 }
 
+function operationsFilterStorageKey(group) {
+    return operationsScope === "cripto" ? `operationsFilter_${group}` : `operationsFilter_${operationsScope}_${group}`
+}
+
 function loadOperationsFilterState(group, defaults) {
     try {
-        const raw = localStorage.getItem(`operationsFilter_${group}`)
+        const raw = localStorage.getItem(operationsFilterStorageKey(group))
         if (raw) {
             const parsed = JSON.parse(raw)
             if (Array.isArray(parsed)) return new Set(parsed)
@@ -567,13 +630,13 @@ function loadOperationsFilterState(group, defaults) {
 
 function saveOperationsFilterState() {
     try {
-        localStorage.setItem("operationsFilter_type", JSON.stringify([...currentOperationTypeFilter]))
-        localStorage.setItem("operationsFilter_status", JSON.stringify([...currentOperationStatusFilter]))
+        localStorage.setItem(operationsFilterStorageKey("type"), JSON.stringify([...currentOperationTypeFilter]))
+        localStorage.setItem(operationsFilterStorageKey("status"), JSON.stringify([...currentOperationStatusFilter]))
     } catch { /* ignorar */ }
 }
 
 function createEmptyOperationRow() {
-    const firstAsset = operationsAssets[0] || null
+    const firstAsset = getScopedOperationAssets()[0] || null
     const assetId = firstAsset?.id || ""
     const pairOptions = getOperationPairOptions(assetId)
     const pair = pairOptions[0] || ""
@@ -615,7 +678,7 @@ function getFilteredOperationsRows() {
     return (currentOperationsData.rows || []).filter((row) => {
         const typeMatches = currentOperationTypeFilter.has(row.orden)
         const statusMatches = currentOperationStatusFilter.has(row.estado)
-        return typeMatches && statusMatches
+        return typeMatches && statusMatches && isOperationRowInScope(row)
     })
 }
 
@@ -628,7 +691,7 @@ function renderOperationsStablecoinPanel() {
 
     const enabledStablecoins = getOperationsEnabledStablecoinSymbols()
 
-    const fiatLocked = getOperationsLockedFiatTotalsFromActiveBuys(currentOperationsData.rows || [])
+    const fiatLocked = getOperationsLockedFiatTotalsFromActiveBuys(getScopedOperationRows())
     const fiatItems = Object.entries(fiatLocked)
         .filter(([, locked]) => locked > 0)
         .map(([symbol, locked]) => ({ symbol, locked }))
@@ -640,7 +703,7 @@ function renderOperationsStablecoinPanel() {
     }
 
     panel.classList.remove("hidden")
-    const summary = buildOperationsStablecoinBalanceSummary(operationsStablecoinsData, currentOperationsData.rows || [])
+    const summary = buildOperationsStablecoinBalanceSummary(operationsStablecoinsData, getScopedOperationRows())
     const stablecoinItems = Object.values(summary)
 
     panel.innerHTML = `
@@ -660,6 +723,60 @@ function renderOperationsStablecoinPanel() {
             `).join("")}
         </div>
     `
+}
+
+// El año de una operación completada es el de su cierre; si la fila no lo tiene
+// (se marcó como completada sin rellenar la fecha) se usa el de apertura.
+function getOperationYear(row = {}) {
+    const candidates = [row.fechaCierre, row.fechaApertura]
+
+    for (const candidate of candidates) {
+        const parts = String(candidate || "").trim().split(/[-/]/)
+        const year = parts.length === 3 ? parts[2].trim() : ""
+
+        if (/^\d{4}$/.test(year)) {
+            return year
+        }
+
+        if (/^\d{2}$/.test(year)) {
+            return `20${year}`
+        }
+    }
+
+    return ""
+}
+
+function groupCompletedOperationsByYear(rows = []) {
+    const groupsByYear = new Map()
+
+    rows
+        .filter((row) => row.estado === "Completado")
+        .forEach((row) => {
+            const year = getOperationYear(row)
+
+            if (!groupsByYear.has(year)) {
+                groupsByYear.set(year, { year, rows: [] })
+            }
+
+            groupsByYear.get(year).rows.push(row)
+        })
+
+    // Años más recientes primero; las filas sin fecha legible, al final.
+    return [...groupsByYear.values()].sort((left, right) => {
+        if (!left.year) return 1
+        if (!right.year) return -1
+        return Number(right.year) - Number(left.year)
+    })
+}
+
+function buildOperationsYearHeaderRow(group) {
+    const columnCount = document.querySelector(".operationsTable thead tr")?.cells.length || 13
+    const label = group.year || "Sin fecha"
+    const count = group.rows.length
+    const tr = document.createElement("tr")
+    tr.className = "tableGroupRow operationsYearRow"
+    tr.innerHTML = `<td class="operationsYearHeader" colspan="${columnCount}">Completadas ${label} · ${count} ${count === 1 ? "operación" : "operaciones"}</td>`
+    return tr
 }
 
 function renderOperationsTable() {
@@ -684,8 +801,18 @@ function renderOperationsTable() {
     if (operacionesEmptyEl) operacionesEmptyEl.classList.add("hidden")
     if (operationsTableWrapper) operationsTableWrapper.classList.remove("hidden")
 
-    rows.forEach((row) => {
+    const openRows = rows.filter((row) => row.estado !== "Completado")
+    const completedGroups = groupCompletedOperationsByYear(rows)
+
+    openRows.forEach((row) => {
         operationsBody.appendChild(buildOperationRow(row))
+    })
+
+    completedGroups.forEach((group) => {
+        operationsBody.appendChild(buildOperationsYearHeaderRow(group))
+        group.rows.forEach((row) => {
+            operationsBody.appendChild(buildOperationRow(row))
+        })
     })
 
     rows.forEach((row) => {
@@ -710,7 +837,7 @@ function refreshOperationsRowPrice(tr) {
         priceEl.className = "operationsTickerPrice"
         return
     }
-    priceEl.textContent = formatMoney(price, asset.precioCurrency || asset.currency || "EUR")
+    priceEl.textContent = formatMoney(price, asset.currency || "EUR")
     priceEl.className = "operationsTickerPrice"
 }
 
@@ -771,9 +898,11 @@ function formatOperationsQuantity(value) {
         return ""
     }
 
+    const decimals = getOperationsScopeConfig().quantityDecimals
+
     return parsedValue.toLocaleString("es-ES", {
-        minimumFractionDigits: OPERATION_QUANTITY_DECIMALS,
-        maximumFractionDigits: OPERATION_QUANTITY_DECIMALS
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
     })
 }
 
@@ -799,7 +928,7 @@ function formatOperationsCryptoCommissionCell(row = {}) {
     const symbol = getOperationBaseSymbol(row)
     const asset = getOperationAssetById(row.assetId)
     const price = parseLooseNumber(asset?.price)
-    const priceCurrency = asset?.precioCurrency || asset?.currency || "EUR"
+    const priceCurrency = asset?.currency || "EUR"
     const hint = amount > 0 && price !== null && price > 0
         ? `<span class="operationsFeeHint">≈ ${formatMoney(amount * price, priceCurrency)}</span>`
         : ""
@@ -919,7 +1048,7 @@ function openOperacionRowModal(rowId) {
     const isEdit = rowIndex >= 0
     const rowData = isEdit ? normalizeOperationRow({ ...currentOperationsData.rows[rowIndex] }) : createEmptyOperationRow()
 
-    const assetOptions = operationsAssets.map((a) => `<option value="${a.id}"${rowData.assetId === a.id ? " selected" : ""}>${a.name}</option>`).join("")
+    const assetOptions = getScopedOperationAssets().map((a) => `<option value="${a.id}"${rowData.assetId === a.id ? " selected" : ""}>${a.name}</option>`).join("")
     const pairOptions = getOperationPairOptions(rowData.assetId)
     const selectedPair = pairOptions.includes(rowData.par) ? rowData.par : (pairOptions[0] || "")
     const pairOptionsHtml = pairOptions.length
@@ -959,7 +1088,7 @@ function openOperacionRowModal(rowId) {
             <input id="opModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.cantidad || ""}">
         </div>
         <div class="assetRowModalField">
-            <label class="assetRowModalLabel">Comisiones cripto</label>
+            <label class="assetRowModalLabel">${operationsScope === "bolsa" ? "Comisiones en títulos" : "Comisiones cripto"}</label>
             <input id="opModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.comisionesCripto || ""}">
         </div>
         <div class="assetRowModalField">
@@ -1077,7 +1206,7 @@ function saveOperacionRowFromModal() {
         const required = parseLooseNumber(rowData.total) || 0
 
         if (symbol && required > 0) {
-            const operationsRowsWithoutCurrent = (currentOperationsData.rows || []).filter((r) => r.id !== rowId)
+            const operationsRowsWithoutCurrent = getScopedOperationRows().filter((r) => r.id !== rowId)
             const summary = buildOperationsStablecoinBalanceSummary(operationsStablecoinsData, operationsRowsWithoutCurrent)
             const available = summary[symbol]?.available ?? 0
 

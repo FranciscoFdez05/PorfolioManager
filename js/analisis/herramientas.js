@@ -5,6 +5,11 @@ let _hPrecioMedioCount = 0
 async function initHerramientasLogic() {
     window.flushPendingPageChanges = null
 
+    // Las referencias históricas que fija el usuario se guardan, así que hay que
+    // reflejarlas en las etiquetas al abrir la página.
+    hRatioAplicarHistoricoLabels()
+    hOroBtcAplicarRefLabels()
+
     // ── Navegación entre herramientas ──────────────────────────────
     document.querySelectorAll(".herramientaBtn").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -396,7 +401,17 @@ async function hRatioLoadPrecios() {
     btn.disabled = false
 }
 
-let _ratioHistorico = 60
+let _ratioHistorico = Number(getChartPref("hRatioHistorico", 60)) || 60
+
+function hRatioAplicarHistoricoLabels() {
+    const v = _ratioHistorico
+    const label       = document.getElementById("hRatioHistLabel")
+    const labelResult = document.getElementById("hRatioHistLabelResult")
+    const labelJusto  = document.getElementById("hRatioHistLabelJusto")
+    if (label)       label.textContent = v
+    if (labelResult) labelResult.textContent = v
+    if (labelJusto)  labelJusto.textContent = v
+}
 
 function hRatioAbrirEditor() {
     document.getElementById("hRatioHistInput").value = _ratioHistorico
@@ -412,9 +427,8 @@ function hRatioGuardarHistorico() {
     const v = parseFloat(document.getElementById("hRatioHistInput").value)
     if (!v || v <= 0) return
     _ratioHistorico = v
-    document.getElementById("hRatioHistLabel").textContent = v
-    document.getElementById("hRatioHistLabelResult").textContent = v
-    document.getElementById("hRatioHistLabelJusto").textContent = v
+    setChartPref("hRatioHistorico", v)
+    hRatioAplicarHistoricoLabels()
     hRatioCerrarEditor()
     hCalcRatioOroPlata()
 }
@@ -480,7 +494,17 @@ function hCalcYield() {
 
 const BTC_KEYWORDS = ["bitcoin", "btc"]
 
-let _oroBtcRef = 20
+let _oroBtcRef = Number(getChartPref("hOroBtcRef", 20)) || 20
+
+function hOroBtcAplicarRefLabels() {
+    const v = _oroBtcRef
+    const label       = document.getElementById("hOroBtcHistLabel")
+    const labelResult = document.getElementById("hOroBtcHistLabelResult")
+    const labelJusto  = document.getElementById("hOroBtcHistLabelJusto")
+    if (label)       label.textContent = v
+    if (labelResult) labelResult.textContent = v
+    if (labelJusto)  labelJusto.textContent = v
+}
 
 function hOroBtcAbrirEditor() {
     document.getElementById("hOroBtcHistInput").value = _oroBtcRef
@@ -496,9 +520,8 @@ function hOroBtcGuardarRef() {
     const v = parseFloat(document.getElementById("hOroBtcHistInput").value)
     if (!v || v <= 0) return
     _oroBtcRef = v
-    document.getElementById("hOroBtcHistLabel").textContent = v
-    document.getElementById("hOroBtcHistLabelResult").textContent = v
-    document.getElementById("hOroBtcHistLabelJusto").textContent = v
+    setChartPref("hOroBtcRef", v)
+    hOroBtcAplicarRefLabels()
     hOroBtcCerrarEditor()
     hCalcOroBtc()
 }
