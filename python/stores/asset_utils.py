@@ -231,6 +231,9 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "lastUpdated": _trunc(requestData.get("lastUpdated", ""), _MAX_TEXT).strip(),
         "color": sanitize_color(requestData.get("color", "")),
         "tvSymbol": _trunc(requestData.get("tvSymbol", ""), _MAX_TICKER).strip(),
+        # El cliente reenvía el activo entero al guardar, así que si `hidden` no
+        # se copia aquí el upsert lo reescribe a 0 y el activo oculto reaparece.
+        "hidden": bool(requestData.get("hidden", False)),
         "operationRows": sanitizeAssetOperationRows(requestData.get("operationRows", [])),
         "conversionRows": sanitizeAssetConversionRows(
             requestData.get("conversionRows", []),

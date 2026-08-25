@@ -240,6 +240,61 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
     return top_results, None
 
 
+def fetch_price_series(symbol, from_ts, to_ts, timeout=None):
+    """Cierres diarios de un ticker entre dos fechas.
+
+    Yahoo es el único de los cuatro proveedores conectados que sirve series
+    largas sin clave ni cuota, y además cotiza los índices (^GSPC, ^STOXX50E…)
+    que no aparecen en las APIs de acciones.
+
+    Devuelve `([{"ts", "close"}], error)` con los puntos ordenados; los días
+    sin cierre (festivos, sesiones a medias) se descartan en vez de
+    interpolarse: un hueco es más honesto que un precio inventado.
+    """
+    normalized_symbol = str(symbol or "").strip().upper()
+    if not normalized_symbol:
+        return [], "El ticker de Yahoo Finance es obligatorio"
+
+    record_api_call("Yahoo Finance")
+
+    try:
+        payload = _fetch_json(
+            f"{YAHOO_CHART_URL}/{quote(normalized_symbol, safe='=^')}",
+            {"period1": int(from_ts), "period2": int(to_ts), "interval": "1d"},
+            timeout=timeout,
+        )
+    except HTTPError as error:
+        return [], f"Yahoo Finance devolvió HTTP {error.code}"
+    except URLError as error:
+        return [], f"No se pudo conectar con Yahoo Finance: {error.reason}"
+    except Exception as error:
+        return [], f"Error al obtener el histórico de Yahoo Finance: {error}"
+
+    try:
+        resultado = payload["chart"]["result"][0]
+        marcas    = resultado["timestamp"]
+        cierres   = resultado["indicators"]["quote"][0]["close"]
+    except (KeyError, IndexError, TypeError):
+        return [], "Yahoo Finance no devolvió histórico para ese ticker"
+
+    serie = []
+    for ts, cierre in zip(marcas, cierres, strict=False):
+        if cierre is None:
+            continue
+        try:
+            valor = float(cierre)
+        except (TypeError, ValueError):
+            continue
+        if valor > 0:
+            serie.append({"ts": int(ts), "close": valor})
+
+    if not serie:
+        return [], "Yahoo Finance no devolvió cierres para ese periodo"
+
+    serie.sort(key=lambda punto: punto["ts"])
+    return serie, None
+
+
 def fetch_quote(symbol, timeout=None):
     normalized_symbol = str(symbol or "").strip().upper()
 

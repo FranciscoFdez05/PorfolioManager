@@ -1,4 +1,5 @@
 from core.db import get_db, transactional
+from core.fifo import FifoError, parse_decimal
 from stores.asset_utils import slugify
 
 
@@ -215,10 +216,13 @@ def writeAssetFile(assetId, data):
 
 
 def _parse_num(value):
-    text = str(value or "").strip().replace(".", "").replace(",", ".")
+    # Se delega en el parser del motor fiscal para que la ficha y las ventas
+    # lean exactamente los mismos números. La versión anterior de esta función
+    # devolvía 0 ante un importe con divisa ("25,00 €") y machacaba el punto
+    # decimal de los valores ya serializados ("1234.56" -> 123456).
     try:
-        return float(text)
-    except (TypeError, ValueError):
+        return float(parse_decimal(value))
+    except (FifoError, TypeError, ValueError):
         return 0.0
 
 

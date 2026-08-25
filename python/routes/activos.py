@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from flask import Blueprint, jsonify, request
 
+from core import dinero, pnl_divisa
 from core.db import get_db
 from providers.alpha_vantage_client import fetch_quote as fetch_av_quote
 from providers.eodhd_client import fetch_quote as fetch_eodhd_quote
@@ -46,6 +49,56 @@ def getActivos():
     return jsonify({"assets": listAssets()})
 
 
+def _columna(row, nombre, defecto=""):
+    """Valor de una columna que puede no existir todavía en la BD.
+
+    `fx_rate` se añade por migración, y una consulta hecha contra una base que
+    aún no la tiene lanzaría IndexError. Devolver el defecto deja el desglose
+    marcado como incompleto, que es la degradación correcta.
+    """
+    try:
+        valor = row[nombre]
+    except (IndexError, KeyError):
+        return defecto
+    return defecto if valor is None else valor
+
+
+def _descomponer_por_divisa(rows, participaciones_vivas, current_price, fx_actual):
+    """Separa el resultado del activo entre efecto activo y efecto divisa.
+
+    Cada compra aporta su lote con **su** tipo de cambio: aplicar un tipo medio
+    a todo el invertido daría un efecto divisa que no corresponde a ninguna
+    operación real. El valor actual se reparte entre los lotes en proporción a
+    lo invertido en cada uno, que es la única forma de repartirlo sin conocer a
+    qué lote pertenece cada participación que queda viva (eso lo sabe el FIFO
+    fiscal, y traerlo aquí ataría esta pantalla al módulo de ventas).
+    """
+    compras = []
+    for row in rows:
+        if str(row["tipo_operacion"] or "").strip().lower() == "venta":
+            continue
+        capital = parse_loose_number(row["capital_invertido_bruto"]) or Decimal("0")
+        if capital <= 0:
+            continue
+        compras.append({
+            "invertido": capital,
+            "fxCompra": _columna(row, "fx_rate"),
+        })
+
+    invertido_total = sum((c["invertido"] for c in compras), Decimal("0"))
+    valor_actual = max(Decimal("0"), participaciones_vivas) * current_price
+
+    if invertido_total <= 0:
+        # Sin compras registradas no hay nada que repartir, pero el valor actual
+        # (una posición heredada, por ejemplo) sí se convierte a euros.
+        return pnl_divisa.descomponer(0, valor_actual, fx_actual, fx_actual)
+
+    for compra in compras:
+        compra["valorActual"] = valor_actual * compra["invertido"] / invertido_total
+
+    return pnl_divisa.descomponer_lotes(compras, fx_actual)
+
+
 @activos_bp.route("/api/activos/rendimiento-batch", methods=["GET"])
 def getRendimientoBatch():
     conn = get_db()
@@ -54,16 +107,19 @@ def getRendimientoBatch():
     ).fetchall()
 
     result = {}
+    # Tipos de cambio actuales, uno por divisa presente en la cartera. Se
+    # resuelven fuera del bucle para no repetir la consulta por cada activo.
+    fx_actuales = _tipos_actuales({str(a["currency"] or "EUR").upper() for a in assets})
 
     for asset in assets:
         asset_id = asset["id"]
         asset_type = str(asset["type"] or "").strip().lower()
         is_crypto = asset_type == "cripto"
-        current_price = parse_loose_number(str(asset["price"] or "")) or 0
+        current_price = parse_loose_number(asset["price"]) or Decimal("0")
 
         rows = conn.execute(
             "SELECT tipo_operacion, participaciones, capital_invertido_bruto, "
-            "comisiones, comisiones_fiat FROM activo_rows WHERE asset_id = ?",
+            "comisiones, comisiones_fiat, fx_rate FROM activo_rows WHERE asset_id = ?",
             (asset_id,)
         ).fetchall()
 
@@ -73,16 +129,19 @@ def getRendimientoBatch():
             (asset_id,)
         ).fetchall()
 
-        total_participaciones = 0.0
-        total_invertido_bruto = 0.0
-        total_comisiones_fiat = 0.0
+        # Decimal y no float: estos tres acumuladores recorren todas las filas
+        # de un activo, y en coma flotante el error de cada suma se arrastra
+        # hasta el total invertido que se enseña en la tabla principal.
+        total_participaciones = Decimal("0")
+        total_invertido_bruto = Decimal("0")
+        total_comisiones_fiat = Decimal("0")
 
         for row in rows:
             tipo = str(row["tipo_operacion"] or "").strip().lower()
-            partic = parse_loose_number(str(row["participaciones"] or "")) or 0
-            capital = parse_loose_number(str(row["capital_invertido_bruto"] or "")) or 0
-            comis = parse_loose_number(str(row["comisiones"] or "")) or 0
-            comis_fiat = parse_loose_number(str(row["comisiones_fiat"] or "")) or 0
+            partic = parse_loose_number(row["participaciones"]) or Decimal("0")
+            capital = parse_loose_number(row["capital_invertido_bruto"]) or Decimal("0")
+            comis = parse_loose_number(row["comisiones"]) or Decimal("0")
+            comis_fiat = parse_loose_number(row["comisiones_fiat"]) or Decimal("0")
 
             if tipo == "venta":
                 total_participaciones -= partic
@@ -93,29 +152,63 @@ def getRendimientoBatch():
 
         for op in op_rows:
             orden = str(op["orden"] or "").strip().lower()
-            cantidad = parse_loose_number(str(op["cantidad"] or "")) or 0
-            comis_cripto = parse_loose_number(str(op["comisiones_cripto"] or "")) or 0
-            total_fiat = parse_loose_number(str(op["total"] or "")) or 0
+            cantidad = parse_loose_number(op["cantidad"]) or Decimal("0")
+            comis_cripto = parse_loose_number(op["comisiones_cripto"]) or Decimal("0")
+            total_fiat = parse_loose_number(op["total"]) or Decimal("0")
 
             if orden == "venta":
                 total_participaciones -= cantidad + comis_cripto
             else:
-                total_participaciones += max(0, cantidad - comis_cripto)
+                total_participaciones += max(Decimal("0"), cantidad - comis_cripto)
                 total_invertido_bruto += total_fiat
 
-        inverted_neto = max(0, total_invertido_bruto - total_comisiones_fiat)
-        neto_actual = max(0, total_participaciones) * current_price
+        inverted_neto = max(Decimal("0"), total_invertido_bruto - total_comisiones_fiat)
+        neto_actual = max(Decimal("0"), total_participaciones) * current_price
         rendimiento = neto_actual - inverted_neto
-        rendimiento_pct = (rendimiento / inverted_neto * 100) if inverted_neto > 0 else 0
+        rendimiento_pct = (rendimiento / inverted_neto * 100) if inverted_neto > 0 else Decimal("0")
 
+        # `float` solo aquí, al serializar: el JSON de esta ruta lleva números
+        # y el frontend los espera así. Todo el cálculo de arriba es Decimal, y
+        # la conversión se hace una vez sobre el valor ya redondeado.
         result[asset_id] = {
-            "rendimiento": round(rendimiento, 2),
-            "invertidoNeto": round(inverted_neto, 2),
-            "rendimientoPct": round(rendimiento_pct, 2),
-            "netoActual": round(neto_actual, 2),
+            "rendimiento": float(dinero.redondear(rendimiento)),
+            "invertidoNeto": float(dinero.redondear(inverted_neto)),
+            "rendimientoPct": float(dinero.redondear(rendimiento_pct)),
+            "netoActual": float(dinero.redondear(neto_actual)),
+        }
+
+        # Desglose activo/divisa. Las cifras de arriba están en la moneda del
+        # activo y se mantienen tal cual —cambiarlas rompería la tabla que ya
+        # las pinta—; esto se añade al lado, en euros. Para un activo en euros
+        # el efecto divisa sale cero y el desglose no estorba.
+        moneda = str(asset["currency"] or "EUR").upper()
+        descomposicion = _descomponer_por_divisa(
+            rows, total_participaciones, current_price, fx_actuales.get(moneda),
+        )
+        result[asset_id]["divisa"] = {
+            "moneda": moneda,
+            **descomposicion.como_dict(),
         }
 
     return jsonify(result)
+
+
+def _tipos_actuales(monedas):
+    """Tipo de cambio de hoy para cada divisa, sin salir a la red si no hace falta.
+
+    `permitir_descarga=False`: esta ruta la llama la tabla principal en cada
+    carga, y una petición a un proveedor por divisa la volvería lenta y
+    dependiente de que el proveedor conteste. Si no hay tipo cacheado se usa 1,
+    lo que deja el importe en la moneda del activo y marca el desglose como
+    incompleto —el frontend lo advierte— en vez de inventarse una conversión.
+    """
+    from stores.fx_historico import tasa_actual
+
+    tipos = {}
+    for moneda in monedas:
+        rate, _origen, _fecha = tasa_actual(moneda, permitir_descarga=False)
+        tipos[moneda] = rate
+    return tipos
 
 
 @activos_bp.route("/api/activos", methods=["POST"])
@@ -169,11 +262,16 @@ def reorderActivos():
         assetById = {asset["id"]: asset for asset in assets}
         assets = [assetById[assetId] for assetId in normalizedIds]
     else:
-        assetId = slugify(requestData.get("assetId", ""))
+        # Se comprueba el valor crudo, no el slug: slugify("") devuelve
+        # "activo", así que `if not assetId` nunca se cumplía y omitir el campo
+        # acababa en un 404 "Activo no encontrado" que no dice qué falta.
+        assetIdCrudo = str(requestData.get("assetId", "")).strip()
         direction = str(requestData.get("direction", "")).strip().lower()
 
-        if not assetId:
+        if not assetIdCrudo:
             return jsonify({"ok": False, "error": "assetId es obligatorio"}), 400
+
+        assetId = slugify(assetIdCrudo)
 
         if direction not in {"up", "down"}:
             return jsonify({"ok": False, "error": "direction inválida"}), 400
@@ -339,6 +437,41 @@ def deleteActivo(assetId):
     return jsonify({"ok": True})
 
 
+# ── Tipos de cambio históricos ────────────────────────────────────────────────
+# Separar el efecto divisa exige el tipo de cambio del día de cada operación, y
+# ese dato no estaba: las operaciones anteriores a esta versión lo tienen vacío.
+# Estas dos rutas permiten ver cuántas faltan y reconstruirlas por lotes.
+
+
+@activos_bp.route("/api/fx/pendientes", methods=["GET"])
+def getFxPendientes():
+    from stores.fx_historico import contar_pendientes
+
+    return jsonify({"ok": True, "pendientes": contar_pendientes()})
+
+
+@activos_bp.route("/api/fx/rellenar", methods=["POST"])
+def rellenarFx():
+    """Completa un lote de tipos de cambio históricos.
+
+    Por lotes y no de una vez: una cartera con años de operaciones son cientos
+    de peticiones al proveedor, y hacerlas todas dentro de una petición HTTP
+    acabaría en timeout del navegador. Se llama repetidamente hasta que
+    `pendientes` llega a cero.
+    """
+    from stores.fx_historico import rellenar_pendientes
+
+    requestData = request.get_json(silent=True) or {}
+    try:
+        # Tope generoso pero acotado: sin límite superior, un cliente podría
+        # pedir un lote que tarde minutos y bloquee un worker.
+        limite = max(1, min(1000, int(requestData.get("limite", 200))))
+    except (TypeError, ValueError):
+        limite = 200
+
+    return jsonify({"ok": True, **rellenar_pendientes(limite=limite)})
+
+
 @activos_bp.route("/api/metricas/inversiones", methods=["GET"])
 def getMetricasInversiones():
     conn = get_db()
@@ -361,11 +494,11 @@ def getMetricasInversiones():
         parts = str(row["fecha_operacion"] or "").strip().split("-")
         if len(parts) != 3:
             continue
-        capital = parse_loose_number(str(row["capital_invertido_bruto"] or "")) or 0
+        capital = parse_loose_number(row["capital_invertido_bruto"]) or Decimal("0")
         month, year = parts[1].zfill(2), parts[2]
         key = f"{year}-{month}"
-        by_month[key] = by_month.get(key, 0) + capital
-        by_year[year] = by_year.get(year, 0) + capital
+        by_month[key] = by_month.get(key, Decimal("0")) + capital
+        by_year[year] = by_year.get(year, Decimal("0")) + capital
 
     for row in op_rows:
         if str(row["orden"] or "").strip().lower() == "venta":
@@ -373,10 +506,16 @@ def getMetricasInversiones():
         parts = str(row["fecha_apertura"] or "").strip().split("-")
         if len(parts) != 3:
             continue
-        total = parse_loose_number(str(row["total"] or "")) or 0
+        total = parse_loose_number(row["total"]) or Decimal("0")
         month, year = parts[1].zfill(2), parts[2]
         key = f"{year}-{month}"
-        by_month[key] = by_month.get(key, 0) + total
-        by_year[year] = by_year.get(year, 0) + total
+        by_month[key] = by_month.get(key, Decimal("0")) + total
+        by_year[year] = by_year.get(year, Decimal("0")) + total
 
-    return jsonify({"byMonth": by_month, "byYear": by_year})
+    # De Decimal a float una sola vez, al serializar. Redondeado a dos
+    # decimales: son importes en euros y antes salían con la cola binaria de
+    # las sumas en coma flotante (12.340000000000002).
+    return jsonify({
+        "byMonth": {k: float(dinero.redondear(v)) for k, v in by_month.items()},
+        "byYear": {k: float(dinero.redondear(v)) for k, v in by_year.items()},
+    })
