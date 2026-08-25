@@ -1,6 +1,27 @@
 # Portfolio Python
 
+[![CI](https://github.com/FranciscoFdez05/PorfolioPython/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioPython/actions/workflows/ci.yml)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.0.0-blue)](CHANGELOG.md)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
+[![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
+
 Aplicación web **local** para el seguimiento de una cartera de inversión personal. Sin dependencias cloud obligatorias: todo se guarda en **SQLite** y corre en tu máquina (o en cualquier servidor doméstico con Docker).
+
+Nada sale de tu red salvo las consultas de cotizaciones, y esas son opcionales: sin ninguna clave de API la aplicación funciona igual, solo que los precios los introduces tú.
+
+**[Novedades de cada versión →](CHANGELOG.md)**
+
+---
+
+## Índice
+
+| Empezar | Uso | Operación |
+|---|---|---|
+| [Características](#características) | [Ventas y fiscalidad (España)](#ventas-y-fiscalidad-españa) | [Configuración](#configuración) |
+| [Quick start — Docker](#quick-start--docker-recomendado) | [Rentabilidad y riesgo](#rentabilidad-riesgo-y-comparación-con-índices) | [Actualizar](#actualizar) |
+| [Quick start — Sin Docker](#quick-start--sin-docker) | [Efecto activo y efecto divisa](#efecto-activo-y-efecto-divisa) | [Base de datos y backups](#base-de-datos-y-backups) |
+| [Claves API](#claves-api-opcional) | [Histórico del portfolio](#histórico-del-portfolio) | [Seguridad](#seguridad) |
+| [Atajo de iOS](#atajo-de-ios--apuntar-gastos-desde-el-móvil) | [Stack](#stack) | [Desarrollo](#desarrollo) |
 
 ---
 
@@ -44,7 +65,7 @@ No hace falta tener Python instalado en el servidor: si no lo encuentra, usa la 
 
 El contenedor publica el puerto en todas las interfaces del host, así que cualquier dispositivo de la misma red llega poniendo la IP del servidor y el puerto. Si no responde desde otro equipo, casi siempre es el firewall del host: hay que abrir ese puerto (por ejemplo `sudo ufw allow 5000/tcp`).
 
-El puerto se controla con `port` en `config.ini` (sección `[server]`, por defecto `5000`) — esa es la fuente de verdad. `docker-up.sh` lo lee de ahí y lo exporta como `PORT` antes de levantar el stack, así `docker-compose.yml`, `entrypoint.sh` y el healthcheck siempre usan el mismo valor sin tener que tocar varios sitios. Si lanzas `docker compose up` directamente (sin pasar por `docker-up.sh`), se usará el `PORT` que haya en `.env` en su lugar.
+El puerto por defecto es `5000`, y para cambiarlo pon `PORT` en `.env` (ver [Configuración](#configuración)). `docker-up.sh` resuelve el valor con la misma capa que usa la aplicación —entorno, luego `config.ini`, luego el defecto— y lo exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse.
 
 ```bash
 # Ver logs en tiempo real
@@ -66,7 +87,7 @@ docker compose down
 
 ## Quick start — Sin Docker
 
-**Requisitos:** Python 3.10+
+**Requisitos:** Python 3.11 o superior (CI prueba 3.11, 3.12 y 3.13).
 
 ```bash
 python -m venv .venv
@@ -82,6 +103,124 @@ python python/server.py
 ```
 
 Abre `http://localhost:5000`.
+
+---
+
+## Configuración
+
+Hay **dos sitios** y no dan lo mismo. Esta es la parte que más problemas da al actualizar, así que va antes que nada:
+
+| | `config.ini` | `.env` |
+|---|---|---|
+| Qué es | Los **valores de fábrica** | La configuración de **esta** instalación |
+| ¿Va en git? | Sí, se distribuye con el código | No, está en `.gitignore` |
+| ¿Sobrevive a un `git pull`? | **No** — se actualiza con el código | Sí |
+| Para qué sirve | Leerlo: documenta cada opción y su rango | Cambiar lo que quieras cambiar |
+
+**En producción, edita `.env`.** Los 45 ajustes tienen su variable de entorno equivalente, y el comentario de cada opción en `config.ini` te dice cuál es:
+
+```ini
+; Peticiones de escritura (POST/PUT/PATCH/DELETE) por IP y minuto. 0 desactiva el límite.
+; [60] · env ESCRITURAS_POR_MINUTO
+escrituras_por_minuto = 60
+```
+
+Ese `· env ESCRITURAS_POR_MINUTO` es el nombre que va en `.env`:
+
+```bash
+ESCRITURAS_POR_MINUTO=120
+```
+
+Si editas `config.ini` en el servidor, el siguiente `git pull` te dará un conflicto justo en mitad de la actualización. `docker-update.sh` lo comprueba antes de empezar y te avisa en vez de dejarte a medias.
+
+### Prioridad
+
+```
+variable de entorno  →  config.ini  →  valor por defecto del código
+```
+
+La resuelve `core/settings.py`, que además valida rangos y avisa en el log de los valores dudosos al arrancar. Un ajuste que falte en `config.ini` no rompe nada: cae al valor por defecto del código, y por eso una versión nueva puede añadir opciones sin que tengas que tocar tu configuración.
+
+### Qué hay en cada sitio
+
+| Sección | Para qué |
+|---|---|
+| `[server]` | Puerto, host, modo debug |
+| `[gunicorn]` | Workers, hilos, timeouts |
+| `[rutas]` | Dónde viven `data/`, `logs/` y `API/` (en Docker las fijan los volúmenes) |
+| `[seguridad]` | CSP, límites de escritura, sesión |
+| `[backups]` | Copias a conservar y timeouts de SQLite |
+| `[atajo]` | Endpoints del Atajo de iOS y redes permitidas |
+| `[mercado]` | Proveedores, caducidad de cotizaciones, peticiones en paralelo |
+
+Los secretos (`SECRET_KEY`, credenciales, claves de API) van **solo** en `.env` o en `API/*.key`, nunca en `config.ini`.
+
+---
+
+## Actualizar
+
+```bash
+./docker-update.sh
+```
+
+Hace la actualización entera y la comprueba:
+
+1. Avisa si has editado `config.ini` (ver [Configuración](#configuración)) antes de tocar nada.
+2. `git pull` y te enseña las novedades de la versión nueva desde el [CHANGELOG](CHANGELOG.md).
+3. Construye la imagen **etiquetada con la versión** y levanta el stack.
+4. Espera a que `/api/health` responda. No es un «¿está arriba el contenedor?»: ese endpoint consulta la base de datos y devuelve 503 si falla.
+5. Si no responde en 90 segundos, **vuelve solo a la versión anterior** y te enseña el log.
+
+Con `--sin-pull` se salta el paso 2, para cuando ya has traído el código a mano.
+
+### Qué versión estoy corriendo
+
+```bash
+curl -s http://localhost:5000/api/health
+```
+
+```json
+{ "ok": true, "estado": "ok", "version": "1.0.0" }
+```
+
+Con la sesión abierta añade el detalle: esquema de la base, portfolio activo, tamaño y tiempo en marcha.
+
+### Volver atrás
+
+Depende de si la versión tocaba el esquema, y el CHANGELOG lo dice en cada entrada.
+
+**Si no lo tocaba** — basta con la imagen anterior, los datos no han cambiado:
+
+```bash
+git checkout v1.0.0
+PORTFOLIO_VERSION=1.0.0 docker compose up -d --no-build
+```
+
+**Si lo subía** — los datos ya están migrados, así que hay que restaurar también el fichero. Antes de migrar, la aplicación deja una copia identificable y **fuera de la rotación de backups**:
+
+```
+data/backups/<portfolio>_pre-esquema-1-a-2_2026-08-25_193000.db
+```
+
+```bash
+docker compose down
+cp data/backups/principal_pre-esquema-1-a-2_*.db data/portfolios/principal.db
+rm -f data/portfolios/principal.db-wal data/portfolios/principal.db-shm
+git checkout v1.0.0
+PORTFOLIO_VERSION=1.0.0 docker compose up -d --no-build
+```
+
+> Los `-wal` y `-shm` hay que borrarlos: un WAL de la versión nueva reaplicado sobre la base restaurada la corrompería.
+
+### Cómo funcionan las migraciones
+
+El esquema lleva su número en `PRAGMA user_version`. Al abrir cada fichero, `core/db.py` compara ese número con el que espera el código:
+
+- **Igual** — no hace nada. Es el caso normal y no cuesta ni una consulta de más.
+- **Menor** — guarda la copia previa y aplica los pasos que falten, en orden.
+- **Mayor** (una base creada por una versión posterior, típicamente al restaurar un backup) — la abre sin tocarla y lo avisa en el log, en vez de intentar a ciegas un `ALTER TABLE` sobre un esquema que no conoce.
+
+Las migraciones son solo hacia delante. La vuelta atrás es restaurar el fichero, que es justo para lo que está la copia previa.
 
 ---
 
@@ -341,7 +480,9 @@ El intervalo y el alcance (solo el portfolio activo o todos) se eligen en **Ajus
 - **Backups manuales:** `data/backups/` (ZIP con todos los portfolios, ajustes y preferencias)
 - **Copias previas a una restauración:** `data/pre_restore/<fecha>/` — se crean solas antes de sobrescribir nada, por si restauras el backup equivocado
 
-Al arrancar se verifica la integridad de la BD activa (`integrity_check` + `foreign_key_check`). Si falla, se intenta reparar y, si no es posible, se restaura desde el backup automático válido más reciente. El esquema se actualiza solo: `core/db.py` aplica las migraciones pendientes la primera vez que se abre cada fichero.
+Al arrancar se verifica la integridad de la BD activa (`integrity_check` + `foreign_key_check`). Si falla, se intenta reparar y, si no es posible, se restaura desde el backup automático válido más reciente.
+
+El esquema se actualiza solo. Lleva su número en `PRAGMA user_version`, y antes de subirlo se guarda una copia identificable y **exenta de la rotación** — `data/backups/<portfolio>_pre-esquema-N-a-M_*.db` — que es el punto de retorno si una actualización sale mal. El detalle está en [Actualizar](#actualizar).
 
 Dentro de la BD del portfolio hay dos tablas que son **caché y no datos del usuario** — `fx_rates` (tipos de cambio históricos) y `benchmark_prices` (cierres de los índices). Se pueden borrar sin perder nada: se vuelven a bajar, a costa de gastar cuota del proveedor. Los `portfolio_snapshots`, en cambio, no se reconstruyen, así que el purgado desde Ajustes vuelca antes una copia en JSON a `data/pre_restore/`.
 
@@ -379,7 +520,7 @@ escrituras_pesadas_por_hora = 30    ; backup, restauración e importación
 
 `core/csp.py`, activable con `[seguridad] csp_activada` y probable sin levantar el servidor:
 
-- **`script-src` con nonce, no `'unsafe-inline'`.** `index.html` lleva un único script en línea (el que aplica el tema guardado antes de pintar, para que no haya destello blanco al cargar); con `'unsafe-inline'` la directiva no protegería de nada. Los orígenes externos permitidos se listan en `csp_origenes_scripts` — por defecto solo el CDN de Chart.js.
+- **`script-src` cerrado a `'self'` y con nonce, no `'unsafe-inline'`.** `index.html` lleva un único script en línea (el que aplica el tema guardado antes de pintar, para que no haya destello blanco al cargar); con `'unsafe-inline'` la directiva no protegería de nada. **No hay ningún origen externo**: Chart.js se sirve desde `js/vendor/`, así que `csp_origenes_scripts` viene vacío. Ese ajuste sigue existiendo por si añades una librería externa a conciencia, pero vaciarlo es lo que hace que un HTML inyectado no pueda traerse código de fuera — y de paso, que la aplicación funcione sin internet.
 - **`style-src` sí admite `'unsafe-inline'`**: el HTML usa atributos `style=` y varios módulos posicionan tooltips con `el.style.…`. El riesgo que cubre quitarlo (exfiltración por CSS) es mucho menor que el de un script.
 - **`connect-src 'self'`**: todas las llamadas a proveedores las hace el servidor. Si el frontend llamara alguna vez directamente a una API externa, esta directiva lo delataría.
 
@@ -389,10 +530,12 @@ escrituras_pesadas_por_hora = 30    ; backup, restauración e importación
 
 | Capa | Tecnología |
 |---|---|
-| Backend | Python + Flask + Gunicorn |
-| Base de datos | SQLite |
-| Frontend | HTML + CSS + JavaScript (sin frameworks) |
-| Despliegue | Docker / Docker Compose |
+| Backend | Python 3.11+ · Flask · Gunicorn |
+| Base de datos | SQLite (WAL), esquema versionado |
+| Frontend | HTML + CSS + JavaScript, sin frameworks ni empaquetado |
+| Gráficos | Chart.js, servido en local desde `js/vendor/` |
+| Despliegue | Docker · Docker Compose |
+| Calidad | pytest · coverage · ruff · vitest · eslint · prettier |
 
 ---
 
@@ -410,7 +553,7 @@ ruff check .                # lint
 ruff check . --fix          # correcciones automáticas
 ```
 
-**Frontend** — no hay empaquetado: `js/` se sirve tal cual con etiquetas `<script>`, así que el `package.json` solo trae linter y formateador.
+**Frontend** — no hay empaquetado: `js/` se sirve tal cual con etiquetas `<script>`, así que `package.json` solo trae linter, formateador y las pruebas.
 
 ```bash
 npm ci
@@ -419,13 +562,23 @@ npm run lint          # eslint sobre js/
 npm run lint:fix
 npm run format        # prettier sobre js/ y css/
 npm run format:check
+npm test              # vitest sobre js/core/
+npm run test:watch
+npm run test:coverage
 ```
+
+Las pruebas del frontend viven en `tests-js/` y corren sobre jsdom. Los módulos no exportan nada —declaran funciones en el ámbito global de la página—, así que `tests-js/cargar.js` reproduce lo que hace el navegador con una etiqueta `<script>` y evalúa el fuente en el contexto global. La alternativa era reescribirlos a módulos ESM para poder importarlos, pero entonces las pruebas no estarían ejercitando el código que se sirve.
 
 El linter no es cosmético aquí: `js/cartera/assets.js` pasa de 4.800 líneas y `js/analisis/metricas.js` de 4.400, y sin él un nombre mal escrito o una variable que ya no existe solo se ve cuando el usuario abre esa pantalla. La configuración (`eslint.config.js`) tiene en cuenta que los módulos comparten el ámbito global de la página, que es lo que hace útil a `no-undef`.
 
 La configuración de pytest, ruff y coverage está en `pyproject.toml`. Los tests **nunca tocan `data/`**: usan una BD temporal vía `set_active_db_path()` y no importan `server`, porque ese módulo inicializa los portfolios reales al importarse. Para probar la capa HTTP, `tests/conftest.py` ofrece `crear_app` y `cliente_autenticado`, que montan una app mínima con los blueprints que interesen y la capa de `core/seguridad_app.py` encima — así se puede comprobar de verdad que un `POST` sin token CSRF recibe `403` o que `/api/restore` exige sesión.
 
-El umbral de cobertura (`fail_under = 58`) **no es una meta, es un trinquete**: sirve para que un PR no baje la cobertura sin que nadie se dé cuenta, y sube cuando sube ella.
+El umbral de cobertura (`fail_under = 60`) **no es una meta, es un trinquete**: sirve para que un PR no baje la cobertura sin que nadie se dé cuenta, y sube cuando sube ella. Ese número es del proyecto entero y mezcla un cliente HTTP con el cálculo de la declaración de la renta, así que hay un segundo umbral, del 90 %, solo para los módulos donde un error no da un fallo sino una cifra equivocada: `fifo`, `fiscal_es`, `informe_renta`, `pnl_divisa`, `rentabilidad` y `dinero`.
+
+Dos pruebas merecen mención porque no comprueban comportamiento sino invariantes, y son las que sostienen decisiones que de otro modo se pierden:
+
+- `tests/test_frontera_dinero.py` recorre el AST para exigir que los módulos de importes no llamen a `float()` fuera de la serialización. El dinero se calcula en `Decimal` de principio a fin y esta prueba es lo que impide que vuelva a colarse.
+- `tests-js/globales.test.js` comprueba que ningún nombre se declare en dos ficheros de `js/` —los 27 scripts comparten un solo ámbito y el último cargado machaca al anterior— y que `csrf.js` y `api.js` sigan cargándose antes que el resto.
 
 ### Integración continua
 
@@ -433,12 +586,40 @@ El umbral de cobertura (`fail_under = 58`) **no es una meta, es un trinquete**: 
 
 | Trabajo | Qué hace |
 |---|---|
-| `test` | ruff + pytest con cobertura en Python 3.11/3.12/3.13, y publica `coverage.xml` como artefacto |
-| `frontend` | `npm ci` + eslint + prettier |
+| `test` | ruff + pytest con cobertura en Python 3.11/3.12/3.13, umbral aparte para los módulos de cálculo, y publica `coverage.xml` como artefacto |
+| `frontend` | `npm ci` + eslint + prettier + vitest, los tres bloqueantes |
 | `auditoria` | `pip-audit` sobre las dependencias de producción y de desarrollo, en modo informativo: un aviso publicado hoy no debe bloquear un PR que no lo introdujo |
 | `docker` | comprueba que la imagen construye |
 
 `.github/dependabot.yml` abre los PR de actualización (pip, npm, GitHub Actions y Docker), agrupando los cambios menores y de parche en uno solo por semana y dejando los mayores sueltos, que esos sí hay que leerlos.
+
+### Publicar una versión
+
+La versión vive en **`python/core/version.py`** y de ahí la lee `/api/health`. `pyproject.toml`, `package.json` y el CHANGELOG tienen que decir lo mismo; `tests/test_version.py` falla si alguno se queda atrás, que es el olvido típico porque no rompe nada al ejecutar.
+
+En un solo commit:
+
+1. Subir `__version__` en `python/core/version.py`, `pyproject.toml` y `package.json`.
+2. Añadir la sección al `CHANGELOG.md`, encabezando el fichero, con su línea **«Esquema de base de datos:»** — es lo que le dice a quien actualiza si podrá deshacerlo volviendo a la imagen anterior o tendrá que restaurar el fichero.
+3. Si el cambio toca el esquema, subir `ESQUEMA_VERSION` en `core/db.py` y registrar el paso con `@_migracion(N)`. Los pasos han de ser idempotentes: una base puede tener aplicada parte de uno posterior, porque antes de existir el contador todos se ejecutaban en cada arranque.
+
+Después:
+
+```bash
+pytest -m "not network" && npm test
+git tag -a v1.1.0 -m "1.1.0"
+git push && git push --tags
+```
+
+La etiqueta importa: es lo que permite a quien tenga esa versión desplegada volver a ella con `git checkout v1.1.0`.
+
+### Qué número subir
+
+| | Cuándo |
+|---|---|
+| **MAYOR** | La actualización pide intervención manual: mover ficheros, reconfigurar, o una migración que no se deshace restaurando el backup previo |
+| **MENOR** | Funcionalidad nueva. Puede subir el esquema; la migración se aplica sola |
+| **PARCHE** | Correcciones. No toca el esquema |
 
 ### Estructura del proyecto
 

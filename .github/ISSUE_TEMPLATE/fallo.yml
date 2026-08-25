@@ -1,0 +1,66 @@
+name: Informar de un fallo
+description: Algo no funciona como debería
+labels: ["fallo"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Si es un problema de **seguridad**, no lo publiques aquí:
+        usa el [aviso privado](https://github.com/FranciscoFdez05/PorfolioPython/security/advisories/new).
+
+  - type: textarea
+    id: que-pasa
+    attributes:
+      label: Qué pasa
+      description: Qué esperabas y qué ocurre en su lugar.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproducir
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: |
+        1. Entro en Activos y abro la ficha de…
+        2. Añado una compra con…
+        3. El total sale…
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión
+      description: "La devuelve: curl -s http://localhost:5000/api/health"
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: despliegue
+    attributes:
+      label: Cómo lo ejecutas
+      options:
+        - Docker (docker-up.sh)
+        - Docker Compose a mano
+        - Sin Docker (python python/server.py)
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log
+      description: >
+        Las líneas de logs/ o de `docker compose logs porfoliopython` alrededor
+        del fallo. Si la respuesta traía un identificador (`ref. abc123`),
+        búscalo ahí: correlaciona con la petición exacta.
+      render: shell
+
+  - type: checkboxes
+    id: datos
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: He quitado del log y de las capturas cualquier importe o dato personal que no quiera publicar
+          required: true
