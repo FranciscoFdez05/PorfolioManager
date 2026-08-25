@@ -84,12 +84,9 @@ describe("parseLooseNumber", () => {
         expect(parseLooseNumber(entrada)).toBe(esperado)
     })
 
-    it.each([[""], [null], [undefined], ["-"], ["abc"]])(
-        "devuelve null para %j, y quien llama decide",
-        (entrada) => {
-            expect(parseLooseNumber(entrada)).toBeNull()
-        }
-    )
+    it.each([[""], [null], [undefined], ["-"], ["abc"]])("devuelve null para %j, y quien llama decide", (entrada) => {
+        expect(parseLooseNumber(entrada)).toBeNull()
+    })
 
     it("coincide con parseEuroNumber en las columnas que leen los dos", () => {
         // Discrepaban: "1234.56" daba 1234,56 en uno y 123.456 en el otro, así
@@ -106,12 +103,9 @@ describe("parseLooseNumber", () => {
 })
 
 describe("ida y vuelta entre formato y lectura", () => {
-    it.each([0, 0.1, 1234.56, -99.99, 1234567.89])(
-        "formatEuro(%f) se vuelve a leer igual",
-        (valor) => {
-            expect(parseEuroNumber(formatEuro(valor))).toBeCloseTo(valor, 2)
-        }
-    )
+    it.each([0, 0.1, 1234.56, -99.99, 1234567.89])("formatEuro(%f) se vuelve a leer igual", (valor) => {
+        expect(parseEuroNumber(formatEuro(valor))).toBeCloseTo(valor, 2)
+    })
 })
 
 describe("formatEuro", () => {
@@ -179,5 +173,33 @@ describe("stripCurrencyText", () => {
     it("deja el número sin el símbolo", () => {
         expect(stripCurrencyText("1.234,56 €").trim()).toBe("1.234,56")
         expect(stripCurrencyText("1.234,56 $").trim()).toBe("1.234,56")
+    })
+})
+
+describe("currencySuffix", () => {
+    // Se extrajo de formatMoneyWithDecimals porque el mapa de calor tiene sus
+    // propias reglas de decimales y estaba pintando los precios sin divisa: un
+    // activo en dólares se veía igual que uno en euros.
+    it.each([
+        ["EUR", "€"],
+        ["USD", "$"],
+        ["GBP", "GBP"],
+        ["CHF", "CHF"]
+    ])("devuelve el sufijo de %s", (divisa, esperado) => {
+        expect(currencySuffix(divisa)).toBe(esperado)
+    })
+
+    it("normaliza las stablecoins a su divisa de referencia", () => {
+        expect(currencySuffix("USDT")).toBe("$")
+        expect(currencySuffix("EURC")).toBe("€")
+    })
+
+    it("una divisa desconocida se muestra con su código, no vacía", () => {
+        expect(currencySuffix("NOK")).toBe("NOK")
+    })
+
+    it("formatMoney sigue dando lo mismo tras extraer el mapa", () => {
+        expect(formatMoney(1234.5, "EUR")).toBe("1234,50 €")
+        expect(formatMoney(1234.5, "USD")).toBe("1234,50 $")
     })
 })

@@ -127,7 +127,7 @@ async function hmLoadData() {
                             euros.invertidoBrutoEur > 0 ? (euros.rendimientoEur / euros.invertidoBrutoEur) * 100 : 0,
                         hasCuenta: euros.invertidoBrutoEur > 0
                     }
-                } catch (e) {
+                } catch {
                     asset._hmMetrics = null
                 }
             })
@@ -178,7 +178,6 @@ async function hmLoadHistorical(period) {
     const cached = _hmHistCache[period]
     if (cached && Date.now() - cached.ts < _HM_HIST_TTL) return
 
-    const container = document.getElementById("heatmapContainer")
     const loading = document.getElementById("heatmapLoading")
     if (loading) {
         loading.textContent = "Cargando datos históricos…"
@@ -235,10 +234,7 @@ function hmRender() {
 
     const enriched = items
         .map((d) => {
-            let value,
-                valueLabel,
-                hasValue,
-                approx = false
+            let value, valueLabel, hasValue
 
             if (_hmMetric === "cuenta") {
                 if (d.hasCuenta) {
@@ -414,10 +410,22 @@ function hmFormatPct(v) {
     return sign + v.toFixed(2).replace(".", ",") + " %"
 }
 
+// Los decimales dependen de la magnitud: en una baldosa del mapa no cabe un
+// precio de cuatro cifras con céntimos, y una cripto de 0,0012 sin decimales
+// se vería como 0.
+//
+// La divisa se añade al final. Las dos llamadas ya la pasaban, pero la función
+// la ignoraba, así que un activo en dólares mostraba el mismo "1.234,56" que
+// uno en euros y no había forma de distinguirlos en el mapa ni en el tooltip.
 function hmFormatPrice(num, currency) {
-    if (num >= 1000) return num.toLocaleString("es-ES", { maximumFractionDigits: 0 })
-    if (num >= 1) return num.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    return num.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+    const decimales =
+        num >= 1000
+            ? { maximumFractionDigits: 0 }
+            : num >= 1
+              ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+              : { minimumFractionDigits: 2, maximumFractionDigits: 4 }
+
+    return `${num.toLocaleString("es-ES", decimales)} ${currencySuffix(currency)}`
 }
 
 function hmColorForValue(pct) {

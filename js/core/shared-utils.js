@@ -77,23 +77,31 @@ function normalizeCurrencyCode(currency) {
     return normalized || "EUR"
 }
 
+// Sufijo con el que se muestra cada divisa. Fuera de `formatMoneyWithDecimals`
+// para que cualquier formateador con sus propias reglas de decimales pueda
+// usarlo sin copiar el mapa: el mapa de calor tiene las suyas (0, 2 o 4
+// decimales según la magnitud) y estaba enseñando los precios sin divisa.
+const SUFIJO_DIVISA = {
+    EUR: "€",
+    USD: "$",
+    GBP: "GBP",
+    CHF: "CHF",
+    JPY: "JPY",
+    SEK: "SEK"
+}
+
+function currencySuffix(currency) {
+    const normalized = normalizeCurrencyCode(currency)
+    return SUFIJO_DIVISA[normalized] || normalized
+}
+
 function formatMoneyWithDecimals(value, currency = "EUR", decimals = 2) {
-    const normalizedCurrency = normalizeCurrencyCode(currency)
     const formattedNumber = new Intl.NumberFormat(_nl(), {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
     }).format(value)
 
-    const suffixByCurrency = {
-        EUR: "€",
-        USD: "$",
-        GBP: "GBP",
-        CHF: "CHF",
-        JPY: "JPY",
-        SEK: "SEK"
-    }
-
-    return `${formattedNumber} ${suffixByCurrency[normalizedCurrency] || normalizedCurrency}`
+    return `${formattedNumber} ${currencySuffix(currency)}`
 }
 
 function formatMoney(value, currency = "EUR") {
@@ -393,7 +401,10 @@ function formatCellSatoshisValue(value) {
     return formatSatoshis(parsed)
 }
 
-function formatAssetCommissionValue(value, currency = "EUR") {
+// Sin parámetro de divisa: los dos llamadores formatean comisiones en cripto,
+// que se muestran como cantidad y sin símbolo. El argumento estaba declarado y
+// no lo usaba ni la función ni ninguna llamada.
+function formatAssetCommissionValue(value) {
     const parsed = parseLooseNumber(value)
 
     if (parsed === null || String(value ?? "").trim() === "") {
