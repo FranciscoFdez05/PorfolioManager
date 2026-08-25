@@ -1,0 +1,80 @@
+/* Dividendos
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* ===== DIVIDENDOS ===== */
+
+.dividendosLayout {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+}
+
+.dividendosMainArea {
+    display: grid;
+    grid-template-columns: 1fr 220px;
+    column-gap: 20px;
+    align-items: start;
+}
+
+.dividendosActions {
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
+}
+
+.dividendosTableSection {
+    min-width: 0;
+}
+
+.dividendosTableWrapper {
+    position: relative;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    overflow: auto;
+}
+
+.dividendosTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    color: #7a8fb0;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-soft);
+    padding: 10px 14px;
+}
+
+.dividendosTable tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #1a2640;
+    color: var(--text-subtle);
+    font-size: 0.84rem;
+}
+
+.dividendosTable tbody tr:nth-child(odd) td {
+    background: var(--bg-panel);
+}
+
+.dividendosTable tbody tr:hover td {
+    background: var(--bg-elevated) !important;
+}
+
+.dividendosSummarySection {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dividendosCalBtn {
+    width: 100%;
+    padding: 10px 8px;
+    font-size: 0.85rem;
+    border-radius: 10px;
+    letter-spacing: 0.04em;
+}

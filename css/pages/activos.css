@@ -1,0 +1,781 @@
+/* Activos y watchlist
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* ===== ACTIVOS PAGE ===== */
+
+.activosPage {
+    padding: 0 0 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.seguimientoPage {
+    padding: 0 0 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.activosToolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 2px 0 6px 0;
+    flex: 0 0 auto;
+}
+
+#activosAddBtn,
+#seguimientoAddBtn,
+#addAssetBtn,
+#refreshSidebarMarketBtn,
+#addAssetRowBtn,
+#addRowBtn,
+#addRowDividendoBtn,
+#bonosAddBtn,
+#addOperationRowBtn,
+#addStablecoinRowBtn,
+#addStakingRowBtn,
+#addEarnRowBtn,
+#addTradingRowBtn,
+#addVentaRowBtn,
+#addTransaccionRowBtn,
+#addConversionRowBtn,
+#addGastoRowBtn,
+#addIngresoRowBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 30px !important;
+    line-height: 1;
+    padding: 0 12px !important;
+    background: linear-gradient(135deg, #1a2e4a 0%, #0f1f35 100%) !important;
+    border: 1px solid #2d6abf !important;
+    border-left: 3px solid #3b82f6 !important;
+    border-radius: 20px !important;
+    color: #93c5fd !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    box-shadow:
+        0 0 0 1px rgba(59, 130, 246, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+    transform: none !important;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+#activosAddBtn:hover,
+#seguimientoAddBtn:hover,
+#addAssetBtn:hover,
+#refreshSidebarMarketBtn:hover,
+#addAssetRowBtn:hover,
+#addRowBtn:hover,
+#addRowDividendoBtn:hover,
+#bonosAddBtn:hover,
+#addOperationRowBtn:hover,
+#addStablecoinRowBtn:hover,
+#addStakingRowBtn:hover,
+#addEarnRowBtn:hover,
+#addTradingRowBtn:hover,
+#addVentaRowBtn:hover,
+#addTransaccionRowBtn:hover,
+#addConversionRowBtn:hover,
+#addGastoRowBtn:hover,
+#addIngresoRowBtn:hover {
+    background: linear-gradient(135deg, #1e3a5f 0%, #142640 100%) !important;
+    border-color: #4f96f0 !important;
+    border-left-color: #60a5fa !important;
+    color: #bfdbfe !important;
+    transform: none !important;
+    box-shadow:
+        0 0 0 2px rgba(59, 130, 246, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+.filterDrop {
+    position: relative;
+    display: inline-flex;
+}
+.filterDropBtn {
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--btn-border);
+    border-radius: 6px;
+    background: var(--btn-bg);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 13px;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+    white-space: nowrap;
+}
+.filterDropBtn:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--btn-border-hover);
+}
+.filterDropBtn.active {
+    border-color: var(--accent, #3a7bd5);
+    color: var(--accent, #3a7bd5);
+}
+.filterDropMenu {
+    display: none;
+    position: fixed;
+    background: var(--bg-surface);
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    padding: 10px;
+    z-index: 10001;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28);
+    min-width: max-content;
+}
+.filterDropMenu.open {
+    display: flex;
+}
+.filterDropSep {
+    height: 1px;
+    background: var(--border-soft, #2a2a3a);
+    margin: 2px 0;
+}
+
+.activosFilters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.filtersDivider {
+    width: 1px;
+    height: 25px;
+    background: var(--border, #333);
+    align-self: center;
+    flex-shrink: 0;
+    margin: 0 2px;
+}
+
+/* activosFilterBtn — base visual heredado de overviewFilterOption (components.css) */
+.activosFilterBtn[data-type="all"]::before {
+    background: #8899bb55;
+}
+.activosFilterBtn[data-type="all"]:has(input:checked)::before {
+    background: #8899bb;
+}
+.activosFilterBtn[data-type="cripto"]::before {
+    background: #f7931a55;
+}
+.activosFilterBtn[data-type="acciones"]::before {
+    background: #3a7bd555;
+}
+.activosFilterBtn[data-type="etfs"]::before {
+    background: #2ecc7155;
+}
+.activosFilterBtn[data-type="comoditis"]::before {
+    background: #e0c06855;
+}
+
+.activosFilterBtn[data-type="all"].active,
+.activosFilterBtn[data-type="all"]:has(input:checked) {
+    border-color: #3a7bd544;
+}
+.activosFilterBtn[data-type="cripto"].active,
+.activosFilterBtn[data-type="cripto"]:has(input:checked) {
+    border-color: #f7931a44;
+}
+.activosFilterBtn[data-type="acciones"].active,
+.activosFilterBtn[data-type="acciones"]:has(input:checked) {
+    border-color: #3a7bd544;
+}
+.activosFilterBtn[data-type="etfs"].active,
+.activosFilterBtn[data-type="etfs"]:has(input:checked) {
+    border-color: #2ecc7144;
+}
+.activosFilterBtn[data-type="comoditis"].active,
+.activosFilterBtn[data-type="comoditis"]:has(input:checked) {
+    border-color: #e0c06844;
+}
+
+.activosFilterBtn[data-type="cripto"].active::before,
+.activosFilterBtn[data-type="cripto"]:has(input:checked)::before {
+    background: #f7931a;
+}
+.activosFilterBtn[data-type="acciones"].active::before,
+.activosFilterBtn[data-type="acciones"]:has(input:checked)::before {
+    background: #3a7bd5;
+}
+.activosFilterBtn[data-type="etfs"].active::before,
+.activosFilterBtn[data-type="etfs"]:has(input:checked)::before {
+    background: #2ecc71;
+}
+.activosFilterBtn[data-type="comoditis"].active::before,
+.activosFilterBtn[data-type="comoditis"]:has(input:checked)::before {
+    background: #e0c068;
+}
+
+.activosFilterBtn[data-source="all"]::before {
+    background: #8899bb55;
+}
+.activosFilterBtn[data-source="all"]:has(input:checked)::before {
+    background: #8899bb;
+}
+.activosFilterBtn[data-source="portfolio"]::before {
+    background: #64b5f655;
+}
+.activosFilterBtn[data-source="nuevos"]::before {
+    background: #b39ddb55;
+}
+
+.activosFilterBtn[data-source="all"].active,
+.activosFilterBtn[data-source="all"]:has(input:checked) {
+    border-color: #64b5f644;
+}
+.activosFilterBtn[data-source="portfolio"].active,
+.activosFilterBtn[data-source="portfolio"]:has(input:checked) {
+    border-color: #64b5f644;
+}
+.activosFilterBtn[data-source="nuevos"].active,
+.activosFilterBtn[data-source="nuevos"]:has(input:checked) {
+    border-color: #b39ddb44;
+}
+
+.activosFilterBtn[data-source="portfolio"].active::before,
+.activosFilterBtn[data-source="portfolio"]:has(input:checked)::before {
+    background: #64b5f6;
+}
+.activosFilterBtn[data-source="nuevos"].active::before,
+.activosFilterBtn[data-source="nuevos"]:has(input:checked)::before {
+    background: #b39ddb;
+}
+
+.activosSearch {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    outline: none;
+    min-width: 200px;
+    transition: border-color 0.15s;
+}
+
+.activosSearch:focus {
+    border-color: #3a7bd5;
+}
+
+.activosSearch::placeholder {
+    color: var(--text-dim);
+}
+
+.activosCount {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-left: 4px;
+}
+
+/* ── View Toggle ── */
+.avViewToggle {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-header);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 3px;
+    margin-left: auto;
+}
+
+.avViewBtn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s;
+}
+
+.avViewBtn:hover {
+    background: var(--btn-bg-hover);
+    color: var(--text-subtle);
+}
+
+.avViewBtn.active {
+    background: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+/* ── Table view ── */
+.activosTableWrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 650px;
+    border-radius: 10px;
+    border: 1px solid var(--border-soft);
+}
+
+.activosPage .activosTableWrap,
+.seguimientoPage .activosTableWrap {
+    flex: 0 0 auto;
+    max-height: calc(100vh - 245px);
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.activosTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.activosTable thead tr {
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.activosTable th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #7a8fb0;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border-soft);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg-header);
+}
+
+.avTableRow {
+    border-bottom: 1px solid var(--bg-surface);
+    transition: background 0.12s;
+    cursor: pointer;
+}
+
+.avTableRow:last-child {
+    border-bottom: none;
+}
+
+.avTableRow:hover {
+    background: #151f35;
+}
+
+.activosTable td {
+    padding: 10px 14px;
+    color: var(--text-subtle);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.avTrName {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+.avTrPrice {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+.avTrProvider {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+}
+.avTrUpdated {
+    color: #3a4a68;
+    font-size: 0.75rem;
+}
+
+.avTrRend {
+    font-weight: 600;
+}
+.avTrRend.avPos {
+    color: var(--color-pos);
+}
+.avTrRend.avNeg {
+    color: var(--color-neg);
+}
+.avTrRend small {
+    font-weight: 400;
+    color: inherit;
+    opacity: 0.8;
+}
+
+.avTrActions {
+    display: flex;
+    gap: 4px;
+}
+
+/* ── Grid ── */
+.activosGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+    align-content: start;
+    grid-auto-rows: max-content;
+    padding-bottom: 24px;
+}
+
+.activosPage .activosGrid,
+.seguimientoPage .activosGrid {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    padding-top: 10px;
+}
+
+.activosPage .activosGrid::-webkit-scrollbar,
+.seguimientoPage .activosGrid::-webkit-scrollbar {
+    display: none;
+}
+
+/* ── Card ── */
+.avCard {
+    position: relative;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    padding: 16px 16px 14px;
+    cursor: pointer;
+    overflow: hidden;
+    transition:
+        border-color 0.15s,
+        transform 0.12s,
+        box-shadow 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.avCard:hover {
+    border-color: var(--av-color, #3a7bd5);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    transform: translateY(-2px);
+}
+
+.avCard:hover .avCardActions,
+.avCardActions:has(.rowMenuDropdown.open) {
+    opacity: 1;
+}
+
+.avCard:has(.rowMenuDropdown.open) {
+    transform: none;
+}
+
+.avCardTop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.avBadge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.avCardActions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.avActionBtn {
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--bg-header);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        background 0.12s,
+        color 0.12s,
+        border-color 0.12s;
+    position: relative;
+}
+
+/* ── Tooltip flotante para botones de acción ── */
+.avTooltip {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    background: var(--bg-elevated);
+    color: #c8d8ef;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 4px 10px;
+    border-radius: 5px;
+    border: 1px solid var(--border-mid);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.02em;
+    opacity: 0;
+    transform: translateX(-50%) translateY(-100%) translateY(-4px);
+    transition:
+        opacity 0.13s,
+        transform 0.13s;
+}
+.avTooltip.avTooltipVisible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-100%) translateY(-8px);
+}
+
+.avColorDot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    align-self: center;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 0 0 transparent;
+    transition:
+        box-shadow 0.15s,
+        border-color 0.15s;
+    cursor: default;
+}
+
+.avColorDot:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 7px 2px var(--dot-color, #888);
+}
+
+.avTrColorDot {
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 7px;
+    position: relative;
+    top: -1px;
+}
+
+.avEditBtn:hover {
+    background: var(--btn-bg-hover);
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.avDeleteBtn:hover {
+    background: rgba(231, 76, 60, 0.1);
+    color: var(--color-neg);
+    border-color: var(--color-neg);
+}
+
+.avCardSymbol {
+    display: none;
+}
+
+.avCardName {
+    font-size: 1rem;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.avCardPrice {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-subtle);
+    margin-top: 6px;
+}
+
+.avCardTicker {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+}
+
+.avCardUpdated {
+    font-size: 0.68rem;
+    color: #3a4a68;
+    margin-top: 8px;
+    text-align: left;
+}
+
+.avCardBar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    opacity: 0.6;
+    border-radius: 0 0 12px 12px;
+}
+
+.avCardMetrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 10px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.avMetricItem {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.avMetricLabel {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+}
+
+.avMetricValue {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-subtle);
+}
+
+.avPos {
+    color: var(--color-pos);
+}
+.avNeg {
+    color: var(--color-neg);
+}
+
+.avMetricItemWide {
+    grid-column: 1 / -1;
+}
+
+/* Hueco: muestra en vivo la posición final del activo mientras se arrastra */
+.avCard.avDragging {
+    cursor: grabbing;
+    border-style: dashed;
+    border-color: var(--av-color, #3a7bd5);
+    background: var(--bg-elevated);
+    box-shadow: inset 0 0 0 1px var(--av-color, #3a7bd5);
+    transform: none;
+}
+
+.avCard.avDragging > * {
+    opacity: 0.35;
+}
+
+.avCard.avDragging .avCardSymbol,
+.avCard.avDragging .avCardName {
+    opacity: 0.75;
+}
+
+.avCard[draggable="true"] {
+    cursor: grab;
+}
+
+/* ── Watchlist section headers ─────────────────────────────── */
+.segSectionHeader {
+    grid-column: 1 / -1;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    padding: 4px 2px 6px;
+    border-bottom: 1px solid var(--border-soft);
+    margin-bottom: 2px;
+}
+.segSectionHeader:not(:first-child) {
+    margin-top: 14px;
+}
+.segTableSectionRow td.segTableSectionHeader {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    padding: 14px 10px 6px;
+    border-bottom: 1px solid var(--border-soft);
+    pointer-events: none;
+}
+.segTableSectionRow:first-child td.segTableSectionHeader {
+    padding-top: 6px;
+}
+
+.ovTypeBadge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* ── Desglose activo / divisa ──────────────────────────────────────────────
+   Va debajo del P&L de la ficha. Solo aparece cuando el activo está en otra
+   moneda: para uno en euros el efecto divisa es cero y la línea sería ruido. */
+
+.assetStatDivisa {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 4px;
+    font-size: 0.72rem;
+}
+
+.assetStatDivisaItem {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    font-variant-numeric: tabular-nums;
+}
+
+.assetStatDivisaLabel {
+    color: var(--text-dim);
+}
+
+/* El aviso de "aproximado" no es decorativo: sin los tipos de cambio del día
+   de cada compra el reparto entre los dos efectos es una estimación, y
+   presentarlo como exacto sería peor que no darlo. */
+.assetStatDivisaAviso {
+    padding: 1px 6px;
+    border: 1px solid var(--color-warn, #d9a441);
+    border-radius: 6px;
+    color: var(--color-warn, #d9a441);
+    font-size: 0.66rem;
+    cursor: help;
+}

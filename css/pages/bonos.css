@@ -1,0 +1,213 @@
+/* Bonos y renta fija
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* ── Bonos ────────────────────────────────────────────────── */
+
+.bonosPage {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+}
+
+.bonosTabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 16px;
+}
+
+.bonosTab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    padding: 8px 18px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    transition:
+        color 0.15s,
+        background 0.15s;
+}
+
+.bonosTab:hover {
+    color: var(--text-subtle);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.bonosTab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: rgba(59, 130, 246, 0.07);
+}
+
+.bonosTabPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.bonosTabPanel.hidden {
+    display: none;
+}
+
+.bonosToolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.bonosFilters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* bonosFilterBtn — base visual heredado de overviewFilterOption (components.css) */
+.bonosFilterBtn[data-tipo="all"]::before {
+    background: #8899bb55;
+}
+.bonosFilterBtn[data-tipo="all"]:has(input:checked)::before {
+    background: #8899bb;
+}
+
+.bonosFilterBtn[data-tipo="gubernamental"]::before {
+    background: #2ecc7155;
+}
+.bonosFilterBtn[data-tipo="corporativo"]::before {
+    background: #3a7bd555;
+}
+.bonosFilterBtn[data-tipo="if"]::before {
+    background: #9b59b655;
+}
+
+.bonosFilterBtn[data-tipo="all"].active,
+.bonosFilterBtn[data-tipo="all"]:has(input:checked) {
+    border-color: #3a7bd544;
+}
+.bonosFilterBtn[data-tipo="gubernamental"].active,
+.bonosFilterBtn[data-tipo="gubernamental"]:has(input:checked) {
+    border-color: #2ecc7144;
+}
+.bonosFilterBtn[data-tipo="corporativo"].active,
+.bonosFilterBtn[data-tipo="corporativo"]:has(input:checked) {
+    border-color: #3a7bd544;
+}
+.bonosFilterBtn[data-tipo="if"].active,
+.bonosFilterBtn[data-tipo="if"]:has(input:checked) {
+    border-color: #9b59b644;
+}
+
+.bonosFilterBtn[data-tipo="gubernamental"].active::before,
+.bonosFilterBtn[data-tipo="gubernamental"]:has(input:checked)::before {
+    background: #2ecc71;
+}
+.bonosFilterBtn[data-tipo="corporativo"].active::before,
+.bonosFilterBtn[data-tipo="corporativo"]:has(input:checked)::before {
+    background: #3a7bd5;
+}
+.bonosFilterBtn[data-tipo="if"].active::before,
+.bonosFilterBtn[data-tipo="if"]:has(input:checked)::before {
+    background: #9b59b6;
+}
+
+.bonosSummary {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.bonosSummaryCard {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-radius: 8px;
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 140px;
+}
+
+.bonosSummaryGub {
+    border-color: #3a7bd544;
+}
+
+.bonosSummaryCorp {
+    border-color: #e0c06844;
+}
+
+.bonosSummaryLabel {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.bonosSummaryValue {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-subtle);
+}
+
+.bonosTableWrapper {
+    position: relative;
+    max-height: calc(11 * 41px + 42px);
+    overflow: auto;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+}
+
+.bonosTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.bonosTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    color: #7a8fb0;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-soft);
+    padding: 10px 14px;
+}
+
+.bonosTable tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #1a2640;
+    color: var(--text-subtle);
+    font-size: 0.84rem;
+}
+
+.bonosTable tbody tr:nth-child(odd) td {
+    background: var(--bg-panel);
+}
+
+.bonosTable tbody tr:hover td {
+    background: var(--bg-elevated) !important;
+}
+
+.bonosTable td[contenteditable="true"] {
+    outline: none;
+}
+
+.bonosTable td[contenteditable="true"]:focus {
+    outline: none;
+    background: var(--bg-elevated);
+    box-shadow: inset 0 0 0 2px #3b82f6;
+}
+
+.bonosTotalCell {
+    font-weight: 600;
+    color: var(--text-subtle);
+}

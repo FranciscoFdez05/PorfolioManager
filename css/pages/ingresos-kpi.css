@@ -1,0 +1,94 @@
+/* Tira de KPIs de ingresos
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* ══════════════════════════════════════════════════════
+   INGRESOS — KPI Strip premium
+   ══════════════════════════════════════════════════════ */
+.ingresosKpiStrip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    flex-shrink: 0;
+}
+@media (max-width: 900px) {
+    .ingresosKpiStrip {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+.ingresosKpiCard {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    padding: 14px 18px;
+    min-width: 0;
+    transition:
+        background 0.15s,
+        transform 0.18s,
+        box-shadow 0.18s,
+        border-color 0.15s;
+}
+.ingresosKpiCard:hover {
+    background: #131f33;
+    border-color: var(--border-mid);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+.ingresosKpiIcon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1rem;
+    font-weight: 700;
+}
+.ingresosKpiIconTotal {
+    background: rgba(74, 222, 128, 0.12);
+    color: #4ade80;
+}
+.ingresosKpiIconPromedio {
+    background: rgba(96, 165, 250, 0.12);
+    color: #60a5fa;
+}
+.ingresosKpiIconMejor {
+    background: rgba(167, 139, 250, 0.12);
+    color: #a78bfa;
+}
+.ingresosKpiIconActual {
+    background: rgba(247, 183, 49, 0.14);
+    color: #f7b131;
+}
+.ingresosKpiBody {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.ingresosKpiLabel {
+    font-size: 0.71rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+.ingresosKpiValue {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ingresosKpiSub {
+    font-size: 0.76rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}

@@ -1,0 +1,308 @@
+/* Trading journal
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* ── Trading Journal ────────────────────────────────────────────────────── */
+
+.tradingPage {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-right: 18px;
+    flex: 1;
+}
+
+.tradingFilters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+    padding: 10px 0 4px;
+}
+
+.tradingFilterGroup {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.tradingFilterGroup + .tradingFilterGroup {
+    padding-left: 12px;
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tradingFilterLabel {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+}
+
+.tradingFilterButtons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+/* tradingFilterOption: solo propiedades de layout; los estilos visuales
+   los hereda de overviewFilterOption (components.css) */
+.tradingFilterOption {
+    white-space: nowrap;
+}
+
+.tradingActions {
+    display: flex;
+    gap: 10px;
+    padding: 10px 18px 16px;
+}
+
+.tmCapitalRow {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tmCapitalRow .assetRowModalInput,
+.tmCapitalCurrencySelect {
+    width: 100%;
+}
+
+.tmCurrencyLabel {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    padding: 0 6px;
+    white-space: nowrap;
+}
+
+/* Table */
+.tradingTableWrapper {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.tradingTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.tradingTable thead th {
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    background: var(--surface-2, #141929);
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+}
+
+.tradingTable tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+    vertical-align: middle;
+}
+
+.tradingTable tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.tradingTable tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.tradingNumCol {
+    width: 40px;
+}
+
+.tradingNumCell {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    text-align: right;
+    padding-right: 16px !important;
+}
+
+.tradingMonedaCell {
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: 0.04em;
+}
+
+.tradingEmptyCell {
+    padding: 8px 0 12px !important;
+}
+
+/* Badges */
+.tradingTipoBadge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.tradingTipoSCALP {
+    background: rgba(59, 130, 246, 0.18);
+    color: #60a5fa;
+}
+.tradingTipoSWING {
+    background: rgba(139, 92, 246, 0.18);
+    color: #a78bfa;
+}
+
+.tradingDirBadge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.tradingDirLONG {
+    background: rgba(46, 204, 113, 0.15);
+    color: #2ecc71;
+}
+.tradingDirSHORT {
+    background: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+}
+
+.tradingResultBadge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.tradingProfit {
+    background: rgba(46, 204, 113, 0.18);
+    color: #2ecc71;
+}
+.tradingPerdida {
+    background: rgba(231, 76, 60, 0.18);
+    color: #e74c3c;
+}
+
+/* Color classes */
+.tradingPos {
+    color: #2ecc71;
+}
+.tradingNeg {
+    color: #e74c3c;
+}
+
+/* Hacienda view */
+.tradingHaciendaYearTabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.tradingYearTab {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s;
+}
+
+.tradingYearTab.active {
+    background: var(--accent-dim, rgba(99, 102, 241, 0.2));
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.tradingHaciendaSummary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.tradingHaciendaKpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 140px;
+}
+
+.tradingHaciendaKpiLabel {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.tradingHaciendaKpiVal {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-bright);
+}
+
+.tradingHaciendaTableWrap {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.tradingHaciendaTable tbody td {
+    padding: 7px 12px;
+}
+
+/* Metrics tables */
+.mTradingStatsTable {
+    padding: 8px 0;
+}
+
+.mTradingTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.mTradingTable thead th {
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.74rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+}
+
+.mTradingTable tbody td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: var(--text-secondary);
+}
+
+.mTradingTable tbody tr:last-child td {
+    border-bottom: none;
+}

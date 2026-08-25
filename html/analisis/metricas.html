@@ -60,7 +60,9 @@
                 <div class="mToggleGroup" id="mEvolucionModeGroup">
                     <button class="mEvolucionModeBtn mToggleBtn active" data-mode="eur">€</button>
                     <button class="mEvolucionModeBtn mToggleBtn" data-mode="pct">%</button>
+                    <button class="mEvolucionModeBtn mToggleBtn" data-mode="vs">vs índice</button>
                 </div>
+                <select class="mSelect hidden" id="mBenchmarkSelect" aria-label="Índice de comparación"></select>
             </div>
             <div class="mToggleGroup" id="mEvolucionRangeGroup">
                 <button class="mEvolucionRangeBtn mToggleBtn active" data-range="1D">1D</button>
@@ -81,6 +83,7 @@
                 <div class="metricasChartWrap" style="height:280px">
                     <canvas id="mChartEvolucion"></canvas>
                 </div>
+                <div class="mChartNota hidden" id="mEvolucionNota"></div>
             </div>
         </div>
     </div>
@@ -203,6 +206,64 @@
         </div>
     </div>
 
+    <!-- -- Rentabilidad y riesgo -------------------------------- -->
+    <div class="metricasSection" id="mSectionRiesgo" data-mcat="portfolio">
+        <div class="metricasSectionHeader">
+            <span class="metricasSectionTitle">Rentabilidad y riesgo</span>
+        </div>
+        <div id="mRiesgoEmpty" class="mEvolucionEmpty hidden">
+            <span>Hacen falta varios días de histórico para calcular TWR, XIRR y volatilidad.</span>
+        </div>
+        <div id="mRiesgoWrap">
+            <div class="metricasKpiRow mRiesgoKpiRow">
+                <div class="metricasKpiGroup mkpiGroupRiesgo">
+                    <span class="metricasKpiGroupLabel">Rentabilidad</span>
+                    <div class="metricasKpiCards">
+                        <div class="metricasKpiCard" data-mhelp="Time-Weighted Return: encadena el rendimiento entre snapshots quitando el efecto de aportar y retirar. Es la cifra comparable contra un índice.">
+                            <div class="mkpiLabel">TWR acumulada</div>
+                            <div class="mkpiValue" id="mkpiTwrTotal">---</div>
+                            <div class="mkpiSubValue" id="mkpiTwrAnual">---</div>
+                        </div>
+                        <div class="metricasKpiCard" data-mhelp="TIR de los flujos reales con sus fechas: lo que ha rentado tu dinero, no la cartera.">
+                            <div class="mkpiLabel">XIRR anual</div>
+                            <div class="mkpiValue" id="mkpiXirr">---</div>
+                            <div class="mkpiSubValue" id="mkpiXirrNota">---</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="metricasKpiGroupSep"></div>
+                <div class="metricasKpiGroup mkpiGroupRiesgoVol">
+                    <span class="metricasKpiGroupLabel">Riesgo</span>
+                    <div class="metricasKpiCards">
+                        <div class="metricasKpiCard" data-mhelp="Peor caída desde un máximo, medida sobre la serie sin flujos: retirar dinero no cuenta como pérdida.">
+                            <div class="mkpiLabel">Máx. drawdown</div>
+                            <div class="mkpiValue" id="mkpiDrawdown">---</div>
+                            <div class="mkpiSubValue" id="mkpiDrawdownFechas">---</div>
+                        </div>
+                        <div class="metricasKpiCard" data-mhelp="Cuánto se aleja el drawdown actual del último máximo histórico.">
+                            <div class="mkpiLabel">Caída actual</div>
+                            <div class="mkpiValue" id="mkpiDrawdownActual">---</div>
+                            <div class="mkpiSubValue" id="mkpiDrawdownActualNota">---</div>
+                        </div>
+                        <div class="metricasKpiCard" data-mhelp="Desviación típica de los rendimientos diarios, anualizada con la raíz del tiempo.">
+                            <div class="mkpiLabel">Volatilidad anual</div>
+                            <div class="mkpiValue" id="mkpiVolatilidad">---</div>
+                            <div class="mkpiSubValue" id="mkpiVolatilidadNota">---</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="metricasChartsGrid1">
+                <div class="metricasChartCard">
+                    <div class="metricasChartTitle">Caídas desde máximos</div>
+                    <div class="metricasChartWrap" style="height:220px">
+                        <canvas id="mChartDrawdown"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- -- Análisis: concentración + rentabilidad anual ---------- -->
     <div class="metricasSection" id="mSectionAnalisis" data-mcat="portfolio">
         <div class="metricasSectionHeader">
@@ -223,6 +284,7 @@
                 <div class="metricasChartWrap" style="height:300px" id="mRentAnualWrap">
                     <canvas id="mChartRentAnual"></canvas>
                 </div>
+                <div class="mChartNota hidden" id="mRentAnualNota"></div>
             </div>
         </div>
     </div>

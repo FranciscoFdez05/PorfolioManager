@@ -1,0 +1,1157 @@
+/* Gastos y mensualidades
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* ===== GASTOS ===== */
+
+.gastosPage {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 18px;
+    flex: 1;
+    margin-top: -6px;
+}
+
+.gastosYearBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 2px 0 2px;
+    margin-bottom: 0;
+    width: 100%;
+}
+
+.gastosYearActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
+.gastosYearActions .dangerButton {
+    height: 36px;
+    font-size: 14px;
+    padding: 0 12px;
+}
+
+.gastosMonthBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 0;
+    width: 100%;
+    padding: 0 2px;
+}
+
+.gastosYearList {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 5px;
+    flex: 1 1 auto;
+}
+
+.gastosYearBtn,
+.gastosMonthTab {
+    flex: 1;
+    text-align: center;
+}
+
+.gastosYearBtn,
+.gastosAddYearBtn,
+.gastosMonthTab {
+    min-width: 78px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.15s ease;
+}
+
+.gastosYearBtn:hover,
+.gastosAddYearBtn:hover,
+.gastosMonthTab:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--btn-border-hover);
+    transform: translateY(-1px);
+}
+
+.gastosYearBtn.active,
+.gastosMonthTab.active {
+    background: var(--btn-active-bg);
+    border-color: var(--btn-active-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.gastosYearBtn.yearViewActive {
+    box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.85);
+}
+
+.gastosAddYearBtn {
+    min-width: 36px;
+    font-size: 22px;
+    line-height: 1;
+    padding: 0 10px;
+}
+
+.gastosAnnualWrapper,
+.gastosMovementsWrapper {
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    background: var(--bg-panel);
+    scrollbar-width: none;
+    overflow-x: hidden;
+}
+
+.gastosMovementsWrapper {
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 498px;
+}
+
+.gastosAnnualWrapper::-webkit-scrollbar,
+.gastosMovementsWrapper::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
+.gastosAnnualTable,
+.gastosMovementsTable {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    background: var(--bg-panel);
+    color: #e8eefc;
+}
+
+.gastosAnnualTable thead th,
+.gastosMovementsTable thead th {
+    padding: 8px 10px;
+    background: var(--bg-panel);
+    color: #f8fbff;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+    border-right: none;
+    border-bottom: 1px solid var(--border-mid);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.gastosMovementsTable thead th {
+    padding: 9px 12px;
+    font-size: 14px;
+}
+
+/* La cabecera de una columna numérica sigue a sus celdas (ver .numCol/.numCell) */
+.gastosAnnualTable thead th.numCol,
+.gastosMovementsTable thead th.numCol {
+    text-align: right;
+}
+
+.gastosAnnualTable tbody td,
+.gastosMovementsTable tbody td {
+    padding: 8px 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-mid);
+    background: var(--bg-surface);
+    color: #e6edf8;
+    font-size: 13px;
+    vertical-align: middle;
+}
+
+.gastosAnnualTable tbody td {
+    padding: 5px 8px;
+}
+
+/* Mismo alto para todas las filas, cabeceras de sección incluidas: las
+   mensualidades ocupan dos líneas (nombre + frecuencia) y las de tipo de gasto
+   solo una. El padding se queda corto a propósito para que el contenido más
+   alto quepa dentro de los 42px y ninguna fila crezca por encima. */
+.gastosAnnualTable tbody tr td {
+    height: 42px;
+}
+
+/* Todas las columnas de mes a la derecha, aunque el mes esté vacío ("- €") y
+   la detección automática de columnas numéricas no lo marque como numérico. */
+.gastosAnnualTable thead th:not(:first-child):not(.rowActionHeader),
+.gastosAnnualTable tbody td:not(:first-child):not(.rowActionsCell) {
+    text-align: right;
+}
+
+.gastosAnnualTable .rowActionHeader {
+    width: 40px;
+    min-width: 40px;
+    padding: 0 4px !important;
+    border-left: none !important;
+    border-right: none !important;
+    background: var(--bg-panel) !important;
+}
+
+.gastosMovementsTable .rowActionHeader {
+    width: 40px;
+    min-width: 40px;
+    padding: 0 4px !important;
+    border-left: none !important;
+    border-right: none !important;
+    background: var(--bg-panel) !important;
+}
+
+.gastosAnnualTable .rowActionsCell {
+    width: 40px;
+    min-width: 40px;
+}
+
+.gastosMovementsTable tbody td {
+    padding: 6px 10px;
+    font-size: 14px;
+    height: 38px;
+}
+
+.gastosMovementsTable .rowActionsCell {
+    width: 40px;
+    min-width: 40px;
+}
+
+/* Columnas compactas y agrupadas a la izquierda: la de acciones absorbe el
+   ancho sobrante del panel en lugar de repartirlo entre todas (table-layout:fixed). */
+.gastosMovementsTable thead th:nth-child(1),
+.gastosMovementsTable tbody td:nth-child(1) {
+    width: 170px;
+}
+.gastosMovementsTable thead th:nth-child(2),
+.gastosMovementsTable tbody td:nth-child(2) {
+    width: 360px;
+}
+.gastosMovementsTable thead th:nth-child(3),
+.gastosMovementsTable tbody td:nth-child(3) {
+    width: 260px;
+}
+.gastosMovementsTable thead th:nth-child(4),
+.gastosMovementsTable tbody td:nth-child(4) {
+    width: 180px;
+}
+
+.gastosMovementsTable thead th.rowActionHeader,
+.gastosMovementsTable tbody td.rowActionsCell {
+    width: auto;
+    text-align: right;
+}
+
+.gastosMovementsTable tbody tr:hover td,
+.ingresosMovementsTable tbody tr:hover td {
+    background: var(--btn-bg-hover) !important;
+}
+
+/* ── Row Menu (··· dropdown) ── */
+.rowMenu {
+    position: relative;
+    display: inline-block;
+}
+
+.rowMenuTrigger {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: var(--bg-elevated);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s,
+        box-shadow 0.15s;
+    user-select: none;
+}
+
+.rowMenuTrigger:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow:
+        0 0 0 2px var(--accent-glow),
+        0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.rowMenuTrigger:active {
+    transform: scale(0.92);
+}
+
+.rowMenuDropdown {
+    position: fixed;
+    z-index: 9999;
+    background: var(--bg-surface);
+    border: 1px solid var(--btn-border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+    min-width: 130px;
+    padding: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px) scale(0.97);
+    transition:
+        opacity 0.15s ease,
+        transform 0.15s ease,
+        visibility 0s linear 0.15s;
+    pointer-events: none;
+}
+
+.rowMenuDropdown.open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    transition:
+        opacity 0.15s ease,
+        transform 0.15s ease,
+        visibility 0s linear 0s;
+    pointer-events: auto;
+}
+
+.rowMenuDropdown hr {
+    margin: 3px 0;
+    border: none;
+    border-top: 1px solid var(--border-color);
+    opacity: 0.5;
+}
+
+.rowMenuItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    color: var(--text-primary, #e6edf8);
+    cursor: pointer;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    border-radius: 5px;
+    transition:
+        background 0.1s,
+        color 0.1s;
+}
+
+.rowMenuItem:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.rowMenuItemDanger {
+    color: var(--color-neg-bright);
+}
+
+.rowMenuItemDanger:hover {
+    background: rgba(231, 76, 60, 0.12);
+    color: var(--color-neg-bright);
+}
+
+.rowMenuDropdown .rowMenuItem:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+.rowMenuDropdown .rowMenuItem:disabled:hover {
+    background: none;
+}
+
+.rowMenuDropdown .avActionBtn {
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0 !important;
+    border: none !important;
+    border-radius: 5px !important;
+    color: inherit !important;
+    font-size: 13px !important;
+    justify-content: flex-start !important;
+    padding: 8px 12px !important;
+    box-sizing: border-box !important;
+}
+
+.rowMenuDropdown .avActionBtn:not(:hover) {
+    background: none !important;
+}
+
+.rowMenuDropdown .avEditBtn:hover,
+.rowMenuDropdown .avActionBtn.rowMenuItem:hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    color: var(--text-primary, #e6edf8) !important;
+    border-color: transparent !important;
+}
+
+.rowMenuDropdown .avDeleteBtn:hover,
+.rowMenuDropdown .avActionBtn.rowMenuItemDanger:hover {
+    background: rgba(220, 60, 50, 0.15) !important;
+    color: #f07070 !important;
+    border-color: transparent !important;
+}
+
+.gastosAnnualTable tbody td[contenteditable="true"],
+.gastosMovementsTable tbody td[contenteditable="true"] {
+    outline: none;
+}
+
+.gastosAnnualTable tbody td[contenteditable="true"]:focus,
+.gastosMovementsTable tbody td[contenteditable="true"]:focus {
+    background: var(--bg-elevated);
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.gastosTypeSelect {
+    width: 100%;
+    height: 30px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%23ccd6f6' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E")
+        no-repeat right 10px center;
+    background-size: 8px 5px;
+    color: var(--text-subtle);
+    font-size: 0.82rem;
+    outline: none;
+    cursor: pointer;
+    padding: 0 28px 0 10px;
+    line-height: 1.2;
+    color-scheme: dark;
+    appearance: none;
+    -webkit-appearance: none;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+}
+
+.gastosTypeSelect:hover {
+    border-color: #4a6080;
+}
+
+.gastosTypeSelect:focus {
+    border-color: #3a7bd5;
+    box-shadow: 0 0 0 2px rgba(58, 123, 213, 0.18);
+    outline: none;
+}
+
+.gastosTypeSelect option {
+    background: var(--bg-panel);
+    color: var(--text-subtle);
+    padding: 6px 10px;
+}
+
+.gastosMovementsTable {
+    width: 100%;
+}
+
+.gastosMovementsTable td[contenteditable="true"] {
+    min-height: 26px;
+    line-height: 1.2;
+}
+
+.gastosSectionToggle {
+    cursor: pointer;
+    user-select: none;
+}
+
+.gastosSectionRow td {
+    background: var(--bg-panel) !important;
+    border-top: 2px solid var(--border-mid);
+    border-bottom: 1px solid var(--border-mid);
+    color: #93c5fd !important;
+    font-size: 11px !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+/* Fila de categoría "Mensualidades" dentro de la sección de gastos */
+.gastosCategoryRow td {
+    background: var(--bg-elevated) !important;
+    font-weight: 700;
+    color: #f1f6ff !important;
+}
+
+.gastosCategoryRow .gastosSectionToggle {
+    color: #93c5fd !important;
+}
+
+.gastosMensualidadDetail td:first-child {
+    padding-left: 20px !important;
+}
+
+.gastosMensualidadDetail td {
+    color: #c9d6ea;
+}
+
+.gastosTotalRow td {
+    font-weight: 700;
+    background: #0d1929 !important;
+    border-top: 1px solid var(--border-mid);
+    color: #f8fbff !important;
+}
+
+.gastosAnnualTable th:first-child,
+.gastosAnnualTable td:first-child {
+    width: 114px;
+    min-width: 114px;
+}
+
+.gastosMonthHeader {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.gastosMonthTabs {
+    display: flex;
+    gap: 5px;
+    flex-wrap: nowrap;
+    margin: 0;
+    flex: 1 1 auto;
+    width: 100%;
+    padding-top: 3px;
+    margin-top: -3px;
+}
+
+.gastosMonthActions {
+    display: none;
+}
+
+.gastosTypePanel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--border-mid);
+    border-radius: 14px;
+    background: var(--bg-surface);
+}
+
+.gastosTypePanelHeader {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.gastosTypePanelEyebrow {
+    margin: 0 0 4px;
+    color: #60a5fa;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.gastosTypePanelTitle {
+    margin: 0;
+    color: var(--text-bright);
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.gastosTypeForm {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.gastosTypeInput {
+    flex: 1 1 260px;
+    min-height: 42px;
+    padding: 0 14px;
+    border: 1px solid var(--btn-border);
+    border-radius: 10px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    font-size: 14px;
+    outline: none;
+}
+
+.gastosTypeInput::placeholder {
+    color: var(--text-muted);
+}
+
+.gastosTypeInput:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.gastosTypeHint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.gastosTypeList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.gastosTypeChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border: 1px solid var(--btn-border);
+    border-radius: 999px;
+    background: var(--btn-bg);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.gastosTypeChip.is-default {
+    border-color: #27415f;
+}
+
+.gastosTypeChipTag {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--bg-elevated);
+    color: #93c5fd;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.gastosTypeChipRemove {
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #fca5a5;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.gastosTypeChipRemove:hover {
+    color: #fecaca;
+}
+
+.gastosMonthTab {
+    min-width: auto;
+    height: 38px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 0 14px;
+}
+
+/* ── Mensualidades ──────────────────────────────────────────────── */
+
+/* Vive en la barra de años, justo a la izquierda del menú "···".
+   Se encadenan las dos clases para ganar a las reglas de .gastosMonthTab /
+   .ingresosMonthTab que aparecen más abajo en el archivo. */
+.gastosMonthTab.gastosMensualidadesTab,
+.ingresosMonthTab.ingresosRecurrentesTab {
+    flex: 0 0 auto;
+    height: 36px;
+    min-width: 132px;
+    padding: 0 14px;
+    border-color: rgba(96, 165, 250, 0.35);
+    color: #bfdbfe;
+}
+
+.gastosMonthTab.gastosMensualidadesTab.active,
+.ingresosMonthTab.ingresosRecurrentesTab.active {
+    background: var(--btn-active-bg);
+    border-color: rgba(96, 165, 250, 0.85);
+    color: #e8f2ff;
+    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.45);
+}
+
+.mensNameCell,
+.recNameCell {
+    line-height: 1.15;
+}
+
+.mensNameMain,
+.recNameMain {
+    display: block;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+
+.mensNameMeta,
+.recNameMeta {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+}
+
+.mensNameNote,
+.recNameNote {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gastosMensualidadPaused td,
+.ingresosRecurrentePaused td {
+    opacity: 0.55;
+}
+
+.mensPanel,
+.recPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.mensPanel.hidden,
+.recPanel.hidden {
+    display: none;
+}
+
+.mensSummary,
+.recSummary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.mensCard,
+.recCard {
+    padding: 14px 16px;
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    background: var(--bg-panel);
+}
+
+.mensCardLabel,
+.recCardLabel {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.mensCardValue,
+.recCardValue {
+    margin: 6px 0 2px;
+    color: var(--text-bright);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.mensCardHint,
+.recCardHint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mensToolbar,
+.recToolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.mensSearchInput,
+.recSearchInput {
+    flex: 1 1 260px;
+    min-width: 180px;
+    height: 38px;
+    padding: 0 14px;
+    border: 1px solid var(--btn-border);
+    border-radius: 10px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    font-size: 14px;
+    outline: none;
+}
+
+.mensSearchInput::placeholder,
+.recSearchInput::placeholder {
+    color: var(--text-muted);
+}
+
+.mensSearchInput:focus,
+.recSearchInput:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.mensFilterGroup,
+.recFilterGroup {
+    display: flex;
+    gap: 4px;
+    padding: 3px;
+    border: 1px solid var(--btn-border);
+    border-radius: 10px;
+    background: var(--bg-panel);
+}
+
+.mensFilterChip,
+.recFilterChip {
+    height: 30px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+.mensFilterChip:hover,
+.recFilterChip:hover {
+    color: var(--text-bright);
+}
+
+.mensFilterChip.active,
+.recFilterChip.active {
+    background: var(--btn-active-bg);
+    color: #e8f2ff;
+}
+
+.mensAddBtn,
+.recAddBtn {
+    height: 38px;
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+.mensTableWrapper,
+.recTableWrapper {
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    background: var(--bg-panel);
+    overflow: hidden;
+}
+
+.mensTable,
+.recTable {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    background: var(--bg-panel);
+}
+
+.mensTable thead th,
+.recTable thead th {
+    padding: 10px 12px;
+    background: var(--bg-panel);
+    color: #f8fbff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-align: left;
+    border-bottom: 1px solid var(--border-mid);
+    white-space: nowrap;
+}
+
+/* La cabecera de una columna numérica sigue a sus celdas (ver .numCol/.numCell).
+   Sin esto la regla de arriba (misma especificidad, hoja posterior) dejaría el
+   título a la izquierda mientras los importes van a la derecha. */
+.mensTable thead th.numCol,
+.recTable thead th.numCol {
+    text-align: right;
+}
+
+.mensTable tbody td,
+.recTable tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-mid);
+    background: var(--bg-surface);
+    color: #e6edf8;
+    font-size: 13px;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mensTable tbody tr:hover td,
+.recTable tbody tr:hover td {
+    background: var(--bg-elevated);
+}
+
+.mensTable .mensColName,
+.recTable .recColName {
+    width: 24%;
+    white-space: normal;
+}
+
+.mensTable .rowActionHeader,
+.recTable .rowActionHeader,
+.mensTable .rowActionsCell,
+.recTable .rowActionsCell {
+    width: 44px;
+    min-width: 44px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+.mensRowPaused td,
+.recRowPaused td {
+    opacity: 0.55;
+}
+
+.mensEmptyRow td,
+.recEmptyRow td {
+    padding: 34px 16px;
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+    white-space: normal;
+}
+
+.mensNextHint,
+.recNextHint {
+    margin-left: 6px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.mensBadge,
+.recBadge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(96, 165, 250, 0.14);
+    color: #93c5fd;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.mensBadge-anual,
+.recBadge-anual {
+    background: rgba(168, 85, 247, 0.16);
+    color: #d8b4fe;
+}
+
+.mensBadge-semestral,
+.recBadge-semestral,
+.mensBadge-cuatrimestral,
+.recBadge-cuatrimestral {
+    background: rgba(45, 212, 191, 0.14);
+    color: #5eead4;
+}
+
+.mensBadge-trimestral,
+.recBadge-trimestral,
+.mensBadge-bimestral,
+.recBadge-bimestral {
+    background: rgba(251, 191, 36, 0.14);
+    color: #fcd34d;
+}
+
+.mensState,
+.recState {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.mensState::before,
+.recState::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.mensStateActive,
+.recStateActive {
+    color: #4ade80;
+}
+
+.mensStatePaused,
+.recStatePaused {
+    color: #94a3b8;
+}
+
+.mensFootRow td,
+.recFootRow td {
+    padding: 10px 12px;
+    background: #0d1929;
+    border-top: 1px solid var(--border-mid);
+    color: #f8fbff;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+    .mensSummary,
+    .recSummary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.gastosMonthActions .primaryButton,
+.gastosMonthActions .secondaryButton,
+.gastosMonthActions .dangerButton {
+    font-size: 13px;
+    padding: 0 12px;
+    height: 34px;
+    white-space: nowrap;
+}
+
+/* ── Menú de acciones "···" (gastos & ingresos) ─────────────── */
+.pageActionsMenu {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.pageActionsMenuTrigger {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s,
+        box-shadow 0.15s;
+    flex-shrink: 0;
+}
+
+.pageActionsMenuTrigger:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow:
+        0 0 0 2px var(--accent-glow),
+        0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.pageActionsDropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 180px;
+    padding: 6px;
+    border: 1px solid var(--btn-border);
+    border-radius: 12px;
+    background: var(--bg-surface);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pageActionsDropdown.open {
+    display: flex;
+    animation: assetMenuIn 0.15s ease;
+}
+
+.pageActionsItem {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.pageActionsItem:hover {
+    background: var(--btn-bg-hover);
+    color: var(--text-bright);
+}
+
+.pageActionsItemDanger {
+    color: #f87171;
+}
+
+.pageActionsItemDanger:hover {
+    background: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+}
+
+.pageActionsDivider {
+    height: 1px;
+    background: var(--border-mid);
+    margin: 4px 0;
+}
+
+.gastosMonthTitle {
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.tableAddRowBar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.gastosActions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: auto;
+}

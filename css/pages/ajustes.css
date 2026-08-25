@@ -1,0 +1,909 @@
+/* Pantalla de ajustes
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* --- Ajustes --- */
+/* ========== AJUSTES ========== */
+
+.ajustesLayout {
+    padding: 28px 24px;
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+}
+
+.ajustesCol {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.ajustesSection {
+    break-inside: avoid;
+    margin-bottom: 16px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+}
+
+.ajustesSection.ajustesUnlocked {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15);
+    cursor: grab;
+}
+
+.ajustesSection.ajustesDragging {
+    opacity: 0.45;
+    cursor: grabbing;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.ajustesDragPlaceholder {
+    break-inside: avoid;
+    height: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    margin: 8px 0;
+    pointer-events: none;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.55);
+    flex-shrink: 0;
+}
+
+/* Drag handle */
+.ajustesDragHandle {
+    flex-shrink: 0;
+    margin-left: auto;
+    width: 26px;
+    height: 26px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: grab;
+    opacity: 0.2;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition:
+        opacity 0.15s,
+        background 0.15s;
+}
+.ajustesDragHandle:hover {
+    opacity: 0.65;
+    background: var(--btn-bg-hover);
+}
+.ajustesDragHandle svg {
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+}
+.ajustesDragging .ajustesDragHandle {
+    cursor: grabbing;
+}
+
+/* Lock button */
+.ajustesLockBtn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    opacity: 0.3;
+    transition:
+        opacity 0.15s,
+        background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--text-muted);
+    z-index: 1;
+}
+
+.ajustesLockBtn:hover {
+    opacity: 1;
+    background: var(--btn-bg-hover);
+}
+
+.ajustesLockIcon {
+    width: 14px;
+    height: 14px;
+}
+
+.ajustesLockIconUnlocked {
+    display: none;
+}
+.ajustesSection.ajustesUnlocked .ajustesLockIconLocked {
+    display: none;
+}
+.ajustesSection.ajustesUnlocked .ajustesLockIconUnlocked {
+    display: block;
+}
+.ajustesSection.ajustesUnlocked .ajustesLockBtn {
+    opacity: 0.7;
+    color: var(--accent);
+}
+
+/* Section header */
+.ajustesSectionHeader {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 48px 14px 18px;
+    background: rgba(0, 0, 0, 0.14);
+    border-radius: 13px 13px 0 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.ajustesSectionIconWrap {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 9px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    margin-top: 1px;
+}
+
+.ajustesSectionIconWrap svg {
+    width: 18px;
+    height: 18px;
+}
+
+.ajustesSectionHeaderText {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ajustesSectionTitle {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.01em;
+    line-height: 1.3;
+}
+
+.ajustesSectionDesc {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+
+.ajustesSectionDesc code {
+    background: var(--btn-bg-hover);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-family: monospace;
+}
+
+.ajustesSectionDivider {
+    height: 1px;
+    background: var(--border-soft);
+    margin: 0;
+}
+
+/* Section body */
+.ajustesSection > .ajustesField {
+    padding: 14px 20px;
+}
+
+.ajustesSectionDivider + .ajustesField {
+    padding-top: 14px;
+}
+
+.ajustesSection > .ajustesField + .ajustesField {
+    padding-top: 14px;
+    border-top: 1px solid var(--border-inset);
+}
+
+.ajustesSection > .ajustesActions {
+    padding: 16px 20px 16px;
+}
+
+.ajustesSection > .ajustesTemaGrid {
+    padding: 16px 24px 16px;
+}
+
+.ajustesSection > .ajustesBackupList {
+    padding: 8px 24px 0;
+}
+.ajustesSection > .ajustesBackupList:last-child {
+    padding-bottom: 16px;
+}
+
+.ajustesSection > .ajustesHiddenList {
+    padding: 12px 24px 0;
+}
+.ajustesSection > .ajustesHiddenList:last-child {
+    padding-bottom: 16px;
+}
+
+.ajustesSection > .ajustesApiStatsList {
+    padding: 12px 24px 0;
+}
+.ajustesSection > .ajustesApiStatsList:last-child {
+    padding-bottom: 16px;
+}
+
+.ajustesSection > .ajustesField:last-child {
+    padding-bottom: 16px;
+}
+
+.ajustesSection > .ajustesSwitchRow:last-child {
+    padding-bottom: 16px;
+}
+
+.ajustesSection > .ajustesInlineMsg:last-child {
+    padding-bottom: 20px;
+}
+
+.ajustesInlineMsg:empty {
+    display: none;
+}
+
+.ajustesField {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ajustesLabel {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ajustesInputRow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.ajustesInput {
+    flex: 1;
+    height: 38px;
+    padding: 0 12px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    outline: none;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+}
+
+.ajustesInput:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.ajustesToggleBtn {
+    height: 38px;
+    width: 38px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    transition:
+        border-color 0.15s,
+        color 0.15s,
+        background 0.15s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.ajustesToggleBtn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.ajustesToggleBtn:hover {
+    border-color: var(--btn-border-hover);
+    color: var(--text-primary);
+    background: var(--btn-bg-hover);
+}
+
+/* Secondary action button */
+.ajustesSecondaryBtn {
+    height: 34px;
+    padding: 0 14px;
+    background: var(--btn-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+}
+
+.ajustesSecondaryBtn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.ajustesSecondaryBtn:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--btn-border-hover);
+    color: var(--text-primary);
+}
+
+/* Add key button */
+.ajustesAddBtn {
+    height: 38px;
+    padding: 0 16px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+}
+
+.ajustesAddBtn:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.ajustesActions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* buttons inside ajustesActions — icon + text alignment */
+.ajustesActions .primaryButton,
+.ajustesActions .secondaryButton,
+.ajustesActions .dangerButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.ajustesActions .primaryButton svg,
+.ajustesActions .secondaryButton svg,
+.ajustesActions .dangerButton svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.ajustesStatusMsg {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+}
+
+.ajustesStatusMsg.ok {
+    color: var(--color-pos-bright);
+}
+.ajustesStatusMsg.error {
+    color: var(--color-neg-bright);
+}
+
+.ajustesLabelRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ajustesKeyStatus {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+}
+
+.ajustesKeyStatus.ok {
+    color: var(--color-pos-bright);
+    border-color: rgba(74, 222, 128, 0.3);
+    background: rgba(74, 222, 128, 0.07);
+}
+
+.ajustesKeyStatus.missing {
+    color: var(--color-neg-bright);
+    border-color: rgba(248, 113, 113, 0.3);
+    background: rgba(248, 113, 113, 0.07);
+}
+
+/* Backup list */
+.ajustesBackupList {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-soft) transparent;
+}
+
+.ajustesBackupItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 9px;
+    transition: border-color 0.12s;
+}
+
+.ajustesBackupItem:hover {
+    border-color: var(--border-hard);
+}
+
+.ajustesBackupItem .ajustesBackupName {
+    flex: 1;
+    min-width: 0;
+}
+
+.ajustesBackupName {
+    font-size: 0.84rem;
+    color: var(--text-muted);
+    font-family: monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ajustesRestoreBtn {
+    font-size: 0.78rem;
+    padding: 0 11px;
+    height: 26px;
+    background: transparent;
+    border: 1px solid var(--border-hard);
+    border-radius: 6px;
+    color: var(--text-dim);
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+}
+
+.ajustesRestoreBtn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--color-neg-bright);
+    color: var(--color-neg-bright);
+}
+
+.ajustesDeleteBackupBtn {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+}
+
+.ajustesDeleteBackupBtn:hover {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #ef4444;
+}
+
+/* Select */
+.ajustesSelect {
+    width: 100%;
+    height: 38px;
+    padding: 0 36px 0 12px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    outline: none;
+    cursor: pointer;
+    min-width: 180px;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+    color-scheme: dark;
+}
+
+.ajustesSelect:hover {
+    border-color: var(--border-mid);
+}
+.ajustesSelect:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+.ajustesSelect option {
+    background: #0f1724;
+    color: #e5edf9;
+    padding: 6px 12px;
+}
+
+/* Inline custom dropdown for settings */
+.ajustesDropWrapper {
+    position: relative;
+    width: 100%;
+}
+.ajustesDropTrigger {
+    width: 100%;
+    height: 38px;
+    padding: 0 36px 0 12px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+    transition:
+        border-color 0.15s,
+        box-shadow 0.15s;
+    gap: 8px;
+}
+.ajustesDropTrigger:hover {
+    border-color: var(--border-mid);
+}
+.ajustesDropTrigger.open {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+.ajustesDropLabel {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ajustesDropArrow {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+}
+.ajustesDropTrigger.open .ajustesDropArrow {
+    transform: rotate(180deg);
+}
+.ajustesDropMenu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    z-index: 100;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    overflow: hidden;
+    flex-direction: column;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.ajustesDropOption {
+    width: 100%;
+    padding: 9px 14px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border-inset);
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s;
+}
+.ajustesDropOption:last-child {
+    border-bottom: none;
+}
+.ajustesDropOption:hover {
+    background: var(--bg-elevated);
+}
+.ajustesDropOption.active {
+    color: var(--accent);
+    background: rgba(59, 130, 246, 0.08);
+}
+
+/* Hidden assets list */
+.ajustesHiddenList {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+/* API stats */
+.ajustesApiStatsList {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ajustesApiStatsRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    font-size: 0.86rem;
+}
+
+.ajustesApiStatsTotal {
+    border-color: rgba(59, 130, 246, 0.35);
+    background: rgba(59, 130, 246, 0.06);
+    font-weight: 600;
+}
+
+.ajustesApiStatsProvider {
+    color: var(--text-muted);
+}
+.ajustesApiStatsCount {
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* Hidden items */
+.ajustesHiddenItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 9px;
+}
+
+.ajustesHiddenName {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.ajustesHiddenToggle {
+    font-size: 0.78rem;
+    padding: 0 13px;
+    height: 26px;
+    background: rgba(74, 222, 128, 0.08);
+    border: 1px solid rgba(74, 222, 128, 0.28);
+    border-radius: 999px;
+    color: var(--color-pos-bright);
+    cursor: pointer;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s,
+        opacity 0.15s;
+    flex-shrink: 0;
+}
+
+.ajustesHiddenToggle.hidden {
+    background: rgba(100, 116, 139, 0.08);
+    border-color: var(--border-hard);
+    color: var(--text-dim);
+}
+
+.ajustesHiddenToggle:hover {
+    opacity: 0.8;
+}
+
+.ajustesDivisaRemove {
+    font-size: 0.78rem;
+    padding: 0 11px;
+    height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--border-soft);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s;
+}
+
+.ajustesDivisaRemove:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #ef4444;
+}
+
+.ajustesDivisaRemove:disabled {
+    opacity: 0.3;
+    cursor: default;
+    pointer-events: none;
+}
+
+.assetBtn.stale .assetBtnPrice {
+    color: var(--text-dim);
+}
+.assetBtn.stale .assetBtnName {
+    color: var(--text-dim);
+}
+
+.ajustesBackupEmpty {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    padding: 10px 0;
+}
+
+/* --- Tema picker --- */
+.ajustesTemaGrid {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.ajustesTemaBtn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    background: var(--bg-inset);
+    border: 2px solid var(--border-soft);
+    border-radius: 11px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition:
+        border-color 0.15s,
+        background 0.15s,
+        box-shadow 0.15s;
+    flex: 1;
+    min-width: 80px;
+}
+
+.ajustesTemaBtn:hover {
+    border-color: var(--btn-border-hover);
+    background: var(--btn-bg-hover);
+}
+
+.ajustesTemaBtn.active {
+    border-color: var(--accent);
+    background: rgba(59, 130, 246, 0.06);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.ajustesTemaPreview {
+    width: 52px;
+    height: 34px;
+    border-radius: 7px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.temaDefault {
+    background: linear-gradient(135deg, #060e1a 50%, #0f1724 50%);
+}
+
+.temaBlack {
+    background: linear-gradient(135deg, #000000 50%, #111111 50%);
+}
+
+.temaLight {
+    background: linear-gradient(135deg, #ffffff 50%, #f0f2f5 50%);
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+.ajustesTemaLabel {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+.ajustesTemaBtn.active .ajustesTemaLabel {
+    color: var(--accent);
+}
+
+/* --- Refresh interval picker --- */
+.ajustesRefreshGrid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 16px 24px 16px;
+}
+
+.ajustesRefreshBtn {
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 2px solid var(--border-soft);
+    background: var(--bg-inset);
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        border-color 0.15s,
+        background 0.15s,
+        box-shadow 0.15s,
+        color 0.15s;
+    white-space: nowrap;
+}
+
+.ajustesRefreshBtn:hover {
+    border-color: var(--btn-border-hover);
+    background: var(--btn-bg-hover);
+    color: var(--text);
+}
+
+.ajustesRefreshBtn.active {
+    border-color: var(--accent);
+    background: rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+    color: var(--accent);
+}
+
+/* Valor de solo lectura dentro de un .ajustesField (contador de operaciones
+   sin tipo de cambio, por ejemplo). */
+.ajustesValorInline {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-main);
+}

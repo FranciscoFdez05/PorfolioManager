@@ -1,0 +1,1225 @@
+/* Métricas
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* ===== METRICAS ===== */
+
+.metricasPage {
+    padding: 8px 24px 40px;
+    max-width: 1600px;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 auto;
+}
+
+.metricasHeader {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 12px;
+}
+
+.metricasTitle {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.metricasLoading {
+    font-size: 0.85rem;
+    color: #7a8fb0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-mid);
+    border-radius: 6px;
+    padding: 4px 12px;
+}
+
+.metricasLoading.hidden {
+    display: none;
+}
+
+/* ── Metricas nav bar (sticky) ── */
+.mNavBar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--bg-panel);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.mNavTabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* Same visual as overviewFilterOption */
+/* mNavTab — base visual heredado de overviewFilterOption (components.css) */
+.mNavTab[data-mcat="todo"]::before {
+    background: #8899bb;
+}
+.mNavTab[data-mcat="portfolio"]::before {
+    background: #3a7bd5;
+}
+.mNavTab[data-mcat="finanzas"]::before {
+    background: #2ecc71;
+}
+.mNavTab[data-mcat="gastos,ingresos"]::before {
+    background: linear-gradient(135deg, #e74c3c 50%, #f39c12 50%);
+}
+.mNavTab[data-mcat="trading"]::before {
+    background: #f7931a;
+}
+
+.mNavTab[data-mcat="todo"].active,
+.mNavTab[data-mcat="todo"]:has(input:checked) {
+    border-color: #8899bb44;
+}
+.mNavTab[data-mcat="portfolio"].active,
+.mNavTab[data-mcat="portfolio"]:has(input:checked) {
+    border-color: #3a7bd544;
+}
+.mNavTab[data-mcat="finanzas"].active,
+.mNavTab[data-mcat="finanzas"]:has(input:checked) {
+    border-color: #2ecc7144;
+}
+.mNavTab[data-mcat="gastos,ingresos"].active,
+.mNavTab[data-mcat="gastos,ingresos"]:has(input:checked) {
+    border-color: #e8720e44;
+}
+.mNavTab[data-mcat="trading"].active,
+.mNavTab[data-mcat="trading"]:has(input:checked) {
+    border-color: #f7931a44;
+}
+
+.mNavHidden {
+    display: none !important;
+}
+
+/* ── KPI row ── */
+.metricasKpiSection {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+    align-items: flex-start;
+    width: 100%;
+    min-width: 0;
+}
+
+.metricasKpiGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.metricasKpiGroupLabel {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    padding-left: 2px;
+    font-weight: 600;
+}
+
+.metricasKpiCards {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+}
+
+.metricasKpiCard {
+    /* 140px es el ancho de referencia, no un tope: los valores largos (un
+       "2026 · 2195,34 €" o el porcentaje con su chip) ensanchan la tarjeta en
+       vez de salirse de ella. */
+    flex: 0 0 auto;
+    min-width: 140px;
+    max-width: 100%;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-top: 2px solid transparent;
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    transition:
+        background 0.15s,
+        transform 0.18s,
+        box-shadow 0.18s,
+        border-color 0.15s;
+    position: relative;
+}
+
+.metricasKpiCard:hover {
+    background: #131f33;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+    z-index: 1;
+}
+
+/* Tooltip personalizado para activos (valor en €) */
+.mkpiCardActivo[data-kpi]::after {
+    content: attr(data-kpi);
+    position: absolute;
+    bottom: calc(100% + 7px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    opacity: 0;
+    pointer-events: none;
+    background: #0f1c2e;
+    border: 1px solid rgba(100, 160, 255, 0.22);
+    border-radius: 7px;
+    padding: 5px 11px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #c8d8f0;
+    white-space: nowrap;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    transition:
+        opacity 0.18s,
+        transform 0.18s;
+    z-index: 20;
+}
+
+.mkpiCardActivo[data-kpi]::before {
+    content: "";
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    opacity: 0;
+    pointer-events: none;
+    border: 5px solid transparent;
+    border-top-color: #0f1c2e;
+    transition:
+        opacity 0.18s,
+        transform 0.18s;
+    z-index: 21;
+}
+
+.mkpiCardActivo[data-kpi]:hover::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.mkpiCardActivo[data-kpi]:hover::before {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.mkpiGroupPortfolio .metricasKpiCard {
+    border-top-color: #3a7bd5;
+}
+.mkpiGroupIngresos .metricasKpiCard {
+    border-top-color: #2ecc71;
+}
+.mkpiGroupBonos .metricasKpiCard {
+    border-top-color: #9b59b6;
+}
+.mkpiGroupRf .metricasKpiCard {
+    border-top-color: #9b59b6;
+}
+.mkpiGroupGastos .metricasKpiCard {
+    border-top-color: #e74c3c;
+}
+.mkpiGroupTrading .metricasKpiCard {
+    border-top-color: #f7931a;
+}
+
+.mkpiGroupGastosTipos {
+    flex-shrink: 1;
+    min-width: 0;
+}
+.mkpiGroupGastosTipos .metricasKpiGroupLabel {
+    color: #f59e0b;
+}
+.mkpiGroupGastosTipos .metricasKpiCards {
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.mkpiGroupGastosTipos .metricasKpiCard {
+    border-top-color: #f59e0b;
+}
+.mkpiGroupGastosTipos .mkpiLabel {
+    white-space: normal;
+    word-break: break-word;
+    max-width: 140px;
+}
+
+/* vertical separator between KPI groups within the same row */
+.metricasKpiGroupSep {
+    width: 1px;
+    align-self: stretch;
+    background: var(--border-soft);
+    margin: 0 6px;
+    flex-shrink: 0;
+}
+
+/* color accents for new groups */
+.mkpiGroupPasivos .metricasKpiCard {
+    border-top-color: #1abc9c;
+}
+.mkpiGroupPasivos .metricasKpiGroupLabel {
+    color: #1abc9c;
+}
+.mkpiGroupAhorro .metricasKpiCard {
+    border-top-color: #3a7bd5;
+}
+.mkpiGroupAhorro .metricasKpiGroupLabel {
+    color: #3a7bd5;
+}
+.mkpiGroupAnalisis .metricasKpiCard {
+    border-top-color: #e67e22;
+}
+.mkpiGroupAnalisis .metricasKpiGroupLabel {
+    color: #e67e22;
+}
+.mkpiGroupAnual .metricasKpiCard {
+    border-top-color: #e8720e;
+}
+.mkpiGroupAnual .metricasKpiGroupLabel {
+    color: #e8720e;
+}
+.mkpiGroupRiesgo .metricasKpiCard {
+    border-top-color: #3a7bd5;
+}
+.mkpiGroupRiesgo .metricasKpiGroupLabel {
+    color: #3a7bd5;
+}
+.mkpiGroupRiesgoVol .metricasKpiCard {
+    border-top-color: #c0562f;
+}
+.mkpiGroupRiesgoVol .metricasKpiGroupLabel {
+    color: #c0562f;
+}
+
+/* Desplegable compacto para cabeceras de sección (el índice del benchmark). */
+.mSelect {
+    font-size: 0.78rem;
+    padding: 5px 26px 5px 10px;
+    border-radius: 8px;
+    max-width: 170px;
+}
+
+/* El .csWrapper nace con width:100% y en la cabecera flex se estiraría hasta
+   empujar al grupo de rangos fuera de la fila. */
+.metricasSectionHeader .csWrapper {
+    width: auto;
+    min-width: 150px;
+    max-width: 190px;
+}
+
+/* Pie de gráfico: la letra pequeña que explica un rayado o una salvedad. */
+.mChartNota {
+    font-size: 0.7rem;
+    line-height: 1.4;
+    color: var(--text-dim);
+    margin-top: 8px;
+    padding: 0 4px;
+}
+
+/* La fila de KPIs de riesgo va dentro de su sección, no encabezando una
+   categoría: sin borde inferior ni el hueco que separa categorías. */
+.mRiesgoKpiRow {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 14px;
+}
+
+/* TWR, XIRR y drawdown no se explican solos: cada tarjeta lleva su
+   definición a un hover de distancia. */
+.metricasKpiCard[data-mhelp] {
+    cursor: help;
+}
+.metricasKpiCard[data-mhelp]::before {
+    content: attr(data-mhelp);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    width: max-content;
+    max-width: 260px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #0b1424;
+    border: 1px solid var(--border-soft);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    color: var(--text-primary);
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: normal;
+    text-transform: none;
+    letter-spacing: normal;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s;
+    z-index: 10;
+    pointer-events: none;
+}
+.metricasKpiCard[data-mhelp]:hover::before {
+    opacity: 1;
+    visibility: visible;
+}
+
+.mkpiGroupActivosRend {
+    flex-shrink: 1;
+    min-width: 0;
+}
+.mkpiGroupActivosRend .metricasKpiGroupLabel {
+    color: #8899bb;
+}
+.mkpiGroupActivosRend .metricasKpiCards {
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.mkpiLabelActivo {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 105px;
+}
+.mkpiSubValue {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    white-space: nowrap;
+    margin-top: 2px;
+}
+.mkpiSubValue.mPositive {
+    color: var(--color-pos);
+}
+.mkpiSubValue.mNegative {
+    color: var(--color-neg);
+}
+
+.mkpiLabel {
+    font-size: 0.73rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-dim);
+    white-space: normal;
+    line-height: 1.25;
+    min-height: 2em;
+}
+
+.mkpiValue {
+    font-size: 1.28rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.mkpiValue.mPositive {
+    color: var(--color-pos);
+}
+.mkpiValue.mNegative {
+    color: var(--color-neg);
+}
+
+/* per-category KPI row placed above its sections */
+.metricasKpiRow {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    width: 100%;
+    min-width: 0;
+    margin-bottom: 14px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+/* ── Category dividers ── */
+.metricasCatDivider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin: 36px 0 22px;
+}
+.metricasCatDividerLine {
+    flex: 1;
+    height: 1px;
+    background: var(--border-soft);
+}
+.metricasCatDividerDot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.metricasCatDividerLabel {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* ── Sections ── */
+.metricasSection {
+    margin-bottom: 28px;
+}
+
+.metricasSection.hidden {
+    display: none;
+}
+
+/* Los controles caen a una segunda fila antes que estrujar el título: sin el
+   wrap, el flex reparte el ancho y "Evolución del Portfolio" se parte en tres
+   líneas. */
+.metricasSectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.mGastosHeader {
+    flex-wrap: nowrap;
+    gap: 12px;
+}
+.mGastosHeaderLeft {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.mDivMensualTablaBtn {
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    font-size: 12px;
+    padding: 5px 12px;
+}
+/* Una columna por acción: con una cartera de veinte no cabe, así que la tabla
+   crece a su ancho natural y scrollea dentro del marco en vez de estrujar las
+   celdas hasta partir los importes en dos líneas. */
+.mDivMensualTablaWrap {
+    overflow-x: auto;
+    max-width: 100%;
+    margin-bottom: 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    /* El reset global esconde todas las barras; aquí hace falta verla, que es
+       la única pista de que queda tabla a la derecha. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-hard) transparent;
+}
+.mDivMensualTablaWrap::-webkit-scrollbar {
+    display: block;
+    height: 8px;
+}
+.mDivMensualTablaWrap::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 4px;
+}
+
+/* border-collapse:collapse rompe el sticky de la primera columna. */
+.mDivMensualTable {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 13px;
+}
+.mDivMensualTable th {
+    color: #7a8fb0;
+    font-weight: 600;
+    padding: 8px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--border-soft);
+    white-space: nowrap;
+}
+.mDivMensualTable th:first-child {
+    text-align: left;
+}
+.mDivMensualTable td {
+    padding: 6px 12px;
+    text-align: right;
+    border-bottom: 1px solid rgba(30, 45, 69, 0.5);
+    color: var(--text-subtle);
+    white-space: nowrap;
+}
+
+/* El mes se queda fijo: sin él, a mitad de scroll no se sabe qué fila se mira. */
+.mDivMensualTable th:first-child,
+.mDivMensualTable td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    /* El fondo de la página, no uno propio: la columna debe pasar
+       desapercibida salvo por la línea que la separa. */
+    background: var(--bg-app);
+    box-shadow: 1px 0 0 var(--border-soft);
+}
+.mDivTabMes {
+    text-align: left !important;
+    color: #7a8fb0;
+    font-weight: 500;
+}
+.mDivTabTotal {
+    color: #a8d8a8;
+    font-weight: 600;
+}
+.mDivTabFootCell {
+    border-top: 1px solid var(--border-soft);
+    border-bottom: none;
+    color: var(--text-primary);
+    font-weight: 700;
+}
+.mGastosMonthToggle {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    margin-bottom: 12px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 3px;
+}
+
+.mGastosMonthToggle .mToggleBtn {
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+    font-size: 0.76rem;
+    padding: 5px 4px;
+    border-radius: 7px;
+    border: none;
+    color: var(--text-dim);
+    font-weight: 500;
+    background: transparent;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        box-shadow 0.15s;
+    white-space: nowrap;
+}
+
+.mGastosMonthToggle .mToggleBtn:hover:not(.active) {
+    background: var(--btn-bg-hover);
+    color: var(--text-subtle);
+}
+
+.mGastosMonthToggle .mToggleBtn.active {
+    background: var(--bg-elevated, #1e2d4a);
+    color: var(--text-primary);
+    font-weight: 600;
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.metricasSectionTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-subtle);
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+.metricasSectionTitle::after {
+    content: "▾";
+    font-size: 0.8rem;
+    opacity: 0.6;
+    transition: transform 0.2s;
+    display: inline-block;
+}
+.metricasSectionTitle.mSectionCollapsed::after {
+    transform: rotate(-90deg);
+}
+.mSectionBodyHidden {
+    display: none !important;
+}
+
+/* ── Toggle ── */
+.mToggleGroup {
+    display: flex;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 2px;
+}
+
+.mToggleBtn,
+.mDistMetricBtn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 6px 16px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    border-radius: 7px;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        box-shadow 0.15s;
+    white-space: nowrap;
+}
+
+.mToggleBtn.active,
+.mDistMetricBtn.active {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-weight: 600;
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.mToggleBtn:hover:not(.active):not(:disabled),
+.mDistMetricBtn:hover:not(.active):not(:disabled) {
+    background: var(--btn-bg-hover);
+    color: var(--text-subtle);
+}
+
+/* Rango sin sentido para el modo activo (1D contra un índice, por ejemplo). */
+.mToggleBtn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* ── Evolución histórica ── */
+.mEvolucionEmpty {
+    padding: 32px 20px;
+    text-align: center;
+    color: var(--text-subtle);
+    font-size: 0.88rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    margin-bottom: 4px;
+}
+
+/* ── Chart cards ── */
+.metricasChartsGrid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.metricasChartCard {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 18px 20px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.metricasTableCard {
+    padding: 0;
+    overflow: hidden;
+}
+
+.metricasChartTitle {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #7a8fb0;
+    margin-bottom: 14px;
+}
+
+.mActivosHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.mActivosHeader .metricasChartTitle {
+    margin-bottom: 0;
+}
+.mActivosFilterGroup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+/* mActivosFilterBtn — base visual heredado de overviewFilterOption (components.css) */
+.mActivosFilterBtn[data-atype="todos"]::before {
+    background: #e5edf9;
+}
+.mActivosFilterBtn[data-atype="cripto"]::before {
+    background: #f7931a;
+}
+.mActivosFilterBtn[data-atype="acciones"]::before {
+    background: #3a7bd5;
+}
+.mActivosFilterBtn[data-atype="etfs"]::before {
+    background: #2ecc71;
+}
+.mActivosFilterBtn[data-atype="comoditis"]::before {
+    background: #e0c068;
+}
+.mActivosFilterBtn[data-atype="bonos"]::before {
+    background: #9b59b6;
+}
+.mActivosFilterBtn[data-atype="rentaFija"]::before {
+    background: #1abc9c;
+}
+
+.mActivosFilterBtn[data-atype="todos"].active,
+.mActivosFilterBtn[data-atype="todos"]:has(input:checked) {
+    border-color: #8899bb44;
+}
+.mActivosFilterBtn[data-atype="cripto"].active,
+.mActivosFilterBtn[data-atype="cripto"]:has(input:checked) {
+    border-color: #f7931a44;
+}
+.mActivosFilterBtn[data-atype="acciones"].active,
+.mActivosFilterBtn[data-atype="acciones"]:has(input:checked) {
+    border-color: #3a7bd544;
+}
+.mActivosFilterBtn[data-atype="etfs"].active,
+.mActivosFilterBtn[data-atype="etfs"]:has(input:checked) {
+    border-color: #2ecc7144;
+}
+.mActivosFilterBtn[data-atype="comoditis"].active,
+.mActivosFilterBtn[data-atype="comoditis"]:has(input:checked) {
+    border-color: #e0c06844;
+}
+.mActivosFilterBtn[data-atype="bonos"].active,
+.mActivosFilterBtn[data-atype="bonos"]:has(input:checked) {
+    border-color: #9b59b644;
+}
+.mActivosFilterBtn[data-atype="rentaFija"].active,
+.mActivosFilterBtn[data-atype="rentaFija"]:has(input:checked) {
+    border-color: #1abc9c44;
+}
+
+/* Dot colors — gasto categories */
+.mActivosFilterBtn[data-cmp-tipo="Café"]::before {
+    background: #c47a3a;
+}
+.mActivosFilterBtn[data-cmp-tipo="Comidas/Cenas"]::before {
+    background: #e86c2c;
+}
+.mActivosFilterBtn[data-cmp-tipo="Compras"]::before {
+    background: #3a7bd5;
+}
+.mActivosFilterBtn[data-cmp-tipo="Gasoil"]::before {
+    background: #d4b44a;
+}
+.mActivosFilterBtn[data-cmp-tipo="Inversion"]::before {
+    background: #2ecc71;
+}
+.mActivosFilterBtn[data-cmp-tipo="Mensualidades"]::before {
+    background: #9b59b6;
+}
+.mActivosFilterBtn[data-cmp-tipo="Otros"]::before {
+    background: #94a3b8;
+}
+
+.mActivosFilterBtn[data-cmp-tipo="Café"].active,
+.mActivosFilterBtn[data-cmp-tipo="Café"]:has(input:checked) {
+    border-color: #c47a3a44;
+}
+.mActivosFilterBtn[data-cmp-tipo="Comidas/Cenas"].active,
+.mActivosFilterBtn[data-cmp-tipo="Comidas/Cenas"]:has(input:checked) {
+    border-color: #e86c2c44;
+}
+.mActivosFilterBtn[data-cmp-tipo="Compras"].active,
+.mActivosFilterBtn[data-cmp-tipo="Compras"]:has(input:checked) {
+    border-color: #3a7bd544;
+}
+.mActivosFilterBtn[data-cmp-tipo="Gasoil"].active,
+.mActivosFilterBtn[data-cmp-tipo="Gasoil"]:has(input:checked) {
+    border-color: #d4b44a44;
+}
+.mActivosFilterBtn[data-cmp-tipo="Inversion"].active,
+.mActivosFilterBtn[data-cmp-tipo="Inversion"]:has(input:checked) {
+    border-color: #2ecc7144;
+}
+.mActivosFilterBtn[data-cmp-tipo="Mensualidades"].active,
+.mActivosFilterBtn[data-cmp-tipo="Mensualidades"]:has(input:checked) {
+    border-color: #9b59b644;
+}
+.mActivosFilterBtn[data-cmp-tipo="Otros"].active,
+.mActivosFilterBtn[data-cmp-tipo="Otros"]:has(input:checked) {
+    border-color: #94a3b844;
+}
+
+/* Dot colors — trading direction filter */
+.mActivosFilterBtn[data-wlfilter="todos"]::before {
+    background: #e5edf9;
+}
+.mActivosFilterBtn[data-wlfilter="LONG"]::before {
+    background: #2ecc71;
+}
+.mActivosFilterBtn[data-wlfilter="SHORT"]::before {
+    background: #e74c3c;
+}
+
+.mActivosFilterBtn[data-wlfilter="todos"].active,
+.mActivosFilterBtn[data-wlfilter="todos"]:has(input:checked) {
+    border-color: #8899bb44;
+}
+.mActivosFilterBtn[data-wlfilter="LONG"].active,
+.mActivosFilterBtn[data-wlfilter="LONG"]:has(input:checked) {
+    border-color: #2ecc7144;
+}
+.mActivosFilterBtn[data-wlfilter="SHORT"].active,
+.mActivosFilterBtn[data-wlfilter="SHORT"]:has(input:checked) {
+    border-color: #e74c3c44;
+}
+
+.mFilterPillGroup {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.metricasChartWrap {
+    position: relative;
+}
+
+/* ── Comparativa filter buttons ── */
+.mComparativaHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+.mComparativaHeaderTop {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+.mComparativaFiltros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+}
+.mComparativaFiltrosLabel {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    margin-right: 2px;
+}
+.mComparativaFiltroBtn {
+    background: var(--border-soft);
+    border: 1px solid var(--btn-border-hover);
+    color: var(--text-primary);
+    font-size: 0.72rem;
+    padding: 3px 9px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s,
+        opacity 0.15s;
+}
+.mComparativaFiltroBtn.excluded {
+    background: transparent;
+    border-color: var(--border-mid);
+    color: var(--text-dim);
+    text-decoration: line-through;
+    opacity: 0.65;
+}
+.mComparativaFiltroBtn:hover {
+    border-color: var(--accent);
+}
+
+.metricasChartDynamic {
+    min-height: 180px;
+}
+
+.metricasChartDivScroll {
+    min-height: 180px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #2a3a5a transparent;
+}
+.metricasChartDivScroll::-webkit-scrollbar {
+    width: 5px;
+}
+.metricasChartDivScroll::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+#mChartDivAxisWrap {
+    background: var(--bg-surface);
+}
+html[data-theme="light"] #mChartDivAxisWrap {
+    background: #ffffff;
+}
+html[data-theme="black"] #mChartDivAxisWrap {
+    background: #0a0a0a;
+}
+
+/* ── Table ── */
+.metricasTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.metricasTable thead tr {
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.metricasTable th {
+    padding: 10px 14px;
+    text-align: left;
+    color: #7a8fb0;
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+}
+
+.metricasTable td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--bg-surface);
+    color: var(--text-subtle);
+    vertical-align: middle;
+}
+
+.metricasTable tbody tr:hover {
+    background: #151f35;
+}
+
+.metricasTable tfoot tr {
+    background: var(--bg-header);
+    border-top: 1px solid var(--border-soft);
+}
+
+.metricasTable tfoot td {
+    font-weight: 700;
+    color: var(--text-primary);
+    border-bottom: none;
+}
+
+/* ── Vista General: alineación estilo CMC ── */
+#overviewTable th,
+#overviewTable td {
+    white-space: nowrap;
+    padding: 13px 18px;
+    font-size: 0.84rem;
+    vertical-align: middle;
+    text-align: right;
+}
+
+/* col 1 – rank */
+#overviewTable th:nth-child(1),
+#overviewTable td:nth-child(1) {
+    text-align: center;
+    padding-left: 10px;
+    padding-right: 10px;
+    width: 44px;
+    min-width: 44px;
+}
+
+/* col 2 – nombre */
+#overviewTable th:nth-child(2),
+#overviewTable td:nth-child(2) {
+    text-align: left;
+    min-width: 180px;
+    padding-left: 20px;
+}
+
+/* col 3 – tipo (badge) */
+#overviewTable th:nth-child(3),
+#overviewTable td:nth-child(3) {
+    text-align: left;
+    min-width: 90px;
+}
+
+/* cols 4+ – numéricos */
+#overviewTable th:nth-child(n + 4),
+#overviewTable td:nth-child(n + 4) {
+    font-variant-numeric: tabular-nums;
+    min-width: 110px;
+    padding-right: 18px;
+}
+
+#overviewTable {
+    width: max-content;
+    min-width: 100%;
+}
+
+.overviewPage .metricasTableCard {
+    overflow: auto;
+    max-height: calc(100vh - 245px);
+}
+
+#overviewTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg-header);
+}
+
+/* ── Métricas tabla Posiciones: alineación estilo CMC ── */
+#metricasTopTable th,
+#metricasTopTable td {
+    white-space: nowrap;
+    padding: 13px 18px;
+    font-size: 0.84rem;
+    vertical-align: middle;
+    text-align: right;
+}
+
+#metricasTopTable th:nth-child(1),
+#metricasTopTable td:nth-child(1) {
+    text-align: center;
+    padding-left: 10px;
+    padding-right: 10px;
+    width: 44px;
+    min-width: 44px;
+}
+
+#metricasTopTable th:nth-child(2),
+#metricasTopTable td:nth-child(2) {
+    text-align: left;
+    min-width: 180px;
+    padding-left: 20px;
+}
+
+#metricasTopTable th:nth-child(3),
+#metricasTopTable td:nth-child(3) {
+    text-align: left;
+    min-width: 90px;
+}
+
+#metricasTopTable th:nth-child(n + 4),
+#metricasTopTable td:nth-child(n + 4) {
+    font-variant-numeric: tabular-nums;
+    min-width: 110px;
+    padding-right: 18px;
+}
+
+#metricasTopTable {
+    width: max-content;
+    min-width: 100%;
+}
+
+#metricasTopTable .mCartBar {
+    justify-content: flex-end;
+    min-width: 130px;
+}
+
+.mTdRank {
+    color: var(--text-dim);
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-align: center;
+    width: 36px;
+}
+
+.mTdName {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.mCellPos,
+.metricasTable td.mCellPos {
+    color: var(--color-pos);
+    font-weight: 600;
+}
+.mCellNeg,
+.metricasTable td.mCellNeg {
+    color: var(--color-neg);
+    font-weight: 600;
+}
+
+.mTypeBadge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.mCartBar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 100px;
+}
+
+.mCartBarFill {
+    height: 6px;
+    background: #3a7bd5;
+    border-radius: 3px;
+    min-width: 2px;
+    flex-shrink: 0;
+}
+
+.mCartBar span {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+    .metricasChartsGrid2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+.mThSort {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color 0.15s;
+}
+
+.mThSort:hover {
+    color: var(--text-subtle);
+}
+
+.mThSort.mThActive {
+    color: #3a7bd5;
+}
+
+.mSortArrow {
+    display: inline-block;
+    width: 14px;
+    font-size: 0.7rem;
+    color: #3a7bd5;
+}
+
+.mSortArrow:empty {
+    width: 0;
+    overflow: hidden;
+}
+
+.metricasChartsGrid1 {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}

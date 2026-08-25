@@ -1,0 +1,223 @@
+/* Mercado privado
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* ========== MERCADO PRIVADO ========== */
+
+.pmPage {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+}
+
+.pmToolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.pmFilters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* dots de color por tipo */
+.pmFilterBtn[data-tipo="all"]::before {
+    background: #8899bb55;
+}
+.pmFilterBtn[data-tipo="pe"]::before {
+    background: #3a7bd555;
+}
+.pmFilterBtn[data-tipo="vc"]::before {
+    background: #9b59b655;
+}
+.pmFilterBtn[data-tipo="credito"]::before {
+    background: #1abc9c55;
+}
+.pmFilterBtn[data-tipo="inmobiliario"]::before {
+    background: #e67e2255;
+}
+.pmFilterBtn[data-tipo="infraestructura"]::before {
+    background: #2ecc7155;
+}
+.pmFilterBtn[data-tipo="otros"]::before {
+    background: #8899bb55;
+}
+
+.pmFilterBtn[data-tipo="all"]:has(input:checked)::before {
+    background: #8899bb;
+}
+.pmFilterBtn[data-tipo="pe"]:has(input:checked)::before {
+    background: #3a7bd5;
+}
+.pmFilterBtn[data-tipo="vc"]:has(input:checked)::before {
+    background: #9b59b6;
+}
+.pmFilterBtn[data-tipo="credito"]:has(input:checked)::before {
+    background: #1abc9c;
+}
+.pmFilterBtn[data-tipo="inmobiliario"]:has(input:checked)::before {
+    background: #e67e22;
+}
+.pmFilterBtn[data-tipo="infraestructura"]:has(input:checked)::before {
+    background: #2ecc71;
+}
+.pmFilterBtn[data-tipo="otros"]:has(input:checked)::before {
+    background: #8899bb;
+}
+
+.pmFilterBtn[data-tipo="all"]:has(input:checked) {
+    border-color: #8899bb44;
+}
+.pmFilterBtn[data-tipo="pe"]:has(input:checked) {
+    border-color: #3a7bd544;
+}
+.pmFilterBtn[data-tipo="vc"]:has(input:checked) {
+    border-color: #9b59b644;
+}
+.pmFilterBtn[data-tipo="credito"]:has(input:checked) {
+    border-color: #1abc9c44;
+}
+.pmFilterBtn[data-tipo="inmobiliario"]:has(input:checked) {
+    border-color: #e67e2244;
+}
+.pmFilterBtn[data-tipo="infraestructura"]:has(input:checked) {
+    border-color: #2ecc7144;
+}
+.pmFilterBtn[data-tipo="otros"]:has(input:checked) {
+    border-color: #8899bb44;
+}
+
+/* summary cards */
+.pmSummary {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.pmSummaryCard {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    border-radius: 8px;
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 130px;
+}
+
+.pmSummaryCard--neto {
+    border-color: #3a7bd544;
+}
+.pmSummaryCard--tvpi {
+    border-color: #9b59b644;
+}
+.pmSummaryCard--mult {
+    border-color: #1abc9c44;
+}
+
+.pmSummaryLabel {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.pmSummaryValue {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-subtle);
+}
+
+/* tabla */
+.pmTableWrapper {
+    position: relative;
+    max-height: calc(13 * 41px + 42px);
+    overflow: auto;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+}
+
+.pmTable {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+}
+
+.pmTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    color: #7a8fb0;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-soft);
+    padding: 10px 14px;
+    white-space: nowrap;
+}
+
+.pmTable tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #1a2640;
+    color: var(--text-subtle);
+    font-size: 0.84rem;
+    white-space: nowrap;
+}
+
+.pmTable tbody tr:nth-child(odd) td {
+    background: var(--bg-panel);
+}
+.pmTable tbody tr:hover td {
+    background: var(--bg-elevated) !important;
+}
+
+/* pill de tipo en tabla */
+.pmTipoPill {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.06);
+}
+.pmTipoPill--pe {
+    background: #3a7bd522;
+    color: #6fa3f7;
+}
+.pmTipoPill--vc {
+    background: #9b59b622;
+    color: #c39be8;
+}
+.pmTipoPill--credito {
+    background: #1abc9c22;
+    color: #4dd4b0;
+}
+.pmTipoPill--inmobiliario {
+    background: #e67e2222;
+    color: #f0a05a;
+}
+.pmTipoPill--infraestructura {
+    background: #2ecc7122;
+    color: #6de6a0;
+}
+.pmTipoPill--otros {
+    background: #8899bb22;
+    color: #aab8d0;
+}
+
+.pmNetoPos {
+    color: #2ecc71;
+    font-weight: 600;
+}
+.pmNetoNeg {
+    color: #e74c3c;
+    font-weight: 600;
+}

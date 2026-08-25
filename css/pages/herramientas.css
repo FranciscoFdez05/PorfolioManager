@@ -1,0 +1,547 @@
+/* Herramientas
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* ── Herramientas ──────────────────────────────────────────────────────── */
+.herramientasPage {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.herramientasNav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.herramientaBtn {
+    background: transparent;
+    border: 1px solid var(--btn-border);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    padding: 7px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s;
+}
+.herramientaBtn.active {
+    background: var(--border-soft);
+    color: var(--text-primary);
+    border-color: var(--btn-border-hover);
+}
+.herramientaBtn:hover:not(.active) {
+    background: var(--btn-bg-hover);
+    color: var(--text-subtle);
+}
+
+.herramientaPanel {
+    display: none;
+}
+.herramientaPanel.active {
+    display: block;
+}
+
+.herramientaPanelTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-subtle);
+    margin-bottom: 20px;
+}
+
+.herramientaBody {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+.herramientaBodyFull {
+    flex-direction: column;
+}
+.herramientaBodyCols {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+}
+
+.herramientaInputs {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 240px;
+}
+.herramientaBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: var(--bg-panel);
+    border: 1px solid #1c2d45;
+    border-radius: 10px;
+    padding: 20px;
+    min-width: 260px;
+}
+.herramientaBlockTitle {
+    font-size: 0.82rem;
+    color: #7a8fb0;
+    font-weight: 500;
+    margin: 0;
+}
+.herramientaField {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.herramientaField label {
+    font-size: 0.76rem;
+    color: #7a8fb0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.herramientaField input {
+    background: var(--bg-panel);
+    border: 1px solid #2a3a5a;
+    color: var(--text-primary);
+    font-size: 0.92rem;
+    padding: 8px 10px;
+    border-radius: 6px;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+}
+.herramientaField input:focus {
+    border-color: #3a7bd5;
+}
+.herramientaField input[type="number"]::-webkit-outer-spin-button,
+.herramientaField input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+.herramientaField input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+.herramientaCalcBtn {
+    background: var(--btn-active-bg);
+    border: 1px solid var(--btn-active-border);
+    color: var(--btn-active-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 9px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    align-self: flex-start;
+    margin-top: 4px;
+}
+.herramientaCalcBtn:hover {
+    background: #2563eb;
+}
+.herramientaSecBtn {
+    background: transparent;
+    border: 1px solid var(--btn-border);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s;
+}
+.herramientaSecBtn:hover {
+    background: var(--btn-bg-hover);
+    color: var(--text-subtle);
+    border-color: var(--btn-border-hover);
+}
+
+.herramientaResults {
+    flex: 1;
+}
+.herramientaResultGrid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.herramientaResultCard {
+    background: var(--bg-panel);
+    border: 1px solid #1c2d45;
+    border-radius: 10px;
+    padding: 14px 18px;
+    min-width: 140px;
+}
+.hResultBig {
+    min-width: 200px;
+    padding: 20px 24px;
+}
+.hResultLabel {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #7a8fb0;
+    margin-bottom: 6px;
+}
+.hResultValue {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.hResultBig .hResultValue {
+    font-size: 1.7rem;
+}
+.hResultPositive {
+    color: var(--color-pos);
+}
+.hResultNegative {
+    color: var(--color-neg);
+}
+
+/* Ratio Oro/Plata */
+.hRatioFuenteMsg {
+    font-size: 0.82rem;
+    margin-bottom: 0.5rem;
+    min-height: 1.2em;
+}
+.hRatioFuenteOk {
+    color: var(--color-pos);
+}
+.hRatioFuenteWarn {
+    color: #f39c12;
+}
+
+.hRatioInterpretacion {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.hRatioInfoPos {
+    background: #1a3a2a;
+    border-left: 3px solid #2ecc71;
+    color: #a8e6c1;
+}
+.hRatioInfoNeg {
+    background: #3a1a1a;
+    border-left: 3px solid #e74c3c;
+    color: #f0a0a0;
+}
+
+/* Spinner numérico en modales de herramientas */
+.assetModal input[type="number"]::-webkit-outer-spin-button,
+.assetModal input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+.assetModal input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.herramientaChartWrap {
+    height: 300px;
+    position: relative;
+}
+
+/* Precio Medio table */
+.hPrecioMedioTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+}
+.hPrecioMedioTable th {
+    text-align: left;
+    color: #7a8fb0;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 8px 10px;
+    border-bottom: 1px solid #1c2d45;
+}
+.hPrecioMedioTable td {
+    padding: 5px 10px;
+    border-bottom: 1px solid #131e30;
+    color: var(--text-subtle);
+    vertical-align: middle;
+}
+.hPrecioMedioTable .hPmNum {
+    color: #7a8fb0;
+    width: 32px;
+}
+.hPrecioInput {
+    background: var(--bg-panel);
+    border: 1px solid #2a3a5a;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    padding: 5px 8px;
+    border-radius: 5px;
+    outline: none;
+    width: 110px;
+}
+.hPrecioInput:focus {
+    border-color: #3a7bd5;
+}
+.hPrecioDeleteBtn {
+    background: transparent;
+    border: none;
+    color: var(--color-neg);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    opacity: 0.7;
+}
+.hPrecioDeleteBtn:hover {
+    opacity: 1;
+    background: rgba(231, 76, 60, 0.08);
+}
+.hPrecioMedioActions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 18px;
+}
+.hBtnRow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+.herramientaResetBtn {
+    background: transparent;
+    border: 1px solid rgba(231, 76, 60, 0.25);
+    color: rgba(231, 76, 60, 0.6);
+    font-size: 0.82rem;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s;
+}
+.herramientaResetBtn:hover {
+    background: rgba(231, 76, 60, 0.08);
+    color: var(--color-neg);
+    border-color: var(--color-neg);
+}
+
+/* Rent. Dividendo */
+.hDivSection {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 28px;
+}
+.hDivSectionHeader {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.hDivSectionTitle {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #7a8fb0;
+    font-weight: 500;
+}
+.hDivChartWrap {
+    position: relative;
+    min-height: 200px;
+    margin-bottom: 16px;
+}
+.hDivTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+}
+.hDivTable th {
+    text-align: left;
+    color: #7a8fb0;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 8px 12px;
+    border-bottom: 1px solid #1c2d45;
+}
+.hDivTable td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #131e30;
+    color: var(--text-subtle);
+    vertical-align: middle;
+}
+.hDivTable tbody tr:nth-child(odd) td {
+    background: #0d1520;
+}
+.hDivName {
+    font-weight: 500;
+}
+.hDivNum {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.hDivPos {
+    color: var(--color-pos);
+    font-weight: 600;
+}
+.hDivNeg {
+    color: var(--color-neg);
+}
+
+.toolsPage {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.toolsHero {
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) 1fr;
+    gap: 16px;
+    align-items: stretch;
+}
+
+.toolsAssetPicker,
+.toolsSelectedAsset {
+    border: 1px solid rgba(116, 149, 255, 0.22);
+    border-radius: 18px;
+    background: rgba(14, 22, 41, 0.86);
+    padding: 18px 20px;
+}
+
+.toolsLabel,
+.toolsSelectedLabel {
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8eb5ff;
+    margin-bottom: 10px;
+}
+
+.toolsAssetSelect {
+    width: 100%;
+}
+
+.toolsSelectedValue {
+    font-size: 32px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1.1;
+}
+
+.toolsSelectedMeta {
+    margin-top: 8px;
+    color: #9fb4da;
+    font-size: 14px;
+}
+
+.cvStatsRow {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.cvStatCard {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cvStatLabel {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+}
+
+.cvStatValue {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+}
+
+.cvStatPos {
+    color: var(--color-pos);
+}
+.cvStatNeg {
+    color: var(--color-neg);
+}
+
+.cvTipoBadge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    background: rgba(100, 116, 139, 0.15);
+    color: var(--text-subtle);
+}
+
+.cvTipoBadgeIn {
+    background: rgba(46, 204, 113, 0.13);
+    color: #4ade80;
+}
+
+.cvTipoBadgeOut {
+    background: rgba(231, 76, 60, 0.13);
+    color: #f87171;
+}
+
+@media (max-width: 1100px) {
+    .toolsHero {
+        grid-template-columns: 1fr;
+    }
+
+    .cvStatsRow {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .conversionesTableWrapper {
+        max-height: 500px;
+    }
+}
+
+@media (max-width: 600px) {
+    .cvStatsRow {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 1280px) {
+    .interesesMainArea {
+        grid-template-columns: 1fr;
+    }
+
+    .interesesSummarySection {
+        max-width: 320px;
+        margin-right: 0;
+    }
+
+    .metrics {
+        justify-content: flex-start;
+        gap: 8px;
+    }
+
+    .interesesTableWrapper {
+        max-height: 500px;
+    }
+}

@@ -1,0 +1,453 @@
+/* Ingresos
+   ─────────────────────────────────────────────────────────────────
+   Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
+   los <link> en index.html reproduce el que tenían aquí, así que la
+   cascada es la misma que antes del troceado. */
+
+/* ── Ingresos page ──────────────────────────────────────────────────────── */
+
+.ingresosPage {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-right: 18px;
+    flex: 1;
+    margin-top: -6px;
+}
+
+.ingresosYearBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 0 2px 0 2px;
+    margin-bottom: 0;
+    width: 100%;
+}
+
+.ingresosYearActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
+.ingresosYearActions .dangerButton {
+    height: 36px;
+    font-size: 14px;
+    padding: 0 12px;
+}
+
+.ingresosMonthBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 0;
+    width: 100%;
+    padding: 0 2px;
+}
+
+.ingresosMonthActions {
+    display: none;
+}
+
+.ingresosYearList {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 5px;
+    flex: 1 1 auto;
+}
+
+.ingresosYearBtn,
+.ingresosMonthTab {
+    flex: 1;
+    text-align: center;
+}
+
+.ingresosYearBtn,
+.ingresosAddYearBtn,
+.ingresosMonthTab {
+    min-width: 78px;
+    height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.15s ease;
+}
+
+.ingresosYearBtn:hover,
+.ingresosAddYearBtn:hover,
+.ingresosMonthTab:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--btn-border-hover);
+    transform: translateY(-1px);
+}
+
+.ingresosYearBtn.active,
+.ingresosMonthTab.active {
+    background: var(--btn-active-bg);
+    border-color: var(--btn-active-border);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.ingresosYearBtn.yearViewActive {
+    box-shadow: inset 0 0 0 2px rgba(96, 165, 250, 0.85);
+}
+
+.ingresosAddYearBtn {
+    min-width: 36px;
+    font-size: 22px;
+    line-height: 1;
+    padding: 0 10px;
+}
+
+.ingresosMonthTab {
+    min-width: auto;
+    height: 38px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 0 14px;
+}
+
+.ingresosMonthActions .primaryButton,
+.ingresosMonthActions .secondaryButton,
+.ingresosMonthActions .dangerButton {
+    font-size: 13px;
+    padding: 0 12px;
+    height: 34px;
+    white-space: nowrap;
+}
+
+.ingresosAnnualWrapper,
+.ingresosMovementsWrapper {
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    background: var(--bg-panel);
+    overflow: auto;
+    scrollbar-width: none;
+}
+
+.ingresosMovementsWrapper {
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 498px;
+}
+
+.ingresosAnnualWrapper::-webkit-scrollbar,
+.ingresosMovementsWrapper::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
+.ingresosAnnualTable,
+.ingresosMovementsTable {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    background: var(--bg-panel);
+    color: #e8eefc;
+}
+
+.ingresosAnnualTable thead th,
+.ingresosMovementsTable thead th {
+    padding: 8px 10px;
+    background: var(--bg-panel);
+    color: #f8fbff;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+    border-right: none;
+    border-bottom: 1px solid var(--border-mid);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.ingresosMovementsTable thead th {
+    padding: 9px 12px;
+    font-size: 14px;
+}
+
+/* La cabecera de una columna numérica sigue a sus celdas (ver .numCol/.numCell) */
+.ingresosAnnualTable thead th.numCol,
+.ingresosMovementsTable thead th.numCol {
+    text-align: right;
+}
+
+.ingresosAnnualTable tbody td,
+.ingresosMovementsTable tbody td {
+    padding: 8px 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-mid);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 13px;
+    vertical-align: middle;
+}
+
+.ingresosAnnualTable tbody td {
+    white-space: nowrap;
+    padding: 5px 8px;
+}
+
+/* Mismo alto para todas las filas, cabeceras de sección incluidas: las
+   recurrentes ocupan dos líneas (nombre + frecuencia) y las de tipo de ingreso
+   solo una. */
+.ingresosAnnualTable tbody tr td {
+    height: 42px;
+}
+
+/* Todas las columnas de mes a la derecha, aunque el mes esté vacío ("- €") y
+   la detección automática de columnas numéricas no lo marque como numérico. */
+.ingresosAnnualTable thead th:not(:first-child):not(.rowActionHeader),
+.ingresosAnnualTable tbody td:not(:first-child):not(.rowActionsCell) {
+    text-align: right;
+}
+
+.ingresosAnnualTable .rowActionHeader,
+.ingresosMovementsTable .rowActionHeader {
+    width: 40px;
+    min-width: 40px;
+    padding: 0 4px !important;
+    border-left: none !important;
+    border-right: none !important;
+    background: var(--bg-panel) !important;
+}
+
+.ingresosAnnualTable .rowActionsCell {
+    width: 40px;
+    min-width: 40px;
+}
+
+.ingresosMovementsTable tbody td {
+    padding: 6px 10px;
+    font-size: 14px;
+    height: 38px;
+}
+
+.ingresosMovementsTable .rowActionsCell {
+    width: 40px;
+    min-width: 40px;
+}
+
+.ingresosMovementsTable {
+    width: 100%;
+}
+
+/* Columnas compactas y agrupadas a la izquierda: la de acciones absorbe el
+   ancho sobrante del panel en lugar de repartirlo entre todas (table-layout:fixed). */
+.ingresosMovementsTable thead th:nth-child(1),
+.ingresosMovementsTable tbody td:nth-child(1) {
+    width: 170px;
+}
+.ingresosMovementsTable thead th:nth-child(2),
+.ingresosMovementsTable tbody td:nth-child(2) {
+    width: 360px;
+}
+.ingresosMovementsTable thead th:nth-child(3),
+.ingresosMovementsTable tbody td:nth-child(3) {
+    width: 260px;
+}
+.ingresosMovementsTable thead th:nth-child(4),
+.ingresosMovementsTable tbody td:nth-child(4) {
+    width: 180px;
+}
+
+.ingresosMovementsTable thead th.rowActionHeader,
+.ingresosMovementsTable tbody td.rowActionsCell {
+    width: auto;
+    text-align: right;
+}
+
+.ingresosSectionRow td {
+    background: var(--bg-panel) !important;
+    border-top: 2px solid var(--border-mid);
+    border-bottom: 1px solid var(--border-mid);
+    color: #93c5fd !important;
+    font-size: 11px !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+.ingresosTotalRow td {
+    font-weight: 700;
+    background: #0d1929 !important;
+    border-top: 1px solid var(--border-mid);
+    color: var(--text-bright) !important;
+}
+
+.ingresosAnnualTable th:first-child,
+.ingresosAnnualTable td:first-child {
+    width: 114px;
+    min-width: 114px;
+}
+
+.ingresosAnnualTable tbody tr:not(.ingresosSectionRow):not(.ingresosTotalRow):hover td {
+    background: var(--btn-bg-hover);
+}
+
+.ingresosMonthHeader {
+    padding: 8px 2px;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.ingresosMonthTabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+    flex: 1 1 auto;
+    width: 100%;
+}
+
+.ingresosActions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: auto;
+}
+
+.ingresosCreateModal {
+    min-width: 360px;
+    max-width: 520px;
+}
+
+.ingresosCreateModalWide {
+    min-width: 560px;
+    max-width: 780px;
+}
+
+.ingresosCreateModalBody {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.ingresosCreateModalField {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ingresosCreateModalBody > .assetModalLabel:not(:first-child) {
+    margin-top: 4px;
+}
+
+.ingresosCreateModalGrid {
+    display: grid;
+    gap: 10px 16px;
+}
+
+.ingresosCreateModalGridMonths {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.ingresosCreateModalFeedback {
+    margin: 4px 0 0 0;
+    font-size: 13px;
+    color: #86efac;
+}
+
+.ingresosCreateModalFeedback.error {
+    color: #fca5a5;
+}
+
+.ingresosCreateModalActions {
+    margin-top: 8px;
+}
+
+/* KPI group ingresos personales */
+.mkpiGroupIngresosPersonales .metricasKpiGroupLabel {
+    color: #4ade80;
+}
+
+.mkpiGroupIngresosPersonales .metricasKpiCard {
+    border-color: #1a3a2a;
+    border-top-color: #4ade80;
+}
+
+/* Metricas ingresos section headers */
+.mIngresosHeader {
+    flex-wrap: nowrap;
+    gap: 12px;
+}
+.mIngresosHeaderLeft {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.mIngresosMonthToggle {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    margin-bottom: 12px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 3px;
+}
+
+.mIngresosMonthToggle .mToggleBtn {
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+    font-size: 0.76rem;
+    padding: 5px 4px;
+    border-radius: 7px;
+    border: none;
+    color: var(--text-dim);
+    font-weight: 500;
+    background: transparent;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        box-shadow 0.15s;
+    white-space: nowrap;
+}
+
+.mIngresosMonthToggle .mToggleBtn:hover:not(.active) {
+    background: var(--btn-bg-hover);
+    color: var(--text-subtle);
+}
+
+.mIngresosMonthToggle .mToggleBtn.active {
+    background: var(--bg-elevated, #1e2d4a);
+    color: var(--text-primary);
+    font-weight: 600;
+    box-shadow:
+        0 1px 4px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 1280px) {
+    .dividendosMainArea {
+        grid-template-columns: 1fr;
+    }
+
+    .dividendosSummarySection {
+        max-width: 320px;
+        margin-right: 0;
+    }
+
+    .dividendosTableWrapper {
+        max-height: 500px;
+    }
+}
