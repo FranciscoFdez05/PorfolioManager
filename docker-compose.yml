@@ -27,7 +27,11 @@ services:
       - ${PORTFOLIO_HOST_API_DIR:-./API}:/app/API
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '5000') + '/login')\" || exit 1"]
+      # /api/health y no /login: la página de login se sirve leyendo un HTML del
+      # disco, así que respondía 200 con la base de datos corrupta o sin montar.
+      # Este endpoint ejecuta una consulta contra la BD activa y devuelve 503 si
+      # falla, que es lo que hace que Docker marque el contenedor como enfermo.
+      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '5000') + '/api/health')\" || exit 1"]
       interval: ${HEALTHCHECK_INTERVAL:-30s}
       timeout: ${HEALTHCHECK_TIMEOUT:-10s}
       retries: ${HEALTHCHECK_RETRIES:-3}

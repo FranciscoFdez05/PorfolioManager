@@ -25,7 +25,29 @@ def set_active_db_path(path) -> None:
 
 
 def get_active_db_path() -> Path:
-    return _DB_PATH
+    """BD activa para el hilo actual: la global, salvo que haya un override."""
+    return getattr(_local, "override_path", None) or _DB_PATH
+
+
+@contextmanager
+def use_db_path(path):
+    """Apunta las llamadas a get_db() de ESTE hilo a otra BD.
+
+    set_active_db_path() cambia la global del proceso, así que un hilo de fondo
+    que recorra varios portfolios le cambiaría la base de datos por debajo a la
+    sesión web abierta. open_db_at() tampoco sirve aquí: devuelve una conexión
+    suelta, y los módulos de dominio (stores, ventas_fifo…) llaman a get_db()
+    por su cuenta. Este override es thread-local, así que solo afecta al hilo
+    que lo abre, y al salir se restaura lo que hubiera.
+    """
+    previo = getattr(_local, "override_path", None)
+    _local.override_path = Path(path)
+    reset_db()
+    try:
+        yield get_db()
+    finally:
+        reset_db()
+        _local.override_path = previo
 
 _SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -63,7 +85,34 @@ CREATE TABLE IF NOT EXISTS activo_rows (
     comisiones             TEXT NOT NULL DEFAULT '',
     comisiones_fiat        TEXT NOT NULL DEFAULT '',
     comisiones_cripto      TEXT NOT NULL DEFAULT '',
-    comisiones_satoshis    TEXT NOT NULL DEFAULT ''
+    comisiones_satoshis    TEXT NOT NULL DEFAULT '',
+    -- Tipo de cambio de `currency` a EUR EN LA FECHA DE LA OPERACIÓN, no hoy.
+    -- Sin él, el resultado de un activo en dólares mezcla en un solo número el
+    -- movimiento del activo y el del euro/dólar, y no hay forma de separarlos a
+    -- posteriori: el tipo de aquel día ya no se puede deducir de los datos.
+    -- Vacío significa "no se conoce"; el consumidor decide si cae al tipo
+    -- actual o si lo marca como incompleto.
+    fx_rate                TEXT NOT NULL DEFAULT '',
+    -- Fecha a la que corresponde `fx_rate`. Puede no coincidir con
+    -- `fecha_operacion`: los mercados de divisas cierran los fines de semana y
+    -- se usa la última sesión disponible.
+    fx_fecha               TEXT NOT NULL DEFAULT '',
+    -- De dónde salió: 'manual', el nombre del proveedor, o 'actual' si se
+    -- rellenó con el tipo de hoy por no haber histórico.
+    fx_origen              TEXT NOT NULL DEFAULT ''
+);
+
+-- Tipos de cambio históricos ya consultados. Se cachean en la base del
+-- portfolio y no en memoria porque el backfill de un histórico de años pide
+-- cientos de fechas y los proveedores gratuitos limitan las llamadas por día:
+-- sin caché persistente, cada reinicio volvería a gastarlas.
+CREATE TABLE IF NOT EXISTS fx_rates (
+    par         TEXT NOT NULL,          -- 'USD/EUR'
+    fecha       TEXT NOT NULL,          -- 'YYYY-MM-DD', la de la sesión usada
+    rate        TEXT NOT NULL DEFAULT '',
+    origen      TEXT NOT NULL DEFAULT '',
+    obtenido_en TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (par, fecha)
 );
 
 CREATE TABLE IF NOT EXISTS activo_operation_rows (
@@ -419,10 +468,99 @@ CREATE TABLE IF NOT EXISTS asset_snapshots (
 );
 CREATE INDEX IF NOT EXISTS idx_asset_snapshots_ts ON asset_snapshots(ts);
 CREATE INDEX IF NOT EXISTS idx_asset_snapshots_asset_id_ts ON asset_snapshots(asset_id, ts);
+
+-- Reserva del hueco horario que va a rellenar el scheduler del servidor. Con
+-- varios workers de gunicorn cada uno arranca su propio hilo: sin esta tabla
+-- todos pedirían cotizaciones a los proveedores para el mismo bucket y solo
+-- una de las respuestas acabaría guardándose.
+CREATE TABLE IF NOT EXISTS snapshot_jobs (
+    bucket INTEGER PRIMARY KEY,
+    ts     INTEGER NOT NULL
+);
+
+-- Cierres diarios de los índices con los que se compara la cartera. Se cachean
+-- porque el histórico pasado no cambia nunca: sin esto, cada visita a Métricas
+-- volvería a bajar años de cotizaciones a Yahoo.
+CREATE TABLE IF NOT EXISTS benchmark_prices (
+    symbol TEXT NOT NULL,
+    dia    TEXT NOT NULL,
+    ts     INTEGER NOT NULL,
+    close  REAL NOT NULL,
+    PRIMARY KEY (symbol, dia)
+);
+CREATE INDEX IF NOT EXISTS idx_benchmark_prices_symbol_ts ON benchmark_prices(symbol, ts);
 """
 
 
+# ── Versión del esquema ───────────────────────────────────────────────────────
+# Se guarda en `PRAGMA user_version` de cada fichero .db. Antes no se guardaba
+# en ninguna parte, y eso tenía dos consecuencias:
+#
+#   * Cada apertura de cada base pagaba la introspección completa —unas treinta
+#     consultas `PRAGMA table_info` más los `CREATE TABLE IF NOT EXISTS`— solo
+#     para descubrir que no había nada que migrar. Con varios portfolios y un
+#     hilo de snapshots que los recorre todos, eso se repite constantemente.
+#   * No había forma de saber en qué esquema estaba un fichero. Al restaurar un
+#     backup antiguo, o al abrir uno creado por una versión posterior, el código
+#     lo intentaba a ciegas: en el primer caso funcionaba por casualidad (los
+#     pasos son idempotentes) y en el segundo podía fallar con un error del
+#     motor en vez de con un mensaje que se entienda.
+#
+# Para añadir un paso: escribe una función nueva decorada con @_migracion(N+1)
+# y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
+# en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
+# antes de existir este contador todos se ejecutaban en cada arranque.
+ESQUEMA_VERSION = 1
+
+_MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
+
+
+def _migracion(version: int):
+    """Registra una función como el paso que lleva el esquema a `version`."""
+    def registrar(funcion):
+        _MIGRACIONES.append((version, funcion))
+        return funcion
+    return registrar
+
+
 def _migrate(conn):
+    """Lleva `conn` hasta ESQUEMA_VERSION aplicando los pasos que le falten."""
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+
+    if version == ESQUEMA_VERSION:
+        return
+
+    if version > ESQUEMA_VERSION:
+        # Caso real: restaurar en esta versión un backup hecho con una
+        # posterior. No se toca nada —un ALTER TABLE a ciegas sobre un esquema
+        # que no se conoce es peor que no hacer nada— pero se avisa, porque el
+        # síntoma sin este mensaje sería "falta una columna" en una consulta
+        # cualquiera, muy lejos de la causa.
+        log.warning(
+            "La base de datos %s declara el esquema %s y este código conoce hasta el %s. "
+            "Se abre tal cual: actualiza la aplicación si algo falla.",
+            get_active_db_path().name, version, ESQUEMA_VERSION,
+        )
+        return
+
+    for numero, paso in sorted(_MIGRACIONES):
+        if numero > version:
+            log.info("Migrando el esquema de %s al %s", version, numero)
+            paso(conn)
+
+    # Interpolado y no parametrizado porque PRAGMA no admite parámetros; el
+    # valor es una constante entera del propio módulo, no entra de fuera.
+    conn.execute(f"PRAGMA user_version = {int(ESQUEMA_VERSION)}")
+
+
+@_migracion(1)
+def _esquema_1(conn):
+    """Estado del esquema anterior al contador de versión.
+
+    Es el cuerpo que se ejecutaba en cada arranque. Se conserva entero y en
+    orden: una base creada hace meses puede estar en cualquier punto intermedio
+    de esta secuencia, así que cada bloque comprueba por su cuenta si le toca.
+    """
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS trading (
             id               TEXT PRIMARY KEY,
@@ -469,6 +607,30 @@ def _migrate(conn):
         operation_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
         if "comisiones_fiat" not in operation_cols:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN comisiones_fiat TEXT NOT NULL DEFAULT ''")
+
+    # Tipo de cambio por operación. Va en las tres tablas que registran un
+    # importe en una divisa concreta y en una fecha concreta: las compras y
+    # ventas de la ficha, las operaciones de cripto y las ventas fiscales. Con
+    # una sola de ellas el desglose entre efecto activo y efecto divisa saldría
+    # a medias, que es peor que no darlo.
+    for table in ("activo_rows", "activo_operation_rows", "operaciones", "ventas"):
+        cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if not cols:
+            continue  # la tabla aún no existe en esta BD
+        for columna in ("fx_rate", "fx_fecha", "fx_origen"):
+            if columna not in cols:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {columna} TEXT NOT NULL DEFAULT ''")
+
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS fx_rates (
+            par         TEXT NOT NULL,
+            fecha       TEXT NOT NULL,
+            rate        TEXT NOT NULL DEFAULT '',
+            origen      TEXT NOT NULL DEFAULT '',
+            obtenido_en TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (par, fecha)
+        );
+    """)
 
     sc_rows_cols = {row[1] for row in conn.execute("PRAGMA table_info(stablecoins_rows)")}
     if "comisiones" not in sc_rows_cols:
@@ -519,6 +681,11 @@ def _migrate(conn):
         );
         CREATE INDEX IF NOT EXISTS idx_asset_snapshots_ts ON asset_snapshots(ts);
         CREATE INDEX IF NOT EXISTS idx_asset_snapshots_asset_id_ts ON asset_snapshots(asset_id, ts);
+
+        CREATE TABLE IF NOT EXISTS snapshot_jobs (
+            bucket INTEGER PRIMARY KEY,
+            ts     INTEGER NOT NULL
+        );
     """)
 
     conn.executescript("""
@@ -563,10 +730,15 @@ def _migrate(conn):
 
 
 def get_db() -> sqlite3.Connection:
+    objetivo = get_active_db_path()
     stale = (
         not hasattr(_local, "conn")
         or _local.conn is None
         or getattr(_local, "_conn_gen", -1) < _reset_generation
+        # Con use_db_path() el hilo puede haber cambiado de BD sin que la
+        # generación global se mueva: reutilizar la conexión anterior escribiría
+        # en el portfolio equivocado.
+        or getattr(_local, "conn_path", None) != str(objetivo)
     )
     if stale:
         old = getattr(_local, "conn", None)
@@ -576,14 +748,14 @@ def get_db() -> sqlite3.Connection:
             except Exception:
                 pass
         _local.conn = None
-        _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False, timeout=settings.dbTimeout())
+        objetivo.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(str(objetivo), check_same_thread=False, timeout=settings.dbTimeout())
         try:
             conn.row_factory = sqlite3.Row
             conn.execute(f"PRAGMA busy_timeout={settings.dbBusyTimeoutMs()}")
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA cache_size=-8000")
-            db_key = str(_DB_PATH)
+            db_key = str(objetivo)
             # Schema + migración solo una vez por BD y bajo lock: evita que dos
             # hilos ejecuten ALTER TABLE a la vez sobre el mismo fichero.
             with _init_lock:
@@ -598,6 +770,7 @@ def get_db() -> sqlite3.Connection:
             conn.close()
             raise
         _local.conn = conn
+        _local.conn_path = str(objetivo)
         _local._conn_gen = _reset_generation
 
     conn = _local.conn
@@ -697,6 +870,7 @@ def reset_db():
         except Exception:
             pass
         _local.conn = None
+        _local.conn_path = None
 
 
 def invalidate_all_connections():
