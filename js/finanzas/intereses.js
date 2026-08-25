@@ -1,11 +1,9 @@
-
-
 // ===== CUENTAS REMUNERADAS =====
 
 let interesesModalKeyHandler = null
-let _allCuentas = []         // [{ id, nombre, rows: [...] }]
+let _allCuentas = [] // [{ id, nombre, rows: [...] }]
 let currentCuentaId = null
-let _allInteresesRows = []   // referencia a la cuenta activa
+let _allInteresesRows = [] // referencia a la cuenta activa
 let currentInteresesYear = null
 
 function generateCuentaId() {
@@ -13,7 +11,7 @@ function generateCuentaId() {
 }
 
 function getCurrentCuenta() {
-    return _allCuentas.find(c => c.id === currentCuentaId) || null
+    return _allCuentas.find((c) => c.id === currentCuentaId) || null
 }
 
 function syncRowsBackToCuenta() {
@@ -28,7 +26,7 @@ function renderCuentasSidebar() {
     if (!list) return
     list.innerHTML = ""
 
-    _allCuentas.forEach(cuenta => {
+    _allCuentas.forEach((cuenta) => {
         const item = document.createElement("div")
         item.className = `cuentaItem${cuenta.id === currentCuentaId ? " active" : ""}`
         item.dataset.cuentaId = cuenta.id
@@ -63,7 +61,7 @@ function openInteresesErrorModal(message, error = null) {
     const existingOverlay = document.getElementById("interesesErrorModalOverlay")
     if (existingOverlay) existingOverlay.remove()
 
-    const detail = error instanceof Error ? error.message : (error ? String(error) : "")
+    const detail = error instanceof Error ? error.message : error ? String(error) : ""
     const overlay = document.createElement("div")
     overlay.id = "interesesErrorModalOverlay"
     overlay.className = "modalOverlay"
@@ -82,9 +80,14 @@ function openInteresesErrorModal(message, error = null) {
 
     const close = () => overlay.remove()
     modal.querySelector("#interesesErrorCloseBtn").addEventListener("click", close)
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) close() })
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) close()
+    })
     document.addEventListener("keydown", function handler(e) {
-        if (e.key === "Escape" || e.key === "Enter") { close(); document.removeEventListener("keydown", handler) }
+        if (e.key === "Escape" || e.key === "Enter") {
+            close()
+            document.removeEventListener("keydown", handler)
+        }
     })
 
     overlay.appendChild(modal)
@@ -121,7 +124,10 @@ function openCuentaNameModal({ title, defaultValue = "", onConfirm }) {
         const nombre = modal.querySelector("#cuentaNameInput")?.value.trim()
         if (!nombre) {
             const fb = modal.querySelector("#cuentaNameFeedback")
-            if (fb) { fb.textContent = "El nombre no puede estar vacío."; fb.classList.remove("hidden") }
+            if (fb) {
+                fb.textContent = "El nombre no puede estar vacío."
+                fb.classList.remove("hidden")
+            }
             return
         }
         close()
@@ -135,7 +141,9 @@ function openCuentaNameModal({ title, defaultValue = "", onConfirm }) {
         if (e.key === "Escape") close()
     })
 
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) close() })
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) close()
+    })
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
     modal.querySelector("#cuentaNameInput")?.focus()
@@ -160,7 +168,7 @@ function addCuenta() {
 }
 
 function renameCuenta(id) {
-    const cuenta = _allCuentas.find(c => c.id === id)
+    const cuenta = _allCuentas.find((c) => c.id === id)
     if (!cuenta) return
     openCuentaNameModal({
         title: "Renombrar cuenta",
@@ -180,7 +188,7 @@ function renameCuenta(id) {
 }
 
 function deleteCuenta(id) {
-    const cuenta = _allCuentas.find(c => c.id === id)
+    const cuenta = _allCuentas.find((c) => c.id === id)
     if (!cuenta) return
 
     openConfirmModal({
@@ -189,7 +197,7 @@ function deleteCuenta(id) {
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {
-                _allCuentas = _allCuentas.filter(c => c.id !== id)
+                _allCuentas = _allCuentas.filter((c) => c.id !== id)
                 if (currentCuentaId === id) {
                     currentCuentaId = _allCuentas.length ? _allCuentas[0].id : null
                 }
@@ -214,7 +222,10 @@ function bindCuentasSidebarActions() {
     const addBtn = document.getElementById("addCuentaBtn")
     if (addBtn && !addBtn.dataset.bound) {
         addBtn.dataset.bound = "true"
-        addBtn.addEventListener("click", () => { if (typeof closeInteresesMenu === "function") closeInteresesMenu(); addCuenta() })
+        addBtn.addEventListener("click", () => {
+            if (typeof closeInteresesMenu === "function") closeInteresesMenu()
+            addCuenta()
+        })
     }
 
     const list = document.getElementById("cuentasList")
@@ -222,10 +233,16 @@ function bindCuentasSidebarActions() {
         list.dataset.bound = "true"
         list.addEventListener("click", (e) => {
             const renameBtn = e.target.closest(".cuentaItemRenameBtn")
-            if (renameBtn) { renameCuenta(renameBtn.dataset.id); return }
+            if (renameBtn) {
+                renameCuenta(renameBtn.dataset.id)
+                return
+            }
 
             const deleteBtn = e.target.closest(".cuentaItemDeleteBtn")
-            if (deleteBtn) { deleteCuenta(deleteBtn.dataset.id); return }
+            if (deleteBtn) {
+                deleteCuenta(deleteBtn.dataset.id)
+                return
+            }
         })
     }
 }
@@ -234,14 +251,17 @@ function bindCuentasSidebarActions() {
 
 function parseInteresYear(fecha) {
     const p = String(fecha || "").split("-")
-    if (p.length === 3) return p[2]   // dd-mm-yyyy
-    if (p.length === 2) return p[1]   // mm-yyyy
+    if (p.length === 3) return p[2] // dd-mm-yyyy
+    if (p.length === 2) return p[1] // mm-yyyy
     return null
 }
 
 function getInteresesYears(rows) {
     const years = new Set()
-    rows.forEach(r => { const y = parseInteresYear(r.fecha); if (y) years.add(y) })
+    rows.forEach((r) => {
+        const y = parseInteresYear(r.fecha)
+        if (y) years.add(y)
+    })
     return [...years].sort((a, b) => Number(a) - Number(b))
 }
 
@@ -249,7 +269,7 @@ function renderInteresesYearBar(years) {
     const list = document.getElementById("interesesYearList")
     if (!list) return
     list.innerHTML = ""
-    years.forEach(year => {
+    years.forEach((year) => {
         const btn = document.createElement("button")
         btn.type = "button"
         btn.className = `interesesYearBtn${year === currentInteresesYear ? " active" : ""}`
@@ -403,7 +423,7 @@ function loadCuentasFromData(data) {
 
     if (!currentCuentaId && _allCuentas.length) {
         currentCuentaId = _allCuentas[0].id
-    } else if (currentCuentaId && !_allCuentas.find(c => c.id === currentCuentaId)) {
+    } else if (currentCuentaId && !_allCuentas.find((c) => c.id === currentCuentaId)) {
         currentCuentaId = _allCuentas.length ? _allCuentas[0].id : null
     }
 
@@ -444,7 +464,9 @@ function renderFilteredIntereses() {
     renderInteresesYearBar(years)
 
     const visible = currentInteresesYear
-        ? _allInteresesRows.map((r, i) => ({ r, i })).filter(({ r }) => parseInteresYear(r.fecha) === currentInteresesYear)
+        ? _allInteresesRows
+              .map((r, i) => ({ r, i }))
+              .filter(({ r }) => parseInteresYear(r.fecha) === currentInteresesYear)
         : _allInteresesRows.map((r, i) => ({ r, i }))
 
     interesesBody.innerHTML = ""
@@ -568,7 +590,8 @@ function handleInteresesRowActionClick(event) {
 
     const globalIndex = Number(deleteButton.dataset.globalIndex)
     const row = _allInteresesRows[globalIndex]
-    const isEmpty = !row || (!row.fecha && parseEuroNumber(row.acumulado || "") === 0 && parseEuroNumber(row.impuestos || "") === 0)
+    const isEmpty =
+        !row || (!row.fecha && parseEuroNumber(row.acumulado || "") === 0 && parseEuroNumber(row.impuestos || "") === 0)
 
     const removeRow = async () => {
         _allInteresesRows.splice(globalIndex, 1)
@@ -622,7 +645,7 @@ function deleteCurrentInteresesYear() {
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {
-                _allInteresesRows = _allInteresesRows.filter(r => parseInteresYear(r.fecha) !== currentInteresesYear)
+                _allInteresesRows = _allInteresesRows.filter((r) => parseInteresYear(r.fecha) !== currentInteresesYear)
                 syncRowsBackToCuenta()
                 const remaining = getInteresesYears(_allInteresesRows)
                 currentInteresesYear = remaining.length ? remaining[remaining.length - 1] : null
@@ -638,4 +661,3 @@ function deleteCurrentInteresesYear() {
 }
 
 // ----- Import / Export -----
-

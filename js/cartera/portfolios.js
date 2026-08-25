@@ -3,54 +3,54 @@ document.addEventListener("DOMContentLoaded", () => {
 })
 
 async function initPortfolioSwitcher() {
-    const listEl       = document.getElementById("portfolioList")
-    const currentName  = document.getElementById("portfolioCurrentName")
-    const newBtn       = document.getElementById("portfolioNewBtn")
-    const importBtn    = document.getElementById("portfolioImportBtn")
+    const listEl = document.getElementById("portfolioList")
+    const currentName = document.getElementById("portfolioCurrentName")
+    const newBtn = document.getElementById("portfolioNewBtn")
+    const importBtn = document.getElementById("portfolioImportBtn")
 
     // Modal crear/renombrar
     const modalOverlay = document.getElementById("portfolioModalOverlay")
-    const modalTitle   = document.getElementById("portfolioModalTitle")
-    const nameInput    = document.getElementById("portfolioNameInput")
-    const cancelBtn    = document.getElementById("cancelPortfolioModalBtn")
-    const confirmBtn   = document.getElementById("confirmPortfolioModalBtn")
+    const modalTitle = document.getElementById("portfolioModalTitle")
+    const nameInput = document.getElementById("portfolioNameInput")
+    const cancelBtn = document.getElementById("cancelPortfolioModalBtn")
+    const confirmBtn = document.getElementById("confirmPortfolioModalBtn")
 
     // Modal importar
-    const importOverlay    = document.getElementById("portfolioImportModalOverlay")
-    const importNameInput  = document.getElementById("portfolioImportName")
-    const importFileInput  = document.getElementById("portfolioImportFile")
-    const importStatus     = document.getElementById("portfolioImportStatus")
-    const cancelImportBtn  = document.getElementById("cancelPortfolioImportBtn")
+    const importOverlay = document.getElementById("portfolioImportModalOverlay")
+    const importNameInput = document.getElementById("portfolioImportName")
+    const importFileInput = document.getElementById("portfolioImportFile")
+    const importStatus = document.getElementById("portfolioImportStatus")
+    const cancelImportBtn = document.getElementById("cancelPortfolioImportBtn")
     const confirmImportBtn = document.getElementById("confirmPortfolioImportBtn")
 
     // Modal confirm genérico
     const pConfirmOverlay = document.getElementById("pConfirmOverlay")
-    const pConfirmTitle   = document.getElementById("pConfirmTitle")
-    const pConfirmMsg     = document.getElementById("pConfirmMsg")
-    const pConfirmCancel  = document.getElementById("pConfirmCancel")
-    const pConfirmOk      = document.getElementById("pConfirmOk")
+    const pConfirmTitle = document.getElementById("pConfirmTitle")
+    const pConfirmMsg = document.getElementById("pConfirmMsg")
+    const pConfirmCancel = document.getElementById("pConfirmCancel")
+    const pConfirmOk = document.getElementById("pConfirmOk")
 
     // Modal eliminar (3 pasos)
-    const pDeleteOverlay   = document.getElementById("pDeleteOverlay")
-    const pDelStep1        = document.getElementById("pDelStep1")
-    const pDelStep2        = document.getElementById("pDelStep2")
-    const pDelStep3        = document.getElementById("pDelStep3")
-    const pDelName1        = document.getElementById("pDelName1")
-    const pDelNameConfirm  = document.getElementById("pDelNameConfirm")
-    const pDelNameInput    = document.getElementById("pDelNameInput")
+    const pDeleteOverlay = document.getElementById("pDeleteOverlay")
+    const pDelStep1 = document.getElementById("pDelStep1")
+    const pDelStep2 = document.getElementById("pDelStep2")
+    const pDelStep3 = document.getElementById("pDelStep3")
+    const pDelName1 = document.getElementById("pDelName1")
+    const pDelNameConfirm = document.getElementById("pDelNameConfirm")
+    const pDelNameInput = document.getElementById("pDelNameInput")
     const pDelConfirmFinal = document.getElementById("pDelConfirmFinal")
 
-    let allPortfolios  = []
-    let activeId       = ""
+    let allPortfolios = []
+    let activeId = ""
     let renameTargetId = null
 
     // ── Confirm modal (Promise) ──────────────────────────
     function portfolioConfirm(title, msg, okLabel = "Confirmar", danger = false) {
-        return new Promise(resolve => {
+        return new Promise((resolve) => {
             pConfirmTitle.textContent = title
-            pConfirmMsg.innerHTML    = msg
-            pConfirmOk.textContent   = okLabel
-            pConfirmOk.className     = danger ? "dangerButton" : "primaryButton"
+            pConfirmMsg.innerHTML = msg
+            pConfirmOk.textContent = okLabel
+            pConfirmOk.className = danger ? "dangerButton" : "primaryButton"
             pConfirmOk.dataset.noAutohide = "true"
             pConfirmOverlay.classList.remove("hidden")
 
@@ -61,9 +61,11 @@ async function initPortfolioSwitcher() {
                 pConfirmOverlay.removeEventListener("click", onBg)
                 resolve(result)
             }
-            const onOk     = () => cleanup(true)
+            const onOk = () => cleanup(true)
             const onCancel = () => cleanup(false)
-            const onBg     = e => { if (e.target === pConfirmOverlay) cleanup(false) }
+            const onBg = (e) => {
+                if (e.target === pConfirmOverlay) cleanup(false)
+            }
 
             pConfirmOk.addEventListener("click", onOk)
             pConfirmCancel.addEventListener("click", onCancel)
@@ -73,11 +75,11 @@ async function initPortfolioSwitcher() {
 
     // ── Delete 3-step (Promise) ──────────────────────────
     function portfolioDelete(portfolioName) {
-        return new Promise(resolve => {
-            pDelName1.textContent       = portfolioName
+        return new Promise((resolve) => {
+            pDelName1.textContent = portfolioName
             pDelNameConfirm.textContent = portfolioName
-            pDelNameInput.value         = ""
-            pDelConfirmFinal.disabled   = true
+            pDelNameInput.value = ""
+            pDelConfirmFinal.disabled = true
 
             pDelStep1.classList.remove("hidden")
             pDelStep2.classList.add("hidden")
@@ -91,15 +93,22 @@ async function initPortfolioSwitcher() {
             }
 
             // Paso 1 → 2
-            const onNext1   = () => { pDelStep1.classList.add("hidden"); pDelStep2.classList.remove("hidden") }
+            const onNext1 = () => {
+                pDelStep1.classList.add("hidden")
+                pDelStep2.classList.remove("hidden")
+            }
             const onCancel1 = () => closeDelete(false)
-            document.getElementById("pDelNext1").onclick   = onNext1
+            document.getElementById("pDelNext1").onclick = onNext1
             document.getElementById("pDelCancel1").onclick = onCancel1
 
             // Paso 2 → 3
-            const onNext2   = () => { pDelStep2.classList.add("hidden"); pDelStep3.classList.remove("hidden"); pDelNameInput.focus() }
+            const onNext2 = () => {
+                pDelStep2.classList.add("hidden")
+                pDelStep3.classList.remove("hidden")
+                pDelNameInput.focus()
+            }
             const onCancel2 = () => closeDelete(false)
-            document.getElementById("pDelNext2").onclick   = onNext2
+            document.getElementById("pDelNext2").onclick = onNext2
             document.getElementById("pDelCancel2").onclick = onCancel2
 
             // Paso 3 — validar nombre
@@ -113,18 +122,20 @@ async function initPortfolioSwitcher() {
             }
             document.getElementById("pDelCancel3").onclick = () => closeDelete(false)
 
-            pDeleteOverlay.onclick = e => { if (e.target === pDeleteOverlay) closeDelete(false) }
+            pDeleteOverlay.onclick = (e) => {
+                if (e.target === pDeleteOverlay) closeDelete(false)
+            }
         })
     }
 
     // ── Carga de portfolios ──────────────────────────────
     async function loadPortfolios() {
         try {
-            const res  = await fetch("/api/portfolios")
+            const res = await fetch("/api/portfolios")
             const data = await res.json()
             if (!data.ok) return
             allPortfolios = data.portfolios
-            activeId      = data.active
+            activeId = data.active
             window._activePortfolioId = activeId
             if (window._viewAllPortfolios && allPortfolios.length >= 2) {
                 if (currentName) currentName.textContent = "Todos"
@@ -133,7 +144,7 @@ async function initPortfolioSwitcher() {
                     localStorage.removeItem("viewAllPortfolios")
                     window._viewAllPortfolios = false
                 }
-                const active  = allPortfolios.find(p => p.id === activeId)
+                const active = allPortfolios.find((p) => p.id === activeId)
                 if (currentName) currentName.textContent = active ? active.name : "Portfolio"
             }
             renderList()
@@ -147,7 +158,9 @@ async function initPortfolioSwitcher() {
         // Opción "Todos" cuando hay 2 o más portfolios
         if (allPortfolios.length >= 2) {
             const todosRow = document.createElement("div")
-            todosRow.className = "portfolioMenuItem portfolioMenuItemTodos" + (window._viewAllPortfolios ? " portfolioMenuItemActive" : "")
+            todosRow.className =
+                "portfolioMenuItem portfolioMenuItemTodos" +
+                (window._viewAllPortfolios ? " portfolioMenuItemActive" : "")
             const todosSpan = document.createElement("span")
             todosSpan.className = "portfolioMenuItemName"
             todosSpan.textContent = "Todos los portfolios"
@@ -161,7 +174,7 @@ async function initPortfolioSwitcher() {
             listEl.appendChild(todosRow)
         }
 
-        allPortfolios.forEach(p => {
+        allPortfolios.forEach((p) => {
             const isActive = !window._viewAllPortfolios && p.id === activeId
             const row = document.createElement("div")
             row.className = "portfolioMenuItem" + (isActive ? " portfolioMenuItemActive" : "")
@@ -178,7 +191,7 @@ async function initPortfolioSwitcher() {
             expBtn.className = "portfolioActionBtn"
             expBtn.title = "Exportar"
             expBtn.textContent = "⬇️"
-            expBtn.addEventListener("click", async e => {
+            expBtn.addEventListener("click", async (e) => {
                 e.stopPropagation()
                 closeMenu()
                 const ok = await portfolioConfirm(
@@ -195,7 +208,7 @@ async function initPortfolioSwitcher() {
             renBtn.className = "portfolioActionBtn"
             renBtn.title = "Renombrar"
             renBtn.textContent = "✏️"
-            renBtn.addEventListener("click", e => {
+            renBtn.addEventListener("click", (e) => {
                 e.stopPropagation()
                 closeMenu()
                 openModal("rename", p.id, p.name)
@@ -208,7 +221,7 @@ async function initPortfolioSwitcher() {
                 delBtn.className = "portfolioActionBtn portfolioDeleteBtn"
                 delBtn.title = "Eliminar"
                 delBtn.textContent = "🗑"
-                delBtn.addEventListener("click", async e => {
+                delBtn.addEventListener("click", async (e) => {
                     e.stopPropagation()
                     closeMenu()
                     const confirmed = await portfolioDelete(p.name)
@@ -241,14 +254,16 @@ async function initPortfolioSwitcher() {
 
     async function switchPortfolio(pid) {
         if (typeof window.flushPendingPageChanges === "function") {
-            try { await window.flushPendingPageChanges() } catch (_) {}
+            try {
+                await window.flushPendingPageChanges()
+            } catch (_) {}
             window.flushPendingPageChanges = null
         }
         try {
-            const res  = await fetch("/api/portfolios/switch", {
+            const res = await fetch("/api/portfolios/switch", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ id: pid }),
+                body: JSON.stringify({ id: pid })
             })
             const data = await res.json()
             if (data.ok) {
@@ -266,7 +281,7 @@ async function initPortfolioSwitcher() {
 
     async function deletePortfolio(pid) {
         try {
-            const res  = await fetch(`/api/portfolios/${pid}`, { method: "DELETE" })
+            const res = await fetch(`/api/portfolios/${pid}`, { method: "DELETE" })
             const data = await res.json()
             if (!data.ok) await portfolioConfirm("Error", data.error || "Error al eliminar", "Aceptar")
             await loadPortfolios()
@@ -278,7 +293,7 @@ async function initPortfolioSwitcher() {
         renameTargetId = pid
         modalTitle.textContent = mode === "rename" ? "Renombrar portfolio" : "Nuevo portfolio"
         confirmBtn.textContent = mode === "rename" ? "Guardar" : "Crear"
-        nameInput.value        = mode === "rename" ? currentVal : ""
+        nameInput.value = mode === "rename" ? currentVal : ""
         confirmBtn.style.display = ""
         modalOverlay.classList.remove("hidden")
         nameInput.focus()
@@ -287,16 +302,25 @@ async function initPortfolioSwitcher() {
     function closeModal() {
         modalOverlay.classList.add("hidden")
         nameInput.value = ""
-        renameTargetId  = null
+        renameTargetId = null
     }
 
-    if (newBtn)    newBtn.addEventListener("click",   e => { e.stopPropagation(); closeMenu(); openModal("create") })
+    if (newBtn)
+        newBtn.addEventListener("click", (e) => {
+            e.stopPropagation()
+            closeMenu()
+            openModal("create")
+        })
     if (cancelBtn) cancelBtn.addEventListener("click", closeModal)
-    if (modalOverlay) modalOverlay.addEventListener("click", e => { if (e.target === modalOverlay) closeModal() })
-    if (nameInput) nameInput.addEventListener("keydown", e => {
-        if (e.key === "Enter")  confirmBtn.click()
-        if (e.key === "Escape") closeModal()
-    })
+    if (modalOverlay)
+        modalOverlay.addEventListener("click", (e) => {
+            if (e.target === modalOverlay) closeModal()
+        })
+    if (nameInput)
+        nameInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") confirmBtn.click()
+            if (e.key === "Escape") closeModal()
+        })
 
     if (confirmBtn) {
         confirmBtn.addEventListener("click", async () => {
@@ -305,21 +329,23 @@ async function initPortfolioSwitcher() {
 
             if (renameTargetId) {
                 try {
-                    const res  = await fetch(`/api/portfolios/${renameTargetId}/rename`, {
+                    const res = await fetch(`/api/portfolios/${renameTargetId}/rename`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ name }),
+                        body: JSON.stringify({ name })
                     })
                     const data = await res.json()
-                    if (data.ok) { closeModal(); await loadPortfolios() }
-                    else await portfolioConfirm("Error", data.error || "Error al renombrar", "Aceptar")
+                    if (data.ok) {
+                        closeModal()
+                        await loadPortfolios()
+                    } else await portfolioConfirm("Error", data.error || "Error al renombrar", "Aceptar")
                 } catch (_) {}
             } else {
                 try {
-                    const res  = await fetch("/api/portfolios", {
+                    const res = await fetch("/api/portfolios", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ name }),
+                        body: JSON.stringify({ name })
                     })
                     const data = await res.json()
                     if (data.ok) {
@@ -341,7 +367,7 @@ async function initPortfolioSwitcher() {
 
     // ── Modal importar ───────────────────────────────────
     if (importBtn) {
-        importBtn.addEventListener("click", e => {
+        importBtn.addEventListener("click", (e) => {
             e.stopPropagation()
             closeMenu()
             importNameInput.value = ""
@@ -362,7 +388,10 @@ async function initPortfolioSwitcher() {
     }
 
     if (cancelImportBtn) cancelImportBtn.addEventListener("click", closeImportModal)
-    if (importOverlay)   importOverlay.addEventListener("click", e => { if (e.target === importOverlay) closeImportModal() })
+    if (importOverlay)
+        importOverlay.addEventListener("click", (e) => {
+            if (e.target === importOverlay) closeImportModal()
+        })
 
     if (importFileInput) {
         importFileInput.addEventListener("change", () => {
@@ -376,22 +405,25 @@ async function initPortfolioSwitcher() {
         confirmImportBtn.addEventListener("click", async () => {
             const name = importNameInput.value.trim()
             const file = importFileInput.files[0]
-            if (!name) { importNameInput.focus(); return }
+            if (!name) {
+                importNameInput.focus()
+                return
+            }
             if (!file) {
                 importStatus.textContent = "Selecciona un fichero .db"
                 importStatus.classList.remove("hidden")
                 return
             }
 
-            confirmImportBtn.disabled    = true
-            importStatus.textContent     = "Importando..."
+            confirmImportBtn.disabled = true
+            importStatus.textContent = "Importando..."
             importStatus.classList.remove("hidden")
 
             try {
                 const fd = new FormData()
                 fd.append("name", name)
                 fd.append("file", file)
-                const res  = await fetch("/api/portfolios/import", { method: "POST", body: fd })
+                const res = await fetch("/api/portfolios/import", { method: "POST", body: fd })
                 const data = await res.json()
                 if (data.ok) {
                     closeImportModal()

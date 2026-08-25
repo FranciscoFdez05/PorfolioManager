@@ -2,7 +2,7 @@ let _hmPeriod = "dia"
 let _hmMetric = "cuenta"
 let _hmActiveTypes = new Set(["all"])
 let _hmData = null
-const _hmHistCache = {}   // { period: { data: {id: pct}, ts: ms } }
+const _hmHistCache = {} // { period: { data: {id: pct}, ts: ms } }
 const _HM_HIST_TTL = 4 * 3600 * 1000
 
 async function initHeatmapLogic() {
@@ -12,14 +12,14 @@ async function initHeatmapLogic() {
     _hmData = null
 
     const periodsEl = document.getElementById("heatmapPeriods")
-    const metricEl  = document.getElementById("heatmapMetric")
-    const typesEl   = document.getElementById("heatmapTypes")
+    const metricEl = document.getElementById("heatmapMetric")
+    const typesEl = document.getElementById("heatmapTypes")
 
     if (periodsEl) {
         periodsEl.addEventListener("click", async (e) => {
             const btn = e.target.closest(".hmGroupBtn")
             if (!btn || !btn.dataset.period) return
-            periodsEl.querySelectorAll(".hmGroupBtn").forEach(b => b.classList.remove("active"))
+            periodsEl.querySelectorAll(".hmGroupBtn").forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _hmPeriod = btn.dataset.period
             if (_hmPeriod !== "dia") {
@@ -33,7 +33,7 @@ async function initHeatmapLogic() {
         metricEl.addEventListener("click", (e) => {
             const btn = e.target.closest(".hmGroupBtn")
             if (!btn || !btn.dataset.metric) return
-            metricEl.querySelectorAll(".hmGroupBtn").forEach(b => b.classList.remove("active"))
+            metricEl.querySelectorAll(".hmGroupBtn").forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _hmMetric = btn.dataset.metric
             // Grey out periods group when cuenta is selected
@@ -50,7 +50,7 @@ async function initHeatmapLogic() {
 
             if (type === "all") {
                 _hmActiveTypes = new Set(["all"])
-                typesEl.querySelectorAll(".hmGroupBtn").forEach(b => b.classList.remove("active"))
+                typesEl.querySelectorAll(".hmGroupBtn").forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
             } else {
                 // Toggle this type
@@ -65,11 +65,10 @@ async function initHeatmapLogic() {
                     _hmActiveTypes.add("all")
                 }
                 // Sync button states
-                typesEl.querySelectorAll(".hmGroupBtn").forEach(b => {
-                    b.classList.toggle("active",
-                        _hmActiveTypes.has("all")
-                            ? b.dataset.type === "all"
-                            : _hmActiveTypes.has(b.dataset.type)
+                typesEl.querySelectorAll(".hmGroupBtn").forEach((b) => {
+                    b.classList.toggle(
+                        "active",
+                        _hmActiveTypes.has("all") ? b.dataset.type === "all" : _hmActiveTypes.has(b.dataset.type)
                     )
                 })
             }
@@ -82,23 +81,25 @@ async function initHeatmapLogic() {
 
     await hmLoadData()
 
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-        hmRender()
+    requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+            hmRender()
 
-        let _hmRenderTimer = null
-        const _hmObserver = new ResizeObserver(() => {
-            clearTimeout(_hmRenderTimer)
-            _hmRenderTimer = setTimeout(hmRender, 40)
+            let _hmRenderTimer = null
+            const _hmObserver = new ResizeObserver(() => {
+                clearTimeout(_hmRenderTimer)
+                _hmRenderTimer = setTimeout(hmRender, 40)
+            })
+            const container = document.getElementById("heatmapContainer")
+            if (container) _hmObserver.observe(container)
+
+            window._hmResizeCleanup = () => {
+                _hmObserver.disconnect()
+                clearTimeout(_hmRenderTimer)
+                document.getElementById("hmTooltip")?.remove()
+            }
         })
-        const container = document.getElementById("heatmapContainer")
-        if (container) _hmObserver.observe(container)
-
-        window._hmResizeCleanup = () => {
-            _hmObserver.disconnect()
-            clearTimeout(_hmRenderTimer)
-            document.getElementById("hmTooltip")?.remove()
-        }
-    }))
+    )
 }
 
 async function hmLoadData() {
@@ -112,54 +113,59 @@ async function hmLoadData() {
 
         // Load full asset data in parallel to get correct per-row metrics
         // (same approach as the Activos page, avoids currency-mismatch in server aggregates)
-        await Promise.all(assets.map(async asset => {
-            try {
-                const fullRes = await fetch(`/api/activos/${asset.id}`)
-                const fullAsset = await fullRes.json()
-                const row = await buildOverviewRow(fullAsset)
-                const euros = await buildSummaryMetricsInEuros(row)
-                asset._hmMetrics = {
-                    netoEur:       euros.netoActualEur,
-                    invertidoEur:  euros.invertidoBrutoEur,
-                    cuentaPct:     euros.invertidoBrutoEur > 0
-                        ? (euros.rendimientoEur / euros.invertidoBrutoEur * 100)
-                        : 0,
-                    hasCuenta:     euros.invertidoBrutoEur > 0,
+        await Promise.all(
+            assets.map(async (asset) => {
+                try {
+                    const fullRes = await fetch(`/api/activos/${asset.id}`)
+                    const fullAsset = await fullRes.json()
+                    const row = await buildOverviewRow(fullAsset)
+                    const euros = await buildSummaryMetricsInEuros(row)
+                    asset._hmMetrics = {
+                        netoEur: euros.netoActualEur,
+                        invertidoEur: euros.invertidoBrutoEur,
+                        cuentaPct:
+                            euros.invertidoBrutoEur > 0 ? (euros.rendimientoEur / euros.invertidoBrutoEur) * 100 : 0,
+                        hasCuenta: euros.invertidoBrutoEur > 0
+                    }
+                } catch (e) {
+                    asset._hmMetrics = null
                 }
-            } catch (e) {
-                asset._hmMetrics = null
-            }
-        }))
+            })
+        )
 
-        _hmData = window._hmData = assets.map(asset => {
-            const cur = hmNormCur(asset.currency)
-            const m   = asset._hmMetrics
+        _hmData = window._hmData = assets
+            .map((asset) => {
+                const cur = hmNormCur(asset.currency)
+                const m = asset._hmMetrics
 
-            const netoEur      = m ? m.netoEur      : 0
-            const invertidoEur = m ? m.invertidoEur : 0
-            const cuentaPct    = m ? m.cuentaPct    : 0
-            const hasCuenta    = m ? m.hasCuenta    : false
+                const netoEur = m ? m.netoEur : 0
+                const invertidoEur = m ? m.invertidoEur : 0
+                const cuentaPct = m ? m.cuentaPct : 0
+                const hasCuenta = m ? m.hasCuenta : false
 
-            const rawChange = String(asset.change || "").replace(/%/g, "").replace(",", ".").trim()
-            const d1 = rawChange !== "" ? parseFloat(rawChange) : null
-            const hasMarket = d1 !== null && !isNaN(d1)
+                const rawChange = String(asset.change || "")
+                    .replace(/%/g, "")
+                    .replace(",", ".")
+                    .trim()
+                const d1 = rawChange !== "" ? parseFloat(rawChange) : null
+                const hasMarket = d1 !== null && !isNaN(d1)
 
-            return {
-                id:       asset.id,
-                name:     asset.name || asset.symbol || asset.id,
-                symbol:   hmExtractSymbol(asset),
-                type:     (asset.type || "acciones").toLowerCase(),
-                price:    asset.price || "---",
-                currency: cur,
-                netoEur,
-                invertidoEur,
-                cuentaPct,
-                hasCuenta,
-                dia: hasMarket ? d1 : null,
-                hasMarket,
-            }
-        }).filter(d => d.netoEur > 0.01 || d.invertidoEur > 0.01)
-
+                return {
+                    id: asset.id,
+                    name: asset.name || asset.symbol || asset.id,
+                    symbol: hmExtractSymbol(asset),
+                    type: (asset.type || "acciones").toLowerCase(),
+                    price: asset.price || "---",
+                    currency: cur,
+                    netoEur,
+                    invertidoEur,
+                    cuentaPct,
+                    hasCuenta,
+                    dia: hasMarket ? d1 : null,
+                    hasMarket
+                }
+            })
+            .filter((d) => d.netoEur > 0.01 || d.invertidoEur > 0.01)
     } catch (err) {
         console.error("Heatmap error:", err)
         _hmData = []
@@ -173,11 +179,14 @@ async function hmLoadHistorical(period) {
     if (cached && Date.now() - cached.ts < _HM_HIST_TTL) return
 
     const container = document.getElementById("heatmapContainer")
-    const loading   = document.getElementById("heatmapLoading")
-    if (loading) { loading.textContent = "Cargando datos históricos…"; loading.style.display = "flex" }
+    const loading = document.getElementById("heatmapLoading")
+    if (loading) {
+        loading.textContent = "Cargando datos históricos…"
+        loading.style.display = "flex"
+    }
 
     try {
-        const res  = await fetch(`/api/historical-changes?period=${period}`)
+        const res = await fetch(`/api/historical-changes?period=${period}`)
         const json = await res.json()
         if (json.ok) {
             _hmHistCache[period] = { data: json.data, ts: Date.now() }
@@ -190,12 +199,24 @@ async function hmLoadHistorical(period) {
 }
 
 function hmNormCur(raw) {
-    return String(raw || "EUR").toUpperCase().trim() || "EUR"
+    return (
+        String(raw || "EUR")
+            .toUpperCase()
+            .trim() || "EUR"
+    )
 }
 
 function hmExtractSymbol(asset) {
-    const ms = String(asset.marketSymbol || asset.finnhubSymbol || "").trim().toUpperCase()
-    if (ms.includes(":")) return ms.split(":").pop().replace(/USDT$|USD$|USDC$|BUSD$/, "") || asset.name
+    const ms = String(asset.marketSymbol || asset.finnhubSymbol || "")
+        .trim()
+        .toUpperCase()
+    if (ms.includes(":"))
+        return (
+            ms
+                .split(":")
+                .pop()
+                .replace(/USDT$|USD$|USDC$|BUSD$/, "") || asset.name
+        )
     if (ms.includes(".")) return ms.split(".")[0]
     return ms || asset.name || asset.id
 }
@@ -205,55 +226,60 @@ function hmRender() {
     if (!container || !_hmData) return
 
     // Filter by selected types (multi-select)
-    const items = _hmData.filter(d =>
-        _hmActiveTypes.has("all") || _hmActiveTypes.has(d.type)
-    )
+    const items = _hmData.filter((d) => _hmActiveTypes.has("all") || _hmActiveTypes.has(d.type))
 
     if (!items.length) {
         container.innerHTML = '<div class="heatmapEmpty">No hay activos para mostrar</div>'
         return
     }
 
-    const enriched = items.map(d => {
-        let value, valueLabel, hasValue, approx = false
+    const enriched = items
+        .map((d) => {
+            let value,
+                valueLabel,
+                hasValue,
+                approx = false
 
-        if (_hmMetric === "cuenta") {
-            if (d.hasCuenta) {
-                value = d.cuentaPct
-                hasValue = true
-                valueLabel = hmFormatPct(value)
-            } else if (d.hasMarket) {
-                value = d.dia
-                hasValue = true
-                valueLabel = hmFormatPct(value)
+            if (_hmMetric === "cuenta") {
+                if (d.hasCuenta) {
+                    value = d.cuentaPct
+                    hasValue = true
+                    valueLabel = hmFormatPct(value)
+                } else if (d.hasMarket) {
+                    value = d.dia
+                    hasValue = true
+                    valueLabel = hmFormatPct(value)
+                } else {
+                    value = null
+                    hasValue = false
+                    valueLabel = "—"
+                }
             } else {
-                value = null; hasValue = false; valueLabel = "—"
+                // activos: día usa datos reales; resto usa histórico real del API
+                if (_hmPeriod === "dia") {
+                    value = d.dia
+                    hasValue = d.dia !== null
+                } else {
+                    const histData = _hmHistCache[_hmPeriod]?.data || {}
+                    value = histData[d.id] ?? null
+                    hasValue = value !== null
+                }
+                valueLabel = hasValue ? hmFormatPct(value) : "N/D"
             }
-        } else {
-            // activos: día usa datos reales; resto usa histórico real del API
-            if (_hmPeriod === "dia") {
-                value = d.dia
-                hasValue = d.dia !== null
-            } else {
-                const histData = _hmHistCache[_hmPeriod]?.data || {}
-                value = histData[d.id] ?? null
-                hasValue = value !== null
+
+            const size = Math.max(d.netoEur, 0.01)
+
+            // Money movement for tooltip
+            let moneyChange = null
+            if (_hmMetric === "cuenta" && d.hasCuenta) {
+                moneyChange = d.netoEur - d.invertidoEur
+            } else if (hasValue && value !== null && d.netoEur > 0) {
+                moneyChange = (d.netoEur * value) / 100
             }
-            valueLabel = hasValue ? hmFormatPct(value) : "N/D"
-        }
 
-        const size = Math.max(d.netoEur, 0.01)
-
-        // Money movement for tooltip
-        let moneyChange = null
-        if (_hmMetric === "cuenta" && d.hasCuenta) {
-            moneyChange = d.netoEur - d.invertidoEur
-        } else if (hasValue && value !== null && d.netoEur > 0) {
-            moneyChange = d.netoEur * value / 100
-        }
-
-        return { ...d, size, value, valueLabel, hasValue, moneyChange }
-    }).sort((a, b) => b.size - a.size)
+            return { ...d, size, value, valueLabel, hasValue, moneyChange }
+        })
+        .sort((a, b) => b.size - a.size)
 
     const totalSize = enriched.reduce((s, d) => s + d.size, 0)
     if (totalSize === 0) {
@@ -261,17 +287,20 @@ function hmRender() {
         return
     }
 
-    const W = container.clientWidth  || container.offsetWidth  || 800
+    const W = container.clientWidth || container.offsetWidth || 800
     const H = container.clientHeight || container.offsetHeight || 500
 
     const rects = hmSquarify(
-        enriched.map(d => ({ ...d, area: (d.size / totalSize) * W * H })),
-        0, 0, W, H
+        enriched.map((d) => ({ ...d, area: (d.size / totalSize) * W * H })),
+        0,
+        0,
+        W,
+        H
     )
 
     container.innerHTML = ""
     hmEnsureTooltip(container)
-    rects.forEach(rect => container.appendChild(hmBuildCell(rect)))
+    rects.forEach((rect) => container.appendChild(hmBuildCell(rect)))
 }
 
 function hmEnsureTooltip(container) {
@@ -285,7 +314,10 @@ function hmEnsureTooltip(container) {
 
     container.addEventListener("mousemove", (e) => {
         const cell = e.target.closest(".heatmapCell")
-        if (!cell) { tip.classList.remove("hmTooltipVisible"); return }
+        if (!cell) {
+            tip.classList.remove("hmTooltipVisible")
+            return
+        }
 
         const d = cell._hmData
         if (!d) return
@@ -297,9 +329,10 @@ function hmEnsureTooltip(container) {
 
         // Price row
         const priceNum = parseFloat(String(d.price || "").replace(",", "."))
-        const priceStr = !isNaN(priceNum) && priceNum > 0
-            ? `<span class="hmTipLabel">Precio</span><span class="hmTipVal">${hmFormatPrice(priceNum, d.currency)}</span>`
-            : ""
+        const priceStr =
+            !isNaN(priceNum) && priceNum > 0
+                ? `<span class="hmTipLabel">Precio</span><span class="hmTipVal">${hmFormatPrice(priceNum, d.currency)}</span>`
+                : ""
 
         // Cuenta rows (only when we hold the asset)
         let cuentaRows = ""
@@ -315,9 +348,10 @@ function hmEnsureTooltip(container) {
         }
 
         // Rentabilidad row
-        const rentRow = d.hasValue && d.value !== null
-            ? `<span class="hmTipLabel">Rentab.</span><span class="hmTipVal ${pctClass}">${d.valueLabel}</span>`
-            : ""
+        const rentRow =
+            d.hasValue && d.value !== null
+                ? `<span class="hmTipLabel">Rentab.</span><span class="hmTipVal ${pctClass}">${d.valueLabel}</span>`
+                : ""
 
         tip.innerHTML = `
             <div class="hmTipName">${d.name}</div>
@@ -326,13 +360,14 @@ function hmEnsureTooltip(container) {
 
         // Position: follow cursor, avoid edges
         const margin = 12
-        const tw = 215, th = d.hasCuenta && d.netoEur > 0 ? 148 : 90
+        const tw = 215,
+            th = d.hasCuenta && d.netoEur > 0 ? 148 : 90
         let lx = e.clientX + margin
         let ly = e.clientY + margin
-        if (lx + tw > window.innerWidth)  lx = e.clientX - tw - margin
+        if (lx + tw > window.innerWidth) lx = e.clientX - tw - margin
         if (ly + th > window.innerHeight) ly = e.clientY - th - margin
         tip.style.left = lx + "px"
-        tip.style.top  = ly + "px"
+        tip.style.top = ly + "px"
         tip.classList.add("hmTooltipVisible")
     })
 
@@ -347,7 +382,7 @@ function hmBuildCell(rect) {
     const el = document.createElement("div")
     el.className = "heatmapCell"
     el.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;background:${bg};color:#fff;`
-    el._hmData = rect   // attach data for tooltip (no title attribute needed)
+    el._hmData = rect // attach data for tooltip (no title attribute needed)
 
     const fontSize = hmFontSize(w, h, symbol.length)
     let inner = `<span class="hmSymbol" style="font-size:${fontSize}px">${symbol}</span>`
@@ -381,7 +416,7 @@ function hmFormatPct(v) {
 
 function hmFormatPrice(num, currency) {
     if (num >= 1000) return num.toLocaleString("es-ES", { maximumFractionDigits: 0 })
-    if (num >= 1)    return num.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    if (num >= 1) return num.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     return num.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 }
 
@@ -390,19 +425,20 @@ function hmColorForValue(pct) {
     if (Math.abs(pct) < 0.04) return "#252d3a"
     // t: 0 = barely different from 0%, 1 = extreme move
     const t = Math.min(Math.abs(pct) / 10, 1)
-    if (pct > 0) return hmBlend("#a5d6a7", "#43a047", "#1b5e20", t)   // verde: pastel → oscuro
-    else         return hmBlend("#ef9a9a", "#e53935", "#b71c1c", t)   // rojo:  pastel → oscuro
+    if (pct > 0)
+        return hmBlend("#a5d6a7", "#43a047", "#1b5e20", t) // verde: pastel → oscuro
+    else return hmBlend("#ef9a9a", "#e53935", "#b71c1c", t) // rojo:  pastel → oscuro
 }
 
 function hmBlend(low, mid, high, t) {
     const a = hmHex(t < 0.4 ? low : mid)
     const b = hmHex(t < 0.4 ? mid : high)
     const tt = t < 0.4 ? t / 0.4 : (t - 0.4) / 0.6
-    return `rgb(${Math.round(a.r+(b.r-a.r)*tt)},${Math.round(a.g+(b.g-a.g)*tt)},${Math.round(a.b+(b.b-a.b)*tt)})`
+    return `rgb(${Math.round(a.r + (b.r - a.r) * tt)},${Math.round(a.g + (b.g - a.g) * tt)},${Math.round(a.b + (b.b - a.b) * tt)})`
 }
 
 function hmHex(hex) {
-    return { r: parseInt(hex.slice(1,3),16), g: parseInt(hex.slice(3,5),16), b: parseInt(hex.slice(5,7),16) }
+    return { r: parseInt(hex.slice(1, 3), 16), g: parseInt(hex.slice(3, 5), 16), b: parseInt(hex.slice(5, 7), 16) }
 }
 
 // Binary space partition treemap
@@ -413,11 +449,15 @@ function hmSquarify(items, x, y, w, h) {
     const total = items.reduce((s, i) => s + i.area, 0)
     if (total <= 0) return []
 
-    let cum = 0, splitIdx = 1
+    let cum = 0,
+        splitIdx = 1
     const half = total / 2
     for (let i = 0; i < items.length - 1; i++) {
         cum += items[i].area
-        if (cum >= half) { splitIdx = i + 1; break }
+        if (cum >= half) {
+            splitIdx = i + 1
+            break
+        }
     }
 
     const a = items.slice(0, splitIdx)

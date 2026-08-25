@@ -13,13 +13,15 @@ async function openSettingsModal() {
         await initAjustesLogic()
     } else {
         try {
-            const res  = await fetch("/api/settings")
+            const res = await fetch("/api/settings")
             const data = await res.json()
             if (data.ok) {
                 _syncModulosChecked(data.modulosConfig ?? {})
                 _syncTopMetricsChecked(data.topMetricsConfig ?? {})
             }
-        } catch { /* ignore */ }
+        } catch {
+            /* ignore */
+        }
     }
 }
 
@@ -83,7 +85,7 @@ const _HANDLE_SVG = `<svg viewBox="0 0 10 16" fill="currentColor" xmlns="http://
 
 function _buildPageColumns(pageEl) {
     const sections = [...pageEl.querySelectorAll(":scope > .ajustesSection")]
-    const byTitle  = new Map(sections.map((s) => [_sectionTitle(s), s]))
+    const byTitle = new Map(sections.map((s) => [_sectionTitle(s), s]))
 
     const col0 = document.createElement("div")
     col0.className = "sttCol"
@@ -100,17 +102,22 @@ function _buildPageColumns(pageEl) {
                     const col = ci === 0 ? col0 : col1
                     titles.forEach((t) => {
                         const s = byTitle.get(t)
-                        if (s && !placed.has(t)) { col.appendChild(s); placed.add(t) }
+                        if (s && !placed.has(t)) {
+                            col.appendChild(s)
+                            placed.add(t)
+                        }
                     })
                 })
-                sections.filter((s) => !placed.has(_sectionTitle(s))).forEach((s, i) =>
-                    (i % 2 === 0 ? col0 : col1).appendChild(s)
-                )
+                sections
+                    .filter((s) => !placed.has(_sectionTitle(s)))
+                    .forEach((s, i) => (i % 2 === 0 ? col0 : col1).appendChild(s))
                 pageEl.appendChild(col0)
                 pageEl.appendChild(col1)
                 return
             }
-        } catch { /* ignore */ }
+        } catch {
+            /* ignore */
+        }
     }
 
     const mid = Math.ceil(sections.length / 2)
@@ -133,7 +140,7 @@ function _initColDrag(colEl, pageEl) {
 
         sec.setAttribute("draggable", "false")
         handle.addEventListener("mousedown", () => sec.setAttribute("draggable", "true"))
-        handle.addEventListener("mouseup",   () => sec.setAttribute("draggable", "false"))
+        handle.addEventListener("mouseup", () => sec.setAttribute("draggable", "false"))
 
         sec.addEventListener("dragstart", (e) => {
             _dragSrc = sec
@@ -156,14 +163,12 @@ function _initColDrag(colEl, pageEl) {
 
         const target = e.target.closest(".ajustesSection")
         if (target && target !== _dragSrc && target.parentElement === colEl) {
-            const rect   = target.getBoundingClientRect()
+            const rect = target.getBoundingClientRect()
             const before = e.clientY < rect.top + rect.height / 2
             if (before) target.before(_dragPlaceholder)
-            else        target.after(_dragPlaceholder)
+            else target.after(_dragPlaceholder)
         } else if (!target || target === _dragSrc) {
-            const last = [...colEl.querySelectorAll(":scope > .ajustesSection")]
-                .filter((s) => s !== _dragSrc)
-                .pop()
+            const last = [...colEl.querySelectorAll(":scope > .ajustesSection")].filter((s) => s !== _dragSrc).pop()
             if (last) last.after(_dragPlaceholder)
             else colEl.prepend(_dragPlaceholder)
         }
@@ -277,7 +282,9 @@ async function initAjustesLogic() {
         const res = await fetch("/api/settings")
         const data = await res.json()
         if (data.ok) settings = data
-    } catch { /* ignore */ }
+    } catch {
+        /* ignore */
+    }
 
     // --- Populate monedaBase select from fiatCurrencies ---
     const _fiatCurrencies = settings.fiatCurrencies || [
@@ -285,7 +292,7 @@ async function initAjustesLogic() {
         { code: "USD", name: "Dólar estadounidense" },
         { code: "GBP", name: "Libra esterlina" },
         { code: "CHF", name: "Franco suizo" },
-        { code: "JPY", name: "Yen japonés" },
+        { code: "JPY", name: "Yen japonés" }
     ]
     window._fiatCurrencies = _fiatCurrencies.map((c) => c.code)
     const _monedaBaseSel0 = document.getElementById("ajustesMonedaBase")
@@ -312,18 +319,18 @@ async function initAjustesLogic() {
     })
 
     // --- API Keys ---
-    const finnhubInput           = document.getElementById("ajustesFinnhubKey")
-    const eodhdInput             = document.getElementById("ajustesEodhdKeys")
-    const alphaVantageInput      = document.getElementById("ajustesAlphaVantageKeys")
-    const finnhubStatus          = document.getElementById("ajustesFinnhubStatus")
-    const eodhdStatus            = document.getElementById("ajustesEodhdStatus")
-    const alphaVantageStatus     = document.getElementById("ajustesAlphaVantageStatus")
-    const guardarFinnhubBtn      = document.getElementById("ajustesGuardarFinnhubBtn")
-    const guardarEodhdBtn        = document.getElementById("ajustesGuardarEodhdBtn")
+    const finnhubInput = document.getElementById("ajustesFinnhubKey")
+    const eodhdInput = document.getElementById("ajustesEodhdKeys")
+    const alphaVantageInput = document.getElementById("ajustesAlphaVantageKeys")
+    const finnhubStatus = document.getElementById("ajustesFinnhubStatus")
+    const eodhdStatus = document.getElementById("ajustesEodhdStatus")
+    const alphaVantageStatus = document.getElementById("ajustesAlphaVantageStatus")
+    const guardarFinnhubBtn = document.getElementById("ajustesGuardarFinnhubBtn")
+    const guardarEodhdBtn = document.getElementById("ajustesGuardarEodhdBtn")
     const guardarAlphaVantageBtn = document.getElementById("ajustesGuardarAlphaVantageBtn")
-    const finnhubMsg             = document.getElementById("ajustesFinnhubMsg")
-    const eodhdMsg               = document.getElementById("ajustesEodhdMsg")
-    const alphaVantageMsg        = document.getElementById("ajustesAlphaVantageMsg")
+    const finnhubMsg = document.getElementById("ajustesFinnhubMsg")
+    const eodhdMsg = document.getElementById("ajustesEodhdMsg")
+    const alphaVantageMsg = document.getElementById("ajustesAlphaVantageMsg")
 
     function setKeyStatus(el, count) {
         if (!el) return
@@ -335,14 +342,14 @@ async function initAjustesLogic() {
             el.className = "ajustesKeyStatus missing"
         }
     }
-    setKeyStatus(finnhubStatus,      settings.finnhubKeyCount      ?? (settings.finnhubKey  ? 1 : 0))
-    setKeyStatus(eodhdStatus,        settings.eodhdKeyCount        ?? (settings.eodhdKeys   ? 1 : 0))
+    setKeyStatus(finnhubStatus, settings.finnhubKeyCount ?? (settings.finnhubKey ? 1 : 0))
+    setKeyStatus(eodhdStatus, settings.eodhdKeyCount ?? (settings.eodhdKeys ? 1 : 0))
     setKeyStatus(alphaVantageStatus, settings.alphaVantageKeyCount ?? 0)
 
     const _keyCountMap = {
-        finnhubKey:       "finnhubKeys",
-        eodhdKeys:        "eodhdKeys",
-        alphaVantageKeys: "alphaVantageKeys",
+        finnhubKey: "finnhubKeys",
+        eodhdKeys: "eodhdKeys",
+        alphaVantageKeys: "alphaVantageKeys"
     }
 
     async function saveApiKey(fieldName, value, input, statusEl, msgEl, btn) {
@@ -354,7 +361,7 @@ async function initAjustesLogic() {
         btn.disabled = true
         showMsg(msgEl, "Guardando…", "")
         try {
-            const res  = await fetch("/api/settings/apikey", {
+            const res = await fetch("/api/settings/apikey", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ [fieldName]: trimmed })
@@ -378,7 +385,14 @@ async function initAjustesLogic() {
 
     if (guardarFinnhubBtn) {
         guardarFinnhubBtn.addEventListener("click", () =>
-            saveApiKey("finnhubKey", finnhubInput?.value || "", finnhubInput, finnhubStatus, finnhubMsg, guardarFinnhubBtn)
+            saveApiKey(
+                "finnhubKey",
+                finnhubInput?.value || "",
+                finnhubInput,
+                finnhubStatus,
+                finnhubMsg,
+                guardarFinnhubBtn
+            )
         )
     }
     if (guardarEodhdBtn) {
@@ -388,14 +402,21 @@ async function initAjustesLogic() {
     }
     if (guardarAlphaVantageBtn) {
         guardarAlphaVantageBtn.addEventListener("click", () =>
-            saveApiKey("alphaVantageKeys", alphaVantageInput?.value || "", alphaVantageInput, alphaVantageStatus, alphaVantageMsg, guardarAlphaVantageBtn)
+            saveApiKey(
+                "alphaVantageKeys",
+                alphaVantageInput?.value || "",
+                alphaVantageInput,
+                alphaVantageStatus,
+                alphaVantageMsg,
+                guardarAlphaVantageBtn
+            )
         )
     }
 
     // --- Auto-backup ---
-    const autoBackupSel  = document.getElementById("ajustesAutoBackup")
+    const autoBackupSel = document.getElementById("ajustesAutoBackup")
     const guardarFreqBtn = document.getElementById("ajustesGuardarBackupFreqBtn")
-    const backupFreqMsg  = document.getElementById("ajustesBackupFreqMsg")
+    const backupFreqMsg = document.getElementById("ajustesBackupFreqMsg")
 
     function setSelect(sel, value) {
         if (!sel) return
@@ -410,7 +431,7 @@ async function initAjustesLogic() {
             guardarFreqBtn.disabled = true
             showMsg(backupFreqMsg, "Guardando…", "")
             try {
-                const res  = await fetch("/api/settings", {
+                const res = await fetch("/api/settings", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ autoBackupDays: Number(autoBackupSel?.value || 0) })
@@ -425,10 +446,79 @@ async function initAjustesLogic() {
         })
     }
 
+    // --- Tipos de cambio históricos ---
+    // El relleno va por lotes: una cartera con años de operaciones son cientos
+    // de peticiones al proveedor, y pedirlas todas en una sola llamada acabaría
+    // en timeout. Aquí se encadenan las tandas y se va enseñando el avance.
+    const fxPendientesEl = document.getElementById("ajustesFxPendientes")
+    const rellenarFxBtn = document.getElementById("ajustesRellenarFxBtn")
+    const fxMsg = document.getElementById("ajustesFxMsg")
+
+    async function refrescarFxPendientes() {
+        if (!fxPendientesEl) return 0
+        try {
+            const res = await fetch("/api/fx/pendientes")
+            const data = await res.json()
+            const pendientes = Number(data.pendientes || 0)
+            fxPendientesEl.textContent = pendientes === 0 ? "Ninguna" : String(pendientes)
+            if (rellenarFxBtn) rellenarFxBtn.disabled = pendientes === 0
+            return pendientes
+        } catch {
+            fxPendientesEl.textContent = "—"
+            return 0
+        }
+    }
+
+    refrescarFxPendientes()
+
+    if (rellenarFxBtn) {
+        rellenarFxBtn.addEventListener("click", async () => {
+            rellenarFxBtn.disabled = true
+            let resueltas = 0
+            let fallidas = 0
+            try {
+                // Tope de tandas: si el proveedor deja de responder, `pendientes`
+                // no bajaría nunca y esto sería un bucle infinito contra la red.
+                for (let tanda = 0; tanda < 40; tanda++) {
+                    showMsg(fxMsg, `Consultando tipos de cambio… (${resueltas} resueltas)`, "")
+                    const res = await fetch("/api/fx/rellenar", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ limite: 100 })
+                    })
+                    const data = await res.json()
+                    if (!data.ok) break
+                    resueltas += Number(data.resueltas || 0)
+                    fallidas = Number(data.fallidas || 0)
+                    fxPendientesEl.textContent = String(data.pendientes ?? 0)
+                    // Sin avance no tiene sentido insistir: lo que queda son
+                    // fechas que el proveedor no cubre.
+                    if (!Number(data.resueltas) || !Number(data.pendientes)) break
+                }
+                const pendientes = await refrescarFxPendientes()
+                if (pendientes > 0 || fallidas > 0) {
+                    showMsg(
+                        fxMsg,
+                        `${resueltas} resueltas. Quedan ${pendientes} sin tipo de cambio: ` +
+                            "el proveedor no cubre esas fechas o no respondió. Vuelve a intentarlo más tarde.",
+                        "error"
+                    )
+                } else {
+                    showMsg(fxMsg, `Histórico completo (${resueltas} operaciones).`, "ok")
+                }
+            } catch {
+                showMsg(fxMsg, "Error de red", "error")
+            } finally {
+                rellenarFxBtn.disabled = false
+                refrescarFxPendientes()
+            }
+        })
+    }
+
     // --- Moneda base ---
-    const monedaBaseSel        = document.getElementById("ajustesMonedaBase")
+    const monedaBaseSel = document.getElementById("ajustesMonedaBase")
     const guardarMonedaBaseBtn = document.getElementById("ajustesGuardarMonedaBaseBtn")
-    const monedaBaseMsg        = document.getElementById("ajustesMonedaBaseMsg")
+    const monedaBaseMsg = document.getElementById("ajustesMonedaBaseMsg")
 
     if (monedaBaseSel) setSelect(monedaBaseSel, settings.monedaBase ?? "EUR")
 
@@ -438,7 +528,7 @@ async function initAjustesLogic() {
             showMsg(monedaBaseMsg, "Guardando…", "")
             try {
                 const moneda = monedaBaseSel?.value ?? "EUR"
-                const res    = await fetch("/api/settings", {
+                const res = await fetch("/api/settings", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ monedaBase: moneda })
@@ -459,11 +549,11 @@ async function initAjustesLogic() {
     }
 
     // --- Divisas fiat ---
-    const divisasListEl  = document.getElementById("ajustesDivisasList")
-    const divisaCodeInp  = document.getElementById("ajustesDivisaCode")
-    const divisaNameInp  = document.getElementById("ajustesDivisaName")
-    const divisaAddBtn   = document.getElementById("ajustesDivisaAddBtn")
-    const divisaMsg      = document.getElementById("ajustesDivisaMsg")
+    const divisasListEl = document.getElementById("ajustesDivisasList")
+    const divisaCodeInp = document.getElementById("ajustesDivisaCode")
+    const divisaNameInp = document.getElementById("ajustesDivisaName")
+    const divisaAddBtn = document.getElementById("ajustesDivisaAddBtn")
+    const divisaMsg = document.getElementById("ajustesDivisaMsg")
 
     let _divisas = [..._fiatCurrencies]
 
@@ -479,8 +569,7 @@ async function initAjustesLogic() {
         if (wrapper) {
             sel.innerHTML = _divisas.map((c) => `<option value="${c.code}">${c.code} — ${c.name}</option>`).join("")
             sel.value = _divisas.find((c) => c.code === current) ? current : _divisas[0]?.code || "EUR"
-            wrapper.querySelector(".ajustesDropLabel").textContent =
-                sel.options[sel.selectedIndex]?.text || sel.value
+            wrapper.querySelector(".ajustesDropLabel").textContent = sel.options[sel.selectedIndex]?.text || sel.value
         } else {
             sel.innerHTML = _divisas.map((c) => `<option value="${c.code}">${c.code} — ${c.name}</option>`).join("")
             sel.value = _divisas.find((c) => c.code === current) ? current : _divisas[0]?.code || "EUR"
@@ -492,7 +581,7 @@ async function initAjustesLogic() {
         await fetch("/api/settings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ fiatCurrencies: _divisas }),
+            body: JSON.stringify({ fiatCurrencies: _divisas })
         })
     }
 
@@ -573,7 +662,7 @@ async function initAjustesLogic() {
 
     // --- Actualización de precios ---
     const autoRefreshGrid = document.getElementById("ajustesRefreshGrid")
-    const autoRefreshMsg  = document.getElementById("ajustesAutoRefreshMsg")
+    const autoRefreshMsg = document.getElementById("ajustesAutoRefreshMsg")
 
     function setActiveRefreshBtn(minutes) {
         autoRefreshGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((btn) => {
@@ -609,7 +698,7 @@ async function initAjustesLogic() {
 
     // --- Evolución del portfolio (snapshots) ---
     const snapshotGrid = document.getElementById("ajustesSnapshotGrid")
-    const snapshotMsg  = document.getElementById("ajustesSnapshotMsg")
+    const snapshotMsg = document.getElementById("ajustesSnapshotMsg")
 
     function setActiveSnapshotBtn(minutes) {
         snapshotGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((btn) => {
@@ -643,10 +732,40 @@ async function initAjustesLogic() {
         }
     })
 
+    // Alcance del hilo de snapshots del servidor. Se guarda al cambiar el
+    // select: es una preferencia de una sola opción y un botón "Guardar" solo
+    // añadiría un paso que olvidar.
+    const snapshotAlcanceSel = document.getElementById("ajustesSnapshotAlcance")
+    const snapshotAlcanceMsg = document.getElementById("ajustesSnapshotAlcanceMsg")
+
+    if (snapshotAlcanceSel) {
+        snapshotAlcanceSel.value = window._snapshotAlcance ?? settings.snapshotAlcance ?? "activo"
+
+        snapshotAlcanceSel.addEventListener("change", async () => {
+            const alcance = snapshotAlcanceSel.value
+            try {
+                const res = await fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ snapshotAlcance: alcance })
+                })
+                const data = await res.json()
+                if (data.ok) {
+                    window._snapshotAlcance = alcance
+                    showMsg(snapshotAlcanceMsg, "Guardado", "ok")
+                } else {
+                    showMsg(snapshotAlcanceMsg, "Error", "error")
+                }
+            } catch {
+                showMsg(snapshotAlcanceMsg, "Error de red", "error")
+            }
+        })
+    }
+
     // --- Umbral cotizaciones ---
-    const staleSel        = document.getElementById("ajustesStaleHours")
+    const staleSel = document.getElementById("ajustesStaleHours")
     const guardarStaleBtn = document.getElementById("ajustesGuardarStaleBtn")
-    const staleMsg        = document.getElementById("ajustesStaleMsg")
+    const staleMsg = document.getElementById("ajustesStaleMsg")
 
     if (staleSel) setSelect(staleSel, settings.staleHours ?? 24)
 
@@ -656,7 +775,7 @@ async function initAjustesLogic() {
             showMsg(staleMsg, "Guardando…", "")
             try {
                 const hours = Number(staleSel?.value ?? 24)
-                const res   = await fetch("/api/settings", {
+                const res = await fetch("/api/settings", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ staleHours: hours })
@@ -678,13 +797,13 @@ async function initAjustesLogic() {
 
     // --- Activos ocultos ---
     const hiddenListEl = document.getElementById("ajustesHiddenList")
-    const hiddenSet    = new Set(settings.hiddenAssets || [])
+    const hiddenSet = new Set(settings.hiddenAssets || [])
 
     async function renderHiddenAssets() {
         if (!hiddenListEl) return
         try {
-            const res     = await fetch("/api/activos")
-            const data    = await res.json()
+            const res = await fetch("/api/activos")
+            const data = await res.json()
             const activos = data.activos || []
             if (!activos.length) {
                 hiddenListEl.innerHTML = '<span class="ajustesBackupEmpty">No hay activos</span>'
@@ -731,15 +850,15 @@ async function initAjustesLogic() {
     renderHiddenAssets()
 
     // --- Backups ---
-    const crearBtn  = document.getElementById("ajustesCrearBackupBtn")
+    const crearBtn = document.getElementById("ajustesCrearBackupBtn")
     const backupMsg = document.getElementById("ajustesBackupMsg")
-    const listEl    = document.getElementById("ajustesBackupList")
+    const listEl = document.getElementById("ajustesBackupList")
 
     async function loadBackupList() {
         if (!listEl) return
         listEl.innerHTML = '<span class="ajustesBackupEmpty">Cargando…</span>'
         try {
-            const res  = await fetch("/api/backups")
+            const res = await fetch("/api/backups")
             const data = await res.json()
             renderBackups(data.backups || [])
         } catch {
@@ -764,7 +883,7 @@ async function initAjustesLogic() {
         }
         listEl.innerHTML = ""
         backups.forEach((filename) => {
-            const item  = document.createElement("div")
+            const item = document.createElement("div")
             item.className = "ajustesBackupItem"
             const label = document.createElement("span")
             label.className = "ajustesBackupName"
@@ -794,7 +913,7 @@ async function initAjustesLogic() {
             onConfirm: async () => {
                 itemEl.style.opacity = "0.4"
                 try {
-                    const res  = await fetch(`/api/backups/${encodeURIComponent(filename)}`, { method: "DELETE" })
+                    const res = await fetch(`/api/backups/${encodeURIComponent(filename)}`, { method: "DELETE" })
                     const data = await res.json()
                     if (data.ok) {
                         renderBackups(data.backups || [])
@@ -824,13 +943,28 @@ async function initAjustesLogic() {
         btn.disabled = true
         showMsg(backupMsg, "Restaurando…", "")
         try {
-            const res  = await fetch("/api/restore", {
+            const res = await fetch("/api/restore", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ filename })
             })
             const data = await res.json()
             if (data.ok) {
+                // El servidor puede haber saltado entradas dañadas del zip y
+                // seguir adelante con el resto. Un "Restaurado" a secas después
+                // de perder un portfolio sería el peor mensaje posible: aquí no
+                // se recarga sola, para que el aviso se pueda leer.
+                const ignorados = data.ignorados || []
+                if (ignorados.length) {
+                    showMsg(
+                        backupMsg,
+                        `Restauración parcial: ${ignorados.length} entrada(s) no se pudieron ` +
+                            `recuperar (${ignorados.join("; ")}). Recarga la página cuando lo hayas revisado.`,
+                        "error"
+                    )
+                    btn.disabled = false
+                    return
+                }
                 showMsg(backupMsg, "Restaurado. Recargando…", "ok")
                 setTimeout(() => window.location.reload(), 1500)
             } else {
@@ -848,7 +982,7 @@ async function initAjustesLogic() {
             crearBtn.disabled = true
             showMsg(backupMsg, "Creando backup…", "")
             try {
-                const res  = await fetch("/api/backup", { method: "POST" })
+                const res = await fetch("/api/backup", { method: "POST" })
                 const data = await res.json()
                 if (data.ok) {
                     showMsg(backupMsg, `Creado: ${data.filename}`, "ok")
@@ -867,13 +1001,13 @@ async function initAjustesLogic() {
     loadBackupList()
 
     // --- Peticiones API ---
-    const apiStatsListEl     = document.getElementById("ajustesApiStatsList")
+    const apiStatsListEl = document.getElementById("ajustesApiStatsList")
     const refreshApiStatsBtn = document.getElementById("ajustesRefreshApiStatsBtn")
 
     async function loadApiStats() {
         if (!apiStatsListEl) return
         try {
-            const res  = await fetch("/api/stats/api-calls")
+            const res = await fetch("/api/stats/api-calls")
             const data = await res.json()
             if (!data.ok) throw new Error()
             renderApiStats(data)
@@ -884,7 +1018,7 @@ async function initAjustesLogic() {
 
     function renderApiStats(data) {
         if (!apiStatsListEl) return
-        const counts  = data.counts || {}
+        const counts = data.counts || {}
         const entries = Object.entries(counts).sort((a, b) => b[1] - a[1])
         if (!entries.length) {
             apiStatsListEl.innerHTML = '<span class="ajustesBackupEmpty">Sin peticiones hoy</span>'
@@ -910,22 +1044,28 @@ async function initAjustesLogic() {
 
     // --- Cambiar nombre de usuario ---
     const credUserCurrentPwd = document.getElementById("ajustesCredUserCurrentPwd")
-    const credNewUser        = document.getElementById("ajustesCredNewUser")
+    const credNewUser = document.getElementById("ajustesCredNewUser")
     const guardarCredUserBtn = document.getElementById("ajustesGuardarCredUserBtn")
-    const credUserMsg        = document.getElementById("ajustesCredUserMsg")
+    const credUserMsg = document.getElementById("ajustesCredUserMsg")
 
     if (guardarCredUserBtn) {
         guardarCredUserBtn.addEventListener("click", async () => {
             const currentPassword = credUserCurrentPwd?.value || ""
-            const newUsername     = credNewUser?.value.trim() || ""
+            const newUsername = credNewUser?.value.trim() || ""
 
-            if (!currentPassword) { showMsg(credUserMsg, "Introduce la contraseña actual", "error"); return }
-            if (!newUsername)     { showMsg(credUserMsg, "El usuario no puede estar vacío", "error"); return }
+            if (!currentPassword) {
+                showMsg(credUserMsg, "Introduce la contraseña actual", "error")
+                return
+            }
+            if (!newUsername) {
+                showMsg(credUserMsg, "El usuario no puede estar vacío", "error")
+                return
+            }
 
             guardarCredUserBtn.disabled = true
             showMsg(credUserMsg, "Guardando…", "")
             try {
-                const res  = await fetch("/api/settings/credentials/username", {
+                const res = await fetch("/api/settings/credentials/username", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ currentPassword, newUsername })
@@ -934,7 +1074,7 @@ async function initAjustesLogic() {
                 if (data.ok) {
                     showMsg(credUserMsg, "Usuario actualizado", "ok")
                     if (credUserCurrentPwd) credUserCurrentPwd.value = ""
-                    if (credNewUser)        credNewUser.value = ""
+                    if (credNewUser) credNewUser.value = ""
                 } else {
                     showMsg(credUserMsg, data.error || "Error al guardar", "error")
                 }
@@ -948,25 +1088,34 @@ async function initAjustesLogic() {
 
     // --- Cambiar contraseña ---
     const credPwdCurrentPwd = document.getElementById("ajustesCredPwdCurrentPwd")
-    const credNewPwd        = document.getElementById("ajustesCredNewPwd")
-    const credNewPwd2       = document.getElementById("ajustesCredNewPwd2")
+    const credNewPwd = document.getElementById("ajustesCredNewPwd")
+    const credNewPwd2 = document.getElementById("ajustesCredNewPwd2")
     const guardarCredPwdBtn = document.getElementById("ajustesGuardarCredPwdBtn")
-    const credPwdMsg        = document.getElementById("ajustesCredPwdMsg")
+    const credPwdMsg = document.getElementById("ajustesCredPwdMsg")
 
     if (guardarCredPwdBtn) {
         guardarCredPwdBtn.addEventListener("click", async () => {
             const currentPassword = credPwdCurrentPwd?.value || ""
-            const newPassword     = credNewPwd?.value || ""
-            const newPassword2    = credNewPwd2?.value || ""
+            const newPassword = credNewPwd?.value || ""
+            const newPassword2 = credNewPwd2?.value || ""
 
-            if (!currentPassword)             { showMsg(credPwdMsg, "Introduce la contraseña actual", "error"); return }
-            if (!newPassword)                 { showMsg(credPwdMsg, "La nueva contraseña no puede estar vacía", "error"); return }
-            if (newPassword !== newPassword2) { showMsg(credPwdMsg, "Las contraseñas no coinciden", "error"); return }
+            if (!currentPassword) {
+                showMsg(credPwdMsg, "Introduce la contraseña actual", "error")
+                return
+            }
+            if (!newPassword) {
+                showMsg(credPwdMsg, "La nueva contraseña no puede estar vacía", "error")
+                return
+            }
+            if (newPassword !== newPassword2) {
+                showMsg(credPwdMsg, "Las contraseñas no coinciden", "error")
+                return
+            }
 
             guardarCredPwdBtn.disabled = true
             showMsg(credPwdMsg, "Guardando…", "")
             try {
-                const res  = await fetch("/api/settings/credentials/password", {
+                const res = await fetch("/api/settings/credentials/password", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ currentPassword, newPassword })
@@ -975,8 +1124,8 @@ async function initAjustesLogic() {
                 if (data.ok) {
                     showMsg(credPwdMsg, "Contraseña actualizada", "ok")
                     if (credPwdCurrentPwd) credPwdCurrentPwd.value = ""
-                    if (credNewPwd)        credNewPwd.value = ""
-                    if (credNewPwd2)       credNewPwd2.value = ""
+                    if (credNewPwd) credNewPwd.value = ""
+                    if (credNewPwd2) credNewPwd2.value = ""
                 } else {
                     showMsg(credPwdMsg, data.error || "Error al guardar", "error")
                 }
@@ -990,12 +1139,12 @@ async function initAjustesLogic() {
 
     // --- Densidad sidebar ---
     const densidadGrid = document.getElementById("ajustesDensidadGrid")
-    const densidadMsg  = document.getElementById("ajustesDensidadMsg")
+    const densidadMsg = document.getElementById("ajustesDensidadMsg")
     const _currentDensity = localStorage.getItem("portfolioDensity") || "normal"
     function setActiveDensidadBtn(val) {
-        densidadGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
-            b.classList.toggle("active", b.dataset.density === val)
-        )
+        densidadGrid
+            ?.querySelectorAll(".ajustesRefreshBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.density === val))
     }
     setActiveDensidadBtn(_currentDensity)
     densidadGrid?.addEventListener("click", (e) => {
@@ -1009,18 +1158,18 @@ async function initAjustesLogic() {
     })
 
     // --- Rotación del detalle de activo ---
-    const rotacionChk  = document.getElementById("ajustesRotacionActiva")
+    const rotacionChk = document.getElementById("ajustesRotacionActiva")
     const rotacionGrid = document.getElementById("ajustesRotacionGrid")
-    const rotacionMsg  = document.getElementById("ajustesRotacionMsg")
+    const rotacionMsg = document.getElementById("ajustesRotacionMsg")
 
     function setActiveRotacionBtn(val) {
-        rotacionGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
-            b.classList.toggle("active", b.dataset.rotation === String(val))
-        )
+        rotacionGrid
+            ?.querySelectorAll(".ajustesRefreshBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.rotation === String(val)))
     }
 
     if (rotacionChk) {
-        const rotacionActiva   = localStorage.getItem("assetRotationEnabled") === "1"
+        const rotacionActiva = localStorage.getItem("assetRotationEnabled") === "1"
         const rotacionSegundos = localStorage.getItem("assetRotationSeconds") || "10"
         rotacionChk.checked = rotacionActiva
         setActiveRotacionBtn(rotacionSegundos)
@@ -1054,19 +1203,19 @@ async function initAjustesLogic() {
     }
 
     // --- Decimales por tipo de activo ---
-    const decimalesMsg     = document.getElementById("ajustesDecimalesMsg")
-    const decimalesTipos   = document.getElementById("ajustesDecimalesTipos")
+    const decimalesMsg = document.getElementById("ajustesDecimalesMsg")
+    const decimalesTipos = document.getElementById("ajustesDecimalesTipos")
     const _decKeyMap = {
-        acciones:  "precioDecimalesAcciones",
-        etfs:      "precioDecimalesEtf",
+        acciones: "precioDecimalesAcciones",
+        etfs: "precioDecimalesEtf",
         comoditis: "precioDecimalesComoditis",
-        cripto:    "precioDecimalesCripto",
+        cripto: "precioDecimalesCripto"
     }
     function initDecimalesTipo(grid) {
-        const tipo   = grid.dataset.tipo
-        const key    = _decKeyMap[tipo]
+        const tipo = grid.dataset.tipo
+        const key = _decKeyMap[tipo]
         if (!key) return
-        const saved  = settings[key] ?? 2
+        const saved = settings[key] ?? 2
         grid.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
             b.classList.toggle("active", Number(b.dataset.dec) === saved)
         )
@@ -1078,7 +1227,7 @@ async function initAjustesLogic() {
                 b.classList.toggle("active", Number(b.dataset.dec) === dec)
             )
             try {
-                const res  = await fetch("/api/settings", {
+                const res = await fetch("/api/settings", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ [key]: dec })
@@ -1098,10 +1247,10 @@ async function initAjustesLogic() {
     decimalesTipos?.querySelectorAll(".ajustesRefreshGrid[data-tipo]").forEach(initDecimalesTipo)
 
     // --- Solo horario de mercado ---
-    const soloMercadoChk  = document.getElementById("ajustesSoloMercado")
-    const soloMercadoMsg  = document.getElementById("ajustesSoloMercadoMsg")
-    const mercadoTiposEl  = document.getElementById("ajustesMercadoTipos")
-    const _savedTipos     = settings.soloMercadoTipos ?? ["acciones", "etfs", "comoditis"]
+    const soloMercadoChk = document.getElementById("ajustesSoloMercado")
+    const soloMercadoMsg = document.getElementById("ajustesSoloMercadoMsg")
+    const mercadoTiposEl = document.getElementById("ajustesMercadoTipos")
+    const _savedTipos = settings.soloMercadoTipos ?? ["acciones", "etfs", "comoditis"]
 
     if (soloMercadoChk) {
         soloMercadoChk.checked = !!settings.soloHorarioMercado
@@ -1114,10 +1263,11 @@ async function initAjustesLogic() {
 
     async function _saveSoloMercado() {
         const enabled = soloMercadoChk?.checked ?? false
-        const tipos   = [...(mercadoTiposEl?.querySelectorAll("input[data-tipo]:checked") || [])]
-            .map((c) => c.dataset.tipo)
+        const tipos = [...(mercadoTiposEl?.querySelectorAll("input[data-tipo]:checked") || [])].map(
+            (c) => c.dataset.tipo
+        )
         try {
-            const res  = await fetch("/api/settings", {
+            const res = await fetch("/api/settings", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ soloHorarioMercado: enabled, soloMercadoTipos: tipos })
@@ -1125,7 +1275,7 @@ async function initAjustesLogic() {
             const data = await res.json()
             if (data.ok) {
                 window._soloHorarioMercado = enabled
-                window._soloMercadoTipos   = tipos
+                window._soloMercadoTipos = tipos
                 showMsg(soloMercadoMsg, "Guardado", "ok")
             } else {
                 showMsg(soloMercadoMsg, "Error", "error")
@@ -1136,14 +1286,14 @@ async function initAjustesLogic() {
     }
 
     soloMercadoChk?.addEventListener("change", _saveSoloMercado)
-    mercadoTiposEl?.querySelectorAll("input[data-tipo]").forEach((chk) =>
-        chk.addEventListener("change", _saveSoloMercado)
-    )
+    mercadoTiposEl
+        ?.querySelectorAll("input[data-tipo]")
+        .forEach((chk) => chk.addEventListener("change", _saveSoloMercado))
 
     // --- Bloqueo por inactividad ---
-    const bloqueoSel        = document.getElementById("ajustesBloqueoInactividad")
+    const bloqueoSel = document.getElementById("ajustesBloqueoInactividad")
     const guardarBloqueoBtn = document.getElementById("ajustesGuardarBloqueoBtn")
-    const bloqueoMsg        = document.getElementById("ajustesBloqueoMsg")
+    const bloqueoMsg = document.getElementById("ajustesBloqueoMsg")
     if (bloqueoSel) setSelect(bloqueoSel, settings.bloqueoInactividad ?? 0)
     if (guardarBloqueoBtn) {
         guardarBloqueoBtn.addEventListener("click", async () => {
@@ -1151,7 +1301,7 @@ async function initAjustesLogic() {
             showMsg(bloqueoMsg, "Guardando…", "")
             try {
                 const minutes = Number(bloqueoSel?.value ?? 0)
-                const res  = await fetch("/api/settings", {
+                const res = await fetch("/api/settings", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ bloqueoInactividad: minutes })
@@ -1174,8 +1324,8 @@ async function initAjustesLogic() {
 
     // --- Exportar datos JSON ---
     const exportJsonBtn = document.getElementById("ajustesExportJsonBtn")
-    const exportZipBtn  = document.getElementById("ajustesExportZipBtn")
-    const exportMsg     = document.getElementById("ajustesExportMsg")
+    const exportZipBtn = document.getElementById("ajustesExportZipBtn")
+    const exportMsg = document.getElementById("ajustesExportMsg")
 
     async function _doExport(url, filename, btn) {
         btn.disabled = true
@@ -1184,8 +1334,8 @@ async function initAjustesLogic() {
             const res = await fetch(url)
             if (!res.ok) throw new Error()
             const blob = await res.blob()
-            const a    = document.createElement("a")
-            a.href     = URL.createObjectURL(blob)
+            const a = document.createElement("a")
+            a.href = URL.createObjectURL(blob)
             a.download = filename
             a.click()
             URL.revokeObjectURL(a.href)
@@ -1211,11 +1361,11 @@ async function initAjustesLogic() {
     }
 
     // --- Importar datos JSON / ZIP ---
-    const importJsonBtn   = document.getElementById("ajustesImportJsonBtn")
-    const importZipBtn    = document.getElementById("ajustesImportZipBtn")
+    const importJsonBtn = document.getElementById("ajustesImportJsonBtn")
+    const importZipBtn = document.getElementById("ajustesImportZipBtn")
     const importJsonInput = document.getElementById("ajustesImportJsonInput")
-    const importZipInput  = document.getElementById("ajustesImportZipInput")
-    const importMsg       = document.getElementById("ajustesImportMsg")
+    const importZipInput = document.getElementById("ajustesImportZipInput")
+    const importMsg = document.getElementById("ajustesImportMsg")
 
     async function _doImport(url, file, btn) {
         btn.disabled = true
@@ -1223,7 +1373,7 @@ async function initAjustesLogic() {
         try {
             const form = new FormData()
             form.append("file", file)
-            const res  = await fetch(url, { method: "POST", body: form })
+            const res = await fetch(url, { method: "POST", body: form })
             const data = await res.json()
             if (data.ok) {
                 showMsg(importMsg, "Importado correctamente", "ok")
@@ -1245,9 +1395,10 @@ async function initAjustesLogic() {
             importJsonInput.value = ""
             openConfirmModal({
                 title: "Importar JSON",
-                message: "Esto sobreescribirá todos los datos y configuración del portfolio activo con el contenido del archivo. ¿Continuar?",
+                message:
+                    "Esto sobreescribirá todos los datos y configuración del portfolio activo con el contenido del archivo. ¿Continuar?",
                 confirmLabel: "Importar",
-                onConfirm: () => _doImport("/api/import/json", file, importJsonBtn),
+                onConfirm: () => _doImport("/api/import/json", file, importJsonBtn)
             })
         })
     }
@@ -1260,17 +1411,18 @@ async function initAjustesLogic() {
             importZipInput.value = ""
             openConfirmModal({
                 title: "Importar ZIP",
-                message: "Esto restaurará la base de datos completa y la configuración desde el archivo ZIP. Los datos actuales serán reemplazados. ¿Continuar?",
+                message:
+                    "Esto restaurará la base de datos completa y la configuración desde el archivo ZIP. Los datos actuales serán reemplazados. ¿Continuar?",
                 confirmLabel: "Importar",
-                onConfirm: () => _doImport("/api/import/zip", file, importZipBtn),
+                onConfirm: () => _doImport("/api/import/zip", file, importZipBtn)
             })
         })
     }
 
     // --- Purgar snapshots ---
     const purgeDaysSel = document.getElementById("ajustesPurgeDays")
-    const purgeBtn     = document.getElementById("ajustesPurgeBtn")
-    const purgeMsg     = document.getElementById("ajustesPurgeMsg")
+    const purgeBtn = document.getElementById("ajustesPurgeBtn")
+    const purgeMsg = document.getElementById("ajustesPurgeMsg")
     if (purgeBtn) {
         purgeBtn.addEventListener("click", () => {
             const days = Number(purgeDaysSel?.value ?? 0)
@@ -1279,9 +1431,10 @@ async function initAjustesLogic() {
                 return
             }
             const label = purgeDaysSel?.options[purgeDaysSel.selectedIndex]?.text || `${days} días`
-            const message = days === -1
-                ? "¿Eliminar TODO el historial de snapshots? Se guardará una copia en data/pre_restore/ antes de borrar."
-                : `¿Eliminar todos los snapshots anteriores a ${label}? Esta acción no se puede deshacer.`
+            const message =
+                days === -1
+                    ? "¿Eliminar TODO el historial de snapshots? Se guardará una copia en data/pre_restore/ antes de borrar."
+                    : `¿Eliminar todos los snapshots anteriores a ${label}? Esta acción no se puede deshacer.`
             openConfirmModal({
                 title: "Purgar historial",
                 message,
@@ -1291,10 +1444,8 @@ async function initAjustesLogic() {
                     showMsg(purgeMsg, "Purgando…", "")
                     try {
                         // El borrado total exige confirmación explícita en el servidor
-                        const payload = days === -1
-                            ? { days, confirm: "BORRAR TODO" }
-                            : { days }
-                        const res  = await fetch("/api/snapshots/purge", {
+                        const payload = days === -1 ? { days, confirm: "BORRAR TODO" } : { days }
+                        const res = await fetch("/api/snapshots/purge", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify(payload)
@@ -1317,12 +1468,12 @@ async function initAjustesLogic() {
 
     // --- Formato de números ---
     const numLocaleGrid = document.getElementById("ajustesNumLocaleGrid")
-    const numLocaleMsg  = document.getElementById("ajustesNumLocaleMsg")
+    const numLocaleMsg = document.getElementById("ajustesNumLocaleMsg")
 
     function setActiveNumLocaleBtn(val) {
-        numLocaleGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
-            b.classList.toggle("active", b.dataset.locale === val)
-        )
+        numLocaleGrid
+            ?.querySelectorAll(".ajustesRefreshBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.locale === val))
     }
     setActiveNumLocaleBtn(settings.numLocale ?? "es-ES")
 
@@ -1332,7 +1483,7 @@ async function initAjustesLogic() {
         const locale = btn.dataset.locale
         setActiveNumLocaleBtn(locale)
         try {
-            const res  = await fetch("/api/settings", {
+            const res = await fetch("/api/settings", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ numLocale: locale })
@@ -1351,12 +1502,12 @@ async function initAjustesLogic() {
 
     // --- Formato de fecha ---
     const dateFmtGrid = document.getElementById("ajustesDateFmtGrid")
-    const dateFmtMsg  = document.getElementById("ajustesDateFmtMsg")
+    const dateFmtMsg = document.getElementById("ajustesDateFmtMsg")
 
     function setActiveDateFmtBtn(val) {
-        dateFmtGrid?.querySelectorAll(".ajustesRefreshBtn").forEach((b) =>
-            b.classList.toggle("active", b.dataset.fmt === val)
-        )
+        dateFmtGrid
+            ?.querySelectorAll(".ajustesRefreshBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.fmt === val))
     }
     setActiveDateFmtBtn(settings.dateFormat ?? "DD/MM/YYYY")
 
@@ -1366,7 +1517,7 @@ async function initAjustesLogic() {
         const fmt = btn.dataset.fmt
         setActiveDateFmtBtn(fmt)
         try {
-            const res  = await fetch("/api/settings", {
+            const res = await fetch("/api/settings", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ dateFormat: fmt })
@@ -1384,9 +1535,9 @@ async function initAjustesLogic() {
     })
 
     // --- Límite de backups ---
-    const maxBackupsSel        = document.getElementById("ajustesMaxBackups")
+    const maxBackupsSel = document.getElementById("ajustesMaxBackups")
     const guardarMaxBackupsBtn = document.getElementById("ajustesGuardarMaxBackupsBtn")
-    const maxBackupsMsg        = document.getElementById("ajustesMaxBackupsMsg")
+    const maxBackupsMsg = document.getElementById("ajustesMaxBackupsMsg")
 
     if (maxBackupsSel) setSelect(maxBackupsSel, settings.maxBackups ?? 0)
 
@@ -1395,7 +1546,7 @@ async function initAjustesLogic() {
             guardarMaxBackupsBtn.disabled = true
             showMsg(maxBackupsMsg, "Guardando…", "")
             try {
-                const res  = await fetch("/api/settings", {
+                const res = await fetch("/api/settings", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ maxBackups: Number(maxBackupsSel?.value ?? 0) })
@@ -1457,37 +1608,39 @@ function showMsg(el, text, type) {
     el.textContent = text
     el.className = "ajustesStatusMsg" + (type ? " " + type : "")
     if (type === "ok" || type === "error") {
-        setTimeout(() => { if (el) el.textContent = "" }, 3000)
+        setTimeout(() => {
+            if (el) el.textContent = ""
+        }, 3000)
     }
 }
 
 function _initTopMetricsToggles(settings) {
     const ALL_TOP_METRICS = [
         // Portfolio
-        { id: "topTotalCuenta",         label: "Total Cuenta",      group: "Portfolio" },
-        { id: "topPorcentajeCuenta",    label: "% Rendimiento",     group: "Portfolio" },
-        { id: "topRendimientoEuros",    label: "Rendimiento €",     group: "Portfolio" },
-        { id: "topInvertido",           label: "Capital Invertido", group: "Portfolio" },
-        { id: "topNumActivos",          label: "Nº Activos",        group: "Portfolio" },
+        { id: "topTotalCuenta", label: "Total Cuenta", group: "Portfolio" },
+        { id: "topPorcentajeCuenta", label: "% Rendimiento", group: "Portfolio" },
+        { id: "topRendimientoEuros", label: "Rendimiento €", group: "Portfolio" },
+        { id: "topInvertido", label: "Capital Invertido", group: "Portfolio" },
+        { id: "topNumActivos", label: "Nº Activos", group: "Portfolio" },
         // Por tipo
-        { id: "topPorcentajeAcciones",  label: "% Acciones",        group: "Por tipo" },
-        { id: "topEurosAcciones",       label: "€ Acciones",        group: "Por tipo" },
-        { id: "topPorcentajeEtf",       label: "% ETF",             group: "Por tipo" },
-        { id: "topEurosEtf",            label: "€ ETF",             group: "Por tipo" },
-        { id: "topPorcentajeComoditis", label: "% Comoditis",       group: "Por tipo" },
-        { id: "topEurosComoditis",      label: "€ Comoditis",       group: "Por tipo" },
-        { id: "topPorcentajeCripto",    label: "% Cripto",          group: "Por tipo" },
-        { id: "topEurosCripto",         label: "€ Cripto",          group: "Por tipo" },
+        { id: "topPorcentajeAcciones", label: "% Acciones", group: "Por tipo" },
+        { id: "topEurosAcciones", label: "€ Acciones", group: "Por tipo" },
+        { id: "topPorcentajeEtf", label: "% ETF", group: "Por tipo" },
+        { id: "topEurosEtf", label: "€ ETF", group: "Por tipo" },
+        { id: "topPorcentajeComoditis", label: "% Comoditis", group: "Por tipo" },
+        { id: "topEurosComoditis", label: "€ Comoditis", group: "Por tipo" },
+        { id: "topPorcentajeCripto", label: "% Cripto", group: "Por tipo" },
+        { id: "topEurosCripto", label: "€ Cripto", group: "Por tipo" },
         // Finanzas
-        { id: "topTotalDividendos",     label: "€ Dividendos",      group: "Finanzas" },
-        { id: "topTotalInteres",        label: "€ C. Remunerada",   group: "Finanzas" },
-        { id: "topTotalRentaFija",      label: "€ Renta Fija",      group: "Finanzas" },
-        { id: "topStaking",             label: "Staking €",         group: "Finanzas" },
-        { id: "topMercadoPrivado",      label: "Mercado Privado",   group: "Finanzas" },
+        { id: "topTotalDividendos", label: "€ Dividendos", group: "Finanzas" },
+        { id: "topTotalInteres", label: "€ C. Remunerada", group: "Finanzas" },
+        { id: "topTotalRentaFija", label: "€ Renta Fija", group: "Finanzas" },
+        { id: "topStaking", label: "Staking €", group: "Finanzas" },
+        { id: "topMercadoPrivado", label: "Mercado Privado", group: "Finanzas" },
         // Operaciones
-        { id: "topGastosAnio",          label: "Gastos (año)",      group: "Operaciones" },
-        { id: "topIngresosAnio",        label: "Ingresos (año)",    group: "Operaciones" },
-        { id: "topTradingPnL",          label: "Trading P&L",       group: "Operaciones" },
+        { id: "topGastosAnio", label: "Gastos (año)", group: "Operaciones" },
+        { id: "topIngresosAnio", label: "Ingresos (año)", group: "Operaciones" },
+        { id: "topTradingPnL", label: "Trading P&L", group: "Operaciones" }
     ]
 
     const cfg = settings?.topMetricsConfig ?? window._topMetricsConfig ?? {}
@@ -1562,13 +1715,13 @@ function _initTopMetricsToggles(settings) {
 
 const _MODULOS_MAP = {
     moduloPanelSuperior: "panelSuperior",
-    moduloVistaGeneral:  "vistaGeneral",
-    moduloActivos:       "activos",
-    moduloGastos:        "gastos",
-    moduloFinanzas:      "finanzas",
-    moduloCripto:        "cripto",
-    moduloHerramientas:  "herramientas",
-    moduloMetricas:      "metricas",
+    moduloVistaGeneral: "vistaGeneral",
+    moduloActivos: "activos",
+    moduloGastos: "gastos",
+    moduloFinanzas: "finanzas",
+    moduloCripto: "cripto",
+    moduloHerramientas: "herramientas",
+    moduloMetricas: "metricas"
 }
 
 function _syncModulosChecked(cfg) {
@@ -1603,9 +1756,9 @@ function _initModulosToggles(settings) {
             window._modulosConfig[mod] = chk.checked
             applyModulesVisibility()
             fetch("/api/settings", {
-                method:  "POST",
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body:    JSON.stringify({ modulosConfig: window._modulosConfig }),
+                body: JSON.stringify({ modulosConfig: window._modulosConfig })
             }).catch(() => {})
         })
     }

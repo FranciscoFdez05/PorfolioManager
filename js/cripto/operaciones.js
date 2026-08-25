@@ -16,7 +16,19 @@ const OPERATION_CURRENCY_OPTIONS = new Proxy([], {
     }
 })
 const OPERATION_QUANTITY_DECIMALS = 8
-const OPERATION_COMMON_QUOTE_SYMBOL_OPTIONS = ["USDC", "USDT", "DAI", "FDUSD", "PYUSD", "TUSD", "USDE", "EURC", "USD", "EUR", "BUSD"]
+const OPERATION_COMMON_QUOTE_SYMBOL_OPTIONS = [
+    "USDC",
+    "USDT",
+    "DAI",
+    "FDUSD",
+    "PYUSD",
+    "TUSD",
+    "USDE",
+    "EURC",
+    "USD",
+    "EUR",
+    "BUSD"
+]
 
 // La misma tabla de operaciones sirve para cripto y para bolsa: cambia el tipo
 // de activo elegible, si los pares admiten stablecoins y los decimales con los
@@ -51,7 +63,6 @@ let operationsAssets = []
 let operationsStablecoinsData = { catalog: [], enabledSymbols: [], rows: [] }
 let operationsTransaccionesRows = []
 
-
 function showOperationsPopup(title, message, options = {}) {
     const confirmLabel = String(options.confirmLabel || "OK")
 
@@ -73,7 +84,7 @@ async function loadOperacionesDependencies() {
         loadOperacionesData(),
         loadOperationAssets(),
         loadStablecoinsData(),
-        (typeof loadTransaccionesData === "function" ? loadTransaccionesData() : Promise.resolve({ rows: [] }))
+        typeof loadTransaccionesData === "function" ? loadTransaccionesData() : Promise.resolve({ rows: [] })
     ])
 
     if (operationsResult.status !== "fulfilled") {
@@ -83,21 +94,31 @@ async function loadOperacionesDependencies() {
     }
 
     if (assetsResult.status !== "fulfilled") {
-        console.warn("No se pudieron cargar los activos para operaciones. Se mostrara la tabla sin selector de activos.", assetsResult.reason)
+        console.warn(
+            "No se pudieron cargar los activos para operaciones. Se mostrara la tabla sin selector de activos.",
+            assetsResult.reason
+        )
     }
 
     if (stablecoinsResult.status !== "fulfilled") {
-        console.warn("No se pudieron cargar las stablecoins para operaciones. Se ocultaran los pares hasta que vuelvan a estar disponibles.", stablecoinsResult.reason)
+        console.warn(
+            "No se pudieron cargar las stablecoins para operaciones. Se ocultaran los pares hasta que vuelvan a estar disponibles.",
+            stablecoinsResult.reason
+        )
     }
 
     if (transaccionesResult.status !== "fulfilled") {
-        console.warn("No se pudieron cargar las transacciones para operaciones. El saldo no descontará comisiones de red.", transaccionesResult.reason)
+        console.warn(
+            "No se pudieron cargar las transacciones para operaciones. El saldo no descontará comisiones de red.",
+            transaccionesResult.reason
+        )
     }
 
     return {
         operationsPayload: operationsResult.value,
         assets: assetsResult.status === "fulfilled" ? assetsResult.value : [],
-        stablecoinsPayload: stablecoinsResult.status === "fulfilled" ? stablecoinsResult.value : { enabledSymbols: [], rows: [] },
+        stablecoinsPayload:
+            stablecoinsResult.status === "fulfilled" ? stablecoinsResult.value : { enabledSymbols: [], rows: [] },
         transaccionesPayload: transaccionesResult.status === "fulfilled" ? transaccionesResult.value : { rows: [] }
     }
 }
@@ -142,10 +163,18 @@ async function loadOperationAssets() {
         .map((asset) => ({
             id: String(asset.id || "").trim(),
             name: String(asset.name || asset.symbol || "").trim(),
-            symbol: String(asset.symbol || asset.name || "").trim().toUpperCase(),
-            marketSymbol: String(asset.marketSymbol || asset.finnhubSymbol || "").trim().toUpperCase(),
-            marketProvider: String(asset.marketProvider || "").trim().toLowerCase(),
-            type: String(asset.type || "").trim().toLowerCase(),
+            symbol: String(asset.symbol || asset.name || "")
+                .trim()
+                .toUpperCase(),
+            marketSymbol: String(asset.marketSymbol || asset.finnhubSymbol || "")
+                .trim()
+                .toUpperCase(),
+            marketProvider: String(asset.marketProvider || "")
+                .trim()
+                .toLowerCase(),
+            type: String(asset.type || "")
+                .trim()
+                .toLowerCase(),
             price: asset.price ?? null,
             currency: String(asset.currency || "EUR").trim()
         }))
@@ -158,8 +187,12 @@ async function loadOperationAssets() {
 }
 
 function deriveOperationAssetBaseSymbol(asset) {
-    const marketSymbol = String(asset?.marketSymbol || "").trim().toUpperCase()
-    const normalizedSymbol = String(asset?.symbol || asset?.name || "").trim().toUpperCase()
+    const marketSymbol = String(asset?.marketSymbol || "")
+        .trim()
+        .toUpperCase()
+    const normalizedSymbol = String(asset?.symbol || asset?.name || "")
+        .trim()
+        .toUpperCase()
     const knownQuoteSymbols = getOperationKnownQuoteSymbolsForAssetParsing()
 
     if (marketSymbol.includes(":")) {
@@ -184,29 +217,46 @@ function deriveOperationAssetBaseSymbol(asset) {
 function normalizeOperationsStablecoinsPayload(payload = {}) {
     const catalog = Array.isArray(payload.catalog)
         ? payload.catalog
-            .map((entry) => ({
-                symbol: String(entry?.symbol || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, ""),
-                marketSymbol: String(entry?.marketSymbol || entry?.symbol || "").trim().toUpperCase()
-            }))
-            .filter((entry, index, array) => entry.symbol && array.findIndex((item) => item.symbol === entry.symbol) === index)
+              .map((entry) => ({
+                  symbol: String(entry?.symbol || "")
+                      .trim()
+                      .toUpperCase()
+                      .replace(/[^A-Z0-9]/g, ""),
+                  marketSymbol: String(entry?.marketSymbol || entry?.symbol || "")
+                      .trim()
+                      .toUpperCase()
+              }))
+              .filter(
+                  (entry, index, array) =>
+                      entry.symbol && array.findIndex((item) => item.symbol === entry.symbol) === index
+              )
         : []
     const enabledSymbols = Array.isArray(payload.enabledSymbols)
         ? payload.enabledSymbols
-            .map((symbol) => String(symbol || "").trim().toUpperCase())
-            .filter((symbol, index, array) => symbol && array.indexOf(symbol) === index)
+              .map((symbol) =>
+                  String(symbol || "")
+                      .trim()
+                      .toUpperCase()
+              )
+              .filter((symbol, index, array) => symbol && array.indexOf(symbol) === index)
         : []
     const fallbackCatalog = catalog.length
         ? catalog
         : enabledSymbols.map((symbol) => ({ symbol, marketSymbol: symbol }))
     const fallbackSymbols = new Set(fallbackCatalog.map((entry) => entry.symbol))
 
-    const rows = Array.isArray(payload.rows) ? payload.rows.map((row, index) => ({
-        id: String(row.id || `stablecoin-${index + 1}`),
-        stablecoinSymbol: String(row.stablecoinSymbol || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, ""),
-        tipo: String(row.tipo || "").trim(),
-        cantidad: String(row.cantidad || "").trim(),
-        total: String(row.total || "").trim()
-    })) : []
+    const rows = Array.isArray(payload.rows)
+        ? payload.rows.map((row, index) => ({
+              id: String(row.id || `stablecoin-${index + 1}`),
+              stablecoinSymbol: String(row.stablecoinSymbol || "")
+                  .trim()
+                  .toUpperCase()
+                  .replace(/[^A-Z0-9]/g, ""),
+              tipo: String(row.tipo || "").trim(),
+              cantidad: String(row.cantidad || "").trim(),
+              total: String(row.total || "").trim()
+          }))
+        : []
 
     return {
         catalog: fallbackCatalog,
@@ -234,22 +284,32 @@ function getOperationsEnabledStablecoinSymbols() {
     return normalizeOperationsStablecoinsPayload(operationsStablecoinsData).enabledSymbols
 }
 
+// ⚠ Ver la nota en js/cripto/stablecoins.js: allí hay otra función global con
+// este mismo nombre y distinto comportamiento. Esta es la que gana en el
+// navegador, por el orden de los <script> en index.html.
+// eslint-disable-next-line no-redeclare
 function getOperationStablecoinSymbol(row = {}) {
-    const explicitSymbol = String(row.stablecoinSymbol || "").trim().toUpperCase()
+    const explicitSymbol = String(row.stablecoinSymbol || "")
+        .trim()
+        .toUpperCase()
     const enabledSymbols = getOperationsEnabledStablecoinSymbols()
 
     if (enabledSymbols.includes(explicitSymbol)) {
         return explicitSymbol
     }
 
-    const pair = String(row.par || "").trim().toUpperCase()
+    const pair = String(row.par || "")
+        .trim()
+        .toUpperCase()
     const quoteSymbol = pair.includes("/") ? pair.split("/").pop() : ""
 
     return enabledSymbols.includes(quoteSymbol) ? quoteSymbol : ""
 }
 
 function getOperationFiatSymbol(row = {}) {
-    const pair = String(row.par || "").trim().toUpperCase()
+    const pair = String(row.par || "")
+        .trim()
+        .toUpperCase()
     const quoteSymbol = pair.includes("/") ? pair.split("/").pop() : ""
     return OPERATION_CURRENCY_OPTIONS.map((c) => c.toUpperCase()).includes(quoteSymbol) ? quoteSymbol : ""
 }
@@ -368,7 +428,10 @@ function getOperationsLockedFiatTotalsFromActiveBuys(operationsRows = [], option
     return lockedTotals
 }
 
-function buildOperationsStablecoinBalanceSummary(stablecoinsPayload = operationsStablecoinsData, operationsRows = currentOperationsData.rows || []) {
+function buildOperationsStablecoinBalanceSummary(
+    stablecoinsPayload = operationsStablecoinsData,
+    operationsRows = currentOperationsData.rows || []
+) {
     const normalizedPayload = normalizeOperationsStablecoinsPayload(stablecoinsPayload)
     const summary = {}
 
@@ -434,14 +497,23 @@ function getOperationAssetById(assetId) {
 }
 
 function findOperationAssetByName(name) {
-    const normalizedName = String(name || "").trim().toLowerCase()
-    return operationsAssets.find((asset) => asset.name.toLowerCase() === normalizedName || asset.symbol.toLowerCase() === normalizedName) || null
+    const normalizedName = String(name || "")
+        .trim()
+        .toLowerCase()
+    return (
+        operationsAssets.find(
+            (asset) => asset.name.toLowerCase() === normalizedName || asset.symbol.toLowerCase() === normalizedName
+        ) || null
+    )
 }
 
 // Un activo sin tipo (o una fila cuyo activo ya no existe) cuenta como cripto:
 // todas las operaciones guardadas antes de separar bolsa y cripto lo eran.
 function isOperationAssetInScope(asset) {
-    const assetType = String(asset?.type || "").trim().toLowerCase() || "cripto"
+    const assetType =
+        String(asset?.type || "")
+            .trim()
+            .toLowerCase() || "cripto"
     return getOperationsScopeConfig().assetTypes.includes(assetType)
 }
 
@@ -463,16 +535,22 @@ function getScopedOperationRows() {
 function getOperationPairOptions(assetId) {
     const asset = getOperationAssetById(assetId)
     const enabledStablecoins = getOperationsEnabledStablecoinSymbols()
-    const fiatCurrencies = OPERATION_CURRENCY_OPTIONS
-        .map((c) => String(c || "").trim().toUpperCase())
-        .filter(Boolean)
+    const fiatCurrencies = OPERATION_CURRENCY_OPTIONS.map((c) =>
+        String(c || "")
+            .trim()
+            .toUpperCase()
+    ).filter(Boolean)
 
     if (!asset) {
         return []
     }
 
     const quoteSymbols = [...enabledStablecoins, ...fiatCurrencies]
-        .map((symbol) => String(symbol || "").trim().toUpperCase())
+        .map((symbol) =>
+            String(symbol || "")
+                .trim()
+                .toUpperCase()
+        )
         .filter((symbol, index, array) => symbol && array.indexOf(symbol) === index)
 
     return quoteSymbols.map((quoteSymbol) => `${asset.baseSymbol || asset.symbol}/${quoteSymbol}`)
@@ -484,7 +562,8 @@ function normalizeOperationRow(row = {}, index = 0) {
     const asset = getOperationAssetById(assetId) || inferredAsset
     const stablecoinSymbol = getOperationStablecoinSymbol(row)
     const pairOptions = getOperationPairOptions(asset?.id || assetId)
-    const defaultPair = stablecoinSymbol && asset ? `${asset.baseSymbol || asset.symbol}/${stablecoinSymbol}` : (pairOptions[0] || "")
+    const defaultPair =
+        stablecoinSymbol && asset ? `${asset.baseSymbol || asset.symbol}/${stablecoinSymbol}` : pairOptions[0] || ""
     const pair = String(row.par || defaultPair || "").trim()
     const quoteSymbol = pair.includes("/") ? pair.split("/").pop() : ""
     const inferredCurrency = normalizeCurrencyCode(quoteSymbol || stablecoinSymbol || "USD")
@@ -504,7 +583,9 @@ function normalizeOperationRow(row = {}, index = 0) {
         comisionesFiat: String(row.comisionesFiat || "").trim(),
         total: String(row.total || "").trim(),
         currency: inferredCurrency,
-        estado: OPERATION_STATUS_OPTIONS.includes(String(row.estado || "").trim()) ? String(row.estado).trim() : "Activo",
+        estado: OPERATION_STATUS_OPTIONS.includes(String(row.estado || "").trim())
+            ? String(row.estado).trim()
+            : "Activo",
         fechaCierre: String(row.fechaCierre || "").trim()
     }
 }
@@ -514,7 +595,9 @@ async function refreshOperationsTickerPrices() {
     if (!operationsBody) return
     try {
         operationsAssets = await loadOperationAssets()
-    } catch { /* mantener activos existentes */ }
+    } catch {
+        /* mantener activos existentes */
+    }
     operationsBody.querySelectorAll("tr[data-operation-id]").forEach((tr) => refreshOperationsRowPrice(tr))
 }
 
@@ -624,7 +707,9 @@ function loadOperationsFilterState(group, defaults) {
             const parsed = JSON.parse(raw)
             if (Array.isArray(parsed)) return new Set(parsed)
         }
-    } catch { /* ignorar */ }
+    } catch {
+        /* ignorar */
+    }
     return new Set(defaults)
 }
 
@@ -632,7 +717,9 @@ function saveOperationsFilterState() {
     try {
         localStorage.setItem(operationsFilterStorageKey("type"), JSON.stringify([...currentOperationTypeFilter]))
         localStorage.setItem(operationsFilterStorageKey("status"), JSON.stringify([...currentOperationStatusFilter]))
-    } catch { /* ignorar */ }
+    } catch {
+        /* ignorar */
+    }
 }
 
 function createEmptyOperationRow() {
@@ -709,18 +796,26 @@ function renderOperationsStablecoinPanel() {
     panel.innerHTML = `
         <span class="operationsPairsSummaryLabel">Par - saldo disponible</span>
         <div class="operationsPairsSummaryValues">
-            ${stablecoinItems.map((item) => `
+            ${stablecoinItems
+                .map(
+                    (item) => `
                 <span class="operationsPairsSummaryItem">
                     ${item.symbol} ${formatMoney(item.available, "USD")}
                     <span class="operationsPairsSummaryHint">(bloqueado ${formatMoney(item.locked, "USD")})</span>
                 </span>
-            `).join("")}
-            ${fiatItems.map((item) => `
+            `
+                )
+                .join("")}
+            ${fiatItems
+                .map(
+                    (item) => `
                 <span class="operationsPairsSummaryItem">
                     ${item.symbol}
                     <span class="operationsPairsSummaryHint">(bloqueado ${formatMoney(item.locked, item.symbol)})</span>
                 </span>
-            `).join("")}
+            `
+                )
+                .join("")}
         </div>
     `
 }
@@ -731,7 +826,9 @@ function getOperationYear(row = {}) {
     const candidates = [row.fechaCierre, row.fechaApertura]
 
     for (const candidate of candidates) {
-        const parts = String(candidate || "").trim().split(/[-/]/)
+        const parts = String(candidate || "")
+            .trim()
+            .split(/[-/]/)
         const year = parts.length === 3 ? parts[2].trim() : ""
 
         if (/^\d{4}$/.test(year)) {
@@ -749,17 +846,15 @@ function getOperationYear(row = {}) {
 function groupCompletedOperationsByYear(rows = []) {
     const groupsByYear = new Map()
 
-    rows
-        .filter((row) => row.estado === "Completado")
-        .forEach((row) => {
-            const year = getOperationYear(row)
+    rows.filter((row) => row.estado === "Completado").forEach((row) => {
+        const year = getOperationYear(row)
 
-            if (!groupsByYear.has(year)) {
-                groupsByYear.set(year, { year, rows: [] })
-            }
+        if (!groupsByYear.has(year)) {
+            groupsByYear.set(year, { year, rows: [] })
+        }
 
-            groupsByYear.get(year).rows.push(row)
-        })
+        groupsByYear.get(year).rows.push(row)
+    })
 
     // Años más recientes primero; las filas sin fecha legible, al final.
     return [...groupsByYear.values()].sort((left, right) => {
@@ -829,7 +924,10 @@ function refreshOperationsRowPrice(tr) {
     if (!priceEl) return
     const rowId = tr.dataset.operationId
     const rowData = (currentOperationsData.rows || []).find((r) => r.id === rowId)
-    if (!rowData) { priceEl.textContent = ""; return }
+    if (!rowData) {
+        priceEl.textContent = ""
+        return
+    }
     const asset = getOperationAssetById(rowData.assetId)
     const price = parseLooseNumber(asset?.price)
     if (!asset || price === null || price <= 0) {
@@ -907,14 +1005,18 @@ function formatOperationsQuantity(value) {
 }
 
 function getOperationBaseSymbol(row = {}) {
-    const pair = String(row.par || "").trim().toUpperCase()
+    const pair = String(row.par || "")
+        .trim()
+        .toUpperCase()
 
     if (pair.includes("/")) {
         return pair.split("/")[0]
     }
 
     const asset = getOperationAssetById(row.assetId)
-    return String(asset?.baseSymbol || asset?.symbol || "").trim().toUpperCase()
+    return String(asset?.baseSymbol || asset?.symbol || "")
+        .trim()
+        .toUpperCase()
 }
 
 function formatOperationsCryptoCommissionCell(row = {}) {
@@ -929,9 +1031,10 @@ function formatOperationsCryptoCommissionCell(row = {}) {
     const asset = getOperationAssetById(row.assetId)
     const price = parseLooseNumber(asset?.price)
     const priceCurrency = asset?.currency || "EUR"
-    const hint = amount > 0 && price !== null && price > 0
-        ? `<span class="operationsFeeHint">≈ ${formatMoney(amount * price, priceCurrency)}</span>`
-        : ""
+    const hint =
+        amount > 0 && price !== null && price > 0
+            ? `<span class="operationsFeeHint">≈ ${formatMoney(amount * price, priceCurrency)}</span>`
+            : ""
 
     return `<span class="operationsFeeAmount">${formattedAmount}${symbol ? ` ${symbol}` : ""}</span>${hint}`
 }
@@ -946,6 +1049,41 @@ function formatOperationsMoney(value, currency = "EUR") {
     return formatMoney(parsedValue, currency)
 }
 
+function requestOperationRowDeletion(rowId) {
+    if (!rowId) return
+
+    const rows = currentOperationsData.rows || []
+    const targetRow = rows.find((item) => item.id === rowId)
+    if (!targetRow) return
+
+    const isCancelled = String(targetRow.estado || "").trim() === "Cancelado"
+
+    openConfirmModal({
+        title: "Eliminar fila",
+        message: isCancelled
+            ? "Esta operación ya está cancelada. ¿Quieres eliminarla definitivamente?"
+            : "¿Quieres eliminar esta operación? Pasará al estado Cancelado.",
+        confirmLabel: "Eliminar",
+        onConfirm: () => {
+            const currentRows = currentOperationsData.rows || []
+            const targetIndex = currentRows.findIndex((item) => item.id === rowId)
+            if (targetIndex >= 0) {
+                if (isCancelled) {
+                    currentRows.splice(targetIndex, 1)
+                } else {
+                    currentRows[targetIndex] = normalizeOperationRow({
+                        ...currentRows[targetIndex],
+                        estado: "Cancelado"
+                    })
+                }
+            }
+            renderOperationsTable()
+            scheduleOperationsAssetRefresh()
+            scheduleOperationsAutosave()
+        }
+    })
+}
+
 function handleOperationsDeleteClick(event) {
     const editButton = event.target.closest(".operacionRowEditBtn")
     if (editButton) {
@@ -956,26 +1094,9 @@ function handleOperationsDeleteClick(event) {
 
     const deleteButton = event.target.closest(".operacionRowDeleteBtn")
     if (deleteButton) {
-        const rowId = deleteButton.dataset.rowId
-        if (!rowId) return
-        openConfirmModal({
-            title: "Eliminar fila",
-            message: "¿Quieres eliminar esta operación? Pasará al estado Cancelado.",
-            confirmLabel: "Eliminar",
-            onConfirm: () => {
-                const rows = currentOperationsData.rows || []
-                const targetIndex = rows.findIndex((item) => item.id === rowId)
-                if (targetIndex >= 0) {
-                    rows[targetIndex] = normalizeOperationRow({ ...rows[targetIndex], estado: "Cancelado" })
-                }
-                renderOperationsTable()
-                scheduleOperationsAssetRefresh()
-                scheduleOperationsAutosave()
-            }
-        })
+        requestOperationRowDeletion(deleteButton.dataset.rowId)
     }
 }
-
 
 function syncOperationsDataFromTable() {
     // Table is display-only; data is managed directly in currentOperationsData.rows via the modal
@@ -1046,11 +1167,15 @@ function openOperacionRowModal(rowId) {
 
     const rowIndex = (currentOperationsData.rows || []).findIndex((r) => r.id === rowId)
     const isEdit = rowIndex >= 0
-    const rowData = isEdit ? normalizeOperationRow({ ...currentOperationsData.rows[rowIndex] }) : createEmptyOperationRow()
+    const rowData = isEdit
+        ? normalizeOperationRow({ ...currentOperationsData.rows[rowIndex] })
+        : createEmptyOperationRow()
 
-    const assetOptions = getScopedOperationAssets().map((a) => `<option value="${a.id}"${rowData.assetId === a.id ? " selected" : ""}>${a.name}</option>`).join("")
+    const assetOptions = getScopedOperationAssets()
+        .map((a) => `<option value="${a.id}"${rowData.assetId === a.id ? " selected" : ""}>${a.name}</option>`)
+        .join("")
     const pairOptions = getOperationPairOptions(rowData.assetId)
-    const selectedPair = pairOptions.includes(rowData.par) ? rowData.par : (pairOptions[0] || "")
+    const selectedPair = pairOptions.includes(rowData.par) ? rowData.par : pairOptions[0] || ""
     const pairOptionsHtml = pairOptions.length
         ? pairOptions.map((p) => `<option value="${p}"${p === selectedPair ? " selected" : ""}>${p}</option>`).join("")
         : `<option value="${rowData.par || ""}">${rowData.par || "Sin pares"}</option>`
@@ -1144,28 +1269,12 @@ function openOperacionRowModal(rowId) {
             : `<option value="">Sin pares</option>`
     })
 
-
     footer.querySelector("#opRowModalSaveBtn").addEventListener("click", saveOperacionRowFromModal)
     footer.querySelector("#opRowModalCancelBtn").addEventListener("click", closeOperacionRowModal)
 
     if (isEdit) {
         footer.querySelector("#opRowModalDeleteBtn").addEventListener("click", () => {
-            openConfirmModal({
-                title: "Eliminar fila",
-                message: "¿Quieres eliminar esta operación? Pasará al estado Cancelado.",
-                confirmLabel: "Eliminar",
-                onConfirm: () => {
-                    const rows = currentOperationsData.rows || []
-                    const targetIndex = rows.findIndex((r) => r.id === rowId)
-                    if (targetIndex >= 0) {
-                        rows[targetIndex] = normalizeOperationRow({ ...rows[targetIndex], estado: "Cancelado" })
-                    }
-                    renderOperationsTable()
-                    renderOperationsStablecoinPanel()
-                    scheduleOperationsAssetRefresh()
-                    scheduleOperationsAutosave()
-                }
-            })
+            requestOperationRowDeletion(rowId)
             closeOperacionRowModal()
         })
     }
@@ -1207,7 +1316,10 @@ function saveOperacionRowFromModal() {
 
         if (symbol && required > 0) {
             const operationsRowsWithoutCurrent = getScopedOperationRows().filter((r) => r.id !== rowId)
-            const summary = buildOperationsStablecoinBalanceSummary(operationsStablecoinsData, operationsRowsWithoutCurrent)
+            const summary = buildOperationsStablecoinBalanceSummary(
+                operationsStablecoinsData,
+                operationsRowsWithoutCurrent
+            )
             const available = summary[symbol]?.available ?? 0
 
             if (required > available) {

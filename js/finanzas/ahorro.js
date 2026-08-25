@@ -1,16 +1,16 @@
 const AHORRO_MONTHS = [
-    { key: "enero",      label: "Ene" },
-    { key: "febrero",    label: "Feb" },
-    { key: "marzo",      label: "Mar" },
-    { key: "abril",      label: "Abr" },
-    { key: "mayo",       label: "May" },
-    { key: "junio",      label: "Jun" },
-    { key: "julio",      label: "Jul" },
-    { key: "agosto",     label: "Ago" },
+    { key: "enero", label: "Ene" },
+    { key: "febrero", label: "Feb" },
+    { key: "marzo", label: "Mar" },
+    { key: "abril", label: "Abr" },
+    { key: "mayo", label: "May" },
+    { key: "junio", label: "Jun" },
+    { key: "julio", label: "Jul" },
+    { key: "agosto", label: "Ago" },
     { key: "septiembre", label: "Sep" },
-    { key: "octubre",    label: "Oct" },
-    { key: "noviembre",  label: "Nov" },
-    { key: "diciembre",  label: "Dic" },
+    { key: "octubre", label: "Oct" },
+    { key: "noviembre", label: "Nov" },
+    { key: "diciembre", label: "Dic" }
 ]
 
 let ahorroCurrentYear = null
@@ -26,11 +26,11 @@ async function initAhorroLogic() {
         const [ingRes, gasRes, sttRes] = await Promise.all([
             fetch("/api/ingresos"),
             fetch("/api/gastos"),
-            fetch("/api/settings"),
+            fetch("/api/settings")
         ])
-        const ingYears   = ingRes.ok   ? (await ingRes.json()).years   || [] : []
-        const gasYears   = gasRes.ok   ? (await gasRes.json()).years   || [] : []
-        const settings   = sttRes.ok   ? await sttRes.json()                  : {}
+        const ingYears = ingRes.ok ? (await ingRes.json()).years || [] : []
+        const gasYears = gasRes.ok ? (await gasRes.json()).years || [] : []
+        const settings = sttRes.ok ? await sttRes.json() : {}
 
         ahorroConfig = settings.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} }
         if (!ahorroConfig.presupuesto) ahorroConfig.presupuesto = {}
@@ -55,10 +55,10 @@ async function initAhorroLogic() {
 async function renderAhorroYear(year) {
     const [ingRes, gasRes] = await Promise.all([
         fetch(`/api/ingresos/${year}`).catch(() => null),
-        fetch(`/api/gastos/${year}`).catch(() => null),
+        fetch(`/api/gastos/${year}`).catch(() => null)
     ])
     ahorroIngresosData = ingRes && ingRes.ok ? await ingRes.json() : null
-    ahorroGastosData   = gasRes && gasRes.ok  ? await gasRes.json()  : null
+    ahorroGastosData = gasRes && gasRes.ok ? await gasRes.json() : null
 
     renderAhorroYearList()
     renderAhorroMonthTabs()
@@ -105,7 +105,7 @@ function calcMonthIngresos(month) {
     const rows = ahorroIngresosData.months?.[month]?.rows || []
     const recurrentes = ahorroIngresosData.recurrentes || []
     const rowsTotal = rows.reduce((s, r) => s + parseEuroNumber(r.cantidad || ""), 0)
-    const recTotal  = recurrentes.reduce((s, r) => s + parseEuroNumber(r.meses?.[month] || ""), 0)
+    const recTotal = recurrentes.reduce((s, r) => s + parseEuroNumber(r.meses?.[month] || ""), 0)
     return rowsTotal + recTotal
 }
 
@@ -132,10 +132,10 @@ function calcMonthGastosTotal(month) {
 function renderAhorroView() {
     const month = ahorroCurrentMonth
     const totalIngresos = calcMonthIngresos(month)
-    const totalGastos   = calcMonthGastosTotal(month)
-    const ahorroReal    = totalIngresos - totalGastos
-    const tasaAhorro    = totalIngresos > 0 ? (ahorroReal / totalIngresos) * 100 : 0
-    const gastosByTipo  = calcMonthGastosByTipo(month)
+    const totalGastos = calcMonthGastosTotal(month)
+    const ahorroReal = totalIngresos - totalGastos
+    const tasaAhorro = totalIngresos > 0 ? (ahorroReal / totalIngresos) * 100 : 0
+    const gastosByTipo = calcMonthGastosByTipo(month)
 
     renderAhorroKpis(totalIngresos, totalGastos, ahorroReal, tasaAhorro)
     renderAhorroObjetivo(totalIngresos, ahorroReal, tasaAhorro)
@@ -145,30 +145,28 @@ function renderAhorroView() {
 }
 
 function renderAhorroKpis(totalIngresos, totalGastos, ahorroReal, tasaAhorro) {
-    const pct = (v, total) => total > 0 ? ((v / total) * 100).toFixed(1) + "%" : "---"
+    const pct = (v, total) => (total > 0 ? ((v / total) * 100).toFixed(1) + "%" : "---")
 
-    const ingVal   = document.getElementById("ahorroKpiIngresosVal")
+    const ingVal = document.getElementById("ahorroKpiIngresosVal")
     const ingresosSub = document.getElementById("ahorroKpiIngresosSub")
-    const gasVal   = document.getElementById("ahorroKpiGastosVal")
-    const gasSub   = document.getElementById("ahorroKpiGastosSub")
-    const ahVal    = document.getElementById("ahorroKpiAhorroVal")
-    const ahSub    = document.getElementById("ahorroKpiAhorroSub")
-    const tasaVal  = document.getElementById("ahorroKpiTasaVal")
-    const tasaSub  = document.getElementById("ahorroKpiTasaSub")
+    const gasVal = document.getElementById("ahorroKpiGastosVal")
+    const gasSub = document.getElementById("ahorroKpiGastosSub")
+    const ahVal = document.getElementById("ahorroKpiAhorroVal")
+    const ahSub = document.getElementById("ahorroKpiAhorroSub")
+    const tasaVal = document.getElementById("ahorroKpiTasaVal")
+    const tasaSub = document.getElementById("ahorroKpiTasaSub")
     if (!ingVal) return
 
-    ingVal.textContent    = formatEuro(totalIngresos)
-    ingresosSub.textContent  = "del mes"
+    ingVal.textContent = formatEuro(totalIngresos)
+    ingresosSub.textContent = "del mes"
 
-    gasVal.textContent    = formatEuro(totalGastos)
-    gasSub.textContent    = totalIngresos > 0
-        ? pct(totalGastos, totalIngresos) + " de los ingresos"
-        : "del mes"
+    gasVal.textContent = formatEuro(totalGastos)
+    gasSub.textContent = totalIngresos > 0 ? pct(totalGastos, totalIngresos) + " de los ingresos" : "del mes"
 
-    ahVal.textContent  = formatEuro(ahorroReal)
+    ahVal.textContent = formatEuro(ahorroReal)
     ahVal.classList.toggle("ahorroKpiPos", ahorroReal >= 0)
     ahVal.classList.toggle("ahorroKpiNeg", ahorroReal < 0)
-    ahSub.textContent  = ahorroReal >= 0 ? "guardado este mes" : "déficit este mes"
+    ahSub.textContent = ahorroReal >= 0 ? "guardado este mes" : "déficit este mes"
 
     const obj = Number(ahorroConfig.objetivoAhorro) || 30
     tasaVal.textContent = tasaAhorro.toFixed(1) + "%"
@@ -186,11 +184,11 @@ function renderAhorroKpis(totalIngresos, totalGastos, ahorroReal, tasaAhorro) {
 }
 
 function renderAhorroObjetivo(totalIngresos, ahorroReal, tasaAhorro) {
-    const obj   = Number(ahorroConfig.objetivoAhorro) || 30
+    const obj = Number(ahorroConfig.objetivoAhorro) || 30
     const pctEl = document.getElementById("ahorroObjetivoPct")
-    const fill  = document.getElementById("ahorroObjetivoFill")
+    const fill = document.getElementById("ahorroObjetivoFill")
     const target = document.getElementById("ahorroObjetivoTarget")
-    const meta  = document.getElementById("ahorroObjetivoMeta")
+    const meta = document.getElementById("ahorroObjetivoMeta")
     if (!pctEl) return
 
     pctEl.textContent = obj + "% objetivo"
@@ -199,26 +197,26 @@ function renderAhorroObjetivo(totalIngresos, ahorroReal, tasaAhorro) {
 
     if (totalIngresos === 0) {
         fill.style.width = "0%"
-        fill.style.left  = ""
+        fill.style.left = ""
         fill.style.right = ""
-        fill.innerHTML   = ""
+        fill.innerHTML = ""
         target.style.left = "66%"
     } else if (tasaAhorro >= 0) {
         const maxPct = Math.max(obj * 1.5, tasaAhorro + 5, 10)
-        const fillW  = Math.min((tasaAhorro / maxPct) * 100, 100)
-        const tgtW   = Math.min((obj / maxPct) * 100, 100)
+        const fillW = Math.min((tasaAhorro / maxPct) * 100, 100)
+        const tgtW = Math.min((obj / maxPct) * 100, 100)
         fill.style.width = fillW + "%"
-        fill.style.left  = ""
+        fill.style.left = ""
         fill.style.right = ""
         fill.classList.add("ahorroObjetivoFillPos")
         fill.innerHTML = `<span class="ahorroObjetivoFillLabel">${tasaAhorro.toFixed(1)}%</span>`
         target.style.left = tgtW + "%"
     } else {
         // Negativo: más déficit → barra MÁS PEQUEÑA (proporcional inversa al objetivo)
-        const tgtW  = Math.min((obj / Math.max(obj * 1.5, 10)) * 100, 100)
+        const tgtW = Math.min((obj / Math.max(obj * 1.5, 10)) * 100, 100)
         const fillW = Math.max(2, 30 - (Math.abs(tasaAhorro) / Math.max(obj, 5)) * 30)
         fill.style.width = fillW + "%"
-        fill.style.left  = ""
+        fill.style.left = ""
         fill.style.right = ""
         fill.classList.add("ahorroObjetivoFillNeg")
         fill.innerHTML = `<span class="ahorroObjetivoFillLabel" style="right:auto;left:8px">${tasaAhorro.toFixed(1)}%</span>`
@@ -227,10 +225,10 @@ function renderAhorroObjetivo(totalIngresos, ahorroReal, tasaAhorro) {
     target.innerHTML = `<span class="ahorroObjetivoTargetLabel">${obj}% objetivo</span>`
 
     const objetivoEur = totalIngresos * (obj / 100)
-    const diff        = ahorroReal - objetivoEur
+    const diff = ahorroReal - objetivoEur
     if (totalIngresos === 0) {
-        meta.textContent  = "No hay ingresos registrados este mes."
-        meta.className    = "ahorroObjetivoMeta"
+        meta.textContent = "No hay ingresos registrados este mes."
+        meta.className = "ahorroObjetivoMeta"
     } else if (ahorroReal >= objetivoEur) {
         meta.innerHTML = `Objetivo: ${formatEuro(objetivoEur)} — Ahorro real: <strong>${formatEuro(ahorroReal)}</strong> — Superas en <strong class="ahorroPos">+${formatEuro(diff)}</strong>`
         meta.className = "ahorroObjetivoMeta"
@@ -243,22 +241,25 @@ function renderAhorroObjetivo(totalIngresos, ahorroReal, tasaAhorro) {
 function _buildDonutSvg(slices, cx, cy, R, r, centerHtml) {
     const ptc = (angle, radius) => ({
         x: cx + radius * Math.cos(angle),
-        y: cy + radius * Math.sin(angle),
+        y: cy + radius * Math.sin(angle)
     })
     let paths = ""
     slices.forEach((s) => {
-        const o1 = ptc(s.startAngle, R), o2 = ptc(s.endAngle, R)
-        const i1 = ptc(s.startAngle, r), i2 = ptc(s.endAngle, r)
+        const o1 = ptc(s.startAngle, R),
+            o2 = ptc(s.endAngle, R)
+        const i1 = ptc(s.startAngle, r),
+            i2 = ptc(s.endAngle, r)
         const lg = s.span > Math.PI ? 1 : 0
         paths += `<path d="M${o1.x} ${o1.y} A${R} ${R} 0 ${lg} 1 ${o2.x} ${o2.y} L${i2.x} ${i2.y} A${r} ${r} 0 ${lg} 0 ${i1.x} ${i1.y}Z" fill="${s.color}"/>`
         if (s.pct >= 0.05) {
             const mid = s.startAngle + s.span / 2
-            const lp  = ptc(mid, (R + r) / 2)
+            const lp = ptc(mid, (R + r) / 2)
             paths += `<text x="${lp.x}" y="${lp.y}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="7.5" font-weight="700" font-family="inherit">${(s.pct * 100).toFixed(0)}%</text>`
         }
     })
     slices.forEach((s) => {
-        const p1 = ptc(s.startAngle, r - 1), p2 = ptc(s.startAngle, R + 1)
+        const p1 = ptc(s.startAngle, r - 1),
+            p2 = ptc(s.startAngle, R + 1)
         paths += `<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="var(--bg-elevated)" stroke-width="1.5"/>`
     })
     return paths + centerHtml
@@ -267,7 +268,7 @@ function _buildDonutSvg(slices, cx, cy, R, r, centerHtml) {
 function _buildSlices(items, totalVal, colors) {
     let angle = -Math.PI / 2
     return items.map((item, i) => {
-        const pct  = totalVal > 0 ? item.value / totalVal : 0
+        const pct = totalVal > 0 ? item.value / totalVal : 0
         const span = pct * 2 * Math.PI
         const s = { ...item, pct, span, startAngle: angle, endAngle: angle + span, color: colors[i % colors.length] }
         angle += span
@@ -276,9 +277,9 @@ function _buildSlices(items, totalVal, colors) {
 }
 
 function renderAhorroDonut(gastosByTipo, totalGastos) {
-    const svg    = document.getElementById("ahorroDonutSvg")
+    const svg = document.getElementById("ahorroDonutSvg")
     const legend = document.getElementById("ahorroDonutLegend")
-    const sub    = document.getElementById("ahorroDonutSubtitle")
+    const sub = document.getElementById("ahorroDonutSubtitle")
     if (!svg || !legend) return
 
     const allGastos = { ...gastosByTipo }
@@ -296,29 +297,50 @@ function renderAhorroDonut(gastosByTipo, totalGastos) {
         return
     }
 
-    const COLORS = ["#60a5fa","#f472b6","#34d399","#fbbf24","#a78bfa","#fb923c","#22d3ee","#f87171","#4ade80","#e879f9","#38bdf8","#facc15"]
-    const slices = _buildSlices(tipos.map(t => ({ tipo: t, value: allGastos[t] })), totalGastos, COLORS)
+    const COLORS = [
+        "#60a5fa",
+        "#f472b6",
+        "#34d399",
+        "#fbbf24",
+        "#a78bfa",
+        "#fb923c",
+        "#22d3ee",
+        "#f87171",
+        "#4ade80",
+        "#e879f9",
+        "#38bdf8",
+        "#facc15"
+    ]
+    const slices = _buildSlices(
+        tipos.map((t) => ({ tipo: t, value: allGastos[t] })),
+        totalGastos,
+        COLORS
+    )
     const center = `<text x="90" y="85" text-anchor="middle" fill="var(--text-primary)" font-size="12" font-weight="700" font-family="inherit">${formatEuro(totalGastos)}</text>
         <text x="90" y="100" text-anchor="middle" fill="var(--text-muted)" font-size="8.5" font-family="inherit">total gastos</text>`
     svg.innerHTML = _buildDonutSvg(slices, 90, 90, 70, 46, center)
 
-    const monthLabel = AHORRO_MONTHS.find(m => m.key === ahorroCurrentMonth)?.label || ""
+    const monthLabel = AHORRO_MONTHS.find((m) => m.key === ahorroCurrentMonth)?.label || ""
     if (sub) sub.textContent = `${monthLabel} ${ahorroCurrentYear} · ${tipos.length} cat.`
 
-    legend.innerHTML = slices.map((s) => `
+    legend.innerHTML = slices
+        .map(
+            (s) => `
         <div class="ahorroDonutLegendRow">
             <span class="ahorroDonutLegendDot" style="background:${s.color}"></span>
             <span class="ahorroDonutLegendName">${escapeAhorroHtml(s.tipo)}</span>
             <span class="ahorroDonutLegendPct">${(s.pct * 100).toFixed(1)}%</span>
             <span class="ahorroDonutLegendVal">${formatEuro(s.value)}</span>
         </div>
-    `).join("")
+    `
+        )
+        .join("")
 }
 
 function renderAhorroSplitDonut(totalIngresos, totalGastos, ahorroReal, tasaAhorro) {
-    const svg    = document.getElementById("ahorroSplitSvg")
+    const svg = document.getElementById("ahorroSplitSvg")
     const legend = document.getElementById("ahorroSplitLegend")
-    const sub    = document.getElementById("ahorroSplitSubtitle")
+    const sub = document.getElementById("ahorroSplitSubtitle")
     if (!svg || !legend) return
 
     const obj = Number(ahorroConfig.objetivoAhorro) || 30
@@ -331,52 +353,67 @@ function renderAhorroSplitDonut(totalIngresos, totalGastos, ahorroReal, tasaAhor
         return
     }
 
-    const gastosPct  = Math.min(totalGastos / totalIngresos, 1)
-    const ahorroPct  = Math.max(ahorroReal / totalIngresos, 0)
+    const gastosPct = Math.min(totalGastos / totalIngresos, 1)
+    const ahorroPct = Math.max(ahorroReal / totalIngresos, 0)
     const deficitPct = ahorroReal < 0 ? Math.min(Math.abs(ahorroReal) / totalIngresos, 1) : 0
 
-    const segments = ahorroReal >= 0
-        ? [{ label: "Gastos", value: totalGastos }, { label: "Ahorro", value: ahorroReal }]
-        : [{ label: "Gastos", value: totalIngresos }, { label: "Déficit", value: Math.abs(ahorroReal) }]
+    const segments =
+        ahorroReal >= 0
+            ? [
+                  { label: "Gastos", value: totalGastos },
+                  { label: "Ahorro", value: ahorroReal }
+              ]
+            : [
+                  { label: "Gastos", value: totalIngresos },
+                  { label: "Déficit", value: Math.abs(ahorroReal) }
+              ]
 
     const total = segments.reduce((s, x) => s + x.value, 0)
     const COLORS = ahorroReal >= 0 ? ["#f87171", "#4ade80"] : ["#f87171", "#dc2626"]
     const slices = _buildSlices(segments, total, COLORS)
 
-    const centerVal  = tasaAhorro.toFixed(1) + "%"
+    const centerVal = tasaAhorro.toFixed(1) + "%"
     const centerColor = tasaAhorro >= obj ? "#4ade80" : tasaAhorro >= 0 ? "#fbbf24" : "#f87171"
     const center = `<text x="90" y="85" text-anchor="middle" fill="${centerColor}" font-size="16" font-weight="700" font-family="inherit">${centerVal}</text>
         <text x="90" y="101" text-anchor="middle" fill="var(--text-muted)" font-size="8.5" font-family="inherit">tasa ahorro</text>`
     svg.innerHTML = _buildDonutSvg(slices, 90, 90, 70, 46, center)
 
-    const monthLabel = AHORRO_MONTHS.find(m => m.key === ahorroCurrentMonth)?.label || ""
+    const monthLabel = AHORRO_MONTHS.find((m) => m.key === ahorroCurrentMonth)?.label || ""
     if (sub) sub.textContent = `${monthLabel} ${ahorroCurrentYear} · obj ${obj}%`
 
-    legend.innerHTML = slices.map((s) => `
+    legend.innerHTML = slices
+        .map(
+            (s) => `
         <div class="ahorroDonutLegendRow">
             <span class="ahorroDonutLegendDot" style="background:${s.color}"></span>
             <span class="ahorroDonutLegendName">${escapeAhorroHtml(s.label)}</span>
             <span class="ahorroDonutLegendPct">${(s.pct * 100).toFixed(1)}%</span>
             <span class="ahorroDonutLegendVal">${formatEuro(s.value)}</span>
         </div>
-    `).join("")
+    `
+        )
+        .join("")
 }
 
 function renderAhorroCategorias(gastosByTipo, totalIngresos, totalGastos) {
-    const list  = document.getElementById("ahorroPresupuestoList")
-    const hint  = document.getElementById("ahorroPresupuestoHint")
+    const list = document.getElementById("ahorroPresupuestoList")
+    const hint = document.getElementById("ahorroPresupuestoHint")
     const empty = document.getElementById("ahorroEmptyState")
     if (!list) return
 
-    const presupuestoTipos = Object.keys(ahorroConfig.presupuesto || {}).filter((t) => Number(ahorroConfig.presupuesto[t]) > 0)
-    const tipos = [...new Set([...Object.keys(gastosByTipo), ...presupuestoTipos])]
-        .sort((a, b) => (gastosByTipo[b] || 0) - (gastosByTipo[a] || 0))
+    const presupuestoTipos = Object.keys(ahorroConfig.presupuesto || {}).filter(
+        (t) => Number(ahorroConfig.presupuesto[t]) > 0
+    )
+    const tipos = [...new Set([...Object.keys(gastosByTipo), ...presupuestoTipos])].sort(
+        (a, b) => (gastosByTipo[b] || 0) - (gastosByTipo[a] || 0)
+    )
 
     if (tipos.length === 0 && totalIngresos === 0) {
         list.innerHTML = ""
         const emptyDiv = document.createElement("div")
         emptyDiv.className = "ahorroEmptyState"
-        emptyDiv.innerHTML = "<p>No hay datos de ingresos ni gastos para este mes.</p><p>Añade movimientos en los módulos <strong>Ingresos</strong> y <strong>Gastos</strong>.</p>"
+        emptyDiv.innerHTML =
+            "<p>No hay datos de ingresos ni gastos para este mes.</p><p>Añade movimientos en los módulos <strong>Ingresos</strong> y <strong>Gastos</strong>.</p>"
         list.appendChild(emptyDiv)
         if (hint) hint.textContent = ""
         return
@@ -388,31 +425,31 @@ function renderAhorroCategorias(gastosByTipo, totalIngresos, totalGastos) {
     const totalPresupuestado = gastosConTipo.reduce((s, t) => {
         return s + (Number(ahorroConfig.presupuesto?.[t]) || 0)
     }, 0)
-    if (hint) hint.textContent = totalPresupuestado > 0
-        ? `${totalPresupuestado.toFixed(0)}% presupuestado de ${totalIngresos > 0 ? formatEuro(totalIngresos) : "los ingresos"}`
-        : ""
+    if (hint)
+        hint.textContent =
+            totalPresupuestado > 0
+                ? `${totalPresupuestado.toFixed(0)}% presupuestado de ${totalIngresos > 0 ? formatEuro(totalIngresos) : "los ingresos"}`
+                : ""
 
     list.innerHTML = ""
 
     tipos.forEach((tipo) => {
         const realEur = gastosByTipo[tipo] || 0
         const realPct = totalIngresos > 0 ? (realEur / totalIngresos) * 100 : 0
-        const objPct  = Number(ahorroConfig.presupuesto?.[tipo]) || 0
-        const objEur  = totalIngresos * (objPct / 100)
-        const hasObj  = objPct > 0
+        const objPct = Number(ahorroConfig.presupuesto?.[tipo]) || 0
+        const objEur = totalIngresos * (objPct / 100)
+        const hasObj = objPct > 0
 
         const maxForBar = hasObj ? Math.max(objPct, realPct, 1) : Math.max(realPct, 1)
-        const fillPct   = Math.min((realPct / maxForBar) * 100, 120)
-        const tgtPct    = hasObj ? Math.min((objPct / maxForBar) * 100, 100) : null
+        const fillPct = Math.min((realPct / maxForBar) * 100, 120)
+        const tgtPct = hasObj ? Math.min((objPct / maxForBar) * 100, 100) : null
         const overBudget = hasObj && realEur > objEur * 1.001
 
         const row = document.createElement("div")
         row.className = `ahorroCategoriaRow${overBudget ? " ahorroCatOver" : ""}`
         row.dataset.tipo = tipo
 
-        const targetLine = tgtPct !== null
-            ? `<div class="ahorroCatTargetLine" style="left:${tgtPct}%"></div>`
-            : ""
+        const targetLine = tgtPct !== null ? `<div class="ahorroCatTargetLine" style="left:${tgtPct}%"></div>` : ""
 
         const objBadge = hasObj
             ? `<span class="ahorroCatObjBadge${overBudget ? " over" : ""}">Obj: ${objPct.toFixed(0)}% · ${formatEuro(objEur)}</span>`
@@ -423,8 +460,8 @@ function renderAhorroCategorias(gastosByTipo, totalIngresos, totalGastos) {
         const statusBadge = overBudget
             ? `<span class="ahorroCatStatus over">⚠ Excedido en ${formatEuro(excesoEur)}</span>`
             : hasObj
-            ? `<span class="ahorroCatStatus ok">✓ Dentro</span>`
-            : ""
+              ? `<span class="ahorroCatStatus ok">✓ Dentro</span>`
+              : ""
 
         row.innerHTML = `
             <div class="ahorroCatTop">
@@ -465,8 +502,11 @@ function bindAhorroEvents() {
 
 function escapeAhorroHtml(v) {
     return String(v || "")
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
 }
 
 function openAhorroConfigModal() {
@@ -478,16 +518,19 @@ function openAhorroConfigModal() {
 
     const month = ahorroCurrentMonth
     const gastosByTipo = calcMonthGastosByTipo(month)
-    const tipos = Object.keys(gastosByTipo).filter((t) => t !== "Sin categoría").sort()
+    const tipos = Object.keys(gastosByTipo)
+        .filter((t) => t !== "Sin categoría")
+        .sort()
 
     const tiposFromGastos = ahorroGastosData?.gastosTipos || []
     const allTipos = [...new Set([...tipos, ...tiposFromGastos])].sort()
 
-    const tiposRows = allTipos.map((tipo) => {
-        const current = Number(ahorroConfig.presupuesto?.[tipo]) || ""
-        const realEur = gastosByTipo[tipo] || 0
-        const realHint = realEur > 0 ? ` (real: ${formatEuro(realEur)})` : ""
-        return `
+    const tiposRows = allTipos
+        .map((tipo) => {
+            const current = Number(ahorroConfig.presupuesto?.[tipo]) || ""
+            const realEur = gastosByTipo[tipo] || 0
+            const realHint = realEur > 0 ? ` (real: ${formatEuro(realEur)})` : ""
+            return `
             <div class="ahorroModalTipoRow">
                 <label class="ahorroModalTipoLabel" for="ahorroPres-${escapeAhorroHtml(tipo)}">${escapeAhorroHtml(tipo)}${realHint}</label>
                 <div class="ahorroModalTipoInputWrap">
@@ -497,7 +540,8 @@ function openAhorroConfigModal() {
                 </div>
             </div>
         `
-    }).join("")
+        })
+        .join("")
 
     const overlay = document.createElement("div")
     overlay.id = "ahorroConfigModalOverlay"
@@ -517,7 +561,9 @@ function openAhorroConfigModal() {
                 <p class="ahorroModalHint">Porcentaje de los ingresos que quieres guardar cada mes.</p>
             </div>
 
-            ${allTipos.length > 0 ? `
+            ${
+                allTipos.length > 0
+                    ? `
             <div class="ahorroModalSection">
                 <label class="ahorroModalSectionLabel">% objetivo por categoría de gasto</label>
                 <p class="ahorroModalHint">Indica qué porcentaje de tus ingresos quieres destinar a cada categoría. Deja en 0 si no quieres establecer objetivo.</p>
@@ -525,7 +571,9 @@ function openAhorroConfigModal() {
                     ${tiposRows}
                 </div>
             </div>
-            ` : `<p class="ahorroModalHint ahorroModalNoTipos">Añade gastos con categorías para configurar el presupuesto por tipo.</p>`}
+            `
+                    : `<p class="ahorroModalHint ahorroModalNoTipos">Añade gastos con categorías para configurar el presupuesto por tipo.</p>`
+            }
 
             <p class="ahorroModalTotalPct" id="ahorroModalTotalPct"></p>
             <p class="ahorroModalFeedback hidden" id="ahorroModalFeedback"></p>
@@ -547,7 +595,9 @@ function openAhorroConfigModal() {
     })
     updateAhorroModalTotalPct()
 
-    ahorroConfigModalKeyHandler = (e) => { if (e.key === "Escape") closeAhorroConfigModal() }
+    ahorroConfigModalKeyHandler = (e) => {
+        if (e.key === "Escape") closeAhorroConfigModal()
+    }
     document.addEventListener("keydown", ahorroConfigModalKeyHandler)
 }
 
@@ -595,7 +645,7 @@ async function saveAhorroConfig() {
     const presupuesto = {}
     document.querySelectorAll(".ahorroModalInput[data-tipo]").forEach((input) => {
         const tipo = input.dataset.tipo
-        const val  = parseFloat(input.value)
+        const val = parseFloat(input.value)
         if (tipo && !isNaN(val) && val > 0) {
             presupuesto[tipo] = Math.min(100, Math.max(0, val))
         }
@@ -603,7 +653,10 @@ async function saveAhorroConfig() {
 
     const totalAsignado = calcAhorroModalTotalPct()
     if (totalAsignado > 100) {
-        setFeedback(`El objetivo de ahorro más los objetivos por categoría no pueden superar el 100% (actual: ${totalAsignado.toFixed(1)}%).`, true)
+        setFeedback(
+            `El objetivo de ahorro más los objetivos por categoría no pueden superar el 100% (actual: ${totalAsignado.toFixed(1)}%).`,
+            true
+        )
         return
     }
 
@@ -613,7 +666,7 @@ async function saveAhorroConfig() {
         const res = await fetch("/api/settings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ahorroConfig: newConfig }),
+            body: JSON.stringify({ ahorroConfig: newConfig })
         })
         if (!res.ok) throw new Error("HTTP " + res.status)
         ahorroConfig = newConfig

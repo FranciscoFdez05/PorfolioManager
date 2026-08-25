@@ -36,13 +36,25 @@ async function saveTradingDataApi(payload, options = {}) {
 // ── Normalize ──────────────────────────────────────────────────────────────
 
 function normalizeTradingRow(row = {}) {
-    const tipo = TRADING_TIPO_OPTIONS.includes(String(row.tipo || "").trim().toUpperCase())
+    const tipo = TRADING_TIPO_OPTIONS.includes(
+        String(row.tipo || "")
+            .trim()
+            .toUpperCase()
+    )
         ? String(row.tipo).trim().toUpperCase()
         : "SCALP"
-    const direccion = TRADING_DIRECCION_OPTIONS.includes(String(row.direccion || "").trim().toUpperCase())
+    const direccion = TRADING_DIRECCION_OPTIONS.includes(
+        String(row.direccion || "")
+            .trim()
+            .toUpperCase()
+    )
         ? String(row.direccion).trim().toUpperCase()
         : "LONG"
-    const resultado = TRADING_RESULTADO_OPTIONS.includes(String(row.resultado || "").trim().toUpperCase())
+    const resultado = TRADING_RESULTADO_OPTIONS.includes(
+        String(row.resultado || "")
+            .trim()
+            .toUpperCase()
+    )
         ? String(row.resultado).trim().toUpperCase()
         : "PROFIT"
 
@@ -50,14 +62,19 @@ function normalizeTradingRow(row = {}) {
         id: String(row.id || `trade-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`).trim(),
         fecha: String(row.fecha || "").trim(),
         tipo,
-        moneda: String(row.moneda || "").trim().toUpperCase(),
+        moneda: String(row.moneda || "")
+            .trim()
+            .toUpperCase(),
         direccion,
         resultado,
         capital: String(row.capital || "").trim(),
-        capital_currency: String(row.capital_currency || "EUR").trim().toUpperCase() || "EUR",
+        capital_currency:
+            String(row.capital_currency || "EUR")
+                .trim()
+                .toUpperCase() || "EUR",
         roi: String(row.roi || "").trim(),
         ganancia: String(row.ganancia || "").trim(),
-        ganancia_neta: String(row.ganancia_neta || "").trim(),
+        ganancia_neta: String(row.ganancia_neta || "").trim()
     }
 }
 
@@ -66,9 +83,9 @@ async function getTradingCurrencyOptions() {
     try {
         const [scRes, actRes] = await Promise.all([
             fetch("/api/stablecoins").catch(() => null),
-            fetch("/api/activos").catch(() => null),
+            fetch("/api/activos").catch(() => null)
         ])
-        const scData  = scRes?.ok  ? await scRes.json()  : {}
+        const scData = scRes?.ok ? await scRes.json() : {}
         const actData = actRes?.ok ? await actRes.json() : {}
 
         const stablecoins = (scData.enabledSymbols || [])
@@ -77,7 +94,11 @@ async function getTradingCurrencyOptions() {
 
         const cryptos = (actData.activos || [])
             .filter((a) => String(a.type || "").toLowerCase() === "cripto")
-            .map((a) => String(a.symbol || "").trim().toUpperCase())
+            .map((a) =>
+                String(a.symbol || "")
+                    .trim()
+                    .toUpperCase()
+            )
             .filter((s) => s && !BASE.includes(s) && !stablecoins.includes(s))
 
         const unique = [...new Set([...BASE, ...stablecoins, ...cryptos])]
@@ -92,9 +113,7 @@ async function getTradingCurrencyOptions() {
 async function initTradingJournalLogic() {
     const payload = await loadTradingData()
     currentTradingData = {
-        rows: Array.isArray(payload?.rows)
-            ? payload.rows.map((r) => normalizeTradingRow(r))
-            : []
+        rows: Array.isArray(payload?.rows) ? payload.rows.map((r) => normalizeTradingRow(r)) : []
     }
     _tFilterTipo = loadTradingFilterState("tipo", TRADING_TIPO_OPTIONS)
     _tFilterDireccion = loadTradingFilterState("direccion", TRADING_DIRECCION_OPTIONS)
@@ -177,7 +196,9 @@ function loadTradingFilterState(group, defaults) {
             const parsed = JSON.parse(raw)
             if (Array.isArray(parsed)) return new Set(parsed)
         }
-    } catch { /* ignorar */ }
+    } catch {
+        /* ignorar */
+    }
     return new Set(defaults)
 }
 
@@ -185,7 +206,9 @@ function loadTradingViewState() {
     try {
         const raw = localStorage.getItem("tradingView")
         if (raw === "tabla" || raw === "hacienda") return raw
-    } catch { /* ignorar */ }
+    } catch {
+        /* ignorar */
+    }
     return "tabla"
 }
 
@@ -195,7 +218,9 @@ function saveTradingFilterState() {
         localStorage.setItem("tradingFilter_direccion", JSON.stringify([..._tFilterDireccion]))
         localStorage.setItem("tradingFilter_resultado", JSON.stringify([..._tFilterResultado]))
         localStorage.setItem("tradingView", _tView)
-    } catch { /* ignorar */ }
+    } catch {
+        /* ignorar */
+    }
 }
 
 function renderTradingFilters() {
@@ -276,9 +301,10 @@ function buildTradingRow(row, num) {
     const gananciaNum = parseTradingPercent(row.ganancia)
 
     const gNetaNum = parseTradingAmount(row.ganancia_neta)
-    const gNetaFmt = gNetaNum !== null
-        ? `${gNetaNum >= 0 ? "+" : ""}${gNetaNum.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.capital_currency || ""}`
-        : ""
+    const gNetaFmt =
+        gNetaNum !== null
+            ? `${gNetaNum >= 0 ? "+" : ""}${gNetaNum.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.capital_currency || ""}`
+            : ""
 
     tr.innerHTML = `
         <td class="tradingNumCell">${num}</td>
@@ -329,9 +355,12 @@ function renderTradingHacienda() {
         _tHaciendaYear = years[0]
     }
 
-    tabsEl.innerHTML = years.map((y) =>
-        `<button class="tradingYearTab${y === _tHaciendaYear ? " active" : ""}" data-year="${y}">${y}</button>`
-    ).join("")
+    tabsEl.innerHTML = years
+        .map(
+            (y) =>
+                `<button class="tradingYearTab${y === _tHaciendaYear ? " active" : ""}" data-year="${y}">${y}</button>`
+        )
+        .join("")
 
     tabsEl.querySelectorAll(".tradingYearTab").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -357,9 +386,13 @@ function buildHaciendaYearTable(rows, year) {
         const cur = r.capital_currency || "EUR"
         netaByCurrency[cur] = (netaByCurrency[cur] || 0) + val
     })
-    const netaStr = Object.entries(netaByCurrency)
-        .map(([cur, val]) => `${val >= 0 ? "+" : ""}${val.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`)
-        .join(" / ") || "—"
+    const netaStr =
+        Object.entries(netaByCurrency)
+            .map(
+                ([cur, val]) =>
+                    `${val >= 0 ? "+" : ""}${val.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`
+            )
+            .join(" / ") || "—"
     const netaPositive = Object.values(netaByCurrency).every((v) => v >= 0)
 
     const summary = `
@@ -391,13 +424,15 @@ function buildHaciendaYearTable(rows, year) {
         return summary + `<p class="overviewEmpty">No hay trades en ${year}.</p>`
     }
 
-    const bodyRows = rows.map((row, idx) => {
-        const esProfit = row.resultado === "PROFIT"
-        const gNetaN = parseTradingAmount(row.ganancia_neta)
-        const gNetaF = gNetaN !== null
-            ? `${gNetaN >= 0 ? "+" : ""}${gNetaN.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.capital_currency || ""}`
-            : ""
-        return `
+    const bodyRows = rows
+        .map((row, idx) => {
+            const esProfit = row.resultado === "PROFIT"
+            const gNetaN = parseTradingAmount(row.ganancia_neta)
+            const gNetaF =
+                gNetaN !== null
+                    ? `${gNetaN >= 0 ? "+" : ""}${gNetaN.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.capital_currency || ""}`
+                    : ""
+            return `
             <tr>
                 <td class="tradingNumCell">${idx + 1}</td>
                 <td>${row.fecha || ""}</td>
@@ -410,9 +445,12 @@ function buildHaciendaYearTable(rows, year) {
                 <td class="${gNetaN !== null ? (gNetaN >= 0 ? "tradingPos" : "tradingNeg") : ""}">${gNetaF}</td>
             </tr>
         `
-    }).join("")
+        })
+        .join("")
 
-    return summary + `
+    return (
+        summary +
+        `
         <div class="tradingHaciendaTableWrap">
             <table class="tradingTable tradingHaciendaTable">
                 <thead>
@@ -432,6 +470,7 @@ function buildHaciendaYearTable(rows, year) {
             </table>
         </div>
     `
+    )
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -506,9 +545,9 @@ async function openTradingModal(tradeId) {
         : normalizeTradingRow({ id: `trade-${Date.now()}-${Math.random().toString(16).slice(2, 8)}` })
 
     const currencyOptions = await getTradingCurrencyOptions()
-    const currencySelect = currencyOptions.map((c) =>
-        `<option value="${c}"${rowData.capital_currency === c ? " selected" : ""}>${c}</option>`
-    ).join("")
+    const currencySelect = currencyOptions
+        .map((c) => `<option value="${c}"${rowData.capital_currency === c ? " selected" : ""}>${c}</option>`)
+        .join("")
 
     const overlay = document.createElement("div")
     overlay.id = "tradingRowModalOverlay"
@@ -610,7 +649,7 @@ async function openTradingModal(tradeId) {
 
     // Sincroniza el label de moneda en "Ganancia neta" con el select de Capital
     const currencySelectEl = document.getElementById("tmCapitalCurrency")
-    const currencyLabelEl  = overlay.querySelector(".tmCurrencyLabel")
+    const currencyLabelEl = overlay.querySelector(".tmCurrencyLabel")
     if (currencySelectEl && currencyLabelEl) {
         currencySelectEl.addEventListener("change", () => {
             currencyLabelEl.textContent = currencySelectEl.value
@@ -633,7 +672,7 @@ function saveTradingFromModal(overlay) {
         capital_currency: g("tmCapitalCurrency") || "EUR",
         roi: g("tmRoi"),
         ganancia: g("tmGanancia"),
-        ganancia_neta: g("tmGananciaNeta"),
+        ganancia_neta: g("tmGananciaNeta")
     })
 
     const idx = currentTradingData.rows.findIndex((r) => r.id === tradeId)

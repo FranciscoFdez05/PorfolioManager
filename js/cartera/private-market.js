@@ -1,12 +1,12 @@
 let _pmCurrentFilter = "all"
 
 const _PM_TIPO_LABELS = {
-    pe:              "Private Equity",
-    vc:              "Venture Capital",
-    credito:         "Crédito Privado",
-    inmobiliario:    "Inmobiliario",
+    pe: "Private Equity",
+    vc: "Venture Capital",
+    credito: "Crédito Privado",
+    inmobiliario: "Inmobiliario",
     infraestructura: "Infraestructura",
-    otros:           "Otros",
+    otros: "Otros"
 }
 
 const _PM_CURRENCY_SYMBOLS_BASE = { EUR: "EUR €", USD: "USD $", GBP: "GBP £", CHF: "CHF ₣", JPY: "JPY ¥" }
@@ -14,12 +14,16 @@ const _PM_CURRENCY_SYMBOLS_BASE = { EUR: "EUR €", USD: "USD $", GBP: "GBP £",
 function _pmGetCurrencySymbols() {
     const codes = window._fiatCurrencies?.length ? window._fiatCurrencies : Object.keys(_PM_CURRENCY_SYMBOLS_BASE)
     const result = {}
-    codes.forEach((c) => { result[c] = _PM_CURRENCY_SYMBOLS_BASE[c] || c })
+    codes.forEach((c) => {
+        result[c] = _PM_CURRENCY_SYMBOLS_BASE[c] || c
+    })
     return result
 }
 
 async function loadPrivateMarketData() {
-    const resp = await fetch("/api/privatemarket").then(r => r.json()).catch(() => ({ rows: [] }))
+    const resp = await fetch("/api/privatemarket")
+        .then((r) => r.json())
+        .catch(() => ({ rows: [] }))
     return { rows: Array.isArray(resp.rows) ? resp.rows : [] }
 }
 
@@ -37,17 +41,17 @@ function _pmCollectRows() {
     return [...document.querySelectorAll("#pmBody tr")].map((row) => {
         const cells = row.querySelectorAll("td")
         return {
-            fecha:        cells[0]?.textContent.trim() || "",
-            tipo:         row.dataset.tipo || "pe",
-            nombre:       cells[2]?.textContent.trim() || "",
-            gestor:       cells[3]?.textContent.trim() || "",
-            vintage:      cells[4]?.textContent.trim() || "",
-            currency:     row.dataset.currency || "EUR",
+            fecha: cells[0]?.textContent.trim() || "",
+            tipo: row.dataset.tipo || "pe",
+            nombre: cells[2]?.textContent.trim() || "",
+            gestor: cells[3]?.textContent.trim() || "",
+            vintage: cells[4]?.textContent.trim() || "",
+            currency: row.dataset.currency || "EUR",
             comprometido: cells[6]?.textContent.trim() || "",
-            llamado:      cells[7]?.textContent.trim() || "",
-            distribuido:  cells[8]?.textContent.trim() || "",
-            valorActual:  cells[9]?.textContent.trim() || "",
-            nota:         row.dataset.nota || "",
+            llamado: cells[7]?.textContent.trim() || "",
+            distribuido: cells[8]?.textContent.trim() || "",
+            valorActual: cells[9]?.textContent.trim() || "",
+            nota: row.dataset.nota || ""
         }
     })
 }
@@ -90,14 +94,14 @@ function _pmBuildRow(rowData, index) {
         })
     })
 
-    const llamado     = parseEuroNumber(rowData.llamado || "")
+    const llamado = parseEuroNumber(rowData.llamado || "")
     const distribuido = parseEuroNumber(rowData.distribuido || "")
     const valorActual = parseEuroNumber(rowData.valorActual || "")
-    const neto        = distribuido + valorActual - llamado
-    const tvpi        = _pmCalcTvpi(llamado, distribuido, valorActual)
+    const neto = distribuido + valorActual - llamado
+    const tvpi = _pmCalcTvpi(llamado, distribuido, valorActual)
 
     const currency = rowData.currency || "EUR"
-    const currLabel = (_pmGetCurrencySymbols()[currency] || currency)
+    const currLabel = _pmGetCurrencySymbols()[currency] || currency
     const tipo = rowData.tipo || "pe"
 
     const cells = [
@@ -112,7 +116,7 @@ function _pmBuildRow(rowData, index) {
         { text: rowData.distribuido || "" },
         { text: rowData.valorActual || "" },
         { text: formatEuro(neto), cls: neto >= 0 ? "pmNetoPos" : "pmNetoNeg" },
-        { text: tvpi !== null ? tvpi.toFixed(2) + "x" : "—" },
+        { text: tvpi !== null ? tvpi.toFixed(2) + "x" : "—" }
     ]
     cells.forEach(({ text, html, cls }) => {
         const td = document.createElement("td")
@@ -141,34 +145,40 @@ function renderPrivateMarketTable(data) {
 function _pmUpdateTotals() {
     const rows = [...document.querySelectorAll("#pmBody tr")]
 
-    let totalComprometido = 0, totalLlamado = 0, totalDistribuido = 0, totalValorActual = 0
+    let totalComprometido = 0,
+        totalLlamado = 0,
+        totalDistribuido = 0,
+        totalValorActual = 0
 
     rows.forEach((row) => {
         const cells = row.querySelectorAll("td")
         totalComprometido += parseEuroNumber(cells[6]?.textContent || "")
-        totalLlamado      += parseEuroNumber(cells[7]?.textContent || "")
-        totalDistribuido  += parseEuroNumber(cells[8]?.textContent || "")
-        totalValorActual  += parseEuroNumber(cells[9]?.textContent || "")
+        totalLlamado += parseEuroNumber(cells[7]?.textContent || "")
+        totalDistribuido += parseEuroNumber(cells[8]?.textContent || "")
+        totalValorActual += parseEuroNumber(cells[9]?.textContent || "")
     })
 
     const totalNeto = totalDistribuido + totalValorActual - totalLlamado
     const tvpi = totalLlamado > 0 ? (totalDistribuido + totalValorActual) / totalLlamado : null
-    const dpi  = totalLlamado > 0 ? totalDistribuido / totalLlamado : null
+    const dpi = totalLlamado > 0 ? totalDistribuido / totalLlamado : null
     const rvpi = totalLlamado > 0 ? totalValorActual / totalLlamado : null
 
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
+    const set = (id, val) => {
+        const el = document.getElementById(id)
+        if (el) el.textContent = val
+    }
     set("pmTotalComprometido", formatEuro(totalComprometido))
-    set("pmTotalLlamado",      formatEuro(totalLlamado))
-    set("pmTotalDistribuido",  formatEuro(totalDistribuido))
-    set("pmTotalValorActual",  formatEuro(totalValorActual))
-    set("pmTotalNeto",         formatEuro(totalNeto))
+    set("pmTotalLlamado", formatEuro(totalLlamado))
+    set("pmTotalDistribuido", formatEuro(totalDistribuido))
+    set("pmTotalValorActual", formatEuro(totalValorActual))
+    set("pmTotalNeto", formatEuro(totalNeto))
     set("pmTvpi", tvpi !== null ? tvpi.toFixed(2) + "x" : "—")
-    set("pmDpi",  dpi  !== null ? dpi.toFixed(2)  + "x" : "—")
+    set("pmDpi", dpi !== null ? dpi.toFixed(2) + "x" : "—")
     set("pmRvpi", rvpi !== null ? rvpi.toFixed(2) + "x" : "—")
 
-    const emptyEl   = document.getElementById("pmEmptyMsg")
+    const emptyEl = document.getElementById("pmEmptyMsg")
     const wrapperEl = document.getElementById("pmTableWrapper")
-    if (emptyEl)   emptyEl.classList.toggle("hidden", rows.length > 0)
+    if (emptyEl) emptyEl.classList.toggle("hidden", rows.length > 0)
     if (wrapperEl) wrapperEl.classList.toggle("hidden", rows.length === 0)
 }
 
@@ -191,11 +201,17 @@ function _pmOpenEditModal(rowIndex = -1) {
     overlay.style.zIndex = "20000"
 
     const currencyOptions = Object.entries(_pmGetCurrencySymbols())
-        .map(([code, label]) => `<option value="${code}"${(rowData.currency || "EUR") === code ? " selected" : ""}>${label}</option>`)
+        .map(
+            ([code, label]) =>
+                `<option value="${code}"${(rowData.currency || "EUR") === code ? " selected" : ""}>${label}</option>`
+        )
         .join("")
 
     const tipoOptions = Object.entries(_PM_TIPO_LABELS)
-        .map(([val, label]) => `<option value="${val}"${(rowData.tipo || "pe") === val ? " selected" : ""}>${label}</option>`)
+        .map(
+            ([val, label]) =>
+                `<option value="${val}"${(rowData.tipo || "pe") === val ? " selected" : ""}>${label}</option>`
+        )
         .join("")
 
     const modal = document.createElement("div")
@@ -245,24 +261,36 @@ function _pmOpenEditModal(rowIndex = -1) {
     const closeModal = () => overlay.remove()
     modal.querySelector("#pmModalCancelBtn").addEventListener("click", closeModal)
     modal.querySelector("#pmModalSaveBtn").addEventListener("click", async () => {
-        const fecha        = modal.querySelector("#pmFechaInput").value.trim()
-        const tipo         = modal.querySelector("#pmTipoSelect").value
-        const nombre       = modal.querySelector("#pmNombreInput").value.trim()
-        const gestor       = modal.querySelector("#pmGestorInput").value.trim()
-        const vintage      = modal.querySelector("#pmVintageInput").value.trim()
-        const currency     = modal.querySelector("#pmCurrencySelect").value
+        const fecha = modal.querySelector("#pmFechaInput").value.trim()
+        const tipo = modal.querySelector("#pmTipoSelect").value
+        const nombre = modal.querySelector("#pmNombreInput").value.trim()
+        const gestor = modal.querySelector("#pmGestorInput").value.trim()
+        const vintage = modal.querySelector("#pmVintageInput").value.trim()
+        const currency = modal.querySelector("#pmCurrencySelect").value
         const comprometidoRaw = modal.querySelector("#pmComprometidoInput").value.trim()
-        const llamadoRaw      = modal.querySelector("#pmLlamadoInput").value.trim()
-        const distribuidoRaw  = modal.querySelector("#pmDistribuidoInput").value.trim()
-        const valorActualRaw  = modal.querySelector("#pmValorActualInput").value.trim()
-        const nota         = modal.querySelector("#pmNotaInput").value.trim()
+        const llamadoRaw = modal.querySelector("#pmLlamadoInput").value.trim()
+        const distribuidoRaw = modal.querySelector("#pmDistribuidoInput").value.trim()
+        const valorActualRaw = modal.querySelector("#pmValorActualInput").value.trim()
+        const nota = modal.querySelector("#pmNotaInput").value.trim()
 
         const comprometido = comprometidoRaw ? formatCellEuroValue(comprometidoRaw) : ""
-        const llamado      = llamadoRaw      ? formatCellEuroValue(llamadoRaw)      : ""
-        const distribuido  = distribuidoRaw  ? formatCellEuroValue(distribuidoRaw)  : ""
-        const valorActual  = valorActualRaw  ? formatCellEuroValue(valorActualRaw)  : ""
+        const llamado = llamadoRaw ? formatCellEuroValue(llamadoRaw) : ""
+        const distribuido = distribuidoRaw ? formatCellEuroValue(distribuidoRaw) : ""
+        const valorActual = valorActualRaw ? formatCellEuroValue(valorActualRaw) : ""
 
-        const newRow = { fecha, tipo, nombre, gestor, vintage, currency, comprometido, llamado, distribuido, valorActual, nota }
+        const newRow = {
+            fecha,
+            tipo,
+            nombre,
+            gestor,
+            vintage,
+            currency,
+            comprometido,
+            llamado,
+            distribuido,
+            valorActual,
+            nota
+        }
 
         if (isEdit) {
             rows[rowIndex] = newRow
@@ -288,7 +316,11 @@ async function initPrivateMarketLogic() {
     document.getElementById("pmAddBtn")?.addEventListener("click", () => _pmOpenEditModal())
 
     document.getElementById("savePmBtn")?.addEventListener("click", async () => {
-        try { await savePrivateMarketData() } catch (err) { console.error(err) }
+        try {
+            await savePrivateMarketData()
+        } catch (err) {
+            console.error(err)
+        }
     })
 
     const filtersEl = document.getElementById("pmFilters")
@@ -299,26 +331,34 @@ async function initPrivateMarketLogic() {
             if (todosInput?.checked) {
                 _pmApplyFilter("all")
             } else {
-                const sel = getIndividuals().filter(cb => cb.checked).map(cb => cb.closest(".pmFilterBtn").dataset.tipo)
+                const sel = getIndividuals()
+                    .filter((cb) => cb.checked)
+                    .map((cb) => cb.closest(".pmFilterBtn").dataset.tipo)
                 if (!sel.length && todosInput) todosInput.checked = true
                 _pmApplyFilter(sel.length ? sel : "all")
             }
         }
         if (todosInput) todosInput.checked = true
-        getIndividuals().forEach(cb => { cb.checked = true })
+        getIndividuals().forEach((cb) => {
+            cb.checked = true
+        })
         if (!filtersEl.dataset.bound) {
             filtersEl.dataset.bound = "true"
             filtersEl.addEventListener("change", (e) => {
                 const changed = e.target
                 if (changed === todosInput) {
                     changed.checked = true
-                    getIndividuals().forEach(cb => { cb.checked = true })
+                    getIndividuals().forEach((cb) => {
+                        cb.checked = true
+                    })
                 } else if (todosInput?.checked) {
                     todosInput.checked = false
-                    getIndividuals().forEach(cb => { cb.checked = cb === changed })
+                    getIndividuals().forEach((cb) => {
+                        cb.checked = cb === changed
+                    })
                     changed.checked = true
                 } else {
-                    if (todosInput) todosInput.checked = getIndividuals().every(cb => cb.checked)
+                    if (todosInput) todosInput.checked = getIndividuals().every((cb) => cb.checked)
                 }
                 syncAndApply()
             })

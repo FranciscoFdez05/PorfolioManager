@@ -4,45 +4,58 @@ let _bonosAutosaveTimer = null
 const _TIPO_LABELS = {
     gubernamental: "Gubernamental",
     corporativo: "Corporativo",
-    if: "Interés Fijo",
+    if: "Interés Fijo"
 }
 
 const _CURRENCY_SYMBOLS_BASE = { EUR: "EUR €", USD: "USD $", GBP: "GBP £", CHF: "CHF ₣", JPY: "JPY ¥" }
 function _getCurrencySymbols() {
     const codes = window._fiatCurrencies?.length ? window._fiatCurrencies : Object.keys(_CURRENCY_SYMBOLS_BASE)
     const result = {}
-    codes.forEach((c) => { result[c] = _CURRENCY_SYMBOLS_BASE[c] || c })
+    codes.forEach((c) => {
+        result[c] = _CURRENCY_SYMBOLS_BASE[c] || c
+    })
     return result
 }
-const _CURRENCY_SYMBOLS = new Proxy({}, {
-    get(_, prop) {
-        return _getCurrencySymbols()[prop]
-    },
-    ownKeys() { return Object.keys(_getCurrencySymbols()) },
-    has(_, prop) { return prop in _getCurrencySymbols() },
-    getOwnPropertyDescriptor(_, prop) {
-        const v = _getCurrencySymbols()[prop]
-        return v !== undefined ? { value: v, writable: false, enumerable: true, configurable: true } : undefined
-    },
-})
+const _CURRENCY_SYMBOLS = new Proxy(
+    {},
+    {
+        get(_, prop) {
+            return _getCurrencySymbols()[prop]
+        },
+        ownKeys() {
+            return Object.keys(_getCurrencySymbols())
+        },
+        has(_, prop) {
+            return prop in _getCurrencySymbols()
+        },
+        getOwnPropertyDescriptor(_, prop) {
+            const v = _getCurrencySymbols()[prop]
+            return v !== undefined ? { value: v, writable: false, enumerable: true, configurable: true } : undefined
+        }
+    }
+)
 
 async function loadAllBonosData() {
     const [bonosResp, rfResp] = await Promise.all([
-        fetch("/api/bonos").then(r => r.json()).catch(() => ({ rows: [] })),
-        fetch("/api/rentafija").then(r => r.json()).catch(() => ({ rows: [] }))
+        fetch("/api/bonos")
+            .then((r) => r.json())
+            .catch(() => ({ rows: [] })),
+        fetch("/api/rentafija")
+            .then((r) => r.json())
+            .catch(() => ({ rows: [] }))
     ])
     const bonosRows = Array.isArray(bonosResp.rows) ? bonosResp.rows : []
-    const rfRows = (Array.isArray(rfResp.rows) ? rfResp.rows : []).map(r => ({
-        fecha:            r.fecha || "",
-        tipo:             "if",
-        currency:         r.currency || "EUR",
-        instrumento:      r.instrumento || "",
-        cupon:            r.rentabilidad || "",
-        vencimiento:      r.vencimiento || "",
-        invertido:        r.invertido || "",
+    const rfRows = (Array.isArray(rfResp.rows) ? rfResp.rows : []).map((r) => ({
+        fecha: r.fecha || "",
+        tipo: "if",
+        currency: r.currency || "EUR",
+        instrumento: r.instrumento || "",
+        cupon: r.rentabilidad || "",
+        vencimiento: r.vencimiento || "",
+        invertido: r.invertido || "",
         interesAcumulado: r.interesAcumulado || "",
-        impuestos:        r.impuestos || "",
-        nota:             "",
+        impuestos: r.impuestos || "",
+        nota: ""
     }))
     return { rows: [...bonosRows, ...rfRows] }
 }
@@ -50,19 +63,19 @@ async function loadAllBonosData() {
 async function saveAllBonosData() {
     const rows = collectAllDataFromTable()
 
-    const bonosRows = rows.filter(r => ["gubernamental", "corporativo"].includes(r.tipo))
+    const bonosRows = rows.filter((r) => ["gubernamental", "corporativo"].includes(r.tipo))
     const rfRows = rows
-        .filter(r => r.tipo === "if")
-        .map(r => ({
-            fecha:            r.fecha,
-            tipo:             r.tipo,
-            currency:         r.currency,
-            instrumento:      r.instrumento,
-            rentabilidad:     r.cupon,
-            vencimiento:      r.vencimiento,
-            invertido:        r.invertido,
+        .filter((r) => r.tipo === "if")
+        .map((r) => ({
+            fecha: r.fecha,
+            tipo: r.tipo,
+            currency: r.currency,
+            instrumento: r.instrumento,
+            rentabilidad: r.cupon,
+            vencimiento: r.vencimiento,
+            invertido: r.invertido,
             interesAcumulado: r.interesAcumulado,
-            impuestos:        r.impuestos,
+            impuestos: r.impuestos
         }))
 
     const [res1, res2] = await Promise.all([
@@ -85,16 +98,16 @@ function collectAllDataFromTable() {
     return [...document.querySelectorAll("#bonosBody tr")].map((row) => {
         const cells = row.querySelectorAll("td")
         return {
-            fecha:            cells[0]?.textContent.trim() || "",
-            tipo:             row.dataset.tipo || "gubernamental",
-            currency:         row.dataset.currency || "EUR",
-            instrumento:      cells[3]?.textContent.trim() || "",
-            cupon:            cells[4]?.textContent.trim() || "",
-            vencimiento:      cells[5]?.textContent.trim() || "",
-            invertido:        cells[6]?.textContent.trim() || "",
+            fecha: cells[0]?.textContent.trim() || "",
+            tipo: row.dataset.tipo || "gubernamental",
+            currency: row.dataset.currency || "EUR",
+            instrumento: cells[3]?.textContent.trim() || "",
+            cupon: cells[4]?.textContent.trim() || "",
+            vencimiento: cells[5]?.textContent.trim() || "",
+            invertido: cells[6]?.textContent.trim() || "",
             interesAcumulado: cells[7]?.textContent.trim() || "",
-            impuestos:        cells[8]?.textContent.trim() || "",
-            nota:             "",
+            impuestos: cells[8]?.textContent.trim() || "",
+            nota: ""
         }
     })
 }
@@ -142,7 +155,7 @@ function buildBonosRow(rowData, index) {
         rowData.invertido || "",
         rowData.interesAcumulado || "",
         rowData.impuestos || "",
-        formatEuro(parseEuroNumber(rowData.interesAcumulado || "") - parseEuroNumber(rowData.impuestos || "")),
+        formatEuro(parseEuroNumber(rowData.interesAcumulado || "") - parseEuroNumber(rowData.impuestos || ""))
     ]
     cellsData.forEach((text) => {
         const td = document.createElement("td")
@@ -169,19 +182,23 @@ function renderBonosTable(data) {
 function updateBonosTotals() {
     const rows = [...document.querySelectorAll("#bonosBody tr")]
 
-    let totalInteres = 0, totalImpuestos = 0, totalInvertido = 0
-    let ifNeto = 0, corpNeto = 0, gubNeto = 0
+    let totalInteres = 0,
+        totalImpuestos = 0,
+        totalInvertido = 0
+    let ifNeto = 0,
+        corpNeto = 0,
+        gubNeto = 0
 
     rows.forEach((row) => {
         const cells = row.querySelectorAll("td")
-        const interes   = parseEuroNumber(cells[7]?.textContent || "")
+        const interes = parseEuroNumber(cells[7]?.textContent || "")
         const impuestos = parseEuroNumber(cells[8]?.textContent || "")
         const invertido = parseEuroNumber(cells[6]?.textContent || "")
         const neto = interes - impuestos
 
         if (cells[9]) cells[9].textContent = formatEuro(neto)
 
-        totalInteres   += interes
+        totalInteres += interes
         totalImpuestos += impuestos
         totalInvertido += invertido
 
@@ -192,14 +209,17 @@ function updateBonosTotals() {
     })
 
     const totalNeto = totalInteres - totalImpuestos
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = formatEuro(val) }
-    set("bonosTotalNeto",      totalNeto)
-    set("bonosTotalInteres",   totalInteres)
+    const set = (id, val) => {
+        const el = document.getElementById(id)
+        if (el) el.textContent = formatEuro(val)
+    }
+    set("bonosTotalNeto", totalNeto)
+    set("bonosTotalInteres", totalInteres)
     set("bonosTotalImpuestos", totalImpuestos)
     set("bonosTotalInvertido", totalInvertido)
-    set("bonosTotalIf",        ifNeto)
-    set("bonosTotalCorp",      corpNeto)
-    set("bonosTotalGub",       gubNeto)
+    set("bonosTotalIf", ifNeto)
+    set("bonosTotalCorp", corpNeto)
+    set("bonosTotalGub", gubNeto)
 
     const bonosEmptyEl = document.getElementById("bonosEmptyMsg")
     const bonosTableWrapper = document.getElementById("bonosTableWrapper")
@@ -242,9 +262,12 @@ function openBonosEditModal(rowIndex = -1) {
 
         <label class="assetModalLabel" for="bonosCurrencySelect">Moneda</label>
         <select id="bonosCurrencySelect" class="assetModalSelect">
-            ${Object.entries(_getCurrencySymbols()).map(([code, label]) =>
-                `<option value="${code}"${(rowData.currency || "EUR") === code ? " selected" : ""}>${label}</option>`
-            ).join("")}
+            ${Object.entries(_getCurrencySymbols())
+                .map(
+                    ([code, label]) =>
+                        `<option value="${code}"${(rowData.currency || "EUR") === code ? " selected" : ""}>${label}</option>`
+                )
+                .join("")}
         </select>
 
         <label class="assetModalLabel" for="bonosInstrumentoInput">Instrumento</label>
@@ -274,21 +297,32 @@ function openBonosEditModal(rowIndex = -1) {
     const closeModal = () => overlay.remove()
     modal.querySelector("#bonosModalCancelBtn").addEventListener("click", closeModal)
     modal.querySelector("#bonosModalSaveBtn").addEventListener("click", async () => {
-        const fecha           = modal.querySelector("#bonosFechaInput").value.trim()
-        const tipo            = modal.querySelector("#bonosTipoSelect").value
-        const currency        = modal.querySelector("#bonosCurrencySelect").value
-        const instrumento     = modal.querySelector("#bonosInstrumentoInput").value.trim()
-        const cupon           = modal.querySelector("#bonosCuponInput").value.trim()
-        const vencimiento     = modal.querySelector("#bonosVencimientoInput").value.trim()
-        const invertidoRaw    = modal.querySelector("#bonosInvertidoInput").value.trim()
-        const interesRaw      = modal.querySelector("#bonosInteresInput").value.trim()
-        const impuestosRaw    = modal.querySelector("#bonosImpuestosInput").value.trim()
+        const fecha = modal.querySelector("#bonosFechaInput").value.trim()
+        const tipo = modal.querySelector("#bonosTipoSelect").value
+        const currency = modal.querySelector("#bonosCurrencySelect").value
+        const instrumento = modal.querySelector("#bonosInstrumentoInput").value.trim()
+        const cupon = modal.querySelector("#bonosCuponInput").value.trim()
+        const vencimiento = modal.querySelector("#bonosVencimientoInput").value.trim()
+        const invertidoRaw = modal.querySelector("#bonosInvertidoInput").value.trim()
+        const interesRaw = modal.querySelector("#bonosInteresInput").value.trim()
+        const impuestosRaw = modal.querySelector("#bonosImpuestosInput").value.trim()
 
-        const invertido        = invertidoRaw ? formatCellEuroValue(invertidoRaw) : ""
-        const interesAcumulado = interesRaw   ? formatCellEuroValue(interesRaw)   : ""
-        const impuestos        = impuestosRaw ? formatCellEuroValue(impuestosRaw) : ""
+        const invertido = invertidoRaw ? formatCellEuroValue(invertidoRaw) : ""
+        const interesAcumulado = interesRaw ? formatCellEuroValue(interesRaw) : ""
+        const impuestos = impuestosRaw ? formatCellEuroValue(impuestosRaw) : ""
 
-        const newRow = { fecha, tipo, currency, instrumento, cupon, vencimiento, invertido, interesAcumulado, impuestos, nota: "" }
+        const newRow = {
+            fecha,
+            tipo,
+            currency,
+            instrumento,
+            cupon,
+            vencimiento,
+            invertido,
+            interesAcumulado,
+            impuestos,
+            nota: ""
+        }
 
         if (isEdit) {
             rows[rowIndex] = newRow
@@ -314,37 +348,51 @@ async function initBonosLogic() {
     document.getElementById("bonosAddBtn")?.addEventListener("click", () => openBonosEditModal())
 
     document.getElementById("saveBonosBtn")?.addEventListener("click", async () => {
-        try { await saveAllBonosData() } catch (err) { console.error(err) }
+        try {
+            await saveAllBonosData()
+        } catch (err) {
+            console.error(err)
+        }
     })
 
     const bonosFiltersEl = document.getElementById("bonosFilters")
     if (bonosFiltersEl) {
         const todosInput = bonosFiltersEl.querySelector('[data-tipo="all"] input')
-        const getIndividuals = () => [...bonosFiltersEl.querySelectorAll('.bonosFilterBtn:not([data-tipo="all"]) input')]
+        const getIndividuals = () => [
+            ...bonosFiltersEl.querySelectorAll('.bonosFilterBtn:not([data-tipo="all"]) input')
+        ]
         const syncAndApply = () => {
             if (todosInput?.checked) {
                 applyBonosFilter("all")
             } else {
-                const sel = getIndividuals().filter(cb => cb.checked).map(cb => cb.closest(".bonosFilterBtn").dataset.tipo)
+                const sel = getIndividuals()
+                    .filter((cb) => cb.checked)
+                    .map((cb) => cb.closest(".bonosFilterBtn").dataset.tipo)
                 if (!sel.length && todosInput) todosInput.checked = true
                 applyBonosFilter(sel.length ? sel : "all")
             }
         }
         if (todosInput) todosInput.checked = true
-        getIndividuals().forEach(cb => { cb.checked = true })
+        getIndividuals().forEach((cb) => {
+            cb.checked = true
+        })
         if (!bonosFiltersEl.dataset.bound) {
             bonosFiltersEl.dataset.bound = "true"
             bonosFiltersEl.addEventListener("change", (e) => {
                 const changed = e.target
                 if (changed === todosInput) {
                     changed.checked = true
-                    getIndividuals().forEach(cb => { cb.checked = true })
+                    getIndividuals().forEach((cb) => {
+                        cb.checked = true
+                    })
                 } else if (todosInput?.checked) {
                     todosInput.checked = false
-                    getIndividuals().forEach(cb => { cb.checked = cb === changed })
+                    getIndividuals().forEach((cb) => {
+                        cb.checked = cb === changed
+                    })
                     changed.checked = true
                 } else {
-                    if (todosInput) todosInput.checked = getIndividuals().every(cb => cb.checked)
+                    if (todosInput) todosInput.checked = getIndividuals().every((cb) => cb.checked)
                 }
                 syncAndApply()
             })

@@ -1,28 +1,28 @@
 const AV_SEG_TYPE_COLORS = {
-    cripto:    "#f7931a",
-    acciones:  "#3a7bd5",
-    etfs:      "#2ecc71",
+    cripto: "#f7931a",
+    acciones: "#3a7bd5",
+    etfs: "#2ecc71",
     comoditis: "#e0c068"
 }
 const AV_SEG_TYPE_LABELS = {
-    cripto:    "Cripto",
-    acciones:  "Acciones",
-    etfs:      "ETFs",
+    cripto: "Cripto",
+    acciones: "Acciones",
+    etfs: "ETFs",
     comoditis: "Comoditis"
 }
 
-let _segAllItems    = []
-let _segFilterType  = "all"
-let _segFilterSrc   = "all"
-let _segSearch      = ""
-let _segViewMode    = localStorage.getItem("whitelistViewMode") || "cards"
+let _segAllItems = []
+let _segFilterType = "all"
+let _segFilterSrc = "all"
+let _segSearch = ""
+let _segViewMode = localStorage.getItem("whitelistViewMode") || "cards"
 
 function _segPid() {
     return window._activePortfolioId || "default"
 }
 
 function segLoadCustomItems() {
-    const key    = `seguimientoList_${_segPid()}`
+    const key = `seguimientoList_${_segPid()}`
     const legacy = "seguimientoList"
     try {
         const stored = localStorage.getItem(key)
@@ -35,47 +35,53 @@ function segLoadCustomItems() {
             return JSON.parse(old)
         }
         return []
-    } catch { return [] }
+    } catch {
+        return []
+    }
 }
 function segSaveCustomItems(items) {
     localStorage.setItem(`seguimientoList_${_segPid()}`, JSON.stringify(items))
 }
 
 function segFilteredItems() {
-    return _segAllItems.filter(item => {
+    return _segAllItems.filter((item) => {
         const matchType = _segFilterType === "all" || _segFilterType.includes(item.type)
-        const matchSrc  = _segFilterSrc === "all"
-            || (Array.isArray(_segFilterSrc)
-                ? (_segFilterSrc.includes("portfolio") && item._fromPortfolio && !item._isWatchOnly)
-                  || (_segFilterSrc.includes("operaciones") && item._fromOperaciones)
-                  || (_segFilterSrc.includes("nuevos") && ((!item._fromPortfolio && !item._fromOperaciones) || item._isWatchOnly))
-                : (_segFilterSrc === "portfolio" && item._fromPortfolio && !item._isWatchOnly)
-                  || (_segFilterSrc === "operaciones" && item._fromOperaciones)
-                  || (_segFilterSrc === "nuevos" && ((!item._fromPortfolio && !item._fromOperaciones) || item._isWatchOnly)))
+        const matchSrc =
+            _segFilterSrc === "all" ||
+            (Array.isArray(_segFilterSrc)
+                ? (_segFilterSrc.includes("portfolio") && item._fromPortfolio && !item._isWatchOnly) ||
+                  (_segFilterSrc.includes("operaciones") && item._fromOperaciones) ||
+                  (_segFilterSrc.includes("nuevos") &&
+                      ((!item._fromPortfolio && !item._fromOperaciones) || item._isWatchOnly))
+                : (_segFilterSrc === "portfolio" && item._fromPortfolio && !item._isWatchOnly) ||
+                  (_segFilterSrc === "operaciones" && item._fromOperaciones) ||
+                  (_segFilterSrc === "nuevos" &&
+                      ((!item._fromPortfolio && !item._fromOperaciones) || item._isWatchOnly)))
         const q = _segSearch.toLowerCase()
-        const matchSearch = !q
-            || (item.name   || "").toLowerCase().includes(q)
-            || (item.symbol || "").toLowerCase().includes(q)
-            || (item.ticker || "").toLowerCase().includes(q)
+        const matchSearch =
+            !q ||
+            (item.name || "").toLowerCase().includes(q) ||
+            (item.symbol || "").toLowerCase().includes(q) ||
+            (item.ticker || "").toLowerCase().includes(q)
         return matchType && matchSrc && matchSearch
     })
 }
 
 function segBuildCard(item) {
-    const color     = AV_SEG_TYPE_COLORS[item.type] || "#888"
+    const color = AV_SEG_TYPE_COLORS[item.type] || "#888"
     const typeLabel = AV_SEG_TYPE_LABELS[item.type] || item.type || ""
-    const price     = parseLooseNumber(item.price || "") || 0
-    const currency  = item.currency || "EUR"
-    const provider  = String(item.marketProvider || "").toUpperCase()
-    const ticker    = item.marketSymbol || item.finnhubSymbol || item.ticker || ""
+    const price = parseLooseNumber(item.price || "") || 0
+    const currency = item.currency || "EUR"
+    const provider = String(item.marketProvider || "").toUpperCase()
+    const ticker = item.marketSymbol || item.finnhubSymbol || item.ticker || ""
 
-    const changePctStr   = String(item.change || "").trim()
-    const changePct      = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
-    const changeAbs      = price > 0 ? Math.abs(price * changePct / 100) : 0
-    const changeSign     = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
-    const changeClass    = changePct < 0 ? "avNeg" : changePct > 0 ? "avPos" : ""
+    const changePctStr = String(item.change || "").trim()
+    const changePct = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
+    const changeAbs = price > 0 ? Math.abs((price * changePct) / 100) : 0
+    const changeSign = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
+    const changeClass = changePct < 0 ? "avNeg" : changePct > 0 ? "avPos" : ""
     const changeMoneyStr = changePctStr ? `${changeSign}${formatMoney(changeAbs, currency)}` : "—"
-    const changePctDisp  = changePctStr || "—"
+    const changePctDisp = changePctStr || "—"
 
     let lastUpdatedStr = "—"
     if (item.lastUpdated) {
@@ -92,9 +98,9 @@ function segBuildCard(item) {
     const sid = escapeHtml(item._segId || "")
     const hideOrDeleteItem = item._isWatchOnly
         ? `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segWatchDeleteBtn" data-seg-id="${sid}">Eliminar</button>`
-        : (item._fromPortfolio || item._fromOperaciones)
-            ? `<button type="button" class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${sid}">Ocultar</button>`
-            : `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${sid}">Eliminar</button>`
+        : item._fromPortfolio || item._fromOperaciones
+          ? `<button type="button" class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${sid}">Ocultar</button>`
+          : `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${sid}">Eliminar</button>`
     const actionBtns = `
         <div class="rowMenu">
             <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
@@ -160,25 +166,25 @@ function segRenderTable(filtered) {
     if (tableWrap) tableWrap.classList.remove("hidden")
     if (tableEmptyEl) tableEmptyEl.classList.add("hidden")
     function buildTableRow(item) {
-        const color     = AV_SEG_TYPE_COLORS[item.type] || "#888"
+        const color = AV_SEG_TYPE_COLORS[item.type] || "#888"
         const typeLabel = AV_SEG_TYPE_LABELS[item.type] || item.type || ""
-        const price     = parseLooseNumber(item.price || "") || 0
-        const currency  = item.currency || "EUR"
-        const provider  = String(item.marketProvider || "").toUpperCase()
-        const ticker    = item.marketSymbol || item.finnhubSymbol || item.ticker || "—"
-        const changePctStr   = String(item.change || "").trim()
-        const changePct      = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
-        const changeAbs      = price > 0 ? Math.abs(price * changePct / 100) : 0
-        const changeSign     = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
-        const changeClass    = changePct < 0 ? "avNeg" : changePct > 0 ? "avPos" : ""
+        const price = parseLooseNumber(item.price || "") || 0
+        const currency = item.currency || "EUR"
+        const provider = String(item.marketProvider || "").toUpperCase()
+        const ticker = item.marketSymbol || item.finnhubSymbol || item.ticker || "—"
+        const changePctStr = String(item.change || "").trim()
+        const changePct = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
+        const changeAbs = price > 0 ? Math.abs((price * changePct) / 100) : 0
+        const changeSign = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
+        const changeClass = changePct < 0 ? "avNeg" : changePct > 0 ? "avPos" : ""
         const changeMoneyStr = changePctStr ? `${changeSign}${formatMoney(changeAbs, currency)}` : "—"
-        const changePctDisp  = changePctStr || "—"
-        const tsid       = escapeHtml(item._segId || "")
+        const changePctDisp = changePctStr || "—"
+        const tsid = escapeHtml(item._segId || "")
         const tHideOrDelItem = item._isWatchOnly
             ? `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segWatchDeleteBtn" data-seg-id="${tsid}">Eliminar</button>`
-            : (item._fromPortfolio || item._fromOperaciones)
-                ? `<button class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${tsid}">Ocultar</button>`
-                : `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${tsid}">Eliminar</button>`
+            : item._fromPortfolio || item._fromOperaciones
+              ? `<button class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${tsid}">Ocultar</button>`
+              : `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${tsid}">Eliminar</button>`
         const removeCell = `
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
@@ -200,9 +206,9 @@ function segRenderTable(filtered) {
         </tr>`
     }
 
-    const portfolioGroup = filtered.filter(i => (i._fromPortfolio && !i._isWatchOnly) || i._fromOperaciones)
-    const customGroup    = filtered.filter(i => (!i._fromPortfolio && !i._fromOperaciones) || i._isWatchOnly)
-    const showSections   = portfolioGroup.length > 0 && customGroup.length > 0
+    const portfolioGroup = filtered.filter((i) => (i._fromPortfolio && !i._isWatchOnly) || i._fromOperaciones)
+    const customGroup = filtered.filter((i) => (!i._fromPortfolio && !i._fromOperaciones) || i._isWatchOnly)
+    const showSections = portfolioGroup.length > 0 && customGroup.length > 0
 
     if (showSections) {
         const colSpan = 8
@@ -215,27 +221,30 @@ function segRenderTable(filtered) {
         tbody.innerHTML = filtered.map(buildTableRow).join("")
     }
 
-    tbody.querySelectorAll(".segHideBtn").forEach(btn => {
+    tbody.querySelectorAll(".segHideBtn").forEach((btn) => {
         btn.addEventListener("click", () => segHideItem(btn.dataset.segId))
     })
-    tbody.querySelectorAll(".segRemoveBtn").forEach(btn => {
+    tbody.querySelectorAll(".segRemoveBtn").forEach((btn) => {
         btn.addEventListener("click", () => segRemoveItem(btn.dataset.segId))
     })
-    tbody.querySelectorAll(".segWatchDeleteBtn").forEach(btn => {
+    tbody.querySelectorAll(".segWatchDeleteBtn").forEach((btn) => {
         btn.addEventListener("click", () => segDeleteWatchAsset(btn.dataset.segId))
     })
 
-    tbody.querySelectorAll(".segEditBtn").forEach(btn => {
+    tbody.querySelectorAll(".segEditBtn").forEach((btn) => {
         btn.addEventListener("click", () => segOpenEditModal(btn.dataset.segId))
     })
 
-    tbody.querySelectorAll(".avTableRow").forEach(row => {
+    tbody.querySelectorAll(".avTableRow").forEach((row) => {
         row.addEventListener("click", (e) => {
             if (e.target.closest(".avTrActions")) return
             const segId = row.dataset.segId
-            const item  = _segAllItems.find(i => i._segId === segId)
+            const item = _segAllItems.find((i) => i._segId === segId)
             if (!item) return
-            const tvSym = typeof buildTVSymbol === "function" ? buildTVSymbol(item) : (item.tvSymbol || item.marketSymbol || item.ticker || "")
+            const tvSym =
+                typeof buildTVSymbol === "function"
+                    ? buildTVSymbol(item)
+                    : item.tvSymbol || item.marketSymbol || item.ticker || ""
             if (tvSym && typeof openTVChartModal === "function") openTVChartModal(tvSym, item.name || item.symbol)
         })
     })
@@ -245,7 +254,7 @@ function segRenderTable(filtered) {
 }
 
 function segLoadHidden() {
-    const key    = `seguimientoHidden_${_segPid()}`
+    const key = `seguimientoHidden_${_segPid()}`
     const legacy = "seguimientoHidden"
     try {
         const stored = localStorage.getItem(key)
@@ -258,7 +267,9 @@ function segLoadHidden() {
             return new Set(JSON.parse(old))
         }
         return new Set()
-    } catch { return new Set() }
+    } catch {
+        return new Set()
+    }
 }
 function segSaveHidden(set) {
     localStorage.setItem(`seguimientoHidden_${_segPid()}`, JSON.stringify([...set]))
@@ -282,11 +293,11 @@ function segUnhideItem(segId) {
 }
 
 function segUpdateHiddenBtn() {
-    const btn   = document.getElementById("segHiddenBtn")
+    const btn = document.getElementById("segHiddenBtn")
     const badge = document.getElementById("segHiddenCount")
     if (!btn) return
     const hidden = segLoadHidden()
-    const count  = [...hidden].filter(id => id.startsWith("portfolio_")).length
+    const count = [...hidden].filter((id) => id.startsWith("portfolio_")).length
     if (count > 0) {
         btn.style.display = ""
         if (badge) badge.textContent = count
@@ -296,34 +307,36 @@ function segUpdateHiddenBtn() {
 }
 
 function segOpenHiddenModal() {
-    const overlay  = document.getElementById("segHiddenModalOverlay")
-    const list     = document.getElementById("segHiddenList")
+    const overlay = document.getElementById("segHiddenModalOverlay")
+    const list = document.getElementById("segHiddenList")
     if (!overlay || !list) return
 
-    const hidden   = segLoadHidden()
-    const hiddenIds = [...hidden].filter(id => id.startsWith("portfolio_"))
-    const assets   = window._segPortfolioAssets || []
+    const hidden = segLoadHidden()
+    const hiddenIds = [...hidden].filter((id) => id.startsWith("portfolio_"))
+    const assets = window._segPortfolioAssets || []
 
     if (hiddenIds.length === 0) {
         list.innerHTML = `<p style="color:var(--text-secondary);font-size:0.9em;text-align:center;padding:16px 0">No hay activos ocultos.</p>`
     } else {
-        list.innerHTML = hiddenIds.map(segId => {
-            const assetId = segId.replace("portfolio_", "")
-            const asset   = assets.find(a => a.id === assetId)
-            const name    = asset?.name || assetId
-            const type    = asset?.type || ""
-            const color   = AV_SEG_TYPE_COLORS[type] || "#888"
-            const label   = AV_SEG_TYPE_LABELS[type] || type
-            return `<div class="segHiddenItem" data-seg-id="${escapeHtml(segId)}">
+        list.innerHTML = hiddenIds
+            .map((segId) => {
+                const assetId = segId.replace("portfolio_", "")
+                const asset = assets.find((a) => a.id === assetId)
+                const name = asset?.name || assetId
+                const type = asset?.type || ""
+                const color = AV_SEG_TYPE_COLORS[type] || "#888"
+                const label = AV_SEG_TYPE_LABELS[type] || type
+                return `<div class="segHiddenItem" data-seg-id="${escapeHtml(segId)}">
                 <span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44;font-size:0.75em">${escapeHtml(label)}</span>
                 <span class="segHiddenItemName">${escapeHtml(name)}</span>
                 <button class="primaryButton segUnhideBtn" data-seg-id="${escapeHtml(segId)}" type="button" style="margin-left:auto;padding:4px 12px;font-size:0.82em">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Mostrar
                 </button>
             </div>`
-        }).join("")
+            })
+            .join("")
 
-        list.querySelectorAll(".segUnhideBtn").forEach(btn => {
+        list.querySelectorAll(".segUnhideBtn").forEach((btn) => {
             btn.addEventListener("click", () => {
                 segUnhideItem(btn.dataset.segId)
                 segOpenHiddenModal()
@@ -337,7 +350,7 @@ function segOpenHiddenModal() {
 function segRemoveItem(segId) {
     if (segId.startsWith("portfolio_") || segId.startsWith("operacion_")) return
 
-    const item = _segAllItems.find(i => i._segId === segId)
+    const item = _segAllItems.find((i) => i._segId === segId)
     const itemName = item?.name || item?.symbol || segId
 
     openConfirmModal({
@@ -360,9 +373,9 @@ function segRemoveItem(segId) {
 }
 
 async function segDeleteWatchAsset(segId) {
-    const item = _segAllItems.find(i => i._segId === segId)
+    const item = _segAllItems.find((i) => i._segId === segId)
     const itemName = item?.name || item?.symbol || segId
-    const assetId  = segId.startsWith("portfolio_") ? segId.slice("portfolio_".length) : segId
+    const assetId = segId.startsWith("portfolio_") ? segId.slice("portfolio_".length) : segId
 
     openConfirmModal({
         title: "Eliminar activo",
@@ -381,7 +394,7 @@ async function segDeleteWatchAsset(segId) {
                         if (!resp.ok) throw new Error(await resp.text())
                         if (typeof refreshAssetsSidebar === "function") await refreshAssetsSidebar()
                         segMergeAndRender(
-                            (window._segPortfolioAssets || []).filter(a => String(a.id) !== String(assetId))
+                            (window._segPortfolioAssets || []).filter((a) => String(a.id) !== String(assetId))
                         )
                     } catch (e) {
                         alert(`Error al eliminar: ${e.message}`)
@@ -393,11 +406,11 @@ async function segDeleteWatchAsset(segId) {
 }
 
 function segOpenDeleteTypeConfirm(segId, itemName) {
-    const overlay    = document.getElementById("segDeleteTypeOverlay")
-    const msg        = document.getElementById("segDeleteTypeMsg")
-    const input      = document.getElementById("segDeleteTypeInput")
-    const cancelBtn  = document.getElementById("segDeleteTypeCancelBtn")
-    const okBtn      = document.getElementById("segDeleteTypeOkBtn")
+    const overlay = document.getElementById("segDeleteTypeOverlay")
+    const msg = document.getElementById("segDeleteTypeMsg")
+    const input = document.getElementById("segDeleteTypeInput")
+    const cancelBtn = document.getElementById("segDeleteTypeCancelBtn")
+    const okBtn = document.getElementById("segDeleteTypeOkBtn")
     if (!overlay || !input) return
 
     const expected = itemName.toUpperCase()
@@ -416,7 +429,7 @@ function segOpenDeleteTypeConfirm(segId, itemName) {
         overlay.classList.add("hidden")
         cleanup()
         let customs = segLoadCustomItems()
-        customs = customs.filter(c => c._segId !== segId)
+        customs = customs.filter((c) => c._segId !== segId)
         segSaveCustomItems(customs)
         segMergeAndRender(window._segPortfolioAssets || [])
     }
@@ -444,9 +457,9 @@ function segOpenDeleteTypeConfirm(segId, itemName) {
 }
 
 function segRenderGrid() {
-    const grid      = document.getElementById("seguimientoGrid")
+    const grid = document.getElementById("seguimientoGrid")
     const tableWrap = document.getElementById("seguimientoTableWrap")
-    const count     = document.getElementById("seguimientoCount")
+    const count = document.getElementById("seguimientoCount")
     if (!grid) return
 
     const filtered = segFilteredItems()
@@ -475,56 +488,60 @@ function segRenderGrid() {
     if (gridEmptyEl) gridEmptyEl.classList.add("hidden")
 
     function wireCard(card, item) {
-        card.querySelectorAll(".segHideBtn").forEach(btn => {
+        card.querySelectorAll(".segHideBtn").forEach((btn) => {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation()
                 segHideItem(btn.dataset.segId)
             })
         })
-        card.querySelectorAll(".segRemoveBtn").forEach(btn => {
+        card.querySelectorAll(".segRemoveBtn").forEach((btn) => {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation()
                 segRemoveItem(btn.dataset.segId)
             })
         })
-        card.querySelectorAll(".segWatchDeleteBtn").forEach(btn => {
+        card.querySelectorAll(".segWatchDeleteBtn").forEach((btn) => {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation()
                 segDeleteWatchAsset(btn.dataset.segId)
             })
         })
-        card.querySelectorAll(".segEditBtn").forEach(btn => {
+        card.querySelectorAll(".segEditBtn").forEach((btn) => {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation()
                 segOpenEditModal(btn.dataset.segId)
             })
         })
         card.addEventListener("click", (e) => {
-            if (e.target.closest(".segRemoveBtn") || e.target.closest(".segEditBtn") || e.target.closest(".rowMenu")) return
-            const tvSym = typeof buildTVSymbol === "function" ? buildTVSymbol(item) : (item.tvSymbol || item.marketSymbol || item.ticker || "")
+            if (e.target.closest(".segRemoveBtn") || e.target.closest(".segEditBtn") || e.target.closest(".rowMenu"))
+                return
+            const tvSym =
+                typeof buildTVSymbol === "function"
+                    ? buildTVSymbol(item)
+                    : item.tvSymbol || item.marketSymbol || item.ticker || ""
             if (tvSym && typeof openTVChartModal === "function") openTVChartModal(tvSym, item.name || item.symbol)
         })
         return card
     }
 
-    const portfolioGroup = filtered.filter(i => (i._fromPortfolio && !i._isWatchOnly) || i._fromOperaciones)
-    const customGroup    = filtered.filter(i => (!i._fromPortfolio && !i._fromOperaciones) || i._isWatchOnly)
-    const showSections   = portfolioGroup.length > 0 && customGroup.length > 0
+    const portfolioGroup = filtered.filter((i) => (i._fromPortfolio && !i._isWatchOnly) || i._fromOperaciones)
+    const customGroup = filtered.filter((i) => (!i._fromPortfolio && !i._fromOperaciones) || i._isWatchOnly)
+    const showSections = portfolioGroup.length > 0 && customGroup.length > 0
 
     if (showSections) {
         const hPort = document.createElement("div")
         hPort.className = "segSectionHeader"
         hPort.textContent = "Portfolio & Operaciones"
         grid.appendChild(hPort)
-        portfolioGroup.forEach(item => grid.appendChild(wireCard(segBuildCard(item), item)))
+        portfolioGroup.forEach((item) => grid.appendChild(wireCard(segBuildCard(item), item)))
 
         const hCustom = document.createElement("div")
         hCustom.className = "segSectionHeader"
         hCustom.textContent = "Lista de seguimiento"
         grid.appendChild(hCustom)
-        customGroup.forEach(item => grid.appendChild(wireCard(segBuildCard(item), item)))
+        customGroup.forEach((item) => grid.appendChild(wireCard(segBuildCard(item), item)))
     } else {
-        filtered.forEach(item => grid.appendChild(wireCard(segBuildCard(item), item)))
+        filtered.forEach((item) => grid.appendChild(wireCard(segBuildCard(item), item)))
     }
 }
 
@@ -532,51 +549,57 @@ function segMergeAndRender(portfolioAssets) {
     window._segPortfolioAssets = portfolioAssets
     const customs = segLoadCustomItems()
     const portfolioKeys = new Set([
-        ...portfolioAssets.map(a => (a.name   || "").toLowerCase()).filter(Boolean),
-        ...portfolioAssets.map(a => (a.symbol || "").toLowerCase()).filter(Boolean),
+        ...portfolioAssets.map((a) => (a.name || "").toLowerCase()).filter(Boolean),
+        ...portfolioAssets.map((a) => (a.symbol || "").toLowerCase()).filter(Boolean)
     ])
-    const portfolioNames = new Set(portfolioAssets.map(a => (a.name || "").toLowerCase()))
+    const portfolioNames = new Set(portfolioAssets.map((a) => (a.name || "").toLowerCase()))
 
     const customItems = customs
-        .filter(c => !portfolioKeys.has((c.nombre || "").toLowerCase()) && !portfolioKeys.has((c.ticker || "").toLowerCase()))
-        .map(c => ({
-            _segId:         c._segId,
-            name:           c.nombre,
-            symbol:         c.ticker || c.nombre,
-            ticker:         c.ticker || "",
-            marketSymbol:   c.ticker || "",
+        .filter(
+            (c) =>
+                !portfolioKeys.has((c.nombre || "").toLowerCase()) && !portfolioKeys.has((c.ticker || "").toLowerCase())
+        )
+        .map((c) => ({
+            _segId: c._segId,
+            name: c.nombre,
+            symbol: c.ticker || c.nombre,
+            ticker: c.ticker || "",
+            marketSymbol: c.ticker || "",
             marketProvider: c.marketProvider || "",
-            tvSymbol:       c.tvSymbol       || "",
-            type:           c.tipo || "acciones",
-            notas:          c.notas || "",
-            price:          c.price          || "",
-            currency:       c.currency       || "EUR",
-            change:         c.change         || "",
-            lastUpdated:    c.lastUpdated     || null,
+            tvSymbol: c.tvSymbol || "",
+            type: c.tipo || "acciones",
+            notas: c.notas || "",
+            price: c.price || "",
+            currency: c.currency || "EUR",
+            change: c.change || "",
+            lastUpdated: c.lastUpdated || null,
             _fromPortfolio: false
         }))
 
-    const hidden    = segLoadHidden()
-    const overrides = JSON.parse(localStorage.getItem(`seguimientoOverrides_${_segPid()}`) || localStorage.getItem("seguimientoOverrides") || "{}")
+    const hidden = segLoadHidden()
+    const overrides = JSON.parse(
+        localStorage.getItem(`seguimientoOverrides_${_segPid()}`) ||
+            localStorage.getItem("seguimientoOverrides") ||
+            "{}"
+    )
 
     const portfolioItems = portfolioAssets
-        .filter(a => !hidden.has(`portfolio_${a.id}`))
-        .map(a => {
+        .filter((a) => !hidden.has(`portfolio_${a.id}`))
+        .map((a) => {
             const segId = `portfolio_${a.id}`
             const ov = overrides[segId] || {}
             return {
                 ...a,
-                _segId:         segId,
+                _segId: segId,
                 _fromPortfolio: true,
-                _isWatchOnly:   !a.hasRows,
-                tvSymbol:       ov.tvSymbol       ?? (a.tvSymbol || ""),
-                marketProvider: ov.marketProvider  ?? (a.marketProvider || ""),
-                marketSymbol:   ov.ticker          ?? (a.marketSymbol || a.finnhubSymbol || "")
+                _isWatchOnly: !a.hasRows,
+                tvSymbol: ov.tvSymbol ?? (a.tvSymbol || ""),
+                marketProvider: ov.marketProvider ?? (a.marketProvider || ""),
+                marketSymbol: ov.ticker ?? (a.marketSymbol || a.finnhubSymbol || "")
             }
         })
 
-    const operacionesItems = (window._segOperacionesItems || [])
-        .filter(item => !hidden.has(item._segId))
+    const operacionesItems = (window._segOperacionesItems || []).filter((item) => !hidden.has(item._segId))
 
     _segAllItems = [...portfolioItems, ...operacionesItems, ...customItems]
     segRenderGrid()
@@ -595,12 +618,14 @@ async function segRefreshCustomPrices() {
             if (!resp.ok) continue
             const data = await resp.json()
             if (!data.ok || !data.price) continue
-            item.price       = String(data.price)
-            item.change      = String(data.change ?? "")
-            item.currency    = data.currency || "EUR"
+            item.price = String(data.price)
+            item.change = String(data.change ?? "")
+            item.currency = data.currency || "EUR"
             item.lastUpdated = data.lastUpdated || new Date().toISOString()
             updated = true
-        } catch { /* ignore individual failures */ }
+        } catch {
+            /* ignore individual failures */
+        }
     }
     if (updated) {
         segSaveCustomItems(customs)
@@ -609,28 +634,28 @@ async function segRefreshCustomPrices() {
 }
 
 async function initSeguimientoLogic() {
-    const addBtn             = document.getElementById("seguimientoAddBtn")
-    const searchInput        = document.getElementById("seguimientoSearch")
-    const modalOverlay       = document.getElementById("seguimientoModalOverlay")
-    const confirmBtn         = document.getElementById("seguimientoConfirmBtn")
-    const cancelBtn          = document.getElementById("seguimientoCancelBtn")
-    const nombreInput        = document.getElementById("seguimientoNombreInput")
-    const typeSelect         = document.getElementById("seguimientoTypeSelect")
-    const tickerInput        = document.getElementById("seguimientoTickerInput")
-    const tvTickerInput      = document.getElementById("seguimientoTVTickerInput")
-    const hiddenBtn          = document.getElementById("segHiddenBtn")
+    const addBtn = document.getElementById("seguimientoAddBtn")
+    const searchInput = document.getElementById("seguimientoSearch")
+    const modalOverlay = document.getElementById("seguimientoModalOverlay")
+    const confirmBtn = document.getElementById("seguimientoConfirmBtn")
+    const cancelBtn = document.getElementById("seguimientoCancelBtn")
+    const nombreInput = document.getElementById("seguimientoNombreInput")
+    const typeSelect = document.getElementById("seguimientoTypeSelect")
+    const tickerInput = document.getElementById("seguimientoTickerInput")
+    const tvTickerInput = document.getElementById("seguimientoTVTickerInput")
+    const hiddenBtn = document.getElementById("segHiddenBtn")
     const hiddenModalOverlay = document.getElementById("segHiddenModalOverlay")
-    const hiddenCloseBtn     = document.getElementById("segHiddenCloseBtn")
+    const hiddenCloseBtn = document.getElementById("segHiddenCloseBtn")
 
-    const filtersEl          = document.getElementById("seguimientoFilters")
-    const srcFiltersEl       = document.getElementById("seguimientoSourceFilters")
-    const viewToggle         = document.getElementById("seguimientoViewToggle")
-    const segFinnhubBtn      = document.getElementById("segSearchFinnhubBtn")
-    const segEodhdBtn        = document.getElementById("segSearchEodhdBtn")
-    const segYahooBtn        = document.getElementById("segSearchYahooBtn")
+    const filtersEl = document.getElementById("seguimientoFilters")
+    const srcFiltersEl = document.getElementById("seguimientoSourceFilters")
+    const viewToggle = document.getElementById("seguimientoViewToggle")
+    const segFinnhubBtn = document.getElementById("segSearchFinnhubBtn")
+    const segEodhdBtn = document.getElementById("segSearchEodhdBtn")
+    const segYahooBtn = document.getElementById("segSearchYahooBtn")
     const segAlphaVantageBtn = document.getElementById("segSearchAlphaVantageBtn")
-    const segSearchFeedback  = document.getElementById("segSearchFeedback")
-    const segSearchResults   = document.getElementById("segSearchResults")
+    const segSearchFeedback = document.getElementById("segSearchFeedback")
+    const segSearchResults = document.getElementById("segSearchResults")
 
     // cargar activos del portfolio
     let portfolioAssets = []
@@ -640,7 +665,9 @@ async function initSeguimientoLogic() {
             const data = await resp.json()
             portfolioAssets = data.assets || data || []
         }
-    } catch { /* sin conexión */ }
+    } catch {
+        /* sin conexión */
+    }
 
     // cargar operaciones y construir items únicos por activo
     try {
@@ -650,33 +677,37 @@ async function initSeguimientoLogic() {
             const opRows = opData.rows || []
             const seenAssetIds = new Set()
             window._segOperacionesItems = opRows
-                .filter(row => {
+                .filter((row) => {
                     if (!row.assetId || seenAssetIds.has(row.assetId)) return false
                     seenAssetIds.add(row.assetId)
                     return true
                 })
-                .flatMap(row => {
-                    const asset = portfolioAssets.find(a => a.id === row.assetId)
+                .flatMap((row) => {
+                    const asset = portfolioAssets.find((a) => a.id === row.assetId)
                     if (!asset) return []
-                    return [{
-                        _segId:          `operacion_${asset.id}`,
-                        _fromOperaciones: true,
-                        _fromPortfolio:   false,
-                        name:            asset.name || asset.symbol || row.activo || "",
-                        symbol:          asset.symbol || asset.name || row.activo || "",
-                        ticker:          asset.marketSymbol || asset.finnhubSymbol || row.ticker || "",
-                        marketSymbol:    asset.marketSymbol || asset.finnhubSymbol || row.ticker || "",
-                        marketProvider:  asset.marketProvider || row.marketProvider || "finnhub",
-                        tvSymbol:        asset.tvSymbol || row.tvSymbol || "",
-                        type:            asset.type || "cripto",
-                        price:           String(asset.price || ""),
-                        currency:        asset.currency || "EUR",
-                        change:          String(asset.change || ""),
-                        lastUpdated:     asset.lastUpdated || null
-                    }]
+                    return [
+                        {
+                            _segId: `operacion_${asset.id}`,
+                            _fromOperaciones: true,
+                            _fromPortfolio: false,
+                            name: asset.name || asset.symbol || row.activo || "",
+                            symbol: asset.symbol || asset.name || row.activo || "",
+                            ticker: asset.marketSymbol || asset.finnhubSymbol || row.ticker || "",
+                            marketSymbol: asset.marketSymbol || asset.finnhubSymbol || row.ticker || "",
+                            marketProvider: asset.marketProvider || row.marketProvider || "finnhub",
+                            tvSymbol: asset.tvSymbol || row.tvSymbol || "",
+                            type: asset.type || "cripto",
+                            price: String(asset.price || ""),
+                            currency: asset.currency || "EUR",
+                            change: String(asset.change || ""),
+                            lastUpdated: asset.lastUpdated || null
+                        }
+                    ]
                 })
         }
-    } catch { window._segOperacionesItems = [] }
+    } catch {
+        window._segOperacionesItems = []
+    }
 
     // restaurar filtros guardados
     const _pid = _segPid()
@@ -684,11 +715,13 @@ async function initSeguimientoLogic() {
         const st = localStorage.getItem(`seguimientoFilterType_${_pid}`)
         const ss = localStorage.getItem(`seguimientoFilterSrc_${_pid}`)
         if (st) _segFilterType = JSON.parse(st)
-        if (ss) _segFilterSrc  = JSON.parse(ss)
-    } catch { /* ignorar */ }
+        if (ss) _segFilterSrc = JSON.parse(ss)
+    } catch {
+        /* ignorar */
+    }
 
     // inicializar vista guardada
-    viewToggle?.querySelectorAll(".avViewBtn").forEach(btn => {
+    viewToggle?.querySelectorAll(".avViewBtn").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.view === _segViewMode)
     })
 
@@ -704,16 +737,20 @@ async function initSeguimientoLogic() {
     const updateSegFilterLabel = () => {
         const btn = document.getElementById("seguimientoFilterDropBtn")
         if (!btn) return
-        const filtersEl2   = document.getElementById("seguimientoFilters")
+        const filtersEl2 = document.getElementById("seguimientoFilters")
         const srcFiltersEl2 = document.getElementById("seguimientoSourceFilters")
         const typeTodos = filtersEl2?.querySelector('[data-type="all"] input')
-        const srcTodos  = srcFiltersEl2?.querySelector('[data-source="all"] input')
-        const typeParts = typeTodos?.checked ? [] :
-            [...(filtersEl2?.querySelectorAll('.activosFilterBtn:not([data-type="all"]) input') || [])]
-                .filter(cb => cb.checked).map(cb => cb.closest(".activosFilterBtn").querySelector("span").textContent)
-        const srcParts = srcTodos?.checked ? [] :
-            [...(srcFiltersEl2?.querySelectorAll('.activosFilterBtn:not([data-source="all"]) input') || [])]
-                .filter(cb => cb.checked).map(cb => cb.closest(".activosFilterBtn").querySelector("span").textContent)
+        const srcTodos = srcFiltersEl2?.querySelector('[data-source="all"] input')
+        const typeParts = typeTodos?.checked
+            ? []
+            : [...(filtersEl2?.querySelectorAll('.activosFilterBtn:not([data-type="all"]) input') || [])]
+                  .filter((cb) => cb.checked)
+                  .map((cb) => cb.closest(".activosFilterBtn").querySelector("span").textContent)
+        const srcParts = srcTodos?.checked
+            ? []
+            : [...(srcFiltersEl2?.querySelectorAll('.activosFilterBtn:not([data-source="all"]) input') || [])]
+                  .filter((cb) => cb.checked)
+                  .map((cb) => cb.closest(".activosFilterBtn").querySelector("span").textContent)
         const parts = [...typeParts, ...srcParts]
         btn.textContent = (parts.length ? parts.join(", ") : "Todos") + " ▾"
     }
@@ -721,12 +758,16 @@ async function initSeguimientoLogic() {
     // filtros de tipo
     if (filtersEl) {
         const todosTInput = filtersEl.querySelector('[data-type="all"] input')
-        const getTypeIndividuals = () => [...filtersEl.querySelectorAll('.activosFilterBtn:not([data-type="all"]) input')]
+        const getTypeIndividuals = () => [
+            ...filtersEl.querySelectorAll('.activosFilterBtn:not([data-type="all"]) input')
+        ]
         const syncTypeState = () => {
             if (todosTInput?.checked) {
                 _segFilterType = "all"
             } else {
-                const sel = getTypeIndividuals().filter(cb => cb.checked).map(cb => cb.closest(".activosFilterBtn").dataset.type)
+                const sel = getTypeIndividuals()
+                    .filter((cb) => cb.checked)
+                    .map((cb) => cb.closest(".activosFilterBtn").dataset.type)
                 _segFilterType = sel.length ? sel : "all"
                 if (!sel.length && todosTInput) todosTInput.checked = true
             }
@@ -735,10 +776,12 @@ async function initSeguimientoLogic() {
         }
         if (_segFilterType === "all") {
             if (todosTInput) todosTInput.checked = true
-            getTypeIndividuals().forEach(cb => { cb.checked = true })
+            getTypeIndividuals().forEach((cb) => {
+                cb.checked = true
+            })
         } else {
             if (todosTInput) todosTInput.checked = false
-            getTypeIndividuals().forEach(cb => {
+            getTypeIndividuals().forEach((cb) => {
                 cb.checked = _segFilterType.includes(cb.closest(".activosFilterBtn").dataset.type)
             })
         }
@@ -748,13 +791,17 @@ async function initSeguimientoLogic() {
                 const changed = e.target
                 if (changed === todosTInput) {
                     changed.checked = true
-                    getTypeIndividuals().forEach(cb => { cb.checked = true })
+                    getTypeIndividuals().forEach((cb) => {
+                        cb.checked = true
+                    })
                 } else if (todosTInput?.checked) {
                     todosTInput.checked = false
-                    getTypeIndividuals().forEach(cb => { cb.checked = cb === changed })
+                    getTypeIndividuals().forEach((cb) => {
+                        cb.checked = cb === changed
+                    })
                     changed.checked = true
                 } else {
-                    if (todosTInput) todosTInput.checked = getTypeIndividuals().every(cb => cb.checked)
+                    if (todosTInput) todosTInput.checked = getTypeIndividuals().every((cb) => cb.checked)
                 }
                 syncTypeState()
                 segRenderGrid()
@@ -765,12 +812,16 @@ async function initSeguimientoLogic() {
     // filtros de fuente (todos / portfolio / nuevos)
     if (srcFiltersEl) {
         const todosSInput = srcFiltersEl.querySelector('[data-source="all"] input')
-        const getSrcIndividuals = () => [...srcFiltersEl.querySelectorAll('.activosFilterBtn:not([data-source="all"]) input')]
+        const getSrcIndividuals = () => [
+            ...srcFiltersEl.querySelectorAll('.activosFilterBtn:not([data-source="all"]) input')
+        ]
         const syncSrcState = () => {
             if (todosSInput?.checked) {
                 _segFilterSrc = "all"
             } else {
-                const sel = getSrcIndividuals().filter(cb => cb.checked).map(cb => cb.closest(".activosFilterBtn").dataset.source)
+                const sel = getSrcIndividuals()
+                    .filter((cb) => cb.checked)
+                    .map((cb) => cb.closest(".activosFilterBtn").dataset.source)
                 _segFilterSrc = sel.length ? sel : "all"
                 if (!sel.length && todosSInput) todosSInput.checked = true
             }
@@ -779,10 +830,12 @@ async function initSeguimientoLogic() {
         }
         if (_segFilterSrc === "all") {
             if (todosSInput) todosSInput.checked = true
-            getSrcIndividuals().forEach(cb => { cb.checked = true })
+            getSrcIndividuals().forEach((cb) => {
+                cb.checked = true
+            })
         } else {
             if (todosSInput) todosSInput.checked = false
-            getSrcIndividuals().forEach(cb => {
+            getSrcIndividuals().forEach((cb) => {
                 cb.checked = _segFilterSrc.includes(cb.closest(".activosFilterBtn").dataset.source)
             })
         }
@@ -792,13 +845,17 @@ async function initSeguimientoLogic() {
                 const changed = e.target
                 if (changed === todosSInput) {
                     changed.checked = true
-                    getSrcIndividuals().forEach(cb => { cb.checked = true })
+                    getSrcIndividuals().forEach((cb) => {
+                        cb.checked = true
+                    })
                 } else if (todosSInput?.checked) {
                     todosSInput.checked = false
-                    getSrcIndividuals().forEach(cb => { cb.checked = cb === changed })
+                    getSrcIndividuals().forEach((cb) => {
+                        cb.checked = cb === changed
+                    })
                     changed.checked = true
                 } else {
-                    if (todosSInput) todosSInput.checked = getSrcIndividuals().every(cb => cb.checked)
+                    if (todosSInput) todosSInput.checked = getSrcIndividuals().every((cb) => cb.checked)
                 }
                 syncSrcState()
                 segRenderGrid()
@@ -812,7 +869,7 @@ async function initSeguimientoLogic() {
     viewToggle?.addEventListener("click", (e) => {
         const btn = e.target.closest(".avViewBtn")
         if (!btn) return
-        viewToggle.querySelectorAll(".avViewBtn").forEach(b => b.classList.remove("active"))
+        viewToggle.querySelectorAll(".avViewBtn").forEach((b) => b.classList.remove("active"))
         btn.classList.add("active")
         _segViewMode = btn.dataset.view
         localStorage.setItem("whitelistViewMode", _segViewMode)
@@ -832,34 +889,44 @@ async function initSeguimientoLogic() {
     function segShowSuggestions(query) {
         if (!suggestionsBox) return
         const q = query.toLowerCase().trim()
-        if (!q) { suggestionsBox.classList.add("hidden"); suggestionsBox.innerHTML = ""; return }
+        if (!q) {
+            suggestionsBox.classList.add("hidden")
+            suggestionsBox.innerHTML = ""
+            return
+        }
 
         const matches = portfolioAssets
-            .filter(a => {
-                const name   = (a.name   || "").toLowerCase()
+            .filter((a) => {
+                const name = (a.name || "").toLowerCase()
                 const symbol = (a.symbol || "").toLowerCase()
                 const ticker = (a.ticker || a.marketSymbol || a.finnhubSymbol || "").toLowerCase()
                 return name.includes(q) || symbol.includes(q) || ticker.includes(q)
             })
             .slice(0, 8)
 
-        if (matches.length === 0) { suggestionsBox.classList.add("hidden"); suggestionsBox.innerHTML = ""; return }
+        if (matches.length === 0) {
+            suggestionsBox.classList.add("hidden")
+            suggestionsBox.innerHTML = ""
+            return
+        }
 
-        suggestionsBox.innerHTML = matches.map((a, i) => {
-            const ticker = a.marketSymbol || a.finnhubSymbol || a.ticker || ""
-            const tipo   = AV_SEG_TYPE_LABELS[a.type] || a.type || ""
-            const color  = AV_SEG_TYPE_COLORS[a.type] || "#888"
-            return `<div class="segSuggestionItem" data-idx="${i}" data-name="${escapeHtml(a.name || a.symbol || "")}" data-ticker="${escapeHtml(ticker)}" data-tipo="${escapeHtml(a.type || "acciones")}">
+        suggestionsBox.innerHTML = matches
+            .map((a, i) => {
+                const ticker = a.marketSymbol || a.finnhubSymbol || a.ticker || ""
+                const tipo = AV_SEG_TYPE_LABELS[a.type] || a.type || ""
+                const color = AV_SEG_TYPE_COLORS[a.type] || "#888"
+                return `<div class="segSuggestionItem" data-idx="${i}" data-name="${escapeHtml(a.name || a.symbol || "")}" data-ticker="${escapeHtml(ticker)}" data-tipo="${escapeHtml(a.type || "acciones")}">
                 <span class="segSuggBadge" style="background:${color}22;color:${color};border-color:${color}44">${tipo}</span>
                 <span class="segSuggName">${escapeHtml(a.name || a.symbol || "")}</span>
                 ${ticker ? `<span class="segSuggTicker">${escapeHtml(ticker)}</span>` : ""}
             </div>`
-        }).join("")
+            })
+            .join("")
 
         _activeSugIdx = -1
         suggestionsBox.classList.remove("hidden")
 
-        suggestionsBox.querySelectorAll(".segSuggestionItem").forEach(el => {
+        suggestionsBox.querySelectorAll(".segSuggestionItem").forEach((el) => {
             el.addEventListener("mousedown", (e) => {
                 e.preventDefault()
                 segApplySuggestion(el)
@@ -869,8 +936,8 @@ async function initSeguimientoLogic() {
 
     function segApplySuggestion(el) {
         if (!el) return
-        nombreInput.value  = el.dataset.name  || ""
-        tickerInput.value  = el.dataset.ticker || ""
+        nombreInput.value = el.dataset.name || ""
+        tickerInput.value = el.dataset.ticker || ""
         if (typeSelect && el.dataset.tipo) typeSelect.value = el.dataset.tipo
         suggestionsBox.classList.add("hidden")
         suggestionsBox.innerHTML = ""
@@ -914,13 +981,16 @@ async function initSeguimientoLogic() {
     // modal
     function segClearSearch() {
         if (segSearchFeedback) segSearchFeedback.classList.add("hidden")
-        if (segSearchResults)  { segSearchResults.classList.add("hidden"); segSearchResults.innerHTML = "" }
+        if (segSearchResults) {
+            segSearchResults.classList.add("hidden")
+            segSearchResults.innerHTML = ""
+        }
     }
 
     function openModal() {
         if (!modalOverlay) return
-        nombreInput.value  = ""
-        tickerInput.value  = ""
+        nombreInput.value = ""
+        tickerInput.value = ""
         if (tvTickerInput) tvTickerInput.value = ""
         delete tickerInput?.dataset.marketProvider
         segHideSuggestions()
@@ -945,13 +1015,14 @@ async function initSeguimientoLogic() {
     const segTickerSelected = (result, providerName) => {
         if (tickerInput) {
             tickerInput.value = result.symbol
-            tickerInput.dataset.marketProvider = String(result.provider || providerName).trim().toLowerCase()
+            tickerInput.dataset.marketProvider = String(result.provider || providerName)
+                .trim()
+                .toLowerCase()
         }
         if (nombreInput && !nombreInput.value.trim()) nombreInput.value = result.description || ""
         if (typeof setAssetSearchFeedback === "function")
             setAssetSearchFeedback(segSearchFeedback, `Ticker seleccionado (${providerName}): ${result.symbol}`)
-        if (typeof renderMarketSearchResults === "function")
-            renderMarketSearchResults(segSearchResults, [], () => {})
+        if (typeof renderMarketSearchResults === "function") renderMarketSearchResults(segSearchResults, [], () => {})
     }
 
     segFinnhubBtn?.addEventListener("click", async () => {
@@ -1008,16 +1079,19 @@ async function initSeguimientoLogic() {
 
     confirmBtn?.addEventListener("click", () => {
         const nombre = nombreInput?.value.trim()
-        if (!nombre) { nombreInput?.focus(); return }
+        if (!nombre) {
+            nombreInput?.focus()
+            return
+        }
         const customs = segLoadCustomItems()
         customs.push({
-            _segId:         `custom_${Date.now()}`,
+            _segId: `custom_${Date.now()}`,
             nombre,
-            ticker:         tickerInput?.value.trim() || "",
+            ticker: tickerInput?.value.trim() || "",
             marketProvider: tickerInput?.dataset.marketProvider || "",
-            tvSymbol:       tvTickerInput?.value.trim() || "",
-            tipo:           typeSelect?.value || "acciones",
-            notas:          ""
+            tvSymbol: tvTickerInput?.value.trim() || "",
+            tipo: typeSelect?.value || "acciones",
+            notas: ""
         })
         segSaveCustomItems(customs)
         closeModal()
@@ -1025,49 +1099,58 @@ async function initSeguimientoLogic() {
     })
 
     // ── Modal de edición ─────────────────────────────────────────────────────
-    const editOverlay     = document.getElementById("segEditModalOverlay")
+    const editOverlay = document.getElementById("segEditModalOverlay")
     const editNombreInput = document.getElementById("segEditNombreInput")
-    const editTypeSelect  = document.getElementById("segEditTypeSelect")
+    const editTypeSelect = document.getElementById("segEditTypeSelect")
     const editTickerInput = document.getElementById("segEditTickerInput")
-    const editTVInput     = document.getElementById("segEditTVTickerInput")
-    const editFeedback    = document.getElementById("segEditSearchFeedback")
-    const editResults     = document.getElementById("segEditSearchResults")
-    const editCancelBtn   = document.getElementById("segEditCancelBtn")
-    const editConfirmBtn  = document.getElementById("segEditConfirmBtn")
-    let _editingSegId     = null
+    const editTVInput = document.getElementById("segEditTVTickerInput")
+    const editFeedback = document.getElementById("segEditSearchFeedback")
+    const editResults = document.getElementById("segEditSearchResults")
+    const editCancelBtn = document.getElementById("segEditCancelBtn")
+    const editConfirmBtn = document.getElementById("segEditConfirmBtn")
+    let _editingSegId = null
 
     function segClearEditSearch() {
         if (editFeedback) editFeedback.classList.add("hidden")
-        if (editResults)  { editResults.classList.add("hidden"); editResults.innerHTML = "" }
+        if (editResults) {
+            editResults.classList.add("hidden")
+            editResults.innerHTML = ""
+        }
     }
 
-    const editModalTitle    = document.getElementById("segEditModalTitle")
+    const editModalTitle = document.getElementById("segEditModalTitle")
     const editPortfolioNote = document.getElementById("segEditPortfolioNotice")
-    const editCustomForm    = document.getElementById("segEditCustomForm")
+    const editCustomForm = document.getElementById("segEditCustomForm")
 
-    window.segOpenEditModal = function(segId) {
+    window.segOpenEditModal = function (segId) {
         if (!editOverlay) return
-        const allItem = _segAllItems.find(i => i._segId === segId)
+        const allItem = _segAllItems.find((i) => i._segId === segId)
         if (!allItem) return
         _editingSegId = segId
 
         segClearEditSearch()
 
         if (allItem._fromPortfolio) {
-            if (editModalTitle)    editModalTitle.textContent = allItem.name || allItem.symbol || "Activo del portfolio"
+            if (editModalTitle) editModalTitle.textContent = allItem.name || allItem.symbol || "Activo del portfolio"
             if (editPortfolioNote) editPortfolioNote.classList.remove("hidden")
-            if (editCustomForm)    editCustomForm.classList.add("hidden")
-            if (editConfirmBtn)    { editConfirmBtn.removeAttribute("style"); editConfirmBtn.classList.remove("hidden") }
+            if (editCustomForm) editCustomForm.classList.add("hidden")
+            if (editConfirmBtn) {
+                editConfirmBtn.removeAttribute("style")
+                editConfirmBtn.classList.remove("hidden")
+            }
             const rawTV = allItem.tvSymbol || ""
             if (editTVInput) editTVInput.value = typeof decodeTVTicker === "function" ? decodeTVTicker(rawTV) : rawTV
         } else {
             const customs = segLoadCustomItems()
-            const item = customs.find(c => c._segId === segId)
+            const item = customs.find((c) => c._segId === segId)
             if (!item) return
-            if (editModalTitle)    editModalTitle.textContent = "Editar activo"
+            if (editModalTitle) editModalTitle.textContent = "Editar activo"
             if (editPortfolioNote) editPortfolioNote.classList.add("hidden")
-            if (editCustomForm)    editCustomForm.classList.remove("hidden")
-            if (editConfirmBtn)    { editConfirmBtn.removeAttribute("style"); editConfirmBtn.classList.remove("hidden") }
+            if (editCustomForm) editCustomForm.classList.remove("hidden")
+            if (editConfirmBtn) {
+                editConfirmBtn.removeAttribute("style")
+                editConfirmBtn.classList.remove("hidden")
+            }
 
             editNombreInput.value = item.nombre || ""
             if (editTypeSelect) editTypeSelect.value = item.tipo || "acciones"
@@ -1090,11 +1173,15 @@ async function initSeguimientoLogic() {
 
     editConfirmBtn?.addEventListener("click", () => {
         if (!_editingSegId) return
-        const allItem = _segAllItems.find(i => i._segId === _editingSegId)
+        const allItem = _segAllItems.find((i) => i._segId === _editingSegId)
 
         if (allItem?._fromPortfolio) {
             const tvVal = editTVInput?.value.trim() || ""
-            const overrides = JSON.parse(localStorage.getItem(`seguimientoOverrides_${_segPid()}`) || localStorage.getItem("seguimientoOverrides") || "{}")
+            const overrides = JSON.parse(
+                localStorage.getItem(`seguimientoOverrides_${_segPid()}`) ||
+                    localStorage.getItem("seguimientoOverrides") ||
+                    "{}"
+            )
             overrides[_editingSegId] = { ...(overrides[_editingSegId] || {}), tvSymbol: tvVal }
             localStorage.setItem(`seguimientoOverrides_${_segPid()}`, JSON.stringify(overrides))
             _editingSegId = null
@@ -1104,18 +1191,21 @@ async function initSeguimientoLogic() {
         }
 
         const nombre = editNombreInput?.value.trim()
-        if (!nombre) { editNombreInput?.focus(); return }
+        if (!nombre) {
+            editNombreInput?.focus()
+            return
+        }
 
         const customs = segLoadCustomItems()
-        const idx = customs.findIndex(c => c._segId === _editingSegId)
+        const idx = customs.findIndex((c) => c._segId === _editingSegId)
         if (idx < 0) return
         customs[idx] = {
             ...customs[idx],
             nombre,
-            ticker:         editTickerInput?.value.trim() || "",
+            ticker: editTickerInput?.value.trim() || "",
             marketProvider: editTickerInput?.dataset.marketProvider || customs[idx].marketProvider || "",
-            tvSymbol:       editTVInput?.value.trim() || "",
-            tipo:           editTypeSelect?.value || "acciones"
+            tvSymbol: editTVInput?.value.trim() || "",
+            tipo: editTypeSelect?.value || "acciones"
         }
         segSaveCustomItems(customs)
 
@@ -1128,13 +1218,14 @@ async function initSeguimientoLogic() {
     const editTickerSelected = (result, providerName) => {
         if (editTickerInput) {
             editTickerInput.value = result.symbol
-            editTickerInput.dataset.marketProvider = String(result.provider || providerName).trim().toLowerCase()
+            editTickerInput.dataset.marketProvider = String(result.provider || providerName)
+                .trim()
+                .toLowerCase()
         }
         if (editNombreInput && !editNombreInput.value.trim()) editNombreInput.value = result.description || ""
         if (typeof setAssetSearchFeedback === "function")
             setAssetSearchFeedback(editFeedback, `Ticker seleccionado (${providerName}): ${result.symbol}`)
-        if (typeof renderMarketSearchResults === "function")
-            renderMarketSearchResults(editResults, [], () => {})
+        if (typeof renderMarketSearchResults === "function") renderMarketSearchResults(editResults, [], () => {})
     }
 
     document.getElementById("segEditSearchFinnhubBtn")?.addEventListener("click", async () => {

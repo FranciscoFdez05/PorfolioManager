@@ -73,10 +73,12 @@ function computeRecurrenteMeses(importeRaw, frecuenciaKey) {
     const step = getRecurrenteFrecuencia(frecuenciaKey).meses
     const value = String(importeRaw || "").trim() ? formatCellEuroValue(importeRaw) : ""
 
-    return Object.fromEntries(INGRESOS_MONTHS.map((month, index) => {
-        const isCharged = value && index % step === 0
-        return [month.key, isCharged ? value : ""]
-    }))
+    return Object.fromEntries(
+        INGRESOS_MONTHS.map((month, index) => {
+            const isCharged = value && index % step === 0
+            return [month.key, isCharged ? value : ""]
+        })
+    )
 }
 
 // Importe de un cobro. Si no está guardado, se usa el del último mes cobrado,
@@ -97,9 +99,11 @@ function getRecurrenteMonthlyAmount(row) {
 }
 
 function getRecurrenteChargedMonths(row) {
-    return INGRESOS_MONTHS
-        .map((month, index) => ({ ...month, index, amount: parseEuroNumber(row.meses?.[month.key] || "") }))
-        .filter((month) => month.amount !== 0)
+    return INGRESOS_MONTHS.map((month, index) => ({
+        ...month,
+        index,
+        amount: parseEuroNumber(row.meses?.[month.key] || "")
+    })).filter((month) => month.amount !== 0)
 }
 
 function getRecurrenteAnnualAmount(row) {
@@ -127,9 +131,7 @@ function getRecurrenteNextCharge(row, year = currentIngresosYear) {
         return new Date(yearNumber, monthIndex, Math.min(day, lastDay))
     }
 
-    const upcoming = charged
-        .map((month) => buildDate(month.index))
-        .find((date) => date >= today)
+    const upcoming = charged.map((month) => buildDate(month.index)).find((date) => date >= today)
 
     const date = upcoming || buildDate(charged[0].index)
     const daysLeft = Math.round((date - today) / 86400000)
@@ -142,7 +144,9 @@ function formatRecurrenteDate(date) {
 }
 
 function sanitizeIngresoTypeLabel(value) {
-    return String(value || "").trim().replace(/\s+/g, " ")
+    return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ")
 }
 
 function normalizeComparableIngresoText(value) {
@@ -171,7 +175,8 @@ function ensureIngresosDataShape(data) {
     const pushMergedType = (value) => {
         const label = sanitizeIngresoTypeLabel(value)
         if (!label) return
-        if (mergedTypes.some((type) => normalizeComparableIngresoText(type) === normalizeComparableIngresoText(label))) return
+        if (mergedTypes.some((type) => normalizeComparableIngresoText(type) === normalizeComparableIngresoText(label)))
+            return
         mergedTypes.push(label)
     }
 
@@ -280,9 +285,9 @@ function openRecurrenteModal() {
 }
 
 function buildRecurrenteFormHtml(row) {
-    const frecuenciaOptions = RECURRENTE_FRECUENCIAS
-        .map((f) => `<option value="${f.key}"${f.key === row.frecuencia ? " selected" : ""}>${f.label}</option>`)
-        .join("")
+    const frecuenciaOptions = RECURRENTE_FRECUENCIAS.map(
+        (f) => `<option value="${f.key}"${f.key === row.frecuencia ? " selected" : ""}>${f.label}</option>`
+    ).join("")
 
     const diaOptions = Array.from({ length: 31 }, (_, i) => i + 1)
         .map((day) => `<option value="${day}"${String(day) === row.diaCobro ? " selected" : ""}>Día ${day}</option>`)
@@ -292,13 +297,15 @@ function buildRecurrenteFormHtml(row) {
         .map((type) => `<option value="${escapeIngresosHtml(type)}"></option>`)
         .join("")
 
-    const monthsHtml = INGRESOS_MONTHS.map((month) => `
+    const monthsHtml = INGRESOS_MONTHS.map(
+        (month) => `
         <div class="recMonthField">
             <label class="recMonthLabel" for="ingresosRecurrente-${month.key}">${month.label}</label>
             <input id="ingresosRecurrente-${month.key}" class="assetModalInput recMonthInput" data-rec-month="${month.key}"
                    type="text" inputmode="decimal" value="${escapeIngresosHtml(row.meses?.[month.key] || "")}" placeholder="—">
         </div>
-    `).join("")
+    `
+    ).join("")
 
     return `
         <div class="recFormGrid">
@@ -450,8 +457,10 @@ function openRecurrenteFormModal(rowIndex = -1) {
             }
 
             // El nombre identifica la ganancia en la base de datos: no puede repetirse.
-            const isDuplicate = (currentIngresosData?.recurrentes || []).some((item, index) =>
-                index !== rowIndex && normalizeComparableIngresoText(item?.nombre || "") === normalizeComparableIngresoText(nombre)
+            const isDuplicate = (currentIngresosData?.recurrentes || []).some(
+                (item, index) =>
+                    index !== rowIndex &&
+                    normalizeComparableIngresoText(item?.nombre || "") === normalizeComparableIngresoText(nombre)
             )
 
             if (isDuplicate) {
@@ -498,7 +507,8 @@ function openIngresoMovementModal(rowIndex = -1) {
     const availableTypes = getAvailableIngresosTypes()
     const typeOptions = availableTypes
         .map((type) => {
-            const isSelected = normalizeComparableIngresoText(rowData.tipo || "") === normalizeComparableIngresoText(type)
+            const isSelected =
+                normalizeComparableIngresoText(rowData.tipo || "") === normalizeComparableIngresoText(type)
             return `<option value="${escapeIngresosHtml(type)}"${isSelected ? " selected" : ""}>${escapeIngresosHtml(type)}</option>`
         })
         .join("")
@@ -785,7 +795,9 @@ function buildMonthlyIncomeTotals() {
     const availableTypes = getAvailableIngresosTypes()
     availableTypes.forEach((type) => {
         totals[type] = {}
-        INGRESOS_MONTHS.forEach((month) => { totals[type][month.key] = 0 })
+        INGRESOS_MONTHS.forEach((month) => {
+            totals[type][month.key] = 0
+        })
     })
     INGRESOS_MONTHS.forEach((month) => {
         const rows = currentIngresosData?.months?.[month.key]?.rows || []
@@ -809,8 +821,9 @@ function downloadIngresosCsv() {
     const availableTypes = getAvailableIngresosTypes()
 
     if (currentIngresosView === "month") {
-        const monthRows = [...(currentIngresosData.months?.[currentIngresosMonth]?.rows || [])]
-            .sort((a, b) => ingresoParseDate(a.fecha) - ingresoParseDate(b.fecha))
+        const monthRows = [...(currentIngresosData.months?.[currentIngresosMonth]?.rows || [])].sort(
+            (a, b) => ingresoParseDate(a.fecha) - ingresoParseDate(b.fecha)
+        )
 
         monthRows.forEach((row) => {
             rows.push({
@@ -885,10 +898,9 @@ function renderIngresosAnnualTable() {
     const totalRecurrentes = currentIngresosData.recurrentes.length
     currentIngresosData.recurrentes.forEach((rawRow, rowIndex) => {
         const row = normalizeRecurrente(rawRow)
-        const meta = [
-            getRecurrenteFrecuencia(row.frecuencia).short,
-            row.diaCobro ? `día ${row.diaCobro}` : ""
-        ].filter(Boolean).join(" · ")
+        const meta = [getRecurrenteFrecuencia(row.frecuencia).short, row.diaCobro ? `día ${row.diaCobro}` : ""]
+            .filter(Boolean)
+            .join(" · ")
         const tr = document.createElement("tr")
         if (!row.activa) {
             tr.classList.add("ingresosRecurrentePaused")
@@ -898,9 +910,11 @@ function renderIngresosAnnualTable() {
                 <span class="recNameMain">${escapeIngresosHtml(row.nombre || "")}</span>
                 <span class="recNameMeta">${escapeIngresosHtml(meta)}${row.activa ? "" : " · pausada"}</span>
             </td>
-            ${INGRESOS_MONTHS.map((month) => `
+            ${INGRESOS_MONTHS.map(
+                (month) => `
                 <td>${formatCellEuroValue(row.meses?.[month.key] || "")}</td>
-            `).join("")}
+            `
+            ).join("")}
             <td class="rowActionsCell">
                 <div class="rowMenu">
                     <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
@@ -923,7 +937,10 @@ function renderIngresosAnnualTable() {
     recurrentesTotalRow.innerHTML = `
         <td>Total</td>
         ${INGRESOS_MONTHS.map((month) => {
-            const total = currentIngresosData.recurrentes.reduce((sum, row) => sum + parseEuroNumber(row.meses?.[month.key] || ""), 0)
+            const total = currentIngresosData.recurrentes.reduce(
+                (sum, row) => sum + parseEuroNumber(row.meses?.[month.key] || ""),
+                0
+            )
             return `<td>${formatEuro(total)}</td>`
         }).join("")}
         <td></td>
@@ -975,7 +992,10 @@ function renderIngresosAnnualTable() {
     grandTotalRow.innerHTML = `
         <td>TOTAL</td>
         ${INGRESOS_MONTHS.map((month) => {
-            const totalRecurrentes = currentIngresosData.recurrentes.reduce((sum, row) => sum + parseEuroNumber(row.meses?.[month.key] || ""), 0)
+            const totalRecurrentes = currentIngresosData.recurrentes.reduce(
+                (sum, row) => sum + parseEuroNumber(row.meses?.[month.key] || ""),
+                0
+            )
             const totalIngresos = availableTypes.reduce((sum, type) => sum + incomeTotals[type][month.key], 0)
             return `<td>${formatEuro(totalRecurrentes + totalIngresos)}</td>`
         }).join("")}
@@ -1007,8 +1027,8 @@ function openIngresoTypeRenameModal(rowIndex) {
             }
             const normalizedNew = normalizeComparableIngresoText(label)
             const normalizedCurrent = normalizeComparableIngresoText(currentName)
-            const isDuplicate = sharedIngresosTypes.some((type, idx) =>
-                idx !== rowIndex && normalizeComparableIngresoText(type) === normalizedNew
+            const isDuplicate = sharedIngresosTypes.some(
+                (type, idx) => idx !== rowIndex && normalizeComparableIngresoText(type) === normalizedNew
             )
             if (isDuplicate) {
                 setFeedback("Ya existe un ingreso con ese nombre.", true)
@@ -1061,7 +1081,10 @@ function handleIngresosAnnualDeleteClick(event) {
             scheduleIngresosAutosave()
         }
 
-        if (!hasContent) { removeRow(); return }
+        if (!hasContent) {
+            removeRow()
+            return
+        }
 
         openConfirmModal({
             title: "Eliminar recurrente",
@@ -1092,13 +1115,15 @@ function handleIngresosAnnualDeleteClick(event) {
 
     sharedIngresosTypes.splice(rowIndex, 1)
     if (currentIngresosData) currentIngresosData.ingresosTipos = [...sharedIngresosTypes]
-    persistSharedIngresosTypes().then(() => {
-        renderCurrentIngresosView()
-        scheduleIngresosAutosave()
-    }).catch((error) => {
-        console.error(error)
-        alert("No se pudo guardar la lista global de ingresos.")
-    })
+    persistSharedIngresosTypes()
+        .then(() => {
+            renderCurrentIngresosView()
+            scheduleIngresosAutosave()
+        })
+        .catch((error) => {
+            console.error(error)
+            alert("No se pudo guardar la lista global de ingresos.")
+        })
 }
 
 function handleIngresosAnnualMoveClick(event) {
@@ -1124,9 +1149,15 @@ function handleIngresosAnnualMoveClick(event) {
     const rowIndex = Number(moveTypeBtn.dataset.ingresosMoveTypeRow)
     const dir = moveTypeBtn.dataset.ingresosMoveDir
     if (dir === "up" && rowIndex > 0) {
-        ;[sharedIngresosTypes[rowIndex - 1], sharedIngresosTypes[rowIndex]] = [sharedIngresosTypes[rowIndex], sharedIngresosTypes[rowIndex - 1]]
+        ;[sharedIngresosTypes[rowIndex - 1], sharedIngresosTypes[rowIndex]] = [
+            sharedIngresosTypes[rowIndex],
+            sharedIngresosTypes[rowIndex - 1]
+        ]
     } else if (dir === "down" && rowIndex < sharedIngresosTypes.length - 1) {
-        ;[sharedIngresosTypes[rowIndex], sharedIngresosTypes[rowIndex + 1]] = [sharedIngresosTypes[rowIndex + 1], sharedIngresosTypes[rowIndex]]
+        ;[sharedIngresosTypes[rowIndex], sharedIngresosTypes[rowIndex + 1]] = [
+            sharedIngresosTypes[rowIndex + 1],
+            sharedIngresosTypes[rowIndex]
+        ]
     } else {
         return
     }
@@ -1157,7 +1188,8 @@ function renderIngresosMonthTabs() {
         tabsContainer.appendChild(button)
     })
 
-    document.getElementById("ingresosRecurrentesTabBtn")
+    document
+        .getElementById("ingresosRecurrentesTabBtn")
         ?.classList.toggle("active", currentIngresosView === "recurrentes")
 }
 
@@ -1222,19 +1254,31 @@ function renderRecurrentesSummary() {
 
     const pausadas = rows.length - activas.length
     const cards = [
-        { label: "Ingreso mensual medio", value: formatEuro(totalAnual / 12), hint: `Media de ${currentIngresosYear}, con cambios de importe` },
+        {
+            label: "Ingreso mensual medio",
+            value: formatEuro(totalAnual / 12),
+            hint: `Media de ${currentIngresosYear}, con cambios de importe`
+        },
         { label: "Ingreso anual", value: formatEuro(totalAnual), hint: "Solo ganancias activas" },
-        { label: "Ganancias activas", value: String(activas.length), hint: `${pausadas} pausada${pausadas === 1 ? "" : "s"}` },
+        {
+            label: "Ganancias activas",
+            value: String(activas.length),
+            hint: `${pausadas} pausada${pausadas === 1 ? "" : "s"}`
+        },
         { label: "Próximo cobro", value: nextValue, hint: nextHint }
     ]
 
-    container.innerHTML = cards.map((card) => `
+    container.innerHTML = cards
+        .map(
+            (card) => `
         <article class="recCard">
             <p class="recCardLabel">${escapeIngresosHtml(card.label)}</p>
             <p class="recCardValue">${escapeIngresosHtml(card.value)}</p>
             <p class="recCardHint">${escapeIngresosHtml(card.hint)}</p>
         </article>
-    `).join("")
+    `
+        )
+        .join("")
 }
 
 function getFilteredRecurrentes() {
@@ -1267,17 +1311,16 @@ function renderRecurrentesTable() {
         return
     }
 
-    body.innerHTML = items.map(({ row, index }) => {
-        const anual = getRecurrenteAnnualAmount(row)
-        const frecuencia = getRecurrenteFrecuencia(row.frecuencia)
-        const next = getRecurrenteNextCharge(row)
-        const nextText = next && !next.isPast ? formatRecurrenteDate(next.date) : "—"
-        const nextHint = next && !next.isPast
-            ? (next.daysLeft === 0 ? "hoy" : `en ${next.daysLeft} d`)
-            : ""
-        const cobro = getRecurrenteCobro(row)
+    body.innerHTML = items
+        .map(({ row, index }) => {
+            const anual = getRecurrenteAnnualAmount(row)
+            const frecuencia = getRecurrenteFrecuencia(row.frecuencia)
+            const next = getRecurrenteNextCharge(row)
+            const nextText = next && !next.isPast ? formatRecurrenteDate(next.date) : "—"
+            const nextHint = next && !next.isPast ? (next.daysLeft === 0 ? "hoy" : `en ${next.daysLeft} d`) : ""
+            const cobro = getRecurrenteCobro(row)
 
-        return `
+            return `
             <tr class="${row.activa ? "" : "recRowPaused"}">
                 <td class="recColName">
                     <span class="recNameMain">${escapeIngresosHtml(row.nombre)}</span>
@@ -1305,7 +1348,8 @@ function renderRecurrentesTable() {
                 </td>
             </tr>
         `
-    }).join("")
+        })
+        .join("")
 
     const visibleAnual = items.reduce((sum, { row }) => sum + getRecurrenteAnnualAmount(row), 0)
     const visibleMensual = items.reduce((sum, { row }) => sum + getRecurrenteMonthlyAmount(row), 0)
@@ -1346,7 +1390,9 @@ function handleRecurrentesActionClick(event) {
         if (!row) return
 
         const copy = normalizeRecurrente(row)
-        const taken = (currentIngresosData.recurrentes || []).map((item) => normalizeComparableIngresoText(item?.nombre || ""))
+        const taken = (currentIngresosData.recurrentes || []).map((item) =>
+            normalizeComparableIngresoText(item?.nombre || "")
+        )
         let candidate = `${copy.nombre} (copia)`
         let counter = 2
         while (taken.includes(normalizeComparableIngresoText(candidate))) {
@@ -1438,8 +1484,10 @@ function renderIngresosKpiStrip() {
     const availableTypes = getAvailableIngresosTypes()
 
     const monthTotals = INGRESOS_MONTHS.map((m) => {
-        const recTotal = (currentIngresosData.recurrentes || [])
-            .reduce((s, r) => s + parseEuroNumber(r.meses?.[m.key] || ""), 0)
+        const recTotal = (currentIngresosData.recurrentes || []).reduce(
+            (s, r) => s + parseEuroNumber(r.meses?.[m.key] || ""),
+            0
+        )
         const typesTotal = availableTypes.reduce((s, t) => s + (incomeTotals[t]?.[m.key] || 0), 0)
         return { key: m.key, label: m.label, total: recTotal + typesTotal }
     })
@@ -1448,7 +1496,7 @@ function renderIngresosKpiStrip() {
     const nonZeroMonths = monthTotals.filter((m) => m.total > 0)
     const promedio = nonZeroMonths.length > 0 ? totalAnio / nonZeroMonths.length : 0
 
-    const best = monthTotals.reduce((best, m) => m.total > best.total ? m : best, monthTotals[0])
+    const best = monthTotals.reduce((best, m) => (m.total > best.total ? m : best), monthTotals[0])
 
     const currentMonthKey = INGRESOS_MONTHS[new Date().getMonth()].key
     const currentMonthLabel = INGRESOS_MONTHS[new Date().getMonth()].label
@@ -1474,8 +1522,9 @@ function renderIngresosMonthTable() {
     const body = document.getElementById("ingresosMovementsBody")
     if (!body || !currentIngresosData) return
     body.innerHTML = ""
-    const rows = [...(currentIngresosData.months?.[currentIngresosMonth]?.rows || [])]
-        .sort((a, b) => ingresoParseDate(a.fecha) - ingresoParseDate(b.fecha))
+    const rows = [...(currentIngresosData.months?.[currentIngresosMonth]?.rows || [])].sort(
+        (a, b) => ingresoParseDate(a.fecha) - ingresoParseDate(b.fecha)
+    )
     rows.forEach((row, index) => body.appendChild(buildIngresoMovementRow(row, index)))
 
     const total = rows.reduce((sum, row) => sum + parseEuroNumber(row.cantidad || ""), 0)
@@ -1556,7 +1605,10 @@ function handleIngresosMovementActionClick(event) {
         scheduleIngresosAutosave()
     }
 
-    if (isEmpty) { removeRow(); return }
+    if (isEmpty) {
+        removeRow()
+        return
+    }
 
     openConfirmModal({
         title: "Eliminar fila",
@@ -1588,13 +1640,25 @@ function syncIngresosDataFromTables() {
             currentIngresosData.months[currentIngresosMonth] = { rows: [] }
         }
         currentIngresosData.months[currentIngresosMonth].rows = bodyRows
-        .filter((tr) => !tr.dataset.isTotal)
-        .map((rowElement) => ({
-            fecha: rowElement.dataset.fecha || rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
-            nombre: rowElement.dataset.nombre || rowElement.querySelector('[data-field="nombre"]')?.textContent.trim() || "",
-            tipo: normalizeIngresoTipo(rowElement.dataset.tipo || rowElement.querySelector('[data-field="tipo"]')?.textContent.trim() || ""),
-            cantidad: rowElement.dataset.cantidad || rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || ""
-        })).filter((row) => row.fecha || row.nombre || row.tipo || parseEuroNumber(row.cantidad) !== 0)
+            .filter((tr) => !tr.dataset.isTotal)
+            .map((rowElement) => ({
+                fecha:
+                    rowElement.dataset.fecha ||
+                    rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() ||
+                    "",
+                nombre:
+                    rowElement.dataset.nombre ||
+                    rowElement.querySelector('[data-field="nombre"]')?.textContent.trim() ||
+                    "",
+                tipo: normalizeIngresoTipo(
+                    rowElement.dataset.tipo || rowElement.querySelector('[data-field="tipo"]')?.textContent.trim() || ""
+                ),
+                cantidad:
+                    rowElement.dataset.cantidad ||
+                    rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() ||
+                    ""
+            }))
+            .filter((row) => row.fecha || row.nombre || row.tipo || parseEuroNumber(row.cantidad) !== 0)
     }
 }
 
@@ -1606,8 +1670,10 @@ function normalizeIngresoTipo(value) {
 }
 
 function dedupeIngresosTypes(values) {
-    return values.filter((type, index, array) =>
-        array.findIndex((item) => normalizeComparableIngresoText(item) === normalizeComparableIngresoText(type)) === index
+    return values.filter(
+        (type, index, array) =>
+            array.findIndex((item) => normalizeComparableIngresoText(item) === normalizeComparableIngresoText(type)) ===
+            index
     )
 }
 
@@ -1653,7 +1719,13 @@ function bindIngresosPersistenceGuards() {
     })
 
     document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState !== "hidden" || !currentIngresosYear || !currentIngresosData || !_ingresosDataLoaded) return
+        if (
+            document.visibilityState !== "hidden" ||
+            !currentIngresosYear ||
+            !currentIngresosData ||
+            !_ingresosDataLoaded
+        )
+            return
         syncIngresosDataFromTables()
         saveIngresosYear(currentIngresosYear, currentIngresosData, { keepalive: true }).catch((error) => {
             console.error("Error al guardar ingresos al cambiar de ventana:", error)

@@ -1,6 +1,6 @@
 // ===== EARN =====
 
-let _earnCriptos = []       // [{ id, nombre, rows: [...] }]
+let _earnCriptos = [] // [{ id, nombre, rows: [...] }]
 let earnCurrentCriptoId = null
 let _earnRows = []
 let earnCurrentYear = null
@@ -10,7 +10,7 @@ function generateEarnId() {
 }
 
 function getEarnCurrentCripto() {
-    return _earnCriptos.find(c => c.id === earnCurrentCriptoId) || null
+    return _earnCriptos.find((c) => c.id === earnCurrentCriptoId) || null
 }
 
 function earnSyncRowsBack() {
@@ -25,7 +25,7 @@ function renderEarnCriptosSidebar() {
     if (!list) return
     list.innerHTML = ""
 
-    _earnCriptos.forEach(cripto => {
+    _earnCriptos.forEach((cripto) => {
         const item = document.createElement("div")
         item.className = `cuentaItem${cripto.id === earnCurrentCriptoId ? " active" : ""}`
         item.dataset.criptoId = cripto.id
@@ -67,7 +67,10 @@ function parseEarnYear(fecha) {
 
 function getEarnYears(rows) {
     const years = new Set()
-    rows.forEach(r => { const y = parseEarnYear(r.fecha); if (y) years.add(y) })
+    rows.forEach((r) => {
+        const y = parseEarnYear(r.fecha)
+        if (y) years.add(y)
+    })
     return [...years].sort((a, b) => Number(a) - Number(b))
 }
 
@@ -75,7 +78,7 @@ function renderEarnYearBar(years) {
     const list = document.getElementById("earnYearList")
     if (!list) return
     list.innerHTML = ""
-    years.forEach(year => {
+    years.forEach((year) => {
         const btn = document.createElement("button")
         btn.type = "button"
         btn.className = `interesesYearBtn${year === earnCurrentYear ? " active" : ""}`
@@ -127,7 +130,10 @@ function openEarnNameModal({ title, defaultValue = "", onConfirm }) {
         const nombre = modal.querySelector("#earnNameInput")?.value.trim()
         if (!nombre) {
             const fb = modal.querySelector("#earnNameFeedback")
-            if (fb) { fb.textContent = "El nombre no puede estar vacío."; fb.classList.remove("hidden") }
+            if (fb) {
+                fb.textContent = "El nombre no puede estar vacío."
+                fb.classList.remove("hidden")
+            }
             return
         }
         close()
@@ -140,7 +146,9 @@ function openEarnNameModal({ title, defaultValue = "", onConfirm }) {
         if (e.key === "Enter") doConfirm()
         if (e.key === "Escape") close()
     })
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) close() })
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) close()
+    })
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
     modal.querySelector("#earnNameInput")?.focus()
@@ -167,7 +175,7 @@ function addEarnCripto() {
 }
 
 function renameEarnCripto(id) {
-    const cripto = _earnCriptos.find(c => c.id === id)
+    const cripto = _earnCriptos.find((c) => c.id === id)
     if (!cripto) return
     openEarnNameModal({
         title: "Renombrar cripto/producto",
@@ -187,7 +195,7 @@ function renameEarnCripto(id) {
 }
 
 function deleteEarnCripto(id) {
-    const cripto = _earnCriptos.find(c => c.id === id)
+    const cripto = _earnCriptos.find((c) => c.id === id)
     if (!cripto) return
     openConfirmModal({
         title: "Eliminar cripto/producto",
@@ -195,7 +203,7 @@ function deleteEarnCripto(id) {
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {
-                _earnCriptos = _earnCriptos.filter(c => c.id !== id)
+                _earnCriptos = _earnCriptos.filter((c) => c.id !== id)
                 if (earnCurrentCriptoId === id) {
                     earnCurrentCriptoId = _earnCriptos.length ? _earnCriptos[0].id : null
                 }
@@ -228,9 +236,15 @@ function bindEarnCriptosActions() {
         list.dataset.bound = "true"
         list.addEventListener("click", (e) => {
             const renameBtn = e.target.closest(".cuentaItemRenameBtn")
-            if (renameBtn) { renameEarnCripto(renameBtn.dataset.id); return }
+            if (renameBtn) {
+                renameEarnCripto(renameBtn.dataset.id)
+                return
+            }
             const deleteBtn = e.target.closest(".cuentaItemDeleteBtn")
-            if (deleteBtn) { deleteEarnCripto(deleteBtn.dataset.id); return }
+            if (deleteBtn) {
+                deleteEarnCripto(deleteBtn.dataset.id)
+                return
+            }
         })
     }
 }
@@ -322,7 +336,10 @@ function openEarnModal(globalIndex = -1, defaultFecha = "") {
     document.body.appendChild(overlay)
 
     document.addEventListener("keydown", function handler(e) {
-        if (e.key === "Escape") { closeEarnModal(); document.removeEventListener("keydown", handler) }
+        if (e.key === "Escape") {
+            closeEarnModal()
+            document.removeEventListener("keydown", handler)
+        }
     })
 
     modal.querySelector("input")?.focus()
@@ -406,7 +423,7 @@ function updateEarnTotals() {
     let totalCripto = 0
 
     if (earnBody) {
-        earnBody.querySelectorAll("tr").forEach(tr => {
+        earnBody.querySelectorAll("tr").forEach((tr) => {
             const cells = tr.querySelectorAll("td")
             const cantidad = parseLooseNumber(cells[2]?.textContent || "")
             const precio = parseEuroNumber(cells[3]?.textContent || "")
@@ -452,7 +469,10 @@ function handleEarnRowActionClick(event) {
     }
 
     if (isEmpty) {
-        removeRow().catch(err => { console.error(err); showAlert("No se pudo eliminar la fila.") })
+        removeRow().catch((err) => {
+            console.error(err)
+            showAlert("No se pudo eliminar la fila.")
+        })
         return
     }
 
@@ -461,7 +481,12 @@ function handleEarnRowActionClick(event) {
         message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
         confirmLabel: "Eliminar",
         onConfirm: async () => {
-            try { await removeRow() } catch (err) { console.error(err); showAlert("No se pudo eliminar la fila.") }
+            try {
+                await removeRow()
+            } catch (err) {
+                console.error(err)
+                showAlert("No se pudo eliminar la fila.")
+            }
         }
     })
 }
@@ -490,7 +515,7 @@ function deleteCurrentEarnYear() {
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {
-                _earnRows = _earnRows.filter(r => parseEarnYear(r.fecha) !== earnCurrentYear)
+                _earnRows = _earnRows.filter((r) => parseEarnYear(r.fecha) !== earnCurrentYear)
                 earnSyncRowsBack()
                 const remaining = getEarnYears(_earnRows)
                 earnCurrentYear = remaining.length ? remaining[remaining.length - 1] : null
@@ -523,7 +548,7 @@ function loadEarnFromData(data) {
 
     if (!earnCurrentCriptoId && _earnCriptos.length) {
         earnCurrentCriptoId = _earnCriptos[0].id
-    } else if (earnCurrentCriptoId && !_earnCriptos.find(c => c.id === earnCurrentCriptoId)) {
+    } else if (earnCurrentCriptoId && !_earnCriptos.find((c) => c.id === earnCurrentCriptoId)) {
         earnCurrentCriptoId = _earnCriptos.length ? _earnCriptos[0].id : null
     }
 

@@ -4,19 +4,34 @@
 // de html/, de modo que añadir una página nueva sin tocar este mapa sigue
 // funcionando mientras el fichero esté en html/.
 const _PAGE_DIRS = {
-    activos: "cartera", vistaGeneral: "cartera", privateMarket: "cartera",
+    activos: "cartera",
+    vistaGeneral: "cartera",
+    privateMarket: "cartera",
 
-    gastos: "finanzas", ingresos: "finanzas", ahorro: "finanzas",
-    ventas: "finanzas", dividendos: "finanzas", intereses: "finanzas",
-    bonos: "finanzas", rentaFija: "finanzas", operacionesBolsa: "finanzas",
+    gastos: "finanzas",
+    ingresos: "finanzas",
+    ahorro: "finanzas",
+    ventas: "finanzas",
+    dividendos: "finanzas",
+    intereses: "finanzas",
+    bonos: "finanzas",
+    rentaFija: "finanzas",
+    operacionesBolsa: "finanzas",
 
-    stablecoins: "cripto", operaciones: "cripto", transacciones: "cripto",
-    conversiones: "cripto", Staking: "cripto", Earn: "cripto", Trading: "cripto",
+    stablecoins: "cripto",
+    operaciones: "cripto",
+    transacciones: "cripto",
+    conversiones: "cripto",
+    Staking: "cripto",
+    Earn: "cripto",
+    Trading: "cripto",
 
-    metricas: "analisis", seguimiento: "analisis", heatmap: "analisis",
+    metricas: "analisis",
+    seguimiento: "analisis",
+    heatmap: "analisis",
     herramientas: "analisis",
 
-    ajustes: "sesion",
+    ajustes: "sesion"
 }
 
 function pageHtmlPath(page) {
@@ -35,8 +50,11 @@ let _chartPrefsCache = null
 
 function _chartPrefsAll() {
     if (!_chartPrefsCache) {
-        try { _chartPrefsCache = JSON.parse(localStorage.getItem(_CHART_PREFS_KEY)) || {} }
-        catch { _chartPrefsCache = {} }
+        try {
+            _chartPrefsCache = JSON.parse(localStorage.getItem(_CHART_PREFS_KEY)) || {}
+        } catch {
+            _chartPrefsCache = {}
+        }
     }
     return _chartPrefsCache
 }
@@ -50,7 +68,9 @@ function setChartPref(key, value) {
     const prefs = _chartPrefsAll()
     if (value === undefined || value === null) delete prefs[key]
     else prefs[key] = value
-    try { localStorage.setItem(_CHART_PREFS_KEY, JSON.stringify(prefs)) } catch {}
+    try {
+        localStorage.setItem(_CHART_PREFS_KEY, JSON.stringify(prefs))
+    } catch {}
 }
 
 window.getChartPref = getChartPref
@@ -59,17 +79,22 @@ window.setChartPref = setChartPref
 const _MODULE_PAGES = {
     panelSuperior: [],
     vistaGeneral: ["vistaGeneral"],
-    activos:      ["activos", "seguimiento", "heatmap"],
-    gastos:       ["gastos", "ingresos"],
-    finanzas:     ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
-    cripto:       ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
+    activos: ["activos", "seguimiento", "heatmap"],
+    gastos: ["gastos", "ingresos"],
+    finanzas: ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
+    cripto: ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
     herramientas: ["herramientas"],
-    metricas:     ["metricas"],
+    metricas: ["metricas"]
 }
 
 const _TOP_METRICS_DEFAULT_HIDDEN = new Set([
-    "topInvertido", "topNumActivos", "topStaking",
-    "topGastosAnio", "topIngresosAnio", "topTradingPnL", "topMercadoPrivado"
+    "topInvertido",
+    "topNumActivos",
+    "topStaking",
+    "topGastosAnio",
+    "topIngresosAnio",
+    "topTradingPnL",
+    "topMercadoPrivado"
 ])
 
 function applyTopMetricsVisibility() {
@@ -125,7 +150,7 @@ function applyModulesVisibility() {
     const cfg = window._modulosConfig || {}
     for (const mod of Object.keys(_MODULE_PAGES)) {
         const enabled = cfg[mod] !== false
-        document.querySelectorAll(`[data-module="${mod}"]`).forEach(el => {
+        document.querySelectorAll(`[data-module="${mod}"]`).forEach((el) => {
             el.style.display = enabled ? "" : "none"
         })
     }
@@ -145,16 +170,16 @@ async function _postSnapshot() {
     const m = window._lastPortfolioMetrics
     if (!m) return
     const payload = { total_value: m.totalCuenta, total_invested: m.invertido }
-    const hmData  = window._hmData || window._assetsSnapshotData
+    const hmData = window._hmData || window._assetsSnapshotData
     if (Array.isArray(hmData) && hmData.length) {
         payload.assets = hmData
-            .filter(d => d.netoEur > 0)
-            .map(d => ({ id: d.id, v: d.netoEur, c: d.costEur ?? d.invertidoEur ?? 0 }))
+            .filter((d) => d.netoEur > 0)
+            .map((d) => ({ id: d.id, v: d.netoEur, c: d.costEur ?? d.invertidoEur ?? 0 }))
     }
     await fetch("/api/portfolio/snapshot", {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify(payload)
+        body: JSON.stringify(payload)
     }).catch(() => {})
 }
 
@@ -222,74 +247,82 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function loadGlobalSettings() {
     try {
-        const res  = await fetch("/api/settings")
+        const res = await fetch("/api/settings")
         const data = await res.json()
         if (data.ok) {
-            window._settingsStaleHours      = data.staleHours ?? 24
-            window._hiddenAssets            = new Set(data.hiddenAssets || [])
-            window._metricasDisplayType     = data.metricasDisplayType ?? "doughnut"
-            window._metricasDistMetric      = data.metricasDistMetric  ?? "netoActualEur"
+            window._settingsStaleHours = data.staleHours ?? 24
+            window._hiddenAssets = new Set(data.hiddenAssets || [])
+            window._metricasDisplayType = data.metricasDisplayType ?? "doughnut"
+            window._metricasDistMetric = data.metricasDistMetric ?? "netoActualEur"
             window._metricasComparativaExcluded = data.comparativaExcluded ?? []
-            window._gastosHiddenTipos           = data.gastosHiddenTipos ?? []
-            window._gastosHiddenMensualidades   = data.gastosHiddenMensualidades ?? []
-            window._gastosMostrarPausadas       = data.gastosMostrarPausadas ?? false
-            window._metricasActivosHidden       = data.metricasActivosHidden ?? []
-            window._metricasSectionsCollapsed   = data.metricasSectionsCollapsed ?? []
-            window._topMetricsConfig            = data.topMetricsConfig ?? {}
-            window._modulosConfig               = data.modulosConfig ?? {}
-            window._sidebarCollapsed            = data.sidebarCollapsed ?? false
-            window._monedaBase                  = data.monedaBase ?? "EUR"
-            window._fiatCurrencies              = (data.fiatCurrencies || []).map((c) => c.code).filter(Boolean)
+            window._gastosHiddenTipos = data.gastosHiddenTipos ?? []
+            window._gastosHiddenMensualidades = data.gastosHiddenMensualidades ?? []
+            window._gastosMostrarPausadas = data.gastosMostrarPausadas ?? false
+            window._metricasActivosHidden = data.metricasActivosHidden ?? []
+            window._metricasSectionsCollapsed = data.metricasSectionsCollapsed ?? []
+            window._topMetricsConfig = data.topMetricsConfig ?? {}
+            window._modulosConfig = data.modulosConfig ?? {}
+            window._sidebarCollapsed = data.sidebarCollapsed ?? false
+            window._monedaBase = data.monedaBase ?? "EUR"
+            window._fiatCurrencies = (data.fiatCurrencies || []).map((c) => c.code).filter(Boolean)
             if (!window._fiatCurrencies.length) window._fiatCurrencies = ["EUR", "USD", "GBP", "CHF", "JPY"]
-            window._autoRefreshMinutes          = data.autoRefreshMinutes ?? 0
-            window._snapshotMinutes             = data.snapshotMinutes ?? 60
-            window._soloHorarioMercado          = data.soloHorarioMercado ?? false
-            window._soloMercadoTipos            = data.soloMercadoTipos ?? ["acciones", "etfs", "comoditis"]
-            window._bloqueoInactividad          = data.bloqueoInactividad ?? 0
-            window._precioDecimales_acciones    = data.precioDecimalesAcciones ?? 2
-            window._precioDecimales_etfs        = data.precioDecimalesEtf ?? 2
-            window._precioDecimales_comoditis   = data.precioDecimalesComoditis ?? 2
-            window._precioDecimales_cripto      = data.precioDecimalesCripto ?? 4
-            window._numLocale                   = data.numLocale ?? "es-ES"
-            window._dateFormat                  = data.dateFormat ?? "DD/MM/YYYY"
+            window._autoRefreshMinutes = data.autoRefreshMinutes ?? 0
+            window._snapshotMinutes = data.snapshotMinutes ?? 60
+            window._snapshotAlcance = data.snapshotAlcance ?? "activo"
+            window._soloHorarioMercado = data.soloHorarioMercado ?? false
+            window._soloMercadoTipos = data.soloMercadoTipos ?? ["acciones", "etfs", "comoditis"]
+            window._bloqueoInactividad = data.bloqueoInactividad ?? 0
+            window._precioDecimales_acciones = data.precioDecimalesAcciones ?? 2
+            window._precioDecimales_etfs = data.precioDecimalesEtf ?? 2
+            window._precioDecimales_comoditis = data.precioDecimalesComoditis ?? 2
+            window._precioDecimales_cripto = data.precioDecimalesCripto ?? 4
+            window._numLocale = data.numLocale ?? "es-ES"
+            window._dateFormat = data.dateFormat ?? "DD/MM/YYYY"
             applyAutoRefresh(window._autoRefreshMinutes)
             applySnapshotSchedule(window._snapshotMinutes)
             applyBloqueoInactividad(window._bloqueoInactividad)
         }
     } catch {
-        window._settingsStaleHours      = 24
-        window._hiddenAssets            = new Set()
-        window._metricasDisplayType     = "doughnut"
-        window._metricasDistMetric      = "netoActualEur"
+        window._settingsStaleHours = 24
+        window._hiddenAssets = new Set()
+        window._metricasDisplayType = "doughnut"
+        window._metricasDistMetric = "netoActualEur"
         window._metricasComparativaExcluded = []
-        window._gastosHiddenTipos           = []
-        window._gastosHiddenMensualidades   = []
-        window._gastosMostrarPausadas       = false
-        window._metricasActivosHidden       = []
-        window._metricasSectionsCollapsed   = []
-        window._sidebarCollapsed            = false
-        window._monedaBase                  = "EUR"
-        window._fiatCurrencies              = ["EUR", "USD", "GBP", "CHF", "JPY"]
-        window._autoRefreshMinutes          = 0
-        window._snapshotMinutes             = 60
-        window._soloHorarioMercado          = false
-        window._soloMercadoTipos            = ["acciones", "etfs", "comoditis"]
-        window._bloqueoInactividad          = 0
-        window._precioDecimales_acciones    = 2
-        window._precioDecimales_etfs        = 2
-        window._precioDecimales_comoditis   = 2
-        window._precioDecimales_cripto      = 4
-        window._numLocale                   = "es-ES"
-        window._dateFormat                  = "DD/MM/YYYY"
-        window._modulosConfig               = {}
+        window._gastosHiddenTipos = []
+        window._gastosHiddenMensualidades = []
+        window._gastosMostrarPausadas = false
+        window._metricasActivosHidden = []
+        window._metricasSectionsCollapsed = []
+        window._sidebarCollapsed = false
+        window._monedaBase = "EUR"
+        window._fiatCurrencies = ["EUR", "USD", "GBP", "CHF", "JPY"]
+        window._autoRefreshMinutes = 0
+        window._snapshotMinutes = 60
+        window._snapshotAlcance = "activo"
+        window._soloHorarioMercado = false
+        window._soloMercadoTipos = ["acciones", "etfs", "comoditis"]
+        window._bloqueoInactividad = 0
+        window._precioDecimales_acciones = 2
+        window._precioDecimales_etfs = 2
+        window._precioDecimales_comoditis = 2
+        window._precioDecimales_cripto = 4
+        window._numLocale = "es-ES"
+        window._dateFormat = "DD/MM/YYYY"
+        window._modulosConfig = {}
     }
 }
 
 let _autoRefreshTimer = null
 let _autoRefreshInitTimer = null
 function applyAutoRefresh(minutes) {
-    if (_autoRefreshTimer) { clearInterval(_autoRefreshTimer); _autoRefreshTimer = null }
-    if (_autoRefreshInitTimer) { clearTimeout(_autoRefreshInitTimer); _autoRefreshInitTimer = null }
+    if (_autoRefreshTimer) {
+        clearInterval(_autoRefreshTimer)
+        _autoRefreshTimer = null
+    }
+    if (_autoRefreshInitTimer) {
+        clearTimeout(_autoRefreshInitTimer)
+        _autoRefreshInitTimer = null
+    }
     if (!minutes || minutes <= 0) return
 
     const intervalMs = minutes * 60 * 1000
@@ -322,8 +355,14 @@ function applyAutoRefresh(minutes) {
 let _snapshotTimer = null
 let _snapshotInitTimer = null
 function applySnapshotSchedule(minutes) {
-    if (_snapshotTimer) { clearInterval(_snapshotTimer); _snapshotTimer = null }
-    if (_snapshotInitTimer) { clearTimeout(_snapshotInitTimer); _snapshotInitTimer = null }
+    if (_snapshotTimer) {
+        clearInterval(_snapshotTimer)
+        _snapshotTimer = null
+    }
+    if (_snapshotInitTimer) {
+        clearTimeout(_snapshotInitTimer)
+        _snapshotInitTimer = null
+    }
     if (!minutes || minutes <= 0) return
 
     const intervalMs = minutes * 60 * 1000
@@ -355,8 +394,8 @@ function applySnapshotSchedule(minutes) {
 function initSearchableSelect(selectEl) {
     if (!selectEl) return
     const allOptions = Array.from(selectEl.options)
-        .filter(o => o.value !== "")
-        .map(o => ({ value: o.value, text: o.text }))
+        .filter((o) => o.value !== "")
+        .map((o) => ({ value: o.value, text: o.text }))
 
     // Wrapper replaces the select in the DOM
     const wrapper = document.createElement("div")
@@ -397,7 +436,7 @@ function initSearchableSelect(selectEl) {
 
     // --- Helpers ---
     function getSelectedText() {
-        const cur = allOptions.find(o => o.value === selectEl.value)
+        const cur = allOptions.find((o) => o.value === selectEl.value)
         return cur ? cur.text : ""
     }
 
@@ -409,9 +448,9 @@ function initSearchableSelect(selectEl) {
 
     function renderList(q) {
         const lower = q.toLowerCase()
-        const filtered = q ? allOptions.filter(o => o.text.toLowerCase().includes(lower)) : allOptions
+        const filtered = q ? allOptions.filter((o) => o.text.toLowerCase().includes(lower)) : allOptions
         list.innerHTML = ""
-        filtered.forEach(o => {
+        filtered.forEach((o) => {
             const item = document.createElement("div")
             item.className = "searchableSelectItem" + (o.value === selectEl.value ? " active" : "")
             item.textContent = o.text
@@ -449,9 +488,12 @@ function initSearchableSelect(selectEl) {
     updateTrigger()
 
     // --- Events ---
-    trigger.addEventListener("click", () => wrapper.classList.contains("ssOpen") ? closePanel() : openPanel())
+    trigger.addEventListener("click", () => (wrapper.classList.contains("ssOpen") ? closePanel() : openPanel()))
     trigger.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPanel() }
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            openPanel()
+        }
         if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
             openPanel()
             searchInput.value = e.key
@@ -470,12 +512,20 @@ function initSearchableSelect(selectEl) {
     })
 
     searchInput.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") { e.stopPropagation(); closePanel(); trigger.focus() }
+        if (e.key === "Escape") {
+            e.stopPropagation()
+            closePanel()
+            trigger.focus()
+        }
     })
 
-    document.addEventListener("mousedown", (e) => {
-        if (!wrapper.contains(e.target)) closePanel()
-    }, true)
+    document.addEventListener(
+        "mousedown",
+        (e) => {
+            if (!wrapper.contains(e.target)) closePanel()
+        },
+        true
+    )
 }
 
 function applySidebarState(sideWrapper, toggleButton) {
@@ -543,7 +593,7 @@ function initAssetSelector(assetButtons) {
                         const res = await fetch("/api/portfolios/switch", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ id: pid }),
+                            body: JSON.stringify({ id: pid })
                         })
                         const data = await res.json()
                         if (data.ok) window.location.reload()
@@ -559,12 +609,12 @@ function initAssetSelector(assetButtons) {
             await renderAssetsList(await loadAssetsList())
             restartAssetRotationBar()
             const assetForTV = {
-                tvSymbol:       button.dataset.tvSymbol       || "",
-                marketSymbol:   button.dataset.marketSymbol   || "",
-                finnhubSymbol:  button.dataset.marketSymbol   || "",
+                tvSymbol: button.dataset.tvSymbol || "",
+                marketSymbol: button.dataset.marketSymbol || "",
+                finnhubSymbol: button.dataset.marketSymbol || "",
                 marketProvider: button.dataset.marketProvider || "",
-                symbol:         button.dataset.assetSymbol    || "",
-                name:           button.dataset.assetName      || "",
+                symbol: button.dataset.assetSymbol || "",
+                name: button.dataset.assetName || ""
             }
             const tvSym = buildTVSymbol(assetForTV)
             if (tvSym) openTVChartModal(tvSym, button.dataset.assetName || button.dataset.assetSymbol || "")
@@ -609,8 +659,8 @@ function initNavigation(navButtons, contentArea) {
             })
             if (!isOpen) {
                 const rect = btn.getBoundingClientRect()
-                menu.style.top      = (rect.bottom + 4) + "px"
-                menu.style.left     = rect.left + "px"
+                menu.style.top = rect.bottom + 4 + "px"
+                menu.style.left = rect.left + "px"
                 menu.style.minWidth = rect.width + "px"
                 menu.classList.add("open")
             }
@@ -630,17 +680,17 @@ function initNavigation(navButtons, contentArea) {
             const menu = drop?.querySelector(".filterDropMenu")
             if (!menu) return
             const isOpen = menu.classList.contains("open")
-            document.querySelectorAll(".filterDropMenu.open").forEach(m => m.classList.remove("open"))
-            document.querySelectorAll(".navDropdownMenu.open").forEach(m => m.classList.remove("open"))
+            document.querySelectorAll(".filterDropMenu.open").forEach((m) => m.classList.remove("open"))
+            document.querySelectorAll(".navDropdownMenu.open").forEach((m) => m.classList.remove("open"))
             if (!isOpen) {
                 const rect = fBtn.getBoundingClientRect()
-                menu.style.top  = (rect.bottom + 4) + "px"
+                menu.style.top = rect.bottom + 4 + "px"
                 menu.style.left = rect.left + "px"
                 menu.classList.add("open")
             }
             return
         }
-        document.querySelectorAll(".filterDropMenu.open").forEach(m => m.classList.remove("open"))
+        document.querySelectorAll(".filterDropMenu.open").forEach((m) => m.classList.remove("open"))
     })
 
     document.addEventListener("click", () => {
@@ -667,13 +717,13 @@ function initNavigation(navButtons, contentArea) {
             const menuHeight = menu.offsetHeight || 90
             const spaceBelow = window.innerHeight - rect.bottom
             if (spaceBelow < menuHeight + 8) {
-                menu.style.bottom = (window.innerHeight - rect.top + 4) + "px"
+                menu.style.bottom = window.innerHeight - rect.top + 4 + "px"
                 menu.style.top = "auto"
             } else {
-                menu.style.top = (rect.bottom + 4) + "px"
+                menu.style.top = rect.bottom + 4 + "px"
                 menu.style.bottom = "auto"
             }
-            menu.style.right = (window.innerWidth - rect.right) + "px"
+            menu.style.right = window.innerWidth - rect.right + "px"
             menu.style.left = "auto"
             menu.classList.add("open")
         }
@@ -683,26 +733,34 @@ function initNavigation(navButtons, contentArea) {
     avTip.className = "avTooltip"
     document.body.appendChild(avTip)
 
-    document.addEventListener("mouseover", e => {
-        const btn = e.target.closest(".avActionBtn")
-        if (!btn) return
-        if (btn.hasAttribute("title")) {
-            btn.dataset.tip = btn.title
-            btn.removeAttribute("title")
-        }
-        const label = btn.dataset.tip
-        if (!label) return
-        avTip.textContent = label
-        const r = btn.getBoundingClientRect()
-        avTip.style.left = (r.left + r.width / 2) + "px"
-        avTip.style.top  = (r.top - 8) + "px"
-        avTip.classList.add("avTooltipVisible")
-    }, true)
+    document.addEventListener(
+        "mouseover",
+        (e) => {
+            const btn = e.target.closest(".avActionBtn")
+            if (!btn) return
+            if (btn.hasAttribute("title")) {
+                btn.dataset.tip = btn.title
+                btn.removeAttribute("title")
+            }
+            const label = btn.dataset.tip
+            if (!label) return
+            avTip.textContent = label
+            const r = btn.getBoundingClientRect()
+            avTip.style.left = r.left + r.width / 2 + "px"
+            avTip.style.top = r.top - 8 + "px"
+            avTip.classList.add("avTooltipVisible")
+        },
+        true
+    )
 
-    document.addEventListener("mouseout", e => {
-        if (!e.target.closest(".avActionBtn")) return
-        avTip.classList.remove("avTooltipVisible")
-    }, true)
+    document.addEventListener(
+        "mouseout",
+        (e) => {
+            if (!e.target.closest(".avActionBtn")) return
+            avTip.classList.remove("avTooltipVisible")
+        },
+        true
+    )
 }
 
 async function loadPage(page, contentArea = document.getElementById("dynamicContent")) {
@@ -737,7 +795,7 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
         }
 
         const htmlContent = await response.text()
-        document.querySelectorAll(".csBodyMenu").forEach(m => m.remove())
+        document.querySelectorAll(".csBodyMenu").forEach((m) => m.remove())
         contentArea.innerHTML = htmlContent
 
         const mainContent = document.querySelector(".mainContent")
@@ -819,12 +877,18 @@ async function initInteresesLogic() {
 
     if (addYearButton && !addYearButton.dataset.bound) {
         addYearButton.dataset.bound = "true"
-        addYearButton.addEventListener("click", () => { closeInteresesMenu(); addInteresesYear() })
+        addYearButton.addEventListener("click", () => {
+            closeInteresesMenu()
+            addInteresesYear()
+        })
     }
 
     if (deleteYearButton && !deleteYearButton.dataset.bound) {
         deleteYearButton.dataset.bound = "true"
-        deleteYearButton.addEventListener("click", () => { closeInteresesMenu(); deleteCurrentInteresesYear() })
+        deleteYearButton.addEventListener("click", () => {
+            closeInteresesMenu()
+            deleteCurrentInteresesYear()
+        })
     }
 
     const menuBtn = document.getElementById("interesesMenuBtn")
@@ -849,58 +913,116 @@ function closeInteresesMenu() {
 }
 
 document.addEventListener("click", (e) => {
-    if (!e.target.closest("#interesesMenuWrapper") && !e.target.closest("#interesesMenuBtn") && !e.target.closest("#interesesMenuDropdown")) {
+    if (
+        !e.target.closest("#interesesMenuWrapper") &&
+        !e.target.closest("#interesesMenuBtn") &&
+        !e.target.closest("#interesesMenuDropdown")
+    ) {
         closeInteresesMenu()
     }
 })
 
 async function refreshTopDividendosIntereses() {
-    const _MONTH_KEYS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
+    const _MONTH_KEYS = [
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre"
+    ]
     try {
         const year = new Date().getFullYear().toString()
-        const [interesesData, dividendosData, bonosResp, rfResp, gastosData, ingresosData, tradingData, stakingData, pmData] = await Promise.all([
+        const [
+            interesesData,
+            dividendosData,
+            bonosResp,
+            rfResp,
+            gastosData,
+            ingresosData,
+            tradingData,
+            stakingData,
+            pmData
+        ] = await Promise.all([
             loadInteresesData(),
             loadDividendosData(),
-            fetch("/api/bonos").then((r) => r.json()).catch(() => ({ rows: [] })),
-            fetch("/api/rentafija").then((r) => r.json()).catch(() => ({ rows: [] })),
-            fetch(`/api/gastos/${year}`).then((r) => r.json()).catch(() => null),
-            fetch(`/api/ingresos/${year}`).then((r) => r.json()).catch(() => null),
-            fetch("/api/trading").then((r) => r.json()).catch(() => ({ rows: [] })),
-            fetch("/api/staking").then((r) => r.json()).catch(() => ({ rows: [] })),
-            fetch("/api/privatemarket").then((r) => r.json()).catch(() => ({ rows: [] })),
+            fetch("/api/bonos")
+                .then((r) => r.json())
+                .catch(() => ({ rows: [] })),
+            fetch("/api/rentafija")
+                .then((r) => r.json())
+                .catch(() => ({ rows: [] })),
+            fetch(`/api/gastos/${year}`)
+                .then((r) => r.json())
+                .catch(() => null),
+            fetch(`/api/ingresos/${year}`)
+                .then((r) => r.json())
+                .catch(() => null),
+            fetch("/api/trading")
+                .then((r) => r.json())
+                .catch(() => ({ rows: [] })),
+            fetch("/api/staking")
+                .then((r) => r.json())
+                .catch(() => ({ rows: [] })),
+            fetch("/api/privatemarket")
+                .then((r) => r.json())
+                .catch(() => ({ rows: [] }))
         ])
 
-        const allInteresesRows = (Array.isArray(interesesData?.cuentas) ? interesesData.cuentas : [])
-            .flatMap(c => Array.isArray(c.rows) ? c.rows : [])
-        const totalInteres = allInteresesRows
-            .reduce((sum, row) => sum + (parseEuroNumber(row.acumulado) - parseEuroNumber(row.impuestos)), 0)
+        const allInteresesRows = (Array.isArray(interesesData?.cuentas) ? interesesData.cuentas : []).flatMap((c) =>
+            Array.isArray(c.rows) ? c.rows : []
+        )
+        const totalInteres = allInteresesRows.reduce(
+            (sum, row) => sum + (parseEuroNumber(row.acumulado) - parseEuroNumber(row.impuestos)),
+            0
+        )
 
-        const totalDividendos = (Array.isArray(dividendosData?.rows) ? dividendosData.rows : [])
-            .reduce((sum, row) => sum + parseEuroNumber(row.total), 0)
+        const totalDividendos = (Array.isArray(dividendosData?.rows) ? dividendosData.rows : []).reduce(
+            (sum, row) => sum + parseEuroNumber(row.total),
+            0
+        )
 
-        const totalBonos = (Array.isArray(bonosResp?.rows) ? bonosResp.rows : [])
-            .reduce((sum, r) => sum + parseEuroNumber(r.interesAcumulado) - parseEuroNumber(r.impuestos), 0)
+        const totalBonos = (Array.isArray(bonosResp?.rows) ? bonosResp.rows : []).reduce(
+            (sum, r) => sum + parseEuroNumber(r.interesAcumulado) - parseEuroNumber(r.impuestos),
+            0
+        )
 
-        const totalRentaFija = (Array.isArray(rfResp?.rows) ? rfResp.rows : [])
-            .reduce((sum, r) => sum + parseEuroNumber(r.interesAcumulado) - parseEuroNumber(r.impuestos), 0)
+        const totalRentaFija = (Array.isArray(rfResp?.rows) ? rfResp.rows : []).reduce(
+            (sum, r) => sum + parseEuroNumber(r.interesAcumulado) - parseEuroNumber(r.impuestos),
+            0
+        )
 
         let totalGastos = 0
         if (gastosData?.months) {
             _MONTH_KEYS.forEach((m) => {
-                ;(gastosData.months[m]?.rows || []).forEach((r) => { totalGastos += parseEuroNumber(r.cantidad || "") })
+                ;(gastosData.months[m]?.rows || []).forEach((r) => {
+                    totalGastos += parseEuroNumber(r.cantidad || "")
+                })
             })
         }
 
         let totalIngresos = 0
         if (ingresosData?.months) {
             _MONTH_KEYS.forEach((m) => {
-                ;(ingresosData.months[m]?.rows || []).forEach((r) => { totalIngresos += parseEuroNumber(r.cantidad || "") })
+                ;(ingresosData.months[m]?.rows || []).forEach((r) => {
+                    totalIngresos += parseEuroNumber(r.cantidad || "")
+                })
             })
         }
 
         let totalTradingPnL = 0
         ;(tradingData?.rows || []).forEach((r) => {
-            const val = parseFloat(String(r.ganancia_neta || "").replace(",", ".").trim())
+            const val = parseFloat(
+                String(r.ganancia_neta || "")
+                    .replace(",", ".")
+                    .trim()
+            )
             if (!isNaN(val) && (r.capital_currency || "EUR") === "EUR") totalTradingPnL += val
         })
 
@@ -911,18 +1033,23 @@ async function refreshTopDividendosIntereses() {
             if (!isNaN(qty)) totalStaking += qty * precio
         })
 
-        const totalMercadoPrivado = (Array.isArray(pmData?.rows) ? pmData.rows : [])
-            .reduce((sum, r) => sum + parseEuroNumber(r.valorActual || ""), 0)
+        const totalMercadoPrivado = (Array.isArray(pmData?.rows) ? pmData.rows : []).reduce(
+            (sum, r) => sum + parseEuroNumber(r.valorActual || ""),
+            0
+        )
 
-        const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
-        set("topTotalInteres",    formatEuro(totalInteres))
+        const set = (id, val) => {
+            const el = document.getElementById(id)
+            if (el) el.textContent = val
+        }
+        set("topTotalInteres", formatEuro(totalInteres))
         set("topTotalDividendos", formatEuro(totalDividendos))
-        set("topTotalRentaFija",  formatEuro(totalBonos + totalRentaFija))
-        set("topGastosAnio",      formatEuro(totalGastos))
-        set("topIngresosAnio",    formatEuro(totalIngresos))
-        set("topTradingPnL",      (totalTradingPnL >= 0 ? "+" : "") + formatEuro(totalTradingPnL))
-        set("topStaking",         formatEuro(totalStaking))
-        set("topMercadoPrivado",  formatEuro(totalMercadoPrivado))
+        set("topTotalRentaFija", formatEuro(totalBonos + totalRentaFija))
+        set("topGastosAnio", formatEuro(totalGastos))
+        set("topIngresosAnio", formatEuro(totalIngresos))
+        set("topTradingPnL", (totalTradingPnL >= 0 ? "+" : "") + formatEuro(totalTradingPnL))
+        set("topStaking", formatEuro(totalStaking))
+        set("topMercadoPrivado", formatEuro(totalMercadoPrivado))
         applyTopMetricsVisibility()
     } catch (error) {
         console.error("Error actualizando métricas de dividendos/intereses:", error)
@@ -935,14 +1062,16 @@ function initResizeHandles() {
     const DETAIL_MIN = 80
     const DETAIL_MAX = 520
 
-    const sideWrapper    = document.getElementById("sideWrapper")
-    const sideHandle     = document.getElementById("sideResizeHandle")
-    const detailView     = document.getElementById("assetDetailView")
-    const detailHandle   = document.getElementById("detailResizeHandle")
-    const sidePanel      = document.getElementById("sidePanel")
+    const sideWrapper = document.getElementById("sideWrapper")
+    const sideHandle = document.getElementById("sideResizeHandle")
+    const detailView = document.getElementById("assetDetailView")
+    const detailHandle = document.getElementById("detailResizeHandle")
+    const sidePanel = document.getElementById("sidePanel")
 
     if (sideWrapper && sideHandle) {
-        let startX, startW, rafId = null
+        let startX,
+            startW,
+            rafId = null
 
         sideHandle.addEventListener("mousedown", (e) => {
             e.preventDefault()
@@ -957,8 +1086,8 @@ function initResizeHandles() {
                 if (rafId) return
                 rafId = requestAnimationFrame(() => {
                     const delta = startX - e.clientX
-                    const newW  = Math.min(SIDE_MAX, Math.max(SIDE_MIN, startW + delta))
-                    sideWrapper.style.width    = newW + "px"
+                    const newW = Math.min(SIDE_MAX, Math.max(SIDE_MIN, startW + delta))
+                    sideWrapper.style.width = newW + "px"
                     sideWrapper.style.minWidth = newW + "px"
                     document.documentElement.style.setProperty("--sidebar-width", newW + "px")
                     rafId = null
@@ -966,7 +1095,10 @@ function initResizeHandles() {
             }
 
             function onUp() {
-                if (rafId) { cancelAnimationFrame(rafId); rafId = null }
+                if (rafId) {
+                    cancelAnimationFrame(rafId)
+                    rafId = null
+                }
                 sideHandle.classList.remove("dragging")
                 sideWrapper.classList.remove("is-resizing")
                 document.body.style.cursor = ""
@@ -993,7 +1125,7 @@ function initResizeHandles() {
 
             function onMove(e) {
                 const delta = startY - e.clientY
-                const newH  = Math.min(DETAIL_MAX, Math.max(DETAIL_MIN, startH + delta))
+                const newH = Math.min(DETAIL_MAX, Math.max(DETAIL_MIN, startH + delta))
                 detailView.style.flex = `0 0 ${newH}px`
             }
 
@@ -1043,9 +1175,9 @@ function applyDensidadSidebar(val) {
 }
 
 /* --- Rotación automática del detalle de activo --- */
-let _assetRotationTimer  = null
-let _assetRotationBusy   = false
-let _assetRotationBound  = false
+let _assetRotationTimer = null
+let _assetRotationBusy = false
+let _assetRotationBound = false
 
 function getAssetRotationConfig() {
     const seconds = Number(localStorage.getItem("assetRotationSeconds"))
@@ -1112,14 +1244,15 @@ async function rotateAssetDetailStep() {
     document.body.classList.toggle("asset-rotation-halted", blocked)
     if (_assetRotationBusy || blocked) return
 
-    const buttons = [...document.querySelectorAll("#assetsList .assetBtn:not(.assetBtnSegCustom)")]
-        .filter((button) => button.dataset.assetId)
+    const buttons = [...document.querySelectorAll("#assetsList .assetBtn:not(.assetBtnSegCustom)")].filter(
+        (button) => button.dataset.assetId
+    )
 
     if (buttons.length < 2) return
 
     const currentIndex = buttons.findIndex((button) => button.dataset.assetId === currentAssetId)
-    const nextButton   = buttons[(currentIndex + 1) % buttons.length]
-    const nextAssetId  = nextButton.dataset.assetId
+    const nextButton = buttons[(currentIndex + 1) % buttons.length]
+    const nextAssetId = nextButton.dataset.assetId
 
     _assetRotationBusy = true
     try {
@@ -1143,7 +1276,10 @@ async function rotateAssetDetailStep() {
 
 let _inactivityTimer = null
 function applyBloqueoInactividad(minutes) {
-    if (_inactivityTimer) { clearTimeout(_inactivityTimer); _inactivityTimer = null }
+    if (_inactivityTimer) {
+        clearTimeout(_inactivityTimer)
+        _inactivityTimer = null
+    }
     if (!minutes || minutes <= 0) return
 
     const ms = minutes * 60 * 1000

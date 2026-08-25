@@ -12,7 +12,10 @@ function parseDividendoYear(fecha) {
 
 function getDividendosYears(rows) {
     const years = new Set()
-    rows.forEach(r => { const y = parseDividendoYear(r.fecha); if (y) years.add(y) })
+    rows.forEach((r) => {
+        const y = parseDividendoYear(r.fecha)
+        if (y) years.add(y)
+    })
     return [...years].sort((a, b) => Number(a) - Number(b))
 }
 
@@ -20,7 +23,7 @@ function renderDividendosYearBar(years) {
     const list = document.getElementById("dividendosYearList")
     if (!list) return
     list.innerHTML = ""
-    years.forEach(year => {
+    years.forEach((year) => {
         const btn = document.createElement("button")
         btn.type = "button"
         btn.className = `interesesYearBtn${year === currentDividendosYear ? " active" : ""}`
@@ -34,13 +37,11 @@ function renderDividendosYearBar(years) {
 }
 
 function buildDividendosCurrencyOptions(selected, defaultVal = "USD") {
-    const currencies = window._fiatCurrencies?.length
-        ? window._fiatCurrencies
-        : ["USD", "EUR", "GBP", "CHF", "JPY"]
+    const currencies = window._fiatCurrencies?.length ? window._fiatCurrencies : ["USD", "EUR", "GBP", "CHF", "JPY"]
     const effective = selected || defaultVal
-    const opts = currencies.map(c =>
-        `<option value="${c}"${c === effective ? " selected" : ""}>${c}</option>`
-    ).join("")
+    const opts = currencies
+        .map((c) => `<option value="${c}"${c === effective ? " selected" : ""}>${c}</option>`)
+        .join("")
     if (!currencies.includes(effective)) {
         return `<option value="${escapeHtml(effective)}" selected>${escapeHtml(effective)}</option>` + opts
     }
@@ -49,12 +50,16 @@ function buildDividendosCurrencyOptions(selected, defaultVal = "USD") {
 
 function buildDividendosInstrumentoOptions(selectedName) {
     const exists = _dividendosAssets.some((a) => a.name === selectedName)
-    const extra = (!exists && selectedName)
-        ? `<option value="${escapeHtml(selectedName)}" selected>${escapeHtml(selectedName)}</option>`
-        : ""
-    const opts = _dividendosAssets.map((a) =>
-        `<option value="${escapeHtml(a.name)}"${a.name === selectedName ? " selected" : ""}>${escapeHtml(a.name)}</option>`
-    ).join("")
+    const extra =
+        !exists && selectedName
+            ? `<option value="${escapeHtml(selectedName)}" selected>${escapeHtml(selectedName)}</option>`
+            : ""
+    const opts = _dividendosAssets
+        .map(
+            (a) =>
+                `<option value="${escapeHtml(a.name)}"${a.name === selectedName ? " selected" : ""}>${escapeHtml(a.name)}</option>`
+        )
+        .join("")
 
     return `<option value=""></option>${extra}${opts}`
 }
@@ -152,7 +157,16 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
             return
         }
 
-        const nextRow = { fecha, instrumento, acciones, dividendoAccion, impuestos, total, monedaDividendo, monedaTotal }
+        const nextRow = {
+            fecha,
+            instrumento,
+            acciones,
+            dividendoAccion,
+            impuestos,
+            total,
+            monedaDividendo,
+            monedaTotal
+        }
 
         if (isEdit) {
             _allDividendosRows[globalIndex] = nextRow
@@ -205,10 +219,7 @@ async function renderDividendosTable() {
         return
     }
 
-    const [dividendosData, assetsList] = await Promise.all([
-        loadDividendosData(),
-        loadAssetsList().catch(() => [])
-    ])
+    const [dividendosData, assetsList] = await Promise.all([loadDividendosData(), loadAssetsList().catch(() => [])])
     _dividendosAssets = assetsList.filter((a) => a.type === "acciones" || a.type === "etfs")
     renderDividendosRowsFromData(dividendosData)
 }
@@ -230,7 +241,9 @@ function renderFilteredDividendos() {
     renderDividendosYearBar(years)
 
     const visible = currentDividendosYear
-        ? _allDividendosRows.map((r, i) => ({ r, i })).filter(({ r }) => parseDividendoYear(r.fecha) === currentDividendosYear)
+        ? _allDividendosRows
+              .map((r, i) => ({ r, i }))
+              .filter(({ r }) => parseDividendoYear(r.fecha) === currentDividendosYear)
         : _allDividendosRows.map((r, i) => ({ r, i }))
 
     dividendosBody.innerHTML = ""
@@ -251,10 +264,10 @@ function renderFilteredDividendos() {
         const rowElement = document.createElement("tr")
         rowElement.dataset.globalIndex = String(globalIndex)
 
-        const mdiv  = rowData.monedaDividendo || "USD"
-        const mtot  = rowData.monedaTotal    || "EUR"
+        const mdiv = rowData.monedaDividendo || "USD"
+        const mtot = rowData.monedaTotal || "EUR"
         rowElement.dataset.monedaDividendo = mdiv
-        rowElement.dataset.monedaTotal     = mtot
+        rowElement.dataset.monedaTotal = mtot
         rowElement.innerHTML = `
             <td data-field="fecha">${escapeHtml(rowData.fecha || "")}</td>
             <td data-field="instrumento">${escapeHtml(rowData.instrumento || "")}</td>
@@ -306,13 +319,20 @@ async function _getDivExchangeRate(from, to) {
     if (from === to) return 1
     const key = `${from}->${to}`
     if (!_divRateCache.has(key)) {
-        _divRateCache.set(key, (async () => {
-            try {
-                const res = await fetch(`/api/exchange-rate?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
-                const d = await res.json()
-                return d.ok && d.rate ? Number(d.rate) : 1
-            } catch { return 1 }
-        })())
+        _divRateCache.set(
+            key,
+            (async () => {
+                try {
+                    const res = await fetch(
+                        `/api/exchange-rate?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+                    )
+                    const d = await res.json()
+                    return d.ok && d.rate ? Number(d.rate) : 1
+                } catch {
+                    return 1
+                }
+            })()
+        )
     }
     return _divRateCache.get(key)
 }
@@ -324,25 +344,27 @@ async function updateDividendosTotals() {
     const base = (window._monedaBase || "EUR").toUpperCase()
     const rowElements = [...dividendosBody.querySelectorAll("tr")]
 
-    const amounts = await Promise.all(rowElements.map(async (rowElement) => {
-        const cells = rowElement.querySelectorAll("td")
-        const monedaTotal = rowElement.dataset.monedaTotal || cells[5]?.dataset?.moneda || "EUR"
-        const impuestosRaw = parseLooseNumber(cells[4]?.textContent || "") ?? 0
-        const totalRaw     = parseLooseNumber(cells[5]?.textContent || "") ?? 0
-        const rate = await _getDivExchangeRate(monedaTotal.toUpperCase(), base)
-        return { total: totalRaw * rate, impuestos: impuestosRaw * rate }
-    }))
+    const amounts = await Promise.all(
+        rowElements.map(async (rowElement) => {
+            const cells = rowElement.querySelectorAll("td")
+            const monedaTotal = rowElement.dataset.monedaTotal || cells[5]?.dataset?.moneda || "EUR"
+            const impuestosRaw = parseLooseNumber(cells[4]?.textContent || "") ?? 0
+            const totalRaw = parseLooseNumber(cells[5]?.textContent || "") ?? 0
+            const rate = await _getDivExchangeRate(monedaTotal.toUpperCase(), base)
+            return { total: totalRaw * rate, impuestos: impuestosRaw * rate }
+        })
+    )
 
-    const totalNeto     = amounts.reduce((s, x) => s + x.total, 0)
+    const totalNeto = amounts.reduce((s, x) => s + x.total, 0)
     const totalImpuestos = amounts.reduce((s, x) => s + x.impuestos, 0)
 
-    const totalResumen      = document.getElementById("totalDividendosResumen")
-    const impuestosResumen  = document.getElementById("impuestosDividendosResumen")
+    const totalResumen = document.getElementById("totalDividendosResumen")
+    const impuestosResumen = document.getElementById("impuestosDividendosResumen")
     const topTotalDividendos = document.getElementById("topTotalDividendos")
 
     const fmt = (v) => formatMoney(v, base)
-    if (totalResumen)       totalResumen.textContent      = fmt(totalNeto)
-    if (impuestosResumen)   impuestosResumen.textContent  = fmt(totalImpuestos)
+    if (totalResumen) totalResumen.textContent = fmt(totalNeto)
+    if (impuestosResumen) impuestosResumen.textContent = fmt(totalImpuestos)
     if (topTotalDividendos) topTotalDividendos.textContent = fmt(totalNeto)
 }
 
@@ -365,7 +387,9 @@ function deleteCurrentDividendosYear() {
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {
-                _allDividendosRows = _allDividendosRows.filter(r => parseDividendoYear(r.fecha) !== currentDividendosYear)
+                _allDividendosRows = _allDividendosRows.filter(
+                    (r) => parseDividendoYear(r.fecha) !== currentDividendosYear
+                )
                 const remaining = getDividendosYears(_allDividendosRows)
                 currentDividendosYear = remaining.length ? remaining[remaining.length - 1] : null
                 renderFilteredDividendos()
@@ -390,7 +414,14 @@ function handleDividendosRowActionClick(event) {
 
     const globalIndex = Number(deleteButton.dataset.globalIndex)
     const row = _allDividendosRows[globalIndex]
-    const isEmpty = !row || (!row.fecha && !row.instrumento && parseLooseNumber(row.acciones || "") === 0 && parseDollarNumber(row.dividendoAccion || "") === 0 && parseEuroNumber(row.impuestos || "") === 0 && parseEuroNumber(row.total || "") === 0)
+    const isEmpty =
+        !row ||
+        (!row.fecha &&
+            !row.instrumento &&
+            parseLooseNumber(row.acciones || "") === 0 &&
+            parseDollarNumber(row.dividendoAccion || "") === 0 &&
+            parseEuroNumber(row.impuestos || "") === 0 &&
+            parseEuroNumber(row.total || "") === 0)
 
     const removeRow = async () => {
         _allDividendosRows.splice(globalIndex, 1)
@@ -430,10 +461,18 @@ const CALENDARIO_MONTHS = [
 ]
 
 const CALENDARIO_MONTH_COLORS = {
-    enero: "#3a7bd5", febrero: "#3a7bd5", marzo: "#3a7bd5",
-    abril: "#3a7bd5", mayo: "#3a7bd5", junio: "#3a7bd5",
-    julio: "#3a7bd5", agosto: "#3a7bd5", septiembre: "#3a7bd5",
-    octubre: "#3a7bd5", noviembre: "#3a7bd5", diciembre: "#3a7bd5"
+    enero: "#3a7bd5",
+    febrero: "#3a7bd5",
+    marzo: "#3a7bd5",
+    abril: "#3a7bd5",
+    mayo: "#3a7bd5",
+    junio: "#3a7bd5",
+    julio: "#3a7bd5",
+    agosto: "#3a7bd5",
+    septiembre: "#3a7bd5",
+    octubre: "#3a7bd5",
+    noviembre: "#3a7bd5",
+    diciembre: "#3a7bd5"
 }
 
 let _calendarioData = {}
@@ -473,12 +512,16 @@ function buildCalendarioCell(month, names, assets) {
     const color = CALENDARIO_MONTH_COLORS[month] || "#444"
     const monthLabel = month.charAt(0).toUpperCase() + month.slice(1)
 
-    const tagsHtml = names.map((name) => `
+    const tagsHtml = names
+        .map(
+            (name) => `
         <div class="calTag">
             <span class="calTagName">${escapeHtml(name)}</span>
             <button type="button" class="calTagRemove" data-month="${month}" data-name="${encodeURIComponent(name)}" title="Quitar">×</button>
         </div>
-    `).join("")
+    `
+        )
+        .join("")
 
     const optionsHtml = assets
         .filter((a) => a.type === "acciones" && !names.includes(a.name))
@@ -508,9 +551,7 @@ function renderCalendarioBody(calendar, assets) {
 
     CALENDARIO_MONTHS.forEach((row) => {
         const tr = document.createElement("tr")
-        tr.innerHTML = row.map((month) =>
-            buildCalendarioCell(month, calendar[month] || [], assets)
-        ).join("")
+        tr.innerHTML = row.map((month) => buildCalendarioCell(month, calendar[month] || [], assets)).join("")
         tbody.appendChild(tr)
     })
 
@@ -556,10 +597,7 @@ async function openCalendarioDividendos() {
         closeBtn.addEventListener("click", () => overlay.classList.add("hidden"))
     }
 
-    ;[_calendarioData, _calendarioAssets] = await Promise.all([
-        loadCalendarioData(),
-        loadCalendarioAssets()
-    ])
+    ;[_calendarioData, _calendarioAssets] = await Promise.all([loadCalendarioData(), loadCalendarioAssets()])
 
     renderCalendarioBody(_calendarioData, _calendarioAssets)
     overlay.classList.remove("hidden")
@@ -579,7 +617,6 @@ function initCalendarioDividendosButton() {
             document.getElementById("calendarioDividendosOverlay")?.classList.add("hidden")
         })
     }
-
 }
 
 async function renameCalendarioAsset(oldName, newName) {
@@ -598,4 +635,3 @@ async function renameCalendarioAsset(oldName, newName) {
         await saveCalendarioData(calendar)
     }
 }
-

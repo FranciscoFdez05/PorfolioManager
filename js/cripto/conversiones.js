@@ -16,9 +16,8 @@ async function initConversionesLogic() {
     const cryptoAssets = assets.filter((a) => a.type === "cripto")
     renderConversionesAssetOptions(cryptoAssets)
     const firstId = cryptoAssets[0]?.id || ""
-    conversionesSelectedAssetId = (currentAssetId && cryptoAssets.find((a) => a.id === currentAssetId))
-        ? currentAssetId
-        : firstId
+    conversionesSelectedAssetId =
+        currentAssetId && cryptoAssets.find((a) => a.id === currentAssetId) ? currentAssetId : firstId
 
     if (conversionesSelectedAssetId) {
         assetSelect.value = conversionesSelectedAssetId
@@ -95,9 +94,13 @@ function renderConversionesAssetOptions(assets) {
         return
     }
 
-    assetSelect.innerHTML = assets.map((asset) => `
+    assetSelect.innerHTML = assets
+        .map(
+            (asset) => `
         <option value="${asset.id}">${asset.name}</option>
-    `).join("")
+    `
+        )
+        .join("")
 }
 
 function renderConversionesSelectedAsset(asset) {
@@ -166,11 +169,11 @@ function buildConversionesRowElement(row = {}, asset = conversionesCurrentAsset)
 
     const baseSymbol = deriveAssetBaseSymbolFromData(asset)
     const convertedInLabel = getConvertedInOperationLabel(baseSymbol)
-    const isIn = row.tipo
-        ? String(row.tipo).toLowerCase() === convertedInLabel.toLowerCase()
-        : true
+    const isIn = row.tipo ? String(row.tipo).toLowerCase() === convertedInLabel.toLowerCase() : true
     const tipoBadgeClass = row.tipo
-        ? (isIn ? "cvTipoBadge cvTipoBadgeIn" : "cvTipoBadge cvTipoBadgeOut")
+        ? isIn
+            ? "cvTipoBadge cvTipoBadgeIn"
+            : "cvTipoBadge cvTipoBadgeOut"
         : "cvTipoBadge"
 
     rowElement.innerHTML = `
@@ -243,16 +246,20 @@ function liveUpdateConversionesStats() {
 }
 
 function collectConversionesRows() {
-    return [...document.querySelectorAll("#conversionesBody tr")].map((rowElement) => ({
-        id: rowElement.dataset.rowId || createConversionRowId(),
-        fecha: rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
-        par: rowElement.querySelector('[data-field="par"]')?.textContent.trim() || "",
-        tipo: rowElement.querySelector('[data-field="tipo"]')?.dataset.value || getConvertedInOperationLabel(deriveAssetBaseSymbolFromData(conversionesCurrentAsset || {})),
-        cantidad: rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || ""
-    })).filter((row) => {
-        const quantity = parseLooseNumber(row.cantidad || "") || 0
-        return row.fecha || row.par || quantity > 0
-    })
+    return [...document.querySelectorAll("#conversionesBody tr")]
+        .map((rowElement) => ({
+            id: rowElement.dataset.rowId || createConversionRowId(),
+            fecha: rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
+            par: rowElement.querySelector('[data-field="par"]')?.textContent.trim() || "",
+            tipo:
+                rowElement.querySelector('[data-field="tipo"]')?.dataset.value ||
+                getConvertedInOperationLabel(deriveAssetBaseSymbolFromData(conversionesCurrentAsset || {})),
+            cantidad: rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || ""
+        }))
+        .filter((row) => {
+            const quantity = parseLooseNumber(row.cantidad || "") || 0
+            return row.fecha || row.par || quantity > 0
+        })
 }
 
 function scheduleConversionesAutosave() {
@@ -279,17 +286,21 @@ function openConversiónRowModal(rowId) {
     const rowElement = document.querySelector(`#conversionesBody tr[data-row-id="${rowId}"]`)
     const isEdit = Boolean(rowElement)
     const asset = conversionesCurrentAsset || {}
-    const rowData = isEdit ? {
-        fecha: rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
-        par: rowElement.querySelector('[data-field="par"]')?.textContent.trim() || "",
-        tipo: rowElement.querySelector('[data-field="tipo"]')?.dataset.value || "",
-        cantidad: rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || ""
-    } : { fecha: "", par: "", tipo: "", cantidad: "" }
+    const rowData = isEdit
+        ? {
+              fecha: rowElement.querySelector('[data-field="fecha"]')?.textContent.trim() || "",
+              par: rowElement.querySelector('[data-field="par"]')?.textContent.trim() || "",
+              tipo: rowElement.querySelector('[data-field="tipo"]')?.dataset.value || "",
+              cantidad: rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() || ""
+          }
+        : { fecha: "", par: "", tipo: "", cantidad: "" }
 
     const baseSymbol = deriveAssetBaseSymbolFromData(asset)
     const convertedInLabel = getConvertedInOperationLabel(baseSymbol)
     const convertedOutLabel = getConvertedOutOperationLabel(baseSymbol)
-    const tipoNorm = String(rowData.tipo || "").trim().toLowerCase()
+    const tipoNorm = String(rowData.tipo || "")
+        .trim()
+        .toLowerCase()
     const selectedTipo = tipoNorm === convertedOutLabel.toLowerCase() ? convertedOutLabel : convertedInLabel
 
     const fieldsHtml = `
@@ -387,20 +398,29 @@ function saveConversiónRowFromModal() {
             const baseSymbol = deriveAssetBaseSymbolFromData(conversionesCurrentAsset || {})
             const convertedInLabel = getConvertedInOperationLabel(baseSymbol)
             const isIn = newTipo.toLowerCase() === convertedInLabel.toLowerCase()
-            const badgeClass = newTipo ? (isIn ? "cvTipoBadge cvTipoBadgeIn" : "cvTipoBadge cvTipoBadgeOut") : "cvTipoBadge"
+            const badgeClass = newTipo
+                ? isIn
+                    ? "cvTipoBadge cvTipoBadgeIn"
+                    : "cvTipoBadge cvTipoBadgeOut"
+                : "cvTipoBadge"
             tipoCell.innerHTML = `<span class="${badgeClass}">${newTipo}</span>`
         }
         if (cantidadCell) cantidadCell.textContent = g("cvModalCantidad")
     } else {
         const body = document.getElementById("conversionesBody")
         if (body && conversionesCurrentAsset) {
-            body.appendChild(buildConversionesRowElement({
-                id: rowId || createConversionRowId(),
-                fecha: g("cvModalFecha"),
-                par: g("cvModalPar"),
-                tipo: g("cvModalTipo"),
-                cantidad: g("cvModalCantidad")
-            }, conversionesCurrentAsset))
+            body.appendChild(
+                buildConversionesRowElement(
+                    {
+                        id: rowId || createConversionRowId(),
+                        fecha: g("cvModalFecha"),
+                        par: g("cvModalPar"),
+                        tipo: g("cvModalTipo"),
+                        cantidad: g("cvModalCantidad")
+                    },
+                    conversionesCurrentAsset
+                )
+            )
         }
     }
 
@@ -416,7 +436,9 @@ async function saveConversionesData(silent = false) {
     const payload = {
         ...conversionesCurrentAsset,
         rows: getPrimaryAssetRows(conversionesCurrentAsset),
-        operationRows: Array.isArray(conversionesCurrentAsset.operationRows) ? conversionesCurrentAsset.operationRows : [],
+        operationRows: Array.isArray(conversionesCurrentAsset.operationRows)
+            ? conversionesCurrentAsset.operationRows
+            : [],
         conversionRows: collectConversionesRows()
     }
 

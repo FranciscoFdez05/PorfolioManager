@@ -1,6 +1,6 @@
 // ===== STAKING =====
 
-let _stakingCriptos = []       // [{ id, nombre, rows: [...] }]
+let _stakingCriptos = [] // [{ id, nombre, rows: [...] }]
 let stakingCurrentCriptoId = null
 let _stakingRows = []
 let stakingCurrentYear = null
@@ -10,7 +10,7 @@ function generateStakingId() {
 }
 
 function getStakingCurrentCripto() {
-    return _stakingCriptos.find(c => c.id === stakingCurrentCriptoId) || null
+    return _stakingCriptos.find((c) => c.id === stakingCurrentCriptoId) || null
 }
 
 function stakingSyncRowsBack() {
@@ -25,7 +25,7 @@ function renderStakingCriptosSidebar() {
     if (!list) return
     list.innerHTML = ""
 
-    _stakingCriptos.forEach(cripto => {
+    _stakingCriptos.forEach((cripto) => {
         const item = document.createElement("div")
         item.className = `cuentaItem${cripto.id === stakingCurrentCriptoId ? " active" : ""}`
         item.dataset.criptoId = cripto.id
@@ -67,7 +67,10 @@ function parseStakingYear(fecha) {
 
 function getStakingYears(rows) {
     const years = new Set()
-    rows.forEach(r => { const y = parseStakingYear(r.fecha); if (y) years.add(y) })
+    rows.forEach((r) => {
+        const y = parseStakingYear(r.fecha)
+        if (y) years.add(y)
+    })
     return [...years].sort((a, b) => Number(a) - Number(b))
 }
 
@@ -75,7 +78,7 @@ function renderStakingYearBar(years) {
     const list = document.getElementById("stakingYearList")
     if (!list) return
     list.innerHTML = ""
-    years.forEach(year => {
+    years.forEach((year) => {
         const btn = document.createElement("button")
         btn.type = "button"
         btn.className = `interesesYearBtn${year === stakingCurrentYear ? " active" : ""}`
@@ -127,7 +130,10 @@ function openStakingNameModal({ title, defaultValue = "", onConfirm }) {
         const nombre = modal.querySelector("#stakingNameInput")?.value.trim()
         if (!nombre) {
             const fb = modal.querySelector("#stakingNameFeedback")
-            if (fb) { fb.textContent = "El nombre no puede estar vacío."; fb.classList.remove("hidden") }
+            if (fb) {
+                fb.textContent = "El nombre no puede estar vacío."
+                fb.classList.remove("hidden")
+            }
             return
         }
         close()
@@ -140,7 +146,9 @@ function openStakingNameModal({ title, defaultValue = "", onConfirm }) {
         if (e.key === "Enter") doConfirm()
         if (e.key === "Escape") close()
     })
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) close() })
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) close()
+    })
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
     modal.querySelector("#stakingNameInput")?.focus()
@@ -167,7 +175,7 @@ function addStakingCripto() {
 }
 
 function renameStakingCripto(id) {
-    const cripto = _stakingCriptos.find(c => c.id === id)
+    const cripto = _stakingCriptos.find((c) => c.id === id)
     if (!cripto) return
     openStakingNameModal({
         title: "Renombrar cripto",
@@ -187,7 +195,7 @@ function renameStakingCripto(id) {
 }
 
 function deleteStakingCripto(id) {
-    const cripto = _stakingCriptos.find(c => c.id === id)
+    const cripto = _stakingCriptos.find((c) => c.id === id)
     if (!cripto) return
     openConfirmModal({
         title: "Eliminar cripto",
@@ -195,7 +203,7 @@ function deleteStakingCripto(id) {
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {
-                _stakingCriptos = _stakingCriptos.filter(c => c.id !== id)
+                _stakingCriptos = _stakingCriptos.filter((c) => c.id !== id)
                 if (stakingCurrentCriptoId === id) {
                     stakingCurrentCriptoId = _stakingCriptos.length ? _stakingCriptos[0].id : null
                 }
@@ -228,9 +236,15 @@ function bindStakingCriptosActions() {
         list.dataset.bound = "true"
         list.addEventListener("click", (e) => {
             const renameBtn = e.target.closest(".cuentaItemRenameBtn")
-            if (renameBtn) { renameStakingCripto(renameBtn.dataset.id); return }
+            if (renameBtn) {
+                renameStakingCripto(renameBtn.dataset.id)
+                return
+            }
             const deleteBtn = e.target.closest(".cuentaItemDeleteBtn")
-            if (deleteBtn) { deleteStakingCripto(deleteBtn.dataset.id); return }
+            if (deleteBtn) {
+                deleteStakingCripto(deleteBtn.dataset.id)
+                return
+            }
         })
     }
 }
@@ -319,7 +333,10 @@ function openStakingModal(globalIndex = -1, defaultFecha = "") {
     document.body.appendChild(overlay)
 
     document.addEventListener("keydown", function handler(e) {
-        if (e.key === "Escape") { closeStakingModal(); document.removeEventListener("keydown", handler) }
+        if (e.key === "Escape") {
+            closeStakingModal()
+            document.removeEventListener("keydown", handler)
+        }
     })
 
     modal.querySelector("input")?.focus()
@@ -402,7 +419,7 @@ function updateStakingTotals() {
     let totalCripto = 0
 
     if (stakingBody) {
-        stakingBody.querySelectorAll("tr").forEach(tr => {
+        stakingBody.querySelectorAll("tr").forEach((tr) => {
             const cells = tr.querySelectorAll("td")
             const cantidad = parseLooseNumber(cells[1]?.textContent || "")
             const precio = parseEuroNumber(cells[2]?.textContent || "")
@@ -448,7 +465,10 @@ function handleStakingRowActionClick(event) {
     }
 
     if (isEmpty) {
-        removeRow().catch(err => { console.error(err); showAlert("No se pudo eliminar la fila.") })
+        removeRow().catch((err) => {
+            console.error(err)
+            showAlert("No se pudo eliminar la fila.")
+        })
         return
     }
 
@@ -457,7 +477,12 @@ function handleStakingRowActionClick(event) {
         message: "Esta fila tiene contenido. ¿Quieres eliminarla?",
         confirmLabel: "Eliminar",
         onConfirm: async () => {
-            try { await removeRow() } catch (err) { console.error(err); showAlert("No se pudo eliminar la fila.") }
+            try {
+                await removeRow()
+            } catch (err) {
+                console.error(err)
+                showAlert("No se pudo eliminar la fila.")
+            }
         }
     })
 }
@@ -486,7 +511,7 @@ function deleteCurrentStakingYear() {
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {
-                _stakingRows = _stakingRows.filter(r => parseStakingYear(r.fecha) !== stakingCurrentYear)
+                _stakingRows = _stakingRows.filter((r) => parseStakingYear(r.fecha) !== stakingCurrentYear)
                 stakingSyncRowsBack()
                 const remaining = getStakingYears(_stakingRows)
                 stakingCurrentYear = remaining.length ? remaining[remaining.length - 1] : null
@@ -519,7 +544,7 @@ function loadStakingFromData(data) {
 
     if (!stakingCurrentCriptoId && _stakingCriptos.length) {
         stakingCurrentCriptoId = _stakingCriptos[0].id
-    } else if (stakingCurrentCriptoId && !_stakingCriptos.find(c => c.id === stakingCurrentCriptoId)) {
+    } else if (stakingCurrentCriptoId && !_stakingCriptos.find((c) => c.id === stakingCurrentCriptoId)) {
         stakingCurrentCriptoId = _stakingCriptos.length ? _stakingCriptos[0].id : null
     }
 

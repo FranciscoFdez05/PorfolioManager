@@ -18,10 +18,23 @@ let categoriasKeyHandler = null
 let categoriasEstado = null
 
 const CATEGORIAS_PANELES = [
-    { clave: "gasto", titulo: "Gastos", etiqueta: "gasto", endpointLista: "/api/gastos-tipos", idTabla: "gastosAnnualBody", pagina: "gastos" },
-    { clave: "ingreso", titulo: "Ingresos", etiqueta: "ingreso", endpointLista: "/api/ingresos-tipos", idTabla: "ingresosAnnualBody", pagina: "ingresos" },
+    {
+        clave: "gasto",
+        titulo: "Gastos",
+        etiqueta: "gasto",
+        endpointLista: "/api/gastos-tipos",
+        idTabla: "gastosAnnualBody",
+        pagina: "gastos"
+    },
+    {
+        clave: "ingreso",
+        titulo: "Ingresos",
+        etiqueta: "ingreso",
+        endpointLista: "/api/ingresos-tipos",
+        idTabla: "ingresosAnnualBody",
+        pagina: "ingresos"
+    }
 ]
-
 
 function escapeCategoriasHtml(value) {
     return String(value || "")
@@ -32,7 +45,6 @@ function escapeCategoriasHtml(value) {
         .replace(/'/g, "&#39;")
 }
 
-
 function normalizarCategoriaTexto(value) {
     return String(value || "")
         .trim()
@@ -41,11 +53,13 @@ function normalizarCategoriaTexto(value) {
         .replace(/[̀-ͯ]/g, "")
 }
 
-
 function limpiarCategoriaTexto(value) {
-    return String(value || "").trim().replace(/\s+/g, " ").slice(0, 80).trim()
+    return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .slice(0, 80)
+        .trim()
 }
-
 
 async function cargarCategoriasEstado() {
     const datos = await Api.get("/api/categorias/resumen")
@@ -58,14 +72,13 @@ async function cargarCategoriasEstado() {
             filas: lista.map((item) => ({
                 original: item.label,
                 valor: item.label,
-                usos: Number(item.usos) || 0,
-            })),
+                usos: Number(item.usos) || 0
+            }))
         }
     })
 
     return estado
 }
-
 
 function cerrarCategoriasModal() {
     document.getElementById(CATEGORIAS_OVERLAY_ID)?.remove()
@@ -77,7 +90,6 @@ function cerrarCategoriasModal() {
     }
 }
 
-
 function ponerFeedbackCategorias(mensaje = "", esError = false) {
     const feedback = document.getElementById("categoriasModalFeedback")
     if (!feedback) {
@@ -88,7 +100,6 @@ function ponerFeedbackCategorias(mensaje = "", esError = false) {
     feedback.classList.toggle("hidden", !mensaje)
     feedback.classList.toggle("error", Boolean(mensaje && esError))
 }
-
 
 function construirFilaCategoria(panel, fila, indice, total) {
     const enUso = fila.usos > 0
@@ -109,7 +120,6 @@ function construirFilaCategoria(panel, fila, indice, total) {
     `
 }
 
-
 function construirColumnaCategorias(panel) {
     const filas = categoriasEstado[panel.clave].filas
 
@@ -126,7 +136,6 @@ function construirColumnaCategorias(panel) {
     `
 }
 
-
 function renderCategoriasModal() {
     const contenedor = document.getElementById("categoriasModalBody")
     if (!contenedor || !categoriasEstado) {
@@ -135,7 +144,6 @@ function renderCategoriasModal() {
 
     contenedor.innerHTML = CATEGORIAS_PANELES.map(construirColumnaCategorias).join("")
 }
-
 
 function leerInputsCategorias() {
     // Los inputs mandan sobre el estado: el usuario puede haber escrito sin que
@@ -147,7 +155,6 @@ function leerInputsCategorias() {
         }
     })
 }
-
 
 function manejarClickCategorias(event) {
     if (!categoriasEstado) {
@@ -190,7 +197,6 @@ function manejarClickCategorias(event) {
     }
 }
 
-
 function planificarCambiosCategorias(panel) {
     const filas = categoriasEstado[panel.clave].filas
     const finales = []
@@ -216,9 +222,7 @@ function planificarCambiosCategorias(panel) {
     }
 
     const presentes = new Set(finales.map((fila) => fila.original).filter(Boolean))
-    const eliminadas = filas
-        .map((fila) => fila.original)
-        .filter((original) => original && !presentes.has(original))
+    const eliminadas = filas.map((fila) => fila.original).filter((original) => original && !presentes.has(original))
 
     const renombradas = finales
         .filter((fila) => fila.original && fila.original !== fila.etiqueta)
@@ -228,19 +232,19 @@ function planificarCambiosCategorias(panel) {
     // panel está igual que al abrir, no se manda nada al servidor.
     const ordenPrevio = filas.map((fila) => fila.original).filter(Boolean)
     const ordenNuevo = finales.map((fila) => fila.original)
-    const sinCambios = !eliminadas.length
-        && !renombradas.length
-        && ordenPrevio.length === ordenNuevo.length
-        && ordenNuevo.every((original, indice) => original === ordenPrevio[indice])
+    const sinCambios =
+        !eliminadas.length &&
+        !renombradas.length &&
+        ordenPrevio.length === ordenNuevo.length &&
+        ordenNuevo.every((original, indice) => original === ordenPrevio[indice])
 
     return {
         etiquetas: finales.map((fila) => fila.etiqueta),
         eliminadas,
         renombradas,
-        sinCambios,
+        sinCambios
     }
 }
-
 
 async function guardarCategorias() {
     leerInputsCategorias()
@@ -293,7 +297,6 @@ async function guardarCategorias() {
     return { ok: true, cambios: planes.some(({ plan }) => !plan.sinCambios) }
 }
 
-
 function refrescarPaginaTrasCategorias() {
     // Recargar la pestaña abierta es más fiable que parchear su estado en
     // memoria: tras un renombrado global sus filas ya no coinciden con lo que
@@ -304,7 +307,6 @@ function refrescarPaginaTrasCategorias() {
         loadPage(panel.pagina)
     }
 }
-
 
 function abrirCategoriasModal() {
     cerrarCategoriasModal()
@@ -376,7 +378,6 @@ function abrirCategoriasModal() {
             ponerFeedbackCategorias("No se pudieron cargar las categorías.", true)
         })
 }
-
 
 // Delegación en document: los fragmentos de página se inyectan después de que
 // este script se ejecute, así que enlazar por id al cargar no serviría.

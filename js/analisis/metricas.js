@@ -1,38 +1,108 @@
 let _metricasCharts = {}
 
 window._resizeChartsOnSidebarChange = function () {
-    Object.values(_metricasCharts).forEach((c) => { try { c.resize() } catch (_) {} })
+    Object.values(_metricasCharts).forEach((c) => {
+        try {
+            c.resize()
+        } catch (_) {}
+    })
 }
 
+// Estos tres nombres existen dos veces a propósito: js/core/app-core.js escribe
+// `window._metricasDisplayType` (y compañía) al cargar los ajustes del
+// servidor, y aquí se declaran con `let`, lo que crea un binding léxico global
+// que NO es la misma casilla que la propiedad de window. El puente lo hace a
+// mano mLoadPreferencias(), que copia window.* a estas variables. Se deja como
+// está —cambiarlo es tocar el arranque de la pantalla entera— pero conviene
+// saberlo antes de tocar cualquiera de los dos lados.
+// eslint-disable-next-line no-redeclare
 let _metricasDisplayType = "doughnut"
+// eslint-disable-next-line no-redeclare
 let _metricasDistMetric = "netoActualEur"
 let _metricasGastosMonth = getChartPref("metricasGastosMonth", "all")
 let _metricasIngresosMonth = getChartPref("metricasIngresosMonth", "all")
 let _metricasPayload = null
 let _metricasSortKey = getChartPref("metricasSortKey", "netoActualEur")
 let _metricasSortDir = getChartPref("metricasSortDir", "desc")
-let _metricasActivosFilter = new Set(["cripto","acciones","etfs","comoditis","rentaFija"])
+let _metricasActivosFilter = new Set(["cripto", "acciones", "etfs", "comoditis", "rentaFija"])
 let _metricasGastosTipoFilter = new Set()
 let _metricasComparativaExclude = new Set()
+// eslint-disable-next-line no-redeclare -- ver la nota de _metricasDisplayType
 let _metricasSectionsCollapsed = new Set()
 let _mGastosChartsCache = null
 
-const M_GASTOS_KEYS   = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
-const M_GASTOS_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+const M_GASTOS_KEYS = [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre"
+]
+const M_GASTOS_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 const _M_ES_MONTH_MAP = {
-    ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12,div:12,
-    enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,
-    septiembre:9,octubre:10,noviembre:11,diciembre:12
+    ene: 1,
+    feb: 2,
+    mar: 3,
+    abr: 4,
+    may: 5,
+    jun: 6,
+    jul: 7,
+    ago: 8,
+    sep: 9,
+    oct: 10,
+    nov: 11,
+    dic: 12,
+    div: 12,
+    enero: 1,
+    febrero: 2,
+    marzo: 3,
+    abril: 4,
+    mayo: 5,
+    junio: 6,
+    julio: 7,
+    agosto: 8,
+    septiembre: 9,
+    octubre: 10,
+    noviembre: 11,
+    diciembre: 12
 }
-function mParseEsMonth(s) { return _M_ES_MONTH_MAP[String(s||"").toLowerCase()] || 0 }
-function mParseShortYear(y) { const n = parseInt(y); return isNaN(n) ? null : (n < 100 ? 2000 + n : n) }
+function mParseEsMonth(s) {
+    return _M_ES_MONTH_MAP[String(s || "").toLowerCase()] || 0
+}
+function mParseShortYear(y) {
+    const n = parseInt(y)
+    return isNaN(n) ? null : n < 100 ? 2000 + n : n
+}
 
 const M_PALETTE = [
-    "#3a7bd5", "#f7931a", "#2ecc71", "#e74c3c", "#9b59b6",
-    "#1abc9c", "#e67e22", "#00bcd4", "#8bc34a", "#ff5722",
-    "#e91e63", "#673ab7", "#607d8b", "#f39c12", "#795548",
-    "#26c6da", "#66bb6a", "#ef5350", "#ab47bc", "#ffa726"
+    "#3a7bd5",
+    "#f7931a",
+    "#2ecc71",
+    "#e74c3c",
+    "#9b59b6",
+    "#1abc9c",
+    "#e67e22",
+    "#00bcd4",
+    "#8bc34a",
+    "#ff5722",
+    "#e91e63",
+    "#673ab7",
+    "#607d8b",
+    "#f39c12",
+    "#795548",
+    "#26c6da",
+    "#66bb6a",
+    "#ef5350",
+    "#ab47bc",
+    "#ffa726"
 ]
 
 function mPaletteForName(name) {
@@ -42,17 +112,17 @@ function mPaletteForName(name) {
 }
 
 const M_TYPE_COLORS = {
-    cripto:    "#f7931a",
-    acciones:  "#3a7bd5",
-    etfs:      "#2ecc71",
+    cripto: "#f7931a",
+    acciones: "#3a7bd5",
+    etfs: "#2ecc71",
     comoditis: "#e0c068",
     rentaFija: "#00bcd4"
 }
 
 const M_TYPE_LABELS = {
-    cripto:    "Cripto",
-    acciones:  "Acciones",
-    etfs:      "ETFs",
+    cripto: "Cripto",
+    acciones: "Acciones",
+    etfs: "ETFs",
     comoditis: "Comoditis",
     rentaFija: "Renta Fija"
 }
@@ -99,13 +169,13 @@ function mGridTooltip(label, raw, total) {
 function mAxisX() {
     return {
         ticks: { color: "#8899bb" },
-        grid:  { color: "rgba(255,255,255,0.06)" }
+        grid: { color: "rgba(255,255,255,0.06)" }
     }
 }
 function mAxisY(fontSize = 12) {
     return {
         ticks: { color: "#ccd6f6", font: { size: fontSize } },
-        grid:  { display: false }
+        grid: { display: false }
     }
 }
 
@@ -115,20 +185,44 @@ async function buildMetricasPayload() {
     const baseAssets = await loadAssetsList()
     const fullAssets = await Promise.all(baseAssets.map((a) => loadAssetData(a.id)))
 
-    const summaries = await Promise.all(fullAssets.map(async (asset) => {
-        const row    = await buildOverviewRow(asset)
-        const euros  = await buildSummaryMetricsInEuros(row)
-        return {
-            name:           asset.name || asset.symbol || "Activo",
-            type:           asset.type || "acciones",
-            color:          asset.color || "",
-            netoActualEur:  euros.netoActualEur,
-            invertidoEur:   euros.invertidoBrutoEur,
-            rendimientoEur: euros.rendimientoEur
-        }
-    }))
+    const summaries = await Promise.all(
+        fullAssets.map(async (asset) => {
+            const row = await buildOverviewRow(asset)
+            const euros = await buildSummaryMetricsInEuros(row)
+            return {
+                name: asset.name || asset.symbol || "Activo",
+                type: asset.type || "acciones",
+                color: asset.color || "",
+                netoActualEur: euros.netoActualEur,
+                invertidoEur: euros.invertidoBrutoEur,
+                rendimientoEur: euros.rendimientoEur
+            }
+        })
+    )
 
-    const [divResp, intResp, bonosResp, rfResp, gastosYearsResp, ingresosYearsResp, tradingResp, snapshotResp, inversionesResp, pmResp, settingsResp] = await Promise.all([
+    // TWR/XIRR/drawdown los calcula el servidor sobre el histórico completo,
+    // pero el último punto guardado puede tener minutos: se le pasa el valor
+    // vivo para que las cifras cuadren con las KPIs de arriba.
+    const liveValue = summaries.reduce((s, a) => s + a.netoActualEur, 0)
+    const liveInvested = summaries.reduce((s, a) => s + a.invertidoEur, 0)
+    const rentabilidadUrl =
+        `/api/portfolio/rentabilidad?value=${encodeURIComponent(liveValue.toFixed(2))}` +
+        `&invested=${encodeURIComponent(liveInvested.toFixed(2))}`
+
+    const [
+        divResp,
+        intResp,
+        bonosResp,
+        rfResp,
+        gastosYearsResp,
+        ingresosYearsResp,
+        tradingResp,
+        snapshotResp,
+        inversionesResp,
+        pmResp,
+        settingsResp,
+        rentResp
+    ] = await Promise.all([
         fetch("/api/dividendos"),
         fetch("/api/intereses"),
         fetch("/api/bonos"),
@@ -140,31 +234,38 @@ async function buildMetricasPayload() {
         fetch("/api/metricas/inversiones").catch(() => null),
         fetch("/api/privatemarket").catch(() => null),
         fetch("/api/settings").catch(() => null),
+        fetch(rentabilidadUrl).catch(() => null)
     ])
-    const divData   = await divResp.json()
-    const intData   = await intResp.json()
+    const divData = await divResp.json()
+    const intData = await intResp.json()
     const bonosData = await bonosResp.json()
-    const rfData    = await rfResp.json()
+    const rfData = await rfResp.json()
 
     const gastosYearsData = gastosYearsResp ? await gastosYearsResp.json().catch(() => ({ years: [] })) : { years: [] }
     const gastosYearsList = Array.isArray(gastosYearsData.years) ? gastosYearsData.years : []
     // Si el usuario dejó seleccionado otro año, se carga ese en vez del último.
-    const prefGastosYear  = getChartPref("metricasGastosYear", null)
-    const gastosYear      = gastosYearsList.map(String).includes(String(prefGastosYear))
+    const prefGastosYear = getChartPref("metricasGastosYear", null)
+    const gastosYear = gastosYearsList.map(String).includes(String(prefGastosYear))
         ? prefGastosYear
-        : (gastosYearsList[0] || null)
-    const gastosYearData  = gastosYear
-        ? await fetch(`/api/gastos/${gastosYear}`).then((r) => r.json()).catch(() => null)
+        : gastosYearsList[0] || null
+    const gastosYearData = gastosYear
+        ? await fetch(`/api/gastos/${gastosYear}`)
+              .then((r) => r.json())
+              .catch(() => null)
         : null
 
-    const ingresosYearsData = ingresosYearsResp ? await ingresosYearsResp.json().catch(() => ({ years: [] })) : { years: [] }
+    const ingresosYearsData = ingresosYearsResp
+        ? await ingresosYearsResp.json().catch(() => ({ years: [] }))
+        : { years: [] }
     const ingresosYearsList = Array.isArray(ingresosYearsData.years) ? ingresosYearsData.years : []
     const prefIngresosYear = getChartPref("metricasIngresosYear", null)
-    const ingresosYear     = ingresosYearsList.map(String).includes(String(prefIngresosYear))
+    const ingresosYear = ingresosYearsList.map(String).includes(String(prefIngresosYear))
         ? prefIngresosYear
-        : (ingresosYearsList[0] || null)
-    const ingresosYearData  = ingresosYear
-        ? await fetch(`/api/ingresos/${ingresosYear}`).then((r) => r.json()).catch(() => null)
+        : ingresosYearsList[0] || null
+    const ingresosYearData = ingresosYear
+        ? await fetch(`/api/ingresos/${ingresosYear}`)
+              .then((r) => r.json())
+              .catch(() => null)
         : null
 
     // Resumen anual: hacen falta todos los años, no solo el seleccionado en los
@@ -172,66 +273,81 @@ async function buildMetricasPayload() {
     const anualYears = [...new Set([...gastosYearsList, ...ingresosYearsList].map(Number))]
         .filter((y) => Number.isFinite(y))
         .sort((a, b) => a - b)
-    const anualData = await Promise.all(anualYears.map(async (y) => {
-        const [gastos, ingresos] = await Promise.all([
-            gastosYearsList.map(String).includes(String(y))
-                ? (String(y) === String(gastosYear)
-                    ? gastosYearData
-                    : fetch(`/api/gastos/${y}`).then((r) => r.json()).catch(() => null))
-                : null,
-            ingresosYearsList.map(String).includes(String(y))
-                ? (String(y) === String(ingresosYear)
-                    ? ingresosYearData
-                    : fetch(`/api/ingresos/${y}`).then((r) => r.json()).catch(() => null))
-                : null,
-        ])
-        return { year: y, gastosData: gastos, ingresosData: ingresos }
-    }))
+    const anualData = await Promise.all(
+        anualYears.map(async (y) => {
+            const [gastos, ingresos] = await Promise.all([
+                gastosYearsList.map(String).includes(String(y))
+                    ? String(y) === String(gastosYear)
+                        ? gastosYearData
+                        : fetch(`/api/gastos/${y}`)
+                              .then((r) => r.json())
+                              .catch(() => null)
+                    : null,
+                ingresosYearsList.map(String).includes(String(y))
+                    ? String(y) === String(ingresosYear)
+                        ? ingresosYearData
+                        : fetch(`/api/ingresos/${y}`)
+                              .then((r) => r.json())
+                              .catch(() => null)
+                    : null
+            ])
+            return { year: y, gastosData: gastos, ingresosData: ingresos }
+        })
+    )
 
-    const tradingData     = tradingResp     ? await tradingResp.json().catch(() => ({ rows: [] })) : { rows: [] }
-    const snapshotData    = snapshotResp    ? await snapshotResp.json().catch(() => ({ data: [] })) : { data: [] }
-    const inversionesData = inversionesResp ? await inversionesResp.json().catch(() => ({ byMonth: {}, byYear: {} })) : { byMonth: {}, byYear: {} }
-    const pmData          = pmResp          ? await pmResp.json().catch(() => ({ rows: [] })) : { rows: [] }
-    const settingsData    = settingsResp    ? await settingsResp.json().catch(() => ({})) : {}
-    const ahorroConfig    = settingsData.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} }
+    const tradingData = tradingResp ? await tradingResp.json().catch(() => ({ rows: [] })) : { rows: [] }
+    const snapshotData = snapshotResp ? await snapshotResp.json().catch(() => ({ data: [] })) : { data: [] }
+    const inversionesData = inversionesResp
+        ? await inversionesResp.json().catch(() => ({ byMonth: {}, byYear: {} }))
+        : { byMonth: {}, byYear: {} }
+    const pmData = pmResp ? await pmResp.json().catch(() => ({ rows: [] })) : { rows: [] }
+    const settingsData = settingsResp ? await settingsResp.json().catch(() => ({})) : {}
+    const rentData = rentResp ? await rentResp.json().catch(() => null) : null
+    const ahorroConfig = settingsData.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} }
 
     return {
         summaries,
-        dividendos:      Array.isArray(divData.rows)   ? divData.rows   : [],
-        intereses:       Array.isArray(intData.cuentas)
-            ? intData.cuentas.flatMap(c => Array.isArray(c.rows) ? c.rows : [])
-            : (Array.isArray(intData.rows) ? intData.rows : []),
+        dividendos: Array.isArray(divData.rows) ? divData.rows : [],
+        intereses: Array.isArray(intData.cuentas)
+            ? intData.cuentas.flatMap((c) => (Array.isArray(c.rows) ? c.rows : []))
+            : Array.isArray(intData.rows)
+              ? intData.rows
+              : [],
         cuentasRemuneradas: Array.isArray(intData.cuentas) ? intData.cuentas : [],
-        bonos:           Array.isArray(bonosData.rows)  ? bonosData.rows : [],
-        rentaFija:       Array.isArray(rfData.rows)     ? rfData.rows    : [],
-        privateMarket:   Array.isArray(pmData.rows)     ? pmData.rows    : [],
+        bonos: Array.isArray(bonosData.rows) ? bonosData.rows : [],
+        rentaFija: Array.isArray(rfData.rows) ? rfData.rows : [],
+        privateMarket: Array.isArray(pmData.rows) ? pmData.rows : [],
         gastosYearsList,
         gastosYearData,
         ingresosYearsList,
         ingresosYearData,
         anualData,
-        tradingRows:     Array.isArray(tradingData.rows) ? tradingData.rows : [],
+        tradingRows: Array.isArray(tradingData.rows) ? tradingData.rows : [],
         snapshotHistory: Array.isArray(snapshotData.data) ? snapshotData.data : [],
-        inversiones:     inversionesData,
-        ahorroConfig,
+        rentabilidad: rentData?.ok ? rentData : null,
+        inversiones: inversionesData,
+        ahorroConfig
     }
 }
 
 // ── KPI cards ──────────────────────────────────────────────────────────────
 
 function mSyncTopBar(summaries, rendimiento, invertido, totalCuenta) {
-    const topSet = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
-    topSet("topTotalCuenta",       formatEuro(totalCuenta))
-    topSet("topRendimientoEuros",  formatEuro(rendimiento))
-    topSet("topPorcentajeCuenta",  formatPercent(invertido > 0 ? (rendimiento / invertido) * 100 : 0))
+    const topSet = (id, val) => {
+        const el = document.getElementById(id)
+        if (el) el.textContent = val
+    }
+    topSet("topTotalCuenta", formatEuro(totalCuenta))
+    topSet("topRendimientoEuros", formatEuro(rendimiento))
+    topSet("topPorcentajeCuenta", formatPercent(invertido > 0 ? (rendimiento / invertido) * 100 : 0))
 
     const typeMap = { cripto: "Cripto", acciones: "Acciones", etfs: "Etf", comoditis: "Comoditis" }
     Object.entries(typeMap).forEach(([type, suffix]) => {
         const group = summaries.filter((a) => a.type === type)
-        const neto  = group.reduce((s, a) => s + a.netoActualEur, 0)
-        const inv   = group.reduce((s, a) => s + a.invertidoEur, 0)
-        const rend  = group.reduce((s, a) => s + a.rendimientoEur, 0)
-        topSet(`topEuros${suffix}`,      formatEuro(neto))
+        const neto = group.reduce((s, a) => s + a.netoActualEur, 0)
+        const inv = group.reduce((s, a) => s + a.invertidoEur, 0)
+        const rend = group.reduce((s, a) => s + a.rendimientoEur, 0)
+        topSet(`topEuros${suffix}`, formatEuro(neto))
         topSet(`topPorcentaje${suffix}`, formatPercent(inv > 0 ? (rend / inv) * 100 : 0))
     })
 }
@@ -242,51 +358,74 @@ function mUpdateKpis(payload) {
     const tRows = Array.isArray(tradingRows) ? tradingRows : []
     if (tRows.length) {
         const tProfits = tRows.filter((r) => r.resultado === "PROFIT").length
-        const tLosses  = tRows.filter((r) => r.resultado === "PÉRDIDA").length
-        const winRate  = tRows.length > 0 ? (tProfits / tRows.length) * 100 : 0
+        const tLosses = tRows.filter((r) => r.resultado === "PÉRDIDA").length
+        const winRate = tRows.length > 0 ? (tProfits / tRows.length) * 100 : 0
         const gananciaTotal = tRows.reduce((s, r) => {
-            const v = parseFloat(String(r.ganancia || "").replace(",", ".").replace("%", ""))
+            const v = parseFloat(
+                String(r.ganancia || "")
+                    .replace(",", ".")
+                    .replace("%", "")
+            )
             return s + (isNaN(v) ? 0 : v)
         }, 0)
-        const roiMedio = tRows.reduce((s, r) => {
-            const v = parseFloat(String(r.roi || "").replace(",", ".").replace("%", ""))
-            return s + (isNaN(v) ? 0 : v)
-        }, 0) / (tRows.length || 1)
+        const roiMedio =
+            tRows.reduce((s, r) => {
+                const v = parseFloat(
+                    String(r.roi || "")
+                        .replace(",", ".")
+                        .replace("%", "")
+                )
+                return s + (isNaN(v) ? 0 : v)
+            }, 0) / (tRows.length || 1)
 
-        mSetKpi("mkpiTradingTotal",    String(tRows.length))
-        mSetKpi("mkpiTradingProfits",  String(tProfits), "mPositive")
-        mSetKpi("mkpiTradingLosses",   String(tLosses),  "mNegative")
-        mSetKpi("mkpiTradingWinRate",  winRate.toFixed(1).replace(".", ",") + "%", winRate >= 50 ? "mPositive" : "mNegative")
-        mSetKpi("mkpiTradingGanancia", (gananciaTotal >= 0 ? "+" : "") + gananciaTotal.toFixed(2).replace(".", ",") + "%", gananciaTotal >= 0 ? "mPositive" : "mNegative")
-        mSetKpi("mkpiTradingRoiMedio", (roiMedio >= 0 ? "+" : "") + roiMedio.toFixed(1).replace(".", ",") + "%", roiMedio >= 0 ? "mPositive" : "mNegative")
+        mSetKpi("mkpiTradingTotal", String(tRows.length))
+        mSetKpi("mkpiTradingProfits", String(tProfits), "mPositive")
+        mSetKpi("mkpiTradingLosses", String(tLosses), "mNegative")
+        mSetKpi(
+            "mkpiTradingWinRate",
+            winRate.toFixed(1).replace(".", ",") + "%",
+            winRate >= 50 ? "mPositive" : "mNegative"
+        )
+        mSetKpi(
+            "mkpiTradingGanancia",
+            (gananciaTotal >= 0 ? "+" : "") + gananciaTotal.toFixed(2).replace(".", ",") + "%",
+            gananciaTotal >= 0 ? "mPositive" : "mNegative"
+        )
+        mSetKpi(
+            "mkpiTradingRoiMedio",
+            (roiMedio >= 0 ? "+" : "") + roiMedio.toFixed(1).replace(".", ",") + "%",
+            roiMedio >= 0 ? "mPositive" : "mNegative"
+        )
     }
 
-    const totalCuenta  = summaries.reduce((s, a) => s + a.netoActualEur,  0)
-    const invertido    = summaries.reduce((s, a) => s + a.invertidoEur,   0)
-    const rendimiento  = totalCuenta - invertido
-    const rendPct      = invertido > 0 ? (rendimiento / invertido) * 100 : 0
-    const totalDiv     = dividendos.reduce((s, r) => s + parseEuroNumber(r.total || ""), 0)
-    const totalInt     = intereses.reduce((s, r) =>
-        s + parseEuroNumber(r.acumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const totalCuenta = summaries.reduce((s, a) => s + a.netoActualEur, 0)
+    const invertido = summaries.reduce((s, a) => s + a.invertidoEur, 0)
+    const rendimiento = totalCuenta - invertido
+    const rendPct = invertido > 0 ? (rendimiento / invertido) * 100 : 0
+    const totalDiv = dividendos.reduce((s, r) => s + parseEuroNumber(r.total || ""), 0)
+    const totalInt = intereses.reduce(
+        (s, r) => s + parseEuroNumber(r.acumulado || "") - parseEuroNumber(r.impuestos || ""),
+        0
+    )
 
     mSetKpi("mkpiTotalCuenta", formatEuro(totalCuenta))
-    mSetKpi("mkpiInvertido",   formatEuro(invertido))
+    mSetKpi("mkpiInvertido", formatEuro(invertido))
     mSetKpi("mkpiRendimiento", formatEuro(rendimiento), rendimiento >= 0 ? "mPositive" : "mNegative")
-    mSetKpi("mkpiRendPct",     formatPercent(rendPct),  rendPct      >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiRendPct", formatPercent(rendPct), rendPct >= 0 ? "mPositive" : "mNegative")
 
     // ── Rendimiento por tipo de activo ───────────────────────────────
     const activosRendContainer = document.getElementById("mkpiActivosRendCards")
     if (activosRendContainer) {
         const TYPE_ORDER = ["acciones", "etfs", "comoditis", "cripto"]
-        activosRendContainer.innerHTML = TYPE_ORDER.map(type => {
-            const group  = summaries.filter(s => s.type === type)
+        activosRendContainer.innerHTML = TYPE_ORDER.map((type) => {
+            const group = summaries.filter((s) => s.type === type)
             if (!group.length) return ""
-            const inv    = group.reduce((s, a) => s + a.invertidoEur,   0)
-            const rend   = group.reduce((s, a) => s + a.rendimientoEur, 0)
-            const pct    = inv > 0 ? (rend / inv) * 100 : 0
-            const cls    = pct >= 0 ? "mPositive" : "mNegative"
-            const color  = M_TYPE_COLORS[type]
-            const label  = M_TYPE_LABELS[type] || type
+            const inv = group.reduce((s, a) => s + a.invertidoEur, 0)
+            const rend = group.reduce((s, a) => s + a.rendimientoEur, 0)
+            const pct = inv > 0 ? (rend / inv) * 100 : 0
+            const cls = pct >= 0 ? "mPositive" : "mNegative"
+            const color = M_TYPE_COLORS[type]
+            const label = M_TYPE_LABELS[type] || type
             const pctStr = (pct >= 0 ? "+" : "") + pct.toFixed(2).replace(".", ",") + "%"
             const eurStr = (rend >= 0 ? "+" : "") + formatEuro(rend)
             return `<div class="metricasKpiCard mkpiCardActivo" style="border-top-color:${color}" data-kpi="${eurStr}">
@@ -297,21 +436,29 @@ function mUpdateKpis(payload) {
     }
 
     mSyncTopBar(summaries, rendimiento, invertido, totalCuenta)
-    const bonosRows   = Array.isArray(bonos) ? bonos : []
-    const bonosNeto   = bonosRows.reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
-    const bonosGub    = bonosRows.filter((r) => r.tipo === "gubernamental")
+    const bonosRows = Array.isArray(bonos) ? bonos : []
+    const bonosNeto = bonosRows.reduce(
+        (s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""),
+        0
+    )
+    const bonosGub = bonosRows
+        .filter((r) => r.tipo === "gubernamental")
         .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
-    const bonosCorp   = bonosRows.filter((r) => r.tipo === "corporativo")
+    const bonosCorp = bonosRows
+        .filter((r) => r.tipo === "corporativo")
         .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
 
-    mSetKpi("mkpiDividendos",  formatEuro(totalDiv))
-    mSetKpi("mkpiInteres",     formatEuro(totalInt))
-    mSetKpi("mkpiBonos",       formatEuro(bonosNeto))
-    mSetKpi("mkpiBonosGub",    formatEuro(bonosGub))
-    mSetKpi("mkpiBonosCorp",   formatEuro(bonosCorp))
+    mSetKpi("mkpiDividendos", formatEuro(totalDiv))
+    mSetKpi("mkpiInteres", formatEuro(totalInt))
+    mSetKpi("mkpiBonos", formatEuro(bonosNeto))
+    mSetKpi("mkpiBonosGub", formatEuro(bonosGub))
+    mSetKpi("mkpiBonosCorp", formatEuro(bonosCorp))
 
     const rfRows = Array.isArray(rentaFija) ? rentaFija : []
-    const rfNeto = rfRows.reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const rfNeto = rfRows.reduce(
+        (s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""),
+        0
+    )
 
     mSetKpi("mkpiRentaFija", formatEuro(rfNeto))
 
@@ -319,22 +466,26 @@ function mUpdateKpis(payload) {
     if (rfGroup) rfGroup.classList.toggle("hidden", bonosRows.length === 0 && rfRows.length === 0)
 
     // ── Mercado Privado ───────────────────────────────────────────────
-    const pmRows        = Array.isArray(privateMarket) ? privateMarket : []
-    const pmLlamado     = pmRows.reduce((s, r) => s + parseEuroNumber(r.llamado     || ""), 0)
+    const pmRows = Array.isArray(privateMarket) ? privateMarket : []
+    const pmLlamado = pmRows.reduce((s, r) => s + parseEuroNumber(r.llamado || ""), 0)
     const pmDistribuido = pmRows.reduce((s, r) => s + parseEuroNumber(r.distribuido || ""), 0)
     const pmValorActual = pmRows.reduce((s, r) => s + parseEuroNumber(r.valorActual || ""), 0)
-    const pmNeto        = pmDistribuido + pmValorActual - pmLlamado
-    const pmTvpi        = pmLlamado > 0 ? (pmDistribuido + pmValorActual) / pmLlamado : null
-    const pmDpi         = pmLlamado > 0 ? pmDistribuido / pmLlamado : null
-    const pmRvpi        = pmLlamado > 0 ? pmValorActual / pmLlamado : null
-    const fmtX = (v) => v !== null ? v.toFixed(2) + "x" : "—"
-    mSetKpi("mkpiPmLlamado",     formatEuro(pmLlamado))
+    const pmNeto = pmDistribuido + pmValorActual - pmLlamado
+    const pmTvpi = pmLlamado > 0 ? (pmDistribuido + pmValorActual) / pmLlamado : null
+    const pmDpi = pmLlamado > 0 ? pmDistribuido / pmLlamado : null
+    const pmRvpi = pmLlamado > 0 ? pmValorActual / pmLlamado : null
+    const fmtX = (v) => (v !== null ? v.toFixed(2) + "x" : "—")
+    mSetKpi("mkpiPmLlamado", formatEuro(pmLlamado))
     mSetKpi("mkpiPmDistribuido", formatEuro(pmDistribuido))
     mSetKpi("mkpiPmValorActual", formatEuro(pmValorActual))
-    mSetKpi("mkpiPmNeto",        formatEuro(pmNeto), pmNeto >= 0 ? "mPositive" : "mNegative")
-    mSetKpi("mkpiPmTvpi",        fmtX(pmTvpi),  pmTvpi !== null && pmTvpi >= 1 ? "mPositive" : pmTvpi !== null ? "mNegative" : "")
-    mSetKpi("mkpiPmDpi",         fmtX(pmDpi))
-    mSetKpi("mkpiPmRvpi",        fmtX(pmRvpi))
+    mSetKpi("mkpiPmNeto", formatEuro(pmNeto), pmNeto >= 0 ? "mPositive" : "mNegative")
+    mSetKpi(
+        "mkpiPmTvpi",
+        fmtX(pmTvpi),
+        pmTvpi !== null && pmTvpi >= 1 ? "mPositive" : pmTvpi !== null ? "mNegative" : ""
+    )
+    mSetKpi("mkpiPmDpi", fmtX(pmDpi))
+    mSetKpi("mkpiPmRvpi", fmtX(pmRvpi))
     const pmGroup = document.getElementById("mkpiGroupPm")
     if (pmGroup) pmGroup.classList.toggle("hidden", pmRows.length === 0)
 
@@ -348,52 +499,61 @@ function mUpdateKpis(payload) {
 
     // Media mensual y proyección anual — basadas en el rango temporal de dividendos
     const divDates = dividendos
-        .map(r => {
+        .map((r) => {
             const p = String(r.fecha || "").split("-")
             if (p.length !== 3) return null
             const mon = mParseEsMonth(p[1]) || parseInt(p[1])
-            const yr  = mParseShortYear(p[2])
+            const yr = mParseShortYear(p[2])
             if (!mon || !yr || mon < 1 || mon > 12) return null
             return new Date(yr, mon - 1, parseInt(p[0]) || 1)
         })
-        .filter(Boolean).sort((a, b) => a - b)
-    let pasivosPerMes = 0, pasivosPerAnio = 0
+        .filter(Boolean)
+        .sort((a, b) => a - b)
+    let pasivosPerMes = 0,
+        pasivosPerAnio = 0
     if (divDates.length > 0) {
         const now = new Date()
-        const meses = Math.max(1, (now.getFullYear() - divDates[0].getFullYear()) * 12 + (now.getMonth() - divDates[0].getMonth()) + 1)
-        pasivosPerMes  = totalPasivos / meses
+        const meses = Math.max(
+            1,
+            (now.getFullYear() - divDates[0].getFullYear()) * 12 + (now.getMonth() - divDates[0].getMonth()) + 1
+        )
+        pasivosPerMes = totalPasivos / meses
         pasivosPerAnio = pasivosPerMes * 12
     } else if (totalPasivos > 0) {
-        pasivosPerMes  = totalPasivos / 12
+        pasivosPerMes = totalPasivos / 12
         pasivosPerAnio = totalPasivos
     }
-    mSetKpi("mkpiPasivosPerMes",  formatEuro(pasivosPerMes),  pasivosPerMes  >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiPasivosPerMes", formatEuro(pasivosPerMes), pasivosPerMes >= 0 ? "mPositive" : "mNegative")
     mSetKpi("mkpiPasivosPerAnio", formatEuro(pasivosPerAnio), pasivosPerAnio >= 0 ? "mPositive" : "mNegative")
 
     mSetKpi("mkpiPasivosYield", formatPercent(pasivosYield), pasivosYield > 0 ? "mPositive" : "")
     const pasivosGroup = document.getElementById("mkpiGroupPasivos")
-    if (pasivosGroup) pasivosGroup.classList.toggle("hidden",
-        dividendos.length === 0 && intereses.length === 0 && bonosRows.length === 0 && rfRows.length === 0)
+    if (pasivosGroup)
+        pasivosGroup.classList.toggle(
+            "hidden",
+            dividendos.length === 0 && intereses.length === 0 && bonosRows.length === 0 && rfRows.length === 0
+        )
 
     // ── Concentración top 5 ───────────────────────────────────
-    const topSet2 = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val }
+    const topSet2 = (id, val) => {
+        const el = document.getElementById(id)
+        if (el) el.textContent = val
+    }
     topSet2("topTotalDividendos", formatEuro(totalDiv))
-    topSet2("topTotalInteres",    formatEuro(totalInt))
-    topSet2("topTotalRentaFija",  formatEuro(bonosNeto + rfNeto))
+    topSet2("topTotalInteres", formatEuro(totalInt))
+    topSet2("topTotalRentaFija", formatEuro(bonosNeto + rfNeto))
 }
 
 // ── charts ─────────────────────────────────────────────────────────────────
 
 function mDistMetricLabel(metric) {
     if (metric === "rendimientoEur") return "Rendimiento (€)"
-    if (metric === "invertidoEur")   return "Invertido (€)"
+    if (metric === "invertidoEur") return "Invertido (€)"
     return "Valor actual (€)"
 }
 
 function mDistAssetVal(a, metric) {
-    return metric === "rendimientoEur" ? a.rendimientoEur
-         : metric === "invertidoEur"   ? a.invertidoEur
-         : a.netoActualEur
+    return metric === "rendimientoEur" ? a.rendimientoEur : metric === "invertidoEur" ? a.invertidoEur : a.netoActualEur
 }
 
 function mDistBonoVal(r, metric) {
@@ -403,9 +563,10 @@ function mDistBonoVal(r, metric) {
 }
 
 function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], metric = "netoActualEur") {
-    const types  = ["cripto", "acciones", "etfs", "comoditis"]
-    const rfTotal = bonos.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
-                  + rentaFija.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
+    const types = ["cripto", "acciones", "etfs", "comoditis"]
+    const rfTotal =
+        bonos.reduce((s, r) => s + mDistBonoVal(r, metric), 0) +
+        rentaFija.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
     const labels = [...types.map((t) => M_TYPE_LABELS[t]), "Renta Fija"]
     const rawValues = [
         ...types.map((t) => summaries.filter((a) => a.type === t).reduce((s, a) => s + mDistAssetVal(a, metric), 0)),
@@ -415,18 +576,20 @@ function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], me
 
     if (displayType === "doughnut") {
         const values = rawValues.map((v) => Math.max(0, v))
-        const total  = values.reduce((a, b) => a + b, 0)
+        const total = values.reduce((a, b) => a + b, 0)
         mCreateChart("mChartTipos", {
             type: "doughnut",
             data: {
                 labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: colors,
-                    borderColor: "#0b1120",
-                    borderWidth: 3,
-                    hoverOffset: 10
-                }]
+                datasets: [
+                    {
+                        data: values,
+                        backgroundColor: colors,
+                        borderColor: "#0b1120",
+                        borderWidth: 3,
+                        hoverOffset: 10
+                    }
+                ]
             },
             options: {
                 ...M_CHART_DEFAULTS,
@@ -444,14 +607,16 @@ function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], me
             type: "bar",
             data: {
                 labels,
-                datasets: [{
-                    label: mDistMetricLabel(metric),
-                    data: rawValues,
-                    backgroundColor: colors.map((c) => c + "cc"),
-                    borderColor: colors,
-                    borderWidth: 1,
-                    borderRadius: 6
-                }]
+                datasets: [
+                    {
+                        label: mDistMetricLabel(metric),
+                        data: rawValues,
+                        backgroundColor: colors.map((c) => c + "cc"),
+                        borderColor: colors,
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }
+                ]
             },
             options: {
                 ...M_CHART_DEFAULTS,
@@ -487,7 +652,9 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
         ...Object.entries(rfMap).map(([name, val]) => ({ name, _val: val }))
     ]
     const allItems = [
-        ...summaries.filter((a) => _metricasActivosFilter.has(a.type)).map((a) => ({ name: a.name, _val: mDistAssetVal(a, metric), color: a.color || "" })),
+        ...summaries
+            .filter((a) => _metricasActivosFilter.has(a.type))
+            .map((a) => ({ name: a.name, _val: mDistAssetVal(a, metric), color: a.color || "" })),
         ...extras
     ].sort((a, b) => b._val - a._val)
 
@@ -497,18 +664,20 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
 
     if (displayType === "doughnut") {
         const values = rawValues.map((v) => Math.max(0, v))
-        const total  = values.reduce((a, b) => a + b, 0)
+        const total = values.reduce((a, b) => a + b, 0)
         mCreateChart("mChartActivos", {
             type: "doughnut",
             data: {
                 labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: colors,
-                    borderColor: "#0b1120",
-                    borderWidth: 2,
-                    hoverOffset: 10
-                }]
+                datasets: [
+                    {
+                        data: values,
+                        backgroundColor: colors,
+                        borderColor: "#0b1120",
+                        borderWidth: 2,
+                        hoverOffset: 10
+                    }
+                ]
             },
             options: {
                 ...M_CHART_DEFAULTS,
@@ -525,14 +694,16 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
             type: "bar",
             data: {
                 labels,
-                datasets: [{
-                    label: mDistMetricLabel(metric),
-                    data: rawValues,
-                    backgroundColor: colors.map((c) => c + "bb"),
-                    borderColor: colors,
-                    borderWidth: 1,
-                    borderRadius: 4
-                }]
+                datasets: [
+                    {
+                        label: mDistMetricLabel(metric),
+                        data: rawValues,
+                        backgroundColor: colors.map((c) => c + "bb"),
+                        borderColor: colors,
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }
+                ]
             },
             options: {
                 ...M_CHART_DEFAULTS,
@@ -549,11 +720,13 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
 }
 
 function mRenderRendTipos(summaries) {
-    const types  = ["cripto", "acciones", "etfs", "comoditis"]
-    const pairs  = types.map((t) => ({
-        label: M_TYPE_LABELS[t],
-        value: summaries.filter((a) => a.type === t).reduce((s, a) => s + a.rendimientoEur, 0)
-    })).sort((a, b) => b.value - a.value)
+    const types = ["cripto", "acciones", "etfs", "comoditis"]
+    const pairs = types
+        .map((t) => ({
+            label: M_TYPE_LABELS[t],
+            value: summaries.filter((a) => a.type === t).reduce((s, a) => s + a.rendimientoEur, 0)
+        }))
+        .sort((a, b) => b.value - a.value)
     const labels = pairs.map((p) => p.label)
     const values = pairs.map((p) => p.value)
     const colors = values.map((v) => (v >= 0 ? "#2ecc71cc" : "#e74c3ccc"))
@@ -563,14 +736,16 @@ function mRenderRendTipos(summaries) {
         type: "bar",
         data: {
             labels,
-            datasets: [{
-                label: "Rendimiento (€)",
-                data: values,
-                backgroundColor: colors,
-                borderColor: borders,
-                borderWidth: 1,
-                borderRadius: 6
-            }]
+            datasets: [
+                {
+                    label: "Rendimiento (€)",
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: borders,
+                    borderWidth: 1,
+                    borderRadius: 6
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -604,14 +779,16 @@ function mRenderRendActivos(summaries) {
         type: "bar",
         data: {
             labels,
-            datasets: [{
-                label: "Rendimiento (€)",
-                data: values,
-                backgroundColor: colors,
-                borderColor: borders,
-                borderWidth: 1,
-                borderRadius: 4
-            }]
+            datasets: [
+                {
+                    label: "Rendimiento (€)",
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: borders,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -653,15 +830,18 @@ function mRenderDividendos(dividendos, colorMap = {}) {
     const toggle = document.getElementById("mDivYearToggle")
     if (toggle) {
         const opts = [...years, "total"]
-        toggle.innerHTML = opts.map(y =>
-            `<button class="mToggleBtn${y === _metricasDivYear ? " active" : ""}" data-divy="${y}">${y === "total" ? "Total" : y}</button>`
-        ).join("")
+        toggle.innerHTML = opts
+            .map(
+                (y) =>
+                    `<button class="mToggleBtn${y === _metricasDivYear ? " active" : ""}" data-divy="${y}">${y === "total" ? "Total" : y}</button>`
+            )
+            .join("")
         if (!toggle.dataset.bound) {
             toggle.dataset.bound = "true"
             toggle.addEventListener("click", (e) => {
                 const btn = e.target.closest("[data-divy]")
                 if (!btn) return
-                toggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+                toggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasDivYear = btn.dataset.divy
                 setChartPref("metricasDivYear", _metricasDivYear)
@@ -674,9 +854,8 @@ function mRenderDividendos(dividendos, colorMap = {}) {
 }
 
 function mDrawDividendosCharts(dividendos, colorMap, getYear) {
-    const filtered = _metricasDivYear === "total"
-        ? dividendos
-        : dividendos.filter(r => getYear(r) === _metricasDivYear)
+    const filtered =
+        _metricasDivYear === "total" ? dividendos : dividendos.filter((r) => getYear(r) === _metricasDivYear)
 
     const map = {}
     filtered.forEach((r) => {
@@ -711,14 +890,16 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
         type: "bar",
         data: {
             labels,
-            datasets: [{
-                label: "Dividendos (€)",
-                data: values,
-                backgroundColor: colors.map((c) => c + "bb"),
-                borderColor: colors,
-                borderWidth: 1,
-                borderRadius: 4
-            }]
+            datasets: [
+                {
+                    label: "Dividendos (€)",
+                    data: values,
+                    backgroundColor: colors.map((c) => c + "bb"),
+                    borderColor: colors,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -735,7 +916,9 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
                     grid: { color: "rgba(255,255,255,0.06)" },
                     border: { display: false },
                     max: maxVal * 1.05,
-                    afterFit(scale) { scale.height = 0 }
+                    afterFit(scale) {
+                        scale.height = 0
+                    }
                 },
                 y: mAxisY(12)
             }
@@ -750,7 +933,10 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
 
         mCreateChart("mChartDividendosAxis", {
             type: "bar",
-            data: { labels: [""], datasets: [{ data: [0], backgroundColor: "transparent", borderColor: "transparent", borderWidth: 0 }] },
+            data: {
+                labels: [""],
+                datasets: [{ data: [0], backgroundColor: "transparent", borderColor: "transparent", borderWidth: 0 }]
+            },
             options: {
                 ...M_CHART_DEFAULTS,
                 indexAxis: "y",
@@ -778,11 +964,21 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
     const donutTotal = values.reduce((a, b) => a + b, 0)
     mCreateChart("mChartDividendosDonut", {
         type: "doughnut",
-        data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: "#0b1120", borderWidth: 2, hoverOffset: 10 }] },
+        data: {
+            labels,
+            datasets: [
+                { data: values, backgroundColor: colors, borderColor: "#0b1120", borderWidth: 2, hoverOffset: 10 }
+            ]
+        },
         options: {
-            ...M_CHART_DEFAULTS, cutout: "55%",
+            ...M_CHART_DEFAULTS,
+            cutout: "55%",
             layout: { padding: { bottom: 0 } },
-            plugins: { ...M_CHART_DEFAULTS.plugins, legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" }, tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, donutTotal) } } }
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, donutTotal) } }
+            }
         }
     })
 }
@@ -796,7 +992,10 @@ let _metricasInvertidoYear = getChartPref("metricasInvertidoYear", null)
 function mRenderDivMensual(dividendos, colorMap = {}) {
     const section = document.getElementById("mSectionDivMensual")
     const rows = Array.isArray(dividendos) ? dividendos : []
-    if (!rows.length) { if (section) section.classList.add("hidden"); return }
+    if (!rows.length) {
+        if (section) section.classList.add("hidden")
+        return
+    }
     if (section) section.classList.remove("hidden")
 
     function dYear(fecha) {
@@ -809,26 +1008,28 @@ function mRenderDivMensual(dividendos, colorMap = {}) {
         const p = String(fecha || "").split("-")
         if (p.length !== 3) return -1
         const mon = mParseEsMonth(p[1]) || parseInt(p[1])
-        return (mon >= 1 && mon <= 12) ? mon - 1 : -1
+        return mon >= 1 && mon <= 12 ? mon - 1 : -1
     }
 
-    const years = [...new Set(rows.map(r => dYear(r.fecha)).filter(Boolean))]
-        .sort((a, b) => Number(a) - Number(b))
+    const years = [...new Set(rows.map((r) => dYear(r.fecha)).filter(Boolean))].sort((a, b) => Number(a) - Number(b))
 
     if (!_metricasDivMensualYear || !years.includes(_metricasDivMensualYear))
         _metricasDivMensualYear = years[years.length - 1] || null
 
     const yearToggle = document.getElementById("mDivMensualYearToggle")
     if (yearToggle) {
-        yearToggle.innerHTML = years.map(y =>
-            `<button class="mToggleBtn${y === _metricasDivMensualYear ? " active" : ""}" data-divmy="${y}">${y}</button>`
-        ).join("")
+        yearToggle.innerHTML = years
+            .map(
+                (y) =>
+                    `<button class="mToggleBtn${y === _metricasDivMensualYear ? " active" : ""}" data-divmy="${y}">${y}</button>`
+            )
+            .join("")
         if (!yearToggle.dataset.bound) {
             yearToggle.dataset.bound = "true"
             yearToggle.addEventListener("click", (e) => {
                 const btn = e.target.closest("[data-divmy]")
                 if (!btn) return
-                yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+                yearToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasDivMensualYear = btn.dataset.divmy
                 setChartPref("metricasDivMensualYear", _metricasDivMensualYear)
@@ -869,56 +1070,66 @@ function mDrawDivMensualTabla(rows, year, dYear, dMonth) {
     if (!head || !body || !foot) return
 
     const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-    const yearRows = rows.filter(r => dYear(r.fecha) === year)
-    const stocks = [...new Set(yearRows.map(r => r.instrumento || "Desconocido"))].sort()
+    const yearRows = rows.filter((r) => dYear(r.fecha) === year)
+    const stocks = [...new Set(yearRows.map((r) => r.instrumento || "Desconocido"))].sort()
 
     const monthData = {}
-    stocks.forEach(s => { monthData[s] = Array(12).fill(0) })
-    yearRows.forEach(r => {
+    stocks.forEach((s) => {
+        monthData[s] = Array(12).fill(0)
+    })
+    yearRows.forEach((r) => {
         const m = dMonth(r.fecha)
         if (m < 0 || m > 11) return
         monthData[r.instrumento || "Desconocido"][m] += parseEuroNumber(r.total || "")
     })
 
     const monthTotals = Array(12).fill(0)
-    stocks.forEach(s => monthData[s].forEach((v, i) => { monthTotals[i] += v }))
+    stocks.forEach((s) =>
+        monthData[s].forEach((v, i) => {
+            monthTotals[i] += v
+        })
+    )
 
-    head.innerHTML = `<tr><th>Mes</th>${stocks.map(s => `<th>${escapeMetricasHtml(s)}</th>`).join("")}<th>Total</th></tr>`
+    head.innerHTML = `<tr><th>Mes</th>${stocks.map((s) => `<th>${escapeMetricasHtml(s)}</th>`).join("")}<th>Total</th></tr>`
 
     body.innerHTML = MONTH_LABELS.map((label, i) => {
         const rowTotal = stocks.reduce((t, s) => t + monthData[s][i], 0)
         if (rowTotal === 0) return ""
-        const cells = stocks.map(s => {
-            const v = monthData[s][i]
-            return `<td>${v > 0 ? formatEuro(v) : ""}</td>`
-        }).join("")
+        const cells = stocks
+            .map((s) => {
+                const v = monthData[s][i]
+                return `<td>${v > 0 ? formatEuro(v) : ""}</td>`
+            })
+            .join("")
         return `<tr><td class="mDivTabMes">${label}</td>${cells}<td class="mDivTabTotal">${formatEuro(rowTotal)}</td></tr>`
     }).join("")
 
     const grandTotal = monthTotals.reduce((t, v) => t + v, 0)
-    const footCells = stocks.map(s => {
-        const t = monthData[s].reduce((a, b) => a + b, 0)
-        return `<td class="mDivTabFootCell">${t > 0 ? formatEuro(t) : ""}</td>`
-    }).join("")
+    const footCells = stocks
+        .map((s) => {
+            const t = monthData[s].reduce((a, b) => a + b, 0)
+            return `<td class="mDivTabFootCell">${t > 0 ? formatEuro(t) : ""}</td>`
+        })
+        .join("")
     foot.innerHTML = `<tr><td class="mDivTabMes mDivTabFootCell">Total</td>${footCells}<td class="mDivTabTotal mDivTabFootCell">${formatEuro(grandTotal)}</td></tr>`
 }
 
 function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
-    const yearRows = rows.filter(r => dYear(r.fecha) === year)
-    const stocks = [...new Set(yearRows.map(r => r.instrumento || "Desconocido"))].sort()
+    const yearRows = rows.filter((r) => dYear(r.fecha) === year)
+    const stocks = [...new Set(yearRows.map((r) => r.instrumento || "Desconocido"))].sort()
 
     const monthData = {}
     const monthDetails = {}
-    stocks.forEach(s => {
+    stocks.forEach((s) => {
         monthData[s] = Array(12).fill(0)
-        monthDetails[s] = Array.from({length:12}, () => ({ acciones: 0, impuestos: 0, xAccionStr: "" }))
+        monthDetails[s] = Array.from({ length: 12 }, () => ({ acciones: 0, impuestos: 0, xAccionStr: "" }))
     })
-    yearRows.forEach(r => {
+    yearRows.forEach((r) => {
         const m = dMonth(r.fecha)
         if (m < 0 || m > 11) return
         const name = r.instrumento || "Desconocido"
         monthData[name][m] += parseEuroNumber(r.total || "")
-        monthDetails[name][m].acciones  += parseFloat(String(r.acciones  || "").replace(",", ".")) || 0
+        monthDetails[name][m].acciones += parseFloat(String(r.acciones || "").replace(",", ".")) || 0
         monthDetails[name][m].impuestos += parseEuroNumber(r.impuestos || "")
         if (r.dividendoAccion) monthDetails[name][m].xAccionStr = String(r.dividendoAccion).trim()
     })
@@ -976,8 +1187,8 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
                     const rawH = Math.abs(bar.height)
                     const barW = bar.width || 40
                     const segTop = Math.min(bar.y, bar.base)
-                    const w  = barW - 2
-                    const x  = bar.x - barW / 2 + 1
+                    const w = barW - 2
+                    const x = bar.x - barW / 2 + 1
                     const dY = segTop + SEG_GAP
                     const dH = Math.max(rawH - SEG_GAP - 1, 2)
 
@@ -996,17 +1207,16 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
                     if (ctx.measureText(txt).width > maxW) {
                         txt = dataset.label.split(/[\s&]+/)[0]
                         if (ctx.measureText(txt).width > maxW) {
-                            while (txt.length > 2 && ctx.measureText(txt + "…").width > maxW)
-                                txt = txt.slice(0, -1)
+                            while (txt.length > 2 && ctx.measureText(txt + "…").width > maxW) txt = txt.slice(0, -1)
                             txt += "…"
                         }
                     }
 
                     ctx.shadowColor = "rgba(0,0,0,0.8)"
-                    ctx.shadowBlur   = 4
-                    ctx.fillStyle    = "#ffffff"
+                    ctx.shadowBlur = 4
+                    ctx.fillStyle = "#ffffff"
                     ctx.fillText(txt, bar.x, dY + dH / 2)
-                    ctx.shadowBlur   = 0
+                    ctx.shadowBlur = 0
                 })
             })
 
@@ -1016,7 +1226,7 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
 
     // Register custom tooltip positioner centered on each bar segment
     if (window.Chart && !Chart.Tooltip.positioners.segCenter) {
-        Chart.Tooltip.positioners.segCenter = function(elements, eventPos) {
+        Chart.Tooltip.positioners.segCenter = function (elements, eventPos) {
             if (!elements.length) return false
             const el = elements[0].element
             const cx = el.x
@@ -1037,7 +1247,7 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
                 x: { ...mAxisX(), stacked: true },
                 y: {
                     stacked: true,
-                    ticks: { color: "#ccd6f6", callback: v => formatEuro(v) },
+                    ticks: { color: "#ccd6f6", callback: (v) => formatEuro(v) },
                     grid: { color: "rgba(255,255,255,0.06)" }
                 }
             },
@@ -1046,7 +1256,10 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
                 legend: {
                     position: "top",
                     labels: {
-                        color: "#ffffff", font: { size: 11 }, padding: 12, boxWidth: 12,
+                        color: "#ffffff",
+                        font: { size: 11 },
+                        padding: 12,
+                        boxWidth: 12,
                         generateLabels(chart) {
                             return chart.data.datasets.map((ds, i) => ({
                                 text: ds.label,
@@ -1068,7 +1281,7 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
                         title: (items) => {
                             if (!items.length) return ""
                             const tp = items[0].chart.tooltip.dataPoints || items
-                            const total = tp.filter(i => i.raw > 0).reduce((s, i) => s + i.raw, 0)
+                            const total = tp.filter((i) => i.raw > 0).reduce((s, i) => s + i.raw, 0)
                             return `${items[0].label}  ·  Total: ${formatEuro(total)}`
                         },
                         label: (c) => {
@@ -1077,9 +1290,9 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
                             const acc = det.acciones || 0
                             const imp = det.impuestos || 0
                             const lines = [` ${c.dataset.label}: ${formatEuro(c.raw)}`]
-                            if (acc > 0)           lines.push(`   Acciones: ${acc % 1 === 0 ? acc : acc.toFixed(4)}`)
-                            if (imp > 0)           lines.push(`   Impuestos: ${formatEuro(imp)}`)
-                            if (det.xAccionStr)    lines.push(`   Total/acción: ${det.xAccionStr}`)
+                            if (acc > 0) lines.push(`   Acciones: ${acc % 1 === 0 ? acc : acc.toFixed(4)}`)
+                            if (imp > 0) lines.push(`   Impuestos: ${formatEuro(imp)}`)
+                            if (det.xAccionStr) lines.push(`   Total/acción: ${det.xAccionStr}`)
                             return lines
                         },
                         labelColor: (c) => ({
@@ -1103,7 +1316,8 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
             if (!_divTip) {
                 _divTip = document.createElement("div")
                 _divTip.id = "mDivMensualAxisTip"
-                _divTip.style.cssText = "position:fixed;z-index:9999;pointer-events:none;background:#0f1724;border:1px solid #273246;border-radius:8px;padding:10px 14px;font-size:12px;color:#e5edf9;min-width:180px;box-shadow:0 4px 20px rgba(0,0,0,0.6);display:none;"
+                _divTip.style.cssText =
+                    "position:fixed;z-index:9999;pointer-events:none;background:#0f1724;border:1px solid #273246;border-radius:8px;padding:10px 14px;font-size:12px;color:#e5edf9;min-width:180px;box-shadow:0 4px 20px rgba(0,0,0,0.6);display:none;"
                 document.body.appendChild(_divTip)
             }
             return _divTip
@@ -1126,11 +1340,15 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
 
             // Find closest month index by x position
             const scale = chart.scales.x
-            let bestIdx = -1, bestDist = Infinity
+            let bestIdx = -1,
+                bestDist = Infinity
             for (let i = 0; i < 12; i++) {
                 const px = scale.getPixelForValue(i)
                 const d = Math.abs(mx - px)
-                if (d < bestDist) { bestDist = d; bestIdx = i }
+                if (d < bestDist) {
+                    bestDist = d
+                    bestIdx = i
+                }
             }
             if (bestIdx < 0 || bestDist > (ca.right - ca.left) / 14) {
                 tip.style.display = "none"
@@ -1142,7 +1360,10 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
                 if (meta.hidden) return s
                 return s + (ds.data[bestIdx] || 0)
             }, 0)
-            if (monthTotal <= 0) { tip.style.display = "none"; return }
+            if (monthTotal <= 0) {
+                tip.style.display = "none"
+                return
+            }
 
             const lines = chart.data.datasets
                 .map((ds, di) => {
@@ -1152,26 +1373,33 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
                     if (v <= 0) return null
                     const pct = ((v / monthTotal) * 100).toFixed(1)
                     const col = (ds._color || "#888") + "ee"
-                    return `<div style="display:flex;align-items:center;gap:7px;margin-top:5px">` +
+                    return (
+                        `<div style="display:flex;align-items:center;gap:7px;margin-top:5px">` +
                         `<span style="width:10px;height:10px;border-radius:3px;background:${col};flex-shrink:0"></span>` +
                         `<span style="flex:1">${ds.label}</span>` +
                         `<span style="font-weight:600;margin-left:8px">${formatEuro(v)}</span>` +
                         `<span style="color:#94a3b8;min-width:44px;text-align:right">${pct}%</span>` +
                         `</div>`
-                }).filter(Boolean).join("")
+                    )
+                })
+                .filter(Boolean)
+                .join("")
 
-            tip.innerHTML = `<div style="font-weight:700;font-size:13px;margin-bottom:4px;border-bottom:1px solid #273246;padding-bottom:6px">` +
+            tip.innerHTML =
+                `<div style="font-weight:700;font-size:13px;margin-bottom:4px;border-bottom:1px solid #273246;padding-bottom:6px">` +
                 `${labels[bestIdx]} · <span style="color:#3b82f6">${formatEuro(monthTotal)}</span></div>${lines}`
             tip.style.display = "block"
             const tw = tip.offsetWidth || 200
             const th = tip.offsetHeight || 100
-            const vw = window.innerWidth, vh = window.innerHeight
-            let tx = e.clientX + 14, ty = e.clientY - th / 2
+            const vw = window.innerWidth,
+                vh = window.innerHeight
+            let tx = e.clientX + 14,
+                ty = e.clientY - th / 2
             if (tx + tw > vw - 8) tx = e.clientX - tw - 14
             if (ty < 8) ty = 8
             if (ty + th > vh - 8) ty = vh - th - 8
             tip.style.left = tx + "px"
-            tip.style.top  = ty + "px"
+            tip.style.top = ty + "px"
         })
 
         canvas.addEventListener("mouseleave", () => {
@@ -1191,12 +1419,14 @@ function mRenderBonosTipos(bonos) {
     }
     if (section) section.classList.remove("hidden")
 
-    const GUB_COLOR  = "#9b59b6"
+    const GUB_COLOR = "#9b59b6"
     const CORP_COLOR = "#c39bd3"
 
-    const gubNeto  = bonos.filter((r) => r.tipo === "gubernamental")
+    const gubNeto = bonos
+        .filter((r) => r.tipo === "gubernamental")
         .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
-    const corpNeto = bonos.filter((r) => r.tipo === "corporativo")
+    const corpNeto = bonos
+        .filter((r) => r.tipo === "corporativo")
         .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
     const total = gubNeto + corpNeto
 
@@ -1204,13 +1434,15 @@ function mRenderBonosTipos(bonos) {
         type: "doughnut",
         data: {
             labels: ["Gubernamentales", "Corporativos"],
-            datasets: [{
-                data: [Math.max(0, gubNeto), Math.max(0, corpNeto)],
-                backgroundColor: [GUB_COLOR + "cc", CORP_COLOR + "cc"],
-                borderColor: "#0b1120",
-                borderWidth: 3,
-                hoverOffset: 10
-            }]
+            datasets: [
+                {
+                    data: [Math.max(0, gubNeto), Math.max(0, corpNeto)],
+                    backgroundColor: [GUB_COLOR + "cc", CORP_COLOR + "cc"],
+                    borderColor: "#0b1120",
+                    borderWidth: 3,
+                    hoverOffset: 10
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -1237,8 +1469,8 @@ function mRenderBonosInst(bonos) {
     const sorted = Object.entries(map).sort((a, b) => b[1] - a[1])
     const labels = sorted.map(([name]) => name)
     const values = sorted.map(([, v]) => v)
-    const colors = values.map((v) => v >= 0 ? "#9b59b6bb" : "#e74c3cbb")
-    const borders = values.map((v) => v >= 0 ? "#9b59b6" : "#e74c3c")
+    const colors = values.map((v) => (v >= 0 ? "#9b59b6bb" : "#e74c3cbb"))
+    const borders = values.map((v) => (v >= 0 ? "#9b59b6" : "#e74c3c"))
 
     const wrap = document.getElementById("mChartBonosInstWrap")
     if (wrap) wrap.style.height = Math.max(180, sorted.length * 36 + 40) + "px"
@@ -1247,14 +1479,16 @@ function mRenderBonosInst(bonos) {
         type: "bar",
         data: {
             labels,
-            datasets: [{
-                label: "Interés neto (€)",
-                data: values,
-                backgroundColor: colors,
-                borderColor: borders,
-                borderWidth: 1,
-                borderRadius: 4
-            }]
+            datasets: [
+                {
+                    label: "Interés neto (€)",
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: borders,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -1273,22 +1507,30 @@ function mRenderBonosInst(bonos) {
 
 function mRenderRentaFijaTipos(rentaFija) {
     const section = document.getElementById("mSectionRentaFija")
-    if (!rentaFija.length) { if (section) section.classList.add("hidden"); return }
+    if (!rentaFija.length) {
+        if (section) section.classList.add("hidden")
+        return
+    }
     if (section) section.classList.remove("hidden")
 
-    const total = rentaFija.reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
+    const total = rentaFija.reduce(
+        (s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""),
+        0
+    )
 
     mCreateChart("mChartRfTipos", {
         type: "doughnut",
         data: {
             labels: ["Interés Fijo"],
-            datasets: [{
-                data: [Math.max(0, total)],
-                backgroundColor: ["#00bcd4cc"],
-                borderColor: "#0b1120",
-                borderWidth: 3,
-                hoverOffset: 10
-            }]
+            datasets: [
+                {
+                    data: [Math.max(0, total)],
+                    backgroundColor: ["#00bcd4cc"],
+                    borderColor: "#0b1120",
+                    borderWidth: 3,
+                    hoverOffset: 10
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -1310,11 +1552,11 @@ function mRenderRentaFijaInst(rentaFija) {
         const neto = parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || "")
         map[name] = (map[name] || 0) + neto
     })
-    const sorted  = Object.entries(map).sort((a, b) => b[1] - a[1])
-    const labels  = sorted.map(([name]) => name)
-    const values  = sorted.map(([, v]) => v)
-    const colors  = values.map((v) => v >= 0 ? "#00bcd4bb" : "#e74c3cbb")
-    const borders = values.map((v) => v >= 0 ? "#00bcd4" : "#e74c3c")
+    const sorted = Object.entries(map).sort((a, b) => b[1] - a[1])
+    const labels = sorted.map(([name]) => name)
+    const values = sorted.map(([, v]) => v)
+    const colors = values.map((v) => (v >= 0 ? "#00bcd4bb" : "#e74c3cbb"))
+    const borders = values.map((v) => (v >= 0 ? "#00bcd4" : "#e74c3c"))
 
     const wrap = document.getElementById("mChartRfInstWrap")
     if (wrap) wrap.style.height = Math.max(180, sorted.length * 36 + 40) + "px"
@@ -1323,14 +1565,16 @@ function mRenderRentaFijaInst(rentaFija) {
         type: "bar",
         data: {
             labels,
-            datasets: [{
-                label: "Interés neto (€)",
-                data: values,
-                backgroundColor: colors,
-                borderColor: borders,
-                borderWidth: 1,
-                borderRadius: 4
-            }]
+            datasets: [
+                {
+                    label: "Interés neto (€)",
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: borders,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -1398,18 +1642,21 @@ function mRenderGastos(yearsList, yearData) {
     const { totalMes, totalTipo, totalMensualidades, totalMovimientos } = mComputeGastosData(yearData)
     const totalGeneral = totalMensualidades + totalMovimientos
 
-    mSetKpi("mkpiGastosTotal",         formatEuro(totalGeneral))
+    mSetKpi("mkpiGastosTotal", formatEuro(totalGeneral))
     mSetKpi("mkpiGastosMensualidades", formatEuro(totalMensualidades))
-    mSetKpi("mkpiGastosMovimientos",   formatEuro(totalMovimientos))
+    mSetKpi("mkpiGastosMovimientos", formatEuro(totalMovimientos))
 
     // Year toggle
     const yearToggle = document.getElementById("mGastosYearToggle")
     if (yearToggle) {
         if (!yearToggle.dataset.bound) {
             yearToggle.dataset.bound = "true"
-            yearToggle.innerHTML = yearsList.map((y) =>
-                `<button class="mToggleBtn${String(y) === String(yearData.year) ? " active" : ""}" data-gastosyear="${y}">${y}</button>`
-            ).join("")
+            yearToggle.innerHTML = yearsList
+                .map(
+                    (y) =>
+                        `<button class="mToggleBtn${String(y) === String(yearData.year) ? " active" : ""}" data-gastosyear="${y}">${y}</button>`
+                )
+                .join("")
             yearToggle.addEventListener("click", async (e) => {
                 const btn = e.target.closest("[data-gastosyear]")
                 if (!btn) return
@@ -1418,19 +1665,24 @@ function mRenderGastos(yearsList, yearData) {
                 _metricasGastosMonth = "all"
                 setChartPref("metricasGastosMonth", _metricasGastosMonth)
                 setChartPref("metricasGastosYear", btn.dataset.gastosyear)
-                const newData = await fetch(`/api/gastos/${btn.dataset.gastosyear}`).then((r) => r.json()).catch(() => null)
+                const newData = await fetch(`/api/gastos/${btn.dataset.gastosyear}`)
+                    .then((r) => r.json())
+                    .catch(() => null)
                 if (newData) {
                     _metricasPayload.gastosYearData = newData
                     const monthToggle = document.getElementById("mGastosMonthToggle")
-                    if (monthToggle) { monthToggle.dataset.bound = ""; monthToggle.innerHTML = "" }
+                    if (monthToggle) {
+                        monthToggle.dataset.bound = ""
+                        monthToggle.innerHTML = ""
+                    }
                     mRenderGastos(yearsList, newData)
                     mRenderComparativa(_metricasPayload.ingresosYearData, newData)
                 }
             })
         } else {
-            yearToggle.querySelectorAll(".mToggleBtn").forEach((b) =>
-                b.classList.toggle("active", b.dataset.gastosyear === String(yearData.year))
-            )
+            yearToggle
+                .querySelectorAll(".mToggleBtn")
+                .forEach((b) => b.classList.toggle("active", b.dataset.gastosyear === String(yearData.year)))
         }
     }
 
@@ -1439,8 +1691,9 @@ function mRenderGastos(yearsList, yearData) {
     if (monthToggle && !monthToggle.dataset.bound) {
         monthToggle.dataset.bound = "true"
         const allBtn = `<button class="mToggleBtn${_metricasGastosMonth === "all" ? " active" : ""}" data-gastosmonth="all">Todos</button>`
-        const monthBtns = M_GASTOS_KEYS.map((k, i) =>
-            `<button class="mToggleBtn${_metricasGastosMonth === k ? " active" : ""}" data-gastosmonth="${k}">${M_GASTOS_LABELS[i]}</button>`
+        const monthBtns = M_GASTOS_KEYS.map(
+            (k, i) =>
+                `<button class="mToggleBtn${_metricasGastosMonth === k ? " active" : ""}" data-gastosmonth="${k}">${M_GASTOS_LABELS[i]}</button>`
         ).join("")
         monthToggle.innerHTML = allBtn + monthBtns
         monthToggle.addEventListener("click", (e) => {
@@ -1453,24 +1706,23 @@ function mRenderGastos(yearsList, yearData) {
             mRenderGastosCharts(yearData, totalMes, totalTipo)
         })
     } else if (monthToggle) {
-        monthToggle.querySelectorAll(".mToggleBtn").forEach((b) =>
-            b.classList.toggle("active", b.dataset.gastosmonth === _metricasGastosMonth)
-        )
+        monthToggle
+            .querySelectorAll(".mToggleBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.gastosmonth === _metricasGastosMonth))
     }
 
     mRenderGastosCharts(yearData, totalMes, totalTipo)
 }
 
-
 function mRenderGastosCharts(yearData, totalMes, totalTipo) {
     _mGastosChartsCache = { yearData, totalMes, totalTipo }
-    const mesTitle  = document.getElementById("mGastosMesTitle")
+    const mesTitle = document.getElementById("mGastosMesTitle")
     const tipoTitle = document.getElementById("mGastosTipoTitle")
-    const mesWrap   = document.getElementById("mChartGastosMesWrap")
+    const mesWrap = document.getElementById("mChartGastosMesWrap")
 
     // Left chart: always annual monthly totals, fixed label
-    if (mesTitle)  mesTitle.textContent = "Tabla Gastos"
-    if (mesWrap)   mesWrap.style.height = "300px"
+    if (mesTitle) mesTitle.textContent = "Tabla Gastos"
+    if (mesWrap) mesWrap.style.height = "300px"
 
     const mesValues = M_GASTOS_KEYS.map((k) => totalMes[k] || 0)
     const mesColors = M_GASTOS_LABELS.map((_, i) => M_PALETTE[i % M_PALETTE.length])
@@ -1478,11 +1730,25 @@ function mRenderGastosCharts(yearData, totalMes, totalTipo) {
         type: "bar",
         data: {
             labels: M_GASTOS_LABELS,
-            datasets: [{ label: "Gastos (€)", data: mesValues, backgroundColor: mesColors.map((c) => c + "bb"), borderColor: mesColors, borderWidth: 1, borderRadius: 4 }]
+            datasets: [
+                {
+                    label: "Gastos (€)",
+                    data: mesValues,
+                    backgroundColor: mesColors.map((c) => c + "bb"),
+                    borderColor: mesColors,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
         },
         options: {
-            ...M_CHART_DEFAULTS, indexAxis: "y",
-            plugins: { ...M_CHART_DEFAULTS.plugins, legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } } },
+            ...M_CHART_DEFAULTS,
+            indexAxis: "y",
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { display: false },
+                tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
+            },
             scales: { x: mAxisX(), y: mAxisY(11) }
         }
     })
@@ -1494,18 +1760,21 @@ function mRenderGastosCharts(yearData, totalMes, totalTipo) {
         if (tipoTitle) tipoTitle.textContent = "Por tipo (anual)"
         mRenderGastosTipoChart(totalTipo)
     } else {
-        const monthIdx  = M_GASTOS_KEYS.indexOf(_metricasGastosMonth)
+        const monthIdx = M_GASTOS_KEYS.indexOf(_metricasGastosMonth)
         const monthName = M_GASTOS_LABELS[monthIdx] || _metricasGastosMonth
         if (tipoTitle) tipoTitle.textContent = `Por tipo — ${monthName}`
 
         const monthTipo = {}
         ;(yearData?.months?.[_metricasGastosMonth]?.rows || []).forEach((r) => {
-            const val  = parseEuroNumber(r.cantidad || "")
+            const val = parseEuroNumber(r.cantidad || "")
             const tipo = (r.tipo || "Sin tipo").trim()
             if (val > 0) monthTipo[tipo] = (monthTipo[tipo] || 0) + val
         })
         const mensTotal = isMensualidadMonthActive(yearData, _metricasGastosMonth)
-            ? (yearData?.mensualidades || []).reduce((s, m) => s + parseEuroNumber(m.meses?.[_metricasGastosMonth] || ""), 0)
+            ? (yearData?.mensualidades || []).reduce(
+                  (s, m) => s + parseEuroNumber(m.meses?.[_metricasGastosMonth] || ""),
+                  0
+              )
             : 0
         if (mensTotal > 0) monthTipo["Mensualidades"] = (monthTipo["Mensualidades"] || 0) + mensTotal
 
@@ -1514,33 +1783,37 @@ function mRenderGastosCharts(yearData, totalMes, totalTipo) {
 }
 
 const M_GASTOS_TIPO_PALETTE = [
-    "#e74c3c",  // rojo
-    "#3498db",  // azul claro
-    "#2ecc71",  // verde
-    "#f1c40f",  // amarillo
-    "#9b59b6",  // morado
-    "#ff6b35",  // naranja
-    "#1abc9c",  // turquesa
-    "#e91e63",  // rosa/magenta
-    "#00bcd4",  // cyan
-    "#8bc34a",  // verde lima
-    "#1a5276",  // azul oscuro
-    "#a04000",  // marrón naranja
+    "#e74c3c", // rojo
+    "#3498db", // azul claro
+    "#2ecc71", // verde
+    "#f1c40f", // amarillo
+    "#9b59b6", // morado
+    "#ff6b35", // naranja
+    "#1abc9c", // turquesa
+    "#e91e63", // rosa/magenta
+    "#00bcd4", // cyan
+    "#8bc34a", // verde lima
+    "#1a5276", // azul oscuro
+    "#a04000" // marrón naranja
 ]
 
 const M_GASTOS_TIPO_FIXED = {
-    "compras":        "#00bcd4",
-    "mensualidades":  "#3498db",
-    "comidas/cenas":  "#2ecc71",
-    "comidas":        "#2ecc71",
-    "gasoil":         "#ff6b35",
-    "otros":          "#9b59b6",
-    "cafe":           "#795548",
-    "café":           "#795548",
+    compras: "#00bcd4",
+    mensualidades: "#3498db",
+    "comidas/cenas": "#2ecc71",
+    comidas: "#2ecc71",
+    gasoil: "#ff6b35",
+    otros: "#9b59b6",
+    cafe: "#795548",
+    café: "#795548"
 }
 
 function mGastosTipoColor(label) {
-    const key = String(label).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    const key = String(label)
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
     if (M_GASTOS_TIPO_FIXED[key]) return M_GASTOS_TIPO_FIXED[key]
     let hash = 0
     for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) & 0xfffff
@@ -1548,7 +1821,11 @@ function mGastosTipoColor(label) {
 }
 
 function mNormTipo(s) {
-    return String(s || "").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    return String(s || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
 }
 
 function mRenderGastosTiposKpi(totalTipo) {
@@ -1561,34 +1838,64 @@ function mRenderGastosTiposKpi(totalTipo) {
         .filter(([tipo, v]) => v > 0 && !hidden.includes(mNormTipo(tipo)))
         .sort((a, b) => b[1] - a[1])
 
-    if (!entries.length) { group.classList.add("hidden"); return }
+    if (!entries.length) {
+        group.classList.add("hidden")
+        return
+    }
     group.classList.remove("hidden")
-    container.innerHTML = entries.map(([tipo, val]) =>
-        `<div class="metricasKpiCard"><div class="mkpiLabel">${escapeMetricasHtml(tipo)}</div><div class="mkpiValue">${formatEuro(val)}</div></div>`
-    ).join("")
+    container.innerHTML = entries
+        .map(
+            ([tipo, val]) =>
+                `<div class="metricasKpiCard"><div class="mkpiLabel">${escapeMetricasHtml(tipo)}</div><div class="mkpiValue">${formatEuro(val)}</div></div>`
+        )
+        .join("")
 }
 
 function escapeMetricasHtml(s) {
-    return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
 }
 
 function mRenderGastosTipoChart(tipoData) {
-    const tipoEntries = Object.entries(tipoData).filter(([k, v]) => v > 0 && !_metricasGastosTipoFilter.has(k)).sort((a, b) => b[1] - a[1])
-    if (!tipoEntries.length) { mDestroyChart("mChartGastosTipo"); return }
+    const tipoEntries = Object.entries(tipoData)
+        .filter(([k, v]) => v > 0 && !_metricasGastosTipoFilter.has(k))
+        .sort((a, b) => b[1] - a[1])
+    if (!tipoEntries.length) {
+        mDestroyChart("mChartGastosTipo")
+        return
+    }
     const tipoLabels = tipoEntries.map(([k]) => k)
     const tipoValues = tipoEntries.map(([, v]) => v)
     const tipoColors = tipoLabels.map((label) => mGastosTipoColor(label))
-    const tipoTotal  = tipoValues.reduce((a, b) => a + b, 0)
+    const tipoTotal = tipoValues.reduce((a, b) => a + b, 0)
     mCreateChart("mChartGastosTipo", {
         type: "doughnut",
-        data: { labels: tipoLabels, datasets: [{ data: tipoValues, backgroundColor: tipoColors, borderColor: "#0b1120", borderWidth: 2, hoverOffset: 10 }] },
+        data: {
+            labels: tipoLabels,
+            datasets: [
+                {
+                    data: tipoValues,
+                    backgroundColor: tipoColors,
+                    borderColor: "#0b1120",
+                    borderWidth: 2,
+                    hoverOffset: 10
+                }
+            ]
+        },
         options: {
-            ...M_CHART_DEFAULTS, cutout: "55%",
+            ...M_CHART_DEFAULTS,
+            cutout: "55%",
             onClick: (_e, elements) => {
                 if (!elements.length) return
                 openGastosTipoPopup(tipoLabels[elements[0].index])
             },
-            plugins: { ...M_CHART_DEFAULTS.plugins, legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" }, tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } } }
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } }
+            }
         }
     })
     const canvas = document.getElementById("mChartGastosTipo")
@@ -1607,14 +1914,25 @@ function openGastosTipoPopup(tipoLabel) {
             monthScope.forEach((mk) => {
                 if (!isMensualidadMonthActive(yearData, mk)) return
                 const val = parseEuroNumber(m.meses?.[mk] || "")
-                if (val > 0) rows.push({ fecha: "—", mes: M_GASTOS_LABELS[M_GASTOS_KEYS.indexOf(mk)] || mk, nombre: m.nombre || "—", cantidad: val })
+                if (val > 0)
+                    rows.push({
+                        fecha: "—",
+                        mes: M_GASTOS_LABELS[M_GASTOS_KEYS.indexOf(mk)] || mk,
+                        nombre: m.nombre || "—",
+                        cantidad: val
+                    })
             })
         })
     } else {
         monthScope.forEach((mk) => {
             ;(yearData?.months?.[mk]?.rows || []).forEach((r) => {
                 if ((r.tipo || "Sin tipo").trim() === tipoLabel) {
-                    rows.push({ fecha: r.fecha || "—", mes: M_GASTOS_LABELS[M_GASTOS_KEYS.indexOf(mk)] || mk, nombre: r.nombre || "—", cantidad: parseEuroNumber(r.cantidad || "") })
+                    rows.push({
+                        fecha: r.fecha || "—",
+                        mes: M_GASTOS_LABELS[M_GASTOS_KEYS.indexOf(mk)] || mk,
+                        nombre: r.nombre || "—",
+                        cantidad: parseEuroNumber(r.cantidad || "")
+                    })
                 }
             })
         })
@@ -1627,18 +1945,22 @@ function openGastosTipoPopup(tipoLabel) {
     const rect = mainContent.getBoundingClientRect()
     const total = rows.reduce((s, r) => s + r.cantidad, 0)
 
-    const tableRows = rows.map((r) => `
-        <tr data-nombre="${(r.nombre||"").toLowerCase().replace(/"/g,"&quot;")}" data-cantidad="${r.cantidad}">
+    const tableRows = rows
+        .map(
+            (r) => `
+        <tr data-nombre="${(r.nombre || "").toLowerCase().replace(/"/g, "&quot;")}" data-cantidad="${r.cantidad}">
             <td>${r.fecha}</td>
             <td>${r.mes}</td>
             <td>${r.nombre}</td>
             <td style="text-align:right">${formatEuro(r.cantidad)}</td>
-        </tr>`).join("")
+        </tr>`
+        )
+        .join("")
 
-    const popupW = Math.round(rect.width  * 0.92)
+    const popupW = Math.round(rect.width * 0.92)
     const popupH = Math.round(rect.height * 0.82)
-    const popupL = rect.left + Math.round((rect.width  - popupW) / 2)
-    const popupT = rect.top  + Math.round((rect.height - popupH) / 2)
+    const popupL = rect.left + Math.round((rect.width - popupW) / 2)
+    const popupT = rect.top + Math.round((rect.height - popupH) / 2)
 
     const backdrop = document.createElement("div")
     backdrop.id = "gastosTipoBackdrop"
@@ -1680,7 +2002,10 @@ function openGastosTipoPopup(tipoLabel) {
             </table>
         </div>`
 
-    const closePopup = () => { backdrop.remove(); popup.remove() }
+    const closePopup = () => {
+        backdrop.remove()
+        popup.remove()
+    }
     backdrop.addEventListener("click", closePopup)
     document.body.appendChild(backdrop)
     document.body.appendChild(popup)
@@ -1692,14 +2017,19 @@ function openGastosTipoPopup(tipoLabel) {
     if (searchInput) {
         searchInput.addEventListener("input", () => {
             const q = searchInput.value.trim().toLowerCase()
-            let filtTotal = 0, filtCount = 0
+            let filtTotal = 0,
+                filtCount = 0
             table?.querySelectorAll("tbody tr:not(.gtTotalRow)").forEach((tr) => {
                 const match = !q || (tr.dataset.nombre || "").includes(q)
                 tr.style.display = match ? "" : "none"
-                if (match) { filtTotal += parseFloat(tr.dataset.cantidad) || 0; filtCount++ }
+                if (match) {
+                    filtTotal += parseFloat(tr.dataset.cantidad) || 0
+                    filtCount++
+                }
             })
             document.getElementById("gtTotalCell").innerHTML = `<strong>${formatEuro(filtTotal)}</strong>`
-            document.getElementById("gtPopupTotalLabel").textContent = `Total: ${formatEuro(filtTotal)} · ${filtCount} movimientos`
+            document.getElementById("gtPopupTotalLabel").textContent =
+                `Total: ${formatEuro(filtTotal)} · ${filtCount} movimientos`
         })
         searchInput.focus()
     }
@@ -1713,7 +2043,7 @@ function mSortSummaries(summaries) {
     const withDerived = summaries.map((a) => ({
         ...a,
         rendPct: a.invertidoEur > 0 ? (a.rendimientoEur / a.invertidoEur) * 100 : 0,
-        cartPct: totalCuenta > 0    ? (Math.max(0, a.netoActualEur) / totalCuenta) * 100 : 0
+        cartPct: totalCuenta > 0 ? (Math.max(0, a.netoActualEur) / totalCuenta) * 100 : 0
     }))
 
     const key = _metricasSortKey
@@ -1724,7 +2054,7 @@ function mSortSummaries(summaries) {
         const va = isStr ? (a[key] || "").toLowerCase() : (a[key] ?? 0)
         const vb = isStr ? (b[key] || "").toLowerCase() : (b[key] ?? 0)
         if (va < vb) return -dir
-        if (va > vb) return  dir
+        if (va > vb) return dir
         return 0
     })
 
@@ -1751,12 +2081,13 @@ function mRenderTopTable(summaries) {
 
     const rows = mSortSummaries(summaries)
 
-    tbody.innerHTML = rows.map((a, idx) => {
-        const rClass    = a.rendimientoEur >= 0 ? "mCellPos" : "mCellNeg"
-        const typeLabel = M_TYPE_LABELS[a.type] || a.type
-        const typeColor = M_TYPE_COLORS[a.type] || "#888"
+    tbody.innerHTML = rows
+        .map((a, idx) => {
+            const rClass = a.rendimientoEur >= 0 ? "mCellPos" : "mCellNeg"
+            const typeLabel = M_TYPE_LABELS[a.type] || a.type
+            const typeColor = M_TYPE_COLORS[a.type] || "#888"
 
-        return `
+            return `
         <tr>
             <td class="mTdRank">${idx + 1}</td>
             <td class="mTdName">${escapeMetricasHtml(a.name)}</td>
@@ -1772,7 +2103,8 @@ function mRenderTopTable(summaries) {
                 </div>
             </td>
         </tr>`
-    }).join("")
+        })
+        .join("")
 
     mUpdateSortArrows()
 }
@@ -1799,37 +2131,69 @@ function mRenderIngresos(ingresosYearData) {
     if (!group) return
 
     if (!ingresosYearData) {
-        mSetKpi("mkpiIngresosTotal",      "---")
-        mSetKpi("mkpiIngresosRecurrentes","---")
-        mSetKpi("mkpiIngresosMovimientos","---")
+        mSetKpi("mkpiIngresosTotal", "---")
+        mSetKpi("mkpiIngresosRecurrentes", "---")
+        mSetKpi("mkpiIngresosMovimientos", "---")
         return
     }
 
-    const M_ING_KEYS = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
+    const M_ING_KEYS = [
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre"
+    ]
 
-    const totalRecurrentes = (ingresosYearData.recurrentes || []).reduce((s, row) =>
-        s + M_ING_KEYS.reduce((ms, k) => ms + parseEuroNumber(row.meses?.[k] || ""), 0), 0)
+    const totalRecurrentes = (ingresosYearData.recurrentes || []).reduce(
+        (s, row) => s + M_ING_KEYS.reduce((ms, k) => ms + parseEuroNumber(row.meses?.[k] || ""), 0),
+        0
+    )
 
-    const totalMovimientos = Object.values(ingresosYearData.months || {}).reduce((s, monthData) =>
-        s + (monthData?.rows || []).reduce((ms, row) => ms + parseEuroNumber(row.cantidad || ""), 0), 0)
+    const totalMovimientos = Object.values(ingresosYearData.months || {}).reduce(
+        (s, monthData) => s + (monthData?.rows || []).reduce((ms, row) => ms + parseEuroNumber(row.cantidad || ""), 0),
+        0
+    )
 
-    mSetKpi("mkpiIngresosTotal",       formatEuro(totalRecurrentes + totalMovimientos))
+    mSetKpi("mkpiIngresosTotal", formatEuro(totalRecurrentes + totalMovimientos))
     mSetKpi("mkpiIngresosRecurrentes", formatEuro(totalRecurrentes))
     mSetKpi("mkpiIngresosMovimientos", formatEuro(totalMovimientos))
 }
 
 // ── ingresos charts ────────────────────────────────────────────────────────
 
-const M_ING_KEYS   = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
-const M_ING_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+const M_ING_KEYS = [
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre"
+]
+const M_ING_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 function mComputeIngresosMonthly(ingresosYearData) {
-    const totals = Object.fromEntries(M_ING_KEYS.map(k => [k, 0]))
-    ;(ingresosYearData?.recurrentes || []).forEach(row => {
-        M_ING_KEYS.forEach(k => { totals[k] += parseEuroNumber(row.meses?.[k] || "") })
+    const totals = Object.fromEntries(M_ING_KEYS.map((k) => [k, 0]))
+    ;(ingresosYearData?.recurrentes || []).forEach((row) => {
+        M_ING_KEYS.forEach((k) => {
+            totals[k] += parseEuroNumber(row.meses?.[k] || "")
+        })
     })
-    M_ING_KEYS.forEach(k => {
-        ;(ingresosYearData?.months?.[k]?.rows || []).forEach(row => {
+    M_ING_KEYS.forEach((k) => {
+        ;(ingresosYearData?.months?.[k]?.rows || []).forEach((row) => {
             totals[k] += parseEuroNumber(row.cantidad || "")
         })
     })
@@ -1839,25 +2203,25 @@ function mComputeIngresosMonthly(ingresosYearData) {
 function mComputeIngresosTipo(ingresosYearData, monthKey) {
     const totals = {}
     if (monthKey === "all") {
-        ;(ingresosYearData?.recurrentes || []).forEach(row => {
+        ;(ingresosYearData?.recurrentes || []).forEach((row) => {
             const nombre = (row.nombre || "Recurrentes").trim()
             const sub = M_ING_KEYS.reduce((s, k) => s + parseEuroNumber(row.meses?.[k] || ""), 0)
             if (sub > 0) totals[nombre] = (totals[nombre] || 0) + sub
         })
-        M_ING_KEYS.forEach(k => {
-            ;(ingresosYearData?.months?.[k]?.rows || []).forEach(row => {
+        M_ING_KEYS.forEach((k) => {
+            ;(ingresosYearData?.months?.[k]?.rows || []).forEach((row) => {
                 const tipo = (row.tipo || "Sin tipo").trim()
                 const val = parseEuroNumber(row.cantidad || "")
                 if (val > 0) totals[tipo] = (totals[tipo] || 0) + val
             })
         })
     } else {
-        ;(ingresosYearData?.recurrentes || []).forEach(row => {
+        ;(ingresosYearData?.recurrentes || []).forEach((row) => {
             const nombre = (row.nombre || "Recurrentes").trim()
             const val = parseEuroNumber(row.meses?.[monthKey] || "")
             if (val > 0) totals[nombre] = (totals[nombre] || 0) + val
         })
-        ;(ingresosYearData?.months?.[monthKey]?.rows || []).forEach(row => {
+        ;(ingresosYearData?.months?.[monthKey]?.rows || []).forEach((row) => {
             const tipo = (row.tipo || "Sin tipo").trim()
             const val = parseEuroNumber(row.cantidad || "")
             if (val > 0) totals[tipo] = (totals[tipo] || 0) + val
@@ -1867,20 +2231,37 @@ function mComputeIngresosTipo(ingresosYearData, monthKey) {
 }
 
 function mRenderIngresosCharts(ingresosYearData) {
-    const totalMes  = mComputeIngresosMonthly(ingresosYearData)
+    const totalMes = mComputeIngresosMonthly(ingresosYearData)
     const totalTipo = mComputeIngresosTipo(ingresosYearData, _metricasIngresosMonth)
 
     const mesWrap = document.getElementById("mChartIngresosMesWrap")
     if (mesWrap) mesWrap.style.height = "280px"
 
-    const mesValues = M_ING_KEYS.map(k => totalMes[k] || 0)
+    const mesValues = M_ING_KEYS.map((k) => totalMes[k] || 0)
     const mesColors = M_ING_LABELS.map((_, i) => M_PALETTE[i % M_PALETTE.length])
     mCreateChart("mChartIngresosMes", {
         type: "bar",
-        data: { labels: M_ING_LABELS, datasets: [{ label: "Ingresos (€)", data: mesValues, backgroundColor: mesColors.map(c => c + "bb"), borderColor: mesColors, borderWidth: 1, borderRadius: 4 }] },
+        data: {
+            labels: M_ING_LABELS,
+            datasets: [
+                {
+                    label: "Ingresos (€)",
+                    data: mesValues,
+                    backgroundColor: mesColors.map((c) => c + "bb"),
+                    borderColor: mesColors,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
+        },
         options: {
-            ...M_CHART_DEFAULTS, indexAxis: "y",
-            plugins: { ...M_CHART_DEFAULTS.plugins, legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } } },
+            ...M_CHART_DEFAULTS,
+            indexAxis: "y",
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { display: false },
+                tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
+            },
             scales: { x: mAxisX(), y: mAxisY(11) }
         }
     })
@@ -1890,13 +2271,29 @@ function mRenderIngresosCharts(ingresosYearData) {
         const tipoLabels = tipoEntries.map(([k]) => k)
         const tipoValues = tipoEntries.map(([, v]) => v)
         const tipoColors = tipoLabels.map((_, i) => M_PALETTE[i % M_PALETTE.length])
-        const tipoTotal  = tipoValues.reduce((a, b) => a + b, 0)
+        const tipoTotal = tipoValues.reduce((a, b) => a + b, 0)
         mCreateChart("mChartIngresosTipo", {
             type: "doughnut",
-            data: { labels: tipoLabels, datasets: [{ data: tipoValues, backgroundColor: tipoColors, borderColor: "#0b1120", borderWidth: 2, hoverOffset: 10 }] },
+            data: {
+                labels: tipoLabels,
+                datasets: [
+                    {
+                        data: tipoValues,
+                        backgroundColor: tipoColors,
+                        borderColor: "#0b1120",
+                        borderWidth: 2,
+                        hoverOffset: 10
+                    }
+                ]
+            },
             options: {
-                ...M_CHART_DEFAULTS, cutout: "55%",
-                plugins: { ...M_CHART_DEFAULTS.plugins, legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" }, tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } } }
+                ...M_CHART_DEFAULTS,
+                cutout: "55%",
+                plugins: {
+                    ...M_CHART_DEFAULTS.plugins,
+                    legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                    tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } }
+                }
             }
         })
     } else {
@@ -1918,58 +2315,75 @@ function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
     const yearToggle = document.getElementById("mIngresosYearToggle")
     if (yearToggle && !yearToggle.dataset.bound) {
         yearToggle.dataset.bound = "true"
-        yearToggle.innerHTML = ingresosYearsList.map(y =>
-            `<button class="mToggleBtn${String(y) === String(ingresosYearData.year) ? " active" : ""}" data-ingresosyear="${y}">${y}</button>`
-        ).join("")
+        yearToggle.innerHTML = ingresosYearsList
+            .map(
+                (y) =>
+                    `<button class="mToggleBtn${String(y) === String(ingresosYearData.year) ? " active" : ""}" data-ingresosyear="${y}">${y}</button>`
+            )
+            .join("")
         yearToggle.addEventListener("click", async (e) => {
             const btn = e.target.closest("[data-ingresosyear]")
             if (!btn) return
-            yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+            yearToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _metricasIngresosMonth = "all"
             setChartPref("metricasIngresosMonth", _metricasIngresosMonth)
             setChartPref("metricasIngresosYear", btn.dataset.ingresosyear)
-            const newData = await fetch(`/api/ingresos/${btn.dataset.ingresosyear}`).then(r => r.json()).catch(() => null)
+            const newData = await fetch(`/api/ingresos/${btn.dataset.ingresosyear}`)
+                .then((r) => r.json())
+                .catch(() => null)
             if (newData) {
                 _metricasPayload.ingresosYearData = newData
                 const mt = document.getElementById("mIngresosMonthToggle")
-                if (mt) { mt.dataset.bound = ""; mt.innerHTML = "" }
+                if (mt) {
+                    mt.dataset.bound = ""
+                    mt.innerHTML = ""
+                }
                 mRenderIngresosSection(ingresosYearsList, newData)
                 mRenderComparativa(_metricasPayload.ingresosYearData, _metricasPayload.gastosYearData)
             }
         })
     } else if (yearToggle) {
-        yearToggle.querySelectorAll(".mToggleBtn").forEach(b =>
-            b.classList.toggle("active", b.dataset.ingresosyear === String(ingresosYearData.year))
-        )
+        yearToggle
+            .querySelectorAll(".mToggleBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.ingresosyear === String(ingresosYearData.year)))
     }
 
     const monthToggle = document.getElementById("mIngresosMonthToggle")
-    const tipoTitle   = document.getElementById("mIngresosTipoTitle")
+    const tipoTitle = document.getElementById("mIngresosTipoTitle")
     if (monthToggle && !monthToggle.dataset.bound) {
         monthToggle.dataset.bound = "true"
-        const allBtn   = `<button class="mToggleBtn${_metricasIngresosMonth === "all" ? " active" : ""}" data-ingresosmonth="all">Todos</button>`
-        const monthBtns = M_ING_KEYS.map((k, i) =>
-            `<button class="mToggleBtn${_metricasIngresosMonth === k ? " active" : ""}" data-ingresosmonth="${k}">${M_ING_LABELS[i]}</button>`
+        const allBtn = `<button class="mToggleBtn${_metricasIngresosMonth === "all" ? " active" : ""}" data-ingresosmonth="all">Todos</button>`
+        const monthBtns = M_ING_KEYS.map(
+            (k, i) =>
+                `<button class="mToggleBtn${_metricasIngresosMonth === k ? " active" : ""}" data-ingresosmonth="${k}">${M_ING_LABELS[i]}</button>`
         ).join("")
         monthToggle.innerHTML = allBtn + monthBtns
         monthToggle.addEventListener("click", (e) => {
             const btn = e.target.closest("[data-ingresosmonth]")
             if (!btn) return
-            monthToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+            monthToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _metricasIngresosMonth = btn.dataset.ingresosmonth
             setChartPref("metricasIngresosMonth", _metricasIngresosMonth)
-            if (tipoTitle) tipoTitle.textContent = _metricasIngresosMonth === "all" ? "Por tipo (anual)" : `Por tipo — ${M_ING_LABELS[M_ING_KEYS.indexOf(_metricasIngresosMonth)] || _metricasIngresosMonth}`
+            if (tipoTitle)
+                tipoTitle.textContent =
+                    _metricasIngresosMonth === "all"
+                        ? "Por tipo (anual)"
+                        : `Por tipo — ${M_ING_LABELS[M_ING_KEYS.indexOf(_metricasIngresosMonth)] || _metricasIngresosMonth}`
             mRenderIngresosCharts(ingresosYearData)
         })
     } else if (monthToggle) {
-        monthToggle.querySelectorAll(".mToggleBtn").forEach(b =>
-            b.classList.toggle("active", b.dataset.ingresosmonth === _metricasIngresosMonth)
-        )
+        monthToggle
+            .querySelectorAll(".mToggleBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.ingresosmonth === _metricasIngresosMonth))
     }
 
-    if (tipoTitle) tipoTitle.textContent = _metricasIngresosMonth === "all" ? "Por tipo (anual)" : `Por tipo — ${M_ING_LABELS[M_ING_KEYS.indexOf(_metricasIngresosMonth)] || _metricasIngresosMonth}`
+    if (tipoTitle)
+        tipoTitle.textContent =
+            _metricasIngresosMonth === "all"
+                ? "Por tipo (anual)"
+                : `Por tipo — ${M_ING_LABELS[M_ING_KEYS.indexOf(_metricasIngresosMonth)] || _metricasIngresosMonth}`
     mRenderIngresosCharts(ingresosYearData)
 }
 
@@ -1978,8 +2392,16 @@ function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
 let _metricasInteresesYear = getChartPref("metricasInteresesYear", null)
 
 const _CUENTA_COLORS = [
-    "#3a7bd5", "#2ecc71", "#e67e22", "#9b59b6", "#1abc9c",
-    "#e74c3c", "#f39c12", "#00cec9", "#fd79a8", "#6c5ce7"
+    "#3a7bd5",
+    "#2ecc71",
+    "#e67e22",
+    "#9b59b6",
+    "#1abc9c",
+    "#e74c3c",
+    "#f39c12",
+    "#00cec9",
+    "#fd79a8",
+    "#6c5ce7"
 ]
 
 function intYear(fecha) {
@@ -1996,29 +2418,36 @@ function intMonth(fecha) {
     else if (p.length === 2) s = p[0]
     else return -1
     const mon = mParseEsMonth(s) || parseInt(s)
-    return (mon >= 1 && mon <= 12) ? mon - 1 : -1
+    return mon >= 1 && mon <= 12 ? mon - 1 : -1
 }
 
 function mRenderInteresesSection(interesRows, cuentas) {
     const section = document.getElementById("mSectionIntereses")
     const rows = Array.isArray(interesRows) ? interesRows : []
-    if (!rows.length) { if (section) section.classList.add("hidden"); return }
+    if (!rows.length) {
+        if (section) section.classList.add("hidden")
+        return
+    }
     if (section) section.classList.remove("hidden")
 
-    const years = [...new Set(rows.map(r => intYear(r.fecha)).filter(Boolean))].sort((a, b) => Number(a) - Number(b))
-    if (!_metricasInteresesYear || !years.includes(_metricasInteresesYear)) _metricasInteresesYear = years[years.length - 1] || null
+    const years = [...new Set(rows.map((r) => intYear(r.fecha)).filter(Boolean))].sort((a, b) => Number(a) - Number(b))
+    if (!_metricasInteresesYear || !years.includes(_metricasInteresesYear))
+        _metricasInteresesYear = years[years.length - 1] || null
 
     const yearToggle = document.getElementById("mInteresesYearToggle")
     if (yearToggle) {
-        yearToggle.innerHTML = years.map(y =>
-            `<button class="mToggleBtn${y === _metricasInteresesYear ? " active" : ""}" data-intano="${y}">${y}</button>`
-        ).join("")
+        yearToggle.innerHTML = years
+            .map(
+                (y) =>
+                    `<button class="mToggleBtn${y === _metricasInteresesYear ? " active" : ""}" data-intano="${y}">${y}</button>`
+            )
+            .join("")
         if (!yearToggle.dataset.bound) {
             yearToggle.dataset.bound = "true"
             yearToggle.addEventListener("click", (e) => {
                 const btn = e.target.closest("[data-intano]")
                 if (!btn) return
-                yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+                yearToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasInteresesYear = btn.dataset.intano
                 setChartPref("metricasInteresesYear", _metricasInteresesYear)
@@ -2031,40 +2460,58 @@ function mRenderInteresesSection(interesRows, cuentas) {
 }
 
 function mDrawInteresesChart(cuentas, year) {
-    const labels = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+    const labels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
     const cuentasList = Array.isArray(cuentas) && cuentas.length ? cuentas : []
 
     // Por mes: totales y desglose por cuenta
     const monthAcum = Array(12).fill(0)
-    const monthNet  = Array(12).fill(0)
+    const monthNet = Array(12).fill(0)
     // desglose[mes] = [{ nombre, acum, neto }]
-    const desglose  = Array.from({ length: 12 }, () => [])
+    const desglose = Array.from({ length: 12 }, () => [])
 
-    cuentasList.forEach(cuenta => {
+    cuentasList.forEach((cuenta) => {
         const cuentaRows = Array.isArray(cuenta.rows) ? cuenta.rows : []
-        cuentaRows.filter(r => intYear(r.fecha) === year).forEach(r => {
-            const m = intMonth(r.fecha)
-            if (m < 0 || m > 11) return
-            const acum = parseEuroNumber(r.acumulado || "")
-            const imp  = parseEuroNumber(r.impuestos || "")
-            const neto = acum - imp
-            monthAcum[m] += acum
-            monthNet[m]  += neto
-            const existing = desglose[m].find(d => d.nombre === cuenta.nombre)
-            if (existing) { existing.acum += acum; existing.neto += neto }
-            else desglose[m].push({ nombre: cuenta.nombre, acum, neto })
-        })
+        cuentaRows
+            .filter((r) => intYear(r.fecha) === year)
+            .forEach((r) => {
+                const m = intMonth(r.fecha)
+                if (m < 0 || m > 11) return
+                const acum = parseEuroNumber(r.acumulado || "")
+                const imp = parseEuroNumber(r.impuestos || "")
+                const neto = acum - imp
+                monthAcum[m] += acum
+                monthNet[m] += neto
+                const existing = desglose[m].find((d) => d.nombre === cuenta.nombre)
+                if (existing) {
+                    existing.acum += acum
+                    existing.neto += neto
+                } else desglose[m].push({ nombre: cuenta.nombre, acum, neto })
+            })
     })
 
-    const netColors = monthNet.map(v => v >= 0 ? "#2ecc71" : "#e74c3c")
+    const netColors = monthNet.map((v) => (v >= 0 ? "#2ecc71" : "#e74c3c"))
 
     mCreateChart("mChartIntereses", {
         type: "bar",
         data: {
             labels,
             datasets: [
-                { label: "Acumulado", data: monthAcum, backgroundColor: "#3a7bd544", borderColor: "#3a7bd5", borderWidth: 1, borderRadius: 4 },
-                { label: "Neto",      data: monthNet,  backgroundColor: netColors.map(c => c + "bb"), borderColor: netColors, borderWidth: 1, borderRadius: 4 }
+                {
+                    label: "Acumulado",
+                    data: monthAcum,
+                    backgroundColor: "#3a7bd544",
+                    borderColor: "#3a7bd5",
+                    borderWidth: 1,
+                    borderRadius: 4
+                },
+                {
+                    label: "Neto",
+                    data: monthNet,
+                    backgroundColor: netColors.map((c) => c + "bb"),
+                    borderColor: netColors,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
             ]
         },
         options: {
@@ -2078,7 +2525,7 @@ function mDrawInteresesChart(cuentas, year) {
                             const mes = c.dataIndex
                             if (!desglose[mes] || !desglose[mes].length) return []
                             const isAcum = c.datasetIndex === 0
-                            return desglose[mes].map(d => `  · ${d.nombre}: ${formatEuro(isAcum ? d.acum : d.neto)}`)
+                            return desglose[mes].map((d) => `  · ${d.nombre}: ${formatEuro(isAcum ? d.acum : d.neto)}`)
                         }
                     }
                 }
@@ -2100,8 +2547,8 @@ function mRenderComparativa(ingresosYearData, gastosYearData) {
 
     // Collect all tipos de gastos (movimientos rows)
     const tiposSet = new Set()
-    Object.values(gastosYearData?.months || {}).forEach(monthData => {
-        ;(monthData?.rows || []).forEach(row => {
+    Object.values(gastosYearData?.months || {}).forEach((monthData) => {
+        ;(monthData?.rows || []).forEach((row) => {
             tiposSet.add((row.tipo || "Sin tipo").trim())
         })
     })
@@ -2112,10 +2559,13 @@ function mRenderComparativa(ingresosYearData, gastosYearData) {
     // Render filter buttons — always rebuild so listener always sees current year data
     const filtrosEl = document.getElementById("mComparativaFiltros")
     if (filtrosEl) {
-        filtrosEl.innerHTML = allTipos.map(t =>
-            `<label class="mActivosFilterBtn" data-cmp-tipo="${t}"><input type="checkbox"${_metricasComparativaExclude.has(t) ? "" : " checked"}><span>${t}</span></label>`
-        ).join("")
-        filtrosEl.onchange = e => {
+        filtrosEl.innerHTML = allTipos
+            .map(
+                (t) =>
+                    `<label class="mActivosFilterBtn" data-cmp-tipo="${t}"><input type="checkbox"${_metricasComparativaExclude.has(t) ? "" : " checked"}><span>${t}</span></label>`
+            )
+            .join("")
+        filtrosEl.onchange = (e) => {
             const input = e.target
             if (!input.matches('input[type="checkbox"]')) return
             const label = input.closest("[data-cmp-tipo]")
@@ -2139,20 +2589,27 @@ function mRenderComparativa(ingresosYearData, gastosYearData) {
 }
 
 function mDrawComparativaChart(ingresosYearData, gastosYearData) {
-    const ingMonthly = M_ING_KEYS.map(k => {
+    const ingMonthly = M_ING_KEYS.map((k) => {
         let t = 0
-        ;(ingresosYearData?.recurrentes || []).forEach(r => { t += parseEuroNumber(r.meses?.[k] || "") })
-        ;(ingresosYearData?.months?.[k]?.rows || []).forEach(r => { t += parseEuroNumber(r.cantidad || "") })
+        ;(ingresosYearData?.recurrentes || []).forEach((r) => {
+            t += parseEuroNumber(r.meses?.[k] || "")
+        })
+        ;(ingresosYearData?.months?.[k]?.rows || []).forEach((r) => {
+            t += parseEuroNumber(r.cantidad || "")
+        })
         return t
     })
 
-    const gastosDetalle = M_GASTOS_KEYS.map(k => {
+    const gastosDetalle = M_GASTOS_KEYS.map((k) => {
         const detalle = {}
         if (!_metricasComparativaExclude.has("Mensualidades") && isMensualidadMonthActive(gastosYearData, k)) {
-            const mens = (gastosYearData?.mensualidades || []).reduce((s, r) => s + parseEuroNumber(r.meses?.[k] || ""), 0)
+            const mens = (gastosYearData?.mensualidades || []).reduce(
+                (s, r) => s + parseEuroNumber(r.meses?.[k] || ""),
+                0
+            )
             if (mens > 0) detalle["Mensualidades"] = mens
         }
-        ;(gastosYearData?.months?.[k]?.rows || []).forEach(row => {
+        ;(gastosYearData?.months?.[k]?.rows || []).forEach((row) => {
             const tipo = (row.tipo || "Sin tipo").trim()
             if (!_metricasComparativaExclude.has(tipo)) {
                 const val = parseEuroNumber(row.cantidad || "")
@@ -2162,7 +2619,7 @@ function mDrawComparativaChart(ingresosYearData, gastosYearData) {
         return detalle
     })
 
-    const gastosMonthly = gastosDetalle.map(d => Object.values(d).reduce((s, v) => s + v, 0))
+    const gastosMonthly = gastosDetalle.map((d) => Object.values(d).reduce((s, v) => s + v, 0))
 
     const balance = ingMonthly.map((ing, i) => ing - gastosMonthly[i])
 
@@ -2173,9 +2630,30 @@ function mDrawComparativaChart(ingresosYearData, gastosYearData) {
         data: {
             labels: M_ING_LABELS,
             datasets: [
-                { label: "Ingresos", data: ingMonthly,   backgroundColor: "#2ecc7188", borderColor: "#2ecc71", borderWidth: 1, borderRadius: 4 },
-                { label: "Gastos",   data: gastosMonthly, backgroundColor: "#e74c3c88", borderColor: "#e74c3c", borderWidth: 1, borderRadius: 4 },
-                { label: "Balance",  data: balance, backgroundColor: balance.map(v => v >= 0 ? "#3a7bd577" : "#e74c3c44"), borderColor: balance.map(v => v >= 0 ? "#3a7bd5" : "#e74c3c"), borderWidth: 1, borderRadius: 4 }
+                {
+                    label: "Ingresos",
+                    data: ingMonthly,
+                    backgroundColor: "#2ecc7188",
+                    borderColor: "#2ecc71",
+                    borderWidth: 1,
+                    borderRadius: 4
+                },
+                {
+                    label: "Gastos",
+                    data: gastosMonthly,
+                    backgroundColor: "#e74c3c88",
+                    borderColor: "#e74c3c",
+                    borderWidth: 1,
+                    borderRadius: 4
+                },
+                {
+                    label: "Balance",
+                    data: balance,
+                    backgroundColor: balance.map((v) => (v >= 0 ? "#3a7bd577" : "#e74c3c44")),
+                    borderColor: balance.map((v) => (v >= 0 ? "#3a7bd5" : "#e74c3c")),
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
             ]
         },
         options: {
@@ -2207,9 +2685,9 @@ function mDrawComparativaLineChart(ingMonthly, gastosMonthly) {
     for (let i = 0; i < 12; i++) {
         if (ingMonthly[i] > 0 || gastosMonthly[i] > 0) lastIdx = i
     }
-    const visibleLabels   = lastIdx >= 0 ? labels.slice(0, lastIdx + 1)         : labels
-    const visibleIngresos = lastIdx >= 0 ? ingMonthly.slice(0, lastIdx + 1)     : ingMonthly
-    const visibleGastos   = lastIdx >= 0 ? gastosMonthly.slice(0, lastIdx + 1)  : gastosMonthly
+    const visibleLabels = lastIdx >= 0 ? labels.slice(0, lastIdx + 1) : labels
+    const visibleIngresos = lastIdx >= 0 ? ingMonthly.slice(0, lastIdx + 1) : ingMonthly
+    const visibleGastos = lastIdx >= 0 ? gastosMonthly.slice(0, lastIdx + 1) : gastosMonthly
 
     mCreateChart("mChartComparativaLinea", {
         type: "line",
@@ -2251,8 +2729,8 @@ function mDrawComparativaLineChart(ingMonthly, gastosMonthly) {
                     callbacks: {
                         label: (c) => ` ${c.dataset.label}: ${formatEuro(c.raw)}`,
                         afterBody: (items) => {
-                            const ing = items.find(i => i.dataset.label === "Ingresos")?.raw ?? 0
-                            const gas = items.find(i => i.dataset.label === "Gastos")?.raw ?? 0
+                            const ing = items.find((i) => i.dataset.label === "Ingresos")?.raw ?? 0
+                            const gas = items.find((i) => i.dataset.label === "Gastos")?.raw ?? 0
                             const bal = ing - gas
                             return [`Balance: ${formatEuro(bal)}`]
                         }
@@ -2276,27 +2754,29 @@ function mDrawComparativaLineChart(ingMonthly, gastosMonthly) {
 // ── concentración top 10 ──────────────────────────────────────────────────
 
 function mRenderConcentracion(summaries) {
-    const positive = summaries.filter(a => a.netoActualEur > 0)
+    const positive = summaries.filter((a) => a.netoActualEur > 0)
     const total = positive.reduce((s, a) => s + a.netoActualEur, 0)
     if (!positive.length || total <= 0) return
 
     const sorted = [...positive].sort((a, b) => b.netoActualEur - a.netoActualEur).slice(0, 10)
-    const labels = sorted.map(a => a.name)
-    const values = sorted.map(a => parseFloat(((a.netoActualEur / total) * 100).toFixed(2)))
+    const labels = sorted.map((a) => a.name)
+    const values = sorted.map((a) => parseFloat(((a.netoActualEur / total) * 100).toFixed(2)))
     const colors = sorted.map((a, i) => a.color || M_PALETTE[i % M_PALETTE.length])
 
     mCreateChart("mChartConcentracion", {
         type: "bar",
         data: {
             labels,
-            datasets: [{
-                label: "% Cartera",
-                data: values,
-                backgroundColor: colors.map(c => c + "bb"),
-                borderColor: colors,
-                borderWidth: 1,
-                borderRadius: 4
-            }]
+            datasets: [
+                {
+                    label: "% Cartera",
+                    data: values,
+                    backgroundColor: colors.map((c) => c + "bb"),
+                    borderColor: colors,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -2306,14 +2786,15 @@ function mRenderConcentracion(summaries) {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: (c) => ` ${c.raw.toFixed(1).replace(".", ",")}%  —  ${formatEuro(sorted[c.dataIndex].netoActualEur)}`
+                        label: (c) =>
+                            ` ${c.raw.toFixed(1).replace(".", ",")}%  —  ${formatEuro(sorted[c.dataIndex].netoActualEur)}`
                     }
                 }
             },
             scales: {
                 x: {
                     ...mAxisX(),
-                    ticks: { color: "#8899bb", callback: v => v.toFixed(0) + "%" }
+                    ticks: { color: "#8899bb", callback: (v) => v.toFixed(0) + "%" }
                 },
                 y: mAxisY(11)
             }
@@ -2321,63 +2802,293 @@ function mRenderConcentracion(summaries) {
     })
 }
 
+// ── rentabilidad y riesgo (TWR, XIRR, drawdown, volatilidad) ───────────────
+
+// Las cifras las calcula el servidor (`core/rentabilidad.py`) sobre el
+// histórico completo; aquí solo se pintan. TWR y XIRR se enseñan juntas a
+// propósito: la primera mide la cartera y la segunda tu dinero, y cuando
+// discrepan es porque el momento de las aportaciones ha pesado.
+
+function mFmtPctSigno(valor, decimales = 2) {
+    const pct = valor * 100
+    return (pct >= 0 ? "+" : "") + pct.toFixed(decimales).replace(".", ",") + " %"
+}
+
+function mFechaCorta(ts) {
+    if (!ts) return ""
+    return new Date(ts * 1000).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "2-digit" })
+}
+
+function mSetSub(id, texto, cls = "") {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.textContent = texto
+    el.className = "mkpiSubValue" + (cls ? " " + cls : "")
+}
+
+function mRenderRiesgo(rent) {
+    const empty = document.getElementById("mRiesgoEmpty")
+    const wrap = document.getElementById("mRiesgoWrap")
+
+    const sinDatos = !rent || rent.twr?.total === null || rent.twr?.total === undefined
+    if (empty) empty.classList.toggle("hidden", !sinDatos)
+    if (wrap) wrap.classList.toggle("hidden", sinDatos)
+    if (sinDatos) {
+        mDestroyChart("mChartDrawdown")
+        return
+    }
+
+    const { twr, xirr, drawdown, volatilidad } = rent
+    const signo = (v) => (v >= 0 ? "mPositive" : "mNegative")
+
+    mSetKpi("mkpiTwrTotal", mFmtPctSigno(twr.total), signo(twr.total))
+    mSetSub(
+        "mkpiTwrAnual",
+        twr.anual !== null && twr.anual !== undefined
+            ? `${mFmtPctSigno(twr.anual)} anualizada`
+            : // Anualizar dos meses de histórico da un número de fantasía; se
+              // dice el periodo real en su lugar.
+              `en ${twr.dias} ${twr.dias === 1 ? "día" : "días"}`
+    )
+
+    if (xirr === null || xirr === undefined) {
+        mSetKpi("mkpiXirr", "—")
+        mSetSub("mkpiXirrNota", "Sin flujos suficientes")
+    } else {
+        mSetKpi("mkpiXirr", mFmtPctSigno(xirr), signo(xirr))
+        // La comparación solo vale contra la TWR anualizada: enfrentar una TIR
+        // anual con un acumulado de cuatro meses diría que las aportaciones
+        // acertaron cuando lo único que pasa es que las escalas no coinciden.
+        if (twr.anual === null || twr.anual === undefined) {
+            mSetSub("mkpiXirrNota", "Anualizada sobre tus flujos")
+        } else {
+            const brecha = xirr - twr.anual
+            mSetSub(
+                "mkpiXirrNota",
+                Math.abs(brecha) < 0.005
+                    ? "En línea con la TWR"
+                    : brecha > 0
+                      ? "Aportaste antes de subir"
+                      : "Aportaste antes de caer"
+            )
+        }
+    }
+
+    if (drawdown.maximo === null || drawdown.maximo === undefined) {
+        mSetKpi("mkpiDrawdown", "—")
+        mSetSub("mkpiDrawdownFechas", "")
+    } else {
+        mSetKpi("mkpiDrawdown", mFmtPctSigno(drawdown.maximo), drawdown.maximo < 0 ? "mNegative" : "")
+        mSetSub(
+            "mkpiDrawdownFechas",
+            drawdown.ts_pico ? `${mFechaCorta(drawdown.ts_pico)} → ${mFechaCorta(drawdown.ts_valle)}` : "Sin caídas"
+        )
+    }
+
+    const actual = drawdown.actual ?? 0
+    mSetKpi("mkpiDrawdownActual", mFmtPctSigno(actual), actual < -0.0001 ? "mNegative" : "mPositive")
+    mSetSub("mkpiDrawdownActualNota", actual < -0.0001 ? "Por debajo del máximo" : "En máximos históricos")
+
+    if (volatilidad.anual === null || volatilidad.anual === undefined) {
+        mSetKpi("mkpiVolatilidad", "—")
+        mSetSub(
+            "mkpiVolatilidadNota",
+            `Solo ${volatilidad.muestras} ${volatilidad.muestras === 1 ? "tramo" : "tramos"}`
+        )
+    } else {
+        mSetKpi("mkpiVolatilidad", (volatilidad.anual * 100).toFixed(1).replace(".", ",") + " %")
+        mSetSub("mkpiVolatilidadNota", `${(volatilidad.diaria * 100).toFixed(2).replace(".", ",")} % diaria`)
+    }
+
+    mDrawDrawdownChart(rent.indice || [])
+}
+
+// Gráfico "underwater": distancia al máximo histórico en cada momento. Se
+// dibuja sobre el índice TWR y no sobre el valor en euros porque una retirada
+// hunde el valor sin que la cartera haya perdido nada.
+function mDrawDrawdownChart(indice) {
+    if (indice.length < 2) {
+        mDestroyChart("mChartDrawdown")
+        return
+    }
+
+    let pico = indice[0].idx
+    const caidas = indice.map((p) => {
+        if (p.idx > pico) pico = p.idx
+        return +((p.idx / pico - 1) * 100).toFixed(2)
+    })
+    const labels = indice.map((p) => mFechaCorta(p.ts))
+
+    mCreateChart("mChartDrawdown", {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Caída desde máximos",
+                    data: caidas,
+                    borderColor: "#e74c3c",
+                    backgroundColor: "rgba(231,76,60,0.18)",
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    fill: "origin",
+                    tension: 0.2
+                }
+            ]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (c) => ` ${c.raw.toFixed(2).replace(".", ",")} % desde máximos`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ...mAxisX(),
+                    ticks: { color: "#8899bb", maxTicksLimit: 10, autoSkip: true }
+                },
+                y: {
+                    max: 0,
+                    ticks: { color: "#ccd6f6", callback: (v) => v.toFixed(0) + "%" },
+                    grid: { color: "rgba(255,255,255,0.06)" }
+                }
+            }
+        }
+    })
+}
+
 // ── rentabilidad por año ───────────────────────────────────────────────────
 
-function mRenderRentabilidadAnual(snaps, currentValue) {
+// La rentabilidad del año NO es la variación del valor de la cartera: aportar o
+// retirar dinero mueve el valor sin que haya ganado ni perdido nada (con las
+// retiradas de 2026 salía un -21 % teniendo la cartera en positivo). Se usa
+// Modified Dietz, que descuenta el flujo neto del periodo y le da peso medio:
+//
+//     r = (Vfin − Vini − Flujo) / (Vini + Flujo/2)
+//
+// El flujo se deduce del invertido de cada snapshot (sube al comprar y baja al
+// vender), que es justo el dinero que entra y sale de la cartera.
+// Por debajo de este porcentaje de días registrados, la barra del año se
+// dibuja rayada: un 2024 con tres snapshots no mide lo mismo que uno con
+// trescientos, y en un gráfico de barras los dos pesan igual.
+const M_COBERTURA_MINIMA = 60
+
+// Rayado diagonal para las barras de cobertura pobre. Se genera sobre un
+// canvas suelto porque Chart.js acepta un CanvasPattern donde acepta un color.
+function mPatronRayado(color) {
+    const tile = document.createElement("canvas")
+    tile.width = tile.height = 8
+    const ctx = tile.getContext("2d")
+    if (!ctx) return color
+    ctx.fillStyle = "rgba(20,30,50,0.55)"
+    ctx.fillRect(0, 0, 8, 8)
+    ctx.strokeStyle = color
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.moveTo(-2, 10)
+    ctx.lineTo(10, -2)
+    ctx.moveTo(2, 14)
+    ctx.lineTo(14, 2)
+    ctx.stroke()
+    return ctx.createPattern(tile, "repeat") || color
+}
+
+function mRenderRentabilidadAnual(snaps, currentValue, currentInvested, cobertura = {}) {
     const emptyEl = document.getElementById("mRentAnualEmpty")
-    const wrapEl  = document.getElementById("mRentAnualWrap")
+    const wrapEl = document.getElementById("mRentAnualWrap")
+    const notaEl = document.getElementById("mRentAnualNota")
 
     if (!snaps.length) {
         if (emptyEl) emptyEl.classList.remove("hidden")
-        if (wrapEl)  wrapEl.classList.add("hidden")
+        if (wrapEl) wrapEl.classList.add("hidden")
         return
     }
 
     const currentYear = new Date().getFullYear()
     const byYear = {}
-    snaps.forEach(p => {
+    snaps.forEach((p) => {
         const yr = new Date(p.ts * 1000).getFullYear()
         if (!byYear[yr]) byYear[yr] = { first: p, last: p }
         else byYear[yr].last = p
     })
 
-    const years = Object.keys(byYear).map(Number).sort((a, b) => a - b)
+    const years = Object.keys(byYear)
+        .map(Number)
+        .sort((a, b) => a - b)
     const labels = []
     const values = []
+    const detalle = []
 
-    years.forEach(yr => {
+    years.forEach((yr) => {
         const prevData = byYear[yr - 1]
-        const startV   = prevData ? prevData.last.v : byYear[yr].first.v
-        const endV     = yr === currentYear ? currentValue : byYear[yr].last.v
-        if (startV <= 0) return
-        const ret = ((endV - startV) / startV) * 100
-        labels.push(String(yr) + (yr === currentYear ? " (YTD)" : ""))
+        const inicio = prevData ? prevData.last : byYear[yr].first
+        const cierre = yr === currentYear ? { v: currentValue, i: currentInvested } : byYear[yr].last
+
+        // Un único snapshot en un año ya cerrado no delimita ningún periodo.
+        if (!prevData && byYear[yr].first === byYear[yr].last && yr !== currentYear) return
+
+        const flujo = cierre.i - inicio.i
+        const base = inicio.v + flujo / 2
+        if (!(base > 0)) return
+
+        const ret = ((cierre.v - inicio.v - flujo) / base) * 100
+        if (!Number.isFinite(ret)) return
+
+        const cob = cobertura[yr] || cobertura[String(yr)] || null
+        const pobre = cob ? cob.pct < M_COBERTURA_MINIMA : false
+
+        labels.push(String(yr) + (yr === currentYear ? " (YTD)" : "") + (pobre ? " *" : ""))
         values.push(parseFloat(ret.toFixed(2)))
+        // parcial: el año no arranca en el cierre del anterior, sino en el
+        // primer snapshot que hay guardado, así que mide menos de 12 meses.
+        detalle.push({ inicio: inicio.v, cierre: cierre.v, flujo, parcial: !prevData, cobertura: cob, pobre })
     })
 
     if (labels.length < 1) {
         if (emptyEl) emptyEl.classList.remove("hidden")
-        if (wrapEl)  wrapEl.classList.add("hidden")
+        if (wrapEl) wrapEl.classList.add("hidden")
         return
     }
     if (emptyEl) emptyEl.classList.add("hidden")
-    if (wrapEl)  wrapEl.classList.remove("hidden")
+    if (wrapEl) wrapEl.classList.remove("hidden")
 
-    const colors  = values.map(v => v >= 0 ? "#2ecc71cc" : "#e74c3ccc")
-    const borders = values.map(v => v >= 0 ? "#2ecc71" : "#e74c3c")
+    const colors = values.map((v, i) =>
+        detalle[i].pobre ? mPatronRayado(v >= 0 ? "#2ecc71aa" : "#e74c3caa") : v >= 0 ? "#2ecc71cc" : "#e74c3ccc"
+    )
+    const borders = values.map((v) => (v >= 0 ? "#2ecc71" : "#e74c3c"))
+
+    const pobres = detalle.filter((d) => d.pobre).length
+    if (notaEl) {
+        notaEl.textContent = pobres
+            ? `* Años con menos del ${M_COBERTURA_MINIMA} % de los días registrados: la barra se calcula con muy pocos puntos.`
+            : ""
+        notaEl.classList.toggle("hidden", !pobres)
+    }
 
     mCreateChart("mChartRentAnual", {
         type: "bar",
         data: {
             labels,
-            datasets: [{
-                label: "Rentabilidad (%)",
-                data: values,
-                backgroundColor: colors,
-                borderColor: borders,
-                borderWidth: 1,
-                borderRadius: 6
-            }]
+            datasets: [
+                {
+                    label: "Rentabilidad (%)",
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: borders,
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    maxBarThickness: 90,
+                    categoryPercentage: 0.6,
+                    barPercentage: 0.92
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -2386,7 +3097,24 @@ function mRenderRentabilidadAnual(snaps, currentValue) {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: (c) => ` ${c.raw >= 0 ? "+" : ""}${c.raw.toFixed(2).replace(".", ",")}%`
+                        label: (c) => ` ${c.raw >= 0 ? "+" : ""}${c.raw.toFixed(2).replace(".", ",")}%`,
+                        afterBody: (items) => {
+                            const d = detalle[items[0]?.dataIndex]
+                            if (!d) return []
+                            const lineas = [
+                                `Valor inicial: ${formatEuro(d.inicio)}`,
+                                `Valor final: ${formatEuro(d.cierre)}`,
+                                `${d.flujo >= 0 ? "Aportado" : "Retirado"}: ${formatEuro(Math.abs(d.flujo))}`
+                            ]
+                            if (d.parcial) lineas.push("Periodo parcial (desde el primer registro)")
+                            if (d.cobertura) {
+                                lineas.push(
+                                    `Cobertura: ${d.cobertura.dias} de ${d.cobertura.esperados} días (${String(d.cobertura.pct).replace(".", ",")} %)`
+                                )
+                                if (d.pobre) lineas.push("⚠ Pocos puntos: la cifra es orientativa")
+                            }
+                            return lineas
+                        }
                     }
                 }
             },
@@ -2395,7 +3123,7 @@ function mRenderRentabilidadAnual(snaps, currentValue) {
                 y: {
                     ticks: {
                         color: "#ccd6f6",
-                        callback: v => (v >= 0 ? "+" : "") + v.toFixed(1) + "%"
+                        callback: (v) => (v >= 0 ? "+" : "") + v.toFixed(1) + "%"
                     },
                     grid: { color: "rgba(255,255,255,0.06)" }
                 }
@@ -2407,68 +3135,74 @@ function mRenderRentabilidadAnual(snaps, currentValue) {
 // ── tasa de ahorro mensual ────────────────────────────────────────────────
 
 function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
-    const section  = document.getElementById("mSectionAhorro")
+    const section = document.getElementById("mSectionAhorro")
     const kpiGroup = document.getElementById("mkpiGroupAhorro")
-    const kpiSep   = document.getElementById("mkpiSepAhorro")
+    const kpiSep = document.getElementById("mkpiSepAhorro")
 
     if (!ingresosYearData || !gastosYearData) {
-        if (section)  section.classList.add("hidden")
+        if (section) section.classList.add("hidden")
         if (kpiGroup) kpiGroup.classList.add("hidden")
-        if (kpiSep)   kpiSep.classList.add("hidden")
+        if (kpiSep) kpiSep.classList.add("hidden")
         return
     }
-    if (section)  section.classList.remove("hidden")
+    if (section) section.classList.remove("hidden")
     if (kpiGroup) kpiGroup.classList.remove("hidden")
-    if (kpiSep)   kpiSep.classList.remove("hidden")
+    if (kpiSep) kpiSep.classList.remove("hidden")
 
-    const ingMonthly = M_ING_KEYS.map(k => {
+    const ingMonthly = M_ING_KEYS.map((k) => {
         let t = 0
-        ;(ingresosYearData?.recurrentes || []).forEach(r => { t += parseEuroNumber(r.meses?.[k] || "") })
-        ;(ingresosYearData?.months?.[k]?.rows || []).forEach(r => { t += parseEuroNumber(r.cantidad || "") })
+        ;(ingresosYearData?.recurrentes || []).forEach((r) => {
+            t += parseEuroNumber(r.meses?.[k] || "")
+        })
+        ;(ingresosYearData?.months?.[k]?.rows || []).forEach((r) => {
+            t += parseEuroNumber(r.cantidad || "")
+        })
         return t
     })
 
     const { totalMes: gastosMes } = mComputeGastosData(gastosYearData)
-    const gastosMonthly = M_GASTOS_KEYS.map(k => gastosMes[k] || 0)
+    const gastosMonthly = M_GASTOS_KEYS.map((k) => gastosMes[k] || 0)
 
     const ahorroMonthly = ingMonthly.map((ing, i) => ing - gastosMonthly[i])
-    const tasaMonthly   = ingMonthly.map((ing, i) => ing > 0 ? ((ing - gastosMonthly[i]) / ing) * 100 : null)
+    const tasaMonthly = ingMonthly.map((ing, i) => (ing > 0 ? ((ing - gastosMonthly[i]) / ing) * 100 : null))
 
     const activeMeses = ingMonthly
         .map((v, i) => ({ ing: v, tasa: tasaMonthly[i] }))
-        .filter(m => m.ing > 0 && m.tasa !== null)
-    const avgTasa    = activeMeses.length > 0
-        ? activeMeses.reduce((s, m) => s + m.tasa, 0) / activeMeses.length : 0
+        .filter((m) => m.ing > 0 && m.tasa !== null)
+    const avgTasa = activeMeses.length > 0 ? activeMeses.reduce((s, m) => s + m.tasa, 0) / activeMeses.length : 0
     const totalAhorro = ahorroMonthly.reduce((s, v) => s + v, 0)
 
     const objAhorro = Number(ahorroConfig?.objetivoAhorro) || 30
-    const objText   = avgTasa >= objAhorro ? `${avgTasa.toFixed(1)}% — +${(avgTasa - objAhorro).toFixed(1)} pp sobre objetivo (${objAhorro}%)` : `${avgTasa.toFixed(1)}% — ${(avgTasa - objAhorro).toFixed(1)} pp bajo objetivo (${objAhorro}%)`
+    const objText =
+        avgTasa >= objAhorro
+            ? `${avgTasa.toFixed(1)}% — +${(avgTasa - objAhorro).toFixed(1)} pp sobre objetivo (${objAhorro}%)`
+            : `${avgTasa.toFixed(1)}% — ${(avgTasa - objAhorro).toFixed(1)} pp bajo objetivo (${objAhorro}%)`
 
-    mSetKpi("mkpiTasaAhorro",  formatPercent(avgTasa),   avgTasa    >= 0 ? "mPositive" : "mNegative")
-    mSetKpi("mkpiAhorroTotal", formatEuro(totalAhorro),  totalAhorro >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiTasaAhorro", formatPercent(avgTasa), avgTasa >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiAhorroTotal", formatEuro(totalAhorro), totalAhorro >= 0 ? "mPositive" : "mNegative")
 
     // KPI vs Objetivo — estructura visual separada
-    const tasaEl  = document.getElementById("mkpiAhorroObjetivoTasa")
+    const tasaEl = document.getElementById("mkpiAhorroObjetivoTasa")
     const deltaEl = document.getElementById("mkpiAhorroObjetivoDelta")
-    const subEl   = document.getElementById("mkpiAhorroObjetivoSub")
+    const subEl = document.getElementById("mkpiAhorroObjetivoSub")
     if (tasaEl) {
-        const above     = avgTasa >= objAhorro
-        const diffPp    = avgTasa - objAhorro
+        const above = avgTasa >= objAhorro
+        const diffPp = avgTasa - objAhorro
         tasaEl.textContent = avgTasa.toFixed(1) + "%"
-        tasaEl.className   = "mkpiValue " + (above ? "mPositive" : "mNegative")
+        tasaEl.className = "mkpiValue " + (above ? "mPositive" : "mNegative")
         if (deltaEl) {
             deltaEl.textContent = (above ? "+" : "") + diffPp.toFixed(1) + " pp"
-            deltaEl.className   = "mkpiAhorroObjDelta " + (above ? "positive" : "negative")
+            deltaEl.className = "mkpiAhorroObjDelta " + (above ? "positive" : "negative")
         }
         if (subEl) {
             subEl.textContent = (above ? "sobre" : "bajo") + " objetivo (" + objAhorro + "%)"
         }
     }
 
-    const barColors  = ahorroMonthly.map(v => v >= 0 ? "#2ecc71aa" : "#e74c3caa")
-    const barBorders = ahorroMonthly.map(v => v >= 0 ? "#2ecc71" : "#e74c3c")
-    const lineData   = tasaMonthly.map(v => v !== null ? parseFloat(v.toFixed(1)) : null)
-    const objLine    = M_ING_LABELS.map(() => objAhorro)
+    const barColors = ahorroMonthly.map((v) => (v >= 0 ? "#2ecc71aa" : "#e74c3caa"))
+    const barBorders = ahorroMonthly.map((v) => (v >= 0 ? "#2ecc71" : "#e74c3c"))
+    const lineData = tasaMonthly.map((v) => (v !== null ? parseFloat(v.toFixed(1)) : null))
+    const objLine = M_ING_LABELS.map(() => objAhorro)
 
     mCreateChart("mChartTasaAhorro", {
         type: "bar",
@@ -2491,7 +3225,7 @@ function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
                     borderColor: "#3a7bd5",
                     backgroundColor: "rgba(58,123,213,0.08)",
                     borderWidth: 2,
-                    pointRadius: lineData.map(v => v !== null ? 4 : 0),
+                    pointRadius: lineData.map((v) => (v !== null ? 4 : 0)),
                     pointBackgroundColor: "#3a7bd5",
                     tension: 0.35,
                     spanGaps: false,
@@ -2532,13 +3266,13 @@ function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
                 yEur: {
                     type: "linear",
                     position: "left",
-                    ticks: { color: "#ccd6f6", callback: v => formatEuro(v) },
+                    ticks: { color: "#ccd6f6", callback: (v) => formatEuro(v) },
                     grid: { color: "rgba(255,255,255,0.06)" }
                 },
                 yPct: {
                     type: "linear",
                     position: "right",
-                    ticks: { color: "#8899bb", callback: v => v.toFixed(0) + "%" },
+                    ticks: { color: "#8899bb", callback: (v) => v.toFixed(0) + "%" },
                     grid: { display: false }
                 }
             }
@@ -2552,26 +3286,28 @@ let _metricasAnualMode = getChartPref("metricasAnualMode", "eur")
 let _mAnualResumenCache = []
 
 function mComputeResumenAnual(anualData) {
-    return (anualData || []).map(({ year, gastosData, ingresosData }) => {
-        const { totalMes } = mComputeGastosData(gastosData)
-        const gastado  = M_GASTOS_KEYS.reduce((s, k) => s + (totalMes[k] || 0), 0)
-        const ingMes   = mComputeIngresosMonthly(ingresosData)
-        const ingresos = M_ING_KEYS.reduce((s, k) => s + (ingMes[k] || 0), 0)
-        const ahorrado = ingresos - gastado
-        return {
-            year,
-            ingresos,
-            gastado,
-            ahorrado,
-            tasa:     ingresos > 0 ? (ahorrado / ingresos) * 100 : null,
-            pctGasto: ingresos > 0 ? (gastado  / ingresos) * 100 : null
-        }
-    }).filter(r => r.ingresos > 0 || r.gastado > 0)
+    return (anualData || [])
+        .map(({ year, gastosData, ingresosData }) => {
+            const { totalMes } = mComputeGastosData(gastosData)
+            const gastado = M_GASTOS_KEYS.reduce((s, k) => s + (totalMes[k] || 0), 0)
+            const ingMes = mComputeIngresosMonthly(ingresosData)
+            const ingresos = M_ING_KEYS.reduce((s, k) => s + (ingMes[k] || 0), 0)
+            const ahorrado = ingresos - gastado
+            return {
+                year,
+                ingresos,
+                gastado,
+                ahorrado,
+                tasa: ingresos > 0 ? (ahorrado / ingresos) * 100 : null,
+                pctGasto: ingresos > 0 ? (gastado / ingresos) * 100 : null
+            }
+        })
+        .filter((r) => r.ingresos > 0 || r.gastado > 0)
 }
 
 function mRenderAnual(anualData) {
     const section = document.getElementById("mSectionAnual")
-    const kpiRow  = document.getElementById("mkpiRowAnual")
+    const kpiRow = document.getElementById("mkpiRowAnual")
 
     const resumen = mComputeResumenAnual(anualData)
     _mAnualResumenCache = resumen
@@ -2580,31 +3316,35 @@ function mRenderAnual(anualData) {
     // categorías de la barra superior reescribe el display de estas filas.
     if (!resumen.length) {
         if (section) section.classList.add("hidden")
-        if (kpiRow)  kpiRow.classList.add("hidden")
+        if (kpiRow) kpiRow.classList.add("hidden")
         return
     }
     if (section) section.classList.remove("hidden")
-    if (kpiRow)  kpiRow.classList.remove("hidden")
+    if (kpiRow) kpiRow.classList.remove("hidden")
 
     const totalIngresos = resumen.reduce((s, r) => s + r.ingresos, 0)
-    const totalGastado  = resumen.reduce((s, r) => s + r.gastado,  0)
+    const totalGastado = resumen.reduce((s, r) => s + r.gastado, 0)
     const totalAhorrado = totalIngresos - totalGastado
-    const tasaGlobal    = totalIngresos > 0 ? (totalAhorrado / totalIngresos) * 100 : 0
-    const mediaAhorro   = totalAhorrado / resumen.length
-    const mejor         = resumen.reduce((best, r) => (best === null || r.ahorrado > best.ahorrado ? r : best), null)
+    const tasaGlobal = totalIngresos > 0 ? (totalAhorrado / totalIngresos) * 100 : 0
+    const mediaAhorro = totalAhorrado / resumen.length
+    const mejor = resumen.reduce((best, r) => (best === null || r.ahorrado > best.ahorrado ? r : best), null)
 
-    mSetKpi("mkpiAnualGastado",     formatEuro(totalGastado))
-    mSetKpi("mkpiAnualAhorrado",    formatEuro(totalAhorrado), totalAhorrado >= 0 ? "mPositive" : "mNegative")
-    mSetKpi("mkpiAnualTasaGlobal",  formatPercent(tasaGlobal), tasaGlobal    >= 0 ? "mPositive" : "mNegative")
-    mSetKpi("mkpiAnualMediaAhorro", formatEuro(mediaAhorro),   mediaAhorro   >= 0 ? "mPositive" : "mNegative")
-    mSetKpi("mkpiAnualMejorAnio",   mejor ? `${mejor.year} · ${formatEuro(mejor.ahorrado)}` : "---",
-        mejor && mejor.ahorrado >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiAnualGastado", formatEuro(totalGastado))
+    mSetKpi("mkpiAnualAhorrado", formatEuro(totalAhorrado), totalAhorrado >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiAnualTasaGlobal", formatPercent(tasaGlobal), tasaGlobal >= 0 ? "mPositive" : "mNegative")
+    mSetKpi("mkpiAnualMediaAhorro", formatEuro(mediaAhorro), mediaAhorro >= 0 ? "mPositive" : "mNegative")
+    mSetKpi(
+        "mkpiAnualMejorAnio",
+        mejor ? `${mejor.year} · ${formatEuro(mejor.ahorrado)}` : "---",
+        mejor && mejor.ahorrado >= 0 ? "mPositive" : "mNegative"
+    )
 
     // Toggle € / %
     const modeGroup = document.getElementById("mAnualModeGroup")
     if (modeGroup) {
-        modeGroup.querySelectorAll(".mAnualModeBtn").forEach(b =>
-            b.classList.toggle("active", b.dataset.anualmode === _metricasAnualMode))
+        modeGroup
+            .querySelectorAll(".mAnualModeBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.anualmode === _metricasAnualMode))
         if (!modeGroup.dataset.bound) {
             modeGroup.dataset.bound = "true"
             modeGroup.addEventListener("click", (e) => {
@@ -2612,8 +3352,9 @@ function mRenderAnual(anualData) {
                 if (!btn) return
                 _metricasAnualMode = btn.dataset.anualmode
                 setChartPref("metricasAnualMode", _metricasAnualMode)
-                modeGroup.querySelectorAll(".mAnualModeBtn").forEach(b =>
-                    b.classList.toggle("active", b.dataset.anualmode === _metricasAnualMode))
+                modeGroup
+                    .querySelectorAll(".mAnualModeBtn")
+                    .forEach((b) => b.classList.toggle("active", b.dataset.anualmode === _metricasAnualMode))
                 mDrawAnualBarras(_mAnualResumenCache)
             })
         }
@@ -2626,15 +3367,15 @@ function mRenderAnual(anualData) {
 }
 
 function mDrawAnualBarras(resumen) {
-    const labels  = resumen.map(r => String(r.year))
+    const labels = resumen.map((r) => String(r.year))
     const titleEl = document.getElementById("mAnualBarrasTitle")
-    const esPct   = _metricasAnualMode === "pct"
-    if (titleEl) titleEl.textContent = esPct
-        ? "Reparto de los ingresos por año (%)"
-        : "Gastado y ahorrado por año (€)"
+    const esPct = _metricasAnualMode === "pct"
+    if (titleEl) titleEl.textContent = esPct ? "Reparto de los ingresos por año (%)" : "Gastado y ahorrado por año (€)"
 
-    const gastado  = resumen.map(r => esPct ? (r.pctGasto !== null ? parseFloat(r.pctGasto.toFixed(1)) : null) : r.gastado)
-    const ahorrado = resumen.map(r => esPct ? (r.tasa     !== null ? parseFloat(r.tasa.toFixed(1))     : null) : r.ahorrado)
+    const gastado = resumen.map((r) =>
+        esPct ? (r.pctGasto !== null ? parseFloat(r.pctGasto.toFixed(1)) : null) : r.gastado
+    )
+    const ahorrado = resumen.map((r) => (esPct ? (r.tasa !== null ? parseFloat(r.tasa.toFixed(1)) : null) : r.ahorrado))
 
     // En % las dos barras se apilan porque juntas son el 100 % de los ingresos.
     // En € van una al lado de otra: apiladas, el ahorro arrancaba a la altura
@@ -2663,15 +3404,15 @@ function mDrawAnualBarras(resumen) {
             ...barraComun,
             label: esPct ? "Ahorrado (%)" : "Ahorrado",
             data: ahorrado,
-            backgroundColor: ahorrado.map(v => (v ?? 0) >= 0 ? "#2ecc7188" : "#c0392b88"),
-            borderColor: ahorrado.map(v => (v ?? 0) >= 0 ? "#2ecc71" : "#c0392b")
+            backgroundColor: ahorrado.map((v) => ((v ?? 0) >= 0 ? "#2ecc7188" : "#c0392b88")),
+            borderColor: ahorrado.map((v) => ((v ?? 0) >= 0 ? "#2ecc71" : "#c0392b"))
         }
     ]
 
     if (!esPct) {
         datasets.push({
             label: "Tasa de ahorro (%)",
-            data: resumen.map(r => r.tasa !== null ? parseFloat(r.tasa.toFixed(1)) : null),
+            data: resumen.map((r) => (r.tasa !== null ? parseFloat(r.tasa.toFixed(1)) : null)),
             type: "line",
             borderColor: "#3a7bd5",
             backgroundColor: "rgba(58,123,213,0.08)",
@@ -2686,28 +3427,28 @@ function mDrawAnualBarras(resumen) {
 
     const scales = esPct
         ? {
-            x: { ...mAxisX(), stacked: true },
-            y: {
-                stacked: true,
-                ticks: { color: "#ccd6f6", callback: v => v.toFixed(0) + "%" },
-                grid: { color: "rgba(255,255,255,0.06)" }
-            }
-        }
+              x: { ...mAxisX(), stacked: true },
+              y: {
+                  stacked: true,
+                  ticks: { color: "#ccd6f6", callback: (v) => v.toFixed(0) + "%" },
+                  grid: { color: "rgba(255,255,255,0.06)" }
+              }
+          }
         : {
-            x: mAxisX(),
-            yEur: {
-                type: "linear",
-                position: "left",
-                ticks: { color: "#ccd6f6", callback: v => formatEuro(v) },
-                grid: { color: "rgba(255,255,255,0.06)" }
-            },
-            yPct: {
-                type: "linear",
-                position: "right",
-                ticks: { color: "#8899bb", callback: v => v.toFixed(0) + "%" },
-                grid: { display: false }
-            }
-        }
+              x: mAxisX(),
+              yEur: {
+                  type: "linear",
+                  position: "left",
+                  ticks: { color: "#ccd6f6", callback: (v) => formatEuro(v) },
+                  grid: { color: "rgba(255,255,255,0.06)" }
+              },
+              yPct: {
+                  type: "linear",
+                  position: "right",
+                  ticks: { color: "#8899bb", callback: (v) => v.toFixed(0) + "%" },
+                  grid: { display: false }
+              }
+          }
 
     mCreateChart("mChartAnualBarras", {
         type: "bar",
@@ -2718,6 +3459,10 @@ function mDrawAnualBarras(resumen) {
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
                 tooltip: {
+                    // Apiladas, Chart.js lista los items en orden de dataset (gasto
+                    // primero) pero el gasto se pinta abajo: se invierte para que el
+                    // tooltip se lea igual que la columna, ahorro arriba.
+                    ...(esPct ? { itemSort: (a, b) => b.datasetIndex - a.datasetIndex } : {}),
                     callbacks: {
                         label: (c) => {
                             if (c.raw === null) return ` ${c.dataset.label}: ---`
@@ -2746,14 +3491,16 @@ function mDrawAnualReparto(totalGastado, totalAhorrado) {
             type: "bar",
             data: {
                 labels: ["Gastado", "Ahorrado"],
-                datasets: [{
-                    label: "Acumulado",
-                    data: [totalGastado, totalAhorrado],
-                    backgroundColor: ["#e74c3c88", "#c0392b88"],
-                    borderColor: ["#e74c3c", "#c0392b"],
-                    borderWidth: 1,
-                    borderRadius: 4
-                }]
+                datasets: [
+                    {
+                        label: "Acumulado",
+                        data: [totalGastado, totalAhorrado],
+                        backgroundColor: ["#e74c3c88", "#c0392b88"],
+                        borderColor: ["#e74c3c", "#c0392b"],
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }
+                ]
             },
             options: {
                 ...M_CHART_DEFAULTS,
@@ -2762,7 +3509,7 @@ function mDrawAnualReparto(totalGastado, totalAhorrado) {
                     legend: { display: false },
                     tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
                 },
-                scales: { x: mAxisX(), y: { ...mAxisY(), ticks: { color: "#ccd6f6", callback: v => formatEuro(v) } } }
+                scales: { x: mAxisX(), y: { ...mAxisY(), ticks: { color: "#ccd6f6", callback: (v) => formatEuro(v) } } }
             }
         })
         return
@@ -2773,13 +3520,15 @@ function mDrawAnualReparto(totalGastado, totalAhorrado) {
         type: "doughnut",
         data: {
             labels: ["Gastado", "Ahorrado"],
-            datasets: [{
-                data: [totalGastado, totalAhorrado],
-                backgroundColor: ["#e74c3c", "#2ecc71"],
-                borderColor: "#0b1120",
-                borderWidth: 2,
-                hoverOffset: 10
-            }]
+            datasets: [
+                {
+                    data: [totalGastado, totalAhorrado],
+                    backgroundColor: ["#e74c3c", "#2ecc71"],
+                    borderColor: "#0b1120",
+                    borderWidth: 2,
+                    hoverOffset: 10
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -2795,24 +3544,29 @@ function mDrawAnualReparto(totalGastado, totalAhorrado) {
 
 function mDrawAnualAcumulado(resumen) {
     let acc = 0
-    const data = resumen.map(r => { acc += r.ahorrado; return parseFloat(acc.toFixed(2)) })
+    const data = resumen.map((r) => {
+        acc += r.ahorrado
+        return parseFloat(acc.toFixed(2))
+    })
 
     mCreateChart("mChartAnualAcumulado", {
         type: "line",
         data: {
-            labels: resumen.map(r => String(r.year)),
-            datasets: [{
-                label: "Ahorro acumulado",
-                data,
-                borderColor: "#2ecc71",
-                backgroundColor: "rgba(46,204,113,0.12)",
-                borderWidth: 2.5,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                pointBackgroundColor: "#2ecc71",
-                tension: 0.35,
-                fill: true
-            }]
+            labels: resumen.map((r) => String(r.year)),
+            datasets: [
+                {
+                    label: "Ahorro acumulado",
+                    data,
+                    borderColor: "#2ecc71",
+                    backgroundColor: "rgba(46,204,113,0.12)",
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: "#2ecc71",
+                    tension: 0.35,
+                    fill: true
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -2828,7 +3582,7 @@ function mDrawAnualAcumulado(resumen) {
             },
             scales: {
                 x: mAxisX(),
-                y: { ...mAxisY(), ticks: { color: "#ccd6f6", callback: v => formatEuro(v) } }
+                y: { ...mAxisY(), ticks: { color: "#ccd6f6", callback: (v) => formatEuro(v) } }
             }
         }
     })
@@ -2841,9 +3595,10 @@ function mRenderAnualTabla(resumen, totales) {
 
     const anioActual = new Date().getFullYear()
 
-    body.innerHTML = resumen.map(r => {
-        const cls = r.ahorrado >= 0 ? "mCellPos" : "mCellNeg"
-        return `
+    body.innerHTML = resumen
+        .map((r) => {
+            const cls = r.ahorrado >= 0 ? "mCellPos" : "mCellNeg"
+            return `
         <tr>
             <td class="mTdName">${r.year}${r.year === anioActual ? " (YTD)" : ""}</td>
             <td>${formatEuro(r.ingresos)}</td>
@@ -2852,7 +3607,8 @@ function mRenderAnualTabla(resumen, totales) {
             <td>${r.pctGasto !== null ? formatPercent(r.pctGasto) : "---"}</td>
             <td class="${cls}">${r.tasa !== null ? formatPercent(r.tasa) : "---"}</td>
         </tr>`
-    }).join("")
+        })
+        .join("")
 
     if (foot) {
         const cls = totales.totalAhorrado >= 0 ? "mCellPos" : "mCellNeg"
@@ -2872,27 +3628,40 @@ function mRenderAnualTabla(resumen, totales) {
 // ── invertido por periodo ──────────────────────────────────────────────────
 
 function mDrawInvertidoMesChart(monthMap, year) {
-    const MONTH_ABBR = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
-    const months    = Object.keys(monthMap).filter(k => k.startsWith(year + "-")).sort()
-    const mesLabels = months.map(k => { const mo = k.split("-")[1]; return MONTH_ABBR[parseInt(mo) - 1] })
-    const mesValues = months.map(k => parseFloat((monthMap[k] || 0).toFixed(2)))
+    const MONTH_ABBR = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    const months = Object.keys(monthMap)
+        .filter((k) => k.startsWith(year + "-"))
+        .sort()
+    const mesLabels = months.map((k) => {
+        const mo = k.split("-")[1]
+        return MONTH_ABBR[parseInt(mo) - 1]
+    })
+    const mesValues = months.map((k) => parseFloat((monthMap[k] || 0).toFixed(2)))
 
     mCreateChart("mChartInvertidoMes", {
         type: "bar",
         data: {
             labels: mesLabels,
-            datasets: [{ label: "Invertido (€)", data: mesValues,
-                backgroundColor: "#3a7bd5aa", borderColor: "#3a7bd5",
-                borderWidth: 1, borderRadius: 4 }]
+            datasets: [
+                {
+                    label: "Invertido (€)",
+                    data: mesValues,
+                    backgroundColor: "#3a7bd5aa",
+                    borderColor: "#3a7bd5",
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
         },
         options: {
-            ...M_CHART_DEFAULTS, animation: false,
+            ...M_CHART_DEFAULTS,
+            animation: false,
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
                 legend: { display: false },
                 tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
             },
-            scales: { x: mAxisX(), y: { ...mAxisY(), ticks: { color: "#ccd6f6", callback: v => formatEuro(v) } } }
+            scales: { x: mAxisX(), y: { ...mAxisY(), ticks: { color: "#ccd6f6", callback: (v) => formatEuro(v) } } }
         }
     })
 }
@@ -2900,10 +3669,13 @@ function mDrawInvertidoMesChart(monthMap, year) {
 function mRenderInvertidoPeriodo(invData) {
     const section = document.getElementById("mSectionInvertidoPeriodo")
     const monthMap = invData.byMonth || {}
-    const yearMap  = invData.byYear  || {}
+    const yearMap = invData.byYear || {}
 
     const hasData = Object.keys(monthMap).length > 0
-    if (!hasData) { if (section) section.classList.add("hidden"); return }
+    if (!hasData) {
+        if (section) section.classList.add("hidden")
+        return
+    }
     if (section) section.classList.remove("hidden")
 
     const years = Object.keys(yearMap).sort()
@@ -2912,15 +3684,18 @@ function mRenderInvertidoPeriodo(invData) {
 
     const yearToggle = document.getElementById("mInvertidoYearToggle")
     if (yearToggle) {
-        yearToggle.innerHTML = years.map(y =>
-            `<button class="mToggleBtn${y === _metricasInvertidoYear ? " active" : ""}" data-invyr="${y}">${y}</button>`
-        ).join("")
+        yearToggle.innerHTML = years
+            .map(
+                (y) =>
+                    `<button class="mToggleBtn${y === _metricasInvertidoYear ? " active" : ""}" data-invyr="${y}">${y}</button>`
+            )
+            .join("")
         if (!yearToggle.dataset.bound) {
             yearToggle.dataset.bound = "true"
             yearToggle.addEventListener("click", (e) => {
                 const btn = e.target.closest("[data-invyr]")
                 if (!btn) return
-                yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+                yearToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasInvertidoYear = btn.dataset.invyr
                 setChartPref("metricasInvertidoYear", _metricasInvertidoYear)
@@ -2931,16 +3706,23 @@ function mRenderInvertidoPeriodo(invData) {
 
     if (_metricasInvertidoYear) mDrawInvertidoMesChart(monthMap, _metricasInvertidoYear)
 
-    const anioLabels = years.map(y => String(y) === String(new Date().getFullYear()) ? `${y} (YTD)` : y)
-    const anioValues = years.map(k => parseFloat((yearMap[k] || 0).toFixed(2)))
+    const anioLabels = years.map((y) => (String(y) === String(new Date().getFullYear()) ? `${y} (YTD)` : y))
+    const anioValues = years.map((k) => parseFloat((yearMap[k] || 0).toFixed(2)))
 
     mCreateChart("mChartInvertidoAnio", {
         type: "bar",
         data: {
             labels: anioLabels,
-            datasets: [{ label: "Invertido (€)", data: anioValues,
-                backgroundColor: "#3a7bd5aa", borderColor: "#3a7bd5",
-                borderWidth: 1, borderRadius: 4 }]
+            datasets: [
+                {
+                    label: "Invertido (€)",
+                    data: anioValues,
+                    backgroundColor: "#3a7bd5aa",
+                    borderColor: "#3a7bd5",
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -2949,7 +3731,7 @@ function mRenderInvertidoPeriodo(invData) {
                 legend: { display: false },
                 tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
             },
-            scales: { x: mAxisX(), y: { ...mAxisY(), ticks: { color: "#ccd6f6", callback: v => formatEuro(v) } } }
+            scales: { x: mAxisX(), y: { ...mAxisY(), ticks: { color: "#ccd6f6", callback: (v) => formatEuro(v) } } }
         }
     })
 }
@@ -2957,22 +3739,35 @@ function mRenderInvertidoPeriodo(invData) {
 // ── ingresos pasivos histórico ─────────────────────────────────────────────
 
 function mDrawPasivosMesChart(monthMap, year) {
-    const MONTH_ABBR = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
-    const months     = Object.keys(monthMap).filter(k => k.startsWith(year + "-")).sort()
-    const mesLabels  = months.map(k => { const mo = k.split("-")[1]; return MONTH_ABBR[parseInt(mo) - 1] })
-    const mesValues  = months.map(k => parseFloat((monthMap[k] || 0).toFixed(2)))
-    const mesColors  = mesValues.map(v => v >= 0 ? "#1abc9c" : "#e74c3c")
+    const MONTH_ABBR = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    const months = Object.keys(monthMap)
+        .filter((k) => k.startsWith(year + "-"))
+        .sort()
+    const mesLabels = months.map((k) => {
+        const mo = k.split("-")[1]
+        return MONTH_ABBR[parseInt(mo) - 1]
+    })
+    const mesValues = months.map((k) => parseFloat((monthMap[k] || 0).toFixed(2)))
+    const mesColors = mesValues.map((v) => (v >= 0 ? "#1abc9c" : "#e74c3c"))
 
     mCreateChart("mChartPasivosMes", {
         type: "bar",
         data: {
             labels: mesLabels,
-            datasets: [{ label: "Ingresos pasivos (€)", data: mesValues,
-                backgroundColor: mesColors.map(c => c + "aa"), borderColor: mesColors,
-                borderWidth: 1, borderRadius: 4 }]
+            datasets: [
+                {
+                    label: "Ingresos pasivos (€)",
+                    data: mesValues,
+                    backgroundColor: mesColors.map((c) => c + "aa"),
+                    borderColor: mesColors,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
         },
         options: {
-            ...M_CHART_DEFAULTS, animation: false,
+            ...M_CHART_DEFAULTS,
+            animation: false,
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
                 legend: { display: false },
@@ -2986,13 +3781,13 @@ function mDrawPasivosMesChart(monthMap, year) {
 function mRenderPasivosCharts(dividendos, intereses) {
     const section = document.getElementById("mSectionPasivosEvol")
     const monthMap = {}
-    const yearMap  = {}
+    const yearMap = {}
 
-    dividendos.forEach(r => {
+    dividendos.forEach((r) => {
         const p = String(r.fecha || "").split("-")
         if (p.length !== 3) return
         const mon = mParseEsMonth(p[1]) || parseInt(p[1])
-        const yr  = mParseShortYear(p[2])
+        const yr = mParseShortYear(p[2])
         if (!mon || !yr || mon < 1 || mon > 12) return
         const key = `${yr}-${String(mon).padStart(2, "0")}`
         const val = parseEuroNumber(r.total || "")
@@ -3000,15 +3795,15 @@ function mRenderPasivosCharts(dividendos, intereses) {
         yearMap[String(yr)] = (yearMap[String(yr)] || 0) + val
     })
 
-    ;(Array.isArray(intereses) ? intereses : []).forEach(r => {
+    ;(Array.isArray(intereses) ? intereses : []).forEach((r) => {
         const p = String(r.fecha || "").split("-")
         let mon, yr
         if (p.length === 3) {
             mon = mParseEsMonth(p[1]) || parseInt(p[1])
-            yr  = mParseShortYear(p[2])
+            yr = mParseShortYear(p[2])
         } else if (p.length === 2) {
             mon = mParseEsMonth(p[0]) || parseInt(p[0])
-            yr  = mParseShortYear(p[1])
+            yr = mParseShortYear(p[1])
         }
         if (!mon || !yr || mon < 1 || mon > 12) return
         const key = `${yr}-${String(mon).padStart(2, "0")}`
@@ -3018,7 +3813,10 @@ function mRenderPasivosCharts(dividendos, intereses) {
     })
 
     const hasData = Object.keys(monthMap).length > 0 || Object.keys(yearMap).length > 0
-    if (!hasData) { if (section) section.classList.add("hidden"); return }
+    if (!hasData) {
+        if (section) section.classList.add("hidden")
+        return
+    }
     if (section) section.classList.remove("hidden")
 
     // ── year toggle buttons ──
@@ -3028,15 +3826,18 @@ function mRenderPasivosCharts(dividendos, intereses) {
 
     const yearToggle = document.getElementById("mPasivosYearToggle")
     if (yearToggle) {
-        yearToggle.innerHTML = years.map(y =>
-            `<button class="mToggleBtn${y === _metricasPasivosYear ? " active" : ""}" data-pasmy="${y}">${y}</button>`
-        ).join("")
+        yearToggle.innerHTML = years
+            .map(
+                (y) =>
+                    `<button class="mToggleBtn${y === _metricasPasivosYear ? " active" : ""}" data-pasmy="${y}">${y}</button>`
+            )
+            .join("")
         if (!yearToggle.dataset.bound) {
             yearToggle.dataset.bound = "true"
             yearToggle.addEventListener("click", (e) => {
                 const btn = e.target.closest("[data-pasmy]")
                 if (!btn) return
-                yearToggle.querySelectorAll(".mToggleBtn").forEach(b => b.classList.remove("active"))
+                yearToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
                 btn.classList.add("active")
                 _metricasPasivosYear = btn.dataset.pasmy
                 setChartPref("metricasPasivosYear", _metricasPasivosYear)
@@ -3049,17 +3850,24 @@ function mRenderPasivosCharts(dividendos, intereses) {
     if (_metricasPasivosYear) mDrawPasivosMesChart(monthMap, _metricasPasivosYear)
 
     // ── chart por año ──
-    const anioLabels = years.map(y => String(y) === String(new Date().getFullYear()) ? `${y} (YTD)` : y)
-    const anioValues = years.map(k => parseFloat((yearMap[k] || 0).toFixed(2)))
-    const anioColors = anioValues.map(v => v >= 0 ? "#1abc9c" : "#e74c3c")
+    const anioLabels = years.map((y) => (String(y) === String(new Date().getFullYear()) ? `${y} (YTD)` : y))
+    const anioValues = years.map((k) => parseFloat((yearMap[k] || 0).toFixed(2)))
+    const anioColors = anioValues.map((v) => (v >= 0 ? "#1abc9c" : "#e74c3c"))
 
     mCreateChart("mChartPasivosAnio", {
         type: "bar",
         data: {
             labels: anioLabels,
-            datasets: [{ label: "Ingresos pasivos (€)", data: anioValues,
-                backgroundColor: anioColors.map(c => c + "aa"), borderColor: anioColors,
-                borderWidth: 1, borderRadius: 4 }]
+            datasets: [
+                {
+                    label: "Ingresos pasivos (€)",
+                    data: anioValues,
+                    backgroundColor: anioColors.map((c) => c + "aa"),
+                    borderColor: anioColors,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -3086,20 +3894,24 @@ function mRenderPasivosCharts(dividendos, intereses) {
 // por su propia lógica (trading sin operaciones, renta fija sin filas…) deben
 // quedarse como están.
 
-// Estos dos se piden al servidor por rango después de la pasada, así que se
-// gestionan aparte en mRenderAll: si se ocultaran por "no tener gráfico todavía"
-// desaparecerían aunque sí hubiera histórico.
-const _M_SECCIONES_ASINCRONAS = new Set(["mSectionEvolucion", "mSectionEvolucionTipos"])
+// Secciones que viven del histórico de snapshots y ya deciden solas cuándo
+// esconderse. Las dos de evolución porque se piden por rango después de esta
+// pasada (si se ocultaran por "no tener gráfico todavía" desaparecerían aunque
+// sí hubiera histórico), y la de riesgo porque su gráfico de drawdown es todo
+// ceros mientras la cartera esté en máximos, que es un dato, no un hueco.
+const _M_SECCIONES_ASINCRONAS = new Set(["mSectionEvolucion", "mSectionEvolucionTipos", "mSectionRiesgo"])
 
 function _mChartConDatos(canvas) {
     const chart = _metricasCharts[canvas?.id]
     if (!chart) return false
 
-    return (chart.data?.datasets || []).some((ds) => (ds.data || []).some((punto) => {
-        const valor  = punto && typeof punto === "object" ? (punto.y ?? punto.v ?? punto.r) : punto
-        const numero = Number(valor)
-        return Number.isFinite(numero) && numero !== 0
-    }))
+    return (chart.data?.datasets || []).some((ds) =>
+        (ds.data || []).some((punto) => {
+            const valor = punto && typeof punto === "object" ? (punto.y ?? punto.v ?? punto.r) : punto
+            const numero = Number(valor)
+            return Number.isFinite(numero) && numero !== 0
+        })
+    )
 }
 
 function _mContenedorConDatos(el) {
@@ -3209,13 +4021,26 @@ function mOcultarApartadosSinDatos() {
 }
 
 function mRenderAll(payload) {
-    const { summaries, dividendos, bonos, rentaFija, gastosYearsList, gastosYearData, ingresosYearsList, ingresosYearData, tradingRows, snapshotHistory, inversiones } = payload
-    const b = bonos || [], rf = rentaFija || []
+    const {
+        summaries,
+        dividendos,
+        bonos,
+        rentaFija,
+        gastosYearsList,
+        gastosYearData,
+        ingresosYearsList,
+        ingresosYearData,
+        tradingRows,
+        snapshotHistory,
+        inversiones
+    } = payload
+    const b = bonos || [],
+        rf = rentaFija || []
     mRenderDistTipos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
     mRenderDistActivos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
     mRenderRendTipos(summaries)
     mRenderRendActivos(summaries)
-    const colorMap = Object.fromEntries(summaries.map(s => [s.name, s.color]).filter(([, c]) => c))
+    const colorMap = Object.fromEntries(summaries.map((s) => [s.name, s.color]).filter(([, c]) => c))
     mRenderDividendos(dividendos, colorMap)
     mRenderDivMensual(dividendos, colorMap)
     mRenderInteresesSection(payload.intereses, payload.cuentasRemuneradas)
@@ -3232,9 +4057,15 @@ function mRenderAll(payload) {
     mRenderTopTable(summaries)
     mRenderTrading(tradingRows || [])
     const liveValue = summaries.reduce((s, a) => s + a.netoActualEur, 0)
+    const liveInvested = summaries.reduce((s, a) => s + a.invertidoEur, 0)
     mRenderConcentracion(summaries)
-    mRenderRentabilidadAnual(snapshotHistory || [], liveValue)
-    mRenderAhorro(ingresosYearData || null, gastosYearData || null, payload.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} })
+    mRenderRentabilidadAnual(snapshotHistory || [], liveValue, liveInvested, payload.rentabilidad?.cobertura || {})
+    mRenderRiesgo(payload.rentabilidad)
+    mRenderAhorro(
+        ingresosYearData || null,
+        gastosYearData || null,
+        payload.ahorroConfig || { objetivoAhorro: 30, presupuesto: {} }
+    )
     mRenderAnual(payload.anualData || [])
 
     const gastosEmpty = !gastosYearsList?.length || !gastosYearData
@@ -3269,15 +4100,21 @@ function mFmtTradingPct(value) {
 
 function mRenderTrading(rows) {
     const tradingSections = ["mSectionTradingDireccion", "mSectionTradingWinLoss", "mSectionTradingRendimiento"]
-    const tradingKpiRow   = document.querySelector(".metricasKpiRow[data-mcat='trading']")
-    const tradingDivider  = document.querySelector(".metricasCatDivider[data-mcat='trading']")
+    const tradingKpiRow = document.querySelector(".metricasKpiRow[data-mcat='trading']")
+    const tradingDivider = document.querySelector(".metricasCatDivider[data-mcat='trading']")
     if (!rows.length) {
-        tradingSections.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add("hidden") })
+        tradingSections.forEach((id) => {
+            const el = document.getElementById(id)
+            if (el) el.classList.add("hidden")
+        })
         if (tradingKpiRow) tradingKpiRow.style.display = "none"
         if (tradingDivider) tradingDivider.style.display = "none"
         return
     }
-    tradingSections.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove("hidden") })
+    tradingSections.forEach((id) => {
+        const el = document.getElementById(id)
+        if (el) el.classList.remove("hidden")
+    })
     if (tradingKpiRow) tradingKpiRow.style.display = ""
     if (tradingDivider) tradingDivider.style.display = ""
 
@@ -3289,9 +4126,9 @@ function mRenderTrading(rows) {
     if (wlFilterEl && !wlFilterEl.dataset.bound) {
         wlFilterEl.dataset.bound = "true"
         // Marca el filtro guardado; si ya no existe, vuelve a "todos".
-        const savedLabel  = wlFilterEl.querySelector(`.mActivosFilterBtn[data-wlfilter="${_mTradingWinLossFilter}"]`)
-        const savedInput  = savedLabel?.querySelector("input")
-        const todosInput  = wlFilterEl.querySelector('input[value="todos"]')
+        const savedLabel = wlFilterEl.querySelector(`.mActivosFilterBtn[data-wlfilter="${_mTradingWinLossFilter}"]`)
+        const savedInput = savedLabel?.querySelector("input")
+        const todosInput = wlFilterEl.querySelector('input[value="todos"]')
         if (savedInput) savedInput.checked = true
         else {
             _mTradingWinLossFilter = "todos"
@@ -3308,20 +4145,22 @@ function mRenderTrading(rows) {
 }
 
 function mRenderTradingDireccion(rows) {
-    const longs  = rows.filter((r) => r.direccion === "LONG")
+    const longs = rows.filter((r) => r.direccion === "LONG")
     const shorts = rows.filter((r) => r.direccion === "SHORT")
 
     mCreateChart("mChartTradingDireccion", {
         type: "doughnut",
         data: {
             labels: ["LONG", "SHORT"],
-            datasets: [{
-                data: [longs.length, shorts.length],
-                backgroundColor: ["#2ecc71", "#e74c3c"],
-                borderColor: "#0b1120",
-                borderWidth: 3,
-                hoverOffset: 10
-            }]
+            datasets: [
+                {
+                    data: [longs.length, shorts.length],
+                    backgroundColor: ["#2ecc71", "#e74c3c"],
+                    borderColor: "#0b1120",
+                    borderWidth: 3,
+                    hoverOffset: 10
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -3329,7 +4168,12 @@ function mRenderTradingDireccion(rows) {
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
                 legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
-                tooltip: { callbacks: { label: (c) => ` ${c.raw} trades (${rows.length > 0 ? ((c.raw / rows.length) * 100).toFixed(1) : 0}%)` } }
+                tooltip: {
+                    callbacks: {
+                        label: (c) =>
+                            ` ${c.raw} trades (${rows.length > 0 ? ((c.raw / rows.length) * 100).toFixed(1) : 0}%)`
+                    }
+                }
             }
         }
     })
@@ -3339,13 +4183,15 @@ function mRenderTradingDireccion(rows) {
 
     function dirStats(subset, label, color) {
         const profits = subset.filter((r) => r.resultado === "PROFIT")
-        const wr = subset.length > 0 ? (profits.length / subset.length * 100).toFixed(1) : "0.0"
-        const ganMedia = subset.length > 0
-            ? (subset.reduce((s, r) => s + (mParseTradingPct(r.ganancia) || 0), 0) / subset.length).toFixed(2)
-            : "0.00"
-        const roiMedia = subset.length > 0
-            ? (subset.reduce((s, r) => s + (mParseTradingPct(r.roi) || 0), 0) / subset.length).toFixed(1)
-            : "0.0"
+        const wr = subset.length > 0 ? ((profits.length / subset.length) * 100).toFixed(1) : "0.0"
+        const ganMedia =
+            subset.length > 0
+                ? (subset.reduce((s, r) => s + (mParseTradingPct(r.ganancia) || 0), 0) / subset.length).toFixed(2)
+                : "0.00"
+        const roiMedia =
+            subset.length > 0
+                ? (subset.reduce((s, r) => s + (mParseTradingPct(r.roi) || 0), 0) / subset.length).toFixed(1)
+                : "0.0"
         return `
             <tr>
                 <td><span class="tradingDirBadge tradingDir${label}" style="font-size:12px">${label}</span></td>
@@ -3377,24 +4223,29 @@ function mRenderTradingDireccion(rows) {
 }
 
 function mRenderTradingWinLoss(rows, filter = "todos") {
-    const filtered = filter === "LONG" ? rows.filter((r) => r.direccion === "LONG")
-                   : filter === "SHORT" ? rows.filter((r) => r.direccion === "SHORT")
-                   : rows
+    const filtered =
+        filter === "LONG"
+            ? rows.filter((r) => r.direccion === "LONG")
+            : filter === "SHORT"
+              ? rows.filter((r) => r.direccion === "SHORT")
+              : rows
 
-    const profits  = filtered.filter((r) => r.resultado === "PROFIT").length
+    const profits = filtered.filter((r) => r.resultado === "PROFIT").length
     const perdidas = filtered.filter((r) => r.resultado === "PÉRDIDA").length
 
     mCreateChart("mChartTradingWinLoss", {
         type: "doughnut",
         data: {
             labels: ["Aciertos", "Fallos"],
-            datasets: [{
-                data: [profits, perdidas],
-                backgroundColor: ["#2ecc71cc", "#e74c3ccc"],
-                borderColor: ["#2ecc71", "#e74c3c"],
-                borderWidth: 2,
-                hoverOffset: 10
-            }]
+            datasets: [
+                {
+                    data: [profits, perdidas],
+                    backgroundColor: ["#2ecc71cc", "#e74c3ccc"],
+                    borderColor: ["#2ecc71", "#e74c3c"],
+                    borderWidth: 2,
+                    hoverOffset: 10
+                }
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -3402,7 +4253,12 @@ function mRenderTradingWinLoss(rows, filter = "todos") {
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
                 legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
-                tooltip: { callbacks: { label: (c) => ` ${c.raw} (${filtered.length > 0 ? ((c.raw / filtered.length) * 100).toFixed(1) : 0}%)` } }
+                tooltip: {
+                    callbacks: {
+                        label: (c) =>
+                            ` ${c.raw} (${filtered.length > 0 ? ((c.raw / filtered.length) * 100).toFixed(1) : 0}%)`
+                    }
+                }
             }
         }
     })
@@ -3410,13 +4266,21 @@ function mRenderTradingWinLoss(rows, filter = "todos") {
     const mediaEl = document.getElementById("mTradingMediaTable")
     if (!mediaEl) return
 
-    const profitRows  = filtered.filter((r) => r.resultado === "PROFIT")
+    const profitRows = filtered.filter((r) => r.resultado === "PROFIT")
     const perdidaRows = filtered.filter((r) => r.resultado === "PÉRDIDA")
 
-    const avgGanProfit  = profitRows.length ? profitRows.reduce((s, r) => s + (mParseTradingPct(r.ganancia) || 0), 0) / profitRows.length : 0
-    const avgGanLoss    = perdidaRows.length ? perdidaRows.reduce((s, r) => s + (mParseTradingPct(r.ganancia) || 0), 0) / perdidaRows.length : 0
-    const avgRoiProfit  = profitRows.length ? profitRows.reduce((s, r) => s + (mParseTradingPct(r.roi) || 0), 0) / profitRows.length : 0
-    const avgRoiLoss    = perdidaRows.length ? perdidaRows.reduce((s, r) => s + (mParseTradingPct(r.roi) || 0), 0) / perdidaRows.length : 0
+    const avgGanProfit = profitRows.length
+        ? profitRows.reduce((s, r) => s + (mParseTradingPct(r.ganancia) || 0), 0) / profitRows.length
+        : 0
+    const avgGanLoss = perdidaRows.length
+        ? perdidaRows.reduce((s, r) => s + (mParseTradingPct(r.ganancia) || 0), 0) / perdidaRows.length
+        : 0
+    const avgRoiProfit = profitRows.length
+        ? profitRows.reduce((s, r) => s + (mParseTradingPct(r.roi) || 0), 0) / profitRows.length
+        : 0
+    const avgRoiLoss = perdidaRows.length
+        ? perdidaRows.reduce((s, r) => s + (mParseTradingPct(r.roi) || 0), 0) / perdidaRows.length
+        : 0
 
     mediaEl.innerHTML = `
         <table class="mTradingTable">
@@ -3448,8 +4312,14 @@ function mRenderTradingWinLoss(rows, filter = "todos") {
 
 function mRenderTradingRendimiento(rows) {
     const sorted = [...rows].sort((a, b) => {
-        const da = String(a.fecha || "").split(/[-/]/).reverse().join("")
-        const db = String(b.fecha || "").split(/[-/]/).reverse().join("")
+        const da = String(a.fecha || "")
+            .split(/[-/]/)
+            .reverse()
+            .join("")
+        const db = String(b.fecha || "")
+            .split(/[-/]/)
+            .reverse()
+            .join("")
         return da.localeCompare(db)
     })
 
@@ -3471,20 +4341,22 @@ function mRenderTradingRendimiento(rows) {
         type: "line",
         data: {
             labels,
-            datasets: [{
-                label: "Rendimiento neto acumulado (%)",
-                data,
-                borderColor: positiveColor,
-                backgroundColor: "rgba(46,204,113,0.08)",
-                borderWidth: 2,
-                pointRadius: data.length > 50 ? 0 : 3,
-                pointHoverRadius: 5,
-                tension: 0.35,
-                fill: true,
-                segment: {
-                    borderColor: (ctx) => ctx.p1.parsed.y >= 0 ? positiveColor : negativeColor
+            datasets: [
+                {
+                    label: "Rendimiento neto acumulado (%)",
+                    data,
+                    borderColor: positiveColor,
+                    backgroundColor: "rgba(46,204,113,0.08)",
+                    borderWidth: 2,
+                    pointRadius: data.length > 50 ? 0 : 3,
+                    pointHoverRadius: 5,
+                    tension: 0.35,
+                    fill: true,
+                    segment: {
+                        borderColor: (ctx) => (ctx.p1.parsed.y >= 0 ? positiveColor : negativeColor)
+                    }
                 }
-            }]
+            ]
         },
         options: {
             ...M_CHART_DEFAULTS,
@@ -3500,7 +4372,7 @@ function mRenderTradingRendimiento(rows) {
             scales: {
                 x: {
                     ticks: { color: "#8899bb", maxTicksLimit: 12, maxRotation: 45 },
-                    grid:  { color: "rgba(255,255,255,0.06)" }
+                    grid: { color: "rgba(255,255,255,0.06)" }
                 },
                 y: {
                     ticks: {
@@ -3519,24 +4391,24 @@ function mRenderTradingRendimiento(rows) {
 async function initMetricasLogic() {
     Object.values(_metricasCharts).forEach((c) => c?.destroy())
     _metricasCharts = {}
-    _metricasDisplayType  = window._metricasDisplayType ?? "doughnut"
-    _metricasDistMetric   = window._metricasDistMetric  ?? "netoActualEur"
+    _metricasDisplayType = window._metricasDisplayType ?? "doughnut"
+    _metricasDistMetric = window._metricasDistMetric ?? "netoActualEur"
     // Selecciones del usuario: se recuperan de las preferencias guardadas. Cada
     // sección valida después el año/mes contra los que existan en sus datos.
-    _metricasGastosMonth    = getChartPref("metricasGastosMonth", "all")
-    _metricasIngresosMonth  = getChartPref("metricasIngresosMonth", "all")
-    _metricasInteresesYear  = getChartPref("metricasInteresesYear", null)
+    _metricasGastosMonth = getChartPref("metricasGastosMonth", "all")
+    _metricasIngresosMonth = getChartPref("metricasIngresosMonth", "all")
+    _metricasInteresesYear = getChartPref("metricasInteresesYear", null)
     _metricasDivMensualYear = getChartPref("metricasDivMensualYear", null)
-    _metricasDivYear        = getChartPref("metricasDivYear", null)
-    _metricasInvertidoYear  = getChartPref("metricasInvertidoYear", null)
-    _metricasPasivosYear    = getChartPref("metricasPasivosYear", null)
-    _metricasSortKey        = getChartPref("metricasSortKey", "netoActualEur")
-    _metricasSortDir        = getChartPref("metricasSortDir", "desc")
+    _metricasDivYear = getChartPref("metricasDivYear", null)
+    _metricasInvertidoYear = getChartPref("metricasInvertidoYear", null)
+    _metricasPasivosYear = getChartPref("metricasPasivosYear", null)
+    _metricasSortKey = getChartPref("metricasSortKey", "netoActualEur")
+    _metricasSortDir = getChartPref("metricasSortDir", "desc")
     const _divYearToggle = document.getElementById("mDivYearToggle")
     if (_divYearToggle) _divYearToggle.dataset.bound = ""
-    const _allActivosTypes = ["cripto","acciones","etfs","comoditis","rentaFija"]
+    const _allActivosTypes = ["cripto", "acciones", "etfs", "comoditis", "rentaFija"]
     const _savedHidden = window._metricasActivosHidden || []
-    _metricasActivosFilter = new Set(_allActivosTypes.filter(t => !_savedHidden.includes(t)))
+    _metricasActivosFilter = new Set(_allActivosTypes.filter((t) => !_savedHidden.includes(t)))
     _metricasGastosTipoFilter = new Set()
     _metricasComparativaExclude = new Set(window._metricasComparativaExcluded || [])
     _metricasSectionsCollapsed = new Set(window._metricasSectionsCollapsed || [])
@@ -3556,32 +4428,42 @@ async function initMetricasLogic() {
         mInitEvolucion()
         mInitEvolucionTipos()
 
-        const _allTypes = ["cripto","acciones","etfs","comoditis","rentaFija"]
+        const _allTypes = ["cripto", "acciones", "etfs", "comoditis", "rentaFija"]
         const _todosBtn = document.querySelector(".mActivosFilterBtn[data-atype='todos']")
         const _specificBtns = [...document.querySelectorAll(".mActivosFilterBtn[data-atype]:not([data-atype='todos'])")]
 
         function _mIsTodosMode() {
-            return _allTypes.every(t => _metricasActivosFilter.has(t))
+            return _allTypes.every((t) => _metricasActivosFilter.has(t))
         }
 
         function _mActivosApplyVisual() {
             const todosMode = _mIsTodosMode()
             const todosInput = _todosBtn?.querySelector("input")
             if (todosInput) todosInput.checked = todosMode
-            _specificBtns.forEach(b => {
+            _specificBtns.forEach((b) => {
                 const inp = b.querySelector("input")
                 if (inp) inp.checked = !todosMode && _metricasActivosFilter.has(b.dataset.atype)
             })
         }
 
         function _mActivosSave() {
-            const hidden = _allTypes.filter(t => !_metricasActivosFilter.has(t))
+            const hidden = _allTypes.filter((t) => !_metricasActivosFilter.has(t))
             window._metricasActivosHidden = hidden
-            fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ metricasActivosHidden: hidden }) }).catch(() => {})
+            fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ metricasActivosHidden: hidden })
+            }).catch(() => {})
         }
 
         function _mActivosRender() {
-            mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
+            mRenderDistActivos(
+                _metricasPayload.summaries,
+                _metricasDisplayType,
+                _metricasPayload.bonos || [],
+                _metricasPayload.rentaFija || [],
+                _metricasDistMetric
+            )
         }
 
         _mActivosApplyVisual()
@@ -3590,7 +4472,7 @@ async function initMetricasLogic() {
             const todosInput = _todosBtn.querySelector("input")
             if (todosInput) {
                 todosInput.addEventListener("change", () => {
-                    _allTypes.forEach(t => _metricasActivosFilter.add(t))
+                    _allTypes.forEach((t) => _metricasActivosFilter.add(t))
                     _mActivosApplyVisual()
                     _mActivosSave()
                     _mActivosRender()
@@ -3598,7 +4480,7 @@ async function initMetricasLogic() {
             }
         }
 
-        _specificBtns.forEach(btn => {
+        _specificBtns.forEach((btn) => {
             const inp = btn.querySelector("input")
             if (inp) {
                 inp.addEventListener("change", () => {
@@ -3608,7 +4490,7 @@ async function initMetricasLogic() {
                         _metricasActivosFilter.add(tipo)
                     } else if (!inp.checked) {
                         _metricasActivosFilter.delete(tipo)
-                        if (_metricasActivosFilter.size === 0) _allTypes.forEach(t => _metricasActivosFilter.add(t))
+                        if (_metricasActivosFilter.size === 0) _allTypes.forEach((t) => _metricasActivosFilter.add(t))
                     } else {
                         _metricasActivosFilter.add(tipo)
                     }
@@ -3627,9 +4509,25 @@ async function initMetricasLogic() {
                 btn.classList.add("active")
                 _metricasDisplayType = btn.dataset.charttype
                 window._metricasDisplayType = _metricasDisplayType
-                fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ metricasDisplayType: _metricasDisplayType }) })
-                mRenderDistTipos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
-                mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
+                fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ metricasDisplayType: _metricasDisplayType })
+                })
+                mRenderDistTipos(
+                    _metricasPayload.summaries,
+                    _metricasDisplayType,
+                    _metricasPayload.bonos || [],
+                    _metricasPayload.rentaFija || [],
+                    _metricasDistMetric
+                )
+                mRenderDistActivos(
+                    _metricasPayload.summaries,
+                    _metricasDisplayType,
+                    _metricasPayload.bonos || [],
+                    _metricasPayload.rentaFija || [],
+                    _metricasDistMetric
+                )
             })
         })
 
@@ -3641,9 +4539,25 @@ async function initMetricasLogic() {
                 btn.classList.add("active")
                 _metricasDistMetric = btn.dataset.metric
                 window._metricasDistMetric = _metricasDistMetric
-                fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ metricasDistMetric: _metricasDistMetric }) })
-                mRenderDistTipos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
-                mRenderDistActivos(_metricasPayload.summaries, _metricasDisplayType, _metricasPayload.bonos || [], _metricasPayload.rentaFija || [], _metricasDistMetric)
+                fetch("/api/settings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ metricasDistMetric: _metricasDistMetric })
+                })
+                mRenderDistTipos(
+                    _metricasPayload.summaries,
+                    _metricasDisplayType,
+                    _metricasPayload.bonos || [],
+                    _metricasPayload.rentaFija || [],
+                    _metricasDistMetric
+                )
+                mRenderDistActivos(
+                    _metricasPayload.summaries,
+                    _metricasDisplayType,
+                    _metricasPayload.bonos || [],
+                    _metricasPayload.rentaFija || [],
+                    _metricasDistMetric
+                )
             })
         })
 
@@ -3657,11 +4571,15 @@ async function initMetricasLogic() {
         }
 
         function mApplyNavFilter() {
-            document.querySelectorAll(".metricasSection[data-mcat], .metricasKpiRow[data-mcat], .metricasCatDivider[data-mcat]").forEach(el => {
-                const elCat    = el.dataset.mcat
-                const catMatch = _mActiveCats.size === 0 || [..._mActiveCats].some(c => elCat === c)
-                el.style.display = catMatch ? "" : "none"
-            })
+            document
+                .querySelectorAll(
+                    ".metricasSection[data-mcat], .metricasKpiRow[data-mcat], .metricasCatDivider[data-mcat]"
+                )
+                .forEach((el) => {
+                    const elCat = el.dataset.mcat
+                    const catMatch = _mActiveCats.size === 0 || [..._mActiveCats].some((c) => elCat === c)
+                    el.style.display = catMatch ? "" : "none"
+                })
         }
 
         navTabsContainer?.addEventListener("change", (e) => {
@@ -3674,24 +4592,32 @@ async function initMetricasLogic() {
             if (mcat === "todo") {
                 if (!input.checked) input.checked = true
                 _mActiveCats.clear()
-                allInputs.forEach(i => { if (i !== input) i.checked = false })
+                allInputs.forEach((i) => {
+                    if (i !== input) i.checked = false
+                })
                 mSaveNavCat(null)
                 mApplyNavFilter()
             } else if (input.checked) {
-                allInputs.forEach(i => { if (i !== input) i.checked = false })
-                _mActiveCats = new Set(mcat.split(",").map(s => s.trim()))
+                allInputs.forEach((i) => {
+                    if (i !== input) i.checked = false
+                })
+                _mActiveCats = new Set(mcat.split(",").map((s) => s.trim()))
                 mSaveNavCat(mcat)
                 mApplyNavFilter()
                 // scroll to first visible KPI row of this category
                 const firstCat = mcat.split(",")[0].trim()
-                const target   = document.querySelector(`.metricasKpiRow[data-mcat="${mcat}"]`)
-                              || document.querySelector(`.metricasKpiRow[data-mcat="${firstCat}"]`)
+                const target =
+                    document.querySelector(`.metricasKpiRow[data-mcat="${mcat}"]`) ||
+                    document.querySelector(`.metricasKpiRow[data-mcat="${firstCat}"]`)
                 const scrollEl = document.querySelector(".mainContent")
                 if (target && scrollEl) {
                     const navH = document.querySelector(".mNavBar")?.offsetHeight || 60
-                    const top  = target.getBoundingClientRect().top
-                               - scrollEl.getBoundingClientRect().top
-                               + scrollEl.scrollTop - navH - 8
+                    const top =
+                        target.getBoundingClientRect().top -
+                        scrollEl.getBoundingClientRect().top +
+                        scrollEl.scrollTop -
+                        navH -
+                        8
                     scrollEl.scrollTo({ top, behavior: "smooth" })
                 }
             } else {
@@ -3709,8 +4635,10 @@ async function initMetricasLogic() {
             ? navTabsContainer?.querySelector(`.mNavTab[data-mcat="${_savedNavCat}"] input`)
             : null
         if (_savedNavTab) {
-            navTabsContainer.querySelectorAll(".mNavTab input").forEach(i => { i.checked = i === _savedNavTab })
-            _mActiveCats = new Set(_savedNavCat.split(",").map(s => s.trim()))
+            navTabsContainer.querySelectorAll(".mNavTab input").forEach((i) => {
+                i.checked = i === _savedNavTab
+            })
+            _mActiveCats = new Set(_savedNavCat.split(",").map((s) => s.trim()))
             mApplyNavFilter()
         } else if (_savedNavCat) {
             mSaveNavCat(null)
@@ -3718,10 +4646,10 @@ async function initMetricasLogic() {
 
         // ── section collapse ────────────────────────────────────────────────
         function _mSectionContentEls(sec) {
-            return [...sec.children].filter(c => !c.classList.contains("metricasSectionHeader"))
+            return [...sec.children].filter((c) => !c.classList.contains("metricasSectionHeader"))
         }
         function _mApplySectionCollapse(sec, collapsed) {
-            _mSectionContentEls(sec).forEach(el => el.classList.toggle("mSectionBodyHidden", collapsed))
+            _mSectionContentEls(sec).forEach((el) => el.classList.toggle("mSectionBodyHidden", collapsed))
             sec.querySelector(".metricasSectionTitle")?.classList.toggle("mSectionCollapsed", collapsed)
         }
         function _mSaveSectionsCollapsed() {
@@ -3732,7 +4660,7 @@ async function initMetricasLogic() {
                 body: JSON.stringify({ metricasSectionsCollapsed: [..._metricasSectionsCollapsed] })
             }).catch(() => {})
         }
-        document.querySelectorAll(".metricasSection[id]").forEach(sec => {
+        document.querySelectorAll(".metricasSection[id]").forEach((sec) => {
             _mApplySectionCollapse(sec, _metricasSectionsCollapsed.has(sec.id))
             const title = sec.querySelector(".metricasSectionTitle")
             if (!title || title._mCollapseListened) return
@@ -3745,7 +4673,6 @@ async function initMetricasLogic() {
                 _mSaveSectionsCollapsed()
             })
         })
-
     } catch (err) {
         console.error("Error cargando métricas:", err)
         if (loading) loading.textContent = "Error al cargar los datos."
@@ -3755,12 +4682,12 @@ async function initMetricasLogic() {
 // ── Evolución histórica del portfolio ──────────────────────────────────────
 
 let _evolucionRange = getChartPref("evolucionRange", "1D")
-let _evolucionMode  = getChartPref("evolucionMode", "eur")
+let _evolucionMode = getChartPref("evolucionMode", "eur")
 
 async function mRenderEvolucion(range, mode) {
     mode = mode || _evolucionMode
     const empty = document.getElementById("mEvolucionEmpty")
-    const wrap  = document.getElementById("mEvolucionChartWrap")
+    const wrap = document.getElementById("mEvolucionChartWrap")
 
     let resp, data
     try {
@@ -3776,12 +4703,12 @@ async function mRenderEvolucion(range, mode) {
     // matching the KPI cards (snapshots are saved periodically and may be stale).
     if (_metricasPayload) {
         const { summaries } = _metricasPayload
-        const liveValue    = summaries.reduce((s, a) => s + a.netoActualEur, 0)
+        const liveValue = summaries.reduce((s, a) => s + a.netoActualEur, 0)
         const liveInvested = summaries.reduce((s, a) => s + a.invertidoEur, 0)
         const nowTs = Math.floor(Date.now() / 1000)
         const lastTs = points.length ? points[points.length - 1].ts : 0
         // Replace last point if it's within 2 minutes, otherwise append
-        if (points.length && (nowTs - lastTs) < 120) {
+        if (points.length && nowTs - lastTs < 120) {
             points = [...points.slice(0, -1), { ts: nowTs, v: liveValue, i: liveInvested }]
         } else {
             points = [...points, { ts: nowTs, v: liveValue, i: liveInvested }]
@@ -3789,47 +4716,70 @@ async function mRenderEvolucion(range, mode) {
     }
 
     if (points.length < 2) {
+        mSetEvolucionEmpty(null)
+        mSetEvolucionNota(null)
         if (empty) empty.classList.remove("hidden")
-        if (wrap)  wrap.classList.add("hidden")
+        if (wrap) wrap.classList.add("hidden")
         mDestroyChart("mChartEvolucion")
         const oldTip = document.getElementById("mEvolucionTooltip")
         if (oldTip) oldTip.remove()
         return
     }
 
+    // El modo comparativo tiene poco que ver con los otros dos: no dibuja
+    // euros ni el invertido, sino dos series de variación porcentual. Se va por su rama
+    // antes de montar todo el andamiaje del gráfico de valor.
+    if (mode === "vs") {
+        await mDrawEvolucionVsIndice(points)
+        return
+    }
+
+    mSetEvolucionNota(null)
     if (empty) empty.classList.add("hidden")
-    if (wrap)  wrap.classList.remove("hidden")
+    if (wrap) wrap.classList.remove("hidden")
 
     // Eliminar tooltip anterior si existía
     const oldTip = document.getElementById("mEvolucionTooltip")
     if (oldTip) oldTip.remove()
 
-    const values   = points.map(p => p.v)
-    const invested = points.map(p => p.i)
-    const span     = points.length > 1 ? (points[points.length - 1].ts - points[0].ts) : 0
-    const isLong   = span > 7 * 86400
-    const isPct    = (mode === "pct")
+    const values = points.map((p) => p.v)
+    const invested = points.map((p) => p.i)
+    const span = points.length > 1 ? points[points.length - 1].ts - points[0].ts : 0
+    const isLong = span > 7 * 86400
+    const isPct = mode === "pct"
 
-    const dispValues   = isPct ? values.map((v, idx) => {
-        const inv = invested[idx] || 1
-        return +((( v - inv) / inv) * 100).toFixed(2)
-    }) : values
+    const dispValues = isPct
+        ? values.map((v, idx) => {
+              const inv = invested[idx] || 1
+              return +(((v - inv) / inv) * 100).toFixed(2)
+          })
+        : values
     const dispInvested = isPct ? values.map(() => 0) : invested
 
     // Round interval for axis labels so ticks land on clean boundaries
     let roundSec
-    if      (span <= 86400)           roundSec = 300        // ≤1D  → cada 5 min
-    else if (span <= 31 * 86400)      roundSec = 21600      // ≤1M  → cada 6h
-    else if (span <= 365 * 86400)     roundSec = 86400      // ≤1A  → cada día
-    else                              roundSec = 7 * 86400  // >1A  → cada semana
+    if (span <= 86400)
+        roundSec = 300 // ≤1D  → cada 5 min
+    else if (span <= 31 * 86400)
+        roundSec = 21600 // ≤1M  → cada 6h
+    else if (span <= 365 * 86400)
+        roundSec = 86400 // ≤1A  → cada día
+    else roundSec = 7 * 86400 // >1A  → cada semana
 
-    const labels = points.map(p => {
+    const labels = points.map((p) => {
         const snap = Math.round(p.ts / roundSec) * roundSec
-        const d    = new Date(snap * 1000)
+        const d = new Date(snap * 1000)
         if (roundSec >= 86400)
-            return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", ...(roundSec >= 7 * 86400 ? { year: "2-digit" } : {}) })
-        return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" })
-               + " " + d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+            return d.toLocaleDateString("es-ES", {
+                day: "2-digit",
+                month: "2-digit",
+                ...(roundSec >= 7 * 86400 ? { year: "2-digit" } : {})
+            })
+        return (
+            d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }) +
+            " " +
+            d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+        )
     })
 
     // Color dinámico por punto: verde si valor >= invertido, rojo si no
@@ -3843,9 +4793,16 @@ async function mRenderEvolucion(range, mode) {
         return dispValues[i] >= dispInvested[i] ? "#2ecc71" : "#e74c3c"
     }
 
-    const tooltipDates = points.map(p => {
+    const tooltipDates = points.map((p) => {
         const d = new Date(p.ts * 1000)
-        return d.toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        return d.toLocaleString("es-ES", {
+            weekday: "short",
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+        })
     })
 
     // Plugin crosshair: línea vertical + horizontal siguiendo el cursor
@@ -3877,7 +4834,11 @@ async function mRenderEvolucion(range, mode) {
             ctx.lineTo(x, chartArea.bottom)
             ctx.stroke()
             // Línea horizontal siguiendo el cursor real
-            if (_evolucionMouseY !== null && _evolucionMouseY >= chartArea.top && _evolucionMouseY <= chartArea.bottom) {
+            if (
+                _evolucionMouseY !== null &&
+                _evolucionMouseY >= chartArea.top &&
+                _evolucionMouseY <= chartArea.bottom
+            ) {
                 ctx.beginPath()
                 ctx.moveTo(chartArea.left, _evolucionMouseY)
                 ctx.lineTo(chartArea.right, _evolucionMouseY)
@@ -3895,31 +4856,43 @@ async function mRenderEvolucion(range, mode) {
             el = document.createElement("div")
             el.id = "mEvolucionTooltip"
             el.style.cssText = [
-                "position:absolute", "pointer-events:none", "z-index:99",
-                "background:#1a2235", "border:1px solid rgba(100,130,200,0.35)",
-                "border-radius:8px", "padding:10px 14px", "min-width:180px",
-                "box-shadow:0 4px 24px rgba(0,0,0,0.5)", "transition:opacity 0.12s",
-                "font-family:inherit", "font-size:12px", "color:#ccd6f6", "line-height:1.6"
+                "position:absolute",
+                "pointer-events:none",
+                "z-index:99",
+                "background:#1a2235",
+                "border:1px solid rgba(100,130,200,0.35)",
+                "border-radius:8px",
+                "padding:10px 14px",
+                "min-width:180px",
+                "box-shadow:0 4px 24px rgba(0,0,0,0.5)",
+                "transition:opacity 0.12s",
+                "font-family:inherit",
+                "font-size:12px",
+                "color:#ccd6f6",
+                "line-height:1.6"
             ].join(";")
             chart.canvas.parentElement.style.position = "relative"
             chart.canvas.parentElement.appendChild(el)
         }
 
-        if (tooltip.opacity === 0) { el.style.opacity = "0"; return }
+        if (tooltip.opacity === 0) {
+            el.style.opacity = "0"
+            return
+        }
 
         if (!tooltip.dataPoints || !tooltip.dataPoints.length) return
-        const dp    = tooltip.dataPoints[0]
-        const idx   = dp.dataIndex
-        const val   = values[idx]
-        const inv   = invested[idx]
-        const rend  = val - inv
-        const pct   = inv > 0 ? ((rend / inv) * 100).toFixed(2) : "0.00"
-        const sign  = rend >= 0 ? "+" : ""
+        const dp = tooltip.dataPoints[0]
+        const idx = dp.dataIndex
+        const val = values[idx]
+        const inv = invested[idx]
+        const rend = val - inv
+        const pct = inv > 0 ? ((rend / inv) * 100).toFixed(2) : "0.00"
+        const sign = rend >= 0 ? "+" : ""
         const rendColor = rend >= 0 ? "#2ecc71" : "#e74c3c"
-        const dotColor  = val >= inv ? "#2ecc71" : "#e74c3c"
+        const dotColor = val >= inv ? "#2ecc71" : "#e74c3c"
 
         if (isPct) {
-            const vPct  = dispValues[idx]
+            const vPct = dispValues[idx]
             const vSign = vPct >= 0 ? "+" : ""
             el.innerHTML = `
                 <div style="color:#8899bb;font-size:11px;margin-bottom:6px;font-weight:500">${tooltipDates[idx] || ""}</div>
@@ -3927,11 +4900,6 @@ async function mRenderEvolucion(range, mode) {
                     <span style="width:9px;height:9px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span>
                     <span style="color:#a0b0cc">Valor total</span>
                     <span style="margin-left:auto;font-weight:600;color:${dotColor}">${vSign}${vPct.toFixed(2).replace(".", ",")}%</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
-                    <span style="width:9px;height:2px;background:rgba(100,130,200,0.7);flex-shrink:0;display:inline-block"></span>
-                    <span style="color:#a0b0cc">Invertido</span>
-                    <span style="margin-left:auto;font-weight:600;color:#e8eeff">0,00%</span>
                 </div>
                 <div style="border-top:1px solid rgba(100,130,200,0.2);margin-top:6px;padding-top:5px;display:flex;align-items:center;gap:6px">
                     <span style="color:#a0b0cc">Rendimiento</span>
@@ -3958,14 +4926,12 @@ async function mRenderEvolucion(range, mode) {
 
         // Posición relativa al canvas
         const canvasRect = chart.canvas.getBoundingClientRect()
-        const wrapRect   = chart.canvas.parentElement.getBoundingClientRect()
+        const wrapRect = chart.canvas.parentElement.getBoundingClientRect()
         const xPos = tooltip.caretX
-        const elW  = 200
-        const left = xPos + elW + 10 > chart.chartArea.right
-            ? xPos - elW - 12
-            : xPos + 12
-        el.style.left    = left + "px"
-        el.style.top     = (chart.chartArea.top + 8) + "px"
+        const elW = 200
+        const left = xPos + elW + 10 > chart.chartArea.right ? xPos - elW - 12 : xPos + 12
+        el.style.left = left + "px"
+        el.style.top = chart.chartArea.top + 8 + "px"
         el.style.opacity = "1"
     }
 
@@ -3986,25 +4952,32 @@ async function mRenderEvolucion(range, mode) {
                     pointRadius: points.length <= 60 ? 3 : 0,
                     pointHoverRadius: 0,
                     fill: {
-                        target: 1,
+                        // En % la referencia es siempre el 0 del eje, así que se
+                        // rellena contra el origen y no hace falta la serie plana.
+                        target: isPct ? "origin" : 1,
                         above: "rgba(46,204,113,0.12)",
                         below: "rgba(231,76,60,0.12)"
                     },
                     tension: 0.3
                 },
-                {
-                    label: "Invertido",
-                    data: dispInvested,
-                    borderColor: "rgba(100,130,200,0.7)",
-                    backgroundColor: "transparent",
-                    borderWidth: 1.5,
-                    borderDash: [5, 4],
-                    pointRadius: 0,
-                    pointHoverRadius: 0,
-                    pointStyle: "line",
-                    fill: false,
-                    tension: 0.3
-                }
+                // La línea de invertido solo aporta en €: en % sería una recta en 0.
+                ...(isPct
+                    ? []
+                    : [
+                          {
+                              label: "Invertido",
+                              data: dispInvested,
+                              borderColor: "rgba(100,130,200,0.7)",
+                              backgroundColor: "transparent",
+                              borderWidth: 1.5,
+                              borderDash: [5, 4],
+                              pointRadius: 0,
+                              pointHoverRadius: 0,
+                              pointStyle: "line",
+                              fill: false,
+                              tension: 0.3
+                          }
+                      ])
             ]
         },
         options: {
@@ -4015,15 +4988,19 @@ async function mRenderEvolucion(range, mode) {
             plugins: {
                 legend: {
                     labels: {
-                        color: "#ccd6f6", font: { size: 12 }, padding: 14, usePointStyle: true,
+                        color: "#ccd6f6",
+                        font: { size: 12 },
+                        padding: 14,
+                        usePointStyle: true,
                         generateLabels(chart) {
                             const items = Chart.defaults.plugins.legend.labels.generateLabels(chart)
                             if (items[0]) {
-                                const lastColor = values[values.length - 1] >= invested[values.length - 1] ? "#2ecc71" : "#e74c3c"
+                                const lastColor =
+                                    values[values.length - 1] >= invested[values.length - 1] ? "#2ecc71" : "#e74c3c"
                                 items[0].strokeStyle = lastColor
-                                items[0].fillStyle   = lastColor
-                                items[0].pointStyle  = "line"
-                                items[0].lineWidth   = 2
+                                items[0].fillStyle = lastColor
+                                items[0].pointStyle = "line"
+                                items[0].lineWidth = 2
                             }
                             return items
                         }
@@ -4037,7 +5014,7 @@ async function mRenderEvolucion(range, mode) {
             scales: {
                 x: {
                     ticks: { color: "#8899bb", maxTicksLimit: 8, maxRotation: 0 },
-                    grid:  { color: "rgba(255,255,255,0.06)" }
+                    grid: { color: "rgba(255,255,255,0.06)" }
                 },
                 y: {
                     ticks: {
@@ -4054,14 +5031,331 @@ async function mRenderEvolucion(range, mode) {
     })
 }
 
+// ── comparativa contra un índice ───────────────────────────────────────────
+
+// La cartera se compara con el índice usando su serie TWR en variación %, no su
+// valor en euros: si se compara el valor, una aportación de 5.000 € parece un
+// +40 % que el índice "no ha conseguido", y la comparación deja de significar
+// nada. La TWR quita precisamente eso.
+
+let _benchmarkIndice = getChartPref("evolucionBenchmark", "sp500")
+
+// El cartel de "sin datos" es compartido con los otros dos modos, así que el
+// modo comparativo lo cambia y luego lo devuelve a su sitio.
+const M_EVOLUCION_EMPTY_DEFECTO =
+    "Aún no hay datos históricos. El portfolio se registra automáticamente en cada actualización de precios."
+
+function mSetEvolucionEmpty(texto) {
+    const span = document.getElementById("mEvolucionEmpty")?.querySelector("span")
+    if (span) span.textContent = texto || M_EVOLUCION_EMPTY_DEFECTO
+}
+
+function mDiaIso(ts) {
+    const d = new Date(ts * 1000)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
+// Un valor por día (el último), que es la granularidad a la que se compara.
+function mPorDia(puntos, campo) {
+    const mapa = new Map()
+    puntos.forEach((p) => mapa.set(mDiaIso(p.ts), p[campo]))
+    return mapa
+}
+
+// Variación porcentual acumulada desde el día de arranque común, que llega ya
+// recortado en `dias`: la serie vale directamente el % (0 el primer día), sin
+// pasar por base 100. Si una serie no cotiza ese día concreto (festivo del
+// índice) se toma el primero que sí tenga dato: mover la base un día no
+// descuadra la comparación, pero dejar la serie entera a null la haría
+// desaparecer.
+function mVariacionPct(mapa, dias) {
+    let base = null
+    return dias.map((dia) => {
+        const valor = mapa.get(dia)
+        if (valor === undefined) return null
+        if (base === null) base = valor
+        return base > 0 ? +((valor / base - 1) * 100).toFixed(2) : null
+    })
+}
+
+// El índice no cotiza fines de semana ni festivos, pero la cartera sí tiene
+// snapshot: sin arrastrar el último cierre la línea del índice queda con
+// huecos y el tooltip de esos días sale vacío.
+// `previos` son los cierres anteriores al primer día del rango: si la cartera
+// arranca en sábado hay que partir del cierre del viernes, o el índice se
+// quedaría sin base y empezaría un par de días más tarde que la cartera.
+function mArrastrarCierres(mapa, dias, previos = []) {
+    const lleno = new Map()
+    let ultimo = previos.length ? mapa.get(previos[previos.length - 1]) : undefined
+    dias.forEach((dia) => {
+        const valor = mapa.get(dia)
+        if (valor !== undefined) ultimo = valor
+        if (ultimo !== undefined) lleno.set(dia, ultimo)
+    })
+    return lleno
+}
+
+function mSetEvolucionNota(texto) {
+    const el = document.getElementById("mEvolucionNota")
+    if (!el) return
+    el.textContent = texto || ""
+    el.classList.toggle("hidden", !texto)
+}
+
+// Los días de estas series son "YYYY-MM-DD", no epoch: se pasa a segundos para
+// que los formatee el mFechaCorta de siempre.
+function mDiaLegible(dia) {
+    const [a, m, j] = dia.split("-").map(Number)
+    return mFechaCorta(new Date(a, m - 1, j).getTime() / 1000)
+}
+
+async function mDrawEvolucionVsIndice(points) {
+    const empty = document.getElementById("mEvolucionEmpty")
+    const wrap = document.getElementById("mEvolucionChartWrap")
+    // Este modo usa el tooltip normal de Chart.js; el HTML que monta el modo
+    // en euros se quedaría flotando encima.
+    document.getElementById("mEvolucionTooltip")?.remove()
+    const desde = points[0].ts
+    const hasta = points[points.length - 1].ts
+
+    const fallar = (motivo) => {
+        mSetEvolucionEmpty(motivo)
+        mSetEvolucionNota(null)
+        if (empty) empty.classList.remove("hidden")
+        if (wrap) wrap.classList.add("hidden")
+        mDestroyChart("mChartEvolucion")
+    }
+
+    // La serie TWR la calcula el servidor sobre todo el histórico; aquí se
+    // recorta al rango que se está mirando.
+    const indiceCartera = (_metricasPayload?.rentabilidad?.indice || []).filter((p) => p.ts >= desde && p.ts <= hasta)
+
+    let bench = null
+    // Se piden unos días de más por delante para tener siempre un cierre
+    // anterior con el que arrancar aunque el rango empiece en fin de semana o
+    // en festivo; los sobrantes se recortan al alinear las series.
+    const desdeBench = desde - 7 * 86400
+    try {
+        const resp = await fetch(
+            `/api/market/benchmark?indice=${encodeURIComponent(_benchmarkIndice)}&from=${desdeBench}&to=${hasta}`
+        )
+        const data = await resp.json()
+        if (data.ok && Array.isArray(data.data) && data.data.length) bench = data
+    } catch (_) {
+        /* sin índice se dibuja solo la cartera */
+    }
+
+    const carteraPorDia = mPorDia(indiceCartera, "idx")
+    if (carteraPorDia.size < 2) {
+        // Con un solo día de histórico diario no hay nada que encadenar: una
+        // cartera recién estrenada cae aquí.
+        fallar("Hacen falta al menos dos días de histórico para comparar contra un índice.")
+        return
+    }
+
+    // Las dos series tienen que arrancar el mismo día o la comparación miente:
+    // si el índice empieza más tarde, su origen cae en una fecha distinta y
+    // se le regala (o se le quita) todo el tramo intermedio.
+    const diasCartera = [...carteraPorDia.keys()].sort()
+    let dias = diasCartera
+    let benchPorDia = new Map()
+    const nombreBench = bench?.nombre || "Índice"
+
+    if (bench) {
+        const crudo = mPorDia(bench.data, "close")
+        const diasBench = [...crudo.keys()].sort()
+        const arranque = diasBench[0] > diasCartera[0] ? diasBench[0] : diasCartera[0]
+        dias = diasCartera.filter((d) => d >= arranque)
+        benchPorDia = mArrastrarCierres(
+            crudo,
+            dias,
+            diasBench.filter((d) => d < dias[0])
+        )
+    }
+
+    if (dias.length < 2) {
+        fallar(`No hay días solapados suficientes entre la cartera y ${nombreBench} en este rango.`)
+        return
+    }
+
+    if (empty) empty.classList.add("hidden")
+    if (wrap) wrap.classList.remove("hidden")
+
+    const serieCartera = mVariacionPct(carteraPorDia, dias)
+    const serieBench = bench ? mVariacionPct(benchPorDia, dias) : []
+    const multiAnio = dias[0].slice(0, 4) !== dias[dias.length - 1].slice(0, 4)
+    const labels = dias.map((d) => {
+        const [a, m, j] = d.split("-")
+        if (dias.length > 400) return `${m}/${a.slice(2)}`
+        return multiAnio ? `${j}/${m}/${a.slice(2)}` : `${j}/${m}`
+    })
+
+    const ultimo = [...serieCartera].reverse().find((v) => v !== null) ?? 0
+    const colorCartera = ultimo >= 0 ? "#2ecc71" : "#e74c3c"
+
+    if (!bench) {
+        mSetEvolucionNota("No se ha podido cargar el índice de comparación; se muestra solo la cartera.")
+    } else {
+        const ultimoBench = [...serieBench].reverse().find((v) => v !== null) ?? 0
+        // Diferencia porcentual, no en puntos: lo que se responde es "cuánto
+        // más (o menos) ha rendido la cartera que el índice", que es comparar
+        // los dos multiplicadores, no restar los dos porcentajes.
+        const dif = ((1 + ultimo / 100) / (1 + ultimoBench / 100) - 1) * 100
+        const signo = dif >= 0 ? "+" : "−"
+        mSetEvolucionNota(
+            `Variación desde el ${mDiaLegible(dias[0])}. La cartera va ${signo}${Math.abs(dif).toFixed(2).replace(".", ",")} % ` +
+                `respecto a ${nombreBench}. Se compara la TWR de la cartera, que ignora aportaciones y retiradas.`
+        )
+    }
+
+    mCreateChart("mChartEvolucion", {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Cartera (TWR)",
+                    data: serieCartera,
+                    borderColor: colorCartera,
+                    backgroundColor: "transparent",
+                    borderWidth: 2,
+                    // Con pocos días la línea se ve mejor con los puntos
+                    // marcados; en un año serían un churro.
+                    pointRadius: dias.length <= 20 ? 2.5 : 0,
+                    pointHoverRadius: 4,
+                    spanGaps: true,
+                    tension: 0.25
+                },
+                ...(bench
+                    ? [
+                          {
+                              label: nombreBench,
+                              data: serieBench,
+                              borderColor: "#8ea2c6",
+                              backgroundColor: "transparent",
+                              borderWidth: 1.5,
+                              borderDash: [5, 4],
+                              pointRadius: dias.length <= 20 ? 2.5 : 0,
+                              pointHoverRadius: 4,
+                              spanGaps: true,
+                              tension: 0.25
+                          }
+                      ]
+                    : [])
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 300 },
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                legend: { labels: { color: "#ccd6f6", font: { size: 12 }, padding: 14, usePointStyle: true } },
+                tooltip: {
+                    callbacks: {
+                        // La serie ya viene en %, que es la pregunta real:
+                        // quién va por delante y cuánto.
+                        label: (c) => {
+                            if (c.raw === null) return null
+                            return ` ${c.dataset.label}: ${(c.raw >= 0 ? "+" : "") + c.raw.toFixed(2).replace(".", ",")} %`
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ...mAxisX(),
+                    ticks: { color: "#8899bb", maxTicksLimit: 12, autoSkip: true }
+                },
+                y: {
+                    ticks: {
+                        color: "#ccd6f6",
+                        maxTicksLimit: 8,
+                        // Con rangos estrechos (unos décimos de punto) redondear
+                        // a entero repite "+0%" en todas las marcas: los
+                        // decimales salen del salto real entre marcas.
+                        callback: (v, i, marcas) => {
+                            const salto = marcas.length > 1 ? Math.abs(marcas[1].value - marcas[0].value) : 1
+                            const dec = salto >= 1 ? 0 : salto >= 0.1 ? 1 : 2
+                            return (v >= 0 ? "+" : "") + v.toFixed(dec).replace(".", ",") + "%"
+                        }
+                    },
+                    grid: { color: "rgba(255,255,255,0.06)" }
+                }
+            }
+        }
+    })
+}
+
+async function mInitBenchmarkSelect() {
+    const sel = document.getElementById("mBenchmarkSelect")
+    if (!sel || sel.dataset.listo) return
+    sel.dataset.listo = "1"
+
+    let indices = []
+    try {
+        const data = await fetch("/api/market/benchmarks").then((r) => r.json())
+        indices = data.ok ? data.indices : []
+    } catch (_) {
+        /* sin catálogo, el desplegable se queda vacío y oculto */
+    }
+
+    if (!indices.length) return
+    sel.innerHTML = indices
+        .map((i) => `<option value="${escapeMetricasHtml(i.clave)}">${escapeMetricasHtml(i.nombre)}</option>`)
+        .join("")
+    if (indices.some((i) => i.clave === _benchmarkIndice)) sel.value = _benchmarkIndice
+    else _benchmarkIndice = sel.value
+
+    sel.addEventListener("change", () => {
+        _benchmarkIndice = sel.value
+        setChartPref("evolucionBenchmark", _benchmarkIndice)
+        mRenderEvolucion(_evolucionRange, _evolucionMode)
+    })
+}
+
+// Basta con marcar el <select>: el envoltorio .csWrapper que le monta encima
+// el select personalizado se oculta solo (regla :has en base.css), y así da
+// igual si el widget ya se había construido o no cuando se llama a esto.
+async function mSyncBenchmarkSelect() {
+    const sel = document.getElementById("mBenchmarkSelect")
+    if (!sel) return
+    if (_evolucionMode !== "vs") {
+        sel.classList.add("hidden")
+        return
+    }
+    await mInitBenchmarkSelect()
+    sel.classList.toggle("hidden", sel.options.length === 0)
+}
+
+// Un solo día no da dos cierres que encadenar, así que el modo comparativo no
+// tiene nada que dibujar en 1D: se bloquea el botón y se cae a 1S.
+const M_VS_RANGOS_BLOQUEADOS = new Set(["1D"])
+const M_VS_RANGO_DEFECTO = "1W"
+
+function mSyncRangosVs() {
+    const esVs = _evolucionMode === "vs"
+    let cambiado = false
+    if (esVs && M_VS_RANGOS_BLOQUEADOS.has(_evolucionRange)) {
+        _evolucionRange = M_VS_RANGO_DEFECTO
+        setChartPref("evolucionRange", _evolucionRange)
+        cambiado = true
+    }
+    document.querySelectorAll(".mEvolucionRangeBtn").forEach((b) => {
+        b.disabled = esVs && M_VS_RANGOS_BLOQUEADOS.has(b.dataset.range)
+        b.title = b.disabled ? "Necesita al menos dos días de cierres" : ""
+        if (cambiado) b.classList.toggle("active", b.dataset.range === _evolucionRange)
+    })
+}
+
 function mInitEvolucion() {
     const rangeBtns = document.querySelectorAll(".mEvolucionRangeBtn")
-    const modeBtns  = document.querySelectorAll(".mEvolucionModeBtn")
+    const modeBtns = document.querySelectorAll(".mEvolucionModeBtn")
 
-    rangeBtns.forEach(btn => {
+    rangeBtns.forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.range === _evolucionRange)
         btn.addEventListener("click", () => {
-            rangeBtns.forEach(b => b.classList.remove("active"))
+            rangeBtns.forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _evolucionRange = btn.dataset.range
             setChartPref("evolucionRange", _evolucionRange)
@@ -4071,20 +5365,24 @@ function mInitEvolucion() {
         })
     })
 
-    modeBtns.forEach(btn => {
+    modeBtns.forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.mode === _evolucionMode)
         btn.addEventListener("click", () => {
-            modeBtns.forEach(b => b.classList.remove("active"))
+            modeBtns.forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _evolucionMode = btn.dataset.mode
             setChartPref("evolucionMode", _evolucionMode)
             const oldTip = document.getElementById("mEvolucionTooltip")
             if (oldTip) oldTip.remove()
-            mRenderEvolucion(_evolucionRange, _evolucionMode)
+            mSyncRangosVs()
+            // Se espera al desplegable: si la preferencia guardada ya no
+            // existe en el catálogo, hay que corregirla antes de pedir la serie.
+            mSyncBenchmarkSelect().then(() => mRenderEvolucion(_evolucionRange, _evolucionMode))
         })
     })
 
-    mRenderEvolucion(_evolucionRange, _evolucionMode)
+    mSyncRangosVs()
+    mSyncBenchmarkSelect().then(() => mRenderEvolucion(_evolucionRange, _evolucionMode))
 }
 
 // ── Evolución por tipo de activo ───────────────────────────────────────────
@@ -4092,11 +5390,11 @@ function mInitEvolucion() {
 let _evolucionTiposRange = getChartPref("evolucionTiposRange", "1D")
 // El modo vivía en su propia clave de localStorage; se migra a las preferencias
 // de gráficos para no perder la elección de quien ya la tenía guardada.
-let _evolucionTiposMode  = getChartPref("evolucionTiposMode", localStorage.getItem("evolucionTiposMode") || "eur")
+let _evolucionTiposMode = getChartPref("evolucionTiposMode", localStorage.getItem("evolucionTiposMode") || "eur")
 
 async function mRenderEvolucionTipos(range, mode) {
     const empty = document.getElementById("mEvolucionTiposEmpty")
-    const wrap  = document.getElementById("mEvolucionTiposChartWrap")
+    const wrap = document.getElementById("mEvolucionTiposChartWrap")
 
     let resp, data
     try {
@@ -4113,18 +5411,20 @@ async function mRenderEvolucionTipos(range, mode) {
         const { summaries } = _metricasPayload
         const liveByType = {}
         const liveCostByType = {}
-        summaries.forEach(a => {
+        summaries.forEach((a) => {
             if (a.type) {
-                liveByType[a.type]     = (liveByType[a.type]     || 0) + (a.netoActualEur || 0)
-                liveCostByType[a.type] = (liveCostByType[a.type] || 0) + (a.invertidoEur  || 0)
+                liveByType[a.type] = (liveByType[a.type] || 0) + (a.netoActualEur || 0)
+                liveCostByType[a.type] = (liveCostByType[a.type] || 0) + (a.invertidoEur || 0)
             }
         })
         if (Object.keys(liveByType).length) {
-            const nowTs  = Math.floor(Date.now() / 1000)
+            const nowTs = Math.floor(Date.now() / 1000)
             const lastTs = points.length ? points[points.length - 1].ts : 0
             const livePoint = { ts: nowTs, ...liveByType }
-            Object.keys(liveCostByType).forEach(t => { livePoint[`c_${t}`] = liveCostByType[t] })
-            if (points.length && (nowTs - lastTs) < 120) {
+            Object.keys(liveCostByType).forEach((t) => {
+                livePoint[`c_${t}`] = liveCostByType[t]
+            })
+            if (points.length && nowTs - lastTs < 120) {
                 points = [...points.slice(0, -1), livePoint]
             } else {
                 points = [...points, livePoint]
@@ -4133,21 +5433,28 @@ async function mRenderEvolucionTipos(range, mode) {
     }
 
     const typeSet = new Set()
-    points.forEach(p => { Object.keys(p).forEach(k => { if (k !== "ts" && !k.startsWith("c_")) typeSet.add(k) }) })
+    points.forEach((p) => {
+        Object.keys(p).forEach((k) => {
+            if (k !== "ts" && !k.startsWith("c_")) typeSet.add(k)
+        })
+    })
     const types = [...typeSet]
 
     // Coste de fallback para snapshots antiguos sin cost_eur
     const fallbackCost = {}
     if (_metricasPayload) {
-        _metricasPayload.summaries.forEach(a => {
+        _metricasPayload.summaries.forEach((a) => {
             if (a.type) fallbackCost[a.type] = (fallbackCost[a.type] || 0) + (a.invertidoEur || 0)
         })
     }
-    const pointCost = (p, t) => { const c = p[`c_${t}`]; return (c && c > 0) ? c : (fallbackCost[t] || 0) }
+    const pointCost = (p, t) => {
+        const c = p[`c_${t}`]
+        return c && c > 0 ? c : fallbackCost[t] || 0
+    }
 
     if (types.length === 0) {
         if (empty) empty.classList.remove("hidden")
-        if (wrap)  wrap.classList.add("hidden")
+        if (wrap) wrap.classList.add("hidden")
         mDestroyChart("mChartEvolucionTipos")
         const oldTip = document.getElementById("mEvolucionTiposTooltip")
         if (oldTip) oldTip.remove()
@@ -4156,7 +5463,16 @@ async function mRenderEvolucionTipos(range, mode) {
 
     // Si solo hay 1 punto (live), añadir un punto sintético al inicio del rango para mostrar línea plana
     if (points.length === 1) {
-        const rangeMap = { "1D": 86400, "1W": 7*86400, "1M": 30*86400, "3M": 90*86400, "6M": 180*86400, "1Y": 365*86400, "ALL": 365*86400, "YTD": 365*86400 }
+        const rangeMap = {
+            "1D": 86400,
+            "1W": 7 * 86400,
+            "1M": 30 * 86400,
+            "3M": 90 * 86400,
+            "6M": 180 * 86400,
+            "1Y": 365 * 86400,
+            ALL: 365 * 86400,
+            YTD: 365 * 86400
+        }
         const rangeSpan = rangeMap[range] || 86400
         const startTs = points[0].ts - rangeSpan
         const { ts: _ts, ...typeVals } = points[0]
@@ -4164,30 +5480,44 @@ async function mRenderEvolucionTipos(range, mode) {
     }
 
     if (empty) empty.classList.add("hidden")
-    if (wrap)  wrap.classList.remove("hidden")
+    if (wrap) wrap.classList.remove("hidden")
 
-    const span = points.length > 1 ? (points[points.length - 1].ts - points[0].ts) : 0
+    const span = points.length > 1 ? points[points.length - 1].ts - points[0].ts : 0
     let roundSec
-    if      (span <= 86400)           roundSec = 300
-    else if (span <= 31 * 86400)      roundSec = 21600
-    else if (span <= 365 * 86400)     roundSec = 86400
-    else                              roundSec = 7 * 86400
+    if (span <= 86400) roundSec = 300
+    else if (span <= 31 * 86400) roundSec = 21600
+    else if (span <= 365 * 86400) roundSec = 86400
+    else roundSec = 7 * 86400
 
-    const labels = points.map(p => {
+    const labels = points.map((p) => {
         const snap = Math.round(p.ts / roundSec) * roundSec
-        const d    = new Date(snap * 1000)
+        const d = new Date(snap * 1000)
         if (roundSec >= 86400)
-            return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", ...(roundSec >= 7 * 86400 ? { year: "2-digit" } : {}) })
-        return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" })
-               + " " + d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+            return d.toLocaleDateString("es-ES", {
+                day: "2-digit",
+                month: "2-digit",
+                ...(roundSec >= 7 * 86400 ? { year: "2-digit" } : {})
+            })
+        return (
+            d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" }) +
+            " " +
+            d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+        )
     })
 
-    const tooltipDates = points.map(p => {
+    const tooltipDates = points.map((p) => {
         const d = new Date(p.ts * 1000)
-        return d.toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+        return d.toLocaleString("es-ES", {
+            weekday: "short",
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+        })
     })
 
-    const isPct     = (mode === "pct")
+    const isPct = mode === "pct"
 
     // Sort types by last-point value descending so legend and tooltip match ranking
     const lastPoint = points[points.length - 1]
@@ -4206,11 +5536,11 @@ async function mRenderEvolucionTipos(range, mode) {
         return rawB - rawA
     })
 
-    const datasets = types.map(type => {
+    const datasets = types.map((type) => {
         const color = M_TYPE_COLORS[type] || mPaletteForName(type)
         const label = M_TYPE_LABELS[type] || type
 
-        const values = points.map(p => {
+        const values = points.map((p) => {
             const v = p[type] ?? null
             if (v === null) return null
             if (isPct) {
@@ -4277,20 +5607,32 @@ async function mRenderEvolucionTipos(range, mode) {
             el = document.createElement("div")
             el.id = "mEvolucionTiposTooltip"
             el.style.cssText = [
-                "position:absolute", "pointer-events:none", "z-index:99",
-                "background:#1a2235", "border:1px solid rgba(100,130,200,0.35)",
-                "border-radius:8px", "padding:10px 14px", "min-width:180px",
-                "box-shadow:0 4px 24px rgba(0,0,0,0.5)", "transition:opacity 0.12s",
-                "font-family:inherit", "font-size:12px", "color:#ccd6f6", "line-height:1.6"
+                "position:absolute",
+                "pointer-events:none",
+                "z-index:99",
+                "background:#1a2235",
+                "border:1px solid rgba(100,130,200,0.35)",
+                "border-radius:8px",
+                "padding:10px 14px",
+                "min-width:180px",
+                "box-shadow:0 4px 24px rgba(0,0,0,0.5)",
+                "transition:opacity 0.12s",
+                "font-family:inherit",
+                "font-size:12px",
+                "color:#ccd6f6",
+                "line-height:1.6"
             ].join(";")
             chart.canvas.parentElement.style.position = "relative"
             chart.canvas.parentElement.appendChild(el)
         }
 
-        if (tooltip.opacity === 0) { el.style.opacity = "0"; return }
+        if (tooltip.opacity === 0) {
+            el.style.opacity = "0"
+            return
+        }
         if (!tooltip.dataPoints || !tooltip.dataPoints.length) return
 
-        const idx  = tooltip.dataPoints[0].dataIndex
+        const idx = tooltip.dataPoints[0].dataIndex
         const date = tooltipDates[idx]
 
         let html = `<div style="font-size:11px;color:#8899bb;margin-bottom:6px">${date}</div>`
@@ -4302,22 +5644,22 @@ async function mRenderEvolucionTipos(range, mode) {
             if (isPct) {
                 const costA = pointCost(points[idx], a) || 1
                 const costB = pointCost(points[idx], b) || 1
-                return ((rawB - costB) / costB) - ((rawA - costA) / costA)
+                return (rawB - costB) / costB - (rawA - costA) / costA
             }
             return rawB - rawA
         })
-        tooltipTypes.forEach(type => {
+        tooltipTypes.forEach((type) => {
             const v = points[idx][type] ?? null
             if (v === null) return
             const color = M_TYPE_COLORS[type] || mPaletteForName(type)
-            const lbl   = M_TYPE_LABELS[type] || type
+            const lbl = M_TYPE_LABELS[type] || type
             let valStr
             if (isPct) {
                 const cost = pointCost(points[idx], type)
                 if (cost === 0) return
                 const pctVal = ((v - cost) / cost) * 100
-                const sign   = pctVal >= 0 ? "+" : ""
-                const clr    = pctVal >= 0 ? "#2ecc71" : "#e74c3c"
+                const sign = pctVal >= 0 ? "+" : ""
+                const clr = pctVal >= 0 ? "#2ecc71" : "#e74c3c"
                 valStr = `<span style="color:${clr}">${sign}${pctVal.toFixed(2).replace(".", ",")}%</span>`
             } else {
                 valStr = `<span style="color:#e8eeff">${formatEuro(v)}</span>`
@@ -4331,11 +5673,11 @@ async function mRenderEvolucionTipos(range, mode) {
 
         el.innerHTML = html
 
-        const elW  = 210
+        const elW = 210
         const xPos = tooltip.caretX
         const left = xPos + elW + 10 > chart.chartArea.right ? xPos - elW - 12 : xPos + 12
-        el.style.left    = left + "px"
-        el.style.top     = (chart.chartArea.top + 8) + "px"
+        el.style.left = left + "px"
+        el.style.top = chart.chartArea.top + 8 + "px"
         el.style.opacity = "1"
     }
 
@@ -4350,8 +5692,11 @@ async function mRenderEvolucionTipos(range, mode) {
             plugins: {
                 legend: {
                     labels: {
-                        color: "#ccd6f6", font: { size: 12 }, padding: 14,
-                        usePointStyle: true, pointStyle: "line"
+                        color: "#ccd6f6",
+                        font: { size: 12 },
+                        padding: 14,
+                        usePointStyle: true,
+                        pointStyle: "line"
                     }
                 },
                 tooltip: { enabled: false, external: tiposTooltipHandler }
@@ -4359,7 +5704,7 @@ async function mRenderEvolucionTipos(range, mode) {
             scales: {
                 x: {
                     ticks: { color: "#8899bb", maxTicksLimit: 8, maxRotation: 0 },
-                    grid:  { color: "rgba(255,255,255,0.06)" }
+                    grid: { color: "rgba(255,255,255,0.06)" }
                 },
                 y: {
                     ticks: {
@@ -4378,12 +5723,12 @@ async function mRenderEvolucionTipos(range, mode) {
 
 function mInitEvolucionTipos() {
     const rangeBtns = document.querySelectorAll(".mEvolucionTiposRangeBtn")
-    const modeBtns  = document.querySelectorAll(".mEvolucionTiposModeBtn")
+    const modeBtns = document.querySelectorAll(".mEvolucionTiposModeBtn")
 
-    rangeBtns.forEach(btn => {
+    rangeBtns.forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.range === _evolucionTiposRange)
         btn.addEventListener("click", () => {
-            rangeBtns.forEach(b => b.classList.remove("active"))
+            rangeBtns.forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _evolucionTiposRange = btn.dataset.range
             setChartPref("evolucionTiposRange", _evolucionTiposRange)
@@ -4393,10 +5738,10 @@ function mInitEvolucionTipos() {
         })
     })
 
-    modeBtns.forEach(btn => {
+    modeBtns.forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.mode === _evolucionTiposMode)
         btn.addEventListener("click", () => {
-            modeBtns.forEach(b => b.classList.remove("active"))
+            modeBtns.forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _evolucionTiposMode = btn.dataset.mode
             setChartPref("evolucionTiposMode", _evolucionTiposMode)

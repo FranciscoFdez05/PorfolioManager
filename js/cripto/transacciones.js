@@ -49,10 +49,19 @@ async function initTransaccionesLogic() {
 async function loadTransaccionesCryptoAssets() {
     const assets = await loadAssetsList()
     const cryptoAssets = assets
-        .filter((asset) => String(asset?.type || "").trim().toLowerCase() === "cripto")
+        .filter(
+            (asset) =>
+                String(asset?.type || "")
+                    .trim()
+                    .toLowerCase() === "cripto"
+        )
         .sort((firstAsset, secondAsset) => {
-            const firstOrder = Number.isFinite(Number(firstAsset?.order)) ? Number(firstAsset.order) : Number.MAX_SAFE_INTEGER
-            const secondOrder = Number.isFinite(Number(secondAsset?.order)) ? Number(secondAsset.order) : Number.MAX_SAFE_INTEGER
+            const firstOrder = Number.isFinite(Number(firstAsset?.order))
+                ? Number(firstAsset.order)
+                : Number.MAX_SAFE_INTEGER
+            const secondOrder = Number.isFinite(Number(secondAsset?.order))
+                ? Number(secondAsset.order)
+                : Number.MAX_SAFE_INTEGER
 
             if (firstOrder !== secondOrder) {
                 return firstOrder - secondOrder
@@ -66,10 +75,17 @@ async function loadTransaccionesCryptoAssets() {
     if (typeof loadStablecoinsData === "function") {
         try {
             const stablecoinsPayload = await loadStablecoinsData()
-            const enabledSymbols = Array.isArray(stablecoinsPayload?.enabledSymbols) ? stablecoinsPayload.enabledSymbols : []
+            const enabledSymbols = Array.isArray(stablecoinsPayload?.enabledSymbols)
+                ? stablecoinsPayload.enabledSymbols
+                : []
 
             enabledSymbols
-                .map((symbol) => String(symbol || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, ""))
+                .map((symbol) =>
+                    String(symbol || "")
+                        .trim()
+                        .toUpperCase()
+                        .replace(/[^A-Z0-9]/g, "")
+                )
                 .filter(Boolean)
                 .forEach((symbol) => {
                     stablecoinAssets.push({
@@ -125,7 +141,6 @@ function bindTransaccionesEvents() {
             }
         })
     }
-
 }
 
 function createEmptyTransaccionRow() {
@@ -250,7 +265,9 @@ function formatHashTransaccionDisplay(value) {
 }
 
 function normalizeTransaccionWalletTipo(value) {
-    const normalizedValue = String(value || "").trim().toLowerCase()
+    const normalizedValue = String(value || "")
+        .trim()
+        .toLowerCase()
 
     if (normalizedValue === "recibida") {
         return "recibida"
@@ -266,7 +283,10 @@ function normalizeTransaccionWalletTipo(value) {
 function buildTransaccionRow(row) {
     const tr = document.createElement("tr")
     const hashTransaccion = normalizeHashTransaccionValue(row.hashTransaccion || row.walletOrigen || "")
-    const walletLabel = TRANSACCION_WALLET_OPTIONS.find((o) => o.value === normalizeTransaccionWalletTipo(row.walletTipo))?.label || row.walletTipo || ""
+    const walletLabel =
+        TRANSACCION_WALLET_OPTIONS.find((o) => o.value === normalizeTransaccionWalletTipo(row.walletTipo))?.label ||
+        row.walletTipo ||
+        ""
     tr.dataset.transaccionId = row.id
     tr.innerHTML = `
         <td>${row.fechaOperacion || ""}</td>
@@ -315,10 +335,12 @@ async function copyHashTransaccionToClipboard(cell) {
         cell.classList.add("copied")
         cell.title = "Hash copiado"
         window.clearTimeout(Number(cell.dataset.copyTimeoutId || 0))
-        cell.dataset.copyTimeoutId = String(window.setTimeout(() => {
-            cell.classList.remove("copied")
-            cell.title = "Haz clic para copiar el hash completo"
-        }, 1200))
+        cell.dataset.copyTimeoutId = String(
+            window.setTimeout(() => {
+                cell.classList.remove("copied")
+                cell.title = "Haz clic para copiar el hash completo"
+            }, 1200)
+        )
     } catch (error) {
         console.error("No se pudo copiar el hash:", error)
     }
@@ -443,8 +465,9 @@ function openTransaccionRowModal(rowId) {
     const isEdit = rowIndex >= 0
     const rowData = isEdit ? { ...currentTransaccionesData.rows[rowIndex] } : createEmptyTransaccionRow()
 
-    const walletOptions = TRANSACCION_WALLET_OPTIONS.map((opt) =>
-        `<option value="${opt.value}"${rowData.walletTipo === opt.value ? " selected" : ""}>${opt.label}</option>`
+    const walletOptions = TRANSACCION_WALLET_OPTIONS.map(
+        (opt) =>
+            `<option value="${opt.value}"${rowData.walletTipo === opt.value ? " selected" : ""}>${opt.label}</option>`
     ).join("")
 
     const fieldsHtml = `
