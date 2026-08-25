@@ -44,6 +44,17 @@ class TestParseo:
         assert fifo.parse_decimal("1234.56") == Decimal("1234.56")
         assert fifo.parse_decimal("") == Decimal("0")
 
+    @pytest.mark.parametrize("texto", ["83,58 €", "83,58€", "€83,58", "83,58 EUR"])
+    def test_el_simbolo_de_la_divisa_no_invalida_el_importe(self, texto):
+        # La ficha guarda importes ya formateados. Antes reventaban el parseo,
+        # el importe caía a cero y el lote entraba con coste de adquisición 0.
+        assert fifo.parse_decimal(texto) == Decimal("83.58")
+
+    @pytest.mark.parametrize("texto", ["12abc34", "no es un número"])
+    def test_un_importe_corrupto_sigue_siendo_error(self, texto):
+        with pytest.raises(fifo.FifoError):
+            fifo.parse_decimal(texto)
+
 
 class TestReparto:
     def test_consume_el_lote_mas_antiguo_primero(self):

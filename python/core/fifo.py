@@ -28,10 +28,11 @@ Convenios de valoración (art. 35 LIRPF):
     transmitente. Por eso las comisiones **restan** al vender.
 """
 
-import re
 from dataclasses import dataclass, field
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
+
+from core import dinero
 
 # Cantidades y precios se manejan con esta escala interna. Es holgada a
 # propósito: una fracción de bitcoin tiene 8 decimales y el coste unitario de
@@ -59,27 +60,21 @@ class FifoError(ValueError):
 
 
 def _dec(value, campo="importe") -> Decimal:
-    """Convierte a Decimal aceptando None, números y cadenas es-ES."""
-    if value is None or value == "":
-        return Decimal("0")
-    if isinstance(value, Decimal):
-        return value
-    if isinstance(value, (int, float)):
-        return Decimal(str(value))
+    """Convierte a Decimal aceptando None, números y cadenas es-ES.
 
-    texto = str(value).strip()
-    if not texto:
+    La conversión en sí vive en `core.dinero`, que es la única que hay en el
+    proyecto: había cinco, y dos de ellas devolvían cero para los importes en
+    formato español que guarda el propio esquema. Aquí solo se traduce la
+    excepción a `FifoError`, porque el motor tiene su propio contrato de
+    errores, y se conserva el vacío como cero: una comisión sin rellenar es
+    cero comisión, no una fila corrupta.
+    """
+    if value is None or (isinstance(value, str) and not value.strip()):
         return Decimal("0")
-    # "1.234,56" (es-ES) y "1234.56" (serializado) deben dar lo mismo.
-    if "," in texto:
-        texto = texto.replace(".", "").replace(",", ".")
-    # El navegador separa los miles con espacios que no son el ASCII 32 (NBSP,
-    # espacio fino irrompible) y que Decimal no digiere.
-    texto = re.sub(r"\s", "", texto)
     try:
-        return Decimal(texto)
-    except InvalidOperation as error:
-        raise FifoError(f"«{campo}» no es un número válido: {value!r}") from error
+        return dinero.aDecimal(value, campo)
+    except dinero.ImporteInvalido as error:
+        raise FifoError(str(error)) from error
 
 
 def parse_decimal(value, campo="importe") -> Decimal:

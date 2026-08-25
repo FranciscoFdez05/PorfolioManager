@@ -68,6 +68,19 @@ class TestCalculo:
         assert fila["neto"] == "402.50"
         assert fila["incidencia"] == ""
 
+    def test_una_compra_con_la_divisa_en_el_importe_cuenta_igual(self, temp_db):
+        # La ficha guarda a veces el importe ya formateado ("10,00 €"). Antes se
+        # leía como 0: el lote entraba con coste cero y la venta declaraba el
+        # precio íntegro de esa compra como ganancia.
+        crear_activo(filas=[
+            compra_ficha("01-01-2023", "10", "10,00 €"),
+            compra_ficha("01-06-2023", "10", "20"),
+        ])
+        fila = guardar("2024", [venta("v1", "01-09-2024", "15", "30")])["rows"][0]
+
+        assert fila["costeAdquisicion"] == "200.00"
+        assert fila["dineroDeclarar"] == "250.00"
+
     def test_los_importes_que_manda_el_cliente_se_ignoran(self, temp_db):
         # El POST antes escribía estos campos tal cual. Ahora son derivados.
         crear_activo(filas=[compra_ficha("01-01-2023", "10", "10")])

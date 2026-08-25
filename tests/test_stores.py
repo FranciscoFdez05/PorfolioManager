@@ -9,9 +9,9 @@ import pytest
 
 from stores.asset_utils import (
     ALLOWED_ASSET_TYPES,
-    normalizeAssetCurrency,
     createAssetSymbol,
     inferMarketProviderFromSymbol,
+    normalizeAssetCurrency,
     normalizeMarketProvider,
     sanitize_color,
     sanitizeAssetPayload,
@@ -207,3 +207,21 @@ class TestMonedaDelActivo:
     @pytest.mark.parametrize("raw", ["", "   ", "1234", "e", None])
     def test_valores_invalidos_caen_al_fallback(self, raw):
         assert normalizeAssetCurrency({"currency": raw}) == "EUR"
+
+
+class TestActivoOculto:
+    """Ocultar un activo tiene que sobrevivir al siguiente guardado.
+
+    El cliente reenvía el activo entero en cada POST, así que un campo que el
+    saneado no copie se pierde en el upsert: el activo se ocultaba y volvía a
+    aparecer al recargar.
+    """
+
+    def test_hidden_viaja_en_el_payload(self):
+        payload, error = sanitizeAssetPayload({"name": "Colgate", "type": "acciones", "hidden": True, "rows": []})
+        assert error is None
+        assert payload["hidden"] is True
+
+    def test_sin_hidden_el_activo_es_visible(self):
+        payload, _ = sanitizeAssetPayload({"name": "Colgate", "type": "acciones", "rows": []})
+        assert payload["hidden"] is False

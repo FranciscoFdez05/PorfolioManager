@@ -20,6 +20,7 @@ Eso es deliberado: antes el descuadre se tragaba en silencio y salían costes de
 adquisición inventados.
 """
 
+from dataclasses import replace
 from decimal import Decimal
 
 from core import fifo, fiscal_es
@@ -200,20 +201,11 @@ def validar_venta(fila, activos):
     return {"fecha": fecha, "cantidad": cantidad, "precio": precio}, ""
 
 
-def calcular_todo():
-    """Liquida todas las ventas de todos los ejercicios.
+def _añadir_ventas(por_activo, ventas, activos):
+    """Mete las ventas fiscales válidas en la línea temporal de cada activo.
 
-    Se calcula siempre sobre el histórico completo, nunca sobre un año suelto:
-    el coste FIFO de una venta de 2026 depende de lo que se vendiera en 2025, y
-    calcular un año aislado es justamente el fallo que tenía la versión
-    anterior.
-
-    Devuelve `{"filas": {(anio, id): dato}, "liquidaciones": {...},
-    "incidencias": [...]}`.
+    Devuelve `{(anio, id): incidencia}` con las que no se pudieron colocar.
     """
-    por_activo, activos = _operaciones_de_fichas()
-    ventas = _leer_ventas_crudas()
-
     invalidas = {}
     for fila in ventas:
         datos, incidencia = validar_venta(fila, activos)
@@ -237,6 +229,58 @@ def calcular_todo():
             origen="ventas",
             fiscal=True,
         ))
+
+    return invalidas
+
+
+def cartera_viva():
+    """Posición que sigue en cartera por activo, según el FIFO.
+
+    Devuelve `{asset_id: {"cantidad": Decimal, "coste": Decimal}}`, en la moneda
+    del activo. Es lo que el navegador calcula con `buildRemainingAssetLots`, y
+    lo necesita el snapshot del servidor para valorar la cartera sin depender de
+    que haya una pestaña abierta.
+
+    Dos diferencias deliberadas con `calcular_todo()`:
+
+    * Las comisiones se descuentan de las operaciones antes de repartir. El
+      coste que devuelve esta función es el **invertido bruto**, que es la cifra
+      que el frontend manda como `total_invested`; sumarle las comisiones
+      dejaría el histórico con dos definiciones distintas de invertido según
+      quién guardara el punto.
+    * No pasa por `fiscal_es`: la regla de antiaplicación mueve el resultado
+      declarable de una venta, no las participaciones que quedan ni su coste.
+    """
+    por_activo, activos = _operaciones_de_fichas()
+    _añadir_ventas(por_activo, _leer_ventas_crudas(), activos)
+
+    cartera = {}
+    for activo_id, operaciones in por_activo.items():
+        sin_comision = [replace(op, comision=Decimal("0")) for op in operaciones]
+        _, lotes = fifo.aplicar_fifo(sin_comision)
+
+        cantidad = sum((lote.restante for lote in lotes), Decimal("0"))
+        coste = sum((lote.restante * lote.coste_unitario for lote in lotes), Decimal("0"))
+        if cantidad > 0:
+            cartera[activo_id] = {"cantidad": cantidad, "coste": coste}
+
+    return cartera
+
+
+def calcular_todo():
+    """Liquida todas las ventas de todos los ejercicios.
+
+    Se calcula siempre sobre el histórico completo, nunca sobre un año suelto:
+    el coste FIFO de una venta de 2026 depende de lo que se vendiera en 2025, y
+    calcular un año aislado es justamente el fallo que tenía la versión
+    anterior.
+
+    Devuelve `{"filas": {(anio, id): dato}, "liquidaciones": {...},
+    "incidencias": [...]}`.
+    """
+    por_activo, activos = _operaciones_de_fichas()
+    ventas = _leer_ventas_crudas()
+    invalidas = _añadir_ventas(por_activo, ventas, activos)
 
     resultados_por_ref = {}
     lotes_vivos = {}
@@ -385,6 +429,25 @@ def serializar_liquidacion(liquidacion):
         "pendienteCompensar": _money(liquidacion.pendiente_compensar),
         "perdidasNoComputables": _money(liquidacion.perdidas_no_computables),
         "perdidasDiferidasLiberadas": _money(liquidacion.perdidas_diferidas_liberadas),
+        # El total de `pendienteCompensar` no basta para declarar: cada saldo
+        # negativo caduca a los cuatro ejercicios de su origen, así que hay que
+        # saber de qué año viene cada trozo.
+        "arrastres": [
+            {
+                "anioOrigen": str(a["anio_origen"]),
+                "importe": _money(a["importe"]),
+                "ultimoEjercicio": str(a["ultimo_ejercicio"]),
+            }
+            for a in liquidacion.arrastres
+        ],
+        "compensacionesAplicadas": [
+            {
+                "anioOrigen": str(c["anio_origen"]),
+                "importe": _money(c["importe"]),
+                "ultimoEjercicio": str(c["ultimo_ejercicio"]),
+            }
+            for c in liquidacion.compensaciones_aplicadas
+        ],
     }
 
 

@@ -1,5 +1,6 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, Response, g, jsonify
 
+from core import csp, informe_renta
 from core.validation import json_body
 from stores import ventas_fifo
 from stores.gastos_store import normalize_year
@@ -86,6 +87,63 @@ def saveVentasYear(year):
         "resumen": data["resumen"],
         "incidencias": data["incidencias"],
     })
+
+
+# ── Informe anual para la declaración ─────────────────────────────────────────
+# El cálculo fiscal ya era correcto, pero solo se podía leer en pantalla: en
+# abril había que copiar las cifras a mano a Renta Web. Estas dos rutas sirven
+# el mismo informe en los dos formatos que hacen falta —hoja de cálculo y
+# documento imprimible— desde un único cálculo, para que no puedan divergir.
+
+
+def _preparar_informe(year):
+    """Devuelve `(informe, error)`; `error` es la respuesta lista para devolver."""
+    normalized_year = normalize_year(year)
+    if not normalized_year:
+        return None, (jsonify({"ok": False, "error": "Año inválido"}), 400)
+
+    data = read_ventas_year(normalized_year)
+    if data is None:
+        return None, (jsonify({"ok": False, "error": "Año no encontrado"}), 404)
+
+    return informe_renta.construir(normalized_year, data["rows"], data["resumen"]), None
+
+
+@ventas_bp.route("/api/ventas/<year>/informe.csv", methods=["GET"])
+def getInformeCsv(year):
+    informe, error = _preparar_informe(year)
+    if error:
+        return error
+
+    return Response(
+        informe_renta.a_csv(informe),
+        # charset explícito además del BOM: si el navegador decide el suyo, los
+        # acentos se ven mal al abrirlo directamente en vez de descargarlo.
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename=ganancias-patrimoniales-{informe["anio"]}.csv'
+            ),
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@ventas_bp.route("/api/ventas/<year>/informe.html", methods=["GET"])
+def getInformeHtml(year):
+    informe, error = _preparar_informe(year)
+    if error:
+        return error
+
+    # El nonce va en `g` para que la CSP que monta core/seguridad_app.py lo
+    # recoja en el after_request; sin él, el navegador bloquea el script que
+    # engancha el botón de imprimir.
+    g.csp_nonce = csp.generar_nonce()
+    return Response(
+        informe_renta.a_html(informe, nonce=g.csp_nonce),
+        mimetype="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @ventas_bp.route("/api/ventas/<year>", methods=["DELETE"])

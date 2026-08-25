@@ -115,10 +115,7 @@ async function loadVentasAssets() {
 }
 
 async function initVentasLogic() {
-    const [ventasIndex] = await Promise.all([
-        loadVentasIndex(),
-        loadVentasAssets()
-    ])
+    const [ventasIndex] = await Promise.all([loadVentasIndex(), loadVentasAssets()])
 
     ventasYears = Array.isArray(ventasIndex?.years) ? ventasIndex.years : []
     currentVentasYear = ventasYears[0] || "2026"
@@ -193,7 +190,9 @@ function bindVentasEvents() {
                         confirmSide: "left",
                         onConfirm: async () => {
                             const response = await deleteVentasYearRequest(currentVentasYear)
-                            ventasYears = Array.isArray(response.years) ? response.years : (await loadVentasIndex()).years || []
+                            ventasYears = Array.isArray(response.years)
+                                ? response.years
+                                : (await loadVentasIndex()).years || []
                             await renderVentasYear(ventasYears[0] || "2026")
                         }
                     })
@@ -221,7 +220,6 @@ function bindVentasEvents() {
             }
         })
     }
-
 }
 
 function closeVentasModal() {
@@ -424,8 +422,13 @@ function normalizeVentaRow(row = {}) {
 }
 
 function getVentasAssetIdByName(assetName) {
-    const normalizedName = String(assetName || "").trim().toLowerCase()
-    const asset = ventasAssets.find((item) => item.name.trim().toLowerCase() === normalizedName || item.symbol.trim().toLowerCase() === normalizedName)
+    const normalizedName = String(assetName || "")
+        .trim()
+        .toLowerCase()
+    const asset = ventasAssets.find(
+        (item) =>
+            item.name.trim().toLowerCase() === normalizedName || item.symbol.trim().toLowerCase() === normalizedName
+    )
     return asset?.id || ""
 }
 
@@ -493,23 +496,55 @@ function renderVentasResumen() {
     const opcionales = []
 
     if (parseLooseNumber(resumen.compensadoAnteriores)) {
-        opcionales.push(dato(
-            "Compensado de años anteriores", resumen.compensadoAnteriores,
-            "Saldo negativo de ejercicios previos aplicado a la base de este año (art. 49.1.b LIRPF)."
-        ))
+        opcionales.push(
+            dato(
+                "Compensado de años anteriores",
+                resumen.compensadoAnteriores,
+                "Saldo negativo de ejercicios previos aplicado a la base de este año (art. 49.1.b LIRPF)."
+            )
+        )
     }
     if (parseLooseNumber(resumen.pendienteCompensar)) {
-        opcionales.push(dato(
-            "Pendiente de compensar", resumen.pendienteCompensar,
-            "Saldo negativo que queda vivo para los próximos ejercicios (máximo cuatro)."
-        ))
+        opcionales.push(
+            dato(
+                "Pendiente de compensar",
+                resumen.pendienteCompensar,
+                "Saldo negativo que queda vivo para los próximos ejercicios (máximo cuatro)."
+            )
+        )
     }
     if (parseLooseNumber(resumen.perdidasNoComputables)) {
-        opcionales.push(dato(
-            "Pérdidas bloqueadas por recompra", resumen.perdidasNoComputables,
-            "Minusvalías no computables este año por la regla de antiaplicación (art. 33.5 LIRPF). Se imputarán al transmitir los valores recomprados."
-        ))
+        opcionales.push(
+            dato(
+                "Pérdidas bloqueadas por recompra",
+                resumen.perdidasNoComputables,
+                "Minusvalías no computables este año por la regla de antiaplicación (art. 33.5 LIRPF). Se imputarán al transmitir los valores recomprados."
+            )
+        )
     }
+
+    // Desglose de los saldos negativos que se arrastran. El total ya salía
+    // arriba, pero para declarar hace falta saber de qué ejercicio viene cada
+    // trozo: cada uno caduca por su cuenta a los cuatro años.
+    const arrastres = Array.isArray(resumen.arrastres) ? resumen.arrastres : []
+    const bloqueArrastres = arrastres.length
+        ? `
+        <div class="ventasArrastres">
+            <span class="ventasArrastresTitulo">Saldos negativos pendientes por ejercicio</span>
+            <ul class="ventasArrastresLista">
+                ${arrastres
+                    .map(
+                        (a) => `<li>
+                            <span>${escapeVentasHtml(a.anioOrigen)}</span>
+                            <span>${formatVentasMoney(a.importe) || "- €"}</span>
+                            <span class="ventasArrastreCaduca">aplicable hasta ${escapeVentasHtml(a.ultimoEjercicio)}</span>
+                        </li>`
+                    )
+                    .join("")}
+            </ul>
+        </div>
+    `
+        : ""
 
     contenedor.innerHTML = `
         <h4 class="ventasResumenTitulo">Ejercicio ${escapeVentasHtml(resumen.year)} · base del ahorro</h4>
@@ -520,6 +555,13 @@ function renderVentasResumen() {
             ${dato("Base gravada", resumen.base)}
             ${dato("Cuota", resumen.cuota)}
             ${opcionales.join("")}
+        </div>
+        ${bloqueArrastres}
+        <div class="ventasResumenAcciones">
+            <a class="ventasInformeBtn" href="/api/ventas/${encodeURIComponent(resumen.year)}/informe.csv"
+               download>Descargar CSV</a>
+            <a class="ventasInformeBtn" href="/api/ventas/${encodeURIComponent(resumen.year)}/informe.html"
+               target="_blank" rel="noopener">Informe imprimible</a>
         </div>
         <p class="ventasResumenNota">
             Cálculo por FIFO sobre el histórico completo. No contempla la compensación
@@ -543,7 +585,9 @@ function buildVentaRow(row, index) {
     const avisos = []
     if (row.notaAntiaplicacion) avisos.push(row.notaAntiaplicacion)
     if (parseLooseNumber(row.perdidaDiferidaLiberada)) {
-        avisos.push(`Incluye ${formatVentasMoney(row.perdidaDiferidaLiberada)} de pérdida aplazada que se imputa en esta venta.`)
+        avisos.push(
+            `Incluye ${formatVentasMoney(row.perdidaDiferidaLiberada)} de pérdida aplazada que se imputa en esta venta.`
+        )
     }
 
     tr.innerHTML = `
@@ -583,9 +627,15 @@ function describirLotes(lotes) {
         return ""
     }
 
-    return "Lotes consumidos (FIFO):\n" + lotes
-        .map((lote) => `${formatVentasNumber(lote.cantidad)} ud. de la compra de ${lote.fecha} a ${formatVentasMoney(lote.costeUnitario)} = ${formatVentasMoney(lote.coste)}`)
-        .join("\n")
+    return (
+        "Lotes consumidos (FIFO):\n" +
+        lotes
+            .map(
+                (lote) =>
+                    `${formatVentasNumber(lote.cantidad)} ud. de la compra de ${lote.fecha} a ${formatVentasMoney(lote.costeUnitario)} = ${formatVentasMoney(lote.coste)}`
+            )
+            .join("\n")
+    )
 }
 
 function formatVentasNumber(value) {
@@ -639,7 +689,12 @@ function handleVentasActionClick(event) {
 
     const rowIndex = Number(deleteButton.dataset.rowIndex)
     const row = currentVentasData.rows?.[rowIndex]
-    const isEmpty = !row || (!row.fecha && !row.assetId && parseLooseNumber(row.cantidad || "") === null && parseLooseNumber(row.valorVenta || "") === null)
+    const isEmpty =
+        !row ||
+        (!row.fecha &&
+            !row.assetId &&
+            parseLooseNumber(row.cantidad || "") === null &&
+            parseLooseNumber(row.valorVenta || "") === null)
 
     const removeRow = async () => {
         currentVentasData.rows.splice(rowIndex, 1)
@@ -657,7 +712,8 @@ function handleVentasActionClick(event) {
 
     openConfirmModal({
         title: "Eliminar fila",
-        message: "Esta fila tiene contenido. Al borrarla, sus participaciones vuelven a la cartera y el coste FIFO de las ventas posteriores se recalculará. ¿Quieres eliminarla?",
+        message:
+            "Esta fila tiene contenido. Al borrarla, sus participaciones vuelven a la cartera y el coste FIFO de las ventas posteriores se recalculará. ¿Quieres eliminarla?",
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {

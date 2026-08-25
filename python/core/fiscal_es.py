@@ -113,6 +113,15 @@ class Liquidacion:
     pendiente_compensar: Decimal = Decimal("0")
     perdidas_no_computables: Decimal = Decimal("0")
     perdidas_diferidas_liberadas: Decimal = Decimal("0")
+    # Desglose de `pendiente_compensar`, que como total no sirve para
+    # declarar: Renta Web pide los saldos negativos separados por el ejercicio
+    # en que se generaron, porque cada uno caduca por su cuenta a los cuatro
+    # años. Cada entrada es
+    # {"anio_origen": int, "importe": Decimal, "ultimo_ejercicio": int}.
+    arrastres: list = field(default_factory=list)
+    # Detalle de lo que compensó este ejercicio, con el mismo formato. Sin
+    # esto no se puede justificar de dónde sale `compensado_anteriores`.
+    compensaciones_aplicadas: list = field(default_factory=list)
 
 
 def calcular_con_normativa(operaciones, tipo_activo=""):
@@ -262,6 +271,11 @@ def liquidar_ejercicios(resultados_por_anio):
                 pendiente["importe"] -= aplicado
                 disponible -= aplicado
                 liquidacion.compensado_anteriores += aplicado
+                liquidacion.compensaciones_aplicadas.append({
+                    "anio_origen": pendiente["anio"],
+                    "importe": aplicado,
+                    "ultimo_ejercicio": pendiente["anio"] + EJERCICIOS_ARRASTRE,
+                })
             liquidacion.base = disponible
         else:
             liquidacion.base = Decimal("0")
@@ -273,11 +287,23 @@ def liquidar_ejercicios(resultados_por_anio):
                 })
 
         pendientes = [p for p in pendientes if p["importe"] > 0]
+        vivos = [
+            p for p in pendientes
+            if _anio_int(anio) - p["anio"] <= EJERCICIOS_ARRASTRE
+        ]
         liquidacion.pendiente_compensar = sum(
-            (p["importe"] for p in pendientes
-             if _anio_int(anio) - p["anio"] <= EJERCICIOS_ARRASTRE),
-            Decimal("0"),
+            (p["importe"] for p in vivos), Decimal("0"),
         )
+        liquidacion.arrastres = [
+            {
+                "anio_origen": p["anio"],
+                "importe": p["importe"],
+                # Último ejercicio en el que se puede aplicar: art. 49.1.b da
+                # los cuatro siguientes al de generación.
+                "ultimo_ejercicio": p["anio"] + EJERCICIOS_ARRASTRE,
+            }
+            for p in sorted(vivos, key=lambda p: p["anio"])
+        ]
 
         liquidacion.tramos = repartir_en_tramos(liquidacion.base, escala_del_ejercicio(anio))
         liquidacion.cuota = sum(liquidacion.tramos.values(), Decimal("0"))
