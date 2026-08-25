@@ -1,0 +1,41 @@
+version: 2
+
+# Sin esto, las dependencias solo se actualizaban cuando alguien se acordaba de
+# mirarlas: requirements.txt documenta CVEs corregidos a mano (Werkzeug 3.1.3,
+# gunicorn 23) porque el aviso llegó tarde. Dependabot abre el PR el mismo día.
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencias]
+    groups:
+      # Un PR por semana con los parches menores en vez de cinco sueltos. Los
+      # cambios de versión mayor se quedan aparte: esos sí hay que leerlos.
+      menores:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: [dependencias, frontend]
+    groups:
+      menores:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencias, ci]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    labels: [dependencias, docker]

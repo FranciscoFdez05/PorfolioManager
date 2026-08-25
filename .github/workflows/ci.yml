@@ -35,14 +35,92 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
-      - name: Formato (ruff format --check)
-        run: ruff format --check --diff .
-        continue-on-error: true  # informativo mientras se normaliza el formato existente
+      # No hay paso de `ruff format`: el código alinea asignaciones y comentarios
+      # en columnas a propósito, y el formateador las deshace. `ruff check` sí es
+      # obligatorio, y es el que encuentra fallos reales (nombres sin definir,
+      # imports muertos, mutables por defecto) en vez de discutir espacios.
 
-      - name: Tests
+      - name: Tests con cobertura
         # -m "not network": las pruebas marcadas salen a internet y dependen de
         # proveedores externos, así que no deben decidir si un PR pasa.
-        run: pytest -m "not network"
+        # El umbral (fail_under) y las exclusiones están en pyproject.toml.
+        run: pytest -m "not network" --cov --cov-report=term --cov-report=xml
+
+      # El umbral global (58%) mete en el mismo saco un cliente HTTP y el cálculo
+      # de la declaración de la renta. Estos cinco módulos son los que deciden
+      # cuánto se declara a Hacienda y cuánto rinde la cartera: un fallo aquí no
+      # se ve en pantalla, se ve en el resultado. Se les exige cobertura alta por
+      # separado, reutilizando los datos de la ejecución anterior.
+      - name: Cobertura de los módulos de cálculo
+        run: |
+          coverage report --fail-under=90 --show-missing             --include="python/core/fifo.py,python/core/fiscal_es.py,python/core/informe_renta.py,python/core/pnl_divisa.py,python/core/rentabilidad.py,python/core/dinero.py"
+
+      - name: Publicar el informe de cobertura
+        # Solo de una versión: tres artefactos idénticos no aportan nada.
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura
+          path: coverage.xml
+          retention-days: 14
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # js/cartera/assets.js pasa de 4.800 líneas y js/analisis/metricas.js de
+      # 4.400. Sin linter, un nombre mal escrito o una variable que ya no existe
+      # solo se ve cuando el usuario abre esa pantalla.
+      - name: Lint (eslint)
+        run: npm run lint
+
+      # Ya no es informativo: el código está formateado y `npm run format` lo
+      # mantiene así. A diferencia del de Python, aquí el estilo del proyecto y
+      # el del formateador coinciden, así que exigirlo no pelea con nadie.
+      - name: Formato (prettier --check)
+        run: npm run format:check
+
+      # js/core/ concentra lo que usan todos los demás módulos: el formateo de
+      # importes y la capa de acceso a la API. Un fallo ahí no da un error, da un
+      # número equivocado en pantalla (`parseEuroNumber("1234.56")` devolvía
+      # 123456), que es justo lo que ESLint no puede ver.
+      - name: Tests del frontend (vitest)
+        run: npm test
+
+  auditoria:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar pip-audit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      # Informativo: un aviso publicado hoy no debe bloquear un PR que no lo
+      # introdujo. Lo que importa es que aparezca en el resumen del workflow, y
+      # que Dependabot (.github/dependabot.yml) abra el PR con la actualización.
+      - name: Auditar dependencias de producción
+        continue-on-error: true
+        run: pip-audit --requirement requirements.txt --desc
+
+      - name: Auditar dependencias de desarrollo
+        continue-on-error: true
+        run: pip-audit --requirement requirements-dev.txt --desc
 
   docker:
     runs-on: ubuntu-latest

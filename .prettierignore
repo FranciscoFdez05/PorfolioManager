@@ -1,0 +1,8 @@
+# Librerías de terceros: se sustituyen descargando la versión nueva entera
+# (ver js/vendor/README.md), no reformateando el fichero.
+js/vendor/
+
+node_modules/
+data/
+logs/
+API/

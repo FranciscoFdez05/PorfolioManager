@@ -58,3 +58,16 @@ Thumbs.db
 # =========================
 .claude/
 
+
+# Tooling del frontend (eslint/prettier). package.json y package-lock.json sí
+# se versionan: `npm ci` en CI los necesita.
+node_modules/
+
+# Cobertura de tests
+.coverage
+coverage.xml
+htmlcov/
+
+# Salidas de las pruebas del frontend (vitest)
+coverage/
+.vitest/

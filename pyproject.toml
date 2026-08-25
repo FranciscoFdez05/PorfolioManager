@@ -16,6 +16,45 @@ markers = [
     "network: pruebas que salen a internet (desactivadas en CI)",
 ]
 
+[tool.coverage.run]
+source = ["python"]
+branch = true
+omit = [
+    # server.py se excluye porque la suite tiene prohibido importarlo: al
+    # importarse ejecuta init_portfolios() y ensureDataFile(), que escriben
+    # sobre los datos reales de quien lance los tests. Lo que sí importaba de
+    # ese módulo —CSRF, sesión, límite de escrituras, cabeceras— vive ahora en
+    # core/seguridad_app.py, y eso sí está cubierto.
+    "python/server.py",
+    # Clientes HTTP de los proveedores de mercado: son casi enteramente
+    # peticiones a APIs externas y el parseo de sus respuestas. Sus pruebas
+    # están marcadas `network` y CI las salta, así que contarlos aquí solo
+    # bajaría el umbral hasta volverlo inútil. El código propio que los rodea
+    # (providers/http.py, providers/text.py) sí cuenta.
+    "python/providers/finnhub_client.py",
+    "python/providers/yahoo_finance_client.py",
+    "python/providers/eodhd_client.py",
+    "python/providers/alpha_vantage_client.py",
+]
+
+[tool.coverage.report]
+# El umbral no es una meta, es un trinquete: sube cuando suba la cobertura y
+# sirve para que un PR no la baje sin que nadie se dé cuenta. Se deja un par de
+# puntos por debajo del valor actual (~62% con cobertura de ramas) para que un
+# refactor que mueva código no rompa CI por décimas.
+#
+# Este número es el del proyecto entero, y mezcla un cliente HTTP con el cálculo
+# de la declaración de la renta. Los módulos donde un error cuesta dinero tienen
+# su propio umbral, mucho más alto, en un paso aparte del workflow de CI.
+fail_under = 60
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    'if __name__ == "__main__":',
+]
+
 [tool.ruff]
 line-length = 120
 target-version = "py311"
