@@ -543,6 +543,8 @@ def _migrate(conn):
         )
         return
 
+    _copia_antes_de_migrar(version, ESQUEMA_VERSION)
+
     for numero, paso in sorted(_MIGRACIONES):
         if numero > version:
             log.info("Migrando el esquema de %s al %s", version, numero)
@@ -551,6 +553,38 @@ def _migrate(conn):
     # Interpolado y no parametrizado porque PRAGMA no admite parámetros; el
     # valor es una constante entera del propio módulo, no entra de fuera.
     conn.execute(f"PRAGMA user_version = {int(ESQUEMA_VERSION)}")
+
+
+def _copia_antes_de_migrar(desde: int, hasta: int) -> None:
+    """Punto de retorno identificable antes de tocar el esquema.
+
+    Una migración aplica ALTER TABLE y DROP COLUMN, y no hay paso inverso: si
+    algo sale mal, la única vuelta atrás es restaurar el fichero anterior. El
+    backup diario del arranque ya existe, pero se llama por fecha y lo acaba
+    borrando la rotación; este lleva el salto en el nombre y no rota.
+
+    El import es local a propósito: `admin` está por encima de `core` en el
+    orden de dependencias del proyecto, y hacerlo arriba crearía un ciclo.
+
+    Si la copia falla no se aborta el arranque. La aplicación está construida
+    para levantarse sola —verifica, repara y restaura la base al arrancar— y
+    dejarla caída por un disco lleno sería peor que seguir. Pero se registra
+    como error, no como aviso: es la diferencia entre poder deshacer esta
+    actualización y no poder.
+    """
+    try:
+        from admin.backup_manager import backup_previo_a_migracion
+
+        destino = backup_previo_a_migracion(get_active_db_path(), desde, hasta)
+        if destino is not None:
+            log.info("Copia previa a la migración: %s", destino.name)
+    except Exception as error:
+        log.error(
+            "No se pudo crear la copia previa a la migración del esquema %s->%s: %s. "
+            "Se migra igualmente, pero esta actualización no se podrá deshacer "
+            "restaurando el fichero anterior.",
+            desde, hasta, error,
+        )
 
 
 @_migracion(1)

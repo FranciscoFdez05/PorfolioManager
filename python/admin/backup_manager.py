@@ -129,6 +129,35 @@ def _checkpoint_and_copy(db_path: Path, backup_path: Path):
         raise
 
 
+def backup_previo_a_migracion(db_path: Path, desde: int, hasta: int):
+    """Copia de seguridad justo antes de subir el esquema. Devuelve la ruta o None.
+
+    Ya existe un backup diario que se hace al arrancar (`run_startup_backup`) y
+    que, por el orden en que server.py llama a las cosas, siempre es anterior a
+    las migraciones. Lo que no da es un punto de retorno **identificable**: se
+    llama `<portfolio>_2026-08-25.db` igual que los otros, así que para volver
+    atrás hay que adivinar cuál se hizo antes del salto, y la rotación de
+    `[backups] max_copias` acaba borrándolo si el problema tarda unos días en
+    aparecer.
+
+    Esta copia se hace solo cuando de verdad va a migrar, lleva el salto en el
+    nombre y **queda fuera de la rotación**: `_dated_backups()` solo reconoce el
+    patrón `<stem>_AAAA-MM-DD.db`, y este no encaja, así que nunca se elige para
+    borrar. Son unos pocos ficheros en la vida del proyecto, uno por cada
+    versión del esquema.
+    """
+    db_path = Path(db_path)
+    if not db_path.exists():
+        return None
+
+    _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    marca = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    destino = _BACKUP_DIR / f"{db_path.stem}_pre-esquema-{desde}-a-{hasta}_{marca}.db"
+
+    _checkpoint_and_copy(db_path, destino)
+    return destino
+
+
 def run_startup_backup(db_path: Path):
     """
     Llamar desde portfolios_manager.init_portfolios() después de activar el DB.
