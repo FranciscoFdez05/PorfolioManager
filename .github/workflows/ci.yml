@@ -58,7 +58,7 @@ jobs:
       - name: Publicar el informe de cobertura
         # Solo de una versión: tres artefactos idénticos no aportan nada.
         if: matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cobertura
           path: coverage.xml
