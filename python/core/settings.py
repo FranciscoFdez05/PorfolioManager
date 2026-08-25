@@ -146,6 +146,17 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("seguridad", "hash_iteraciones", ENTERO, 600_000, env="HASH_ITERACIONES",
            minimo=100_000, maximo=10_000_000,
            descripcion="Iteraciones PBKDF2-SHA256 de la contraseña de acceso."),
+    Ajuste("seguridad", "escrituras_por_minuto", ENTERO, 120, env="ESCRITURAS_POR_MINUTO",
+           minimo=0, maximo=100_000,
+           descripcion="Peticiones de escritura (POST/PUT/PATCH/DELETE) por IP y minuto. 0 desactiva el límite."),
+    Ajuste("seguridad", "escrituras_pesadas_por_hora", ENTERO, 30, env="ESCRITURAS_PESADAS_POR_HORA",
+           minimo=0, maximo=100_000,
+           descripcion="Tope por IP y hora de backup/restore/importación, que copian bases enteras. 0 lo desactiva."),
+    Ajuste("seguridad", "csp_activada", BOOLEANO, True, env="CSP_ACTIVADA",
+           descripcion="Envía la cabecera Content-Security-Policy. Desactívalo solo para depurar."),
+    Ajuste("seguridad", "csp_origenes_scripts", LISTA, (),
+           env="CSP_ORIGENES_SCRIPTS", vaciarEsExplicito=True,
+           descripcion="Orígenes externos permitidos en script-src. Vacío: Chart.js se sirve desde js/vendor/."),
 
     # [atajo] — endpoints del Atajo de iOS
     Ajuste("atajo", "activado", BOOLEANO, True, env="MOVIMIENTOS_ACTIVADO",
@@ -184,6 +195,13 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("mercado", "snapshot_intervalo_minimo_segundos", ENTERO, 60, env="MERCADO_SNAPSHOT_MIN",
            minimo=1, maximo=86400,
            descripcion="Suelo del intervalo entre snapshots, por debajo de lo que pida Ajustes."),
+    Ajuste("mercado", "snapshot_servidor", BOOLEANO, True, env="MERCADO_SNAPSHOT_SERVIDOR",
+           descripcion="Hilo que guarda snapshots sin navegador abierto. Al apagarlo, el histórico "
+                       "vuelve a depender de que la web esté abierta."),
+    Ajuste("mercado", "snapshot_servidor_gracia_segundos", ENTERO, 120,
+           env="MERCADO_SNAPSHOT_GRACIA", minimo=0, maximo=3600,
+           descripcion="Margen que espera ese hilo tras cada hueco horario para que, si hay una "
+                       "pestaña abierta, guarde ella el punto y no se pidan las cotizaciones dos veces."),
 
     # [proveedores]
     Ajuste("proveedores", "timeout_segundos", DECIMAL, 10.0, env="PROVEEDORES_TIMEOUT",
@@ -312,6 +330,22 @@ def metodoHashPassword() -> str:
     return f"pbkdf2:sha256:{obtener('seguridad.hash_iteraciones')}"
 
 
+def escriturasPorMinuto() -> int:
+    return obtener("seguridad.escrituras_por_minuto")
+
+
+def escriturasPesadasPorHora() -> int:
+    return obtener("seguridad.escrituras_pesadas_por_hora")
+
+
+def cspActivada() -> bool:
+    return obtener("seguridad.csp_activada")
+
+
+def cspOrigenesScripts() -> list:
+    return obtener("seguridad.csp_origenes_scripts")
+
+
 def maxCopiasBackup() -> int:
     return obtener("backups.max_copias")
 
@@ -338,6 +372,14 @@ def maxPeticionesParalelas() -> int:
 
 def snapshotIntervaloMinimo() -> int:
     return obtener("mercado.snapshot_intervalo_minimo_segundos")
+
+
+def snapshotServidorActivo() -> bool:
+    return obtener("mercado.snapshot_servidor")
+
+
+def snapshotServidorGracia() -> int:
+    return obtener("mercado.snapshot_servidor_gracia_segundos")
 
 
 def proveedorTimeout() -> float:

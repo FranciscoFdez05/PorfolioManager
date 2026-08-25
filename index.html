@@ -7,20 +7,43 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Portfolio Manager</title>
-    <link rel="stylesheet" href="css/variables.css?v=20260511d">
-    <link rel="stylesheet" href="css/base.css?v=20260613a">
-    <link rel="stylesheet" href="css/components.css?v=20260813a">
-    <link rel="stylesheet" href="css/pages.css?v=20260813c">
-    <link rel="stylesheet" href="css/themes.css?v=20260813a">
-    <script>
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <!-- css/pages.css llegó a 7.022 líneas con dieciséis pantallas dentro. Está
+         troceado en css/pages/, y el orden de estos <link> es exactamente el que
+         tenían las secciones en aquel fichero: la cascada no cambia. Al añadir
+         una hoja nueva, colócala en el punto que le corresponda, no al final. -->
+    <link rel="stylesheet" href="css/pages/herramientas.css">
+    <link rel="stylesheet" href="css/pages/dividendos.css">
+    <link rel="stylesheet" href="css/pages/operaciones.css">
+    <link rel="stylesheet" href="css/pages/gastos.css">
+    <link rel="stylesheet" href="css/pages/ingresos.css">
+    <link rel="stylesheet" href="css/pages/calendario-dividendos.css">
+    <link rel="stylesheet" href="css/pages/metricas.css">
+    <link rel="stylesheet" href="css/pages/activos.css">
+    <link rel="stylesheet" href="css/pages/bonos.css">
+    <link rel="stylesheet" href="css/pages/mercado-privado.css">
+    <link rel="stylesheet" href="css/pages/ajustes.css">
+    <link rel="stylesheet" href="css/pages/trading-journal.css">
+    <link rel="stylesheet" href="css/pages/settings-overlay.css">
+    <link rel="stylesheet" href="css/pages/ingresos-kpi.css">
+    <link rel="stylesheet" href="css/pages/ahorro.css">
+    <link rel="stylesheet" href="css/pages/ventas.css">
+    <link rel="stylesheet" href="css/themes.css">
+    <!-- El marcador del atributo nonce lo sustituye serveIndex por el valor de
+         esta petición (core/csp.py). Es el único script en línea de la
+         aplicación, y va con nonce para que la Content-Security-Policy no tenga
+         que abrirse con 'unsafe-inline'. -->
+    <script nonce="__CSP_NONCE__">
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
     </script>
     <!-- Debe ir antes que cualquier script que llame a fetch() -->
-    <script src="js/core/csrf.js?v=20260730a"></script>
+    <script src="js/core/csrf.js"></script>
     <!-- api.js envuelve fetch DESPUÉS de csrf.js (sesión caducada, timeouts);
          dom.js expone escapeHtml y los helpers que usan todos los módulos. -->
-    <script src="js/core/api.js?v=20260802a"></script>
-    <script src="js/core/dom.js?v=20260802a"></script>
+    <script src="js/core/api.js"></script>
+    <script src="js/core/dom.js"></script>
 </head>
 <body>
 
@@ -946,7 +969,7 @@
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Evolución del portfolio</div>
-                        <div class="ajustesSectionDesc">Cada cuánto se guarda un punto en el gráfico de evolución histórica.</div>
+                        <div class="ajustesSectionDesc">Cada cuánto se guarda un punto en el gráfico de evolución histórica. El servidor los guarda también con la web cerrada.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
@@ -960,6 +983,19 @@
                     <button class="ajustesRefreshBtn" data-minutes="1440" type="button">1 día</button>
                 </div>
                 <span id="ajustesSnapshotMsg" class="ajustesStatusMsg ajustesInlineMsg"></span>
+
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesSnapshotAlcance">Portfolios que guarda el servidor</label>
+                    <select id="ajustesSnapshotAlcance" class="ajustesSelect" data-no-custom>
+                        <option value="activo">Solo el portfolio activo</option>
+                        <option value="todos">Todos los portfolios</option>
+                    </select>
+                    <div class="ajustesSectionDesc">Con «todos» se pide cotización para los activos de cada portfolio en cada punto: multiplica el consumo de la API.</div>
+                </div>
+                <div class="ajustesActions">
+                    <span id="ajustesSnapshotAlcanceMsg" class="ajustesStatusMsg"></span>
+                </div>
             </div>
 
             <div class="ajustesSection">
@@ -1271,6 +1307,27 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7h11M11 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 13H6M9 16l-3-3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Tipos de cambio históricos</div>
+                        <div class="ajustesSectionDesc">Guarda el tipo de cambio del día de cada operación en divisa extranjera. Sin él, el resultado de un activo en dólares mezcla en un solo número lo que hizo el activo y lo que hizo la divisa.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <span class="ajustesLabel">Operaciones sin tipo de cambio</span>
+                    <span class="ajustesValorInline" id="ajustesFxPendientes">—</span>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesRellenarFxBtn" class="primaryButton" type="button" data-no-autohide="true">Completar histórico</button>
+                    <span id="ajustesFxMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
                         <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h12a1 1 0 0 1 1 1v2H3V5a1 1 0 0 1 1-1ZM3 7h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 11h4M10 9v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                     </div>
                     <div class="ajustesSectionHeaderText">
@@ -1422,31 +1479,31 @@
     </div><!-- /.sttContent -->
 </div><!-- /.sttOverlay -->
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="js/core/app-core.js?v=20260813a"></script>
-<script src="js/cartera/assets.js?v=20260805a"></script>
-<script src="js/finanzas/intereses.js?v=20260501a"></script>
-<script src="js/finanzas/dividendos.js?v=20260802b"></script>
-<script src="js/finanzas/gastos.js?v=20260809a"></script>
-<script src="js/finanzas/ingresos.js?v=20260809a"></script>
-<script src="js/finanzas/categorias.js?v=20260808a"></script>
-<script src="js/finanzas/ventas.js?v=20260423a"></script>
-<script src="js/cripto/transacciones.js?v=20260423a"></script>
-<script src="js/cripto/stablecoins.js?v=20260802b"></script>
-<script src="js/cripto/operaciones.js?v=20260813b"></script>
-<script src="js/cripto/trading-journal.js?v=20260802b"></script>
-<script src="js/cripto/staking.js?v=20260515b"></script>
-<script src="js/cripto/earn.js?v=20260515b"></script>
-<script src="js/cripto/conversiones.js?v=20260802b"></script>
-<script src="js/analisis/herramientas.js?v=20260812a"></script>
-<script src="js/finanzas/bonos.js?v=20260802b"></script>
-<script src="js/analisis/metricas.js?v=20260813a"></script>
-<script src="js/ajustes/ajustes.js?v=20260813a"></script>
-<script src="js/core/shared-utils.js?v=20260813b"></script>
-<script src="js/analisis/heatmap.js?v=20260505b"></script>
-<script src="js/analisis/seguimiento.js?v=20260518c"></script>
-<script src="js/cartera/portfolios.js?v=20260511b"></script>
-<script src="js/cartera/private-market.js?v=20260614a"></script>
-<script src="js/finanzas/ahorro.js?v=20260703a"></script>
+<script src="js/vendor/chart.umd.min.js?v=4.4.4"></script>
+<script src="js/core/app-core.js"></script>
+<script src="js/cartera/assets.js"></script>
+<script src="js/finanzas/intereses.js"></script>
+<script src="js/finanzas/dividendos.js"></script>
+<script src="js/finanzas/gastos.js"></script>
+<script src="js/finanzas/ingresos.js"></script>
+<script src="js/finanzas/categorias.js"></script>
+<script src="js/finanzas/ventas.js"></script>
+<script src="js/cripto/transacciones.js"></script>
+<script src="js/cripto/stablecoins.js"></script>
+<script src="js/cripto/operaciones.js"></script>
+<script src="js/cripto/trading-journal.js"></script>
+<script src="js/cripto/staking.js"></script>
+<script src="js/cripto/earn.js"></script>
+<script src="js/cripto/conversiones.js"></script>
+<script src="js/analisis/herramientas.js"></script>
+<script src="js/finanzas/bonos.js"></script>
+<script src="js/analisis/metricas.js"></script>
+<script src="js/ajustes/ajustes.js"></script>
+<script src="js/core/shared-utils.js"></script>
+<script src="js/analisis/heatmap.js"></script>
+<script src="js/analisis/seguimiento.js"></script>
+<script src="js/cartera/portfolios.js"></script>
+<script src="js/cartera/private-market.js"></script>
+<script src="js/finanzas/ahorro.js"></script>
 </body>
 </html>
