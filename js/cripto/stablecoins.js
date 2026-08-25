@@ -162,29 +162,23 @@ function getEnabledStablecoinSymbols(payload = currentStablecoinsData) {
     return normalized.enabledSymbols
 }
 
-// ⚠ Colisión de nombre sin resolver. js/cripto/operaciones.js define otra
-// función global con este mismo nombre y una implementación distinta: la suya
-// filtra el símbolo contra la lista de stablecoins habilitadas y devuelve ""
-// si no está, mientras que esta se limita a normalizar la cadena. index.html
-// carga stablecoins.js ANTES que operaciones.js, así que en el navegador gana
-// la de operaciones.js y las llamadas de este fichero (líneas 188 y 283)
-// ejecutan aquella, no esta. Lo detectó ESLint al montarlo; no se unifica aquí
-// porque elegir cuál de las dos es la correcta cambia importes en pantalla y
-// esa decisión no es del linter.
-// eslint-disable-next-line no-redeclare
 // `getOperationStablecoinSymbol` vive en js/cripto/operaciones.js.
 //
-// Aquí había una segunda definición del mismo nombre, con otro criterio: esta
-// normalizaba el símbolo y aquella lo filtra contra la lista de stablecoins
-// activadas. Como los dos ficheros son scripts clásicos y operaciones.js se
-// carga después, su definición machacaba a esta y las dos llamadas de este
-// módulo ya usaban la de allí: la de aquí era código muerto que solo servía
-// para hacer creer que este fichero se comportaba de otra manera.
+// Aquí había una segunda definición del mismo nombre con otro criterio —esta
+// solo normalizaba la cadena; aquella filtra además contra la lista de
+// stablecoins habilitadas— y la colisión estaba anotada y silenciada con un
+// eslint-disable, dejando pendiente la decisión de cuál era la buena, porque
+// esa elección cambia importes en pantalla.
 //
-// Se ha borrado en vez de renombrarla porque las filas que se le pasan desde
-// aquí son `operationsRows`, o sea las del módulo de operaciones, y filtrarlas
-// por las stablecoins activadas es lo que corresponde. `tests-js/globales.test.js`
-// impide que vuelva a aparecer una colisión como esta.
+// Se resuelve quedándose con la de operaciones.js. No es una preferencia: es
+// la que el navegador ya ejecutaba en los dos ficheros, porque ambos son
+// scripts clásicos y aquel se carga después, así que su definición machacaba a
+// esta. Borrar la de aquí no cambia nada en pantalla, solo deja de hacer creer
+// que este módulo se comportaba de otra manera. Y encaja con el argumento: lo
+// que se le pasa desde aquí son `operationsRows`, filas del módulo de
+// operaciones, y filtrarlas por las habilitadas es lo suyo.
+//
+// `tests-js/globales.test.js` vigila que no reaparezca una colisión así.
 
 function getStablecoinsLockedQuoteAmount(row = {}) {
     const total = parseLooseNumber(row.total) || 0

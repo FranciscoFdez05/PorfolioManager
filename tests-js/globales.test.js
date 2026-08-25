@@ -46,9 +46,7 @@ function rutaRelativa(ruta) {
 function declaracionesGlobales(ruta) {
     const fuente = readFileSync(ruta, "utf-8")
     const nombres = []
-    for (const coincidencia of fuente.matchAll(
-        /^(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)/gm
-    )) {
+    for (const coincidencia of fuente.matchAll(/^(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=)/gm)) {
         nombres.push(coincidencia[1] || coincidencia[2])
     }
     return nombres

@@ -19,18 +19,18 @@
 ;(function () {
     "use strict"
 
-    var DEFAULT_TIMEOUT_MS = 20000
+    const DEFAULT_TIMEOUT_MS = 20000
     // Solo se reintentan peticiones idempotentes: repetir un POST podría
     // duplicar filas.
-    var IDEMPOTENT_METHODS = { GET: 1, HEAD: 1 }
-    var RETRYABLE_STATUS = { 502: 1, 503: 1, 504: 1 }
-    var DEFAULT_RETRIES = 1
+    const IDEMPOTENT_METHODS = { GET: 1, HEAD: 1 }
+    const RETRYABLE_STATUS = { 502: 1, 503: 1, 504: 1 }
+    const DEFAULT_RETRIES = 1
 
-    var redirectingToLogin = false
+    let redirectingToLogin = false
 
     function ApiError(message, options) {
         options = options || {}
-        var error = Error.call(this, message)
+        const error = Error.call(this, message)
         this.name = "ApiError"
         this.message = message
         this.stack = error.stack
@@ -49,7 +49,7 @@
     function goToLogin() {
         if (redirectingToLogin) return
         redirectingToLogin = true
-        var next = encodeURIComponent(window.location.pathname + window.location.search)
+        const next = encodeURIComponent(window.location.pathname + window.location.search)
         window.location.assign("/login?next=" + next)
     }
 
@@ -69,7 +69,7 @@
                 if (!text) return null
                 try {
                     return JSON.parse(text)
-                } catch (e) {
+                } catch {
                     return { error: text.slice(0, 200) }
                 }
             })
@@ -79,7 +79,7 @@
     }
 
     function buildHttpError(response, body) {
-        var message = (body && (body.error || body.message)) || "Error " + response.status + " del servidor"
+        const message = (body && (body.error || body.message)) || "Error " + response.status + " del servidor"
         return new ApiError(message, {
             status: response.status,
             requestId: (body && body.requestId) || response.headers.get("X-Request-Id") || "",
@@ -90,11 +90,11 @@
 
     function request(url, options) {
         options = options || {}
-        var method = (options.method || "GET").toUpperCase()
-        var timeout = options.timeout != null ? options.timeout : DEFAULT_TIMEOUT_MS
-        var retries = options.retries != null ? options.retries : IDEMPOTENT_METHODS[method] ? DEFAULT_RETRIES : 0
+        const method = (options.method || "GET").toUpperCase()
+        const timeout = options.timeout != null ? options.timeout : DEFAULT_TIMEOUT_MS
+        const retries = options.retries != null ? options.retries : IDEMPOTENT_METHODS[method] ? DEFAULT_RETRIES : 0
 
-        var init = { method: method, headers: {} }
+        const init = { method: method, headers: {} }
         Object.keys(options.headers || {}).forEach(function (key) {
             init.headers[key] = options.headers[key]
         })
@@ -109,9 +109,9 @@
         }
 
         function attempt(remaining, delay) {
-            var controller = new AbortController()
-            var timedOut = false
-            var timer = setTimeout(function () {
+            const controller = new AbortController()
+            let timedOut = false
+            const timer = setTimeout(function () {
                 timedOut = true
                 controller.abort()
             }, timeout)
@@ -155,7 +155,7 @@
                         if (!text) return null
                         try {
                             return JSON.parse(text)
-                        } catch (e) {
+                        } catch {
                             throw new ApiError("El servidor devolvió una respuesta no válida", {
                                 status: response.status,
                                 requestId: response.headers.get("X-Request-Id") || ""
@@ -168,7 +168,7 @@
 
                     if (error instanceof ApiError) throw error
 
-                    var aborted = error && error.name === "AbortError"
+                    const aborted = error && error.name === "AbortError"
                     if (aborted && !timedOut) {
                         throw error // cancelación deliberada de quien llama
                     }
@@ -190,7 +190,7 @@
         return attempt(retries, 400)
     }
 
-    var Api = {
+    const Api = {
         ApiError: ApiError,
         request: request,
         get: function (url, options) {
@@ -222,11 +222,11 @@
     // Los módulos existentes hacen `fetch("/api/…")` sin comprobar el 401. Sin
     // esto, una sesión caducada les rompe el `.json()` con un error opaco.
     // Interceptar aquí cubre las ~165 llamadas de una vez.
-    var wrappedFetch = window.fetch.bind(window)
+    const wrappedFetch = window.fetch.bind(window)
     window.fetch = function (input, init) {
         return wrappedFetch(input, init).then(function (response) {
             if (response.status === 401) {
-                var url = typeof input === "string" ? input : (input && input.url) || ""
+                const url = typeof input === "string" ? input : (input && input.url) || ""
                 if (url.indexOf("/api/") !== -1) goToLogin()
             }
             return response

@@ -536,12 +536,12 @@ function applySidebarState(sideWrapper, toggleButton) {
     }
 }
 
-let dividendosAutosaveTimeout = null
+const dividendosAutosaveTimeout = null
 let currentAssetId = null
-let assetModalState = null
-let confirmModalState = null
-let editAssetModalState = null
-let draggedAssetId = null
+const assetModalState = null
+const confirmModalState = null
+const editAssetModalState = null
+const draggedAssetId = null
 const PAGE_HTML_VERSION = "20260813a"
 
 window._viewAllPortfolios = localStorage.getItem("viewAllPortfolios") === "1"

@@ -10,37 +10,37 @@
 ;(function () {
     "use strict"
 
-    var SAFE_METHODS = { GET: 1, HEAD: 1, OPTIONS: 1, TRACE: 1 }
+    const SAFE_METHODS = { GET: 1, HEAD: 1, OPTIONS: 1, TRACE: 1 }
 
     function readCsrfToken() {
-        var match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/)
+        const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/)
         return match ? decodeURIComponent(match[1]) : ""
     }
 
     function isSameOrigin(url) {
         try {
             return new URL(url, window.location.href).origin === window.location.origin
-        } catch (e) {
+        } catch {
             // URL relativa que no se puede parsear: se trata como propia
             return true
         }
     }
 
-    var originalFetch = window.fetch.bind(window)
+    const originalFetch = window.fetch.bind(window)
 
     window.fetch = function (input, init) {
         init = init || {}
-        var url = typeof input === "string" ? input : (input && input.url) || ""
-        var method = (init.method || (input && input.method) || "GET").toUpperCase()
+        const url = typeof input === "string" ? input : (input && input.url) || ""
+        const method = (init.method || (input && input.method) || "GET").toUpperCase()
 
         // Nunca adjuntar el token a destinos externos: se filtraría a terceros
         if (SAFE_METHODS[method] || !isSameOrigin(url)) {
             return originalFetch(input, init)
         }
 
-        var token = readCsrfToken()
+        const token = readCsrfToken()
         if (token) {
-            var headers = new Headers(init.headers || (input && input.headers) || {})
+            const headers = new Headers(init.headers || (input && input.headers) || {})
             headers.set("X-CSRF-Token", token)
             init = Object.assign({}, init, { headers: headers })
         }

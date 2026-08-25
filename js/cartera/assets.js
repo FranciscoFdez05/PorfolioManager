@@ -2258,12 +2258,12 @@ function parseAssetOperationDate(value) {
     return new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}T00:00:00`).getTime()
 }
 
-function getRowGrossAmount(row, assetType = "") {
+function getRowGrossAmount(row) {
     const capitalInvertidoBruto = parseLooseNumber(row.capitalInvertidoBruto || "")
     return capitalInvertidoBruto || 0
 }
 
-function getRowTotalCostForLot(row, assetType = "") {
+function getRowTotalCostForLot(row) {
     const capitalInvertidoBruto = parseLooseNumber(row.capitalInvertidoBruto || "")
     if (capitalInvertidoBruto !== null && capitalInvertidoBruto > 0) {
         return capitalInvertidoBruto
@@ -2364,7 +2364,7 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
                 continue
             }
 
-            let totalCost = getRowTotalCostForLot(row, asset.type)
+            let totalCost = getRowTotalCostForLot(row)
 
             if (isCryptoAssetType(asset.type)) {
                 totalCost = await convertCryptoRowMoneyToAssetCurrency(totalCost, row, targetCurrency)
@@ -2817,10 +2817,6 @@ function renderAssetTablePage(asset) {
     const contentArea = document.getElementById("dynamicContent")
     const primaryRows = getPrimaryAssetRows(asset)
     const conversionRows = getAssetConversionRows(asset)
-    const currentCurrency = String(asset.currency || "EUR")
-        .trim()
-        .toUpperCase()
-    const targetCurrency = currentCurrency === "EUR" ? "USD" : "EUR"
     const isCrypto = isCryptoAssetType(asset.type)
     const isEtf =
         String(asset.type || "")
@@ -3103,10 +3099,6 @@ function updateAssetTableTotals() {
     const assetPage = document.querySelector(".assetTablePage")
     const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
     const assetType = assetPage?.dataset.assetType || "acciones"
-    const isEtf =
-        String(assetType || "")
-            .trim()
-            .toLowerCase() === "etfs"
 
     rowElements.forEach((rowElement) => {
         const rowCurrency = getAssetRowCurrency(rowElement, assetCurrency)
@@ -3116,7 +3108,7 @@ function updateAssetTableTotals() {
             capitalInvertidoBruto: rowElement.querySelector('[data-field="capitalInvertidoBruto"]')?.textContent || "",
             costeAnual: rowElement.querySelector('[data-field="costeAnual"]')?.textContent || ""
         }
-        const bruto = getRowGrossAmount(rowData, assetType)
+        const bruto = getRowGrossAmount(rowData)
         const comisionesCell = rowElement.querySelector('[data-field="comisiones"], [data-field="comisionesFiat"]')
         const comisiones =
             parseLooseNumber(comisionesCell?.querySelector("input")?.value || comisionesCell?.textContent || "") || 0
@@ -3586,7 +3578,6 @@ function openAssetRowModal(rowIndex) {
 
     const assetPage = document.querySelector(".assetTablePage")
     const assetType = assetPage?.dataset.assetType || "acciones"
-    const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
     const isCrypto = isCryptoAssetType(assetType)
     const isEtf =
         String(assetType || "")
@@ -4278,7 +4269,6 @@ async function submitAssetModal() {
 }
 
 function initEditAssetModal() {
-    const editAssetModalOverlay = document.getElementById("editAssetModalOverlay")
     const editAssetNameInput = document.getElementById("editAssetNameInput")
     const editAssetTickerInput = document.getElementById("editAssetTickerInput")
     const confirmEditAssetModalButton = document.getElementById("confirmEditAssetModalBtn")
@@ -4630,7 +4620,6 @@ function avBuildCard(asset) {
     const provider = String(
         asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "") || ""
     ).toUpperCase()
-    const ticker = asset.marketSymbol || asset.finnhubSymbol || ""
 
     const m = asset._metrics
     const hasM = !!m
@@ -4901,7 +4890,7 @@ function decodeTVTicker(raw) {
     if (!s) return ""
     try {
         return decodeURIComponent(s)
-    } catch (e) {
+    } catch {
         return s
     }
 }

@@ -134,9 +134,7 @@ describe("errores del servidor", () => {
 
     it("un cuerpo que no es JSON no rompe el manejo de errores", async () => {
         // Un proxy por delante puede devolver una página HTML de error.
-        fetchFalso.mockResolvedValue(
-            respuesta({ status: 502, body: "<html>Bad Gateway</html>" })
-        )
+        fetchFalso.mockResolvedValue(respuesta({ status: 502, body: "<html>Bad Gateway</html>" }))
 
         const error = await Api.post("/api/cosas", {}).catch((e) => e)
         expect(error.status).toBe(502)
@@ -144,9 +142,7 @@ describe("errores del servidor", () => {
     })
 
     it("describeError añade la referencia para poder buscarla en el log", async () => {
-        fetchFalso.mockResolvedValue(
-            respuesta({ status: 500, body: '{"error":"Fallo interno","requestId":"xyz789"}' })
-        )
+        fetchFalso.mockResolvedValue(respuesta({ status: 500, body: '{"error":"Fallo interno","requestId":"xyz789"}' }))
 
         const error = await Api.get("/api/cosas", { retries: 0 }).catch((e) => e)
         expect(Api.describeError(error)).toBe("Fallo interno (ref. xyz789)")

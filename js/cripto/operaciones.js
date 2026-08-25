@@ -284,10 +284,10 @@ function getOperationsEnabledStablecoinSymbols() {
     return normalizeOperationsStablecoinsPayload(operationsStablecoinsData).enabledSymbols
 }
 
-// ⚠ Ver la nota en js/cripto/stablecoins.js: allí hay otra función global con
-// este mismo nombre y distinto comportamiento. Esta es la que gana en el
-// navegador, por el orden de los <script> en index.html.
-// eslint-disable-next-line no-redeclare
+// Única definición desde que se borró la gemela de js/cripto/stablecoins.js.
+// Aquella normalizaba el símbolo sin más; esta lo filtra además contra la lista
+// de stablecoins habilitadas, y era la que el navegador ejecutaba en los dos
+// ficheros. La nota completa está en stablecoins.js, junto a sus llamadas.
 function getOperationStablecoinSymbol(row = {}) {
     const explicitSymbol = String(row.stablecoinSymbol || "")
         .trim()

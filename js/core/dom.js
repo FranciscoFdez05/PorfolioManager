@@ -7,7 +7,7 @@
 ;(function () {
     "use strict"
 
-    var HTML_ESCAPES = {
+    const HTML_ESCAPES = {
         "&": "&amp;",
         "<": "&lt;",
         ">": "&gt;",
@@ -42,10 +42,10 @@
      * marcado aunque el valor venga del usuario.
      */
     function el(tag, attrs, children) {
-        var node = document.createElement(tag)
+        const node = document.createElement(tag)
 
         Object.keys(attrs || {}).forEach(function (key) {
-            var value = attrs[key]
+            const value = attrs[key]
             if (value == null || value === false) return
             if (key === "class" || key === "className") {
                 node.className = String(value)
@@ -87,7 +87,7 @@
     // ── Avisos no bloqueantes ────────────────────────────────────────────────
     // Muchos errores acababan solo en console.error: el guardado fallaba y el
     // usuario seguía trabajando creyendo que se había guardado.
-    var TOAST_STYLES = [
+    const TOAST_STYLES = [
         ".appToastHost{position:fixed;right:16px;bottom:16px;z-index:9999;",
         "display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:min(380px,90vw)}",
         ".appToast{pointer-events:auto;padding:10px 14px;border-radius:8px;font-size:14px;",
@@ -100,11 +100,11 @@
         ".appToast.isWarning{border-left-color:#f5a524}"
     ].join("")
 
-    var toastHost = null
+    let toastHost = null
 
     function ensureToastHost() {
         if (toastHost && document.body.contains(toastHost)) return toastHost
-        var style = document.getElementById("appToastStyles")
+        let style = document.getElementById("appToastStyles")
         if (!style) {
             style = document.createElement("style")
             style.id = "appToastStyles"
@@ -125,8 +125,8 @@
         options = options || {}
         if (!document.body) return null
 
-        var host = ensureToastHost()
-        var toast = document.createElement("div")
+        const host = ensureToastHost()
+        const toast = document.createElement("div")
         toast.className = "appToast"
         if (options.type === "error") toast.classList.add("isError")
         else if (options.type === "success") toast.classList.add("isSuccess")
@@ -140,7 +140,7 @@
             toast.classList.add("isVisible")
         })
 
-        var duration = options.duration != null ? options.duration : options.type === "error" ? 6000 : 3500
+        const duration = options.duration != null ? options.duration : options.type === "error" ? 6000 : 3500
         setTimeout(function () {
             toast.classList.remove("isVisible")
             setTimeout(function () {
@@ -154,7 +154,7 @@
     /** Muestra un error de forma consistente y lo deja en consola para depurar. */
     function showError(message, error) {
         if (error) console.error(message, error)
-        var detail = error && window.Api ? window.Api.describeError(error) : ""
+        const detail = error && window.Api ? window.Api.describeError(error) : ""
         showToast(detail && detail !== message ? message + ": " + detail : message, { type: "error" })
     }
 

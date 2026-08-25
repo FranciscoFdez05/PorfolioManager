@@ -121,7 +121,11 @@ const reglas = {
             args: "after-used",
             argsIgnorePattern: "^_",
             varsIgnorePattern: "^_",
-            caughtErrorsIgnorePattern: "^_"
+            caughtErrorsIgnorePattern: "^_",
+            // `const { sortIndex, ...row } = fila` es la forma idiomática de
+            // quitar una clave de un objeto: la variable sobra a propósito, y
+            // marcarla empuja a escribir algo peor para callar al linter.
+            ignoreRestSiblings: true
         }
     ],
     "no-dupe-keys": "error",

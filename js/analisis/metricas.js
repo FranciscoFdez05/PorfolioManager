@@ -602,7 +602,6 @@ function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], me
             }
         })
     } else {
-        const total = rawValues.reduce((a, b) => a + Math.abs(b), 0)
         mCreateChart("mChartTipos", {
             type: "bar",
             data: {
@@ -1226,7 +1225,7 @@ function mDrawDivMensualChart(rows, year, dYear, dMonth, colorMap = {}) {
 
     // Register custom tooltip positioner centered on each bar segment
     if (window.Chart && !Chart.Tooltip.positioners.segCenter) {
-        Chart.Tooltip.positioners.segCenter = function (elements, eventPos) {
+        Chart.Tooltip.positioners.segCenter = function (elements, _eventPos) {
             if (!elements.length) return false
             const el = elements[0].element
             const cx = el.x
@@ -3173,11 +3172,6 @@ function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
     const totalAhorro = ahorroMonthly.reduce((s, v) => s + v, 0)
 
     const objAhorro = Number(ahorroConfig?.objetivoAhorro) || 30
-    const objText =
-        avgTasa >= objAhorro
-            ? `${avgTasa.toFixed(1)}% — +${(avgTasa - objAhorro).toFixed(1)} pp sobre objetivo (${objAhorro}%)`
-            : `${avgTasa.toFixed(1)}% — ${(avgTasa - objAhorro).toFixed(1)} pp bajo objetivo (${objAhorro}%)`
-
     mSetKpi("mkpiTasaAhorro", formatPercent(avgTasa), avgTasa >= 0 ? "mPositive" : "mNegative")
     mSetKpi("mkpiAhorroTotal", formatEuro(totalAhorro), totalAhorro >= 0 ? "mPositive" : "mNegative")
 
@@ -4181,7 +4175,7 @@ function mRenderTradingDireccion(rows) {
     const statsEl = document.getElementById("mTradingDireccionStats")
     if (!statsEl) return
 
-    function dirStats(subset, label, color) {
+    function dirStats(subset, label) {
         const profits = subset.filter((r) => r.resultado === "PROFIT")
         const wr = subset.length > 0 ? ((profits.length / subset.length) * 100).toFixed(1) : "0.0"
         const ganMedia =
@@ -4215,8 +4209,8 @@ function mRenderTradingDireccion(rows) {
                 </tr>
             </thead>
             <tbody>
-                ${dirStats(longs, "LONG", "#2ecc71")}
-                ${dirStats(shorts, "SHORT", "#e74c3c")}
+                ${dirStats(longs, "LONG")}
+                ${dirStats(shorts, "SHORT")}
             </tbody>
         </table>
     `
@@ -4745,7 +4739,6 @@ async function mRenderEvolucion(range, mode) {
     const values = points.map((p) => p.v)
     const invested = points.map((p) => p.i)
     const span = points.length > 1 ? points[points.length - 1].ts - points[0].ts : 0
-    const isLong = span > 7 * 86400
     const isPct = mode === "pct"
 
     const dispValues = isPct
@@ -4924,9 +4917,8 @@ async function mRenderEvolucion(range, mode) {
                 </div>`
         }
 
-        // Posición relativa al canvas
-        const canvasRect = chart.canvas.getBoundingClientRect()
-        const wrapRect = chart.canvas.parentElement.getBoundingClientRect()
+        // Posición relativa al área del gráfico, no al canvas: así el
+        // tooltip no se sale por el borde cuando hay ejes anchos.
         const xPos = tooltip.caretX
         const elW = 200
         const left = xPos + elW + 10 > chart.chartArea.right ? xPos - elW - 12 : xPos + 12

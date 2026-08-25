@@ -139,7 +139,7 @@ function renderAhorroView() {
 
     renderAhorroKpis(totalIngresos, totalGastos, ahorroReal, tasaAhorro)
     renderAhorroObjetivo(totalIngresos, ahorroReal, tasaAhorro)
-    renderAhorroCategorias(gastosByTipo, totalIngresos, totalGastos)
+    renderAhorroCategorias(gastosByTipo, totalIngresos)
     renderAhorroDonut(gastosByTipo, totalGastos)
     renderAhorroSplitDonut(totalIngresos, totalGastos, ahorroReal, tasaAhorro)
 }
@@ -353,10 +353,6 @@ function renderAhorroSplitDonut(totalIngresos, totalGastos, ahorroReal, tasaAhor
         return
     }
 
-    const gastosPct = Math.min(totalGastos / totalIngresos, 1)
-    const ahorroPct = Math.max(ahorroReal / totalIngresos, 0)
-    const deficitPct = ahorroReal < 0 ? Math.min(Math.abs(ahorroReal) / totalIngresos, 1) : 0
-
     const segments =
         ahorroReal >= 0
             ? [
@@ -395,10 +391,9 @@ function renderAhorroSplitDonut(totalIngresos, totalGastos, ahorroReal, tasaAhor
         .join("")
 }
 
-function renderAhorroCategorias(gastosByTipo, totalIngresos, totalGastos) {
+function renderAhorroCategorias(gastosByTipo, totalIngresos) {
     const list = document.getElementById("ahorroPresupuestoList")
     const hint = document.getElementById("ahorroPresupuestoHint")
-    const empty = document.getElementById("ahorroEmptyState")
     if (!list) return
 
     const presupuestoTipos = Object.keys(ahorroConfig.presupuesto || {}).filter(

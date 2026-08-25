@@ -552,7 +552,6 @@ function segMergeAndRender(portfolioAssets) {
         ...portfolioAssets.map((a) => (a.name || "").toLowerCase()).filter(Boolean),
         ...portfolioAssets.map((a) => (a.symbol || "").toLowerCase()).filter(Boolean)
     ])
-    const portfolioNames = new Set(portfolioAssets.map((a) => (a.name || "").toLowerCase()))
 
     const customItems = customs
         .filter(

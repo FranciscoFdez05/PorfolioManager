@@ -1,5 +1,5 @@
 let _bonosCurrentFilter = "all"
-let _bonosAutosaveTimer = null
+const _bonosAutosaveTimer = null
 
 const _TIPO_LABELS = {
     gubernamental: "Gubernamental",
