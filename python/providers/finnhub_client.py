@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 from urllib.error import HTTPError, URLError
 
+from core import dinero
 from providers import (
     compact_symbol as _compact_symbol,
     fetch_json,
@@ -413,12 +414,19 @@ def fetch_exchange_rate(source_currency, target_currency, timeout=None):
 
 
 def convert_amount(value, source_currency, target_currency, timeout=None):
+    """Convierte un importe de divisa. Devuelve `Decimal`, no `float`.
+
+    El tipo de cambio llega de la API como float —ahí no hay elección— pero la
+    multiplicación se hace en Decimal: el resultado acaba guardado en una
+    columna de importes, y `float(value) * rate` metía la cola binaria del
+    producto en el dato almacenado.
+    """
     rate, error = fetch_exchange_rate(source_currency, target_currency, timeout=timeout)
 
     if error:
         return None, error
 
-    return float(value) * rate, None
+    return dinero.aDecimal(value, "importe a convertir") * dinero.aDecimal(rate, "tipo de cambio"), None
 
 
 def convert_quote_currency(quote, target_currency, timeout=None):

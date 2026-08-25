@@ -1,3 +1,4 @@
+from core import dinero
 from providers.finnhub_client import convert_amount
 from stores.app_data import (
     readAlphaVantageApiKey,
@@ -80,29 +81,30 @@ def call_alpha_vantage_with_fallbacks(callback):
 
 
 def parse_loose_number(value):
-    text = str(value or "").strip()
+    """Importe de una columna TEXT a `Decimal`, o `None` si no se entiende.
 
-    if not text:
-        return None
+    Devuelve `Decimal` y no `float` porque lo que sale de aquí se acumula: los
+    totales de invertido y de participaciones de `/api/activos/rendimiento-batch`
+    se sumaban en coma flotante fila a fila. La conversión es la de
+    `core.dinero`, la única del proyecto.
 
-    cleaned = "".join(character for character in text if character.isdigit() or character in ",.-")
-
-    if not cleaned:
-        return None
-
-    if "," in cleaned and "." in cleaned:
-        normalized = cleaned.replace(".", "").replace(",", ".")
-    else:
-        normalized = cleaned.replace(",", ".")
-
-    try:
-        return float(normalized)
-    except ValueError:
-        return None
+    Antes descartaba cualquier carácter que no fuera dígito, coma, punto o
+    signo, de modo que "12abc34" se convertía en 1234 sin decir nada. Ahora eso
+    devuelve `None` y quien llama decide: todos los llamadores ya escriben
+    `or 0`, así que un dato corrupto pasa a contar como cero en vez de como una
+    cifra inventada.
+    """
+    return dinero.aDecimalONulo(value)
 
 
 def format_decimal(value, digits=2):
-    return f"{float(value):.{digits}f}".replace(".", ",")
+    """Importe en formato español sin separador de miles ("1234,56").
+
+    Es formato de **presentación**. Que además acabe guardado en algunas
+    columnas TEXT es la deuda que describe `core.dinero`: mientras siga siendo
+    así, al menos la conversión de ida y la de vuelta son la misma.
+    """
+    return dinero.aTextoEs(value, decimales=digits, miles=False)
 
 
 def is_temporary_service_error(error):

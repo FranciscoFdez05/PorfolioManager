@@ -10,6 +10,7 @@ Todas las funciones son puras y no dependen de Flask salvo `json_body`, para
 poder testearlas sin contexto de petición.
 """
 
+from core import dinero
 from core.errors import ValidationError
 
 # Tope por defecto para cualquier cadena que venga del cliente. Los campos de
@@ -61,40 +62,42 @@ def as_text(value, field="valor", *, default="", max_length=DEFAULT_MAX_LENGTH,
     return text
 
 
-def as_number(value, field="valor", *, default=None, minimum=None, maximum=None,
-              required=False):
-    """Número tolerante al formato español (1.234,56) y a los sufijos € / %."""
+def as_decimal(value, field="valor", *, default=None, minimum=None, maximum=None,
+               required=False):
+    """Número validado, en `Decimal`. Es la forma correcta para un importe.
+
+    La conversión la hace `core.dinero`, la única del proyecto. Antes esta
+    función tenía su propia copia, que descartaba cualquier carácter que no
+    fuera dígito o separador: "12abc34" se convertía en 1234 y entraba en la
+    aplicación como un importe legítimo.
+    """
     if value is None or (isinstance(value, str) and not value.strip()):
         if required:
             raise ValidationError(f"«{field}» es obligatorio", field=field)
         return default
 
-    if isinstance(value, bool):
-        raise ValidationError(f"«{field}» debe ser numérico", field=field)
+    try:
+        number = dinero.aDecimal(value, field)
+    except dinero.ImporteInvalido:
+        raise ValidationError(f"«{field}» debe ser numérico", field=field) from None
 
-    if isinstance(value, (int, float)):
-        number = float(value)
-    else:
-        text = str(value).strip()
-        cleaned = "".join(ch for ch in text if ch.isdigit() or ch in ",.-")
-        if "," in cleaned and "." in cleaned:
-            # Formato español: el punto es separador de miles.
-            cleaned = cleaned.replace(".", "").replace(",", ".")
-        else:
-            cleaned = cleaned.replace(",", ".")
-        try:
-            number = float(cleaned)
-        except ValueError:
-            raise ValidationError(f"«{field}» debe ser numérico", field=field) from None
-
-    if number != number or number in (float("inf"), float("-inf")):
-        # NaN e infinitos rompen json.dumps y cualquier cálculo posterior.
-        raise ValidationError(f"«{field}» no es un número válido", field=field)
     if minimum is not None and number < minimum:
         raise ValidationError(f"«{field}» debe ser mayor o igual que {minimum}", field=field)
     if maximum is not None and number > maximum:
         raise ValidationError(f"«{field}» debe ser menor o igual que {maximum}", field=field)
     return number
+
+
+def as_number(value, field="valor", *, default=None, minimum=None, maximum=None,
+              required=False):
+    """Igual que `as_decimal` pero devuelve `float`.
+
+    Para lo que no es dinero: porcentajes de una gráfica, límites, contadores.
+    Para importes usa `as_decimal`, porque lo que sale de aquí se suma.
+    """
+    number = as_decimal(value, field, default=default, minimum=minimum,
+                        maximum=maximum, required=required)
+    return number if number is None or isinstance(number, (int, float)) else float(number)
 
 
 def as_int(value, field="valor", *, default=None, minimum=None, maximum=None,

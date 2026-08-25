@@ -36,12 +36,19 @@ async function saveStablecoinsData(payload, options = {}) {
 }
 
 function normalizeStablecoinSymbol(value = "") {
-    return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "")
+    return String(value || "")
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "")
 }
 
 function normalizeStablecoinCatalogEntry(entry = {}) {
-    const marketSymbol = String(entry.marketSymbol || entry.symbol || "").trim().toUpperCase()
-    const displaySymbol = String(entry.displaySymbol || marketSymbol || entry.symbol || "").trim().toUpperCase()
+    const marketSymbol = String(entry.marketSymbol || entry.symbol || "")
+        .trim()
+        .toUpperCase()
+    const displaySymbol = String(entry.displaySymbol || marketSymbol || entry.symbol || "")
+        .trim()
+        .toUpperCase()
     let symbol = normalizeStablecoinSymbol(entry.symbol || "")
 
     if (!symbol && displaySymbol) {
@@ -62,16 +69,22 @@ function normalizeStablecoinCatalogEntry(entry = {}) {
         marketSymbol: marketSymbol || symbol,
         displaySymbol: displaySymbol || symbol,
         description: String(entry.description || "").trim(),
-        provider: String(entry.provider || "FINNHUB").trim().toUpperCase() || "FINNHUB"
+        provider:
+            String(entry.provider || "FINNHUB")
+                .trim()
+                .toUpperCase() || "FINNHUB"
     }
 }
 
 function normalizeStablecoinMovementRow(row = {}) {
     const stablecoinSymbol = normalizeStablecoinSymbol(row.stablecoinSymbol || "")
     const rawMovementType = String(row.tipo || "").trim()
-    const movementType = rawMovementType === "Gasto"
-        ? "Venta"
-        : (STABLECOIN_MOVEMENT_TYPES.includes(rawMovementType) ? rawMovementType : "Compra")
+    const movementType =
+        rawMovementType === "Gasto"
+            ? "Venta"
+            : STABLECOIN_MOVEMENT_TYPES.includes(rawMovementType)
+              ? rawMovementType
+              : "Compra"
     const currency = normalizeCurrencyCode(row.currency || "USD")
 
     return {
@@ -92,8 +105,8 @@ function normalizeStablecoinsPayload(payload = {}) {
     const rawCatalog = Array.isArray(payload.catalog)
         ? payload.catalog
         : Array.isArray(payload.availableSymbols)
-            ? payload.availableSymbols
-            : []
+          ? payload.availableSymbols
+          : []
     const normalizedCatalog = []
     const catalogSymbols = new Set()
 
@@ -110,8 +123,8 @@ function normalizeStablecoinsPayload(payload = {}) {
 
     const enabledSymbols = Array.isArray(payload.enabledSymbols)
         ? payload.enabledSymbols
-            .map((symbol) => normalizeStablecoinSymbol(symbol))
-            .filter((symbol, index, array) => symbol && array.indexOf(symbol) === index)
+              .map((symbol) => normalizeStablecoinSymbol(symbol))
+              .filter((symbol, index, array) => symbol && array.indexOf(symbol) === index)
         : []
     const fallbackCatalog = normalizedCatalog.length
         ? normalizedCatalog
@@ -123,14 +136,15 @@ function normalizeStablecoinsPayload(payload = {}) {
         enabledSymbols: enabledSymbols.filter((symbol) => fallbackCatalogSymbols.has(symbol)),
         rows: Array.isArray(payload.rows)
             ? payload.rows.map((row) => {
-                const normalizedRow = normalizeStablecoinMovementRow(row)
-                const fallbackSymbol = enabledSymbols[0] || fallbackCatalog[0]?.symbol || normalizedRow.stablecoinSymbol
+                  const normalizedRow = normalizeStablecoinMovementRow(row)
+                  const fallbackSymbol =
+                      enabledSymbols[0] || fallbackCatalog[0]?.symbol || normalizedRow.stablecoinSymbol
 
-                return {
-                    ...normalizedRow,
-                    stablecoinSymbol: normalizedRow.stablecoinSymbol || fallbackSymbol || ""
-                }
-            })
+                  return {
+                      ...normalizedRow,
+                      stablecoinSymbol: normalizedRow.stablecoinSymbol || fallbackSymbol || ""
+                  }
+              })
             : []
     }
 }
@@ -148,18 +162,29 @@ function getEnabledStablecoinSymbols(payload = currentStablecoinsData) {
     return normalized.enabledSymbols
 }
 
-function getOperationStablecoinSymbol(row = {}) {
-    const explicitSymbol = normalizeStablecoinSymbol(row.stablecoinSymbol || "")
-
-    if (explicitSymbol) {
-        return explicitSymbol
-    }
-
-    const pair = String(row.par || "").trim().toUpperCase()
-    const quoteSymbol = pair.includes("/") ? pair.split("/").pop() : ""
-
-    return normalizeStablecoinSymbol(quoteSymbol)
-}
+// ⚠ Colisión de nombre sin resolver. js/cripto/operaciones.js define otra
+// función global con este mismo nombre y una implementación distinta: la suya
+// filtra el símbolo contra la lista de stablecoins habilitadas y devuelve ""
+// si no está, mientras que esta se limita a normalizar la cadena. index.html
+// carga stablecoins.js ANTES que operaciones.js, así que en el navegador gana
+// la de operaciones.js y las llamadas de este fichero (líneas 188 y 283)
+// ejecutan aquella, no esta. Lo detectó ESLint al montarlo; no se unifica aquí
+// porque elegir cuál de las dos es la correcta cambia importes en pantalla y
+// esa decisión no es del linter.
+// eslint-disable-next-line no-redeclare
+// `getOperationStablecoinSymbol` vive en js/cripto/operaciones.js.
+//
+// Aquí había una segunda definición del mismo nombre, con otro criterio: esta
+// normalizaba el símbolo y aquella lo filtra contra la lista de stablecoins
+// activadas. Como los dos ficheros son scripts clásicos y operaciones.js se
+// carga después, su definición machacaba a esta y las dos llamadas de este
+// módulo ya usaban la de allí: la de aquí era código muerto que solo servía
+// para hacer creer que este fichero se comportaba de otra manera.
+//
+// Se ha borrado en vez de renombrarla porque las filas que se le pasan desde
+// aquí son `operationsRows`, o sea las del módulo de operaciones, y filtrarlas
+// por las stablecoins activadas es lo que corresponde. `tests-js/globales.test.js`
+// impide que vuelva a aparecer una colisión como esta.
 
 function getStablecoinsLockedQuoteAmount(row = {}) {
     const total = parseLooseNumber(row.total) || 0
@@ -241,7 +266,10 @@ function getStablecoinsNetworkFeesBySymbol(transaccionesRows = []) {
     return totals
 }
 
-function buildStablecoinBalanceSummary(stablecoinsPayload = currentStablecoinsData, operationsRows = currentStablecoinsOperationsRows) {
+function buildStablecoinBalanceSummary(
+    stablecoinsPayload = currentStablecoinsData,
+    operationsRows = currentStablecoinsOperationsRows
+) {
     const normalizedPayload = normalizeStablecoinsPayload(stablecoinsPayload)
     const summary = {}
 
@@ -339,7 +367,7 @@ async function initStablecoinsLogic() {
     const [stablecoinsPayload, operationsPayload, transaccionesPayload] = await Promise.all([
         loadStablecoinsData(),
         loadOperacionesData(),
-        (typeof loadTransaccionesData === "function" ? loadTransaccionesData() : Promise.resolve({ rows: [] }))
+        typeof loadTransaccionesData === "function" ? loadTransaccionesData() : Promise.resolve({ rows: [] })
     ])
 
     currentStablecoinsData = normalizeStablecoinsPayload(stablecoinsPayload)
@@ -519,10 +547,12 @@ function renderStablecoinsSummary() {
     summaryContainer.classList.remove("hidden")
     headerPanel.classList.remove("stablecoinsHeaderPanelCompact")
 
-    Object.values(summary).filter((item) => item.enabled).forEach((item) => {
-        const card = document.createElement("article")
-        card.className = "stablecoinSummaryCard"
-        card.innerHTML = `
+    Object.values(summary)
+        .filter((item) => item.enabled)
+        .forEach((item) => {
+            const card = document.createElement("article")
+            card.className = "stablecoinSummaryCard"
+            card.innerHTML = `
             <div class="stablecoinSummaryHeader">
                 <div class="stablecoinSummaryHeaderCopy">
                     <h4>${item.symbol}</h4>
@@ -537,8 +567,8 @@ function renderStablecoinsSummary() {
                 <span>Comisiones pagadas: ${formatMoney(item.totalComisiones, "USD")}</span>
             </div>
         `
-        summaryContainer.appendChild(card)
-    })
+            summaryContainer.appendChild(card)
+        })
 }
 
 function handleStablecoinSummaryClick(event) {
@@ -559,8 +589,12 @@ function handleStablecoinSummaryClick(event) {
 
 function requestStablecoinDeletion(stablecoinSymbol) {
     const confirmDelete = () => {
-        const nextCatalog = getStablecoinCatalog(currentStablecoinsData).filter((entry) => entry.symbol !== stablecoinSymbol)
-        const nextEnabledSymbols = getEnabledStablecoinSymbols(currentStablecoinsData).filter((symbol) => symbol !== stablecoinSymbol)
+        const nextCatalog = getStablecoinCatalog(currentStablecoinsData).filter(
+            (entry) => entry.symbol !== stablecoinSymbol
+        )
+        const nextEnabledSymbols = getEnabledStablecoinSymbols(currentStablecoinsData).filter(
+            (symbol) => symbol !== stablecoinSymbol
+        )
         const nextRows = (currentStablecoinsData.rows || []).filter((row) => row.stablecoinSymbol !== stablecoinSymbol)
 
         currentStablecoinsData = normalizeStablecoinsPayload({
@@ -594,7 +628,10 @@ function requestStablecoinDeletion(stablecoinSymbol) {
         return
     }
 
-    if (window.confirm(`Vas a eliminar ${stablecoinSymbol}. ¿Quieres continuar?`) && window.confirm(`Confirma de nuevo que quieres eliminar ${stablecoinSymbol}.`)) {
+    if (
+        window.confirm(`Vas a eliminar ${stablecoinSymbol}. ¿Quieres continuar?`) &&
+        window.confirm(`Confirma de nuevo que quieres eliminar ${stablecoinSymbol}.`)
+    ) {
         confirmDelete()
     }
 }
@@ -733,41 +770,46 @@ function buildStablecoinSearchEntry(result = {}, query = "") {
         ? normalizeStablecoinSymbol(query)
         : ""
 
-    return normalizeStablecoinCatalogEntry({
-        symbol: normalizedQuerySymbol,
-        marketSymbol: result.symbol || "",
-        displaySymbol: result.displaySymbol || result.symbol || "",
-        description: result.description || "",
-        provider: result.provider || "FINNHUB"
-    }) || normalizeStablecoinCatalogEntry({
-        marketSymbol: result.symbol || "",
-        displaySymbol: result.displaySymbol || result.symbol || "",
-        description: result.description || "",
-        provider: result.provider || "FINNHUB"
-    })
+    return (
+        normalizeStablecoinCatalogEntry({
+            symbol: normalizedQuerySymbol,
+            marketSymbol: result.symbol || "",
+            displaySymbol: result.displaySymbol || result.symbol || "",
+            description: result.description || "",
+            provider: result.provider || "FINNHUB"
+        }) ||
+        normalizeStablecoinCatalogEntry({
+            marketSymbol: result.symbol || "",
+            displaySymbol: result.displaySymbol || result.symbol || "",
+            description: result.description || "",
+            provider: result.provider || "FINNHUB"
+        })
+    )
 }
 
 function normalizeStablecoinSearchResults(results = [], query = "") {
     const seenSymbols = new Set()
 
-    return (results || []).map((result) => {
-        const entry = buildStablecoinSearchEntry(result, query)
+    return (results || [])
+        .map((result) => {
+            const entry = buildStablecoinSearchEntry(result, query)
 
-        if (!entry || seenSymbols.has(entry.symbol)) {
-            return null
-        }
+            if (!entry || seenSymbols.has(entry.symbol)) {
+                return null
+            }
 
-        seenSymbols.add(entry.symbol)
+            seenSymbols.add(entry.symbol)
 
-        return {
-            ...result,
-            stablecoinSymbol: entry.symbol,
-            marketSymbol: entry.marketSymbol,
-            displaySymbol: `${entry.symbol}${entry.displaySymbol && entry.displaySymbol !== entry.symbol ? ` · ${entry.displaySymbol}` : ""}`,
-            description: entry.description || result.description || "",
-            provider: entry.provider || result.provider || "FINNHUB"
-        }
-    }).filter(Boolean)
+            return {
+                ...result,
+                stablecoinSymbol: entry.symbol,
+                marketSymbol: entry.marketSymbol,
+                displaySymbol: `${entry.symbol}${entry.displaySymbol && entry.displaySymbol !== entry.symbol ? ` · ${entry.displaySymbol}` : ""}`,
+                description: entry.description || result.description || "",
+                provider: entry.provider || result.provider || "FINNHUB"
+            }
+        })
+        .filter(Boolean)
 }
 
 function addStablecoinFromSearchResult(result = {}) {

@@ -1,14 +1,30 @@
+// Un punto es separador de MILES solo si agrupa de tres en tres ("1.234").
+// Si no, es el separador decimal ("1234.56").
+//
+// Antes se descartaban todos los puntos sin mirar, y eso multiplicaba por cien
+// cualquier importe que llegara en el formato canónico que usa el servidor:
+// parseEuroNumber("1234.56") devolvía 123456. No saltaba a la vista porque la
+// mayoría de columnas se guardan en formato español, pero basta con que un
+// endpoint devuelva un número ya serializado (los snapshots, el motor FIFO, un
+// tipo de cambio) para que un total salga cien veces mayor.
+//
+// Cuando hay coma no hay ambigüedad posible: la coma es el decimal y el punto
+// solo puede ser de miles, que es lo que se hacía y se conserva.
+const MILES_ES = /^-?\d{1,3}(\.\d{3})+$/
+
+function normalizeDecimalSeparators(text) {
+    if (text.includes(",")) {
+        return text.replaceAll(".", "").replace(",", ".")
+    }
+    return MILES_ES.test(text) ? text.replaceAll(".", "") : text
+}
+
 function parseEuroNumber(value) {
     if (!value) {
         return 0
     }
 
-    const cleanValue = value
-        .toString()
-        .replaceAll("€", "")
-        .replaceAll(/\s/g, "")
-        .replaceAll(".", "")
-        .replace(",", ".")
+    const cleanValue = normalizeDecimalSeparators(value.toString().replaceAll("€", "").replaceAll(/\s/g, ""))
 
     const parsedValue = parseFloat(cleanValue)
     return Number.isNaN(parsedValue) ? 0 : parsedValue
@@ -19,34 +35,38 @@ function parseDollarNumber(value) {
         return 0
     }
 
-    const cleanValue = value
-        .toString()
-        .replaceAll("$", "")
-        .replaceAll(/\s/g, "")
-        .replaceAll(".", "")
-        .replace(",", ".")
+    const cleanValue = normalizeDecimalSeparators(value.toString().replaceAll("$", "").replaceAll(/\s/g, ""))
 
     const parsedValue = parseFloat(cleanValue)
     return Number.isNaN(parsedValue) ? 0 : parsedValue
 }
 
-function _nl() { return window._numLocale || "es-ES" }
+function _nl() {
+    return window._numLocale || "es-ES"
+}
 
 function formatEuro(value) {
-    return new Intl.NumberFormat(_nl(), {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    }).format(value) + " €"
+    return (
+        new Intl.NumberFormat(_nl(), {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(value) + " €"
+    )
 }
 
 function normalizeCurrencyCode(currency) {
-    const normalized = String(currency || "EUR").trim().toUpperCase()
+    const normalized = String(currency || "EUR")
+        .trim()
+        .toUpperCase()
 
     if (!normalized) {
         return "EUR"
     }
 
-    if (["USD", "USDT", "USDC", "BUSD", "DAI", "FDUSD", "PYUSD", "TUSD", "USDE"].includes(normalized) || normalized.endsWith("USD")) {
+    if (
+        ["USD", "USDT", "USDC", "BUSD", "DAI", "FDUSD", "PYUSD", "TUSD", "USDE"].includes(normalized) ||
+        normalized.endsWith("USD")
+    ) {
         return "USD"
     }
 
@@ -102,14 +122,17 @@ function getCurrentAssetCurrency() {
 }
 
 function normalizeAssetRowCurrency(currency, fallback = "EUR") {
-    const normalized = String(currency || fallback).trim().toUpperCase()
+    const normalized = String(currency || fallback)
+        .trim()
+        .toUpperCase()
     return normalized === "USD" ? "USD" : "EUR"
 }
 
 function getAssetRowCurrency(rowOrCell, fallback = getCurrentAssetCurrency()) {
     const rowElement = rowOrCell?.closest ? rowOrCell.closest("tr") : null
-    const explicitCurrency = rowElement?.querySelector('select[data-field="currency"]')?.value
-        || rowElement?.querySelector('td[data-field="currency"]')?.textContent?.trim()
+    const explicitCurrency =
+        rowElement?.querySelector('select[data-field="currency"]')?.value ||
+        rowElement?.querySelector('td[data-field="currency"]')?.textContent?.trim()
     return normalizeAssetRowCurrency(explicitCurrency, fallback)
 }
 
@@ -127,7 +150,9 @@ function formatShareQuantity(value, maxDecimals = 6) {
 }
 
 function getAssetParticipationDecimals(assetType) {
-    const normalizedType = String(assetType || "").trim().toLowerCase()
+    const normalizedType = String(assetType || "")
+        .trim()
+        .toLowerCase()
 
     if (normalizedType === "cripto" || normalizedType === "comoditis") {
         return 8
@@ -194,13 +219,19 @@ async function initDividendosLogic() {
     const addYearBtn = document.getElementById("addDividendosYearBtn")
     if (addYearBtn && !addYearBtn.dataset.bound) {
         addYearBtn.dataset.bound = "true"
-        addYearBtn.addEventListener("click", () => { closeDividendosMenu(); addDividendosYear() })
+        addYearBtn.addEventListener("click", () => {
+            closeDividendosMenu()
+            addDividendosYear()
+        })
     }
 
     const deleteYearBtn = document.getElementById("deleteDividendosYearBtn")
     if (deleteYearBtn && !deleteYearBtn.dataset.bound) {
         deleteYearBtn.dataset.bound = "true"
-        deleteYearBtn.addEventListener("click", () => { closeDividendosMenu(); deleteCurrentDividendosYear() })
+        deleteYearBtn.addEventListener("click", () => {
+            closeDividendosMenu()
+            deleteCurrentDividendosYear()
+        })
     }
 
     const divMenuBtn = document.getElementById("dividendosMenuBtn")
@@ -298,24 +329,41 @@ function isAssetParticipationsCell(cell) {
 }
 
 function isAssetCommissionsCell(cell) {
-    return cell?.dataset?.field === "comisiones" ||
+    return (
+        cell?.dataset?.field === "comisiones" ||
         cell?.dataset?.field === "comisionesFiat" ||
         getTableHeaderText(cell) === "comisiones" ||
         getTableHeaderText(cell) === "comisiones fiat"
+    )
 }
 
 function isAssetCryptoCommissionsCell(cell) {
-    return cell?.dataset?.field === "comisionesSatoshis" ||
+    return (
+        cell?.dataset?.field === "comisionesSatoshis" ||
         cell?.dataset?.field === "comisionesCripto" ||
         getTableHeaderText(cell) === "comisiones cripto"
+    )
 }
 
 function isCryptoAssetType(assetType) {
-    return String(assetType || "").trim().toLowerCase() === "cripto"
+    return (
+        String(assetType || "")
+            .trim()
+            .toLowerCase() === "cripto"
+    )
 }
 
 function getAssetTableMoneyCurrency(assetType, fieldName, assetCurrency = "EUR", rowCurrency = "") {
-    if (isCryptoAssetType(assetType) && ["precioParticipacion", "capitalInvertidoBruto", "comisiones", "comisionesFiat", "capitalInvertidoNeto"].includes(fieldName)) {
+    if (
+        isCryptoAssetType(assetType) &&
+        [
+            "precioParticipacion",
+            "capitalInvertidoBruto",
+            "comisiones",
+            "comisionesFiat",
+            "capitalInvertidoNeto"
+        ].includes(fieldName)
+    ) {
         return normalizeAssetRowCurrency(rowCurrency, assetCurrency)
     }
 
@@ -363,19 +411,17 @@ function parseLooseNumber(value) {
         return Number.isFinite(value) ? value : null
     }
 
-    const text = String(value ?? "").replace(/[^\d,.\-]/g, "").trim()
+    const text = String(value ?? "")
+        .replace(/[^\d,.-]/g, "")
+        .trim()
     if (!text) {
         return null
     }
 
-    let normalized = text
-    if (text.includes(",") && text.includes(".")) {
-        normalized = text.replace(/\./g, "").replace(",", ".")
-    } else {
-        normalized = text.replace(",", ".")
-    }
-
-    const parsed = Number(normalized)
+    // El mismo criterio que parseEuroNumber: los dos parsers leen las mismas
+    // columnas y discrepaban entre ellos ("1234.56" daba 1234,56 aquí y
+    // 123.456 allí), así que el resultado dependía de cuál tocara esa pantalla.
+    const parsed = Number(normalizeDecimalSeparators(text))
     return Number.isFinite(parsed) ? parsed : null
 }
 
@@ -450,9 +496,7 @@ document.addEventListener("focusout", (event) => {
         queueMicrotask(() => {
             const text = String(cell.textContent || "").trim()
             const currentCurrency = getAssetRowCurrency(cell, getCurrentAssetCurrency())
-            cell.textContent = currentCurrency === "EUR"
-                ? formatEuroSafe(text)
-                : formatDollarSafe(text)
+            cell.textContent = currentCurrency === "EUR" ? formatEuroSafe(text) : formatDollarSafe(text)
         })
         return
     }
@@ -555,9 +599,7 @@ function downloadCsvFile(filename, rows, headers = null) {
         return false
     }
 
-    const csvHeaders = Array.isArray(headers) && headers.length
-        ? headers
-        : Object.keys(rows[0] || {})
+    const csvHeaders = Array.isArray(headers) && headers.length ? headers : Object.keys(rows[0] || {})
 
     const escapeCsvCell = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`
     const normalizeRowValue = (value) => {
@@ -567,7 +609,9 @@ function downloadCsvFile(filename, rows, headers = null) {
         return value ?? ""
     }
 
-    const csvBody = rows.map((row) => csvHeaders.map((header) => escapeCsvCell(normalizeRowValue(row[header]))).join(","))
+    const csvBody = rows.map((row) =>
+        csvHeaders.map((header) => escapeCsvCell(normalizeRowValue(row[header]))).join(",")
+    )
     const csv = [csvHeaders.map((header) => escapeCsvCell(header)).join(","), ...csvBody].join("\n")
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
@@ -590,7 +634,9 @@ function bindTableSort(table, storageKey) {
     const lsKey = storageKey ? `tableSort_${storageKey}` : null
     let saved = null
     if (lsKey) {
-        try { saved = JSON.parse(localStorage.getItem(lsKey)) } catch {}
+        try {
+            saved = JSON.parse(localStorage.getItem(lsKey))
+        } catch {}
     }
 
     let currentKey = saved?.key ?? null
@@ -598,7 +644,9 @@ function bindTableSort(table, storageKey) {
 
     function persist() {
         if (!lsKey) return
-        try { localStorage.setItem(lsKey, JSON.stringify({ key: currentKey, dir: currentDir })) } catch {}
+        try {
+            localStorage.setItem(lsKey, JSON.stringify({ key: currentKey, dir: currentDir }))
+        } catch {}
     }
 
     function cellText(row, colIdx) {
@@ -610,12 +658,17 @@ function bindTableSort(table, storageKey) {
     }
 
     function toComparable(text) {
-        const dm = text.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})$/)
+        const dm = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/)
         if (dm) {
             const y = dm[3].length === 2 ? 2000 + +dm[3] : +dm[3]
             return new Date(y, +dm[2] - 1, +dm[1]).getTime()
         }
-        const n = parseFloat(text.replace(/\./g, "").replace(",", ".").replace(/[^\d.-]/g, ""))
+        const n = parseFloat(
+            text
+                .replace(/\./g, "")
+                .replace(",", ".")
+                .replace(/[^\d.-]/g, "")
+        )
         if (!isNaN(n)) return n
         return text.toLowerCase()
     }
@@ -696,7 +749,8 @@ function bindTableSort(table, storageKey) {
 
 // Importes ("1.234,56 €"), porcentajes ("+4,01 %") y cantidades ("0,00466667",
 // "0,00010000 BTC"). Las fechas ("05-08-2026") no encajan a propósito.
-const NUMERIC_TABLE_CELL_PATTERN = /^[\u2248~]?\s*[-+]?\s*[\u20ac$]?\s*\d[\d.\u00a0\u202f ]*(?:,\d+)?\s*(?:%|\u20ac|\$|[A-Z]{2,6})?$/
+const NUMERIC_TABLE_CELL_PATTERN =
+    /^[\u2248~]?\s*[-+]?\s*[\u20ac$]?\s*\d[\d.\u00a0\u202f ]*(?:,\d+)?\s*(?:%|\u20ac|\$|[A-Z]{2,6})?$/
 
 function getNumericTableCellText(cell) {
     const field = cell.querySelector("input, textarea")
@@ -726,14 +780,14 @@ function refreshTableNumericAlignment(table) {
     // La fila de totales del pie es una fila de datos más: sin ella, un tfoot
     // con las mismas columnas que el cuerpo se quedaba alineado a la izquierda.
     const footRows = table.tFoot ? Array.from(table.tFoot.rows) : []
-    const columnCount = headerUsable ? headerCells.length : ((bodyRows[0] || footRows[0])?.cells.length || 0)
+    const columnCount = headerUsable ? headerCells.length : (bodyRows[0] || footRows[0])?.cells.length || 0
 
     if (!columnCount) {
         return
     }
 
-    const dataRows = [...bodyRows, ...footRows].filter((row) =>
-        row.cells.length === columnCount && !Array.from(row.cells).some((cell) => cell.colSpan > 1)
+    const dataRows = [...bodyRows, ...footRows].filter(
+        (row) => row.cells.length === columnCount && !Array.from(row.cells).some((cell) => cell.colSpan > 1)
     )
 
     for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
@@ -787,11 +841,14 @@ function scheduleNumericTableAlignment() {
 // Solo observamos childList: las clases que añadimos son mutaciones de
 // atributo, así que el observer no se dispara a sí mismo.
 new MutationObserver((mutations) => {
-    const touchesTable = mutations.some((mutation) =>
-        mutation.target.closest?.("table") ||
-        Array.from(mutation.addedNodes).some((node) =>
-            node.nodeType === 1 && (node.matches?.("table, thead, tbody, tr, td, th") || node.querySelector?.("table"))
-        )
+    const touchesTable = mutations.some(
+        (mutation) =>
+            mutation.target.closest?.("table") ||
+            Array.from(mutation.addedNodes).some(
+                (node) =>
+                    node.nodeType === 1 &&
+                    (node.matches?.("table, thead, tbody, tr, td, th") || node.querySelector?.("table"))
+            )
     )
 
     if (touchesTable) {
@@ -839,14 +896,14 @@ function _buildCustomSelect(select) {
     trigger.tabIndex = 0
 
     function positionMenu() {
-        const rect   = trigger.getBoundingClientRect()
-        const left   = Math.round(rect.left)
-        const width  = Math.round(rect.width)
+        const rect = trigger.getBoundingClientRect()
+        const left = Math.round(rect.left)
+        const width = Math.round(rect.width)
         const bottom = Math.round(rect.bottom)
-        const top    = Math.round(rect.top)
+        const top = Math.round(rect.top)
 
         menu.style.position = "fixed"
-        menu.style.left  = left + "px"
+        menu.style.left = left + "px"
         menu.style.width = Math.max(width, 150) + "px"
 
         const previousVisibility = menu.style.visibility
@@ -860,7 +917,7 @@ function _buildCustomSelect(select) {
 
         const spaceBelow = window.innerHeight - bottom - 8
         if (spaceBelow < menuH && top >= menuH) {
-            menu.style.top = (top - menuH) + "px"
+            menu.style.top = top - menuH + "px"
         } else {
             menu.style.top = bottom + "px"
         }
@@ -967,14 +1024,20 @@ function _buildCustomSelect(select) {
             clearTimeout(searchTimer)
             searchBuffer += e.key.toLowerCase()
             jumpToSearch()
-            searchTimer = setTimeout(() => { searchBuffer = "" }, 800)
+            searchTimer = setTimeout(() => {
+                searchBuffer = ""
+            }, 800)
         }
     })
 
     document.addEventListener("click", closeMenu)
-    document.addEventListener("scroll", (e) => {
-        if (!menu.contains(e.target)) closeMenu()
-    }, true)
+    document.addEventListener(
+        "scroll",
+        (e) => {
+            if (!menu.contains(e.target)) closeMenu()
+        },
+        true
+    )
 
     select.addEventListener("change", () => {
         syncLabel()
@@ -987,14 +1050,57 @@ function _buildCustomSelect(select) {
     }).observe(select, { childList: true })
 }
 
+// Las fechas se teclean a mano en formato dd-mm-aaaa en todos los popups. Para
+// no escribir la de hoy una y otra vez, cada campo de fecha recibe un botón
+// "Hoy" que la rellena. Se detectan por el placeholder, común a todos ellos.
+const _DATE_INPUT_PLACEHOLDER = /^dd[-/]mm[-/](aaaa|yyyy)$/i
+
+function todayDateString() {
+    const now = new Date()
+    const day = String(now.getDate()).padStart(2, "0")
+    const month = String(now.getMonth() + 1).padStart(2, "0")
+    return `${day}-${month}-${now.getFullYear()}`
+}
+
+function _buildDateTodayButton(input) {
+    if (input.dataset.todayBtn === "1") return
+    if (!_DATE_INPUT_PLACEHOLDER.test((input.getAttribute("placeholder") || "").trim())) return
+    if (!input.parentNode) return
+
+    input.dataset.todayBtn = "1"
+
+    const wrap = document.createElement("div")
+    wrap.className = "dateFieldWrap"
+    input.parentNode.insertBefore(wrap, input)
+    wrap.appendChild(input)
+
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "dateTodayBtn"
+    button.textContent = "Hoy"
+    button.title = "Poner la fecha de hoy"
+    button.tabIndex = -1
+    button.addEventListener("click", () => {
+        input.value = todayDateString()
+        input.dispatchEvent(new Event("input", { bubbles: true }))
+        input.dispatchEvent(new Event("change", { bubbles: true }))
+        input.focus()
+    })
+
+    wrap.appendChild(button)
+}
+
 new MutationObserver((mutations) => {
     for (const m of mutations) {
         for (const node of m.addedNodes) {
             if (node.nodeType !== 1) continue
             if (node.tagName === "SELECT" && !node.hasAttribute("data-no-custom")) _buildCustomSelect(node)
             node.querySelectorAll?.("select:not([data-no-custom])").forEach(_buildCustomSelect)
+            if (node.tagName === "INPUT") _buildDateTodayButton(node)
+            node.querySelectorAll?.("input[placeholder]").forEach(_buildDateTodayButton)
         }
     }
 }).observe(document.body, { childList: true, subtree: true })
 
 document.querySelectorAll("select:not([data-no-custom])").forEach(_buildCustomSelect)
+document.querySelectorAll("input[placeholder]").forEach(_buildDateTodayButton)
