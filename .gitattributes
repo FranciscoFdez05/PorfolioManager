@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Librerías de terceros: sin normalizar. Se descargan tal cual del CDN y deben
+# quedarse byte a byte iguales al original, que es lo que permite comparar su
+# hash con el que publica el proveedor al actualizarlas.
+js/vendor/** -text
