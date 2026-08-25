@@ -1,8 +1,31 @@
 [project]
 name = "porfoliopython"
+# La versión canónica está en python/core/version.py, que es de donde la lee la
+# aplicación. Aquí se repite porque las herramientas del ecosistema la esperan;
+# tests/test_version.py comprueba que las dos no se separen.
 version = "1.0.0"
 description = "Seguimiento local de una cartera de inversión personal (Flask + SQLite)"
+readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "GPL-3.0-or-later" }
+keywords = ["portfolio", "inversión", "fifo", "irpf", "finanzas", "sqlite", "flask"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Framework :: Flask",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Natural Language :: Spanish",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+[project.urls]
+Repositorio = "https://github.com/FranciscoFdez05/PorfolioPython"
+Cambios = "https://github.com/FranciscoFdez05/PorfolioPython/blob/main/CHANGELOG.md"
+Incidencias = "https://github.com/FranciscoFdez05/PorfolioPython/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

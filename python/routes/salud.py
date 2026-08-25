@@ -23,12 +23,11 @@ import time
 from flask import Blueprint, jsonify, session
 
 from core import db, settings
+from core.version import __version__
 
 log = logging.getLogger(__name__)
 
 salud_bp = Blueprint("salud", __name__)
-
-VERSION = "1.0.0"
 
 # Momento de importación del módulo, que en la práctica es el arranque del
 # worker. Sirve para distinguir "lleva días en pie" de "se acaba de reiniciar
@@ -72,7 +71,7 @@ def getHealth():
     respuesta = {
         "ok": sano,
         "estado": "ok" if sano else "degradado",
-        "version": VERSION,
+        "version": __version__,
     }
 
     # A partir de aquí, solo para quien ya ha iniciado sesión.
