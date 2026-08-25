@@ -10,12 +10,13 @@ mimetypes.add_type("font/woff", ".woff")
 mimetypes.add_type("font/woff2", ".woff2")
 
 from dotenv import load_dotenv
-from flask import Flask, abort, redirect, request, send_from_directory, session, url_for
+from flask import Flask, abort, g, make_response, send_from_directory
 
+from admin import snapshot_scheduler
 from admin.portfolios_manager import init_portfolios
-from core import settings
+from core import csp, seguridad_app, settings
 from core.errors import register_error_handlers
-from core.paths import AJUSTES_JSON, API_DIR, BACKUPS_DIR, BASE_DIR
+from core.paths import AJUSTES_JSON, API_DIR, BACKUPS_DIR, BASE_DIR, INDEX_FILE
 from routes.activos import activos_bp
 from routes.ajustes import ajustes_bp
 from routes.auth import auth_bp
@@ -28,6 +29,7 @@ from routes.movimientos import movimientos_bp
 from routes.operaciones import operaciones_bp
 from routes.portfolios import portfolios_bp
 from routes.registros import registros_bp
+from routes.salud import salud_bp
 from routes.snapshots import snapshots_bp
 from routes.trading import trading_bp
 from routes.ventas import ventas_bp
@@ -72,14 +74,9 @@ app.secret_key = _secret_key
 # importación y restauración necesitan más: un export JSON completo del
 # portfolio ya ronda los 25 MB, así que con el tope general aplicado a todo era
 # imposible reimportar un backup propio (413 Request Entity Too Large). Ambos
-# topes salen de [server] en config.ini.
-_UPLOAD_PATHS = ("/api/import/json", "/api/import/zip", "/api/portfolios/import")
-
-app.config["MAX_CONTENT_LENGTH"] = settings.maxSubidaBytes()
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = settings.cookieSameSite()
-# SESSION_COOKIE_SECURE se activa solo cuando hay HTTPS (evita romper HTTP local)
-app.config["SESSION_COOKIE_SECURE"] = settings.httpsActivado()
+# topes salen de [server] en config.ini; los aplica seguridad_app junto al resto
+# de la configuración de sesión.
+seguridad_app.aplicar_configuracion_sesion(app)
 
 # Antes que los blueprints, para que el request id ya esté disponible en los
 # before_request de CSRF y de login (así sus warnings se pueden correlacionar
@@ -99,116 +96,15 @@ app.register_blueprint(operaciones_bp)
 app.register_blueprint(portfolios_bp)
 app.register_blueprint(trading_bp)
 app.register_blueprint(registros_bp)
+app.register_blueprint(salud_bp)
 app.register_blueprint(snapshots_bp)
 app.register_blueprint(ventas_bp)
 
-_PUBLIC_ENDPOINTS = {"auth.login", "auth.setup", "auth.logout"}
-# Endpoints del Atajo de iOS. No pueden usar la sesión ni el token CSRF (un
-# Atajo no mantiene cookies), así que quedan fuera de require_login y de
-# verify_csrf y se autentican por su cuenta: filtro de IP en core/red_local.py
-# más firma HMAC en core/firma_hmac.py, ambos aplicados dentro de cada vista.
-# Se mantienen aparte de _PUBLIC_ENDPOINTS para que quede explícito que estas
-# rutas no son públicas, solo se protegen de otra forma.
-_ATAJO_ENDPOINTS = {
-    "movimientos.createMovimiento",
-    "movimientos.getCategorias",
-    "movimientos.getPortfoliosLista",
-    "movimientos.prepararMovimiento",
-    "movimientos.firmarTexto",
-}
-# Extensiones que la página de login necesita antes de autenticarse. Solo se
-# aceptan bajo los directorios de _PUBLIC_DIRS: cualquier otra ruta con estas
-# extensiones sigue exigiendo sesión.
-_PUBLIC_EXTENSIONS = {".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".svg",
-                      ".woff", ".woff2", ".ttf"}
-_PUBLIC_DIRS = ("css/", "js/", "img/")
-_PUBLIC_FILES = {"favicon.ico"}
-
-
-# ── CSRF (double-submit cookie) ───────────────────────────────────────────────
-# SESSION_COOKIE_SAMESITE=Lax ya bloquea los POST cross-site en navegadores
-# actuales, pero no cubre navegadores antiguos ni peticiones same-site desde
-# subdominios, y no es una defensa que se pueda auditar. El token se guarda en
-# la sesión (firmada) y se replica en una cookie legible por JS, que el wrapper
-# de js/csrf.js reenvía en la cabecera X-CSRF-Token.
-_CSRF_COOKIE = "csrf_token"
-_CSRF_HEADER = "X-CSRF-Token"
-_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
-
-
-def _current_csrf_token() -> str:
-    token = session.get("csrf_token")
-    if not token:
-        token = secrets.token_urlsafe(32)
-        session["csrf_token"] = token
-    return token
-
-
-@app.before_request
-def verify_csrf():
-    if request.method in _SAFE_METHODS:
-        return
-    # El login es la única entrada sin sesión previa; lo protege el propio
-    # formulario junto al límite de intentos por IP.
-    if request.endpoint in _PUBLIC_ENDPOINTS or request.endpoint in _ATAJO_ENDPOINTS:
-        return
-    if not session.get("logged_in"):
-        # Sin sesión no hay nada que proteger; require_login responde 401.
-        return
-    # Fail-closed: una sesión autenticada sin token (por ejemplo emitida por una
-    # versión anterior a este control) no se puede validar, así que se rechaza en
-    # vez de dejar pasar la petición. Cualquier GET posterior vuelve a emitir el
-    # token en set_csrf_cookie, de modo que la sesión se recupera sola.
-    expected = session.get("csrf_token")
-    provided = request.headers.get(_CSRF_HEADER, "") or request.form.get("csrf_token", "")
-    if not expected or not provided or not secrets.compare_digest(provided, expected):
-        logging.warning("Petición %s %s rechazada por CSRF inválido", request.method, request.path)
-        abort(403)
-
-
-@app.after_request
-def set_csrf_cookie(response):
-    if session.get("logged_in"):
-        response.set_cookie(
-            _CSRF_COOKIE,
-            _current_csrf_token(),
-            httponly=False,          # el JS debe poder leerla para reenviarla
-            samesite=app.config["SESSION_COOKIE_SAMESITE"],
-            secure=app.config["SESSION_COOKIE_SECURE"],
-        )
-    return response
-
-
-@app.before_request
-def enforce_body_limit():
-    """Aplica el tope estricto a todo salvo a los endpoints de subida.
-
-    MAX_CONTENT_LENGTH es global en Werkzeug 3.0 (no es escribible por
-    petición), así que se fija al máximo de subida y aquí se restringe el resto.
-    """
-    if request.path in _UPLOAD_PATHS:
-        return
-    length = request.content_length
-    if length is not None and length > settings.maxCuerpoBytes():
-        abort(413)
-
-
-@app.before_request
-def require_login():
-    if request.endpoint in _PUBLIC_ENDPOINTS or request.endpoint in _ATAJO_ENDPOINTS:
-        return
-    # Assets del login (CSS/JS/imágenes/fuentes), restringidos a sus directorios
-    normalized_path = request.path.lstrip("/").replace("\\", "/")
-    if (
-        os.path.splitext(normalized_path)[1].lower() in _PUBLIC_EXTENSIONS
-        and (normalized_path.startswith(_PUBLIC_DIRS) or normalized_path in _PUBLIC_FILES)
-        and ".." not in normalized_path.split("/")
-    ):
-        return
-    if not session.get("logged_in"):
-        if request.path.startswith("/api/") or request.is_json:
-            abort(401)
-        return redirect(url_for("auth.login", next=request.path))
+# CSRF, tope de cuerpo, límite de escrituras, sesión y cabeceras de respuesta.
+# El detalle vive en core/seguridad_app.py: aquí ocupaba 130 líneas que ningún
+# test podía alcanzar, porque importar este módulo escribe sobre los datos
+# reales (init_portfolios/ensureDataFile) y la suite tiene prohibido hacerlo.
+seguridad_app.instalar(app)
 
 
 # Directorios y ficheros que nunca deben ser accesibles desde el navegador
@@ -217,17 +113,16 @@ _BLOCKED_PREFIXES = ("python/", "data/", "api/", ".env", ".git/", "__pycache__/"
 _ALLOWED_EXTENSIONS = {".html", ".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".svg", ".woff", ".woff2", ".ttf"}
 
 
-@app.after_request
-def add_security_headers(response):
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "SAMEORIGIN"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    return response
-
-
 @app.route("/")
 def serveIndex():
-    response = send_from_directory(BASE_DIR, "index.html")
+    # index.html se sirve leído y no con send_from_directory porque hay que
+    # sustituir el marcador del nonce de CSP por el de esta petición. El
+    # fichero ya se enviaba con Cache-Control: no-store, así que releerlo no
+    # cambia el número de lecturas de disco.
+    g.csp_nonce = csp.generar_nonce()
+    html = csp.insertar_nonce(INDEX_FILE.read_text("utf-8"), g.csp_nonce)
+    response = make_response(html)
+    response.headers["Content-Type"] = "text/html; charset=utf-8"
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -256,7 +151,16 @@ def serveStatic(path):
         abort(404)
 
     response = send_from_directory(BASE_DIR, normalized)
-    if ext in (".js", ".css"):
+    if normalized.startswith("js/vendor/"):
+        # Librerías de terceros: el contenido de una versión no cambia nunca, y
+        # la URL lleva la versión en el `?v=`. Cachearlas un año evita volver a
+        # bajar los 200 KB de Chart.js en cada carga de la página, que es lo
+        # que pasaba cuando todo js/ se servía con no-store.
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif ext in (".js", ".css"):
+        # Código propio: no-store. Antes las etiquetas llevaban además un `?v=`
+        # a mano que había que acordarse de subir en cada cambio; con no-store
+        # no aportaba nada y solo podía olvidarse, así que se quitaron.
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -357,6 +261,10 @@ def _encrypt_api_keys_at_rest():
 ensureDataFile()
 _encrypt_api_keys_at_rest()
 _check_auto_backup()
+# El histórico de evolución lo programaba un setInterval del navegador, así que
+# solo existía mientras hubiera una pestaña abierta. Este hilo lo guarda desde
+# el servidor; con varios workers, el primero que reclama el hueco lo escribe.
+snapshot_scheduler.iniciar()
 
 if __name__ == "__main__":
     # Servidor de desarrollo. En Docker manda gunicorn (ver entrypoint.sh), que

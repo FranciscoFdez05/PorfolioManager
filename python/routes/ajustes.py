@@ -39,6 +39,9 @@ _GLOBAL_DEFAULTS = {
     "staleHours": 24,
     "autoRefreshMinutes": 0,
     "snapshotMinutes": DEFAULT_SNAPSHOT_MINUTES,
+    # Qué portfolios cubre el hilo de snapshots del servidor: solo el activo
+    # (lo que hacía el navegador) o todos.
+    "snapshotAlcance": "activo",
     "theme": "default",
     "sidebarCollapsed": False,
     "monedaBase": "EUR",
@@ -195,6 +198,8 @@ def get_settings():
         "staleHours":            _as_int(gcfg.get("staleHours"), 24),
         "autoRefreshMinutes":    _as_int(gcfg.get("autoRefreshMinutes"), 0),
         "snapshotMinutes":       _as_int(gcfg.get("snapshotMinutes"), 60),
+        "snapshotAlcance":       gcfg.get("snapshotAlcance") or "activo",
+        "snapshotServidor":      settings.snapshotServidorActivo(),
         "theme":                 gcfg.get("theme") or "default",
         "sidebarCollapsed":      bool(gcfg.get("sidebarCollapsed", False)),
         "monedaBase":            gcfg.get("monedaBase") or "EUR",
@@ -272,6 +277,9 @@ def save_settings():
         gcfg["autoRefreshMinutes"] = _as_int(data["autoRefreshMinutes"], 0, {0, 1, 5, 15, 30, 60})
     if "snapshotMinutes" in data:
         gcfg["snapshotMinutes"] = _as_int(data["snapshotMinutes"], 60, {0, 5, 15, 30, 60, 240, 1440})
+    if "snapshotAlcance" in data:
+        alcance = str(data["snapshotAlcance"]).strip().lower()
+        gcfg["snapshotAlcance"] = alcance if alcance in {"activo", "todos"} else "activo"
     if "theme" in data:
         gcfg["theme"] = str(data["theme"]) if data["theme"] in {"default", "black", "light"} else "default"
     if "sidebarCollapsed" in data:

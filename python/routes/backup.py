@@ -276,6 +276,11 @@ def _restore_locked():
 
     safety_dir = _safety_copy_before_restore()
 
+    # Entradas del zip que no se han podido restaurar. Se acumulan en vez de
+    # abortar: si el backup trae cinco portfolios y uno está dañado, interesa
+    # recuperar los otros cuatro y saber cuál falta, no perderlo todo.
+    ignorados: list[str] = []
+
     from core.db import invalidate_all_connections
     invalidate_all_connections()
 
@@ -292,17 +297,28 @@ def _restore_locked():
                         db_name = Path(name).name
                         if not _RE_SAFE_DB_NAME.match(db_name):
                             log.warning(f"[backup] Entrada de zip ignorada por nombre inseguro: {name}")
+                            ignorados.append(f"{name}: nombre no admisible")
                             continue
                         dst_path = _PORTFOLIOS_DIR / db_name
                         raw = zf.read(name)
                         if not raw.startswith(b"SQLite format 3\x00"):
                             log.warning(f"[backup] Entrada {name} no es un SQLite válido, ignorada")
+                            ignorados.append(f"{name}: no es un fichero SQLite")
                             continue
                         tmp_path = _PORTFOLIOS_DIR / f"_restore_tmp_{db_name}"
                         try:
                             tmp_path.write_bytes(raw)
                             _sqlite_copy(tmp_path, dst_path)
                             _remove_wal_sidecars(dst_path)
+                        except Exception as e:
+                            # La cabecera "SQLite format 3" son 16 bytes: acertarla
+                            # no garantiza que el resto del fichero sea legible.
+                            # Antes, una sola entrada así abortaba la restauración
+                            # completa y dejaba los portfolios ya procesados
+                            # mezclados con los que aún no se habían tocado. Ahora
+                            # se salta y se informa de cuál falló.
+                            log.error(f"[backup] No se pudo restaurar {name}: {e}")
+                            ignorados.append(f"{name}: {e}")
                         finally:
                             tmp_path.unlink(missing_ok=True)
                             for suffix in ("-wal", "-shm"):
@@ -326,6 +342,7 @@ def _restore_locked():
                         prefs_name = Path(name).name
                         if not _RE_SAFE_PREFS_NAME.match(prefs_name):
                             log.warning(f"[backup] Entrada de prefs ignorada por nombre inseguro: {name}")
+                            ignorados.append(f"{name}: nombre no admisible")
                             continue
                         dst = _JSON_DIR / prefs_name
                         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -390,12 +407,21 @@ def _restore_locked():
             "ok": False,
             "error": str(e),
             "safetyCopy": str(safety_dir) if safety_dir else None,
+            "ignorados": ignorados,
         }), 500
     finally:
         # Los .db han cambiado bajo los pies de las conexiones cacheadas
         invalidate_all_connections()
 
-    return jsonify({"ok": True, "safetyCopy": str(safety_dir) if safety_dir else None})
+    if ignorados:
+        log.warning("[backup] Restauración parcial: %d entradas ignoradas", len(ignorados))
+    return jsonify({
+        "ok": True,
+        "safetyCopy": str(safety_dir) if safety_dir else None,
+        # El frontend debe avisar si la restauración fue parcial: un "ok" a
+        # secas después de perder un portfolio sería el peor resultado posible.
+        "ignorados": ignorados,
+    })
 
 
 @backup_bp.route("/api/backups/<filename>", methods=["DELETE"])
