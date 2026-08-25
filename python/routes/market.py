@@ -4,20 +4,19 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
-from core import settings
+from core import dinero, settings
 from core.db import get_db
-from providers.alpha_vantage_client import fetch_quote as fetch_av_quote, search_symbol as search_av_symbol
-from providers.eodhd_client import fetch_quote as fetch_eodhd_quote, search_symbol as search_eodhd_symbol
+from providers.alpha_vantage_client import search_symbol as search_av_symbol
+from providers.eodhd_client import search_symbol as search_eodhd_symbol
 from providers.finnhub_client import (
     fetch_candle_close,
     fetch_exchange_rate,
-    fetch_quote as fetch_finnhub_quote,
     search_symbol,
 )
-from providers.yahoo_finance_client import fetch_quote as fetch_yahoo_quote, search_symbol as search_yahoo_symbol
+from providers.yahoo_finance_client import search_symbol as search_yahoo_symbol
+from stores import benchmark
 from stores.app_data import readFinnhubApiKey
 from stores.asset_store import listAssets
-from stores.asset_utils import inferMarketProviderFromSymbol, normalizeMarketProvider
 from stores.helpers import (
     call_alpha_vantage_with_fallbacks,
     call_eodhd_with_fallbacks,
@@ -25,6 +24,7 @@ from stores.helpers import (
     normalize_currency_code,
     parse_loose_number,
 )
+from stores.market_data import fetch_asset_quote
 
 _hist_cache = {}   # {period: {"data": {...}, "ts": float}}
 
@@ -132,13 +132,20 @@ def getHistoricalChanges():
 
         def fetch_one(asset):
             symbol    = str(asset.get("marketSymbol") or asset.get("finnhubSymbol") or "").strip()
-            cur_price = parse_loose_number(str(asset.get("price") or ""))
+            cur_price = parse_loose_number(asset.get("price"))
             if not symbol or not cur_price or cur_price <= 0:
                 return asset["id"], None
             hist_price, _ = fetch_candle_close(symbol, from_ts, to_ts, api_key)
-            if hist_price and hist_price > 0:
-                return asset["id"], round((cur_price - hist_price) / hist_price * 100, 2)
-            return asset["id"], None
+            if not hist_price or hist_price <= 0:
+                return asset["id"], None
+            # El precio actual sale de una columna TEXT (Decimal) y el histórico
+            # de la API de Finnhub (float). Restarlos directamente es un
+            # TypeError, así que el float del proveedor entra por `dinero`, que
+            # lo convierte por su representación más corta en vez de arrastrar
+            # la cola binaria.
+            hist = dinero.aDecimal(hist_price, "precio histórico")
+            variacion = (cur_price - hist) / hist * 100
+            return asset["id"], float(dinero.redondear(variacion))
 
         with ThreadPoolExecutor(max_workers=settings.maxPeticionesParalelas()) as pool:
             futures = {pool.submit(fetch_one, a): a for a in assets_needing_api}
@@ -149,6 +156,32 @@ def getHistoricalChanges():
 
     _hist_cache[period] = {"data": result, "ts": time.time()}
     return jsonify({"ok": True, "data": result, "cached": False})
+
+
+@market_bp.route("/api/market/benchmarks", methods=["GET"])
+def listBenchmarks():
+    return jsonify({"ok": True, "indices": benchmark.catalogo()})
+
+
+@market_bp.route("/api/market/benchmark", methods=["GET"])
+def getBenchmark():
+    """Cierres diarios del índice pedido, para superponerlo a la evolución."""
+    clave = request.args.get("indice", "")
+    ahora = int(time.time())
+    try:
+        desde = int(request.args.get("from") or (ahora - 365 * 86400))
+        hasta = int(request.args.get("to") or ahora)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "Rango inválido"}), 400
+    if desde >= hasta:
+        return jsonify({"ok": False, "error": "Rango inválido"}), 400
+
+    datos, error = benchmark.serie(clave, desde, hasta)
+    if error:
+        statusCode = 503 if is_temporary_service_error(error) else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    return jsonify({"ok": True, **datos})
 
 
 @market_bp.route("/api/historical-changes/invalidate", methods=["POST"])
@@ -210,17 +243,7 @@ def getMarketQuote():
     if not symbol:
         return jsonify({"ok": False, "error": "symbol requerido"}), 400
 
-    provider = normalizeMarketProvider(provider_raw, fallback=inferMarketProviderFromSymbol(symbol))
-
-    if provider == "eodhd":
-        quote, error = call_eodhd_with_fallbacks(lambda apiKey: fetch_eodhd_quote(symbol, apiKey))
-    elif provider == "yahoo":
-        quote, error = fetch_yahoo_quote(symbol)
-    elif provider == "alphavantage":
-        quote, error = call_alpha_vantage_with_fallbacks(lambda apiKey: fetch_av_quote(symbol, apiKey))
-    else:
-        api_key = readFinnhubApiKey()
-        quote, error = fetch_finnhub_quote(symbol, api_key)
+    quote, error = fetch_asset_quote(symbol, provider_raw)
 
     if error:
         statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
