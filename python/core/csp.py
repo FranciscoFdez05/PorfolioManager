@@ -22,6 +22,11 @@ Decisiones que no son obvias:
 * **frame-ancestors 'self'** duplica X-Frame-Options a propósito: la cabecera
   antigua la ignoran los navegadores modernos cuando hay CSP, y la nueva no la
   entienden los muy viejos.
+* **frame-src con TradingView.** El modal de gráfico de un activo incrusta
+  `www.tradingview.com/widgetembed/`. Sin esta directiva heredaría
+  `default-src 'self'` y el navegador bloquearía el iframe mostrando su propia
+  página de error, que no menciona la CSP por ningún lado. Es la única
+  excepción: no hay más iframes en la aplicación.
 """
 
 import secrets
@@ -29,6 +34,11 @@ import secrets
 from core import settings
 
 _MARCADOR_NONCE = "__CSP_NONCE__"
+
+# Orígenes del widget de gráficos. `www` sirve /widgetembed/, que es lo que va
+# en el src del iframe; `s` es de donde tira el propio widget si alguna vez se
+# usa el embebido por script en vez de por URL.
+_ORIGENES_FRAME = ("https://www.tradingview.com", "https://s.tradingview.com")
 
 
 def generar_nonce() -> str:
@@ -53,6 +63,7 @@ def construir(nonce: str = "") -> str:
         ("base-uri", ["'self'"]),
         ("form-action", ["'self'"]),
         ("frame-ancestors", ["'self'"]),
+        ("frame-src", ["'self'", *_ORIGENES_FRAME]),
     ]
     return "; ".join(f"{nombre} {' '.join(valores)}" for nombre, valores in directivas)
 

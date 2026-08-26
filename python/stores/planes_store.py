@@ -1,10 +1,13 @@
 """Planes de inversión y planes de aportación periódica (DCA).
 
 Son la única parte de la aplicación que guarda *intención* en vez de hechos: lo
-que se piensa hacer con un activo (a qué precio entrar, dónde recoger el
-beneficio, dónde cortar la pérdida) y con qué periodicidad aportar. Por eso no
-pasan por `asset_store` ni entran en el cálculo de rendimiento ni en el FIFO
-fiscal: un plan que no se ha ejecutado no es una operación.
+que se piensa hacer con un activo (a qué precio entrar, a qué precio recoger el
+beneficio, con cuánto capital) y con qué periodicidad aportar. Por eso no pasan
+por `asset_store` ni entran en el cálculo de rendimiento ni en el FIFO fiscal:
+un plan que no se ha ejecutado no es una operación.
+
+Cada plan cuelga de un activo (`asset_id`, con FK y ON DELETE CASCADE): se
+consulta desde su ficha, así que uno huérfano no tendría dónde verse.
 
 Los importes se guardan como texto, igual que en el resto de tablas: entran tal
 y como se teclean —"1.234,56", "0,00021"— y el que los interpreta es
@@ -13,6 +16,7 @@ capa de almacenamiento y perdería lo que el usuario escribió.
 """
 
 from core.db import get_db, transactional
+from core.errors import ValidationError
 
 _PLAN_COLUMNS = (
     ("id",              "id"),
@@ -22,11 +26,9 @@ _PLAN_COLUMNS = (
     ("ticker",          "ticker"),
     ("market_provider", "marketProvider"),
     ("tv_symbol",       "tvSymbol"),
-    ("direccion",       "direccion"),
     ("currency",        "currency"),
     ("precio_entrada",  "precioEntrada"),
     ("precio_salida",   "precioSalida"),
-    ("stop_loss",       "stopLoss"),
     ("capital",         "capital"),
     ("horizonte",       "horizonte"),
     ("estado",          "estado"),
@@ -70,6 +72,24 @@ def _leer(tabla, columnas):
     ]}
 
 
+def _comprobar_activos(conn, filas):
+    """Rechaza los planes que apunten a un activo que ya no existe.
+
+    Sin esto el aviso lo daría la clave foránea, con un error del motor y un 500
+    en la cara: pasa cuando se borra un activo desde otra pestaña y esta guarda
+    después la lista que tenía cargada.
+    """
+    existentes = {fila["id"] for fila in conn.execute("SELECT id FROM activos")}
+    huerfanos = sorted({
+        fila.get("assetId", "") for fila in filas if fila.get("assetId", "") not in existentes
+    })
+
+    if huerfanos:
+        raise ValidationError(
+            f"Estos planes apuntan a un activo que ya no existe: {', '.join(huerfanos)}"
+        )
+
+
 def _escribir(tabla, columnas, filas):
     """Reemplaza el contenido de la tabla por `filas`, en ese orden.
 
@@ -80,6 +100,7 @@ def _escribir(tabla, columnas, filas):
     medias, la tabla se queda como estaba en vez de vaciarse.
     """
     conn = get_db()
+    _comprobar_activos(conn, filas)
     conn.execute(f"DELETE FROM {tabla}")
 
     nombres = [columna for columna, _ in columnas] + ["sort_order"]

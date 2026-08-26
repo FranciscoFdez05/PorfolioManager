@@ -1,106 +1,51 @@
 <div class="activosPage">
 
-    <div class="avCatTabs" id="avCatTabs">
-        <button type="button" class="avCatTab avCatTabActive" data-cat="activos">Activos</button>
-        <button type="button" class="avCatTab" data-cat="planes">Planes de inversión</button>
-        <button type="button" class="avCatTab" data-cat="dca">DCA</button>
+    <div class="activosToolbar">
+        <button id="activosAddBtn" class="primaryButton">+ Añadir activo</button>
+        <div class="activosFilters" id="activosFilters">
+            <label class="activosFilterBtn" data-type="all"><input type="checkbox" checked><span>Todos</span></label>
+            <label class="activosFilterBtn" data-type="cripto"><input type="checkbox" checked><span>Cripto</span></label>
+            <label class="activosFilterBtn" data-type="acciones"><input type="checkbox" checked><span>Acciones</span></label>
+            <label class="activosFilterBtn" data-type="etfs"><input type="checkbox" checked><span>ETFs</span></label>
+            <label class="activosFilterBtn" data-type="comoditis"><input type="checkbox" checked><span>Comoditis</span></label>
+        </div>
+        <input type="text" class="activosSearch" id="activosSearch" placeholder="Buscar activo...">
+        <span class="activosCount" id="activosCount"></span>
+        <button type="button" id="activosShowHiddenBtn" class="avShowHiddenBtn" title="Mostrar activos ocultos">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3C4 3 1.5 5.5 1.5 7S4 11 7 11s5.5-2.5 5.5-4S10 3 7 3z" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="7" cy="7" r="1.8" fill="currentColor"/></svg>
+            Ocultos
+        </button>
+        <div class="avViewToggle" id="avViewToggle">
+            <button class="avViewBtn active" data-view="cards" title="Vista tarjetas">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg>
+            </button>
+            <button class="avViewBtn" data-view="table" title="Vista tabla">
+                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="2" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="6.75" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="11.5" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>
+            </button>
+        </div>
     </div>
 
-    <section class="avCatPanel" id="avCatPanelActivos">
-
-        <div class="activosToolbar">
-            <button id="activosAddBtn" class="primaryButton">+ Añadir activo</button>
-            <div class="activosFilters" id="activosFilters">
-                <label class="activosFilterBtn" data-type="all"><input type="checkbox" checked><span>Todos</span></label>
-                <label class="activosFilterBtn" data-type="cripto"><input type="checkbox" checked><span>Cripto</span></label>
-                <label class="activosFilterBtn" data-type="acciones"><input type="checkbox" checked><span>Acciones</span></label>
-                <label class="activosFilterBtn" data-type="etfs"><input type="checkbox" checked><span>ETFs</span></label>
-                <label class="activosFilterBtn" data-type="comoditis"><input type="checkbox" checked><span>Comoditis</span></label>
-            </div>
-            <input type="text" class="activosSearch" id="activosSearch" placeholder="Buscar activo...">
-            <span class="activosCount" id="activosCount"></span>
-            <button type="button" id="activosShowHiddenBtn" class="avShowHiddenBtn" title="Mostrar activos ocultos">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3C4 3 1.5 5.5 1.5 7S4 11 7 11s5.5-2.5 5.5-4S10 3 7 3z" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="7" cy="7" r="1.8" fill="currentColor"/></svg>
-                Ocultos
-            </button>
-            <div class="avViewToggle" id="avViewToggle">
-                <button class="avViewBtn active" data-view="cards" title="Vista tarjetas">
-                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg>
-                </button>
-                <button class="avViewBtn" data-view="table" title="Vista tabla">
-                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="2" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="6.75" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="11.5" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>
-                </button>
-            </div>
-        </div>
-
-        <div class="activosGrid" id="activosGrid"></div>
-        <p class="overviewEmpty hidden" id="activosGridEmpty">No hay activos.</p>
-        <div class="activosTableWrap hidden" id="activosTableWrap">
-            <table class="activosTable" id="activosTable">
-                <thead>
-                    <tr>
-                        <th class="mThSort" data-sortkey="0">Tipo<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="1">Nombre<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="2">Precio<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="3">Provider<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="4">Posición<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="5">Valor actual<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="6">P. medio compra<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="7">Rendimiento<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="8">Actualizado<span class="mSortArrow"></span></th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody id="activosTableBody"></tbody>
-            </table>
-        </div>
-        <p class="overviewEmpty hidden" id="activosTableEmpty">No hay activos.</p>
-
-    </section>
-
-    <section class="avCatPanel hidden" id="avCatPanelPlanes">
-
-        <div class="activosToolbar">
-            <button id="planesAddBtn" class="primaryButton">+ Nuevo plan</button>
-            <div class="planFilters" id="planesEstadoFilters">
-                <button type="button" class="filterDropBtn active" data-estado="all">Todos</button>
-                <button type="button" class="filterDropBtn" data-estado="Pendiente">Pendientes</button>
-                <button type="button" class="filterDropBtn" data-estado="En curso">En curso</button>
-                <button type="button" class="filterDropBtn" data-estado="Cumplido">Cumplidos</button>
-                <button type="button" class="filterDropBtn" data-estado="Cancelado">Cancelados</button>
-            </div>
-            <input type="text" class="activosSearch" id="planesSearch" placeholder="Buscar plan...">
-            <span class="activosCount" id="planesCount"></span>
-            <button type="button" class="avShowHiddenBtn" id="planesExportBtn" title="Descargar los planes en CSV">CSV</button>
-        </div>
-
-        <div class="planKpiRow" id="planesKpis"></div>
-
-        <div class="activosGrid planesGrid" id="planesGrid"></div>
-        <p class="overviewEmpty hidden" id="planesEmpty">Todavía no hay ningún plan de inversión. Crea uno para fijar por escrito a qué precio entras, dónde recoges el beneficio y dónde cortas la pérdida.</p>
-
-    </section>
-
-    <section class="avCatPanel hidden" id="avCatPanelDca">
-
-        <div class="activosToolbar">
-            <button id="dcaAddBtn" class="primaryButton">+ Nuevo plan DCA</button>
-            <div class="planFilters" id="dcaEstadoFilters">
-                <button type="button" class="filterDropBtn active" data-estado="all">Todos</button>
-                <button type="button" class="filterDropBtn" data-estado="Activo">Activos</button>
-                <button type="button" class="filterDropBtn" data-estado="Pausado">Pausados</button>
-                <button type="button" class="filterDropBtn" data-estado="Finalizado">Finalizados</button>
-            </div>
-            <input type="text" class="activosSearch" id="dcaSearch" placeholder="Buscar plan DCA...">
-            <span class="activosCount" id="dcaCount"></span>
-            <button type="button" class="avShowHiddenBtn" id="dcaExportBtn" title="Descargar los planes DCA en CSV">CSV</button>
-        </div>
-
-        <div class="planKpiRow" id="dcaKpis"></div>
-
-        <div class="activosGrid planesGrid" id="dcaGrid"></div>
-        <p class="overviewEmpty hidden" id="dcaEmpty">Todavía no hay ningún plan de aportación periódica. Crea uno para fijar cuánto aportas, cada cuánto y hasta cuándo.</p>
-
-    </section>
+    <div class="activosGrid" id="activosGrid"></div>
+    <p class="overviewEmpty hidden" id="activosGridEmpty">No hay activos.</p>
+    <div class="activosTableWrap hidden" id="activosTableWrap">
+        <table class="activosTable" id="activosTable">
+            <thead>
+                <tr>
+                    <th class="mThSort" data-sortkey="0">Tipo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Nombre<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Precio<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3">Provider<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="4">Posición<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5">Valor actual<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6">P. medio compra<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="7">Rendimiento<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="8">Actualizado<span class="mSortArrow"></span></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="activosTableBody"></tbody>
+        </table>
+    </div>
+    <p class="overviewEmpty hidden" id="activosTableEmpty">No hay activos.</p>
 
 </div>

@@ -7,6 +7,10 @@ próximo aporte dependen del precio del momento, que ya se pide aparte— pero s
 normaliza: los desplegables entran acotados a sus opciones y el resto de campos
 se recortan, para que en la base no acabe ni un estado inventado ni una nota de
 un megabyte.
+
+`assetId` es obligatorio en los dos: un plan se consulta desde la ficha de su
+activo, así que uno sin activo se guardaría en un sitio del que no se puede
+salir. La tabla lo refuerza con una clave foránea.
 """
 
 from flask import Blueprint, jsonify
@@ -16,7 +20,6 @@ from stores.planes_store import read_dca, read_planes, write_dca, write_planes
 
 planes_bp = Blueprint("planes", __name__)
 
-_DIRECCIONES = {"Largo", "Corto"}
 _HORIZONTES = {"Corto", "Medio", "Largo"}
 _ESTADOS_PLAN = {"Pendiente", "En curso", "Cumplido", "Cancelado"}
 _FRECUENCIAS = {"Semanal", "Quincenal", "Mensual", "Trimestral"}
@@ -37,13 +40,14 @@ def _identificador(fila, indice, prefijo):
 def _mercado(fila):
     """Campos con los que se localiza la cotización del plan.
 
-    Un plan puede apuntar a un activo de la cartera (`assetId`) o a algo que
-    todavía no se tiene, en cuyo caso lo único que hay es el ticker y el
-    proveedor. Se guardan los dos: si el activo se borra, el plan sigue sabiendo
-    de qué estaba hablando.
+    El plan cuelga siempre de un activo de la cartera, y de él saca el precio
+    con el que se evalúa. El símbolo, el ticker y el proveedor se copian del
+    activo al crearlo: no se usan para cotizar —eso ya lo hace el activo— pero
+    dejan escrito de qué se estaba hablando y son con lo que la tarjeta abre el
+    gráfico.
     """
     return {
-        "assetId":        as_text(fila.get("assetId"), "assetId", max_length=120),
+        "assetId":        as_text(fila.get("assetId"), "assetId", max_length=120, required=True),
         "symbol":         as_text(fila.get("symbol"), "symbol", max_length=40).upper(),
         "ticker":         as_text(fila.get("ticker"), "ticker", max_length=80).upper(),
         "marketProvider": as_text(fila.get("marketProvider"), "marketProvider", max_length=40).lower(),
@@ -57,10 +61,8 @@ def _sanear_plan(fila, indice):
         **_mercado(fila),
         "id":            _identificador(fila, indice, "plan"),
         "nombre":        as_text(fila.get("nombre"), "nombre", max_length=_MAX_NOMBRE),
-        "direccion":     one_of(fila.get("direccion"), _DIRECCIONES, "direccion", default="Largo"),
         "precioEntrada": as_text(fila.get("precioEntrada"), "precioEntrada", max_length=_MAX_IMPORTE),
         "precioSalida":  as_text(fila.get("precioSalida"), "precioSalida", max_length=_MAX_IMPORTE),
-        "stopLoss":      as_text(fila.get("stopLoss"), "stopLoss", max_length=_MAX_IMPORTE),
         "capital":       as_text(fila.get("capital"), "capital", max_length=_MAX_IMPORTE),
         "horizonte":     one_of(fila.get("horizonte"), _HORIZONTES, "horizonte", default="Medio"),
         "estado":        one_of(fila.get("estado"), _ESTADOS_PLAN, "estado", default="Pendiente"),

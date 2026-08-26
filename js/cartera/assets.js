@@ -2908,7 +2908,11 @@ function renderAssetTablePage(asset) {
                     <button class="assetTabBtn hidden" id="completadasTabBtn" data-tab="completadas">Operaciones Spot</button>
                     <button class="assetTabBtn hidden" id="transaccionesTabBtn" data-tab="transacciones">Transacciones</button>
                     <button class="assetTabBtn" id="ventasTabBtn" data-tab="ventas">Ventas</button>
+                    <button class="assetTabBtn" id="planesTabBtn" data-tab="planes">Planes</button>
+                    <button class="assetTabBtn" id="dcaTabBtn" data-tab="dca">DCA</button>
                     <button class="assetTabsNavAction hidden" id="assetAddVentaNavBtn" type="button"><span class="assetBtnIcon">+</span> Añadir venta</button>
+                    <button class="assetTabsNavAction hidden" id="assetAddPlanNavBtn" type="button"><span class="assetBtnIcon">+</span> Nuevo plan</button>
+                    <button class="assetTabsNavAction hidden" id="assetAddDcaNavBtn" type="button"><span class="assetBtnIcon">+</span> Nuevo plan DCA</button>
                 </div>
                 <div class="assetTabPanel" data-tab="spot">
                     <div class="assetTableWrapper">
@@ -2941,6 +2945,12 @@ function renderAssetTablePage(asset) {
                 <div class="assetTabPanel hidden" data-tab="ventas">
                     <div id="assetVentasSection"></div>
                 </div>
+                <div class="assetTabPanel hidden" data-tab="planes">
+                    <div id="assetPlanesSection"></div>
+                </div>
+                <div class="assetTabPanel hidden" data-tab="dca">
+                    <div id="assetDcaSection"></div>
+                </div>
             </div>
         </section>
     `
@@ -2954,6 +2964,11 @@ function renderAssetTablePage(asset) {
     setupAssetTabs(asset)
     _assetBindSort(asset.id)
     initAssetTableLogic(asset)
+
+    // Planes de inversión y DCA: lo que se piensa hacer con ESTE activo. Van
+    // después de pintar la ficha porque sus tarjetas leen de ella el precio
+    // actual, y sin `await` porque nada de lo de arriba depende de ellas.
+    initAssetPlanesLogic(asset)
 
     const titleEl = document.querySelector(".assetPageTitle")
     if (titleEl) {
@@ -2974,6 +2989,8 @@ function setActiveAssetTab(tab) {
         p.classList.toggle("hidden", p.dataset.tab !== tab)
     })
     document.getElementById("assetAddVentaNavBtn")?.classList.toggle("hidden", tab !== "ventas")
+    document.getElementById("assetAddPlanNavBtn")?.classList.toggle("hidden", tab !== "planes")
+    document.getElementById("assetAddDcaNavBtn")?.classList.toggle("hidden", tab !== "dca")
 }
 
 function setupAssetTabs(asset) {
@@ -2987,6 +3004,8 @@ function setupAssetTabs(asset) {
     })
 
     nav.querySelector("#assetAddVentaNavBtn")?.addEventListener("click", () => openAssetAddVentaModal(asset))
+    nav.querySelector("#assetAddPlanNavBtn")?.addEventListener("click", () => planAbrirEditor())
+    nav.querySelector("#assetAddDcaNavBtn")?.addEventListener("click", () => dcaAbrirEditor())
 }
 
 function renderAssetRows(rows) {
@@ -5129,11 +5148,6 @@ async function initActivosPageLogic() {
     if (addBtn) addBtn.addEventListener("click", () => openAssetModal())
 
     avInitDragDrop()
-
-    // Planes de inversión y DCA: dos categorías más de esta misma página. Van
-    // después de cargar los activos porque sus tarjetas leen de ahí el precio
-    // actual, y sin `await` porque nada de lo de arriba depende de ellas.
-    initPlanesLogic()
 }
 
 function avInitDragDrop() {

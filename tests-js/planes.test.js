@@ -1,20 +1,19 @@
 // Pruebas de la aritmética de js/cartera/planes.js.
 //
 // Un plan no guarda ningún número calculado: lo que se ve en la tarjeta —lo que
-// falta para el objetivo, el ratio beneficio/riesgo, cuántos aportes llevas— se
-// deriva del precio de hoy cada vez que se pinta. Eso quiere decir que un fallo
-// aquí no da un error: da un número equivocado, que es exactamente lo que el
-// linter no puede ver.
+// falta para el objetivo, cuántos aportes llevas— se deriva del precio de hoy
+// cada vez que se pinta. Eso quiere decir que un fallo aquí no da un error: da
+// un número equivocado, que es exactamente lo que el linter no puede ver.
 //
 // Los dos casos que más se pueden torcer, y por los que existe este fichero:
 //
-//   1. **Los planes cortos.** Se gana cuando el precio baja, así que el signo
-//      del recorrido, el del riesgo y los tres avisos (entrada, objetivo, stop)
-//      van al revés que en un largo.
+//   1. **El plan a medio escribir.** Sin precio de mercado, sin capital o con
+//      una entrada a cero hay que dejar el hueco en blanco, no rellenarlo con
+//      un cero que se lee como un dato bueno.
 //   2. **El calendario mensual.** Un plan empezado un día 31 tiene que caer en
 //      el último día de febrero y volver al 31 en marzo. Sumando periodos de 30
 //      días, ni las fechas ni el número de aportes cuadran.
-import { beforeAll, describe, expect, it, vi } from "vitest"
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { cargarScript } from "./cargar.js"
 
 beforeAll(() => {
@@ -27,33 +26,28 @@ beforeAll(() => {
     cargarScript("js/cartera/planes.js")
 })
 
-/** Plan con el precio actual inyectado en la caché de cotizaciones. */
-function planConPrecio(campos, precioActual) {
-    const row = { id: "p", ticker: "TEST", marketProvider: "finnhub", currency: "EUR", ...campos }
-    if (precioActual !== undefined) {
-        _planesQuoteCache.set("finnhub|TEST", { price: precioActual, currency: "EUR" })
-    }
-    return row
+beforeEach(() => {
+    _planesAsset = null
+})
+
+/** El precio sale del activo cuya ficha está abierta, y de ningún otro sitio. */
+function conActivoA(precioActual) {
+    _planesAsset = { id: "a", name: "Activo", symbol: "TEST", price: precioActual, currency: "EUR" }
 }
 
-const LARGO = {
-    direccion: "Largo",
+const PLAN = {
+    id: "p",
+    assetId: "a",
     precioEntrada: "100",
     precioSalida: "150",
-    stopLoss: "90",
     capital: "1000"
 }
 
-const CORTO = {
-    direccion: "Corto",
-    precioEntrada: "100",
-    precioSalida: "70",
-    stopLoss: "110",
-    capital: "1000"
-}
-
-describe("planCalcular · plan largo", () => {
-    const c = () => planCalcular(planConPrecio(LARGO, 120))
+describe("planCalcular", () => {
+    const c = (campos = {}, precio = "120") => {
+        conActivoA(precio)
+        return planCalcular({ ...PLAN, ...campos })
+    }
 
     it("dice cuánto tiene que subir el precio para llegar al objetivo", () => {
         // De 120 a 150 hay un 25 %: es el dato que preside la tarjeta.
@@ -64,91 +58,44 @@ describe("planCalcular · plan largo", () => {
         expect(c().hastaEntrada).toBeCloseTo(-16.666666, 4)
     })
 
-    it("mide el recorrido y el riesgo desde la entrada, no desde el precio de hoy", () => {
+    it("mide el recorrido desde la entrada, no desde el precio de hoy", () => {
         // El plan no cambia porque el precio se mueva: de 100 a 150 se gana un
-        // 50 %, y de 100 a 90 se pierde un 10 %, valga hoy lo que valga.
+        // 50 %, valga hoy lo que valga.
         expect(c().recorrido).toBeCloseTo(50, 6)
-        expect(c().riesgo).toBeCloseTo(10, 6)
-        expect(c().ratio).toBeCloseTo(5, 6)
     })
 
-    it("traduce el plan a euros con el capital previsto", () => {
+    it("traduce el plan a dinero con el capital previsto", () => {
         expect(c().unidades).toBeCloseTo(10, 6)
         expect(c().beneficio).toBeCloseTo(500, 6)
-        expect(c().perdida).toBeCloseTo(100, 6)
     })
 
-    it("sitúa el precio en el recorrido que va del stop al objetivo", () => {
-        // Del 90 al 150 hay 60; el precio está en 120, la mitad del camino.
-        expect(c().progreso).toBeCloseTo(50, 6)
-        expect(c().marcaEntrada).toBeCloseTo(16.666666, 4)
-    })
-
-    it.each([
-        [120, ""],
-        [100, "entrada"],
-        [95, "entrada"],
-        [150, "objetivo"],
-        [160, "objetivo"],
-        [90, "stop"],
-        [85, "stop"]
-    ])("con el precio en %s avisa de «%s»", (precio, esperado) => {
-        expect(planCalcular(planConPrecio(LARGO, precio)).aviso).toBe(esperado)
-    })
-})
-
-describe("planCalcular · plan corto", () => {
-    const c = () => planCalcular(planConPrecio(CORTO, 90))
-
-    it("cuenta como beneficio la caída hasta el objetivo", () => {
-        // Bajar de 100 a 70 es ganar un 30 %: con el signo del largo saldría
-        // −30 % y el plan parecería una pérdida garantizada.
-        expect(c().recorrido).toBeCloseTo(30, 6)
-        expect(c().beneficio).toBeCloseTo(300, 6)
-    })
-
-    it("cuenta como riesgo la subida hasta el stop", () => {
-        expect(c().riesgo).toBeCloseTo(10, 6)
-        expect(c().perdida).toBeCloseTo(100, 6)
-        expect(c().ratio).toBeCloseTo(3, 6)
-    })
-
-    it("el objetivo está por debajo, así que falta un porcentaje negativo", () => {
-        expect(c().hastaObjetivo).toBeCloseTo(-22.222222, 4)
-    })
-
-    it("sitúa el precio en el recorrido aunque vaya de más a menos", () => {
-        // Del stop (110) al objetivo (70); el precio está en 90, a mitad.
-        expect(c().progreso).toBeCloseTo(50, 6)
+    it("sitúa el precio en el recorrido que va de la entrada al objetivo", () => {
+        // De 100 a 150 hay 50; el precio está en 120, a un 40 % del camino.
+        expect(c().progreso).toBeCloseTo(40, 6)
     })
 
     it.each([
-        [90, ""],
-        [105, "entrada"],
-        [100, "entrada"],
-        [65, "objetivo"],
-        [70, "objetivo"],
-        [115, "stop"],
-        [110, "stop"]
+        ["120", ""],
+        ["100", "entrada"],
+        ["95", "entrada"],
+        ["150", "objetivo"],
+        ["160", "objetivo"]
     ])("con el precio en %s avisa de «%s»", (precio, esperado) => {
-        expect(planCalcular(planConPrecio(CORTO, precio)).aviso).toBe(esperado)
+        expect(c({}, precio).aviso).toBe(esperado)
+    })
+
+    it("un objetivo por debajo de la entrada sale en negativo, no del revés", () => {
+        // Aquí no hay cortos: un plan así está mal escrito, y verlo en rojo es
+        // justo lo que hace falta para corregirlo.
+        expect(c({ precioSalida: "70" }).recorrido).toBeCloseTo(-30, 6)
+        expect(c({ precioSalida: "70" }).beneficio).toBeCloseTo(-300, 6)
     })
 })
 
 describe("planCalcular · datos incompletos", () => {
-    it("sin stop no hay riesgo que medir y el ratio se queda vacío", () => {
-        const c = planCalcular(planConPrecio({ ...LARGO, stopLoss: "" }, 120))
-
-        expect(c.riesgo).toBeNull()
-        expect(c.perdida).toBeNull()
-        expect(c.ratio).toBeNull()
-        // El recorrido pasa a medirse desde la entrada: de 100 a 150, y el
-        // precio de 120 está a un 40 % del camino.
-        expect(c.progreso).toBeCloseTo(40, 6)
-    })
-
     it("sin precio actual no se inventa ningún porcentaje", () => {
-        const c = planCalcular({ id: "p", ...LARGO, currency: "EUR" })
+        _planesAsset = { id: "a", price: "", currency: "EUR" }
+        const c = planCalcular(PLAN)
 
         expect(c.actual).toBeNull()
         expect(c.hastaObjetivo).toBeNull()
@@ -158,22 +105,41 @@ describe("planCalcular · datos incompletos", () => {
         expect(c.recorrido).toBeCloseTo(50, 6)
     })
 
-    it("un precio de entrada de cero no da un recorrido del 0 %", () => {
-        // `signo * null` vale 0: sin comprobarlo aparte, un dato imposible se
-        // colaba en la tarjeta como un porcentaje legítimo.
-        const c = planCalcular(planConPrecio({ ...LARGO, precioEntrada: "0" }, 120))
+    it("sin ficha abierta no hay precio ni moneda que suponer", () => {
+        const c = planCalcular(PLAN)
 
-        expect(c.recorrido).toBeNull()
-        expect(c.riesgo).toBeNull()
+        expect(c.actual).toBeNull()
+        expect(c.currency).toBe("EUR")
     })
 
-    it("un ratio no se puede calcular si el stop está en la entrada", () => {
-        expect(planCalcular(planConPrecio({ ...LARGO, stopLoss: "100" }, 120)).ratio).toBeNull()
+    it("un precio de entrada de cero no da un recorrido del 0 %", () => {
+        conActivoA("120")
+        const c = planCalcular({ ...PLAN, precioEntrada: "0" })
+
+        expect(c.recorrido).toBeNull()
+        expect(c.unidades).toBeNull()
+        expect(c.beneficio).toBeNull()
+    })
+
+    it("sin capital no hay beneficio potencial que estimar", () => {
+        conActivoA("120")
+        const c = planCalcular({ ...PLAN, capital: "" })
+
+        expect(c.unidades).toBeNull()
+        expect(c.beneficio).toBeNull()
+        expect(c.recorrido).toBeCloseTo(50, 6)
     })
 
     it("lee los importes en formato español", () => {
-        const c = planCalcular(planConPrecio({ ...LARGO, precioEntrada: "1.234,50" }, 120))
-        expect(c.entrada).toBeCloseTo(1234.5, 6)
+        conActivoA("120")
+        expect(planCalcular({ ...PLAN, precioEntrada: "1.234,50" }).entrada).toBeCloseTo(1234.5, 6)
+    })
+
+    it("toma la moneda del activo, no la del plan", () => {
+        // El plan guarda la moneda con la que se creó; la que manda es la del
+        // activo, porque es la del precio con el que se está comparando.
+        _planesAsset = { id: "a", price: "120", currency: "USD" }
+        expect(planCalcular({ ...PLAN, currency: "EUR" }).currency).toBe("USD")
     })
 })
 
@@ -212,20 +178,21 @@ describe("dcaFechaAporte", () => {
 })
 
 describe("dcaCalcular", () => {
-    const PLAN = {
+    const PLAN_DCA = {
         id: "d",
+        assetId: "a",
         estado: "Activo",
         importe: "300",
         frecuencia: "Mensual",
-        fechaInicio: "15-01-2026",
-        currency: "EUR"
+        fechaInicio: "15-01-2026"
     }
 
     function conFecha(hoy, campos = {}) {
+        conActivoA("")
         vi.useFakeTimers()
         vi.setSystemTime(hoy)
         try {
-            return dcaCalcular({ ...PLAN, ...campos })
+            return dcaCalcular({ ...PLAN_DCA, ...campos })
         } finally {
             vi.useRealTimers()
         }
@@ -281,9 +248,9 @@ describe("dcaCalcular", () => {
         ["Quincenal", (300 * 26) / 12],
         ["Mensual", 300],
         ["Trimestral", 100]
-    ])("expresa un plan %s en euros al mes", (frecuencia, esperado) => {
+    ])("expresa un plan %s en dinero al mes", (frecuencia, esperado) => {
         // Sin esta equivalencia no hay forma de comparar un plan semanal con uno
-        // trimestral, ni de sumarlos en el resumen de la categoría.
+        // trimestral, ni de sumarlos en el resumen de la pestaña.
         expect(conFecha(new Date(2026, 2, 20), { frecuencia }).equivalenteMensual).toBeCloseTo(esperado, 6)
     })
 
@@ -293,21 +260,34 @@ describe("dcaCalcular", () => {
         expect(c.realizados).toBe(0)
         expect(c.proximo).toBeNull()
     })
+
+    it("avisa cuando el precio del activo supera el máximo de compra", () => {
+        conActivoA("140")
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date(2026, 2, 20))
+        try {
+            expect(dcaCalcular({ ...PLAN_DCA, precioMaximo: "120" }).porEncimaDelMaximo).toBe(true)
+            expect(dcaCalcular({ ...PLAN_DCA, precioMaximo: "150" }).porEncimaDelMaximo).toBe(false)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
 })
 
 describe("dcaProximosAportes", () => {
     function proximos(campos, hoy, cuantos) {
+        conActivoA("")
         vi.useFakeTimers()
         vi.setSystemTime(hoy)
         try {
             return dcaProximosAportes(
                 {
                     id: "d",
+                    assetId: "a",
                     estado: "Activo",
                     importe: "300",
                     frecuencia: "Mensual",
                     fechaInicio: "15-01-2026",
-                    currency: "EUR",
                     ...campos
                 },
                 cuantos

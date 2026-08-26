@@ -74,6 +74,25 @@ def test_directivas_de_cierre():
     assert directivas["default-src"] == ["'self'"]
 
 
+def test_frame_src_permite_tradingview():
+    """El modal de gráfico incrusta widgetembed; sin esto el iframe sale en blanco.
+
+    El síntoma es engañoso —el navegador pinta su propia página de "contenido
+    bloqueado", sin decir que la culpa es de la CSP— así que la directiva se
+    afirma aquí para que nadie la borre por parecer de más.
+    """
+    directiva = _directivas(csp.construir())["frame-src"]
+    assert "https://www.tradingview.com" in directiva
+    assert directiva[0] == "'self'"
+
+
+def test_frame_src_no_se_abre_a_cualquiera():
+    """Una lista cerrada: el comodín dejaría incrustar cualquier página."""
+    directiva = _directivas(csp.construir())["frame-src"]
+    assert "*" not in directiva
+    assert all(o == "'self'" or o.startswith("https://") for o in directiva)
+
+
 def test_connect_src_solo_self():
     """El navegador solo habla con /api/; a los proveedores sale el servidor."""
     assert _directivas(csp.construir())["connect-src"] == ["'self'"]

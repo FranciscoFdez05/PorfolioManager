@@ -490,25 +490,25 @@ CREATE TABLE IF NOT EXISTS benchmark_prices (
 );
 CREATE INDEX IF NOT EXISTS idx_benchmark_prices_symbol_ts ON benchmark_prices(symbol, ts);
 
--- Planes de inversión: la decisión escrita ANTES de comprar (dónde entrar,
--- dónde salir, dónde cortar). No es una operación: no toca ni el rendimiento
--- ni la fiscalidad, y por eso vive en su propia tabla y no en `activo_rows`.
--- `asset_id` es opcional y sin FK a propósito: se planifica también sobre algo
--- que todavía no está en cartera, y borrar el activo no debe llevarse por
--- delante el plan que explica por qué se compró.
+-- Planes de inversión: la decisión escrita ANTES de comprar (a qué precio
+-- entrar, dónde recoger el beneficio, con cuánto capital). No es una operación
+-- —no toca ni el rendimiento ni la fiscalidad— y tampoco es una operativa de
+-- trading: no hay dirección corta ni stop, porque lo que se planifica aquí es
+-- una compra a plazo, no una entrada apalancada.
+-- Todo plan cuelga de un activo de la cartera: se consulta desde su ficha, así
+-- que un plan sin activo no tendría dónde verse, y borrar el activo se lleva
+-- por delante lo que se pensaba hacer con él.
 CREATE TABLE IF NOT EXISTS planes_inversion (
     id              TEXT PRIMARY KEY,
-    asset_id        TEXT NOT NULL DEFAULT '',
+    asset_id        TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
     nombre          TEXT NOT NULL DEFAULT '',
     symbol          TEXT NOT NULL DEFAULT '',
     ticker          TEXT NOT NULL DEFAULT '',
     market_provider TEXT NOT NULL DEFAULT '',
     tv_symbol       TEXT NOT NULL DEFAULT '',
-    direccion       TEXT NOT NULL DEFAULT 'Largo',
     currency        TEXT NOT NULL DEFAULT 'EUR',
     precio_entrada  TEXT NOT NULL DEFAULT '',
     precio_salida   TEXT NOT NULL DEFAULT '',
-    stop_loss       TEXT NOT NULL DEFAULT '',
     capital         TEXT NOT NULL DEFAULT '',
     horizonte       TEXT NOT NULL DEFAULT 'Medio',
     estado          TEXT NOT NULL DEFAULT 'Pendiente',
@@ -522,7 +522,7 @@ CREATE TABLE IF NOT EXISTS planes_inversion (
 -- que cambiar la periodicidad no obligue a reescribir filas ya guardadas.
 CREATE TABLE IF NOT EXISTS dca_planes (
     id               TEXT PRIMARY KEY,
-    asset_id         TEXT NOT NULL DEFAULT '',
+    asset_id         TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
     nombre           TEXT NOT NULL DEFAULT '',
     symbol           TEXT NOT NULL DEFAULT '',
     ticker           TEXT NOT NULL DEFAULT '',
@@ -560,7 +560,7 @@ CREATE TABLE IF NOT EXISTS dca_planes (
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 2
+ESQUEMA_VERSION = 3
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -866,6 +866,111 @@ def _esquema_2(conn):
             sort_order       INTEGER NOT NULL DEFAULT 0
         );
     """)
+
+
+@_migracion(3)
+def _esquema_3(conn):
+    """Los planes pasan a colgar de un activo, y dejan de ser trading.
+
+    Tres cambios sobre las tablas que creó el paso anterior:
+
+      * Fuera `direccion` y `stop_loss` de `planes_inversion`. Un plan de
+        inversión es una compra a plazo: no hay corto que llevar al revés ni
+        stop que cortar, y con ellos se iba también el ratio beneficio/riesgo.
+      * `asset_id` pasa a ser una clave foránea a `activos` con ON DELETE
+        CASCADE. Los planes se consultan desde la ficha de cada activo, así que
+        uno sin activo no tendría dónde verse, y al borrar el activo lo que se
+        pensaba hacer con él sobra.
+      * Por eso mismo se descartan las filas que no apuntan a ningún activo
+        existente: la clave foránea no las admitiría. Es la única migración del
+        proyecto que borra filas, y por eso conviene la copia previa que hace
+        `_copia_antes_de_migrar` antes de llegar aquí.
+
+    Se reconstruyen las tablas enteras porque SQLite no sabe añadir una clave
+    foránea con ALTER TABLE. `legacy_alter_table` mantiene el sentido clásico de
+    ALTER ... RENAME: sin él, el motor reescribiría las referencias de las otras
+    tablas para que sigan apuntando al nombre nuevo, que es justo lo contrario
+    de lo que hace falta aquí.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(planes_inversion)")}
+    if not columnas:
+        return
+
+    # Una base recién creada ya nace con la tabla de ahora (`_SCHEMA` se aplica
+    # antes que las migraciones): no hay nada que reconstruir, y hacerlo sería
+    # copiar dos tablas vacías en cada estreno.
+    yaMigrada = "direccion" not in columnas and any(
+        conn.execute("PRAGMA foreign_key_list(planes_inversion)")
+    )
+    if yaMigrada:
+        return
+
+    conn.execute("PRAGMA legacy_alter_table=ON")
+    try:
+        conn.executescript("""
+            ALTER TABLE planes_inversion RENAME TO planes_inversion_viejo;
+            ALTER TABLE dca_planes RENAME TO dca_planes_viejo;
+
+            CREATE TABLE planes_inversion (
+                id              TEXT PRIMARY KEY,
+                asset_id        TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+                nombre          TEXT NOT NULL DEFAULT '',
+                symbol          TEXT NOT NULL DEFAULT '',
+                ticker          TEXT NOT NULL DEFAULT '',
+                market_provider TEXT NOT NULL DEFAULT '',
+                tv_symbol       TEXT NOT NULL DEFAULT '',
+                currency        TEXT NOT NULL DEFAULT 'EUR',
+                precio_entrada  TEXT NOT NULL DEFAULT '',
+                precio_salida   TEXT NOT NULL DEFAULT '',
+                capital         TEXT NOT NULL DEFAULT '',
+                horizonte       TEXT NOT NULL DEFAULT 'Medio',
+                estado          TEXT NOT NULL DEFAULT 'Pendiente',
+                fecha_objetivo  TEXT NOT NULL DEFAULT '',
+                notas           TEXT NOT NULL DEFAULT '',
+                sort_order      INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE TABLE dca_planes (
+                id               TEXT PRIMARY KEY,
+                asset_id         TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+                nombre           TEXT NOT NULL DEFAULT '',
+                symbol           TEXT NOT NULL DEFAULT '',
+                ticker           TEXT NOT NULL DEFAULT '',
+                market_provider  TEXT NOT NULL DEFAULT '',
+                tv_symbol        TEXT NOT NULL DEFAULT '',
+                currency         TEXT NOT NULL DEFAULT 'EUR',
+                importe          TEXT NOT NULL DEFAULT '',
+                frecuencia       TEXT NOT NULL DEFAULT 'Mensual',
+                fecha_inicio     TEXT NOT NULL DEFAULT '',
+                fecha_fin        TEXT NOT NULL DEFAULT '',
+                aportes_objetivo TEXT NOT NULL DEFAULT '',
+                precio_maximo    TEXT NOT NULL DEFAULT '',
+                estado           TEXT NOT NULL DEFAULT 'Activo',
+                notas            TEXT NOT NULL DEFAULT '',
+                sort_order       INTEGER NOT NULL DEFAULT 0
+            );
+
+            INSERT INTO planes_inversion (
+                id, asset_id, nombre, symbol, ticker, market_provider, tv_symbol,
+                currency, precio_entrada, precio_salida, capital, horizonte,
+                estado, fecha_objetivo, notas, sort_order
+            )
+            SELECT
+                id, asset_id, nombre, symbol, ticker, market_provider, tv_symbol,
+                currency, precio_entrada, precio_salida, capital, horizonte,
+                estado, fecha_objetivo, notas, sort_order
+            FROM planes_inversion_viejo
+            WHERE asset_id IN (SELECT id FROM activos);
+
+            INSERT INTO dca_planes
+            SELECT * FROM dca_planes_viejo
+            WHERE asset_id IN (SELECT id FROM activos);
+
+            DROP TABLE planes_inversion_viejo;
+            DROP TABLE dca_planes_viejo;
+        """)
+    finally:
+        conn.execute("PRAGMA legacy_alter_table=OFF")
 
 
 def get_db() -> sqlite3.Connection:

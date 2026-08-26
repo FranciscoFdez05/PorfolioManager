@@ -29,8 +29,8 @@ Nada sale de tu red salvo las consultas de cotizaciones, y esas son opcionales: 
 
 - **Vista General** — resumen del portfolio con tabla de activos y métricas clave
 - **Activos** — ficha por activo: compras/aportes, precio medio, rendimiento y, en los activos en divisa extranjera, el desglose entre **efecto activo** y **efecto divisa**
-- **Planes de inversión** — a qué precio entrar, dónde recoger el beneficio y dónde cortar la pérdida, con el porcentaje que falta desde el precio actual hasta cada uno, el ratio beneficio/riesgo y el aviso cuando la cotización entra en zona
-- **Planes DCA** — aportación periódica: importe, frecuencia y horizonte, con los aportes ya vencidos, el siguiente y el calendario de los doce próximos
+- **Planes de inversión** — dentro de la ficha de cada activo: a qué precio entrar, a qué precio recoger el beneficio y con cuánto capital, con el porcentaje que falta desde el precio actual hasta cada uno y el aviso cuando la cotización entra en zona
+- **Planes DCA** — también por activo: aportación periódica con importe, frecuencia y horizonte, los aportes ya vencidos, el siguiente y el calendario de los doce próximos
 - **Gastos & Ingresos** — gastos por categoría, ingresos recurrentes y puntuales
 - **Finanzas** — cuenta remunerada, dividendos, renta fija, bonos y ventas
 - **Ventas con FIFO fiscal español** — lotes, regla de los dos meses y escala del ahorro calculados en el servidor, con **informe anual de la Renta** en CSV y en HTML imprimible ([detalle](#ventas-y-fiscalidad-españa))
@@ -525,6 +525,7 @@ escrituras_pesadas_por_hora = 30    ; backup, restauración e importación
 - **`script-src` cerrado a `'self'` y con nonce, no `'unsafe-inline'`.** `index.html` lleva un único script en línea (el que aplica el tema guardado antes de pintar, para que no haya destello blanco al cargar); con `'unsafe-inline'` la directiva no protegería de nada. **No hay ningún origen externo**: Chart.js se sirve desde `js/vendor/`, así que `csp_origenes_scripts` viene vacío. Ese ajuste sigue existiendo por si añades una librería externa a conciencia, pero vaciarlo es lo que hace que un HTML inyectado no pueda traerse código de fuera — y de paso, que la aplicación funcione sin internet.
 - **`style-src` sí admite `'unsafe-inline'`**: el HTML usa atributos `style=` y varios módulos posicionan tooltips con `el.style.…`. El riesgo que cubre quitarlo (exfiltración por CSS) es mucho menor que el de un script.
 - **`connect-src 'self'`**: todas las llamadas a proveedores las hace el servidor. Si el frontend llamara alguna vez directamente a una API externa, esta directiva lo delataría.
+- **`frame-src` con `www.tradingview.com`**: la única excepción a `default-src 'self'`. El modal de gráfico de un activo incrusta el widget de TradingView; sin la directiva el navegador bloquea el iframe y pinta su propia página de error, que no menciona la CSP.
 
 ---
 

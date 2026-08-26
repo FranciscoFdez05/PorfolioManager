@@ -1,79 +1,56 @@
 /* Planes de inversión y DCA
    ─────────────────────────────────────────────────────────────────
-   Las tarjetas reutilizan a propósito las clases de Activos (.avCard,
-   .avCardMetrics, .avBadge…): son la misma pieza con otro contenido, y
-   compartirlas hace que los tres temas —oscuro, claro y negro— sigan
-   funcionando sin duplicar aquí sus overrides. Este fichero solo añade
-   lo que no existía: las pestañas de categoría, la barra de resumen y
-   el recorrido entrada → objetivo. */
+   Las dos pestañas viven dentro de la ficha de cada activo, así que la
+   caja de fuera (.assetTabPanel) ya la pone activos.css. Las tarjetas
+   reutilizan a propósito las clases de Activos (.avCard, .avCardMetrics,
+   .avBadge…): son la misma pieza con otro contenido, y compartirlas hace
+   que los tres temas —oscuro, claro y negro— sigan funcionando sin
+   duplicar aquí sus overrides. Este fichero solo añade lo que no existía:
+   la barra de la pestaña, el resumen y el recorrido entrada → objetivo. */
 
-/* ── Pestañas de categoría ── */
-.avCatTabs {
+/* ── Caja de la pestaña ── */
+/* La pestaña de compras es una tabla a sangre y por eso .assetTabPanel no
+   lleva relleno; estas dos no son una tabla, así que se lo ponen ellas. Sin
+   esto los filtros salen pegados a la barra de pestañas y al borde de la caja. */
+#assetPlanesSection,
+#assetDcaSection {
+    padding: 18px;
+}
+
+/* ── Barra de la pestaña ── */
+.planPanelBar {
     display: flex;
     align-items: center;
-    gap: 4px;
-    flex: 0 0 auto;
-    border-bottom: 1px solid var(--border-soft);
-    padding-bottom: 0;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
 }
 
-.avCatTab {
-    padding: 9px 18px;
-    background: transparent;
-    color: var(--text-muted);
-    border: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    cursor: pointer;
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    transition: color 0.15s;
-    white-space: nowrap;
-}
-
-.avCatTab:hover {
-    color: var(--text-subtle);
-}
-
-.avCatTab.avCatTabActive {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-}
-
-/* El panel hereda la caja que antes era .activosPage: sin esto la rejilla
-   pierde el `flex: 1` del que cuelga su propio scroll. */
-.avCatPanel {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    flex: 1 1 auto;
-    min-height: 0;
-}
-
-/* ── Filtros por estado ── */
 .planFilters {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
 /* ── Barra de resumen ── */
 .planKpiRow {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     flex-wrap: wrap;
     flex: 0 0 auto;
+    margin-bottom: 18px;
 }
 
+/* Se dimensionan por su contenido y no se estiran: son tres en la pestaña de
+   planes y cinco en la de DCA, y repartiendo el ancho entre tres salían tres
+   cajas enormes con un número diminuto dentro. */
 .planKpi {
     display: flex;
     flex-direction: column;
     gap: 3px;
-    min-width: 140px;
-    flex: 1 1 140px;
+    min-width: 160px;
+    flex: 0 1 auto;
     padding: 10px 14px;
     background: var(--bg-surface);
     border: 1px solid var(--border-soft);
@@ -98,8 +75,12 @@
 }
 
 /* ── Tarjeta ── */
+/* El relleno inferior de .activosGrid es para el scroll de la página de
+   Activos; aquí el hueco ya lo pone la caja de la pestaña y sumarlo dejaría el
+   doble de aire debajo de las tarjetas. */
 .planesGrid {
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    padding-bottom: 0;
 }
 
 .planCard {
@@ -123,18 +104,6 @@
     border-radius: 20px;
     border: 1px solid;
     white-space: nowrap;
-}
-
-.planDirLargo {
-    color: var(--color-pos);
-    border-color: rgba(46, 204, 113, 0.35);
-    background: rgba(46, 204, 113, 0.1);
-}
-
-.planDirCorto {
-    color: var(--color-neg);
-    border-color: rgba(231, 76, 60, 0.35);
-    background: rgba(231, 76, 60, 0.1);
 }
 
 .planDirDca {
@@ -172,7 +141,7 @@
     background: rgba(46, 204, 113, 0.12);
 }
 
-.planAvisoStop {
+.planAvisoMaximo {
     color: var(--color-neg-bright);
     border-color: rgba(231, 76, 60, 0.4);
     background: rgba(231, 76, 60, 0.12);
@@ -219,18 +188,6 @@
     inset: 0 auto 0 0;
     border-radius: 4px 0 0 4px;
     opacity: 0.75;
-}
-
-/* Marca del precio de entrada dentro del recorrido: sin ella no se ve si el
-   precio de hoy ya ha pasado por la zona de compra. */
-.planTrackMark {
-    position: absolute;
-    top: -2px;
-    bottom: -2px;
-    width: 2px;
-    background: var(--text-primary);
-    opacity: 0.65;
-    transform: translateX(-1px);
 }
 
 .planTrackLabels {
@@ -329,9 +286,6 @@
 }
 
 /* ── Tema claro ── */
-html[data-theme="light"] .avCatTabs {
-    border-bottom-color: #e2e8f0;
-}
 html[data-theme="light"] .planKpi {
     background: #ffffff;
     border-color: #e2e8f0;
@@ -352,9 +306,6 @@ html[data-theme="light"] .planTrack {
     background: #f1f5f9;
     border-color: #e2e8f0;
 }
-html[data-theme="light"] .planTrackMark {
-    background: #0f172a;
-}
 html[data-theme="light"] .planCalendario td {
     color: #334155;
     border-bottom-color: #f1f5f9;
@@ -368,9 +319,6 @@ html[data-theme="light"] .planCalendarioWrap {
 }
 
 /* ── Tema negro ── */
-html[data-theme="black"] .avCatTabs {
-    border-bottom-color: #222228;
-}
 html[data-theme="black"] .planKpi {
     background: #17171b;
     border-color: #222228;
