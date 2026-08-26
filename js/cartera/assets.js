@@ -5129,6 +5129,11 @@ async function initActivosPageLogic() {
     if (addBtn) addBtn.addEventListener("click", () => openAssetModal())
 
     avInitDragDrop()
+
+    // Planes de inversión y DCA: dos categorías más de esta misma página. Van
+    // después de cargar los activos porque sus tarjetas leen de ahí el precio
+    // actual, y sin `await` porque nada de lo de arriba depende de ellas.
+    initPlanesLogic()
 }
 
 function avInitDragDrop() {

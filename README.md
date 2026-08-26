@@ -29,6 +29,8 @@ Nada sale de tu red salvo las consultas de cotizaciones, y esas son opcionales: 
 
 - **Vista General** — resumen del portfolio con tabla de activos y métricas clave
 - **Activos** — ficha por activo: compras/aportes, precio medio, rendimiento y, en los activos en divisa extranjera, el desglose entre **efecto activo** y **efecto divisa**
+- **Planes de inversión** — a qué precio entrar, dónde recoger el beneficio y dónde cortar la pérdida, con el porcentaje que falta desde el precio actual hasta cada uno, el ratio beneficio/riesgo y el aviso cuando la cotización entra en zona
+- **Planes DCA** — aportación periódica: importe, frecuencia y horizonte, con los aportes ya vencidos, el siguiente y el calendario de los doce próximos
 - **Gastos & Ingresos** — gastos por categoría, ingresos recurrentes y puntuales
 - **Finanzas** — cuenta remunerada, dividendos, renta fija, bonos y ventas
 - **Ventas con FIFO fiscal español** — lotes, regla de los dos meses y escala del ahorro calculados en el servidor, con **informe anual de la Renta** en CSV y en HTML imprimible ([detalle](#ventas-y-fiscalidad-españa))
@@ -637,7 +639,7 @@ python/
 
 js/
   core/              csrf, api, dom, app-core, shared-utils
-  cartera/           assets, portfolios, private-market
+  cartera/           assets, portfolios, private-market, planes
   finanzas/          gastos, ingresos, ahorro, ventas, dividendos, intereses, bonos
   cripto/            stablecoins, operaciones, transacciones, conversiones,
                      staking, earn, trading-journal

@@ -22,6 +22,45 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.1.0] — 2026-08-26
+
+Planes de inversión y aportación periódica: la página de Activos deja de contar
+solo lo que se tiene y pasa a recoger también lo que se piensa hacer con ello.
+
+**Esquema de base de datos:** sube a la versión 2. La migración solo crea dos
+tablas nuevas y no toca ninguna fila existente; aun así deja la copia previa
+`data/backups/<portfolio>_pre-esquema-1-a-2_*.db`, exenta de rotación.
+
+### Añadido
+
+- **Planes de inversión.** Nueva categoría en Activos: precio de entrada, precio
+  de salida y stop loss frente al precio actual, con el porcentaje que falta
+  para llegar a cada uno, el recorrido y el riesgo en porcentaje y en euros, el
+  ratio beneficio/riesgo y la posición del precio de hoy dentro del recorrido
+  del plan. Admite planes cortos, en los que el signo del resultado y los avisos
+  de entrada, objetivo y stop van al revés.
+- **Planes DCA.** Segunda categoría nueva: importe por aporte, periodicidad
+  (semanal, quincenal, mensual o trimestral), fechas de inicio y fin y número de
+  aportes objetivo. De ahí se derivan los aportes ya vencidos, el siguiente, lo
+  aportado hasta hoy, el total planificado y la equivalencia mensual, que es lo
+  que permite comparar un plan semanal con uno trimestral y sumarlos.
+- **Calendario de aportes.** Ficha con los doce próximos aportes de un plan DCA:
+  fecha, importe, acumulado y unidades estimadas al precio del día.
+- **Aviso de zona.** La tarjeta marca cuándo el precio entra en la zona de
+  compra, alcanza el objetivo o toca el stop; en un DCA, cuándo supera el precio
+  máximo fijado.
+- **Resumen por categoría** en euros aunque los planes estén en varias monedas,
+  y exportación a CSV de lo que haya en pantalla.
+- Un plan puede apuntar a un activo de la cartera —de donde toma el precio ya
+  cargado— o llevar su propio ticker, para planificar sobre algo que todavía no
+  se tiene.
+- `/api/planes` y `/api/dca`, con 12 pruebas nuevas de rutas, 51 del cálculo del
+  frontend y 16 del cableado de la pantalla contra el HTML real.
+
+[1.1.0]: https://github.com/FranciscoFdez05/PorfolioPython/releases/tag/v1.1.0
+
+---
+
 ## [1.0.0] — 2026-08-25
 
 Primera versión publicada. Consolida el traslado del cálculo del navegador al

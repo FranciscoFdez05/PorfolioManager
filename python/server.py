@@ -27,6 +27,7 @@ from routes.ingresos import ingresos_bp
 from routes.market import market_bp
 from routes.movimientos import movimientos_bp
 from routes.operaciones import operaciones_bp
+from routes.planes import planes_bp
 from routes.portfolios import portfolios_bp
 from routes.registros import registros_bp
 from routes.salud import salud_bp
@@ -93,6 +94,7 @@ app.register_blueprint(ingresos_bp)
 app.register_blueprint(market_bp)
 app.register_blueprint(movimientos_bp)
 app.register_blueprint(operaciones_bp)
+app.register_blueprint(planes_bp)
 app.register_blueprint(portfolios_bp)
 app.register_blueprint(trading_bp)
 app.register_blueprint(registros_bp)

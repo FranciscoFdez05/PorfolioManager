@@ -3,7 +3,7 @@ name = "porfoliopython"
 # La versión canónica está en python/core/version.py, que es de donde la lee la
 # aplicación. Aquí se repite porque las herramientas del ecosistema la esperan;
 # tests/test_version.py comprueba que las dos no se separen.
-version = "1.0.0"
+version = "1.1.0"
 description = "Seguimiento local de una cartera de inversión personal (Flask + SQLite)"
 readme = "README.md"
 requires-python = ">=3.11"

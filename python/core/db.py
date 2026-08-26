@@ -489,6 +489,56 @@ CREATE TABLE IF NOT EXISTS benchmark_prices (
     PRIMARY KEY (symbol, dia)
 );
 CREATE INDEX IF NOT EXISTS idx_benchmark_prices_symbol_ts ON benchmark_prices(symbol, ts);
+
+-- Planes de inversión: la decisión escrita ANTES de comprar (dónde entrar,
+-- dónde salir, dónde cortar). No es una operación: no toca ni el rendimiento
+-- ni la fiscalidad, y por eso vive en su propia tabla y no en `activo_rows`.
+-- `asset_id` es opcional y sin FK a propósito: se planifica también sobre algo
+-- que todavía no está en cartera, y borrar el activo no debe llevarse por
+-- delante el plan que explica por qué se compró.
+CREATE TABLE IF NOT EXISTS planes_inversion (
+    id              TEXT PRIMARY KEY,
+    asset_id        TEXT NOT NULL DEFAULT '',
+    nombre          TEXT NOT NULL DEFAULT '',
+    symbol          TEXT NOT NULL DEFAULT '',
+    ticker          TEXT NOT NULL DEFAULT '',
+    market_provider TEXT NOT NULL DEFAULT '',
+    tv_symbol       TEXT NOT NULL DEFAULT '',
+    direccion       TEXT NOT NULL DEFAULT 'Largo',
+    currency        TEXT NOT NULL DEFAULT 'EUR',
+    precio_entrada  TEXT NOT NULL DEFAULT '',
+    precio_salida   TEXT NOT NULL DEFAULT '',
+    stop_loss       TEXT NOT NULL DEFAULT '',
+    capital         TEXT NOT NULL DEFAULT '',
+    horizonte       TEXT NOT NULL DEFAULT 'Medio',
+    estado          TEXT NOT NULL DEFAULT 'Pendiente',
+    fecha_objetivo  TEXT NOT NULL DEFAULT '',
+    notas           TEXT NOT NULL DEFAULT '',
+    sort_order      INTEGER NOT NULL DEFAULT 0
+);
+
+-- Planes de aportación periódica. Solo guarda la *regla* (cuánto, cada cuánto,
+-- desde cuándo); el calendario de aportes se deriva de ella al pintarlo, para
+-- que cambiar la periodicidad no obligue a reescribir filas ya guardadas.
+CREATE TABLE IF NOT EXISTS dca_planes (
+    id               TEXT PRIMARY KEY,
+    asset_id         TEXT NOT NULL DEFAULT '',
+    nombre           TEXT NOT NULL DEFAULT '',
+    symbol           TEXT NOT NULL DEFAULT '',
+    ticker           TEXT NOT NULL DEFAULT '',
+    market_provider  TEXT NOT NULL DEFAULT '',
+    tv_symbol        TEXT NOT NULL DEFAULT '',
+    currency         TEXT NOT NULL DEFAULT 'EUR',
+    importe          TEXT NOT NULL DEFAULT '',
+    frecuencia       TEXT NOT NULL DEFAULT 'Mensual',
+    fecha_inicio     TEXT NOT NULL DEFAULT '',
+    fecha_fin        TEXT NOT NULL DEFAULT '',
+    aportes_objetivo TEXT NOT NULL DEFAULT '',
+    precio_maximo    TEXT NOT NULL DEFAULT '',
+    estado           TEXT NOT NULL DEFAULT 'Activo',
+    notas            TEXT NOT NULL DEFAULT '',
+    sort_order       INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -510,7 +560,7 @@ CREATE INDEX IF NOT EXISTS idx_benchmark_prices_symbol_ts ON benchmark_prices(sy
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 1
+ESQUEMA_VERSION = 2
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -760,6 +810,61 @@ def _esquema_1(conn):
         SELECT DISTINCT year FROM gastos_rows
         UNION
         SELECT DISTINCT year FROM mensualidades;
+    """)
+
+
+@_migracion(2)
+def _esquema_2(conn):
+    """Planes de inversión y planes de aportación periódica (DCA).
+
+    Solo crea tablas nuevas: no toca ni una fila de las que ya había, así que
+    deshacer esta actualización es volver a la imagen anterior —las tablas se
+    quedan ahí, sin que nadie las lea—. La definición se repite aquí en vez de
+    reaprovechar `_SCHEMA` a propósito: ese texto va a seguir cambiando con las
+    versiones siguientes y un paso de migración tiene que describir el esquema
+    del momento en que se escribió, no el último.
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS planes_inversion (
+            id              TEXT PRIMARY KEY,
+            asset_id        TEXT NOT NULL DEFAULT '',
+            nombre          TEXT NOT NULL DEFAULT '',
+            symbol          TEXT NOT NULL DEFAULT '',
+            ticker          TEXT NOT NULL DEFAULT '',
+            market_provider TEXT NOT NULL DEFAULT '',
+            tv_symbol       TEXT NOT NULL DEFAULT '',
+            direccion       TEXT NOT NULL DEFAULT 'Largo',
+            currency        TEXT NOT NULL DEFAULT 'EUR',
+            precio_entrada  TEXT NOT NULL DEFAULT '',
+            precio_salida   TEXT NOT NULL DEFAULT '',
+            stop_loss       TEXT NOT NULL DEFAULT '',
+            capital         TEXT NOT NULL DEFAULT '',
+            horizonte       TEXT NOT NULL DEFAULT 'Medio',
+            estado          TEXT NOT NULL DEFAULT 'Pendiente',
+            fecha_objetivo  TEXT NOT NULL DEFAULT '',
+            notas           TEXT NOT NULL DEFAULT '',
+            sort_order      INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS dca_planes (
+            id               TEXT PRIMARY KEY,
+            asset_id         TEXT NOT NULL DEFAULT '',
+            nombre           TEXT NOT NULL DEFAULT '',
+            symbol           TEXT NOT NULL DEFAULT '',
+            ticker           TEXT NOT NULL DEFAULT '',
+            market_provider  TEXT NOT NULL DEFAULT '',
+            tv_symbol        TEXT NOT NULL DEFAULT '',
+            currency         TEXT NOT NULL DEFAULT 'EUR',
+            importe          TEXT NOT NULL DEFAULT '',
+            frecuencia       TEXT NOT NULL DEFAULT 'Mensual',
+            fecha_inicio     TEXT NOT NULL DEFAULT '',
+            fecha_fin        TEXT NOT NULL DEFAULT '',
+            aportes_objetivo TEXT NOT NULL DEFAULT '',
+            precio_maximo    TEXT NOT NULL DEFAULT '',
+            estado           TEXT NOT NULL DEFAULT 'Activo',
+            notas            TEXT NOT NULL DEFAULT '',
+            sort_order       INTEGER NOT NULL DEFAULT 0
+        );
     """)
 
 
