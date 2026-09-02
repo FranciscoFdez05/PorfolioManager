@@ -16,6 +16,12 @@
 #      volver atrás era reconstruir desde el código anterior, varios minutos con
 #      la base de datos ya migrada. Ahora cada versión queda etiquetada y la
 #      vuelta atrás es inmediata.
+#   4. Este script se actualiza a sí mismo. El `git pull` reemplaza el fichero
+#      que el intérprete está leyendo, y `sh` guarda un desplazamiento dentro de
+#      él: si el fichero nuevo tiene otro tamaño, las órdenes que quedan por leer
+#      se descolocan y la actualización se queda a medias por un error de
+#      sintaxis absurdo. Por eso lo primero que hace es ejecutarse desde una
+#      copia (ver abajo).
 #
 # Si el arranque no responde, se vuelve solo a la imagen anterior. Lo que este
 # script NO deshace es la migración del esquema: para eso está la copia
@@ -23,7 +29,28 @@
 #
 # Uso: ./docker-update.sh [--sin-pull]
 set -e
-cd "$(dirname "$0")"
+
+# El directorio del proyecto se fija antes que nada: la copia de la que se
+# reejecuta vive en /tmp, así que allí `dirname "$0"` ya no sirve.
+PM_PROYECTO="${PM_PROYECTO:-$(cd "$(dirname "$0")" && pwd)}"
+export PM_PROYECTO
+cd "$PM_PROYECTO"
+
+# Reejecutarse desde una copia: lo que corre es una foto del script, y el pull
+# de más abajo puede reemplazar el original sin descolocar esta ejecución. Si no
+# se pudiera crear la copia se sigue igualmente: es una protección, no un
+# requisito.
+if [ -z "$PM_UPDATE_COPIA" ]; then
+    copia=$(mktemp "${TMPDIR:-/tmp}/docker-update.XXXXXX" 2>/dev/null) || copia=""
+    if [ -n "$copia" ] && cp "$0" "$copia" 2>/dev/null; then
+        PM_UPDATE_COPIA="$copia"
+        export PM_UPDATE_COPIA
+        codigo=0
+        sh "$copia" "$@" || codigo=$?
+        rm -f "$copia"
+        exit "$codigo"
+    fi
+fi
 
 SIN_PULL=0
 [ "$1" = "--sin-pull" ] && SIN_PULL=1

@@ -38,6 +38,23 @@ def test_package_json_declara_la_misma_version():
     assert datos["version"] == __version__
 
 
+def test_el_badge_del_readme_declara_la_misma_version():
+    """El badge del README es lo primero que se ve del proyecto.
+
+    Y es justo lo que nadie mira al publicar: se quedó anunciando la 1.0.0
+    mientras el código ya iba por la 1.1.0. Como el resto de comprobaciones de
+    este fichero, aquí no se rompe nada al ejecutar, así que solo lo detecta
+    algo así.
+    """
+    readme = (RAIZ / "README.md").read_text("utf-8")
+    esperado = f"badge/versi%C3%B3n-{__version__}-blue"
+
+    assert esperado in readme, (
+        f"el badge del README no anuncia la {__version__}. Actualízalo en el "
+        f"mismo commit en que subas la versión."
+    )
+
+
 # ── CHANGELOG ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture
