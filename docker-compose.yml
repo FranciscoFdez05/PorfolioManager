@@ -1,6 +1,7 @@
 services:
   porfoliomanager:
-    container_name: porfoliomanager
+    # Nombre que se verá en `docker ps` y Docker Desktop.
+    container_name: PorfolioManager
     build: .
     # Etiquetada con la versión, no solo `latest`. Es lo que permite volver a la
     # anterior en segundos cuando una actualización no arranca: sin esto, cada
@@ -8,6 +9,8 @@ services:
     # código antiguo, varios minutos y con la base de datos ya migrada.
     # docker-update.sh exporta PORTFOLIO_VERSION; a mano vale el `latest`.
     image: porfoliomanager:${PORTFOLIO_VERSION:-latest}
+    labels:
+      org.opencontainers.image.title: PorfolioManager
     env_file: .env
     environment:
       # Sobrescribe el PORT de .env con el que exporta docker-up.sh

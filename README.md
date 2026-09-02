@@ -53,10 +53,14 @@ Las cotizaciones se obtienen opcionalmente vía **Finnhub**, **EODHD**, **Yahoo 
 ```bash
 git clone https://github.com/FranciscoFdez05/PorfolioManager.git
 cd PorfolioManager
-./docker-up.sh
+./docker-setup
 ```
 
-`docker-up.sh` deja el stack listo en un solo paso: crea `.env` a partir de `.env.example` si no existe, genera la `SECRET_KEY`, pide usuario y contraseña la primera vez (guarda el hash, nunca la contraseña), lee el puerto de `config.ini` y lanza `docker compose up -d --build`. Al terminar imprime la URL de acceso desde la LAN.
+`docker-setup` deja el stack listo en un solo paso: comprueba Docker, crea `.env` a partir de `.env.example` si no existe, genera la `SECRET_KEY`, pide usuario y contraseña la primera vez (guarda el hash, nunca la contraseña), lee el puerto de `config.ini` y lanza `docker compose up -d --build`. Solo imprime la URL cuando el healthcheck confirma que la aplicación está lista. Puedes pasarle argumentos extra de `docker compose up`, por ejemplo `./docker-setup --force-recreate`.
+
+Ejecuta el script con tu usuario normal, **sin `sudo`**. Si Docker exige permisos,
+añade una vez tu usuario al grupo `docker` con `sudo usermod -aG docker "$USER"`
+y vuelve a iniciar sesión.
 
 No hace falta tener Python instalado en el servidor: si no lo encuentra, usa la propia imagen base para generar la clave y el hash.
 
@@ -67,11 +71,11 @@ No hace falta tener Python instalado en el servidor: si no lo encuentra, usa la 
 
 El contenedor publica el puerto en todas las interfaces del host, así que cualquier dispositivo de la misma red llega poniendo la IP del servidor y el puerto. Si no responde desde otro equipo, casi siempre es el firewall del host: hay que abrir ese puerto (por ejemplo `sudo ufw allow 5000/tcp`).
 
-El puerto por defecto es `5000`, y para cambiarlo pon `PORT` en `.env` (ver [Configuración](#configuración)). `docker-up.sh` resuelve el valor con la misma capa que usa la aplicación —entorno, luego `config.ini`, luego el defecto— y lo exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse.
+El puerto por defecto es `5000`, y para cambiarlo pon `PORT` en `.env` (ver [Configuración](#configuración)). `docker-setup` resuelve el valor con la misma capa que usa la aplicación —entorno, luego `config.ini`, luego el defecto— y lo exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse.
 
 ```bash
 # Ver logs en tiempo real
-docker compose logs -f porfoliomanager
+docker logs -f PorfolioManager
 
 # Parar
 docker compose down
@@ -360,7 +364,7 @@ http://192.168.1.X:5000/api/categorias
 Añade esa IP (o su rango) a `redes_permitidas`. Haz la prueba **dos veces, una por Wi-Fi y otra con la VPN conectada**: según si el túnel enmascara o enruta el tráfico, el móvil puede aparecer con su IP del túnel o con la del router, y así configuras los dos rangos de una vez. La misma información queda en el log:
 
 ```bash
-docker compose logs --tail=20 porfoliomanager | grep red_local
+docker logs --tail=20 PorfolioManager | grep red_local
 ```
 
 Este endpoint es el que hace que el Atajo no tenga ninguna categoría escrita a mano dentro: las pide aquí cada vez que se ejecuta, así que una categoría nueva creada desde la web aparece sola en el móvil.
