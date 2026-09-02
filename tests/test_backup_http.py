@@ -11,9 +11,11 @@ Ningún caso toca `data/`: el fixture `datos_aislados` redirige a tmp_path todos
 los directorios que usan estas rutas.
 """
 
+import io
 import json
 import sqlite3
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -487,3 +489,90 @@ def test_una_copia_temporal_abandonada_se_barre_en_la_siguiente(cliente):
 
     assert not huerfano.exists()
     assert reciente.exists()
+
+
+# ── Importar un backup desde Ajustes ─────────────────────────────────────────
+
+@pytest.fixture
+def cliente_completo(cliente_autenticado, datos_aislados, monkeypatch):
+    """Cliente con los dos blueprints: el mismo zip entra por Ajustes y por copias."""
+    from routes.ajustes import ajustes_bp
+    from routes.backup import backup_bp
+
+    monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
+    monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
+
+    client, cabeceras, _app = cliente_autenticado(backup_bp, ajustes_bp)
+    return client, cabeceras, datos_aislados
+
+
+def test_importar_un_zip_de_backup_restaura_las_bases_de_datos(cliente_completo):
+    """El fallo que se veía en producción.
+
+    «Importar ZIP» buscaba el `.db` en la raíz del zip. Una copia de seguridad lo
+    lleva bajo `portfolios/`, así que no encontraba ninguno, restauraba solo los
+    ajustes y respondía que todo había ido bien: la pantalla decía «importado» y
+    las carteras seguían exactamente como estaban.
+    """
+    client, cabeceras, rutas = cliente_completo
+    _crear_db(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
+    _crear_db(rutas["portfolios"] / "cripto.db", [("2026-01-02", 50.0, 40.0)])
+    rutas["meta"].write_text(json.dumps({"active": "principal"}), encoding="utf-8")
+
+    nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
+    contenido = (rutas["backups"] / nombre).read_bytes()
+
+    # Los datos cambian después de la copia: si la importación funciona, vuelven.
+    _crear_db(rutas["portfolios"] / "principal.db", [("2030-12-31", 1.0, 1.0)])
+    (rutas["portfolios"] / "cripto.db").unlink()
+
+    respuesta = client.post(
+        "/api/import/zip",
+        data={"file": (io.BytesIO(contenido), nombre)},
+        headers=cabeceras,
+        content_type="multipart/form-data",
+    )
+
+    assert respuesta.status_code == 200, respuesta.get_json()
+    assert respuesta.get_json()["ok"] is True
+    assert _snapshots(rutas["portfolios"] / "principal.db") == [("2026-01-01", 100.0, 90.0)]
+    assert (rutas["portfolios"] / "cripto.db").exists()
+    assert _snapshots(rutas["portfolios"] / "cripto.db") == [("2026-01-02", 50.0, 40.0)]
+
+
+def test_importar_un_backup_deja_copia_previa(cliente_completo):
+    """Sobrescribe todas las carteras, así que vale la misma red que /api/restore."""
+    client, cabeceras, rutas = cliente_completo
+    _crear_db(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
+
+    nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
+    contenido = (rutas["backups"] / nombre).read_bytes()
+
+    datos = client.post(
+        "/api/import/zip",
+        data={"file": (io.BytesIO(contenido), nombre)},
+        headers=cabeceras,
+        content_type="multipart/form-data",
+    ).get_json()
+
+    assert datos["safetyCopy"]
+    assert (Path(datos["safetyCopy"]) / "principal.db").exists()
+
+
+def test_un_zip_sin_nada_reconocible_se_rechaza(cliente_completo):
+    """Antes respondía «ok» sin haber importado nada."""
+    client, cabeceras, _rutas = cliente_completo
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("cualquier-cosa.txt", b"nada que ver")
+    buf.seek(0)
+
+    respuesta = client.post(
+        "/api/import/zip",
+        data={"file": (buf, "cosas.zip")},
+        headers=cabeceras,
+        content_type="multipart/form-data",
+    )
+
+    assert respuesta.status_code == 400
+    assert "no contiene" in respuesta.get_json()["error"]

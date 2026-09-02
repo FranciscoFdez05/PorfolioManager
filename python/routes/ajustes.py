@@ -611,6 +611,18 @@ def import_zip():
     except zipfile.BadZipFile:
         return jsonify({"ok": False, "error": "El archivo no es un ZIP válido"}), 400
 
+    # Una copia de seguridad completa no es un export de una cartera: trae todas
+    # las bases bajo `portfolios/`, más `portfolios.json`. Se restaura con el
+    # mismo código que /api/restore. Antes se buscaba el `.db` en la raíz, no se
+    # encontraba, se restauraban solo los ajustes y se respondía «ok»: la
+    # pantalla decía que había ido bien y las carteras seguían como estaban.
+    from routes.backup import es_backup_completo, restaurar_backup_subido
+
+    if es_backup_completo(names):
+        with temporalPara(paths.BACKUPS_DIR / "importado.zip", directorio=paths.TMP_DIR) as tmp:
+            tmp.write_bytes(raw_bytes)
+            return restaurar_backup_subido(tmp)
+
     db_path  = get_active_db_path()
     json_dir = _AJUSTES_JSON.parent
 
@@ -621,31 +633,53 @@ def import_zip():
 
             # Buscar .db en la raíz del ZIP (export format: portfolio-{date}.db)
             root_db = next((n for n in names if n.endswith(".db") and "/" not in n), None)
+            json_name = next(
+                (n for n in names if n.endswith(".json") and "export" in n and "/" not in n), None
+            )
+
+            # `ajustes.json` y las preferencias se restauran más abajo, así que
+            # un zip que solo traiga eso sí tiene contenido válido.
+            trae_configuracion = any(
+                Path(n).name == "ajustes.json" or Path(n).name.startswith("prefs_")
+                for n in names
+            )
+
+            if not root_db and not json_name and not trae_configuracion:
+                # Nada reconocible: no hay nada que importar. Decirlo es la
+                # diferencia entre «este zip no vale» y creer que se ha
+                # importado algo que en realidad sigue sin estar.
+                return jsonify({
+                    "ok": False,
+                    "error": (
+                        "El ZIP no contiene ni una base de datos ni un export de esta "
+                        "aplicación. Usa el ZIP que genera «Exportar ZIP», o una copia "
+                        "de seguridad de Ajustes → Copias de seguridad."
+                    ),
+                }), 400
 
             if root_db:
                 from core.db import invalidate_all_connections
                 raw_db = zf.read(root_db)
-                tmp    = db_path.parent / f"_import_tmp_{db_path.name}"
-                try:
+                # El temporal va a data/tmp: en data/portfolios lo veía como una
+                # cartera más cualquier `glob("*.db")` mientras duraba la copia.
+                with temporalPara(db_path, directorio=paths.TMP_DIR) as tmp:
                     tmp.write_bytes(raw_db)
                     invalidate_all_connections()
                     src = _sqlite3.connect(str(tmp), timeout=settings.backupSqliteTimeout())
                     dst = _sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
-                    src.backup(dst)
-                    dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                    dst.commit()
-                    dst.close()
-                    src.close()
-                finally:
-                    tmp.unlink(missing_ok=True)
-            else:
+                    try:
+                        src.backup(dst)
+                        dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                        dst.commit()
+                    finally:
+                        dst.close()
+                        src.close()
+            elif json_name:
                 # Sin .db → restaurar desde el JSON interno
-                json_name = next((n for n in names if n.endswith(".json") and "export" in n and "/" not in n), None)
-                if json_name:
-                    data = json.loads(zf.read(json_name).decode("utf-8"))
-                    if isinstance(data, dict):
-                        conn = get_db()
-                        _restore_tables_from_dict(conn, data)
+                data = json.loads(zf.read(json_name).decode("utf-8"))
+                if isinstance(data, dict):
+                    conn = get_db()
+                    _restore_tables_from_dict(conn, data)
 
             # Restaurar ajustes.json
             if "ajustes.json" in names:

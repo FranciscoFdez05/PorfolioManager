@@ -332,6 +332,31 @@ def restoreBackup():
         return _restore_locked()
 
 
+def es_backup_completo(nombres) -> bool:
+    """¿Este zip es una copia de seguridad de todas las carteras?
+
+    Se distingue por la carpeta `portfolios/`, que es donde el backup guarda
+    cada `.db`; un export de una sola cartera lo lleva en la raíz. Saberlo
+    importa porque el mismo fichero se puede soltar en dos sitios distintos de
+    la interfaz, y el «Importar ZIP» de Ajustes se tragaba el backup en
+    silencio: no encontraba el `.db` en la raíz, restauraba solo los ajustes y
+    respondía que todo había ido bien.
+    """
+    return any(n.startswith("portfolios/") and n.endswith(".db") for n in nombres)
+
+
+def restaurar_backup_subido(zip_path: Path):
+    """Restaura un backup que llega subido, en vez de estar en data/backups.
+
+    Toma el mismo cerrojo que /api/restore: da igual por dónde entre el
+    fichero, dos restauraciones a la vez se pisan los `.db` igual de mal. La
+    respuesta es la misma que la de /api/restore —incluidos `safetyCopy` e
+    `ignorados`—, que es justo lo que el usuario necesita saber.
+    """
+    with _BACKUP_LOCK:
+        return _restaurar_archivo(zip_path, zip_path.name, es_zip=True)
+
+
 def _restore_locked():
     data = request.get_json(silent=True) or {}
     filename = str(data.get("filename", "")).strip()
@@ -343,9 +368,19 @@ def _restore_locked():
     if not backup_path.exists():
         return jsonify({"ok": False, "error": "Backup no encontrado"}), 404
 
+    return _restaurar_archivo(backup_path, filename, es_zip=bool(_RE_ZIP.match(filename)))
+
+
+def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
+    """El restore propiamente dicho, ya con el fichero localizado.
+
+    Separado de la vista porque hay dos caminos hasta aquí: restaurar una copia
+    de la lista de Ajustes y subir ese mismo zip por «Importar ZIP». Antes cada
+    uno tenía su propia idea de qué hacer con el fichero.
+    """
     # Validar el zip ANTES de tocar nada: si está corrupto se abortaba a mitad
     # de la restauración, con parte de los portfolios ya sobrescritos.
-    if _RE_ZIP.match(filename):
+    if es_zip:
         try:
             with zipfile.ZipFile(str(backup_path), "r") as zf:
                 bad = zf.testzip()
@@ -365,7 +400,7 @@ def _restore_locked():
     invalidate_all_connections()
 
     try:
-        if _RE_ZIP.match(filename):
+        if es_zip:
             with zipfile.ZipFile(str(backup_path), "r") as zf:
                 names = zf.namelist()
 

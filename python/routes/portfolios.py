@@ -1,6 +1,7 @@
 import io
 import sqlite3
 import tempfile
+import zipfile
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request, send_file
@@ -238,6 +239,37 @@ def export_portfolio(pid):
     )
 
 
+def _db_de_un_zip(datos: bytes):
+    """Saca la base de datos de un ZIP de la aplicación. Devuelve (bytes, error).
+
+    Vale tanto el ZIP de «Exportar ZIP» —que lleva el `.db` en la raíz— como una
+    copia de seguridad de una sola cartera, que lo lleva bajo `portfolios/`. Si
+    la copia trae varias, no hay forma de adivinar cuál se quiere: se dice cuáles
+    hay y se manda a Restaurar, que es lo que recupera todas de una vez.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(datos), "r") as zf:
+            dañada = zf.testzip()
+            if dañada:
+                return None, f"El ZIP está dañado: {dañada}"
+            bases = [n for n in zf.namelist() if n.endswith(".db")]
+            if not bases:
+                return None, "El ZIP no contiene ninguna base de datos"
+            if len(bases) > 1:
+                nombres = ", ".join(sorted(Path(n).stem for n in bases))
+                return None, (
+                    f"El ZIP contiene varias carteras ({nombres}). Para recuperarlas "
+                    "todas usa Ajustes → Copias de seguridad → Restaurar."
+                )
+            contenido = zf.read(bases[0])
+    except zipfile.BadZipFile:
+        return None, "El archivo no es un ZIP válido"
+
+    if not contenido.startswith(b"SQLite format 3"):
+        return None, "Lo que hay dentro del ZIP no es una base de datos SQLite"
+    return contenido, None
+
+
 @portfolios_bp.route("/api/portfolios/import", methods=["POST"])
 def import_portfolio():
     name = request.form.get("name", "").strip()
@@ -248,9 +280,19 @@ def import_portfolio():
     if not file:
         return jsonify({"ok": False, "error": "Fichero requerido"}), 400
 
-    # Validar que el fichero es un SQLite válido
-    header = file.read(16)
-    if not header.startswith(b"SQLite format 3"):
+    # El fichero puede ser el .db suelto o el ZIP que genera «Exportar ZIP»:
+    # los dos salen de esta misma aplicación y no tiene sentido que uno se
+    # acepte y el otro dé «no es una base de datos SQLite válida», que es lo
+    # que pasaba al elegir aquí el zip.
+    header = file.read(4)
+    file.seek(0)
+
+    if header.startswith(b"PK"):
+        contenido, error = _db_de_un_zip(file.read())
+        if error:
+            return jsonify({"ok": False, "error": error}), 400
+        file = io.BytesIO(contenido)
+    elif not file.read(16).startswith(b"SQLite format 3"):
         return jsonify({"ok": False, "error": "El fichero no es una base de datos SQLite válida"}), 400
     file.seek(0)
 
@@ -275,7 +317,10 @@ def import_portfolio():
     # decenas de MB esa ventana dura segundos, no un instante.
     tmp_dest = rutaTemporal(dest, directorio=paths.TMP_DIR)
     try:
-        file.save(str(tmp_dest))
+        if hasattr(file, "save"):
+            file.save(str(tmp_dest))
+        else:
+            tmp_dest.write_bytes(file.read())
 
         # Verificar integridad de verdad: antes se ejecutaba el PRAGMA pero
         # nunca se miraba el resultado, así que cualquier BD que se pudiera

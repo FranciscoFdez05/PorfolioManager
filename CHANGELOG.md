@@ -27,6 +27,24 @@ decide cómo se deshace la actualización:
 **Esquema de base de datos:** no se toca. Sigue en la versión 3, así que deshacer
 esta actualización es volver a la imagen anterior, sin tocar los datos.
 
+### Corregido
+
+- **Importar una copia de seguridad desde «Importar ZIP» no restauraba nada** y
+  decía que sí. Buscaba el `.db` en la raíz del zip, que es donde lo pone el
+  export de una sola cartera; una copia de seguridad los guarda bajo
+  `portfolios/`, así que no encontraba ninguno, restauraba solo los ajustes y
+  respondía «importado correctamente». Ahora reconoce el formato y lo restaura
+  con el mismo código que Ajustes → Restaurar, copia previa incluida.
+- **«Importar portfolio» solo aceptaba el `.db` suelto.** Al elegir el ZIP que
+  genera «Exportar ZIP» —de la propia aplicación— contestaba «no es una base de
+  datos SQLite válida». Ahora saca la base del zip; si el zip trae varias
+  carteras, dice cuáles y manda a Restaurar, que es lo que las recupera todas.
+- Un ZIP sin nada reconocible ya no responde «ok»: se rechaza diciendo qué
+  ficheros valen.
+- La importación avisa cuando ha sido **parcial**, en vez de darla por buena, y
+  recarga la página al terminar: lo que había en pantalla ya no eran los datos
+  de la base.
+
 ### Añadido
 
 - **La versión se ve en la interfaz**, al final de la barra de pestañas, en

@@ -69,7 +69,11 @@ def datos_aislados(tmp_path, monkeypatch):
     """
     from admin import portfolios_manager
     from core import paths
-    from routes import ajustes as rutas_ajustes, backup as rutas_backup
+    from routes import (
+        ajustes as rutas_ajustes,
+        backup as rutas_backup,
+        portfolios as rutas_portfolios,
+    )
 
     data = tmp_path / "data"
     backups = data / "backups"
@@ -111,6 +115,10 @@ def datos_aislados(tmp_path, monkeypatch):
     # portfolio guardado en el backup. Sin parchear también estos nombres, ese
     # paso final leería y escribiría el portfolios.json real.
     monkeypatch.setattr(portfolios_manager, "_PORTFOLIOS_DIR", portfolios)
+    # routes/portfolios.py se lleva el nombre con `from … import`, así que
+    # parchear solo el de admin dejaría la importación de carteras escribiendo
+    # en el data/ real.
+    monkeypatch.setattr(rutas_portfolios, "_PORTFOLIOS_DIR", portfolios)
     monkeypatch.setattr(portfolios_manager, "_META_FILE", data / "portfolios.json")
     monkeypatch.setattr(portfolios_manager, "_DELETED_DIR", data / "deleted")
     monkeypatch.setattr(portfolios_manager, "_LEGACY_DB", data / "portfolio.db")

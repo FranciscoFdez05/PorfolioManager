@@ -1379,7 +1379,23 @@ async function initAjustesLogic() {
             const res = await fetch(url, { method: "POST", body: form })
             const data = await res.json()
             if (data.ok) {
-                showMsg(importMsg, "Importado correctamente", "ok")
+                // Una importación parcial no puede anunciarse como un éxito a
+                // secas: el usuario tiene que saber qué no ha entrado. Mismo
+                // criterio que al restaurar una copia de seguridad.
+                const ignorados = data.ignorados || []
+                if (ignorados.length) {
+                    showMsg(
+                        importMsg,
+                        `Importación parcial: ${ignorados.length} entrada(s) no se pudieron ` +
+                            `recuperar (${ignorados.join("; ")}). Recarga la página cuando lo hayas revisado.`,
+                        "error"
+                    )
+                    return
+                }
+                // Los datos que hay en pantalla ya no son los de la base: se
+                // recarga, igual que después de restaurar.
+                showMsg(importMsg, "Importado correctamente. Recargando…", "ok")
+                setTimeout(() => window.location.reload(), 1500)
             } else {
                 showMsg(importMsg, data.error || "Error al importar", "error")
             }
@@ -1415,7 +1431,9 @@ async function initAjustesLogic() {
             openConfirmModal({
                 title: "Importar ZIP",
                 message:
-                    "Esto restaurará la base de datos completa y la configuración desde el archivo ZIP. Los datos actuales serán reemplazados. ¿Continuar?",
+                    "Vale tanto un ZIP exportado (restaura la cartera activa) como una copia de seguridad " +
+                    "(restaura todas las carteras y la configuración). Los datos actuales serán reemplazados " +
+                    "y se guardará antes una copia del estado actual. ¿Continuar?",
                 confirmLabel: "Importar",
                 onConfirm: () => _doImport("/api/import/zip", file, importZipBtn)
             })
