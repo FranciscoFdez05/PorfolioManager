@@ -1084,10 +1084,7 @@ function requestOperationRowDeletion(rowId) {
             try {
                 await persistOperationsData()
             } catch (error) {
-                showError(
-                    isCancelled ? "No se pudo eliminar la operación" : "No se pudo cancelar la operación",
-                    error
-                )
+                showError(isCancelled ? "No se pudo eliminar la operación" : "No se pudo cancelar la operación", error)
             }
         }
     })

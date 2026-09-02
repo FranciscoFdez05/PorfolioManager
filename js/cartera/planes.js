@@ -1033,7 +1033,18 @@ function planFiltrosHtml(id, estados) {
  * construye aquí y los manejadores se enganchan al contenedor recién creado: no
  * hay listeners que sobrevivan a la pantalla anterior ni que se dupliquen.
  */
-function planesMontarSeccion({ seccionId, filtrosId, kpisId, gridId, vacioId, contadorId, filtros, vacio, alFiltrar, alHacerClick }) {
+function planesMontarSeccion({
+    seccionId,
+    filtrosId,
+    kpisId,
+    gridId,
+    vacioId,
+    contadorId,
+    filtros,
+    vacio,
+    alFiltrar,
+    alHacerClick
+}) {
     const seccion = document.getElementById(seccionId)
     if (!seccion) return null
 
