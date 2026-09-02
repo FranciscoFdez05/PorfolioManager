@@ -60,7 +60,7 @@ activo de la cartera, porque ya no habría dónde consultarlos.
 - `/api/planes` y `/api/dca`, con 17 pruebas nuevas de rutas, 41 del cálculo del
   frontend y 18 del cableado de la pantalla contra la ficha real del activo.
 
-[1.1.0]: https://github.com/FranciscoFdez05/PorfolioPython/releases/tag/v1.1.0
+[1.1.0]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.1.0
 
 ---
 
@@ -124,4 +124,4 @@ se migra sola al abrirla).
   módulos de cálculo, aparte del global.
 - Esquema versionado con `PRAGMA user_version` y copia previa a cada migración.
 
-[1.0.0]: https://github.com/FranciscoFdez05/PorfolioPython/releases/tag/v1.0.0
+[1.0.0]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.0.0

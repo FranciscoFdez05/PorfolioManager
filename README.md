@@ -1,6 +1,6 @@
-# Portfolio Python
+# PorfolioManager
 
-[![CI](https://github.com/FranciscoFdez05/PorfolioPython/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioPython/actions/workflows/ci.yml)
+[![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
 [![Versión](https://img.shields.io/badge/versi%C3%B3n-1.0.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
@@ -51,8 +51,8 @@ Las cotizaciones se obtienen opcionalmente vía **Finnhub**, **EODHD**, **Yahoo 
 **Requisitos:** Docker + Docker Compose.
 
 ```bash
-git clone https://github.com/FranciscoFdez05/PorfolioPython.git
-cd PorfolioPython
+git clone https://github.com/FranciscoFdez05/PorfolioManager.git
+cd PorfolioManager
 ./docker-up.sh
 ```
 
@@ -71,7 +71,7 @@ El puerto por defecto es `5000`, y para cambiarlo pon `PORT` en `.env` (ver [Con
 
 ```bash
 # Ver logs en tiempo real
-docker compose logs -f porfoliopython
+docker compose logs -f porfoliomanager
 
 # Parar
 docker compose down
@@ -292,7 +292,7 @@ Hay que hacerlo **en la máquina donde corre el servidor**, no en la de desarrol
 
 ```bash
 # Con Docker (lo habitual)
-docker compose exec -u appuser porfoliopython python tools/generar_clave_movimientos.py
+docker compose exec -u appuser porfoliomanager python tools/generar_clave_movimientos.py
 
 # Sin Docker
 python tools/generar_clave_movimientos.py
@@ -360,7 +360,7 @@ http://192.168.1.X:5000/api/categorias
 Añade esa IP (o su rango) a `redes_permitidas`. Haz la prueba **dos veces, una por Wi-Fi y otra con la VPN conectada**: según si el túnel enmascara o enruta el tráfico, el móvil puede aparecer con su IP del túnel o con la del router, y así configuras los dos rangos de una vez. La misma información queda en el log:
 
 ```bash
-docker compose logs --tail=20 porfoliopython | grep red_local
+docker compose logs --tail=20 porfoliomanager | grep red_local
 ```
 
 Este endpoint es el que hace que el Atajo no tenga ninguna categoría escrita a mano dentro: las pide aquí cada vez que se ejecuta, así que una categoría nueva creada desde la web aparece sola en el móvil.

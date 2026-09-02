@@ -28,7 +28,7 @@ cd "$(dirname "$0")"
 SIN_PULL=0
 [ "$1" = "--sin-pull" ] && SIN_PULL=1
 
-SERVICIO="porfoliopython"
+SERVICIO="porfoliomanager"
 ESPERA_SALUD=90   # segundos que se le dan a la versión nueva para responder
 
 # ── Intérprete Python ─────────────────────────────────────────────────────────
@@ -160,7 +160,7 @@ echo "Últimas líneas del log:"
 docker compose logs --tail 40 "$SERVICIO" 2>&1 || true
 
 if [ "$VERSION_ANTERIOR" != "desconocida" ] \
-   && docker image inspect "porfoliopython:${VERSION_ANTERIOR}" >/dev/null 2>&1; then
+   && docker image inspect "porfoliomanager:${VERSION_ANTERIOR}" >/dev/null 2>&1; then
     paso "Levantando de nuevo la $VERSION_ANTERIOR"
     PORTFOLIO_VERSION="$VERSION_ANTERIOR" docker compose up -d --no-build
     aviso "Se ha vuelto a la $VERSION_ANTERIOR. El código del repositorio SÍ está actualizado:

@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Si es un problema de **seguridad**, no lo publiques aquí:
-        usa el [aviso privado](https://github.com/FranciscoFdez05/PorfolioPython/security/advisories/new).
+        usa el [aviso privado](https://github.com/FranciscoFdez05/PorfolioManager/security/advisories/new).
 
   - type: textarea
     id: que-pasa
@@ -52,7 +52,7 @@ body:
     attributes:
       label: Log
       description: >
-        Las líneas de logs/ o de `docker compose logs porfoliopython` alrededor
+        Las líneas de logs/ o de `docker compose logs porfoliomanager` alrededor
         del fallo. Si la respuesta traía un identificador (`ref. abc123`),
         búscalo ahí: correlaciona con la petición exacta.
       render: shell

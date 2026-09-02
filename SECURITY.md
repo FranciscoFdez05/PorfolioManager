@@ -11,7 +11,7 @@
 
 **No abras una issue pública.** Usa el aviso privado de GitHub:
 
-**[Security → Report a vulnerability](https://github.com/FranciscoFdez05/PorfolioPython/security/advisories/new)**
+**[Security → Report a vulnerability](https://github.com/FranciscoFdez05/PorfolioManager/security/advisories/new)**
 
 Cuenta qué has encontrado, cómo reproducirlo y qué versión usas (`GET /api/health` la devuelve). Respondo en cuanto pueda; esto es un proyecto personal y no hay ningún acuerdo de plazos detrás.
 

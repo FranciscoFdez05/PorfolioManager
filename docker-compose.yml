@@ -1,13 +1,13 @@
 services:
-  porfoliopython:
-    container_name: porfoliopython
+  porfoliomanager:
+    container_name: porfoliomanager
     build: .
     # Etiquetada con la versión, no solo `latest`. Es lo que permite volver a la
     # anterior en segundos cuando una actualización no arranca: sin esto, cada
     # `build` dejaba una única imagen y la vuelta atrás era reconstruir desde el
     # código antiguo, varios minutos y con la base de datos ya migrada.
     # docker-update.sh exporta PORTFOLIO_VERSION; a mano vale el `latest`.
-    image: porfoliopython:${PORTFOLIO_VERSION:-latest}
+    image: porfoliomanager:${PORTFOLIO_VERSION:-latest}
     env_file: .env
     environment:
       # Sobrescribe el PORT de .env con el que exporta docker-up.sh
