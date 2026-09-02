@@ -55,6 +55,14 @@ if [ "$PUID" != "$(id -u appuser)" ]; then
         || echo "AVISO: no se pudo ajustar el uid del usuario a $PUID." >&2
 fi
 
+# El directorio personal de appuser. gosu fija HOME leyendo /etc/passwd, y ahí
+# pone /home/appuser aunque nadie lo haya creado: gunicorn 26 arrancaba su
+# «control server» dentro y dejaba un «Control server error: Permission denied:
+# '/home/appuser'» en cada arranque. La aplicación funcionaba igual, pero es un
+# ERROR en el log que no lo es, y de esos son los que tapan a los de verdad.
+mkdir -p /home/appuser 2>/dev/null || true
+chown "$PUID:$PGID" /home/appuser 2>/dev/null || true
+
 # El chown ya no es fatal. Con `set -e` a secas, un volumen que no admite
 # cambios de propietario (NFS con root_squash, SMB, un disco montado con uid
 # fijo) mataba el contenedor en esta línea sin explicar nada; y si el volumen ya

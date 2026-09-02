@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends gosu \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd -r appgroup \
  && useradd -r -g appgroup appuser \
- && mkdir -p /app/data /app/logs /app/API \
+ && mkdir -p /app/data /app/logs /app/API /home/appuser \
  && chmod +x /app/entrypoint.sh
 
 # Solo documentativo: el puerto real sale de [server] port en config.ini y lo
