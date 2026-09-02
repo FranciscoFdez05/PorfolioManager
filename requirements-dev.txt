@@ -4,7 +4,7 @@
 
 pytest>=8.3.0
 pytest-cov>=6.0.0
-ruff>=0.8.0
+ruff>=0.16.4
 # Audita requirements.txt contra la base de vulnerabilidades de PyPI. Se ejecuta
 # en su propio job de CI, informativo: un aviso nuevo no debe bloquear un PR que
 # no lo introdujo, pero sí tiene que verse.
