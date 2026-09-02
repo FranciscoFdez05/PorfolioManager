@@ -9,4 +9,4 @@ Werkzeug>=3.1.8
 python-dotenv>=1.0.1
 # gunicorn < 23.0.0: request smuggling vía cabecera Transfer-Encoding (CVE-2024-6827)
 gunicorn>=23.0.0
-cryptography>=44.0.1
+cryptography>=50.0.0
