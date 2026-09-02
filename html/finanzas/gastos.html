@@ -30,10 +30,16 @@
                 <button type="button" class="mensFilterChip" data-mens-filter="activas">Activas</button>
                 <button type="button" class="mensFilterChip" data-mens-filter="pausadas">Pausadas</button>
             </div>
+            <div class="mensFilterGroup" id="mensViewGroup">
+                <button type="button" class="mensFilterChip active" data-mens-view="tabla">Tabla</button>
+                <button type="button" class="mensFilterChip" data-mens-view="calendario">Calendario</button>
+            </div>
             <button id="mensAddBtn" class="primaryButton mensAddBtn" type="button">+ Nueva mensualidad</button>
         </div>
 
-        <div class="mensTableWrapper">
+        <div class="mensCalendar hidden" id="mensCalendar"></div>
+
+        <div class="mensTableWrapper" id="mensTableWrapper">
             <table class="mensTable">
                 <thead>
                     <tr>

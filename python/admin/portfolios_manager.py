@@ -186,7 +186,27 @@ def init_portfolios():
 
     _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
     active_id = meta.get("active", "principal")
-    active_db = _PORTFOLIOS_DIR / f"{active_id}.db"
+
+    # El id sale de portfolios.json, y ese fichero ya no es necesariamente uno
+    # que haya escrito la aplicación: desde que «Importar ZIP» acepta un archivo
+    # subido, su contenido puede venir de fuera. Un `active` como
+    # "../../../tmp/principal" hacía que la base activa —y con ella todo lo que
+    # se escriba después— acabara fuera del volumen de datos, y el valor se
+    # persistía, así que el desvío sobrevivía a cada arranque.
+    #
+    # `_portfolio_db_path` es la comprobación que ya existía para esto mismo en
+    # borrar y cambiar de portfolio; lo que faltaba era usarla también aquí.
+    try:
+        active_db = _portfolio_db_path(active_id)
+    except ValueError:
+        log.error(
+            "[portfolios] El portfolio activo declarado en portfolios.json no es un id "
+            "admisible (%r). Se vuelve a 'principal'.", active_id,
+        )
+        active_id = "principal"
+        active_db = _portfolio_db_path(active_id)
+        meta["active"] = active_id
+        _write_meta(meta)
 
     # Si el DB activo no existe, intentar recuperarlo desde el backup más reciente
     if not active_db.exists():

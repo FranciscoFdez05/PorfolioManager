@@ -30,6 +30,10 @@ let gastosMensualidadesCollapsed = false
 let gastosMostrarPausadas = false
 let mensualidadesFilter = "todas"
 let mensualidadesSearch = ""
+// La vista Mensualidades se ve como tabla o como calendario del año. El día
+// seleccionado ("mes-día") es lo que detalla el panel lateral del calendario.
+let mensualidadesTab = "tabla"
+let mensCalendarSelection = null
 
 // Cada frecuencia indica cada cuántos meses se repite el cargo.
 const MENSUALIDAD_FRECUENCIAS = [
@@ -56,6 +60,7 @@ function normalizeMensualidad(row = {}) {
         importe: String(row.importe || ""),
         frecuencia: getMensualidadFrecuencia(row.frecuencia).key,
         diaCobro: normalizeMensualidadDia(row.diaCobro),
+        diasCobro: normalizeMensualidadDias(row.diasCobro),
         mesInicio: GASTOS_MONTHS.some((month) => month.key === row.mesInicio) ? row.mesInicio : "enero",
         activa: row.activa === undefined ? true : Boolean(row.activa),
         nota: String(row.nota || ""),
@@ -66,6 +71,55 @@ function normalizeMensualidad(row = {}) {
 function normalizeMensualidadDia(value) {
     const day = parseInt(String(value ?? "").trim(), 10)
     return Number.isInteger(day) && day >= 1 && day <= 31 ? String(day) : ""
+}
+
+// Excepciones al día de renovación, mes a mes. Solo se guardan los meses que se
+// salen de la norma: el resto se cobra el día por defecto de la mensualidad, y
+// repetirlo doce veces sería inventar un dato que nadie ha escrito.
+function normalizeMensualidadDias(value) {
+    let source = value
+
+    // La API lo devuelve ya como objeto, pero un export antiguo o una copia
+    // pegada a mano pueden traer el JSON crudo de la columna.
+    if (typeof source === "string") {
+        try {
+            source = source.trim() ? JSON.parse(source) : {}
+        } catch {
+            return {}
+        }
+    }
+
+    if (!source || typeof source !== "object") {
+        return {}
+    }
+
+    const dias = {}
+    GASTOS_MONTHS.forEach((month) => {
+        const day = normalizeMensualidadDia(source[month.key])
+        if (day) {
+            dias[month.key] = day
+        }
+    })
+    return dias
+}
+
+// Día en que se cobra un mes concreto: su excepción si la tiene, y si no el día
+// por defecto. Devuelve "" cuando no hay ninguno de los dos.
+function getMensualidadDiaMes(row, monthKey) {
+    return normalizeMensualidadDia(row.diasCobro?.[monthKey]) || normalizeMensualidadDia(row.diaCobro)
+}
+
+// El día se recorta al último del mes: una renovación el 31 se cobra el 28 en
+// febrero, no el 3 de marzo.
+function buildMensualidadDate(year, monthIndex, day) {
+    const lastDay = new Date(year, monthIndex + 1, 0).getDate()
+    return new Date(year, monthIndex, Math.min(Math.max(day || 1, 1), lastDay))
+}
+
+function getGastosToday() {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return today
 }
 
 function getMensualidades() {
@@ -109,8 +163,26 @@ function getMensualidadCargo(row) {
 
 // Coste mensual equivalente: el importe del cargo repartido entre los meses
 // que abarca su frecuencia (en una mensual coincide con el importe por cargo).
+//
+// Una pausada cuesta cero. Lo que no se va a cobrar no puede seguir sumando en
+// el total de la tabla ni en la media del año: era justo lo que hacía parecer
+// que se gastaban 100 € al mes en suscripciones cuando dos estaban paradas.
 function getMensualidadMonthlyCost(row) {
+    if (!row.activa) {
+        return 0
+    }
+
     return getMensualidadCargo(row) / getMensualidadFrecuencia(row.frecuencia).meses
+}
+
+// Importe del cargo tal y como se escribe en una celda, para rellenar meses.
+function getMensualidadImporteTexto(row) {
+    if (String(row.importe || "").trim()) {
+        return formatCellEuroValue(row.importe)
+    }
+
+    const charged = getMensualidadChargedMonths(row)
+    return charged.length ? formatCellEuroValue(row.meses[charged[charged.length - 1].key]) : ""
 }
 
 function getMensualidadChargedMonths(row) {
@@ -125,37 +197,113 @@ function getMensualidadAnnualCost(row) {
     return GASTOS_MONTHS.reduce((sum, month) => sum + parseEuroNumber(row.meses?.[month.key] || ""), 0)
 }
 
-// Próxima renovación dentro del año mostrado (o el primer cargo si el año no es el actual).
-function getMensualidadNextCharge(row, year = currentGastosYear) {
-    const charged = getMensualidadChargedMonths(row)
-    if (!charged.length) {
-        return null
-    }
-
+// Los cargos del año, uno por mes con importe: cuándo se cobra cada uno y
+// cuánto. De aquí salen el próximo cobro y el calendario, así que el día por mes
+// se resuelve en un único sitio.
+function getMensualidadCargos(row, year = currentGastosYear) {
     const yearNumber = Number(year)
     if (!Number.isInteger(yearNumber)) {
+        return []
+    }
+
+    return getMensualidadChargedMonths(row).map((month) => {
+        const dia = getMensualidadDiaMes(row, month.key)
+        return {
+            ...month,
+            dia,
+            // Sin día definido el cargo se ordena como si fuera el 1, pero el
+            // calendario lo saca aparte en vez de fingir una fecha exacta.
+            sinDia: !dia,
+            date: buildMensualidadDate(yearNumber, month.index, Number(dia || 1))
+        }
+    })
+}
+
+// Próxima renovación dentro del año mostrado (o el primer cargo si el año no es el actual).
+function getMensualidadNextCharge(row, year = currentGastosYear) {
+    const cargos = getMensualidadCargos(row, year)
+    if (!cargos.length) {
         return null
     }
 
-    const day = Number(row.diaCobro || 1) || 1
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const buildDate = (monthIndex) => {
-        const lastDay = new Date(yearNumber, monthIndex + 1, 0).getDate()
-        return new Date(yearNumber, monthIndex, Math.min(day, lastDay))
-    }
-
-    const upcoming = charged.map((month) => buildDate(month.index)).find((date) => date >= today)
-
-    const date = upcoming || buildDate(charged[0].index)
+    const today = getGastosToday()
+    const upcoming = cargos.find((cargo) => cargo.date >= today)
+    const date = (upcoming || cargos[0]).date
     const daysLeft = Math.round((date - today) / 86400000)
 
     return { date, daysLeft, isPast: !upcoming }
 }
 
+// Mes a partir del cual una pausa deja de contar. En el año en curso es el mes
+// actual, salvo que su cargo ya se haya pasado por el banco: lo que ya se pagó
+// no se borra. En un año pasado no queda nada por delante; en uno futuro, todo.
+function getMensualidadPauseIndex(row, year = currentGastosYear) {
+    const today = getGastosToday()
+    const yearNumber = Number(year)
+
+    if (!Number.isInteger(yearNumber) || yearNumber > today.getFullYear()) {
+        return 0
+    }
+
+    if (yearNumber < today.getFullYear()) {
+        return GASTOS_MONTHS.length
+    }
+
+    const monthIndex = today.getMonth()
+    const dia = Number(getMensualidadDiaMes(row, GASTOS_MONTHS[monthIndex].key) || 0)
+    const yaCobrado = dia > 0 && buildMensualidadDate(yearNumber, monthIndex, dia) <= today
+
+    return yaCobrado ? monthIndex + 1 : monthIndex
+}
+
+// Pausar no es solo una etiqueta: se vacían los importes de los meses que ya no
+// se van a cobrar. Esos importes son lo que leen la tabla anual, Métricas y
+// Ahorro, así que dejarlos puestos seguiría contando un gasto que no existe.
+function pauseMensualidad(row) {
+    const from = getMensualidadPauseIndex(row)
+    const meses = { ...row.meses }
+
+    GASTOS_MONTHS.forEach((month, index) => {
+        if (index >= from) {
+            meses[month.key] = ""
+        }
+    })
+
+    return { ...row, activa: false, meses }
+}
+
+// Reactivar devuelve los cargos desde el mes en curso. La fase se cuenta desde
+// el primer cargo que quedó en el año para que una trimestral no se descoloque
+// al volver.
+function resumeMensualidad(row) {
+    const from = getMensualidadPauseIndex(row)
+    const value = getMensualidadImporteTexto(row)
+    const step = getMensualidadFrecuencia(row.frecuencia).meses
+    const charged = getMensualidadChargedMonths(row)
+    const phase = charged.length ? charged[0].index : from
+    const meses = { ...row.meses }
+
+    if (value) {
+        GASTOS_MONTHS.forEach((month, index) => {
+            if (index >= from && index >= phase && (index - phase) % step === 0) {
+                meses[month.key] = value
+            }
+        })
+    }
+
+    return { ...row, activa: true, meses }
+}
+
 function formatMensualidadDate(date) {
     return `${date.getDate()} ${GASTOS_MONTHS[date.getMonth()].label.toLowerCase()}`
+}
+
+// DD-MM-AAAA, el mismo formato con el que se escriben las fechas de los
+// movimientos de gastos, para que un CSV de cargos se pegue al lado sin traducir.
+function formatGastoCargoDate(date) {
+    const day = String(date.getDate()).padStart(2, "0")
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    return `${day}-${month}-${date.getFullYear()}`
 }
 
 // Las mensualidades se agrupan en la tabla anual y en Métricas bajo esta categoría.
@@ -407,12 +555,17 @@ function buildMensualidadFormHtml(row) {
         .map((day) => `<option value="${day}"${String(day) === row.diaCobro ? " selected" : ""}>Día ${day}</option>`)
         .join("")
 
+    const diaPlaceholder = row.diaCobro ? `Día ${row.diaCobro}` : "Día"
+
     const monthsHtml = GASTOS_MONTHS.map(
         (month) => `
         <div class="mensMonthField">
             <label class="mensMonthLabel" for="gastosMensualidad-${month.key}">${month.label}</label>
             <input id="gastosMensualidad-${month.key}" class="assetModalInput mensMonthInput" data-mens-month="${month.key}"
                    type="text" inputmode="decimal" value="${escapeGastosHtml(row.meses?.[month.key] || "")}" placeholder="—">
+            <input class="assetModalInput mensMonthDayInput" data-mens-day="${month.key}" type="text"
+                   inputmode="numeric" maxlength="2" aria-label="Día de cobro de ${month.label}"
+                   value="${escapeGastosHtml(row.diasCobro?.[month.key] || "")}" placeholder="${escapeGastosHtml(diaPlaceholder)}">
         </div>
     `
     ).join("")
@@ -461,8 +614,8 @@ function buildMensualidadFormHtml(row) {
                 <span class="mensFormMonthsTitle">Importes por mes</span>
                 <button type="button" class="mensGhostBtn" id="gastosMensualidadRecalcBtn">Recalcular desde el importe</button>
             </div>
-            <p class="mensFormMonthsHint">Se rellenan solos con el importe y la frecuencia. Edita un mes para ajustarlo a mano.</p>
-            <div class="mensMonthsGrid">${monthsHtml}</div>
+            <p class="mensFormMonthsHint">Se rellenan solos con el importe y la frecuencia. Edita un mes para ajustarlo a mano. El recuadro pequeño es el día de cobro de ese mes: déjalo vacío y se usa el día de renovación.</p>
+            <div class="mensMonthsGrid mensMonthsGridDays">${monthsHtml}</div>
         </div>
     `
 }
@@ -471,10 +624,24 @@ function bindMensualidadFormModal(modal, { autoFill, startIndex }) {
     const importeInput = modal.querySelector("#gastosMensualidadImporte")
     const frecuenciaSelect = modal.querySelector("#gastosMensualidadFrecuencia")
     const diaSelect = modal.querySelector("#gastosMensualidadDia")
+    const estadoSelect = modal.querySelector("#gastosMensualidadEstado")
     const preview = modal.querySelector("#gastosMensualidadPreview")
     const monthInputs = [...modal.querySelectorAll("[data-mens-month]")]
+    const dayInputs = [...modal.querySelectorAll("[data-mens-day]")]
 
     const readMeses = () => Object.fromEntries(monthInputs.map((input) => [input.dataset.mensMonth, input.value]))
+    const readDias = () =>
+        normalizeMensualidadDias(Object.fromEntries(dayInputs.map((input) => [input.dataset.mensDay, input.value])))
+
+    // Fila a medio escribir, para lo que necesita saber cuándo cae el cargo de
+    // un mes sin esperar a que se guarde.
+    const readFormRow = () => ({
+        importe: importeInput.value,
+        frecuencia: frecuenciaSelect.value,
+        diaCobro: normalizeMensualidadDia(diaSelect.value),
+        diasCobro: readDias(),
+        meses: readMeses()
+    })
 
     const updatePreview = () => {
         const meses = readMeses()
@@ -482,25 +649,58 @@ function bindMensualidadFormModal(modal, { autoFill, startIndex }) {
         const cargos = GASTOS_MONTHS.filter((month) => parseEuroNumber(meses[month.key] || "") !== 0).length
 
         if (!cargos) {
-            preview.textContent = "Sin cargos configurados este año."
+            preview.textContent =
+                estadoSelect.value === "pausada"
+                    ? "Pausada: no queda ningún cargo por cobrar este año."
+                    : "Sin cargos configurados este año."
             return
         }
 
         const dia = normalizeMensualidadDia(diaSelect.value)
         const diaText = dia ? ` · se renueva el día ${dia}` : ""
-        preview.textContent = `${cargos} ${cargos === 1 ? "cargo" : "cargos"} en ${currentGastosYear} · ${formatEuro(total)} al año · ${formatEuro(total / 12)} al mes de media${diaText}`
+        const excepciones = Object.keys(readDias()).length
+        const excepcionesText = excepciones ? ` · ${excepciones} mes${excepciones === 1 ? "" : "es"} con otro día` : ""
+        preview.textContent = `${cargos} ${cargos === 1 ? "cargo" : "cargos"} en ${currentGastosYear} · ${formatEuro(total)} al año · ${formatEuro(total / 12)} al mes de media${diaText}${excepcionesText}`
     }
 
-    const refillMonths = ({ force = false } = {}) => {
+    // El día por defecto se ve como marca de agua en cada mes, así que se
+    // refresca al cambiarlo: es lo que se cobra donde no hay excepción.
+    const updateDayPlaceholders = () => {
+        const dia = normalizeMensualidadDia(diaSelect.value)
+        dayInputs.forEach((input) => {
+            input.placeholder = dia ? `Día ${dia}` : "Día"
+        })
+    }
+
+    const refillMonths = ({ force = false, from = 0 } = {}) => {
         const computed = computeMensualidadMeses(importeInput.value, frecuenciaSelect.value, startIndex)
-        monthInputs.forEach((input) => {
-            if (!force && input.dataset.mensDirty === "true") {
+        monthInputs.forEach((input, index) => {
+            if (index < from || (!force && input.dataset.mensDirty === "true")) {
                 return
             }
             input.value = computed[input.dataset.mensMonth]
             delete input.dataset.mensDirty
         })
         updatePreview()
+    }
+
+    // Pausar desde el formulario hace lo mismo que pausar desde la tabla: vacía
+    // los cargos que ya no se van a cobrar, a la vista y sin sorpresas.
+    const applyEstado = () => {
+        const from = getMensualidadPauseIndex(readFormRow())
+
+        if (estadoSelect.value === "pausada") {
+            monthInputs.forEach((input, index) => {
+                if (index >= from) {
+                    input.value = ""
+                    delete input.dataset.mensDirty
+                }
+            })
+            updatePreview()
+            return
+        }
+
+        refillMonths({ force: true, from })
     }
 
     monthInputs.forEach((input) => {
@@ -517,10 +717,27 @@ function bindMensualidadFormModal(modal, { autoFill, startIndex }) {
         })
     })
 
+    dayInputs.forEach((input) => {
+        input.addEventListener("input", () => {
+            input.value = input.value.replace(/[^0-9]/g, "").slice(0, 2)
+            updatePreview()
+        })
+        input.addEventListener("blur", () => {
+            input.value = normalizeMensualidadDia(input.value)
+            updatePreview()
+        })
+    })
+
     importeInput.addEventListener("input", () => refillMonths())
     frecuenciaSelect.addEventListener("change", () => refillMonths())
-    diaSelect.addEventListener("change", updatePreview)
+    diaSelect.addEventListener("change", () => {
+        updateDayPlaceholders()
+        updatePreview()
+    })
+    estadoSelect.addEventListener("change", applyEstado)
     modal.querySelector("#gastosMensualidadRecalcBtn")?.addEventListener("click", () => refillMonths({ force: true }))
+
+    updateDayPlaceholders()
 
     if (autoFill) {
         refillMonths()
@@ -582,11 +799,28 @@ function openMensualidadFormModal(rowIndex = -1) {
             }
 
             const importeRaw = String(getValue("gastosMensualidadImporte")).trim()
+            const diaCobro = normalizeMensualidadDia(getValue("gastosMensualidadDia"))
+            // Solo se guardan los meses que se salen del día por defecto:
+            // repetirlo en los otros once sería un dato que nadie ha escrito y
+            // que dejaría de seguir al día general si se cambia.
+            const diasCobro = Object.fromEntries(
+                Object.entries(
+                    normalizeMensualidadDias(
+                        Object.fromEntries(
+                            [...modal.querySelectorAll("[data-mens-day]")].map((input) => [
+                                input.dataset.mensDay,
+                                input.value
+                            ])
+                        )
+                    )
+                ).filter(([, dia]) => dia !== diaCobro)
+            )
             const nextRow = {
                 nombre,
                 importe: importeRaw ? formatCellEuroValue(importeRaw) : "",
                 frecuencia: getMensualidadFrecuencia(getValue("gastosMensualidadFrecuencia")).key,
-                diaCobro: normalizeMensualidadDia(getValue("gastosMensualidadDia")),
+                diaCobro,
+                diasCobro,
                 activa: getValue("gastosMensualidadEstado") !== "pausada",
                 nota: String(getValue("gastosMensualidadNota")).trim(),
                 meses
@@ -734,6 +968,8 @@ async function initGastosLogic() {
     currentGastosView = "year"
     mensualidadesFilter = "todas"
     mensualidadesSearch = ""
+    mensualidadesTab = "tabla"
+    mensCalendarSelection = null
     gastosMensualidadesCollapsed = (window._gastosHiddenMensualidades || []).includes("Mensualidades")
     gastosMostrarPausadas = Boolean(window._gastosMostrarPausadas)
     bindGastosPersistenceGuards()
@@ -974,6 +1210,23 @@ function downloadGastosCsv() {
     }
 
     if (currentGastosView === "mensualidades") {
+        // Desde el calendario se baja un cargo por línea, con su fecha: es lo
+        // que se está mirando, y lo que sirve para cuadrar con el banco.
+        if (mensualidadesTab === "calendario") {
+            getMensualidadesCargosDelAno().forEach((cargo) => {
+                rows.push({
+                    Fecha: cargo.sinDia ? "" : formatGastoCargoDate(cargo.date),
+                    Mes: GASTOS_MONTHS[cargo.monthIndex].label,
+                    Servicio: cargo.nombre,
+                    Importe: cargo.amount,
+                    Estado: cargo.activa ? "Activa" : "Pausada"
+                })
+            })
+
+            downloadCsvFile(`cargos-mensualidades-${currentGastosYear}.csv`, rows)
+            return
+        }
+
         getMensualidades().forEach((row) => {
             const anual = getMensualidadAnnualCost(row)
             rows.push({
@@ -981,6 +1234,9 @@ function downloadGastosCsv() {
                 Importe: getMensualidadCargo(row),
                 Frecuencia: getMensualidadFrecuencia(row.frecuencia).short,
                 "Día de renovación": row.diaCobro,
+                "Días por mes": GASTOS_MONTHS.filter((month) => row.diasCobro?.[month.key])
+                    .map((month) => `${month.label}: ${row.diasCobro[month.key]}`)
+                    .join(" · "),
                 "Coste mensual": getMensualidadMonthlyCost(row),
                 "Coste anual": anual,
                 Estado: row.activa ? "Activa" : "Pausada",
@@ -1433,6 +1689,25 @@ function renderCurrentGastosView() {
 
 function renderMensualidadesView() {
     renderMensualidadesSummary()
+    renderMensualidadesList()
+}
+
+// Tabla y calendario miran los mismos datos con los mismos filtros: solo cambia
+// la forma. Un único sitio decide cuál se ve para que el buscador y los chips
+// no tengan que saberlo.
+function renderMensualidadesList() {
+    const table = document.getElementById("mensTableWrapper")
+    const calendar = document.getElementById("mensCalendar")
+    const isCalendar = mensualidadesTab === "calendario"
+
+    table?.classList.toggle("hidden", isCalendar)
+    calendar?.classList.toggle("hidden", !isCalendar)
+
+    if (isCalendar) {
+        renderMensualidadesCalendar()
+        return
+    }
+
     renderMensualidadesTable()
 }
 
@@ -1445,7 +1720,11 @@ function renderMensualidadesSummary() {
 
     const rows = getMensualidades()
     const activas = rows.filter((row) => row.activa)
-    const totalAnual = activas.reduce((sum, row) => sum + getMensualidadAnnualCost(row), 0)
+    // Dos números distintos y los dos ciertos: lo que se paga ahora (una pausada
+    // cuesta cero) y lo que ha costado el año (una pausada sí cobró antes de
+    // pararse). Mezclarlos era lo que inflaba el coste mensual.
+    const mensualActual = rows.reduce((sum, row) => sum + getMensualidadMonthlyCost(row), 0)
+    const totalAnual = rows.reduce((sum, row) => sum + getMensualidadAnnualCost(row), 0)
 
     const nextCharges = activas
         .map((row) => ({ row, next: getMensualidadNextCharge(row) }))
@@ -1458,17 +1737,22 @@ function renderMensualidadesSummary() {
         ? `${nextItem.row.nombre} · ${nextItem.next.daysLeft === 0 ? "hoy" : `en ${nextItem.next.daysLeft} día${nextItem.next.daysLeft === 1 ? "" : "s"}`}`
         : "Sin cargos pendientes"
 
+    const pausadas = rows.length - activas.length
     const cards = [
         {
-            label: "Coste mensual medio",
-            value: formatEuro(totalAnual / 12),
-            hint: `Media de ${currentGastosYear}, con cambios de precio`
+            label: "Coste mensual",
+            value: formatEuro(mensualActual),
+            hint: pausadas ? `Solo lo activo · ${pausadas} sin contar` : "Lo que se cobra cada mes"
         },
-        { label: "Coste anual", value: formatEuro(totalAnual), hint: "Solo mensualidades activas" },
+        {
+            label: "Coste del año",
+            value: formatEuro(totalAnual),
+            hint: `Cargos de ${currentGastosYear} · ${formatEuro(totalAnual / 12)} al mes de media`
+        },
         {
             label: "Suscripciones activas",
             value: String(activas.length),
-            hint: `${rows.length - activas.length} pausada${rows.length - activas.length === 1 ? "" : "s"}`
+            hint: `${pausadas} pausada${pausadas === 1 ? "" : "s"}`
         },
         { label: "Próxima renovación", value: nextValue, hint: nextHint }
     ]
@@ -1541,6 +1825,16 @@ function renderMensualidadesTable() {
             const nextText = next && !next.isPast ? formatMensualidadDate(next.date) : "—"
             const nextHint = next && !next.isPast ? (next.daysLeft === 0 ? "hoy" : `en ${next.daysLeft} d`) : ""
             const cargo = getMensualidadCargo(row)
+            // Los meses con un día distinto se resumen aquí: la columna dice el
+            // día habitual y avisa de cuántas veces no se cumple.
+            const diasDistintos = GASTOS_MONTHS.filter((month) => row.diasCobro?.[month.key])
+            const renovacionText = row.diaCobro ? `Día ${escapeGastosHtml(row.diaCobro)}` : "—"
+            const excepciones = diasDistintos.length
+                ? `${diasDistintos.length} mes${diasDistintos.length === 1 ? "" : "es"} aparte`
+                : ""
+            const excepcionesTitle = diasDistintos
+                .map((month) => `${month.label}: día ${row.diasCobro[month.key]}`)
+                .join(" · ")
 
             return `
             <tr class="${row.activa ? "" : "mensRowPaused"}">
@@ -1550,9 +1844,9 @@ function renderMensualidadesTable() {
                 </td>
                 <td>${cargo ? formatEuro(cargo) : "—"}</td>
                 <td><span class="mensBadge mensBadge-${frecuencia.key}">${frecuencia.short}</span></td>
-                <td>${row.diaCobro ? `Día ${escapeGastosHtml(row.diaCobro)}` : "—"}</td>
+                <td>${renovacionText}${excepciones ? `<span class="mensNextHint" title="${escapeGastosHtml(excepcionesTitle)}">${excepciones}</span>` : ""}</td>
                 <td>${escapeGastosHtml(nextText)}${nextHint ? `<span class="mensNextHint">${nextHint}</span>` : ""}</td>
-                <td>${formatEuro(getMensualidadMonthlyCost(row))}</td>
+                <td>${row.activa ? formatEuro(getMensualidadMonthlyCost(row)) : "—"}</td>
                 <td>${formatEuro(anual)}</td>
                 <td><span class="mensState ${row.activa ? "mensStateActive" : "mensStatePaused"}">${row.activa ? "Activa" : "Pausada"}</span></td>
                 <td class="rowActionsCell">
@@ -1575,14 +1869,221 @@ function renderMensualidadesTable() {
         .join("")
 
     const visibleAnual = items.reduce((sum, { row }) => sum + getMensualidadAnnualCost(row), 0)
+    // El coste mensual de una pausada es cero, así que el total ya solo suma lo
+    // que se sigue cobrando. El anual sí cuenta lo pausado: es dinero que salió.
     const visibleMensual = items.reduce((sum, { row }) => sum + getMensualidadMonthlyCost(row), 0)
+    const pausadas = items.filter(({ row }) => !row.activa).length
     foot.innerHTML = `
         <tr class="mensFootRow">
-            <td colspan="5">Total (${items.length} ${items.length === 1 ? "mensualidad" : "mensualidades"})</td>
+            <td colspan="5">Total (${items.length} ${items.length === 1 ? "mensualidad" : "mensualidades"})${pausadas ? `<span class="mensFootHint">${pausadas} pausada${pausadas === 1 ? "" : "s"}, fuera del coste mensual</span>` : ""}</td>
             <td class="numCell">${formatEuro(visibleMensual)}</td>
             <td class="numCell">${formatEuro(visibleAnual)}</td>
             <td colspan="2"></td>
         </tr>
+    `
+}
+
+// ── Calendario del año ──────────────────────────────────────────────────────
+
+// La semana empieza en lunes, como los calendarios de aquí.
+const MENS_CAL_WEEKDAYS = ["L", "M", "X", "J", "V", "S", "D"]
+
+// Todos los cargos del año que pasan el filtro, con su fecha y su importe.
+// Es la lista que se pinta y de la que salen los totales de cada mes.
+function getMensualidadesCargosDelAno() {
+    const cargos = []
+
+    getFilteredMensualidades().forEach(({ row, index }) => {
+        getMensualidadCargos(row).forEach((cargo) => {
+            cargos.push({
+                index,
+                nombre: row.nombre,
+                activa: row.activa,
+                frecuencia: row.frecuencia,
+                monthIndex: cargo.index,
+                monthKey: cargo.key,
+                dia: cargo.dia,
+                sinDia: cargo.sinDia,
+                date: cargo.date,
+                amount: cargo.amount
+            })
+        })
+    })
+
+    return cargos.sort((a, b) => a.date - b.date || a.nombre.localeCompare(b.nombre))
+}
+
+function mensCalDayKey(monthIndex, day) {
+    return `${monthIndex}-${day}`
+}
+
+function buildMensCalMonth(monthIndex, cargosDelMes, today, yearNumber) {
+    const month = GASTOS_MONTHS[monthIndex]
+    const conDia = cargosDelMes.filter((cargo) => !cargo.sinDia)
+    const sinDia = cargosDelMes.filter((cargo) => cargo.sinDia)
+    const total = cargosDelMes.reduce((sum, cargo) => sum + cargo.amount, 0)
+
+    const porDia = new Map()
+    conDia.forEach((cargo) => {
+        const day = cargo.date.getDate()
+        porDia.set(day, [...(porDia.get(day) || []), cargo])
+    })
+
+    const diasDelMes = new Date(yearNumber, monthIndex + 1, 0).getDate()
+    // getDay() cuenta desde el domingo; aquí la semana empieza en lunes.
+    const hueco = (new Date(yearNumber, monthIndex, 1).getDay() + 6) % 7
+
+    const celdas = Array.from({ length: hueco }, () => '<span class="mensCalDay mensCalDayBlank"></span>')
+
+    for (let day = 1; day <= diasDelMes; day += 1) {
+        const delDia = porDia.get(day) || []
+        const fecha = new Date(yearNumber, monthIndex, day)
+        const esHoy = fecha.getTime() === today.getTime()
+        const classes = ["mensCalDay"]
+
+        if (esHoy) {
+            classes.push("mensCalDayToday")
+        }
+
+        if (!delDia.length) {
+            celdas.push(
+                `<span class="${classes.join(" ")} mensCalDayEmpty"><span class="mensCalDayNum">${day}</span></span>`
+            )
+            continue
+        }
+
+        const key = mensCalDayKey(monthIndex, day)
+        const importe = delDia.reduce((sum, cargo) => sum + cargo.amount, 0)
+        classes.push("mensCalDayCharged")
+        classes.push(fecha <= today ? "mensCalDayPast" : "mensCalDayNext")
+
+        if (mensCalendarSelection === key) {
+            classes.push("mensCalDaySelected")
+        }
+
+        const detalle = delDia.map((cargo) => `${cargo.nombre}: ${formatEuro(cargo.amount)}`).join(" · ")
+
+        celdas.push(`
+            <button type="button" class="${classes.join(" ")}" data-mens-cal-day="${key}"
+                    title="${escapeGastosHtml(`${day} de ${month.label.toLowerCase()} · ${detalle}`)}">
+                <span class="mensCalDayNum">${day}</span>
+                <span class="mensCalDayAmount">${formatEuro(importe)}</span>
+                ${delDia.length > 1 ? `<span class="mensCalDayCount">${delDia.length}</span>` : ""}
+            </button>
+        `)
+    }
+
+    return `
+        <article class="mensCalMonth${cargosDelMes.length ? "" : " mensCalMonthEmpty"}">
+            <header class="mensCalMonthHead">
+                <span class="mensCalMonthName">${month.label}</span>
+                <span class="mensCalMonthTotal">${cargosDelMes.length ? formatEuro(total) : "—"}</span>
+            </header>
+            <div class="mensCalWeekdays">${MENS_CAL_WEEKDAYS.map((d) => `<span>${d}</span>`).join("")}</div>
+            <div class="mensCalDays">${celdas.join("")}</div>
+            ${
+                sinDia.length
+                    ? `<p class="mensCalNoDay">Sin día: ${escapeGastosHtml(sinDia.map((cargo) => cargo.nombre).join(", "))}</p>`
+                    : ""
+            }
+        </article>
+    `
+}
+
+function buildMensCalDetalle(cargos, today) {
+    if (mensCalendarSelection) {
+        const [monthIndex, day] = mensCalendarSelection.split("-").map(Number)
+        const delDia = cargos.filter(
+            (cargo) => !cargo.sinDia && cargo.monthIndex === monthIndex && cargo.date.getDate() === day
+        )
+
+        if (delDia.length) {
+            const total = delDia.reduce((sum, cargo) => sum + cargo.amount, 0)
+            const fecha = delDia[0].date
+            const cobrado = fecha <= today
+
+            return `
+                <p class="mensCalSideLabel">${cobrado ? "Cobrado" : "Previsto"}</p>
+                <p class="mensCalSideTitle">${day} de ${GASTOS_MONTHS[monthIndex].label.toLowerCase()}</p>
+                <ul class="mensCalSideList">
+                    ${delDia
+                        .map(
+                            (cargo) => `
+                        <li class="mensCalSideItem${cargo.activa ? "" : " mensCalSideItemPaused"}">
+                            <span class="mensCalSideName">${escapeGastosHtml(cargo.nombre)}</span>
+                            <span class="mensCalSideAmount">${formatEuro(cargo.amount)}</span>
+                        </li>
+                    `
+                        )
+                        .join("")}
+                </ul>
+                <p class="mensCalSideTotal"><span>Total del día</span><span>${formatEuro(total)}</span></p>
+            `
+        }
+    }
+
+    // Sin día elegido, el panel cuenta el año: lo ya cobrado y lo que viene.
+    const cobrados = cargos.filter((cargo) => cargo.date <= today)
+    const pendientes = cargos.filter((cargo) => cargo.date > today)
+    const totalCobrado = cobrados.reduce((sum, cargo) => sum + cargo.amount, 0)
+    const totalPendiente = pendientes.reduce((sum, cargo) => sum + cargo.amount, 0)
+
+    return `
+        <p class="mensCalSideLabel">Histórico de ${currentGastosYear}</p>
+        <p class="mensCalSideTitle">${cargos.length} ${cargos.length === 1 ? "cargo" : "cargos"}</p>
+        <p class="mensCalSideTotal"><span>Cobrado</span><span>${formatEuro(totalCobrado)}</span></p>
+        <p class="mensCalSideTotal"><span>Por cobrar</span><span>${formatEuro(totalPendiente)}</span></p>
+        <p class="mensCalSideLabel mensCalSideLabelSpaced">Lo que viene</p>
+        ${
+            pendientes.length
+                ? `<ul class="mensCalSideList">
+                        ${pendientes
+                            .slice(0, 6)
+                            .map(
+                                (cargo) => `
+                            <li class="mensCalSideItem">
+                                <span class="mensCalSideName">${escapeGastosHtml(cargo.nombre)}</span>
+                                <span class="mensCalSideDate">${cargo.sinDia ? GASTOS_MONTHS[cargo.monthIndex].label.toLowerCase() : formatMensualidadDate(cargo.date)}</span>
+                                <span class="mensCalSideAmount">${formatEuro(cargo.amount)}</span>
+                            </li>
+                        `
+                            )
+                            .join("")}
+                   </ul>`
+                : '<p class="mensCalSideEmpty">No queda ningún cargo este año.</p>'
+        }
+        <p class="mensCalSideHint">Pulsa un día para ver qué se cobró.</p>
+    `
+}
+
+function renderMensualidadesCalendar() {
+    const container = document.getElementById("mensCalendar")
+
+    if (!container) {
+        return
+    }
+
+    const yearNumber = Number(currentGastosYear)
+    const cargos = Number.isInteger(yearNumber) ? getMensualidadesCargosDelAno() : []
+
+    if (!cargos.length) {
+        const totalRows = (currentGastosData?.mensualidades || []).length
+        container.innerHTML = `<p class="mensCalEmpty">${
+            totalRows
+                ? "Ninguna mensualidad con cargos coincide con el filtro."
+                : "Aún no hay mensualidades. Añade la primera para ver el calendario de cobros."
+        }</p>`
+        return
+    }
+
+    const today = getGastosToday()
+    const porMes = GASTOS_MONTHS.map((month, index) => cargos.filter((cargo) => cargo.monthIndex === index))
+
+    container.innerHTML = `
+        <div class="mensCalGrid">
+            ${GASTOS_MONTHS.map((month, index) => buildMensCalMonth(index, porMes[index], today, yearNumber)).join("")}
+        </div>
+        <aside class="mensCalSide">${buildMensCalDetalle(cargos, today)}</aside>
     `
 }
 
@@ -1619,7 +2120,9 @@ function handleMensualidadesActionClick(event) {
         }
 
         const normalized = normalizeMensualidad(row)
-        currentGastosData.mensualidades[index] = { ...normalized, activa: !normalized.activa }
+        currentGastosData.mensualidades[index] = normalized.activa
+            ? pauseMensualidad(normalized)
+            : resumeMensualidad(normalized)
         renderCurrentGastosView()
         scheduleGastosAutosave()
         return
@@ -1699,7 +2202,7 @@ function bindMensualidadesViewEvents() {
         searchInput.dataset.bound = "true"
         searchInput.addEventListener("input", () => {
             mensualidadesSearch = searchInput.value
-            renderMensualidadesTable()
+            renderMensualidadesList()
         })
     }
 
@@ -1716,7 +2219,41 @@ function bindMensualidadesViewEvents() {
             filterGroup.querySelectorAll("[data-mens-filter]").forEach((item) => {
                 item.classList.toggle("active", item === chip)
             })
-            renderMensualidadesTable()
+            renderMensualidadesList()
+        })
+    }
+
+    const viewGroup = document.getElementById("mensViewGroup")
+    if (viewGroup && !viewGroup.dataset.bound) {
+        viewGroup.dataset.bound = "true"
+        viewGroup.addEventListener("click", (event) => {
+            const chip = event.target.closest("[data-mens-view]")
+            if (!chip) {
+                return
+            }
+
+            mensualidadesTab = chip.dataset.mensView
+            viewGroup.querySelectorAll("[data-mens-view]").forEach((item) => {
+                item.classList.toggle("active", item === chip)
+            })
+            renderMensualidadesList()
+        })
+    }
+
+    const calendar = document.getElementById("mensCalendar")
+    if (calendar && !calendar.dataset.bound) {
+        calendar.dataset.bound = "true"
+        calendar.addEventListener("click", (event) => {
+            const dayButton = event.target.closest("[data-mens-cal-day]")
+            if (!dayButton) {
+                return
+            }
+
+            // Volver a pulsar el día abierto lo cierra: el panel vuelve al
+            // resumen del año, que es lo que se ve al entrar.
+            const key = dayButton.dataset.mensCalDay
+            mensCalendarSelection = mensCalendarSelection === key ? null : key
+            renderMensualidadesCalendar()
         })
     }
 

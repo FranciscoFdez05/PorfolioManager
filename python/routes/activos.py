@@ -315,6 +315,20 @@ def saveActivo(assetId):
     if not requestData.get("operationRows") and isinstance(existing_asset.get("operationRows"), list):
         payload["operationRows"] = existing_asset.get("operationRows", [])
 
+    # Guardar reescribe el activo entero: lo que no venga en el cuerpo se borra.
+    # Una edición de la cabecera —renombrar, cambiar el color o el ticker— no
+    # tiene por qué mandar las compras ni las conversiones, y hacerlo se llevaba
+    # el historial por delante sin decir nada.
+    #
+    # Se distingue "no viene la clave" de "viene vacía": mandar [] sigue
+    # vaciando, que es como la tabla borra su última fila. La comprobación de
+    # `operationRows` de arriba no puede hacer lo mismo —conserva también con
+    # [] y así estaba antes de esto—, porque quien las manda las tiene en una
+    # variable en memoria que no siempre está poblada.
+    for campo in ("rows", "conversionRows"):
+        if campo not in requestData and isinstance(existing_asset.get(campo), list):
+            payload[campo] = existing_asset[campo]
+
     writeAssetFile(assetId, payload)
     return jsonify({"ok": True})
 

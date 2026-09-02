@@ -204,6 +204,38 @@ def test_una_bd_del_futuro_se_abre_sin_tocarla_y_avisa(temp_db, monkeypatch, cap
     assert "esquema" in caplog.text.lower()
 
 
+def test_una_bd_sin_dias_cobro_gana_la_columna_al_migrar(temp_db):
+    """El paso 4, sobre una base con la tabla de mensualidades como estaba.
+
+    Se recrea la tabla sin `dias_cobro` porque `_SCHEMA` ya la crea con ella:
+    sin esto la prueba pasaría sin haber migrado nada.
+    """
+    from core import db
+
+    conexion = db.get_db()
+    conexion.execute("DROP TABLE mensualidades")
+    conexion.execute("""
+        CREATE TABLE mensualidades (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            year       TEXT NOT NULL,
+            nombre     TEXT NOT NULL,
+            dia_cobro  TEXT NOT NULL DEFAULT '',
+            UNIQUE(year, nombre)
+        )
+    """)
+    conexion.execute("INSERT INTO mensualidades (year, nombre, dia_cobro) VALUES ('2026', 'Luz', '5')")
+
+    db._esquema_4(conexion)
+
+    fila = conexion.execute("SELECT dia_cobro, dias_cobro FROM mensualidades").fetchone()
+    assert fila["dia_cobro"] == "5", "la migración no debe tocar el día que ya había"
+    assert fila["dias_cobro"] == ""
+
+    # Idempotente: una base en la versión 0 puede tener ya parte aplicada.
+    db._esquema_4(conexion)
+    assert conexion.execute("SELECT COUNT(*) FROM mensualidades").fetchone()[0] == 1
+
+
 def test_el_numero_de_version_cubre_todos_los_pasos_registrados():
     """Subir un paso y olvidar ESQUEMA_VERSION dejaría la migración sin aplicarse."""
     from core import db

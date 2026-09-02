@@ -161,6 +161,47 @@ def test_guardar_sin_operationRows_no_borra_las_que_ya_habia(cliente):
     assert len(client.get("/api/activos/bitcoin").get_json()["operationRows"]) == 1
 
 
+def test_editar_la_cabecera_sin_mandar_las_filas_no_borra_el_historico(cliente):
+    """Renombrar o cambiar el color no puede llevarse las compras por delante.
+
+    Guardar reescribe el activo entero, así que un cuerpo sin `rows` las
+    borraba: cambiar el color de un activo desde la vista de Activos vaciaba su
+    histórico de compras sin decir nada, y respondía 200.
+    """
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Apple")
+    ficha = client.get("/api/activos/apple").get_json()
+    ficha["rows"] = [{"fechaOperacion": "10-01-2026", "participaciones": "10"}]
+    client.post("/api/activos/apple", json=ficha, headers=cabeceras)
+
+    solo_cabecera = {k: v for k, v in ficha.items() if k not in ("rows", "conversionRows")}
+    solo_cabecera["color"] = "#242222"
+    respuesta = client.post("/api/activos/apple", json=solo_cabecera, headers=cabeceras)
+
+    assert respuesta.status_code == 200
+    guardado = client.get("/api/activos/apple").get_json()
+    assert guardado["color"] == "#242222", "el cambio pedido sí tiene que guardarse"
+    assert len(guardado["rows"]) == 1, "las compras no se mandaron, así que no se tocan"
+
+
+def test_mandar_las_filas_vacias_sigue_vaciandolas(cliente):
+    """Borrar la última fila desde la tabla tiene que seguir funcionando.
+
+    Es la diferencia entre "no mando las filas" y "mando que no hay ninguna":
+    conservar en los dos casos dejaría un activo con una fila imborrable.
+    """
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Apple")
+    ficha = client.get("/api/activos/apple").get_json()
+    ficha["rows"] = [{"fechaOperacion": "10-01-2026", "participaciones": "10"}]
+    client.post("/api/activos/apple", json=ficha, headers=cabeceras)
+
+    ficha["rows"] = []
+    client.post("/api/activos/apple", json=ficha, headers=cabeceras)
+
+    assert client.get("/api/activos/apple").get_json()["rows"] == []
+
+
 # ── Reordenar ────────────────────────────────────────────────────────────────
 
 def test_reordenar_con_la_lista_completa(cliente):

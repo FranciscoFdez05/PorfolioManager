@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.2.0-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.3.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 
@@ -31,7 +31,7 @@ Nada sale de tu red salvo las consultas de cotizaciones, y esas son opcionales: 
 - **Activos** — ficha por activo: compras/aportes, precio medio, rendimiento y, en los activos en divisa extranjera, el desglose entre **efecto activo** y **efecto divisa**
 - **Planes de inversión** — dentro de la ficha de cada activo: a qué precio entrar, a qué precio recoger el beneficio y con cuánto capital, con el porcentaje que falta desde el precio actual hasta cada uno y el aviso cuando la cotización entra en zona
 - **Planes DCA** — también por activo: aportación periódica con importe, frecuencia y horizonte, los aportes ya vencidos, el siguiente y el calendario de los doce próximos
-- **Gastos & Ingresos** — gastos por categoría, ingresos recurrentes y puntuales
+- **Gastos & Ingresos** — gastos por categoría, ingresos recurrentes y puntuales, y **mensualidades** (suscripciones) con día de cobro propio por mes y un calendario del año que dice qué se cobró cada día
 - **Finanzas** — cuenta remunerada, dividendos, renta fija, bonos y ventas
 - **Ventas con FIFO fiscal español** — lotes, regla de los dos meses y escala del ahorro calculados en el servidor, con **informe anual de la Renta** en CSV y en HTML imprimible ([detalle](#ventas-y-fiscalidad-españa))
 - **Cripto** — stablecoins, operaciones, transacciones y conversiones
@@ -257,7 +257,7 @@ curl -s http://localhost:5000/api/health
 ```
 
 ```json
-{ "ok": true, "estado": "ok", "version": "1.2.0" }
+{ "ok": true, "estado": "ok", "version": "1.3.0" }
 ```
 
 Con la sesión abierta añade el detalle: esquema de la base, portfolio activo, tamaño y tiempo en marcha.

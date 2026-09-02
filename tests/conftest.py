@@ -22,7 +22,7 @@ if str(_PYTHON_DIR) not in sys.path:
 
 @pytest.fixture(autouse=True)
 def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
-    """Saca `data/tmp` del repositorio en TODOS los tests.
+    """Saca `data/tmp` y `data/backups/auto` del repositorio en TODOS los tests.
 
     Ahí van los ficheros de bloqueo entre procesos (migración del esquema,
     copia automática) y los temporales de las copias de bases de datos. A
@@ -30,12 +30,30 @@ def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
     datos, no solo los que piden `datos_aislados`, así que el aislamiento tiene
     que ser automático: si no, la suite deja ficheros sueltos en el `data/` real
     de quien la ejecuta.
+
+    El directorio de copias automáticas se quedó fuera de esa regla y el efecto
+    era acumulativo: cada base que crea `temp_db` nace en la versión 0 del
+    esquema, así que migra, y cada migración deja su copia previa
+    `<base>_pre-esquema-N-a-M_*.db`. Esas copias están **exentas de la
+    rotación** a propósito —son el punto de retorno de una actualización—, así
+    que nadie las borraba nunca: una sola pasada de la suite deja unas
+    cuatrocientas en el `data/backups/auto` de verdad.
+
+    Se parchea el nombre dentro de `admin.backup_manager`, no en `core.paths`,
+    por lo mismo que explica `datos_aislados`: el módulo se lo lleva con
+    `from core.paths import AUTO_BACKUPS_DIR as _BACKUP_DIR` al importarse, y
+    reasignar el original ya no alcanza a nadie.
     """
+    from admin import backup_manager
     from core import paths
 
     destino = tmp_path_factory.getbasetemp() / "datos_tmp"
     destino.mkdir(exist_ok=True)
     monkeypatch.setattr(paths, "TMP_DIR", destino, raising=False)
+
+    copias = tmp_path_factory.getbasetemp() / "backups_auto"
+    copias.mkdir(exist_ok=True)
+    monkeypatch.setattr(backup_manager, "_BACKUP_DIR", copias, raising=False)
 
 
 @pytest.fixture

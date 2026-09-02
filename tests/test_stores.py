@@ -22,12 +22,14 @@ from stores.asset_utils import (
 from stores.gastos_store import (
     MONTH_KEYS,
     normalize_dia_cobro,
+    normalize_dias_cobro,
     normalize_frecuencia,
     normalize_mes,
     normalize_year,
     sanitize_gastos_types,
     sanitize_mensualidades_rows,
     sanitize_month_rows,
+    serialize_dias_cobro,
 )
 
 
@@ -155,6 +157,79 @@ class TestSanitizeMensualidades:
 
     def test_entrada_no_lista(self):
         assert sanitize_mensualidades_rows("no soy una lista") == []
+
+    def test_dias_por_mes_sobreviven_al_saneado(self):
+        row = sanitize_mensualidades_rows([{"nombre": "Luz", "diasCobro": {"marzo": "5"}}])[0]
+        assert row["diasCobro"] == {"marzo": "5"}
+
+
+class TestDiasCobro:
+    """El día de cobro que cambia de un mes a otro.
+
+    Se guarda como JSON en una sola columna, así que el saneado es también el
+    parser: lo que entre mal escrito se descarta mes a mes, sin tirar la fila.
+    """
+
+    def test_solo_pasan_los_meses_reconocibles(self):
+        assert normalize_dias_cobro({"marzo": "5", "brumario": "9"}) == {"marzo": "5"}
+
+    @pytest.mark.parametrize("dia", ["0", "32", "", "  ", "cinco", None])
+    def test_dias_fuera_de_rango_se_descartan(self, dia):
+        assert normalize_dias_cobro({"marzo": dia}) == {}
+
+    def test_acepta_el_json_con_el_que_se_guarda(self):
+        assert normalize_dias_cobro('{"marzo": "5"}') == {"marzo": "5"}
+
+    @pytest.mark.parametrize("raw", ["", "   ", "{no es json", "[1, 2]", None, 7])
+    def test_lo_que_no_es_un_mapa_de_meses_no_rompe(self, raw):
+        assert normalize_dias_cobro(raw) == {}
+
+    def test_ida_y_vuelta_por_la_columna(self):
+        guardado = serialize_dias_cobro({"marzo": "5", "julio": 12})
+        assert normalize_dias_cobro(guardado) == {"marzo": "5", "julio": "12"}
+
+    def test_sin_excepciones_no_se_guarda_json_vacio(self):
+        # Una columna con "{}" en cada fila sería ruido: lo normal es no tener
+        # ninguna excepción.
+        assert serialize_dias_cobro({}) == ""
+        assert serialize_dias_cobro({"brumario": "9"}) == ""
+
+
+class TestMensualidadesEnLaBase:
+    """Ida y vuelta por SQLite: es donde se vería que falta la columna nueva."""
+
+    def test_los_dias_por_mes_vuelven_tal_cual(self, temp_db):
+        from stores.gastos_store import read_gastos_year, write_gastos_year
+
+        write_gastos_year("2026", {
+            "year": "2026",
+            "gastosTipos": [],
+            "months": {mes: {"rows": []} for mes in MONTH_KEYS},
+            "mensualidades": [{
+                "nombre": "Claude",
+                "importe": "22,00 €",
+                "diaCobro": "2",
+                "diasCobro": {"marzo": "5", "agosto": "9"},
+                "meses": dict.fromkeys(MONTH_KEYS, "22,00 €"),
+            }],
+        })
+
+        fila = read_gastos_year("2026")["mensualidades"][0]
+
+        assert fila["diaCobro"] == "2"
+        assert fila["diasCobro"] == {"marzo": "5", "agosto": "9"}
+
+    def test_una_mensualidad_sin_excepciones_las_lee_vacias(self, temp_db):
+        from stores.gastos_store import read_gastos_year, write_gastos_year
+
+        write_gastos_year("2026", {
+            "year": "2026",
+            "gastosTipos": [],
+            "months": {mes: {"rows": []} for mes in MONTH_KEYS},
+            "mensualidades": [{"nombre": "Luz", "meses": dict.fromkeys(MONTH_KEYS, "")}],
+        })
+
+        assert read_gastos_year("2026")["mensualidades"][0]["diasCobro"] == {}
 
 
 class TestSanitizeMonthRows:

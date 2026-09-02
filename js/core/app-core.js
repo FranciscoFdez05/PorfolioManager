@@ -537,12 +537,29 @@ function applySidebarState(sideWrapper, toggleButton) {
 }
 
 const dividendosAutosaveTimeout = null
+
+// ── Estado de página que escriben otros módulos ──────────────────────────────
+// Estas cuatro viven aquí porque las lee más de un fichero, pero quien las
+// asigna es js/cartera/assets.js: el ámbito global de la página es uno solo.
+//
+// Tienen que ser `let`. Con `const`, la asignación no falla al cargar —falla al
+// ejecutarse—, así que el fallo no aparece hasta que alguien abre el diálogo o
+// arrastra un activo, y llega como un `TypeError: Assignment to constant
+// variable` que el `catch` de turno traduce a un mensaje que no dice nada del
+// problema real. Tres de ellas se quedaron en `const` al pasar el `--fix` del
+// linter, y con ellas se rompieron editar un activo, crear uno y reordenarlos
+// arrastrando.
+//
+// ESLint no puede verlo: analiza fichero a fichero, y aquí solo ve una
+// declaración que nadie reasigna. De ahí el `eslint-disable`, que es lo que
+// impide que el próximo `npm run lint:fix` las devuelva a `const`.
+/* eslint-disable prefer-const */
 let currentAssetId = null
-const assetModalState = null
-// El diálogo reutiliza esta referencia en cada confirmación.
+let assetModalState = null
 let confirmModalState = null
-const editAssetModalState = null
-const draggedAssetId = null
+let editAssetModalState = null
+let draggedAssetId = null
+/* eslint-enable prefer-const */
 const PAGE_HTML_VERSION = "20260826b"
 
 window._viewAllPortfolios = localStorage.getItem("viewAllPortfolios") === "1"

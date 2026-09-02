@@ -63,6 +63,33 @@ def _contar(ruta, tabla):
         conn.close()
 
 
+def test_un_portfolio_activo_con_ruta_de_escape_no_abre_nada_fuera(entorno):
+    """Segunda barrera, en el punto donde el id se convierte en una ruta.
+
+    La primera es la validación al restaurar, que impide que un índice así se
+    escriba. Esta cubre el fichero que ya está en disco —restaurado por una
+    versión anterior, editado a mano o copiado de otra máquina—: sin ella, la
+    base activa acababa fuera del directorio de datos y el valor se persistía,
+    así que el desvío se repetía en cada arranque.
+    """
+    from admin.portfolios_manager import init_portfolios
+    from core.db import get_active_db_path, init_db_at_path
+
+    init_db_at_path(entorno["dir"] / "principal.db")
+    entorno["meta"].write_text(json.dumps({
+        "active": "../../../fuera/principal",
+        "portfolios": [{"id": "principal", "name": "Principal"}],
+    }), encoding="utf-8")
+
+    init_portfolios()
+
+    activa = get_active_db_path().resolve()
+    assert activa.parent == entorno["dir"].resolve(), f"la base activa se fue a {activa}"
+    assert not list(entorno["dir"].parent.parent.glob("fuera/*.db"))
+    # Y no se queda para el siguiente arranque.
+    assert json.loads(entorno["meta"].read_text())["active"] == "principal"
+
+
 def test_un_portfolio_nuevo_activo_no_recibe_el_legacy(entorno):
     """El fallo original: activar un portfolio vacío y reiniciar lo contaminaba."""
     from admin.portfolios_manager import init_portfolios

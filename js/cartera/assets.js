@@ -3488,6 +3488,29 @@ function closeEditAssetModal() {
     editAssetModalState = null
 }
 
+// Base sobre la que se guarda una edición del activo.
+//
+// El guardado reescribe el activo entero, y el modal solo edita cuatro campos
+// de cabecera: nombre, ticker, color y ticker de TradingView. Todo lo demás
+// —operaciones, conversiones, precio, divisa— tiene que viajar intacto o el
+// guardado lo borra. `buildCurrentAssetPayload` saca las filas de la tabla de
+// operaciones, así que solo sirve con esa tabla en pantalla: desde la vista de
+// Activos, sin ella, devolvía un activo sin filas y cambiar el color se llevaba
+// por delante todo el historial de compras.
+async function buildEditAssetPayload() {
+    if (_editingAsset) {
+        // Viene de la vista de Activos: es la copia completa que dio el servidor.
+        return { ..._editingAsset }
+    }
+
+    if (document.getElementById("assetOperationsBody")) {
+        // La tabla está delante: refleja también lo editado y aún sin guardar.
+        return buildCurrentAssetPayload()
+    }
+
+    return await loadAssetData(currentAssetId)
+}
+
 async function submitEditAssetModal() {
     if (!currentAssetId) {
         return
@@ -3499,7 +3522,7 @@ async function submitEditAssetModal() {
         return
     }
 
-    const payload = _editingAsset ? { ..._editingAsset } : buildCurrentAssetPayload()
+    const payload = await buildEditAssetPayload()
     const currentName = String(payload.name || "").trim()
     const trimmedName = editAssetNameInput.value.trim()
     const newColor = document.getElementById("editAssetColorInput")?.value || ""
@@ -3921,8 +3944,7 @@ function initAssetTableLogic(asset) {
             try {
                 await renameCurrentAsset()
             } catch (error) {
-                console.error(error)
-                alert("No se pudo actualizar el nombre del activo.")
+                reportEditAssetError(error)
             }
         })
     }
@@ -4287,6 +4309,27 @@ async function submitAssetModal() {
     }
 }
 
+// La edición toca nombre, ticker, color y ticker de TradingView; el aviso decía
+// siempre «no se pudo actualizar el nombre», así que quien cambiaba el color leía
+// un error sobre algo que no había tocado. Además va al hueco de mensajes del
+// propio modal —que sigue abierto— en vez de a un `alert` que tapa el formulario
+// y obliga a empezar de nuevo. Del servidor se aprovecha su mensaje: es el que
+// distingue un ticker inválido de una sesión caducada.
+function reportEditAssetError(error) {
+    console.error(error)
+
+    const detalle = extractApiErrorMessage(error)
+    const mensaje = `No se pudieron guardar los cambios del activo.${detalle ? ` ${detalle}` : ""}`
+    const feedback = document.getElementById("editAssetSearchFeedback")
+
+    if (feedback) {
+        setAssetSearchFeedback(feedback, mensaje, true)
+        return
+    }
+
+    alert(mensaje)
+}
+
 function initEditAssetModal() {
     const editAssetNameInput = document.getElementById("editAssetNameInput")
     const editAssetTickerInput = document.getElementById("editAssetTickerInput")
@@ -4304,8 +4347,7 @@ function initEditAssetModal() {
             try {
                 await submitEditAssetModal()
             } catch (error) {
-                console.error(error)
-                alert("No se pudo actualizar el nombre del activo.")
+                reportEditAssetError(error)
             }
         })
     }
@@ -4324,8 +4366,7 @@ function initEditAssetModal() {
                 try {
                     await submitEditAssetModal()
                 } catch (error) {
-                    console.error(error)
-                    alert("No se pudo actualizar el nombre del activo.")
+                    reportEditAssetError(error)
                 }
             }
         })

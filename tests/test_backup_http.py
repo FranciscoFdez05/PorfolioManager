@@ -335,6 +335,100 @@ def test_un_nombre_de_prefs_manipulado_se_ignora(cliente):
     assert json.loads((rutas["json"] / "prefs_principal.json").read_text()) == {"tema": "oscuro"}
 
 
+# ── Restaurar: el índice de portfolios ───────────────────────────────────────
+#
+# `portfolios.json` es el único contenido del zip que acaba usándose como ruta:
+# de su campo `active` sale el nombre del fichero .db que la aplicación abrirá.
+# Los .db y los prefs se filtran por nombre desde el principio; el índice no lo
+# hacía, y desde que «Importar ZIP» acepta un archivo subido su contenido puede
+# venir de fuera de esta instalación.
+
+def _zip_con_indice(rutas, indice):
+    origen = _crear_db(rutas["data"] / "origen.db", [("2026-01-01", 1.0, 1.0)])
+    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(ruta_zip, "w") as zf:
+        zf.writestr("portfolios/principal.db", origen.read_bytes())
+        zf.writestr("portfolios.json", indice)
+    return ruta_zip
+
+
+@pytest.mark.parametrize("active", [
+    "../../../../tmp/principal",     # sale del directorio de datos
+    "..",
+    "principal/../otro",
+    "Principal",                     # el alfabeto de un id es en minúsculas
+    "con espacio",
+])
+def test_un_portfolio_activo_manipulado_no_se_restaura(cliente, active):
+    """El id del activo decide qué fichero se abre: si no es un id, no entra.
+
+    Un `active` como '../../../tmp/principal' dejaba la base activa fuera del
+    volumen de datos, y el valor se persistía: el desvío sobrevivía a cada
+    arranque, mientras los backups seguían mirando data/portfolios.
+    """
+    client, cabeceras, rutas = cliente
+    rutas["meta"].write_text(json.dumps({"active": "principal",
+                                         "portfolios": [{"id": "principal", "name": "P"}]}))
+    ruta_zip = _zip_con_indice(rutas, json.dumps({
+        "active": active,
+        "portfolios": [{"id": "principal", "name": "P"}],
+    }))
+
+    datos = client.post("/api/restore", json={"filename": ruta_zip.name},
+                        headers=cabeceras).get_json()
+
+    assert json.loads(rutas["meta"].read_text())["active"] == "principal"
+    assert any("portfolios.json" in entrada for entrada in datos["ignorados"]), (
+        "restaurar a medias sin decirlo es peor que no restaurar"
+    )
+
+
+def test_un_id_manipulado_en_la_lista_tampoco_pasa(cliente):
+    """No solo `active`: de cada id de la lista sale también un nombre de fichero."""
+    client, cabeceras, rutas = cliente
+    rutas["meta"].write_text(json.dumps({"active": "principal", "portfolios": []}))
+    ruta_zip = _zip_con_indice(rutas, json.dumps({
+        "active": "principal",
+        "portfolios": [{"id": "../../otro", "name": "P"}],
+    }))
+
+    client.post("/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras)
+
+    assert json.loads(rutas["meta"].read_text())["portfolios"] == []
+
+
+@pytest.mark.parametrize("crudo", [b"no soy json", b"[]", b'"principal"', b"\xff\xfe"])
+def test_un_indice_ilegible_se_ignora_y_se_dice(cliente, crudo):
+    client, cabeceras, rutas = cliente
+    rutas["meta"].write_text(json.dumps({"active": "principal", "portfolios": []}))
+    origen = _crear_db(rutas["data"] / "origen.db", [("2026-01-01", 1.0, 1.0)])
+    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(ruta_zip, "w") as zf:
+        zf.writestr("portfolios/principal.db", origen.read_bytes())
+        zf.writestr("portfolios.json", crudo)
+
+    datos = client.post("/api/restore", json={"filename": ruta_zip.name},
+                        headers=cabeceras).get_json()
+
+    assert json.loads(rutas["meta"].read_text())["active"] == "principal"
+    assert any("portfolios.json" in entrada for entrada in datos["ignorados"])
+
+
+def test_un_indice_correcto_se_restaura_entero(cliente):
+    """La validación no puede volverse una excusa para no restaurar lo bueno."""
+    client, cabeceras, rutas = cliente
+    ruta_zip = _zip_con_indice(rutas, json.dumps({
+        "active": "otro-2",
+        "portfolios": [{"id": "principal", "name": "P"}, {"id": "otro-2", "name": "Otro"}],
+    }))
+
+    datos = client.post("/api/restore", json={"filename": ruta_zip.name},
+                        headers=cabeceras).get_json()
+
+    assert json.loads(rutas["meta"].read_text())["active"] == "otro-2"
+    assert not [e for e in datos["ignorados"] if "portfolios.json" in e]
+
+
 # ── Restaurar: camino feliz ──────────────────────────────────────────────────
 
 def test_restore_devuelve_los_datos_del_backup(cliente):

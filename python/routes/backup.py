@@ -40,7 +40,51 @@ _RE_ZIP = re.compile(r'^backup_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.zip$')
 _RE_DB  = re.compile(r'^portfolio_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.db$')
 # Nombres de portfolio admisibles al restaurar entradas de un zip
 _RE_SAFE_DB_NAME = re.compile(r'^[A-Za-z0-9_-]{1,64}\.db$')
+# Mismo alfabeto que exige admin.portfolios_manager para un id de portfolio: de
+# ahí sale un nombre de fichero, así que ni barras ni puntos ni mayúsculas.
+_RE_SAFE_PORTFOLIO_ID = re.compile(r'^[a-z0-9_-]{1,64}$')
 _RE_SAFE_PREFS_NAME = re.compile(r'^prefs_[A-Za-z0-9_-]{1,64}\.json$')
+
+
+def _problema_del_indice(crudo: bytes) -> str | None:
+    """Motivo por el que no se puede confiar en un `portfolios.json` del zip.
+
+    Devuelve None si el índice es utilizable. Se comprueba lo que después se
+    convierte en una ruta: el id del portfolio activo y el de cada uno de los
+    listados, porque `admin.portfolios_manager` construye con ellos el nombre
+    del fichero `.db` que abrirá.
+
+    No valida el resto del contenido —nombres visibles, claves de más— a
+    propósito: lo que hay que impedir es que un id decida qué fichero se abre,
+    no imponer un esquema a un fichero que puede crecer con las versiones.
+    """
+    try:
+        meta = json.loads(crudo.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError) as error:
+        return f"no es JSON válido ({error})"
+
+    if not isinstance(meta, dict):
+        return "no es un objeto JSON"
+
+    ids = [meta.get("active")]
+
+    listados = meta.get("portfolios")
+    if listados is not None:
+        if not isinstance(listados, list):
+            return "la lista de portfolios no es una lista"
+        for entrada in listados:
+            if not isinstance(entrada, dict):
+                return "hay un portfolio que no es un objeto"
+            ids.append(entrada.get("id"))
+
+    for pid in ids:
+        # `active` puede faltar: quien lo lee tiene su propio valor por defecto.
+        if pid is None:
+            continue
+        if not isinstance(pid, str) or not _RE_SAFE_PORTFOLIO_ID.match(pid):
+            return f"identificador de portfolio no admisible: {pid!r}"
+
+    return None
 
 
 def _parse_dt(name):
@@ -441,8 +485,23 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
                             limpiarTemporal(tmp_path)
 
                 # Restaurar portfolios.json (escritura atómica)
+                #
+                # Es el único contenido del zip que se usa como ruta: de aquí
+                # sale el id del portfolio activo, y con él el fichero .db que
+                # la aplicación abrirá al arrancar. Los .db y los prefs ya se
+                # filtran por nombre; esto es lo mismo para el índice, y hace
+                # falta desde que se puede importar un zip que no ha generado
+                # esta instalación. Un índice que no pase se ignora y se dice:
+                # mejor quedarse con el que ya había que restaurar uno que
+                # apunta fuera del directorio de datos.
                 if "portfolios.json" in names:
-                    escribirAtomico(_META_FILE, zf.read("portfolios.json"))
+                    meta_cruda = zf.read("portfolios.json")
+                    problema = _problema_del_indice(meta_cruda)
+                    if problema:
+                        log.warning("[backup] portfolios.json ignorado: %s", problema)
+                        ignorados.append(f"portfolios.json: {problema}")
+                    else:
+                        escribirAtomico(_META_FILE, meta_cruda)
 
                 # Restaurar ajustes.json
                 if "ajustes.json" in names:

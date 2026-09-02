@@ -1,3 +1,5 @@
+import json
+
 from core.db import get_db, transactional
 
 _MAX_LABEL = 80
@@ -39,6 +41,37 @@ def normalize_dia_cobro(value):
         return ""
     day = int(text)
     return str(day) if 1 <= day <= 31 else ""
+
+
+def normalize_dias_cobro(value):
+    """Días de cobro que se salen del día por defecto, por mes.
+
+    Entra un dict `{"marzo": "5"}` —o el JSON con el que se guarda— y sale otro
+    con solo los meses reconocibles y los días entre 1 y 31. Se descarta lo
+    demás en vez de rechazar la fila entera: un mes mal escrito no debe costar
+    el guardado de una mensualidad.
+    """
+    if isinstance(value, str):
+        try:
+            value = json.loads(value) if value.strip() else {}
+        except ValueError:
+            return {}
+
+    if not isinstance(value, dict):
+        return {}
+
+    dias = {}
+    for month in MONTH_KEYS:
+        day = normalize_dia_cobro(value.get(month))
+        if day:
+            dias[month] = day
+    return dias
+
+
+def serialize_dias_cobro(value):
+    """El dict de excepciones, listo para la columna. Vacío se guarda como ''."""
+    dias = normalize_dias_cobro(value)
+    return json.dumps(dias, ensure_ascii=False, sort_keys=True) if dias else ""
 
 
 def normalize_year(year_value):
@@ -111,6 +144,7 @@ def sanitize_mensualidades_rows(rows):
             "importe": str(row.get("importe", ""))[:_MAX_SHORT].strip(),
             "frecuencia": normalize_frecuencia(row.get("frecuencia")),
             "diaCobro": normalize_dia_cobro(row.get("diaCobro")),
+            "diasCobro": normalize_dias_cobro(row.get("diasCobro")),
             "mesInicio": normalize_mes(row.get("mesInicio")),
             "activa": bool(row.get("activa", True)),
             "nota": str(row.get("nota", ""))[:_MAX_NOTA].strip(),
@@ -209,6 +243,7 @@ def read_gastos_year(year):
             "importe": r["importe"],
             "frecuencia": normalize_frecuencia(r["frecuencia"]),
             "diaCobro": normalize_dia_cobro(r["dia_cobro"]),
+            "diasCobro": normalize_dias_cobro(r["dias_cobro"]),
             "mesInicio": normalize_mes(r["mes_inicio"]),
             "activa": bool(r["activa"]),
             "nota": r["nota"],
@@ -217,7 +252,7 @@ def read_gastos_year(year):
         for r in conn.execute(
             "SELECT nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
             "septiembre, octubre, noviembre, diciembre, "
-            "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota "
+            "categoria, importe, frecuencia, dia_cobro, dias_cobro, mes_inicio, activa, nota "
             "FROM mensualidades WHERE year = ? ORDER BY id",
             (normalized,)
         ).fetchall()
@@ -258,8 +293,8 @@ def write_gastos_year(year, data):
         "INSERT INTO mensualidades "
         "(year, nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
         "septiembre, octubre, noviembre, diciembre, "
-        "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "categoria, importe, frecuencia, dia_cobro, dias_cobro, mes_inicio, activa, nota) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (normalized, m.get("nombre", ""),
              m.get("meses", {}).get("enero", ""), m.get("meses", {}).get("febrero", ""),
@@ -271,6 +306,7 @@ def write_gastos_year(year, data):
              m.get("categoria", ""), m.get("importe", ""),
              normalize_frecuencia(m.get("frecuencia")),
              normalize_dia_cobro(m.get("diaCobro")),
+             serialize_dias_cobro(m.get("diasCobro")),
              normalize_mes(m.get("mesInicio")),
              1 if m.get("activa", True) else 0,
              m.get("nota", ""))

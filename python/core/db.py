@@ -272,6 +272,7 @@ CREATE TABLE IF NOT EXISTS mensualidades (
     importe     TEXT NOT NULL DEFAULT '',
     frecuencia  TEXT NOT NULL DEFAULT 'mensual',
     dia_cobro   TEXT NOT NULL DEFAULT '',
+    dias_cobro  TEXT NOT NULL DEFAULT '',
     mes_inicio  TEXT NOT NULL DEFAULT 'enero',
     activa      INTEGER NOT NULL DEFAULT 1,
     nota        TEXT NOT NULL DEFAULT '',
@@ -561,7 +562,7 @@ CREATE TABLE IF NOT EXISTS dca_planes (
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 3
+ESQUEMA_VERSION = 4
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1005,6 +1006,35 @@ def _esquema_3(conn):
         """)
     finally:
         conn.execute("PRAGMA legacy_alter_table=OFF")
+
+
+@_migracion(4)
+def _esquema_4(conn):
+    """El día de cobro de una mensualidad puede cambiar de un mes a otro.
+
+    `dia_cobro` guarda un único día para todo el año, y eso no describe lo que
+    pasa de verdad: un servicio contratado a mitad de mes se cobra el día 2 en
+    unos meses y el 5 en otros, porque el cargo se mueve con los festivos o
+    porque se cambió la forma de pago. La columna nueva guarda las excepciones
+    —un JSON `{"marzo": "5"}` con solo los meses que se salen de la norma— y
+    `dia_cobro` sigue siendo el día por defecto del resto.
+
+    Se guarda como JSON en una columna y no como doce columnas nuevas porque
+    son datos opcionales y dispersos: lo normal es que una mensualidad no tenga
+    ninguna excepción, y doce columnas vacías por fila costarían más de leer
+    en el esquema que el propio dato.
+
+    Solo la tocan las mensualidades. `ingresos_recurrentes` comparte los mismos
+    campos, pero una nómina o un alquiler cobrado no tiene esta necesidad y
+    añadir ahí una columna que nadie lee sería esquema muerto.
+
+    Añadir una columna con DEFAULT no reescribe la tabla ni puede perder datos:
+    deshacer esta actualización es volver a la imagen anterior, que ignorará la
+    columna (las excepciones por mes se quedarían sin efecto, pero nada más).
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(mensualidades)")}
+    if "dias_cobro" not in columnas:
+        conn.execute("ALTER TABLE mensualidades ADD COLUMN dias_cobro TEXT NOT NULL DEFAULT ''")
 
 
 def get_db() -> sqlite3.Connection:

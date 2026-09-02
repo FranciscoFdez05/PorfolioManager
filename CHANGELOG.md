@@ -22,6 +22,103 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.3.0] — 2026-09-03
+
+La pantalla de **Mensualidades** deja de mentir sobre lo que cuestan las
+suscripciones y pasa a poder mirarse como un calendario del año. Y se arregla
+que editar un activo fallara siempre, borrando de paso su histórico de compras.
+
+**Esquema de base de datos:** sube a la versión **4** (venía de la 3). La
+migración añade una columna a `mensualidades` y se aplica sola al arrancar;
+antes de tocarla se guarda `data/backups/<portfolio>_pre-esquema-3-a-4_*.db`,
+exento de rotación. Volver atrás es levantar la imagen anterior y restaurar ese fichero.
+
+### Corregido
+
+- **Una mensualidad pausada seguía sumando su coste mensual.** La fila decía
+  «Pausada» y a la vez ponía 10,00 € en la columna de coste mensual, que además
+  entraba en el total de la tabla: el resumen contaba como gasto fijo lo que se
+  había dejado de pagar. Ahora el coste mensual de una pausada es «—» y queda
+  fuera del total, y pausar vacía los cargos de los meses que quedan por
+  delante —respetando el del mes en curso si su día ya pasó—. Como la tabla
+  anual, Métricas y Ahorro leen esos importes por mes, los tres se corrigen con
+  ello. Reactivar los devuelve desde el mes en curso, siguiendo el ritmo de la
+  frecuencia para que una trimestral no se descoloque.
+- El coste anual sí sigue contando lo que una pausada cobró antes de pararse:
+  es dinero que salió de la cuenta y borrarlo del año falsearía el gasto de los
+  meses en que estuvo activa.
+- **Editar un activo fallaba siempre**, dijeras lo que dijeras: cambiar el color
+  respondía «No se pudo actualizar el nombre del activo». El guardado sí llegaba
+  al servidor; lo que reventaba era la línea siguiente, al cerrar el diálogo,
+  contra tres variables que habían quedado declaradas `const` en
+  `js/core/app-core.js` y que asigna `js/cartera/assets.js`. Como el ámbito
+  global de la página es uno solo pero el linter analiza fichero a fichero, el
+  `--fix` de un `prefer-const` las convirtió en constantes sin que nada avisara
+  hasta la ejecución. Con ellas se habían roto también **crear un activo** y
+  **reordenarlos arrastrando**, con el mismo síntoma: la acción se hacía y la
+  pantalla decía que no.
+- **Editar la cabecera de un activo borraba sus compras.** Guardar reescribe el
+  activo entero, y al editar desde la vista de Activos se enviaba un activo sin
+  filas —se leían de una tabla que no está en pantalla—, así que cambiar el
+  color se llevaba por delante todo el histórico y respondía «ok». Ahora la
+  edición parte del activo completo, y el servidor conserva las compras y las
+  conversiones que no vengan en el cuerpo. Mandar una lista vacía sí las vacía:
+  es como se borra la última fila desde la tabla.
+- El aviso de una edición fallida **dice qué ha fallado**: habla de los cambios
+  del activo en vez de solo del nombre, repite el motivo que dio el servidor y
+  sale en el propio formulario, que se queda abierto para corregir, en lugar de
+  en un `alert` que lo tapaba.
+
+### Seguridad
+
+- **Un `portfolios.json` manipulado dentro de un ZIP importado podía sacar la
+  base de datos activa del volumen de datos.** De su campo `active` sale el
+  nombre del fichero `.db` que se abre al arrancar, y no se validaba: un valor
+  como `../../../../tmp/principal` desviaba la base activa fuera de `data/`, se
+  persistía —así que el desvío se repetía en cada arranque— y las copias de
+  seguridad seguían mirando `data/portfolios/`, quedándose sin los datos vivos.
+  Los `.db` y las preferencias del ZIP ya se filtraban por nombre; faltaba el
+  índice, y hacía falta desde que «Importar ZIP» acepta un archivo que no ha
+  generado esta instalación.
+
+  Se cierra en los dos sitios: al restaurar se rechaza el índice cuyo `active`
+  —o el `id` de cualquier portfolio listado— no sea un identificador admisible,
+  y se dice en la lista de entradas ignoradas en vez de restaurar a medias en
+  silencio; y al arrancar, `init_portfolios` pasa el id por la misma
+  comprobación que ya usaban borrar y cambiar de portfolio, que era justo la que
+  no se estaba aplicando ahí. Lo segundo protege también a un fichero que ya
+  estuviera en disco.
+
+### Añadido
+
+- **Una prueba que carga la página entera.** El fallo de la edición de activos
+  no lo podía ver ningún linter: analiza fichero a fichero, y estos scripts
+  comparten un único ámbito global. `tests-js/pagina-completa.test.js` carga los
+  29 módulos de `js/` en el orden de `index.html` y comprueba lo que solo existe
+  con todos juntos: que la página cargue —dos declaraciones del mismo nombre en
+  ficheros distintos matan el segundo script entero— y que las globales que un
+  módulo declara y otro asigna se puedan seguir escribiendo.
+- **Día de cobro distinto según el mes.** Hasta ahora una mensualidad tenía un
+  único día para todo el año, y eso no es lo que hace el banco: el cargo se
+  mueve con los festivos o al cambiar la forma de pago. En el formulario, cada
+  mes lleva su propio recuadro de día junto al importe; el que se deje vacío
+  usa el día de renovación general. La tabla avisa de cuántos meses se salen de
+  la norma y el próximo cobro ya se calcula con el día real de cada mes.
+- **Calendario de cobros del año.** Junto a «Tabla», en la propia pantalla de
+  Mensualidades, con los doce meses a la vez: cada día cobrado se marca con su
+  importe, distinguiendo lo ya pasado de lo que queda por venir, y al pulsarlo
+  se abre el detalle de qué suscripciones se cobraron ese día. Sin ningún día
+  seleccionado, el panel resume el año —cobrado, por cobrar y los siguientes
+  cargos—. Respeta el buscador y los filtros de la tabla, y «Descargar CSV»
+  baja desde aquí un cargo por línea con su fecha, para cuadrarlo con el banco.
+- Los dos primeros recuadros del resumen dejan de ser el mismo número dividido:
+  **«Coste mensual»** es lo que se cobra ahora (sin las pausadas) y **«Coste del
+  año»**, los cargos de todo el año con su media mensual al lado.
+
+[1.3.0]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.3.0
+
+---
+
 ## [1.2.0] — 2026-09-02
 
 **Esquema de base de datos:** no se toca. Sigue en la versión 3, así que deshacer
