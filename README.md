@@ -89,6 +89,40 @@ docker compose down
 | `logs/` | `/app/logs` | Logs en disco |
 | `API/` | `/app/API` | Archivos de claves API (se escriben desde Ajustes) |
 
+#### Permisos de los volúmenes (Linux)
+
+En Linux un bind mount conserva **el propietario que tiene en el host**, así que
+el contenedor solo puede escribir en `data/`, `logs/` y `API/` si corre con un
+usuario que tenga permiso sobre ellos. Cuando no es así el síntoma despista: la
+aplicación arranca, se navega y la lista de backups se ve —leer no necesita
+permiso de escritura— pero **no se guarda nada**: ni las copias, ni los ajustes,
+ni las claves de API.
+
+`docker-setup` lo deja resuelto: crea los tres directorios con tu usuario y
+exporta `PUID`/`PGID`, de modo que el contenedor escribe con tu uid y los
+ficheros que crea siguen siendo tuyos. Si levantas el stack a mano con
+`docker compose up`, el contenedor adopta el propietario de `data/`.
+
+Para forzar otro usuario, ponlo en `.env` (`id -u` y `id -g` dan los tuyos):
+
+```bash
+PUID=1000
+PGID=1000
+```
+
+Si aun así no puede escribir, el contenedor **no arranca** y dice en el log qué
+directorio falla y cómo arreglarlo. La reparación habitual, desde la carpeta del
+proyecto en el host:
+
+```bash
+sudo chown -R "$(id -u):$(id -g)" data logs API
+```
+
+Un aviso sobre dónde poner `data/`: tiene que estar en un **disco local**. En
+una carpeta de red (NFS, SMB/Samba) o en un disco NTFS/exFAT, los bloqueos que
+SQLite necesita no funcionan y la base de datos falla al escribir —o se
+corrompe— aunque los permisos sean correctos.
+
 ---
 
 ## Quick start — Sin Docker
@@ -485,6 +519,7 @@ El intervalo y el alcance (solo el portfolio activo o todos) se eligen en **Ajus
 - **Backups automáticos diarios:** `data/backups/auto/` — se conservan los últimos 14
 - **Backups manuales:** `data/backups/` (ZIP con todos los portfolios, ajustes y preferencias)
 - **Copias previas a una restauración:** `data/pre_restore/<fecha>/` — se crean solas antes de sobrescribir nada, por si restauras el backup equivocado
+- **Temporales y bloqueos:** `data/tmp/` — copias a medio hacer y los ficheros con los que los dos workers de gunicorn se coordinan. Se puede vaciar con el servidor parado; no contiene nada que se necesite conservar
 
 Al arrancar se verifica la integridad de la BD activa (`integrity_check` + `foreign_key_check`). Si falla, se intenta reparar y, si no es posible, se restaura desde el backup automático válido más reciente.
 
@@ -496,6 +531,28 @@ Backup manual rápido (con el servidor parado):
 
 ```bash
 cp data/portfolios/principal.db data/portfolios/principal.db.bak
+```
+
+### Si algo no se guarda
+
+Los mensajes de error de guardado dicen la causa (permisos del volumen, disco
+lleno, sistema de ficheros de solo lectura, base de datos bloqueada). Para ver
+el estado completo, con la sesión iniciada:
+
+```
+http://<servidor>:<puerto>/api/health
+```
+
+El bloque `almacenamiento` lista **la ruta que la aplicación ha resuelto dentro
+del contenedor** para cada directorio y si puede escribir en ella, y `proceso`
+el uid/gid con el que corre. Con Docker, casi todos los "no me guarda" se ven
+ahí: o la ruta no es la que se creía tener montada, o el usuario del contenedor
+no puede escribir en ella ([permisos de los volúmenes](#permisos-de-los-volúmenes-linux)).
+
+Lo mismo queda registrado al arrancar; en el contenedor:
+
+```bash
+docker compose logs | grep "\[rutas\]"
 ```
 
 ---
@@ -669,7 +726,9 @@ css/                 variables, base, components, themes
 |---|---|
 | `core/errors.py` | Excepciones de negocio (`ValidationError`, `NotFoundError`, `ConflictError`, `UpstreamError`) y manejadores globales. Todo lo que cuelga de `/api/` responde JSON `{ok:false, error, requestId}`, incluso ante un fallo no previsto, y el detalle interno solo va al log. |
 | `core/validation.py` | Normalización de la entrada de las rutas (`as_text`, `as_number`, `as_year`, `as_rows`, `one_of`…) con límites de longitud y de número de filas. |
-| `core/paths.py` | Única fuente de verdad de las rutas del proyecto. |
+| `core/paths.py` | Única fuente de verdad de las rutas del proyecto, y comprobación de que se puede escribir en cada directorio de datos (lo que publica `/api/health` y se registra al arrancar). |
+| `core/escritura.py` | Temporales con nombre único y escritura atómica (tmp → fsync → rename). Cada módulo se lo montaba por su cuenta con un nombre fijo, que con los dos workers de gunicorn dejaba de ser único; y varios de esos temporales eran `.db` dentro de `data/portfolios/`, donde el proyecto busca los portfolios con `glob("*.db")`. |
+| `core/bloqueo.py` | Exclusión mutua **entre procesos** (`fcntl` en Linux, `msvcrt` en Windows) para lo que no puede hacerse dos veces a la vez: migrar el esquema y la copia automática diaria. Un `threading.Lock` solo protege de los hilos del mismo worker. |
 | `core/config_ini.py` | Lectura de `config.ini` con caché por mtime y prioridad entorno → fichero → defecto. Los ajustes viven en el `.ini`, no como constantes repartidas por el código. |
 | `core/red_local.py` + `core/firma_hmac.py` | Autenticación de los endpoints que no pueden usar la sesión de la web app (el Atajo de iOS): filtro de IP por CIDR y firma HMAC-SHA256 sobre timestamp + cuerpo crudo. Se configuran en `[atajo]` de `config.ini`. Ver [docs/atajo-ios.md](docs/atajo-ios.md). |
 | `core/seguridad_app.py` | CSRF, sesión, tope de cuerpo, límite de escrituras y cabeceras de respuesta, montados con `instalar(app)` sobre cualquier Flask — también sobre la app mínima que construyen los tests. Ver [Seguridad](#seguridad). |

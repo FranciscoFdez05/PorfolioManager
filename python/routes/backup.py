@@ -4,14 +4,18 @@ import re
 import shutil
 import sqlite3
 import threading
+import time
 import zipfile
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
 from admin.backup_manager import _remove_wal_sidecars
-from core import settings
+from core import paths, settings
+from core.errors import mensajeAlmacenamiento, registrarFalloEscritura
+from core.escritura import escribirAtomico, limpiarTemporal, rutaTemporal, temporalPara
 from core.paths import (
     AJUSTES_JSON as _AJUSTES_SRC,
     BACKUPS_DIR as _BACKUP_DIR,
@@ -107,18 +111,37 @@ def _safety_copy_before_restore() -> Path | None:
         return None
 
 
-def _sqlite_copy_to_bytes(src_path: Path) -> bytes:
-    """Copia un SQLite DB (incluyendo WAL pendiente) a bytes para incluir en el zip."""
-    tmp_path = src_path.parent / f"_tmp_bak_{src_path.name}"
-    try:
+def _tmp_dir(crear=True) -> Path:
+    """Carpeta de temporales (core.paths.TMP_DIR), creada a demanda.
+
+    Se lee del módulo `paths` en cada llamada, y no con un `from … import` al
+    principio: así sigue siendo la única definición de la ruta y los tests, que
+    la reasignan para no tocar el `data/` real, alcanzan también a este módulo.
+    """
+    destino = paths.TMP_DIR
+    if crear:
+        destino.mkdir(parents=True, exist_ok=True)
+    return destino
+
+
+@contextmanager
+def _copia_temporal(src_path: Path):
+    """Copia consistente de un .db en un fichero temporal, ya cerrada.
+
+    El temporal va a data/tmp y no a data/portfolios: allí, un
+    `_tmp_bak_x.db` a medio escribir entraba en cualquier `glob("*.db")` —la
+    rotación de copias automáticas, el scheduler de snapshots, el listado de
+    portfolios— como si fuera un portfolio de verdad. Con el servidor de
+    desarrollo (un proceso, un hilo) la ventana era estrecha; con los dos
+    workers y cuatro hilos de gunicorn del contenedor, deja de serlo.
+
+    Se devuelve la ruta y no los bytes porque zipfile puede leer del fichero
+    directamente: cargar en memoria una BD de decenas de MB por cada portfolio
+    era gratis en un PC y no lo es en el servidor doméstico donde corre esto.
+    """
+    with temporalPara(src_path, directorio=_tmp_dir()) as tmp_path:
         _sqlite_copy(src_path, tmp_path)
-        return tmp_path.read_bytes()
-    finally:
-        tmp_path.unlink(missing_ok=True)
-        # Los sidecars del temporal quedaban huérfanos en data/portfolios y
-        # _PORTFOLIOS_DIR.glob("*.db") no los limpia nunca.
-        for suffix in ("-wal", "-shm"):
-            Path(str(tmp_path) + suffix).unlink(missing_ok=True)
+        yield tmp_path
 
 
 def _checkpoint_active_db():
@@ -169,9 +192,60 @@ def createBackup():
         return _create_backup_locked()
 
 
-def _create_backup_locked():
-    _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+def _preparar_destino():
+    """Comprueba que se pueda escribir donde va a ir la copia. (ok, mensaje).
 
+    Se hace **antes** de empezar el zip, y creando un fichero de verdad: con el
+    volumen de Docker montado de solo lectura o perteneciente a otro usuario, la
+    copia fallaba a mitad y el usuario recibía un 500 sin causa.
+    """
+    for destino in (_BACKUP_DIR, _tmp_dir(crear=False)):
+        escribible, motivo = paths.comprobarEscritura(destino)
+        if not escribible:
+            return False, (
+                f"no se puede escribir en {destino}: {motivo}. "
+                "Comprueba los permisos del volumen de datos"
+            )
+    return True, ""
+
+
+def _limpiar_temporales_huerfanos(antiguedad_segundos=3600):
+    """Barre las copias temporales que dejó un proceso muerto a media copia.
+
+    El `finally` de _copia_temporal cubre cualquier excepción, pero no que el
+    contenedor se pare —o que Docker mate al worker— justo mientras copia. Sin
+    esto, cada uno de esos cortes deja para siempre una copia entera de la base
+    de datos ocupando disco.
+    """
+    limite = time.time() - antiguedad_segundos
+    try:
+        candidatos = list(_tmp_dir(crear=False).glob("_bak_*"))
+    except OSError:
+        return
+    for viejo in candidatos:
+        try:
+            if viejo.stat().st_mtime < limite:
+                viejo.unlink(missing_ok=True)
+                log.info("[backup] Temporal huérfano eliminado: %s", viejo.name)
+        except OSError:
+            pass
+
+
+def _create_backup_locked():
+    try:
+        _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        mensaje = registrarFalloEscritura(
+            log, "[backup] No se pudo preparar el directorio de copias", e, _BACKUP_DIR
+        )
+        return jsonify({"ok": False, "error": mensaje}), 500
+
+    listo, motivo = _preparar_destino()
+    if not listo:
+        log.error("[backup] Destino no escribible: %s", motivo)
+        return jsonify({"ok": False, "error": motivo}), 500
+
+    _limpiar_temporales_huerfanos()
     _checkpoint_active_db()
 
     ts = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
@@ -185,8 +259,8 @@ def _create_backup_locked():
             # Todos los portfolios + snapshots JSON de seguridad
             if _PORTFOLIOS_DIR.exists():
                 for db_file in sorted(_PORTFOLIOS_DIR.glob("*.db")):
-                    data = _sqlite_copy_to_bytes(db_file)
-                    zf.writestr(f"portfolios/{db_file.name}", data)
+                    with _copia_temporal(db_file) as copia:
+                        zf.write(str(copia), f"portfolios/{db_file.name}")
                     snap_json = _export_snapshots_json(db_file)
                     zf.writestr(f"snapshots/{db_file.stem}.json", snap_json)
                     portfolio_names.append(db_file.stem)
@@ -221,9 +295,15 @@ def _create_backup_locked():
         tmp_path.replace(backup_path)
 
     except Exception as e:
-        tmp_path.unlink(missing_ok=True)
-        log.error(f"[backup] Error creando backup: {e}")
-        return jsonify({"ok": False, "error": str(e)}), 500
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        # Traza completa al log y, al usuario, la causa real: sin ella el
+        # "Error al crear backup" de la pantalla de Ajustes no distinguía entre
+        # un volumen sin permisos, un disco lleno y una BD bloqueada.
+        mensaje = registrarFalloEscritura(log, "[backup] Error creando backup", e, _BACKUP_DIR)
+        return jsonify({"ok": False, "error": mensaje}), 500
 
     all_backups = _list_backups()
     try:
@@ -305,7 +385,10 @@ def _restore_locked():
                             log.warning(f"[backup] Entrada {name} no es un SQLite válido, ignorada")
                             ignorados.append(f"{name}: no es un fichero SQLite")
                             continue
-                        tmp_path = _PORTFOLIOS_DIR / f"_restore_tmp_{db_name}"
+                        # El temporal va a data/tmp: `_restore_tmp_<x>.db` en
+                        # data/portfolios entraba en los `glob("*.db")` como un
+                        # portfolio más mientras duraba la restauración.
+                        tmp_path = rutaTemporal(dst_path, directorio=_tmp_dir())
                         try:
                             tmp_path.write_bytes(raw)
                             _sqlite_copy(tmp_path, dst_path)
@@ -320,21 +403,15 @@ def _restore_locked():
                             log.error(f"[backup] No se pudo restaurar {name}: {e}")
                             ignorados.append(f"{name}: {e}")
                         finally:
-                            tmp_path.unlink(missing_ok=True)
-                            for suffix in ("-wal", "-shm"):
-                                Path(str(tmp_path) + suffix).unlink(missing_ok=True)
+                            limpiarTemporal(tmp_path)
 
                 # Restaurar portfolios.json (escritura atómica)
                 if "portfolios.json" in names:
-                    _META_FILE.parent.mkdir(parents=True, exist_ok=True)
-                    meta_tmp = _META_FILE.with_suffix(".tmp")
-                    meta_tmp.write_bytes(zf.read("portfolios.json"))
-                    meta_tmp.replace(_META_FILE)
+                    escribirAtomico(_META_FILE, zf.read("portfolios.json"))
 
                 # Restaurar ajustes.json
                 if "ajustes.json" in names:
-                    _AJUSTES_SRC.parent.mkdir(parents=True, exist_ok=True)
-                    _AJUSTES_SRC.write_bytes(zf.read("ajustes.json"))
+                    escribirAtomico(_AJUSTES_SRC, zf.read("ajustes.json"))
 
                 # Restaurar preferencias por-portfolio
                 for name in names:
@@ -344,9 +421,7 @@ def _restore_locked():
                             log.warning(f"[backup] Entrada de prefs ignorada por nombre inseguro: {name}")
                             ignorados.append(f"{name}: nombre no admisible")
                             continue
-                        dst = _JSON_DIR / prefs_name
-                        dst.parent.mkdir(parents=True, exist_ok=True)
-                        dst.write_bytes(zf.read(name))
+                        escribirAtomico(_JSON_DIR / prefs_name, zf.read(name))
 
                 # Restaurar snapshots desde JSON de seguridad si el DB restaurado quedó vacío
                 for name in names:
@@ -402,10 +477,12 @@ def _restore_locked():
                     shutil.copy2(ajustes_bak, _AJUSTES_SRC)
 
     except Exception as e:
-        log.error(f"[backup] Error en restore de {filename}: {e}")
+        mensaje = registrarFalloEscritura(
+            log, f"[backup] Error en restore de {filename}", e, _PORTFOLIOS_DIR
+        )
         return jsonify({
             "ok": False,
-            "error": str(e),
+            "error": mensaje,
             "safetyCopy": str(safety_dir) if safety_dir else None,
             "ignorados": ignorados,
         }), 500
@@ -442,7 +519,14 @@ def deleteBackup(filename):
                 "ok": False,
                 "error": "No se puede eliminar el único backup existente",
             }), 400
-        backup_path.unlink(missing_ok=True)
+        try:
+            backup_path.unlink(missing_ok=True)
+        except OSError as e:
+            log.exception("[backup] No se pudo eliminar %s", filename)
+            return jsonify({
+                "ok": False,
+                "error": mensajeAlmacenamiento(e, backup_path),
+            }), 500
 
     # Borrar ajustes snapshot legacy si existe
     ts_m = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', filename)

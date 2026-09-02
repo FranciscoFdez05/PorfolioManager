@@ -22,6 +22,91 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.1.1] — 2026-09-02
+
+Correcciones de la ejecución en Docker sobre Linux. En el equipo de desarrollo
+la aplicación es **un** proceso que además es dueño de la carpeta del proyecto;
+en el servidor son **dos workers** de gunicorn escribiendo en volúmenes montados
+desde el host, con el propietario y los permisos del host. Todo lo que sigue
+solo se manifiesta en el segundo caso, y el síntoma era siempre parecido: la
+aplicación arranca, se ve y se navega —leer no necesita permiso de escritura—
+pero no guarda.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 3, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+### Corregido
+
+- **No se podía crear ninguna copia de seguridad, ni guardar los ajustes ni las
+  claves de API.** El contenedor corría con un usuario de sistema creado dentro
+  de la imagen, que no tiene por qué poder escribir en un volumen que pertenece
+  al usuario del host. Ahora adopta el uid/gid del dueño del volumen de datos —o
+  el `PUID`/`PGID` de `.env`—, así que escribe con permiso y lo que crea sigue
+  siendo del usuario del servidor, que puede copiar `data/` sin `sudo`.
+- **El error no decía qué pasaba.** «Error al crear backup» tapaba por igual un
+  problema de permisos, un disco lleno, un sistema de ficheros de solo lectura y
+  una base de datos bloqueada. Los fallos de disco se traducen ahora a su causa
+  y al siguiente paso, y la traza completa va al log.
+- **Temporales que aparecían como portfolios.** Las copias, exportaciones e
+  importaciones dejaban ficheros `.db` a medio escribir dentro de
+  `data/portfolios/`, que es donde el proyecto busca los portfolios con
+  `glob("*.db")`: una importación en curso podía acabar dentro de un backup como
+  si fuera una cartera más. Ahora van a `data/tmp` y no los recoge ningún
+  listado.
+- **Temporales con el mismo nombre en los dos workers.** `portfolios.tmp`,
+  `<portfolio>.repair.db` o `<backup>.tmp` eran el mismo fichero para todos los
+  procesos, y los dos workers hacen ese trabajo a la vez al arrancar: lo que se
+  renombraba sobre el destino podía ser la mezcla de dos escrituras. Cada
+  temporal lleva ahora proceso, hilo y un aleatorio.
+- **Migración del esquema por duplicado.** El bloqueo que impedía dos `ALTER
+  TABLE` simultáneos era de hilos, no de procesos, así que no protegía de los
+  dos workers. Los pasos de migración son idempotentes uno a uno, pero el que
+  reconstruye tablas no es reentrante. Ahora se toma un bloqueo entre procesos y
+  migra solo uno.
+- **Copia automática hecha dos veces.** El hilo horario de copias corría en cada
+  worker: los dos verificaban, copiaban y rotaban los mismos ficheros en
+  paralelo. Ahora la hace el primero que llega y el otro se la salta.
+- **El contador de llamadas a la API enseñaba la mitad.** Vivía en memoria de
+  cada worker, así que Ajustes mostraba las de quien contestara la petición, y
+  un número distinto en cada recarga. Con una cuota diaria por delante, eso
+  llevaba a pasarse sin saberlo; el recuento es ahora único y compartido.
+- **Restauración con escrituras a medias.** `ajustes.json`, las preferencias y
+  `portfolios.json` se sobrescribían truncando el fichero antes de escribirlo:
+  un corte a mitad dejaba un JSON inválido, que se lee en silencio como «sin
+  ajustes». Ahora se escriben de forma atómica y con fsync.
+
+### Añadido
+
+- **`PUID`/`PGID` en `.env`** para fijar con qué usuario escribe el contenedor.
+  Sin ellos adopta el dueño de `data/`, que es lo que deja preparado
+  `docker-setup`.
+- **Diagnóstico de almacenamiento.** Al arrancar se registra la ruta que ha
+  resuelto la aplicación para cada directorio de datos y si puede escribir en
+  ella; con la sesión iniciada, `GET /api/health` lo publica junto al uid/gid del
+  proceso. Es lo primero que mirar cuando algo no se guarda.
+- **El contenedor se niega a arrancar si no puede escribir en `data/`**, con el
+  `chown` exacto que hay que ejecutar. Antes arrancaba y fallaba en cada
+  guardado, que es mucho más difícil de diagnosticar.
+- **CI que levanta el contenedor de verdad**: comprueba que responde, que crea
+  la base de datos dentro del volumen del host y con su usuario, y que se niega
+  a arrancar —explicando por qué— si el volumen es de solo lectura. Construir la
+  imagen no detectaba nada de esto.
+- 49 pruebas nuevas: escritura atómica, bloqueo entre procesos, detección de
+  directorios no escribibles, traducción de los errores de disco y contador de
+  API compartido.
+
+### Cambiado
+
+- `docker-setup` y `docker-update.sh` crean `data/`, `logs/` y `API/` con tu
+  usuario antes de levantar el stack. Si no existen, los crea el demonio de
+  Docker como `root` y ni el contenedor ni tú podéis escribir en ellos.
+- `docker-update.sh` rechaza ejecutarse con `sudo`, igual que ya hacía
+  `docker-up.sh`: con `sudo`, los datos acabarían siendo de `root`.
+
+[1.1.1]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.1.1
+
+---
+
 ## [1.1.0] — 2026-08-26
 
 Planes de inversión y aportación periódica: la ficha de cada activo deja de

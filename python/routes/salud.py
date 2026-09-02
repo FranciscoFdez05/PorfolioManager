@@ -22,7 +22,7 @@ import time
 
 from flask import Blueprint, jsonify, session
 
-from core import db, settings
+from core import db, paths, settings
 from core.version import __version__
 
 log = logging.getLogger(__name__)
@@ -91,6 +91,18 @@ def getHealth():
             respuesta["portfolio_activo"] = get_active_portfolio_id()
         except Exception as error:
             respuesta["portfolio_activo"] = f"no disponible: {error}"
+
+        # Estado de los directorios de datos. Es lo primero que hay que mirar
+        # cuando "no guarda nada": en Docker dice qué ruta resolvió realmente la
+        # aplicación dentro del contenedor y si puede escribir en ella, que es
+        # justo lo que no se ve desde el host.
+        try:
+            respuesta["almacenamiento"] = paths.diagnosticoAlmacenamiento(crear=False)
+            proceso = paths.descripcionProceso()
+            if proceso:
+                respuesta["proceso"] = proceso
+        except Exception as error:
+            respuesta["almacenamiento"] = {"error": str(error)[:200]}
 
         respuesta["debug"] = settings.modoDebug()
     elif not sano:

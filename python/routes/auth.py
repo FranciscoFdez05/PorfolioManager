@@ -27,6 +27,14 @@ logger = logging.getLogger(__name__)
 # No había ninguno: se podía probar contraseñas de forma ilimitada contra
 # /login. El número de intentos y la duración del bloqueo salen de [seguridad]
 # en config.ini: endurecerlos no debería obligar a tocar código.
+#
+# El contador vive en memoria del proceso, igual que el de core/rate_limit.py y
+# por el mismo motivo (no meter Redis en un despliegue que es un contenedor y un
+# fichero SQLite). La consecuencia hay que tenerla presente al elegir el número:
+# gunicorn corre con varios workers y cada uno lleva su cuenta, así que los
+# intentos que de verdad hacen falta para bloquear una IP son los configurados
+# multiplicados por el número de workers. La primera barrera del despliegue es
+# que solo se llega desde la LAN o por WireGuard.
 _attempts: dict[str, list] = {}   # ip -> [nº fallos, instante del último fallo]
 _attempts_lock = threading.Lock()
 

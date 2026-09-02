@@ -128,3 +128,57 @@ jobs:
       - uses: actions/checkout@v4
       - name: Comprobar que la imagen construye
         run: docker build -t porfoliomanager:ci .
+
+      # Construir no es arrancar. El fallo que motivó estas pruebas —la
+      # aplicación se veía pero no guardaba nada— no lo detecta ningún test de
+      # Python: solo aparece con los volúmenes montados desde el host, con su
+      # propietario, y el contenedor corriendo como otro usuario. Eso es Linux,
+      # y es exactamente lo que hay aquí.
+      - name: El contenedor arranca y escribe en los volúmenes montados
+        run: |
+          mkdir -p ci-datos/data ci-datos/logs ci-datos/API
+          docker run -d --name pm-ci -p 5000:5000 \
+            -e PORT=5000 \
+            -e SECRET_KEY=clave-solo-para-ci-0123456789abcdef \
+            -e PUID="$(id -u)" -e PGID="$(id -g)" \
+            -v "$PWD/ci-datos/data:/app/data" \
+            -v "$PWD/ci-datos/logs:/app/logs" \
+            -v "$PWD/ci-datos/API:/app/API" \
+            porfoliomanager:ci
+          sano=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:5000/api/health >/dev/null 2>&1; then sano=1; break; fi
+            sleep 2
+          done
+          docker logs pm-ci
+          test "$sano" = 1 || { echo "::error::/api/health no respondió"; exit 1; }
+          # La comprobación que faltaba: que lo escrito acabe en el volumen del
+          # host y con su usuario, no dentro del contenedor ni a nombre de otro.
+          ls -l ci-datos/data/portfolios
+          test -n "$(ls ci-datos/data/portfolios/*.db 2>/dev/null)" \
+            || { echo "::error::no creó ninguna base de datos en el volumen"; exit 1; }
+          propietario=$(stat -c '%u' ci-datos/data/portfolios/*.db | head -n 1)
+          test "$propietario" = "$(id -u)" \
+            || { echo "::error::los ficheros son del uid $propietario y no del $(id -u) del host"; exit 1; }
+          # Y que el arranque deje escrito qué rutas resolvió: es el diagnóstico
+          # que se le pide al usuario cuando algo no se guarda.
+          docker logs pm-ci 2>&1 | grep -q "\[rutas\]" \
+            || { echo "::error::el arranque no registró las rutas de datos"; exit 1; }
+          docker rm -f pm-ci
+
+      # El otro lado: cuando de verdad no se puede escribir, el contenedor tiene
+      # que pararse y decir por qué, no arrancar y fallar luego en cada guardado.
+      - name: Se niega a arrancar si el volumen de datos no es escribible
+        run: |
+          mkdir -p ci-solo-lectura
+          codigo=0
+          docker run --name pm-ci-ro \
+            -v "$PWD/ci-solo-lectura:/app/data:ro" \
+            porfoliomanager:ci || codigo=$?
+          docker logs pm-ci-ro 2>&1 | tee salida-ro.txt
+          docker rm -f pm-ci-ro
+          test "$codigo" -ne 0 || { echo "::error::arrancó con el volumen de solo lectura"; exit 1; }
+          grep -q "no se puede escribir" salida-ro.txt \
+            || { echo "::error::no explicó que no podía escribir"; exit 1; }
+          grep -q "chown" salida-ro.txt \
+            || { echo "::error::no indicó cómo arreglarlo"; exit 1; }

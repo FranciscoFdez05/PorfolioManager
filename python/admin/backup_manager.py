@@ -16,7 +16,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from core import settings
+from core import paths, settings
+from core.bloqueo import exclusivo
+from core.escritura import escribirJsonAtomico, temporalPara
 from core.paths import (
     AUTO_BACKUPS_DIR as _BACKUP_DIR,
     JSON_DIR as _JSON_DIR,
@@ -139,35 +141,33 @@ def _rotate(db_stem: str):
 
 def _checkpoint_and_copy(db_path: Path, backup_path: Path):
     """Copia consistente vía API de backup de SQLite (incluye WAL pendiente)
-    a un temporal y rename atómico al destino."""
-    tmp = backup_path.with_suffix(".tmp")
-    src = dst = None
-    try:
-        src = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
-        dst = sqlite3.connect(str(tmp), timeout=settings.backupSqliteTimeout())
-        src.backup(dst)
-        dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        dst.commit()
-        dst.close()
-        dst = None
-        src.close()
-        src = None
-        tmp.replace(backup_path)
-        _remove_wal_sidecars(tmp)
-    except Exception:
-        if dst is not None:
-            try:
-                dst.close()
-            except Exception:
-                pass
-        if src is not None:
-            try:
-                src.close()
-            except Exception:
-                pass
-        tmp.unlink(missing_ok=True)
-        _remove_wal_sidecars(tmp)
-        raise
+    a un temporal y rename atómico al destino.
+
+    El temporal ya no se llama `<destino>.tmp`: ese nombre es el mismo en todos
+    los procesos, y los dos workers de gunicorn hacen esta copia a la vez al
+    arrancar y en cada comprobación horaria. Escribían el mismo fichero desde
+    dos procesos y renombraban encima la mezcla.
+    """
+    with temporalPara(backup_path) as tmp:
+        src = dst = None
+        try:
+            src = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
+            dst = sqlite3.connect(str(tmp), timeout=settings.backupSqliteTimeout())
+            src.backup(dst)
+            dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            dst.commit()
+            dst.close()
+            dst = None
+            src.close()
+            src = None
+            tmp.replace(backup_path)
+        finally:
+            for conn in (dst, src):
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
 
 
 def backup_previo_a_migracion(db_path: Path, desde: int, hasta: int):
@@ -216,6 +216,19 @@ def run_startup_backup(db_path: Path):
     if not db_path.exists():
         return
 
+    # Un intento sin espera. Los dos workers de gunicorn llegan aquí a la vez
+    # —al importar server.py y en cada comprobación horaria— y hasta ahora los
+    # dos verificaban, reparaban, copiaban y rotaban los mismos ficheros en
+    # paralelo. Basta con que lo haga uno: el que no consiga el bloqueo se lo
+    # salta, porque el trabajo es el mismo y ya se está haciendo.
+    with exclusivo(_ruta_bloqueo(), obligatorio=False) as conseguido:
+        if not conseguido:
+            log.info("[backup] Otro proceso está con la copia automática; se omite.")
+            return False
+        return _run_startup_backup_locked(db_path)
+
+
+def _run_startup_backup_locked(db_path: Path):
     _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
     # ── 1. Integridad del DB activo ─────────────────────────────────────────
@@ -255,7 +268,11 @@ def run_startup_backup(db_path: Path):
 
 
 def check_scheduled_backup():
-    """Comprueba la frecuencia sin depender de reiniciar el servidor."""
+    """Comprueba la frecuencia sin depender de reiniciar el servidor.
+
+    El `threading.Lock` serializa los hilos de este proceso; de los otros
+    workers se encarga el bloqueo de fichero de `run_startup_backup`.
+    """
     from core.db import get_active_db_path
 
     with _AUTO_BACKUP_LOCK:
@@ -265,6 +282,15 @@ def check_scheduled_backup():
             # Un fallo de I/O no debe matar el hilo; se reintentará después.
             log.error("[backup] Comprobación automática fallida: %s", e)
             return False
+
+
+def _ruta_bloqueo():
+    """Fichero de bloqueo de las copias automáticas, común a todos los workers.
+
+    Se lee de `paths` en cada llamada para que los tests, que redirigen los
+    directorios de datos, no acaben coordinándose sobre el `data/` real.
+    """
+    return paths.TMP_DIR / "backup-automatico.lock"
 
 
 def _scheduler_loop(interval_seconds: int):
@@ -317,13 +343,10 @@ def _backup_config(dest: Path):
     if not bundle:
         return
 
-    tmp = dest.with_suffix(".tmp")
     try:
-        tmp.write_text(json.dumps(bundle, indent=2, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(dest)
+        escribirJsonAtomico(dest, bundle)
         log.info(f"[backup] Config backup creado: {dest.name}")
-    except Exception as e:
-        tmp.unlink(missing_ok=True)
+    except OSError as e:
         log.error(f"[backup] Error al crear config backup: {e}")
 
     # Rotar config backups
@@ -387,9 +410,20 @@ def _ensure_daily_snapshot(db_path: Path):
 
 
 def _emergency_repair(db_path: Path) -> bool:
-    """Dump + restore para recuperar una BD corrupta. Devuelve True si tuvo éxito."""
-    repair_path = db_path.with_suffix(".repair.db")
+    """Dump + restore para recuperar una BD corrupta. Devuelve True si tuvo éxito.
+
+    La base reconstruida se arma en `data/tmp` y no como `<portfolio>.repair.db`
+    junto a la original: allí la habría visto como un portfolio más cualquiera de
+    los `glob("*.db")` del proyecto, y el nombre era además el mismo para los dos
+    workers de gunicorn, que llegan aquí a la vez cuando una base está dañada.
+    """
     corrupted_backup = _BACKUP_DIR / f"{db_path.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    with temporalPara(db_path, directorio=paths.TMP_DIR) as repair_path:
+        return _reparar_en(db_path, repair_path, corrupted_backup)
+
+
+def _reparar_en(db_path: Path, repair_path: Path, corrupted_backup: Path) -> bool:
+    """El trabajo de _emergency_repair, ya con el temporal reservado."""
     try:
         src = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
         dump = list(src.iterdump())

@@ -126,3 +126,23 @@ def test_una_bd_corrupta_se_detecta(cliente_salud, monkeypatch, tmp_path):
     respuesta = cliente_salud.get("/api/health")
     assert respuesta.status_code == 503
     assert respuesta.get_json()["fallo"] == "corrupta"
+
+
+def test_con_sesion_publica_el_estado_de_los_directorios(cliente_autenticado, temp_db, datos_aislados):
+    """El diagnóstico que faltaba cuando "no guarda nada" en Docker.
+
+    Dice qué ruta resolvió la aplicación **dentro** del contenedor y si puede
+    escribir en ella, que es justo lo que no se ve desde el host.
+    """
+    from routes.salud import salud_bp
+
+    client, _, _ = cliente_autenticado(salud_bp)
+    almacenamiento = client.get("/api/health").get_json()["almacenamiento"]
+
+    assert set(almacenamiento) >= {"datos", "portfolios", "json", "backups", "claves"}
+    assert almacenamiento["datos"]["ruta"] == str(datos_aislados["data"])
+    assert almacenamiento["datos"]["escribible"] is True
+
+
+def test_el_estado_de_los_directorios_no_sale_sin_sesion(cliente_salud):
+    assert "almacenamiento" not in cliente_salud.get("/api/health").get_json()

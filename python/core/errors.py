@@ -8,7 +8,9 @@ usuario no veía nada. Aquí se garantiza que todo lo que cuelgue de /api/
 responda siempre JSON con la forma {"ok": false, "error": ...}.
 """
 
+import errno
 import logging
+import sqlite3
 import uuid
 
 from flask import current_app, g, jsonify, request
@@ -82,6 +84,90 @@ class UpstreamError(ApiError):
     """Fallo de un proveedor externo (Finnhub, EODHD, Yahoo, Alpha Vantage)."""
 
     status_code = 502
+
+
+# ── Fallos de escritura en disco ──────────────────────────────────────────────
+# Estos sí se cuentan al usuario con detalle, al revés que el resto de errores
+# internos. El motivo: son los únicos que no puede arreglar quien programa,
+# solo quien administra la máquina, y "Error al crear backup" no dice si falta
+# espacio, si el volumen de Docker está montado de solo lectura o si el
+# contenedor corre con un usuario que no puede escribir en él. Nada de lo que
+# se revela aquí es un secreto para el dueño del servidor, que es el único que
+# ve estas respuestas: hay que tener sesión iniciada para llegar.
+
+_MOTIVOS_ERRNO = {
+    errno.EACCES: (
+        "sin permiso de escritura en {ruta}. Si va en Docker, el volumen "
+        "montado pertenece a otro usuario que el del contenedor: repara los "
+        "permisos en el host con «sudo chown -R $(id -u):$(id -g) data logs API» "
+        "y vuelve a levantarlo, o fija PUID/PGID en .env"
+    ),
+    errno.EPERM: (
+        "operación no permitida sobre {ruta}. Suele ser un volumen montado con "
+        "opciones que impiden escribir (NFS, SMB o un disco con uid fijo)"
+    ),
+    errno.EROFS: "el sistema de ficheros de {ruta} está montado de solo lectura",
+    errno.ENOSPC: "no queda espacio libre en el disco donde vive {ruta}",
+    errno.EDQUOT: "se ha agotado la cuota de disco del usuario en {ruta}",
+    errno.ENOENT: "la ruta {ruta} no existe (¿el volumen no está montado?)",
+    errno.EIO: (
+        "error de entrada/salida al escribir en {ruta}: el disco o el montaje "
+        "de red está fallando"
+    ),
+}
+
+
+def mensajeAlmacenamiento(error, ruta=None) -> str:
+    """Traduce un fallo de disco a una frase con la causa y el siguiente paso.
+
+    Cubre también los de SQLite, que envuelve los errores del sistema de
+    ficheros en sus propios mensajes ('unable to open database file' cuando no
+    puede crear el WAL, 'database is locked' cuando el bloqueo POSIX no
+    funciona sobre el montaje).
+    """
+    destino = str(ruta) if ruta else "el directorio de datos"
+
+    if isinstance(error, sqlite3.Error):
+        texto = str(error).lower()
+        if "readonly" in texto or "attempt to write a readonly database" in texto:
+            return f"la base de datos en {destino} está en modo solo lectura (permisos del volumen)"
+        if "unable to open database file" in texto:
+            return (
+                f"SQLite no ha podido abrir ni crear los ficheros de {destino}. "
+                "Necesita permiso de escritura sobre el directorio, no solo sobre el .db, "
+                "para crear los ficheros -wal y -shm"
+            )
+        if "disk i/o error" in texto:
+            return (
+                f"error de entrada/salida de SQLite en {destino}. Si los datos están en "
+                "una carpeta de red (NFS, SMB) o en un disco externo, SQLite no puede "
+                "trabajar ahí con garantías: mueve data/ a un disco local"
+            )
+        if "database is locked" in texto:
+            return (
+                "la base de datos está bloqueada por otra operación. Vuelve a intentarlo; "
+                "si se repite siempre, los datos están en una carpeta de red donde los "
+                "bloqueos de SQLite no funcionan"
+            )
+        if "database disk image is malformed" in texto:
+            return "la base de datos está dañada; restaura el último backup válido"
+        return f"error de la base de datos: {error}"
+
+    if isinstance(error, OSError):
+        plantilla = _MOTIVOS_ERRNO.get(error.errno)
+        if plantilla:
+            return plantilla.format(ruta=destino)
+        detalle = error.strerror or str(error)
+        return f"no se pudo escribir en {destino}: {detalle}"
+
+    return str(error)
+
+
+def registrarFalloEscritura(log_destino, contexto, error, ruta=None) -> str:
+    """Deja la traza completa en el log y devuelve el mensaje para el usuario."""
+    mensaje = mensajeAlmacenamiento(error, ruta)
+    log_destino.exception("%s: %s", contexto, mensaje)
+    return mensaje
 
 
 def wants_json() -> bool:

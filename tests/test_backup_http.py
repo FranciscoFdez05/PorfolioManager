@@ -119,6 +119,75 @@ def test_un_zip_a_medio_escribir_no_queda_en_el_listado(cliente):
     assert client.get("/api/backups").get_json()["backups"] == []
 
 
+def test_las_copias_temporales_no_se_dejan_caer_en_portfolios(cliente):
+    """El .db temporal de cada copia va a data/tmp, no junto a los portfolios.
+
+    En data/portfolios lo veía como un portfolio más cualquier `glob("*.db")`:
+    la rotación de copias automáticas, el scheduler de snapshots y el listado de
+    portfolios. Con un solo proceso la ventana era estrecha; con los dos workers
+    y cuatro hilos de gunicorn del contenedor, no.
+    """
+    client, cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
+
+    assert client.post("/api/backup", headers=cabeceras).get_json()["ok"] is True
+
+    assert sorted(p.name for p in rutas["portfolios"].iterdir()) == ["principal.db"]
+    # Y el temporal tampoco se queda: ni el .db ni sus sidecars -wal/-shm.
+    assert list((rutas["data"] / "tmp").iterdir()) == []
+
+
+def test_un_fallo_de_permisos_se_devuelve_con_su_causa(cliente, monkeypatch):
+    """El caso de Docker: el volumen montado no deja escribir.
+
+    Antes salía un 500 con `str(e)` a secas —o el "Error interno del servidor"
+    del manejador genérico— y en pantalla un "Error al crear backup" que no
+    distinguía entre permisos, disco lleno y base de datos bloqueada.
+    """
+    import errno
+
+    from routes import backup as rutas_backup
+
+    client, cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db")
+
+    def _denegado(*_args, **_kwargs):
+        raise PermissionError(errno.EACCES, "Permission denied")
+
+    monkeypatch.setattr(rutas_backup.zipfile, "ZipFile", _denegado)
+
+    respuesta = client.post("/api/backup", headers=cabeceras)
+    datos = respuesta.get_json()
+
+    assert respuesta.status_code == 500
+    assert datos["ok"] is False
+    assert "permiso de escritura" in datos["error"]
+    # La ruta concreta es la mitad del diagnóstico: dice qué volumen mirar.
+    assert str(rutas["backups"]) in datos["error"]
+
+
+def test_no_se_empieza_el_zip_si_el_destino_no_es_escribible(cliente, monkeypatch):
+    """La comprobación va antes de tocar nada, para no dejar un zip a medias."""
+    from core import paths
+    from routes import backup as rutas_backup
+
+    client, cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db")
+
+    monkeypatch.setattr(
+        paths, "comprobarEscritura",
+        lambda directorio, crear=True: (False, "Read-only file system"),
+    )
+    monkeypatch.setattr(rutas_backup, "paths", paths)
+
+    respuesta = client.post("/api/backup", headers=cabeceras)
+    datos = respuesta.get_json()
+
+    assert respuesta.status_code == 500
+    assert "Read-only file system" in datos["error"]
+    assert not any(rutas["backups"].iterdir())
+
+
 # ── Restaurar: rechazos ──────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("nombre", [
@@ -394,3 +463,27 @@ def test_borrar_rechaza_nombres_que_no_son_de_un_backup(cliente, nombre):
     client, cabeceras, _rutas = cliente
     respuesta = client.delete(f"/api/backups/{nombre}", headers=cabeceras)
     assert respuesta.status_code in (400, 404)
+
+
+def test_una_copia_temporal_abandonada_se_barre_en_la_siguiente(cliente):
+    """Si el contenedor muere a media copia, el temporal no se queda para siempre."""
+    import os
+    import time
+
+    client, cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db")
+
+    tmp = rutas["data"] / "tmp"
+    tmp.mkdir(parents=True, exist_ok=True)
+    huerfano = tmp / "_bak_999_1_principal.db"
+    huerfano.write_bytes(b"copia a medias")
+    viejo = time.time() - 7200
+    os.utime(huerfano, (viejo, viejo))
+
+    reciente = tmp / "_bak_999_2_principal.db"
+    reciente.write_bytes(b"de otro worker que sigue vivo")
+
+    assert client.post("/api/backup", headers=cabeceras).get_json()["ok"] is True
+
+    assert not huerfano.exists()
+    assert reciente.exists()

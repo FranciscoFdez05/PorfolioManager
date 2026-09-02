@@ -24,6 +24,6 @@ Al subir la versión hay que tocar, en el mismo commit: este fichero,
 `pyproject.toml`, `package.json` y `CHANGELOG.md`. El test falla si falta alguno.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 __all__ = ["__version__"]

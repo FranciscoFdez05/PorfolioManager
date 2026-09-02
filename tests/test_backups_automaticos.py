@@ -14,6 +14,7 @@ def _crear_db(path):
 
 def _preparar(monkeypatch, tmp_path, dias):
     from admin import backup_manager
+    from core import paths
 
     portfolios = tmp_path / "portfolios"
     backups = tmp_path / "backups" / "auto"
@@ -29,6 +30,9 @@ def _preparar(monkeypatch, tmp_path, dias):
     monkeypatch.setattr(backup_manager, "_BACKUP_DIR", backups)
     monkeypatch.setattr(backup_manager, "_JSON_DIR", json_dir)
     monkeypatch.setattr(backup_manager, "_META_FILE", tmp_path / "portfolios.json")
+    # El bloqueo entre workers vive en data/tmp: sin redirigirlo, la suite
+    # dejaría su fichero en el data/ real del usuario.
+    monkeypatch.setattr(paths, "TMP_DIR", tmp_path / "tmp", raising=False)
     return backup_manager, db_path, backups
 
 

@@ -988,7 +988,10 @@ async function initAjustesLogic() {
                     showMsg(backupMsg, `Creado: ${data.filename}`, "ok")
                     renderBackups(data.backups || [])
                 } else {
-                    showMsg(backupMsg, "Error al crear backup", "error")
+                    // El servidor incluye el motivo (por ejemplo permisos del
+                    // volumen Docker o un bloqueo de SQLite). Ocultarlo con un
+                    // mensaje genérico hacía imposible distinguir ambos casos.
+                    showMsg(backupMsg, data.error || "Error al crear backup", "error")
                 }
             } catch {
                 showMsg(backupMsg, "Error de red", "error")

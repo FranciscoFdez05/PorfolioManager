@@ -20,6 +20,24 @@ if str(_PYTHON_DIR) not in sys.path:
     sys.path.insert(0, str(_PYTHON_DIR))
 
 
+@pytest.fixture(autouse=True)
+def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
+    """Saca `data/tmp` del repositorio en TODOS los tests.
+
+    Ahí van los ficheros de bloqueo entre procesos (migración del esquema,
+    copia automática) y los temporales de las copias de bases de datos. A
+    diferencia del resto de rutas, los usa cualquier test que abra una base de
+    datos, no solo los que piden `datos_aislados`, así que el aislamiento tiene
+    que ser automático: si no, la suite deja ficheros sueltos en el `data/` real
+    de quien la ejecuta.
+    """
+    from core import paths
+
+    destino = tmp_path_factory.getbasetemp() / "datos_tmp"
+    destino.mkdir(exist_ok=True)
+    monkeypatch.setattr(paths, "TMP_DIR", destino, raising=False)
+
+
 @pytest.fixture
 def temp_db(tmp_path, monkeypatch):
     """Base de datos SQLite vacía y aislada para el test."""
@@ -57,7 +75,11 @@ def datos_aislados(tmp_path, monkeypatch):
     backups = data / "backups"
     portfolios = data / "portfolios"
     json_dir = data / "JSON"
-    for carpeta in (data, backups, portfolios, json_dir):
+    # logs/ también: el diagnóstico de almacenamiento comprueba la escritura
+    # creando un fichero de verdad en cada directorio, y sin aislarlo tocaría el
+    # logs/ del repositorio.
+    logs = tmp_path / "logs"
+    for carpeta in (data, backups, portfolios, json_dir, logs):
         carpeta.mkdir(parents=True, exist_ok=True)
 
     monkeypatch.setattr(paths, "DATA_DIR", data, raising=False)
@@ -67,6 +89,8 @@ def datos_aislados(tmp_path, monkeypatch):
     monkeypatch.setattr(paths, "AJUSTES_JSON", json_dir / "ajustes.json", raising=False)
     monkeypatch.setattr(paths, "PORTFOLIOS_META_FILE", data / "portfolios.json", raising=False)
     monkeypatch.setattr(paths, "AUTH_FILE", data / "auth.dat", raising=False)
+    monkeypatch.setattr(paths, "LOGS_DIR", logs, raising=False)
+    monkeypatch.setattr(paths, "TMP_DIR", data / "tmp", raising=False)
 
     monkeypatch.setattr(rutas_backup, "DATA_DIR", data)
     monkeypatch.setattr(rutas_backup, "_BACKUP_DIR", backups)
@@ -93,6 +117,7 @@ def datos_aislados(tmp_path, monkeypatch):
 
     return {
         "data": data,
+        "logs": logs,
         "backups": backups,
         "portfolios": portfolios,
         "json": json_dir,

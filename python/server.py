@@ -15,7 +15,7 @@ from flask import Flask, abort, g, make_response, send_from_directory
 from admin import snapshot_scheduler
 from admin.backup_manager import start_scheduler as start_backup_scheduler
 from admin.portfolios_manager import init_portfolios
-from core import csp, seguridad_app, settings
+from core import csp, paths, seguridad_app, settings
 from core.errors import register_error_handlers
 from core.paths import API_DIR, BASE_DIR, INDEX_FILE
 from routes.activos import activos_bp
@@ -51,6 +51,47 @@ logging.basicConfig(level=settings.nivelLog(), format=settings.formatoLog())
 # de los valores dudosos (fuera de rango, mal escritos, combinaciones que no
 # funcionan). No aborta el arranque: los valores ya vienen acotados.
 settings.registrarConfiguracion()
+
+def _comprobarAlmacenamiento():
+    """Avisa al arrancar si algún directorio de datos no se puede escribir.
+
+    Es la comprobación que faltaba al pasar de Windows a Docker sobre Linux.
+    En Windows el proceso es el dueño de la carpeta del proyecto y cualquier
+    ruta relativa funciona; en el contenedor, data/, logs/ y API/ son volúmenes
+    montados desde el host, con su propietario y sus permisos, y la aplicación
+    corre como otro usuario. Cuando eso no encaja, la web se ve y se navega
+    —leer no necesita permiso de escritura— pero **nada se guarda**: ni el
+    backup, ni los ajustes, ni las claves de API.
+
+    Se avisa y se sigue: el usuario puede entrar, ver sus datos y arreglar los
+    permisos con el mensaje delante, en vez de encontrarse un contenedor que
+    reinicia en bucle sin decir por qué.
+    """
+    informe = paths.diagnosticoAlmacenamiento()
+    proceso = paths.descripcionProceso()
+    fallos = {n: d for n, d in informe.items() if not d["escribible"]}
+
+    for nombre, detalle in informe.items():
+        logging.info("[rutas] %-11s %s", nombre, detalle["ruta"])
+
+    if not fallos:
+        return
+
+    quien = f" (proceso uid={proceso['uid']} gid={proceso['gid']})" if proceso else ""
+    for nombre, detalle in fallos.items():
+        logging.critical(
+            "[rutas] NO SE PUEDE ESCRIBIR en %s -> %s: %s%s",
+            nombre, detalle["ruta"], detalle["motivo"], quien,
+        )
+    logging.critical(
+        "[rutas] Mientras siga así no se guardará nada (backups, ajustes, claves). "
+        "En Docker suele ser el propietario de los volúmenes montados: párate el "
+        "stack y ejecuta en el host «sudo chown -R $(id -u):$(id -g) data logs API», "
+        "o fija PUID/PGID en .env con tu usuario."
+    )
+
+
+_comprobarAlmacenamiento()
 
 init_portfolios()
 

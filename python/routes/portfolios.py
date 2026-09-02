@@ -1,5 +1,4 @@
 import io
-import os
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -15,7 +14,8 @@ from admin.portfolios_manager import (
     rename_portfolio,
     switch_portfolio,
 )
-from core import settings
+from core import paths, settings
+from core.escritura import limpiarTemporal, rutaTemporal, temporalPara
 from stores.asset_utils import slugify
 
 portfolios_bp = Blueprint("portfolios", __name__)
@@ -220,16 +220,15 @@ def export_portfolio(pid):
     # fuera lo que aún está en el -wal, y el NamedTemporaryFile(delete=False)
     # anterior nunca se borraba, acumulando una copia completa de la BD en el
     # directorio temporal en cada exportación.
-    from admin.backup_manager import _remove_wal_sidecars
-    tmp_path = Path(tempfile.gettempdir()) / f"_export_{pid}_{os.getpid()}.db"
-    try:
-        _sqlite_backup(db_file, tmp_path)
-        payload = tmp_path.read_bytes()
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"No se pudo exportar: {e}"}), 500
-    finally:
-        tmp_path.unlink(missing_ok=True)
-        _remove_wal_sidecars(tmp_path)
+    # El nombre llevaba el pid, que distingue a los dos workers de gunicorn pero
+    # no a sus cuatro hilos: dos exportaciones del mismo portfolio a la vez
+    # escribían el mismo fichero. rutaTemporal añade el hilo y un aleatorio.
+    with temporalPara(db_file, directorio=Path(tempfile.gettempdir())) as tmp_path:
+        try:
+            _sqlite_backup(db_file, tmp_path)
+            payload = tmp_path.read_bytes()
+        except Exception as e:
+            return jsonify({"ok": False, "error": f"No se pudo exportar: {e}"}), 500
 
     return send_file(
         io.BytesIO(payload),
@@ -270,7 +269,11 @@ def import_portfolio():
     # Guardar en temporal y validar antes de publicarlo como portfolio: escribir
     # directamente en dest dejaba un .db corrupto en data/portfolios si la
     # validación fallaba y el unlink no llegaba a ejecutarse.
-    tmp_dest = _PORTFOLIOS_DIR / f"_import_tmp_{pid}.db"
+    # El temporal va a data/tmp: en data/portfolios, un `_import_tmp_x.db` a
+    # medio subir lo veía como un portfolio más cualquier `glob("*.db")` —la
+    # copia automática, el backup manual, la rotación—, y con ficheros de
+    # decenas de MB esa ventana dura segundos, no un instante.
+    tmp_dest = rutaTemporal(dest, directorio=paths.TMP_DIR)
     try:
         file.save(str(tmp_dest))
 
@@ -298,9 +301,7 @@ def import_portfolio():
     except Exception as e:
         return jsonify({"ok": False, "error": f"No se pudo importar: {e}"}), 400
     finally:
-        tmp_dest.unlink(missing_ok=True)
-        for suffix in ("-wal", "-shm"):
-            Path(str(tmp_dest) + suffix).unlink(missing_ok=True)
+        limpiarTemporal(tmp_dest)
 
     meta["portfolios"].append({"id": pid, "name": name})
     from admin.portfolios_manager import _write_meta

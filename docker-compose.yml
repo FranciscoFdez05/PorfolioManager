@@ -26,6 +26,14 @@ services:
       - PORTFOLIO_DATA_DIR=/app/data
       - PORTFOLIO_LOGS_DIR=/app/logs
       - PORTFOLIO_API_DIR=/app/API
+      # Usuario con el que el contenedor escribe en los volúmenes de arriba.
+      # En Linux los bind mounts conservan el propietario del host, así que un
+      # uid de sistema creado dentro de la imagen puede no tener permiso para
+      # escribir: la aplicación se ve pero no guarda nada. Vacío (lo normal)
+      # significa "adopta el propietario de ./data", que docker-up.sh crea con
+      # el usuario que lanza el stack. Rellénalos en .env solo si quieres otro.
+      - PUID=${PUID:-}
+      - PGID=${PGID:-}
     ports:
       - "${PORT:-5000}:${PORT:-5000}"
     volumes:

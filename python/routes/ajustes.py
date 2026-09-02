@@ -2,16 +2,16 @@ import datetime
 import io
 import json
 import logging
-import os
 import re
-import tempfile
 import zipfile
 from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, request
 
-from core import settings
+from core import paths, settings
 from core.db import get_active_db_path, get_db
+from core.errors import registrarFalloEscritura
+from core.escritura import escribirJsonAtomico, temporalPara
 from core.paths import AJUSTES_JSON as _AJUSTES_JSON, API_DIR as _API_DIR, JSON_DIR
 from core.secret_store import read_secret_lines, write_secret_lines
 from providers.api_stats import get_today_stats
@@ -105,19 +105,12 @@ def _atomic_write_json(path: Path, data) -> None:
     write_text() directo truncaba el fichero antes de escribirlo: un fallo a
     mitad dejaba un JSON inválido y _read_ajustes/_read_prefs caen al valor por
     defecto en silencio, es decir, todos los ajustes perdidos sin aviso.
+
+    La mecánica vive ahora en core/escritura.py, que es de donde la toman
+    también los backups y portfolios.json: era el mismo procedimiento escrito
+    de tres formas distintas, y solo una de las tres era correcta.
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(data, indent=2, ensure_ascii=False)
-    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(tmp_name, str(path))
-    except Exception:
-        Path(tmp_name).unlink(missing_ok=True)
-        raise
+    escribirJsonAtomico(path, data)
 
 
 def _write_ajustes(data):
@@ -365,8 +358,18 @@ def save_settings():
                         presupuesto[k_clean] = v_clean
             pcfg["ahorroConfig"] = {"objetivoAhorro": obj, "presupuesto": presupuesto}
 
-    _write_ajustes(gcfg)
-    _write_prefs(pid, pcfg)
+    try:
+        _write_ajustes(gcfg)
+        _write_prefs(pid, pcfg)
+    except OSError as e:
+        # Igual que en /api/backup: si el fallo es del disco (permisos del
+        # volumen en Docker, montaje de solo lectura, disco lleno), el manejador
+        # genérico devolvía "Error interno del servidor" y no había forma de
+        # saber por qué los ajustes no se guardaban.
+        mensaje = registrarFalloEscritura(
+            log, "[ajustes] No se pudieron guardar los ajustes", e, JSON_DIR
+        )
+        return jsonify({"ok": False, "error": mensaje}), 500
     return jsonify({"ok": True})
 
 
@@ -465,9 +468,20 @@ def export_zip():
 
 
 def _consistent_db_bytes(db_path) -> bytes:
-    """Bytes de una copia consistente del .db (incluye el WAL pendiente)."""
+    """Bytes de una copia consistente del .db (incluye el WAL pendiente).
+
+    El temporal va a data/tmp. Antes se llamaba `_tmp_export_<portfolio>.db` y
+    se creaba **dentro de data/portfolios**, donde todo el proyecto hace
+    `glob("*.db")` para saber qué portfolios existen: exportar mientras corría
+    una copia de seguridad metía la exportación a medias en el backup como si
+    fuera un portfolio más.
+    """
     import sqlite3 as _sqlite3
-    tmp = db_path.parent / f"_tmp_export_{db_path.name}"
+    with temporalPara(db_path, directorio=paths.TMP_DIR) as tmp:
+        return _copiar_db_a_bytes(db_path, tmp, _sqlite3)
+
+
+def _copiar_db_a_bytes(db_path, tmp, _sqlite3) -> bytes:
     src = dst = None
     try:
         src = _sqlite3.connect(str(db_path), timeout=settings.dbTimeout())
@@ -487,9 +501,6 @@ def _consistent_db_bytes(db_path) -> bytes:
                     conn.close()
                 except Exception:
                     pass
-        tmp.unlink(missing_ok=True)
-        for suffix in ("-wal", "-shm"):
-            Path(str(tmp) + suffix).unlink(missing_ok=True)
 
 
 def _restore_tables_from_dict(conn, data: dict):

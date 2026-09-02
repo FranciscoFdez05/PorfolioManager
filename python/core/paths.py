@@ -55,6 +55,13 @@ AUTO_BACKUPS_DIR = BACKUPS_DIR / "auto"
 PORTFOLIOS_DIR = DATA_DIR / "portfolios"
 DELETED_DIR = DATA_DIR / "deleted"
 JSON_DIR = DATA_DIR / "JSON"
+# Temporales de las copias de bases de datos. Tienen carpeta propia y no viven
+# en portfolios/: allí, un `_tmp_bak_x.db` a medio escribir lo veía cualquier
+# `glob("*.db")` —la rotación de backups, el scheduler de snapshots, el listado
+# de portfolios— como si fuera un portfolio más. Con un solo proceso (el
+# servidor de desarrollo en Windows) la ventana era mínima; con los dos workers
+# y cuatro hilos de gunicorn en Docker, deja de serlo.
+TMP_DIR = DATA_DIR / "tmp"
 
 # ── Ficheros ──────────────────────────────────────────────────────────────────
 ENV_FILE = BASE_DIR / ".env"
@@ -76,6 +83,99 @@ def rutaDesdeBase(relativa):
     return ruta if ruta.is_absolute() else BASE_DIR / ruta
 
 
+# ── Diagnóstico de escritura ─────────────────────────────────────────────────
+# Que una ruta exista no significa que se pueda escribir en ella, y esa es
+# justo la diferencia entre ejecutar la aplicación en Windows (donde el proceso
+# es el dueño de la carpeta del proyecto) y en Docker sobre Linux (donde
+# data/, logs/ y API/ son volúmenes montados desde el host, con el propietario
+# y los permisos que tenga el host, y el proceso corre como otro usuario).
+#
+# El síntoma era desconcertante: la aplicación arrancaba, la lista de backups
+# se veía —leer solo necesita permiso de lectura— y cualquier intento de
+# guardar fallaba, porque crear un fichero exige permiso de escritura sobre el
+# **directorio**. Comprobarlo aquí, con el mismo Path que usa el resto del
+# código, convierte ese fallo difuso en un mensaje que dice qué carpeta es y
+# qué dice el sistema operativo.
+
+
+def comprobarEscritura(directorio, crear=True):
+    """(sePuedeEscribir, motivo) sobre `directorio`.
+
+    Se comprueba creando y borrando un fichero de verdad, no con os.access():
+    access() consulta los bits de permiso del proceso y devuelve respuestas
+    equivocadas justo en los casos que aquí importan —montajes de solo
+    lectura, ACL, root dentro del contenedor— que son los que hay que
+    detectar.
+    """
+    ruta = Path(directorio)
+    try:
+        if crear:
+            ruta.mkdir(parents=True, exist_ok=True)
+        elif not ruta.is_dir():
+            return False, "no existe"
+    except OSError as error:
+        return False, f"no se pudo crear: {error.strerror or error}"
+
+    testigo = ruta / f".escritura_{os.getpid()}"
+    try:
+        with open(testigo, "wb") as handle:
+            handle.write(b"ok")
+        testigo.unlink()
+        return True, ""
+    except OSError as error:
+        try:
+            testigo.unlink()
+        except OSError:
+            pass
+        return False, error.strerror or str(error)
+
+
+def directoriosDeDatos():
+    """Los directorios que la aplicación necesita poder escribir.
+
+    Se leen de los globales en cada llamada (y no en una constante calculada al
+    importar) para que los tests, que reasignan DATA_DIR y compañía, no acaben
+    comprobando el `data/` real del usuario.
+    """
+    return {
+        "datos": DATA_DIR,
+        "portfolios": PORTFOLIOS_DIR,
+        "json": JSON_DIR,
+        "backups": BACKUPS_DIR,
+        "logs": LOGS_DIR,
+        "claves": API_DIR,
+    }
+
+
+def diagnosticoAlmacenamiento(crear=True):
+    """Estado de cada directorio de datos: ruta resuelta y si se puede escribir.
+
+    Lo usan el aviso de arranque y /api/health. Devuelve rutas absolutas: en
+    Docker el 90 % de los "no me guarda" se resuelve viendo que la ruta que la
+    aplicación resolvió no es la que el usuario creía tener montada.
+    """
+    informe = {}
+    for nombre, ruta in directoriosDeDatos().items():
+        escribible, motivo = comprobarEscritura(ruta, crear=crear)
+        informe[nombre] = {
+            "ruta": str(ruta),
+            "escribible": escribible,
+            "motivo": motivo,
+        }
+    return informe
+
+
+def descripcionProceso():
+    """Usuario y permisos con los que corre el proceso.
+
+    En Windows no existen uid/gid; devolver el diccionario vacío evita tener
+    que preguntarlo en cada sitio donde se imprime el diagnóstico.
+    """
+    if not hasattr(os, "geteuid"):
+        return {}
+    return {"uid": os.geteuid(), "gid": os.getegid()}
+
+
 __all__ = [
     "AJUSTES_JSON",
     "API_DIR",
@@ -94,5 +194,10 @@ __all__ = [
     "LOGS_DIR",
     "PORTFOLIOS_DIR",
     "PORTFOLIOS_META_FILE",
+    "TMP_DIR",
+    "comprobarEscritura",
+    "descripcionProceso",
+    "diagnosticoAlmacenamiento",
+    "directoriosDeDatos",
     "rutaDesdeBase",
 ]

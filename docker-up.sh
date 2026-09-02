@@ -1,12 +1,14 @@
 #!/usr/bin/env sh
 # Levanta el stack listo para usarse desde cualquier dispositivo de la LAN.
 #
-# Se encarga de las tres cosas que hay que hacer antes de "docker compose up":
+# Se encarga de lo que hay que hacer antes de "docker compose up":
 #   1. Crear .env (a partir de .env.example) si aún no existe.
 #   2. Generar SECRET_KEY y, en el primer arranque, las credenciales de acceso.
 #   3. Leer el puerto de config.ini y exportarlo como PORT, para que el mapeo
 #      host:contenedor de docker-compose.yml coincida siempre con el valor real
 #      que usa la app.
+#   4. Crear data/, logs/ y API/ con tu usuario y exportar PUID/PGID, para que
+#      el contenedor pueda escribir en ellos y lo que cree siga siendo tuyo.
 #
 # Uso: ./docker-up.sh [args extra para docker compose up]
 set -e
@@ -231,7 +233,22 @@ PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
 [ -n "$PORT" ] || PORT=5000
 export PORT
 
-# ── 5. Arranque ───────────────────────────────────────────────────────────────
+# ── 5. Volúmenes y usuario ────────────────────────────────────────────────────
+# Los tres directorios se crean AQUÍ, con el usuario que lanza el stack. Si no
+# existen cuando arranca Compose, los crea el demonio de Docker y quedan como
+# root: a partir de ahí el contenedor no puede escribir en ellos (la aplicación
+# se ve, pero no guarda nada) y en el host hacen falta permisos de root hasta
+# para copiarlos.
+mkdir -p data logs API
+
+# El contenedor escribirá con este uid/gid, de modo que los ficheros que cree
+# sigan siendo tuyos. Se pueden fijar a mano en .env; si no, el entrypoint
+# adopta el propietario de data/, que es el que se acaba de crear.
+PUID=$(id -u)
+PGID=$(id -g)
+export PUID PGID
+
+# ── 6. Arranque ───────────────────────────────────────────────────────────────
 docker compose up -d --build "$@"
 
 # `up -d` termina cuando crea el contenedor, no cuando la aplicación puede

@@ -28,6 +28,16 @@ cd "$(dirname "$0")"
 SIN_PULL=0
 [ "$1" = "--sin-pull" ] && SIN_PULL=1
 
+# Con sudo, el git pull deja los ficheros como root y —lo que de verdad duele—
+# PUID/PGID saldrían 0:0, así que el contenedor escribiría en los volúmenes
+# como root y el usuario del servidor perdería el acceso a sus propios datos.
+# Docker no necesita sudo cuando el usuario pertenece al grupo docker.
+if [ "$(id -u)" -eq 0 ]; then
+    echo "ERROR: no ejecutes docker-update.sh con sudo." >&2
+    echo "       Ejecútalo como tu usuario normal: ./docker-update.sh" >&2
+    exit 1
+fi
+
 SERVICIO="porfoliomanager"
 ESPERA_SALUD=90   # segundos que se le dan a la versión nueva para responder
 
@@ -120,14 +130,25 @@ PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
 export PORT
 export PORTFOLIO_VERSION="$VERSION_NUEVA"
 
-# ── 4. Construir y levantar ───────────────────────────────────────────────────
+# ── 4. Volúmenes y usuario ────────────────────────────────────────────────────
+# Lo mismo que hace docker-up.sh. Los directorios ya existirán en una
+# instalación en marcha, pero PUID/PGID sí hacen falta aquí: sin ellos, una
+# instalación que venía de una versión anterior se queda con los datos a nombre
+# del usuario de sistema de la imagen, y en el host hacen falta permisos de root
+# hasta para copiar data/.
+mkdir -p data logs API
+PUID=$(id -u)
+PGID=$(id -g)
+export PUID PGID
+
+# ── 5. Construir y levantar ───────────────────────────────────────────────────
 paso "Construyendo la imagen $VERSION_NUEVA"
 docker compose build
 
 paso "Levantando"
 docker compose up -d
 
-# ── 5. Comprobar que arranca de verdad ────────────────────────────────────────
+# ── 6. Comprobar que arranca de verdad ────────────────────────────────────────
 # /api/health consulta la base de datos activa y devuelve 503 si falla, así que
 # esperar aquí distingue «el contenedor está arriba» de «la aplicación funciona».
 paso "Esperando a que responda (hasta ${ESPERA_SALUD}s)"
@@ -152,7 +173,7 @@ if [ "$sano" -eq 1 ]; then
     exit 0
 fi
 
-# ── 6. Vuelta atrás ───────────────────────────────────────────────────────────
+# ── 7. Vuelta atrás ───────────────────────────────────────────────────────────
 error "La versión $VERSION_NUEVA no responde tras ${ESPERA_SALUD}s. Volviendo atrás."
 
 echo

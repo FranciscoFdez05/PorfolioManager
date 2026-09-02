@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from core import settings
+from core.escritura import escribirJsonAtomico
 from core.paths import (
     DELETED_DIR as _DELETED_DIR,
     LEGACY_DB as _LEGACY_DB,
@@ -27,14 +28,15 @@ def _read_meta():
 
 
 def _write_meta(data):
-    _META_FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = _META_FILE.with_suffix(".tmp")
-    try:
-        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(_META_FILE)
-    except Exception:
-        tmp.unlink(missing_ok=True)
-        raise
+    """Guarda portfolios.json sin poder dejarlo a medias.
+
+    El temporal se llamaba `portfolios.tmp`, el mismo nombre en todos los
+    procesos: los dos workers de gunicorn guardan aquí al arrancar (la marca de
+    `legacyMigrated`, el portfolio activo) y escribían el mismo fichero a la
+    vez. `escribirAtomico` da un nombre único por proceso e hilo y añade el
+    fsync que faltaba antes del rename.
+    """
+    escribirJsonAtomico(_META_FILE, data)
 
 
 def _safe_id(name: str) -> str:

@@ -5,7 +5,8 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
-from core import settings
+from core import paths, settings
+from core.bloqueo import exclusivo
 from core.paths import LEGACY_DB
 
 log = logging.getLogger(__name__)
@@ -573,6 +574,39 @@ def _migracion(version: int):
     return registrar
 
 
+# Segundos que un proceso espera a que otro termine de migrar antes de
+# rendirse. Generoso a propósito: una migración que reconstruye tablas sobre una
+# base grande tarda, y rendirse antes de tiempo devuelve justo el problema que
+# este bloqueo evita.
+_ESPERA_BLOQUEO_ESQUEMA = 120
+
+
+def _bloqueo_esquema(ruta) -> Path:
+    """Fichero de bloqueo de la migración de `ruta`, común a todos los procesos."""
+    return paths.TMP_DIR / f"esquema-{Path(ruta).stem}.lock"
+
+
+def _aplicar_esquema(conn, ruta) -> None:
+    """Crea el esquema y aplica las migraciones pendientes, una sola vez.
+
+    `_init_lock` protege de los otros hilos del proceso. Esto protege de los
+    otros **procesos**: gunicorn levanta dos workers que importan server.py a la
+    vez y abren la misma base, así que los dos llegaban aquí a la vez. Los pasos
+    de migración son idempotentes uno a uno, pero no reentrantes: el paso 3
+    reconstruye tablas (RENAME + CREATE + INSERT + DROP) y dos procesos
+    haciéndolo a la vez dejan el esquema a medias.
+
+    Si no se consigue el bloqueo se lanza `BloqueoOcupado` en vez de migrar
+    igualmente: el worker muere, gunicorn lo levanta de nuevo y para entonces el
+    otro ya habrá terminado. Un arranque ruidoso es mejor que dos ALTER TABLE
+    simultáneos sobre los datos del usuario.
+    """
+    with exclusivo(_bloqueo_esquema(ruta), espera=_ESPERA_BLOQUEO_ESQUEMA):
+        conn.executescript(_SCHEMA)
+        _migrate(conn)
+        conn.commit()
+
+
 def _migrate(conn):
     """Lleva `conn` hasta ESQUEMA_VERSION aplicando los pasos que le falten."""
     version = conn.execute("PRAGMA user_version").fetchone()[0]
@@ -1000,13 +1034,12 @@ def get_db() -> sqlite3.Connection:
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA cache_size=-8000")
             db_key = str(objetivo)
-            # Schema + migración solo una vez por BD y bajo lock: evita que dos
-            # hilos ejecuten ALTER TABLE a la vez sobre el mismo fichero.
+            # Schema + migración solo una vez por BD y proceso. El lock evita
+            # que dos hilos ejecuten ALTER TABLE a la vez sobre el mismo
+            # fichero; de los otros workers se encarga _aplicar_esquema.
             with _init_lock:
                 if db_key not in _initialized_paths:
-                    conn.executescript(_SCHEMA)
-                    _migrate(conn)
-                    conn.commit()
+                    _aplicar_esquema(conn, objetivo)
                     _initialized_paths.add(db_key)
                 else:
                     conn.execute("PRAGMA foreign_keys=ON")
@@ -1057,9 +1090,7 @@ def open_db_at(path):
         db_key = str(p)
         with _init_lock:
             if db_key not in _initialized_paths:
-                conn.executescript(_SCHEMA)
-                _migrate(conn)
-                conn.commit()
+                _aplicar_esquema(conn, p)
                 _initialized_paths.add(db_key)
 
         yield conn
@@ -1138,8 +1169,6 @@ def init_db_at_path(path) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(p), check_same_thread=False, timeout=settings.backupSqliteTimeout())
     try:
-        conn.executescript(_SCHEMA)
-        _migrate(conn)
-        conn.commit()
+        _aplicar_esquema(conn, p)
     finally:
         conn.close()
