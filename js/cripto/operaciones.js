@@ -941,6 +941,9 @@ function refreshOperationsRowPrice(tr) {
 
 function buildOperationRow(row) {
     const normalizedRow = normalizeOperationRow(row)
+    const isCancelled = normalizedRow.estado === "Cancelado"
+    const actionLabel = isCancelled ? "Eliminar" : "Cancelar"
+    const actionTitle = isCancelled ? "Eliminar definitivamente" : "Cancelar operación"
     const tr = document.createElement("tr")
     tr.dataset.operationId = normalizedRow.id
     tr.innerHTML = `
@@ -964,7 +967,7 @@ function buildOperationRow(row) {
                 <div class="rowMenuDropdown">
                     <button type="button" class="rowMenuItem assetRowEditBtn operacionRowEditBtn avActionBtn avEditBtn" data-row-id="${normalizedRow.id}">Editar</button>
                     <hr>
-                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn operacionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${normalizedRow.id}">Eliminar</button>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn operacionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${normalizedRow.id}" title="${actionTitle}">${actionLabel}</button>
                 </div>
             </div>
         </td>
@@ -1059,12 +1062,12 @@ function requestOperationRowDeletion(rowId) {
     const isCancelled = String(targetRow.estado || "").trim() === "Cancelado"
 
     openConfirmModal({
-        title: "Eliminar fila",
+        title: isCancelled ? "Eliminar operación" : "Cancelar operación",
         message: isCancelled
             ? "Esta operación ya está cancelada. ¿Quieres eliminarla definitivamente?"
-            : "¿Quieres eliminar esta operación? Pasará al estado Cancelado.",
-        confirmLabel: "Eliminar",
-        onConfirm: () => {
+            : "¿Quieres cancelar esta operación? Pasará a la categoría Cancelado.",
+        confirmLabel: isCancelled ? "Eliminar" : "Cancelar",
+        onConfirm: async () => {
             const currentRows = currentOperationsData.rows || []
             const targetIndex = currentRows.findIndex((item) => item.id === rowId)
             if (targetIndex >= 0) {
@@ -1078,8 +1081,14 @@ function requestOperationRowDeletion(rowId) {
                 }
             }
             renderOperationsTable()
-            scheduleOperationsAssetRefresh()
-            scheduleOperationsAutosave()
+            try {
+                await persistOperationsData()
+            } catch (error) {
+                showError(
+                    isCancelled ? "No se pudo eliminar la operación" : "No se pudo cancelar la operación",
+                    error
+                )
+            }
         }
     })
 }
@@ -1255,7 +1264,13 @@ function openOperacionRowModal(rowId) {
     const footer = document.createElement("div")
     footer.className = "assetRowModalFooter"
     footer.innerHTML = `
-        ${isEdit ? `<button type="button" id="opRowModalDeleteBtn" class="dangerButton assetRowModalDeleteBtn">Eliminar</button>` : ""}
+        ${
+            isEdit
+                ? `<button type="button" id="opRowModalDeleteBtn" class="dangerButton assetRowModalDeleteBtn">${
+                      rowData.estado === "Cancelado" ? "Eliminar" : "Cancelar"
+                  }</button>`
+                : ""
+        }
         <button type="button" id="opRowModalCancelBtn" class="cancelButton">Cancelar</button>
         <button type="button" id="opRowModalSaveBtn" class="primaryButton" data-no-autohide="true">Guardar</button>
     `

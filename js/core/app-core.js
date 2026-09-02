@@ -539,7 +539,8 @@ function applySidebarState(sideWrapper, toggleButton) {
 const dividendosAutosaveTimeout = null
 let currentAssetId = null
 const assetModalState = null
-const confirmModalState = null
+// El diálogo reutiliza esta referencia en cada confirmación.
+let confirmModalState = null
 const editAssetModalState = null
 const draggedAssetId = null
 const PAGE_HTML_VERSION = "20260826b"

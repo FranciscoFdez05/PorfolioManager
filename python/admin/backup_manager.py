@@ -11,6 +11,8 @@ import logging
 import re
 import shutil
 import sqlite3
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -23,6 +25,45 @@ from core.paths import (
 )
 
 log = logging.getLogger(__name__)
+
+# El scheduler puede coexistir con una creación durante el arranque. Serializar
+# ambos evita que dos copias SQLite escriban el mismo temporal a la vez.
+_AUTO_BACKUP_LOCK = threading.Lock()
+_scheduler_thread = None
+_scheduler_started = False
+
+
+def _configured_backup_days() -> int:
+    """Frecuencia elegida en Ajustes, con 0 como desactivado."""
+    try:
+        raw = json.loads((_JSON_DIR / "ajustes.json").read_text("utf-8"))
+        return max(0, min(365, int(raw.get("autoBackupDays") or 0))) if isinstance(raw, dict) else 0
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return 0
+
+
+def _last_backup_date():
+    """Fecha de la última copia automática válida, de cualquier portfolio."""
+    latest = None
+    if not _BACKUP_DIR.exists():
+        return None
+    for path in _BACKUP_DIR.glob("*.db"):
+        match = re.match(r"^.+_(\d{4}-\d{2}-\d{2})\.db$", path.name)
+        if match:
+            try:
+                value = datetime.strptime(match.group(1), "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            latest = max(latest, value) if latest else value
+    return latest
+
+
+def _backup_is_due() -> bool:
+    days = _configured_backup_days()
+    if days <= 0:
+        return False
+    last = _last_backup_date()
+    return last is None or (datetime.now().date() - last).days >= days
 
 
 def _backup_name(db_path: Path) -> str:
@@ -159,10 +200,14 @@ def backup_previo_a_migracion(db_path: Path, desde: int, hasta: int):
 
 
 def run_startup_backup(db_path: Path):
-    """
-    Llamar desde portfolios_manager.init_portfolios() después de activar el DB.
+    """Comprueba el DB y crea una copia automática cuando toca.
+
+    La frecuencia de Ajustes se respeta al arrancar y desde el scheduler. Antes
+    este método copiaba siempre y server.py añadía otro mecanismo incompatible
+    que solo copiaba el portfolio activo.
+
     1. Verifica integridad del DB activo. Si falla: repara o restaura desde backup.
-    2. Crea backup diario de TODOS los portfolios si no existe uno de hoy.
+    2. Cuando corresponde, crea backup de TODOS los portfolios.
     3. Guarda backup de configuración (portfolios.json + ajustes + prefs).
     4. Inserta snapshot diario si no existe.
     5. Rota backups antiguos.
@@ -182,6 +227,9 @@ def run_startup_backup(db_path: Path):
             _restore_from_latest_auto_backup(db_path)
     else:
         log.info(f"[backup] Integridad OK: {db_path.name}")
+
+    if not _backup_is_due():
+        return False
 
     # ── 2. Backup diario de TODOS los portfolios ────────────────────────────
     if _PORTFOLIOS_DIR.exists():
@@ -203,6 +251,41 @@ def run_startup_backup(db_path: Path):
 
     # ── 4. Snapshot diario ──────────────────────────────────────────────────
     _ensure_daily_snapshot(db_path)
+    return True
+
+
+def check_scheduled_backup():
+    """Comprueba la frecuencia sin depender de reiniciar el servidor."""
+    from core.db import get_active_db_path
+
+    with _AUTO_BACKUP_LOCK:
+        try:
+            return run_startup_backup(get_active_db_path())
+        except Exception as e:
+            # Un fallo de I/O no debe matar el hilo; se reintentará después.
+            log.error("[backup] Comprobación automática fallida: %s", e)
+            return False
+
+
+def _scheduler_loop(interval_seconds: int):
+    while True:
+        time.sleep(interval_seconds)
+        check_scheduled_backup()
+
+
+def start_scheduler(interval_seconds: int = 3600):
+    """Inicia una única comprobación horaria de las copias automáticas."""
+    global _scheduler_started, _scheduler_thread
+    if _scheduler_started:
+        return
+    _scheduler_started = True
+    _scheduler_thread = threading.Thread(
+        target=_scheduler_loop,
+        args=(max(60, int(interval_seconds)),),
+        name="backup-scheduler",
+        daemon=True,
+    )
+    _scheduler_thread.start()
 
 
 def _backup_config(dest: Path):

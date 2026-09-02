@@ -13,10 +13,11 @@ from dotenv import load_dotenv
 from flask import Flask, abort, g, make_response, send_from_directory
 
 from admin import snapshot_scheduler
+from admin.backup_manager import start_scheduler as start_backup_scheduler
 from admin.portfolios_manager import init_portfolios
 from core import csp, seguridad_app, settings
 from core.errors import register_error_handlers
-from core.paths import AJUSTES_JSON, API_DIR, BACKUPS_DIR, BASE_DIR, INDEX_FILE
+from core.paths import API_DIR, BASE_DIR, INDEX_FILE
 from routes.activos import activos_bp
 from routes.ajustes import ajustes_bp
 from routes.auth import auth_bp
@@ -167,79 +168,6 @@ def serveStatic(path):
     return response
 
 
-def _check_auto_backup():
-    import json
-    import re
-    import sqlite3
-    from datetime import datetime, timedelta
-
-    ajustes_path = AJUSTES_JSON
-    days = 0
-    try:
-        if ajustes_path.exists():
-            cfg = json.loads(ajustes_path.read_text("utf-8"))
-            days = int(cfg.get("autoBackupDays") or 0)
-    except Exception:
-        return
-    if days <= 0:
-        return
-
-    # La BD activa, NO data/portfolio.db: ese fichero es el legacy congelado en
-    # el momento de la migración a multi-portfolio. Apuntar ahí generaba
-    # backups de datos obsoletos que, al restaurarlos, sobrescribían la BD real.
-    from core.db import get_active_db_path
-    db_path = get_active_db_path()
-    if not db_path.exists():
-        return
-
-    backups_dir = BACKUPS_DIR
-    filename_re = re.compile(r'^portfolio_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.db$')
-    if backups_dir.exists():
-        candidates = sorted(
-            [f for f in backups_dir.iterdir() if filename_re.match(f.name)],
-            key=lambda f: f.name,
-            reverse=True
-        )
-        if candidates:
-            m = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', candidates[0].name)
-            if m:
-                try:
-                    last_dt = datetime.strptime(m.group(1), "%d-%m-%Y_%H-%M-%S")
-                    if datetime.now() - last_dt < timedelta(days=days):
-                        return
-                except ValueError:
-                    pass
-
-    src = dst = None
-    tmp_path = None
-    try:
-        backups_dir.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        dst_path = backups_dir / f"portfolio_{ts}.db"
-        # Escribir a temporal y renombrar: si el proceso muere a mitad, no queda
-        # un portfolio_*.db truncado que luego se ofrezca como restaurable.
-        tmp_path = backups_dir / f"_tmp_portfolio_{ts}.db"
-        src = sqlite3.connect(str(db_path), timeout=settings.dbTimeout())
-        dst = sqlite3.connect(str(tmp_path), timeout=settings.dbTimeout())
-        src.backup(dst)
-        dst.close()
-        dst = None
-        src.close()
-        src = None
-        tmp_path.replace(dst_path)
-        logging.info("Auto-backup creado: %s", dst_path.name)
-    except Exception as e:
-        for conn in (dst, src):
-            if conn is not None:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-        if tmp_path is not None:
-            tmp_path.unlink(missing_ok=True)
-        logging.warning("Auto-backup fallido: %s", e)
-
-
 def _encrypt_api_keys_at_rest():
     """Cifra los API/*.key que sigan en texto plano de instalaciones previas.
 
@@ -262,7 +190,9 @@ def _encrypt_api_keys_at_rest():
 # Inicialización al arrancar, tanto con Gunicorn como con el servidor de desarrollo
 ensureDataFile()
 _encrypt_api_keys_at_rest()
-_check_auto_backup()
+# Las copias automáticas se comprueban ya al iniciar portfolios y luego cada
+# hora. Así cambiar la frecuencia en Ajustes no exige reiniciar el servidor.
+start_backup_scheduler()
 # El histórico de evolución lo programaba un setInterval del navegador, así que
 # solo existía mientras hubiera una pestaña abierta. Este hilo lo guarda desde
 # el servidor; con varios workers, el primero que reclama el hueco lo escribe.
