@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.1.1-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.2.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 
@@ -257,7 +257,7 @@ curl -s http://localhost:5000/api/health
 ```
 
 ```json
-{ "ok": true, "estado": "ok", "version": "1.1.1" }
+{ "ok": true, "estado": "ok", "version": "1.2.0" }
 ```
 
 Con la sesión abierta añade el detalle: esquema de la base, portfolio activo, tamaño y tiempo en marcha.
@@ -269,8 +269,8 @@ Depende de si la versión tocaba el esquema, y el CHANGELOG lo dice en cada entr
 **Si no lo tocaba** — basta con la imagen anterior, los datos no han cambiado:
 
 ```bash
-git checkout v1.1.0
-PORTFOLIO_VERSION=1.1.0 docker compose up -d --no-build
+git checkout v<versión-anterior>
+PORTFOLIO_VERSION=<versión-anterior> docker compose up -d --no-build
 ```
 
 **Si lo subía** — los datos ya están migrados, así que hay que restaurar también el fichero. Antes de migrar, la aplicación deja una copia identificable y **fuera de la rotación de backups**:
@@ -283,8 +283,8 @@ data/backups/<portfolio>_pre-esquema-1-a-2_2026-08-25_193000.db
 docker compose down
 cp data/backups/principal_pre-esquema-1-a-2_*.db data/portfolios/principal.db
 rm -f data/portfolios/principal.db-wal data/portfolios/principal.db-shm
-git checkout v1.1.0
-PORTFOLIO_VERSION=1.1.0 docker compose up -d --no-build
+git checkout v<versión-anterior>
+PORTFOLIO_VERSION=<versión-anterior> docker compose up -d --no-build
 ```
 
 > Los `-wal` y `-shm` hay que borrarlos: un WAL de la versión nueva reaplicado sobre la base restaurada la corrompería.

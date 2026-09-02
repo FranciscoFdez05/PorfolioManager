@@ -18,6 +18,7 @@ from admin.portfolios_manager import init_portfolios
 from core import csp, paths, seguridad_app, settings
 from core.errors import register_error_handlers
 from core.paths import API_DIR, BASE_DIR, INDEX_FILE
+from core.version import insertar_version
 from routes.activos import activos_bp
 from routes.ajustes import ajustes_bp
 from routes.auth import auth_bp
@@ -165,6 +166,9 @@ def serveIndex():
     # cambia el número de lecturas de disco.
     g.csp_nonce = csp.generar_nonce()
     html = csp.insertar_nonce(INDEX_FILE.read_text("utf-8"), g.csp_nonce)
+    # La versión se inyecta aquí por lo mismo que el nonce: la plantilla es un
+    # fichero estático y este es el único punto por el que pasa antes de salir.
+    html = insertar_version(html)
     response = make_response(html)
     response.headers["Content-Type"] = "text/html; charset=utf-8"
     response.headers["Cache-Control"] = "no-store"

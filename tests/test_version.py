@@ -38,6 +38,27 @@ def test_package_json_declara_la_misma_version():
     assert datos["version"] == __version__
 
 
+def test_la_plantilla_lleva_el_marcador_de_version():
+    """index.html se sirve tal cual salvo por dos sustituciones: el nonce de CSP
+    y la versión. Si alguien quita el marcador, la interfaz deja de decir qué
+    versión está corriendo y nadie se entera hasta que hace falta saberlo."""
+    from core.version import MARCADOR_VERSION
+
+    index = (RAIZ / "index.html").read_text("utf-8")
+
+    assert index.count(MARCADOR_VERSION) == 1, (
+        f"index.html debe llevar exactamente un {MARCADOR_VERSION}"
+    )
+
+
+def test_la_version_sustituye_al_marcador():
+    from core.version import MARCADOR_VERSION, insertar_version
+
+    resultado = insertar_version(f'<span class="appVersion">{MARCADOR_VERSION}</span>')
+
+    assert resultado == f'<span class="appVersion">{__version__}</span>'
+
+
 def test_el_badge_del_readme_declara_la_misma_version():
     """El badge del README es lo primero que se ve del proyecto.
 

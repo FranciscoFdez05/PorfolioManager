@@ -22,6 +22,24 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.2.0] — 2026-09-02
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 3, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+### Añadido
+
+- **La versión se ve en la interfaz**, al final de la barra de pestañas, en
+  pequeño y apagada. Saber qué hay desplegado obligaba a abrir `/api/health` o a
+  mirar el log del contenedor, justo cuando uno quiere confirmar de un vistazo
+  que la actualización ha entrado. La sustituye el servidor al servir la página,
+  igual que el nonce de CSP: sin una petición extra en cada carga y sin el hueco
+  visible mientras llegaba la respuesta.
+
+[1.2.0]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.2.0
+
+---
+
 ## [1.1.1] — 2026-09-02
 
 Correcciones de la ejecución en Docker sobre Linux. En el equipo de desarrollo

@@ -234,6 +234,12 @@
                 <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores">👁</button>
 
             </div>
+
+            <!-- Versión en curso. El marcador lo sustituye el servidor al
+                 servir la página (core/version.py), igual que el nonce de CSP:
+                 así se sabe qué hay desplegado sin abrir /api/health y sin
+                 gastar una petición más en cada carga. -->
+            <span class="appVersion" id="appVersion" title="Versión de PorfolioManager">__APP_VERSION__</span>
         </nav>
 
         <main class="mainContent" id="mainContent">

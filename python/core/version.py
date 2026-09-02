@@ -21,9 +21,23 @@ sino datos de usuario y un despliegue que se actualiza en sitio):
 * **PARCHE** — correcciones. No toca el esquema.
 
 Al subir la versión hay que tocar, en el mismo commit: este fichero,
-`pyproject.toml`, `package.json` y `CHANGELOG.md`. El test falla si falta alguno.
+`pyproject.toml`, `package.json`, el badge del `README.md` y `CHANGELOG.md`. El
+test falla si falta alguno.
 """
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 
-__all__ = ["__version__"]
+# La plantilla `index.html` lleva este marcador donde va la versión, y lo
+# sustituye el servidor al servirla. Se hace así, y no con una petición del
+# navegador a /api/health, porque la versión no cambia mientras la página está
+# abierta: pedirla aparte sería una llamada más en cada carga y un hueco visible
+# hasta que llegara la respuesta.
+MARCADOR_VERSION = "__APP_VERSION__"
+
+
+def insertar_version(html: str) -> str:
+    """Sustituye el marcador de la plantilla por la versión en curso."""
+    return html.replace(MARCADOR_VERSION, __version__)
+
+
+__all__ = ["MARCADOR_VERSION", "__version__", "insertar_version"]
