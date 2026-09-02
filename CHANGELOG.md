@@ -102,6 +102,20 @@ esta actualización es volver a la imagen anterior, sin tocar los datos.
   Docker como `root` y ni el contenedor ni tú podéis escribir en ellos.
 - `docker-update.sh` rechaza ejecutarse con `sudo`, igual que ya hacía
   `docker-up.sh`: con `sudo`, los datos acabarían siendo de `root`.
+- `docker-update.sh` se reejecuta desde una copia en `/tmp`. Se actualiza a sí
+  mismo: el `git pull` reemplaza el fichero que `sh` está leyendo y, con un
+  tamaño distinto, las órdenes que quedaban por leer se descolocaban a mitad de
+  la actualización.
+- `docker-up.sh` etiqueta la imagen con la versión desde la primera
+  instalación, no solo como `latest`. Sin eso, la primera actualización no
+  tenía imagen anterior a la que volver si algo fallaba.
+- `appuser` tiene directorio personal. `gosu` fija `HOME` leyendo
+  `/etc/passwd`, y gunicorn 26 dejaba un `Control server error: Permission
+  denied: '/home/appuser'` en cada arranque: un ERROR en el log que no lo era.
+- El README anunciaba la 1.0.0 con el código en la 1.1.1. Puesto al día, con un
+  test que ata el badge a `core/version.py` —como los que ya existían para
+  `pyproject.toml`, `package.json` y este fichero— y una sección nueva para
+  reinstalar desde cero.
 
 [1.1.1]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.1.1
 

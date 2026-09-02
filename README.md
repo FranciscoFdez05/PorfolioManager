@@ -213,6 +213,43 @@ Hace la actualización entera y la comprueba:
 
 Con `--sin-pull` se salta el paso 2, para cuando ya has traído el código a mano.
 
+Ejecútalo **con tu usuario, sin `sudo`** (lo rechaza si lo intentas): con `sudo`, el `git pull` y los datos quedarían a nombre de `root` y el siguiente arranque normal ya no podría escribir en ellos.
+
+### Si el `git pull` falla con «Permission denied»
+
+```
+fatal: Unable to create temporary file '.../.git/objects/pack/tmp_pack_XXXXXX': Permission denied
+```
+
+No es un problema de red —los objetos ya se han descargado—, sino de que algo se ejecutó con `sudo` en su día y dejó parte de `.git/` a nombre de `root`. Se arregla una vez:
+
+```bash
+sudo chown -R "$(id -un):$(id -gn)" .
+```
+
+### Empezar de cero
+
+Para reinstalar sin arrastrar nada (un despliegue de pruebas, o una instalación que quedó con los permisos revueltos). **Se lleva por delante los datos**, así que si hay algo que conservar, cópialo antes: `.env`, `data/` y `API/`.
+
+```bash
+cd ~/dockers/PorfolioManager
+docker compose down                      # para el contenedor
+docker rm -f PorfolioManager 2>/dev/null # por si quedara suelto
+docker image rm $(docker images -q porfoliomanager) 2>/dev/null
+
+cd ..
+sudo chown -R "$(id -un):$(id -gn)" PorfolioManager   # para poder borrarlo
+rm -rf PorfolioManager
+
+git clone https://github.com/FranciscoFdez05/PorfolioManager.git
+cd PorfolioManager
+./docker-setup
+```
+
+`docker-setup` vuelve a pedir usuario y contraseña, genera una `SECRET_KEY` nueva y deja el stack en marcha. A partir de ahí, las actualizaciones son `./docker-update.sh`.
+
+> Con una `SECRET_KEY` nueva, las claves de API de un `API/` antiguo ya no se pueden descifrar: si reaprovechas ese directorio, copia también el `.env` viejo, o vuelve a introducir las claves desde Ajustes.
+
 ### Qué versión estoy corriendo
 
 ```bash

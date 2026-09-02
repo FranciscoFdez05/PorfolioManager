@@ -248,7 +248,17 @@ PUID=$(id -u)
 PGID=$(id -g)
 export PUID PGID
 
-# ── 6. Arranque ───────────────────────────────────────────────────────────────
+# ── 6. Versión de la imagen ───────────────────────────────────────────────────
+# La imagen se etiqueta con la versión desde la primera instalación, no solo
+# como `latest`. Sin esto, la primera actualización no tenía a dónde volver: si
+# la versión nueva no arrancaba, docker-update.sh buscaba la imagen anterior
+# etiquetada y solo encontraba `latest`, que para entonces ya era la nueva.
+# Misma línea que usa docker-update.sh, para que no puedan discrepar.
+PORTFOLIO_VERSION=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' python/core/version.py | head -n 1)
+[ -n "$PORTFOLIO_VERSION" ] || PORTFOLIO_VERSION=latest
+export PORTFOLIO_VERSION
+
+# ── 7. Arranque ───────────────────────────────────────────────────────────────
 docker compose up -d --build "$@"
 
 # `up -d` termina cuando crea el contenedor, no cuando la aplicación puede
@@ -291,6 +301,9 @@ LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 [ -n "$LAN_IP" ] || LAN_IP="<IP_DEL_SERVIDOR>"
 
 echo
-echo "PorfolioManager levantado:"
+echo "PorfolioManager $PORTFOLIO_VERSION levantado:"
 echo "  Esta máquina : http://localhost:$PORT"
 echo "  Red local    : http://$LAN_IP:$PORT"
+echo "  Escribe como : uid $PUID, gid $PGID"
+echo
+echo "Para actualizar más adelante: ./docker-update.sh"
