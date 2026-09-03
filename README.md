@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.3.0-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.3.1-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 
@@ -346,6 +346,20 @@ EODHD_API_KEYS=CLAVE1,CLAVE2
 Las claves se rotan en round-robin entre peticiones, distribuyendo la carga.
 
 Sin ningún archivo de clave la aplicación funciona igualmente; solo no obtendrá cotizaciones en tiempo real de los proveedores que lo requieren.
+
+### Estado de los proveedores
+
+**Ajustes › API › Estado de las APIs** comprueba cada proveedor con una cotización de prueba y distingue los casos que se confunden cuando los precios dejan de actualizarse:
+
+| Estado | Qué significa | Qué hacer |
+|---|---|---|
+| **Operativa** | Responde y devuelve datos. | — |
+| **Sin clave** | No hay clave configurada; no se llega a llamar. | Añadirla arriba, en Claves API. |
+| **Clave rechazada** | El proveedor devuelve 401/403. | La clave caducó o está mal copiada. |
+| **Cuota agotada** | 429/402, o el aviso de Alpha Vantage dentro de un 200. | Esperar al reinicio diario o añadir otra clave. |
+| **No responde / Caída** | Timeout, corte de red o 5xx. | No es cosa de la instalación. |
+
+La comprobación consume cuota real, así que el resultado se guarda un minuto y la pantalla indica de cuándo es. «Comprobar ahora» fuerza un sondeo nuevo.
 
 ### Cifrado en reposo
 

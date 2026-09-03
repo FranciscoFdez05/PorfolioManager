@@ -22,6 +22,54 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.3.1] — 2026-09-03
+
+Ajustes gana un panel que dice **si los proveedores de cotizaciones responden**.
+Cuando un activo se queda con el precio de ayer, el sidebar lo apaga pero no
+explica por qué: hasta ahora había que abrir los logs del contenedor para saber
+si se había agotado la cuota, si la clave ya no valía o si el servicio estaba
+caído.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+### Añadido
+
+- **Estado de las APIs**, en Ajustes › API, encima del contador de peticiones.
+  Una fila por proveedor —Finnhub, EODHD, Alpha Vantage, Yahoo Finance y el tipo
+  de cambio— con lo que hay que hacer en cada caso, que es lo que el contador de
+  llamadas no podía decir: **Operativa** (con el tiempo de respuesta al lado,
+  que es lo que distingue «va bien» de «va bien pero tarda cuatro segundos»),
+  **Sin clave**, **Clave rechazada**, **Cuota agotada** o **No responde**. El
+  código HTTP concreto queda en el título de la fila.
+
+  Cuota agotada y clave rechazada salen en ámbar y no en rojo a propósito: el
+  servicio responde, es la cuenta la que no da más, y es lo único de los cinco
+  casos que se arregla desde esta misma pantalla.
+
+  Alpha Vantage necesita mirar el cuerpo de la respuesta: devuelve **200 con una
+  nota** cuando se acaba el límite diario, así que juzgando por el código HTTP
+  saldría «Operativa» justo en el caso que este panel existe para detectar.
+
+  Los cinco se comprueban a la vez, con seis segundos de espera: en serie serían
+  cinco timeouts encadenados —medio minuto largo con todo caído— y aquí hay
+  alguien mirando la pantalla.
+
+  **El sondeo gasta cuota de verdad**, así que cuenta en «Peticiones API hoy» y
+  el resultado se guarda un minuto: refrescar en bucle no puede acabar siendo el
+  motivo de que se agote la cuota. Por eso el panel dice de cuándo es el dato en
+  vez de fingir que se acaba de comprobar, y solo «Comprobar ahora» fuerza una
+  comprobación nueva. Sin clave configurada no se llama al proveedor: sería
+  gastar una petición para obtener un 401 previsible, que además se leería como
+  «clave rechazada» cuando lo que hay es un hueco.
+
+  El endpoint (`GET /api/stats/api-estado`) exige sesión como el resto: sondear
+  sin ella sería una forma gratuita de gastarle la cuota a otro.
+
+[1.3.1]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.3.1
+
+---
+
 ## [1.3.0] — 2026-09-03
 
 La pantalla de **Mensualidades** deja de mentir sobre lo que cuestan las

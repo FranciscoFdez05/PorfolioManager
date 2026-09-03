@@ -14,6 +14,7 @@ from core.errors import registrarFalloEscritura
 from core.escritura import escribirJsonAtomico, temporalPara
 from core.paths import AJUSTES_JSON as _AJUSTES_JSON, API_DIR as _API_DIR, JSON_DIR
 from core.secret_store import read_secret_lines, write_secret_lines
+from providers import estado as estado_proveedores
 from providers.api_stats import get_today_stats
 
 log = logging.getLogger(__name__)
@@ -242,6 +243,22 @@ def append_api_key():
 @ajustes_bp.route("/api/stats/api-calls", methods=["GET"])
 def get_api_call_stats():
     return jsonify({"ok": True, **get_today_stats()})
+
+
+@ajustes_bp.route("/api/stats/api-estado", methods=["GET"])
+def get_api_estado():
+    """Estado de cada proveedor: operativo, sin clave, sin cuota o caído.
+
+    `?forzar=1` salta la caché. Se deja fuera de la comprobación automática
+    porque cada sondeo gasta cuota real: la pantalla pide el estado cacheado y
+    solo se fuerza cuando el usuario lo pide a mano.
+    """
+    forzar = str(request.args.get("forzar", "")).strip().lower() in ("1", "true", "si", "sí")
+    try:
+        return jsonify({"ok": True, **estado_proveedores.obtener(forzar=forzar)})
+    except Exception as error:
+        log.warning("No se pudo comprobar el estado de los proveedores: %s", error)
+        return jsonify({"ok": False, "error": str(error)[:200]}), 500
 
 
 @ajustes_bp.route("/api/settings", methods=["POST"])

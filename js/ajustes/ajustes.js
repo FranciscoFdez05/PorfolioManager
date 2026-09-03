@@ -1045,6 +1045,85 @@ async function initAjustesLogic() {
     }
     loadApiStats()
 
+    // --- Estado de las APIs ---
+    // El sondeo consume cuota de los proveedores, así que la carga normal se
+    // conforma con lo que el servidor tenga cacheado; solo el botón fuerza una
+    // comprobación nueva.
+    const apiEstadoListEl = document.getElementById("ajustesApiEstadoList")
+    const refreshApiEstadoBtn = document.getElementById("ajustesRefreshApiEstadoBtn")
+    const apiEstadoMsg = document.getElementById("ajustesApiEstadoMsg")
+
+    async function loadApiEstado(forzar = false) {
+        if (!apiEstadoListEl) return
+        if (refreshApiEstadoBtn) refreshApiEstadoBtn.disabled = true
+        if (forzar) showMsg(apiEstadoMsg, "Comprobando…", "")
+        try {
+            const res = await fetch(`/api/stats/api-estado${forzar ? "?forzar=1" : ""}`)
+            const data = await res.json()
+            if (!data.ok) throw new Error(data.error || "")
+            renderApiEstado(data)
+            if (forzar) showMsg(apiEstadoMsg, "Comprobado", "ok")
+        } catch {
+            apiEstadoListEl.innerHTML = '<span class="ajustesBackupEmpty">No se pudo comprobar el estado</span>'
+            if (forzar) showMsg(apiEstadoMsg, "Error al comprobar", "error")
+        } finally {
+            if (refreshApiEstadoBtn) refreshApiEstadoBtn.disabled = false
+        }
+    }
+
+    function _edadTexto(segundos) {
+        if (!Number.isFinite(segundos) || segundos <= 1) return "ahora mismo"
+        if (segundos < 60) return `hace ${segundos} s`
+        const minutos = Math.round(segundos / 60)
+        return `hace ${minutos} min`
+    }
+
+    function renderApiEstado(data) {
+        const proveedores = data.proveedores || []
+        apiEstadoListEl.innerHTML = ""
+        if (!proveedores.length) {
+            apiEstadoListEl.innerHTML = '<span class="ajustesBackupEmpty">Sin proveedores configurados</span>'
+            return
+        }
+        proveedores.forEach((p) => {
+            const row = document.createElement("div")
+            row.className = "ajustesApiEstadoRow"
+            // El detalle (HTTP 429, motivo del corte…) va en el title: en la
+            // fila solo cabe la etiqueta, pero al diagnosticar hace falta.
+            if (p.detalle) row.title = p.detalle
+
+            const nombre = document.createElement("span")
+            nombre.className = "ajustesApiEstadoProvider"
+            nombre.textContent = p.nombre
+
+            const badge = document.createElement("span")
+            badge.className = `ajustesApiEstadoBadge ${p.estado || "error"}`
+            badge.textContent = p.etiqueta || p.estado || "—"
+
+            row.appendChild(nombre)
+            // Los milisegundos son la diferencia entre "va bien" y "va bien
+            // pero tarda cuatro segundos", que es lo que precede a una caída.
+            if (p.estado === "ok" && p.ms) {
+                const ms = document.createElement("span")
+                ms.className = "ajustesApiEstadoMs"
+                ms.textContent = `${p.ms} ms`
+                row.appendChild(ms)
+            }
+            row.appendChild(badge)
+            apiEstadoListEl.appendChild(row)
+        })
+
+        const pie = document.createElement("div")
+        pie.className = "ajustesApiEstadoPie"
+        pie.textContent = `Comprobado ${_edadTexto(data.edadSegundos)}`
+        apiEstadoListEl.appendChild(pie)
+    }
+
+    if (refreshApiEstadoBtn) {
+        refreshApiEstadoBtn.addEventListener("click", () => loadApiEstado(true))
+    }
+    loadApiEstado()
+
     // --- Cambiar nombre de usuario ---
     const credUserCurrentPwd = document.getElementById("ajustesCredUserCurrentPwd")
     const credNewUser = document.getElementById("ajustesCredNewUser")
