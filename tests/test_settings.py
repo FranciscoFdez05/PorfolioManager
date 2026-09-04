@@ -155,6 +155,46 @@ def test_avisa_del_modo_debug(config):
     assert any("debug" in aviso for aviso in settings.validar())
 
 
+# ── TLS y proxy inverso ───────────────────────────────────────────────────────
+
+def test_avisa_de_https_sin_proxy(config):
+    """La app no termina TLS: con https_activado hay un proxy, y hay que decirlo.
+
+    Sin proxy_saltos, la IP de todas las peticiones sería la del proxy, y con
+    ella se cuentan el límite de escrituras y el bloqueo por intentos de login.
+    """
+    config("[server]\nhttps_activado = true\nproxy_saltos = 0\n")
+    assert any("proxy_saltos" in aviso for aviso in settings.validar())
+
+
+def test_avisa_de_proxy_sin_https(config):
+    """Al revés: hay proxy declarado, pero la cookie sale sin Secure."""
+    config("[server]\nhttps_activado = false\nproxy_saltos = 1\n")
+    assert any("Secure" in aviso for aviso in settings.validar())
+
+
+def test_https_con_proxy_no_genera_avisos(config):
+    config("[server]\nhttps_activado = true\nproxy_saltos = 1\n")
+    assert settings.validar() == []
+
+
+def test_el_aviso_de_http_plano_esta_fuera_de_validar(config):
+    """Servir por HTTP es el defecto, no un error de configuración.
+
+    Si estuviera en validar(), el config.ini que se distribuye no pasaría su
+    propia validación. El recordatorio vive en core/tls.py, que es quien sabe si
+    el HTTPS está encendido desde Ajustes, y sale en el log de arranque.
+    """
+    config("[server]\nhttps_activado = false\n")
+    assert settings.validar() == []
+
+
+def test_proxy_saltos_se_acota_por_abajo(config):
+    """Un valor raro aquí decide de quién se fía la app: se recorta al mínimo."""
+    config("[server]\nproxy_saltos = -1\n")
+    assert settings.proxySaltos() == 0
+
+
 # ── Diagnóstico ───────────────────────────────────────────────────────────────
 
 def test_el_diagnostico_indica_el_origen_de_cada_valor(config, monkeypatch):

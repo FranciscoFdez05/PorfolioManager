@@ -113,6 +113,8 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("server", "cookie_samesite", OPCION, "Lax", env="COOKIE_SAMESITE",
            permitidos=("Lax", "Strict", "None"),
            descripcion="SameSite de la cookie de sesión. 'None' exige https_activado."),
+    Ajuste("server", "proxy_saltos", ENTERO, 0, env="PROXY_FIX_HOPS", minimo=0, maximo=10,
+           descripcion="Proxies inversos de confianza delante. 0 = ninguno; con Caddy, 1."),
     Ajuste("server", "max_cuerpo_mb", ENTERO, 5, env="MAX_CUERPO_MB", minimo=1, maximo=1024,
            descripcion="Tamaño máximo de una petición normal, en MB."),
     Ajuste("server", "max_subida_mb", ENTERO, 256, env="MAX_SUBIDA_MB", minimo=1, maximo=4096,
@@ -295,6 +297,17 @@ def cookieSameSite() -> str:
         return "Lax"
 
     return valor
+
+
+def proxySaltos() -> int:
+    """Cuántos proxies inversos de confianza hay delante de la aplicación.
+
+    Es el número de saltos que ProxyFix debe descontar de las cabeceras
+    `X-Forwarded-*`. Con 0 (el defecto, sin proxy) el middleware no se instala y
+    esas cabeceras se ignoran, que es lo correcto cuando cualquiera puede
+    inventárselas conectando directamente al puerto de gunicorn.
+    """
+    return obtener("server.proxy_saltos")
 
 
 def maxCuerpoBytes() -> int:
@@ -510,6 +523,27 @@ def validar() -> list[str]:
 
     if obtener("server.debug"):
         avisos.append("[server] debug = true: no lo dejes activado en producción")
+
+    # ── TLS y proxy inverso ───────────────────────────────────────────────────
+    # La aplicación nunca termina TLS por sí misma: si hay HTTPS, lo pone un
+    # proxy delante. De ahí que estos dos ajustes casi siempre vayan juntos y
+    # que cada combinación suelta signifique un despliegue a medio configurar.
+    https = obtener("server.https_activado")
+    saltos = obtener("server.proxy_saltos")
+
+    if https and not saltos:
+        avisos.append(
+            "[server] https_activado = true con proxy_saltos = 0: el TLS lo termina "
+            "un proxy, así que sin proxy_saltos la IP registrada en el log, en el "
+            "límite de escrituras y en el bloqueo de login será la del proxy para "
+            "todas las peticiones"
+        )
+
+    if saltos and not https:
+        avisos.append(
+            "[server] proxy_saltos > 0 con https_activado = false: la cookie de "
+            "sesión sale sin Secure, así que puede acabar viajando en claro"
+        )
 
     return avisos
 

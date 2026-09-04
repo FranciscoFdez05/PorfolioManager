@@ -295,15 +295,46 @@ if [ "$INTENTOS" -eq 0 ]; then
     exit 1
 fi
 
+# El proxy no entra en el bucle de arriba porque su fallo típico no es tardar,
+# sino no arrancar. Y ahora es la puerta de entrada: sin él no se llega a la
+# aplicación, que ya no publica su puerto. Comprobarlo aquí evita terminar
+# anunciando una URL que no responde.
+CADDY=$(docker compose ps -q caddy)
+ESTADO_CADDY=$(docker inspect --format '{{.State.Status}}' "$CADDY" 2>/dev/null || echo ausente)
+if [ "$ESTADO_CADDY" != "running" ]; then
+    echo "ERROR: el proxy no está en marcha (estado: $ESTADO_CADDY)." >&2
+    echo "       Es quien publica el puerto $PORT: sin él no hay forma de entrar." >&2
+    echo "       Lo más común es que ese puerto ya esté ocupado en el host." >&2
+    docker compose logs --tail=50 caddy >&2 || true
+    exit 1
+fi
+
 # IP de la LAN, para no tener que buscarla a mano en el servidor.
 LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 [ -n "$LAN_IP" ] || LAN_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
 [ -n "$LAN_IP" ] || LAN_IP="<IP_DEL_SERVIDOR>"
 
+# El esquema sale del estado que guarda Ajustes, no de una variable: el HTTPS se
+# enciende desde la interfaz y este script no tiene por qué saber nada más.
+ESQUEMA=http
+if grep -q '"activado"[[:space:]]*:[[:space:]]*true' data/tls/estado.json 2>/dev/null; then
+    ESQUEMA=https
+fi
+
 echo
 echo "PorfolioManager $PORTFOLIO_VERSION levantado:"
-echo "  Esta máquina : http://localhost:$PORT"
-echo "  Red local    : http://$LAN_IP:$PORT"
+echo "  Esta máquina : $ESQUEMA://localhost:$PORT"
+echo "  Red local    : $ESQUEMA://$LAN_IP:$PORT"
 echo "  Escribe como : uid $PUID, gid $PGID"
+echo
+if [ "$ESQUEMA" = "http" ]; then
+    echo "Sin HTTPS: la contraseña y la cookie de sesión viajan en claro por la red."
+    echo "Se activa desde la propia aplicación, en Ajustes › HTTPS: genera el"
+    echo "certificado y te lo da para instalarlo en el móvil y en el portátil."
+    echo "La dirección no cambia, solo pasa a ser https://"
+else
+    echo "HTTPS activo. Si un aparato aún avisa del certificado, es que le falta"
+    echo "la CA: descárgala desde Ajustes › HTTPS e instálala en él."
+fi
 echo
 echo "Para actualizar más adelante: ./docker-update.sh"

@@ -996,3 +996,118 @@
     font-variant-numeric: tabular-nums;
     color: var(--text-main);
 }
+
+/* ── HTTPS ────────────────────────────────────────────────────────────────────
+   Panel de Ajustes › HTTPS. Los estados se distinguen por color porque es la
+   única sección donde el estado actual decide qué se puede hacer: activado,
+   desactivado o el proxy sin responder (y entonces no hay nada que pulsar). */
+.ajustesSection > .ajustesTlsEstado {
+    padding: 12px 24px 0;
+}
+
+.ajustesTlsEstado {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-subtle);
+}
+
+.ajustesTlsPunto {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: var(--text-dim);
+}
+.ajustesTlsEstado.on .ajustesTlsPunto {
+    background: var(--color-pos);
+    box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.18);
+}
+.ajustesTlsEstado.off .ajustesTlsPunto {
+    background: #f0a020;
+    box-shadow: 0 0 0 3px rgba(240, 160, 32, 0.16);
+}
+.ajustesTlsEstado.roto .ajustesTlsPunto {
+    background: var(--color-neg);
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.18);
+}
+
+.ajustesTlsEstadoTexto strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.ajustesFieldHint {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+.ajustesFieldHint strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+
+.ajustesSection > .ajustesTlsCa {
+    padding: 0 24px 16px;
+}
+
+.ajustesTlsCaTexto {
+    padding-top: 12px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-muted);
+}
+.ajustesTlsCaTexto strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+
+.ajustesTlsAyuda {
+    margin-top: 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg-inset);
+}
+
+.ajustesTlsAyuda > summary {
+    padding: 9px 12px;
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--text-subtle);
+    user-select: none;
+}
+.ajustesTlsAyuda > summary:hover {
+    color: var(--text-primary);
+}
+
+.ajustesTlsAyudaCuerpo {
+    padding: 0 12px 10px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+.ajustesTlsAyudaCuerpo p {
+    margin: 0 0 8px;
+}
+.ajustesTlsAyudaCuerpo p:last-child {
+    margin-bottom: 0;
+}
+.ajustesTlsAyudaCuerpo strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+
+/* El aviso de que la página se va a recargar en https:// ocupa toda la fila:
+   es lo único que hay que leer antes de que cambie la dirección. */
+.ajustesTlsSaltando {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg-inset);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-subtle);
+}

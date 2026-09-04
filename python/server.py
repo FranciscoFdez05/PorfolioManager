@@ -15,7 +15,7 @@ from flask import Flask, abort, g, make_response, send_from_directory
 from admin import snapshot_scheduler
 from admin.backup_manager import start_scheduler as start_backup_scheduler
 from admin.portfolios_manager import init_portfolios
-from core import csp, paths, seguridad_app, settings
+from core import csp, paths, seguridad_app, settings, tls
 from core.errors import register_error_handlers
 from core.paths import API_DIR, BASE_DIR, INDEX_FILE
 from core.version import insertar_version
@@ -34,6 +34,7 @@ from routes.portfolios import portfolios_bp
 from routes.registros import registros_bp
 from routes.salud import salud_bp
 from routes.snapshots import snapshots_bp
+from routes.tls import tls_bp
 from routes.trading import trading_bp
 from routes.ventas import ventas_bp
 from stores.app_data import ensureDataFile
@@ -114,6 +115,11 @@ if not _secret_key:
     _secret_key = secrets.token_hex(32)
 app.secret_key = _secret_key
 
+# Con un proxy inverso delante (el Caddy del perfil `https`), la conexión que ve
+# gunicorn sale siempre del proxy. El detalle está en core/seguridad_app.py,
+# junto al resto de la capa de seguridad y al alcance de los tests.
+seguridad_app.aplicar_proxy_inverso(app)
+
 # Límite general (por defecto 5 MB) para no agotar memoria. Los endpoints de
 # importación y restauración necesitan más: un export JSON completo del
 # portfolio ya ronda los 25 MB, así que con el tope general aplicado a todo era
@@ -143,6 +149,7 @@ app.register_blueprint(trading_bp)
 app.register_blueprint(registros_bp)
 app.register_blueprint(salud_bp)
 app.register_blueprint(snapshots_bp)
+app.register_blueprint(tls_bp)
 app.register_blueprint(ventas_bp)
 
 # CSRF, tope de cuerpo, límite de escrituras, sesión y cabeceras de respuesta.
@@ -242,6 +249,16 @@ start_backup_scheduler()
 # solo existía mientras hubiera una pestaña abierta. Este hilo lo guarda desde
 # el servidor; con varios workers, el primero que reclama el hueco lo escribe.
 snapshot_scheduler.iniciar()
+
+# Reaplica en el proxy el estado de HTTPS guardado desde Ajustes. Va al final
+# porque no condiciona nada de lo anterior, y no aborta si el proxy no responde:
+# la aplicación tiene que poder arrancar para que haya una interfaz desde la que
+# arreglarlo. El detalle, en core/tls.py.
+tls.converger()
+
+_aviso_tls = tls.avisoSinHttps()
+if _aviso_tls:
+    logging.warning("[tls] %s", _aviso_tls)
 
 if __name__ == "__main__":
     # Servidor de desarrollo. En Docker manda gunicorn (ver entrypoint.sh), que

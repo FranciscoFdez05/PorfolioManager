@@ -180,10 +180,21 @@ docker compose up -d
 # esperar aquí distingue «el contenedor está arriba» de «la aplicación funciona».
 paso "Esperando a que responda (hasta ${ESPERA_SALUD}s)"
 
+# Se prueban los dos esquemas porque el puerto es el mismo en ambos casos: el
+# HTTPS se activa desde Ajustes y este script no sabe —ni tiene por qué saber—
+# en qué estado quedó. Comprobando solo `http://`, una instalación con HTTPS
+# activo daría siempre por fallida la actualización y volvería atrás sola.
+# La `-k` no baja la seguridad de nada: es una llamada a localhost contra un
+# certificado emitido por la CA interna, que curl no tiene por qué conocer.
+salud() {
+    curl -fsSk "https://localhost:${PORT}/api/health" 2>/dev/null \
+        || curl -fsS "http://localhost:${PORT}/api/health" 2>/dev/null
+}
+
 sano=0
 i=0
 while [ "$i" -lt "$ESPERA_SALUD" ]; do
-    if curl -fsS "http://localhost:${PORT}/api/health" >/dev/null 2>&1; then
+    if salud >/dev/null 2>&1; then
         sano=1
         break
     fi
@@ -195,7 +206,7 @@ printf '\n'
 
 if [ "$sano" -eq 1 ]; then
     paso "Actualización correcta"
-    curl -fsS "http://localhost:${PORT}/api/health" 2>/dev/null || true
+    salud || true
     printf '\n\nVersión %s en marcha en el puerto %s.\n' "$VERSION_NUEVA" "$PORT"
     exit 0
 fi

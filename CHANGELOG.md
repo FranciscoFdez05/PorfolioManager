@@ -22,6 +22,116 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.4.0] — 2026-09-04
+
+**HTTPS, y se enciende desde Ajustes.** Hasta aquí la aplicación solo hablaba
+HTTP: el `POST /login` llevaba la contraseña en el cuerpo y la respuesta
+devolvía la cookie de sesión, las dos en texto plano. Quien compartiera la wifi,
+el switch o el punto de acceso podía leerlas y entrar.
+
+Ahora es un interruptor en **Ajustes › HTTPS**: escribes los nombres y las IP por
+las que entras, pulsas *Activar*, y en ese mismo momento se emite el certificado
+y el puerto pasa a hablar solo TLS. Sin reiniciar nada, sin tocar ficheros, y
+**sin cambiar la dirección**: `http://192.168.1.50:5000` pasa a ser
+`https://192.168.1.50:5000`. Después, el panel te da el certificado de la CA
+para instalarlo en el móvil y en el portátil, con las instrucciones de cada
+sistema —incluido el paso de iOS que todo el mundo se salta, el de Ajustes ›
+General › Información › Ajustes de confianza de certificados—.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+### Añadido
+
+- **Ajustes › HTTPS**: estado actual, lista de nombres del certificado, activar,
+  desactivar y descargar la CA. Sugiere el nombre por el que has entrado, que
+  desde dentro de un contenedor es la única forma de saber por dónde te llega la
+  gente: es literalmente lo que tienes escrito en la barra del navegador.
+
+  Tras activarlo, la página salta sola a `https://`. Es necesario: el puerto es
+  el mismo y a partir de ese instante ya no atiende texto plano, así que
+  cualquier petición posterior fallaría sin explicar por qué. Y si la respuesta a
+  la propia activación se pierde —el proxy recarga con esa petición en vuelo—,
+  se salta igual en vez de decir «error de red», que sería mentir la mitad de las
+  veces.
+
+- **`core/tls.py`**: el estado (`data/tls/estado.json`), la generación de la
+  configuración del proxy y el cliente de su API de admin. Fuera de config.ini a
+  propósito: eso es configuración de despliegue, versionada y sobrescrita en cada
+  `git pull`, y esto es una decisión que el usuario toma desde la interfaz.
+
+- **`GET /api/tls/ca.crt`**, con `Content-Type: application/x-x509-ca-cert`, que
+  es lo que hace que iOS ofrezca instalarlo como perfil en vez de enseñarlo como
+  texto. Pide sesión: un certificado raíz es público, pero instalarlo es decidir
+  confiar en una autoridad para *todos* los sitios que visites, y servirlo sin
+  autenticar invita a que alguien enlace a él desde fuera.
+
+- **`Strict-Transport-Security`** en las respuestas, solo con el HTTPS activo.
+  Sin ella, tener TLS delante no evita que la primera visita del día salga por
+  HTTP y sea interceptable. Se emite únicamente con HTTPS porque puesta sobre una
+  instalación en claro dejaría el nombre del host inaccesible durante un año en
+  cada navegador que la hubiera visto, sin manera de retirarla desde el servidor.
+  Sin `includeSubDomains`: apagarles el HTTP a los demás subdominios sería una
+  sorpresa difícil de deshacer.
+
+- **`REMEMBER_COOKIE_SECURE`, `REMEMBER_COOKIE_HTTPONLY` y
+  `REMEMBER_COOKIE_SAMESITE`**, heredando la política de la cookie de sesión.
+  Hoy no los usa nada —no hay «recordarme»— pero los valores de fábrica de
+  Flask-Login son un año de duración, sin `Secure` y sin `SameSite`, y ese
+  descuido no se vería: la aplicación funcionaría igual, solo que con una cookie
+  de larga vida viajando en claro.
+
+- **`[server] proxy_saltos`** (env `PROXY_FIX_HOPS`), que instala `ProxyFix`.
+  Con un proxy delante, la conexión que ve Gunicorn sale siempre de él, así que
+  `request.remote_addr` valdría la IP del proxy en **todas** las peticiones. Y de
+  esa IP dependen el límite de escrituras, el bloqueo tras N intentos fallidos de
+  login y el filtro de red del Atajo de iOS: sin esto, un solo atacante agotaría
+  el cubo de todo el mundo y el bloqueo por intentos fallidos dejaría fuera a
+  cualquiera que llegase por el mismo proxy. En Docker lo fija
+  `docker-compose.yml` a 1; sin Docker no hay proxy y sigue en 0, que es lo
+  correcto: ahí las cabeceras `X-Forwarded-*` las pone quien quiera.
+
+- Aviso en el log de arranque cuando se sirve en claro, y avisos de configuración
+  para las dos combinaciones a medias: `https_activado` sin `proxy_saltos` (todas
+  las IP serían la del proxy) y `proxy_saltos` sin `https_activado` (la cookie
+  sale sin `Secure`).
+
+### Cambiado
+
+- **El stack pasa a ser dos contenedores.** Caddy va siempre levantado y es él
+  quien publica el puerto; la aplicación deja de publicarlo y solo se llega a
+  ella a través del proxy. Con el HTTPS apagado hace de simple pasarela en claro
+  y todo se comporta igual que antes.
+
+  Está delante y no dentro porque encender el TLS desde la interfaz exige
+  reconfigurar algo en caliente, y gunicorn lee el certificado al arrancar. Y no
+  se levanta bajo demanda porque arrancarlo desde la aplicación pedía montarle el
+  socket de Docker, que es root sobre el host: un agujero peor que el que esto
+  viene a tapar.
+
+  Que la aplicación no publique su puerto es parte de la protección: si siguiera
+  abierto en la LAN, bastaría escribirlo en la barra para saltarse el TLS.
+
+- `docker-update.sh` comprueba la salud por `https://` y por `http://`. El
+  puerto es el mismo en ambos casos y el script no sabe —ni tiene por qué saber—
+  en qué estado quedó el HTTPS; comprobando solo `http://`, una instalación con
+  HTTPS activo daría toda actualización por fallida y volvería atrás sola.
+
+- `localhost` y `127.0.0.1` entran siempre en el certificado, se escriban o no.
+  Por ahí pasan el healthcheck del contenedor y la comprobación de
+  `docker-update.sh`, y Caddy rechaza la conexión si el nombre no tiene sitio.
+
+- `docker-up.sh` comprueba que el proxy esté en marcha antes de anunciar la URL:
+  ahora es la puerta de entrada, y su fallo típico no es tardar sino no arrancar
+  porque el puerto ya está ocupado en el host.
+
+- El cableado de `ProxyFix` vive en `core/seguridad_app.py` y no en `server.py`,
+  por el mismo motivo que el resto de esa capa: la suite tiene prohibido importar
+  `server`, así que ahí no lo habría comprobado nadie. De qué IP se cree que
+  viene una petición lo decide todo lo demás.
+
+---
+
 ## [1.3.1] — 2026-09-03
 
 Ajustes gana un panel que dice **si los proveedores de cotizaciones responden**.

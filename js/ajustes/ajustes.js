@@ -1124,6 +1124,151 @@ async function initAjustesLogic() {
     }
     loadApiEstado()
 
+    // --- HTTPS ---
+    // Enciende y apaga el TLS del proxy que hay delante. El botón hace tres
+    // cosas seguidas —configurar el proxy, guardar el estado y cambiar la
+    // política de las cookies— y luego el navegador tiene que saltar a https://,
+    // porque el puerto es el mismo y a partir de ese momento ya no habla claro.
+    const tlsEstadoEl = document.getElementById("ajustesTlsEstado")
+    const tlsNombresEl = document.getElementById("ajustesTlsNombres")
+    const tlsActivarBtn = document.getElementById("ajustesTlsActivarBtn")
+    const tlsDesactivarBtn = document.getElementById("ajustesTlsDesactivarBtn")
+    const tlsCaEl = document.getElementById("ajustesTlsCa")
+    const tlsMsg = document.getElementById("ajustesTlsMsg")
+
+    function _pintarTls(data) {
+        if (!tlsEstadoEl) return
+
+        let clase = "off"
+        let texto = "<strong>Desactivado.</strong> La contraseña y la cookie de sesión viajan en claro."
+
+        if (!data.proxyDisponible) {
+            clase = "roto"
+            texto = "<strong>El proxy no responde.</strong> Comprueba que el contenedor <code>caddy</code> está en marcha; sin él no se puede activar el HTTPS."
+        } else if (data.gestionadoPorEntorno) {
+            clase = "on"
+            texto = "<strong>Activado por configuración del servidor</strong> (<code>HTTPS_ENABLED</code> en <code>.env</code>). Se cambia allí, no desde aquí."
+        } else if (data.activado) {
+            clase = "on"
+            const lista = (data.nombres || []).join(", ")
+            texto = `<strong>Activado</strong> para ${lista || "(sin nombres)"}.`
+        }
+
+        tlsEstadoEl.className = "ajustesTlsEstado " + clase
+        tlsEstadoEl.innerHTML =
+            '<span class="ajustesTlsPunto"></span><span class="ajustesTlsEstadoTexto">' + texto + "</span>"
+
+        // Sin proxy o con el HTTPS impuesto por .env no hay nada que pulsar:
+        // un botón que solo puede devolver un error es peor que ninguno.
+        const editable = data.proxyDisponible && !data.gestionadoPorEntorno
+        if (tlsNombresEl) {
+            tlsNombresEl.disabled = !editable
+            // Solo se rellena si el usuario no ha escrito nada: al recargar tras
+            // guardar, machacar lo que tenga a medias sería perder su trabajo.
+            if (!tlsNombresEl.value.trim()) {
+                const sugerencia = (data.nombres || []).length
+                    ? data.nombres.join(", ")
+                    : (data.nombreActual || location.hostname || "")
+                tlsNombresEl.value = sugerencia
+            }
+        }
+        if (tlsActivarBtn) {
+            tlsActivarBtn.style.display = editable && !data.activado ? "" : "none"
+            tlsActivarBtn.disabled = !editable
+        }
+        if (tlsDesactivarBtn) {
+            tlsDesactivarBtn.style.display = editable && data.activado ? "" : "none"
+        }
+        if (tlsCaEl) {
+            tlsCaEl.style.display = data.activado && data.proxyDisponible ? "" : "none"
+        }
+    }
+
+    async function loadTls() {
+        if (!tlsEstadoEl) return
+        try {
+            const res = await fetch("/api/tls")
+            const data = await res.json()
+            if (data.ok) _pintarTls(data)
+        } catch {
+            tlsEstadoEl.className = "ajustesTlsEstado roto"
+            tlsEstadoEl.innerHTML =
+                '<span class="ajustesTlsPunto"></span><span class="ajustesTlsEstadoTexto">No se ha podido consultar el estado.</span>'
+        }
+    }
+
+    // Tras activar, la página actual está en http:// y el servidor ya solo
+    // atiende TLS en ese mismo puerto: cualquier petición siguiente fallaría sin
+    // explicar por qué. Se avisa y se salta sola, dando margen para leerlo.
+    function _saltarAHttps(nombres) {
+        // Se mantiene el host por el que ha entrado si está entre los nombres
+        // del certificado; si no, se usa el primero, que sí lo está. Saltar a un
+        // nombre que no cubre el certificado daría un aviso evitable.
+        const actual = location.hostname
+        const destino = nombres.includes(actual) ? actual : nombres[0]
+        const url = `https://${destino}${location.port ? ":" + location.port : ""}${location.pathname}`
+
+        const aviso = document.createElement("div")
+        aviso.className = "ajustesTlsSaltando"
+        aviso.innerHTML =
+            `<strong>HTTPS activado.</strong> Esta página se va a recargar en <code>${url}</code>. ` +
+            "El navegador avisará del certificado hasta que instales la CA: descárgala desde este mismo panel y sigue las instrucciones."
+        tlsCaEl?.parentNode?.insertBefore(aviso, tlsCaEl)
+
+        setTimeout(() => { location.replace(url) }, 6000)
+    }
+
+    async function _guardarTls(activado) {
+        const nombres = (tlsNombresEl?.value || "")
+            .split(/[\n,;]+/)
+            .map(n => n.trim())
+            .filter(Boolean)
+
+        if (activado && !nombres.length) {
+            showMsg(tlsMsg, "Escribe al menos un nombre o IP", "error")
+            return
+        }
+
+        if (tlsActivarBtn) tlsActivarBtn.disabled = true
+        if (tlsDesactivarBtn) tlsDesactivarBtn.disabled = true
+        showMsg(tlsMsg, activado ? "Emitiendo certificado…" : "Desactivando…", "")
+
+        try {
+            const res = await fetch("/api/tls", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ activado, nombres })
+            })
+            const data = await res.json()
+            if (!data.ok) {
+                showMsg(tlsMsg, data.error || "No se ha podido aplicar", "error")
+                return
+            }
+            _pintarTls(data)
+            showMsg(tlsMsg, activado ? "HTTPS activado" : "HTTPS desactivado", "ok")
+            if (activado) _saltarAHttps(data.nombres)
+        } catch {
+            // Al activar, el proxy recarga su configuración mientras esta misma
+            // petición está en vuelo: es posible que haya funcionado y que la
+            // respuesta no llegue, porque el puerto ya solo habla TLS. Decir
+            // «error de red» sería mentir la mitad de las veces, así que se
+            // salta igualmente y que lo confirme el propio navegador.
+            if (activado) {
+                showMsg(tlsMsg, "Aplicado; comprobando por https…", "")
+                _saltarAHttps(nombres)
+            } else {
+                showMsg(tlsMsg, "Error de red", "error")
+            }
+        } finally {
+            if (tlsActivarBtn) tlsActivarBtn.disabled = false
+            if (tlsDesactivarBtn) tlsDesactivarBtn.disabled = false
+        }
+    }
+
+    if (tlsActivarBtn) tlsActivarBtn.addEventListener("click", () => _guardarTls(true))
+    if (tlsDesactivarBtn) tlsDesactivarBtn.addEventListener("click", () => _guardarTls(false))
+    loadTls()
+
     // --- Cambiar nombre de usuario ---
     const credUserCurrentPwd = document.getElementById("ajustesCredUserCurrentPwd")
     const credNewUser = document.getElementById("ajustesCredNewUser")

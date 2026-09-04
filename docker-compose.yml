@@ -17,6 +17,14 @@ services:
       # (leído de config.ini), para que el contenedor y el mapeo de
       # puertos de abajo nunca puedan desincronizarse.
       - PORT=${PORT:-5000}
+      # En Docker SIEMPRE hay un proxy delante (el servicio caddy de abajo), así
+      # que ProxyFix va activado aquí y no en config.ini: ese fichero lo comparte
+      # la instalación sin Docker, donde no hay ningún proxy y confiar en las
+      # cabeceras X-Forwarded-* sería regalar la suplantación de IP.
+      - PROXY_FIX_HOPS=${PROXY_FIX_HOPS:-1}
+      # Dirección de la API de admin del proxy dentro de la red de Compose. Es
+      # por donde Ajustes enciende y apaga el HTTPS.
+      - CADDY_ADMIN_URL=http://caddy:2019
       # Dentro del contenedor los datos viven siempre en estas rutas, que son
       # las que montan los volúmenes de abajo. Se fijan aquí para que un
       # [rutas] del config.ini pensado para el host (por ejemplo /srv/datos) no
@@ -34,8 +42,12 @@ services:
       # el usuario que lanza el stack. Rellénalos en .env solo si quieres otro.
       - PUID=${PUID:-}
       - PGID=${PGID:-}
-    ports:
-      - "${PORT:-5000}:${PORT:-5000}"
+    # Sin `ports`: a la aplicación solo se llega a través de Caddy, que publica
+    # el mismo puerto en el host. Publicarlo también aquí sería una segunda
+    # puerta en claro por la que saltarse el TLS escribiendo el puerto en la
+    # barra, con lo que tener el proxy delante no serviría de nada.
+    expose:
+      - "${PORT:-5000}"
     volumes:
       - ${PORTFOLIO_HOST_DATA_DIR:-./data}:/app/data
       - ${PORTFOLIO_HOST_LOGS_DIR:-./logs}:/app/logs
@@ -53,3 +65,51 @@ services:
       timeout: ${HEALTHCHECK_TIMEOUT:-10s}
       retries: ${HEALTHCHECK_RETRIES:-3}
       start_period: ${HEALTHCHECK_START_PERIOD:-15s}
+
+  # ── Proxy: es la puerta de entrada, con o sin HTTPS ─────────────────────────
+  # Siempre levantado, y siempre es él quien publica el puerto. Con el HTTPS
+  # apagado hace de simple pasarela en claro (el stack se comporta igual que
+  # antes de existir); al activarlo desde Ajustes, la aplicación le carga por su
+  # API de admin una configuración con `tls internal` y ese mismo puerto pasa a
+  # hablar solo TLS.
+  #
+  # Está aquí y no dentro de la aplicación porque encender el TLS desde la
+  # interfaz exige reconfigurar algo en caliente: gunicorn lee el certificado al
+  # arrancar. Y no se arranca bajo demanda porque hacerlo desde la aplicación
+  # pedía montarle el socket de Docker, que es root sobre el host.
+  caddy:
+    container_name: PorfolioManager-caddy
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - porfoliomanager
+    # --resume recupera la última configuración cargada por la API de admin, que
+    # Caddy guarda en /config. Sin esto, reiniciar el contenedor devolvería el
+    # proxy al Caddyfile de arranque —es decir, a servir en claro— mientras la
+    # aplicación sigue creyendo que hay HTTPS y emite cookies `Secure` que el
+    # navegador descarta: nadie podría iniciar sesión.
+    command: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile --resume
+    ports:
+      # El MISMO puerto de siempre. Activar el HTTPS no mueve la dirección: solo
+      # cambia el esquema, de http:// a https://.
+      - "${PORT:-5000}:${PORT:-5000}"
+    environment:
+      - PORT=${PORT:-5000}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # La CA interna y los certificados emitidos. Con un volumen anónimo, cada
+      # recreación del contenedor generaría una CA nueva y habría que volver a
+      # instalarla en el móvil y en el portátil.
+      - caddy_data:/data
+      # La configuración cargada en caliente, que es lo que recupera --resume.
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  caddy_data:
+  caddy_config:

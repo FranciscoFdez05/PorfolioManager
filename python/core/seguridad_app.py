@@ -12,6 +12,10 @@ Recogidos aquí, `instalar(app)` los monta sobre cualquier Flask, y un test pued
 construir una app mínima con los blueprints que le interesen y comprobar de
 verdad que un POST sin token CSRF recibe 403 o que /api/restore exige sesión.
 
+`aplicar_proxy_inverso(app)` está aquí por el mismo motivo: de qué IP se cree
+que viene una petición lo decide todo lo de abajo (el límite por IP, el bloqueo
+de login, el filtro de red del Atajo), así que no podía quedarse sin test.
+
 El orden de registro importa y es el que había:
 
   1. `verify_csrf`      — barato, y rechaza antes de tocar nada.
@@ -27,7 +31,7 @@ import secrets
 
 from flask import abort, g, make_response, redirect, request, session, url_for
 
-from core import csp, settings
+from core import csp, settings, tls
 from core.rate_limit import LimitadorVentana
 
 log = logging.getLogger(__name__)
@@ -210,6 +214,22 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
         # Ninguna pantalla necesita cámara, micrófono ni geolocalización:
         # cerrarlas evita que un script inyectado pueda siquiera pedir permiso.
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=(), payment=()"
+        if tls.httpsActivo():
+            # Sin HSTS, tener HTTPS delante no impide que la primera visita
+            # («escribo la dirección en la barra») salga por HTTP y sea
+            # interceptable antes de la redirección del proxy. Con la cabecera,
+            # el navegador recuerda el dominio y a partir de la segunda visita
+            # ni siquiera intenta el HTTP.
+            #
+            # Solo se emite con https_activado: puesta en una instalación por
+            # HTTP dejaría el nombre del host inaccesible durante un año en cada
+            # navegador que la hubiera visto, y sin manera de retirarlo desde el
+            # servidor.
+            #
+            # Sin includeSubDomains a propósito: el subdominio de la aplicación
+            # no manda sobre lo que haya en los demás del mismo dominio, y
+            # apagarles el HTTP a todos desde aquí sería una sorpresa.
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
         if settings.cspActivada():
             # El nonce lo fija la vista que sirve index.html; el resto de
             # respuestas no llevan scripts en línea, así que su política queda
@@ -220,12 +240,74 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
     return limite_escrituras, limite_pesadas
 
 
+def aplicar_proxy_inverso(app) -> int:
+    """Instala ProxyFix si hay proxies de confianza declarados. Devuelve cuántos.
+
+    Con Caddy (u otro proxy) delante, la conexión que ve gunicorn sale siempre
+    del proxy: sin esto, `request.remote_addr` valdría la IP del contenedor del
+    proxy en **todas** las peticiones. Y esa IP es con la que se registran los
+    intentos de login, se cuenta el límite de escrituras y se filtra el Atajo de
+    iOS, así que el efecto no es solo un log inútil: un único atacante agotaría
+    el cubo de escrituras de todo el mundo, y el bloqueo tras N intentos
+    fallidos dejaría fuera a cualquiera que llegase por el mismo proxy.
+
+    El número de saltos se declara, no se adivina: ProxyFix toma el elemento
+    `saltos`-ésimo por la derecha de X-Forwarded-For. Poner de más deja que el
+    cliente prefije la cabecera y elija con qué IP se le cuenta —justo la
+    falsificación de la que este ajuste protege—, así que el valor tiene que ser
+    exactamente el número de proxies que reescriben la cabecera.
+
+    Con 0 (el defecto, sin proxy) no se instala nada y las X-Forwarded-* se
+    ignoran por completo, que es lo correcto: ahí llegan del cliente.
+    """
+    saltos = settings.proxySaltos()
+    if not saltos:
+        return 0
+
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=saltos,
+        # x_proto hace que request.is_secure sepa que la petición original era
+        # HTTPS aunque el tramo proxy→aplicación sea HTTP plano.
+        x_proto=saltos,
+        # x_host/x_port/x_prefix a 0: nada construye URLs absolutas a partir del
+        # Host (las redirecciones del login son relativas), así que confiar en
+        # X-Forwarded-Host solo añadiría una vía de envenenamiento del host sin
+        # ganar nada.
+        x_host=0,
+        x_port=0,
+        x_prefix=0,
+    )
+    log.info("ProxyFix activo con %d salto(s) de confianza", saltos)
+    return saltos
+
+
 def aplicar_configuracion_sesion(app):
     """Cookies de sesión y topes de cuerpo. Separado de `instalar` porque son
     valores de `app.config`, no manejadores, y algún test quiere lo uno sin lo
-    otro."""
+    otro.
+
+    Se puede volver a llamar con la aplicación en marcha, y es lo que hace el
+    endpoint que activa el HTTPS desde Ajustes: Flask consulta estas claves de
+    `app.config` cada vez que emite la cookie, así que reasignarlas cambia la
+    política a partir de la respuesta siguiente sin reiniciar el proceso.
+    """
     app.config["MAX_CONTENT_LENGTH"] = settings.maxSubidaBytes()
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = settings.cookieSameSite()
-    # SESSION_COOKIE_SECURE se activa solo cuando hay HTTPS (evita romper HTTP local)
-    app.config["SESSION_COOKIE_SECURE"] = settings.httpsActivado()
+    # SESSION_COOKIE_SECURE se activa solo cuando hay HTTPS (evita romper HTTP local).
+    # Sale de core.tls y no de settings porque el interruptor está en Ajustes: el
+    # ajuste de config.ini es solo el override de despliegue.
+    app.config["SESSION_COOKIE_SECURE"] = tls.httpsActivo()
+    # REMEMBER_COOKIE_* no lo usa nada hoy: no hay Flask-Login ni "recordarme",
+    # el login abre una sesión no permanente. Se fijan igualmente porque el día
+    # que se añada, los valores de fábrica de esa extensión son un año de
+    # duración, sin Secure y sin SameSite, y el descuido no se vería: la
+    # aplicación funcionaría igual, solo que con una cookie de larga vida
+    # viajando en claro. Dejarlos escritos aquí hace que herede la misma
+    # política que la sesión.
+    app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+    app.config["REMEMBER_COOKIE_SAMESITE"] = app.config["SESSION_COOKIE_SAMESITE"]
+    app.config["REMEMBER_COOKIE_SECURE"] = app.config["SESSION_COOKIE_SECURE"]

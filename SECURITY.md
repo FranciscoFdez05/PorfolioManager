@@ -29,7 +29,7 @@ La aplicación está pensada para correr **en una red local o detrás de una VPN
 
 **No lo es:**
 
-- **Exponer la aplicación directamente a internet.** No está pensada para eso: no hay TLS propio, ni segundo factor, ni aislamiento entre usuarios. Ponla detrás de una VPN.
+- **Exponer la aplicación directamente a internet.** No está pensada para eso: no hay segundo factor ni aislamiento entre usuarios. Ponla detrás de una VPN. (Que se pueda servir por HTTPS no cambia esto: el TLS evita que la contraseña viaje en claro, no sustituye a lo demás.)
 - Que alguien con acceso al servidor lea la base de datos. SQLite no está cifrado en reposo; eso lo resuelve el cifrado del disco.
 - Que `SECRET_KEY` esté en `.env` en claro. Es la raíz de la que se derivan las demás claves y tiene que estar disponible al arrancar sin intervención.
 - Denegación de servicio por fuerza bruta contra tu propia LAN.
@@ -37,6 +37,7 @@ La aplicación está pensada para correr **en una red local o detrás de una VPN
 ## Lo que la aplicación ya hace
 
 - Contraseña guardada como hash `pbkdf2:sha256`, nunca en claro.
+- HTTPS que se activa desde la propia aplicación (Ajustes › HTTPS): emite el certificado, marca las cookies como `Secure`, emite `Strict-Transport-Security` y deja el puerto hablando solo TLS, sin reiniciar nada. El certificado de la CA se descarga desde el mismo panel para instalarlo en cada aparato. Sin activarlo, la contraseña del login y la cookie de sesión viajan en claro por la LAN. Ver «HTTPS» en el README.
 - `API/*.key` cifradas en reposo con Fernet, con clave derivada de `SECRET_KEY`. Las que estuvieran en texto plano se convierten solas al arrancar.
 - CSRF por doble cookie en toda petición que modifique estado.
 - CSP con nonce y `script-src` cerrado a `'self'`: sin CDN, sin `unsafe-inline` para scripts.

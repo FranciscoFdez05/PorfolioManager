@@ -1,0 +1,50 @@
+# Configuración de ARRANQUE de Caddy. La de verdad la manda la aplicación.
+#
+# Caddy está siempre levantado y es quien termina el TLS. El interruptor vive en
+# Ajustes › HTTPS: al activarlo, la aplicación genera la configuración
+# equivalente a este fichero pero con `tls internal` y la carga por la API de
+# admin (`POST :2019/load`), Caddy emite el certificado con su CA interna y el
+# puerto pasa a hablar solo TLS. Nada de eso reinicia ningún contenedor.
+#
+# ¿Por qué no lo hace todo la aplicación? Porque arrancar Caddy desde dentro
+# exigiría montarle el socket de Docker, y eso convierte cualquier fallo de la
+# aplicación en root sobre el host. Reconfigurar un proxy que ya está en marcha
+# no necesita ningún privilegio.
+#
+# Este fichero es el estado seguro: proxy en claro. Se usa en el primer arranque
+# y como red de seguridad. En arranques posteriores manda `--resume` (ver el
+# `command` de docker-compose.yml), que recupera la última configuración
+# cargada; y por si las dos se separasen, la aplicación reaplica el estado
+# guardado al arrancar (`core/tls.py`, `converger()`).
+
+{
+	# La API de admin escucha en la red interna de Compose para que la
+	# aplicación pueda llamarla. NO se publica al host en docker-compose.yml:
+	# quien la alcanza reconfigura el proxy entero.
+	admin :2019 {
+		origins caddy:2019 localhost:2019 127.0.0.1:2019
+	}
+
+	# Sin esto, Caddy vería un sitio sin certificado e intentaría gestionarlo
+	# por su cuenta (y montar un redirector en el 80, que aquí no se publica).
+	auto_https off
+}
+
+# Mismo puerto que usa la aplicación: al activar el HTTPS la dirección no
+# cambia de sitio, solo de esquema. `PORT` lo inyecta docker-compose.yml desde
+# el mismo config.ini que lee todo lo demás.
+:{$PORT:5000} {
+	reverse_proxy porfoliomanager:{$PORT:5000} {
+		# Backups, restauraciones e importaciones mueven ficheros de decenas de
+		# MB; el minuto por defecto los cortaba a media respuesta.
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

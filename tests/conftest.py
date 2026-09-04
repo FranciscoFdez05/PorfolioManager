@@ -177,6 +177,9 @@ def crear_app(monkeypatch):
         app = Flask(__name__, static_folder=None)
         app.secret_key = "clave-de-pruebas-0123456789abcdef0123456789abcdef"
         app.config["TESTING"] = True
+        # Mismo orden que server.py: el proxy envuelve la wsgi_app antes de que
+        # nada mire request.remote_addr.
+        seguridad_app.aplicar_proxy_inverso(app)
         seguridad_app.aplicar_configuracion_sesion(app)
         app.config.update(config)
 

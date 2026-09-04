@@ -9,9 +9,14 @@ Los rangos salen de [atajo] redes_permitidas en config.ini (o de la variable de
 entorno MOVIMIENTOS_REDES_PERMITIDAS como override puntual), no de constantes
 en este fichero: cambiar de red no debe obligar a tocar código.
 
-Importante: esto asume que Flask/Gunicorn recibe la conexión directamente, sin
-proxy inverso delante. Con un proxy, request.remote_addr sería siempre la IP
-del proxy y este filtro dejaría de discriminar nada.
+Importante: el filtro mira `request.remote_addr`, así que depende de que esa IP
+sea la de verdad. Sin proxy delante lo es. Con un proxy inverso (el Caddy del
+perfil `https`) lo es solo si `[server] proxy_saltos` está bien puesto: ese
+ajuste instala ProxyFix en server.py, que reescribe remote_addr con la IP real
+del cliente. Con un proxy delante y proxy_saltos = 0, remote_addr sería la del
+proxy en todas las peticiones y este filtro dejaría de discriminar nada —lo
+dejaría todo dentro o todo fuera, según los rangos configurados—. `validar()`
+en core/settings.py avisa al arrancar de esa combinación.
 """
 
 import functools
@@ -73,9 +78,11 @@ def ipEstaPermitida(ipCliente, redes=None):
 def obtenerIpCliente():
     """IP de origen de la petición.
 
-    Se usa remote_addr y nunca X-Forwarded-For: esa cabecera la puede falsificar
-    cualquiera y, sin un proxy de confianza delante que la reescriba, confiar en
-    ella convertiría este filtro en un adorno.
+    Se lee remote_addr y nunca X-Forwarded-For a mano: esa cabecera la puede
+    falsificar cualquiera y confiar en ella sin más convertiría este filtro en
+    un adorno. Quien la traduce, cuando hay proxy, es ProxyFix, y solo hasta el
+    número de saltos declarado en `[server] proxy_saltos`; el resultado ya viene
+    en remote_addr, así que aquí no cambia nada.
     """
     return request.remote_addr
 

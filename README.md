@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.3.1-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 
@@ -70,6 +70,8 @@ No hace falta tener Python instalado en el servidor: si no lo encuentra, usa la 
 | Red local | `http://<IP_DEL_SERVIDOR>:5000` |
 
 El contenedor publica el puerto en todas las interfaces del host, así que cualquier dispositivo de la misma red llega poniendo la IP del servidor y el puerto. Si no responde desde otro equipo, casi siempre es el firewall del host: hay que abrir ese puerto (por ejemplo `sudo ufw allow 5000/tcp`).
+
+> **Eso es HTTP plano.** La contraseña del login y la cookie de sesión viajan en claro por la red, así que cualquiera con acceso a la misma wifi puede leerlas. Para la máquina local da igual; en cuanto entres desde el móvil o desde otro equipo, activa [HTTPS](#https) desde Ajustes › HTTPS — dos clics, y la dirección no cambia.
 
 El puerto por defecto es `5000`, y para cambiarlo pon `PORT` en `.env` (ver [Configuración](#configuración)). `docker-setup` resuelve el valor con la misma capa que usa la aplicación —entorno, luego `config.ini`, luego el defecto— y lo exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse.
 
@@ -157,7 +159,7 @@ Hay **dos sitios** y no dan lo mismo. Esta es la parte que más problemas da al 
 | ¿Sobrevive a un `git pull`? | **No** — se actualiza con el código | Sí |
 | Para qué sirve | Leerlo: documenta cada opción y su rango | Cambiar lo que quieras cambiar |
 
-**En producción, edita `.env`.** Los 45 ajustes tienen su variable de entorno equivalente, y el comentario de cada opción en `config.ini` te dice cuál es:
+**En producción, edita `.env`.** Los 46 ajustes tienen su variable de entorno equivalente, y el comentario de cada opción en `config.ini` te dice cuál es:
 
 ```ini
 ; Peticiones de escritura (POST/PUT/PATCH/DELETE) por IP y minuto. 0 desactiva el límite.
@@ -185,7 +187,7 @@ La resuelve `core/settings.py`, que además valida rangos y avisa en el log de l
 
 | Sección | Para qué |
 |---|---|
-| `[server]` | Puerto, host, modo debug |
+| `[server]` | Puerto, host, modo debug, HTTPS y proxy inverso |
 | `[gunicorn]` | Workers, hilos, timeouts |
 | `[rutas]` | Dónde viven `data/`, `logs/` y `API/` (en Docker las fijan los volúmenes) |
 | `[seguridad]` | CSP, límites de escritura, sesión |
@@ -618,7 +620,60 @@ El orden de registro importa:
 2. **Tope de cuerpo** — corta los cuerpos enormes antes de leerlos (`413`). `[server] max_cuerpo_mb`, con un tope aparte para importaciones y restauraciones.
 3. **Límite de escrituras** — cuenta solo lo que va a llegar a la vista (`429` con `Retry-After`).
 4. **Sesión** — el último, para que un `401` no revele si el endpoint existía o si el token era válido.
-5. **Cabeceras de respuesta** — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` (cámara, micrófono, geolocalización y pagos cerrados) y CSP.
+5. **Cabeceras de respuesta** — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` (cámara, micrófono, geolocalización y pagos cerrados), CSP y, solo con [HTTPS](#https) activo, `Strict-Transport-Security`.
+
+### HTTPS
+
+La aplicación habla HTTP y no termina TLS ella misma. Sin nada delante, el `POST /login` lleva la contraseña en el cuerpo y la respuesta devuelve la cookie de sesión, las dos cosas en texto plano: quien comparta la wifi, el switch o el punto de acceso puede leerlas y entrar. No es un riesgo teórico, es leer un paquete.
+
+**Se activa desde la propia aplicación: Ajustes › HTTPS.** Escribes los nombres y las IP por las que entras, pulsas *Activar*, y en el mismo momento se emite el certificado y el puerto pasa a hablar solo TLS. No hay que reiniciar nada ni tocar ningún fichero, y **la dirección no cambia**: `http://192.168.1.50:5000` pasa a ser `https://192.168.1.50:5000`.
+
+Después, el panel ofrece **descargar el certificado** de la autoridad que lo firma, con las instrucciones para instalarlo en cada aparato. Hasta que lo instales, el navegador seguirá avisando: es una CA propia de tu servidor y ningún dispositivo la conoce todavía. Se hace una vez por aparato.
+
+#### Cómo está montado, y por qué así
+
+Quien termina el TLS es un **Caddy** que va siempre en el stack, delante de la aplicación. Es él quien publica el puerto; la aplicación ya no lo publica y solo se llega a ella a través del proxy.
+
+Eso último importa: si el puerto de la aplicación siguiera abierto en la LAN, bastaría con escribirlo en la barra para saltarse el TLS, y tener el proxy delante no serviría de nada.
+
+Activar el HTTPS es la aplicación mandándole a Caddy una configuración nueva por su **API de admin**, que vive en la red interna de Compose y no se publica al host:
+
+```
+Ajustes ──POST :2019/load──> Caddy ─┬─ emite el certificado con su CA interna
+                                     └─ el puerto pasa a hablar solo TLS
+```
+
+La alternativa —arrancar Caddy bajo demanda desde la aplicación— exigiría montarle el socket de Docker, y eso convierte cualquier fallo de la aplicación en root sobre el host: un agujero bastante peor que el que veníamos a tapar. Reconfigurar un proxy que ya está en marcha no necesita ningún privilegio. Y meter el TLS dentro de gunicorn tampoco valía: lee el certificado al arrancar, así que activarlo desde la interfaz obligaría a reiniciar el contenedor en mitad de la petición que lo activa.
+
+#### Los nombres del certificado
+
+El certificado **solo vale para los nombres que declares**. Si entras por una IP o un nombre que no esté en la lista, el navegador avisará aunque tengas la CA instalada, porque lo que no cuadra es el nombre. Mete la IP del servidor y cualquier nombre que uses.
+
+`localhost` y `127.0.0.1` se añaden siempre, los escribas o no: por ahí entran el healthcheck del contenedor y la comprobación de `docker-update.sh`, y si el certificado no los cubriera, Caddy rechazaría esas conexiones y la actualización se daría por fallida y volvería atrás sola.
+
+#### Qué pasa si algo sale mal
+
+| Situación | Qué ocurre |
+|---|---|
+| Caddy rechaza la configuración | No se guarda nada y sigues conectado como estabas. El estado solo se escribe **después** de que el proxy la acepte: al revés, un estado diciendo «HTTPS activo» sobre un proxy en claro haría que las cookies salieran con `Secure`, el navegador las descartaría y no se podría iniciar sesión. |
+| Se recrea el contenedor del proxy | Caddy arranca con `--resume` y recupera la última configuración cargada. Y por si acaso, la aplicación reaplica el estado guardado al arrancar, con reintentos mientras el proxy termina de levantar. |
+| `data/tls/estado.json` ilegible | Se lee como «HTTPS desactivado», que es el estado que siempre funciona. |
+| Quieres volver a HTTP | *Desactivar* en el mismo panel. A mano: borra `data/tls/estado.json` y reinicia. |
+
+#### Si ya tienes tu propio proxy delante
+
+Si el stack entero va detrás de un Nginx, un Traefik o un túnel de Cloudflare que ya hace TLS, el interruptor de Ajustes sobra: díselo en `.env` y la aplicación no tocará nada.
+
+```bash
+HTTPS_ENABLED=true
+PROXY_FIX_HOPS=2   # tu proxy + el Caddy del stack
+```
+
+**Por qué `PROXY_FIX_HOPS` no es opcional.** Con un proxy delante, la conexión que ve Gunicorn sale siempre de él, así que `request.remote_addr` valdría la IP del proxy en *todas* las peticiones. Y de esa IP dependen tres cosas: el límite de escrituras, el bloqueo tras N intentos fallidos de login y el filtro de red del Atajo de iOS. Sin `ProxyFix` no es que el log quede feo — es que un solo atacante agota el cubo de todo el mundo y **el bloqueo por intentos fallidos deja fuera a cualquiera que llegue por el mismo proxy**. En Docker lo fija `docker-compose.yml` a 1, que son los proxies que trae el stack.
+
+El número de saltos se declara, no se adivina: `ProxyFix` toma el elemento *n*-ésimo por la derecha de `X-Forwarded-For`, así que declarar más proxies de los que hay deja que el cliente prefije la cabecera y elija con qué IP se le cuenta.
+
+**Esto no convierte la aplicación en algo que exponer a internet.** Sigue sin haber segundo factor ni aislamiento entre usuarios; lo que resuelve el HTTPS es que la contraseña y la sesión dejen de ir en claro por tu propia red. Para llegar desde fuera, VPN (ver [SECURITY.md](SECURITY.md)).
 
 ### Límite de peticiones de escritura
 
