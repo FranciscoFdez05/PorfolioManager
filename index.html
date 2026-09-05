@@ -1170,7 +1170,7 @@
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Claves API</div>
-                        <div class="ajustesSectionDesc">Las claves se guardan en <code>API/finnhub.key</code>, <code>API/eodhd.key</code> y <code>API/alphavantage.key</code>.</div>
+                        <div class="ajustesSectionDesc">Las claves se guardan en <code>API/finnhub.key</code>, <code>API/eodhd.key</code> y <code>API/alphavantage.key</code>. Si el <code>.env</code> del servidor define <code>FINNHUB_API_KEY</code>, <code>EODHD_API_KEYS</code> o <code>ALPHA_VANTAGE_API_KEYS</code>, esas tienen prioridad sobre el fichero.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
@@ -1273,6 +1273,28 @@
         <!-- ── Datos ── -->
         <div class="sttPage" id="sttPage-datos">
             <h2 class="sttPageTitle">Datos</h2>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.5 10a6.5 6.5 0 1 1-1.9-4.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M16.5 3v3.5H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Actualizar la aplicación</div>
+                        <div class="ajustesSectionDesc">Lanza <code>docker-update.sh</code> en el servidor: descarga la versión nueva, la construye, comprueba que arranca y, si no arranca, vuelve sola a la anterior. La aplicación se reinicia, así que estarás un par de minutos sin servicio.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesUpdateVersion">Versión instalada: <strong id="ajustesUpdateVersion">—</strong></div>
+                <div class="ajustesAviso" id="ajustesUpdateAviso" hidden></div>
+                <div class="ajustesActions">
+                    <button id="ajustesUpdateBtn" class="primaryButton" type="button">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 8a5 5 0 1 1-1.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13 2.5v3h-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Actualizar ahora
+                    </button>
+                </div>
+                <span id="ajustesUpdateMsg" class="ajustesStatusMsg"></span>
+            </div>
 
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">

@@ -92,6 +92,7 @@ def datos_aislados(tmp_path, monkeypatch):
         backup as rutas_backup,
         portfolios as rutas_portfolios,
     )
+    from stores import app_data
 
     data = tmp_path / "data"
     backups = data / "backups"
@@ -128,6 +129,12 @@ def datos_aislados(tmp_path, monkeypatch):
     claves.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(paths, "API_DIR", claves, raising=False)
     monkeypatch.setattr(rutas_ajustes, "_API_DIR", claves)
+    # `stores.app_data` resuelve su propio `apiDir` al importarse, y es quien
+    # lee las claves para los proveedores. Sin parchearlo también, la suite
+    # acaba leyendo el API/ real del equipo que la ejecuta: hasta ahora salía
+    # vacío de casualidad —porque sin SECRET_KEY no se puede descifrar— y con
+    # ella exportada los tests habrían empezado a ver claves de verdad.
+    monkeypatch.setattr(app_data, "apiDir", claves)
 
     # /api/restore llama a init_portfolios() al terminar, que reactiva el
     # portfolio guardado en el backup. Sin parchear también estos nombres, ese

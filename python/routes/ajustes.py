@@ -16,6 +16,7 @@ from core.paths import AJUSTES_JSON as _AJUSTES_JSON, API_DIR as _API_DIR, JSON_
 from core.secret_store import read_secret_lines, write_secret_lines
 from providers import estado as estado_proveedores
 from providers.api_stats import get_today_stats
+from stores import app_data
 
 log = logging.getLogger(__name__)
 
@@ -165,6 +166,16 @@ _FICHEROS_CLAVES = {
 }
 
 
+def _fichero_de_claves(proveedor):
+    """Ruta del fichero del proveedor, o None si el nombre no es de los tres.
+
+    El nombre llega en el cuerpo de la petición: sin contrastarlo contra los
+    tres conocidos sería una forma de señalar cualquier fichero del disco.
+    """
+    nombre = _FICHEROS_CLAVES.get(str(proveedor or "").strip().lower())
+    return (_API_DIR / nombre) if nombre else None
+
+
 def _enmascarar_clave(clave):
     """Lo justo para reconocer una clave sin enseñarla.
 
@@ -246,38 +257,48 @@ def get_settings():
 
 @ajustes_bp.route("/api/settings/apikeys", methods=["GET"])
 def list_api_keys():
-    """Las claves guardadas de cada proveedor: enmascaradas y completas.
+    """Las claves de cada proveedor, y —lo importante— de dónde salen.
 
     Hasta aquí la interfaz solo sabía **cuántas** claves había. Con varias
     configuradas —y con el proveedor recorriéndolas cuando una se queda sin
-    cuota— «2 claves» no dice cuáles son, ni si la que falla sigue ahí, ni si el
-    fichero que está leyendo el servidor es el que uno cree que es.
+    cuota— «2 claves» no dice cuáles son ni si la que falla sigue ahí.
 
-    Se manda también el valor completo, no solo la máscara, y eso es una
-    decisión con supuesto detrás: **esta aplicación vive en una LAN cerrada, sin
-    salida a internet y con un único usuario**. En ese escenario pedir el texto
-    aparte no protege de nada —si la conexión va en claro, la segunda respuesta
-    también— y a cambio mete una petición por cada ojo que se pulsa. La interfaz
-    pinta la máscara y descubre el valor sin volver a preguntar.
+    Y había algo peor que no decía nadie: si `FINNHUB_API_KEY` o
+    `EODHD_API_KEYS` están puestas en el `.env`, **ganan al fichero**, que es lo
+    que esta pantalla gestiona. Con la variable puesta se podían añadir y borrar
+    claves aquí, ver la lista actualizarse, y que la aplicación siguiera usando
+    otra distinta. Por eso cada proveedor dice ahora su `origen` y cuántas
+    claves del fichero se están ignorando.
 
-    Si esta instancia dejara de estar aislada, esto es lo que habría que
-    revisar: el valor entero viaja en cada carga de Ajustes.
+    Se manda también el valor completo de cada clave, no solo la máscara, para
+    que el ojo la descubra sin volver a preguntar. Eso es una decisión con un
+    supuesto detrás: **esta aplicación vive en una LAN cerrada, sin salida a
+    internet y con un único usuario**. En ese escenario pedir el texto aparte no
+    protege de nada —si la conexión va en claro, la segunda respuesta también— y
+    a cambio mete una petición por cada pulsación. Si esta instalación dejara de
+    estar aislada, esto es lo que habría que revisar.
     """
-    respuesta = jsonify({
-        "ok": True,
-        "proveedores": {
-            proveedor: [
+    proveedores = {}
+
+    for proveedor in _FICHEROS_CLAVES:
+        origen = app_data.readApiKeysConOrigen(proveedor)
+        proveedores[proveedor] = {
+            "origen": origen["origen"],
+            "variable": origen["variable"],
+            "fichero": _FICHEROS_CLAVES[proveedor],
+            "ignoradas": origen["ignoradas"],
+            "claves": [
                 {
                     "indice": indice,
                     "vista": _enmascarar_clave(clave),
                     "clave": clave,
                     "longitud": len(clave),
                 }
-                for indice, clave in enumerate(read_secret_lines(_API_DIR / fichero))
-            ]
-            for proveedor, fichero in _FICHEROS_CLAVES.items()
-        },
-    })
+                for indice, clave in enumerate(origen["claves"])
+            ],
+        }
+
+    respuesta = jsonify({"ok": True, "proveedores": proveedores})
     # Lleva secretos dentro: que no se quede en ninguna caché intermedia.
     respuesta.headers["Cache-Control"] = "no-store"
     return respuesta
@@ -298,6 +319,39 @@ def append_api_key():
         "eodhdKeys":        len([k for k in _read_key_file(_API_DIR / "eodhd.key").splitlines() if k.strip()]),
         "alphaVantageKeys": len([k for k in _read_key_file(_API_DIR / "alphavantage.key").splitlines() if k.strip()]),
     })
+
+
+@ajustes_bp.route("/api/settings/apikey", methods=["DELETE"])
+def delete_api_key():
+    """Quita una clave del fichero de su proveedor.
+
+    Se borra **por valor, no por posición**. La lista que el usuario tiene
+    delante puede haberse quedado atrás —otra pestaña, otra sesión, una clave
+    añadida entretanto— y con un índice viejo se borraría la clave equivocada
+    sin que nada lo advirtiera. Por valor, o coincide o no se toca nada.
+
+    La clave va en el cuerpo y no en la URL para no dejarla escrita en los logs
+    del proxy ni en el historial del navegador, que es donde acaban las rutas.
+    """
+    datos = request.get_json(silent=True) or {}
+    fichero = _fichero_de_claves(datos.get("proveedor"))
+
+    if fichero is None:
+        return jsonify({"ok": False, "error": "Proveedor desconocido"}), 400
+
+    clave = str(datos.get("clave") or "").strip()
+    claves = read_secret_lines(fichero)
+
+    if not clave or clave not in claves:
+        # También cae aquí una clave que viene del entorno: esa no está en el
+        # fichero y no se puede quitar desde aquí, sino del `.env` del servidor.
+        return jsonify({"ok": False, "error": "Esa clave ya no está guardada"}), 404
+
+    restantes = [existente for existente in claves if existente != clave]
+    write_secret_lines(fichero, restantes)
+    log.info("Clave de API eliminada de %s; quedan %s", fichero.name, len(restantes))
+
+    return jsonify({"ok": True, "restantes": len(restantes)})
 
 
 @ajustes_bp.route("/api/stats/api-calls", methods=["GET"])

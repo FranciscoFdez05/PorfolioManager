@@ -1,0 +1,21 @@
+[Unit]
+Description=Recoge la señal de actualización que deja PorfolioManager y ejecuta docker-update.sh
+Documentation=file:///opt/PorfolioManager/tools/actualizador/README.md
+
+[Service]
+Type=oneshot
+
+# ── Ajusta estas tres líneas a tu instalación ────────────────────────────────
+User=francisco
+WorkingDirectory=/opt/PorfolioManager
+ExecStart=/opt/PorfolioManager/tools/actualizador/portfolio-actualizador.sh
+# ─────────────────────────────────────────────────────────────────────────────
+
+# El script reconstruye la imagen: puede tardar varios minutos en un servidor
+# modesto, y que systemd lo mate a mitad dejaría la actualización sin terminar.
+TimeoutStartSec=1800
+
+# Sin salida por cada pasada: el temporizador dispara cada 30 segundos y casi
+# todas terminan sin hacer nada. Lo que importa va a logs/actualizacion.log.
+StandardOutput=null
+StandardError=journal

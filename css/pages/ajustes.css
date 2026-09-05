@@ -542,6 +542,37 @@
     cursor: default;
 }
 
+.ajustesKeyRowDel {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+}
+
+.ajustesUpdateVersion {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    padding-bottom: 10px;
+}
+
+.ajustesUpdateVersion strong {
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Aviso ámbar: algo que hay que saber antes de fiarse de lo que hay debajo.
+   Lo usan la precedencia del .env sobre los ficheros de claves y el estado del
+   actualizador. Ni rojo ni verde: no es un fallo, es una condición. */
+.ajustesAviso {
+    margin-bottom: 10px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: #fbbf24;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
 /* Backup list */
 .ajustesBackupList {
     display: flex;
@@ -604,7 +635,8 @@
     color: var(--color-neg-bright);
 }
 
-.ajustesDeleteBackupBtn {
+.ajustesDeleteBackupBtn,
+.ajustesKeyRowDel {
     width: 26px;
     height: 26px;
     padding: 0;
@@ -624,7 +656,8 @@
         color 0.15s;
 }
 
-.ajustesDeleteBackupBtn:hover {
+.ajustesDeleteBackupBtn:hover,
+.ajustesKeyRowDel:hover {
     background: rgba(239, 68, 68, 0.12);
     border-color: rgba(239, 68, 68, 0.4);
     color: #ef4444;

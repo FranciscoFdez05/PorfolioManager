@@ -77,11 +77,25 @@ def test_las_claves_de_api_no_se_guardan_en_claro_en_disco(cliente):
     assert b"clave-secreta-1" not in crudo
 
 
-# ── Lista de claves ──────────────────────────────────────────────────────────
+# ── Lista de claves y de dónde salen ─────────────────────────────────────────
+
+_VARIABLES = ("FINNHUB_API_KEY", "EODHD_API_KEYS", "ALPHA_VANTAGE_API_KEYS")
+
+
+@pytest.fixture(autouse=True)
+def sin_claves_en_el_entorno(monkeypatch):
+    """El entorno gana al fichero, así que un `.env` cargado torcería la suite."""
+    for variable in _VARIABLES:
+        monkeypatch.delenv(variable, raising=False)
+
 
 def _anadir_claves(client, cabeceras, *claves, campo="finnhubKey"):
     for clave in claves:
         client.post("/api/settings/apikey", json={campo: clave}, headers=cabeceras)
+
+
+def _listar(client, proveedor="finnhub"):
+    return client.get("/api/settings/apikeys").get_json()["proveedores"][proveedor]
 
 
 def test_la_lista_trae_cada_clave_enmascarada_y_entera(cliente):
@@ -95,7 +109,7 @@ def test_la_lista_trae_cada_clave_enmascarada_y_entera(cliente):
     client, cabeceras, _rutas = cliente
     _anadir_claves(client, cabeceras, "abcdefghijklmnop", "1234567890123456")
 
-    claves = client.get("/api/settings/apikeys").get_json()["proveedores"]["finnhub"]
+    claves = _listar(client)["claves"]
 
     assert [c["indice"] for c in claves] == [0, 1]
     assert claves[0]["vista"] == "abcd••••••mnop"
@@ -118,9 +132,7 @@ def test_una_clave_corta_no_deja_ver_ni_las_puntas(cliente):
     client, cabeceras, _rutas = cliente
     _anadir_claves(client, cabeceras, "12345678")
 
-    claves = client.get("/api/settings/apikeys").get_json()["proveedores"]["finnhub"]
-
-    assert claves[0]["vista"] == "•" * 8
+    assert _listar(client)["claves"][0]["vista"] == "•" * 8
 
 
 def test_los_tres_proveedores_salen_aunque_no_tengan_claves(cliente):
@@ -130,7 +142,7 @@ def test_los_tres_proveedores_salen_aunque_no_tengan_claves(cliente):
     proveedores = client.get("/api/settings/apikeys").get_json()["proveedores"]
 
     assert sorted(proveedores) == ["alphavantage", "eodhd", "finnhub"]
-    assert proveedores["eodhd"] == []
+    assert proveedores["eodhd"]["claves"] == []
 
 
 def test_cada_proveedor_lista_solo_sus_claves(cliente):
@@ -138,10 +150,8 @@ def test_cada_proveedor_lista_solo_sus_claves(cliente):
     _anadir_claves(client, cabeceras, "clave-de-finnhub", campo="finnhubKey")
     _anadir_claves(client, cabeceras, "clave-de-eodhd-1", campo="eodhdKeys")
 
-    proveedores = client.get("/api/settings/apikeys").get_json()["proveedores"]
-
-    assert [c["clave"] for c in proveedores["finnhub"]] == ["clave-de-finnhub"]
-    assert [c["clave"] for c in proveedores["eodhd"]] == ["clave-de-eodhd-1"]
+    assert [c["clave"] for c in _listar(client, "finnhub")["claves"]] == ["clave-de-finnhub"]
+    assert [c["clave"] for c in _listar(client, "eodhd")["claves"]] == ["clave-de-eodhd-1"]
 
 
 def test_el_orden_de_la_lista_es_el_de_la_rotacion(cliente):
@@ -149,9 +159,70 @@ def test_el_orden_de_la_lista_es_el_de_la_rotacion(cliente):
     client, cabeceras, _rutas = cliente
     _anadir_claves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb", "tercera-clave-cc")
 
-    claves = client.get("/api/settings/apikeys").get_json()["proveedores"]["finnhub"]
+    claves = _listar(client)["claves"]
 
     assert [c["clave"] for c in claves] == ["primera-clave-aa", "segunda-clave-bb", "tercera-clave-cc"]
+
+
+def test_sin_variable_de_entorno_las_claves_salen_del_fichero(cliente):
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "clave-del-fichero")
+
+    info = _listar(client)
+
+    assert info["origen"] == "fichero"
+    assert info["ignoradas"] == 0
+    assert info["variable"] == "FINNHUB_API_KEY"
+
+
+def test_la_variable_de_entorno_gana_al_fichero_y_se_dice(cliente, monkeypatch):
+    """La trampa que dejaba la pantalla mintiendo.
+
+    Con la variable puesta se podían añadir y borrar claves en Ajustes, ver la
+    lista actualizarse, y que la aplicación siguiera usando otra distinta. Un
+    `.env` con el valor de ejemplo sin tocar dejaba al proveedor rechazando
+    peticiones sin que nada en la interfaz lo insinuara.
+    """
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "clave-del-fichero", "otra-del-fichero")
+    monkeypatch.setenv("FINNHUB_API_KEY", "clave-del-entorno")
+
+    info = _listar(client)
+
+    assert info["origen"] == "entorno"
+    assert info["variable"] == "FINNHUB_API_KEY"
+    assert [c["clave"] for c in info["claves"]] == ["clave-del-entorno"]
+    # Las del fichero siguen ahí, y la pantalla tiene que poder decir cuántas.
+    assert info["ignoradas"] == 2
+
+
+def test_la_variable_de_eodhd_admite_varias_separadas_por_coma(cliente, monkeypatch):
+    client, _cabeceras, _rutas = cliente
+    monkeypatch.setenv("EODHD_API_KEYS", "clave-una, clave-dos ,clave-tres")
+
+    info = _listar(client, "eodhd")
+
+    assert [c["clave"] for c in info["claves"]] == ["clave-una", "clave-dos", "clave-tres"]
+
+
+def test_la_variable_de_finnhub_es_una_sola_clave(cliente, monkeypatch):
+    """`FINNHUB_API_KEY` no se parte por comas: el lector real la usa entera."""
+    client, _cabeceras, _rutas = cliente
+    monkeypatch.setenv("FINNHUB_API_KEY", "clave,con,comas")
+
+    assert [c["clave"] for c in _listar(client)["claves"]] == ["clave,con,comas"]
+
+
+def test_una_variable_vacia_no_tapa_al_fichero(cliente, monkeypatch):
+    """`.env.example` deja las líneas puestas; en blanco no deben contar."""
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "clave-del-fichero")
+    monkeypatch.setenv("FINNHUB_API_KEY", "   ")
+
+    info = _listar(client)
+
+    assert info["origen"] == "fichero"
+    assert [c["clave"] for c in info["claves"]] == ["clave-del-fichero"]
 
 
 def test_listar_las_claves_sin_sesion_es_401(crear_app, datos_aislados, temp_db):
@@ -160,6 +231,124 @@ def test_listar_las_claves_sin_sesion_es_401(crear_app, datos_aislados, temp_db)
 
     client = crear_app(ajustes_bp).test_client()
     assert client.get("/api/settings/apikeys").status_code == 401
+
+
+# ── Borrado de claves ────────────────────────────────────────────────────────
+
+def _borrar(client, cabeceras, proveedor, clave):
+    return client.delete(
+        "/api/settings/apikey",
+        json={"proveedor": proveedor, "clave": clave},
+        headers=cabeceras,
+    )
+
+
+def test_borrar_una_clave_deja_las_demas(cliente):
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb", "tercera-clave-cc")
+
+    respuesta = _borrar(client, cabeceras, "finnhub", "segunda-clave-bb")
+
+    assert respuesta.get_json() == {"ok": True, "restantes": 2}
+    assert [c["clave"] for c in _listar(client)["claves"]] == ["primera-clave-aa", "tercera-clave-cc"]
+
+
+def test_se_borra_por_valor_y_no_por_posicion(cliente):
+    """La lista que ve el usuario puede haberse quedado atrás.
+
+    Con un índice viejo —otra pestaña, una clave añadida entretanto— se borraría
+    la clave equivocada sin que nada lo advirtiera.
+    """
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb")
+
+    _borrar(client, cabeceras, "finnhub", "primera-clave-aa")
+    _borrar(client, cabeceras, "finnhub", "segunda-clave-bb")
+
+    assert _listar(client)["claves"] == []
+
+
+def test_borrar_la_ultima_clave_deja_el_proveedor_sin_ninguna(cliente):
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "clave-unica-aaa")
+
+    respuesta = _borrar(client, cabeceras, "finnhub", "clave-unica-aaa")
+
+    assert respuesta.get_json()["restantes"] == 0
+    assert client.get("/api/settings").get_json()["finnhubKeyCount"] == 0
+
+
+def test_borrar_no_toca_las_claves_de_los_otros_proveedores(cliente):
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "clave-de-finnhub", campo="finnhubKey")
+    _anadir_claves(client, cabeceras, "clave-de-eodhd-1", campo="eodhdKeys")
+
+    _borrar(client, cabeceras, "finnhub", "clave-de-finnhub")
+
+    assert _listar(client, "finnhub")["claves"] == []
+    assert [c["clave"] for c in _listar(client, "eodhd")["claves"]] == ["clave-de-eodhd-1"]
+
+
+def test_el_fichero_sigue_cifrado_despues_de_borrar(cliente):
+    """Se reescribe entero: si la reescritura lo dejara en claro, nadie lo vería."""
+    client, cabeceras, rutas = cliente
+    _anadir_claves(client, cabeceras, "clave-secreta-1", "clave-secreta-2")
+
+    _borrar(client, cabeceras, "finnhub", "clave-secreta-1")
+
+    crudo = (rutas["claves"] / "finnhub.key").read_bytes()
+    assert b"clave-secreta-2" not in crudo
+
+
+def test_borrar_una_clave_que_no_esta_es_404(cliente):
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "clave-secreta-1")
+
+    assert _borrar(client, cabeceras, "finnhub", "clave-que-no-existe").status_code == 404
+
+
+def test_una_clave_del_entorno_no_se_puede_borrar_desde_aqui(cliente, monkeypatch):
+    """No está en el fichero: se quita del `.env` del servidor, no de esta pantalla."""
+    client, cabeceras, _rutas = cliente
+    monkeypatch.setenv("FINNHUB_API_KEY", "clave-del-entorno")
+
+    assert _borrar(client, cabeceras, "finnhub", "clave-del-entorno").status_code == 404
+
+
+@pytest.mark.parametrize("clave", ["", None])
+def test_borrar_sin_decir_que_clave_no_borra_nada(cliente, clave):
+    """Un cuerpo a medias no puede acabar vaciando el fichero."""
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "clave-secreta-1")
+
+    respuesta = _borrar(client, cabeceras, "finnhub", clave)
+
+    assert respuesta.status_code == 404
+    assert client.get("/api/settings").get_json()["finnhubKeyCount"] == 1
+
+
+def test_borrar_en_un_proveedor_que_no_existe_es_400(cliente):
+    client, cabeceras, _rutas = cliente
+
+    assert _borrar(client, cabeceras, "../../.env", "lo-que-sea").status_code == 400
+
+
+def test_borrar_una_clave_sin_sesion_es_401(crear_app, datos_aislados, temp_db):
+    from routes.ajustes import ajustes_bp
+
+    client = crear_app(ajustes_bp).test_client()
+    respuesta = client.delete("/api/settings/apikey", json={"proveedor": "finnhub", "clave": "x"})
+
+    assert respuesta.status_code == 401
+
+
+def test_borrar_una_clave_sin_csrf_es_403(cliente_autenticado, datos_aislados, temp_db):
+    from routes.ajustes import ajustes_bp
+
+    client, _cabeceras, _app = cliente_autenticado(ajustes_bp)
+    respuesta = client.delete("/api/settings/apikey", json={"proveedor": "finnhub", "clave": "x"})
+
+    assert respuesta.status_code == 403
 
 
 # ── Escritura: validación de cada ajuste ─────────────────────────────────────

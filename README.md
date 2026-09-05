@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.5.0-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.6.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 
@@ -341,9 +341,21 @@ CLAVE_TERCIARIA
 **Opción 2 — variable de entorno** (útil en Docker):
 
 ```
+FINNHUB_API_KEY=CLAVE
 ALPHA_VANTAGE_API_KEYS=CLAVE1,CLAVE2,CLAVE3
 EODHD_API_KEYS=CLAVE1,CLAVE2
 ```
+
+> **La variable de entorno gana al archivo.** No son dos opciones que se sumen:
+> si `FINNHUB_API_KEY`, `EODHD_API_KEYS` o `ALPHA_VANTAGE_API_KEYS` tienen valor
+> en el `.env`, la aplicación usa esas y **no mira el `API/*.key` que gestiona
+> Ajustes**. Se podían añadir y borrar claves en esa pantalla, ver la lista
+> actualizarse, y que el proveedor siguiera usando otra distinta —incluido el
+> valor de ejemplo de `.env.example` sin tocar, que da «Clave rechazada» para
+> siempre—. Desde la 1.6.0, el panel de Claves API lo avisa cuando pasa.
+>
+> Lo normal es dejar esas líneas vacías en el `.env` y poner las claves desde
+> Ajustes: se guardan cifradas y se cambian sin reiniciar el contenedor.
 
 Las claves se rotan en round-robin entre peticiones, distribuyendo la carga.
 
@@ -357,7 +369,8 @@ Sin ningún archivo de clave la aplicación funciona igualmente; solo no obtendr
 |---|---|---|
 | **Operativa** | Responde y devuelve datos. | — |
 | **Sin clave** | No hay clave configurada; no se llega a llamar. | Añadirla arriba, en Claves API. |
-| **Clave rechazada** | El proveedor devuelve 401/403. | La clave caducó o está mal copiada. |
+| **Clave rechazada** | El proveedor devuelve 401. | La clave caducó, está mal copiada, o el `.env` está tapando la buena (ver arriba). |
+| **Fuera del plan** | 403: la clave vale, pero el plan no cubre lo pedido. | Finnhub gratuito solo da mercado de EE. UU. y no da históricos. |
 | **Cuota agotada** | 429/402, o el aviso de Alpha Vantage dentro de un 200. | Esperar al reinicio diario o añadir otra clave. |
 | **No responde / Caída** | Timeout, corte de red o 5xx. | No es cosa de la instalación. |
 

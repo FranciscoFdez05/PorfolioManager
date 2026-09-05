@@ -20,6 +20,7 @@ from core.errors import register_error_handlers
 from core.paths import API_DIR, BASE_DIR, INDEX_FILE
 from core.version import insertar_version
 from routes.activos import activos_bp
+from routes.actualizacion import actualizacion_bp
 from routes.ajustes import ajustes_bp
 from routes.auth import auth_bp
 from routes.backup import backup_bp
@@ -135,6 +136,7 @@ register_error_handlers(app)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(activos_bp)
+app.register_blueprint(actualizacion_bp)
 app.register_blueprint(ajustes_bp)
 app.register_blueprint(backup_bp)
 app.register_blueprint(categorias_bp)

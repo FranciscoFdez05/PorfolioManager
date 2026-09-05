@@ -22,6 +22,75 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.6.0] — 2026-09-05
+
+**Lo que faltaba para poder arreglar una clave rechazada sin entrar por SSH.**
+La 1.5.0 dejó ver qué claves hay guardadas; faltaban las dos cosas que hacen
+falta cuando una ha dejado de valer: poder quitarla, y saber si la aplicación
+está usando de verdad la que estás mirando. Y, ya puestos, poder actualizar sin
+abrir una terminal.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+### Añadido
+
+- **Cada clave se puede borrar desde la propia lista**, con la ✕ de su fila y
+  una confirmación que dice cuál es y de qué proveedor. Hasta ahora una clave
+  caducada o revocada solo se podía quitar entrando al contenedor a editar el
+  fichero —cifrado—, así que en la práctica se quedaba ahí: el proveedor la
+  seguía intentando, gastando una petición para obtener el mismo rechazo.
+
+  Si es la última que queda, la confirmación lo avisa, porque el proveedor deja
+  de actualizar precios y eso no se nota hasta el siguiente refresco.
+
+  Se borra **por valor y no por posición**: la lista que uno tiene delante puede
+  haberse quedado atrás —otra pestaña, otra sesión, una clave añadida
+  entretanto— y con un índice viejo se borraría la clave equivocada sin que nada
+  lo advirtiera. Por valor, o coincide o no se toca nada. El fichero se
+  reescribe cifrado, como al añadir.
+
+- **El panel avisa cuando una variable de entorno está tapando al fichero.**
+  Bajo el proveedor afectado sale, en ámbar: «Estas claves salen de
+  `FINNHUB_API_KEY`, en el .env del servidor, y no de `API/finnhub.key`. Lo que
+  añadas o borres aquí no se usará mientras esa variable tenga valor», y cuántas
+  claves del fichero se están ignorando. Esas filas no llevan ✕: no están en el
+  fichero, se quitan del `.env` del servidor.
+
+  La precedencia no cambia —hay instalaciones que se configuran solo por
+  entorno— pero deja de ser invisible. `.env.example` ahora trae las tres
+  variables **vacías** y explica que lo normal es poner las claves desde
+  Ajustes, y el README deja de presentar fichero y entorno como dos opciones
+  intercambiables.
+
+- **Botón de actualizar en Ajustes > Datos.** Lanza `docker-update.sh` —el que
+  descarga la versión nueva, la construye, comprueba que arranca y vuelve solo
+  a la anterior si no— sin entrar por SSH. El panel dice la versión instalada,
+  y mientras dura la actualización va informando: solicitada, reiniciando, y la
+  versión con la que ha vuelto.
+
+  **La aplicación no ejecuta el script**, porque no puede: dentro del contenedor
+  no hay Docker ni repositorio, y `docker-update.sh` para y recrea el contenedor
+  que lo estaría ejecutando —lo mataría justo antes de la comprobación de
+  arranque y del retroceso automático, que es lo que hace que actualizar sea
+  seguro—. Lo que hace el botón es dejar una señal en `data/tmp/`, y un
+  vigilante del host la recoge y lanza el script desde fuera.
+
+  Eso significa **una cosa que hay que instalar una vez en el servidor**: un
+  temporizador de systemd que mira esa señal cada 30 segundos. Están hechos, con
+  las instrucciones, en `tools/actualizador/`. La alternativa habitual —montar
+  el socket de Docker en el contenedor— se descartó a propósito: equivale a dar
+  root del host a la aplicación web.
+
+  Mientras el vigilante no esté instalado, el panel **lo dice** en vez de dejar
+  el botón girando para siempre: si nunca ha escrito su fichero de estado, sale
+  un aviso de que no da señales de vida y de que hay que actualizar por SSH. El
+  registro completo de cada actualización queda en `logs/actualizacion.log`.
+
+[1.6.0]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.6.0
+
+---
+
 ## [1.5.0] — 2026-09-05
 
 **Ajustes › API deja de decir solo cuántas claves hay y pasa a decir cuáles

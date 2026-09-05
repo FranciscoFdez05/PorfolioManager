@@ -363,6 +363,10 @@ async function initAjustesLogic() {
         alphavantage: { lista: document.getElementById("ajustesAlphaVantageKeyList"), estado: alphaVantageStatus }
     }
 
+    const _mensajesClaves = { finnhub: finnhubMsg, eodhd: eodhdMsg, alphavantage: alphaVantageMsg }
+
+    const _NOMBRES_PROVEEDOR = { finnhub: "Finnhub", eodhd: "EODHD", alphavantage: "Alpha Vantage" }
+
     function _pintarIconoOjo(btn, visible) {
         const eyeShow = btn.querySelector(".ajustesEyeShow")
         const eyeHide = btn.querySelector(".ajustesEyeHide")
@@ -383,12 +387,71 @@ async function initAjustesLogic() {
         _pintarIconoOjo(btn, visible)
     }
 
-    function _pintarClaves(proveedor, claves) {
+    function _borrarClave(proveedor, clave, restantes, fila) {
+        const nombre = _NOMBRES_PROVEEDOR[proveedor] || proveedor
+        // Que sea la última importa: al quedarse sin claves el proveedor deja
+        // de dar precios, y eso no se ve hasta el siguiente refresco.
+        const aviso = restantes === 1 ? ` Es la única que queda, así que ${nombre} dejará de actualizar precios.` : ""
+
+        openConfirmModal({
+            title: "Eliminar clave",
+            message: `¿Eliminar la clave ${clave.vista} de ${nombre}?${aviso} Esta acción no se puede deshacer.`,
+            confirmLabel: "Eliminar",
+            onConfirm: async () => {
+                fila.style.opacity = "0.4"
+                try {
+                    const res = await fetch("/api/settings/apikey", {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ proveedor, clave: clave.clave })
+                    })
+                    const data = await res.json()
+                    if (data.ok) {
+                        cargarClaves()
+                    } else {
+                        showMsg(_mensajesClaves[proveedor], data.error || "Error al eliminar", "error")
+                        fila.style.opacity = ""
+                    }
+                } catch {
+                    showMsg(_mensajesClaves[proveedor], "Error de red", "error")
+                    fila.style.opacity = ""
+                }
+            }
+        })
+    }
+
+    function _plural(n, singular, plural) {
+        return `${n} ${n === 1 ? singular : plural}`
+    }
+
+    // Si el .env del servidor define la variable del proveedor, esa gana al
+    // fichero que gestiona esta pantalla. Sin decirlo, se podían añadir y borrar
+    // claves aquí, ver la lista actualizarse, y que la aplicación siguiera
+    // usando otra: es el aviso que faltaba para no buscar el fallo en la clave.
+    function _avisoDeEntorno(info) {
+        const aviso = document.createElement("div")
+        aviso.className = "ajustesAviso"
+        let texto =
+            `Estas claves salen de ${info.variable}, en el .env del servidor, y no de ` +
+            `API/${info.fichero}. Lo que añadas o borres aquí no se usará mientras esa variable tenga valor.`
+        if (info.ignoradas) {
+            texto += ` Hay ${_plural(info.ignoradas, "clave guardada", "claves guardadas")} en el fichero que la aplicación está ignorando.`
+        }
+        aviso.textContent = texto
+        return aviso
+    }
+
+    function _pintarClaves(proveedor, info) {
         const destino = _proveedoresClaves[proveedor]
         if (!destino?.lista) return
 
+        const claves = info.claves || []
+        const delEntorno = info.origen === "entorno"
+
         destino.lista.innerHTML = ""
         setKeyStatus(destino.estado, claves.length)
+
+        if (delEntorno) destino.lista.appendChild(_avisoDeEntorno(info))
 
         claves.forEach((clave) => {
             const fila = document.createElement("div")
@@ -413,6 +476,19 @@ async function initAjustesLogic() {
             ojo.addEventListener("click", () => _alternarClave(clave, valor, ojo))
 
             fila.append(numero, valor, ojo)
+
+            // Una clave del entorno no vive en el fichero, así que no hay nada
+            // que borrar: se quita del .env del servidor.
+            if (!delEntorno) {
+                const borrar = document.createElement("button")
+                borrar.type = "button"
+                borrar.className = "ajustesKeyRowDel"
+                borrar.textContent = "✕"
+                borrar.title = "Eliminar clave"
+                borrar.addEventListener("click", () => _borrarClave(proveedor, clave, claves.length, fila))
+                fila.appendChild(borrar)
+            }
+
             destino.lista.appendChild(fila)
         })
     }
@@ -422,8 +498,8 @@ async function initAjustesLogic() {
             const res = await fetch("/api/settings/apikeys")
             const data = await res.json()
             if (!data.ok) return
-            Object.entries(data.proveedores || {}).forEach(([proveedor, claves]) => {
-                _pintarClaves(proveedor, claves || [])
+            Object.entries(data.proveedores || {}).forEach(([proveedor, info]) => {
+                _pintarClaves(proveedor, info || {})
             })
         } catch {
             // Sin lista, el contador de claves de /api/settings sigue estando:
@@ -1640,6 +1716,121 @@ async function initAjustesLogic() {
             }
         })
     }
+
+    // --- Actualizar la aplicación ---
+    // El botón no actualiza: deja una señal en data/tmp/ que recoge un
+    // vigilante del host (tools/actualizador/). No puede hacer más —dentro del
+    // contenedor no hay Docker ni repositorio, y docker-update.sh recrea el
+    // contenedor que lo ejecutaría, matándolo antes del retroceso automático—.
+    const updateBtn = document.getElementById("ajustesUpdateBtn")
+    const updateVersionEl = document.getElementById("ajustesUpdateVersion")
+    const updateAvisoEl = document.getElementById("ajustesUpdateAviso")
+    const updateMsg = document.getElementById("ajustesUpdateMsg")
+
+    let _versionAlPedir = null
+    let _sondeoUpdate = null
+
+    function _pintarAvisoUpdate(texto) {
+        if (!updateAvisoEl) return
+        updateAvisoEl.textContent = texto || ""
+        updateAvisoEl.hidden = !texto
+    }
+
+    function _pintarUpdate(datos) {
+        if (updateVersionEl) updateVersionEl.textContent = datos.version || "—"
+
+        if (!datos.vigilanteVisto) {
+            // Sin vigilante instalado, la señal se queda ahí para siempre. Un
+            // botón que gira sin fin es peor que decir que no está montado.
+            _pintarAvisoUpdate(
+                "El vigilante del servidor no da señales de vida: no ha informado de ninguna " +
+                    "actualización todavía. Mientras no esté instalado (ver tools/actualizador/), " +
+                    "este botón deja la petición y nadie la recoge; hay que actualizar con " +
+                    "./docker-update.sh por SSH."
+            )
+        } else if (datos.enMarcha) {
+            _pintarAvisoUpdate("")
+        } else if (datos.ultimo?.estado === "fallo") {
+            _pintarAvisoUpdate(
+                `La última actualización falló (código ${datos.ultimo.codigo}). La versión anterior ` +
+                    `sigue en marcha. Detalle: ${datos.ultimo.detalle || "sin detalle"}`
+            )
+        } else {
+            _pintarAvisoUpdate("")
+        }
+
+        if (updateBtn) updateBtn.disabled = Boolean(datos.enMarcha)
+        if (datos.enMarcha) showMsg(updateMsg, "Actualizando… la aplicación se reiniciará", "")
+    }
+
+    async function _consultarUpdate() {
+        try {
+            const res = await fetch("/api/actualizacion")
+            const datos = await res.json()
+            if (datos.ok) _pintarUpdate(datos)
+            return datos
+        } catch {
+            // Durante la actualización el contenedor se para: que la petición
+            // falle es la señal de que va en serio, no un error que contar.
+            return null
+        }
+    }
+
+    function _sondearUpdate() {
+        if (_sondeoUpdate) clearInterval(_sondeoUpdate)
+        _sondeoUpdate = setInterval(async () => {
+            const datos = await _consultarUpdate()
+            if (!datos) {
+                showMsg(updateMsg, "Reiniciando… esperando a que vuelva", "")
+                return
+            }
+            if (datos.version && _versionAlPedir && datos.version !== _versionAlPedir) {
+                clearInterval(_sondeoUpdate)
+                _sondeoUpdate = null
+                showMsg(updateMsg, `Actualizada a la ${datos.version}. Recarga la página.`, "ok")
+                return
+            }
+            if (datos.ultimo?.estado === "fallo") {
+                clearInterval(_sondeoUpdate)
+                _sondeoUpdate = null
+                showMsg(updateMsg, "La actualización falló; sigue la versión anterior", "error")
+            }
+        }, 5000)
+    }
+
+    if (updateBtn) {
+        updateBtn.addEventListener("click", () => {
+            openConfirmModal({
+                title: "Actualizar la aplicación",
+                message:
+                    "Se descargará y construirá la versión nueva, y la aplicación se reiniciará: " +
+                    "estarás un par de minutos sin servicio. Si la versión nueva no arranca, el " +
+                    "servidor vuelve solo a la anterior. ¿Continuar?",
+                confirmLabel: "Actualizar",
+                onConfirm: async () => {
+                    updateBtn.disabled = true
+                    showMsg(updateMsg, "Solicitando…", "")
+                    try {
+                        const res = await fetch("/api/actualizacion", { method: "POST" })
+                        const datos = await res.json()
+                        if (!datos.ok) {
+                            showMsg(updateMsg, datos.error || "No se pudo solicitar", "error")
+                            updateBtn.disabled = false
+                            return
+                        }
+                        _versionAlPedir = datos.version
+                        showMsg(updateMsg, "Lanzada. Esperando a que el servidor la recoja…", "")
+                        _sondearUpdate()
+                    } catch {
+                        showMsg(updateMsg, "Error de red", "error")
+                        updateBtn.disabled = false
+                    }
+                }
+            })
+        })
+    }
+
+    _consultarUpdate()
 
     // --- Exportar datos JSON ---
     const exportJsonBtn = document.getElementById("ajustesExportJsonBtn")

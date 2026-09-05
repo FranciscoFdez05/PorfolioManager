@@ -25,6 +25,64 @@ def _read_first_api_key(file_path):
     return apiKeys[0] if apiKeys else None
 
 
+# De dónde puede salir la clave de cada proveedor: (variable de entorno,
+# fichero, si la variable admite varias separadas por coma).
+API_KEY_SOURCES = {
+    "finnhub": ("FINNHUB_API_KEY", "finnhub.key", False),
+    "eodhd": ("EODHD_API_KEYS", "eodhd.key", True),
+    "alphavantage": ("ALPHA_VANTAGE_API_KEYS", "alphavantage.key", True),
+}
+
+
+def _clavesDeEntorno(variable, admiteVarias):
+    crudo = os.environ.get(variable, "").strip()
+    if not crudo:
+        return []
+    if not admiteVarias:
+        return [crudo]
+    return [clave.strip() for clave in crudo.split(",") if clave.strip()]
+
+
+def readApiKeysConOrigen(proveedor):
+    """Las claves que se usan de verdad, y de dónde salen.
+
+    La variable de entorno gana al fichero. Así lleva funcionando desde el
+    principio y hay instalaciones que se configuran solo por entorno, así que la
+    precedencia se queda como está —pero era **invisible**, y ahí estaba la
+    trampa: Ajustes gestiona el fichero, de modo que con la variable puesta se
+    podían añadir y borrar claves en esa pantalla, ver la lista actualizarse, y
+    que la aplicación siguiera usando otra clave distinta. Un `.env` con el
+    valor de ejemplo sin tocar dejaba al proveedor rechazando peticiones sin que
+    nada en la interfaz lo insinuara.
+
+    Devolver el origen es lo que permite decirlo en pantalla.
+    """
+    variable, fichero, admiteVarias = API_KEY_SOURCES[proveedor]
+    delFichero = _read_api_keys(apiDir / fichero)
+
+    # Compatibilidad: la clave de Finnhub se aceptaba en twelvedata.key, y ese
+    # fichero sigue leyéndose cuando finnhub.key está vacío.
+    if proveedor == "finnhub" and not delFichero:
+        delFichero = _read_api_keys(apiDir / "twelvedata.key")
+
+    delEntorno = _clavesDeEntorno(variable, admiteVarias)
+
+    if delEntorno:
+        return {
+            "claves": delEntorno,
+            "origen": "entorno",
+            "variable": variable,
+            "ignoradas": len(delFichero),
+        }
+
+    return {
+        "claves": delFichero,
+        "origen": "fichero",
+        "variable": variable,
+        "ignoradas": 0,
+    }
+
+
 def ensureDataFile():
     init_db()
 
