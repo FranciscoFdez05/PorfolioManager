@@ -10,10 +10,15 @@ de un símbolo conocido— y el fallo se traduce a uno de estos estados:
 
 * ``ok``        — responde y devuelve datos.
 * ``sin_clave`` — no hay clave configurada; el proveedor ni se llega a llamar.
-* ``clave``     — la clave existe pero el proveedor la rechaza (401/403).
+* ``clave``     — la clave existe pero el proveedor la rechaza (401).
+* ``plan``      — la clave vale, pero el plan no cubre lo que se ha pedido (403).
 * ``limite``    — cuota agotada (429/402, o el aviso en el cuerpo de Alpha Vantage).
 * ``caido``     — no contesta: timeout, corte de red o 5xx.
 * ``error``     — contesta algo que no se entiende.
+
+Los proveedores que admiten varias claves se comprueban recorriéndolas hasta
+que una responde: el diagnóstico dice si el proveedor sirve, no si sirve la
+primera clave de la lista.
 
 **Las comprobaciones gastan cuota real**, así que se contabilizan en `api_stats`
 como cualquier otra llamada y el resultado se cachea: pulsar "Actualizar" en
@@ -77,6 +82,54 @@ def _clave(lector):
     return valor
 
 
+def _lista_claves(lector_lista, lector_legado):
+    """Todas las claves configuradas del proveedor, en orden.
+
+    El lector "legado" es el de una sola clave y sigue haciendo falta: cubre las
+    instalaciones que nunca llegaron a configurar varias. Si no hay ninguna,
+    corta la comprobación igual que `_clave`.
+    """
+    try:
+        claves = [clave for clave in (lector_lista() or []) if clave]
+    except Exception as error:
+        log.debug("[estado] No se pudieron leer las claves: %s", error)
+        claves = []
+    return claves or [_clave(lector_legado)]
+
+
+def _sondear_claves(claves, llamada):
+    """Prueba las claves en orden y para en la primera que responde.
+
+    Antes se sondeaba solo la primera. Con varias configuradas —EODHD da 20
+    peticiones al día por clave, que es justo el motivo de poner varias— que la
+    #1 se quedara sin cuota pintaba «EODHD · Cuota agotada» aunque las otras
+    estuvieran enteras y la aplicación siguiera actualizando precios con ellas.
+    El usuario veía un proveedor roto que no lo estaba.
+
+    Mientras la primera responda —el caso normal— sigue costando una sola
+    petición: solo baja por la lista cuando ya hay un fallo que explicar, y esas
+    claves de más que se prueban son precisamente las que no tienen cuota que
+    gastar.
+    """
+    ultimo_error = None
+
+    for numero, clave in enumerate(claves, start=1):
+        try:
+            llamada(clave)
+        except Exception as error:
+            ultimo_error = error
+            continue
+
+        if numero == 1:
+            return ""
+
+        # Que responda la tercera no es lo mismo que responder a la primera: el
+        # proveedor sirve, pero quedan menos claves de las que parece.
+        return f"Responde la clave {numero} de {len(claves)}; las anteriores, no"
+
+    raise ultimo_error
+
+
 def _probar_finnhub():
     fetch_json(
         "https://finnhub.io/api/v1/quote",
@@ -86,26 +139,31 @@ def _probar_finnhub():
 
 
 def _probar_eodhd():
-    fetch_json(
-        "https://eodhd.com/api/real-time/AAPL.US",
-        {"api_token": _clave(app_data.readEodhdApiKey), "fmt": "json"},
-        timeout=_TIMEOUT, provider="EODHD", retries=0,
+    return _sondear_claves(
+        _lista_claves(app_data.readEodhdApiKeys, app_data.readEodhdApiKey),
+        lambda clave: fetch_json(
+            "https://eodhd.com/api/real-time/AAPL.US",
+            {"api_token": clave, "fmt": "json"},
+            timeout=_TIMEOUT, provider="EODHD", retries=0,
+        ),
     )
 
 
-def _probar_alpha_vantage():
+def _consultar_alpha_vantage(clave):
     payload = fetch_json(
         "https://www.alphavantage.co/query",
         {
             "function": "GLOBAL_QUOTE",
             "symbol": "AAPL",
-            "apikey": _clave(app_data.readAlphaVantageApiKey),
+            "apikey": clave,
         },
         timeout=_TIMEOUT, provider="Alpha Vantage", retries=0,
     )
     # Alpha Vantage no usa códigos HTTP para esto: el límite diario y la clave
     # inválida llegan como un 200 con un texto explicativo, así que sin mirar
-    # el cuerpo saldría "Operativa" con la cuota agotada.
+    # el cuerpo saldría "Operativa" con la cuota agotada. Se mira aquí dentro,
+    # y no después del sondeo, para que una clave sin cuota deje paso a la
+    # siguiente en vez de dar por fallado al proveedor entero.
     if not isinstance(payload, dict):
         return
     aviso = payload.get("Note") or payload.get("Information")
@@ -113,6 +171,13 @@ def _probar_alpha_vantage():
         raise _Limite(aviso)
     if payload.get("Error Message"):
         raise _Clave(payload["Error Message"])
+
+
+def _probar_alpha_vantage():
+    return _sondear_claves(
+        _lista_claves(app_data.readAlphaVantageApiKeys, app_data.readAlphaVantageApiKey),
+        _consultar_alpha_vantage,
+    )
 
 
 def _probar_yahoo():
@@ -154,8 +219,14 @@ def _fila(id_proveedor, nombre, estado, etiqueta, detalle="", ms=0):
 
 
 def _por_codigo(codigo):
-    if codigo in (401, 403):
+    if codigo == 401:
         return "clave", "Clave rechazada"
+    if codigo == 403:
+        # Finnhub usa el 403 para "tu plan no cubre esto" —bolsas fuera de
+        # EE. UU., históricos— con la clave perfectamente válida. Pintarlo como
+        # clave rechazada mandaba al usuario a cambiar una clave que funciona,
+        # y a no encontrar nunca el problema, que es el plan.
+        return "plan", "Fuera del plan"
     if codigo in (402, 429):
         # 402 es lo que devuelve EODHD cuando se agota el plan del día.
         return "limite", "Cuota agotada"
@@ -172,7 +243,7 @@ def _diagnosticar(id_proveedor, nombre, probar):
         return _fila(id_proveedor, nombre, estado, etiqueta, detalle, ms)
 
     try:
-        probar()
+        detalle_ok = probar()
     except _SinClave:
         return fin("sin_clave", "Sin clave", "No hay ninguna clave configurada")
     except _Limite as error:
@@ -187,7 +258,7 @@ def _diagnosticar(id_proveedor, nombre, probar):
     except Exception as error:
         log.debug("[estado] %s falló de forma inesperada: %s", nombre, error)
         return fin("error", "Error", error)
-    return fin("ok", "Operativa")
+    return fin("ok", "Operativa", detalle_ok or "")
 
 
 def comprobar():

@@ -770,10 +770,11 @@
     background: rgba(74, 222, 128, 0.07);
 }
 
-/* Cuota agotada y clave rechazada no son una caída: el servicio responde, es
-   la cuenta la que no da más. Ámbar y no rojo, que es lo que el usuario puede
-   arreglar por su cuenta. */
+/* Cuota agotada, clave rechazada y plan insuficiente no son una caída: el
+   servicio responde, es la cuenta la que no da más. Ámbar y no rojo, que es lo
+   que el usuario puede arreglar por su cuenta. */
 .ajustesApiEstadoBadge.limite,
+.ajustesApiEstadoBadge.plan,
 .ajustesApiEstadoBadge.clave {
     color: #fbbf24;
     border-color: rgba(251, 191, 36, 0.3);

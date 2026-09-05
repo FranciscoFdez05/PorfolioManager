@@ -13,6 +13,78 @@ from providers import (
 
 EODHD_SEARCH_URL = "https://eodhd.com/api/search"
 EODHD_REALTIME_URL = "https://eodhd.com/api/real-time"
+
+# Divisa en la que cotiza cada mercado de EODHD, por el sufijo del símbolo.
+# `search` sí devuelve el campo `Currency`, pero `real-time` —de donde salen
+# las cotizaciones— no lo trae nunca, así que hay que deducirlo del símbolo.
+EXCHANGE_CURRENCIES = {
+    "US": "USD", "NYSE": "USD", "NASDAQ": "USD", "AMEX": "USD", "BATS": "USD",
+    "NMFQS": "USD", "OTC": "USD", "PINK": "USD", "INDX": "USD",
+    "TO": "CAD", "V": "CAD", "NEO": "CAD",
+    "XETRA": "EUR", "F": "EUR", "BE": "EUR", "DU": "EUR", "HM": "EUR",
+    "HA": "EUR", "MU": "EUR", "STU": "EUR",
+    "MC": "EUR", "PA": "EUR", "MI": "EUR", "AS": "EUR", "BR": "EUR",
+    "LS": "EUR", "VI": "EUR", "IR": "EUR", "HE": "EUR", "AT": "EUR",
+    "TL": "EUR", "RG": "EUR", "VS": "EUR",
+    # La bolsa de Londres cotiza en peniques, no en libras. Etiquetarlo "GBP"
+    # multiplicaría por cien el valor del activo; "GBX" no tiene conversión
+    # automática, así que la aplicación lo dice en vez de inventárselo.
+    "LSE": "GBX", "L": "GBX",
+    "IL": "USD",
+    "SW": "CHF", "VX": "CHF",
+    "ST": "SEK", "CO": "DKK", "OL": "NOK", "IC": "ISK",
+    "WAR": "PLN", "PR": "CZK", "BUD": "HUF", "RO": "RON",
+    "AU": "AUD", "NZ": "NZD", "JP": "JPY", "HK": "HKD", "SG": "SGD",
+    "KO": "KRW", "KQ": "KRW", "SHG": "CNY", "SHE": "CNY", "TW": "TWD",
+    "NSE": "INR", "BSE": "INR", "JK": "IDR", "BK": "THB", "KLSE": "MYR",
+    "SA": "BRL", "MX": "MXN", "SN": "CLP", "BA": "ARS",
+    "IS": "TRY", "JSE": "ZAR", "TA": "ILS", "CA": "EGP",
+}
+
+
+def infer_currency_from_symbol(symbol, fallback="EUR"):
+    """Divisa de la cotización, deducida del sufijo de mercado.
+
+    `real-time` no devuelve el campo `currency` —solo lo trae `search`—, así que
+    aquí se caía siempre al valor por defecto y **toda** cotización de EODHD
+    quedaba etiquetada en euros. Un AAPL.US a 320 USD se mostraba como 320 €, y
+    como la conversión a la divisa de la cartera mira justo esa etiqueta,
+    tampoco se convertía: el error se quedaba en el dato guardado.
+    """
+    normalized_symbol = str(symbol or "").strip().upper()
+
+    if "." not in normalized_symbol:
+        return fallback
+
+    code, _, market = normalized_symbol.rpartition(".")
+
+    if market == "FOREX":
+        # Pares de seis letras (EURUSD, XAUEUR): cotizan en la segunda divisa.
+        pair = code.replace("-", "").replace("/", "")
+        return pair[3:] if len(pair) == 6 else fallback
+
+    if market == "CC":
+        # Cripto: BTC-USD.CC cotiza en la divisa que va tras el guion.
+        _, separator, quoted = code.rpartition("-")
+        return quoted if separator and len(quoted) >= 3 else "USD"
+
+    return EXCHANGE_CURRENCIES.get(market, fallback)
+
+
+def _mensaje_http(error):
+    """El código de EODHD, dicho en términos de lo que hay que hacer.
+
+    El 402 es cuota diaria agotada —el plan gratuito da 20 peticiones al día por
+    clave— y es de lejos el fallo más habitual. Como «EODHD devolvió HTTP 402»
+    no lo dice, el corte parecía una avería del proveedor.
+    """
+    if error.code == 401:
+        return "EODHD rechaza la API key (HTTP 401)"
+    if error.code in (402, 429):
+        return f"EODHD: cuota diaria agotada (HTTP {error.code})"
+    if error.code == 403:
+        return "El plan de EODHD no cubre ese símbolo (HTTP 403)"
+    return f"EODHD devolvió HTTP {error.code}"
 PREFERRED_EXCHANGES_BY_TYPE = {
     "acciones": {"US", "NYSE", "NASDAQ", "XETRA", "LSE", "PA"},
     "etfs": {"XETRA", "PA", "LSE", "US", "NYSE", "NASDAQ", "AS", "SW"},
@@ -117,7 +189,7 @@ def search_symbol(query_text, api_key, timeout=None, limit=8, asset_name="", pre
             timeout=timeout
         )
     except HTTPError as error:
-        return None, f"EODHD devolvió HTTP {error.code}"
+        return None, _mensaje_http(error)
     except URLError:
         return None, "No se pudo conectar con EODHD"
 
@@ -175,7 +247,7 @@ def fetch_quote(symbol, api_key, timeout=None):
             timeout=timeout
         )
     except HTTPError as error:
-        return None, f"EODHD devolvió HTTP {error.code}"
+        return None, _mensaje_http(error)
     except URLError:
         return None, "No se pudo conectar con EODHD"
 
@@ -193,7 +265,8 @@ def fetch_quote(symbol, api_key, timeout=None):
     if current_price <= 0:
         current_price = previous_close
 
-    currency = str(payload.get("currency", "")).strip().upper() or "EUR"
+    currency = (str(payload.get("currency", "")).strip().upper()
+                or infer_currency_from_symbol(normalized_symbol))
 
     if current_price <= 0 and previous_close <= 0:
         return None, "EODHD no devolvió cotización para ese ticker"

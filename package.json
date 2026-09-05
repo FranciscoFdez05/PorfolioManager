@@ -1,6 +1,6 @@
 {
   "name": "porfoliomanager-frontend",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "type": "module",
   "description": "Tooling del frontend. La aplicación no se empaqueta: js/ se sirve tal cual con etiquetas <script>, así que aquí solo hay linter, formateador y las pruebas de los módulos de js/core/.",

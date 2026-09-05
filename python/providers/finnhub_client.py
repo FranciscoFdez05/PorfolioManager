@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import datetime
 from urllib.error import HTTPError, URLError
@@ -10,6 +11,27 @@ from providers import (
     format_percent as _format_percent,
     normalize_text as _normalize_text,
 )
+
+log = logging.getLogger(__name__)
+
+
+def _mensaje_http(error):
+    """Traduce el código de Finnhub a algo que diga qué hacer.
+
+    Finnhub contesta 403 «You don't have access to this resource» cuando la
+    clave es correcta pero el plan no cubre lo que se ha pedido: en el plan
+    gratuito, cualquier bolsa fuera de EE. UU. y todos los históricos. Un
+    «Finnhub devolvió HTTP 403» mandaba a revisar la clave —lo único que el
+    usuario puede tocar— y ahí no estaba el problema, así que no se encontraba
+    nunca.
+    """
+    if error.code == 401:
+        return "Finnhub rechaza la API key (HTTP 401)"
+    if error.code == 403:
+        return "El plan de Finnhub no cubre ese mercado (HTTP 403)"
+    if error.code == 429:
+        return "Finnhub: límite de peticiones alcanzado (HTTP 429)"
+    return f"Finnhub devolvió HTTP {error.code}"
 
 
 def _provider_from_url(url: str) -> str:
@@ -339,7 +361,7 @@ def fetch_quote(symbol, api_key, timeout=None):
             "token": api_key
         }, timeout=timeout)
     except HTTPError as error:
-        return None, f"Finnhub devolvió HTTP {error.code}"
+        return None, _mensaje_http(error)
     except URLError:
         return None, "No se pudo conectar con Finnhub"
 
@@ -517,7 +539,7 @@ def search_symbol(query_text, api_key, timeout=None, limit=8, asset_name="", pre
                 "token": api_key
             }, timeout=timeout)
         except HTTPError as error:
-            return None, f"Finnhub devolvió HTTP {error.code}"
+            return None, _mensaje_http(error)
         except URLError:
             return None, "No se pudo conectar con Finnhub"
 
@@ -587,11 +609,28 @@ def search_symbol(query_text, api_key, timeout=None, limit=8, asset_name="", pre
 FINNHUB_STOCK_CANDLE_URL  = "https://finnhub.io/api/v1/stock/candle"
 FINNHUB_CRYPTO_CANDLE_URL = "https://finnhub.io/api/v1/crypto/candle"
 
+SIN_HISTORICO = "El plan de Finnhub no incluye históricos (HTTP 403)"
+
+# Finnhub sacó los endpoints de velas del plan gratuito: contestan 403 pase lo
+# que pase. Quien pide esto es el cálculo de variación por periodo, que lo
+# lanza en paralelo para todos los activos sin snapshot guardado, así que un
+# plan sin históricos costaba una tanda de 403 —una por activo— en cada
+# consulta, y ninguna iba a funcionar nunca. Con el primero basta para saberlo.
+#
+# Se recuerda solo mientras viva el proceso: al mejorar el plan, un reinicio
+# vuelve a intentarlo.
+_sin_historicos = False
+
 
 def fetch_candle_close(symbol, from_ts, to_ts, api_key, timeout=None):
     """Return the first available daily closing price in [from_ts, to_ts]."""
+    global _sin_historicos
+
     if not symbol or not api_key:
         return None, "Parámetros insuficientes"
+
+    if _sin_historicos:
+        return None, SIN_HISTORICO
 
     normalized = str(symbol).strip().upper()
     is_crypto = ":" in normalized
@@ -605,10 +644,25 @@ def fetch_candle_close(symbol, from_ts, to_ts, api_key, timeout=None):
             "to": int(to_ts),
             "token": api_key,
         }, timeout=timeout)
+    except HTTPError as error:
+        if error.code == 403:
+            _sin_historicos = True
+            log.warning(
+                "Finnhub no da históricos con este plan: la variación por "
+                "periodo se calculará solo con los snapshots guardados."
+            )
+            return None, SIN_HISTORICO
+        return None, _mensaje_http(error)
+    except (TimeoutError, URLError) as error:
+        return None, str(error)
 
-        if data.get("s") == "ok" and data.get("c"):
-            return float(data["c"][0]), None
+    if data.get("s") == "ok" and data.get("c"):
+        return float(data["c"][0]), None
 
-        return None, f"Sin datos ({data.get('s', 'unknown')})"
-    except (HTTPError, URLError, Exception) as exc:
-        return None, str(exc)
+    return None, f"Sin datos ({data.get('s', 'unknown')})"
+
+
+def reiniciar_historicos_para_pruebas():
+    """Olvida el 403 recordado. Simula un proceso recién arrancado."""
+    global _sin_historicos
+    _sin_historicos = False

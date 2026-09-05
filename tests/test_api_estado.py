@@ -24,13 +24,23 @@ def sin_cache():
 
 
 _LECTORES = ("readFinnhubApiKey", "readEodhdApiKey", "readAlphaVantageApiKey")
+# EODHD y Alpha Vantage admiten varias claves y el sondeo las recorre, así que
+# hay que parchear también estos: si no, la prueba acabaría leyendo las claves
+# reales de API/ del equipo que ejecuta la suite.
+_LECTORES_LISTA = ("readEodhdApiKeys", "readAlphaVantageApiKeys")
 
 
-def _claves(monkeypatch, valor):
+def _claves(monkeypatch, valor, lista=None):
     from stores import app_data
 
     for lector in _LECTORES:
         monkeypatch.setattr(app_data, lector, lambda valor=valor: valor)
+
+    if lista is None:
+        lista = [valor] if valor else []
+
+    for lector in _LECTORES_LISTA:
+        monkeypatch.setattr(app_data, lector, lambda lista=lista: list(lista))
 
 
 @pytest.fixture
@@ -98,6 +108,23 @@ def test_el_401_señala_la_clave_no_el_servicio(monkeypatch, con_claves):
     _respuesta(monkeypatch, falla)
 
     assert _por_id(estado.comprobar())["finnhub"]["estado"] == "clave"
+
+
+def test_el_403_es_un_limite_de_plan_y_no_una_clave_rechazada(monkeypatch, con_claves):
+    """Finnhub contesta 403 cuando el plan no cubre lo pedido, con la clave bien.
+
+    Mandaba al usuario a cambiar una clave que funciona: el problema es el plan
+    —fuera de EE. UU. y los históricos no entran en el gratuito— y ninguna clave
+    nueva lo iba a arreglar.
+    """
+    def falla(*a, **k):
+        raise _http(403)
+
+    _respuesta(monkeypatch, falla)
+
+    fila = _por_id(estado.comprobar())["finnhub"]
+    assert fila["estado"] == "plan"
+    assert fila["etiqueta"] == "Fuera del plan"
 
 
 def test_un_5xx_es_una_caida_del_proveedor(monkeypatch, con_claves):
@@ -169,6 +196,105 @@ def test_el_orden_de_la_lista_no_depende_de_quien_conteste_antes(monkeypatch, co
     ids = [fila["id"] for fila in estado.comprobar()]
 
     assert ids == [proveedor[0] for proveedor in estado._PROVEEDORES]
+
+
+# ── Varias claves por proveedor ──────────────────────────────────────────────
+
+@pytest.fixture
+def cuatro_claves(monkeypatch):
+    """EODHD con cuatro claves, que es como se usa: 20 peticiones al día cada una."""
+    _claves(monkeypatch, "clave-1", lista=["clave-1", "clave-2", "clave-3", "clave-4"])
+
+
+def _sin_cuota(claves_agotadas):
+    """fetch_json que da 402 en EODHD para las claves dadas y datos para el resto.
+
+    Solo cuenta las llamadas a EODHD: los otros cuatro proveedores se sondean en
+    la misma pasada y ensuciarían el recuento.
+    """
+    usadas = []
+
+    def responde(url, params=None, **k):
+        if "eodhd" not in url:
+            return {"c": 1}
+
+        clave = (params or {}).get("api_token")
+        usadas.append(clave)
+        if clave in claves_agotadas:
+            raise _http(402)
+        return {"close": 1}
+
+    return responde, usadas
+
+
+def test_una_clave_sin_cuota_no_da_por_caido_al_proveedor(monkeypatch, cuatro_claves):
+    """El sondeo miraba solo la primera clave.
+
+    Con la #1 agotada, Ajustes decía «EODHD · Cuota agotada» mientras la
+    aplicación seguía actualizando precios con las otras tres: el usuario veía
+    roto lo que funcionaba.
+    """
+    responde, usadas = _sin_cuota({"clave-1"})
+    _respuesta(monkeypatch, responde)
+
+    fila = _por_id(estado.comprobar())["eodhd"]
+
+    assert fila["estado"] == "ok"
+    assert usadas.count("clave-2") == 1
+
+
+def test_se_avisa_de_las_claves_que_ya_no_responden(monkeypatch, cuatro_claves):
+    """Operativa, sí, pero quedan menos claves de las que parece."""
+    responde, _usadas = _sin_cuota({"clave-1", "clave-2"})
+    _respuesta(monkeypatch, responde)
+
+    fila = _por_id(estado.comprobar())["eodhd"]
+
+    assert fila["estado"] == "ok"
+    assert "clave 3 de 4" in fila["detalle"]
+
+
+def test_la_cuota_agotada_solo_se_declara_si_fallan_todas(monkeypatch, cuatro_claves):
+    responde, usadas = _sin_cuota({"clave-1", "clave-2", "clave-3", "clave-4"})
+    _respuesta(monkeypatch, responde)
+
+    fila = _por_id(estado.comprobar())["eodhd"]
+
+    assert fila["estado"] == "limite"
+    assert len(usadas) == 4
+
+
+def test_con_una_sola_clave_el_sondeo_no_gasta_de_mas(monkeypatch, con_claves):
+    """El caso normal sigue costando una petición, que es cuota real."""
+    usadas = []
+
+    def responde(url, params=None, **k):
+        if "eodhd" in url:
+            usadas.append((params or {}).get("api_token"))
+        return {"close": 1}
+
+    _respuesta(monkeypatch, responde)
+    estado.comprobar()
+
+    assert usadas == ["clave-de-prueba"]
+
+
+def test_alpha_vantage_pasa_a_la_siguiente_clave_si_la_primera_no_tiene_cuota(monkeypatch):
+    """El aviso de cuota de Alpha Vantage llega dentro de un 200.
+
+    Si se mirase después del sondeo en vez de por clave, la primera agotada
+    daría por agotado al proveedor entero.
+    """
+    _claves(monkeypatch, "clave-1", lista=["clave-1", "clave-2"])
+
+    def responde(url, params=None, **k):
+        if "alphavantage" in url and (params or {}).get("apikey") == "clave-1":
+            return {"Note": "standard API rate limit"}
+        return {"c": 1}
+
+    _respuesta(monkeypatch, responde)
+
+    assert _por_id(estado.comprobar())["alphavantage"]["estado"] == "ok"
 
 
 # ── Caché ────────────────────────────────────────────────────────────────────

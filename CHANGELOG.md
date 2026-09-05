@@ -22,6 +22,77 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.4.1] — 2026-09-05
+
+**Cuando un proveedor falla, decir cuál es el problema de verdad.** Finnhub y
+EODHD daban error en la pantalla y el mensaje no llevaba a ninguna parte:
+«devolvió HTTP 403», «devolvió HTTP 402». Ninguno de los dos estaba caído ni
+tenía la clave mal —los dos responden y las claves valen—; lo que pasa es que
+sus planes gratuitos no cubren lo que se les pedía. Uno de los mensajes,
+además, mentía: el panel de estado pintaba el 403 como **Clave rechazada** y
+mandaba a cambiar una clave que funciona.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+### Corregido
+
+- **El panel de Ajustes daba por agotado a EODHD mirando solo la primera
+  clave.** EODHD da 20 peticiones al día por clave —por eso se configuran
+  varias, y la aplicación las va recorriendo cuando una se queda sin cuota—,
+  pero el sondeo probaba siempre la primera y nada más. Con la #1 gastada, la
+  pantalla decía «Cuota agotada» mientras los precios se seguían actualizando
+  con las otras tres: un proveedor roto que no lo estaba, y ninguna forma de
+  saberlo sin abrir los logs.
+
+  Ahora el sondeo recorre las claves y para en la primera que responde, así que
+  dice si el proveedor sirve y no si sirve la primera de la lista. Mientras esa
+  responda —el caso normal— sigue costando una sola petición; solo baja por la
+  lista cuando ya hay un fallo que explicar, y las claves de más que prueba son
+  justo las que no tienen cuota que gastar. Si contesta una que no es la
+  primera, el detalle de la fila lo dice: **operativa, pero quedan menos claves
+  de las que parece**. Mismo arreglo en Alpha Vantage, que también admite
+  varias y comparte el problema: su aviso de cuota llega dentro de un 200, y
+  ahora se mira clave por clave.
+
+- **El 403 se pintaba como clave rechazada.** Finnhub lo usa para «tu plan no
+  cubre esto» —cualquier bolsa fuera de EE. UU., y los históricos— con la clave
+  perfectamente válida. El panel tiene ahora un estado propio, **Fuera del
+  plan**, en el mismo ámbar que la cuota agotada: el servicio responde, es la
+  cuenta la que no llega. El 401, que sí es la clave, se queda solo con su
+  etiqueta.
+
+- **Los mensajes de error de los dos proveedores decían el código y poco más.**
+  Un 402 de EODHD ahora se lee como «cuota diaria agotada», un 403 de Finnhub
+  como «el plan no cubre ese mercado» y un 401 como que la clave está
+  rechazada. Es la diferencia entre esperar a mañana, cambiar de proveedor para
+  ese activo y entrar a poner una clave nueva.
+
+- **Toda cotización de EODHD se etiquetaba en euros.** Su endpoint de tiempo
+  real no devuelve la divisa —solo la trae el buscador—, y el código caía a
+  «EUR» por defecto: un valor estadounidense a 320 USD se guardaba como 320 €.
+  Y como la conversión a la divisa de la cartera mira justo esa etiqueta,
+  tampoco lo convertía después: el error se quedaba dentro del dato. Ahora la
+  divisa se deduce del sufijo de mercado del símbolo (`.US` → USD, `.MC` → EUR,
+  `.SW` → CHF, los pares `.FOREX` por su segunda divisa, `.CC` por la que va
+  tras el guion…), igual que ya se hacía con Finnhub. Londres se etiqueta
+  **GBX**, que es lo que es —peniques—: decir «GBP» multiplicaría por cien el
+  valor del activo, y como no hay conversión automática desde GBX, la
+  aplicación lo dice en vez de inventárselo.
+
+- **La variación por periodo pedía a Finnhub históricos que su plan no da.** Los
+  endpoints de velas salieron del plan gratuito y contestan 403 pase lo que
+  pase; como esa consulta los pide en paralelo para todos los activos sin
+  snapshot guardado, cada vez se gastaba una tanda entera de peticiones
+  condenadas al mismo error. Con el primer 403 basta: se apunta que este plan no
+  tiene históricos y se deja de preguntar. La variación se calcula entonces con
+  los snapshots guardados, que es lo que ya venía pasando, pero sin el gasto. Si
+  se mejora el plan, un reinicio vuelve a intentarlo.
+
+[1.4.1]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.4.1
+
+---
+
 ## [1.4.0] — 2026-09-04
 
 **HTTPS, y se enciende desde Ajustes.** Hasta aquí la aplicación solo hablaba
