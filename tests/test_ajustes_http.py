@@ -175,54 +175,119 @@ def test_sin_variable_de_entorno_las_claves_salen_del_fichero(cliente):
     assert info["variable"] == "FINNHUB_API_KEY"
 
 
-def test_la_variable_de_entorno_gana_al_fichero_y_se_dice(cliente, monkeypatch):
-    """La trampa que dejaba la pantalla mintiendo.
+def test_manda_el_fichero_y_la_variable_queda_de_respaldo(cliente, monkeypatch):
+    """La trampa que se comía instalaciones enteras, ahora del revés.
 
-    Con la variable puesta se podían añadir y borrar claves en Ajustes, ver la
-    lista actualizarse, y que la aplicación siguiera usando otra distinta. Un
-    `.env` con el valor de ejemplo sin tocar dejaba al proveedor rechazando
-    peticiones sin que nada en la interfaz lo insinuara.
+    Cuando mandaba el entorno, se podían añadir claves en Ajustes, verlas
+    aparecer, darse de alta en otra cuenta del proveedor, y que la aplicación
+    siguiera mandando la del `.env` —el valor de ejemplo de `.env.example`, en
+    el caso que lo destapó— sin que nada lo insinuara. Ahora manda lo que se ve
+    en pantalla, que es lo único que se puede arreglar desde ella.
     """
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "clave-del-fichero", "otra-del-fichero")
-    monkeypatch.setenv("FINNHUB_API_KEY", "clave-del-entorno")
+    _anadir_claves(client, cabeceras, "d41d8cd98f00b204e980", "9e800998ecf8427e1234")
+    monkeypatch.setenv("FINNHUB_API_KEY", "3c59dc048e8850243be8")
+
+    info = _listar(client)
+
+    assert info["origen"] == "fichero"
+    assert [c["clave"] for c in info["claves"]] == ["d41d8cd98f00b204e980", "9e800998ecf8427e1234"]
+    # La del entorno no rompe nada, pero conviene decir que está de más.
+    assert info["ignoradas"] == 1
+
+
+def test_sin_claves_en_el_fichero_se_usa_la_del_entorno(cliente, monkeypatch):
+    """Un despliegue sin volumen para API/ no tiene dónde guardarlas."""
+    client, _cabeceras, _rutas = cliente
+    monkeypatch.setenv("FINNHUB_API_KEY", "3c59dc048e8850243be8")
 
     info = _listar(client)
 
     assert info["origen"] == "entorno"
-    assert info["variable"] == "FINNHUB_API_KEY"
-    assert [c["clave"] for c in info["claves"]] == ["clave-del-entorno"]
-    # Las del fichero siguen ahí, y la pantalla tiene que poder decir cuántas.
-    assert info["ignoradas"] == 2
+    assert [c["clave"] for c in info["claves"]] == ["3c59dc048e8850243be8"]
+    assert info["ignoradas"] == 0
+
+
+def test_sin_claves_en_ningun_sitio_el_origen_lo_dice(cliente):
+    client, _cabeceras, _rutas = cliente
+
+    info = _listar(client)
+
+    assert info["origen"] == "ninguno"
+    assert info["claves"] == []
+
+
+@pytest.mark.parametrize("ejemplo", [
+    "tu_clave_finnhub",
+    "tu_clave_EODHD1",
+    "CLAVE1",
+    "CLAVE_PRINCIPAL",
+    "changeme",
+    "your_api_key",
+])
+def test_los_valores_de_ejemplo_de_la_documentacion_se_descartan(cliente, monkeypatch, ejemplo):
+    """No son claves: su único efecto posible es romper el proveedor.
+
+    Es el fallo que destapó todo esto: un `.env` copiado de `.env.example` y sin
+    rellenar dejaba a Finnhub y EODHD mandando `tu_clave_finnhub` contra la API,
+    con «Clave rechazada» en pantalla y ninguna pista de por qué.
+    """
+    client, _cabeceras, _rutas = cliente
+    monkeypatch.setenv("FINNHUB_API_KEY", ejemplo)
+
+    info = _listar(client)
+
+    assert info["claves"] == []
+    assert info["origen"] == "ninguno"
+
+
+def test_un_ejemplo_en_el_entorno_no_tapa_a_la_clave_del_fichero(cliente, monkeypatch):
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "d41d8cd98f00b204e980")
+    monkeypatch.setenv("FINNHUB_API_KEY", "tu_clave_finnhub")
+
+    info = _listar(client)
+
+    assert [c["clave"] for c in info["claves"]] == ["d41d8cd98f00b204e980"]
+    # El ejemplo se descarta antes de contar, así que no figura como ignorada.
+    assert info["ignoradas"] == 0
+
+
+def test_una_clave_de_verdad_no_se_confunde_con_un_ejemplo(cliente, monkeypatch):
+    """El reconocimiento es estrecho a propósito: tirar una clave buena sería peor."""
+    client, _cabeceras, _rutas = cliente
+    monkeypatch.setenv("FINNHUB_API_KEY", "d6s0abcdefghijklmnopsfe0")
+
+    assert [c["clave"] for c in _listar(client)["claves"]] == ["d6s0abcdefghijklmnopsfe0"]
 
 
 def test_la_variable_de_eodhd_admite_varias_separadas_por_coma(cliente, monkeypatch):
     client, _cabeceras, _rutas = cliente
-    monkeypatch.setenv("EODHD_API_KEYS", "clave-una, clave-dos ,clave-tres")
+    monkeypatch.setenv("EODHD_API_KEYS", "69c2aaaa1875, 69c2bbbb6133 ,69c2cccc7788")
 
     info = _listar(client, "eodhd")
 
-    assert [c["clave"] for c in info["claves"]] == ["clave-una", "clave-dos", "clave-tres"]
+    assert [c["clave"] for c in info["claves"]] == ["69c2aaaa1875", "69c2bbbb6133", "69c2cccc7788"]
 
 
 def test_la_variable_de_finnhub_es_una_sola_clave(cliente, monkeypatch):
     """`FINNHUB_API_KEY` no se parte por comas: el lector real la usa entera."""
     client, _cabeceras, _rutas = cliente
-    monkeypatch.setenv("FINNHUB_API_KEY", "clave,con,comas")
+    monkeypatch.setenv("FINNHUB_API_KEY", "d41d,8cd9,8f00")
 
-    assert [c["clave"] for c in _listar(client)["claves"]] == ["clave,con,comas"]
+    assert [c["clave"] for c in _listar(client)["claves"]] == ["d41d,8cd9,8f00"]
 
 
-def test_una_variable_vacia_no_tapa_al_fichero(cliente, monkeypatch):
+def test_una_variable_vacia_no_cuenta(cliente, monkeypatch):
     """`.env.example` deja las líneas puestas; en blanco no deben contar."""
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "clave-del-fichero")
+    _anadir_claves(client, cabeceras, "d41d8cd98f00b204e980")
     monkeypatch.setenv("FINNHUB_API_KEY", "   ")
 
     info = _listar(client)
 
     assert info["origen"] == "fichero"
-    assert [c["clave"] for c in info["claves"]] == ["clave-del-fichero"]
+    assert info["ignoradas"] == 0
 
 
 def test_listar_las_claves_sin_sesion_es_401(crear_app, datos_aislados, temp_db):

@@ -11,9 +11,12 @@ from providers.alpha_vantage_client import fetch_quote as _fetch_av_quote
 from providers.eodhd_client import fetch_quote as _fetch_eodhd_quote
 from providers.finnhub_client import fetch_quote as _fetch_finnhub_quote
 from providers.yahoo_finance_client import fetch_quote as _fetch_yahoo_quote
-from stores.app_data import readFinnhubApiKey
 from stores.asset_utils import inferMarketProviderFromSymbol, normalizeMarketProvider
-from stores.helpers import call_alpha_vantage_with_fallbacks, call_eodhd_with_fallbacks
+from stores.helpers import (
+    call_alpha_vantage_with_fallbacks,
+    call_eodhd_with_fallbacks,
+    call_finnhub_with_fallbacks,
+)
 
 
 def fetch_asset_quote(symbol, provider=None):
@@ -33,4 +36,4 @@ def fetch_asset_quote(symbol, provider=None):
     if proveedor == "alphavantage":
         return call_alpha_vantage_with_fallbacks(lambda apiKey: _fetch_av_quote(symbol, apiKey))
 
-    return _fetch_finnhub_quote(symbol, readFinnhubApiKey())
+    return call_finnhub_with_fallbacks(lambda apiKey: _fetch_finnhub_quote(symbol, apiKey))

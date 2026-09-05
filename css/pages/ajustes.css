@@ -551,7 +551,10 @@
 .ajustesUpdateVersion {
     color: var(--text-dim);
     font-size: 0.85rem;
-    padding-bottom: 10px;
+}
+
+.ajustesSection > .ajustesUpdateVersion {
+    padding: 14px 20px 0;
 }
 
 .ajustesUpdateVersion strong {
@@ -563,7 +566,6 @@
    Lo usan la precedencia del .env sobre los ficheros de claves y el estado del
    actualizador. Ni rojo ni verde: no es un fallo, es una condición. */
 .ajustesAviso {
-    margin-bottom: 10px;
     padding: 7px 10px;
     border-radius: 8px;
     background: rgba(251, 191, 36, 0.08);
@@ -571,6 +573,21 @@
     color: #fbbf24;
     font-size: 0.78rem;
     line-height: 1.45;
+}
+
+.ajustesSection > .ajustesAviso {
+    margin: 12px 20px 0;
+}
+
+/* Este mensaje se queda en pantalla mientras dura la actualización —los demás
+   se borran solos a los tres segundos—, así que aquí sí se le nota que estaba
+   pegado al borde de la tarjeta. */
+.ajustesSection > .ajustesUpdateMsg {
+    padding: 0 20px 14px;
+}
+
+.ajustesKeyList > .ajustesAviso {
+    margin-bottom: 3px;
 }
 
 /* Backup list */

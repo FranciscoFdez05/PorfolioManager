@@ -3,6 +3,7 @@ from providers.finnhub_client import convert_amount
 from stores.app_data import (
     readAlphaVantageApiKey,
     readEodhdApiKey,
+    readFinnhubApiKeys,
     readRotatedAlphaVantageApiKeys,
     readRotatedEodhdApiKeys,
 )
@@ -20,6 +21,42 @@ def normalize_currency_code(currency, fallback="EUR"):
         return "EUR"
 
     return normalized or fallback
+
+
+def call_finnhub_with_fallbacks(callback):
+    """Prueba las claves de Finnhub en orden y se queda con la primera que sirve.
+
+    Finnhub era el único proveedor sin respaldo: usaba siempre la primera clave
+    del fichero y ninguna más. Con tres configuradas, que la primera estuviera
+    caducada dejaba a los diecinueve activos de Finnhub sin cotizar aunque las
+    otras dos fueran perfectamente válidas, y desde la interfaz no había forma
+    de saber cuál de las tres era la mala: solo se veía «Clave rechazada».
+
+    No rota, a diferencia de EODHD y Alpha Vantage. Ahí la rotación reparte una
+    cuota diaria muy corta; aquí el límite es por minuto y de sobra, así que el
+    orden estable es preferible: la clave que se usa es siempre la primera de la
+    lista que funcione, que es lo que la pantalla enseña.
+    """
+    apiKeys = readFinnhubApiKeys()
+
+    if not apiKeys:
+        return None, "No se ha encontrado ninguna API key de Finnhub"
+
+    lastError = None
+
+    for apiKey in apiKeys:
+        try:
+            result, error = callback(apiKey)
+        except Exception as exc:
+            result = None
+            error = str(exc)
+
+        if not error:
+            return result, None
+
+        lastError = error
+
+    return None, lastError or "Todas las API keys de Finnhub han fallado"
 
 
 def call_eodhd_with_fallbacks(callback):

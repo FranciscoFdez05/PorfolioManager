@@ -263,12 +263,12 @@ def list_api_keys():
     configuradas —y con el proveedor recorriéndolas cuando una se queda sin
     cuota— «2 claves» no dice cuáles son ni si la que falla sigue ahí.
 
-    Y había algo peor que no decía nadie: si `FINNHUB_API_KEY` o
-    `EODHD_API_KEYS` están puestas en el `.env`, **ganan al fichero**, que es lo
-    que esta pantalla gestiona. Con la variable puesta se podían añadir y borrar
-    claves aquí, ver la lista actualizarse, y que la aplicación siguiera usando
-    otra distinta. Por eso cada proveedor dice ahora su `origen` y cuántas
-    claves del fichero se están ignorando.
+    Y cada proveedor dice su `origen`: manda el fichero, y la variable de
+    entorno del `.env` es el respaldo para cuando no hay ninguna guardada. Hasta
+    la 1.5.0 era al revés y la precedencia no se veía por ningún lado, así que
+    se podían añadir y borrar claves aquí, ver la lista actualizarse, y que la
+    aplicación siguiera usando otra distinta. Ahora manda lo que se ve, y si
+    queda alguna clave del entorno sin usar, se dice.
 
     Se manda también el valor completo de cada clave, no solo la máscara, para
     que el ojo la descubra sin volver a preguntar. Eso es una decisión con un

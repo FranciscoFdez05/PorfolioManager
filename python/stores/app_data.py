@@ -1,12 +1,31 @@
+import logging
 import os
+import re
 
 from core.db import get_db, init_db, transactional
 from core.paths import BASE_DIR
 from core.secret_store import read_secret_lines
 
+log = logging.getLogger(__name__)
+
 apiDir = BASE_DIR / "API"
 _eodhdKeyRotationIndex = 0
 _alphaVantageKeyRotationIndex = 0
+
+# Los huecos que trae la documentación —`.env.example` y el README— para que se
+# rellenen. Una clave de verdad es un token de veinte o cuarenta caracteres al
+# azar: ninguna empieza por «tu_clave» ni se llama «CLAVE1», así que reconocerlos
+# no puede tirar una clave buena, y a cambio evita el fallo más caro que tiene
+# esta instalación: arrancar con el ejemplo puesto y no entender por qué el
+# proveedor rechaza todo.
+_EJEMPLO = re.compile(
+    r"^(?:tu[_-]?(?:clave|api[_-]?key)\w*"
+    r"|clave(?:[_-]?\w+)?"
+    r"|your[_-]?api[_-]?key\w*"
+    r"|(?:change|cambia)me"
+    r"|x{3,})$",
+    re.IGNORECASE,
+)
 
 
 def _read_api_keys(file_path):
@@ -32,55 +51,6 @@ API_KEY_SOURCES = {
     "eodhd": ("EODHD_API_KEYS", "eodhd.key", True),
     "alphavantage": ("ALPHA_VANTAGE_API_KEYS", "alphavantage.key", True),
 }
-
-
-def _clavesDeEntorno(variable, admiteVarias):
-    crudo = os.environ.get(variable, "").strip()
-    if not crudo:
-        return []
-    if not admiteVarias:
-        return [crudo]
-    return [clave.strip() for clave in crudo.split(",") if clave.strip()]
-
-
-def readApiKeysConOrigen(proveedor):
-    """Las claves que se usan de verdad, y de dónde salen.
-
-    La variable de entorno gana al fichero. Así lleva funcionando desde el
-    principio y hay instalaciones que se configuran solo por entorno, así que la
-    precedencia se queda como está —pero era **invisible**, y ahí estaba la
-    trampa: Ajustes gestiona el fichero, de modo que con la variable puesta se
-    podían añadir y borrar claves en esa pantalla, ver la lista actualizarse, y
-    que la aplicación siguiera usando otra clave distinta. Un `.env` con el
-    valor de ejemplo sin tocar dejaba al proveedor rechazando peticiones sin que
-    nada en la interfaz lo insinuara.
-
-    Devolver el origen es lo que permite decirlo en pantalla.
-    """
-    variable, fichero, admiteVarias = API_KEY_SOURCES[proveedor]
-    delFichero = _read_api_keys(apiDir / fichero)
-
-    # Compatibilidad: la clave de Finnhub se aceptaba en twelvedata.key, y ese
-    # fichero sigue leyéndose cuando finnhub.key está vacío.
-    if proveedor == "finnhub" and not delFichero:
-        delFichero = _read_api_keys(apiDir / "twelvedata.key")
-
-    delEntorno = _clavesDeEntorno(variable, admiteVarias)
-
-    if delEntorno:
-        return {
-            "claves": delEntorno,
-            "origen": "entorno",
-            "variable": variable,
-            "ignoradas": len(delFichero),
-        }
-
-    return {
-        "claves": delFichero,
-        "origen": "fichero",
-        "variable": variable,
-        "ignoradas": 0,
-    }
 
 
 def ensureDataFile():
@@ -682,42 +652,129 @@ def writePrivateMarketFile(data):
     conn.commit()
 
 
-# --- API keys (siguen leyendo de ficheros / env) ---
+# --- API keys ---------------------------------------------------------------
+#
+# Una clave puede venir de dos sitios: el fichero `API/<proveedor>.key`, que es
+# lo que gestiona Ajustes, o una variable de entorno del `.env`. **Manda el
+# fichero.** Antes mandaba la variable, y esa precedencia —invisible desde la
+# interfaz— se comía instalaciones enteras: `.env.example` traía
+# `FINNHUB_API_KEY=tu_clave_finnhub` y `EODHD_API_KEYS=tu_clave_EODHD1,...`, así
+# que quien copiaba el ejemplo y luego ponía sus claves de verdad desde Ajustes
+# se quedaba con los dos proveedores en «clave rechazada» para siempre: podía
+# añadir claves, borrarlas, darse de alta en otra cuenta, y la aplicación seguía
+# mandando `tu_clave_finnhub`.
+#
+# Ahora el orden es el que se puede ver y arreglar desde la pantalla: si el
+# fichero tiene claves, se usan las del fichero. La variable de entorno sigue
+# valiendo —hay despliegues que se configuran solo así, sin volumen para API/—
+# pero como respaldo, no como sustituto silencioso.
+#
+# Y en los dos sitios se descartan los valores de ejemplo de la documentación.
+# No son claves: su único efecto posible es romper el proveedor.
+
+
+def _es_valor_de_ejemplo(clave):
+    """¿Es un hueco de la documentación en vez de una clave?
+
+    La lista es deliberadamente estrecha —los valores que aparecen en
+    `.env.example` y en el README— y cada descarte queda en el log. Una clave de
+    verdad es un token de veinte o cuarenta caracteres: ninguna empieza por
+    «tu_clave» ni se llama «CLAVE1».
+    """
+    return bool(_EJEMPLO.match(str(clave or "").strip()))
+
+
+def _sin_ejemplos(claves, procedencia):
+    utiles = []
+    for clave in claves:
+        if _es_valor_de_ejemplo(clave):
+            log.warning(
+                "Se ignora %s: es el valor de ejemplo de la documentación, no una clave.",
+                procedencia,
+            )
+            continue
+        utiles.append(clave)
+    return utiles
+
+
+def _clavesDeEntorno(variable, admiteVarias):
+    crudo = os.environ.get(variable, "").strip()
+    if not crudo:
+        return []
+    partes = [c.strip() for c in crudo.split(",") if c.strip()] if admiteVarias else [crudo]
+    return _sin_ejemplos(partes, f"el valor de {variable}")
+
+
+def readApiKeysConOrigen(proveedor):
+    """Las claves que se usan de verdad, y de dónde salen.
+
+    Es el único sitio que decide la precedencia, y de aquí la leen tanto los
+    proveedores como la pantalla de Ajustes. Que fueran dos caminos distintos
+    era justo lo que permitía que la lista de claves y las claves realmente
+    usadas no tuvieran nada que ver.
+    """
+    variable, fichero, admiteVarias = API_KEY_SOURCES[proveedor]
+    delFichero = _sin_ejemplos(_read_api_keys(apiDir / fichero), f"una clave de {fichero}")
+
+    # Compatibilidad: la clave de Finnhub se aceptaba en twelvedata.key, y ese
+    # fichero sigue leyéndose cuando finnhub.key está vacío.
+    if proveedor == "finnhub" and not delFichero:
+        delFichero = _sin_ejemplos(_read_api_keys(apiDir / "twelvedata.key"), "una clave de twelvedata.key")
+
+    delEntorno = _clavesDeEntorno(variable, admiteVarias)
+
+    if delFichero:
+        return {
+            "claves": delFichero,
+            "origen": "fichero",
+            "variable": variable,
+            # Las del entorno que quedan sin usar. Ya no rompen nada, pero
+            # conviene decirlo: explica por qué esa variable no hace efecto.
+            "ignoradas": len(delEntorno),
+        }
+
+    return {
+        "claves": delEntorno,
+        "origen": "entorno" if delEntorno else "ninguno",
+        "variable": variable,
+        "ignoradas": 0,
+    }
+
+
+def _claves_efectivas(proveedor):
+    return readApiKeysConOrigen(proveedor)["claves"]
+
+
+def readFinnhubApiKeys():
+    return _claves_efectivas("finnhub")
+
 
 def readFinnhubApiKey():
-    key = os.environ.get("FINNHUB_API_KEY", "").strip()
-    if key:
-        return key
-    return (
-        _read_first_api_key(apiDir / "finnhub.key")
-        or _read_first_api_key(apiDir / "twelvedata.key")
-    )
+    claves = readFinnhubApiKeys()
+    return claves[0] if claves else None
 
 
 def readEodhdApiKey():
-    env_keys = os.environ.get("EODHD_API_KEYS", "").strip()
-    if env_keys:
-        first_key = env_keys.split(",")[0].strip()
-        if first_key:
-            return first_key
-    return _read_first_api_key(apiDir / "eodhd.key")
+    claves = _claves_efectivas("eodhd")
+    return claves[0] if claves else None
+
+
+def readEodhdApiKeys():
+    return _claves_efectivas("eodhd")
 
 
 def readAlphaVantageApiKey():
-    env_keys = os.environ.get("ALPHA_VANTAGE_API_KEYS", "").strip()
-    if env_keys:
-        first_key = env_keys.split(",")[0].strip()
-        if first_key:
-            return first_key
-    return _read_first_api_key(apiDir / "alphavantage.key")
+    claves = _claves_efectivas("alphavantage")
+    return claves[0] if claves else None
 
 
 def readAlphaVantageApiKeys():
-    env_keys_str = os.environ.get("ALPHA_VANTAGE_API_KEYS", "").strip()
-    if env_keys_str:
-        return [k.strip() for k in env_keys_str.split(",") if k.strip()]
+    return _claves_efectivas("alphavantage")
 
-    return _read_api_keys(apiDir / "alphavantage.key")
+
+def _rotar(apiKeys, indice):
+    inicio = indice % len(apiKeys)
+    return apiKeys[inicio:] + apiKeys[:inicio], (inicio + 1) % len(apiKeys)
 
 
 def readRotatedAlphaVantageApiKeys():
@@ -725,17 +782,8 @@ def readRotatedAlphaVantageApiKeys():
     apiKeys = readAlphaVantageApiKeys()
     if not apiKeys:
         return []
-    startIndex = _alphaVantageKeyRotationIndex % len(apiKeys)
-    _alphaVantageKeyRotationIndex = (startIndex + 1) % len(apiKeys)
-    return apiKeys[startIndex:] + apiKeys[:startIndex]
-
-
-def readEodhdApiKeys():
-    env_keys_str = os.environ.get("EODHD_API_KEYS", "").strip()
-    if env_keys_str:
-        return [k.strip() for k in env_keys_str.split(",") if k.strip()]
-
-    return _read_api_keys(apiDir / "eodhd.key")
+    rotadas, _alphaVantageKeyRotationIndex = _rotar(apiKeys, _alphaVantageKeyRotationIndex)
+    return rotadas
 
 
 def readRotatedEodhdApiKeys():
@@ -743,6 +791,5 @@ def readRotatedEodhdApiKeys():
     apiKeys = readEodhdApiKeys()
     if not apiKeys:
         return []
-    startIndex = _eodhdKeyRotationIndex % len(apiKeys)
-    _eodhdKeyRotationIndex = (startIndex + 1) % len(apiKeys)
-    return apiKeys[startIndex:] + apiKeys[:startIndex]
+    rotadas, _eodhdKeyRotationIndex = _rotar(apiKeys, _eodhdKeyRotationIndex)
+    return rotadas

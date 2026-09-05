@@ -131,10 +131,13 @@ def _sondear_claves(claves, llamada):
 
 
 def _probar_finnhub():
-    fetch_json(
-        "https://finnhub.io/api/v1/quote",
-        {"symbol": "AAPL", "token": _clave(app_data.readFinnhubApiKey)},
-        timeout=_TIMEOUT, provider="Finnhub", retries=0,
+    return _sondear_claves(
+        _lista_claves(app_data.readFinnhubApiKeys, app_data.readFinnhubApiKey),
+        lambda clave: fetch_json(
+            "https://finnhub.io/api/v1/quote",
+            {"symbol": "AAPL", "token": clave},
+            timeout=_TIMEOUT, provider="Finnhub", retries=0,
+        ),
     )
 
 

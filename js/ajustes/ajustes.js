@@ -424,19 +424,26 @@ async function initAjustesLogic() {
         return `${n} ${n === 1 ? singular : plural}`
     }
 
-    // Si el .env del servidor define la variable del proveedor, esa gana al
-    // fichero que gestiona esta pantalla. Sin decirlo, se podían añadir y borrar
-    // claves aquí, ver la lista actualizarse, y que la aplicación siguiera
-    // usando otra: es el aviso que faltaba para no buscar el fallo en la clave.
-    function _avisoDeEntorno(info) {
+    // Manda el fichero, que es lo que gestiona esta pantalla; la variable de
+    // entorno es el respaldo cuando no hay ninguna guardada. El aviso está para
+    // que nunca haya que adivinar cuál de los dos sitios está mandando.
+    function _avisoDeOrigen(info) {
+        let texto = ""
+
+        if (info.origen === "entorno") {
+            texto =
+                `Estas claves salen de ${info.variable}, en el .env del servidor, porque ` +
+                `API/${info.fichero} está vacío. En cuanto añadas una aquí, mandará la de aquí.`
+        } else if (info.ignoradas) {
+            texto =
+                `${_plural(info.ignoradas, "clave configurada", "claves configuradas")} en ${info.variable} ` +
+                `que no se están usando: manda lo que hay en esta lista. Puedes vaciar esa variable del .env.`
+        }
+
+        if (!texto) return null
+
         const aviso = document.createElement("div")
         aviso.className = "ajustesAviso"
-        let texto =
-            `Estas claves salen de ${info.variable}, en el .env del servidor, y no de ` +
-            `API/${info.fichero}. Lo que añadas o borres aquí no se usará mientras esa variable tenga valor.`
-        if (info.ignoradas) {
-            texto += ` Hay ${_plural(info.ignoradas, "clave guardada", "claves guardadas")} en el fichero que la aplicación está ignorando.`
-        }
         aviso.textContent = texto
         return aviso
     }
@@ -451,7 +458,8 @@ async function initAjustesLogic() {
         destino.lista.innerHTML = ""
         setKeyStatus(destino.estado, claves.length)
 
-        if (delEntorno) destino.lista.appendChild(_avisoDeEntorno(info))
+        const aviso = _avisoDeOrigen(info)
+        if (aviso) destino.lista.appendChild(aviso)
 
         claves.forEach((clave) => {
             const fila = document.createElement("div")

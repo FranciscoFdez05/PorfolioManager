@@ -15,11 +15,11 @@ from providers.finnhub_client import (
 )
 from providers.yahoo_finance_client import search_symbol as search_yahoo_symbol
 from stores import benchmark
-from stores.app_data import readFinnhubApiKey
 from stores.asset_store import listAssets
 from stores.helpers import (
     call_alpha_vantage_with_fallbacks,
     call_eodhd_with_fallbacks,
+    call_finnhub_with_fallbacks,
     is_temporary_service_error,
     normalize_currency_code,
     parse_loose_number,
@@ -58,8 +58,9 @@ def searchFinnhubSymbol():
     query = str(request.args.get("q", "")).strip()
     assetName = str(request.args.get("assetName", "")).strip()
     assetType = str(request.args.get("assetType", "")).strip()
-    apiKey = readFinnhubApiKey()
-    results, error = search_symbol(query, apiKey, asset_name=assetName, preferred_asset_type=assetType)
+    results, error = call_finnhub_with_fallbacks(
+        lambda apiKey: search_symbol(query, apiKey, asset_name=assetName, preferred_asset_type=assetType)
+    )
 
     if error:
         statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
@@ -128,14 +129,14 @@ def getHistoricalChanges():
 
     # Fallback a Finnhub para activos sin snapshots almacenados
     if assets_needing_api:
-        api_key = readFinnhubApiKey()
-
         def fetch_one(asset):
             symbol    = str(asset.get("marketSymbol") or asset.get("finnhubSymbol") or "").strip()
             cur_price = parse_loose_number(asset.get("price"))
             if not symbol or not cur_price or cur_price <= 0:
                 return asset["id"], None
-            hist_price, _ = fetch_candle_close(symbol, from_ts, to_ts, api_key)
+            hist_price, _ = call_finnhub_with_fallbacks(
+                lambda apiKey: fetch_candle_close(symbol, from_ts, to_ts, apiKey)
+            )
             if not hist_price or hist_price <= 0:
                 return asset["id"], None
             # El precio actual sale de una columna TEXT (Decimal) y el histórico

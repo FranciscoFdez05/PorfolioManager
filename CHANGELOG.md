@@ -22,6 +22,76 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.6.1] — 2026-09-05
+
+**Las claves que se ven en Ajustes pasan a ser las que se usan.** No tenía por
+qué serlo: si el `.env` definía `FINNHUB_API_KEY` o `EODHD_API_KEYS`, esas
+ganaban al fichero que gestiona esa pantalla, y en ningún sitio se decía. Con
+los valores de ejemplo de `.env.example` puestos —que es como sale una
+instalación recién copiada— el resultado era Finnhub y EODHD en «Clave
+rechazada» a perpetuidad, inmunes a cualquier cosa hecha desde la interfaz: se
+podían añadir claves, borrarlas y darse de alta en otra cuenta del proveedor,
+que la aplicación seguía mandando `tu_clave_finnhub` a la API.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+### Cambiado
+
+- **Manda el fichero de claves, no la variable de entorno.** Si
+  `API/<proveedor>.key` tiene claves, se usan esas. La variable de entorno sigue
+  valiendo —hay despliegues sin volumen para `API/`, que no tienen dónde
+  guardarlas— pero como respaldo, no como sustituto silencioso. El orden pasa a
+  ser el que se puede ver y arreglar desde la pantalla.
+
+  **Ojo al actualizar** si tienes claves en los dos sitios a la vez: a partir de
+  aquí manda el fichero. El panel dice cuál de los dos está mandando, así que se
+  ve de un vistazo.
+
+- **Los valores de ejemplo de la documentación se descartan como claves.**
+  `tu_clave_...`, `CLAVE1`, `CLAVE_PRINCIPAL`, `changeme`, `your_api_key` y
+  similares no son claves: su único efecto posible es romper el proveedor. Se
+  ignoran vengan del `.env` o del fichero, y cada descarte queda en el log. El
+  reconocimiento es deliberadamente estrecho —una clave de verdad es un token de
+  veinte o cuarenta caracteres al azar, ninguna empieza por «tu_clave»— porque
+  tirar una clave buena sería peor que el problema que resuelve.
+
+- **Finnhub prueba todas sus claves, no solo la primera.** Era el único
+  proveedor sin respaldo: EODHD y Alpha Vantage ya pasaban a la siguiente
+  cuando una fallaba, pero Finnhub usaba siempre la primera del fichero y
+  ninguna más. Con tres configuradas, que la primera estuviera caducada dejaba
+  sin cotizar a todos sus activos aunque las otras dos valieran, y la pantalla
+  solo sabía decir «Clave rechazada» sin poder señalar cuál de las tres era la
+  mala. Ahora el panel de estado dice «Responde la clave 2 de 3».
+
+  No rota, a diferencia de los otros dos: ahí la rotación reparte una cuota
+  diaria muy corta, mientras que el límite de Finnhub es por minuto y va de
+  sobra. El orden estable es preferible, porque así la clave que se usa es
+  siempre la primera de la lista que funcione — la misma que enseña la pantalla.
+
+- **Una sola función decide de dónde sale cada clave**, y de ella leen tanto los
+  proveedores como la pantalla de Ajustes. Que fueran dos caminos distintos es
+  lo que permitía que la lista de claves y las claves realmente usadas no
+  tuvieran nada que ver: el panel enseñaba el fichero mientras Finnhub mandaba
+  otra cosa. `.env.example` y el README, que presentaban fichero y entorno como
+  dos opciones intercambiables, dicen ahora cuál manda.
+
+### Corregido
+
+- **Espaciado del panel de actualización.** La línea de la versión, el aviso
+  ámbar y el mensaje de estado eran hijos directos de la tarjeta, donde el
+  relleno lateral lo pone cada tipo de hijo y no el contenedor: los tres salían
+  pegados al borde, el aviso encajado contra la versión y el mensaje contra el
+  borde inferior.
+
+- Una `e` suelta al final de `docker-update.sh`, de un pulsado accidental con el
+  fichero abierto. Quedaba detrás del `exit 1`, así que no llegaba a ejecutarse
+  nunca, pero no pinta nada en el script de actualización.
+
+[1.6.1]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.6.1
+
+---
+
 ## [1.6.0] — 2026-09-05
 
 **Lo que faltaba para poder arreglar una clave rechazada sin entrar por SSH.**

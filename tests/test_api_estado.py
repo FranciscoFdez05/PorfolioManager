@@ -27,7 +27,7 @@ _LECTORES = ("readFinnhubApiKey", "readEodhdApiKey", "readAlphaVantageApiKey")
 # EODHD y Alpha Vantage admiten varias claves y el sondeo las recorre, así que
 # hay que parchear también estos: si no, la prueba acabaría leyendo las claves
 # reales de API/ del equipo que ejecuta la suite.
-_LECTORES_LISTA = ("readEodhdApiKeys", "readAlphaVantageApiKeys")
+_LECTORES_LISTA = ("readFinnhubApiKeys", "readEodhdApiKeys", "readAlphaVantageApiKeys")
 
 
 def _claves(monkeypatch, valor, lista=None):
@@ -277,6 +277,42 @@ def test_con_una_sola_clave_el_sondeo_no_gasta_de_mas(monkeypatch, con_claves):
     estado.comprobar()
 
     assert usadas == ["clave-de-prueba"]
+
+
+def test_finnhub_tambien_prueba_todas_sus_claves(monkeypatch):
+    """Finnhub era el único proveedor sin respaldo.
+
+    Usaba siempre la primera clave del fichero: con tres configuradas, que la
+    primera estuviera caducada dejaba sin cotizar a todos sus activos aunque las
+    otras dos valieran, y la pantalla solo sabía decir «Clave rechazada» sin
+    poder señalar cuál de las tres era la mala.
+    """
+    _claves(monkeypatch, "clave-1", lista=["clave-1", "clave-2", "clave-3"])
+
+    def responde(url, params=None, **k):
+        if "finnhub" in url and (params or {}).get("token") == "clave-1":
+            raise _http(401)
+        return {"c": 1}
+
+    _respuesta(monkeypatch, responde)
+
+    fila = _por_id(estado.comprobar())["finnhub"]
+
+    assert fila["estado"] == "ok"
+    assert "clave 2 de 3" in fila["detalle"]
+
+
+def test_finnhub_solo_da_la_clave_por_mala_si_fallan_todas(monkeypatch):
+    _claves(monkeypatch, "clave-1", lista=["clave-1", "clave-2"])
+
+    def responde(url, params=None, **k):
+        if "finnhub" in url:
+            raise _http(401)
+        return {"c": 1}
+
+    _respuesta(monkeypatch, responde)
+
+    assert _por_id(estado.comprobar())["finnhub"]["estado"] == "clave"
 
 
 def test_alpha_vantage_pasa_a_la_siguiente_clave_si_la_primera_no_tiene_cuota(monkeypatch):

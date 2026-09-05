@@ -8,7 +8,6 @@ from providers.alpha_vantage_client import fetch_quote as fetch_av_quote
 from providers.eodhd_client import fetch_quote as fetch_eodhd_quote
 from providers.finnhub_client import convert_amount, convert_quote_currency, fetch_quote
 from providers.yahoo_finance_client import fetch_quote as fetch_yahoo_quote
-from stores.app_data import readFinnhubApiKey
 from stores.asset_store import (
     deleteAssetFile,
     getAssetFile,
@@ -32,6 +31,7 @@ from stores.asset_utils import (
 from stores.helpers import (
     call_alpha_vantage_with_fallbacks,
     call_eodhd_with_fallbacks,
+    call_finnhub_with_fallbacks,
     convert_asset_rows_currency,
     format_decimal,
     is_temporary_service_error,
@@ -356,8 +356,7 @@ def refreshActivoMarketData(assetId):
     elif marketProvider == "alphavantage":
         quote, error = call_alpha_vantage_with_fallbacks(lambda apiKey: fetch_av_quote(marketSymbol, apiKey))
     else:
-        apiKey = readFinnhubApiKey()
-        quote, error = fetch_quote(marketSymbol, apiKey)
+        quote, error = call_finnhub_with_fallbacks(lambda apiKey: fetch_quote(marketSymbol, apiKey))
 
     if error:
         statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400

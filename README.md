@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.6.0-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.6.1-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 
@@ -346,16 +346,19 @@ ALPHA_VANTAGE_API_KEYS=CLAVE1,CLAVE2,CLAVE3
 EODHD_API_KEYS=CLAVE1,CLAVE2
 ```
 
-> **La variable de entorno gana al archivo.** No son dos opciones que se sumen:
-> si `FINNHUB_API_KEY`, `EODHD_API_KEYS` o `ALPHA_VANTAGE_API_KEYS` tienen valor
-> en el `.env`, la aplicación usa esas y **no mira el `API/*.key` que gestiona
-> Ajustes**. Se podían añadir y borrar claves en esa pantalla, ver la lista
-> actualizarse, y que el proveedor siguiera usando otra distinta —incluido el
-> valor de ejemplo de `.env.example` sin tocar, que da «Clave rechazada» para
-> siempre—. Desde la 1.6.0, el panel de Claves API lo avisa cuando pasa.
+> **Manda el archivo.** Si `API/<proveedor>.key` tiene claves, se usan esas; la
+> variable de entorno es el respaldo para cuando no hay ninguna guardada (por
+> ejemplo, un despliegue sin volumen para `API/`). El panel de Claves API dice
+> siempre cuál de los dos sitios está mandando.
 >
-> Lo normal es dejar esas líneas vacías en el `.env` y poner las claves desde
-> Ajustes: se guardan cifradas y se cambian sin reiniciar el contenedor.
+> Hasta la 1.5.0 era al revés, y esa precedencia —invisible desde la interfaz—
+> se comía instalaciones enteras: `.env.example` traía
+> `FINNHUB_API_KEY=tu_clave_finnhub`, así que quien copiaba el ejemplo y luego
+> ponía sus claves de verdad desde Ajustes se quedaba con el proveedor en «Clave
+> rechazada» para siempre, sin que nada lo insinuara. Desde la 1.6.1 mandan las
+> claves que se ven en pantalla, y **los valores de ejemplo de la documentación
+> se descartan** en los dos sitios: `tu_clave_...`, `CLAVE1`, `changeme` y
+> similares no son claves, y su único efecto posible es romper el proveedor.
 
 Las claves se rotan en round-robin entre peticiones, distribuyendo la carga.
 
