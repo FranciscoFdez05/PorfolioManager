@@ -346,6 +346,93 @@ async function initAjustesLogic() {
     setKeyStatus(eodhdStatus, settings.eodhdKeyCount ?? (settings.eodhdKeys ? 1 : 0))
     setKeyStatus(alphaVantageStatus, settings.alphaVantageKeyCount ?? 0)
 
+    // --- Claves guardadas: enmascaradas, y visibles al pulsar el ojo ---
+    // El panel solo decía cuántas claves había. Con varias configuradas —y con
+    // el proveedor pasando a la siguiente cuando una se queda sin cuota— «2
+    // claves» no permite saber cuáles son ni si la que está fallando sigue ahí.
+    const _OJO_SVG =
+        '<svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/>' +
+        '<circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>' +
+        '<svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none">' +
+        '<path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
+
+    const _proveedoresClaves = {
+        finnhub: { lista: document.getElementById("ajustesFinnhubKeyList"), estado: finnhubStatus },
+        eodhd: { lista: document.getElementById("ajustesEodhdKeyList"), estado: eodhdStatus },
+        alphavantage: { lista: document.getElementById("ajustesAlphaVantageKeyList"), estado: alphaVantageStatus }
+    }
+
+    function _pintarIconoOjo(btn, visible) {
+        const eyeShow = btn.querySelector(".ajustesEyeShow")
+        const eyeHide = btn.querySelector(".ajustesEyeHide")
+        if (eyeShow) eyeShow.style.display = visible ? "none" : ""
+        if (eyeHide) eyeHide.style.display = visible ? "" : "none"
+    }
+
+    // El listado ya trae el valor completo, así que el ojo no va al servidor:
+    // esta instalación es una LAN cerrada de un solo usuario, y pedir el texto
+    // aparte solo añadía una petición por pulsación sin proteger de nada que la
+    // propia conexión no expusiera ya.
+    function _alternarClave(clave, valorEl, btn) {
+        const visible = btn.dataset.visible !== "1"
+        valorEl.textContent = visible ? clave.clave : clave.vista
+        valorEl.classList.toggle("revelada", visible)
+        btn.dataset.visible = visible ? "1" : ""
+        btn.title = visible ? "Ocultar" : "Mostrar"
+        _pintarIconoOjo(btn, visible)
+    }
+
+    function _pintarClaves(proveedor, claves) {
+        const destino = _proveedoresClaves[proveedor]
+        if (!destino?.lista) return
+
+        destino.lista.innerHTML = ""
+        setKeyStatus(destino.estado, claves.length)
+
+        claves.forEach((clave) => {
+            const fila = document.createElement("div")
+            fila.className = "ajustesKeyRow"
+
+            // El número no es decorativo: es el orden en que el proveedor las
+            // recorre cuando una se queda sin cuota, y el que nombra el panel
+            // de estado al decir cuál de ellas ha respondido.
+            const numero = document.createElement("span")
+            numero.className = "ajustesKeyRowNum"
+            numero.textContent = String(clave.indice + 1)
+
+            const valor = document.createElement("code")
+            valor.className = "ajustesKeyRowValue"
+            valor.textContent = clave.vista
+
+            const ojo = document.createElement("button")
+            ojo.type = "button"
+            ojo.className = "ajustesToggleBtn ajustesKeyRowEye"
+            ojo.title = "Mostrar"
+            ojo.innerHTML = _OJO_SVG
+            ojo.addEventListener("click", () => _alternarClave(clave, valor, ojo))
+
+            fila.append(numero, valor, ojo)
+            destino.lista.appendChild(fila)
+        })
+    }
+
+    async function cargarClaves() {
+        try {
+            const res = await fetch("/api/settings/apikeys")
+            const data = await res.json()
+            if (!data.ok) return
+            Object.entries(data.proveedores || {}).forEach(([proveedor, claves]) => {
+                _pintarClaves(proveedor, claves || [])
+            })
+        } catch {
+            // Sin lista, el contador de claves de /api/settings sigue estando:
+            // se pierde el detalle, no la pantalla.
+        }
+    }
+
+    cargarClaves()
+
     const _keyCountMap = {
         finnhubKey: "finnhubKeys",
         eodhdKeys: "eodhdKeys",
@@ -373,6 +460,7 @@ async function initAjustesLogic() {
                 showMsg(msgEl, "Añadida", "ok")
                 setKeyStatus(statusEl, count ?? 1)
                 input.value = ""
+                cargarClaves()
             } else {
                 showMsg(msgEl, "Error al guardar", "error")
             }
@@ -1144,10 +1232,12 @@ async function initAjustesLogic() {
 
         if (!data.proxyDisponible) {
             clase = "roto"
-            texto = "<strong>El proxy no responde.</strong> Comprueba que el contenedor <code>caddy</code> está en marcha; sin él no se puede activar el HTTPS."
+            texto =
+                "<strong>El proxy no responde.</strong> Comprueba que el contenedor <code>caddy</code> está en marcha; sin él no se puede activar el HTTPS."
         } else if (data.gestionadoPorEntorno) {
             clase = "on"
-            texto = "<strong>Activado por configuración del servidor</strong> (<code>HTTPS_ENABLED</code> en <code>.env</code>). Se cambia allí, no desde aquí."
+            texto =
+                "<strong>Activado por configuración del servidor</strong> (<code>HTTPS_ENABLED</code> en <code>.env</code>). Se cambia allí, no desde aquí."
         } else if (data.activado) {
             clase = "on"
             const lista = (data.nombres || []).join(", ")
@@ -1168,7 +1258,7 @@ async function initAjustesLogic() {
             if (!tlsNombresEl.value.trim()) {
                 const sugerencia = (data.nombres || []).length
                     ? data.nombres.join(", ")
-                    : (data.nombreActual || location.hostname || "")
+                    : data.nombreActual || location.hostname || ""
                 tlsNombresEl.value = sugerencia
             }
         }
@@ -1215,13 +1305,15 @@ async function initAjustesLogic() {
             "El navegador avisará del certificado hasta que instales la CA: descárgala desde este mismo panel y sigue las instrucciones."
         tlsCaEl?.parentNode?.insertBefore(aviso, tlsCaEl)
 
-        setTimeout(() => { location.replace(url) }, 6000)
+        setTimeout(() => {
+            location.replace(url)
+        }, 6000)
     }
 
     async function _guardarTls(activado) {
         const nombres = (tlsNombresEl?.value || "")
             .split(/[\n,;]+/)
-            .map(n => n.trim())
+            .map((n) => n.trim())
             .filter(Boolean)
 
         if (activado && !nombres.length) {

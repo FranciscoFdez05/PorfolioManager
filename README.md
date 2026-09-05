@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.4.1-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.5.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 

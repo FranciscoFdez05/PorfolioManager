@@ -157,6 +157,27 @@ def _as_int(value, default, allowed=None):
     return result
 
 
+# Los tres ficheros de claves, por el nombre con el que los pide la interfaz.
+_FICHEROS_CLAVES = {
+    "finnhub": "finnhub.key",
+    "eodhd": "eodhd.key",
+    "alphavantage": "alphavantage.key",
+}
+
+
+def _enmascarar_clave(clave):
+    """Lo justo para reconocer una clave sin enseñarla.
+
+    Con las puntas se distingue una clave de otra —que es lo que hace falta para
+    saber cuál de ellas es la que está fallando— sin dejar el valor entero
+    legible en pantalla a la espalda de cualquiera.
+    """
+    if len(clave) <= 8:
+        # Demasiado corta para dejar puntas sin regalar media clave.
+        return "•" * len(clave)
+    return f"{clave[:4]}{'•' * 6}{clave[-4:]}"
+
+
 def _read_key_file(path):
     """Claves del fichero, descifrando si está en formato cifrado."""
     return "\n".join(read_secret_lines(path))
@@ -221,6 +242,45 @@ def get_settings():
         "modulosConfig":            pcfg.get("modulosConfig") or {},
         "ahorroConfig":             pcfg.get("ahorroConfig") or {"objetivoAhorro": 30, "presupuesto": {}},
     })
+
+
+@ajustes_bp.route("/api/settings/apikeys", methods=["GET"])
+def list_api_keys():
+    """Las claves guardadas de cada proveedor: enmascaradas y completas.
+
+    Hasta aquí la interfaz solo sabía **cuántas** claves había. Con varias
+    configuradas —y con el proveedor recorriéndolas cuando una se queda sin
+    cuota— «2 claves» no dice cuáles son, ni si la que falla sigue ahí, ni si el
+    fichero que está leyendo el servidor es el que uno cree que es.
+
+    Se manda también el valor completo, no solo la máscara, y eso es una
+    decisión con supuesto detrás: **esta aplicación vive en una LAN cerrada, sin
+    salida a internet y con un único usuario**. En ese escenario pedir el texto
+    aparte no protege de nada —si la conexión va en claro, la segunda respuesta
+    también— y a cambio mete una petición por cada ojo que se pulsa. La interfaz
+    pinta la máscara y descubre el valor sin volver a preguntar.
+
+    Si esta instancia dejara de estar aislada, esto es lo que habría que
+    revisar: el valor entero viaja en cada carga de Ajustes.
+    """
+    respuesta = jsonify({
+        "ok": True,
+        "proveedores": {
+            proveedor: [
+                {
+                    "indice": indice,
+                    "vista": _enmascarar_clave(clave),
+                    "clave": clave,
+                    "longitud": len(clave),
+                }
+                for indice, clave in enumerate(read_secret_lines(_API_DIR / fichero))
+            ]
+            for proveedor, fichero in _FICHEROS_CLAVES.items()
+        },
+    })
+    # Lleva secretos dentro: que no se quede en ninguna caché intermedia.
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta
 
 
 @ajustes_bp.route("/api/settings/apikey", methods=["POST"])

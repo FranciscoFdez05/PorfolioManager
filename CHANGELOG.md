@@ -22,6 +22,54 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.5.0] — 2026-09-05
+
+**Ajustes › API deja de decir solo cuántas claves hay y pasa a decir cuáles
+son.** Con varias claves configuradas —y con el proveedor saltando a la
+siguiente cuando una se queda sin cuota— un «✓ 2 claves» no permite saber cuál
+es la que está fallando, si la que se cambió ayer llegó a guardarse, ni si el
+fichero que está leyendo el servidor es el que uno cree que es. Para
+averiguarlo había que entrar al contenedor y descifrar el fichero a mano.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+### Añadido
+
+- **Las claves guardadas, listadas bajo cada proveedor.** Una fila por clave,
+  numerada, con el valor **enmascarado** —las cuatro primeras letras, las cuatro
+  últimas y el resto en puntos— y un **ojo** que muestra el texto completo. Se
+  vuelve a pulsar y se oculta.
+
+  El número no es decorativo: es el orden en que el proveedor las recorre cuando
+  una se queda sin cuota, y el mismo con el que el panel de Estado de las APIs
+  dice cuál ha respondido. «Responde la clave 3 de 4» y la tercera fila de la
+  lista son ahora la misma clave.
+
+  Con las puntas basta para distinguir una clave de otra, que es justo lo que
+  hace falta para saber cuál hay que cambiar, y evita dejar los secretos
+  legibles en pantalla a la espalda de cualquiera. Una clave de ocho caracteres
+  o menos sale entera en puntos: enseñar cuatro y cuatro sería enseñarla toda.
+
+- **El endpoint del listado** (`GET /api/settings/apikeys`) manda cada clave
+  enmascarada y también completa, de modo que el ojo descubre el valor sin
+  volver a preguntar al servidor. Eso es una decisión con un supuesto detrás, y
+  conviene tenerlo escrito: **esta aplicación vive en una LAN cerrada, sin
+  salida a internet y con un único usuario**. En ese escenario pedir el texto
+  aparte no protege de nada —si la conexión va en claro, la segunda respuesta
+  también— y a cambio mete una petición por cada pulsación.
+
+  Si esta instalación dejara de estar aislada, esto es lo primero que habría que
+  revisar: el valor entero de las claves viaja en cada carga de Ajustes. La
+  respuesta va con `no-store` para que al menos no se quede por el camino, y el
+  endpoint exige sesión como todo lo demás.
+
+  Al añadir una clave, la lista se refresca sola.
+
+[1.5.0]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.5.0
+
+---
+
 ## [1.4.1] — 2026-09-05
 
 **Cuando un proveedor falla, decir cuál es el problema de verdad.** Finnhub y

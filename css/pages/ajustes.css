@@ -463,6 +463,85 @@
     background: rgba(248, 113, 113, 0.07);
 }
 
+/* Claves guardadas: una fila por clave, enmascarada hasta que se pulsa el ojo */
+.ajustesKeyList {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.ajustesKeyList:not(:empty) {
+    margin-top: 8px;
+}
+
+.ajustesKeyRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 6px 5px 10px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+}
+
+/* El número es el orden de rotación: cuando una clave se queda sin cuota, el
+   proveedor pasa a la siguiente, y el panel de estado nombra a la que responde. */
+.ajustesKeyRowNum {
+    flex-shrink: 0;
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    color: var(--text-dim);
+    font-size: 0.68rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.ajustesKeyRowValue {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    scrollbar-width: none;
+}
+
+.ajustesKeyRowValue::-webkit-scrollbar {
+    display: none;
+}
+
+/* Revelada se ve distinta a propósito: que no quede duda de que eso de ahí es
+   el secreto entero y no las puntas. */
+.ajustesKeyRowValue.revelada {
+    color: var(--text-primary);
+    letter-spacing: 0;
+    user-select: all;
+}
+
+.ajustesKeyRowEye {
+    height: 28px;
+    width: 28px;
+    border-radius: 6px;
+}
+
+.ajustesKeyRowEye svg {
+    width: 14px;
+    height: 14px;
+}
+
+.ajustesKeyRowEye:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
 /* Backup list */
 .ajustesBackupList {
     display: flex;

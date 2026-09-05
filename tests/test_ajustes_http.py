@@ -77,6 +77,91 @@ def test_las_claves_de_api_no_se_guardan_en_claro_en_disco(cliente):
     assert b"clave-secreta-1" not in crudo
 
 
+# ── Lista de claves ──────────────────────────────────────────────────────────
+
+def _anadir_claves(client, cabeceras, *claves, campo="finnhubKey"):
+    for clave in claves:
+        client.post("/api/settings/apikey", json={campo: clave}, headers=cabeceras)
+
+
+def test_la_lista_trae_cada_clave_enmascarada_y_entera(cliente):
+    """Enmascarada para pintarla; entera para que el ojo no vuelva al servidor.
+
+    Mandar el valor completo es una decisión con supuesto detrás —LAN cerrada,
+    un solo usuario, sin salida a internet—: pedirlo aparte no protegería de
+    nada que la propia conexión no expusiera ya, y metía una petición por cada
+    pulsación del ojo.
+    """
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "abcdefghijklmnop", "1234567890123456")
+
+    claves = client.get("/api/settings/apikeys").get_json()["proveedores"]["finnhub"]
+
+    assert [c["indice"] for c in claves] == [0, 1]
+    assert claves[0]["vista"] == "abcd••••••mnop"
+    assert claves[0]["clave"] == "abcdefghijklmnop"
+    assert claves[0]["longitud"] == 16
+
+
+def test_la_lista_de_claves_no_se_queda_en_ninguna_cache(cliente):
+    """Lleva secretos dentro, así que no puede guardarla nadie por el camino."""
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "clave-secreta-1")
+
+    respuesta = client.get("/api/settings/apikeys")
+
+    assert respuesta.headers.get("Cache-Control") == "no-store"
+
+
+def test_una_clave_corta_no_deja_ver_ni_las_puntas(cliente):
+    """Con ocho caracteres, enseñar cuatro y cuatro sería enseñarla entera."""
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "12345678")
+
+    claves = client.get("/api/settings/apikeys").get_json()["proveedores"]["finnhub"]
+
+    assert claves[0]["vista"] == "•" * 8
+
+
+def test_los_tres_proveedores_salen_aunque_no_tengan_claves(cliente):
+    """La interfaz pinta las tres filas; un proveedor ausente sería un hueco."""
+    client, _cabeceras, _rutas = cliente
+
+    proveedores = client.get("/api/settings/apikeys").get_json()["proveedores"]
+
+    assert sorted(proveedores) == ["alphavantage", "eodhd", "finnhub"]
+    assert proveedores["eodhd"] == []
+
+
+def test_cada_proveedor_lista_solo_sus_claves(cliente):
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "clave-de-finnhub", campo="finnhubKey")
+    _anadir_claves(client, cabeceras, "clave-de-eodhd-1", campo="eodhdKeys")
+
+    proveedores = client.get("/api/settings/apikeys").get_json()["proveedores"]
+
+    assert [c["clave"] for c in proveedores["finnhub"]] == ["clave-de-finnhub"]
+    assert [c["clave"] for c in proveedores["eodhd"]] == ["clave-de-eodhd-1"]
+
+
+def test_el_orden_de_la_lista_es_el_de_la_rotacion(cliente):
+    """El número de cada fila es con el que el panel de estado las nombra."""
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb", "tercera-clave-cc")
+
+    claves = client.get("/api/settings/apikeys").get_json()["proveedores"]["finnhub"]
+
+    assert [c["clave"] for c in claves] == ["primera-clave-aa", "segunda-clave-bb", "tercera-clave-cc"]
+
+
+def test_listar_las_claves_sin_sesion_es_401(crear_app, datos_aislados, temp_db):
+    """Es el único sitio del que salen las claves en claro."""
+    from routes.ajustes import ajustes_bp
+
+    client = crear_app(ajustes_bp).test_client()
+    assert client.get("/api/settings/apikeys").status_code == 401
+
+
 # ── Escritura: validación de cada ajuste ─────────────────────────────────────
 
 def test_los_ajustes_validos_se_persisten(cliente):
