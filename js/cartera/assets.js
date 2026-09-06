@@ -1258,6 +1258,132 @@ function getSidebarVisibleAssets(assets) {
     return visible
 }
 
+// Qué activos ha fallado el proveedor en el último intento, y con qué mensaje.
+// El bucle de actualización se lo tragaba en la consola, así que un precio
+// congelado por una clave caducada se veía igual que uno congelado por ser
+// sábado: los dos, un número quieto sin ninguna explicación.
+const _falloApiPorActivo = new Map()
+
+function _mensajeDeFalloApi(error) {
+    const texto = String(error?.message || error || "").trim()
+
+    // refreshAssetMarketDataOnServer lanza `HTTP 503: {"ok": false, "error": …}`.
+    // Interesa el motivo de dentro, que es el que dice si es la clave, la cuota
+    // o el proveedor; el código HTTP no le dice nada a nadie.
+    const inicioJson = texto.indexOf("{")
+
+    if (inicioJson !== -1) {
+        try {
+            const datos = JSON.parse(texto.slice(inicioJson))
+            if (datos?.error) {
+                return String(datos.error)
+            }
+        } catch {
+            /* no era JSON: se usa el texto tal cual */
+        }
+    }
+
+    return texto || "El proveedor no respondió"
+}
+
+function _avisoDePausa(motivo, tipos) {
+    const cuando = motivo === "fin de semana" ? "es fin de semana" : "está fuera del horario de mercado (22:00–8:00)"
+    const vuelve = motivo === "fin de semana" ? "el lunes a las 8:00" : "a las 8:00"
+    const nombres = {
+        acciones: "acciones",
+        etfs: "ETF",
+        comoditis: "comodities",
+        cripto: "cripto"
+    }
+    const afectados = tipos.map((tipo) => nombres[tipo] || tipo).join(", ")
+
+    return `Precios en pausa: ${cuando}. No se piden cotizaciones de ${afectados} hasta ${vuelve}.`
+}
+
+function _crearBotonDeActivo(asset, displayPrice, displayCurrency, { isStale, enPausa, falloApi }) {
+    const portfolioBadge =
+        window._viewAllPortfolios && asset.portfolioName
+            ? `<span class="assetPortfolioBadge">${escapeHtml(asset.portfolioName)}</span>`
+            : ""
+    const changePctStr = String(asset.change || "").trim()
+    const changePct = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
+    const changeAbs = Math.abs((displayPrice * changePct) / 100)
+    const changeSign = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
+    const changeClass = changePct < 0 ? "negative" : changePct > 0 ? "positive" : ""
+    const changeMoneyStr = changePctStr ? `${changeSign}${formatMoney(changeAbs, displayCurrency)}` : "—"
+
+    // El ⚠ solo marca fallos del proveedor. Un precio parado por la pausa no es
+    // un problema —lo ha pedido el usuario en Ajustes—, así que se queda en
+    // gris: si la pausa también pintase advertencias, el aviso dejaría de
+    // significar «esto hay que mirarlo» cada fin de semana.
+    const aviso = falloApi ? `<span class="assetBtnAviso" aria-hidden="true">⚠</span>` : ""
+
+    const button = document.createElement("button")
+    button.className = [
+        "assetBtn",
+        asset.id === currentAssetId ? "selected" : "",
+        isStale ? "stale" : "",
+        enPausa ? "pausado" : "",
+        falloApi ? "falloApi" : ""
+    ]
+        .filter(Boolean)
+        .join(" ")
+
+    if (falloApi) {
+        button.title = `No se pudo actualizar: ${falloApi}`
+    } else if (enPausa) {
+        button.title = _avisoDePausa(motivoPausaMercado(), [asset.type || ""])
+    }
+
+    button.dataset.assetId = asset.id
+    button.dataset.assetOrder = String(asset.order ?? 0)
+    button.dataset.tvSymbol = asset.tvSymbol || ""
+    button.dataset.marketSymbol = asset.marketSymbol || asset.finnhubSymbol || ""
+    button.dataset.marketProvider = asset.marketProvider || ""
+    button.dataset.assetSymbol = asset.symbol || ""
+    button.dataset.assetName = asset.name || ""
+    button.draggable = !window._viewAllPortfolios
+    button.innerHTML = `
+                <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}${portfolioBadge}${aviso}</span>
+                <span class="assetBtnPrice">${formatMoney(displayPrice, displayCurrency)}</span>
+                <span class="assetBtnChange ${changeClass}">${changeMoneyStr}</span>
+                <span class="assetBtnChangePct ${changeClass}">${changePctStr || "—"}</span>
+            `
+
+    return button
+}
+
+function _renderAvisoDePausa(visible) {
+    const contenedor = document.getElementById("assetsPausaAviso")
+
+    if (!contenedor) {
+        return
+    }
+
+    const motivo = motivoPausaMercado()
+    const pausados = tiposEnPausa()
+    const tiposVisibles = new Set(
+        visible.map((asset) =>
+            String(asset.type || "")
+                .trim()
+                .toLowerCase()
+        )
+    )
+    const afectados = pausados.filter((tipo) => tiposVisibles.has(tipo))
+
+    // Sin activos de un tipo pausado no hay nada que explicar: el aviso saldría
+    // todos los fines de semana en una cartera que solo tiene cripto.
+    if (!motivo || afectados.length === 0) {
+        contenedor.hidden = true
+        contenedor.textContent = ""
+        return
+    }
+
+    const sigueVivo = [...tiposVisibles].some((tipo) => tipo && !pausados.includes(tipo))
+    contenedor.hidden = false
+    contenedor.textContent = _avisoDePausa(motivo, afectados) + (sigueVivo ? " El resto se sigue actualizando." : "")
+}
+
 async function renderAssetsList(assets) {
     const assetsList = document.getElementById("assetsList")
 
@@ -1270,70 +1396,31 @@ async function renderAssetsList(assets) {
     const visible = getSidebarVisibleAssets(assets)
     const fragment = document.createDocumentFragment()
 
+    _renderAvisoDePausa(visible)
+
     for (const asset of visible) {
         const isStale =
             staleMs < Infinity && asset.lastUpdated ? now - new Date(asset.lastUpdated).getTime() > staleMs : false
-        const portfolioBadge =
-            window._viewAllPortfolios && asset.portfolioName
-                ? `<span class="assetPortfolioBadge">${escapeHtml(asset.portfolioName)}</span>`
-                : ""
+        const displayCurrency = asset.currency || "EUR"
+        let displayPrice
+
         try {
-            const displayPrice = await getAssetDisplayPriceValue(asset)
-            const displayCurrency = asset.currency || "EUR"
-            const changePctStr = String(asset.change || "").trim()
-            const changePct = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
-            const changeAbs = Math.abs((displayPrice * changePct) / 100)
-            const changeSign = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
-            const changeClass = changePct < 0 ? "negative" : changePct > 0 ? "positive" : ""
-            const changeMoneyStr = changePctStr ? `${changeSign}${formatMoney(changeAbs, displayCurrency)}` : "—"
-            const button = document.createElement("button")
-            button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}${isStale ? " stale" : ""}`
-            button.dataset.assetId = asset.id
-            button.dataset.assetOrder = String(asset.order ?? 0)
-            button.dataset.tvSymbol = asset.tvSymbol || ""
-            button.dataset.marketSymbol = asset.marketSymbol || asset.finnhubSymbol || ""
-            button.dataset.marketProvider = asset.marketProvider || ""
-            button.dataset.assetSymbol = asset.symbol || ""
-            button.dataset.assetName = asset.name || ""
-            button.draggable = !window._viewAllPortfolios
-            button.innerHTML = `
-                <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}${portfolioBadge}</span>
-                <span class="assetBtnPrice">${formatMoney(displayPrice, displayCurrency)}</span>
-                <span class="assetBtnChange ${changeClass}">${changeMoneyStr}</span>
-                <span class="assetBtnChangePct ${changeClass}">${changePctStr || "—"}</span>
-            `
-            fragment.appendChild(button)
+            displayPrice = await getAssetDisplayPriceValue(asset)
         } catch (error) {
             console.error(
                 `No se pudo renderizar el precio del activo ${asset.name || asset.symbol || asset.id}:`,
                 error
             )
-            const fallbackPrice = parseLooseNumber(asset.price || "") || 0
-            const fallbackCurrency = asset.currency || "EUR"
-            const changePctStr = String(asset.change || "").trim()
-            const changePct = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
-            const changeAbs = Math.abs((fallbackPrice * changePct) / 100)
-            const changeSign = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
-            const changeClass = changePct < 0 ? "negative" : changePct > 0 ? "positive" : ""
-            const changeMoneyStr = changePctStr ? `${changeSign}${formatMoney(changeAbs, fallbackCurrency)}` : "—"
-            const button = document.createElement("button")
-            button.className = `assetBtn${asset.id === currentAssetId ? " selected" : ""}${isStale ? " stale" : ""}`
-            button.dataset.assetId = asset.id
-            button.dataset.assetOrder = String(asset.order ?? 0)
-            button.dataset.tvSymbol = asset.tvSymbol || ""
-            button.dataset.marketSymbol = asset.marketSymbol || asset.finnhubSymbol || ""
-            button.dataset.marketProvider = asset.marketProvider || ""
-            button.dataset.assetSymbol = asset.symbol || ""
-            button.dataset.assetName = asset.name || ""
-            button.draggable = !window._viewAllPortfolios
-            button.innerHTML = `
-                <span class="assetBtnName">${escapeHtml(asset.name || asset.symbol || "Activo")}${portfolioBadge}</span>
-                <span class="assetBtnPrice">${formatMoney(fallbackPrice, fallbackCurrency)}</span>
-                <span class="assetBtnChange ${changeClass}">${changeMoneyStr}</span>
-                <span class="assetBtnChangePct ${changeClass}">${changePctStr || "—"}</span>
-            `
-            fragment.appendChild(button)
+            displayPrice = parseLooseNumber(asset.price || "") || 0
         }
+
+        fragment.appendChild(
+            _crearBotonDeActivo(asset, displayPrice, displayCurrency, {
+                isStale,
+                enPausa: tipoEnPausa(asset.type),
+                falloApi: _falloApiPorActivo.get(asset.id) || ""
+            })
+        )
     }
 
     if (_sidebarFilter === "watchlist" && !window._viewAllPortfolios) {
@@ -1989,7 +2076,16 @@ async function initVistaGeneralLogic() {
     await renderVistaGeneralTable()
 }
 
-async function refreshOverviewMarketData(buttonElement = null) {
+/**
+ * Pide cotizaciones nuevas al servidor, activo por activo.
+ *
+ * `respetarPausa` solo lo activa el refresco automático: es el que tiene que
+ * ahorrar cuota mientras los mercados están cerrados. Pulsar «Actualizar
+ * cotizaciones» pide precios igualmente —quien pulsa quiere el dato ahora, no
+ * una explicación de por qué no—, que es como se comportaba antes de que la
+ * pausa existiera.
+ */
+async function refreshOverviewMarketData(buttonElement = null, { respetarPausa = false } = {}) {
     const originalLabel = buttonElement?.textContent || ""
 
     if (buttonElement) {
@@ -2002,11 +2098,19 @@ async function refreshOverviewMarketData(buttonElement = null) {
         const assetsWithTicker = assets.filter((asset) =>
             String(asset.marketSymbol || asset.finnhubSymbol || "").trim()
         )
+        const pendientes = respetarPausa
+            ? assetsWithTicker.filter((asset) => !tipoEnPausa(asset.type))
+            : assetsWithTicker
 
-        for (const asset of assetsWithTicker) {
+        for (const asset of pendientes) {
             try {
                 await refreshAssetMarketDataOnServer(asset.id)
+                _falloApiPorActivo.delete(asset.id)
             } catch (error) {
+                // Se guarda para que el sidebar pueda marcarlo con ⚠ y decir de
+                // qué se queja el proveedor. Antes solo iba a la consola, donde
+                // no lo veía nadie sin abrir las herramientas del navegador.
+                _falloApiPorActivo.set(asset.id, _mensajeDeFalloApi(error))
                 console.error(`No se pudo actualizar ${asset.name || asset.symbol || asset.id}:`, error)
             }
         }

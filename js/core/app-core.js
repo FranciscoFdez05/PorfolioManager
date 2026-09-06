@@ -312,6 +312,48 @@ async function loadGlobalSettings() {
     }
 }
 
+// ── Pausa fuera del horario de mercado ────────────────────────────────────────
+//
+// Ajustes › Automatización puede dejar de pedir cotizaciones de lunes a viernes
+// entre las 22:00 y las 8:00 y durante todo el fin de semana, para no gastar
+// cuota mientras los mercados están cerrados. La pausa es POR TIPO de activo:
+// la cripto cotiza 24/7 y el propio panel dice que no se pausa.
+//
+// Esto vive aquí, y no dentro del temporizador, porque el sidebar necesita la
+// misma respuesta: un precio que no se mueve porque es sábado y otro que no se
+// mueve porque el proveedor está fallando se veían exactamente igual, y esa era
+// la diferencia que había que mirar en el log para averiguar.
+
+const TIPOS_PAUSABLES_POR_DEFECTO = ["acciones", "etfs", "comoditis"]
+
+function motivoPausaMercado() {
+    const ahora = new Date()
+    const dia = ahora.getDay()
+
+    if (dia === 0 || dia === 6) {
+        return "fin de semana"
+    }
+
+    const hora = ahora.getHours()
+    return hora >= 8 && hora < 22 ? "" : "fuera de horario"
+}
+
+function tiposEnPausa() {
+    if (!window._soloHorarioMercado || !motivoPausaMercado()) {
+        return []
+    }
+
+    return window._soloMercadoTipos ?? TIPOS_PAUSABLES_POR_DEFECTO
+}
+
+function tipoEnPausa(tipo) {
+    return tiposEnPausa().includes(
+        String(tipo || "")
+            .trim()
+            .toLowerCase()
+    )
+}
+
 let _autoRefreshTimer = null
 let _autoRefreshInitTimer = null
 function applyAutoRefresh(minutes) {
@@ -327,21 +369,14 @@ function applyAutoRefresh(minutes) {
 
     const intervalMs = minutes * 60 * 1000
 
-    function _mercadoEstaAbierto() {
-        const now = new Date()
-        const day = now.getDay()
-        const hour = now.getHours()
-        if (day === 0 || day === 6) return false
-        return hour >= 8 && hour < 22
-    }
-
     async function doRefresh() {
-        if (window._soloHorarioMercado && !_mercadoEstaAbierto()) {
-            const tipos = window._soloMercadoTipos ?? ["acciones", "etfs", "comoditis"]
-            if (tipos.length > 0) return
-        }
+        // La pausa ya no corta el refresco entero: la aplica activo a activo
+        // refreshOverviewMarketData. Cortar aquí paraba también la cripto, que
+        // cotiza 24/7 y a la que el propio panel de Ajustes promete no pausar,
+        // y dejaba el sidebar sin repintar, así que los precios parados no
+        // llegaban ni a ponerse en gris ni a explicar por qué no se movían.
         await refreshAssetsSidebar()
-        await refreshOverviewMarketData()
+        await refreshOverviewMarketData(null, { respetarPausa: true })
     }
 
     const nowMs = Date.now()

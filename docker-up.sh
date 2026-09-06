@@ -4,10 +4,11 @@
 # Se encarga de lo que hay que hacer antes de "docker compose up":
 #   1. Crear .env (a partir de .env.example) si aún no existe.
 #   2. Generar SECRET_KEY y, en el primer arranque, las credenciales de acceso.
-#   3. Leer el puerto de config.ini y exportarlo como PORT, para que el mapeo
+#   3. Comprobar que config.ini existe y que el .env no lo está tapando.
+#   4. Leer el puerto de config.ini y exportarlo como PORT, para que el mapeo
 #      host:contenedor de docker-compose.yml coincida siempre con el valor real
 #      que usa la app.
-#   4. Crear data/, logs/ y API/ con tu usuario y exportar PUID/PGID, para que
+#   5. Crear data/, logs/ y API/ con tu usuario y exportar PUID/PGID, para que
 #      el contenedor pueda escribir en ellos y lo que cree siga siendo tuyo.
 #
 # Uso: ./docker-up.sh [args extra para docker compose up]
@@ -224,7 +225,53 @@ print('pbkdf2:sha256:%d\$%s\$%s' % (
     fi
 fi
 
-# ── 4. Puerto ─────────────────────────────────────────────────────────────────
+# ── 4. config.ini ─────────────────────────────────────────────────────────────
+# El fichero va montado dentro del contenedor (docker-compose.yml), para que
+# editarlo surta efecto al reiniciar en vez de exigir reconstruir la imagen. Eso
+# obliga a comprobarlo aquí: cuando el origen de un bind mount no existe, Docker
+# crea en su lugar un DIRECTORIO vacío y lo monta encima. La aplicación
+# arrancaría con toda la configuración en sus valores por defecto, el puerto de
+# este script y el del contenedor podrían dejar de coincidir, y en el host
+# quedaría un config.ini/ propiedad de root en vez del fichero.
+if [ -d config.ini ]; then
+    echo "ERROR: config.ini es un directorio, no un fichero." >&2
+    echo "       Lo crea Docker cuando el fichero falta al montar el volumen." >&2
+    echo "       Bórralo y recupera el fichero del repositorio:" >&2
+    echo "           sudo rm -rf config.ini && git checkout config.ini" >&2
+    exit 1
+fi
+
+if [ ! -f config.ini ]; then
+    cat > config.ini <<'INI'
+; Fichero creado por docker-up.sh porque faltaba. Está vacío a propósito: sin
+; opciones escritas, cada ajuste toma su valor por defecto, que es exactamente
+; lo que hacía la aplicación sin este fichero.
+;
+; El original viene documentado opción por opción en el repositorio:
+;     git checkout config.ini
+INI
+    echo "AVISO: no había config.ini; se ha creado uno vacío (todo por defecto)." >&2
+    echo "       El original, documentado, se recupera con: git checkout config.ini" >&2
+fi
+
+# Ajustes escritos en config.ini que el .env tapa sin decirlo. Es el fallo que
+# se comió las claves de API en la 1.6.0, en su versión de config: dos sitios
+# donde poner lo mismo, uno con prioridad, y nada que lo indique. El aviso
+# equivalente sale también en el log del contenedor al arrancar, pero ahí no lo
+# lee nadie hasta que ya hay un problema que investigar.
+SOMBRAS=$(run_py_file tools/leer_ajuste.py --sombras 2>/dev/null) || true
+if [ -n "$SOMBRAS" ]; then
+    echo >&2
+    echo "AVISO: el .env está tapando ajustes escritos en config.ini." >&2
+    echo "$SOMBRAS" | sed 's/^/       /' >&2
+    echo "       Manda el .env. Si el valor bueno es el del fichero, quita esa" >&2
+    echo "       línea del .env; si es el del .env, cámbialo también en" >&2
+    echo "       config.ini para que los dos digan lo mismo." >&2
+    echo >&2
+fi
+
+
+# ── 5. Puerto ─────────────────────────────────────────────────────────────────
 # Se lee con la misma capa de configuración que usa la aplicación
 # (tools/leer_ajuste.py), no con un configparser aparte: así el puerto del mapeo
 # de Docker respeta la prioridad entorno → config.ini → defecto y queda validado
@@ -233,7 +280,7 @@ PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
 [ -n "$PORT" ] || PORT=5000
 export PORT
 
-# ── 5. Volúmenes y usuario ────────────────────────────────────────────────────
+# ── 6. Volúmenes y usuario ────────────────────────────────────────────────────
 # Los tres directorios se crean AQUÍ, con el usuario que lanza el stack. Si no
 # existen cuando arranca Compose, los crea el demonio de Docker y quedan como
 # root: a partir de ahí el contenedor no puede escribir en ellos (la aplicación
@@ -248,7 +295,7 @@ PUID=$(id -u)
 PGID=$(id -g)
 export PUID PGID
 
-# ── 6. Versión de la imagen ───────────────────────────────────────────────────
+# ── 7. Versión de la imagen ───────────────────────────────────────────────────
 # La imagen se etiqueta con la versión desde la primera instalación, no solo
 # como `latest`. Sin esto, la primera actualización no tenía a dónde volver: si
 # la versión nueva no arrancaba, docker-update.sh buscaba la imagen anterior
@@ -258,7 +305,7 @@ PORTFOLIO_VERSION=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' python/core/version.
 [ -n "$PORTFOLIO_VERSION" ] || PORTFOLIO_VERSION=latest
 export PORTFOLIO_VERSION
 
-# ── 7. Arranque ───────────────────────────────────────────────────────────────
+# ── 8. Arranque ───────────────────────────────────────────────────────────────
 docker compose up -d --build "$@"
 
 # `up -d` termina cuando crea el contenedor, no cuando la aplicación puede

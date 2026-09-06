@@ -250,6 +250,43 @@
     color: var(--text-bright);
 }
 
+/* Los tres motivos por los que un precio del sidebar puede estar quieto.
+   Los dos primeros son grises —el dato es viejo, pero no hay nada roto— y el
+   tercero es el único que pide mirar algo. Estaban repartidos entre hojas
+   distintas, así que se veían de golpe solo ejecutando la aplicación. */
+
+/* Pasado el umbral de Ajustes › Umbral de cotizaciones. */
+.assetBtn.stale .assetBtnPrice,
+.assetBtn.stale .assetBtnName {
+    color: var(--text-dim);
+}
+
+/* Pausado a propósito: fin de semana o fuera del horario de mercado. */
+.assetBtn.pausado .assetBtnPrice,
+.assetBtn.pausado .assetBtnName,
+.assetBtn.pausado .assetBtnChange,
+.assetBtn.pausado .assetBtnChangePct {
+    color: var(--text-dim);
+}
+
+/* Falla el proveedor: aquí sí hay algo que arreglar. */
+.assetBtnAviso {
+    margin-left: 5px;
+    font-size: 11px;
+    /* El mismo ámbar con el que Ajustes › API marca «clave rechazada» y
+       «cuota agotada»: casi siempre es la misma avería vista desde el sidebar. */
+    color: #fbbf24;
+}
+
+.assetsPausaAviso {
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border-inset);
+    background: var(--bg-surface);
+    color: var(--text-dim);
+    font-size: 11px;
+    line-height: 1.35;
+}
+
 .assetBtnName {
     grid-column: 1;
     grid-row: 1;

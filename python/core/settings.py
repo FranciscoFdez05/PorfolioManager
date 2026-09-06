@@ -67,30 +67,37 @@ class Ajuste:
     def nombre(self) -> str:
         return f"{self.seccion}.{self.opcion}"
 
-    def leer(self):
-        """Valor efectivo ahora mismo, releyendo config.ini si ha cambiado."""
+    def leer(self, usarEntorno: bool = True):
+        """Valor efectivo ahora mismo, releyendo config.ini si ha cambiado.
+
+        Con `usarEntorno=False` se ignora la variable de entorno y se devuelve
+        lo que dice el fichero (o el defecto). Sirve para poder comparar las dos
+        fuentes y avisar cuando no coinciden: ver `sombras()`.
+        """
+        env = self.env if usarEntorno else None
+
         if self.tipo == TEXTO:
-            return config_ini.obtenerTexto(self.seccion, self.opcion, self.defecto, env=self.env)
+            return config_ini.obtenerTexto(self.seccion, self.opcion, self.defecto, env=env)
         if self.tipo == ENTERO:
             return config_ini.obtenerEntero(
                 self.seccion, self.opcion, self.defecto,
-                env=self.env, minimo=self.minimo, maximo=self.maximo,
+                env=env, minimo=self.minimo, maximo=self.maximo,
             )
         if self.tipo == DECIMAL:
             return config_ini.obtenerDecimal(
                 self.seccion, self.opcion, self.defecto,
-                env=self.env, minimo=self.minimo, maximo=self.maximo,
+                env=env, minimo=self.minimo, maximo=self.maximo,
             )
         if self.tipo == BOOLEANO:
-            return config_ini.obtenerBooleano(self.seccion, self.opcion, self.defecto, env=self.env)
+            return config_ini.obtenerBooleano(self.seccion, self.opcion, self.defecto, env=env)
         if self.tipo == LISTA:
             return config_ini.obtenerLista(
                 self.seccion, self.opcion, self.defecto,
-                env=self.env, vaciarEsExplicito=self.vaciarEsExplicito,
+                env=env, vaciarEsExplicito=self.vaciarEsExplicito,
             )
         if self.tipo == OPCION:
             return config_ini.obtenerOpcion(
-                self.seccion, self.opcion, self.defecto, self.permitidos, env=self.env,
+                self.seccion, self.opcion, self.defecto, self.permitidos, env=env,
             )
         raise ValueError(f"Tipo de ajuste desconocido: {self.tipo!r}")
 
@@ -436,6 +443,97 @@ def _origen(ajuste: Ajuste) -> str:
     return "defecto"
 
 
+def _comoTexto(valor) -> str:
+    """Valor tal y como se escribiría en config.ini o en el .env."""
+    if isinstance(valor, bool):
+        return "true" if valor else "false"
+    if isinstance(valor, (list, tuple)):
+        return ", ".join(str(item) for item in valor)
+    return str(valor)
+
+
+# Variables que fija el propio despliegue, no quien configura la instalación.
+# docker-compose.yml las escribe en el contenedor a propósito, porque ahí el
+# valor correcto no es el del fichero: config.ini lo comparte la instalación sin
+# Docker, donde no hay proxy delante ni volúmenes montados en /app. Avisar de
+# ellas sería un aviso en cada arranque que no señala ningún fallo, y de esos
+# nacen los logs que nadie lee.
+#
+# `tests/test_settings.py` comprueba que esta lista siga cubriendo exactamente
+# lo que fija docker-compose.yml: añadir allí un override y olvidarlo aquí
+# volvería a llenar el arranque de ruido.
+FIJADAS_POR_EL_DESPLIEGUE = frozenset({
+    "PORT",
+    "PROXY_FIX_HOPS",
+    "PORTFOLIO_DATA_DIR",
+    "PORTFOLIO_LOGS_DIR",
+    "PORTFOLIO_API_DIR",
+})
+
+
+def _esElDeFabrica(ajuste: Ajuste, valor) -> bool:
+    """¿El fichero trae este ajuste tal y como se distribuye?"""
+    if ajuste.tipo == LISTA:
+        return list(valor) == list(ajuste.defecto)
+    return valor == ajuste.defecto
+
+
+def sombras() -> list[str]:
+    """Ajustes escritos en config.ini a los que una variable de entorno tapa.
+
+    Es el mismo fallo que se comió las claves de API en la 1.6.0: dos sitios
+    donde configurar lo mismo, uno de ellos con prioridad y ninguna señal de
+    cuál manda. Quien editaba el fichero veía su valor ahí escrito, la
+    aplicación usaba el otro, y no había forma de notarlo salvo deducirlo del
+    comportamiento.
+
+    La precedencia no cambia —el entorno tiene que poder sobrescribir, es lo que
+    permite ajustar una máquina concreta sin tocar el fichero versionado— pero
+    deja de ser invisible: cada choque sale en el log al arrancar, y
+    `docker-up.sh` los enseña en la terminal antes de levantar el stack.
+
+    Se avisa solo de lo que es una decisión perdida, que son dos condiciones:
+
+    * Los dos valores **difieren**. Repetir en el .env el mismo valor que ya
+      está en el fichero es redundante, pero no engaña a nadie.
+    * El del fichero **no es el de fábrica**. config.ini se distribuye con todas
+      las opciones escritas en su valor por defecto para que sirvan de
+      documentación (lo garantiza `test_config_ini_coincide_con_los_defectos_del_catalogo`),
+      así que una línea sin tocar no es la decisión de nadie. Sin esto, el flujo
+      que recomienda el README —config.ini como referencia, los cambios en el
+      .env— avisaría en todos los arranques de todos los overrides, y un aviso
+      que sale siempre no lo lee nadie.
+
+    Queda fuera, entonces, exactamente un caso: alguien editó config.ini, y el
+    .env está deshaciendo esa edición sin decirlo.
+    """
+    avisos = []
+
+    for ajuste in CATALOGO:
+        if not ajuste.env or ajuste.env in FIJADAS_POR_EL_DESPLIEGUE:
+            continue
+
+        if not os.environ.get(ajuste.env, "").strip():
+            continue
+
+        if not config_ini.leerConfig().has_option(ajuste.seccion, ajuste.opcion):
+            continue
+
+        delFichero = ajuste.leer(usarEntorno=False)
+        efectivo = ajuste.leer()
+
+        if delFichero == efectivo or _esElDeFabrica(ajuste, delFichero):
+            continue
+
+        avisos.append(
+            f"[{ajuste.seccion}] {ajuste.opcion} = {_comoTexto(delFichero)} en config.ini, "
+            f"pero manda {ajuste.env}={_comoTexto(efectivo)} del entorno (.env): "
+            f"el fichero dice una cosa y la aplicación usa otra"
+        )
+
+    return avisos
+
+
 def diagnostico(incluirDescripcion: bool = False) -> list[dict]:
     """Configuración efectiva completa, con el origen de cada valor.
 
@@ -478,7 +576,8 @@ def validar() -> list[str]:
         # Con un override por entorno, el valor efectivo no sale del fichero:
         # compararlo con lo escrito en config.ini daría un aviso inventado
         # ("port = 5000 fuera de rango" cuando el efectivo es el 5099 del
-        # entorno). El valor del entorno lo valida config_ini al resolverlo.
+        # entorno). El valor del entorno lo valida config_ini al resolverlo, y
+        # del choque entre los dos sitios avisa `sombras()` más abajo.
         if _origen(ajuste) == "entorno":
             continue
 
@@ -506,6 +605,9 @@ def validar() -> list[str]:
 
         elif ajuste.tipo == BOOLEANO and not config_ini.esBooleanoValido(crudo):
             avisos.append(f"[{ajuste.seccion}] {ajuste.opcion} = {crudo.strip()!r} no es booleano; se usa {valor}")
+
+    # Lo escrito en config.ini que no llega a usarse porque el .env lo tapa.
+    avisos.extend(sombras())
 
     # Comprobaciones que cruzan varios ajustes: cada uno es válido por separado,
     # pero la combinación no funciona.

@@ -1,9 +1,10 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.6.1-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.7.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
+[![SQLite](https://img.shields.io/badge/sqlite-3.40%2B-lightgrey)](Dockerfile)
 
 Aplicación web **local** para el seguimiento de una cartera de inversión personal. Sin dependencias cloud obligatorias: todo se guarda en **SQLite** y corre en tu máquina (o en cualquier servidor doméstico con Docker).
 
@@ -182,6 +183,10 @@ variable de entorno  →  config.ini  →  valor por defecto del código
 ```
 
 La resuelve `core/settings.py`, que además valida rangos y avisa en el log de los valores dudosos al arrancar. Un ajuste que falte en `config.ini` no rompe nada: cae al valor por defecto del código, y por eso una versión nueva puede añadir opciones sin que tengas que tocar tu configuración.
+
+Si además de poner un ajuste en `.env` **editas** esa misma opción en `config.ini` con otro valor, se avisa: en el log al arrancar y en la terminal al lanzar `./docker-setup`. No cambia quién manda —manda el entorno—, pero deja de ser invisible que el fichero esté diciendo una cosa mientras la aplicación hace otra. Usar el `.env` sin tocar `config.ini`, que es lo recomendado aquí arriba, no avisa de nada.
+
+Con Docker, `config.ini` va montado en el contenedor: editarlo surte efecto al reiniciarlo, sin reconstruir la imagen.
 
 ### Qué hay en cada sitio
 
@@ -717,7 +722,7 @@ escrituras_pesadas_por_hora = 30    ; backup, restauración e importación
 | Capa | Tecnología |
 |---|---|
 | Backend | Python 3.11+ · Flask · Gunicorn |
-| Base de datos | SQLite (WAL), esquema versionado |
+| Base de datos | SQLite 3.40+ (WAL), esquema versionado |
 | Frontend | HTML + CSS + JavaScript, sin frameworks ni empaquetado |
 | Gráficos | Chart.js, servido en local desde `js/vendor/` |
 | Despliegue | Docker · Docker Compose |

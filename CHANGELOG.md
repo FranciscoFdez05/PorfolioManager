@@ -22,6 +22,82 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.7.0] — 2026-09-06
+
+**Dos sitios donde un valor podía estar diciendo una cosa mientras la
+aplicación hacía otra.** Es la misma avería que en la 1.6.0 se comió las claves
+de API, en sus otras dos formas: el `.env` tapando en silencio a `config.ini`, y
+un precio parado en el sidebar sin decir si era porque estaba pausado a
+propósito o porque el proveedor había dejado de responder.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+### Añadido
+
+- **El sidebar dice por qué un precio no se mueve.** Antes había tres motivos y
+  un único aspecto —un número quieto—, así que distinguirlos era ir al log.
+  Ahora:
+
+  - **Pausado** (fin de semana, o fuera del horario de mercado, con «Solo
+    horario de mercado» activado): el activo se ve en gris y encima de la lista
+    sale una línea que dice cuál es el motivo y cuándo se reanuda —«Precios en
+    pausa: es fin de semana. No se piden cotizaciones de acciones, ETF,
+    comodities hasta el lunes a las 8:00»—, más «El resto se sigue
+    actualizando» cuando queda algo vivo, que en la práctica es la cripto.
+  - **Fallo del proveedor**: ⚠ junto al nombre, y el motivo que dio el
+    proveedor —clave rechazada, cuota agotada— al pasar el ratón por encima. Es
+    el único de los tres que pide hacer algo, así que es el único que lo parece.
+  - **Dato viejo** (pasado el umbral de Ajustes › Umbral de cotizaciones): sigue
+    en gris, como hasta ahora.
+
+  El aviso de pausa solo sale si en la lista hay activos de un tipo pausado: en
+  una cartera de solo cripto no aparece ningún sábado.
+
+- **Aviso cuando el `.env` tapa a `config.ini`.** Si una opción que has
+  **editado** en el fichero tiene además su variable de entorno puesta con otro
+  valor, se dice: en el log al arrancar y, con Docker, en la terminal antes de
+  levantar el stack. La precedencia no cambia —el entorno tiene que poder
+  mandar, es lo que permite ajustar una máquina sin tocar el fichero
+  versionado— pero deja de ser invisible, que era lo que convertía «he editado
+  config.ini y no pasa nada» en una tarde perdida.
+
+  Poner ajustes en el `.env` es el flujo que recomienda el README y no avisa de
+  nada: `config.ini` se distribuye con todas las opciones escritas en su valor
+  de fábrica, y una línea sin tocar no es la decisión de nadie. Tampoco se avisa
+  de lo que fija el propio despliegue (`PROXY_FIX_HOPS`, las rutas de los
+  volúmenes, el puerto). Un aviso que sale en cada arranque deja de leerse, así
+  que sale exactamente en un caso: el fichero dice una cosa y la aplicación hace
+  otra. Una prueba comprueba que esa lista de exenciones y `docker-compose.yml`
+  no se separen.
+
+### Cambiado
+
+- **`config.ini` se monta en el contenedor.** Hasta ahora solo entraba en la
+  imagen al construirla, así que editarlo con Docker no hacía nada hasta la
+  siguiente reconstrucción: el fichero que se veía en el editor y el que estaba
+  corriendo podían llevar semanas separados. Ahora es el mismo, y los cambios
+  se aplican al reiniciar el contenedor.
+
+- **La pausa se aplica por tipo de activo, no al refresco entero.** El panel de
+  Ajustes promete que la cripto no se pausa porque opera 24/7, pero el refresco
+  automático se cortaba entero: los fines de semana tampoco se actualizaba. Y de
+  paso el sidebar no se repintaba, así que los precios parados no llegaban ni a
+  ponerse en gris.
+
+  Pulsar «Actualizar cotizaciones» sigue pidiendo precios de todo, pausa o no:
+  quien pulsa quiere el dato, no una explicación.
+
+- **`docker-up.sh` comprueba `config.ini` antes de arrancar.** Si falta, Docker
+  crearía un *directorio* con ese nombre y lo montaría encima, dejando la
+  aplicación con todos los valores por defecto y un `config.ini/` de root en el
+  host. Ahora se detecta: si falta se crea uno vacío avisando, y si ya quedó
+  convertido en directorio se para y se dice cómo recuperarlo.
+
+[1.7.0]: https://github.com/FranciscoFdez05/PorfolioManager/releases/tag/v1.7.0
+
+---
+
 ## [1.6.1] — 2026-09-05
 
 **Las claves que se ven en Ajustes pasan a ser las que se usan.** No tenía por

@@ -195,6 +195,115 @@ def test_proxy_saltos_se_acota_por_abajo(config):
     assert settings.proxySaltos() == 0
 
 
+# ── Sombras: el .env tapando a config.ini ─────────────────────────────────────
+#
+# El fallo de la 1.6.0 con las claves de API, en su versión de configuración:
+# dos sitios donde poner lo mismo, uno con prioridad, y nada que lo diga. Estas
+# pruebas fijan que el choque se avise y que avisar no se convierta en ruido.
+
+def test_avisa_cuando_el_entorno_tapa_un_valor_escrito(config, monkeypatch):
+    config("[backups]\nmax_copias = 7\n")
+    monkeypatch.setenv("BACKUPS_MAX_COPIAS", "30")
+
+    avisos = settings.sombras()
+
+    assert len(avisos) == 1
+    assert "max_copias" in avisos[0]
+    assert "7" in avisos[0] and "30" in avisos[0]
+    assert "BACKUPS_MAX_COPIAS" in avisos[0]
+    assert avisos == [aviso for aviso in settings.validar() if aviso in avisos]
+
+
+def test_no_avisa_si_los_dos_sitios_dicen_lo_mismo(config, monkeypatch):
+    """Redundante, pero no engaña a nadie: avisar aquí sería ruido."""
+    config("[backups]\nmax_copias = 30\n")
+    monkeypatch.setenv("BACKUPS_MAX_COPIAS", "30")
+
+    assert settings.sombras() == []
+
+
+def test_no_avisa_si_el_fichero_esta_como_se_distribuye(config, monkeypatch):
+    """El README recomienda dejar config.ini quieto y cambiar las cosas en .env.
+
+    Como el fichero se distribuye con todas las opciones escritas en su valor
+    por defecto, avisar de esas líneas denunciaría el flujo recomendado en cada
+    arranque. Solo es una decisión perdida si alguien editó el fichero.
+    """
+    config("[backups]\nmax_copias = 14\n")
+    monkeypatch.setenv("BACKUPS_MAX_COPIAS", "30")
+
+    assert settings.sombras() == []
+
+
+def test_el_config_ini_del_repositorio_no_genera_sombras(monkeypatch):
+    """La comprobación de arriba, contra el fichero de verdad y todo el catálogo."""
+    for ajuste in settings.CATALOGO:
+        if ajuste.env and ajuste.env not in settings.FIJADAS_POR_EL_DESPLIEGUE:
+            monkeypatch.setenv(ajuste.env, "1")
+
+    assert settings.sombras() == []
+
+
+def test_no_avisa_de_un_ajuste_que_no_esta_escrito(config, monkeypatch):
+    """Sin la opción en el fichero no hay dos valores: el entorno es el único."""
+    config("[server]\nport = 8080\n")
+    monkeypatch.setenv("BACKUPS_MAX_COPIAS", "30")
+
+    assert settings.sombras() == []
+
+
+def test_una_variable_vacia_no_tapa_nada(config, monkeypatch):
+    config("[backups]\nmax_copias = 7\n")
+    monkeypatch.setenv("BACKUPS_MAX_COPIAS", "")
+
+    assert settings.sombras() == []
+
+
+def test_no_avisa_de_lo_que_fija_el_despliegue(config, monkeypatch):
+    """PROXY_FIX_HOPS lo pone docker-compose.yml en todos los arranques."""
+    config("[server]\nproxy_saltos = 2\n")
+    monkeypatch.setenv("PROXY_FIX_HOPS", "1")
+
+    assert settings.sombras() == []
+
+
+def test_las_variables_fijadas_existen_en_el_catalogo():
+    envs = {ajuste.env for ajuste in settings.CATALOGO if ajuste.env}
+    assert envs >= settings.FIJADAS_POR_EL_DESPLIEGUE
+
+
+def test_las_fijadas_cubren_lo_que_escribe_docker_compose():
+    """Un override nuevo en docker-compose.yml sin añadir aquí = aviso en cada arranque.
+
+    docker-compose.yml escribe algunas variables en el contenedor a propósito
+    —el proxy, las rutas de los volúmenes, el puerto— porque ahí el valor
+    correcto no es el del fichero. Si una de ellas no está exenta, `sombras()`
+    la denunciaría en todos los arranques con Docker y el aviso dejaría de
+    significar nada.
+    """
+    compose = (config_ini._RAIZ / "docker-compose.yml").read_text(encoding="utf-8")
+    envs = {ajuste.env for ajuste in settings.CATALOGO if ajuste.env}
+
+    escritas = {
+        linea.strip().lstrip("- ").split("=", 1)[0]
+        for linea in compose.splitlines()
+        if linea.strip().startswith("- ") and "=" in linea
+    }
+    delCatalogo = escritas & envs
+
+    assert delCatalogo == set(settings.FIJADAS_POR_EL_DESPLIEGUE), (
+        "docker-compose.yml y settings.FIJADAS_POR_EL_DESPLIEGUE se han separado: "
+        f"sobra(n) {set(settings.FIJADAS_POR_EL_DESPLIEGUE) - delCatalogo}, "
+        f"falta(n) {delCatalogo - set(settings.FIJADAS_POR_EL_DESPLIEGUE)}"
+    )
+
+
+def test_el_config_ini_se_monta_en_el_contenedor():
+    """Sin el montaje, editar config.ini no hace nada hasta reconstruir la imagen."""
+    compose = (config_ini._RAIZ / "docker-compose.yml").read_text(encoding="utf-8")
+    assert "./config.ini:/app/config.ini:ro" in compose
+
+
 # ── Diagnóstico ───────────────────────────────────────────────────────────────
 
 def test_el_diagnostico_indica_el_origen_de_cada_valor(config, monkeypatch):
