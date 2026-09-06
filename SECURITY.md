@@ -50,3 +50,44 @@ La aplicación está pensada para correr **en una red local o detrás de una VPN
 1. Cambia `SECRET_KEY` en `.env`. **Ojo:** eso invalida `auth.dat` y las `API/*.key` cifradas; tendrás que volver a crear las credenciales y a introducir las claves.
 2. Revoca y regenera las claves de API en el panel de cada proveedor.
 3. Revisa `logs/` por si el incidente dejó rastro.
+
+### Rotar la `SECRET_KEY`, paso a paso
+
+El orden importa: en cuanto la clave cambia, **lo que estaba cifrado con la vieja no se recupera**. Con ella se cifran `data/auth.dat`, las `API/*.key` de los proveedores y `API/movimientos.key` (la firma del Atajo de iOS).
+
+1. **Copia las claves de API que estés usando.** Ajustes › API las enseña completas. Después del cambio ya no hay forma de leerlas.
+
+2. **Regenera el hash de tu contraseña actual.** Al no poder descifrar `auth.dat`, el login cae a `LOGIN_USERNAME` y `LOGIN_PASSWORD_HASH` del `.env` (`python/routes/auth.py`), que son los del primer arranque: si cambiaste la contraseña desde Ajustes, volverías a la anterior sin que nada lo diga. Así no queda en el historial del shell:
+
+   ```bash
+   read -rsp "Contraseña: " PW; echo
+   docker exec -i -e PW="$PW" PorfolioManager python -c "import os; from werkzeug.security import generate_password_hash; print(generate_password_hash(os.environ['PW'], method='pbkdf2:sha256:600000'))"
+   unset PW
+   ```
+
+   Las iteraciones tienen que ser las de `[seguridad] hash_iteraciones` en `config.ini`. Sin Docker, el mismo `python -c` con el intérprete del entorno virtual.
+
+3. **Genera la clave nueva:** `openssl rand -hex 32`.
+
+4. **Edita `.env`:** `SECRET_KEY` con ese valor y `LOGIN_PASSWORD_HASH` con el hash del paso 2.
+
+5. **Aparta lo que va a quedar indescifrable.** Moverlo, no borrarlo, hasta comprobar que todo funciona:
+
+   ```bash
+   mv data/auth.dat data/auth.dat.bak
+   mkdir -p API/viejas && mv API/*.key API/viejas/
+   ```
+
+   `auth.dat` se vuelve a crear en el primer arranque con el usuario y el hash del `.env`.
+
+6. **Levanta el stack con `./docker-up.sh`.** Tiene que ser un `up` y no un `restart`: el `.env` se lee al **crear** el contenedor, así que reiniciarlo seguiría usando la clave vieja.
+
+7. **Rehaz lo cifrado.** Vuelve a introducir las claves en Ajustes › API y, si usas el Atajo de iOS, regenera la suya y actualiza el Atajo con el valor nuevo:
+
+   ```bash
+   docker exec -it PorfolioManager python tools/generar_clave_movimientos.py
+   ```
+
+8. **Vuelve a iniciar sesión.** Las sesiones abiertas quedan invalidadas, que es parte de lo que se busca al rotar.
+
+Cuando todo responda —precios actualizándose y, si lo usas, el Atajo enviando—, borra `data/auth.dat.bak` y `API/viejas/`.

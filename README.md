@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.8.0-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.0.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 [![SQLite](https://img.shields.io/badge/sqlite-3.40%2B-lightgrey)](Dockerfile)
@@ -231,7 +231,7 @@ Mientras ese vigilante no esté instalado, el panel lo dice en vez de dejar el b
 
 **Antes de pulsar, el panel dice si hay algo que traer.** Lee `python/core/version.py` de la rama en GitHub y lo compara con la versión instalada:
 
-- **Hay actualización** — el botón pasa a «Actualizar a la 1.8.0».
+- **Hay actualización** — el botón pasa a «Actualizar a la 2.1.0».
 - **Al día** — pulsar reconstruiría la misma versión. Es legítimo (rehacer la imagen, aplicar un `.env` nuevo), pero el modal lo avisa para que nadie se coma dos minutos de reinicio creyendo que trae novedades.
 
 Esto sí lo hace la aplicación por su cuenta: es una lectura, no una actualización, así que funciona aunque el vigilante no esté instalado. La respuesta se guarda seis horas —el panel se recarga cada cinco segundos mientras dura una actualización— y **Comprobar si hay versión nueva** salta esa caché. Se configura en `[actualizacion]`: la rama consultada tiene que ser la del checkout del servidor, o estarías comparando con una versión que tu `git pull` no va a traer. Con `comprobar_version = false` el servidor no hace ninguna llamada saliente por esto y el panel deja de mostrar la línea.

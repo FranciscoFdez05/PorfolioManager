@@ -22,15 +22,38 @@ decide cómo se deshace la actualización:
 
 ---
 
-## [1.8.0] — 2026-09-06
+## [2.0.0] — 2026-09-06
 
-**El botón de actualizar ya no actualiza a ciegas.** Pulsarlo reconstruía la
-imagen y reiniciaba el contenedor —un par de minutos sin servicio— aunque no
-hubiera nada que traer, y la única forma de saberlo antes era entrar por SSH a
-mirar el `git log`.
+**Dos cosas que se hacían a ciegas dejan de hacerse a ciegas.** Actualizar era
+pulsar y esperar: se reconstruía la imagen y se reiniciaba el contenedor —un par
+de minutos sin servicio— aunque no hubiera nada que traer, y la única forma de
+saberlo por adelantado era entrar por SSH a mirar el `git log`. Y cifrar la
+conexión era accionar un interruptor y confiar, porque el panel solo repetía lo
+que se le había pedido, no lo que estaba ocurriendo: con el certificado emitido
+y la CA instalada, un aparato podía seguir avisando sin que nada explicara que
+lo que faltaba era un nombre en una lista. Las dos tienen ahora una respuesta
+antes de pulsar y una comprobación después.
+
+**Por qué 2.0.0:** por el calado —la seguridad pasa a tener su propio apartado
+en Ajustes y el HTTPS deja de ser un interruptor a ciegas—, no porque la
+actualización pida intervención manual. No pide ninguna.
 
 **Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
 esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos si tienes el vigilante instalado. Nada que editar a mano. Dos
+cosas opcionales, ninguna necesaria para que funcione:
+
+- Si tu `.env` viene de una copia antigua de `.env.example` y todavía tiene
+  `FINNHUB_API_KEY=tu_clave_finnhub`, puedes vaciar esa línea y la de
+  `EODHD_API_KEYS`. Nunca se usaron —se descartan por ser valores de ejemplo—
+  y así el log arranca del todo limpio.
+- Las claves de API y el estado del HTTPS viven en `API/` y en `data/`, que no
+  se tocan. Si en algún momento reinstalas desde cero, lo único que **no** puede
+  perderse es la `SECRET_KEY` del `.env`: sin ella, `API/*.key` y
+  `data/auth.dat` dejan de poder descifrarse. El procedimiento completo está en
+  SECURITY.md.
 
 ### Añadido
 
@@ -98,11 +121,29 @@ esta actualización es volver a la imagen anterior, sin tocar los datos.
   bien, la CA quedaba instalada, y el móvil seguía avisando sin que nada
   dijera que lo que faltaba era una línea en esa lista.
 
+- **Runbook para rotar la `SECRET_KEY`** en `SECURITY.md`. Estaba dicho el qué
+  («cambia SECRET_KEY») pero no el cómo, y el orden es justo lo que importa:
+  con ella se cifran `auth.dat`, las claves de los proveedores y la del Atajo,
+  así que copiarlas **antes** es la diferencia entre rotar y perderlas.
+
 - **Tres pasos escritos en el propio panel** —repasar los nombres, activar,
   instalar la CA y comprobar—, visibles solo mientras el HTTPS está apagado, que
   es cuando hacen falta. El README dice lo mismo, en el mismo orden.
 
 ### Cambiado
+
+- **El descarte de un valor de ejemplo se avisa una vez, no en cada lectura.**
+  `.env.example` traía `FINNHUB_API_KEY=tu_clave_finnhub`, y la aplicación hace
+  lo correcto —descartarlo, porque no es una clave—, pero lo decía cada vez que
+  leía las claves, o sea en cada ciclo de precios: en un servidor con esas dos
+  líneas puestas eran miles de líneas idénticas al día, y el log dejaba de
+  servir para lo que está. Ahora se avisa una vez por variable y por proceso, y
+  la propia línea dice que no se repetirá. El aviso sigue estando —es la
+  explicación de por qué ese proveedor no responde— y el contador de claves
+  ignoradas de Ajustes › API no cambia.
+
+  El `.env.example` actual ya trae esas dos líneas vacías; esto es para las
+  instalaciones que vienen de una copia anterior.
 
 - **El healthcheck del proxy deja de llenar el log.** Preguntaba cada 30 s por
   la API de admin de Caddy, que apunta a nivel info toda petición que le llega:

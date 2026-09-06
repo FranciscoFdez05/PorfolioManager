@@ -677,21 +677,38 @@ def _es_valor_de_ejemplo(clave):
     """¿Es un hueco de la documentación en vez de una clave?
 
     La lista es deliberadamente estrecha —los valores que aparecen en
-    `.env.example` y en el README— y cada descarte queda en el log. Una clave de
+    `.env.example` y en el README— y el descarte queda en el log. Una clave de
     verdad es un token de veinte o cuarenta caracteres: ninguna empieza por
     «tu_clave» ni se llama «CLAVE1».
     """
     return bool(_EJEMPLO.match(str(clave or "").strip()))
 
 
+# Procedencias por las que ya se ha avisado en este proceso.
+#
+# El descarte hay que contarlo —es la explicación de por qué un proveedor no
+# responde—, pero decirlo una vez basta: `_sin_ejemplos()` corre en cada lectura
+# de claves, o sea en cada ciclo de precios, así que un `.env` con el valor de
+# ejemplo puesto escribía miles de líneas idénticas al día y enterraba todo lo
+# demás del log, que es donde se mira cuando algo va mal.
+#
+# Sin candado a propósito: con dos hilos entrando a la vez lo peor que puede
+# pasar es una línea repetida, y un lock aquí sería un punto de bloqueo en el
+# camino de cada cotización a cambio de nada.
+_EJEMPLOS_AVISADOS = set()
+
+
 def _sin_ejemplos(claves, procedencia):
     utiles = []
     for clave in claves:
         if _es_valor_de_ejemplo(clave):
-            log.warning(
-                "Se ignora %s: es el valor de ejemplo de la documentación, no una clave.",
-                procedencia,
-            )
+            if procedencia not in _EJEMPLOS_AVISADOS:
+                _EJEMPLOS_AVISADOS.add(procedencia)
+                log.warning(
+                    "Se ignora %s: es el valor de ejemplo de la documentación, no una "
+                    "clave. No se repetirá este aviso.",
+                    procedencia,
+                )
             continue
         utiles.append(clave)
     return utiles

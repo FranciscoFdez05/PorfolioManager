@@ -301,6 +301,11 @@
         box-shadow 0.15s;
 }
 
+/* Sin fila contenedora, el flex:1 en columna aplasta el alto del campo. */
+.ajustesField > .ajustesInput {
+    flex: none;
+}
+
 .ajustesInput:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
@@ -1145,9 +1150,28 @@
 /* ── HTTPS ────────────────────────────────────────────────────────────────────
    Panel de Ajustes › Seguridad › HTTPS. Los estados se distinguen por color porque es la
    única sección donde el estado actual decide qué se puede hacer: activado,
-   desactivado o el proxy sin responder (y entonces no hay nada que pulsar). */
+   desactivado o el proxy sin responder (y entonces no hay nada que pulsar).
+
+   Y respira más que las demás tarjetas, también a propósito: esto no es un
+   campo que se rellena, es un procedimiento —mirar en qué estado estás, repasar
+   la lista de nombres, encender, instalar la CA en cada aparato—, y apretado se
+   lee como un muro. El canal lateral sigue siendo el mismo 20px de todo
+   Ajustes, así que los bordes quedan alineados con el resto de secciones; lo
+   único que se abre es el ritmo vertical, de 14 a 20. */
 .ajustesSection > .ajustesTlsEstado {
-    padding: 18px 20px 6px;
+    padding: 20px 20px 0;
+}
+
+#ajustesTlsSection > .ajustesField {
+    padding: 20px 20px 2px;
+}
+
+#ajustesTlsSection > .ajustesActions {
+    padding: 20px;
+}
+
+#ajustesTlsSection .ajustesFieldHint {
+    margin-top: 8px;
 }
 
 .ajustesTlsEstado {
@@ -1187,8 +1211,8 @@
 /* Los tres pasos para encenderlo. Solo se ve con el HTTPS apagado: en cuanto
    está puesto, lo que hace falta —instalar la CA, comprobar— sale más abajo. */
 .ajustesSection > .ajustesTlsGuia {
-    margin: 14px 20px 0;
-    padding: 14px 16px 14px 34px;
+    margin: 18px 20px 0;
+    padding: 16px 18px 16px 36px;
     border: 1px solid var(--border-soft);
     border-radius: 10px;
     background: var(--bg-inset);
@@ -1197,7 +1221,7 @@
     color: var(--text-muted);
 }
 .ajustesTlsGuia li + li {
-    margin-top: 9px;
+    margin-top: 11px;
 }
 .ajustesTlsGuia strong {
     color: var(--text-subtle);
@@ -1220,7 +1244,7 @@
 }
 
 .ajustesSection > .ajustesTlsCa {
-    padding: 0 20px 20px;
+    padding: 0 20px 22px;
 }
 
 /* Los bloques que cuelgan del panel traen su propio separador. Se saca a los
@@ -1232,7 +1256,7 @@
 }
 
 .ajustesTlsCaTexto {
-    padding-top: 16px;
+    padding-top: 20px;
     font-size: 12.5px;
     line-height: 1.55;
     color: var(--text-muted);
@@ -1243,7 +1267,7 @@
 }
 
 .ajustesTlsAyuda {
-    margin-top: 14px;
+    margin-top: 18px;
     border: 1px solid var(--border-soft);
     border-radius: 8px;
     background: var(--bg-inset);
@@ -1285,7 +1309,7 @@
 }
 
 .ajustesTlsPruebaTexto {
-    padding-top: 16px;
+    padding-top: 20px;
     font-size: 12.5px;
     line-height: 1.55;
     color: var(--text-muted);
@@ -1296,11 +1320,11 @@
 }
 
 .ajustesTlsPrueba > .ajustesActions {
-    padding: 14px 0 0;
+    padding: 16px 0 0;
 }
 
 .ajustesTlsPruebaRes {
-    margin-top: 14px;
+    margin-top: 16px;
     border: 1px solid var(--border-soft);
     border-radius: 8px;
     background: var(--bg-inset);
