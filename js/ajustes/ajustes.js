@@ -1307,6 +1307,11 @@ async function initAjustesLogic() {
     const tlsDesactivarBtn = document.getElementById("ajustesTlsDesactivarBtn")
     const tlsCaEl = document.getElementById("ajustesTlsCa")
     const tlsMsg = document.getElementById("ajustesTlsMsg")
+    const tlsGuiaEl = document.getElementById("ajustesTlsGuia")
+    const tlsPruebaEl = document.getElementById("ajustesTlsPrueba")
+    const tlsPruebaBtn = document.getElementById("ajustesTlsPruebaBtn")
+    const tlsPruebaMsg = document.getElementById("ajustesTlsPruebaMsg")
+    const tlsPruebaRes = document.getElementById("ajustesTlsPruebaRes")
 
     function _pintarTls(data) {
         if (!tlsEstadoEl) return
@@ -1340,9 +1345,12 @@ async function initAjustesLogic() {
             // Solo se rellena si el usuario no ha escrito nada: al recargar tras
             // guardar, machacar lo que tenga a medias sería perder su trabajo.
             if (!tlsNombresEl.value.trim()) {
+                // La sugerencia la calcula el servidor: incluye la IP del
+                // servidor en la LAN, que desde el navegador no hay forma de
+                // saber y es justo la que se olvida al emitir el certificado.
                 const sugerencia = (data.nombres || []).length
                     ? data.nombres.join(", ")
-                    : data.nombreActual || location.hostname || ""
+                    : (data.nombresSugeridos || []).join(", ") || data.nombreActual || location.hostname || ""
                 tlsNombresEl.value = sugerencia
             }
         }
@@ -1353,9 +1361,21 @@ async function initAjustesLogic() {
         if (tlsDesactivarBtn) {
             tlsDesactivarBtn.style.display = editable && data.activado ? "" : "none"
         }
+        const cifrando = data.activado && data.proxyDisponible
         if (tlsCaEl) {
-            tlsCaEl.style.display = data.activado && data.proxyDisponible ? "" : "none"
+            tlsCaEl.style.display = cifrando ? "" : "none"
         }
+        if (tlsPruebaEl) {
+            tlsPruebaEl.style.display = cifrando ? "" : "none"
+        }
+        // La guía explica cómo encenderlo: con el HTTPS ya puesto sobra, y lo
+        // que hace falta entonces —instalar la CA, comprobar— sale justo debajo.
+        if (tlsGuiaEl) {
+            tlsGuiaEl.style.display = editable && !data.activado ? "" : "none"
+        }
+        // Un resultado de antes de apagar el HTTPS seguiría diciendo «todo
+        // correcto» sobre una conexión que ya va en claro.
+        if (tlsPruebaRes && !cifrando) tlsPruebaRes.hidden = true
     }
 
     async function loadTls() {
@@ -1441,6 +1461,84 @@ async function initAjustesLogic() {
         }
     }
 
+    // --- Comprobar el certificado ---
+    // El estado de arriba solo repite lo que se pidió. Esto abre una conexión de
+    // verdad contra el proxy por cada nombre declarado y valida el certificado
+    // contra la CA que el usuario se descarga aquí mismo, que es la diferencia
+    // entre «quedó guardado el interruptor» y «el navegador va a dejar de avisar».
+
+    function _filaPrueba(r) {
+        const fila = document.createElement("div")
+        fila.className = "ajustesTlsPruebaFila " + (r.ok ? "ok" : "mal")
+
+        const nombre = document.createElement("span")
+        nombre.className = "ajustesTlsPruebaNombre"
+        // textContent y no innerHTML: estos nombres los escribe el usuario.
+        nombre.textContent = r.nombre
+        fila.appendChild(nombre)
+
+        const detalle = document.createElement("span")
+        detalle.className = "ajustesTlsPruebaDetalle"
+        if (!r.ok) {
+            detalle.textContent = r.error || "No se ha podido comprobar"
+        } else if (r.dias === null || r.dias === undefined) {
+            detalle.textContent = "Certificado válido"
+        } else {
+            detalle.textContent = `Certificado válido, caduca en ${r.dias} días (${r.caduca})`
+        }
+        fila.appendChild(detalle)
+
+        return fila
+    }
+
+    function _pintarPrueba(data) {
+        if (!tlsPruebaRes) return
+        tlsPruebaRes.hidden = false
+        tlsPruebaRes.textContent = ""
+
+        if (data.error) {
+            tlsPruebaRes.className = "ajustesTlsPruebaRes roto"
+            tlsPruebaRes.textContent = data.error
+            return
+        }
+
+        tlsPruebaRes.className = "ajustesTlsPruebaRes"
+        ;(data.nombres || []).forEach((r) => tlsPruebaRes.appendChild(_filaPrueba(r)))
+    }
+
+    async function _probarTls() {
+        if (!tlsPruebaBtn) return
+        tlsPruebaBtn.disabled = true
+        showMsg(tlsPruebaMsg, "Comprobando…", "")
+
+        try {
+            const res = await fetch("/api/tls/prueba")
+            const data = await res.json()
+            if (!data.ok) {
+                showMsg(tlsPruebaMsg, data.error || "No se ha podido comprobar", "error")
+                return
+            }
+
+            _pintarPrueba(data)
+
+            const fallan = (data.nombres || []).filter((r) => !r.ok).length
+            if (data.error) {
+                showMsg(tlsPruebaMsg, "Sin comprobar", "error")
+            } else if (fallan) {
+                // En plural o en singular, pero siempre con el número: es lo que
+                // dice cuántos aparatos van a seguir viendo el aviso.
+                showMsg(tlsPruebaMsg, fallan === 1 ? "1 nombre sin cubrir" : `${fallan} nombres sin cubrir`, "error")
+            } else {
+                showMsg(tlsPruebaMsg, "Todo correcto", "ok")
+            }
+        } catch {
+            showMsg(tlsPruebaMsg, "Error de red", "error")
+        } finally {
+            tlsPruebaBtn.disabled = false
+        }
+    }
+
+    if (tlsPruebaBtn) tlsPruebaBtn.addEventListener("click", _probarTls)
     if (tlsActivarBtn) tlsActivarBtn.addEventListener("click", () => _guardarTls(true))
     if (tlsDesactivarBtn) tlsDesactivarBtn.addEventListener("click", () => _guardarTls(false))
     loadTls()
@@ -1731,12 +1829,22 @@ async function initAjustesLogic() {
     // contenedor no hay Docker ni repositorio, y docker-update.sh recrea el
     // contenedor que lo ejecutaría, matándolo antes del retroceso automático—.
     const updateBtn = document.getElementById("ajustesUpdateBtn")
+    const updateCheckBtn = document.getElementById("ajustesUpdateCheckBtn")
     const updateVersionEl = document.getElementById("ajustesUpdateVersion")
+    const updatePublicadaFila = document.getElementById("ajustesUpdatePublicadaFila")
+    const updatePublicadaEl = document.getElementById("ajustesUpdatePublicada")
+    const updateEtiquetaEl = document.getElementById("ajustesUpdateEtiqueta")
+    const updateBtnTextoEl = document.getElementById("ajustesUpdateBtnTexto")
     const updateAvisoEl = document.getElementById("ajustesUpdateAviso")
     const updateMsg = document.getElementById("ajustesUpdateMsg")
 
     let _versionAlPedir = null
     let _sondeoUpdate = null
+    // Última versión publicada conocida: la usa el modal de confirmación para
+    // decir a qué se va a actualizar en vez de «a la versión nueva».
+    let _versionPublicada = null
+    // true / false / null (no se ha podido saber), tal cual lo dice el servidor.
+    let _hayVersionNueva = null
 
     function _pintarAvisoUpdate(texto) {
         if (!updateAvisoEl) return
@@ -1744,8 +1852,58 @@ async function initAjustesLogic() {
         updateAvisoEl.hidden = !texto
     }
 
+    // Qué versión hay publicada en GitHub. La comprobación es solo eso, una
+    // lectura: quien actualiza sigue siendo el vigilante del host. Sirve para no
+    // pagar dos minutos de reinicio cuando no hay nada que traer.
+    function _pintarRemota(remota) {
+        if (!updatePublicadaFila) return
+
+        _versionPublicada = null
+        _hayVersionNueva = null
+
+        if (!remota || !remota.activo) {
+            updatePublicadaFila.hidden = true
+            return
+        }
+
+        updatePublicadaFila.hidden = false
+
+        if (!remota.publicada) {
+            // Sin dato y con error: se dice, en vez de dejar un guion mudo que
+            // se confunde con «no hay versión nueva».
+            updatePublicadaEl.textContent = "no se pudo comprobar"
+            updatePublicadaFila.title = remota.error || ""
+            updateEtiquetaEl.hidden = true
+            return
+        }
+
+        updatePublicadaEl.textContent = remota.publicada
+        _versionPublicada = remota.publicada
+        // Con error y dato a la vez, el dato es el de la última comprobación
+        // que sí funcionó: se enseña, pero diciendo de cuándo es.
+        updatePublicadaFila.title = remota.error
+            ? `${remota.error}. Último dato del ${new Date(remota.comprobado).toLocaleString()}`
+            : ""
+
+        if (remota.hayNueva === null || remota.hayNueva === undefined) {
+            updateEtiquetaEl.hidden = true
+            return
+        }
+
+        _hayVersionNueva = Boolean(remota.hayNueva)
+        updateEtiquetaEl.hidden = false
+        updateEtiquetaEl.textContent = remota.hayNueva ? "Hay actualización" : "Al día"
+        updateEtiquetaEl.classList.toggle("hayNueva", Boolean(remota.hayNueva))
+    }
+
     function _pintarUpdate(datos) {
         if (updateVersionEl) updateVersionEl.textContent = datos.version || "—"
+        _pintarRemota(datos.remota)
+
+        if (updateBtnTextoEl) {
+            updateBtnTextoEl.textContent =
+                _hayVersionNueva && _versionPublicada ? `Actualizar a la ${_versionPublicada}` : "Actualizar ahora"
+        }
 
         if (!datos.vigilanteVisto) {
             // Sin vigilante instalado, la señal se queda ahí para siempre. Un
@@ -1768,6 +1926,7 @@ async function initAjustesLogic() {
         }
 
         if (updateBtn) updateBtn.disabled = Boolean(datos.enMarcha)
+        if (updateCheckBtn) updateCheckBtn.disabled = Boolean(datos.enMarcha)
         if (datos.enMarcha) showMsg(updateMsg, "Actualizando… la aplicación se reiniciará", "")
     }
 
@@ -1806,14 +1965,67 @@ async function initAjustesLogic() {
         }, 5000)
     }
 
+    // Comprobar a mano. La respuesta de GitHub se guarda unas horas, así que sin
+    // esto habría que esperar a que caducara para ver una versión recién
+    // publicada; y el botón es además la forma de ver si la comprobación va.
+    if (updateCheckBtn) {
+        updateCheckBtn.addEventListener("click", async () => {
+            updateCheckBtn.disabled = true
+            showMsg(updateMsg, "Comprobando…", "")
+            try {
+                const res = await fetch("/api/actualizacion?refrescar=1")
+                const datos = await res.json()
+                if (!datos.ok) {
+                    showMsg(updateMsg, "No se pudo comprobar", "error")
+                    return
+                }
+                _pintarUpdate(datos)
+                const remota = datos.remota
+                if (!remota?.activo) {
+                    showMsg(updateMsg, "La comprobación de versión está desactivada", "")
+                } else if (remota.error && !remota.publicada) {
+                    showMsg(updateMsg, remota.error, "error")
+                } else if (remota.hayNueva) {
+                    showMsg(updateMsg, `Hay una versión nueva: la ${remota.publicada}`, "ok")
+                } else if (remota.hayNueva === false) {
+                    showMsg(updateMsg, "Estás en la última versión publicada", "ok")
+                } else {
+                    showMsg(updateMsg, "No se pudo comparar la versión publicada", "")
+                }
+            } catch {
+                showMsg(updateMsg, "Error de red", "error")
+            } finally {
+                // Salvo que la respuesta haya dicho que hay una actualización en
+                // marcha: entonces este botón se queda apagado como el otro.
+                updateCheckBtn.disabled = Boolean(updateBtn?.disabled)
+            }
+        })
+    }
+
+    function _mensajeConfirmacion() {
+        const comun =
+            "La aplicación se reiniciará: estarás un par de minutos sin servicio. Si la " +
+            "versión nueva no arranca, el servidor vuelve solo a la anterior."
+
+        if (_hayVersionNueva === true) {
+            return `Se instalará la ${_versionPublicada}. ${comun} ¿Continuar?`
+        }
+        if (_hayVersionNueva === false) {
+            // Reconstruir la misma versión es legítimo —cambiar .env, rehacer
+            // una imagen corrupta— pero que nadie lo haga creyendo que trae algo.
+            return (
+                `Ya estás en la última publicada (${_versionPublicada}): se volverá a construir ` +
+                `la misma versión, sin novedades. ${comun} ¿Continuar?`
+            )
+        }
+        return `Se descargará y construirá la versión nueva. ${comun} ¿Continuar?`
+    }
+
     if (updateBtn) {
         updateBtn.addEventListener("click", () => {
             openConfirmModal({
                 title: "Actualizar la aplicación",
-                message:
-                    "Se descargará y construirá la versión nueva, y la aplicación se reiniciará: " +
-                    "estarás un par de minutos sin servicio. Si la versión nueva no arranca, el " +
-                    "servidor vuelve solo a la anterior. ¿Continuar?",
+                message: _mensajeConfirmacion(),
                 confirmLabel: "Actualizar",
                 onConfirm: async () => {
                     updateBtn.disabled = true

@@ -304,7 +304,25 @@ PORTFOLIO_VERSION=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' python/core/version.
 [ -n "$PORTFOLIO_VERSION" ] || PORTFOLIO_VERSION=latest
 export PORTFOLIO_VERSION
 
-# ── 8. Arranque ───────────────────────────────────────────────────────────────
+# ── 8. Dirección en la LAN ────────────────────────────────────────────────────
+# Se calcula aquí, en el host, y se le pasa al contenedor: desde dentro solo se
+# ve la red de Compose, así que la aplicación no tiene forma de saber por qué
+# dirección la alcanzan los demás aparatos. Sirve para dos cosas: escribirla al
+# final de este script, y que Ajustes › Seguridad › HTTPS llegue con ella ya
+# puesta en la lista de nombres del certificado —olvidarla es el fallo típico:
+# el certificado se emite bien pero no cubre por donde entra el móvil—.
+LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -n "$LAN_IP" ] || LAN_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
+[ -n "$LAN_IP" ] || LAN_IP="<IP_DEL_SERVIDOR>"
+
+# El marcador de relleno no se exporta: en el panel se vería como un nombre más
+# que se puede pedir, y Caddy no puede emitir un certificado para eso.
+if [ "$LAN_IP" != "<IP_DEL_SERVIDOR>" ]; then
+    PORTFOLIO_LAN_IP=$LAN_IP
+    export PORTFOLIO_LAN_IP
+fi
+
+# ── 9. Arranque ───────────────────────────────────────────────────────────────
 docker compose up -d --build "$@"
 
 # `up -d` termina cuando crea el contenedor, no cuando la aplicación puede
@@ -355,11 +373,6 @@ if [ "$ESTADO_CADDY" != "running" ]; then
     exit 1
 fi
 
-# IP de la LAN, para no tener que buscarla a mano en el servidor.
-LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-[ -n "$LAN_IP" ] || LAN_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
-[ -n "$LAN_IP" ] || LAN_IP="<IP_DEL_SERVIDOR>"
-
 # El esquema sale del estado que guarda Ajustes, no de una variable: el HTTPS se
 # enciende desde la interfaz y este script no tiene por qué saber nada más.
 ESQUEMA=http
@@ -375,12 +388,12 @@ echo "  Escribe como : uid $PUID, gid $PGID"
 echo
 if [ "$ESQUEMA" = "http" ]; then
     echo "Sin HTTPS: la contraseña y la cookie de sesión viajan en claro por la red."
-    echo "Se activa desde la propia aplicación, en Ajustes › HTTPS: genera el"
+    echo "Se activa desde la propia aplicación, en Ajustes › Seguridad › HTTPS: genera el"
     echo "certificado y te lo da para instalarlo en el móvil y en el portátil."
     echo "La dirección no cambia, solo pasa a ser https://"
 else
     echo "HTTPS activo. Si un aparato aún avisa del certificado, es que le falta"
-    echo "la CA: descárgala desde Ajustes › HTTPS e instálala en él."
+    echo "la CA: descárgala desde Ajustes › Seguridad › HTTPS e instálala en él."
 fi
 echo
 echo "Para actualizar más adelante: ./docker-update.sh"

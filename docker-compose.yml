@@ -25,6 +25,13 @@ services:
       # Dirección de la API de admin del proxy dentro de la red de Compose. Es
       # por donde Ajustes enciende y apaga el HTTPS.
       - CADDY_ADMIN_URL=http://caddy:2019
+      # Dirección del servidor en la LAN, que calcula docker-up.sh en el host.
+      # Dentro del contenedor solo se ve la red de Compose, así que sin esto el
+      # panel de HTTPS no puede proponer la dirección por la que entran el móvil
+      # y el portátil —justo el nombre que hay que meter en el certificado, y el
+      # que se olvida—. Vacía no rompe nada: se sugiere el nombre por el que
+      # haya llegado la petición.
+      - PORTFOLIO_LAN_IP=${PORTFOLIO_LAN_IP:-}
       # Dentro del contenedor los datos viven siempre en estas rutas, que son
       # las que montan los volúmenes de abajo. Se fijan aquí para que un
       # [rutas] del config.ini pensado para el host (por ejemplo /srv/datos) no
@@ -111,7 +118,20 @@ services:
       # La configuración cargada en caliente, que es lo que recupera --resume.
       - caddy_config:/config
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:2019/config/"]
+      # Por donde entra un navegador, y no por la API de admin del 2019: Caddy
+      # apunta a nivel info cada petición que le llega ahí, así que preguntarle
+      # cada 30 s escribía 2.880 líneas al día y escondía las únicas que
+      # importan, los `POST /load` con los que la aplicación enciende y apaga el
+      # HTTPS.
+      #
+      # Dos intentos porque el esquema lo elige el usuario desde Ajustes y este
+      # fichero no puede saberlo: primero cifrado y, si no hay HTTPS, en claro.
+      # Así la sonda habla siempre lo mismo que la aplicación, en vez de
+      # dejarse un puerto suelto en claro para ella sola. Con --no-check-
+      # certificate porque el certificado lo firma la CA interna de Caddy, que
+      # no está en el almacén del contenedor: aquí se comprueba que el proxy
+      # contesta y que el TLS levanta, no a quién pertenece el certificado.
+      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://127.0.0.1:${PORT:-5000}/api/health || wget -q --spider http://127.0.0.1:${PORT:-5000}/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3

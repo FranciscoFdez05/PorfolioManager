@@ -550,6 +550,11 @@
                 <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 17c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 Cuenta
             </button>
+            <button class="sttNavBtn" data-stt="seguridad" type="button">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 2.5 4 5v4.5c0 3.4 2.4 6.6 6 8 3.6-1.4 6-4.6 6-8V5l-6-2.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="m7.5 10 1.8 1.8L12.8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Seguridad
+            </button>
+
 
             <button class="sttNavBtn" data-stt="portfolio" type="button">
                 <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 5V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.5"/><path d="M2 9h16" stroke="currentColor" stroke-width="1.5"/></svg>
@@ -763,6 +768,132 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3.5L16 2M6 3.5L4 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Bloqueo por inactividad</div>
+                        <div class="ajustesSectionDesc">Cierra la sesión automáticamente si no hay actividad durante el tiempo indicado.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesBloqueoInactividad">Tiempo hasta cierre de sesión</label>
+                    <select id="ajustesBloqueoInactividad" class="ajustesSelect" data-no-custom>
+                        <option value="0">Desactivado</option>
+                        <option value="15">15 minutos</option>
+                        <option value="30">30 minutos</option>
+                        <option value="60">1 hora</option>
+                        <option value="240">4 horas</option>
+                    </select>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesGuardarBloqueoBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                    <span id="ajustesBloqueoMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Seguridad ── -->
+        <div class="sttPage" id="sttPage-seguridad">
+            <h2 class="sttPageTitle">Seguridad</h2>
+
+            <div class="ajustesSection" id="ajustesTlsSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="9" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">HTTPS</div>
+                        <div class="ajustesSectionDesc">Sin esto, la contraseña y la cookie de sesión viajan en claro por la red. Al activarlo se emite el certificado y la dirección pasa a <code>https://</code>, en el mismo puerto de siempre.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesTlsEstado" id="ajustesTlsEstado">
+                    <span class="ajustesBackupEmpty">Cargando…</span>
+                </div>
+                <ol class="ajustesTlsGuia" id="ajustesTlsGuia">
+                    <li><strong>Repasa la lista de aquí abajo.</strong> Llega con la dirección por la que has
+                        entrado y con la del servidor en la red local. Añade cualquier otra que uses: el
+                        certificado <em>solo</em> vale para las que estén escritas.</li>
+                    <li><strong>Pulsa «Activar HTTPS».</strong> El certificado se emite en ese momento y la
+                        página se recarga sola en <code>https://</code>. No se reinicia nada y el puerto sigue
+                        siendo el mismo.</li>
+                    <li><strong>Instala el certificado en cada aparato</strong> con el botón que aparecerá aquí,
+                        y confírmalo con «Probar ahora». Hasta que lo instales, el navegador seguirá avisando:
+                        lo firma una autoridad de tu servidor que todavía no conoce nadie.</li>
+                </ol>
+
+                <div class="ajustesField">
+                    <div class="ajustesLabelRow">
+                        <label class="ajustesLabel" for="ajustesTlsNombres">Nombres y direcciones por los que entras</label>
+                    </div>
+                    <input id="ajustesTlsNombres" class="ajustesInput" type="text" autocomplete="off"
+                           placeholder="192.168.1.50, portfolio.casa, localhost">
+                    <div class="ajustesFieldHint">
+                        Uno por línea o separados por comas. El certificado <strong>solo vale para los que estén aquí</strong>:
+                        si entras por una dirección que falte, el navegador avisará aunque tengas la CA instalada.
+                        Añade la IP del servidor y cualquier nombre que uses.
+                    </div>
+                </div>
+
+                <div class="ajustesActions">
+                    <button id="ajustesTlsActivarBtn" class="ajustesAddBtn" type="button">Activar HTTPS</button>
+                    <button id="ajustesTlsDesactivarBtn" class="ajustesSecondaryBtn" type="button" style="display:none">Desactivar</button>
+                    <span id="ajustesTlsMsg" class="ajustesStatusMsg"></span>
+                </div>
+
+                <div class="ajustesTlsPrueba" id="ajustesTlsPrueba" style="display:none">
+                    <div class="ajustesSectionDivider"></div>
+                    <div class="ajustesTlsPruebaTexto">
+                        <strong>Comprueba que el cifrado está de verdad.</strong>
+                        Abre una conexión por cada nombre de la lista y valida el certificado contra
+                        la misma CA que te descargas aquí abajo: es la comprobación que hará el navegador.
+                    </div>
+                    <div class="ajustesActions">
+                        <button id="ajustesTlsPruebaBtn" class="ajustesSecondaryBtn" type="button">Probar ahora</button>
+                        <span id="ajustesTlsPruebaMsg" class="ajustesStatusMsg"></span>
+                    </div>
+                    <div class="ajustesTlsPruebaRes" id="ajustesTlsPruebaRes" hidden></div>
+                </div>
+                <div class="ajustesTlsCa" id="ajustesTlsCa" style="display:none">
+                    <div class="ajustesSectionDivider"></div>
+                    <div class="ajustesTlsCaTexto">
+                        <strong>Instala el certificado en cada aparato.</strong>
+                        El certificado lo firma una autoridad propia de este servidor, así que ningún
+                        dispositivo la conoce todavía: hasta que la instales, el navegador seguirá avisando.
+                        Se hace una sola vez por aparato.
+                    </div>
+                    <div class="ajustesActions">
+                        <a id="ajustesTlsCaBtn" class="ajustesSecondaryBtn" href="/api/tls/ca.crt" download>
+                            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                            Descargar certificado
+                        </a>
+                    </div>
+                    <details class="ajustesTlsAyuda">
+                        <summary>Cómo instalarlo</summary>
+                        <div class="ajustesTlsAyudaCuerpo">
+                            <p><strong>iPhone / iPad.</strong> Abre esta página en Safari (no en Chrome) y descarga el certificado.
+                            Ajustes › Perfil descargado › Instalar. Y después, <strong>el paso que todo el mundo se salta</strong>:
+                            Ajustes › General › Información › Ajustes de confianza de certificados, y activa el interruptor.
+                            Sin eso queda instalado pero no es de confianza, y el aviso sigue igual.</p>
+                            <p><strong>Android.</strong> Ajustes › Seguridad › Cifrado y credenciales › Instalar un certificado ›
+                            Certificado de CA. Avisará de que es una acción delicada; lo es, y por eso lo estás instalando tú.</p>
+                            <p><strong>Windows.</strong> Doble clic en el archivo › Instalar certificado › Equipo local ›
+                            «Colocar todos los certificados en el siguiente almacén» › Entidades de certificación raíz de confianza.</p>
+                            <p><strong>macOS.</strong> Doble clic para abrirlo en Acceso a Llaveros, ponlo en el llavero «Sistema»,
+                            ábrelo y en Confiar elige «Confiar siempre».</p>
+                            <p><strong>Firefox</strong> usa su propio almacén: Ajustes › Privacidad y seguridad › Ver certificados ›
+                            Autoridades › Importar.</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
                         <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="9" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14" r="1.5" fill="currentColor"/></svg>
                     </div>
                     <div class="ajustesSectionHeaderText">
@@ -806,103 +937,6 @@
                     <span id="ajustesCredPwdMsg" class="ajustesStatusMsg"></span>
                 </div>
             </div>
-
-            <div class="ajustesSection">
-                <div class="ajustesSectionHeader">
-                    <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3.5L16 2M6 3.5L4 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-                    </div>
-                    <div class="ajustesSectionHeaderText">
-                        <div class="ajustesSectionTitle">Bloqueo por inactividad</div>
-                        <div class="ajustesSectionDesc">Cierra la sesión automáticamente si no hay actividad durante el tiempo indicado.</div>
-                    </div>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-                <div class="ajustesField">
-                    <label class="ajustesLabel" for="ajustesBloqueoInactividad">Tiempo hasta cierre de sesión</label>
-                    <select id="ajustesBloqueoInactividad" class="ajustesSelect" data-no-custom>
-                        <option value="0">Desactivado</option>
-                        <option value="15">15 minutos</option>
-                        <option value="30">30 minutos</option>
-                        <option value="60">1 hora</option>
-                        <option value="240">4 horas</option>
-                    </select>
-                </div>
-                <div class="ajustesActions">
-                    <button id="ajustesGuardarBloqueoBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
-                    <span id="ajustesBloqueoMsg" class="ajustesStatusMsg"></span>
-                </div>
-            </div>
-
-            <div class="ajustesSection" id="ajustesTlsSection">
-                <div class="ajustesSectionHeader">
-                    <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="9" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                    </div>
-                    <div class="ajustesSectionHeaderText">
-                        <div class="ajustesSectionTitle">HTTPS</div>
-                        <div class="ajustesSectionDesc">Sin esto, la contraseña y la cookie de sesión viajan en claro por la red. Al activarlo se emite el certificado y la dirección pasa a <code>https://</code>, en el mismo puerto de siempre.</div>
-                    </div>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-
-                <div class="ajustesTlsEstado" id="ajustesTlsEstado">
-                    <span class="ajustesBackupEmpty">Cargando…</span>
-                </div>
-
-                <div class="ajustesField">
-                    <div class="ajustesLabelRow">
-                        <label class="ajustesLabel" for="ajustesTlsNombres">Nombres y direcciones por los que entras</label>
-                    </div>
-                    <input id="ajustesTlsNombres" class="ajustesInput" type="text" autocomplete="off"
-                           placeholder="192.168.1.50, portfolio.casa, localhost">
-                    <div class="ajustesFieldHint">
-                        Uno por línea o separados por comas. El certificado <strong>solo vale para los que estén aquí</strong>:
-                        si entras por una dirección que falte, el navegador avisará aunque tengas la CA instalada.
-                        Añade la IP del servidor y cualquier nombre que uses.
-                    </div>
-                </div>
-
-                <div class="ajustesActions">
-                    <button id="ajustesTlsActivarBtn" class="ajustesAddBtn" type="button">Activar HTTPS</button>
-                    <button id="ajustesTlsDesactivarBtn" class="ajustesSecondaryBtn" type="button" style="display:none">Desactivar</button>
-                    <span id="ajustesTlsMsg" class="ajustesStatusMsg"></span>
-                </div>
-
-                <div class="ajustesTlsCa" id="ajustesTlsCa" style="display:none">
-                    <div class="ajustesSectionDivider"></div>
-                    <div class="ajustesTlsCaTexto">
-                        <strong>Instala el certificado en cada aparato.</strong>
-                        El certificado lo firma una autoridad propia de este servidor, así que ningún
-                        dispositivo la conoce todavía: hasta que la instales, el navegador seguirá avisando.
-                        Se hace una sola vez por aparato.
-                    </div>
-                    <div class="ajustesActions">
-                        <a id="ajustesTlsCaBtn" class="ajustesSecondaryBtn" href="/api/tls/ca.crt" download>
-                            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-                            Descargar certificado
-                        </a>
-                    </div>
-                    <details class="ajustesTlsAyuda">
-                        <summary>Cómo instalarlo</summary>
-                        <div class="ajustesTlsAyudaCuerpo">
-                            <p><strong>iPhone / iPad.</strong> Abre esta página en Safari (no en Chrome) y descarga el certificado.
-                            Ajustes › Perfil descargado › Instalar. Y después, <strong>el paso que todo el mundo se salta</strong>:
-                            Ajustes › General › Información › Ajustes de confianza de certificados, y activa el interruptor.
-                            Sin eso queda instalado pero no es de confianza, y el aviso sigue igual.</p>
-                            <p><strong>Android.</strong> Ajustes › Seguridad › Cifrado y credenciales › Instalar un certificado ›
-                            Certificado de CA. Avisará de que es una acción delicada; lo es, y por eso lo estás instalando tú.</p>
-                            <p><strong>Windows.</strong> Doble clic en el archivo › Instalar certificado › Equipo local ›
-                            «Colocar todos los certificados en el siguiente almacén» › Entidades de certificación raíz de confianza.</p>
-                            <p><strong>macOS.</strong> Doble clic para abrirlo en Acceso a Llaveros, ponlo en el llavero «Sistema»,
-                            ábrelo y en Confiar elige «Confiar siempre».</p>
-                            <p><strong>Firefox</strong> usa su propio almacén: Ajustes › Privacidad y seguridad › Ver certificados ›
-                            Autoridades › Importar.</p>
-                        </div>
-                    </details>
-                </div>
-            </div>
-
         </div>
 
         <!-- ── Portfolio ── -->
@@ -1289,12 +1323,14 @@
                 </div>
                 <div class="ajustesSectionDivider"></div>
                 <div class="ajustesUpdateVersion">Versión instalada: <strong id="ajustesUpdateVersion">—</strong></div>
+                <div class="ajustesUpdateVersion" id="ajustesUpdatePublicadaFila" hidden>Última publicada: <strong id="ajustesUpdatePublicada">—</strong><span class="ajustesUpdateEtiqueta" id="ajustesUpdateEtiqueta" hidden></span></div>
                 <div class="ajustesAviso" id="ajustesUpdateAviso" hidden></div>
                 <div class="ajustesActions">
                     <button id="ajustesUpdateBtn" class="primaryButton" type="button">
                         <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 8a5 5 0 1 1-1.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13 2.5v3h-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        Actualizar ahora
+                        <span id="ajustesUpdateBtnTexto">Actualizar ahora</span>
                     </button>
+                    <button id="ajustesUpdateCheckBtn" class="secondaryButton" type="button">Comprobar si hay versión nueva</button>
                 </div>
                 <span id="ajustesUpdateMsg" class="ajustesStatusMsg ajustesUpdateMsg"></span>
             </div>

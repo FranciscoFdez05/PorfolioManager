@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.7.0-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-1.8.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 [![SQLite](https://img.shields.io/badge/sqlite-3.40%2B-lightgrey)](Dockerfile)
@@ -72,7 +72,7 @@ No hace falta tener Python instalado en el servidor: si no lo encuentra, usa la 
 
 El contenedor publica el puerto en todas las interfaces del host, así que cualquier dispositivo de la misma red llega poniendo la IP del servidor y el puerto. Si no responde desde otro equipo, casi siempre es el firewall del host: hay que abrir ese puerto (por ejemplo `sudo ufw allow 5000/tcp`).
 
-> **Eso es HTTP plano.** La contraseña del login y la cookie de sesión viajan en claro por la red, así que cualquiera con acceso a la misma wifi puede leerlas. Para la máquina local da igual; en cuanto entres desde el móvil o desde otro equipo, activa [HTTPS](#https) desde Ajustes › HTTPS — dos clics, y la dirección no cambia.
+> **Eso es HTTP plano.** La contraseña del login y la cookie de sesión viajan en claro por la red, así que cualquiera con acceso a la misma wifi puede leerlas. Para la máquina local da igual; en cuanto entres desde el móvil o desde otro equipo, activa [HTTPS](#https) desde Ajustes › Seguridad › HTTPS — dos clics, y la dirección no cambia.
 
 El puerto por defecto es `5000`, y para cambiarlo pon `PORT` en `.env` (ver [Configuración](#configuración)). `docker-setup` resuelve el valor con la misma capa que usa la aplicación —entorno, luego `config.ini`, luego el defecto— y lo exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse.
 
@@ -199,6 +199,7 @@ Con Docker, `config.ini` va montado en el contenedor: editarlo surte efecto al r
 | `[backups]` | Copias a conservar y timeouts de SQLite |
 | `[atajo]` | Endpoints del Atajo de iOS y redes permitidas |
 | `[mercado]` | Proveedores, caducidad de cotizaciones, peticiones en paralelo |
+| `[actualizacion]` | Si se comprueba en GitHub que hay versión nueva, y de qué rama |
 
 Los secretos (`SECRET_KEY`, credenciales, claves de API) van **solo** en `.env` o en `API/*.key`, nunca en `config.ini`.
 
@@ -221,6 +222,19 @@ Hace la actualización entera y la comprueba:
 Con `--sin-pull` se salta el paso 2, para cuando ya has traído el código a mano.
 
 Ejecútalo **con tu usuario, sin `sudo`** (lo rechaza si lo intentas): con `sudo`, el `git pull` y los datos quedarían a nombre de `root` y el siguiente arranque normal ya no podría escribir en ellos.
+
+### Desde Ajustes, sin SSH
+
+**Ajustes › Datos › Actualizar la aplicación** hace lo mismo, con un rodeo: la aplicación no puede lanzar `docker-update.sh` —dentro del contenedor no hay Docker ni repositorio, y el script recrea el contenedor que lo estaría ejecutando, matándolo justo antes de la comprobación de arranque—. Lo que hace el botón es dejar una señal en `data/tmp/`, y un vigilante del host la recoge y ejecuta el script de verdad. Se instala una vez, con systemd o con cron: [tools/actualizador/](tools/actualizador/README.md).
+
+Mientras ese vigilante no esté instalado, el panel lo dice en vez de dejar el botón girando: la señal se quedaría ahí sin que nadie la recogiera.
+
+**Antes de pulsar, el panel dice si hay algo que traer.** Lee `python/core/version.py` de la rama en GitHub y lo compara con la versión instalada:
+
+- **Hay actualización** — el botón pasa a «Actualizar a la 1.8.0».
+- **Al día** — pulsar reconstruiría la misma versión. Es legítimo (rehacer la imagen, aplicar un `.env` nuevo), pero el modal lo avisa para que nadie se coma dos minutos de reinicio creyendo que trae novedades.
+
+Esto sí lo hace la aplicación por su cuenta: es una lectura, no una actualización, así que funciona aunque el vigilante no esté instalado. La respuesta se guarda seis horas —el panel se recarga cada cinco segundos mientras dura una actualización— y **Comprobar si hay versión nueva** salta esa caché. Se configura en `[actualizacion]`: la rama consultada tiene que ser la del checkout del servidor, o estarías comparando con una versión que tu `git pull` no va a traer. Con `comprobar_version = false` el servidor no hace ninguna llamada saliente por esto y el panel deja de mostrar la línea.
 
 ### Si el `git pull` falla con «Permission denied»
 
@@ -647,9 +661,13 @@ El orden de registro importa:
 
 La aplicación habla HTTP y no termina TLS ella misma. Sin nada delante, el `POST /login` lleva la contraseña en el cuerpo y la respuesta devuelve la cookie de sesión, las dos cosas en texto plano: quien comparta la wifi, el switch o el punto de acceso puede leerlas y entrar. No es un riesgo teórico, es leer un paquete.
 
-**Se activa desde la propia aplicación: Ajustes › HTTPS.** Escribes los nombres y las IP por las que entras, pulsas *Activar*, y en el mismo momento se emite el certificado y el puerto pasa a hablar solo TLS. No hay que reiniciar nada ni tocar ningún fichero, y **la dirección no cambia**: `http://192.168.1.50:5000` pasa a ser `https://192.168.1.50:5000`.
+**Se activa desde la propia aplicación: Ajustes › Seguridad › HTTPS.** No hay que reiniciar nada ni tocar ningún fichero, y **la dirección no cambia**: `http://192.168.1.50:5000` pasa a ser `https://192.168.1.50:5000`.
 
-Después, el panel ofrece **descargar el certificado** de la autoridad que lo firma, con las instrucciones para instalarlo en cada aparato. Hasta que lo instales, el navegador seguirá avisando: es una CA propia de tu servidor y ningún dispositivo la conoce todavía. Se hace una vez por aparato.
+1. **Repasa la lista de nombres.** Llega rellena con la dirección por la que has entrado y con la IP del servidor en la red local: esa la calcula `docker-up.sh` en el host y se la pasa al contenedor, porque desde dentro solo se ve la red de Compose. Añade cualquier otra con la que entres —otro nombre DNS, la IP del túnel—, porque **el certificado solo vale para las que estén escritas**.
+2. **Pulsa *Activar HTTPS*.** El certificado se emite en ese momento, el puerto pasa a hablar solo TLS y la página se recarga sola en `https://`.
+3. **Descarga el certificado de la CA e instálalo** en cada aparato, con las instrucciones que trae el propio panel para iOS, Android, Windows, macOS y Firefox. Después, ***Probar ahora*** lo confirma: abre una conexión TLS por cada nombre, valida contra esa misma CA y dice cuál no está cubierto y cuántos días le quedan al certificado.
+
+El paso 3 es el que se salta todo el mundo, y es el que hace que el navegador deje de avisar: la autoridad que firma el certificado es de tu servidor y ningún dispositivo la conoce todavía. Se hace una vez por aparato.
 
 #### Cómo está montado, y por qué así
 
@@ -670,7 +688,7 @@ La alternativa —arrancar Caddy bajo demanda desde la aplicación— exigiría 
 
 El certificado **solo vale para los nombres que declares**. Si entras por una IP o un nombre que no esté en la lista, el navegador avisará aunque tengas la CA instalada, porque lo que no cuadra es el nombre. Mete la IP del servidor y cualquier nombre que uses.
 
-`localhost` y `127.0.0.1` se añaden siempre, los escribas o no: por ahí entran el healthcheck del contenedor y la comprobación de `docker-update.sh`, y si el certificado no los cubriera, Caddy rechazaría esas conexiones y la actualización se daría por fallida y volvería atrás sola.
+`localhost` y `127.0.0.1` se añaden siempre, los escribas o no: por ahí entran el healthcheck del propio proxy, el de la aplicación y la comprobación de `docker-update.sh`. Si el certificado no los cubriera, Caddy rechazaría esas conexiones: Docker daría el proxy por enfermo y una actualización se daría por fallida y volvería atrás sola.
 
 #### Qué pasa si algo sale mal
 
@@ -678,6 +696,7 @@ El certificado **solo vale para los nombres que declares**. Si entras por una IP
 |---|---|
 | Caddy rechaza la configuración | No se guarda nada y sigues conectado como estabas. El estado solo se escribe **después** de que el proxy la acepte: al revés, un estado diciendo «HTTPS activo» sobre un proxy en claro haría que las cookies salieran con `Secure`, el navegador las descartaría y no se podría iniciar sesión. |
 | Se recrea el contenedor del proxy | Caddy arranca con `--resume` y recupera la última configuración cargada. Y por si acaso, la aplicación reaplica el estado guardado al arrancar, con reintentos mientras el proxy termina de levantar. |
+| Un aparato sigue avisando del certificado | *Probar ahora* lo distingue: si dice que ese nombre **no está cubierto**, hay que añadirlo a la lista y volver a activar; si dice que está bien, lo que falta es instalar la CA **en ese aparato**. |
 | `data/tls/estado.json` ilegible | Se lee como «HTTPS desactivado», que es el estado que siempre funciona. |
 | Quieres volver a HTTP | *Desactivar* en el mismo panel. A mano: borra `data/tls/estado.json` y reinicia. |
 

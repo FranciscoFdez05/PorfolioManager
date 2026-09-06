@@ -168,14 +168,26 @@ PUID=$(id -u)
 PGID=$(id -g)
 export PUID PGID
 
-# ── 5. Construir y levantar ───────────────────────────────────────────────────
+# ── 5. Dirección en la LAN ────────────────────────────────────────────────────
+# Lo mismo que docker-up.sh, y por lo mismo: dentro del contenedor solo se ve la
+# red de Compose. Sin esto, la primera actualización dejaba el panel de HTTPS
+# sin la IP por la que entran los demás aparatos, que es la que hay que declarar
+# en el certificado.
+LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -n "$LAN_IP" ] || LAN_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
+if [ -n "$LAN_IP" ]; then
+    PORTFOLIO_LAN_IP=$LAN_IP
+    export PORTFOLIO_LAN_IP
+fi
+
+# ── 6. Construir y levantar ───────────────────────────────────────────────────
 paso "Construyendo la imagen $VERSION_NUEVA"
 docker compose build
 
 paso "Levantando"
 docker compose up -d
 
-# ── 6. Comprobar que arranca de verdad ────────────────────────────────────────
+# ── 7. Comprobar que arranca de verdad ────────────────────────────────────────
 # /api/health consulta la base de datos activa y devuelve 503 si falla, así que
 # esperar aquí distingue «el contenedor está arriba» de «la aplicación funciona».
 paso "Esperando a que responda (hasta ${ESPERA_SALUD}s)"
@@ -211,7 +223,7 @@ if [ "$sano" -eq 1 ]; then
     exit 0
 fi
 
-# ── 7. Vuelta atrás ───────────────────────────────────────────────────────────
+# ── 8. Vuelta atrás ───────────────────────────────────────────────────────────
 error "La versión $VERSION_NUEVA no responde tras ${ESPERA_SALUD}s. Volviendo atrás."
 
 echo

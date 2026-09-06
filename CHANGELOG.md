@@ -22,6 +22,99 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [1.8.0] — 2026-09-06
+
+**El botón de actualizar ya no actualiza a ciegas.** Pulsarlo reconstruía la
+imagen y reiniciaba el contenedor —un par de minutos sin servicio— aunque no
+hubiera nada que traer, y la única forma de saberlo antes era entrar por SSH a
+mirar el `git log`.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+### Añadido
+
+- **Ajustes › Datos dice si hay versión nueva antes de pulsar.** El panel lee
+  `python/core/version.py` de la rama configurada en GitHub y lo compara con la
+  versión instalada. Si hay algo que traer, el botón pasa a decir «Actualizar a
+  la 1.9.0» y la línea nueva lleva la etiqueta **Hay actualización**; si no lo
+  hay, dice **Al día** y el modal de confirmación avisa de que se reconstruiría
+  la misma versión, sin novedades. Reconstruir estando al día sigue siendo
+  posible —es lo que aplica un `.env` nuevo o rehace una imagen corrupta—: lo
+  que cambia es que ya no se hace creyendo otra cosa.
+
+  Cuando no se puede saber, se dice que no se sabe: **«al día» y «no he podido
+  comprobarlo» no se pintan igual**, que era la forma fácil de que un fallo de
+  red pareciera una respuesta.
+
+  Esto es lo único de la actualización que la aplicación puede hacer sola,
+  porque es una lectura y no un reinicio: funciona aunque el vigilante del host
+  (`tools/actualizador/`) no esté instalado, y no le da ningún privilegio nuevo.
+
+- **Botón «Comprobar si hay versión nueva».** La respuesta de GitHub se guarda
+  seis horas —el panel se consulta al abrir Ajustes y cada cinco segundos
+  mientras dura una actualización, y eso no puede ser una llamada saliente cada
+  vez—, así que hay una forma de forzarla cuando acabas de publicar algo. Los
+  fallos también se recuerdan, diez minutos: sin ello, con GitHub caído cada
+  apertura de Ajustes se comería el timeout entero.
+
+- **Sección `[actualizacion]` en `config.ini`** (con sus variables de entorno):
+  si se comprueba o no, de qué repositorio y de qué **rama** —tiene que ser la
+  del checkout del servidor, o estarías comparando con una versión que tu
+  `git pull` no va a traer—, cuánto dura la caché y el timeout. Con
+  `comprobar_version = false` el servidor no hace ninguna llamada saliente por
+  esto.
+
+  Se lee la rama y no las releases a propósito: el repositorio no publica
+  etiquetas, y lo que el servidor va a instalar no es una etiqueta sino lo que
+  traiga `git pull --ff-only` de esa rama. Es la respuesta a la pregunta que se
+  hace quien mira el panel —«si pulso, ¿a qué versión voy?»— en vez de a una
+  parecida.
+
+- **Ajustes › Seguridad.** Pestaña propia para lo que protege la sesión: el
+  HTTPS con su certificado y el cambio de contraseña, que estaban en Cuenta
+  entre el nombre de usuario y el bloqueo por inactividad. Se busca por lo que
+  se quiere hacer —cifrar, cambiar la contraseña—, no por dónde acabó puesto.
+
+- **Botón «Probar ahora» (Ajustes › Seguridad › HTTPS).** Abre una conexión TLS
+  de verdad contra el proxy por **cada nombre declarado** y valida el
+  certificado contra la misma CA que se descarga en ese panel: dice qué nombre
+  no está cubierto y cuántos días le quedan al certificado que caduca antes.
+
+  El estado que había solo repetía lo que se pidió al activar el interruptor.
+  La pregunta que de verdad se hace quien mira esa pantalla es otra —«¿me va a
+  seguir avisando el navegador en el móvil?»—, y esa solo la contesta un
+  handshake. Endpoint nuevo: `GET /api/tls/prueba`, con sesión como el resto.
+
+- **El HTTPS llega preparado para encenderlo.** El campo de nombres del
+  certificado ya no llega vacío ni con solo el host de la barra: trae también
+  **la IP del servidor en la red local**, que es la que se olvidaba. Esa IP no
+  se puede averiguar desde dentro del contenedor —ahí solo se ve la red de
+  Compose—, así que la calculan `docker-up.sh` y `docker-update.sh` en el host y
+  la pasan en `PORTFOLIO_LAN_IP`. Sin ella no rompe nada: se sugiere el nombre
+  por el que haya llegado la petición.
+
+  Olvidarla era el fallo silencioso de esta pantalla: el certificado se emitía
+  bien, la CA quedaba instalada, y el móvil seguía avisando sin que nada
+  dijera que lo que faltaba era una línea en esa lista.
+
+- **Tres pasos escritos en el propio panel** —repasar los nombres, activar,
+  instalar la CA y comprobar—, visibles solo mientras el HTTPS está apagado, que
+  es cuando hacen falta. El README dice lo mismo, en el mismo orden.
+
+### Cambiado
+
+- **El healthcheck del proxy deja de llenar el log.** Preguntaba cada 30 s por
+  la API de admin de Caddy, que apunta a nivel info toda petición que le llega:
+  2.880 líneas al día entre las que había que encontrar las únicas que
+  importan, los `POST /load` con los que la aplicación enciende y apaga el
+  HTTPS. Ahora entra por donde entra un navegador —`127.0.0.1:PORT/api/health`—
+  y **habla lo mismo que la aplicación**: en claro con el HTTPS apagado, y
+  exigiendo cifrado cuando está encendido, en vez de dejarse un puerto suelto
+  en texto plano solo para la sonda.
+
+---
+
 ## [1.7.0] — 2026-09-06
 
 **Dos sitios donde un valor podía estar diciendo una cosa mientras la

@@ -13,6 +13,7 @@ módulo que toca la red.
 """
 
 import json
+import time
 
 import pytest
 
@@ -246,6 +247,107 @@ def test_el_aviso_de_http_plano_solo_sale_sin_https():
     assert tls.avisoSinHttps() is None
 
 
+# ── Nombres sugeridos ─────────────────────────────────────────────────────────
+
+def test_se_sugiere_el_nombre_de_la_barra_y_la_ip_de_la_lan(monkeypatch):
+    """Las dos juntas, porque olvidar la IP de la LAN es el fallo silencioso de
+    esta pantalla: el certificado se emite bien, pero no cubre por donde se
+    entra desde el móvil."""
+    monkeypatch.setenv("PORTFOLIO_LAN_IP", "192.168.1.163")
+
+    assert tls.nombresSugeridos("portfolio.casa:5000") == ["portfolio.casa", "192.168.1.163"]
+
+
+def test_sin_ip_de_la_lan_se_sugiere_lo_que_haya(monkeypatch):
+    """Fuera de Docker nadie rellena PORTFOLIO_LAN_IP, y el panel tiene que
+    seguir llegando con algo puesto."""
+    monkeypatch.delenv("PORTFOLIO_LAN_IP", raising=False)
+
+    assert tls.nombresSugeridos("localhost:5000") == ["localhost"]
+
+
+def test_no_se_sugiere_dos_veces_lo_mismo(monkeypatch):
+    """Se entra por la IP de la LAN: las dos pistas coinciden."""
+    monkeypatch.setenv("PORTFOLIO_LAN_IP", "192.168.1.163")
+
+    assert tls.nombresSugeridos("192.168.1.163:5000") == ["192.168.1.163"]
+
+
+# ── Comprobación ──────────────────────────────────────────────────────────────
+
+def test_el_resumen_saca_del_certificado_lo_que_se_pregunta():
+    """Qué nombres cubre y cuánto le queda: lo demás del certificado no le
+    resuelve ninguna duda a quien mira el panel."""
+    fin = time.time() + 30 * 86400
+    cert = {
+        "subjectAltName": (
+            ("DNS", "portfolio.casa"),
+            ("IP Address", "192.168.1.50"),
+            ("othername", "algo que no se pinta"),
+        ),
+        "notAfter": time.strftime("%b %d %H:%M:%S %Y GMT", time.gmtime(fin)),
+    }
+
+    resumen = tls._resumenCertificado(cert)
+
+    assert resumen["cubre"] == ["portfolio.casa", "192.168.1.50"]
+    # Hacia abajo a propósito: a un certificado con 29 horas le queda un día.
+    assert resumen["dias"] in (29, 30)
+
+
+def test_un_certificado_sin_fecha_no_revienta_la_prueba():
+    """Viene de la red: si el campo falta o es raro, se informa sin fecha en vez
+    de tumbar la comprobación entera."""
+    resumen = tls._resumenCertificado({"notAfter": "el mes que viene"})
+
+    assert resumen["caduca"] is None
+    assert resumen["dias"] is None
+
+
+def test_sin_https_la_prueba_no_es_un_fallo(caddy):
+    """Servir en claro es una decisión legítima del usuario, no un error: el
+    panel lo dice, pero no lo pinta de rojo."""
+    salida = tls.probar()
+
+    assert salida["https"] is False
+    assert salida["error"] is None
+    assert salida["nombres"] == []
+
+
+def test_con_el_proxy_caido_la_prueba_dice_dónde_mirar(monkeypatch):
+    def _muerto(ruta, datos=None, tipo=None):
+        raise OSError("connection refused")
+
+    monkeypatch.setattr(tls, "_admin", _muerto)
+    tls.guardarEstado(True, ["portfolio.casa"])
+
+    salida = tls.probar()
+
+    assert salida["proxy"] is False
+    assert "caddy" in salida["error"]
+    assert salida["nombres"] == []
+
+
+def test_se_comprueba_cada_nombre_y_manda_el_que_caduca_antes(caddy, monkeypatch):
+    """El resumen se queda con el plazo más corto porque es el que va a dar el
+    primer susto; con el más largo, un certificado a punto de caducar se
+    escondería detrás de otro recién emitido."""
+    plazos = {"portfolio.casa": 90, "192.168.1.50": 7}
+
+    def _fingido(contexto, nombre, puerto):
+        return {"nombre": nombre, "ok": True, "error": None, "cubre": [nombre],
+                "caduca": f"2026-01-{plazos[nombre]:02d}", "dias": plazos[nombre]}
+
+    monkeypatch.setattr(tls, "_probarNombre", _fingido)
+    monkeypatch.setattr(tls, "_contextoDeConfianza", lambda: None)
+    tls.guardarEstado(True, ["portfolio.casa", "192.168.1.50"])
+
+    salida = tls.probar()
+
+    assert [r["nombre"] for r in salida["nombres"]] == ["portfolio.casa", "192.168.1.50"]
+    assert salida["dias"] == 7
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 def _ultimo_load(caddy):
@@ -269,6 +371,7 @@ def test_los_endpoints_exigen_sesion(crear_app, bp_tls):
 
     assert client.get("/api/tls").status_code == 401
     assert client.get("/api/tls/ca.crt").status_code == 401
+    assert client.get("/api/tls/prueba").status_code == 401
 
 
 def test_el_estado_sugiere_el_nombre_por_el_que_has_entrado(cliente_autenticado, bp_tls, caddy):
@@ -368,3 +471,14 @@ def test_la_ca_se_descarga_como_fichero(cliente_autenticado, bp_tls, caddy):
     assert res.headers["Content-Type"] == "application/x-x509-ca-cert"
     assert "attachment" in res.headers["Content-Disposition"]
     assert res.data.startswith(b"-----BEGIN CERTIFICATE-----")
+
+
+def test_la_prueba_contesta_aunque_no_haya_nada_que_comprobar(cliente_autenticado, bp_tls, caddy):
+    """Con el HTTPS apagado sigue siendo un 200: la interfaz necesita pintar el
+    estado, no un error."""
+    client, _cab, _app = cliente_autenticado(bp_tls)
+
+    datos = client.get("/api/tls/prueba").get_json()
+
+    assert datos["ok"] is True
+    assert datos["https"] is False

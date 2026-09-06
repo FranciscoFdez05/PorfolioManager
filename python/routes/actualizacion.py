@@ -7,6 +7,10 @@ instalado ni un Docker delante.
     GET  /api/actualizacion   estado, para pintar el panel
     POST /api/actualizacion   deja la señal para el vigilante del host
 
+El GET incluye si hay versión nueva publicada. Con `?refrescar=1` se salta la
+caché de esa comprobación: es el botón «Comprobar» de la pantalla, para no
+tener que esperar seis horas a que caduque cuando acabas de publicar algo.
+
 La aplicación no actualiza nada por sí misma —no puede, y el módulo de `core`
 explica por qué—: solo deja la señal. Quien reconstruye y reinicia es
 `docker-update.sh`, ejecutado desde el host, que es el único sitio desde el que
@@ -15,7 +19,7 @@ se puede reiniciar el contenedor de la aplicación sin matarse a media faena.
 
 import logging
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from core import actualizacion
 
@@ -26,7 +30,8 @@ actualizacion_bp = Blueprint("actualizacion", __name__)
 
 @actualizacion_bp.route("/api/actualizacion", methods=["GET"])
 def get_actualizacion():
-    return jsonify({"ok": True, **actualizacion.estado()})
+    refrescar = request.args.get("refrescar") in ("1", "true", "si")
+    return jsonify({"ok": True, **actualizacion.panel(forzarComprobacion=refrescar)})
 
 
 @actualizacion_bp.route("/api/actualizacion", methods=["POST"])

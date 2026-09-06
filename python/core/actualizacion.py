@@ -27,6 +27,11 @@ Que el vigilante no haya escrito nunca ese segundo fichero es en sí un dato: o
 no está instalado, o no ha llegado a arrancar. La interfaz lo dice en vez de
 dejar el botón girando para siempre.
 
+Aparte del canal de ficheros, `panel()` añade lo único que sí se puede saber
+desde dentro sin ayuda del host: **si hay versión nueva publicada**. Eso es una
+lectura a GitHub y vive en `core/version_remota.py`; aquí solo se acompaña,
+porque es la misma pregunta desde la pantalla.
+
 **Quien pueda escribir ese fichero puede provocar una reconstrucción y un
 reinicio.** Es menos poder que montar el socket de Docker —que es root en el
 host— pero no es ninguno: el endpoint exige sesión, como todo lo demás.
@@ -37,7 +42,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from core import paths
+from core import paths, version_remota
 from core.escritura import escribirJsonAtomico
 from core.version import __version__
 
@@ -113,6 +118,17 @@ def estado() -> dict:
     }
 
 
+def panel(forzarComprobacion: bool = False) -> dict:
+    """El estado, más la versión publicada en GitHub.
+
+    Va aparte de `estado()` porque `estado()` no toca la red y se llama también
+    al dejar la señal: la consulta remota tiene su propia caché y su propio
+    modo de fallar, y mezclarlas haría que un GitHub caído retrasara una
+    solicitud que no lo necesita para nada.
+    """
+    return {**estado(), "remota": version_remota.consultar(forzar=forzarComprobacion)}
+
+
 def solicitar() -> tuple[dict, str | None]:
     """Deja la señal para el vigilante. Devuelve `(estado, error)`."""
     actual = estado()
@@ -132,5 +148,6 @@ __all__ = [
     "NOMBRE_ESTADO",
     "NOMBRE_SOLICITUD",
     "estado",
+    "panel",
     "solicitar",
 ]

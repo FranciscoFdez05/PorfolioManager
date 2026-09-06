@@ -5,6 +5,7 @@ que es lo que se puede probar sin levantar un proxy.
 
     GET  /api/tls            estado actual, para pintar el panel
     POST /api/tls            activar o desactivar
+    GET  /api/tls/prueba     comprobación real del cifrado, nombre por nombre
     GET  /api/tls/ca.crt     certificado raíz, para instalar en cada aparato
 
 **Por qué la descarga pide sesión** aunque un certificado raíz sea público por
@@ -46,6 +47,10 @@ def _estado_publico() -> dict:
         # usuario tiene escrito en la barra del navegador, y desde dentro de un
         # contenedor no hay forma de averiguar la IP de la LAN del host.
         "nombreActual": (request.host or "").split(":")[0],
+        # Con qué llega relleno el campo cuando aún no hay nada guardado: el
+        # nombre de la barra más la IP de la LAN, que es la que se olvida y la
+        # que hace falta para entrar desde el móvil.
+        "nombresSugeridos": tls.nombresSugeridos(request.host or ""),
     }
 
 
@@ -113,6 +118,18 @@ def set_tls():
     )
 
     return jsonify({"ok": True, **_estado_publico(), "estado": estado})
+
+
+@tls_bp.route("/api/tls/prueba", methods=["GET"])
+def get_prueba():
+    """¿Está el cifrado como el usuario cree que está?
+
+    No devuelve error aunque la comprobación salga mal: que un nombre no esté
+    cubierto es un resultado, no un fallo de la petición, y la interfaz necesita
+    pintarlo entero (qué nombre falla y por qué) en vez de un 500 sin detalle.
+    Solo el proxy caído o la CA ausente llenan `error`, y también con 200.
+    """
+    return jsonify({"ok": True, **tls.probar()})
 
 
 @tls_bp.route("/api/tls/ca.crt", methods=["GET"])

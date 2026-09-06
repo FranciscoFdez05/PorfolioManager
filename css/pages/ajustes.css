@@ -562,6 +562,28 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Etiqueta de la versión publicada. Verde cuando no hay nada que traer, para
+   que «al día» se lea de un vistazo y no haya que comparar dos números; ámbar
+   cuando sí lo hay, que es lo mismo que dice el aviso de debajo. */
+.ajustesUpdateEtiqueta {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(52, 211, 153, 0.35);
+    background: rgba(52, 211, 153, 0.1);
+    color: #34d399;
+    font-size: 0.72rem;
+    font-weight: 600;
+    vertical-align: 1px;
+}
+
+.ajustesUpdateEtiqueta.hayNueva {
+    border-color: rgba(251, 191, 36, 0.35);
+    background: rgba(251, 191, 36, 0.1);
+    color: #fbbf24;
+}
+
 /* Aviso ámbar: algo que hay que saber antes de fiarse de lo que hay debajo.
    Lo usan la precedencia del .env sobre los ficheros de claves y el estado del
    actualizador. Ni rojo ni verde: no es un fallo, es una condición. */
@@ -1121,11 +1143,11 @@
 }
 
 /* ── HTTPS ────────────────────────────────────────────────────────────────────
-   Panel de Ajustes › HTTPS. Los estados se distinguen por color porque es la
+   Panel de Ajustes › Seguridad › HTTPS. Los estados se distinguen por color porque es la
    única sección donde el estado actual decide qué se puede hacer: activado,
    desactivado o el proxy sin responder (y entonces no hay nada que pulsar). */
 .ajustesSection > .ajustesTlsEstado {
-    padding: 12px 24px 0;
+    padding: 18px 20px 6px;
 }
 
 .ajustesTlsEstado {
@@ -1133,6 +1155,7 @@
     align-items: center;
     gap: 10px;
     font-size: 13px;
+    line-height: 1.55;
     color: var(--text-subtle);
 }
 
@@ -1161,6 +1184,30 @@
     font-weight: 600;
 }
 
+/* Los tres pasos para encenderlo. Solo se ve con el HTTPS apagado: en cuanto
+   está puesto, lo que hace falta —instalar la CA, comprobar— sale más abajo. */
+.ajustesSection > .ajustesTlsGuia {
+    margin: 14px 20px 0;
+    padding: 14px 16px 14px 34px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-inset);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+.ajustesTlsGuia li + li {
+    margin-top: 9px;
+}
+.ajustesTlsGuia strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+.ajustesTlsGuia em {
+    font-style: normal;
+    color: var(--text-subtle);
+}
+
 .ajustesFieldHint {
     margin-top: 6px;
     font-size: 12px;
@@ -1173,11 +1220,19 @@
 }
 
 .ajustesSection > .ajustesTlsCa {
-    padding: 0 24px 16px;
+    padding: 0 20px 20px;
+}
+
+/* Los bloques que cuelgan del panel traen su propio separador. Se saca a los
+   bordes con el margen negativo para que corte la tarjeta entera, como el de
+   la cabecera, en vez de quedarse un palito corto en medio. */
+.ajustesTlsCa > .ajustesSectionDivider,
+.ajustesTlsPrueba > .ajustesSectionDivider {
+    margin: 0 -20px;
 }
 
 .ajustesTlsCaTexto {
-    padding-top: 12px;
+    padding-top: 16px;
     font-size: 12.5px;
     line-height: 1.55;
     color: var(--text-muted);
@@ -1188,7 +1243,7 @@
 }
 
 .ajustesTlsAyuda {
-    margin-top: 10px;
+    margin-top: 14px;
     border: 1px solid var(--border-soft);
     border-radius: 8px;
     background: var(--bg-inset);
@@ -1220,6 +1275,81 @@
 .ajustesTlsAyudaCuerpo strong {
     color: var(--text-subtle);
     font-weight: 600;
+}
+
+/* Comprobación del certificado. Una línea por nombre y no un resumen, porque lo
+   que se viene a buscar aquí es justo el que falla: con «casi todo bien» no se
+   sabe qué aparato va a seguir viendo el aviso del navegador. */
+.ajustesSection > .ajustesTlsPrueba {
+    padding: 0 20px;
+}
+
+.ajustesTlsPruebaTexto {
+    padding-top: 16px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-muted);
+}
+.ajustesTlsPruebaTexto strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+
+.ajustesTlsPrueba > .ajustesActions {
+    padding: 14px 0 0;
+}
+
+.ajustesTlsPruebaRes {
+    margin-top: 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg-inset);
+    overflow: hidden;
+}
+.ajustesTlsPruebaRes.roto {
+    padding: 11px 12px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-subtle);
+}
+
+.ajustesTlsPruebaFila {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--border-soft);
+}
+.ajustesTlsPruebaFila:last-child {
+    border-bottom: 0;
+}
+
+.ajustesTlsPruebaNombre {
+    flex: 0 0 auto;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+/* El punto repite el código de color del estado de arriba: la misma pregunta
+   contestada dos veces tiene que verse igual. */
+.ajustesTlsPruebaNombre::before {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: var(--color-neg);
+}
+.ajustesTlsPruebaFila.ok .ajustesTlsPruebaNombre::before {
+    background: var(--color-pos);
+}
+
+.ajustesTlsPruebaDetalle {
+    min-width: 0;
+    line-height: 1.5;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
 }
 
 /* El aviso de que la página se va a recargar en https:// ocupa toda la fila:

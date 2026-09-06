@@ -9,6 +9,10 @@ el botón es dejar una señal en `data/tmp/` que recoge un vigilante del host.
 Lo que se prueba aquí es ese contrato: que la señal se deja, que no se pisan dos
 actualizaciones, y —lo que más ayuda a quien lo instala— que la pantalla puede
 distinguir «el vigilante está trabajando» de «el vigilante no existe».
+
+El GET lleva además la versión publicada en GitHub, que es lo único que sí se
+puede averiguar desde dentro: `test_version_remota.py` cubre esa lógica, y aquí
+solo se comprueba que llega a la respuesta y que `?refrescar=1` la fuerza.
 """
 
 import json
@@ -181,3 +185,63 @@ def test_pedir_la_actualizacion_sin_csrf_es_403(cliente_autenticado, datos_aisla
 
     client, _cabeceras, _app = cliente_autenticado(actualizacion_bp)
     assert client.post("/api/actualizacion").status_code == 403
+
+
+# ── Versión publicada ────────────────────────────────────────────────────────
+
+def _responder_github(monkeypatch, version="9.9.9", contador=None):
+    from core import version_remota
+
+    def _falso(url):
+        if contador is not None:
+            contador.append(url)
+        return f'__version__ = "{version}"'
+
+    monkeypatch.setattr(version_remota, "_descargar", _falso)
+
+
+def test_el_estado_dice_si_hay_version_nueva(cliente, monkeypatch):
+    client, _cabeceras = cliente
+    _responder_github(monkeypatch, "9.9.9")
+
+    remota = client.get("/api/actualizacion").get_json()["remota"]
+
+    assert remota["publicada"] == "9.9.9"
+    assert remota["hayNueva"] is True
+
+
+def test_refrescar_vuelve_a_preguntar(cliente, monkeypatch):
+    """El botón «Comprobar»: sin él habría que esperar a que caducara la caché."""
+    client, _cabeceras = cliente
+    llamadas = []
+    _responder_github(monkeypatch, "9.9.9", contador=llamadas)
+
+    client.get("/api/actualizacion")
+    from core import version_remota
+
+    monkeypatch.setattr(version_remota, "ESPERA_MINIMA_FORZADO_SEGUNDOS", 0)
+    client.get("/api/actualizacion?refrescar=1")
+
+    assert len(llamadas) == 2
+
+
+def test_un_github_inalcanzable_no_rompe_el_panel(cliente, monkeypatch):
+    """La actualización sigue pudiéndose pedir aunque no se sepa qué hay fuera."""
+    from urllib.error import URLError
+
+    from core import version_remota
+
+    client, cabeceras = cliente
+
+    def _falla(url):
+        raise URLError("sin ruta al host")
+
+    monkeypatch.setattr(version_remota, "_descargar", _falla)
+
+    datos = client.get("/api/actualizacion").get_json()
+
+    assert datos["ok"] is True
+    assert datos["version"] == __version__
+    assert datos["remota"]["publicada"] is None
+    assert datos["remota"]["error"]
+    assert client.post("/api/actualizacion", headers=cabeceras).get_json()["ok"] is True

@@ -68,6 +68,15 @@ O un bucle en un `tmux`, si el servidor no tiene ni cron:
 while true; do ./tools/actualizador/portfolio-actualizador.sh; sleep 30; done
 ```
 
+## Lo que sí funciona sin vigilante
+
+Saber **si hay versión nueva**. Eso es una lectura —`python/core/version.py` de
+la rama en GitHub, comparado con la versión instalada—, así que la hace la
+propia aplicación y se ve en el panel esté instalado esto o no. Lo que no puede
+hacer sin vigilante es instalarla. Se configura en `[actualizacion]` de
+`config.ini`; ojo con `rama`: tiene que ser la que tenga puesta el checkout de
+este servidor.
+
 ## Cómo saber si está funcionando
 
 La pantalla de Ajustes lo dice: mientras el vigilante no haya escrito nunca

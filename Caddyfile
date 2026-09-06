@@ -1,7 +1,7 @@
 # Configuración de ARRANQUE de Caddy. La de verdad la manda la aplicación.
 #
 # Caddy está siempre levantado y es quien termina el TLS. El interruptor vive en
-# Ajustes › HTTPS: al activarlo, la aplicación genera la configuración
+# Ajustes › Seguridad › HTTPS: al activarlo, la aplicación genera la configuración
 # equivalente a este fichero pero con `tls internal` y la carga por la API de
 # admin (`POST :2019/load`), Caddy emite el certificado con su CA interna y el
 # puerto pasa a hablar solo TLS. Nada de eso reinicia ningún contenedor.

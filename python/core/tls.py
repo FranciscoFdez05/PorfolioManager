@@ -36,8 +36,11 @@ que activar el HTTPS no mueve la dirección: `http://IP:5000` pasa a ser
 import json
 import logging
 import os
+import socket
+import ssl
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 
@@ -153,6 +156,24 @@ def normalizarNombres(nombres) -> list[str]:
         if nombre not in limpios:
             limpios.append(nombre)
     return limpios
+
+
+def nombresSugeridos(hostActual: str = "") -> list[str]:
+    """Con qué nombres llega relleno el campo del certificado.
+
+    Este campo es donde se falla, y se falla en silencio: el certificado solo
+    vale para lo que se declare, así que quien activa el HTTPS entrando por
+    `localhost` se queda con uno que no cubre la IP por la que entra desde el
+    móvil. El navegador sigue avisando, la CA ya está instalada y no hay nada
+    que sugiera que lo que falta es una línea en esta lista.
+
+    Se juntan las dos únicas pistas fiables: el nombre por el que ha llegado
+    esta petición —lo que el usuario tiene escrito en la barra— y la IP de la
+    LAN del servidor. La segunda no se puede averiguar desde dentro del
+    contenedor (ahí solo se ve la red de Compose), así que la pone
+    `docker-up.sh`, que sí corre en el host, en PORTFOLIO_LAN_IP.
+    """
+    return normalizarNombres([hostActual, os.environ.get("PORTFOLIO_LAN_IP", "")])
 
 
 # ── Configuración de Caddy ────────────────────────────────────────────────────
@@ -276,6 +297,144 @@ def proxyDisponible() -> bool:
         return False
 
 
+# ── Comprobación ──────────────────────────────────────────────────────────────
+
+# Segundos que se le dan a cada handshake. Es una conexión a un contenedor
+# vecino: si tarda más, no está lento, está roto.
+TIMEOUT_PRUEBA = 5
+
+
+def _hostDelProxy() -> str:
+    """Dónde escucha Caddy visto desde esta aplicación.
+
+    Sale de la misma variable que la API de admin para que no haya dos sitios
+    que puedan discrepar: quien cambia uno cambia el otro.
+    """
+    return urllib.parse.urlsplit(CADDY_ADMIN).hostname or "caddy"
+
+
+def _resumenCertificado(cert: dict) -> dict:
+    """Lo que importa de un certificado ya validado: qué cubre y hasta cuándo.
+
+    Aparte de `_probarNombre()` porque es la única parte con reglas propias y sí
+    se puede probar sin levantar un TLS de verdad.
+    """
+    nombres = [valor for clave, valor in cert.get("subjectAltName", ()) if clave in ("DNS", "IP Address")]
+
+    caduca, dias = None, None
+    bruto = cert.get("notAfter")
+    if bruto:
+        try:
+            fin = ssl.cert_time_to_seconds(bruto)
+        except ValueError:
+            fin = None
+        if fin is not None:
+            caduca = datetime.fromtimestamp(fin, UTC).date().isoformat()
+            # Hacia abajo: un certificado al que le quedan 29 horas tiene un día,
+            # no dos. Redondear al alza aquí sería tranquilizar de más.
+            dias = int((fin - time.time()) // 86400)
+
+    return {"cubre": nombres, "caduca": caduca, "dias": dias}
+
+
+def _contextoDeConfianza() -> ssl.SSLContext:
+    """Valida contra la CA interna de Caddy, no contra las del sistema.
+
+    Es lo que convierte la prueba en algo que responde a la pregunta del
+    usuario: no basta con que haya TLS, tiene que ser el certificado que firma
+    **la misma CA que se descarga desde esta pantalla**, que es la que va a
+    instalar en el móvil.
+    """
+    return ssl.create_default_context(cadata=raizDeLaCa())
+
+
+def _probarNombre(contexto: ssl.SSLContext, nombre: str, puerto: int) -> dict:
+    """Abre una conexión TLS real contra el proxy pidiendo `nombre`.
+
+    Se conecta al proxy por su nombre en la red de Compose, no al que se está
+    comprobando: los nombres de la lista son los que valen desde fuera (la IP de
+    la LAN, `portfolio.casa`) y dentro del contenedor no tienen por qué
+    resolver. Lo que se comprueba es el certificado que Caddy presenta cuando le
+    piden ese nombre, que es exactamente lo que verá el navegador.
+    """
+    salida = {"nombre": nombre, "ok": False, "error": None, "cubre": [], "caduca": None, "dias": None}
+    try:
+        with (
+            socket.create_connection((_hostDelProxy(), puerto), timeout=TIMEOUT_PRUEBA) as bruto,
+            contexto.wrap_socket(bruto, server_hostname=nombre) as seguro,
+        ):
+            salida.update(_resumenCertificado(seguro.getpeercert() or {}))
+            salida["ok"] = True
+    except ssl.SSLCertVerificationError as e:
+        # El caso que de verdad se viene a cazar: hay TLS, pero el certificado no
+        # sirve para este nombre (o no lo firma la CA que el usuario instaló).
+        salida["error"] = f"El certificado no vale para este nombre: {e.verify_message or e.reason}"
+    except ssl.SSLError as e:
+        salida["error"] = f"El proxy no ha levantado el TLS: {e}"
+    except OSError as e:
+        salida["error"] = f"No se puede conectar con el proxy: {e}"
+    return salida
+
+
+def probar() -> dict:
+    """Comprueba el cifrado de verdad, en vez de repetir lo que dice el estado.
+
+    `estado.json` solo dice lo que se pidió; esto abre una conexión por cada
+    nombre declarado y valida el certificado **contra la misma CA que se
+    descarga desde Ajustes**. Así el botón responde a la pregunta que de verdad
+    tiene el usuario —«¿me va a seguir avisando el navegador?»— y no a «¿quedó
+    guardado el interruptor?».
+    """
+    estado = leerEstado()
+    salida = {
+        "https": httpsActivo(),
+        "proxy": proxyDisponible(),
+        "nombres": [],
+        "caduca": None,
+        "dias": None,
+        "error": None,
+    }
+
+    if not salida["https"]:
+        # No es un fallo: es la otra mitad de la decisión que el usuario ha
+        # tomado. Servir en claro es un estado legítimo y la interfaz lo dice
+        # sin pintarlo de rojo.
+        return salida
+
+    if not salida["proxy"]:
+        salida["error"] = (
+            f"El proxy no responde en {CADDY_ADMIN}. Comprueba que el contenedor "
+            "'caddy' está en marcha."
+        )
+        return salida
+
+    try:
+        contexto = _contextoDeConfianza()
+    except ErrorCaddy as e:
+        salida["error"] = str(e)
+        return salida
+    except ssl.SSLError as e:
+        # La CA llega por la red y puede volver truncada o vacía. Sin esto, un
+        # PEM malformado subía como un 500 sin explicación en vez de como lo que
+        # es: una comprobación que no se ha podido hacer.
+        salida["error"] = f"La CA que devuelve el proxy no es un certificado legible: {e}"
+        return salida
+
+    puerto = settings.puerto()
+    for nombre in estado["nombres"] or ["localhost"]:
+        salida["nombres"].append(_probarNombre(contexto, nombre, puerto))
+
+    # El resumen se queda con el que caduca antes: es el que va a dar el primer
+    # susto, y el único plazo que sirve para decidir si hay que renovar.
+    plazos = [r["dias"] for r in salida["nombres"] if r["dias"] is not None]
+    if plazos:
+        pronto = min(salida["nombres"], key=lambda r: r["dias"] if r["dias"] is not None else 10**6)
+        salida["caduca"] = pronto["caduca"]
+        salida["dias"] = pronto["dias"]
+
+    return salida
+
+
 def avisoSinHttps() -> str | None:
     """Recordatorio de que el login viaja en claro, o None si hay HTTPS.
 
@@ -289,7 +448,7 @@ def avisoSinHttps() -> str | None:
         return None
     return (
         "HTTPS desactivado: la contraseña del login y la cookie de sesión viajan "
-        "en claro. Se activa desde la propia aplicación, en Ajustes > HTTPS; la "
+        "en claro. Se activa desde la propia aplicación, en Ajustes > Seguridad > HTTPS; la "
         "dirección no cambia, solo pasa a ser https://."
     )
 

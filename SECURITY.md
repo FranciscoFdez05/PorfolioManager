@@ -37,7 +37,7 @@ La aplicación está pensada para correr **en una red local o detrás de una VPN
 ## Lo que la aplicación ya hace
 
 - Contraseña guardada como hash `pbkdf2:sha256`, nunca en claro.
-- HTTPS que se activa desde la propia aplicación (Ajustes › HTTPS): emite el certificado, marca las cookies como `Secure`, emite `Strict-Transport-Security` y deja el puerto hablando solo TLS, sin reiniciar nada. El certificado de la CA se descarga desde el mismo panel para instalarlo en cada aparato. Sin activarlo, la contraseña del login y la cookie de sesión viajan en claro por la LAN. Ver «HTTPS» en el README.
+- HTTPS que se activa desde la propia aplicación (Ajustes › Seguridad › HTTPS): emite el certificado, marca las cookies como `Secure`, emite `Strict-Transport-Security` y deja el puerto hablando solo TLS, sin reiniciar nada. El certificado de la CA se descarga desde el mismo panel para instalarlo en cada aparato. Sin activarlo, la contraseña del login y la cookie de sesión viajan en claro por la LAN. Ver «HTTPS» en el README.
 - `API/*.key` cifradas en reposo con Fernet, con clave derivada de `SECRET_KEY`. Las que estuvieran en texto plano se convierten solas al arrancar.
 - CSRF por doble cookie en toda petición que modifique estado.
 - CSP con nonce y `script-src` cerrado a `'self'`: sin CDN, sin `unsafe-inline` para scripts.

@@ -233,6 +233,23 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("proveedores", "user_agent", TEXTO, "PortfolioPython/1.0", env="PROVEEDORES_USER_AGENT",
            descripcion="Cabecera User-Agent con la que se identifica el cliente."),
 
+    # [actualizacion] — solo la comprobación de «¿hay versión nueva?», que es
+    # una lectura a GitHub. Actualizar sigue siendo cosa del vigilante del host:
+    # ver core/actualizacion.py.
+    Ajuste("actualizacion", "comprobar_version", BOOLEANO, True, env="ACTUALIZACION_COMPROBAR",
+           descripcion="Preguntar a GitHub si la versión publicada es más nueva que la instalada."),
+    Ajuste("actualizacion", "repositorio", TEXTO, "FranciscoFdez05/PorfolioManager",
+           env="ACTUALIZACION_REPO",
+           descripcion="Repositorio «usuario/nombre» del que se lee la versión publicada."),
+    Ajuste("actualizacion", "rama", TEXTO, "main", env="ACTUALIZACION_RAMA",
+           descripcion="Rama consultada. Tiene que ser la que trae el git pull del servidor."),
+    Ajuste("actualizacion", "cache_minutos", ENTERO, 360, env="ACTUALIZACION_CACHE_MINUTOS",
+           minimo=1, maximo=10080,
+           descripcion="Cuánto vale la respuesta de GitHub antes de volver a preguntar."),
+    Ajuste("actualizacion", "timeout_segundos", DECIMAL, 6.0, env="ACTUALIZACION_TIMEOUT",
+           minimo=1.0, maximo=60.0,
+           descripcion="Timeout de la consulta a GitHub. Hay alguien esperando a que pinte el panel."),
+
     # [rutas] — las lee core.paths. Relativas a la raíz del proyecto, o
     # absolutas si se quiere sacar los datos fuera del directorio del código.
     Ajuste("rutas", "datos", TEXTO, "data", env="PORTFOLIO_DATA_DIR",
@@ -428,6 +445,26 @@ def proveedorMaxRespuestaBytes() -> int:
 
 def proveedorUserAgent() -> str:
     return obtener("proveedores.user_agent")
+
+
+def comprobarVersionRemota() -> bool:
+    return obtener("actualizacion.comprobar_version")
+
+
+def actualizacionRepositorio() -> str:
+    return obtener("actualizacion.repositorio")
+
+
+def actualizacionRama() -> str:
+    return obtener("actualizacion.rama")
+
+
+def actualizacionCacheSegundos() -> int:
+    return obtener("actualizacion.cache_minutos") * 60
+
+
+def actualizacionTimeout() -> float:
+    return obtener("actualizacion.timeout_segundos")
 
 
 # ── Diagnóstico y validación ──────────────────────────────────────────────────
