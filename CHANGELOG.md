@@ -60,6 +60,27 @@ vale igual. Dos cosas opcionales, ninguna necesaria para que funcione:
 
 ### Añadido
 
+- **El ZIP de exportar se lleva también las claves de API y las preferencias de
+  la interfaz.** Restaurar en una máquina limpia dejaba la aplicación
+  reconocible por dentro y ajena por fuera: las tarjetas de Ajustes en otro
+  orden, cada tabla ordenada por otra columna, las métricas y los activos en
+  otra vista. Todo eso vive en el `localStorage` del navegador, que el servidor
+  no ve; ahora el propio navegador lo manda al pulsar «Exportar como ZIP» y
+  viaja dentro como `ui.json`. Al importar se vuelve a escribir.
+
+  Las claves de API van aparte, en `claves-api.json`, y **solo si se marca la
+  casilla**. Van sin cifrar a propósito: guardadas con la `SECRET_KEY` solo
+  servirían para restaurar en un servidor que la conservara, que es justo el
+  caso en el que no se habían perdido. Al importarlas se vuelven a cifrar con la
+  clave de la instalación de destino, que es lo que convierte una copia en algo
+  que sirve tras reinstalar de cero. Incluye la clave del Atajo de iOS.
+
+  El precio está dicho donde se decide: marcar esa casilla convierte el archivo
+  en un secreto —quien lo tenga tiene tus claves—, y el aviso está entero junto
+  a la casilla, no escondido en un desplegable, porque después de descargarlo ya
+  no hay dónde leerlo.
+
+
 - **Paso «Emitir el certificado» (Ajustes › Seguridad › HTTPS).** Emite el
   certificado y deja la CA lista para descargar **sin tocar el puerto por el que
   estás entrando**: sigues en claro, en la misma dirección y con la misma

@@ -1431,6 +1431,18 @@
                     </button>
                     <span id="ajustesExportMsg" class="ajustesStatusMsg"></span>
                 </div>
+
+                <label class="ajustesExportClaves" for="ajustesExportClaves">
+                    <input id="ajustesExportClaves" type="checkbox">
+                    <span>
+                        <strong>Incluir las claves de API.</strong>
+                        Van <em>sin cifrar</em> dentro del ZIP: es lo que permite restaurarlas en un servidor
+                        recién instalado, donde la <code>SECRET_KEY</code> ya es otra y las cifradas no se
+                        podrían leer. A cambio, <strong>el archivo pasa a ser un secreto</strong>: quien lo
+                        tenga tiene tus claves de los proveedores y la del Atajo. Guárdalo como guardarías una
+                        contraseña.
+                    </span>
+                </label>
             </div>
 
             <div class="ajustesSection">

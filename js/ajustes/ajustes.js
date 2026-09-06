@@ -2350,12 +2350,40 @@ async function initAjustesLogic() {
     const exportJsonBtn = document.getElementById("ajustesExportJsonBtn")
     const exportZipBtn = document.getElementById("ajustesExportZipBtn")
     const exportMsg = document.getElementById("ajustesExportMsg")
+    const exportClavesChk = document.getElementById("ajustesExportClaves")
 
-    async function _doExport(url, filename, btn) {
+    // El orden de las tarjetas de Ajustes, el de cada tabla y los modos de
+    // visualización viven en el navegador, así que el servidor no puede
+    // meterlos en el ZIP por su cuenta: se los mandamos al exportar.
+    function _volcarUi() {
+        const volcado = {}
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const clave = localStorage.key(i)
+                if (clave) volcado[clave] = localStorage.getItem(clave)
+            }
+        } catch {
+            // Modo privado o almacenamiento bloqueado. El export sigue
+            // adelante sin esta parte: perder la copia entera por no poder
+            // leer una preferencia sería un mal negocio.
+        }
+        return volcado
+    }
+
+    async function _doExport(url, filename, btn, cuerpo) {
         btn.disabled = true
         showMsg(exportMsg, "Preparando…", "")
         try {
-            const res = await fetch(url)
+            const res = await fetch(
+                url,
+                cuerpo
+                    ? {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify(cuerpo)
+                      }
+                    : undefined
+            )
             if (!res.ok) throw new Error()
             const blob = await res.blob()
             const a = document.createElement("a")
@@ -2380,7 +2408,10 @@ async function initAjustesLogic() {
     if (exportZipBtn) {
         exportZipBtn.addEventListener("click", () => {
             const date = new Date().toISOString().slice(0, 10)
-            _doExport("/api/export/zip", `portfolio-export-${date}.zip`, exportZipBtn)
+            _doExport("/api/export/zip", `portfolio-export-${date}.zip`, exportZipBtn, {
+                ui: _volcarUi(),
+                incluirClaves: !!exportClavesChk?.checked
+            })
         })
     }
 
@@ -2390,6 +2421,24 @@ async function initAjustesLogic() {
     const importJsonInput = document.getElementById("ajustesImportJsonInput")
     const importZipInput = document.getElementById("ajustesImportZipInput")
     const importMsg = document.getElementById("ajustesImportMsg")
+
+    function _restaurarUi(ui) {
+        if (!ui || typeof ui !== "object") return 0
+        let escritas = 0
+        try {
+            Object.entries(ui).forEach(([clave, valor]) => {
+                if (typeof valor === "string") {
+                    localStorage.setItem(clave, valor)
+                    escritas++
+                }
+            })
+        } catch {
+            // Almacenamiento lleno o bloqueado: los datos ya se han importado,
+            // que es lo que importa. Las preferencias se vuelven a poner solas
+            // según se usa la aplicación.
+        }
+        return escritas
+    }
 
     async function _doImport(url, file, btn) {
         btn.disabled = true
@@ -2413,9 +2462,14 @@ async function initAjustesLogic() {
                     )
                     return
                 }
+                // Las preferencias de interfaz no las guarda el servidor: las
+                // devuelve para que las escriba quien las usa.
+                const restauradas = _restaurarUi(data.ui)
+
                 // Los datos que hay en pantalla ya no son los de la base: se
                 // recarga, igual que después de restaurar.
-                showMsg(importMsg, "Importado correctamente. Recargando…", "ok")
+                const extra = restauradas ? ` y ${restauradas} preferencia(s) de interfaz` : ""
+                showMsg(importMsg, `Importado correctamente${extra}. Recargando…`, "ok")
                 setTimeout(() => window.location.reload(), 1500)
             } else {
                 showMsg(importMsg, data.error || "Error al importar", "error")

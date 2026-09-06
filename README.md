@@ -617,6 +617,20 @@ El esquema se actualiza solo. Lleva su número en `PRAGMA user_version`, y antes
 
 Dentro de la BD del portfolio hay dos tablas que son **caché y no datos del usuario** — `fx_rates` (tipos de cambio históricos) y `benchmark_prices` (cierres de los índices). Se pueden borrar sin perder nada: se vuelven a bajar, a costa de gastar cuota del proveedor. Los `portfolio_snapshots`, en cambio, no se reconstruyen, así que el purgado desde Ajustes vuelca antes una copia en JSON a `data/pre_restore/`.
 
+### Qué lleva el ZIP de «Exportar como ZIP»
+
+| Fichero | Qué es |
+|---|---|
+| `portfolio-export-<fecha>.json` | Volcado de todas las tablas del portfolio activo |
+| `portfolio-<fecha>.db` | La base de datos, copiada en caliente sin páginas a medias |
+| `ajustes.json` y `prefs_<portfolio>.json` | Ajustes del servidor y preferencias del portfolio |
+| `ui.json` | Preferencias de la interfaz: orden de las tarjetas de Ajustes, orden de cada tabla y modos de visualización |
+| `claves-api.json` | Las claves de los proveedores y la del Atajo. **Solo si marcas la casilla** |
+
+`ui.json` lo manda el navegador al pulsar el botón, porque esas preferencias viven en su `localStorage` y el servidor no las ve. Al importar se vuelven a escribir en el navegador que hace la importación.
+
+> **La casilla de las claves convierte el archivo en un secreto.** Van sin cifrar, y a propósito: guardadas con la `SECRET_KEY` solo se podrían restaurar en un servidor que la conservara —y entonces no se habían perdido—. Al importarlas se vuelven a cifrar con la clave de la instalación de destino, que es lo que hace que la copia sirva después de reinstalar de cero. Guarda ese ZIP como guardarías una contraseña.
+
 Backup manual rápido (con el servidor parado):
 
 ```bash

@@ -345,6 +345,10 @@
 .ajustesSecondaryBtn {
     height: 34px;
     padding: 0 14px;
+    /* Dentro de .ajustesActions, que es una fila flex, sin esto el botón encoge
+       y parte su etiqueta en dos líneas en cuanto tiene dos palabras. */
+    white-space: nowrap;
+    flex-shrink: 0;
     background: var(--btn-bg);
     border: 1px solid var(--border-soft);
     border-radius: 8px;
@@ -372,10 +376,22 @@
     color: var(--text-primary);
 }
 
-/* Add key button */
+/* Add key button.
+   Nació para botones de solo texto («Añadir»), y por eso no traía ni caja flex
+   ni tamaño para un icono: al meter un SVG sin `width`, el icono se dibujaba a
+   su tamaño natural y empujaba al texto fuera del botón. Se arregla en la clase
+   y no en cada sitio, que es lo que hace que el siguiente botón con icono no
+   vuelva a romperse. */
 .ajustesAddBtn {
     height: 38px;
     padding: 0 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    /* También se usa en un <a> (la descarga del atajo), que sin esto llega
+       subrayado y con el color de enlace. */
+    text-decoration: none;
     background: var(--bg-inset);
     border: 1px solid var(--border-soft);
     border-radius: 8px;
@@ -389,6 +405,12 @@
         background 0.15s,
         border-color 0.15s,
         color 0.15s;
+}
+
+.ajustesAddBtn svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
 }
 
 .ajustesAddBtn:hover {
@@ -1436,6 +1458,39 @@
     line-height: 1.5;
     color: var(--text-muted);
     overflow-wrap: anywhere;
+}
+
+/* La casilla de incluir las claves en el ZIP. Va debajo de los botones y con
+   el aviso entero visible, sin desplegable: es la única casilla de la
+   aplicación que decide si un fichero descargado contiene secretos, y eso no se
+   puede leer después de haberlo descargado. */
+.ajustesExportClaves {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin: 0 20px 18px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-inset);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.ajustesExportClaves input {
+    margin-top: 3px;
+    flex: 0 0 auto;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+.ajustesExportClaves strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+.ajustesExportClaves em {
+    font-style: normal;
+    color: var(--text-subtle);
 }
 
 /* ── Atajo de iOS ─────────────────────────────────────────────────────────────

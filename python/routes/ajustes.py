@@ -8,7 +8,7 @@ from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, request
 
-from core import paths, settings
+from core import exportables, paths, settings
 from core.db import get_active_db_path, get_db
 from core.errors import registrarFalloEscritura
 from core.escritura import escribirJsonAtomico, temporalPara
@@ -566,11 +566,23 @@ def export_json():
     )
 
 
-@ajustes_bp.route("/api/export/zip", methods=["GET"])
+@ajustes_bp.route("/api/export/zip", methods=["GET", "POST"])
 def export_zip():
+    """El ZIP completo. En POST admite lo que un GET no puede llevar.
+
+    Sigue aceptando GET —un enlace directo o un `curl` siguen valiendo—, pero
+    entonces sale sin las dos cosas que dependen de quien pide: el volcado del
+    `localStorage`, que solo tiene el navegador, y las claves de API, que no se
+    incluyen si nadie las pide expresamente.
+    """
     pid  = _active_portfolio_id()
     conn = get_db()
     export = _build_export(conn, pid)
+
+    peticion = request.get_json(silent=True) if request.method == "POST" else None
+    peticion = peticion if isinstance(peticion, dict) else {}
+    ui = exportables.sanearUi(peticion.get("ui"))
+    incluirClaves = bool(peticion.get("incluirClaves"))
 
     json_bytes = json.dumps(export, ensure_ascii=False, indent=2).encode("utf-8")
 
@@ -589,6 +601,21 @@ def export_zip():
         prefs_file = _prefs_path(pid)
         if prefs_file.exists():
             zf.write(str(prefs_file), f"prefs_{pid}.json")
+
+        # Preferencias de la interfaz: orden de las tarjetas de Ajustes, orden
+        # de cada tabla y modos de visualización. Viven en el navegador, así que
+        # llegan en la petición o no llegan.
+        if ui:
+            zf.writestr(exportables.FICHERO_UI, json.dumps(ui, ensure_ascii=False, indent=2))
+
+        # Las claves van EN CLARO, y por eso solo si se piden: cifradas solo
+        # servirían para restaurar en un servidor con la misma SECRET_KEY, que
+        # es justo el caso en el que no se habían perdido.
+        if incluirClaves:
+            claves = exportables.clavesEnClaro()
+            if claves:
+                zf.writestr(exportables.FICHERO_CLAVES, json.dumps(claves, ensure_ascii=False, indent=2))
+                log.info("[export] ZIP generado CON claves de API en claro (%d proveedores)", len(claves))
 
     buf.seek(0)
     return Response(
@@ -756,6 +783,8 @@ def import_zip():
 
     db_path  = get_active_db_path()
     json_dir = _AJUSTES_JSON.parent
+    ui_restaurada = {}
+    claves_restauradas = []
 
     try:
         buf = io.BytesIO(raw_bytes)
@@ -829,8 +858,23 @@ def import_zip():
                 elif prefs_name.startswith("prefs_"):
                     log.warning("[import] Entrada de prefs ignorada por nombre inseguro: %r", name)
 
+            # Claves de API. Entran en claro desde el ZIP y se guardan cifradas
+            # con la SECRET_KEY de ESTA instalación: ese cambio de cifrado es lo
+            # que hace que una copia sirva en un servidor recién montado.
+            entrada_claves = next((n for n in names if Path(n).name == exportables.FICHERO_CLAVES), None)
+            if entrada_claves:
+                claves_restauradas = exportables.restaurarClaves(json.loads(zf.read(entrada_claves).decode("utf-8")))
+                if claves_restauradas:
+                    log.info("[import] Claves de API restauradas: %s", ", ".join(claves_restauradas))
+
+            # Preferencias de interfaz: no se guardan aquí, se devuelven para
+            # que las escriba el navegador, que es donde viven.
+            entrada_ui = next((n for n in names if Path(n).name == exportables.FICHERO_UI), None)
+            if entrada_ui:
+                ui_restaurada = exportables.sanearUi(json.loads(zf.read(entrada_ui).decode("utf-8")))
+
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "ui": ui_restaurada, "claves": claves_restauradas})
 
