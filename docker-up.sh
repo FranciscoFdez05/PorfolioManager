@@ -270,7 +270,6 @@ if [ -n "$SOMBRAS" ]; then
     echo >&2
 fi
 
-
 # ── 5. Puerto ─────────────────────────────────────────────────────────────────
 # Se lee con la misma capa de configuración que usa la aplicación
 # (tools/leer_ajuste.py), no con un configparser aparte: así el puerto del mapeo
