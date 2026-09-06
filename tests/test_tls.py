@@ -101,6 +101,22 @@ def test_los_nombres_no_se_repiten():
     assert tls.normalizarNombres(["casa", "https://casa", "CASA"]) == ["casa"]
 
 
+@pytest.mark.parametrize("nombres,entrando,cubierto", [
+    (["192.168.1.50"], "192.168.1.50", True),
+    (["localhost"], "192.168.1.50", False),
+    # localhost y 127.0.0.1 van siempre en el certificado, se escriban o no.
+    (["192.168.1.50"], "localhost", True),
+    (["192.168.1.50"], "127.0.0.1", True),
+    # Lo que llega del Host de la petición viene con puerto y en cualquier caja.
+    (["portfolio.casa"], "PORTFOLIO.Casa", True),
+    # Sin nombre no hay nada que objetar.
+    (["portfolio.casa"], "", True),
+])
+def test_se_sabe_si_el_certificado_cubriría_por_donde_entras(nombres, entrando, cubierto):
+    """La pregunta que decide si activar el HTTPS te deja fuera de tu propia app."""
+    assert tls.cubre(nombres, entrando) is cubierto
+
+
 def test_se_descarta_lo_que_rompería_el_caddyfile():
     """Un nombre con espacios o llaves se colaría en la configuración generada."""
     assert tls.normalizarNombres(["", "  ", "a b", "x{y}", "bien"]) == ["bien"]
@@ -187,6 +203,35 @@ def test_se_prepara_con_los_mismos_nombres_con_los_que_se_activará():
     for nombre in ("portfolio.casa", "localhost", "127.0.0.1"):
         assert f"https://{nombre}:" in preparado
         assert f"https://{nombre}:" in activado
+
+
+def test_el_sitio_de_comprobación_existe_en_los_dos_estados():
+    """Antes de encender sirve para probar sin arriesgar nada; con el HTTPS ya
+    puesto, para que un aparato nuevo se compruebe sin jugarse la entrada."""
+    for conf in (
+        tls.construirCaddyfile(False, ["casa"], preparando=True),
+        tls.construirCaddyfile(True, ["casa"]),
+    ):
+        assert f"https://casa:{tls.PUERTO_PREPARACION}" in conf
+        assert "El certificado funciona en este aparato" in conf
+
+
+def test_el_sitio_de_comprobación_no_lleva_a_la_aplicación():
+    """Es una página fija, no una segunda puerta de entrada: el puerto se
+    publica, y lo que se publica tiene que poder mirarse sin encogerse."""
+    conf = tls.construirCaddyfile(False, ["casa"], preparando=True)
+
+    bloque = conf.split(f"https://casa:{tls.PUERTO_PREPARACION}")[1]
+    assert "reverse_proxy" not in bloque
+
+
+def test_la_página_de_comprobación_no_puede_romper_el_caddyfile():
+    """Va dentro de un token entrecomillado: una comilla doble lo cerraría y una
+    llave sería un marcador de Caddy. Las dos cosas dejarían al proxy sin
+    configuración válida justo cuando se va a tocar el TLS."""
+    assert '"' not in tls._PAGINA_PRUEBA
+    assert "{" not in tls._PAGINA_PRUEBA and "}" not in tls._PAGINA_PRUEBA
+    assert tls._PAGINA_PRUEBA.isascii()
 
 
 def test_preparar_sin_nombres_deja_el_proxy_como_estaba():
@@ -402,14 +447,95 @@ def test_un_certificado_sin_fecha_no_revienta_la_prueba():
     assert resumen["dias"] is None
 
 
-def test_sin_https_la_prueba_no_es_un_fallo(caddy):
-    """Servir en claro es una decisión legítima del usuario, no un error: el
-    panel lo dice, pero no lo pinta de rojo."""
+def test_sin_certificado_todavía_la_prueba_dice_qué_falta(caddy):
+    """Servir en claro es una decisión legítima del usuario, no un error. Pero
+    aquí no hay nada que comprobar, y decirlo es más útil que un resultado
+    vacío: lo que falta es pulsar el botón de emitir."""
     salida = tls.probar()
 
     assert salida["https"] is False
-    assert salida["error"] is None
+    assert salida["modo"] == "previo"
+    assert "Emitir el certificado" in salida["error"]
     assert salida["nombres"] == []
+
+
+def test_el_certificado_se_comprueba_antes_de_activar(caddy, monkeypatch):
+    """El arreglo entero: la comprobación deja de ser un diagnóstico póstumo.
+
+    Con el HTTPS apagado pero el certificado ya emitido, se comprueba contra el
+    puerto de preparación —que sirve exactamente el mismo certificado—, así que
+    se sabe si va a funcionar sin haberse jugado la sesión.
+    """
+    puertos = []
+
+    def _fingido(contexto, nombre, puerto):
+        puertos.append(puerto)
+        return {"nombre": nombre, "ok": True, "error": None, "cubre": [nombre],
+                "caduca": None, "dias": None}
+
+    monkeypatch.setattr(tls, "_probarNombre", _fingido)
+    monkeypatch.setattr(tls, "_contextoDeConfianza", lambda: None)
+    tls.guardarEstado(False, ["portfolio.casa"])
+
+    salida = tls.probar()
+
+    assert salida["https"] is False
+    assert salida["modo"] == "previo"
+    assert salida["puerto"] == tls.PUERTO_PREPARACION
+    assert puertos == [tls.PUERTO_PREPARACION]
+    assert salida["error"] is None
+
+
+def test_con_el_https_puesto_se_comprueba_el_puerto_de_verdad(caddy, monkeypatch):
+    """Ahí la pregunta ya es otra: no si el certificado vale, sino si el puerto
+    por el que entra la gente lo está sirviendo."""
+    puertos = []
+
+    def _fingido(contexto, nombre, puerto):
+        puertos.append(puerto)
+        return {"nombre": nombre, "ok": True, "error": None, "cubre": [nombre],
+                "caduca": None, "dias": None}
+
+    monkeypatch.setattr(tls, "_probarNombre", _fingido)
+    monkeypatch.setattr(tls, "_contextoDeConfianza", lambda: None)
+    tls.guardarEstado(True, ["portfolio.casa"])
+
+    salida = tls.probar()
+
+    assert salida["modo"] == "activo"
+    assert puertos == [tls.settings.puerto()]
+
+
+def test_la_prueba_vuelve_a_levantar_el_sitio_de_comprobación(monkeypatch):
+    """Se cae al reiniciar la aplicación, porque al arrancar se reaplica el
+    estado guardado y ahí el HTTPS está apagado.
+
+    Sin esto, el botón daría «no se puede conectar» al día siguiente y parecería
+    un problema del certificado, que es justo lo que se viene a descartar.
+    """
+    cargas = []
+
+    def _admin(ruta, datos=None, tipo=None):
+        if ruta == "/load":
+            cargas.append(datos)
+            return b"{}"
+        if ruta.startswith("/pki/ca/"):
+            return json.dumps({"root_certificate": "-----BEGIN CERTIFICATE-----\nX\n"}).encode()
+        # La configuración cargada no menciona el puerto de comprobación: es lo
+        # que queda tras un reinicio con el HTTPS apagado.
+        return b'{"apps": {"http": {"servers": {"srv0": {"listen": [":5000"]}}}}}'
+
+    monkeypatch.setattr(tls, "_admin", _admin)
+    monkeypatch.setattr(tls, "_probarNombre", lambda *_a: {
+        "nombre": "casa", "ok": True, "error": None, "cubre": [], "caduca": None, "dias": None,
+    })
+    monkeypatch.setattr(tls, "_contextoDeConfianza", lambda: None)
+    tls.guardarEstado(False, ["casa"])
+
+    tls.probar()
+
+    assert cargas, "no se ha vuelto a levantar el sitio de comprobación"
+    assert f"https://casa:{tls.PUERTO_PREPARACION}".encode() in cargas[-1]
 
 
 def test_con_el_proxy_caido_la_prueba_dice_dónde_mirar(monkeypatch):
@@ -487,6 +613,9 @@ def test_el_estado_sugiere_el_nombre_por_el_que_has_entrado(cliente_autenticado,
     # hay que meter en el certificado.
     assert datos["nombreActual"] == "localhost"
     assert datos["activado"] is False
+    # El puerto de comprobación lo pone el servidor y el nombre lo pone el
+    # navegador: la URL para probar desde el aparato se arma con los dos.
+    assert datos["puertoPrueba"] == tls.PUERTO_PREPARACION
 
 
 def test_preparar_emite_el_certificado_sin_encender_nada(cliente_autenticado, bp_tls, caddy):
@@ -558,6 +687,46 @@ def test_activar_sin_nombres_se_rechaza(cliente_autenticado, bp_tls, caddy):
     assert res.status_code == 400
     assert res.get_json()["field"] == "nombres"
     assert _ultimo_load(caddy) is None
+
+
+def test_no_se_activa_un_certificado_que_no_cubre_por_donde_entras(cliente_autenticado, bp_tls, caddy):
+    """El fallo que se lleva por delante el acceso, y no puede ser lo que nadie
+    quería.
+
+    Al saltar a https:// por esa misma dirección el navegador corta, y la
+    pantalla desde la que se arregla queda detrás del aviso: la única salida es
+    saltárselo o entrar por SSH. Así que no se acepta, y el mensaje dice qué
+    nombre falta.
+    """
+    from core.errors import ValidationError
+    from routes.tls import _validar_que_no_te_deja_fuera
+
+    _client, _cab, app = cliente_autenticado(bp_tls)
+
+    # Se entra por la petición y no por el cliente porque cambiarle el Host le
+    # cambia también el origen de la cookie: se acabaría comprobando el login,
+    # no esto. Lo que decide aquí es el Host, y es lo que se fija.
+    with (
+        app.test_request_context("/api/tls", headers={"Host": "192.168.1.50:5000"}),
+        pytest.raises(ValidationError) as fallo,
+    ):
+        _validar_que_no_te_deja_fuera(["portfolio.casa"])
+
+    assert "192.168.1.50" in str(fallo.value)
+    assert _ultimo_load(caddy) is None
+    assert tls.leerEstado()["activado"] is False
+
+
+def test_activar_desde_localhost_no_se_bloquea(cliente_autenticado, bp_tls, caddy):
+    """Es el caso normal de quien enciende esto desde el propio servidor: el
+    certificado lleva localhost siempre, así que nadie se queda fuera."""
+    client, cab, _app = cliente_autenticado(bp_tls)
+
+    res = client.post("/api/tls", headers=cab, json={
+        "activado": True, "nombres": ["192.168.1.50"],
+    })
+
+    assert res.status_code == 200
 
 
 def test_activar_configura_el_proxy_y_guarda_el_estado(cliente_autenticado, bp_tls, caddy):

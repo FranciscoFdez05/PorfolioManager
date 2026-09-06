@@ -682,9 +682,14 @@ La aplicación habla HTTP y no termina TLS ella misma. Sin nada delante, el `POS
 1. **Repasa la lista de nombres.** Llega rellena con la dirección por la que has entrado y con la IP del servidor en la red local: esa la calcula `docker-up.sh` en el host y se la pasa al contenedor, porque desde dentro solo se ve la red de Compose. Añade cualquier otra con la que entres —otro nombre DNS, la IP del túnel—, porque **el certificado solo vale para las que estén escritas**.
 2. **Pulsa *Emitir el certificado*.** Se emite, y **no cambia nada todavía**: sigues entrando por la misma dirección y en claro. Lo único que pasa es que a partir de ahí la CA existe y se puede descargar.
 3. **Instálalo en cada aparato desde el que entres**, con las instrucciones que trae el propio panel para iOS, Android, Windows, macOS y Firefox. Este paso va **antes** de encender el HTTPS a propósito, y es el orden lo que arregla la trampa: con el TLS ya puesto, un aparato sin la CA se encuentra el aviso del navegador justo delante de la página desde la que tendría que descargarla.
-4. **Y entonces sí, *Activar HTTPS*.** El puerto pasa a hablar solo TLS y la página se recarga sola en `https://`. Después, ***Probar ahora*** lo confirma: abre una conexión TLS por cada nombre, valida contra esa misma CA y dice cuál no está cubierto y cuántos días le quedan al certificado.
+4. **Compruébalo, con el HTTPS todavía apagado.** Son dos preguntas distintas y hay un botón para cada una:
+   - ***Probar desde el servidor*** abre una conexión TLS por cada nombre declarado y valida el certificado contra esa misma CA: dice cuál no está cubierto y cuántos días le quedan al que caduca antes.
+   - ***Probar en este aparato*** abre `https://<tu-servidor>:9443` en otra pestaña: una página fija servida con **ese mismo certificado**. Si carga sin avisos, la CA está instalada y es de confianza ahí. Si el navegador protesta, protestaría igual con el HTTPS puesto, y te has enterado sin ponerlo. Repítelo desde cada aparato.
+5. **Y entonces sí, *Activar HTTPS*.** El puerto pasa a hablar solo TLS y la página se recarga sola en `https://`.
 
-Emitir y encender eran la misma pulsación, y en ese orden no puede salir bien: cuando volvía la respuesta, el puerto ya solo hablaba TLS con un certificado que ningún aparato reconocía, así que el navegador cortaba y dejaba fuera **antes** de haber podido descargar lo que habría dejado entrar. Para no tocar el puerto por el que estás entrando, el certificado se emite en un puerto interno (9443 por defecto, `CADDY_PREP_PORT`) que no se publica al host: solo existe dentro de la red de Compose.
+El paso 4 existe porque **instalar un certificado parece que ha ido bien aunque no haya ido**. Windows dice «La importación se completó correctamente» aunque lo hayas dejado en el almacén *Personal*, que no sirve para confiar en nada; iOS lo instala pero no se fía hasta que activas el interruptor de Ajustes de confianza; y Firefox ni mira el almacén del sistema. Sin comprobarlo, todo eso se descubre al encender el HTTPS, o sea desde el otro lado del aviso.
+
+Emitir y encender eran la misma pulsación, y en ese orden no puede salir bien: cuando volvía la respuesta, el puerto ya solo hablaba TLS con un certificado que ningún aparato reconocía, así que el navegador cortaba y dejaba fuera **antes** de haber podido descargar lo que habría dejado entrar. Para no tocar el puerto por el que estás entrando, el certificado se emite en un puerto aparte (9443 por defecto, `CADDY_PREP_PORT`), que después se queda como puerto de comprobación.
 
 #### Cómo está montado, y por qué así
 
@@ -703,7 +708,15 @@ Activar el HTTPS es la aplicación mandándole a Caddy una configuración nueva 
                                        └─ con el mismo certificado, ya instalado
 ```
 
-El puerto de la primera (9443 por defecto, `CADDY_PREP_PORT`) **no se publica**: existe solo dentro de la red de Compose y nadie llega a él desde la LAN. No es una segunda puerta de entrada —no hace `reverse_proxy` a nada—, solo la excusa para que haya un certificado que emitir sin tocar el puerto por el que estás mirando el panel.
+#### El puerto de comprobación
+
+El puerto de la primera pulsación (9443 por defecto, `CADDY_PREP_PORT`) no desaparece después: se queda como **puerto de comprobación**, y está publicado.
+
+Sirve **una página fija** por HTTPS con el mismo certificado que el puerto principal, y **no hace `reverse_proxy` a nada**: no es una segunda entrada a la aplicación, no lleva sesión y lo único que contesta es que el certificado funciona.
+
+Está publicado porque la pregunta que contesta solo la puede contestar el aparato que la hace —*¿se fía este móvil de la CA que acabo de instalar?*—, y eso el servidor no lo sabe. Sin publicarlo, lo único capaz de probar el certificado sería la propia máquina que lo emitió, que es justo la que no hace falta comprobar.
+
+Con el HTTPS ya activado sigue en pie, y ahí gana el otro uso: un aparato nuevo instala la CA y se comprueba en `:9443` **sin** arriesgarse a que la puerta principal lo rechace y lo deje fuera.
 
 La alternativa —arrancar Caddy bajo demanda desde la aplicación— exigiría montarle el socket de Docker, y eso convierte cualquier fallo de la aplicación en root sobre el host: un agujero bastante peor que el que veníamos a tapar. Reconfigurar un proxy que ya está en marcha no necesita ningún privilegio. Y meter el TLS dentro de gunicorn tampoco valía: lee el certificado al arrancar, así que activarlo desde la interfaz obligaría a reiniciar el contenedor en mitad de la petición que lo activa.
 
@@ -719,6 +732,8 @@ El certificado **solo vale para los nombres que declares**. Si entras por una IP
 |---|---|
 | Caddy rechaza la configuración | No se guarda nada y sigues conectado como estabas. El estado solo se escribe **después** de que el proxy la acepte: al revés, un estado diciendo «HTTPS activo» sobre un proxy en claro haría que las cookies salieran con `Secure`, el navegador las descartaría y no se podría iniciar sesión. |
 | Se recrea el contenedor del proxy | Caddy arranca con `--resume` y recupera la última configuración cargada. Y por si acaso, la aplicación reaplica el estado guardado al arrancar, con reintentos mientras el proxy termina de levantar. |
+| Entras por una dirección que el certificado no cubre | No se llega a activar: el panel lo avisa mientras escribes y el servidor devuelve un 400 diciendo qué nombre falta. Es la única forma de quedarse fuera, así que no se acepta. |
+| Instalas el certificado y sigue sin funcionar | Casi siempre está instalado donde no vale. En Windows, el asistente propone el almacén de la pestaña desde la que lo abriste y dice «importación completada» igualmente: tiene que quedar en **Entidades de certificación raíz de confianza**, no en *Personal*. En iOS falta el interruptor de Ajustes › General › Información › Ajustes de confianza. En Firefox, su propio almacén. *Probar en este aparato* lo distingue en un clic y con el HTTPS todavía apagado. |
 | Un aparato sigue avisando del certificado | *Probar ahora* lo distingue: si dice que ese nombre **no está cubierto**, hay que añadirlo a la lista y volver a activar; si dice que está bien, lo que falta es instalar la CA **en ese aparato**. |
 | Activas sin haber instalado la CA | El navegador avisa en ese aparato y, hasta que te saltes el aviso, no puedes ni llegar al panel a descargarla. Por eso emitir e instalar van antes: el botón de activar no se habilita hasta marcar que ya está instalada. Si aun así pasa, salta el aviso una vez, descarga el certificado desde Ajustes e instálalo. |
 | `data/tls/estado.json` ilegible | Se lee como «HTTPS desactivado», que es el estado que siempre funciona. |

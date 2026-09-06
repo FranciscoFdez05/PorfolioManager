@@ -823,6 +823,11 @@
                         siguiendo las instrucciones que salen debajo. Este es el paso que va <em>antes</em>: en
                         cuanto el HTTPS esté puesto, un aparato sin el certificado se encuentra el aviso del
                         navegador y tiene que saltárselo para llegar hasta aquí a descargarlo.</li>
+                    <li><strong>Compruébalo desde cada aparato</strong> con «Probar en este aparato»: abre una
+                        página cifrada con ese mismo certificado. Si carga sin avisos, ahí va a funcionar.
+                        Instalar un certificado <em>parece</em> que ha ido bien aunque no haya ido —Windows llega
+                        a decir «importación completada» dejándolo en el almacén que no es—, así que esto es lo
+                        único que lo confirma.</li>
                     <li><strong>Y entonces sí, «Activar HTTPS».</strong> La página se recarga sola en
                         <code>https://</code>. No se reinicia nada y el puerto sigue siendo el mismo.</li>
                 </ol>
@@ -835,6 +840,7 @@
                         <input id="ajustesTlsNombres" class="ajustesInput" type="text" autocomplete="off"
                                placeholder="192.168.1.50, portfolio.casa, localhost">
                     </div>
+                    <div class="ajustesTlsAvisoNombre" id="ajustesTlsAvisoNombre" hidden></div>
                     <div class="ajustesFieldHint">
                         Uno por línea o separados por comas. El certificado <strong>solo vale para los que estén aquí</strong>:
                         si entras por una dirección que falte, el navegador avisará aunque tengas la CA instalada.
@@ -848,19 +854,6 @@
                     <span id="ajustesTlsMsg" class="ajustesStatusMsg"></span>
                 </div>
 
-                <div class="ajustesTlsPrueba" id="ajustesTlsPrueba" style="display:none">
-                    <div class="ajustesSectionDivider"></div>
-                    <div class="ajustesTlsPruebaTexto">
-                        <strong>Comprueba que el cifrado está de verdad.</strong>
-                        Abre una conexión por cada nombre de la lista y valida el certificado contra
-                        la misma CA que te descargas aquí abajo: es la comprobación que hará el navegador.
-                    </div>
-                    <div class="ajustesActions">
-                        <button id="ajustesTlsPruebaBtn" class="ajustesSecondaryBtn" type="button">Probar ahora</button>
-                        <span id="ajustesTlsPruebaMsg" class="ajustesStatusMsg"></span>
-                    </div>
-                    <div class="ajustesTlsPruebaRes" id="ajustesTlsPruebaRes" hidden></div>
-                </div>
                 <div class="ajustesTlsCa" id="ajustesTlsCa" style="display:none">
                     <div class="ajustesSectionDivider"></div>
                     <div class="ajustesTlsCaTexto">
@@ -887,31 +880,59 @@
                             <p><strong>Android.</strong> Ajustes › Seguridad › Cifrado y credenciales › Instalar un certificado ›
                             Certificado de CA. Avisará de que es una acción delicada; lo es, y por eso lo estás instalando tú.</p>
                             <p><strong>Windows.</strong> Doble clic en el archivo › Instalar certificado › Equipo local ›
-                            «Colocar todos los certificados en el siguiente almacén» › Entidades de certificación raíz de confianza.</p>
+                            <strong>«Colocar todos los certificados en el siguiente almacén»</strong> › Examinar ›
+                            <strong>Entidades de certificación raíz de confianza</strong>.
+                            Ese paso no se puede saltar: si dejas marcado «Seleccionar automáticamente el almacén», o si
+                            abres el asistente desde la pestaña «Personal» del gestor de certificados, el certificado acaba
+                            en <em>Personal</em>, que no sirve para confiar en nada. Windows dirá «La importación se completó
+                            correctamente» igualmente, y el navegador seguirá avisando. Compruébalo en la pestaña
+                            «Entidades de certificación raíz de confianza»: si no está ahí, no está instalado.</p>
                             <p><strong>macOS.</strong> Doble clic para abrirlo en Acceso a Llaveros, ponlo en el llavero «Sistema»,
                             ábrelo y en Confiar elige «Confiar siempre».</p>
                             <p><strong>Firefox</strong> usa su propio almacén: Ajustes › Privacidad y seguridad › Ver certificados ›
                             Autoridades › Importar.</p>
                         </div>
                     </details>
+                </div>
 
-                    <div class="ajustesTlsPaso2" id="ajustesTlsPaso2" style="display:none">
-                        <div class="ajustesTlsCaTexto">
-                            <strong>Y ahora sí, enciéndelo.</strong>
-                            La dirección no cambia: el mismo puerto de siempre pasa a ser <code>https://</code>
-                            y la página se recarga sola. A partir de ahí, los aparatos donde hayas instalado el
-                            certificado entran sin ver un solo aviso.
-                        </div>
-                        <label class="ajustesTlsConfirma">
-                            <input type="checkbox" id="ajustesTlsConfirma">
-                            <span>Ya he instalado el certificado en los aparatos desde los que entro
-                                <small>Si falta alguno, ese verá el aviso del navegador hasta que lo instale, y tendrá que saltárselo para poder llegar a descargarlo.</small>
-                            </span>
-                        </label>
-                        <div class="ajustesActions">
-                            <button id="ajustesTlsActivarBtn" class="ajustesAddBtn" type="button" disabled>Activar HTTPS</button>
-                            <span id="ajustesTlsActivarMsg" class="ajustesStatusMsg"></span>
-                        </div>
+                <div class="ajustesTlsPrueba" id="ajustesTlsPrueba" style="display:none">
+                    <div class="ajustesSectionDivider"></div>
+                    <div class="ajustesTlsPruebaTexto">
+                        <strong>Comprueba que el certificado funciona antes de encender nada.</strong>
+                        Son dos preguntas distintas y hacen falta las dos: si el certificado está bien
+                        emitido, y si <em>este</em> aparato se fía de él. La segunda no la puede contestar
+                        el servidor —solo la sabe el navegador que tienes delante—, así que se abre en una
+                        pestaña.
+                    </div>
+                    <div class="ajustesActions">
+                        <button id="ajustesTlsPruebaBtn" class="ajustesSecondaryBtn" type="button">Probar desde el servidor</button>
+                        <a id="ajustesTlsPruebaAparatoBtn" class="ajustesSecondaryBtn" href="#" target="_blank" rel="noopener">
+                            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.5 3H3.5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M9.5 2.5H13V6M12.8 2.7 7.5 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            Probar en este aparato
+                        </a>
+                        <span id="ajustesTlsPruebaMsg" class="ajustesStatusMsg"></span>
+                    </div>
+                    <div class="ajustesFieldHint" id="ajustesTlsPruebaAparatoHint"></div>
+                    <div class="ajustesTlsPruebaRes" id="ajustesTlsPruebaRes" hidden></div>
+                </div>
+
+                <div class="ajustesTlsPaso2" id="ajustesTlsPaso2" style="display:none">
+                    <div class="ajustesSectionDivider"></div>
+                    <div class="ajustesTlsCaTexto">
+                        <strong>Y ahora sí, enciéndelo.</strong>
+                        La dirección no cambia: el mismo puerto de siempre pasa a ser <code>https://</code>
+                        y la página se recarga sola. A partir de ahí, los aparatos donde hayas instalado el
+                        certificado entran sin ver un solo aviso.
+                    </div>
+                    <label class="ajustesTlsConfirma">
+                        <input type="checkbox" id="ajustesTlsConfirma">
+                        <span>Ya he instalado el certificado en los aparatos desde los que entro
+                            <small>Si falta alguno, ese verá el aviso del navegador hasta que lo instale, y tendrá que saltárselo para poder llegar a descargarlo.</small>
+                        </span>
+                    </label>
+                    <div class="ajustesActions">
+                        <button id="ajustesTlsActivarBtn" class="ajustesAddBtn" type="button" disabled>Activar HTTPS</button>
+                        <span id="ajustesTlsActivarMsg" class="ajustesStatusMsg"></span>
                     </div>
                 </div>
             </div>

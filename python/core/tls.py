@@ -177,6 +177,19 @@ def normalizarNombres(nombres) -> list[str]:
     return limpios
 
 
+def cubre(nombres: list[str], nombre: str) -> bool:
+    """¿Serviría el certificado emitido para `nombres` a quien entre por `nombre`?
+
+    Cuenta con que localhost y 127.0.0.1 van siempre en el certificado, así que
+    la respuesta es la misma que dará el navegador. Sin nombre que comprobar
+    devuelve `True`: no hay nada que objetar, no es que esté cubierto.
+    """
+    objetivo = normalizarNombres([nombre])
+    if not objetivo:
+        return True
+    return objetivo[0] in _conLocalhost(normalizarNombres(nombres))
+
+
 def nombresSugeridos(hostActual: str = "") -> list[str]:
     """Con qué nombres llega relleno el campo del certificado.
 
@@ -212,6 +225,50 @@ def _conLocalhost(nombres: list[str]) -> list[str]:
     return efectivos
 
 
+# Lo que contesta el sitio de comprobación. Va dentro de un token entrecomillado
+# del Caddyfile, así que aquí no puede haber ni comillas dobles ni llaves: las
+# primeras cerrarían el token y las segundas serían marcadores de Caddy. De ahí
+# las comillas simples en los atributos y el CSS en línea.
+_PAGINA_PRUEBA = (
+    "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
+    "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+    "<title>El certificado funciona</title></head>"
+    "<body style='font-family:system-ui,sans-serif;max-width:32em;margin:12vh auto;"
+    "padding:0 1.5em;line-height:1.6;color:#1a1a1a;background:#fff'>"
+    "<h1 style='font-size:1.35em;margin-bottom:.6em'>El certificado funciona en este aparato</h1>"
+    "<p>Est&aacute;s viendo esta p&aacute;gina cifrada y sin ning&uacute;n aviso del navegador, "
+    "as&iacute; que la autoridad de tu servidor est&aacute; instalada y es de "
+    "confianza aqu&iacute;.</p>"
+    "<p>Cierra esta pesta&ntilde;a y activa el HTTPS con tranquilidad: "
+    "es el mismo certificado.</p>"
+    "</body></html>"
+)
+
+
+def _sitioDePrueba(nombres: list[str]) -> str:
+    """Un HTTPS con el mismo certificado, en un puerto aparte, que solo dice que
+    funciona.
+
+    Existe para poder contestar desde el propio aparato la única pregunta que no
+    se puede contestar desde el servidor: **¿se fía este móvil del certificado?**
+    Eso no lo sabe nadie más que el móvil, y la forma de preguntárselo sin
+    apostarse la sesión es darle un TLS que no sea el de la puerta principal.
+
+    No hace `reverse_proxy` a nada: no es una segunda entrada a la aplicación,
+    solo una página fija. Si el navegador la abre sin protestar, el certificado
+    está bien instalado ahí; si protesta, protestaría igual con el HTTPS puesto,
+    y esto se ha averiguado sin haberlo puesto.
+    """
+    sitios = ", ".join(f"https://{n}:{PUERTO_PREPARACION}" for n in nombres)
+    return (
+        f"{sitios} {{\n"
+        "\ttls internal\n"
+        '\theader Content-Type "text/html; charset=utf-8"\n'
+        f'\trespond "{_PAGINA_PRUEBA}" 200\n'
+        "}\n"
+    )
+
+
 def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = False) -> str:
     """Configuración completa de Caddy para el estado pedido.
 
@@ -245,7 +302,12 @@ def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = Fa
             + f"{sitios} {{\n"
             + "\ttls internal\n"
             + proxy
-            + "}\n"
+            + "}\n\n"
+            # El sitio de comprobación se queda también con el HTTPS puesto: es
+            # por donde se averigua si un aparato nuevo se fía del certificado
+            # **sin** tener que arriesgarse a entrar por la puerta principal y
+            # descubrir que no, que es como se descubre ahora.
+            + _sitioDePrueba(_conLocalhost(nombres))
         )
 
     if preparando and nombres:
@@ -254,20 +316,13 @@ def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = Fa
         # explícito es lo que garantiza que este puerto, por el que el usuario
         # está entrando ahora mismo, no cambie bajo sus pies. Un sitio sin
         # nombre tampoco cambiaría, pero esto no depende de saberlo.
-        sitios = ", ".join(f"https://{n}:{PUERTO_PREPARACION}" for n in _conLocalhost(nombres))
         return (
             admin
             + "\tauto_https disable_redirects\n}\n\n"
             + f"http://:{puerto} {{\n"
             + proxy
             + "}\n\n"
-            + f"{sitios} {{\n"
-            + "\ttls internal\n"
-            # Sin reverse_proxy: este puerto no está publicado y no es una
-            # segunda puerta de entrada a la aplicación, solo la excusa para que
-            # haya un certificado que emitir.
-            + '\trespond "preparando el certificado" 200\n'
-            + "}\n"
+            + _sitioDePrueba(_conLocalhost(nombres))
         )
 
     # Sin nombres no hay certificado posible, así que se sirve en claro aunque
@@ -489,6 +544,20 @@ def _probarNombre(contexto: ssl.SSLContext, nombre: str, puerto: int) -> dict:
     return salida
 
 
+def sitioDePruebaLevantado() -> bool:
+    """¿Está en pie el puerto de comprobación?
+
+    Se mira en la configuración que Caddy tiene cargada, no en `estado.json`:
+    aquí la pregunta es qué está sirviendo el proxy ahora mismo, y las dos cosas
+    se separan en cuanto se reinicia algo.
+    """
+    try:
+        cargada = _admin("/config/")
+    except (OSError, ValueError):
+        return False
+    return f":{PUERTO_PREPARACION}".encode() in cargada
+
+
 def probar() -> dict:
     """Comprueba el cifrado de verdad, en vez de repetir lo que dice el estado.
 
@@ -497,22 +566,32 @@ def probar() -> dict:
     descarga desde Ajustes**. Así el botón responde a la pregunta que de verdad
     tiene el usuario —«¿me va a seguir avisando el navegador?»— y no a «¿quedó
     guardado el interruptor?».
+
+    Funciona en los dos estados, y eso es media respuesta: con el HTTPS puesto
+    comprueba el puerto de siempre, y **antes de activarlo** comprueba el puerto
+    de preparación, que sirve el mismo certificado. Así lo que se averigua
+    después de que el navegador te haya echado se puede averiguar antes.
+
+    Lo que esto contesta es si el certificado está bien emitido y cubre cada
+    nombre. Lo que **no** puede contestar desde el servidor es si el aparato que
+    tienes en la mano se fía de la CA; para eso está el sitio de comprobación,
+    que se abre desde el propio aparato.
     """
     estado = leerEstado()
+    activo = httpsActivo()
     salida = {
-        "https": httpsActivo(),
+        "https": activo,
+        # Qué se ha comprobado: el HTTPS de verdad, o el certificado antes de
+        # encenderlo. La interfaz lo dice con todas las letras, porque «todo
+        # correcto» significa cosas distintas en cada caso.
+        "modo": "activo" if activo else "previo",
         "proxy": proxyDisponible(),
+        "puerto": None,
         "nombres": [],
         "caduca": None,
         "dias": None,
         "error": None,
     }
-
-    if not salida["https"]:
-        # No es un fallo: es la otra mitad de la decisión que el usuario ha
-        # tomado. Servir en claro es un estado legítimo y la interfaz lo dice
-        # sin pintarlo de rojo.
-        return salida
 
     if not salida["proxy"]:
         salida["error"] = (
@@ -520,6 +599,34 @@ def probar() -> dict:
             "'caddy' está en marcha."
         )
         return salida
+
+    if activo:
+        puerto = settings.puerto()
+    else:
+        if not estado["nombres"]:
+            # No es un fallo: es que todavía no se ha emitido nada. Servir en
+            # claro es un estado legítimo y la interfaz lo dice sin pintarlo de
+            # rojo, pero aquí no hay nada que comprobar.
+            salida["error"] = (
+                "Todavía no hay ningún certificado que comprobar. Pulsa «Emitir "
+                "el certificado» y vuelve a probar."
+            )
+            return salida
+        puerto = PUERTO_PREPARACION
+        # El sitio de comprobación se cae al reiniciar la aplicación, porque al
+        # arrancar se reaplica el estado guardado y ahí el HTTPS está apagado.
+        # Volver a levantarlo es gratis y no toca el puerto por el que entras;
+        # sin esto, el botón daría «no se puede conectar» al día siguiente y
+        # parecería un problema del certificado, que es justo lo que se viene a
+        # descartar.
+        if not sitioDePruebaLevantado():
+            try:
+                aplicar(False, estado["nombres"], preparando=True)
+            except ErrorCaddy as e:
+                salida["error"] = str(e)
+                return salida
+
+    salida["puerto"] = puerto
 
     try:
         contexto = _contextoDeConfianza()
@@ -533,7 +640,6 @@ def probar() -> dict:
         salida["error"] = f"La CA que devuelve el proxy no es un certificado legible: {e}"
         return salida
 
-    puerto = settings.puerto()
     for nombre in estado["nombres"] or ["localhost"]:
         salida["nombres"].append(_probarNombre(contexto, nombre, puerto))
 

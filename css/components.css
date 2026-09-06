@@ -2087,7 +2087,9 @@ table td.numCell [contenteditable="true"] {
 }
 
 /* Confirm modal: must appear above the Ajustes panel (sttOverlay z-index:9000) */
-/* El padding lo ajusta alignConfirmModalToContent() para centrarlo sobre #dynamicContent */
+/* El padding lo ajusta alignConfirmModalToContent(): sobre #dynamicContent en la
+   aplicación, y sobre la ventana entera cuando el panel de Ajustes está abierto y
+   ese contenido queda detrás. */
 #confirmModalOverlay {
     align-items: center;
     z-index: 10000;

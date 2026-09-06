@@ -52,6 +52,10 @@ def _estado_publico() -> dict:
         # lado del aviso que acabas de provocar». Se pregunta solo con el proxy
         # en pie porque sin él la respuesta sería que no, pero por otro motivo.
         "caDisponible": proxy and tls.caDisponible(),
+        # El puerto donde vive la página de comprobación. Lo necesita el
+        # frontend para armar la URL con el nombre por el que ha entrado ESTE
+        # aparato, que es el único que sabe el navegador y no el servidor.
+        "puertoPrueba": tls.PUERTO_PREPARACION,
         # Cuando el HTTPS viene impuesto por .env (dominio público con Let's
         # Encrypt), la interfaz no debe ofrecer un interruptor que machacaría
         # esa configuración. Se lo dice al frontend en vez de dejarle adivinar.
@@ -90,6 +94,31 @@ def _validar_nombres(nombres: list[str]) -> None:
         raise ValidationError(
             f"Demasiados nombres (máximo {MAX_NOMBRES}).", field="nombres",
         )
+
+
+def _validar_que_no_te_deja_fuera(nombres: list[str]) -> None:
+    """No se activa el HTTPS para una lista que no cubra por dónde estás entrando.
+
+    Es la única forma de quedarse fuera, y no puede ser lo que nadie quería: al
+    saltar a `https://` por esa misma dirección, el certificado no la cubre, el
+    navegador corta, y la pantalla desde la que se arregla queda justo detrás
+    del aviso. Emitir un certificado que no vale para la dirección con la que
+    entras no es una preferencia discutible, es el error de siempre —el que
+    convierte «activar el HTTPS» en «perder el acceso»—, así que se rechaza.
+
+    localhost y 127.0.0.1 no hace falta escribirlos: van siempre.
+    """
+    actual = (request.host or "").split(":")[0]
+    if tls.cubre(nombres, actual):
+        return
+
+    raise ValidationError(
+        f"Estás entrando por «{actual}» y el certificado no cubriría esa "
+        f"dirección: al activar el HTTPS, tu propio navegador rechazaría la "
+        f"conexión y esta pantalla quedaría detrás del aviso. Añade «{actual}» "
+        f"a la lista y vuelve a emitir el certificado.",
+        field="nombres",
+    )
 
 
 @tls_bp.route("/api/tls", methods=["GET"])
@@ -157,6 +186,7 @@ def set_tls():
 
     if activar:
         _validar_nombres(nombres)
+        _validar_que_no_te_deja_fuera(nombres)
 
     try:
         tls.aplicar(activar, nombres)
@@ -192,12 +222,17 @@ def set_tls():
 def get_prueba():
     """¿Está el cifrado como el usuario cree que está?
 
+    Vale en los dos estados: con el HTTPS puesto comprueba el puerto de siempre
+    y, antes de encenderlo, el de preparación, que sirve el mismo certificado.
+    Eso convierte la comprobación en algo que se puede hacer **antes** de
+    apostarse la sesión, en vez de en un diagnóstico póstumo.
+
     No devuelve error aunque la comprobación salga mal: que un nombre no esté
     cubierto es un resultado, no un fallo de la petición, y la interfaz necesita
     pintarlo entero (qué nombre falla y por qué) en vez de un 500 sin detalle.
     Solo el proxy caído o la CA ausente llenan `error`, y también con 200.
     """
-    return jsonify({"ok": True, **tls.probar()})
+    return jsonify({"ok": True, "puertoPrueba": tls.PUERTO_PREPARACION, **tls.probar()})
 
 
 @tls_bp.route("/api/tls/ca.crt", methods=["GET"])

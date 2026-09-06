@@ -4256,6 +4256,15 @@ function alignConfirmModalToContent() {
         return
     }
 
+    // Con Ajustes abierto, #dynamicContent está detrás de un panel que ocupa la
+    // pantalla entera: alinearse con él deja el diálogo descentrado respecto a
+    // lo único que se ve. Ahí el marco visible es la ventana.
+    const ajustes = document.getElementById("sttOverlay")
+    if (ajustes && !ajustes.classList.contains("hidden")) {
+        confirmModalOverlay.style.padding = ""
+        return
+    }
+
     if (!contentArea) {
         confirmModalOverlay.style.padding = ""
         return

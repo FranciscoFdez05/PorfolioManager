@@ -1515,6 +1515,7 @@ async function initAjustesLogic() {
     // aparato mientras esta misma página sigue siendo alcanzable.
     const tlsEstadoEl = document.getElementById("ajustesTlsEstado")
     const tlsNombresEl = document.getElementById("ajustesTlsNombres")
+    const tlsAvisoNombreEl = document.getElementById("ajustesTlsAvisoNombre")
     const tlsPrepararBtn = document.getElementById("ajustesTlsPrepararBtn")
     const tlsActivarBtn = document.getElementById("ajustesTlsActivarBtn")
     const tlsDesactivarBtn = document.getElementById("ajustesTlsDesactivarBtn")
@@ -1528,6 +1529,8 @@ async function initAjustesLogic() {
     const tlsPruebaBtn = document.getElementById("ajustesTlsPruebaBtn")
     const tlsPruebaMsg = document.getElementById("ajustesTlsPruebaMsg")
     const tlsPruebaRes = document.getElementById("ajustesTlsPruebaRes")
+    const tlsPruebaAparatoBtn = document.getElementById("ajustesTlsPruebaAparatoBtn")
+    const tlsPruebaAparatoHint = document.getElementById("ajustesTlsPruebaAparatoHint")
 
     function _pintarTls(data) {
         if (!tlsEstadoEl) return
@@ -1603,9 +1606,15 @@ async function initAjustesLogic() {
         if (tlsActivarBtn) {
             tlsActivarBtn.disabled = !tlsConfirmaEl?.checked
         }
+        _avisarSiTeDejasFuera()
+        // La comprobación también se adelanta: sirve para el certificado ya
+        // emitido, no solo para el HTTPS ya puesto. Era el orden equivocado
+        // —comprobar después de apostarse la sesión es un diagnóstico, no una
+        // comprobación—, y es lo que se viene a arreglar.
         if (tlsPruebaEl) {
-            tlsPruebaEl.style.display = cifrando ? "" : "none"
+            tlsPruebaEl.style.display = cifrando || conCa ? "" : "none"
         }
+        _pintarPruebaAparato(data.puertoPrueba)
         // La guía explica cómo encenderlo: con el HTTPS ya puesto sobra, y lo
         // que hace falta entonces —instalar la CA, comprobar— sale justo debajo.
         if (tlsGuiaEl) {
@@ -1634,6 +1643,54 @@ async function initAjustesLogic() {
             .split(/[\n,;]+/)
             .map((n) => n.trim())
             .filter(Boolean)
+    }
+
+    // Misma limpieza que hace el servidor, para que el aviso de aquí abajo no
+    // salte por un `https://` o un `:5000` que el certificado no ve.
+    function _nombreLimpio(bruto) {
+        return String(bruto)
+            .trim()
+            .toLowerCase()
+            .replace(/^https?:\/\//, "")
+            .split("/")[0]
+            .split(":")[0]
+            .replace(/\.$/, "")
+    }
+
+    // El fallo que se lleva por delante el acceso: emitir un certificado que no
+    // cubre la dirección por la que estás entrando. Al saltar a https:// el
+    // navegador corta, y esta pantalla —la única desde la que se arregla— queda
+    // detrás del aviso. El servidor lo rechaza igualmente; esto lo dice antes,
+    // que es cuando todavía es un renglón que falta y no un problema.
+    function _avisarSiTeDejasFuera() {
+        if (!tlsAvisoNombreEl) return
+
+        const actual = _nombreLimpio(location.hostname)
+        const escritos = _nombresEscritos().map(_nombreLimpio)
+        // localhost y 127.0.0.1 los añade el servidor siempre, se escriban o no.
+        const cubierto = !actual || actual === "localhost" || actual === "127.0.0.1" || escritos.includes(actual)
+
+        tlsAvisoNombreEl.hidden = cubierto
+        if (cubierto) return
+
+        tlsAvisoNombreEl.textContent = ""
+        const texto = document.createElement("span")
+        texto.innerHTML =
+            `Estás entrando por <code>${actual}</code> y no está en la lista. ` +
+            "Tal y como está, al activar el HTTPS tu propio navegador rechazaría la conexión."
+        tlsAvisoNombreEl.appendChild(texto)
+
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = "ajustesTlsAvisoBtn"
+        btn.textContent = `Añadir ${actual}`
+        btn.addEventListener("click", () => {
+            const lista = _nombresEscritos()
+            lista.push(actual)
+            if (tlsNombresEl) tlsNombresEl.value = lista.join(", ")
+            _avisarSiTeDejasFuera()
+        })
+        tlsAvisoNombreEl.appendChild(btn)
     }
 
     // --- Paso 1: emitir el certificado ---
@@ -1752,6 +1809,27 @@ async function initAjustesLogic() {
     // contra la CA que el usuario se descarga aquí mismo, que es la diferencia
     // entre «quedó guardado el interruptor» y «el navegador va a dejar de avisar».
 
+    // --- Probar en este aparato ---
+    // La única pregunta que el servidor no puede contestar: ¿se fía ESTE
+    // navegador del certificado? Nadie más que él lo sabe. Se le da una página
+    // servida con el mismo certificado en el puerto de comprobación: si carga,
+    // la CA está bien instalada aquí; si avisa, avisaría igual con el HTTPS
+    // puesto —y se ha averiguado sin ponerlo—.
+    function _pintarPruebaAparato(puerto) {
+        const url = puerto ? `https://${location.hostname}:${puerto}/` : ""
+        if (tlsPruebaAparatoBtn) {
+            tlsPruebaAparatoBtn.href = url || "#"
+            tlsPruebaAparatoBtn.style.display = url ? "" : "none"
+        }
+        if (tlsPruebaAparatoHint) {
+            tlsPruebaAparatoHint.innerHTML = url
+                ? `Abre <code>${url}</code> en otra pestaña. Si sale una página diciendo que el certificado funciona, ` +
+                  "en este aparato está bien instalado y el HTTPS va a ir. Si el navegador avisa, es que aquí falta " +
+                  "—y avisaría igual con el HTTPS puesto—. Repítelo desde cada aparato, con la dirección de este servidor."
+                : ""
+        }
+    }
+
     function _filaPrueba(r) {
         const fila = document.createElement("div")
         fila.className = "ajustesTlsPruebaFila " + (r.ok ? "ok" : "mal")
@@ -1788,6 +1866,15 @@ async function initAjustesLogic() {
         }
 
         tlsPruebaRes.className = "ajustesTlsPruebaRes"
+
+        // Qué se ha comprobado exactamente. Sin esto, un «todo correcto» antes
+        // de activar se lee como «ya está cifrado», que es justo lo que no es.
+        if (data.modo === "previo") {
+            const pie = document.createElement("div")
+            pie.className = "ajustesTlsPruebaDetalle"
+            pie.textContent = `Comprobado en el puerto ${data.puerto}, sobre el certificado que servirá el HTTPS. Todavía no está activado.`
+            tlsPruebaRes.appendChild(pie)
+        }
         ;(data.nombres || []).forEach((r) => tlsPruebaRes.appendChild(_filaPrueba(r)))
     }
 
@@ -1813,6 +1900,11 @@ async function initAjustesLogic() {
                 // En plural o en singular, pero siempre con el número: es lo que
                 // dice cuántos aparatos van a seguir viendo el aviso.
                 showMsg(tlsPruebaMsg, fallan === 1 ? "1 nombre sin cubrir" : `${fallan} nombres sin cubrir`, "error")
+            } else if (data.modo === "previo") {
+                // Aquí «correcto» solo cubre la mitad del problema: el
+                // certificado está bien, pero que un aparato se fíe de él lo
+                // dice el propio aparato, con el botón de al lado.
+                showMsg(tlsPruebaMsg, "El certificado está bien emitido", "ok")
             } else {
                 showMsg(tlsPruebaMsg, "Todo correcto", "ok")
             }
@@ -1823,6 +1915,7 @@ async function initAjustesLogic() {
         }
     }
 
+    if (tlsNombresEl) tlsNombresEl.addEventListener("input", _avisarSiTeDejasFuera)
     if (tlsPruebaBtn) tlsPruebaBtn.addEventListener("click", _probarTls)
     if (tlsPrepararBtn) tlsPrepararBtn.addEventListener("click", _prepararTls)
     if (tlsActivarBtn) tlsActivarBtn.addEventListener("click", () => _guardarTls(true))

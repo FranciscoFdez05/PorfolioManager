@@ -1259,6 +1259,45 @@
     color: var(--text-subtle);
 }
 
+/* El aviso de que la dirección por la que entras no está en la lista. Va pegado
+   al campo y no junto al botón: es ahí donde se arregla, y con el botón al lado
+   se arregla en el mismo gesto. */
+.ajustesTlsAvisoNombre {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid rgba(240, 160, 32, 0.35);
+    border-radius: 8px;
+    background: rgba(240, 160, 32, 0.08);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-subtle);
+}
+.ajustesTlsAvisoNombre code {
+    font-family: monospace;
+    color: var(--text-primary);
+}
+.ajustesTlsAvisoBtn {
+    height: 28px;
+    padding: 0 12px;
+    background: var(--btn-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 7px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.ajustesTlsAvisoBtn:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 .ajustesFieldHint {
     margin-top: 6px;
     font-size: 12px;
@@ -1328,17 +1367,15 @@
     font-weight: 600;
 }
 
-/* El segundo paso —encender— cuelga del bloque del certificado y no de los
-   botones de arriba, a propósito: leído en orden queda «descárgalo, instálalo
-   así, y cuando lo tengas, activa». Con el botón arriba, la instalación era una
-   nota al pie de algo que ya habías pulsado. */
-.ajustesTlsPaso2 {
-    margin-top: 18px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border-soft);
+/* El segundo paso —encender— va el último de la tarjeta y no arriba con los
+   demás botones, a propósito: leído en orden queda «emítelo, instálalo así,
+   compruébalo, y cuando funcione, activa». Con el botón arriba, todo lo demás
+   era una nota al pie de algo que ya habías pulsado. */
+.ajustesSection > .ajustesTlsPaso2 {
+    padding: 0 20px 22px;
 }
-.ajustesTlsPaso2 > .ajustesTlsCaTexto {
-    padding-top: 0;
+.ajustesTlsPaso2 > .ajustesSectionDivider {
+    margin: 0 -20px;
 }
 .ajustesTlsPaso2 > .ajustesActions {
     margin-top: 14px;
@@ -1388,7 +1425,7 @@
    que se viene a buscar aquí es justo el que falla: con «casi todo bien» no se
    sabe qué aparato va a seguir viendo el aviso del navegador. */
 .ajustesSection > .ajustesTlsPrueba {
-    padding: 0 20px;
+    padding: 0 20px 18px;
 }
 
 .ajustesTlsPruebaTexto {

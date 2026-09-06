@@ -88,10 +88,10 @@ vale igual. Dos cosas opcionales, ninguna necesaria para que funcione:
 
   Por dentro, el proxy recibe una configuración con dos sitios: el de siempre en
   claro —con el `http://` escrito, para que no dependa de adivinar nada— y uno
-  TLS en un puerto interno (9443, `CADDY_PREP_PORT`) que **no se publica** y que
-  no hace proxy a nada. No es una segunda puerta de entrada: es la excusa para
-  que Caddy tenga un certificado que emitir. Endpoint nuevo:
-  `POST /api/tls/preparar`, con sesión como el resto.
+  TLS en un puerto aparte (9443, `CADDY_PREP_PORT`) que no hace proxy a nada.
+  No es una segunda puerta de entrada: es la excusa para que Caddy tenga un
+  certificado que emitir. Endpoint nuevo: `POST /api/tls/preparar`, con sesión
+  como el resto.
 
 - **El certificado se descarga con el HTTPS todavía apagado.** El bloque de
   descarga e instalación aparecía solo *después* de activar, que es exactamente
@@ -105,6 +105,46 @@ vale igual. Dos cosas opcionales, ninguna necesaria para que funcione:
   deshabilitado hasta marcar que el certificado ya está instalado. Es la única
   pulsación de este panel que puede dejar a alguien fuera de la aplicación, y
   basta una casilla para que no se dé de paso.
+
+- **«Probar en este aparato»: se comprueba que el certificado funciona antes de
+  encender nada.** Instalar un certificado *parece* que ha ido bien aunque no
+  haya ido: Windows dice «La importación se completó correctamente» aunque lo
+  hayas dejado en el almacén Personal, iOS lo instala pero no se fía hasta que
+  se activa el interruptor de Ajustes de confianza, y Firefox ni mira el almacén
+  del sistema. Todo eso se descubría al encender el HTTPS, o sea desde el otro
+  lado del aviso.
+
+  El puerto de emisión se queda ahora como **puerto de comprobación** y sirve
+  una página fija por HTTPS con el mismo certificado. El botón la abre en otra
+  pestaña: si carga sin avisos, ahí funciona; si el navegador protesta,
+  protestaría igual con el HTTPS puesto. Está publicado a propósito —esa
+  pregunta solo la puede contestar el aparato que la hace, no el servidor— y
+  sigue sin llevar a ninguna parte: no hace `reverse_proxy`, no lleva sesión y
+  contesta una sola cosa. Sigue en pie con el HTTPS ya activo, que es como se
+  da de alta un aparato nuevo sin arriesgarse a que la puerta principal lo
+  rechace.
+
+- **«Probar ahora» funciona antes de activar**, y dice cuál de las dos cosas ha
+  comprobado. Con el HTTPS puesto mira el puerto de siempre; con el certificado
+  emitido y todavía apagado, el de comprobación, que sirve el mismo certificado.
+  Comprobar solo después de haberse jugado la sesión no es comprobar, es hacer
+  la autopsia. Si el sitio de comprobación se ha caído en un reinicio, se vuelve
+  a levantar solo al pulsar.
+
+- **No se puede activar el HTTPS con un certificado que no cubra la dirección
+  por la que estás entrando.** Es la única forma de quedarse fuera y nunca es lo
+  que se pretendía: si entras por `192.168.1.50` y el certificado se emitió para
+  `localhost`, al saltar a `https://` tu propio navegador rechaza la conexión y
+  la pantalla desde la que se arregla queda detrás del aviso. Ahora el panel lo
+  avisa mientras escribes —con un botón que añade esa dirección— y el servidor
+  lo rechaza con un 400 que dice qué nombre falta. `localhost` y `127.0.0.1` no
+  hace falta escribirlos: van siempre en el certificado.
+
+- **Las instrucciones de Windows dicen dónde se pierde la instalación.** El
+  asistente de certificados propone el almacén de la pestaña desde la que se
+  abre, así que lo normal es acabar con la CA en *Personal* —donde no sirve para
+  confiar en nada— y con un «importación completada» que parece que sí. Ahora el
+  panel lo dice con todas las letras y explica cómo comprobar dónde ha quedado.
 
 - **Ajustes > API gestiona el Atajo de iOS, y lo genera.** El Atajo tenía todas
   sus piezas fuera de la vista —la clave en `API/movimientos.key`, el
@@ -236,6 +276,22 @@ vale igual. Dos cosas opcionales, ninguna necesaria para que funcione:
   y **habla lo mismo que la aplicación**: en claro con el HTTPS apagado, y
   exigiendo cifrado cuando está encendido, en vez de dejarse un puerto suelto
   en texto plano solo para la sonda.
+
+### Corregido
+
+- **Los diálogos de confirmar salían descentrados con Ajustes abierto.** No se
+  centran en la ventana a propósito —se alinean con el área de contenido para
+  caer sobre aquello con lo que estás trabajando, y no sobre la barra lateral—,
+  pero el panel de Ajustes ocupa la pantalla entera con su propia barra, así que
+  ese contenido queda detrás y el diálogo aparecía desplazado respecto a lo
+  único que se ve. Con Ajustes abierto, el marco pasa a ser la ventana.
+
+- **El botón de descargar el atajo se dibujaba roto.** Usaba la clase de los
+  botones de solo texto, que no trae ni caja flex ni tamaño para un icono: el
+  SVG se pintaba a su tamaño natural y empujaba al texto fuera. Arreglado en la
+  clase, no en ese botón, para que el siguiente con icono no repita el fallo. De
+  paso, los botones secundarios dejan de partir su etiqueta en dos líneas dentro
+  de una fila de acciones.
 
 ---
 

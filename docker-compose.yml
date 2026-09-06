@@ -112,6 +112,14 @@ services:
       # El MISMO puerto de siempre. Activar el HTTPS no mueve la dirección: solo
       # cambia el esquema, de http:// a https://.
       - "${PORT:-5000}:${PORT:-5000}"
+      # El puerto de comprobación del certificado. Sirve UNA página fija por
+      # HTTPS con el mismo certificado que el puerto de arriba, y no hace
+      # reverse_proxy a nada: no es una segunda entrada a la aplicación. Se
+      # publica porque la pregunta que contesta —«¿se fía este móvil del
+      # certificado?»— solo la puede contestar el móvil, abriéndolo. Sin
+      # publicarlo, lo único que puede probarlo es el propio servidor, y eso ya
+      # se sabía antes de mirar.
+      - "${CADDY_PREP_PORT:-9443}:${CADDY_PREP_PORT:-9443}"
     environment:
       - PORT=${PORT:-5000}
     volumes:
