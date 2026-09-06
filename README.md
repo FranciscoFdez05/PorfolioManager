@@ -72,7 +72,7 @@ No hace falta tener Python instalado en el servidor: si no lo encuentra, usa la 
 
 El contenedor publica el puerto en todas las interfaces del host, así que cualquier dispositivo de la misma red llega poniendo la IP del servidor y el puerto. Si no responde desde otro equipo, casi siempre es el firewall del host: hay que abrir ese puerto (por ejemplo `sudo ufw allow 5000/tcp`).
 
-> **Eso es HTTP plano.** La contraseña del login y la cookie de sesión viajan en claro por la red, así que cualquiera con acceso a la misma wifi puede leerlas. Para la máquina local da igual; en cuanto entres desde el móvil o desde otro equipo, activa [HTTPS](#https) desde Ajustes › Seguridad › HTTPS — dos clics, y la dirección no cambia.
+> **Eso es HTTP plano.** La contraseña del login y la cookie de sesión viajan en claro por la red, así que cualquiera con acceso a la misma wifi puede leerlas. Para la máquina local da igual; en cuanto entres desde el móvil o desde otro equipo, activa [HTTPS](#https) desde Ajustes › Seguridad › HTTPS — emites el certificado, lo instalas en el aparato y lo enciendes; la dirección no cambia.
 
 El puerto por defecto es `5000`, y para cambiarlo pon `PORT` en `.env` (ver [Configuración](#configuración)). `docker-setup` resuelve el valor con la misma capa que usa la aplicación —entorno, luego `config.ini`, luego el defecto— y lo exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse.
 
@@ -493,7 +493,9 @@ Este endpoint es el que hace que el Atajo no tenga ninguna categoría escrita a 
 
 ### 5. Montar el Atajo
 
-Los pasos concretos, con los nombres de cada acción de la app Atajos, están en **[docs/atajo-ios.md](docs/atajo-ios.md)**. El flujo es:
+**Lo más rápido es no montarlo: que lo genere el servidor.** En **Ajustes › API › Atajo de iOS** hay un botón que descarga el atajo ya hecho, con la dirección de este servidor dentro, además del estado de la configuración, un botón para generar la clave de firma y una prueba en seco que dice qué falta. El fichero va sin firmar por Apple, así que iOS pide tener activado *Ajustes › Atajos › Permitir atajos no fiables*.
+
+Si prefieres montarlo a mano —o si iOS lo rechaza—, los pasos concretos, con los nombres de cada acción de la app Atajos, están en **[docs/atajo-ios.md](docs/atajo-ios.md)**. El flujo es:
 
 ```
 Elegir del menú (Gasto / Ingreso)
@@ -664,10 +666,11 @@ La aplicación habla HTTP y no termina TLS ella misma. Sin nada delante, el `POS
 **Se activa desde la propia aplicación: Ajustes › Seguridad › HTTPS.** No hay que reiniciar nada ni tocar ningún fichero, y **la dirección no cambia**: `http://192.168.1.50:5000` pasa a ser `https://192.168.1.50:5000`.
 
 1. **Repasa la lista de nombres.** Llega rellena con la dirección por la que has entrado y con la IP del servidor en la red local: esa la calcula `docker-up.sh` en el host y se la pasa al contenedor, porque desde dentro solo se ve la red de Compose. Añade cualquier otra con la que entres —otro nombre DNS, la IP del túnel—, porque **el certificado solo vale para las que estén escritas**.
-2. **Pulsa *Activar HTTPS*.** El certificado se emite en ese momento, el puerto pasa a hablar solo TLS y la página se recarga sola en `https://`.
-3. **Descarga el certificado de la CA e instálalo** en cada aparato, con las instrucciones que trae el propio panel para iOS, Android, Windows, macOS y Firefox. Después, ***Probar ahora*** lo confirma: abre una conexión TLS por cada nombre, valida contra esa misma CA y dice cuál no está cubierto y cuántos días le quedan al certificado.
+2. **Pulsa *Emitir el certificado*.** Se emite, y **no cambia nada todavía**: sigues entrando por la misma dirección y en claro. Lo único que pasa es que a partir de ahí la CA existe y se puede descargar.
+3. **Instálalo en cada aparato desde el que entres**, con las instrucciones que trae el propio panel para iOS, Android, Windows, macOS y Firefox. Este paso va **antes** de encender el HTTPS a propósito, y es el orden lo que arregla la trampa: con el TLS ya puesto, un aparato sin la CA se encuentra el aviso del navegador justo delante de la página desde la que tendría que descargarla.
+4. **Y entonces sí, *Activar HTTPS*.** El puerto pasa a hablar solo TLS y la página se recarga sola en `https://`. Después, ***Probar ahora*** lo confirma: abre una conexión TLS por cada nombre, valida contra esa misma CA y dice cuál no está cubierto y cuántos días le quedan al certificado.
 
-El paso 3 es el que se salta todo el mundo, y es el que hace que el navegador deje de avisar: la autoridad que firma el certificado es de tu servidor y ningún dispositivo la conoce todavía. Se hace una vez por aparato.
+Emitir y encender eran la misma pulsación, y en ese orden no puede salir bien: cuando volvía la respuesta, el puerto ya solo hablaba TLS con un certificado que ningún aparato reconocía, así que el navegador cortaba y dejaba fuera **antes** de haber podido descargar lo que habría dejado entrar. Para no tocar el puerto por el que estás entrando, el certificado se emite en un puerto interno (9443 por defecto, `CADDY_PREP_PORT`) que no se publica al host: solo existe dentro de la red de Compose.
 
 #### Cómo está montado, y por qué así
 
@@ -675,12 +678,18 @@ Quien termina el TLS es un **Caddy** que va siempre en el stack, delante de la a
 
 Eso último importa: si el puerto de la aplicación siguiera abierto en la LAN, bastaría con escribirlo en la barra para saltarse el TLS, y tener el proxy delante no serviría de nada.
 
-Activar el HTTPS es la aplicación mandándole a Caddy una configuración nueva por su **API de admin**, que vive en la red interna de Compose y no se publica al host:
+Activar el HTTPS es la aplicación mandándole a Caddy una configuración nueva por su **API de admin**, que vive en la red interna de Compose y no se publica al host. Son dos configuraciones, una por pulsación:
 
 ```
-Ajustes ──POST :2019/load──> Caddy ─┬─ emite el certificado con su CA interna
-                                     └─ el puerto pasa a hablar solo TLS
+1. Emitir  ──POST :2019/load──> Caddy ─┬─ el puerto de siempre sigue en claro
+                                       └─ emite el certificado en un puerto interno,
+                                          y con él crea la CA que vas a instalar
+
+2. Activar ──POST :2019/load──> Caddy ─┬─ el puerto pasa a hablar solo TLS
+                                       └─ con el mismo certificado, ya instalado
 ```
+
+El puerto de la primera (9443 por defecto, `CADDY_PREP_PORT`) **no se publica**: existe solo dentro de la red de Compose y nadie llega a él desde la LAN. No es una segunda puerta de entrada —no hace `reverse_proxy` a nada—, solo la excusa para que haya un certificado que emitir sin tocar el puerto por el que estás mirando el panel.
 
 La alternativa —arrancar Caddy bajo demanda desde la aplicación— exigiría montarle el socket de Docker, y eso convierte cualquier fallo de la aplicación en root sobre el host: un agujero bastante peor que el que veníamos a tapar. Reconfigurar un proxy que ya está en marcha no necesita ningún privilegio. Y meter el TLS dentro de gunicorn tampoco valía: lee el certificado al arrancar, así que activarlo desde la interfaz obligaría a reiniciar el contenedor en mitad de la petición que lo activa.
 
@@ -697,6 +706,7 @@ El certificado **solo vale para los nombres que declares**. Si entras por una IP
 | Caddy rechaza la configuración | No se guarda nada y sigues conectado como estabas. El estado solo se escribe **después** de que el proxy la acepte: al revés, un estado diciendo «HTTPS activo» sobre un proxy en claro haría que las cookies salieran con `Secure`, el navegador las descartaría y no se podría iniciar sesión. |
 | Se recrea el contenedor del proxy | Caddy arranca con `--resume` y recupera la última configuración cargada. Y por si acaso, la aplicación reaplica el estado guardado al arrancar, con reintentos mientras el proxy termina de levantar. |
 | Un aparato sigue avisando del certificado | *Probar ahora* lo distingue: si dice que ese nombre **no está cubierto**, hay que añadirlo a la lista y volver a activar; si dice que está bien, lo que falta es instalar la CA **en ese aparato**. |
+| Activas sin haber instalado la CA | El navegador avisa en ese aparato y, hasta que te saltes el aviso, no puedes ni llegar al panel a descargarla. Por eso emitir e instalar van antes: el botón de activar no se habilita hasta marcar que ya está instalada. Si aun así pasa, salta el aviso una vez, descarga el certificado desde Ajustes e instálalo. |
 | `data/tls/estado.json` ilegible | Se lee como «HTTPS desactivado», que es el estado que siempre funciona. |
 | Quieres volver a HTTP | *Desactivar* en el mismo panel. A mano: borra `data/tls/estado.json` y reinicia. |
 

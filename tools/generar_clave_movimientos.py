@@ -17,7 +17,6 @@ que es justo lo que hay que hacer si sospechas que se ha filtrado. Por eso pide
 confirmación si el fichero ya existe.
 """
 
-import secrets
 import sys
 from pathlib import Path
 
@@ -28,17 +27,8 @@ if str(_PYTHON_DIR) not in sys.path:
 
 from dotenv import load_dotenv  # noqa: E402
 
-from core.firma_hmac import rutaFicheroClave  # noqa: E402
+from core.firma_hmac import escribirClaveNueva, rutaFicheroClave  # noqa: E402
 from core.paths import BASE_DIR  # noqa: E402
-from core.secret_store import write_secret_lines  # noqa: E402
-
-# 32 bytes = 256 bits, el mismo tamaño que la salida de SHA-256. Más longitud no
-# aporta seguridad frente a HMAC-SHA256.
-BYTES_CLAVE = 32
-
-
-def generarClave():
-    return secrets.token_hex(BYTES_CLAVE)
 
 
 def main():
@@ -56,9 +46,11 @@ def main():
             print("Cancelado. No se ha modificado nada.")
             return 1
 
-    write_secret_lines(ruta, [generarClave()])
+    escribirClaveNueva(ruta)
 
     print(f"Clave escrita en {ruta}")
+    print()
+    print("Lo mismo se puede hacer desde Ajustes > API, sin entrar por SSH.")
     print()
     print("Siguiente paso:")
     print("  - Reinicia el servidor para que la lea.")

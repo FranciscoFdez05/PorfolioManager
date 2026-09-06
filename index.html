@@ -816,12 +816,15 @@
                     <li><strong>Repasa la lista de aquí abajo.</strong> Llega con la dirección por la que has
                         entrado y con la del servidor en la red local. Añade cualquier otra que uses: el
                         certificado <em>solo</em> vale para las que estén escritas.</li>
-                    <li><strong>Pulsa «Activar HTTPS».</strong> El certificado se emite en ese momento y la
-                        página se recarga sola en <code>https://</code>. No se reinicia nada y el puerto sigue
-                        siendo el mismo.</li>
-                    <li><strong>Instala el certificado en cada aparato</strong> con el botón que aparecerá aquí,
-                        y confírmalo con «Probar ahora». Hasta que lo instales, el navegador seguirá avisando:
-                        lo firma una autoridad de tu servidor que todavía no conoce nadie.</li>
+                    <li><strong>Pulsa «Emitir el certificado».</strong> Se emite y aparece aquí mismo para
+                        descargarlo. <em>No cambia nada todavía</em>: sigues entrando por la misma dirección y
+                        sin cifrar, así que no hay prisa ninguna.</li>
+                    <li><strong>Instálalo en cada aparato desde el que entres</strong> —el móvil, el portátil—
+                        siguiendo las instrucciones que salen debajo. Este es el paso que va <em>antes</em>: en
+                        cuanto el HTTPS esté puesto, un aparato sin el certificado se encuentra el aviso del
+                        navegador y tiene que saltárselo para llegar hasta aquí a descargarlo.</li>
+                    <li><strong>Y entonces sí, «Activar HTTPS».</strong> La página se recarga sola en
+                        <code>https://</code>. No se reinicia nada y el puerto sigue siendo el mismo.</li>
                 </ol>
 
                 <div class="ajustesField">
@@ -840,7 +843,7 @@
                 </div>
 
                 <div class="ajustesActions">
-                    <button id="ajustesTlsActivarBtn" class="ajustesAddBtn" type="button">Activar HTTPS</button>
+                    <button id="ajustesTlsPrepararBtn" class="ajustesAddBtn" type="button">Emitir el certificado</button>
                     <button id="ajustesTlsDesactivarBtn" class="ajustesSecondaryBtn" type="button" style="display:none">Desactivar</button>
                     <span id="ajustesTlsMsg" class="ajustesStatusMsg"></span>
                 </div>
@@ -862,9 +865,11 @@
                     <div class="ajustesSectionDivider"></div>
                     <div class="ajustesTlsCaTexto">
                         <strong>Instala el certificado en cada aparato.</strong>
-                        El certificado lo firma una autoridad propia de este servidor, así que ningún
-                        dispositivo la conoce todavía: hasta que la instales, el navegador seguirá avisando.
-                        Se hace una sola vez por aparato.
+                        Lo firma una autoridad propia de este servidor, así que ningún dispositivo la conoce
+                        todavía: hasta que la instales, el navegador seguirá avisando. Se hace una sola vez
+                        por aparato, y conviene hacerlo <strong>ahora</strong>, con la conexión todavía en
+                        claro: después de activar el HTTPS, el aparato que no lo tenga se encuentra el aviso
+                        justo delante de esta página, que es de donde tiene que descargarlo.
                     </div>
                     <div class="ajustesActions">
                         <a id="ajustesTlsCaBtn" class="ajustesSecondaryBtn" href="/api/tls/ca.crt" download>
@@ -889,6 +894,25 @@
                             Autoridades › Importar.</p>
                         </div>
                     </details>
+
+                    <div class="ajustesTlsPaso2" id="ajustesTlsPaso2" style="display:none">
+                        <div class="ajustesTlsCaTexto">
+                            <strong>Y ahora sí, enciéndelo.</strong>
+                            La dirección no cambia: el mismo puerto de siempre pasa a ser <code>https://</code>
+                            y la página se recarga sola. A partir de ahí, los aparatos donde hayas instalado el
+                            certificado entran sin ver un solo aviso.
+                        </div>
+                        <label class="ajustesTlsConfirma">
+                            <input type="checkbox" id="ajustesTlsConfirma">
+                            <span>Ya he instalado el certificado en los aparatos desde los que entro
+                                <small>Si falta alguno, ese verá el aviso del navegador hasta que lo instale, y tendrá que saltárselo para poder llegar a descargarlo.</small>
+                            </span>
+                        </label>
+                        <div class="ajustesActions">
+                            <button id="ajustesTlsActivarBtn" class="ajustesAddBtn" type="button" disabled>Activar HTTPS</button>
+                            <span id="ajustesTlsActivarMsg" class="ajustesStatusMsg"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1307,6 +1331,54 @@
                     </button>
                 </div>
             </div>
+            <div class="ajustesSection" id="ajustesAtajoSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="2" width="10" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 4.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="15" r="1" fill="currentColor"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Atajo de iOS</div>
+                        <div class="ajustesSectionDesc">Apuntar un gasto o un ingreso desde el móvil sin abrir la web. El atajo se genera con la dirección de este servidor: pregunta base de datos, tipo y categoría —de las que ya tengas—, pide concepto e importe, y usa la fecha del momento.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesAtajoEstado" id="ajustesAtajoEstado">
+                    <span class="ajustesBackupEmpty">Cargando…</span>
+                </div>
+
+                <dl class="ajustesAtajoDatos" id="ajustesAtajoDatos" hidden>
+                    <div><dt>Dirección que llevará el atajo</dt><dd id="ajustesAtajoUrl">—</dd></div>
+                    <div><dt>Redes desde las que se acepta</dt><dd id="ajustesAtajoRedes">—</dd></div>
+                    <div><dt>Margen de reloj</dt><dd id="ajustesAtajoTolerancia">—</dd></div>
+                </dl>
+
+                <div class="ajustesActions">
+                    <a id="ajustesAtajoDescargarBtn" class="ajustesAddBtn" href="/api/atajo/descargar" download>
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                        Descargar el atajo
+                    </a>
+                    <button id="ajustesAtajoProbarBtn" class="ajustesSecondaryBtn" type="button">Probar</button>
+                    <button id="ajustesAtajoClaveBtn" class="ajustesSecondaryBtn" type="button">Generar clave</button>
+                    <span id="ajustesAtajoMsg" class="ajustesStatusMsg"></span>
+                </div>
+
+                <div class="ajustesAtajoPruebaRes" id="ajustesAtajoPruebaRes" hidden></div>
+
+                <div class="ajustesAtajoAviso">
+                    <strong>Al abrirlo en el iPhone, iOS pedirá permiso.</strong>
+                    El atajo no va firmado por Apple —firmarlo exige sus claves—, así que hace falta
+                    <em>Ajustes › Atajos › Permitir atajos no fiables</em>, un interruptor que solo aparece
+                    después de haber ejecutado algún atajo alguna vez. Si iOS no lo acepta, móntalo a mano:
+                    son las mismas acciones, aquí abajo.
+                </div>
+
+                <details class="ajustesTlsAyuda ajustesAtajoReceta">
+                    <summary>Montarlo a mano, paso a paso</summary>
+                    <div class="ajustesTlsAyudaCuerpo" id="ajustesAtajoReceta"></div>
+                </details>
+            </div>
+
         </div>
 
         <!-- ── Datos ── -->

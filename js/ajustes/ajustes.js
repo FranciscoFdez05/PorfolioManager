@@ -1297,15 +1297,231 @@ async function initAjustesLogic() {
     loadApiEstado()
 
     // --- HTTPS ---
-    // Enciende y apaga el TLS del proxy que hay delante. El botón hace tres
-    // cosas seguidas —configurar el proxy, guardar el estado y cambiar la
-    // política de las cookies— y luego el navegador tiene que saltar a https://,
-    // porque el puerto es el mismo y a partir de ese momento ya no habla claro.
+    // --- Atajo de iOS ---
+    // El Atajo tenía todas sus piezas fuera de la vista: la clave en un fichero,
+    // el interruptor y las redes en config.ini, y el diagnóstico solo en el log
+    // del servidor. Cuando fallaba —y lo que falla casi siempre es que no hay
+    // clave— la única forma de enterarse era entrar por SSH a leer los logs.
+    const atajoEstadoEl = document.getElementById("ajustesAtajoEstado")
+    const atajoDatosEl = document.getElementById("ajustesAtajoDatos")
+    const atajoUrlEl = document.getElementById("ajustesAtajoUrl")
+    const atajoRedesEl = document.getElementById("ajustesAtajoRedes")
+    const atajoToleranciaEl = document.getElementById("ajustesAtajoTolerancia")
+    const atajoDescargarBtn = document.getElementById("ajustesAtajoDescargarBtn")
+    const atajoProbarBtn = document.getElementById("ajustesAtajoProbarBtn")
+    const atajoClaveBtn = document.getElementById("ajustesAtajoClaveBtn")
+    const atajoMsg = document.getElementById("ajustesAtajoMsg")
+    const atajoPruebaRes = document.getElementById("ajustesAtajoPruebaRes")
+    const atajoRecetaEl = document.getElementById("ajustesAtajoReceta")
+
+    let _atajoHayClave = false
+
+    function _pintarAtajo(data) {
+        if (!atajoEstadoEl) return
+
+        let clase = "on"
+        let texto = "<strong>Listo.</strong> Descarga el atajo y ábrelo en el iPhone."
+
+        if (!data.activado) {
+            clase = "roto"
+            texto =
+                "<strong>Desactivado.</strong> <code>[atajo] activado = false</code> en <code>config.ini</code>: estos endpoints responden 404."
+        } else if (!data.redes || !data.redes.length) {
+            clase = "roto"
+            texto =
+                "<strong>Sin redes permitidas.</strong> <code>[atajo] redes_permitidas</code> está vacío, y vacío no significa «todas»: no se acepta a nadie."
+        } else if (!data.clave || !data.clave.hay) {
+            clase = "off"
+            texto =
+                data.clave && data.clave.origen === "ilegible"
+                    ? `<strong>La clave no se puede leer.</strong> ${data.clave.detalle}`
+                    : "<strong>Falta la clave de firma.</strong> Sin ella el servidor responde 503 y el Atajo no puede enviar nada. Se genera aquí mismo."
+        } else if (data.clave.origen === "entorno") {
+            texto = `<strong>Listo.</strong> La clave sale de <code>${data.clave.detalle}</code>, en el <code>.env</code> del servidor.`
+        }
+
+        atajoEstadoEl.className = "ajustesAtajoEstado " + clase
+        atajoEstadoEl.innerHTML =
+            '<span class="ajustesTlsPunto"></span><span class="ajustesTlsEstadoTexto">' + texto + "</span>"
+
+        _atajoHayClave = !!(data.clave && data.clave.hay)
+
+        if (atajoDatosEl) atajoDatosEl.hidden = false
+        if (atajoUrlEl) atajoUrlEl.textContent = data.urlBase || "—"
+        if (atajoRedesEl) atajoRedesEl.textContent = (data.redes || []).join(", ") || "ninguna"
+        if (atajoToleranciaEl) atajoToleranciaEl.textContent = `±${data.tolerancia} s`
+
+        if (atajoClaveBtn) {
+            // Generar y regenerar son la misma llamada, pero no la misma
+            // decisión: con una clave puesta, el botón tiene que decir que la
+            // sustituye.
+            atajoClaveBtn.textContent = _atajoHayClave ? "Regenerar clave" : "Generar clave"
+        }
+        // Descargar el atajo sin clave da un atajo que no va a poder enviar nada.
+        if (atajoDescargarBtn) atajoDescargarBtn.classList.toggle("ajustesBtnApagado", !_atajoHayClave)
+
+        _pintarRecetaAtajo(data.urlBase || "")
+    }
+
+    function _pintarRecetaAtajo(url) {
+        if (!atajoRecetaEl) return
+
+        // Las mismas acciones que lleva el fichero, por si iOS lo rechaza. Salen
+        // de docs/atajo-ios.md, que es donde está el porqué de cada una.
+        const pasos = [
+            ["Obtener contenido de la URL", `${url}/api/portfolios-lista`, "GET"],
+            ["Obtener valor del diccionario", "clave <code>nombres</code>", ""],
+            ["Elegir de la lista", "→ Establecer variable <code>bbdd</code>", ""],
+            [
+                "Texto",
+                "<code>gasto</code> e <code>ingreso</code> en dos líneas → Dividir texto → Elegir de la lista → variable <code>tipo</code>",
+                ""
+            ],
+            [
+                "Obtener contenido de la URL",
+                `${url}/api/categorias?portfolio=<em>bbdd</em>&amp;tipo=<em>tipo</em>`,
+                "GET"
+            ],
+            [
+                "Obtener valor del diccionario",
+                "clave <code>lista</code> → Elegir de la lista → variable <code>categoria</code>",
+                ""
+            ],
+            [
+                "Pedir entrada",
+                "Texto «¿Concepto?» → variable <code>nombre</code>, y Número «¿Importe?» → variable <code>importe</code>",
+                ""
+            ],
+            [
+                "Obtener contenido de la URL",
+                `${url}/api/preparar`,
+                "POST · cuerpo JSON con tipo, categoria, nombre, importe y portfolio"
+            ],
+            [
+                "Obtener valor del diccionario",
+                "claves <code>cuerpo</code>, <code>firma</code> y <code>timestamp</code> → variables <code>envio</code>, <code>sello</code> y <code>marca</code>",
+                ""
+            ],
+            [
+                "Obtener contenido de la URL",
+                `${url}/api/movimiento`,
+                "POST · cabeceras X-Signature y X-Timestamp · cuerpo <strong>Archivo</strong> = envio"
+            ]
+        ]
+
+        const filas = pasos
+            .map(
+                ([accion, detalle, extra]) =>
+                    `<li><strong>${accion}</strong> — ${detalle}${extra ? ` <span class="ajustesAtajoExtra">${extra}</span>` : ""}</li>`
+            )
+            .join("")
+
+        atajoRecetaEl.innerHTML =
+            "<p>La fecha no se pregunta: la pone el servidor con el día en que llega la petición.</p>" +
+            `<ol class="ajustesAtajoPasos">${filas}</ol>` +
+            "<p>El cuerpo del último paso va como <strong>Archivo</strong>, no como JSON: con JSON, Atajos vuelve a serializar el texto, cambian los bytes y la firma falla con un 401 que parece un problema de clave sin serlo.</p>"
+    }
+
+    async function loadAtajo() {
+        if (!atajoEstadoEl) return
+        try {
+            const res = await fetch("/api/atajo")
+            const data = await res.json()
+            if (data.ok) _pintarAtajo(data)
+        } catch {
+            atajoEstadoEl.className = "ajustesAtajoEstado roto"
+            atajoEstadoEl.innerHTML =
+                '<span class="ajustesTlsPunto"></span><span class="ajustesTlsEstadoTexto">No se ha podido consultar el estado.</span>'
+        }
+    }
+
+    async function _generarClaveAtajo() {
+        // Solo se pregunta al sustituir una que ya funciona, y se dice lo que
+        // NO pasa, que es lo que se teme: no hay que rehacer el atajo del
+        // iPhone, porque no guarda la clave.
+        const aviso =
+            "Vas a sustituir la clave de firma actual.\n\nNo hace falta rehacer el atajo del iPhone: no guarda la clave, se la pide al servidor en cada uso."
+        if (_atajoHayClave && !window.confirm(aviso)) return
+
+        if (atajoClaveBtn) atajoClaveBtn.disabled = true
+        showMsg(atajoMsg, "Generando…", "")
+
+        try {
+            const res = await fetch("/api/atajo/clave", { method: "POST" })
+            const data = await res.json()
+            if (!data.ok) {
+                showMsg(atajoMsg, data.error || "No se ha podido generar", "error")
+                return
+            }
+            _pintarAtajo(data)
+            showMsg(atajoMsg, `Clave escrita en ${data.fichero}`, "ok")
+        } catch {
+            showMsg(atajoMsg, "Error de red", "error")
+        } finally {
+            if (atajoClaveBtn) atajoClaveBtn.disabled = false
+        }
+    }
+
+    function _filaPasoAtajo(paso) {
+        const fila = document.createElement("div")
+        fila.className = "ajustesTlsPruebaFila " + (paso.ok ? "ok" : "mal")
+
+        const nombre = document.createElement("span")
+        nombre.className = "ajustesTlsPruebaNombre"
+        nombre.textContent = paso.paso
+        fila.appendChild(nombre)
+
+        const detalle = document.createElement("span")
+        detalle.className = "ajustesTlsPruebaDetalle"
+        // textContent: el detalle puede traer rutas y mensajes del servidor.
+        detalle.textContent = paso.detalle || ""
+        fila.appendChild(detalle)
+
+        return fila
+    }
+
+    async function _probarAtajo() {
+        if (atajoProbarBtn) atajoProbarBtn.disabled = true
+        showMsg(atajoMsg, "Comprobando…", "")
+
+        try {
+            const res = await fetch("/api/atajo/prueba", { method: "POST" })
+            const data = await res.json()
+
+            if (atajoPruebaRes) {
+                atajoPruebaRes.hidden = false
+                atajoPruebaRes.textContent = ""
+                ;(data.pasos || []).forEach((paso) => atajoPruebaRes.appendChild(_filaPasoAtajo(paso)))
+            }
+
+            showMsg(atajoMsg, data.ok ? "Todo listo" : "Hay algo sin configurar", data.ok ? "ok" : "error")
+        } catch {
+            showMsg(atajoMsg, "Error de red", "error")
+        } finally {
+            if (atajoProbarBtn) atajoProbarBtn.disabled = false
+        }
+    }
+
+    if (atajoClaveBtn) atajoClaveBtn.addEventListener("click", _generarClaveAtajo)
+    if (atajoProbarBtn) atajoProbarBtn.addEventListener("click", _probarAtajo)
+    loadAtajo()
+
+    // Enciende y apaga el TLS del proxy que hay delante, en dos pulsaciones que
+    // no se pueden juntar. La segunda —activar— configura el proxy, guarda el
+    // estado y cambia la política de las cookies, y después el navegador tiene
+    // que saltar a https:// porque el puerto es el mismo y a partir de ese
+    // momento ya no habla claro. Por eso la primera existe: emitir el
+    // certificado sin tocar el esquema, para que dé tiempo a instalarlo en cada
+    // aparato mientras esta misma página sigue siendo alcanzable.
     const tlsEstadoEl = document.getElementById("ajustesTlsEstado")
     const tlsNombresEl = document.getElementById("ajustesTlsNombres")
+    const tlsPrepararBtn = document.getElementById("ajustesTlsPrepararBtn")
     const tlsActivarBtn = document.getElementById("ajustesTlsActivarBtn")
     const tlsDesactivarBtn = document.getElementById("ajustesTlsDesactivarBtn")
     const tlsCaEl = document.getElementById("ajustesTlsCa")
+    const tlsPaso2El = document.getElementById("ajustesTlsPaso2")
+    const tlsConfirmaEl = document.getElementById("ajustesTlsConfirma")
+    const tlsActivarMsg = document.getElementById("ajustesTlsActivarMsg")
     const tlsMsg = document.getElementById("ajustesTlsMsg")
     const tlsGuiaEl = document.getElementById("ajustesTlsGuia")
     const tlsPruebaEl = document.getElementById("ajustesTlsPrueba")
@@ -1331,6 +1547,12 @@ async function initAjustesLogic() {
             clase = "on"
             const lista = (data.nombres || []).join(", ")
             texto = `<strong>Activado</strong> para ${lista || "(sin nombres)"}.`
+        } else if (data.caDisponible) {
+            // A medias, y decirlo importa: quien vuelve a esta pantalla después
+            // de instalar el certificado en el móvil tiene que ver que lo que
+            // queda es encenderlo, no volver a emitirlo.
+            texto =
+                "<strong>Desactivado, con el certificado ya emitido.</strong> Instálalo en cada aparato y enciéndelo aquí abajo; hasta entonces, la contraseña y la cookie de sesión siguen viajando en claro."
         }
 
         tlsEstadoEl.className = "ajustesTlsEstado " + clase
@@ -1354,16 +1576,32 @@ async function initAjustesLogic() {
                 tlsNombresEl.value = sugerencia
             }
         }
-        if (tlsActivarBtn) {
-            tlsActivarBtn.style.display = editable && !data.activado ? "" : "none"
-            tlsActivarBtn.disabled = !editable
+        const cifrando = data.activado && data.proxyDisponible
+        // Con la CA ya emitida, el paso que toca no es emitirla otra vez: es
+        // instalarla y encender. La hay tras preparar y también si el HTTPS
+        // estuvo puesto alguna vez, porque la raíz vive en el volumen de Caddy.
+        const conCa = !!data.caDisponible
+        if (tlsPrepararBtn) {
+            tlsPrepararBtn.style.display = editable && !data.activado && !conCa ? "" : "none"
+            tlsPrepararBtn.disabled = !editable
         }
         if (tlsDesactivarBtn) {
             tlsDesactivarBtn.style.display = editable && data.activado ? "" : "none"
         }
-        const cifrando = data.activado && data.proxyDisponible
+        // El bloque del certificado ya no espera a que haya HTTPS: aparecer solo
+        // después era el problema —para descargarlo había que atravesar el aviso
+        // que provocaba no tenerlo—, así que se enseña en cuanto existe algo que
+        // descargar.
         if (tlsCaEl) {
-            tlsCaEl.style.display = cifrando ? "" : "none"
+            tlsCaEl.style.display = cifrando || conCa ? "" : "none"
+        }
+        // Y colgando de él, el segundo paso: encender. Solo mientras esté
+        // apagado; con el HTTPS puesto, lo que se ofrece debajo es comprobarlo.
+        if (tlsPaso2El) {
+            tlsPaso2El.style.display = editable && !data.activado && conCa ? "" : "none"
+        }
+        if (tlsActivarBtn) {
+            tlsActivarBtn.disabled = !tlsConfirmaEl?.checked
         }
         if (tlsPruebaEl) {
             tlsPruebaEl.style.display = cifrando ? "" : "none"
@@ -1391,6 +1629,54 @@ async function initAjustesLogic() {
         }
     }
 
+    function _nombresEscritos() {
+        return (tlsNombresEl?.value || "")
+            .split(/[\n,;]+/)
+            .map((n) => n.trim())
+            .filter(Boolean)
+    }
+
+    // --- Paso 1: emitir el certificado ---
+    // No enciende nada. El proxy sigue sirviendo en claro por el mismo puerto y
+    // esta página sigue donde estaba; lo único que cambia es que a partir de
+    // aquí ya hay una CA que descargar e instalar. Que sea un paso aparte es el
+    // arreglo: emitir e instalar tienen que caber antes de que el navegador
+    // empiece a exigir un certificado que todavía no conoce.
+    async function _prepararTls() {
+        const nombres = _nombresEscritos()
+        if (!nombres.length) {
+            showMsg(tlsMsg, "Escribe al menos un nombre o IP", "error")
+            return
+        }
+
+        if (tlsPrepararBtn) tlsPrepararBtn.disabled = true
+        showMsg(tlsMsg, "Emitiendo el certificado…", "")
+
+        try {
+            const res = await fetch("/api/tls/preparar", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nombres })
+            })
+            const data = await res.json()
+            if (!data.ok) {
+                showMsg(tlsMsg, data.error || "No se ha podido emitir", "error")
+                return
+            }
+            _pintarTls(data)
+            showMsg(tlsMsg, "Certificado emitido. Descárgalo e instálalo.", "ok")
+            // Lo que hay que hacer ahora está más abajo y el panel es largo: sin
+            // esto, la respuesta al botón es un cambio fuera de la pantalla.
+            tlsCaEl?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+        } catch {
+            // Aquí un error de red es un error de red y nada más: a diferencia
+            // de activar, esta petición no toca el esquema por el que ha venido.
+            showMsg(tlsMsg, "Error de red", "error")
+        } finally {
+            if (tlsPrepararBtn) tlsPrepararBtn.disabled = false
+        }
+    }
+
     // Tras activar, la página actual está en http:// y el servidor ya solo
     // atiende TLS en ese mismo puerto: cualquier petición siguiente fallaría sin
     // explicar por qué. Se avisa y se salta sola, dando margen para leerlo.
@@ -1406,28 +1692,27 @@ async function initAjustesLogic() {
         aviso.className = "ajustesTlsSaltando"
         aviso.innerHTML =
             `<strong>HTTPS activado.</strong> Esta página se va a recargar en <code>${url}</code>. ` +
-            "El navegador avisará del certificado hasta que instales la CA: descárgala desde este mismo panel y sigue las instrucciones."
-        tlsCaEl?.parentNode?.insertBefore(aviso, tlsCaEl)
+            "Si algún aparato avisa del certificado, es que ahí falta por instalar: el enlace para descargarlo sigue en este mismo panel."
+        tlsPaso2El?.appendChild(aviso)
 
         setTimeout(() => {
             location.replace(url)
         }, 6000)
     }
 
+    // --- Paso 2: encender ---
     async function _guardarTls(activado) {
-        const nombres = (tlsNombresEl?.value || "")
-            .split(/[\n,;]+/)
-            .map((n) => n.trim())
-            .filter(Boolean)
+        const nombres = _nombresEscritos()
+        const msg = activado ? tlsActivarMsg : tlsMsg
 
         if (activado && !nombres.length) {
-            showMsg(tlsMsg, "Escribe al menos un nombre o IP", "error")
+            showMsg(msg, "Escribe al menos un nombre o IP", "error")
             return
         }
 
         if (tlsActivarBtn) tlsActivarBtn.disabled = true
         if (tlsDesactivarBtn) tlsDesactivarBtn.disabled = true
-        showMsg(tlsMsg, activado ? "Emitiendo certificado…" : "Desactivando…", "")
+        showMsg(msg, activado ? "Activando…" : "Desactivando…", "")
 
         try {
             const res = await fetch("/api/tls", {
@@ -1437,11 +1722,11 @@ async function initAjustesLogic() {
             })
             const data = await res.json()
             if (!data.ok) {
-                showMsg(tlsMsg, data.error || "No se ha podido aplicar", "error")
+                showMsg(msg, data.error || "No se ha podido aplicar", "error")
                 return
             }
             _pintarTls(data)
-            showMsg(tlsMsg, activado ? "HTTPS activado" : "HTTPS desactivado", "ok")
+            showMsg(msg, activado ? "HTTPS activado" : "HTTPS desactivado", "ok")
             if (activado) _saltarAHttps(data.nombres)
         } catch {
             // Al activar, el proxy recarga su configuración mientras esta misma
@@ -1450,13 +1735,13 @@ async function initAjustesLogic() {
             // «error de red» sería mentir la mitad de las veces, así que se
             // salta igualmente y que lo confirme el propio navegador.
             if (activado) {
-                showMsg(tlsMsg, "Aplicado; comprobando por https…", "")
+                showMsg(msg, "Aplicado; comprobando por https…", "")
                 _saltarAHttps(nombres)
             } else {
-                showMsg(tlsMsg, "Error de red", "error")
+                showMsg(msg, "Error de red", "error")
             }
         } finally {
-            if (tlsActivarBtn) tlsActivarBtn.disabled = false
+            if (tlsActivarBtn) tlsActivarBtn.disabled = !tlsConfirmaEl?.checked
             if (tlsDesactivarBtn) tlsDesactivarBtn.disabled = false
         }
     }
@@ -1539,8 +1824,17 @@ async function initAjustesLogic() {
     }
 
     if (tlsPruebaBtn) tlsPruebaBtn.addEventListener("click", _probarTls)
+    if (tlsPrepararBtn) tlsPrepararBtn.addEventListener("click", _prepararTls)
     if (tlsActivarBtn) tlsActivarBtn.addEventListener("click", () => _guardarTls(true))
     if (tlsDesactivarBtn) tlsDesactivarBtn.addEventListener("click", () => _guardarTls(false))
+    // El botón de activar no se habilita hasta que se marca que el certificado
+    // ya está instalado. Es la única pulsación de este panel que puede dejar a
+    // alguien fuera, y basta una casilla para que no se dé por accidente.
+    if (tlsConfirmaEl) {
+        tlsConfirmaEl.addEventListener("change", () => {
+            if (tlsActivarBtn) tlsActivarBtn.disabled = !tlsConfirmaEl.checked
+        })
+    }
     loadTls()
 
     // --- Cambiar nombre de usuario ---

@@ -1,12 +1,20 @@
 """Encender y apagar el HTTPS desde Ajustes, y descargar la CA para instalarla.
 
-Tres endpoints y ninguna lógica: todo lo que decide algo está en `core/tls.py`,
-que es lo que se puede probar sin levantar un proxy.
+Endpoints y ninguna lógica: todo lo que decide algo está en `core/tls.py`, que
+es lo que se puede probar sin levantar un proxy.
 
     GET  /api/tls            estado actual, para pintar el panel
+    POST /api/tls/preparar   emitir el certificado sin encender nada todavía
     POST /api/tls            activar o desactivar
     GET  /api/tls/prueba     comprobación real del cifrado, nombre por nombre
     GET  /api/tls/ca.crt     certificado raíz, para instalar en cada aparato
+
+**Por qué preparar y activar son dos peticiones.** Porque la respuesta a activar
+llega por un puerto que para entonces ya solo habla TLS: si el certificado no
+estaba instalado antes, el navegador corta ahí y el usuario se queda fuera sin
+haber podido descargarlo. `preparar` emite exactamente lo mismo dejando el
+puerto en claro, así que la instalación ocurre con la sesión intacta y activar
+pasa a ser el último paso en vez del primero.
 
 **Por qué la descarga pide sesión** aunque un certificado raíz sea público por
 definición: quien lo instala está decidiendo confiar en una autoridad para
@@ -33,11 +41,17 @@ MAX_NOMBRES = 20
 
 def _estado_publico() -> dict:
     estado = tls.leerEstado()
+    proxy = tls.proxyDisponible()
     return {
         "activado": tls.httpsActivo(),
         "nombres": estado["nombres"],
         "actualizado": estado["actualizado"],
-        "proxyDisponible": tls.proxyDisponible(),
+        "proxyDisponible": proxy,
+        # Si ya hay CA, el panel ofrece el certificado antes de encender nada:
+        # es lo que separa «instálalo con calma» de «instálalo desde el otro
+        # lado del aviso que acabas de provocar». Se pregunta solo con el proxy
+        # en pie porque sin él la respuesta sería que no, pero por otro motivo.
+        "caDisponible": proxy and tls.caDisponible(),
         # Cuando el HTTPS viene impuesto por .env (dominio público con Let's
         # Encrypt), la interfaz no debe ofrecer un interruptor que machacaría
         # esa configuración. Se lo dice al frontend en vez de dejarle adivinar.
@@ -60,8 +74,71 @@ def _gestionado_por_entorno() -> bool:
     return settings.httpsActivado()
 
 
+def _validar_nombres(nombres: list[str]) -> None:
+    """Las dos condiciones que tiene que cumplir la lista para emitir con ella.
+
+    Vale igual para preparar y para activar: el certificado que se emite es el
+    mismo, y lo que se rechace en el primer paso no puede colarse en el segundo.
+    """
+    if not nombres:
+        raise ValidationError(
+            "Hace falta al menos un nombre o dirección IP: el certificado "
+            "solo vale para los nombres que se declaren.",
+            field="nombres",
+        )
+    if len(nombres) > MAX_NOMBRES:
+        raise ValidationError(
+            f"Demasiados nombres (máximo {MAX_NOMBRES}).", field="nombres",
+        )
+
+
 @tls_bp.route("/api/tls", methods=["GET"])
 def get_tls():
+    return jsonify({"ok": True, **_estado_publico()})
+
+
+@tls_bp.route("/api/tls/preparar", methods=["POST"])
+def post_preparar():
+    """Emite el certificado y deja la CA lista para descargar, sin encender nada.
+
+    Al terminar, la conexión sigue exactamente igual que estaba —mismo puerto,
+    mismo esquema, misma sesión—: lo único que ha cambiado es que ya hay algo
+    que instalar en el móvil y en el portátil.
+    """
+    if _gestionado_por_entorno():
+        raise ApiError(
+            "El HTTPS está fijado por la configuración del servidor "
+            "(HTTPS_ENABLED en .env). Cámbialo allí, no desde aquí.",
+            status_code=409,
+        )
+    if tls.httpsActivo():
+        raise ApiError(
+            "El HTTPS ya está activo: el certificado se descarga directamente "
+            "desde este mismo panel.",
+            status_code=409,
+        )
+
+    datos = request.get_json(silent=True) or {}
+    nombres = tls.normalizarNombres(datos.get("nombres"))
+    _validar_nombres(nombres)
+
+    try:
+        tls.preparar(nombres)
+    except tls.ErrorCaddy as e:
+        raise ApiError(str(e), status_code=502) from e
+
+    # Se guardan los nombres pero NO se enciende. Así el panel los recuerda si se
+    # recarga la página entre instalar el certificado y pulsar «Activar» —que es
+    # justo lo que se va a hacer, porque instalar la CA lleva a Ajustes del
+    # móvil y de vuelta—, y el estado sigue diciendo la verdad: esto todavía va
+    # en claro, y las cookies siguen saliendo sin `Secure`.
+    tls.guardarEstado(False, nombres)
+
+    log.info(
+        "[tls] certificado preparado para %s; el HTTPS sigue sin activar",
+        ", ".join(nombres),
+    )
+
     return jsonify({"ok": True, **_estado_publico()})
 
 
@@ -79,16 +156,7 @@ def set_tls():
     nombres = tls.normalizarNombres(datos.get("nombres"))
 
     if activar:
-        if not nombres:
-            raise ValidationError(
-                "Hace falta al menos un nombre o dirección IP: el certificado "
-                "solo vale para los nombres que se declaren.",
-                field="nombres",
-            )
-        if len(nombres) > MAX_NOMBRES:
-            raise ValidationError(
-                f"Demasiados nombres (máximo {MAX_NOMBRES}).", field="nombres",
-            )
+        _validar_nombres(nombres)
 
     try:
         tls.aplicar(activar, nombres)

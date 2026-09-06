@@ -149,6 +149,104 @@ def test_la_api_de_admin_no_se_publica_pero_sí_escucha():
     assert "admin :2019" in tls.construirCaddyfile(False, [])
 
 
+# ── Preparación ───────────────────────────────────────────────────────────────
+# El paso que evita quedarse fuera: se emite el certificado sin que el puerto por
+# el que está entrando el usuario deje de hablar en claro.
+
+def test_preparando_el_puerto_de_siempre_no_cambia_de_esquema():
+    """Es toda la razón de ser de este estado.
+
+    Si al preparar el puerto pasara a TLS, estaríamos otra vez donde estábamos:
+    la respuesta llega por un canal que el navegador ya no acepta, y el usuario
+    se queda fuera antes de haber podido descargar el certificado.
+    """
+    conf = tls.construirCaddyfile(False, ["portfolio.casa"], preparando=True)
+
+    puerto = tls.settings.puerto()
+    assert f"http://:{puerto} {{" in conf
+    assert f"https://portfolio.casa:{puerto}" not in conf
+    assert "reverse_proxy porfoliomanager:" in conf
+
+
+def test_preparando_se_emite_el_certificado_en_un_puerto_interno():
+    """El puerto no está publicado en docker-compose: no es una segunda puerta
+    de entrada, solo la excusa para que haya un certificado que emitir."""
+    conf = tls.construirCaddyfile(False, ["portfolio.casa"], preparando=True)
+
+    assert f"https://portfolio.casa:{tls.PUERTO_PREPARACION}" in conf
+    assert "tls internal" in conf
+    assert f"reverse_proxy porfoliomanager:{tls.PUERTO_PREPARACION}" not in conf
+
+
+def test_se_prepara_con_los_mismos_nombres_con_los_que_se_activará():
+    """Lo que se instala tiene que valer para lo que luego se sirva: emitir aquí
+    una lista y allí otra dejaría al usuario con la CA puesta y el aviso igual."""
+    preparado = tls.construirCaddyfile(False, ["portfolio.casa"], preparando=True)
+    activado = tls.construirCaddyfile(True, ["portfolio.casa"])
+
+    for nombre in ("portfolio.casa", "localhost", "127.0.0.1"):
+        assert f"https://{nombre}:" in preparado
+        assert f"https://{nombre}:" in activado
+
+
+def test_preparar_sin_nombres_deja_el_proxy_como_estaba():
+    """Sin nombres no hay nada que emitir, y tocar el proxy para nada solo puede
+    salir mal."""
+    conf = tls.construirCaddyfile(False, [], preparando=True)
+
+    assert "tls internal" not in conf
+    assert "auto_https off" in conf
+
+
+def test_preparar_devuelve_la_ca_ya_lista_para_instalar(caddy):
+    """Devolver antes de tenerla sería ofrecer un botón de descarga que da 502."""
+    pem = tls.preparar(["portfolio.casa"])
+
+    assert pem.startswith("-----BEGIN CERTIFICATE-----")
+    assert b"tls internal" in _ultimo_load(caddy)
+
+
+def test_preparar_espera_a_que_la_ca_exista(monkeypatch):
+    """La raíz se genera durante la emisión, no al aceptar la configuración: la
+    primera vez puede no estar en la respuesta inmediatamente siguiente."""
+    intentos = []
+
+    def _tardon(ruta, datos=None, tipo=None):
+        if not ruta.startswith("/pki/ca/"):
+            return b"{}"
+        intentos.append(ruta)
+        if len(intentos) < 3:
+            return b'{"root_certificate": ""}'
+        return json.dumps({"root_certificate": "-----BEGIN CERTIFICATE-----\nX\n"}).encode()
+
+    monkeypatch.setattr(tls, "_admin", _tardon)
+    monkeypatch.setattr(tls, "_ESPERA_CA", 0)
+
+    assert tls.preparar(["casa"]).startswith("-----BEGIN CERTIFICATE-----")
+    assert len(intentos) == 3
+
+
+def test_si_la_ca_no_llega_a_aparecer_se_dice(monkeypatch):
+    """Callar aquí dejaría el panel ofreciendo un certificado que no existe."""
+    monkeypatch.setattr(tls, "_admin", lambda *_a, **_k: b'{"root_certificate": ""}')
+    monkeypatch.setattr(tls, "_ESPERA_CA", 0)
+
+    with pytest.raises(tls.ErrorCaddy, match="no ha llegado a emitir"):
+        tls.preparar(["casa"])
+
+
+def test_hay_ca_que_instalar_en_cuanto_se_ha_emitido_algo(caddy):
+    assert tls.caDisponible() is True
+
+
+def test_sin_ca_todavía_el_panel_no_ofrece_descargarla(monkeypatch):
+    """Es lo que decide si se enseña el botón de descarga: ofrecerlo sin CA sería
+    ofrecer un error."""
+    monkeypatch.setattr(tls, "_admin", lambda *_a, **_k: b'{"root_certificate": ""}')
+
+    assert tls.caDisponible() is False
+
+
 # ── Hablar con el proxy ───────────────────────────────────────────────────────
 
 def test_aplicar_manda_el_caddyfile_a_la_api_de_admin(caddy):
@@ -372,6 +470,7 @@ def test_los_endpoints_exigen_sesion(crear_app, bp_tls):
     assert client.get("/api/tls").status_code == 401
     assert client.get("/api/tls/ca.crt").status_code == 401
     assert client.get("/api/tls/prueba").status_code == 401
+    assert client.post("/api/tls/preparar", json={"nombres": ["casa"]}).status_code == 401
 
 
 def test_el_estado_sugiere_el_nombre_por_el_que_has_entrado(cliente_autenticado, bp_tls, caddy):
@@ -388,6 +487,67 @@ def test_el_estado_sugiere_el_nombre_por_el_que_has_entrado(cliente_autenticado,
     # hay que meter en el certificado.
     assert datos["nombreActual"] == "localhost"
     assert datos["activado"] is False
+
+
+def test_preparar_emite_el_certificado_sin_encender_nada(cliente_autenticado, bp_tls, caddy):
+    """El caso entero de este endpoint: al terminar hay algo que instalar y la
+    conexión sigue exactamente como estaba.
+
+    Si de aquí saliera el HTTPS activado, la respuesta viajaría por un puerto que
+    ya solo habla TLS y el navegador la rechazaría: el usuario se quedaría fuera
+    con el certificado sin descargar, que es justo lo que se viene a evitar.
+    """
+    client, cab, app = cliente_autenticado(bp_tls)
+
+    res = client.post("/api/tls/preparar", headers=cab, json={
+        "nombres": ["https://portfolio.casa:5000/"],
+    })
+
+    assert res.status_code == 200
+    datos = res.get_json()
+    assert datos["activado"] is False
+    assert datos["caDisponible"] is True
+    # Los nombres se recuerdan: entre instalar el certificado y volver a pulsar
+    # se pasa por los Ajustes del móvil, y se recarga la página más de una vez.
+    assert datos["nombres"] == ["portfolio.casa"]
+    assert tls.leerEstado()["activado"] is False
+    # Y la cookie sigue sin Secure, porque esto sigue viajando en claro. Al revés
+    # el navegador la descartaría y no se podría ni iniciar sesión.
+    assert app.config["SESSION_COOKIE_SECURE"] is False
+
+
+def test_preparar_deja_el_puerto_de_la_aplicacion_en_claro(cliente_autenticado, bp_tls, caddy):
+    client, cab, _app = cliente_autenticado(bp_tls)
+
+    client.post("/api/tls/preparar", headers=cab, json={"nombres": ["portfolio.casa"]})
+
+    cargado = _ultimo_load(caddy).decode()
+    assert f"http://:{tls.settings.puerto()} {{" in cargado
+    assert f"https://portfolio.casa:{tls.PUERTO_PREPARACION}" in cargado
+
+
+def test_preparar_sin_nombres_se_rechaza(cliente_autenticado, bp_tls, caddy):
+    """La misma validación que activar: el certificado que se emite es el mismo,
+    y lo que no vale en un paso no puede colarse por el otro."""
+    client, cab, _app = cliente_autenticado(bp_tls)
+
+    res = client.post("/api/tls/preparar", headers=cab, json={"nombres": []})
+
+    assert res.status_code == 400
+    assert res.get_json()["field"] == "nombres"
+    assert _ultimo_load(caddy) is None
+
+
+def test_preparar_con_el_https_ya_puesto_no_toca_el_proxy(cliente_autenticado, bp_tls, caddy):
+    """Ahí no hay nada que preparar —la CA ya existe y se descarga tal cual—, y
+    recargar el proxy con la configuración en claro tiraría al usuario."""
+    client, cab, _app = cliente_autenticado(bp_tls)
+    client.post("/api/tls", headers=cab, json={"activado": True, "nombres": ["casa"]})
+
+    res = client.post("/api/tls/preparar", headers=cab, json={"nombres": ["casa"]})
+
+    assert res.status_code == 409
+    assert b"tls internal" in _ultimo_load(caddy)
 
 
 def test_activar_sin_nombres_se_rechaza(cliente_autenticado, bp_tls, caddy):

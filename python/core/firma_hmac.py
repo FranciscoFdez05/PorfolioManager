@@ -24,11 +24,12 @@ import hashlib
 import hmac
 import logging
 import os
+import secrets
 import time
 
 from core import settings
 from core.paths import rutaDesdeBase
-from core.secret_store import read_secret_lines
+from core.secret_store import read_secret_lines, write_secret_lines
 
 log = logging.getLogger(__name__)
 
@@ -81,13 +82,48 @@ def obtenerClaveSecreta():
     if lineas and lineas[0]:
         return lineas[0].encode("utf-8")
 
-    log.error(
-        "[firma_hmac] Sin clave de firma: no existe %s ni está definida %s. "
-        "Genérala con: python tools/generar_clave_movimientos.py",
-        ruta.name, ENV_CLAVE,
-    )
+    if ruta.exists():
+        # Dos averías con soluciones opuestas —generar otra clave, o recuperar
+        # la SECRET_KEY— que antes se veían idénticas en el log, porque las dos
+        # acaban en una lista de líneas vacía.
+        log.error(
+            "[firma_hmac] %s existe pero no se ha podido leer ninguna clave de él. "
+            "Lo normal es que la SECRET_KEY del .env haya cambiado desde que se "
+            "guardó: recupérala, o genera una clave nueva desde Ajustes > API.",
+            ruta.name,
+        )
+    else:
+        log.error(
+            "[firma_hmac] Sin clave de firma: no existe %s ni está definida %s. "
+            "Genérala desde Ajustes > API, o con: python tools/generar_clave_movimientos.py",
+            ruta.name, ENV_CLAVE,
+        )
+
     raise ErrorFirma("Firma no configurada en el servidor", status=503)
 
+
+# 32 bytes = 256 bits, el mismo tamaño que la salida de SHA-256. Más longitud no
+# aporta seguridad frente a HMAC-SHA256.
+BYTES_CLAVE = 32
+
+
+def generarClave() -> str:
+    """Una clave nueva, en hexadecimal."""
+    return secrets.token_hex(BYTES_CLAVE)
+
+
+def escribirClaveNueva(ruta=None):
+    """Genera una clave y la guarda cifrada en su fichero.
+
+    Vive aquí y no en la herramienta de línea de comandos porque ahora hay dos
+    sitios que la crean —`tools/generar_clave_movimientos.py` y el botón de
+    Ajustes > API— y dos copias de esto acabarían generando claves de distinto
+    tamaño o guardándolas de distinta forma.
+    """
+    destino = ruta or rutaFicheroClave()
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    write_secret_lines(destino, [generarClave()])
+    return destino
 
 def calcularFirma(mensaje, clave=None):
     """HMAC-SHA256 en hexadecimal del mensaje indicado."""

@@ -25,6 +25,11 @@ services:
       # Dirección de la API de admin del proxy dentro de la red de Compose. Es
       # por donde Ajustes enciende y apaga el HTTPS.
       - CADDY_ADMIN_URL=http://caddy:2019
+      # Puerto donde el proxy emite el certificado antes de encender el HTTPS,
+      # para que dé tiempo a instalarlo sin que cambie el puerto por el que se
+      # está entrando. NO se publica abajo a propósito: solo existe dentro de
+      # esta red. Solo hay que tocarlo si choca con algo del despliegue.
+      - CADDY_PREP_PORT=${CADDY_PREP_PORT:-9443}
       # Dirección del servidor en la LAN, que calcula docker-up.sh en el host.
       # Dentro del contenedor solo se ve la red de Compose, así que sin esto el
       # panel de HTTPS no puede proponer la dirección por la que entran el móvil

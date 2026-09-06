@@ -14,12 +14,21 @@ peor que el que veníamos a tapar. Así que Caddy está **siempre levantado** y 
 que hace este módulo es *reconfigurarlo en caliente* por su API de admin, que
 vive en la red interna de Compose y no se publica al host.
 
-El flujo completo de activar el HTTPS:
+El flujo completo de activar el HTTPS son **dos pulsaciones**, y ahí está el
+motivo de casi todo lo que sigue: emitir el certificado y encender el TLS no
+pueden ser la misma. Si lo fueran, al volver la respuesta el puerto ya solo
+hablaría TLS con un certificado que el aparato todavía no reconoce; el navegador
+corta ahí, y corta justo antes de que diera tiempo a descargar lo único que le
+habría dejado entrar.
 
-    Ajustes ──POST /load (text/caddyfile)──> caddy:2019
-                                              ├─ emite el certificado con su CA interna
+    1. Preparar ──POST /load (claro + TLS en un puerto interno)─> caddy:2019
+                                              └─ emite el certificado y crea la CA
+       Ajustes  ──GET /pki/ca/local─────────> raíz de la CA, se instala en cada aparato
+                                              (la conexión sigue en claro y por el
+                                               mismo puerto: no se ha movido nada)
+
+    2. Activar  ──POST /load (text/caddyfile)─> caddy:2019
                                               └─ el puerto pasa a hablar solo TLS
-    Ajustes ──GET /pki/ca/local────────────> raíz de la CA, para instalar en cada aparato
 
 **Dónde vive el estado.** En `data/tls/estado.json`, no en config.ini: es una
 decisión del usuario tomada desde la interfaz, y config.ini está versionado y se
@@ -66,6 +75,16 @@ TIMEOUT = 10
 
 # El identificador que Caddy da a su CA interna. Es fijo.
 CA_INTERNA = "local"
+
+# Dónde se emite el certificado antes de encender el HTTPS. Tiene que ser un
+# puerto distinto del de la aplicación —el de siempre se queda en claro, que es
+# justo lo que permite instalar la CA sin perder la sesión— y no se publica en
+# docker-compose: solo existe dentro de la red de Compose, así que a este puerto
+# no llega nadie desde la LAN. La variable está por si choca con otra cosa.
+try:
+    PUERTO_PREPARACION = int(os.environ.get("CADDY_PREP_PORT") or 9443)
+except ValueError:
+    PUERTO_PREPARACION = 9443
 
 # Reintentos al arrancar, solo para la convergencia inicial. Suman 8 segundos en
 # el peor caso; el arranque de gunicorn tiene 120 s de margen.
@@ -178,12 +197,33 @@ def nombresSugeridos(hostActual: str = "") -> list[str]:
 
 # ── Configuración de Caddy ────────────────────────────────────────────────────
 
-def construirCaddyfile(activado: bool, nombres: list[str]) -> str:
+def _conLocalhost(nombres: list[str]) -> list[str]:
+    """La lista del usuario más localhost y 127.0.0.1, que van SIEMPRE.
+
+    Caddy rechaza la conexión si el nombre pedido no tiene sitio, y por
+    localhost entran dos cosas que no se ven: el healthcheck del contenedor y la
+    comprobación de docker-update.sh, que al fallar da la actualización por mala
+    y vuelve atrás sola. No añaden riesgo: solo valen desde el propio host.
+    """
+    efectivos = list(nombres)
+    for fijo in ("localhost", "127.0.0.1"):
+        if fijo not in efectivos:
+            efectivos.append(fijo)
+    return efectivos
+
+
+def construirCaddyfile(activado: bool, nombres: list[str], preparando: bool = False) -> str:
     """Configuración completa de Caddy para el estado pedido.
 
     Se genera un Caddyfile y no el JSON nativo porque la API de admin sabe
     adaptarlo (`Content-Type: text/caddyfile`) y esto se puede leer: el JSON
     equivalente son ochenta líneas anidadas en las que un error no se ve.
+
+    `preparando` es el estado intermedio, el que existe para que el certificado
+    se pueda instalar antes de que haga falta: el puerto de siempre sigue en
+    claro —quien está mirando el panel no nota nada— y en paralelo se monta un
+    sitio TLS en un puerto interno con esos mismos nombres, solo para obligar a
+    Caddy a emitir el certificado y, con él, la CA que hay que instalar.
     """
     puerto = settings.puerto()
     admin = """{
@@ -192,38 +232,52 @@ def construirCaddyfile(activado: bool, nombres: list[str]) -> str:
 	}
 """
 
-    if not activado or not nombres:
-        # Sin nombres no hay certificado posible, así que se sirve en claro
-        # aunque el estado dijera lo contrario: mejor accesible y avisando que
-        # un proxy que rechaza todo y deja al usuario fuera de su propia app.
+    proxy = f"\treverse_proxy porfoliomanager:{puerto}\n"
+
+    if activado and nombres:
+        # disable_redirects: el redirector automático de Caddy escucha en el 80,
+        # que aquí no se publica. Sin esto, el log se llena de avisos por un
+        # puerto que nadie puede alcanzar.
+        sitios = ", ".join(f"https://{n}:{puerto}" for n in _conLocalhost(nombres))
         return (
             admin
-            + "\tauto_https off\n}\n\n"
-            + f":{puerto} {{\n"
-            + f"\treverse_proxy porfoliomanager:{puerto}\n"
+            + "\tauto_https disable_redirects\n}\n\n"
+            + f"{sitios} {{\n"
+            + "\ttls internal\n"
+            + proxy
             + "}\n"
         )
 
-    # localhost y 127.0.0.1 van SIEMPRE, aunque el usuario no los escriba. Caddy
-    # rechaza la conexión si el nombre pedido no tiene sitio, y por localhost
-    # entran dos cosas que no se ven: el healthcheck del contenedor y la
-    # comprobación de docker-update.sh, que al fallar da la actualización por
-    # mala y vuelve atrás sola. No añaden riesgo: solo valen desde el propio host.
-    efectivos = list(nombres)
-    for fijo in ("localhost", "127.0.0.1"):
-        if fijo not in efectivos:
-            efectivos.append(fijo)
+    if preparando and nombres:
+        # El `http://` va escrito a propósito. Aquí el HTTPS automático está
+        # encendido —hace falta para que se emita el certificado— y el esquema
+        # explícito es lo que garantiza que este puerto, por el que el usuario
+        # está entrando ahora mismo, no cambie bajo sus pies. Un sitio sin
+        # nombre tampoco cambiaría, pero esto no depende de saberlo.
+        sitios = ", ".join(f"https://{n}:{PUERTO_PREPARACION}" for n in _conLocalhost(nombres))
+        return (
+            admin
+            + "\tauto_https disable_redirects\n}\n\n"
+            + f"http://:{puerto} {{\n"
+            + proxy
+            + "}\n\n"
+            + f"{sitios} {{\n"
+            + "\ttls internal\n"
+            # Sin reverse_proxy: este puerto no está publicado y no es una
+            # segunda puerta de entrada a la aplicación, solo la excusa para que
+            # haya un certificado que emitir.
+            + '\trespond "preparando el certificado" 200\n'
+            + "}\n"
+        )
 
-    # disable_redirects: el redirector automático de Caddy escucha en el 80, que
-    # aquí no se publica. Sin esto, el log se llena de avisos por un puerto que
-    # nadie puede alcanzar.
-    sitios = ", ".join(f"https://{n}:{puerto}" for n in efectivos)
+    # Sin nombres no hay certificado posible, así que se sirve en claro aunque
+    # el estado dijera lo contrario: mejor accesible y avisando que un proxy que
+    # rechaza todo y deja al usuario fuera de su propia app.
     return (
         admin
-        + "\tauto_https disable_redirects\n}\n\n"
-        + f"{sitios} {{\n"
-        + "\ttls internal\n"
-        + f"\treverse_proxy porfoliomanager:{puerto}\n"
+        + "\tauto_https off\n}\n\n"
+        + f":{puerto} {{\n"
+        + proxy
         + "}\n"
     )
 
@@ -240,14 +294,14 @@ class ErrorCaddy(RuntimeError):
     """El proxy no ha aceptado la configuración, o no responde."""
 
 
-def aplicar(activado: bool, nombres: list[str]) -> None:
+def aplicar(activado: bool, nombres: list[str], preparando: bool = False) -> None:
     """Carga la configuración en Caddy. Lanza ErrorCaddy si no la acepta.
 
     Que Caddy valide antes de aplicar es lo que hace segura la activación desde
     la interfaz: si el Caddyfile generado no es válido, responde 400, no toca su
     configuración en marcha y el usuario sigue conectado como estaba.
     """
-    caddyfile = construirCaddyfile(activado, nombres)
+    caddyfile = construirCaddyfile(activado, nombres, preparando)
     try:
         _admin("/load", caddyfile.encode("utf-8"), "text/caddyfile")
     except urllib.error.HTTPError as e:
@@ -295,6 +349,65 @@ def proxyDisponible() -> bool:
         return True
     except (OSError, ValueError):
         return False
+
+
+def caDisponible() -> bool:
+    """¿Hay ya una CA que descargar e instalar?
+
+    Es lo que decide si el panel puede ofrecer el certificado **antes** de
+    encender el HTTPS, que es el único orden en el que se puede instalar sin
+    quedarse fuera. La hay en cuanto Caddy ha emitido algo con ella: después de
+    preparar, y también si el HTTPS estuvo activo alguna vez aunque luego se
+    apagara, porque la raíz vive en el volumen de Caddy y no se regenera.
+    """
+    try:
+        raizDeLaCa()
+        return True
+    except (ErrorCaddy, ValueError):
+        return False
+
+
+# Lo que se espera a que la CA aparezca tras pedir la preparación. Caddy emite
+# durante la carga de la configuración, así que en la práctica ya está cuando
+# contesta al /load; el margen es para la primera vez, que además tiene que
+# generar la raíz y la intermedia.
+_INTENTOS_CA = 6
+_ESPERA_CA = 1
+
+
+def preparar(nombres: list[str]) -> str:
+    """Emite el certificado sin tocar el puerto por el que estás entrando.
+
+    Es el paso que faltaba. Emitir y encender eran la misma pulsación, y en ese
+    orden no puede salir bien: cuando vuelve la respuesta, el puerto ya solo
+    habla TLS con un certificado que el aparato todavía no reconoce, así que el
+    navegador corta y deja al usuario fuera **antes** de haber podido descargar
+    lo que le habría dejado entrar. Ahí no queda interfaz desde la que
+    arreglarlo; queda saltarse un aviso de seguridad, o el SSH.
+
+    Aquí se le pide a Caddy que emita exactamente los mismos certificados, pero
+    en un puerto interno que no está publicado. El puerto de siempre sigue en
+    claro y la sesión no se entera. Lo que cambia es que a partir de este
+    momento la CA existe y se puede instalar en cada aparato con calma.
+
+    Devuelve la raíz en PEM, y por eso espera a tenerla: mientras no la haya,
+    ofrecer el botón de descarga sería ofrecer un 502.
+    """
+    aplicar(False, nombres, preparando=True)
+
+    ultimo = None
+    for intento in range(_INTENTOS_CA):
+        try:
+            return raizDeLaCa()
+        except ErrorCaddy as e:
+            ultimo = e
+            if intento < _INTENTOS_CA - 1:
+                time.sleep(_ESPERA_CA)
+
+    raise ErrorCaddy(
+        "El proxy ha aceptado la configuración pero no ha llegado a emitir el "
+        f"certificado. {ultimo}"
+    )
 
 
 # ── Comprobación ──────────────────────────────────────────────────────────────

@@ -28,11 +28,13 @@ decide cómo se deshace la actualización:
 pulsar y esperar: se reconstruía la imagen y se reiniciaba el contenedor —un par
 de minutos sin servicio— aunque no hubiera nada que traer, y la única forma de
 saberlo por adelantado era entrar por SSH a mirar el `git log`. Y cifrar la
-conexión era accionar un interruptor y confiar, porque el panel solo repetía lo
-que se le había pedido, no lo que estaba ocurriendo: con el certificado emitido
-y la CA instalada, un aparato podía seguir avisando sin que nada explicara que
-lo que faltaba era un nombre en una lista. Las dos tienen ahora una respuesta
-antes de pulsar y una comprobación después.
+conexión era accionar un interruptor y esperar lo mejor: se emitía y se
+encendía a la vez, así que el navegador se encontraba de golpe un certificado
+que no reconocía y cortaba —justo delante de la página desde la que había que
+descargarlo—; y si un aparato seguía avisando después, el panel no sabía decir
+por qué, porque solo repetía lo que se le había pedido, no lo que estaba
+ocurriendo. Las dos tienen ahora una respuesta antes de pulsar y una
+comprobación después.
 
 **Por qué 2.0.0:** por el calado —la seguridad pasa a tener su propio apartado
 en Ajustes y el HTTPS deja de ser un interruptor a ciegas—, no porque la
@@ -42,8 +44,9 @@ actualización pida intervención manual. No pide ninguna.
 esta actualización es volver a la imagen anterior, sin tocar los datos.
 
 **Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
-Ajustes › Datos si tienes el vigilante instalado. Nada que editar a mano. Dos
-cosas opcionales, ninguna necesaria para que funcione:
+Ajustes › Datos si tienes el vigilante instalado. Nada que editar a mano, y si
+ya tenías el HTTPS activo no cambia nada para ti: el certificado instalado
+vale igual. Dos cosas opcionales, ninguna necesaria para que funcione:
 
 - Si tu `.env` viene de una copia antigua de `.env.example` y todavía tiene
   `FINNHUB_API_KEY=tu_clave_finnhub`, puedes vaciar esa línea y la de
@@ -56,6 +59,56 @@ cosas opcionales, ninguna necesaria para que funcione:
   SECURITY.md.
 
 ### Añadido
+
+- **Paso «Emitir el certificado» (Ajustes › Seguridad › HTTPS).** Emite el
+  certificado y deja la CA lista para descargar **sin tocar el puerto por el que
+  estás entrando**: sigues en claro, en la misma dirección y con la misma
+  sesión. Lo único que cambia es que ya hay algo que instalar.
+
+  Por dentro, el proxy recibe una configuración con dos sitios: el de siempre en
+  claro —con el `http://` escrito, para que no dependa de adivinar nada— y uno
+  TLS en un puerto interno (9443, `CADDY_PREP_PORT`) que **no se publica** y que
+  no hace proxy a nada. No es una segunda puerta de entrada: es la excusa para
+  que Caddy tenga un certificado que emitir. Endpoint nuevo:
+  `POST /api/tls/preparar`, con sesión como el resto.
+
+- **El certificado se descarga con el HTTPS todavía apagado.** El bloque de
+  descarga e instalación aparecía solo *después* de activar, que es exactamente
+  cuando ya no se podía llegar a él sin atravesar el aviso que provocaba no
+  tenerlo. Ahora se enseña en cuanto existe una CA: tras emitir, y también si el
+  HTTPS estuvo activo alguna vez aunque luego se apagara —la raíz vive en el
+  volumen de Caddy y no se regenera, así que ahí el paso de emitir se salta—.
+  Lo dice el estado: `caDisponible` en `GET /api/tls`.
+
+- **Casilla de confirmación antes de activar.** «Activar HTTPS» está
+  deshabilitado hasta marcar que el certificado ya está instalado. Es la única
+  pulsación de este panel que puede dejar a alguien fuera de la aplicación, y
+  basta una casilla para que no se dé de paso.
+
+- **Ajustes > API gestiona el Atajo de iOS, y lo genera.** El Atajo tenía todas
+  sus piezas fuera de la vista —la clave en `API/movimientos.key`, el
+  interruptor y las redes en `config.ini`, el diagnóstico solo en el log— así
+  que cuando fallaba, y lo que falla casi siempre es que no hay clave, la única
+  forma de enterarse era entrar por SSH a leer `docker compose logs`. Ahora el
+  panel trae:
+
+  - **Estado**: si está activado, de dónde sale la clave —o por qué no hay—, las
+    redes desde las que se acepta y el margen de reloj.
+  - **Generar o rehacer la clave de firma** con un botón. Rehacerla no obliga a
+    rehacer el atajo del iPhone: el atajo no la guarda, la pide en cada uso.
+  - **Probar**, que recorre el camino entero —activado, redes, clave, firma y
+    verificación— sin escribir en la base de datos y se para en el primer paso
+    que falla, para señalar la avería en vez de listar síntomas.
+  - **Descargar el atajo ya montado**, con la dirección de este servidor dentro.
+    Pregunta base de datos, gasto o ingreso, categoría —de las que existan en
+    esa base de datos—, concepto e importe; la fecha la pone el servidor con el
+    día en que llega la petición.
+
+  El `.shortcut` se genera sin firmar, porque firmarlo exige las claves de
+  Apple: iOS lo acepta con «Atajos no fiables» activado, y el propio panel lo
+  advierte junto a la descarga y trae la receta manual como respaldo. El fichero
+  **no lleva ninguna clave dentro** —solo la dirección del servidor—, así que
+  puede guardarse o pasarse por AirDrop sin exponer nada.
 
 - **Ajustes › Datos dice si hay versión nueva antes de pulsar.** El panel lee
   `python/core/version.py` de la rama configurada en GitHub y lo compara con la
@@ -126,11 +179,20 @@ cosas opcionales, ninguna necesaria para que funcione:
   con ella se cifran `auth.dat`, las claves de los proveedores y la del Atajo,
   así que copiarlas **antes** es la diferencia entre rotar y perderlas.
 
-- **Tres pasos escritos en el propio panel** —repasar los nombres, activar,
-  instalar la CA y comprobar—, visibles solo mientras el HTTPS está apagado, que
-  es cuando hacen falta. El README dice lo mismo, en el mismo orden.
-
 ### Cambiado
+
+- **La guía del panel y el README cuentan el orden nuevo** —repasar los nombres,
+  emitir, instalar en cada aparato, activar— y explican por qué son cuatro pasos
+  y no dos. El aviso previo al salto a `https://` ya no dice «el navegador
+  avisará hasta que instales la CA», porque a esas alturas debería estar
+  instalada: ahora dice qué significa si aun así avisa.
+
+- **«No hay clave de firma» deja de significar dos cosas distintas.** El log
+  decía «no existe movimientos.key» tanto cuando el fichero faltaba como cuando
+  estaba pero no se podía descifrar, porque las dos acaban en una lista de
+  líneas vacía. Son averías con soluciones opuestas —generar una clave nueva, o
+  recuperar la `SECRET_KEY` con la que se cifró—, y confundirlas lleva a generar
+  una y perder la otra. Ahora se distinguen, en el log y en el panel.
 
 - **El descarte de un valor de ejemplo se avisa una vez, no en cada lectura.**
   `.env.example` traía `FINNHUB_API_KEY=tu_clave_finnhub`, y la aplicación hace

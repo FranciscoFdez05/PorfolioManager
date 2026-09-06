@@ -11,6 +11,28 @@ así que lo apuntado desde el móvil aparece en la pestaña de Gastos o Ingresos
 nada más. Se puede desactivar por completo con `activado = false` sin que la web
 se entere.
 
+## La vía corta: que lo genere el servidor
+
+**Ajustes > API > Atajo de iOS** hace todo esto por ti:
+
+- Dice de un vistazo si falta algo —la clave de firma, sobre todo, que es lo que
+  falla casi siempre— en vez de tener que buscarlo en el log.
+- **Genera la clave** con un botón, sin entrar por SSH.
+- **Prueba** el camino entero sin escribir en la base de datos, y señala el
+  primer paso que falla.
+- **Descarga el atajo ya montado**, con la dirección de tu servidor dentro.
+
+El fichero se genera sin firmar —firmarlo exige las claves de Apple—, así que
+iOS solo lo acepta con *Ajustes > Atajos > Permitir atajos no fiables*, un
+interruptor que además no aparece hasta que has ejecutado algún atajo alguna
+vez. Si tu iPhone lo rechaza, o si prefieres entender cada acción antes de
+usarla, el resto de este documento es la misma receta a mano: son exactamente
+las mismas acciones y en el mismo orden.
+
+El atajo generado **no lleva la clave dentro**: la pide a `/api/preparar` en cada
+ejecución. Por eso se puede guardar en Archivos o pasar por AirDrop sin exponer
+nada, y por eso regenerar la clave desde el panel no obliga a rehacerlo.
+
 ## Configuración
 
 Todos los ajustes están en la sección `[atajo]` de `config.ini`:
