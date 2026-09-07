@@ -239,6 +239,39 @@ def test_generar_la_clave_desde_el_panel_la_deja_utilizable(cliente_autenticado,
     assert firma_hmac.obtenerClaveSecreta()
 
 
+def test_sin_https_el_atajo_apunta_a_http(cliente_autenticado, bp_atajo, tmp_path, monkeypatch):
+    """El Atajo no exige cifrado: con el HTTPS apagado entra en claro, como
+    siempre. Y la dirección que se le mete dentro tiene que decir eso mismo.
+
+    Es la mitad del problema de cambiar de esquema: el atajo lleva la URL
+    congelada, así que un `https://` emitido mientras el servidor sirve en claro
+    dejaría al iPhone llamando a un puerto que no habla TLS.
+    """
+    from core import tls
+
+    monkeypatch.setattr(tls, "ESTADO_FILE", tmp_path / "estado.json", raising=False)
+    monkeypatch.delenv("HTTPS_ENABLED", raising=False)
+    client, _cab, _app = cliente_autenticado(bp_atajo)
+
+    datos = client.get("/api/atajo").get_json()
+
+    assert datos["urlBase"].startswith("http://")
+
+
+def test_con_https_el_atajo_apunta_a_https(cliente_autenticado, bp_atajo, monkeypatch):
+    """Y al revés: encendido, el atajo que se descargue tiene que llamar por TLS.
+
+    Por eso el panel avisa de que hay que volver a descargarlo al cambiar el
+    HTTPS: el que ya esté en el iPhone se queda con el esquema de antes.
+    """
+    monkeypatch.setenv("HTTPS_ENABLED", "true")
+    client, _cab, _app = cliente_autenticado(bp_atajo)
+
+    datos = client.get("/api/atajo").get_json()
+
+    assert datos["urlBase"].startswith("https://")
+
+
 def test_la_descarga_es_un_atajo_con_nombre_de_fichero(cliente_autenticado, bp_atajo):
     client, _cab, _app = cliente_autenticado(bp_atajo)
 

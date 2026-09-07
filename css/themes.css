@@ -2644,12 +2644,14 @@ html[data-theme="black"] .ingresosMovementsTable .rowActionHeader {
 }
 
 /* ── Toggle ocultar dinero ── */
+/* 30px de alto, los mismos que .navBtn y .navDropdownBtn: es un botón más de la
+   barra, y cuatro píxeles de más lo desalineaban de todo lo que tiene al lado. */
 .navMoneyToggleBtn {
-    height: 34px;
+    height: 30px;
     width: 34px;
     padding: 0;
     border: 1px solid #334155;
-    border-radius: 8px;
+    border-radius: 6px;
     background: #0f1724;
     color: #e5edf9;
     cursor: pointer;

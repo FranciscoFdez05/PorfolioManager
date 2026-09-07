@@ -312,6 +312,29 @@ body {
     gap: 8px;
     flex-wrap: nowrap;
     align-items: center;
+    /* Crece para ocupar la barra, que es lo que permite empujar «Métricas» al
+       extremo derecho. `flex-shrink: 0` para que al estrecharse la ventana los
+       botones no se aplasten: `nav.tabs` ya desplaza en horizontal. */
+    flex: 1 0 auto;
+}
+
+/* Separa el patrimonio —activos, finanzas, cripto— de lo que entra y sale.
+   Una línea y nada más: si hiciera falta un título, es que la barra ya no se
+   entiende sola. */
+.navSeparador {
+    display: block;
+    width: 1px;
+    height: 20px;
+    flex: 0 0 auto;
+    margin: 0 6px;
+    background: var(--border-mid);
+    opacity: 0.7;
+}
+
+/* Al extremo derecho, pegado a la versión: es la vista que se mira de vez en
+   cuando, no una pestaña más de las que se recorren en orden. */
+.navBtnFinal {
+    margin-left: auto;
 }
 
 .navDropdown {

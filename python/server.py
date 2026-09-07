@@ -15,7 +15,7 @@ from flask import Flask, abort, g, make_response, send_from_directory
 from admin import snapshot_scheduler
 from admin.backup_manager import start_scheduler as start_backup_scheduler
 from admin.portfolios_manager import init_portfolios
-from core import csp, paths, seguridad_app, settings, tls
+from core import atajo_acceso, csp, paths, seguridad_app, settings, tls
 from core.errors import register_error_handlers
 from core.paths import API_DIR, BASE_DIR, INDEX_FILE
 from core.version import insertar_version
@@ -263,6 +263,13 @@ tls.converger()
 _aviso_tls = tls.avisoSinHttps()
 if _aviso_tls:
     logging.warning("[tls] %s", _aviso_tls)
+
+# Igual que el de arriba: no es una configuración mal puesta, es una decisión
+# tomada desde la interfaz. Pero desde fuera no se distingue de un servidor que
+# sí comprueba quién escribe, así que tiene que quedar escrito al arrancar.
+_aviso_firma = atajo_acceso.avisoSinFirma()
+if _aviso_firma:
+    logging.warning("[atajo] %s", _aviso_firma)
 
 if __name__ == "__main__":
     # Servidor de desarrollo. En Docker manda gunicorn (ver entrypoint.sh), que

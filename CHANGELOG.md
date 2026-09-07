@@ -150,6 +150,41 @@ vale igual. Dos cosas opcionales, ninguna necesaria para que funcione:
   lo rechaza con un 400 que dice qué nombre falta. `localhost` y `127.0.0.1` no
   hace falta escribirlos: van siempre en el certificado.
 
+- **El Atajo puede funcionar sin firma, si lo pides (Ajustes › API).** La firma
+  HMAC exige que el iPhone tenga la clave del servidor, y cuando esa clave se
+  pierde —una reinstalación, un backup que no la llevaba— lo que pasa no es que
+  alguien entre: es que te quedas sin poder apuntar un gasto hasta que vuelvas a
+  montarlo todo. Ahora hay un interruptor para aceptar las peticiones sin firma,
+  y un campo para escribir **desde qué redes** se aceptan, que hasta ahora solo
+  se podía tocar en `config.ini`.
+
+  Lo que se pierde está escrito donde se pulsa: sin firma, la petición deja de
+  probar *quién* la manda y solo prueba *desde dónde* viene, así que cualquiera
+  que alcance el puerto desde esos rangos puede escribir en la base de datos. El
+  valor de fábrica es exigirla, quitarla pide confirmación diciendo el alcance
+  exacto, queda escrito en el log al arrancar —como el aviso de HTTPS apagado— y
+  el estado del panel lo dice en todo momento.
+
+  La otra barrera no se toca: el filtro de red sigue siendo obligatorio y sigue
+  siendo fail-closed. Sin rangos válidos no entra nadie, con firma o sin ella. Y
+  vaciar el campo de redes no cierra la puerta, vuelve a lo que diga
+  `config.ini`: un botón cuyo único efecto fuera romper el Atajo sin avisar no
+  debería existir. Lo guardado vive en `data/atajo/acceso.json`, fuera de
+  `config.ini`, que se sobrescribe en cada `git pull`.
+
+- **El panel dice con qué IP te ve el servidor** (Ajustes › API). En Docker hay
+  un proxy delante siempre, así que la IP que ve la aplicación es la de Caddy
+  salvo que `PROXY_FIX_HOPS` esté bien puesto —lo fija `docker-compose.yml`—.
+  Cuando no lo está, el filtro de red deja de discriminar nada y el síntoma
+  despista: el Atajo falla desde el móvil con la IP correcta escrita en los
+  rangos. Ahora se ve, y en rojo si esa IP no pasaría el filtro. Es lo primero
+  que hay que mirar si se ha quitado la firma, porque entonces es la única
+  barrera que queda.
+
+- **«Probar» entiende que no haya clave cuando no hace falta.** Con la firma
+  desactivada, el paso «hay clave de firma» dejaba la prueba en rojo señalando
+  una avería que no existía. Ahora dice qué barrera queda en pie y termina bien.
+
 - **Las instrucciones de Windows dicen dónde se pierde la instalación.** El
   asistente de certificados propone el almacén de la pestaña desde la que se
   abre, así que lo normal es acabar con la CA en *Personal* —donde no sirve para
@@ -251,6 +286,13 @@ vale igual. Dos cosas opcionales, ninguna necesaria para que funcione:
   así que copiarlas **antes** es la diferencia entre rotar y perderlas.
 
 ### Cambiado
+
+- **La barra de navegación separa el patrimonio del dinero que entra y sale.**
+  «Gastos» pasa detrás del ojo, con una línea vertical delante que marca el
+  corte, y **Ajustes** se va al extremo derecho, junto a la versión: no es una
+  pestaña de las que se recorren en orden, es adonde se va a cambiar algo. El
+  separador se esconde con el módulo que separa, así que apagar Gastos no deja
+  una raya suelta en medio.
 
 - **La guía del panel y el README cuentan el orden nuevo** —repasar los nombres,
   emitir, instalar en cada aparato, activar— y explican por qué son cuatro pasos

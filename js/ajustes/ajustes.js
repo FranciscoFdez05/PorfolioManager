@@ -1307,12 +1307,18 @@ async function initAjustesLogic() {
     const atajoUrlEl = document.getElementById("ajustesAtajoUrl")
     const atajoRedesEl = document.getElementById("ajustesAtajoRedes")
     const atajoToleranciaEl = document.getElementById("ajustesAtajoTolerancia")
+    const atajoTuIpEl = document.getElementById("ajustesAtajoTuIp")
     const atajoDescargarBtn = document.getElementById("ajustesAtajoDescargarBtn")
     const atajoProbarBtn = document.getElementById("ajustesAtajoProbarBtn")
     const atajoClaveBtn = document.getElementById("ajustesAtajoClaveBtn")
     const atajoMsg = document.getElementById("ajustesAtajoMsg")
     const atajoPruebaRes = document.getElementById("ajustesAtajoPruebaRes")
     const atajoRecetaEl = document.getElementById("ajustesAtajoReceta")
+    const atajoRedesInput = document.getElementById("ajustesAtajoRedesInput")
+    const atajoExigirFirmaEl = document.getElementById("ajustesAtajoExigirFirma")
+    const atajoAvisoFirmaEl = document.getElementById("ajustesAtajoAvisoFirma")
+    const atajoAccesoBtn = document.getElementById("ajustesAtajoAccesoBtn")
+    const atajoAccesoMsg = document.getElementById("ajustesAtajoAccesoMsg")
 
     let _atajoHayClave = false
 
@@ -1330,6 +1336,10 @@ async function initAjustesLogic() {
             clase = "roto"
             texto =
                 "<strong>Sin redes permitidas.</strong> <code>[atajo] redes_permitidas</code> está vacío, y vacío no significa «todas»: no se acepta a nadie."
+        } else if (data.acceso && data.acceso.exigirFirma === false) {
+            clase = "off"
+            texto =
+                "<strong>Funcionando sin firma.</strong> Las peticiones se aceptan por venir de las redes permitidas, sin comprobar quién las manda."
         } else if (!data.clave || !data.clave.hay) {
             clase = "off"
             texto =
@@ -1351,16 +1361,99 @@ async function initAjustesLogic() {
         if (atajoRedesEl) atajoRedesEl.textContent = (data.redes || []).join(", ") || "ninguna"
         if (atajoToleranciaEl) atajoToleranciaEl.textContent = `±${data.tolerancia} s`
 
+        // En Docker siempre hay un proxy delante, así que esta IP es la de Caddy
+        // salvo que PROXY_FIX_HOPS esté bien puesto. Cuando no lo está, el filtro
+        // deja de discriminar y el síntoma despista: el Atajo falla desde el
+        // móvil con la IP correcta escrita en los rangos. Verla aquí lo resuelve
+        // de un vistazo, y es lo primero que hay que mirar si se ha quitado la
+        // firma, porque entonces es la única barrera que queda.
+        if (atajoTuIpEl && data.verTe) {
+            atajoTuIpEl.textContent = data.verTe.ip
+            atajoTuIpEl.classList.toggle("ajustesAtajoIpFuera", !data.verTe.permitida)
+            atajoTuIpEl.title = data.verTe.permitida
+                ? "Esta IP está dentro de las redes permitidas"
+                : "Esta IP NO está dentro de las redes permitidas: una petición del Atajo desde aquí se rechazaría"
+        }
+
         if (atajoClaveBtn) {
             // Generar y regenerar son la misma llamada, pero no la misma
             // decisión: con una clave puesta, el botón tiene que decir que la
             // sustituye.
             atajoClaveBtn.textContent = _atajoHayClave ? "Regenerar clave" : "Generar clave"
         }
-        // Descargar el atajo sin clave da un atajo que no va a poder enviar nada.
-        if (atajoDescargarBtn) atajoDescargarBtn.classList.toggle("ajustesBtnApagado", !_atajoHayClave)
+        // Descargar el atajo sin clave da un atajo que no va a poder enviar nada,
+        // salvo que la firma no se exija: entonces no hace falta ninguna.
+        const _sinFirma = !!(data.acceso && data.acceso.exigirFirma === false)
+        if (atajoDescargarBtn) atajoDescargarBtn.classList.toggle("ajustesBtnApagado", !_atajoHayClave && !_sinFirma)
+
+        _pintarAccesoAtajo(data)
 
         _pintarRecetaAtajo(data.urlBase || "")
+    }
+
+    // --- Quién puede escribir por la API del Atajo ---
+    // Las dos barreras que tienen esos endpoints, juntas y en la misma pantalla,
+    // porque solo significan algo la una con la otra: quitar la firma deja la
+    // red de origen como única puerta, y entonces qué rangos hay ahí deja de ser
+    // un detalle de configuración.
+    function _pintarAccesoAtajo(data) {
+        const acceso = data.acceso || {}
+
+        if (atajoExigirFirmaEl) atajoExigirFirmaEl.checked = acceso.exigirFirma !== false
+        if (atajoAvisoFirmaEl) atajoAvisoFirmaEl.hidden = acceso.exigirFirma !== false
+
+        // Solo se rellena si el usuario no ha escrito nada: al repintar tras
+        // guardar, machacar lo que tenga a medias sería perder su trabajo.
+        if (atajoRedesInput && !atajoRedesInput.value.trim()) {
+            // De config.ini no se copia nada al campo: dejarlo vacío es lo que
+            // significa «lo que diga config.ini», y rellenarlo lo congelaría
+            // aquí sin que nadie lo hubiera pedido.
+            atajoRedesInput.value = acceso.origenRedes === "ajustes" ? (data.redes || []).join(", ") : ""
+        }
+        if (atajoRedesInput) {
+            atajoRedesInput.placeholder = (acceso.redesConfig || []).join(", ") || "192.168.1.0/24"
+        }
+    }
+
+    async function _guardarAccesoAtajo() {
+        const redes = (atajoRedesInput?.value || "")
+            .split(/[\n,;]+/)
+            .map((r) => r.trim())
+            .filter(Boolean)
+        const exigirFirma = !!atajoExigirFirmaEl?.checked
+
+        // Se pregunta solo al quitarla, y se dice lo que se pierde en concreto,
+        // no un «¿seguro?»: lo que hay que poder valorar es el alcance.
+        if (!exigirFirma) {
+            const rangos = redes.join(", ") || (atajoRedesInput?.placeholder ?? "los de config.ini")
+            const aviso =
+                "Vas a aceptar peticiones sin comprobar quién las manda.\n\n" +
+                `Cualquiera que alcance este puerto desde ${rangos} podrá apuntar movimientos en tu base de datos.\n\n` +
+                "¿Continuar?"
+            if (!window.confirm(aviso)) return
+        }
+
+        if (atajoAccesoBtn) atajoAccesoBtn.disabled = true
+        showMsg(atajoAccesoMsg, "Guardando…", "")
+
+        try {
+            const res = await fetch("/api/atajo/acceso", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ exigirFirma, redes })
+            })
+            const data = await res.json()
+            if (!data.ok) {
+                showMsg(atajoAccesoMsg, data.error || "No se ha podido guardar", "error")
+                return
+            }
+            _pintarAtajo(data)
+            showMsg(atajoAccesoMsg, exigirFirma ? "Guardado" : "Guardado, sin firma", exigirFirma ? "ok" : "error")
+        } catch {
+            showMsg(atajoAccesoMsg, "Error de red", "error")
+        } finally {
+            if (atajoAccesoBtn) atajoAccesoBtn.disabled = false
+        }
     }
 
     function _pintarRecetaAtajo(url) {
@@ -1503,6 +1596,12 @@ async function initAjustesLogic() {
     }
 
     if (atajoClaveBtn) atajoClaveBtn.addEventListener("click", _generarClaveAtajo)
+    if (atajoAccesoBtn) atajoAccesoBtn.addEventListener("click", _guardarAccesoAtajo)
+    if (atajoExigirFirmaEl) {
+        atajoExigirFirmaEl.addEventListener("change", () => {
+            if (atajoAvisoFirmaEl) atajoAvisoFirmaEl.hidden = atajoExigirFirmaEl.checked
+        })
+    }
     if (atajoProbarBtn) atajoProbarBtn.addEventListener("click", _probarAtajo)
     loadAtajo()
 

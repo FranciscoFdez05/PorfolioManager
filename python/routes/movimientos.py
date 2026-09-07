@@ -22,6 +22,7 @@ from admin.portfolios_manager import (
     get_portfolio_db_path,
     get_portfolios,
 )
+from core import atajo_acceso
 from core.db import open_db_at
 from core.firma_hmac import (
     ErrorFirma,
@@ -42,6 +43,23 @@ from stores.movimientos_store import (
 log = logging.getLogger(__name__)
 
 movimientos_bp = Blueprint("movimientos", __name__)
+
+# Se avisa una vez por proceso y no en cada alta: con el Atajo en uso diario
+# serían cientos de líneas idénticas al mes y el log dejaría de servir para lo
+# que está. Una vez basta para que quede constancia de con qué política arrancó
+# esto; el estado permanente lo dice el aviso de arranque y el panel.
+_avisado_sin_firma = False
+
+
+def _avisarSinFirma() -> None:
+    global _avisado_sin_firma
+    if _avisado_sin_firma:
+        return
+    _avisado_sin_firma = True
+    log.warning(
+        "[movimientos] Peticiones aceptadas SIN firma (Ajustes > API): la unica "
+        "barrera es la red de origen. No se repetira este aviso."
+    )
 
 # Campos que /api/preparar acepta y serializa. Cualquier otra clave que mande el
 # cliente se descarta: el cuerpo firmado solo puede contener lo que el endpoint
@@ -79,11 +97,14 @@ def createMovimiento():
     # get_data() cachea el cuerpo, así que get_json() más abajo sigue funcionando.
     cuerpoRaw = request.get_data(cache=True)
 
-    try:
-        verificarPeticionFirmada(request.headers, cuerpoRaw)
-    except ErrorFirma as error:
-        log.warning("[movimientos] Firma rechazada desde %s: %s", request.remote_addr, error.mensaje)
-        return jsonify({"ok": False, "error": error.mensaje}), error.status
+    if atajo_acceso.exigirFirma():
+        try:
+            verificarPeticionFirmada(request.headers, cuerpoRaw)
+        except ErrorFirma as error:
+            log.warning("[movimientos] Firma rechazada desde %s: %s", request.remote_addr, error.mensaje)
+            return jsonify({"ok": False, "error": error.mensaje}), error.status
+    else:
+        _avisarSinFirma()
 
     payload = request.get_json(silent=True)
 

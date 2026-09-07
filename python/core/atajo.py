@@ -22,7 +22,7 @@ import logging
 import os
 import time
 
-from core import firma_hmac, red_local
+from core import atajo_acceso, firma_hmac, red_local, settings
 from core.secret_store import read_secret_lines
 from stores.movimientos_store import DatosMovimientoInvalidos, sanitizarMovimiento
 
@@ -79,6 +79,14 @@ def estado(urlBase: str = "") -> dict:
         "redes": [str(red) for red in red_local.leerRedesPermitidas()],
         "tolerancia": firma_hmac.toleranciaSegundos(),
         "urlBase": urlBase,
+        # Con qué política se están aceptando las peticiones ahora mismo. El
+        # panel lo necesita entero: si la firma no se exige, la red de origen es
+        # la única barrera que queda y hay que poder verla y cambiarla ahí.
+        "acceso": {
+            "exigirFirma": atajo_acceso.exigirFirma(),
+            "origenRedes": atajo_acceso.origenDeLasRedes(),
+            "redesConfig": [str(r) for r in settings.obtener("atajo.redes_permitidas")],
+        },
     }
 
 
@@ -124,6 +132,19 @@ def probar() -> dict:
         ", ".join(str(r) for r in redes) or "[atajo] redes_permitidas está vacío: no se acepta a nadie.",
     ):
         return {"ok": False, "pasos": pasos}
+
+    if not atajo_acceso.exigirFirma():
+        # Sin firma no hay clave que comprobar ni firma que verificar, así que
+        # seguir sería inventarse un fallo: el camino de verdad termina aquí.
+        # Se dice lo que queda en pie, que es lo que el usuario tiene que poder
+        # leer sin ir a buscarlo a otra pantalla.
+        _paso(
+            "La firma no se exige",
+            True,
+            "Las peticiones se aceptan sin comprobar quién las manda: la única "
+            "barrera son las redes de arriba. Se vuelve a exigir en este mismo panel.",
+        )
+        return {"ok": True, "pasos": pasos}
 
     clave = _estadoDeLaClave()
     if not _paso("Hay clave de firma", clave["hay"], clave["detalle"]):

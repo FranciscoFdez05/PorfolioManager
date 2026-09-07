@@ -720,6 +720,37 @@ Con el HTTPS ya activado sigue en pie, y ahí gana el otro uso: un aparato nuevo
 
 La alternativa —arrancar Caddy bajo demanda desde la aplicación— exigiría montarle el socket de Docker, y eso convierte cualquier fallo de la aplicación en root sobre el host: un agujero bastante peor que el que veníamos a tapar. Reconfigurar un proxy que ya está en marcha no necesita ningún privilegio. Y meter el TLS dentro de gunicorn tampoco valía: lee el certificado al arrancar, así que activarlo desde la interfaz obligaría a reiniciar el contenedor en mitad de la petición que lo activa.
 
+#### Firma, o red de confianza
+
+Los endpoints del Atajo tienen dos barreras: **de dónde llega** la petición y
+**quién la firma**. La segunda se puede quitar desde Ajustes › API, y conviene
+saber qué significa antes de hacerlo.
+
+Con la firma exigida (lo de fábrica), cada petición lleva un HMAC-SHA256 sobre
+el cuerpo y la marca de tiempo, calculado con una clave que solo tienen el
+servidor y quien la escriba en el Atajo. Llegar desde la wifi de casa no basta:
+hay que probar quién eres.
+
+Sin ella, la red de origen es la única barrera. Cualquiera que alcance el puerto
+desde uno de los rangos permitidos puede apuntar movimientos en tu base de
+datos. En una wifi doméstica eso es «quien esté en tu wifi»; con un rango ancho
+ahí, bastante más.
+
+**Cuándo tiene sentido quitarla:** cuando la alternativa real no es «con firma o
+sin firma», sino «con firma o sin Atajo». Si `API/movimientos.key` se ha perdido
+—una reinstalación, un backup que no la llevaba— el Atajo responde 503 y no
+puede enviar nada. Quitar la firma lo devuelve al aire mientras rehaces la
+clave, que es un botón en ese mismo panel.
+
+El filtro de red no se puede quitar, y sigue siendo *fail-closed*: sin rangos
+válidos se rechaza todo. Los rangos se escriben ahora en el propio panel (en
+notación CIDR: `192.168.1.0/24`, o `192.168.1.100/32` para una IP suelta) y se
+guardan en `data/atajo/acceso.json`; dejarlo vacío vuelve a `[atajo]
+redes_permitidas` de `config.ini`.
+
+Con la firma desactivada, el arranque lo deja escrito en el log, igual que el
+aviso de HTTPS apagado. Si un día no recuerdas cómo quedó, ahí está.
+
 #### Los nombres del certificado
 
 El certificado **solo vale para los nombres que declares**. Si entras por una IP o un nombre que no esté en la lista, el navegador avisará aunque tengas la CA instalada, porque lo que no cuadra es el nombre. Mete la IP del servidor y cualquier nombre que uses.

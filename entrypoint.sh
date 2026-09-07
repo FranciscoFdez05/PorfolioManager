@@ -12,6 +12,11 @@ API_DIR="${PORTFOLIO_API_DIR:-/app/API}"
 # como root, para que el chown de más abajo los alcance: si los creaba el
 # proceso ya sin privilegios sobre un volumen ajeno, fallaba justo al guardar.
 #
+# `tls/` y `atajo/` guardan decisiones tomadas desde la interfaz —si hay HTTPS,
+# si se exige la firma del Atajo— y se crean la primera vez que se pulsa el
+# botón. Que esa pulsación sea el momento en que se descubre que el volumen no
+# deja escribir es exactamente lo que se evita adelantándolos aquí.
+#
 # El `|| true` no es descuido: con un volumen montado de solo lectura, `set -e`
 # cortaba aquí con el «mkdir: Read-only file system» del sistema y sin ninguna
 # de las indicaciones de más abajo. Quien decide si se puede trabajar es la
@@ -21,6 +26,8 @@ mkdir -p \
     "$DATA_DIR/JSON" \
     "$DATA_DIR/backups/auto" \
     "$DATA_DIR/tmp" \
+    "$DATA_DIR/tls" \
+    "$DATA_DIR/atajo" \
     "$LOGS_DIR" \
     "$API_DIR" 2>/dev/null || true
 

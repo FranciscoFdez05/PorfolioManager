@@ -25,7 +25,7 @@ import logging
 
 from flask import jsonify, request
 
-from core import settings
+from core import atajo_acceso, settings
 
 log = logging.getLogger(__name__)
 
@@ -39,10 +39,12 @@ def atajoActivado():
 def leerRedesPermitidas():
     """Devuelve la lista de redes permitidas ya parseadas.
 
-    Dejar `redes_permitidas =` vacío en config.ini devuelve una lista vacía, no
-    los rangos por defecto: el decorador de abajo lo traduce en rechazar todo.
+    Salen de `atajo_acceso`, que devuelve lo guardado desde Ajustes o, si ahí no
+    hay nada, lo que diga `[atajo] redes_permitidas`. Dejar esa lista vacía en
+    config.ini devuelve una lista vacía, no los rangos por defecto: el decorador
+    de abajo lo traduce en rechazar todo.
     """
-    crudas = settings.obtener("atajo.redes_permitidas")
+    crudas = atajo_acceso.redesEfectivas()
     redes = []
 
     for texto in crudas:

@@ -871,3 +871,72 @@ def test_firmar_con_texto_no_devuelve_timestamp(movimientos_app):
 
     assert datos["firma"] == _firmar(123, b"{}")
     assert "timestamp" not in datos
+
+
+# ── Sin firma, cuando se pide desde Ajustes ──────────────────────────────────
+# La firma se puede quitar (Ajustes > API): a veces la alternativa real no es
+# «con firma o sin firma», es «con firma o sin Atajo» —una clave perdida en una
+# reinstalación deja al iPhone sin poder apuntar nada—. Lo que no se puede es
+# que al quitarla se caiga también la otra barrera.
+
+@pytest.fixture
+def sin_firma(tmp_path, monkeypatch):
+    from core import atajo_acceso
+
+    destino = tmp_path / "atajo"
+    monkeypatch.setattr(atajo_acceso, "ATAJO_DIR", destino, raising=False)
+    monkeypatch.setattr(atajo_acceso, "ACCESO_FILE", destino / "acceso.json", raising=False)
+    atajo_acceso.guardar(False, [])
+    return atajo_acceso
+
+
+def test_sin_firma_exigida_el_movimiento_entra(movimientos_app, sin_firma):
+    """Es lo que se viene a poder hacer: apuntar sin clave."""
+    client = movimientos_app.test_client()
+
+    respuesta = client.post(
+        "/api/movimiento",
+        data=json.dumps({"tipo": "gasto", "categoria": "Compra", "nombre": "Pan", "importe": 1.2}).encode(),
+        content_type="application/json",
+        environ_base={"REMOTE_ADDR": "192.168.1.50"},
+    )
+
+    assert respuesta.status_code == 201
+    assert respuesta.get_json()["ok"] is True
+
+
+def test_sin_firma_exigida_la_ip_sigue_mandando(movimientos_app, sin_firma):
+    """La barrera que queda tiene que quedar entera.
+
+    Si quitar la firma ensanchara además quién puede llegar, el apaño dejaría de
+    ser un apaño: cualquiera en cualquier red podría escribir.
+    """
+    client = movimientos_app.test_client()
+
+    respuesta = client.post(
+        "/api/movimiento",
+        data=json.dumps({"tipo": "gasto", "categoria": "Compra", "nombre": "Pan", "importe": 1.2}).encode(),
+        content_type="application/json",
+        environ_base={"REMOTE_ADDR": "8.8.8.8"},
+    )
+
+    assert respuesta.status_code == 403
+
+
+def test_sin_firma_exigida_no_hace_falta_ni_clave(movimientos_app, sin_firma, monkeypatch):
+    """El caso que lo motiva: `movimientos.key` perdida tras restaurar un backup.
+
+    Con la firma exigida esto es un 503 y el Atajo no puede enviar nada; sin
+    exigirla tiene que entrar, porque no hay nada que verificar.
+    """
+    monkeypatch.delenv("MOVIMIENTOS_SECRET_KEY", raising=False)
+    client = movimientos_app.test_client()
+
+    respuesta = client.post(
+        "/api/movimiento",
+        data=json.dumps({"tipo": "ingreso", "categoria": "Nomina", "nombre": "Paga", "importe": 10}).encode(),
+        content_type="application/json",
+        environ_base={"REMOTE_ADDR": "192.168.1.50"},
+    )
+
+    assert respuesta.status_code == 201

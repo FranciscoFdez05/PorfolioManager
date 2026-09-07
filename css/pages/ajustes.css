@@ -1372,6 +1372,23 @@
     font-weight: 600;
 }
 
+/* El aviso de que la firma está desactivada. Rojo y no naranja: los demás
+   avisos de este panel explican cómo hacer algo, este dice qué se ha quitado. */
+/* Una IP que no pasa el filtro se marca: es la explicación de la mitad de los
+   fallos del Atajo, y en Docker la primera sospecha cuando el proxy no reescribe
+   la dirección de origen. */
+.ajustesAtajoIpFuera {
+    color: var(--color-neg);
+}
+
+.ajustesAtajoAviso.peligro {
+    border-color: rgba(231, 76, 60, 0.35);
+    background: rgba(231, 76, 60, 0.08);
+}
+.ajustesAtajoAviso[hidden] {
+    display: none;
+}
+
 /* El resultado de la comprobación desde el propio navegador. Verde o rojo sin
    medias tintas: la pregunta era binaria —¿se fía este aparato?— y la respuesta
    la ha dado el navegador, no una interpretación. */

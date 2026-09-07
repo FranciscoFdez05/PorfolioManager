@@ -194,15 +194,6 @@
                     </div>
                 </div>
 
-                <div class="navDropdown" data-module="gastos">
-                    <button class="navDropdownBtn" type="button">Gastos ▾</button>
-                    <div class="navDropdownMenu">
-                        <button class="navBtn navDropdownItem" data-page="gastos">Gastos</button>
-                        <button class="navBtn navDropdownItem" data-page="ingresos">Ingresos</button>
-                        <button class="navBtn navDropdownItem" data-page="ahorro">Ahorro</button>
-                    </div>
-                </div>
-
                 <div class="navDropdown" data-module="finanzas">
                     <button class="navDropdownBtn" type="button">Finanzas ▾</button>
                     <div class="navDropdownMenu">
@@ -230,8 +221,24 @@
 
                 <button class="navBtn" data-page="herramientas" data-module="herramientas">Herramientas</button>
                 <button class="navBtn" data-page="metricas" data-module="metricas">Métricas</button>
-                <button class="navBtn" data-page="ajustes">⚙️</button>
                 <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores">👁</button>
+
+                <!-- Lo que hay a partir de aquí es el dinero que entra y sale, que
+                     no es lo mismo que el patrimonio de la izquierda. El separador
+                     lo dice sin escribirlo; lleva data-module para irse con el
+                     módulo que separa, y no quedarse suelto si se apaga. -->
+                <span class="navSeparador" data-module="gastos" aria-hidden="true"></span>
+
+                <div class="navDropdown" data-module="gastos">
+                    <button class="navDropdownBtn" type="button">Gastos ▾</button>
+                    <div class="navDropdownMenu">
+                        <button class="navBtn navDropdownItem" data-page="gastos">Gastos</button>
+                        <button class="navBtn navDropdownItem" data-page="ingresos">Ingresos</button>
+                        <button class="navBtn navDropdownItem" data-page="ahorro">Ahorro</button>
+                    </div>
+                </div>
+
+                <button class="navBtn navBtnFinal" data-page="ajustes">⚙️</button>
 
             </div>
 
@@ -921,6 +928,9 @@
                         La dirección no cambia: el mismo puerto de siempre pasa a ser <code>https://</code>
                         y la página se recarga sola. A partir de ahí, los aparatos donde hayas instalado el
                         certificado entran sin ver un solo aviso.
+                        <br><br>
+                        Si usas el <strong>Atajo de iOS</strong>, vuelve a descargarlo después: lleva la
+                        dirección dentro y seguiría llamando a <code>http://</code>. Está en Ajustes › API.
                     </div>
                     <div class="ajustesTlsConfianza" id="ajustesTlsConfianza" hidden></div>
                     <label class="ajustesTlsConfirma" id="ajustesTlsConfirmaFila">
@@ -1370,6 +1380,7 @@
                 <dl class="ajustesAtajoDatos" id="ajustesAtajoDatos" hidden>
                     <div><dt>Dirección que llevará el atajo</dt><dd id="ajustesAtajoUrl">—</dd></div>
                     <div><dt>Redes desde las que se acepta</dt><dd id="ajustesAtajoRedes">—</dd></div>
+                    <div><dt>IP con la que te ve el servidor</dt><dd id="ajustesAtajoTuIp">—</dd></div>
                     <div><dt>Margen de reloj</dt><dd id="ajustesAtajoTolerancia">—</dd></div>
                 </dl>
 
@@ -1384,6 +1395,56 @@
                 </div>
 
                 <div class="ajustesAtajoPruebaRes" id="ajustesAtajoPruebaRes" hidden></div>
+
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <div class="ajustesLabelRow">
+                        <label class="ajustesLabel" for="ajustesAtajoRedesInput">Desde qué redes se aceptan las peticiones</label>
+                    </div>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesAtajoRedesInput" class="ajustesInput" type="text" autocomplete="off"
+                               placeholder="192.168.1.0/24, 10.0.0.0/24">
+                    </div>
+                    <div class="ajustesFieldHint">
+                        En notación CIDR, separadas por comas. Una IP suelta se escribe con <code>/32</code>
+                        (<code>192.168.1.100/32</code>). Se rechaza <strong>toda</strong> petición que llegue
+                        desde fuera de estos rangos, así que aquí tiene que estar la red de tu wifi —o la IP
+                        del iPhone—. Déjalo vacío para usar lo que diga <code>config.ini</code>.
+                    </div>
+                </div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Exigir firma en las peticiones
+                        <small>Recomendado. Cada petición del Atajo va firmada con la clave de este servidor, así que llegar desde una red permitida no basta para escribir.</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="ajustesAtajoExigirFirma" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+
+                <div class="ajustesAtajoAviso peligro" id="ajustesAtajoAvisoFirma" hidden>
+                    <strong>Sin firma, la red es la única barrera.</strong>
+                    Cualquiera que alcance este puerto desde los rangos de arriba puede apuntar movimientos
+                    en tu base de datos: la petición deja de probar <em>quién</em> la manda y solo prueba
+                    <em>desde dónde</em> viene. En una wifi doméstica eso es quien esté en tu wifi. Es un
+                    apaño razonable mientras montas la clave, no un sitio donde quedarse.
+                </div>
+
+                <div class="ajustesActions">
+                    <button id="ajustesAtajoAccesoBtn" class="ajustesAddBtn" type="button">Guardar acceso</button>
+                    <span id="ajustesAtajoAccesoMsg" class="ajustesStatusMsg"></span>
+                </div>
+
+                <div class="ajustesAtajoAviso">
+                    <strong>La dirección va dentro del atajo.</strong>
+                    Encender o apagar el HTTPS cambia el esquema de esa dirección —de <code>http://</code> a
+                    <code>https://</code> y al revés—, y el atajo que ya tengas en el iPhone seguirá llamando al
+                    anterior, así que dejará de responder. Cuando cambies el HTTPS, vuelve a descargarlo aquí
+                    (o edita la URL dentro del atajo, en la acción «Obtener contenido de»). La API no exige
+                    cifrado: con el HTTPS apagado, el atajo entra por <code>http://</code> como siempre.
+                </div>
 
                 <div class="ajustesAtajoAviso">
                     <strong>Al abrirlo en el iPhone, iOS pedirá permiso.</strong>
