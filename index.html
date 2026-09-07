@@ -905,13 +905,11 @@
                         pestaña.
                     </div>
                     <div class="ajustesActions">
+                        <button id="ajustesTlsPruebaAparatoBtn" class="ajustesAddBtn" type="button">Comprobar en este aparato</button>
                         <button id="ajustesTlsPruebaBtn" class="ajustesSecondaryBtn" type="button">Probar desde el servidor</button>
-                        <a id="ajustesTlsPruebaAparatoBtn" class="ajustesSecondaryBtn" href="#" target="_blank" rel="noopener">
-                            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.5 3H3.5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M9.5 2.5H13V6M12.8 2.7 7.5 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            Probar en este aparato
-                        </a>
                         <span id="ajustesTlsPruebaMsg" class="ajustesStatusMsg"></span>
                     </div>
+                    <div class="ajustesTlsAparatoRes" id="ajustesTlsAparatoRes" hidden></div>
                     <div class="ajustesFieldHint" id="ajustesTlsPruebaAparatoHint"></div>
                     <div class="ajustesTlsPruebaRes" id="ajustesTlsPruebaRes" hidden></div>
                 </div>
@@ -924,7 +922,8 @@
                         y la página se recarga sola. A partir de ahí, los aparatos donde hayas instalado el
                         certificado entran sin ver un solo aviso.
                     </div>
-                    <label class="ajustesTlsConfirma">
+                    <div class="ajustesTlsConfianza" id="ajustesTlsConfianza" hidden></div>
+                    <label class="ajustesTlsConfirma" id="ajustesTlsConfirmaFila">
                         <input type="checkbox" id="ajustesTlsConfirma">
                         <span>Ya he instalado el certificado en los aparatos desde los que entro
                             <small>Si falta alguno, ese verá el aviso del navegador hasta que lo instale, y tendrá que saltárselo para poder llegar a descargarlo.</small>

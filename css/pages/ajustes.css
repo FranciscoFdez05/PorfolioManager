@@ -1276,6 +1276,11 @@
     line-height: 1.5;
     color: var(--text-subtle);
 }
+/* `display: flex` gana al `display: none` que el navegador le da a [hidden], así
+   que sin esto la caja se pinta vacía aunque no haya nada que avisar. */
+.ajustesTlsAvisoNombre[hidden] {
+    display: none;
+}
 .ajustesTlsAvisoNombre code {
     font-family: monospace;
     color: var(--text-primary);
@@ -1365,6 +1370,66 @@
 .ajustesTlsAyudaCuerpo strong {
     color: var(--text-subtle);
     font-weight: 600;
+}
+
+/* El resultado de la comprobación desde el propio navegador. Verde o rojo sin
+   medias tintas: la pregunta era binaria —¿se fía este aparato?— y la respuesta
+   la ha dado el navegador, no una interpretación. */
+.ajustesTlsAparatoRes {
+    margin-top: 12px;
+    padding: 11px 13px;
+    border-radius: 8px;
+    border: 1px solid var(--border-soft);
+    background: var(--bg-inset);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-muted);
+}
+.ajustesTlsAparatoRes[hidden] {
+    display: none;
+}
+.ajustesTlsAparatoRes strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+.ajustesTlsAparatoRes.ok {
+    border-color: rgba(46, 204, 113, 0.35);
+    background: rgba(46, 204, 113, 0.08);
+}
+.ajustesTlsAparatoRes.mal {
+    border-color: rgba(231, 76, 60, 0.35);
+    background: rgba(231, 76, 60, 0.08);
+}
+.ajustesTlsAparatoEnlace {
+    display: inline-block;
+    margin-top: 8px;
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+/* Lo que sustituye a la casilla cuando la comprobación ha salido bien: ya no se
+   promete nada, se dice lo que se ha medido. */
+.ajustesTlsConfianza {
+    margin-top: 14px;
+    padding: 11px 13px;
+    border: 1px solid rgba(46, 204, 113, 0.35);
+    border-radius: 8px;
+    background: rgba(46, 204, 113, 0.08);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-muted);
+}
+.ajustesTlsConfianza[hidden] {
+    display: none;
+}
+.ajustesTlsConfianza strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+
+/* Igual que arriba: `display: flex` gana al `display: none` de [hidden]. */
+.ajustesTlsConfirma[hidden] {
+    display: none;
 }
 
 /* El segundo paso —encender— va el último de la tarjeta y no arriba con los

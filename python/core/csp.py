@@ -16,9 +16,15 @@ Decisiones que no son obvias:
   una docena de sitios y varios módulos de JS escriben `el.style.…` para
   posicionar tooltips y menús flotantes. Quitarlo exigiría reescribir eso, y el
   riesgo que cubre (exfiltración por CSS) es mucho menor que el de un script.
-* **connect-src 'self'.** Todas las llamadas a proveedores de mercado las hace
-  el servidor; el navegador solo habla con /api/. Si alguna vez el frontend
-  llamara directamente a una API externa, esta directiva lo delataría.
+* **connect-src 'self' y el puerto de comprobación del certificado.** Todas las
+  llamadas a proveedores de mercado las hace el servidor; el navegador solo
+  habla con /api/. La única excepción es la comprobación del HTTPS: el panel de
+  Ajustes pide `https://<este mismo host>:9443` para averiguar si **este**
+  navegador se fía del certificado, que es lo único que el servidor no puede
+  contestar por él. Es el mismo host por el que ha llegado la petición y un
+  puerto que solo sirve una página fija, así que no abre nada que no estuviera
+  ya abierto. Si alguna vez el frontend llamara a una API externa de verdad,
+  esta directiva lo seguiría delatando.
 * **frame-ancestors 'self'** duplica X-Frame-Options a propósito: la cabecera
   antigua la ignoran los navegadores modernos cuando hay CSP, y la nueva no la
   entienden los muy viejos.
@@ -45,11 +51,18 @@ def generar_nonce() -> str:
     return secrets.token_urlsafe(16)
 
 
-def construir(nonce: str = "") -> str:
-    """Cadena de la cabecera Content-Security-Policy."""
+def construir(nonce: str = "", origenesConexion: tuple[str, ...] = ()) -> str:
+    """Cadena de la cabecera Content-Security-Policy.
+
+    `origenesConexion` añade destinos a `connect-src`. Hoy solo lo usa el puerto
+    de comprobación del certificado, que se calcula por petición porque depende
+    del host por el que se ha entrado.
+    """
     origenes_script = ["'self'", *[o for o in settings.cspOrigenesScripts() if o]]
     if nonce:
         origenes_script.append(f"'nonce-{nonce}'")
+
+    origenes_conexion = ["'self'", *[o for o in origenesConexion if o]]
 
     directivas = [
         ("default-src", ["'self'"]),
@@ -58,7 +71,7 @@ def construir(nonce: str = "") -> str:
         # blob: lo necesitan las descargas de CSV/JSON que genera el frontend.
         ("img-src", ["'self'", "data:", "blob:"]),
         ("font-src", ["'self'"]),
-        ("connect-src", ["'self'"]),
+        ("connect-src", origenes_conexion),
         ("object-src", ["'none'"]),
         ("base-uri", ["'self'"]),
         ("form-action", ["'self'"]),

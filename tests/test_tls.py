@@ -679,6 +679,67 @@ def test_preparar_con_el_https_ya_puesto_no_toca_el_proxy(cliente_autenticado, b
     assert b"tls internal" in _ultimo_load(caddy)
 
 
+def test_la_comprobacion_levanta_el_puerto_si_se_ha_caido(cliente_autenticado, bp_tls, monkeypatch):
+    """El sitio de comprobación no sobrevive a un reinicio: al arrancar se
+    reaplica el estado guardado, y con el HTTPS apagado ahí no hay TLS.
+
+    Sin esto, «Probar en este aparato» llevaba a una conexión rechazada, que
+    manda a revisar el certificado cuando lo que pasa es que no hay nadie
+    escuchando.
+    """
+    cargas = []
+
+    def _admin(ruta, datos=None, tipo=None):
+        if ruta == "/load":
+            cargas.append(datos)
+            return b"{}"
+        if ruta.startswith("/pki/ca/"):
+            return json.dumps({"root_certificate": "-----BEGIN CERTIFICATE-----\nX\n"}).encode()
+        return b'{"apps": {"http": {"servers": {"srv0": {"listen": [":5000"]}}}}}'
+
+    monkeypatch.setattr(tls, "_admin", _admin)
+    client, cab, _app = cliente_autenticado(bp_tls)
+    tls.guardarEstado(False, ["192.168.1.163"])
+
+    res = client.post("/api/tls/comprobacion", headers=cab)
+
+    assert res.status_code == 200
+    assert res.get_json()["listo"] is True
+    assert f"https://192.168.1.163:{tls.PUERTO_PREPARACION}".encode() in cargas[-1]
+    # Y sigue sin encender nada: el puerto de la aplicación en claro.
+    assert f"http://:{tls.settings.puerto()}".encode() in cargas[-1]
+
+
+def test_la_comprobacion_no_toca_el_proxy_si_ya_está_en_pie(cliente_autenticado, bp_tls, monkeypatch):
+    """Recargar la configuración por gusto es tocar el proxy que sostiene la
+    sesión: si el puerto ya está, no se hace nada."""
+    cargas = []
+
+    def _admin(ruta, datos=None, tipo=None):
+        if ruta == "/load":
+            cargas.append(datos)
+            return b"{}"
+        if ruta.startswith("/pki/ca/"):
+            return json.dumps({"root_certificate": "-----BEGIN CERTIFICATE-----\nX\n"}).encode()
+        return f'{{"listen": [":{tls.PUERTO_PREPARACION}"]}}'.encode()
+
+    monkeypatch.setattr(tls, "_admin", _admin)
+    client, cab, _app = cliente_autenticado(bp_tls)
+    tls.guardarEstado(False, ["casa"])
+
+    assert client.post("/api/tls/comprobacion", headers=cab).status_code == 200
+    assert cargas == []
+
+
+def test_la_comprobacion_sin_certificado_dice_qué_falta(cliente_autenticado, bp_tls, caddy):
+    client, cab, _app = cliente_autenticado(bp_tls)
+
+    res = client.post("/api/tls/comprobacion", headers=cab)
+
+    assert res.status_code == 409
+    assert "Emitir el certificado" in res.get_json()["error"]
+
+
 def test_activar_sin_nombres_se_rechaza(cliente_autenticado, bp_tls, caddy):
     client, cab, _app = cliente_autenticado(bp_tls)
 

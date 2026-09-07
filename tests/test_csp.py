@@ -98,6 +98,28 @@ def test_connect_src_solo_self():
     assert _directivas(csp.construir())["connect-src"] == ["'self'"]
 
 
+def test_connect_src_admite_el_puerto_de_comprobacion_del_certificado():
+    """La única excepción, y se calcula por petición.
+
+    El panel de HTTPS pide esa página para averiguar si **este** navegador se
+    fía del certificado, que es lo que el servidor no puede contestar. Sin la
+    directiva, la CSP la bloquea y el navegador no dice por qué: parecería que
+    el certificado falla cuando lo que ha fallado es la política.
+    """
+    directiva = _directivas(csp.construir("", ("https://192.168.1.163:9443",)))["connect-src"]
+
+    assert directiva == ["'self'", "https://192.168.1.163:9443"]
+
+
+def test_connect_src_no_se_abre_a_cualquiera():
+    """Lo que se añade es un host concreto, nunca un comodín: la excepción es
+    para el propio servidor, no para la red."""
+    directiva = _directivas(csp.construir("", ("https://192.168.1.163:9443",)))["connect-src"]
+
+    assert "*" not in directiva
+    assert all(o == "'self'" or o.startswith("https://") for o in directiva)
+
+
 def test_los_nonces_no_se_repiten():
     assert len({csp.generar_nonce() for _ in range(50)}) == 50
 

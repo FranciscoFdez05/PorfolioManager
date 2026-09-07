@@ -101,10 +101,12 @@ vale igual. Dos cosas opcionales, ninguna necesaria para que funcione:
   volumen de Caddy y no se regenera, así que ahí el paso de emitir se salta—.
   Lo dice el estado: `caDisponible` en `GET /api/tls`.
 
-- **Casilla de confirmación antes de activar.** «Activar HTTPS» está
-  deshabilitado hasta marcar que el certificado ya está instalado. Es la única
-  pulsación de este panel que puede dejar a alguien fuera de la aplicación, y
-  basta una casilla para que no se dé de paso.
+- **«Activar HTTPS» se habilita cuando se ha comprobado que este aparato se fía
+  del certificado**, no cuando el usuario promete que lo ha instalado. Es la
+  única pulsación de este panel que puede dejar a alguien fuera, así que el
+  permiso lo da una medición y no una intención: el panel le pide la página de
+  comprobación al propio navegador y mira si la valida. Queda una casilla para
+  confirmarlo a mano, para cuando la comprobación no se pueda hacer.
 
 - **«Probar en este aparato»: se comprueba que el certificado funciona antes de
   encender nada.** Instalar un certificado *parece* que ha ido bien aunque no
@@ -115,14 +117,22 @@ vale igual. Dos cosas opcionales, ninguna necesaria para que funcione:
   lado del aviso.
 
   El puerto de emisión se queda ahora como **puerto de comprobación** y sirve
-  una página fija por HTTPS con el mismo certificado. El botón la abre en otra
-  pestaña: si carga sin avisos, ahí funciona; si el navegador protesta,
-  protestaría igual con el HTTPS puesto. Está publicado a propósito —esa
-  pregunta solo la puede contestar el aparato que la hace, no el servidor— y
-  sigue sin llevar a ninguna parte: no hace `reverse_proxy`, no lleva sesión y
-  contesta una sola cosa. Sigue en pie con el HTTPS ya activo, que es como se
-  da de alta un aparato nuevo sin arriesgarse a que la puerta principal lo
-  rechace.
+  una página fija por HTTPS con el mismo certificado. El panel se la pide al
+  navegador que tienes delante: si la valida, ese aparato se fía y el HTTPS va
+  a ir; si no, el intento falla y lo dice, con el HTTPS todavía apagado. Está
+  publicado a propósito —esa pregunta solo la puede contestar el aparato que la
+  hace, no el servidor— y sigue sin llevar a ninguna parte: no hace
+  `reverse_proxy`, no lleva sesión y contesta una sola cosa. Para que el
+  navegador pueda pedirla, el sitio manda `Access-Control-Allow-Origin` y la
+  CSP añade ese origen —el mismo host por el que ha llegado la petición— a
+  `connect-src`; sin eso la bloquearía la propia política, en silencio y
+  pareciendo un fallo del certificado.
+
+  Sigue en pie con el HTTPS ya activo, que es como se da de alta un aparato
+  nuevo sin arriesgarse a que la puerta principal lo rechace. Y se vuelve a
+  levantar solo si se ha caído en un reinicio: sin eso, el botón llevaba a una
+  conexión rechazada, que manda a revisar el certificado cuando lo que pasa es
+  que no hay nadie escuchando.
 
 - **«Probar ahora» funciona antes de activar**, y dice cuál de las dos cosas ha
   comprobado. Con el HTTPS puesto mira el puerto de siempre; con el certificado

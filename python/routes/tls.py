@@ -6,6 +6,7 @@ es lo que se puede probar sin levantar un proxy.
     GET  /api/tls            estado actual, para pintar el panel
     POST /api/tls/preparar   emitir el certificado sin encender nada todavía
     POST /api/tls            activar o desactivar
+    POST /api/tls/comprobacion  levantar el puerto donde se comprueba desde el aparato
     GET  /api/tls/prueba     comprobación real del cifrado, nombre por nombre
     GET  /api/tls/ca.crt     certificado raíz, para instalar en cada aparato
 
@@ -216,6 +217,39 @@ def set_tls():
     )
 
     return jsonify({"ok": True, **_estado_publico(), "estado": estado})
+
+
+@tls_bp.route("/api/tls/comprobacion", methods=["POST"])
+def post_comprobacion():
+    """Deja en pie el puerto de comprobación, para que se pueda abrir desde aquí.
+
+    Hace falta porque ese sitio no sobrevive a un reinicio: al arrancar se
+    reaplica el estado guardado, y con el HTTPS apagado ahí no hay ningún TLS.
+    Sin esto, «Probar en este aparato» lleva a una conexión rechazada, que es el
+    peor mensaje posible: parece que el certificado está mal cuando lo que pasa
+    es que no hay nada escuchando, y manda a revisar lo que no toca.
+
+    Con el HTTPS ya activo no hay nada que levantar: el sitio de comprobación va
+    en la misma configuración que sirve la aplicación.
+    """
+    if tls.httpsActivo():
+        return jsonify({"ok": True, "listo": True, "puerto": tls.PUERTO_PREPARACION})
+
+    estado = tls.leerEstado()
+    if not estado["nombres"]:
+        raise ApiError(
+            "Todavía no hay ningún certificado que comprobar. Pulsa «Emitir el "
+            "certificado».",
+            status_code=409,
+        )
+
+    try:
+        if not tls.sitioDePruebaLevantado():
+            tls.aplicar(False, estado["nombres"], preparando=True)
+    except tls.ErrorCaddy as e:
+        raise ApiError(str(e), status_code=502) from e
+
+    return jsonify({"ok": True, "listo": True, "puerto": tls.PUERTO_PREPARACION})
 
 
 @tls_bp.route("/api/tls/prueba", methods=["GET"])

@@ -264,6 +264,11 @@ def _sitioDePrueba(nombres: list[str]) -> str:
         f"{sitios} {{\n"
         "\ttls internal\n"
         '\theader Content-Type "text/html; charset=utf-8"\n'
+        # Para que el panel pueda pedir esta página con fetch y enterarse de si
+        # el navegador se ha fiado. Sin la cabecera la respuesta llega opaca, y
+        # entonces «no se fía» y «no llega» se confunden. Lo que se expone es
+        # una frase fija: no hay nada que un origen ajeno pueda sacar de aquí.
+        '\theader Access-Control-Allow-Origin "*"\n'
         f'\trespond "{_PAGINA_PRUEBA}" 200\n'
         "}\n"
     )

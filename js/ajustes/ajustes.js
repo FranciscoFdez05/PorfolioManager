@@ -1531,6 +1531,9 @@ async function initAjustesLogic() {
     const tlsPruebaRes = document.getElementById("ajustesTlsPruebaRes")
     const tlsPruebaAparatoBtn = document.getElementById("ajustesTlsPruebaAparatoBtn")
     const tlsPruebaAparatoHint = document.getElementById("ajustesTlsPruebaAparatoHint")
+    const tlsAparatoResEl = document.getElementById("ajustesTlsAparatoRes")
+    const tlsConfianzaEl = document.getElementById("ajustesTlsConfianza")
+    const tlsConfirmaFila = document.getElementById("ajustesTlsConfirmaFila")
 
     function _pintarTls(data) {
         if (!tlsEstadoEl) return
@@ -1603,9 +1606,6 @@ async function initAjustesLogic() {
         if (tlsPaso2El) {
             tlsPaso2El.style.display = editable && !data.activado && conCa ? "" : "none"
         }
-        if (tlsActivarBtn) {
-            tlsActivarBtn.disabled = !tlsConfirmaEl?.checked
-        }
         _avisarSiTeDejasFuera()
         // La comprobación también se adelanta: sirve para el certificado ya
         // emitido, no solo para el HTTPS ya puesto. Era el orden equivocado
@@ -1614,7 +1614,7 @@ async function initAjustesLogic() {
         if (tlsPruebaEl) {
             tlsPruebaEl.style.display = cifrando || conCa ? "" : "none"
         }
-        _pintarPruebaAparato(data.puertoPrueba)
+        _pintarPruebaAparato(data)
         // La guía explica cómo encenderlo: con el HTTPS ya puesto sobra, y lo
         // que hace falta entonces —instalar la CA, comprobar— sale justo debajo.
         if (tlsGuiaEl) {
@@ -1798,7 +1798,7 @@ async function initAjustesLogic() {
                 showMsg(msg, "Error de red", "error")
             }
         } finally {
-            if (tlsActivarBtn) tlsActivarBtn.disabled = !tlsConfirmaEl?.checked
+            _permitirActivar()
             if (tlsDesactivarBtn) tlsDesactivarBtn.disabled = false
         }
     }
@@ -1815,19 +1815,136 @@ async function initAjustesLogic() {
     // servida con el mismo certificado en el puerto de comprobación: si carga,
     // la CA está bien instalada aquí; si avisa, avisaría igual con el HTTPS
     // puesto —y se ha averiguado sin ponerlo—.
-    function _pintarPruebaAparato(puerto) {
-        const url = puerto ? `https://${location.hostname}:${puerto}/` : ""
+    // --- Comprobar en este aparato ---
+    // La única pregunta que el servidor no puede contestar: ¿se fía ESTE
+    // navegador del certificado? Antes se resolvía abriendo una pestaña y
+    // mirando, o sea pidiéndole al usuario que interpretara un aviso. Ahora la
+    // hace el propio panel: si el fetch a la página de comprobación resuelve,
+    // el navegador ha validado el certificado; si no se fía, el fetch falla.
+    // No queda nada que creerse.
+    //
+    // El puerto de comprobación no sobrevive a un reinicio —al arrancar se
+    // reaplica el estado guardado, y con el HTTPS apagado ahí no hay TLS—, así
+    // que primero se le pide al servidor que lo levante. Sin eso, «conexión
+    // rechazada» se confundiría con «no me fío», que manda a arreglar lo que no
+    // está roto.
+    let _aparatoDeConfianza = false
+
+    async function _asegurarPuertoDePrueba() {
+        try {
+            const res = await fetch("/api/tls/comprobacion", { method: "POST" })
+            const data = await res.json()
+            return { ok: !!data.listo, error: data.error }
+        } catch {
+            return { ok: false, error: "No se ha podido hablar con el servidor" }
+        }
+    }
+
+    function _urlDeComprobacion(puerto) {
+        return puerto ? `https://${location.hostname}:${puerto}/` : ""
+    }
+
+    function _pintarAparato(estado, detalle, url) {
+        if (!tlsAparatoResEl) return
+        tlsAparatoResEl.hidden = false
+        tlsAparatoResEl.className = "ajustesTlsAparatoRes " + estado
+        tlsAparatoResEl.innerHTML = detalle
+        if (estado === "mal" && url) {
+            // El fetch no distingue «no me fío» de «no llego»: los dos fallan
+            // igual. El navegador sí lo dice, con todas sus letras, si se abre
+            // la página a mano; así que se ofrece.
+            const enlace = document.createElement("a")
+            enlace.className = "ajustesTlsAparatoEnlace"
+            enlace.href = url
+            enlace.target = "_blank"
+            enlace.rel = "noopener"
+            enlace.textContent = "Abrirla en otra pestaña para ver el motivo"
+            tlsAparatoResEl.appendChild(document.createElement("br"))
+            tlsAparatoResEl.appendChild(enlace)
+        }
+    }
+
+    function _permitirActivar() {
+        if (!tlsActivarBtn) return
+        tlsActivarBtn.disabled = !(_aparatoDeConfianza || tlsConfirmaEl?.checked)
+
+        // Comprobado de verdad, la casilla sobra: era el sustituto de esto.
+        if (tlsConfirmaFila) tlsConfirmaFila.hidden = _aparatoDeConfianza
+        if (tlsConfianzaEl) {
+            tlsConfianzaEl.hidden = !_aparatoDeConfianza
+            tlsConfianzaEl.innerHTML = _aparatoDeConfianza
+                ? "<strong>Este aparato se fía del certificado.</strong> Si entras también desde el móvil o desde otro equipo, instálalo allí antes de encender: aquí solo se ha comprobado este."
+                : ""
+        }
+    }
+
+    async function _comprobarEnEsteAparato() {
+        if (!tlsPruebaAparatoBtn) return
+        const url = _urlDeComprobacion(tlsPruebaAparatoBtn.dataset.puerto)
+        if (!url) return
+
+        tlsPruebaAparatoBtn.disabled = true
+        showMsg(tlsPruebaMsg, "Comprobando en este aparato…", "")
+
+        try {
+            const puerto = await _asegurarPuertoDePrueba()
+            if (!puerto.ok) {
+                showMsg(tlsPruebaMsg, "Sin comprobar", "error")
+                _pintarAparato("mal", puerto.error || "No se ha podido levantar el puerto de comprobación", "")
+                return
+            }
+
+            try {
+                // cache: no-store para que no conteste un resultado viejo: lo
+                // que se mide es el apretón de manos de ahora mismo.
+                await fetch(url, { cache: "no-store" })
+                _aparatoDeConfianza = true
+                showMsg(tlsPruebaMsg, "Este aparato se fía", "ok")
+                _pintarAparato(
+                    "ok",
+                    "<strong>El certificado funciona en este aparato.</strong> El navegador lo ha validado sin un solo aviso: " +
+                        "con el HTTPS puesto entrarás igual que ahora.",
+                    url
+                )
+            } catch {
+                _aparatoDeConfianza = false
+                showMsg(tlsPruebaMsg, "Este aparato no lo acepta", "error")
+                _pintarAparato(
+                    "mal",
+                    "<strong>Este aparato no acepta el certificado.</strong> O no está instalado aquí —en Windows tiene que " +
+                        "quedar en «Entidades de certificación raíz de confianza», no en «Personal»—, o no se llega al puerto " +
+                        "de comprobación. Si activas el HTTPS ahora, este navegador te sacaría el aviso.",
+                    url
+                )
+            }
+        } finally {
+            tlsPruebaAparatoBtn.disabled = false
+            _permitirActivar()
+        }
+    }
+
+    function _pintarPruebaAparato(data) {
+        const puerto = data.puertoPrueba
+        const hayCertificado = !!data.caDisponible || !!data.activado
+        const url = puerto && hayCertificado ? _urlDeComprobacion(puerto) : ""
+
         if (tlsPruebaAparatoBtn) {
-            tlsPruebaAparatoBtn.href = url || "#"
+            tlsPruebaAparatoBtn.dataset.puerto = url ? puerto : ""
             tlsPruebaAparatoBtn.style.display = url ? "" : "none"
         }
         if (tlsPruebaAparatoHint) {
             tlsPruebaAparatoHint.innerHTML = url
-                ? `Abre <code>${url}</code> en otra pestaña. Si sale una página diciendo que el certificado funciona, ` +
-                  "en este aparato está bien instalado y el HTTPS va a ir. Si el navegador avisa, es que aquí falta " +
-                  "—y avisaría igual con el HTTPS puesto—. Repítelo desde cada aparato, con la dirección de este servidor."
+                ? `Pide <code>${url}</code> desde este mismo navegador: una página servida con el mismo certificado ` +
+                  "que servirá el HTTPS. Es la comprobación que el servidor no puede hacer por ti, y hay que repetirla " +
+                  "en cada aparato desde el que entres."
                 : ""
         }
+        // Un «se fía» de antes de tocar los nombres ya no vale para nada.
+        if (!url) {
+            _aparatoDeConfianza = false
+            if (tlsAparatoResEl) tlsAparatoResEl.hidden = true
+        }
+        _permitirActivar()
     }
 
     function _filaPrueba(r) {
@@ -1917,6 +2034,7 @@ async function initAjustesLogic() {
 
     if (tlsNombresEl) tlsNombresEl.addEventListener("input", _avisarSiTeDejasFuera)
     if (tlsPruebaBtn) tlsPruebaBtn.addEventListener("click", _probarTls)
+    if (tlsPruebaAparatoBtn) tlsPruebaAparatoBtn.addEventListener("click", _comprobarEnEsteAparato)
     if (tlsPrepararBtn) tlsPrepararBtn.addEventListener("click", _prepararTls)
     if (tlsActivarBtn) tlsActivarBtn.addEventListener("click", () => _guardarTls(true))
     if (tlsDesactivarBtn) tlsDesactivarBtn.addEventListener("click", () => _guardarTls(false))
@@ -1924,9 +2042,7 @@ async function initAjustesLogic() {
     // ya está instalado. Es la única pulsación de este panel que puede dejar a
     // alguien fuera, y basta una casilla para que no se dé por accidente.
     if (tlsConfirmaEl) {
-        tlsConfirmaEl.addEventListener("change", () => {
-            if (tlsActivarBtn) tlsActivarBtn.disabled = !tlsConfirmaEl.checked
-        })
+        tlsConfirmaEl.addEventListener("change", _permitirActivar)
     }
     loadTls()
 

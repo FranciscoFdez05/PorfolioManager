@@ -104,6 +104,20 @@ def _es_asset_publico(path: str) -> bool:
     )
 
 
+def _origenes_de_comprobacion() -> tuple[str, ...]:
+    """El puerto donde el panel comprueba si ESTE navegador se fía del certificado.
+
+    Va en `connect-src` porque, si no, la comprobación la bloquea la propia CSP
+    y el navegador no dice por qué: parecería que el certificado falla cuando lo
+    que ha fallado es la política. Se arma con el host de esta misma petición
+    —no se abre a nadie más— y con el puerto que sirve una página fija.
+    """
+    host = (request.host or "").split(":")[0]
+    if not host:
+        return ()
+    return (f"https://{host}:{tls.PUERTO_PREPARACION}",)
+
+
 def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
     """Registra los controles sobre `app` y devuelve los dos limitadores.
 
@@ -234,7 +248,9 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
             # El nonce lo fija la vista que sirve index.html; el resto de
             # respuestas no llevan scripts en línea, así que su política queda
             # aún más cerrada.
-            response.headers["Content-Security-Policy"] = csp.construir(g.get("csp_nonce", ""))
+            response.headers["Content-Security-Policy"] = csp.construir(
+                g.get("csp_nonce", ""), _origenes_de_comprobacion()
+            )
         return response
 
     return limite_escrituras, limite_pesadas
