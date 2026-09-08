@@ -5,9 +5,9 @@
 #   1. Crear .env (a partir de .env.example) si aún no existe.
 #   2. Generar SECRET_KEY y, en el primer arranque, las credenciales de acceso.
 #   3. Comprobar que config.ini existe y que el .env no lo está tapando.
-#   4. Leer el puerto de config.ini y exportarlo como PORT, para que el mapeo
-#      host:contenedor de docker-compose.yml coincida siempre con el valor real
-#      que usa la app.
+#   4. Preguntar el puerto, con el que ya hay como respuesta por defecto, y
+#      exportarlo como PORT, para que el mapeo host:contenedor de
+#      docker-compose.yml coincida siempre con el valor real que usa la app.
 #   5. Crear data/, logs/ y API/ con tu usuario y exportar PUID/PGID, para que
 #      el contenedor pueda escribir en ellos y lo que cree siga siendo tuyo.
 #
@@ -271,12 +271,59 @@ if [ -n "$SOMBRAS" ]; then
 fi
 
 # ── 5. Puerto ─────────────────────────────────────────────────────────────────
-# Se lee con la misma capa de configuración que usa la aplicación
-# (tools/leer_ajuste.py), no con un configparser aparte: así el puerto del mapeo
-# de Docker respeta la prioridad entorno → config.ini → defecto y queda validado
-# igual que dentro del contenedor.
-PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
+# El valor de partida sale del .env si está escrito ahí y, si no, de la misma
+# capa de configuración que usa la aplicación (tools/leer_ajuste.py), no de un
+# configparser aparte: así el puerto del mapeo de Docker respeta la prioridad
+# entorno → config.ini → defecto y queda validado igual que dentro del
+# contenedor.
+#
+# El .env va primero porque es donde se configura una instalación concreta: es
+# lo que sobrevive a las actualizaciones —config.ini se distribuye con el código
+# y el pull lo reemplaza— y de donde toma el contenedor sus variables. Leyendo
+# solo config.ini, un PORT puesto a mano en el .env quedaba tapado por el que
+# exporta este script: se veía escrito y no lo usaba nadie.
+PORT=$(env_get PORT)
+if [ -z "$PORT" ]; then
+    PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
+fi
 [ -n "$PORT" ] || PORT=5000
+
+# Se pregunta en cada arranque con terminal, con el valor actual como respuesta
+# por defecto. Que el 5000 esté ocupado en el host es el tropiezo más común de
+# una instalación nueva, y se descubría tarde y mal: el proxy no arrancaba, y
+# había que ir a buscar en qué fichero se cambia el puerto. Enter lo deja como
+# está; sin terminal (cron, el vigilante de actualizaciones, un script) no se
+# pregunta nada y se usa el valor de siempre.
+if [ -t 0 ]; then
+    while true; do
+        printf 'Sobre qué puerto funciona la app [%s]: ' "$PORT"
+        read -r RESPUESTA || RESPUESTA=""
+        [ -n "$RESPUESTA" ] || break
+
+        # Los ceros a la izquierda se quitan antes de comparar: hay shells cuyo
+        # `[ ... -ge ... ]` lee «0080» como octal, y como octal no es válido, así
+        # que el número se rechazaría con un error del intérprete en vez de con
+        # el aviso de aquí abajo.
+        RESPUESTA=$(printf '%s' "$RESPUESTA" | sed 's/^0*//')
+
+        case "$RESPUESTA" in
+            ''|*[!0-9]*) ;;
+            *)
+                if [ "$RESPUESTA" -ge 1 ] && [ "$RESPUESTA" -le 65535 ]; then
+                    PORT="$RESPUESTA"
+                    break
+                fi
+                ;;
+        esac
+        echo "  Tiene que ser un número entre 1 y 65535." >&2
+    done
+
+    # Guardado en .env, no en config.ini: config.ini está versionado y cambiarlo
+    # aquí haría chocar el pull de la siguiente actualización, que es justo lo
+    # que docker-update.sh se para a comprobar. Así el puerto elegido sigue en
+    # pie después de actualizar.
+    [ "$PORT" = "$(env_get PORT)" ] || env_set PORT "$PORT"
+fi
 export PORT
 
 # ── 6. Volúmenes y usuario ────────────────────────────────────────────────────

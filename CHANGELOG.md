@@ -22,6 +22,69 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.0.2] — 2026-09-08
+
+**El puerto se pregunta al arrancar, en vez de esperar a que falle.** Que el
+5000 estuviera ocupado en el servidor era el tropiezo más común de una
+instalación nueva, y se descubría por el peor camino: `docker-setup` se pasaba
+varios minutos construyendo la imagen para terminar con el proxy negándose a
+arrancar, y a partir de ahí había que averiguar en qué fichero se cambia el
+puerto. Ahora lo pregunta antes de construir nada, con el que ya hay como
+respuesta por defecto.
+
+Al ir a guardarlo aparece lo otro: el `PORT` del `.env` no lo estaba usando
+nadie. `docker-up.sh` y `docker-update.sh` resolvían el puerto solo con
+`config.ini` y lo exportaban, y ese valor exportado gana al del `env_file` en
+`docker-compose.yml`. Así que el canal que recomienda el README para configurar
+una instalación —el `.env`, que es lo que sobrevive a las actualizaciones— se
+veía escrito y no surtía efecto, y actualizar devolvía el puerto al de
+`config.ini` sin decir nada.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano. Lo que cambia son los dos scripts del
+host; la aplicación es la misma imagen de siempre. La pregunta del puerto solo
+aparece al ejecutar `./docker-up.sh` desde una terminal: actualizando desde el
+botón no se pregunta nada y se mantiene el puerto que hubiera.
+
+### Añadido
+
+- **`docker-up.sh` pregunta el puerto**, con el actual como respuesta por
+  defecto:
+
+  ```
+  Sobre qué puerto funciona la app [5000]:
+  ```
+
+  Enter lo deja como está. Se admite cualquier número de 1 a 65535 y se vuelve a
+  preguntar si no lo es, en vez de dejar que un valor imposible llegue al mapeo
+  de Docker. El puerto elegido se guarda en `.env`, no en `config.ini`: ese
+  fichero se distribuye con el código, y escribir ahí haría chocar el `git pull`
+  de la siguiente actualización, que es justo lo que `docker-update.sh` se para
+  a comprobar antes de empezar.
+
+  Solo se pregunta si hay terminal. Sin ella —cron, un script, el vigilante de
+  `tools/actualizador/`— se usa el valor de siempre y el arranque no se queda
+  esperando una respuesta que no va a llegar.
+
+### Corregido
+
+- **El `PORT` del `.env` se ignoraba al levantar el stack con los scripts.**
+  Los dos exportaban el puerto leído de `config.ini`, y `docker-compose.yml`
+  toma ese valor exportado con preferencia sobre el del `env_file`. Ahora
+  `docker-up.sh` y `docker-update.sh` miran primero el `.env` y solo si no dice
+  nada acuden a `config.ini`, que es la misma prioridad —entorno, luego fichero,
+  luego el defecto— que aplica la aplicación por dentro.
+
+- **Actualizar cambiaba el puerto solo.** Consecuencia de lo anterior y la parte
+  que de verdad molestaba: una instalación puesta en el 8080 volvía al 5000 en
+  la siguiente actualización, y la dirección guardada en el móvil y en el
+  portátil dejaba de responder sin que nada explicara por qué.
+
+---
+
 ## [2.0.1] — 2026-09-08
 
 **Cerrar sesión pasa a cerrar la sesión.** No lo hacía: `session.clear()` vacía

@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.0.1-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.0.2-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 [![SQLite](https://img.shields.io/badge/sqlite-3.40%2B-lightgrey)](Dockerfile)
@@ -57,7 +57,7 @@ cd PorfolioManager
 ./docker-setup
 ```
 
-`docker-setup` deja el stack listo en un solo paso: comprueba Docker, crea `.env` a partir de `.env.example` si no existe, genera la `SECRET_KEY`, pide usuario y contraseña la primera vez (guarda el hash, nunca la contraseña), lee el puerto de `config.ini` y lanza `docker compose up -d --build`. Solo imprime la URL cuando el healthcheck confirma que la aplicación está lista. Puedes pasarle argumentos extra de `docker compose up`, por ejemplo `./docker-setup --force-recreate`.
+`docker-setup` deja el stack listo en un solo paso: comprueba Docker, crea `.env` a partir de `.env.example` si no existe, genera la `SECRET_KEY`, pide usuario y contraseña la primera vez (guarda el hash, nunca la contraseña), pregunta el puerto y lanza `docker compose up -d --build`. Solo imprime la URL cuando el healthcheck confirma que la aplicación está lista. Puedes pasarle argumentos extra de `docker compose up`, por ejemplo `./docker-setup --force-recreate`.
 
 Ejecuta el script con tu usuario normal, **sin `sudo`**. Si Docker exige permisos,
 añade una vez tu usuario al grupo `docker` con `sudo usermod -aG docker "$USER"`
@@ -74,7 +74,7 @@ El contenedor publica el puerto en todas las interfaces del host, así que cualq
 
 > **Eso es HTTP plano.** La contraseña del login y la cookie de sesión viajan en claro por la red, así que cualquiera con acceso a la misma wifi puede leerlas. Para la máquina local da igual; en cuanto entres desde el móvil o desde otro equipo, activa [HTTPS](#https) desde Ajustes › Seguridad › HTTPS — emites el certificado, lo instalas en el aparato y lo enciendes; la dirección no cambia.
 
-El puerto por defecto es `5000`, y para cambiarlo pon `PORT` en `.env` (ver [Configuración](#configuración)). `docker-setup` resuelve el valor con la misma capa que usa la aplicación —entorno, luego `config.ini`, luego el defecto— y lo exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse.
+El puerto por defecto es `5000`. `docker-setup` lo pregunta en cada arranque —Enter deja el que ya hay— y guarda en `.env` el que elijas, así que también puedes ponerlo ahí a mano (ver [Configuración](#configuración)). El valor de partida se resuelve con la misma capa que usa la aplicación —`.env`, luego `config.ini`, luego el defecto— y se exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse. `docker-update.sh` respeta lo que haya en `.env`, para que actualizar no te cambie el puerto.
 
 ```bash
 # Ver logs en tiempo real

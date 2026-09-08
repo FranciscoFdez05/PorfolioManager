@@ -150,9 +150,15 @@ else
 fi
 
 # ── 3. Puerto ─────────────────────────────────────────────────────────────────
-# Igual que en docker-up.sh: con la misma capa de configuración que la app, para
-# que el mapeo de Docker y el puerto real no puedan desincronizarse.
-PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
+# Igual que en docker-up.sh, y con la misma prioridad: primero el .env, que es
+# donde deja el puerto la pregunta del arranque y lo único que sobrevive al pull
+# de aquí arriba; si no está escrito ahí, la capa de configuración de la app.
+# Sin mirar el .env, actualizar devolvía el mapeo al puerto de config.ini y la
+# aplicación cambiaba de puerto sola.
+PORT=$(sed -n 's/^PORT=//p' .env | head -n 1)
+if [ -z "$PORT" ]; then
+    PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
+fi
 [ -n "$PORT" ] || PORT=5000
 export PORT
 export PORTFOLIO_VERSION="$VERSION_NUEVA"
