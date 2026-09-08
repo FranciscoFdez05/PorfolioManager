@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from flask import Blueprint, jsonify, make_response, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from core import settings
+from core import sesion, settings
 from core.paths import AUTH_FILE as _AUTH_FILE, LOGIN_HTML
 
 auth_bp = Blueprint("auth", __name__)
@@ -201,6 +201,10 @@ def login():
                 session.clear()
                 session["logged_in"] = True
                 session.permanent = False
+                # Identificador nuevo y marcas de tiempo: es lo que permite
+                # caducar la sesión y revocarla en el logout. Va después de
+                # clear() para que no herede nada de la sesión anterior.
+                sesion.abrir(session)
                 return redirect(_safe_next_url(request.args.get("next") or "/"))
 
             _record_failure(ip)
@@ -224,12 +228,55 @@ def login():
 
 @auth_bp.route("/logout")
 def logout():
-    session.clear()
+    # `sesion.cerrar` y no `session.clear()`: vaciar la cookie solo afecta al
+    # navegador que la pidió. Cualquier copia de esa misma cookie seguía siendo
+    # válida después de cerrar sesión, porque nada del lado del servidor la
+    # rechazaba. Ahora el identificador queda revocado.
+    sesion.cerrar(session)
     return redirect(url_for("auth.login"))
+
+
+def _renovar_sesiones() -> None:
+    """Cierra todas las sesiones abiertas y vuelve a sellar la de quien lo pide.
+
+    Cambiar la contraseña tiene que echar a quien estuviera dentro con la
+    anterior; si no, el cambio no sirve para lo único que suele motivarlo. Se
+    vuelve a sellar la sesión en curso para no expulsar también a quien acaba de
+    hacer el cambio, que es el único que ya ha demostrado saber la contraseña
+    nueva. El orden importa: `abrir` tiene que leer la época ya incrementada.
+    """
+    sesion.invalidarTodas()
+    sesion.abrir(session)
+
+
+def _rechazar_si_bloqueado():
+    """Respuesta 429 si esta IP ha agotado los intentos, o None si puede seguir.
+
+    Comparte el contador con /login a propósito. Estos dos endpoints piden la
+    contraseña actual, así que son un segundo sitio donde probarla: sin esto, el
+    límite de intentos se esquivaba sondeando aquí, que además solo estaba
+    frenado por el límite general de escrituras (dos órdenes de magnitud más
+    holgado). Hace falta sesión para llegar, pero el escenario que importa —una
+    cookie robada intentando averiguar la contraseña para cambiarla— entra por
+    aquí, no por /login.
+    """
+    locked = _seconds_locked_out(_client_ip())
+    if not locked:
+        return None
+    respuesta = jsonify({
+        "ok": False,
+        "error": f"Demasiados intentos fallidos. Vuelve a intentarlo en {locked // 60 + 1} min.",
+    })
+    respuesta.headers["Retry-After"] = str(locked)
+    return respuesta, 429
 
 
 @auth_bp.route("/api/settings/credentials/username", methods=["POST"])
 def change_username():
+    bloqueado = _rechazar_si_bloqueado()
+    if bloqueado:
+        return bloqueado
+
     data = request.get_json(silent=True) or {}
     current_password = data.get("currentPassword", "")
     new_username     = data.get("newUsername", "").strip()
@@ -239,14 +286,22 @@ def change_username():
 
     _current_user, password_hash = _load_credentials()
     if not check_password_hash(password_hash, current_password):
+        _record_failure(_client_ip())
+        logger.warning("Contraseña actual incorrecta al cambiar el usuario desde %s", _client_ip())
         return jsonify({"ok": False, "error": "Contraseña actual incorrecta"}), 400
 
+    _clear_failures(_client_ip())
     _save_credentials(new_username, password_hash)
+    _renovar_sesiones()
     return jsonify({"ok": True})
 
 
 @auth_bp.route("/api/settings/credentials/password", methods=["POST"])
 def change_password():
+    bloqueado = _rechazar_si_bloqueado()
+    if bloqueado:
+        return bloqueado
+
     data = request.get_json(silent=True) or {}
     current_password = data.get("currentPassword", "")
     new_password     = data.get("newPassword", "")
@@ -256,8 +311,12 @@ def change_password():
 
     current_user, password_hash = _load_credentials()
     if not check_password_hash(password_hash, current_password):
+        _record_failure(_client_ip())
+        logger.warning("Contraseña actual incorrecta al cambiar la contraseña desde %s", _client_ip())
         return jsonify({"ok": False, "error": "Contraseña actual incorrecta"}), 400
 
+    _clear_failures(_client_ip())
     new_hash = generate_password_hash(new_password, method=settings.metodoHashPassword())
     _save_credentials(current_user, new_hash)
+    _renovar_sesiones()
     return jsonify({"ok": True})

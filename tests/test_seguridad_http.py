@@ -324,10 +324,16 @@ def _origen_visto(app, **peticion):
         visto["scheme"] = request.scheme
         return jsonify({"ok": True})
 
+    from core import sesion
+
     client = app.test_client()
     # Solo la sesión: es un GET, así que no pasa por la comprobación de CSRF.
-    with client.session_transaction() as sesion:
-        sesion["logged_in"] = True
+    # Se sella con `sesion.abrir` igual que en el login real; sin identificador
+    # ni marcas de tiempo, `require_login` la rechaza antes de llegar a la vista
+    # y el helper devolvería None en vez de la IP que se quiere comprobar.
+    with client.session_transaction() as sesion_prueba:
+        sesion_prueba["logged_in"] = True
+        sesion.abrir(sesion_prueba)
 
     client.get("/api/origen", **peticion)
     return visto.get("addr"), visto.get("scheme")

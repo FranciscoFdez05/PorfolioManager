@@ -22,6 +22,91 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.0.1] — 2026-09-08
+
+**Cerrar sesión pasa a cerrar la sesión.** No lo hacía: `session.clear()` vacía
+la cookie del navegador que la pide, y eso es todo lo que hacía. La sesión de
+Flask es una cookie firmada —el servidor no guarda nada, solo comprueba la
+firma—, así que cualquier **copia** de esa cookie seguía autenticando después
+del logout. No había nada del lado del servidor capaz de decir «esa ya no».
+
+Del mismo sitio salían otras tres. Una sesión no permanente no lleva ninguna
+fecha de caducidad dentro del payload firmado: que el navegador borre la cookie
+al cerrarse es una cortesía del cliente, no una garantía, de modo que una copia
+no caducaba **nunca** —ni por inactividad ni en absoluto— mientras no cambiara
+la `SECRET_KEY`. Tampoco había un identificador de sesión que revocar o
+auditar. Y cambiar la contraseña no echaba a nadie, que es justo lo contrario de
+lo que se espera de ese botón: si se cambia porque alguien más tiene acceso, el
+cambio tenía que servir para algo.
+
+Las cuatro son el mismo agujero visto desde cuatro sitios, y se tapan con lo
+mismo: un identificador aleatorio por sesión, dos marcas de tiempo dentro de la
+propia cookie que **valida el servidor** en cada petición, y un fichero pequeño
+en `data/sesion/` con lo revocado. En fichero y no en memoria porque gunicorn
+levanta varios workers: un `dict` de módulo lo tendría cada uno por su cuenta y
+cerrar sesión en uno no la cerraría en el otro, que es exactamente el fallo que
+esto viene a corregir.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano. **Al arrancar tendrás que volver a
+entrar una vez**, tú y cualquier otro dispositivo con la sesión abierta: las
+cookies emitidas antes de esta versión no llevan marcas de tiempo, así que no
+se pueden caducar, y son precisamente las que no deben seguir valiendo. Es el
+único efecto visible de la actualización.
+
+### Añadido
+
+- **Caducidad de sesión, comprobada en el servidor.** Dos topes independientes:
+  por inactividad (`sesion_inactividad_minutos`, 240 por defecto) y absoluto
+  desde el login (`sesion_maxima_minutos`, 720). El segundo existe porque el
+  primero no basta: una pestaña abierta que refresca datos mantiene viva su
+  sesión sola e indefinidamente. Las marcas viajan dentro de la cookie firmada
+  —el cliente no puede tocarlas sin invalidar la firma— y se revisan en cada
+  petición. Cualquiera de los dos a `0` desactiva ese tope; poner los dos a `0`
+  deja la sesión como estaba antes de esta versión, y por eso ninguno viene así.
+
+  La marca de actividad se reescribe como mucho una vez por minuto. Sin ese
+  margen, cada petición modificaría la sesión y saldría con su `Set-Cookie`.
+
+- **Revocación de sesiones**, en `core/sesion.py`. El logout apunta el
+  identificador en una lista; cambiar las credenciales incrementa un contador de
+  época que invalida de golpe todas las sesiones abiertas, sin necesidad de
+  llevar un registro de cuáles son. La lista se poda sola: pasada la caducidad
+  absoluta la cookie ya no vale por sí sola y guardarla no aporta nada.
+
+### Cambiado
+
+- **Cambiar la contraseña o el usuario cierra las sesiones de los demás
+  dispositivos.** La de quien hace el cambio sigue abierta: es el único que ya
+  ha demostrado conocer la contraseña nueva, y echarlo a él también convertiría
+  el cambio en un cierre de sesión con pasos extra.
+
+- **El identificador de sesión es `secrets.token_urlsafe(32)`**, nuevo en cada
+  login aunque sea el mismo usuario. No `uuid4`: aunque también sea aleatorio,
+  su generador no está pensado para esto y su formato invita a tratarlo como un
+  identificador cualquiera.
+
+### Corregido
+
+- **Los dos endpoints de cambio de credenciales eran un segundo sitio donde
+  probar la contraseña, y no tenían freno.** Ambos validan `currentPassword`,
+  pero el bloqueo por intentos fallidos solo cubría `/login`: sondear aquí solo
+  chocaba con el límite general de escrituras, dos órdenes de magnitud más
+  holgado. Pasan a compartir el contador de `/login` y responden 429 con
+  `Retry-After`. Hace falta sesión para llegar, pero el escenario que importa
+  —una cookie robada intentando averiguar la contraseña para cambiarla— entra
+  justo por ahí y no por el formulario.
+
+- **`auth.setup` estaba en la lista de endpoints públicos sin corresponder a
+  ninguna vista** (el alta inicial es el script `admin/setup_password.py`, no una
+  ruta). No abría nada hoy, pero dejaba preparado que el día que alguien añadiera
+  un `setup` al blueprint naciera fuera de `require_login` sin querer. Retirada.
+
+---
+
 ## [2.0.0] — 2026-09-06
 
 **Dos cosas que se hacían a ciegas dejan de hacerse a ciegas.** Actualizar era

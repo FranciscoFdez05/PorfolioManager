@@ -31,7 +31,7 @@ import secrets
 
 from flask import abort, g, make_response, redirect, request, session, url_for
 
-from core import csp, settings, tls
+from core import csp, sesion, settings, tls
 from core.rate_limit import LimitadorVentana
 
 log = logging.getLogger(__name__)
@@ -40,7 +40,11 @@ log = logging.getLogger(__name__)
 # `salud.getHealth` es público porque el healthcheck del contenedor no tiene
 # cookies. Su respuesta anónima se limita a estado y versión; el detalle
 # (rutas, portfolio activo, uptime) solo sale con la sesión abierta.
-PUBLIC_ENDPOINTS = {"auth.login", "auth.setup", "auth.logout", "salud.getHealth"}
+# "auth.setup" estuvo aquí sin que existiera esa vista (el alta inicial es el
+# script admin/setup_password.py, no una ruta). Se retira: una entrada que no
+# corresponde a ningún endpoint no protege nada hoy, pero deja preparado que el
+# día que alguien añada un `setup` al blueprint nazca público sin querer.
+PUBLIC_ENDPOINTS = {"auth.login", "auth.logout", "salud.getHealth"}
 # Endpoints del Atajo de iOS. No pueden usar la sesión ni el token CSRF (un
 # Atajo no mantiene cookies), así que quedan fuera de require_login y de
 # verify_csrf y se autentican por su cuenta: filtro de IP en core/red_local.py
@@ -204,9 +208,24 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
         if _es_asset_publico(request.path):
             return
         if not session.get("logged_in"):
-            if request.path.startswith("/api/") or request.is_json:
-                abort(401)
-            return redirect(url_for("auth.login", next=request.path))
+            return _sin_sesion()
+
+        # Que la cookie tenga firma válida solo dice que la emitimos nosotros,
+        # no que siga valiendo. Aquí se comprueba lo que la firma no cubre:
+        # caducidad, revocación en el logout y cambio de credenciales. El
+        # detalle, en core/sesion.py.
+        motivo = sesion.motivoInvalidez(session)
+        if motivo:
+            log.info("Sesión rechazada en %s %s: %s", request.method, request.path, motivo)
+            session.clear()
+            return _sin_sesion()
+
+        sesion.refrescar(session)
+
+    def _sin_sesion():
+        if request.path.startswith("/api/") or request.is_json:
+            abort(401)
+        return redirect(url_for("auth.login", next=request.path))
 
     @app.after_request
     def set_csrf_cookie(response):

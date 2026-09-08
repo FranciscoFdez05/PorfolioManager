@@ -155,6 +155,12 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("seguridad", "hash_iteraciones", ENTERO, 600_000, env="HASH_ITERACIONES",
            minimo=100_000, maximo=10_000_000,
            descripcion="Iteraciones PBKDF2-SHA256 de la contraseña de acceso."),
+    Ajuste("seguridad", "sesion_inactividad_minutos", ENTERO, 240, env="SESION_INACTIVIDAD_MINUTOS",
+           minimo=0, maximo=525_600,
+           descripcion="Minutos sin actividad tras los que caduca la sesión. 0 la deja sin caducidad."),
+    Ajuste("seguridad", "sesion_maxima_minutos", ENTERO, 720, env="SESION_MAXIMA_MINUTOS",
+           minimo=0, maximo=525_600,
+           descripcion="Duración máxima de una sesión desde el login, haya actividad o no. 0 lo desactiva."),
     Ajuste("seguridad", "escrituras_por_minuto", ENTERO, 120, env="ESCRITURAS_POR_MINUTO",
            minimo=0, maximo=100_000,
            descripcion="Peticiones de escritura (POST/PUT/PATCH/DELETE) por IP y minuto. 0 desactiva el límite."),
@@ -365,6 +371,16 @@ def maxIpsVigiladas() -> int:
 def metodoHashPassword() -> str:
     """Cadena `method` de werkzeug para hashear la contraseña de acceso."""
     return f"pbkdf2:sha256:{obtener('seguridad.hash_iteraciones')}"
+
+
+def sesionInactividadSegundos() -> int:
+    """Segundos sin actividad tras los que la sesión deja de valer. 0 lo desactiva."""
+    return obtener("seguridad.sesion_inactividad_minutos") * 60
+
+
+def sesionMaximaSegundos() -> int:
+    """Duración máxima de una sesión desde el login, se use o no. 0 lo desactiva."""
+    return obtener("seguridad.sesion_maxima_minutos") * 60
 
 
 def escriturasPorMinuto() -> int:

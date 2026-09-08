@@ -45,7 +45,7 @@ def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
     reasignar el original ya no alcanza a nadie.
     """
     from admin import backup_manager
-    from core import paths
+    from core import paths, sesion
 
     destino = tmp_path_factory.getbasetemp() / "datos_tmp"
     destino.mkdir(exist_ok=True)
@@ -54,6 +54,16 @@ def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
     copias = tmp_path_factory.getbasetemp() / "backups_auto"
     copias.mkdir(exist_ok=True)
     monkeypatch.setattr(backup_manager, "_BACKUP_DIR", copias, raising=False)
+
+    # Estado de revocación de sesiones. Va aquí y no en `datos_aislados` por el
+    # mismo motivo que los dos de arriba: lo escribe cualquier test que cierre
+    # sesión o cambie credenciales, no solo los que piden rutas aisladas, y sin
+    # esto la suite dejaría revocaciones en el `data/sesion` real.
+    sesiones = tmp_path_factory.getbasetemp() / "sesion"
+    sesiones.mkdir(exist_ok=True)
+    monkeypatch.setattr(sesion, "SESION_DIR", sesiones, raising=False)
+    monkeypatch.setattr(sesion, "ESTADO_FILE", sesiones / "estado.json", raising=False)
+    monkeypatch.setattr(sesion, "LOCK_FILE", sesiones / "estado.lock", raising=False)
 
 
 @pytest.fixture
@@ -215,13 +225,20 @@ def cliente_autenticado(crear_app):
     cada test de rutas en un test de autenticación. Las cabeceras ya llevan el
     X-CSRF-Token, porque si no todos los POST recibirían 403 y estarían
     comprobando el CSRF una y otra vez en vez de lo que pretenden.
+
+    El sellado de `core.sesion` (identificador y marcas de tiempo) se aplica
+    igual que en el login real: sin él la sesión se rechaza por «versión
+    anterior», que es justo lo que tiene que pasarle a una cookie sin marcas.
     """
+    from core import sesion
+
     def _abrir(*blueprints, **config):
         app = crear_app(*blueprints, **config)
         client = app.test_client()
-        with client.session_transaction() as sesion:
-            sesion["logged_in"] = True
-            sesion["csrf_token"] = CSRF_PRUEBA
+        with client.session_transaction() as sesion_prueba:
+            sesion_prueba["logged_in"] = True
+            sesion_prueba["csrf_token"] = CSRF_PRUEBA
+            sesion.abrir(sesion_prueba)
         return client, {"X-CSRF-Token": CSRF_PRUEBA}, app
 
     return _abrir
