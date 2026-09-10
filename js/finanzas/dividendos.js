@@ -1,13 +1,84 @@
+const DIVIDENDOS_MONTHS = [
+    { key: "01", label: "Enero" },
+    { key: "02", label: "Febrero" },
+    { key: "03", label: "Marzo" },
+    { key: "04", label: "Abril" },
+    { key: "05", label: "Mayo" },
+    { key: "06", label: "Junio" },
+    { key: "07", label: "Julio" },
+    { key: "08", label: "Agosto" },
+    { key: "09", label: "Septiembre" },
+    { key: "10", label: "Octubre" },
+    { key: "11", label: "Noviembre" },
+    { key: "12", label: "Diciembre" }
+]
+
+// Las filas con una fecha que no se puede leer no desaparecen: van a su propio
+// bloque al final de la vista de año.
+const DIVIDENDOS_SIN_FECHA = "sin-fecha"
+
 let _dividendosAssets = []
 let dividendosModalKeyHandler = null
 let _allDividendosRows = []
 let currentDividendosYear = null
+// null = año completo; si no, la clave del mes ("01".."12") que se está viendo.
+let currentDividendosMonth = null
+let _dividendosTotalsToken = 0
+
+// Manda la fecha de cobro: el mes de cada dividendo se deduce de ella, así que
+// lo que ya estaba guardado se clasifica igual que lo que se meta a partir de
+// ahora y no hay que tocar el fichero de datos. Se aceptan dd-mm-aaaa (lo que
+// escribe el modal), mm-aaaa y aaaa-mm-dd por si alguna fila llegó en ISO.
+function splitDividendoFecha(fecha) {
+    const parts = String(fecha || "")
+        .trim()
+        .split(/[-/.]/)
+
+    if (parts.length < 2 || parts.length > 3 || parts.some((part) => !/^\d+$/.test(part))) {
+        return null
+    }
+
+    const isoFirst = parts[0].length === 4
+
+    if (parts.length === 3) {
+        return isoFirst
+            ? { dia: parts[2], mes: parts[1], anio: parts[0] }
+            : { dia: parts[0], mes: parts[1], anio: parts[2] }
+    }
+
+    return isoFirst ? { dia: "", mes: parts[1], anio: parts[0] } : { dia: "", mes: parts[0], anio: parts[1] }
+}
 
 function parseDividendoYear(fecha) {
-    const p = String(fecha || "").split("-")
-    if (p.length === 3) return p[2]
-    if (p.length === 2) return p[1]
-    return null
+    return splitDividendoFecha(fecha)?.anio || null
+}
+
+function parseDividendoMonth(fecha) {
+    const mes = Number(splitDividendoFecha(fecha)?.mes)
+    return Number.isInteger(mes) && mes >= 1 && mes <= 12 ? String(mes).padStart(2, "0") : null
+}
+
+function parseDividendoDay(fecha) {
+    const dia = Number(splitDividendoFecha(fecha)?.dia)
+    return Number.isInteger(dia) && dia >= 1 && dia <= 31 ? dia : 0
+}
+
+function getDividendosMonthLabel(monthKey) {
+    return DIVIDENDOS_MONTHS.find((month) => month.key === monthKey)?.label || "Sin fecha"
+}
+
+// Orden natural de la tabla: mes y, dentro del mes, día de cobro.
+function compareDividendosByDate(left, right) {
+    const mesIzq = parseDividendoMonth(left.r.fecha)
+    const mesDer = parseDividendoMonth(right.r.fecha)
+
+    if (mesIzq !== mesDer) {
+        if (!mesIzq) return 1
+        if (!mesDer) return -1
+        return Number(mesIzq) - Number(mesDer)
+    }
+
+    return parseDividendoDay(left.r.fecha) - parseDividendoDay(right.r.fecha)
 }
 
 function getDividendosYears(rows) {
@@ -30,6 +101,7 @@ function renderDividendosYearBar(years) {
         btn.textContent = year
         btn.addEventListener("click", () => {
             currentDividendosYear = year
+            currentDividendosMonth = null
             renderFilteredDividendos()
         })
         list.appendChild(btn)
@@ -176,6 +248,12 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
             if (newYear) currentDividendosYear = newYear
         }
 
+        // La fila se coloca en el mes de su fecha de cobro. Si se está mirando
+        // un mes concreto y no es ese, se salta al mes donde ha caído: si no,
+        // parecería que la fila no se ha guardado.
+        const newMonth = parseDividendoMonth(fecha)
+        if (currentDividendosMonth && newMonth) currentDividendosMonth = newMonth
+
         try {
             renderFilteredDividendos()
             await saveDividendosDataToServer()
@@ -233,25 +311,177 @@ function renderDividendosRowsFromData(dividendosData) {
     renderFilteredDividendos()
 }
 
+// Filas del año activo ordenadas por fecha, cada una con su índice real dentro
+// de _allDividendosRows: es el que usan editar y eliminar.
+function getDividendosRowsOfYear() {
+    return _allDividendosRows
+        .map((r, i) => ({ r, i }))
+        .filter(({ r }) => !currentDividendosYear || parseDividendoYear(r.fecha) === currentDividendosYear)
+        .sort(compareDividendosByDate)
+}
+
+function groupDividendosByMonth(entries) {
+    const groups = new Map()
+
+    entries.forEach((entry) => {
+        const key = parseDividendoMonth(entry.r.fecha) || DIVIDENDOS_SIN_FECHA
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key).push(entry)
+    })
+
+    return groups
+}
+
+function getDividendosMonthCounts() {
+    const counts = {}
+
+    getDividendosRowsOfYear().forEach(({ r }) => {
+        const key = parseDividendoMonth(r.fecha)
+        if (key) counts[key] = (counts[key] || 0) + 1
+    })
+
+    return counts
+}
+
+function renderDividendosMonthTabs() {
+    const container = document.getElementById("dividendosMonthTabs")
+
+    if (!container) {
+        return
+    }
+
+    const counts = getDividendosMonthCounts()
+    container.innerHTML = ""
+
+    DIVIDENDOS_MONTHS.forEach((month) => {
+        const count = counts[month.key] || 0
+        const button = document.createElement("button")
+        button.type = "button"
+        button.className = `dividendosMonthTab${month.key === currentDividendosMonth ? " active" : ""}${
+            count ? "" : " dividendosMonthTabEmpty"
+        }`
+        button.textContent = month.label
+        button.title = count
+            ? `${count} ${count === 1 ? "cobro" : "cobros"} en ${month.label}`
+            : `Sin dividendos en ${month.label}`
+        button.addEventListener("click", () => {
+            // Volver a pulsar el mes abierto devuelve a la vista del año.
+            currentDividendosMonth = currentDividendosMonth === month.key ? null : month.key
+            renderFilteredDividendos()
+        })
+        container.appendChild(button)
+    })
+}
+
+function renderDividendosMonthHeader(count) {
+    const header = document.getElementById("dividendosMonthHeader")
+
+    if (!header) {
+        return
+    }
+
+    if (!currentDividendosMonth) {
+        header.innerHTML = ""
+        header.classList.add("hidden")
+        return
+    }
+
+    const titulo = `${getDividendosMonthLabel(currentDividendosMonth)}${currentDividendosYear ? ` ${currentDividendosYear}` : ""}`
+    header.innerHTML = `
+        <span class="dividendosMonthHeaderTitle">${escapeHtml(titulo)}</span>
+        <span class="dividendosMonthHeaderMeta">${count} ${count === 1 ? "cobro" : "cobros"}</span>
+    `
+    header.classList.remove("hidden")
+}
+
+// Los importes del lateral son los de lo que se está viendo, así que conviene
+// que se lea a qué periodo corresponden.
+function renderDividendosScope() {
+    const scope = document.getElementById("dividendosSummaryScope")
+
+    if (!scope) {
+        return
+    }
+
+    const anio = currentDividendosYear ? ` ${currentDividendosYear}` : ""
+    scope.textContent = currentDividendosMonth
+        ? `${getDividendosMonthLabel(currentDividendosMonth)}${anio}`
+        : `Año completo${anio}`
+}
+
+function buildDividendosMonthGroupRow(monthKey, count) {
+    const columnCount = document.querySelector(".dividendosTable thead tr")?.cells.length || 7
+    const tr = document.createElement("tr")
+    tr.className = "tableGroupRow dividendosMonthRow"
+    tr.innerHTML = `
+        <td class="dividendosGroupHeader" colspan="${columnCount}">
+            <span class="dividendosGroupName">${escapeHtml(getDividendosMonthLabel(monthKey))}</span>
+            <span class="dividendosGroupMeta">${count} ${count === 1 ? "cobro" : "cobros"}</span>
+            <span class="dividendosGroupTotal" data-mes="${escapeHtml(monthKey)}"></span>
+        </td>
+    `
+    return tr
+}
+
+function buildDividendosRow(rowData, globalIndex) {
+    const rowElement = document.createElement("tr")
+    rowElement.dataset.globalIndex = String(globalIndex)
+
+    const mdiv = rowData.monedaDividendo || "USD"
+    const mtot = rowData.monedaTotal || "EUR"
+    rowElement.dataset.monedaDividendo = mdiv
+    rowElement.dataset.monedaTotal = mtot
+    rowElement.dataset.mes = parseDividendoMonth(rowData.fecha) || DIVIDENDOS_SIN_FECHA
+    rowElement.innerHTML = `
+        <td data-field="fecha">${escapeHtml(rowData.fecha || "")}</td>
+        <td data-field="instrumento">${escapeHtml(rowData.instrumento || "")}</td>
+        <td data-field="acciones">${formatShareQuantity(rowData.acciones)}</td>
+        <td data-field="dividendoAccion">${formatCellMoneyValue(rowData.dividendoAccion, mdiv)}</td>
+        <td data-field="impuestos">${formatCellMoneyValue(rowData.impuestos, mtot)}</td>
+        <td class="rowTotal" data-moneda="${escapeHtml(mtot)}">${formatCellMoneyValue(rowData.total, mtot)}</td>
+        <td class="rowActionsCell">
+            <div class="rowMenu">
+                <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+                <div class="rowMenuDropdown">
+                    <button type="button" class="rowMenuItem assetRowEditBtn dividendosRowEditBtn avActionBtn avEditBtn" data-global-index="${globalIndex}">Editar</button>
+                    <hr>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn dividendosRowDeleteBtn avActionBtn avDeleteBtn" data-global-index="${globalIndex}">Eliminar</button>
+                </div>
+            </div>
+        </td>
+    `
+    return rowElement
+}
+
 function renderFilteredDividendos() {
     const dividendosBody = document.getElementById("dividendosBody")
     if (!dividendosBody) return
 
     const years = getDividendosYears(_allDividendosRows)
     renderDividendosYearBar(years)
+    renderDividendosMonthTabs()
 
-    const visible = currentDividendosYear
-        ? _allDividendosRows
-              .map((r, i) => ({ r, i }))
-              .filter(({ r }) => parseDividendoYear(r.fecha) === currentDividendosYear)
-        : _allDividendosRows.map((r, i) => ({ r, i }))
+    const entriesOfYear = getDividendosRowsOfYear()
+    const visible = currentDividendosMonth
+        ? entriesOfYear.filter(({ r }) => parseDividendoMonth(r.fecha) === currentDividendosMonth)
+        : entriesOfYear
+
+    renderDividendosMonthHeader(visible.length)
+    renderDividendosScope()
 
     dividendosBody.innerHTML = ""
     const dividendosEmptyEl = document.getElementById("dividendosEmptyMsg")
     const dividendosTableWrapper = document.querySelector(".dividendosTableWrapper")
 
     if (!visible.length) {
-        if (dividendosEmptyEl) dividendosEmptyEl.classList.remove("hidden")
+        if (dividendosEmptyEl) {
+            dividendosEmptyEl.textContent = currentDividendosMonth
+                ? `No hay dividendos en ${getDividendosMonthLabel(currentDividendosMonth).toLowerCase()}${
+                      currentDividendosYear ? ` de ${currentDividendosYear}` : ""
+                  }.`
+                : "No hay dividendos registrados."
+            dividendosEmptyEl.classList.remove("hidden")
+        }
         if (dividendosTableWrapper) dividendosTableWrapper.classList.add("hidden")
         updateDividendosTotals()
         return
@@ -260,34 +490,20 @@ function renderFilteredDividendos() {
     if (dividendosEmptyEl) dividendosEmptyEl.classList.add("hidden")
     if (dividendosTableWrapper) dividendosTableWrapper.classList.remove("hidden")
 
-    visible.forEach(({ r: rowData, i: globalIndex }) => {
-        const rowElement = document.createElement("tr")
-        rowElement.dataset.globalIndex = String(globalIndex)
+    if (currentDividendosMonth) {
+        visible.forEach(({ r, i }) => dividendosBody.appendChild(buildDividendosRow(r, i)))
+    } else {
+        // Vista del año: cada mes abre su bloque, para leer la tabla por meses
+        // en vez de como una lista corrida.
+        groupDividendosByMonth(visible).forEach((entries, monthKey) => {
+            dividendosBody.appendChild(buildDividendosMonthGroupRow(monthKey, entries.length))
+            entries.forEach(({ r, i }) => dividendosBody.appendChild(buildDividendosRow(r, i)))
+        })
+    }
 
-        const mdiv = rowData.monedaDividendo || "USD"
-        const mtot = rowData.monedaTotal || "EUR"
-        rowElement.dataset.monedaDividendo = mdiv
-        rowElement.dataset.monedaTotal = mtot
-        rowElement.innerHTML = `
-            <td data-field="fecha">${escapeHtml(rowData.fecha || "")}</td>
-            <td data-field="instrumento">${escapeHtml(rowData.instrumento || "")}</td>
-            <td data-field="acciones">${formatShareQuantity(rowData.acciones)}</td>
-            <td data-field="dividendoAccion">${formatCellMoneyValue(rowData.dividendoAccion, mdiv)}</td>
-            <td data-field="impuestos">${formatCellMoneyValue(rowData.impuestos, mtot)}</td>
-            <td class="rowTotal" data-moneda="${escapeHtml(mtot)}">${formatCellMoneyValue(rowData.total, mtot)}</td>
-            <td class="rowActionsCell">
-                <div class="rowMenu">
-                    <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
-                    <div class="rowMenuDropdown">
-                        <button type="button" class="rowMenuItem assetRowEditBtn dividendosRowEditBtn avActionBtn avEditBtn" data-global-index="${globalIndex}">Editar</button>
-                        <hr>
-                        <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn dividendosRowDeleteBtn avActionBtn avDeleteBtn" data-global-index="${globalIndex}">Eliminar</button>
-                    </div>
-                </div>
-            </td>
-        `
-        dividendosBody.appendChild(rowElement)
-    })
+    // Si había una ordenación elegida en las cabeceras, se reaplica dentro de
+    // cada bloque de mes (bindTableSort respeta las filas .tableGroupRow).
+    document.querySelector(".dividendosTable")?._reSort?.()
 
     updateDividendosTotals()
 }
@@ -338,38 +554,57 @@ async function _getDivExchangeRate(from, to) {
 }
 
 async function updateDividendosTotals() {
-    const dividendosBody = document.getElementById("dividendosBody")
-    if (!dividendosBody) return
+    if (!document.getElementById("dividendosBody")) return
 
+    const token = ++_dividendosTotalsToken
     const base = (window._monedaBase || "EUR").toUpperCase()
-    const rowElements = [...dividendosBody.querySelectorAll("tr")]
 
     const amounts = await Promise.all(
-        rowElements.map(async (rowElement) => {
-            const cells = rowElement.querySelectorAll("td")
-            const monedaTotal = rowElement.dataset.monedaTotal || cells[5]?.dataset?.moneda || "EUR"
-            const impuestosRaw = parseLooseNumber(cells[4]?.textContent || "") ?? 0
-            const totalRaw = parseLooseNumber(cells[5]?.textContent || "") ?? 0
-            const rate = await _getDivExchangeRate(monedaTotal.toUpperCase(), base)
-            return { total: totalRaw * rate, impuestos: impuestosRaw * rate }
+        getDividendosRowsOfYear().map(async ({ r }) => {
+            const monedaTotal = (r.monedaTotal || "EUR").toUpperCase()
+            const rate = await _getDivExchangeRate(monedaTotal, base)
+            return {
+                mes: parseDividendoMonth(r.fecha) || DIVIDENDOS_SIN_FECHA,
+                total: (parseLooseNumber(r.total || "") ?? 0) * rate,
+                impuestos: (parseLooseNumber(r.impuestos || "") ?? 0) * rate
+            }
         })
     )
 
-    const totalNeto = amounts.reduce((s, x) => s + x.total, 0)
-    const totalImpuestos = amounts.reduce((s, x) => s + x.impuestos, 0)
+    // Los cambios de divisa llegan tarde: si mientras tanto se ha cambiado de
+    // mes o de año, este resultado ya no es el de lo que se está mirando.
+    if (token !== _dividendosTotalsToken) return
+
+    const seleccion = currentDividendosMonth ? amounts.filter((x) => x.mes === currentDividendosMonth) : amounts
+    const sumar = (list, campo) => list.reduce((acc, x) => acc + x[campo], 0)
+    const fmt = (v) => formatMoney(v, base)
 
     const totalResumen = document.getElementById("totalDividendosResumen")
     const impuestosResumen = document.getElementById("impuestosDividendosResumen")
     const topTotalDividendos = document.getElementById("topTotalDividendos")
 
-    const fmt = (v) => formatMoney(v, base)
-    if (totalResumen) totalResumen.textContent = fmt(totalNeto)
-    if (impuestosResumen) impuestosResumen.textContent = fmt(totalImpuestos)
-    if (topTotalDividendos) topTotalDividendos.textContent = fmt(totalNeto)
+    if (totalResumen) totalResumen.textContent = fmt(sumar(seleccion, "total"))
+    if (impuestosResumen) impuestosResumen.textContent = fmt(sumar(seleccion, "impuestos"))
+    // La métrica de cabecera es del año entero: abrir un mes no la cambia.
+    if (topTotalDividendos) topTotalDividendos.textContent = fmt(sumar(amounts, "total"))
+
+    document.querySelectorAll(".dividendosGroupTotal").forEach((node) => {
+        const mes = node.dataset.mes
+        node.textContent = fmt(
+            sumar(
+                amounts.filter((x) => x.mes === mes),
+                "total"
+            )
+        )
+    })
 }
 
 function addNewDividendosRow() {
-    openDividendosModal(-1)
+    // Desde un mes abierto la fecha viene puesta con ese mes: lo normal es que
+    // la fila que se está apuntando sea de él.
+    const fechaPorDefecto =
+        currentDividendosMonth && currentDividendosYear ? `01-${currentDividendosMonth}-${currentDividendosYear}` : ""
+    openDividendosModal(-1, fechaPorDefecto)
 }
 
 function addDividendosYear() {
@@ -392,6 +627,7 @@ function deleteCurrentDividendosYear() {
                 )
                 const remaining = getDividendosYears(_allDividendosRows)
                 currentDividendosYear = remaining.length ? remaining[remaining.length - 1] : null
+                currentDividendosMonth = null
                 renderFilteredDividendos()
                 await saveDividendosDataToServer()
             } catch (error) {

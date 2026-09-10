@@ -61,9 +61,139 @@
     background: var(--bg-panel);
 }
 
-.dividendosTable tbody tr:hover td {
+.dividendosTable tbody tr:not(.tableGroupRow):hover td {
     background: var(--bg-elevated) !important;
 }
+
+/* ── Barra de meses ─────────────────────────────────────────────── */
+
+/* Misma pauta que la de gastos: los doce meses reparten el ancho y el
+   que se está viendo queda encendido. */
+.dividendosMonthBar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 0 2px;
+}
+
+.dividendosMonthTabs {
+    display: flex;
+    gap: 5px;
+    flex-wrap: nowrap;
+    flex: 1 1 auto;
+    width: 100%;
+}
+
+.dividendosMonthTab {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.15s ease;
+}
+
+.dividendosMonthTab:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--btn-border-hover);
+    color: var(--text-bright);
+    transform: translateY(-1px);
+}
+
+.dividendosMonthTab.active {
+    background: var(--btn-active-bg);
+    border-color: var(--btn-active-border);
+    color: var(--btn-active-text);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Un mes sin cobros se apaga, para ver de un vistazo dónde hay algo. */
+.dividendosMonthTab.dividendosMonthTabEmpty {
+    color: var(--text-dim);
+    border-color: var(--border-mid);
+}
+
+.dividendosMonthTab.dividendosMonthTabEmpty.active {
+    color: var(--btn-active-text);
+    border-color: var(--btn-active-border);
+}
+
+/* ── Cabecera del mes abierto ───────────────────────────────────── */
+
+.dividendosMonthHeader {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 0 2px 8px;
+}
+
+.dividendosMonthHeaderTitle {
+    color: var(--text-bright);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.dividendosMonthHeaderMeta {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+/* ── Separadores de mes dentro de la tabla del año ──────────────── */
+
+.dividendosTable tbody tr.dividendosMonthRow td.dividendosGroupHeader {
+    padding: 14px 14px 6px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-soft);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.dividendosTable tbody tr.dividendosMonthRow:first-child td.dividendosGroupHeader {
+    padding-top: 8px;
+}
+
+.dividendosGroupName {
+    color: var(--text-subtle);
+}
+
+.dividendosGroupMeta,
+.dividendosGroupTotal {
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.dividendosGroupMeta::before,
+.dividendosGroupTotal::before {
+    content: "·";
+    margin: 0 6px;
+    color: var(--border-hard);
+}
+
+.dividendosGroupTotal {
+    color: var(--text-muted);
+}
+
+/* ── Resumen lateral ────────────────────────────────────────────── */
 
 .dividendosSummarySection {
     display: flex;
@@ -77,4 +207,18 @@
     font-size: 0.85rem;
     border-radius: 10px;
     letter-spacing: 0.04em;
+}
+
+/* Deja claro de qué periodo son los importes de las tarjetas. */
+.dividendosSummaryScope {
+    padding: 6px 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg-header);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-align: center;
+    text-transform: uppercase;
 }

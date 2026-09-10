@@ -22,6 +22,70 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.1.0] — 2026-09-10
+
+**Los dividendos se leen por meses.** La pantalla listaba el año entero de una
+tirada, y la única pista del mes era la fecha de cada fila: para ver qué se
+cobró en marzo había que recorrer la lista, y para saber cuánto, sumarlo a ojo.
+Ahora la tabla del año se separa en bloques por mes —cada uno con su nombre,
+cuántos cobros lleva y lo que suman— y encima hay una barra de meses, como la de
+Gastos, para abrir uno solo.
+
+El mes no es un campo nuevo: sale de la fecha de cobro cada vez que se pinta la
+tabla. Los dividendos que ya estaban apuntados se colocan solos en su mes al
+abrir la pantalla, sin migración, sin tocar `dividendos.json` y sin nada que
+rellenar a mano.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano. El cambio es de pantalla: lo guardado
+sigue siendo lo mismo y se sigue leyendo igual, así que volver atrás tampoco
+pide nada.
+
+### Añadido
+
+- **Barra de meses en Dividendos.** Los doce, repartiendo el ancho como en
+  Gastos. El que se está viendo queda encendido y los que no tienen ningún cobro
+  ese año salen apagados, que es la forma más rápida de ver dónde hay algo.
+  Volver a pulsar el mes abierto —o pulsar el año— devuelve la vista del año
+  completo.
+
+- **Separadores de mes en la tabla del año.** Cada bloque abre con el mes, el
+  número de cobros y el total del mes ya convertido a la moneda base, de modo
+  que el reparto del año se lee sin abrir nada.
+
+- **El periodo, escrito junto a los totales.** Encima de las tarjetas del
+  lateral ahora pone de qué son: «Año completo 2026» o «Marzo 2026».
+
+### Cambiado
+
+- **Total dividendos e Impuestos son los de lo que se está viendo.** Con un mes
+  abierto muestran ese mes; en la vista del año, el año entero, como hasta
+  ahora. La métrica **€ dividendos** de la cabecera no cambia: sigue siendo la
+  del año, para que abrir un mes no parezca que la cartera ha encogido.
+
+- **La fila nueva nace en el mes que se está mirando.** Desde un mes abierto,
+  «Añadir fila» trae ya puesta una fecha de ese mes. Y si se guarda con la de
+  otro, la pantalla salta al mes donde ha caído, en vez de dejar la sensación de
+  que no se ha guardado.
+
+- **Las filas van por fecha de cobro** dentro de su mes. Ordenar por una columna
+  desde su cabecera sigue funcionando igual; lo que cambia es que ahora ordena
+  dentro de cada mes, en vez de deshacer la separación.
+
+### Corregido
+
+- **Una fecha en otro formato se leía como un año inventado.** El campo es texto
+  libre, y `2026-03-11` daba el año «11»: aparecía un botón de año con ese
+  número y el dividendo se iba con él. Ahora se leen los tres formatos que se
+  pueden acabar escribiendo —`dd-mm-aaaa`, que es lo que rellena el formulario,
+  `mm-aaaa` y `aaaa-mm-dd`—, y lo que no hay manera de entender se junta en un
+  bloque «Sin fecha» en vez de colarse en un año que no existe.
+
+---
+
 ## [2.0.2] — 2026-09-08
 
 **El puerto se pregunta al arrancar, en vez de esperar a que falle.** Que el

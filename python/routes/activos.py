@@ -494,7 +494,8 @@ def getMetricasInversiones():
     ).fetchall()
 
     op_rows = conn.execute(
-        "SELECT fecha_apertura, orden, total FROM activo_operation_rows WHERE estado = 'Completado'"
+        "SELECT fecha_apertura, fecha_cierre, orden, total "
+        "FROM activo_operation_rows WHERE estado = 'Completado'"
     ).fetchall()
 
     by_month = {}
@@ -516,7 +517,13 @@ def getMetricasInversiones():
     for row in op_rows:
         if str(row["orden"] or "").strip().lower() == "venta":
             continue
-        parts = str(row["fecha_apertura"] or "").strip().split("-")
+        # La inversión cuenta el mes en que la orden se ejecutó, no aquel en el
+        # que se dejó puesta: una compra abierta en enero y completada en mayo
+        # es dinero invertido en mayo. Si la fila no trae fecha de cierre
+        # utilizable se cae a la de apertura.
+        parts = str(row["fecha_cierre"] or "").strip().split("-")
+        if len(parts) != 3:
+            parts = str(row["fecha_apertura"] or "").strip().split("-")
         if len(parts) != 3:
             continue
         total = parse_loose_number(row["total"]) or Decimal("0")
