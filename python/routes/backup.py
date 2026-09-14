@@ -36,7 +36,10 @@ _BACKUP_LOCK = threading.Lock()
 backup_bp = Blueprint("backup", __name__)
 
 
-_RE_ZIP = re.compile(r'^backup_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.zip$')
+# Las copias automáticas llevan el sufijo `_auto`: mismo formato y misma lista
+# que las manuales —se restauran igual—, pero se distinguen a simple vista y el
+# scheduler sabe cuál fue la última suya sin contar las que hizo el usuario.
+_RE_ZIP = re.compile(r'^backup_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}(_auto)?\.zip$')
 _RE_DB  = re.compile(r'^portfolio_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.db$')
 # Nombres de portfolio admisibles al restaurar entradas de un zip
 _RE_SAFE_DB_NAME = re.compile(r'^[A-Za-z0-9_-]{1,64}\.db$')
@@ -236,6 +239,20 @@ def createBackup():
         return _create_backup_locked()
 
 
+def crear_backup_automatico() -> str:
+    """Copia completa hecha por el scheduler. Devuelve el nombre del fichero.
+
+    Es la misma copia que «Crear backup ahora» —todos los portfolios, ajustes,
+    preferencias y manifest— con `_auto` en el nombre. Antes el automático
+    escribía un `.db` por portfolio en `data/backups/auto/`, que la pantalla de
+    Ajustes no listaba y desde la que no se podía restaurar: para el usuario
+    era como si no existiera. Lanza la excepción al que llama; el scheduler la
+    registra y lo reintenta en la siguiente pasada.
+    """
+    with _BACKUP_LOCK:
+        return _escribir_backup(automatico=True)
+
+
 def _preparar_destino():
     """Comprueba que se pueda escribir donde va a ir la copia. (ok, mensaje).
 
@@ -289,11 +306,37 @@ def _create_backup_locked():
         log.error("[backup] Destino no escribible: %s", motivo)
         return jsonify({"ok": False, "error": motivo}), 500
 
+    try:
+        filename = _escribir_backup(automatico=False)
+    except Exception as e:
+        # Traza completa al log y, al usuario, la causa real: sin ella el
+        # "Error al crear backup" de la pantalla de Ajustes no distinguía entre
+        # un volumen sin permisos, un disco lleno y una BD bloqueada.
+        mensaje = registrarFalloEscritura(log, "[backup] Error creando backup", e, _BACKUP_DIR)
+        return jsonify({"ok": False, "error": mensaje}), 500
+
+    return jsonify({"ok": True, "filename": filename, "backups": _list_backups()})
+
+
+def _escribir_backup(*, automatico: bool) -> str:
+    """Escribe el zip, rota las copias sobrantes y devuelve el nombre.
+
+    Se llama con `_BACKUP_LOCK` cogido. Cualquier fallo sale como excepción,
+    sin dejar el temporal a medias: quien llama decide si es un 500 o una
+    línea de log.
+    """
+    _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     _limpiar_temporales_huerfanos()
-    _checkpoint_active_db()
+    if not automatico:
+        # Solo en la copia manual. `_checkpoint_active_db` pasa por get_db(),
+        # que en su primera llamada aplica el esquema: la copia automática del
+        # arranque se hace justo antes de migrar y tiene que quedar sin migrar.
+        # No pierde nada por saltárselo: `_copia_temporal` usa la API de backup
+        # de SQLite, que ya lleva lo confirmado en el WAL.
+        _checkpoint_active_db()
 
     ts = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-    filename = f"backup_{ts}.zip"
+    filename = f"backup_{ts}{'_auto' if automatico else ''}.zip"
     backup_path = _BACKUP_DIR / filename
     tmp_path = _BACKUP_DIR / f"_tmp_{filename}"
 
@@ -338,16 +381,12 @@ def _create_backup_locked():
 
         tmp_path.replace(backup_path)
 
-    except Exception as e:
+    except Exception:
         try:
             tmp_path.unlink(missing_ok=True)
         except OSError:
             pass
-        # Traza completa al log y, al usuario, la causa real: sin ella el
-        # "Error al crear backup" de la pantalla de Ajustes no distinguía entre
-        # un volumen sin permisos, un disco lleno y una BD bloqueada.
-        mensaje = registrarFalloEscritura(log, "[backup] Error creando backup", e, _BACKUP_DIR)
-        return jsonify({"ok": False, "error": mensaje}), 500
+        raise
 
     all_backups = _list_backups()
     try:
@@ -360,9 +399,8 @@ def _create_backup_locked():
             if old == filename:
                 continue
             (_BACKUP_DIR / old).unlink(missing_ok=True)
-        all_backups = _list_backups()
 
-    return jsonify({"ok": True, "filename": filename, "backups": all_backups})
+    return filename
 
 
 @backup_bp.route("/api/backups", methods=["GET"])

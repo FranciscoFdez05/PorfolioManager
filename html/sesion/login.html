@@ -119,11 +119,27 @@
             <label for="password">Contraseña</label>
             <div class="inputRow">
                 <input id="password" name="password" type="password" autocomplete="current-password" required>
-                <button class="toggleBtn" type="button" onclick="var i=document.getElementById('password');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'" title="Mostrar/ocultar">👁</button>
+                <button id="togglePassword" class="toggleBtn" type="button" title="Mostrar/ocultar" aria-label="Mostrar u ocultar la contraseña">👁</button>
             </div>
         </div>
         <button type="submit">Entrar</button>
     </form>
 </div>
+<!-- El manejador va en un script con nonce y no en un onclick=: la CSP de la
+     aplicación no admite 'unsafe-inline' en script-src, así que un atributo
+     onclick lo bloquea el navegador sin más aviso que la consola. El marcador
+     lo rellena la vista de login con el nonce de cada petición. -->
+<script nonce="__CSP_NONCE__">
+    (function () {
+        var input = document.getElementById('password');
+        var btn = document.getElementById('togglePassword');
+        btn.addEventListener('click', function () {
+            var visible = input.type === 'password';
+            input.type = visible ? 'text' : 'password';
+            btn.textContent = visible ? '🙈' : '👁';
+            btn.setAttribute('aria-pressed', visible ? 'true' : 'false');
+        });
+    })();
+</script>
 </body>
 </html>

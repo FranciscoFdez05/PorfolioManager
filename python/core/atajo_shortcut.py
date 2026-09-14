@@ -17,6 +17,17 @@ firmar solo se importa con «Atajos no fiables» activado (Ajustes > Atajos), qu
 su vez exige haber ejecutado algún atajo antes. Eso se le dice al usuario junto
 al botón de descarga: sin el aviso, el fichero se abre y no ocurre nada.
 
+**Por qué hay un «Si» después de cada llamada al servidor.** Atajos no trata
+un 403 o un 404 como un error: «Obtener contenido de la URL» devuelve el JSON
+del error tan campante, «Obtener valor del diccionario» no encuentra la clave y
+sale vacío, y «Elegir de la lista» con una lista vacía **no pregunta nada y
+sigue**. El resultado era un atajo que, con el filtro de red rechazando al
+móvil, se saltaba la base de datos y la categoría, pedía concepto e importe,
+enviaba un cuerpo vacío y terminaba con la notificación de «Apuntado» sin haber
+apuntado nada. Ahora cada respuesta se guarda, se comprueba lo que se esperaba
+de ella y, si no está, se enseña el `error` que ha devuelto el servidor y el
+atajo se detiene ahí.
+
 Las acciones son las mismas, y en el mismo orden, que la receta manual de
 `docs/atajo-ios.md`. Ese documento explica **por qué** cada paso es como es;
 este módulo solo la escribe en el formato que entiende iOS. Si se toca una, hay
@@ -24,6 +35,7 @@ que tocar la otra.
 """
 
 import plistlib
+import uuid
 
 # Hueco que Atajos usa para una variable dentro de un texto. Las posiciones de
 # `attachmentsByRange` se cuentan sobre la cadena ya con los huecos puestos, así
@@ -40,6 +52,12 @@ _TEXTO = "is.workflow.actions.gettext"
 _PARTIR = "is.workflow.actions.text.split"
 _PREGUNTAR = "is.workflow.actions.ask"
 _NOTIFICAR = "is.workflow.actions.shownotification"
+_SI = "is.workflow.actions.conditional"
+_ALERTA = "is.workflow.actions.alert"
+_PARAR = "is.workflow.actions.exit"
+
+# Códigos internos de la condición del «Si». Son los de iOS 13 en adelante.
+_NO_TIENE_VALOR = 101
 
 
 def _accion(identificador, parametros=None):
@@ -108,6 +126,35 @@ def _valorDe(clave, variable=None):
     return _accion(_DICCIONARIO, parametros)
 
 
+def _pararSiVacia(variable, respuesta, titulo):
+    """«Si `variable` no tiene valor: avisa con el error del servidor y para».
+
+    Las tres acciones del bloque —abrir el «Si», el cuerpo y cerrarlo— van
+    unidas por el mismo `GroupingIdentifier`; es así como Atajos sabe dónde
+    empieza y acaba. El mensaje sale del campo `error` de `respuesta`, que es
+    el mismo en todos los endpoints, así que la alerta dice «Origen no
+    autorizado» o «Portfolio 'x' no encontrado» y no un genérico.
+    """
+    grupo = str(uuid.uuid4()).upper()
+    return [
+        _accion(_SI, {
+            "GroupingIdentifier": grupo,
+            "WFControlFlowMode": 0,
+            "WFCondition": _NO_TIENE_VALOR,
+            "WFInput": {"Type": "Variable", "Variable": _variable(variable)},
+        }),
+        _valorDe("error", respuesta),
+        _guardar("motivo"),
+        _accion(_ALERTA, {
+            "WFAlertActionTitle": _texto(titulo),
+            "WFAlertActionMessage": _texto(("var", "motivo")),
+            "WFAlertActionCancelButtonShown": False,
+        }),
+        _accion(_PARAR),
+        _accion(_SI, {"GroupingIdentifier": grupo, "WFControlFlowMode": 2}),
+    ]
+
+
 def acciones(urlBase: str) -> list:
     """Las acciones del Atajo, en el orden en que se ejecutan.
 
@@ -120,10 +167,18 @@ def acciones(urlBase: str) -> list:
     base = urlBase.rstrip("/")
 
     return [
-        # 1. En qué base de datos, de las que tenga el servidor.
+        # 1. En qué base de datos, de las que tenga el servidor. La lista se
+        # guarda y se comprueba antes de elegir: «Elegir de la lista» con una
+        # lista vacía no pregunta, y el atajo seguiría como si nada.
         _accion(_URL, {"WFURL": _texto(f"{base}/api/portfolios-lista"), "WFHTTPMethod": "GET"}),
-        _valorDe("nombres"),
-        _accion(_ELEGIR, {"WFChooseFromListActionPrompt": "¿En qué base de datos?"}),
+        _guardar("respuesta"),
+        _valorDe("nombres", "respuesta"),
+        _guardar("opciones"),
+        *_pararSiVacia("opciones", "respuesta", "No se pudieron leer las bases de datos"),
+        _accion(_ELEGIR, {
+            "WFInput": _variable("opciones"),
+            "WFChooseFromListActionPrompt": "¿En qué base de datos?",
+        }),
         _guardar("bbdd"),
 
         # 2. Gasto o ingreso. Un texto de dos líneas partido en lista, y no
@@ -143,8 +198,14 @@ def acciones(urlBase: str) -> list:
             ),
             "WFHTTPMethod": "GET",
         }),
-        _valorDe("lista"),
-        _accion(_ELEGIR, {"WFChooseFromListActionPrompt": "¿Qué categoría?"}),
+        _guardar("respuesta"),
+        _valorDe("lista", "respuesta"),
+        _guardar("opciones"),
+        *_pararSiVacia("opciones", "respuesta", "No se pudieron leer las categorías"),
+        _accion(_ELEGIR, {
+            "WFInput": _variable("opciones"),
+            "WFChooseFromListActionPrompt": "¿Qué categoría?",
+        }),
         _guardar("categoria"),
 
         # 4. Concepto e importe.
@@ -172,6 +233,7 @@ def acciones(urlBase: str) -> list:
         _guardar("preparado"),
         _valorDe("cuerpo", "preparado"),
         _guardar("envio"),
+        *_pararSiVacia("envio", "preparado", "No se pudo preparar el movimiento"),
         _valorDe("firma", "preparado"),
         _guardar("sello"),
         _valorDe("timestamp", "preparado"),
@@ -192,9 +254,13 @@ def acciones(urlBase: str) -> list:
             ]),
         }),
 
-        # 7. Confirmar. Sin esto, un fallo del servidor se queda en silencio y el
-        # gasto parece apuntado.
-        _valorDe("movimiento.cantidad"),
+        # 7. Confirmar. La notificación solo sale si la respuesta trae el
+        # movimiento creado; si no, la alerta con el error y se para. Sin esto,
+        # un 401 de firma o un 403 del filtro de red terminaban en «Apuntado».
+        _guardar("resultado"),
+        _valorDe("movimiento.cantidad", "resultado"),
+        _guardar("cantidad"),
+        *_pararSiVacia("cantidad", "resultado", "No se ha apuntado"),
         _accion(_NOTIFICAR, {
             "WFNotificationActionTitle": "Apuntado",
             "WFNotificationActionBody": _texto(("var", "nombre"), ": ", ("var", "importe"), " €"),

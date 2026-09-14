@@ -11,10 +11,10 @@ import time
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from flask import Blueprint, jsonify, make_response, redirect, request, session, url_for
+from flask import Blueprint, g, jsonify, make_response, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from core import sesion, settings
+from core import csp, sesion, settings
 from core.paths import AUTH_FILE as _AUTH_FILE, LOGIN_HTML
 
 auth_bp = Blueprint("auth", __name__)
@@ -200,7 +200,11 @@ def login():
                 _clear_failures(ip)
                 session.clear()
                 session["logged_in"] = True
-                session.permanent = False
+                # Permanente: sobrevive al cierre del navegador, que es lo que
+                # hace que el móvil y el portátil puedan tener cada uno la suya
+                # abierta sin volver a entrar. Caducidad y revocación, en
+                # core/sesion.py.
+                session.permanent = True
                 # Identificador nuevo y marcas de tiempo: es lo que permite
                 # caducar la sesión y revocarla en el logout. Va después de
                 # clear() para que no herede nada de la sesión anterior.
@@ -216,6 +220,11 @@ def login():
         "<!-- ERROR_PLACEHOLDER -->",
         f'<p class="loginError">{error}</p>' if error else "",
     )
+    # El botón de mostrar/ocultar la contraseña va en un script en línea. Con
+    # la CSP sin 'unsafe-inline' solo corre si lleva el nonce de la petición,
+    # que el after_request de core/seguridad_app.py recoge de `g`.
+    g.csp_nonce = csp.generar_nonce()
+    html = csp.insertar_nonce(html, g.csp_nonce)
     response = make_response(html)
     # Sin esto el navegador guarda la página en su caché de historial (bfcache) y
     # el botón "atrás" la muestra tal cual, sin preguntar al servidor, aunque la

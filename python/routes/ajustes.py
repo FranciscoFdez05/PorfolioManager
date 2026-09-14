@@ -8,7 +8,7 @@ from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, request
 
-from core import exportables, paths, settings
+from core import exportables, paths, sesion, settings
 from core.db import get_active_db_path, get_db
 from core.errors import registrarFalloEscritura
 from core.escritura import escribirJsonAtomico, temporalPara
@@ -436,7 +436,11 @@ def save_settings():
         raw = data["soloMercadoTipos"]
         gcfg["soloMercadoTipos"] = [t for t in raw if t in _VALID_TIPOS] if isinstance(raw, list) else []
     if "bloqueoInactividad" in data:
-        gcfg["bloqueoInactividad"] = _as_int(data["bloqueoInactividad"], 0, {0, 15, 30, 60, 240})
+        # La lista de valores vive en core/sesion.py: es quien la aplica en el
+        # servidor, y el navegador solo la imita para cerrar la pestaña abierta.
+        gcfg["bloqueoInactividad"] = _as_int(
+            data["bloqueoInactividad"], 0, set(sesion.INACTIVIDAD_OPCIONES)
+        )
     if "numLocale" in data:
         gcfg["numLocale"] = str(data["numLocale"]) if data["numLocale"] in {"es-ES", "en-US", "fr-FR"} else "es-ES"
     if "dateFormat" in data:

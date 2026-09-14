@@ -28,6 +28,7 @@ El orden de registro importa y es el que había:
 import logging
 import os
 import secrets
+from datetime import timedelta
 
 from flask import abort, g, make_response, redirect, request, session, url_for
 
@@ -330,6 +331,14 @@ def aplicar_configuracion_sesion(app):
     política a partir de la respuesta siguiente sin reiniciar el proceso.
     """
     app.config["MAX_CONTENT_LENGTH"] = settings.maxSubidaBytes()
+    # Cookie permanente: con fecha de caducidad, para que el navegador no la
+    # tire al cerrarse (en el móvil ocurre solo). Cuánto vale de verdad lo
+    # decide core/sesion.py en cada petición, no esta fecha. Sin
+    # SESSION_REFRESH_EACH_REQUEST=False, Flask reemitiría la cookie en cada
+    # respuesta por el mero hecho de ser permanente; `sesion.refrescar` ya la
+    # renueva como mucho una vez por minuto, que es cuando cambia algo.
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=sesion.COOKIE_DIAS)
+    app.config["SESSION_REFRESH_EACH_REQUEST"] = False
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = settings.cookieSameSite()
     # SESSION_COOKIE_SECURE se activa solo cuando hay HTTPS (evita romper HTTP local).

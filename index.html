@@ -771,33 +771,6 @@
                     <span id="ajustesCredUserMsg" class="ajustesStatusMsg"></span>
                 </div>
             </div>
-
-            <div class="ajustesSection">
-                <div class="ajustesSectionHeader">
-                    <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3.5L16 2M6 3.5L4 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-                    </div>
-                    <div class="ajustesSectionHeaderText">
-                        <div class="ajustesSectionTitle">Bloqueo por inactividad</div>
-                        <div class="ajustesSectionDesc">Cierra la sesión automáticamente si no hay actividad durante el tiempo indicado.</div>
-                    </div>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-                <div class="ajustesField">
-                    <label class="ajustesLabel" for="ajustesBloqueoInactividad">Tiempo hasta cierre de sesión</label>
-                    <select id="ajustesBloqueoInactividad" class="ajustesSelect" data-no-custom>
-                        <option value="0">Desactivado</option>
-                        <option value="15">15 minutos</option>
-                        <option value="30">30 minutos</option>
-                        <option value="60">1 hora</option>
-                        <option value="240">4 horas</option>
-                    </select>
-                </div>
-                <div class="ajustesActions">
-                    <button id="ajustesGuardarBloqueoBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
-                    <span id="ajustesBloqueoMsg" class="ajustesStatusMsg"></span>
-                </div>
-            </div>
         </div>
 
         <!-- ── Seguridad ── -->
@@ -991,6 +964,35 @@
                 <div class="ajustesActions">
                     <button id="ajustesGuardarCredPwdBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
                     <span id="ajustesCredPwdMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3.5L16 2M6 3.5L4 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Cierre por inactividad</div>
+                        <div class="ajustesSectionDesc">Cierra la sesión de un aparato cuando lleva este tiempo sin usar la aplicación. Lo comprueba el servidor, así que vale aunque la pestaña esté cerrada. Cada dispositivo tiene su propia sesión: con «No cerrar» se mantienen hasta que cierres sesión o cambies la contraseña.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesBloqueoInactividad">Tiempo sin actividad</label>
+                    <select id="ajustesBloqueoInactividad" class="ajustesSelect" data-no-custom>
+                        <option value="0">No cerrar</option>
+                        <option value="15">15 minutos</option>
+                        <option value="30">30 minutos</option>
+                        <option value="60">1 hora</option>
+                        <option value="240">4 horas</option>
+                        <option value="480">8 horas</option>
+                        <option value="1440">1 día</option>
+                    </select>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesGuardarBloqueoBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
+                    <span id="ajustesBloqueoMsg" class="ajustesStatusMsg"></span>
                 </div>
             </div>
         </div>
@@ -1614,7 +1616,7 @@
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Auto-backup</div>
-                        <div class="ajustesSectionDesc">Copia de seguridad automática cuando se cumple la frecuencia indicada, incluso sin reiniciar el servidor.</div>
+                        <div class="ajustesSectionDesc">Copia de seguridad automática cuando se cumple la frecuencia indicada, incluso sin reiniciar el servidor. Es la misma copia completa que «Crear backup ahora»: aparece en la lista de arriba con la etiqueta <em>auto</em> y se restaura desde ahí.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>

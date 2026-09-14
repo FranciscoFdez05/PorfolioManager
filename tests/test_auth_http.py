@@ -103,6 +103,24 @@ def test_la_pagina_de_login_no_se_guarda_en_cache(cliente):
     assert "no-store" in cabeceras["Cache-Control"]
 
 
+def test_el_script_del_login_lleva_el_nonce_de_la_csp(cliente):
+    """El botón de mostrar la contraseña iba en un onclick= y la CSP lo bloqueaba.
+
+    Ahora va en un <script nonce>: el nonce del HTML tiene que ser el mismo que
+    autoriza la cabecera, y no puede quedar el marcador sin rellenar.
+    """
+    import re
+
+    respuesta = cliente.get("/login")
+    html = respuesta.get_data(as_text=True)
+
+    boton = re.search(r"<button[^>]*id=\"togglePassword\"[^>]*>", html).group(0)
+    assert "onclick" not in boton
+    assert "__CSP_NONCE__" not in html
+    nonce = re.search(r'<script nonce="([^"]+)">', html).group(1)
+    assert f"'nonce-{nonce}'" in respuesta.headers["Content-Security-Policy"]
+
+
 def test_con_sesion_abierta_login_devuelve_a_la_aplicacion(cliente):
     with cliente.session_transaction() as sesion:
         sesion["logged_in"] = True
@@ -122,6 +140,18 @@ def test_logout_cierra_la_sesion(cliente):
     assert respuesta.status_code == 302
     with cliente.session_transaction() as sesion:
         assert not sesion.get("logged_in")
+
+
+def test_la_cookie_de_sesion_es_permanente(cliente):
+    """Sin fecha de caducidad, el navegador la tira al cerrarse —en el móvil,
+    solo— y el usuario tenía que volver a entrar cada dos por tres. Cuánto vale
+    de verdad lo decide el servidor (core/sesion.py), no esta fecha."""
+    respuesta = cliente.post("/login", data={"username": USUARIO, "password": CLAVE})
+
+    cookie = next(c for c in respuesta.headers.getlist("Set-Cookie") if c.startswith("session="))
+    assert "Expires=" in cookie or "Max-Age=" in cookie
+    with cliente.session_transaction() as sesion:
+        assert sesion.permanent is True
 
 
 # ── Destino tras el login (?next) ────────────────────────────────────────────

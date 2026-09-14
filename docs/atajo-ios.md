@@ -124,6 +124,29 @@ con la ventana de 60 segundos.
 Sustituye `192.168.1.X:5000` por la IP y el puerto reales de tu servidor. Por
 WireGuard usarás la IP del túnel, no la de la LAN.
 
+**0. El bloque que va después de cada llamada al servidor**
+
+Atajos no trata un 403 o un 404 como un error: «Obtener contenido de la URL»
+devuelve el JSON del fallo como si nada, «Obtener valor del diccionario» no
+encuentra la clave y sale vacío, y **«Elegir de la lista» con una lista vacía
+no pregunta nada y sigue**. Sin esto, con el filtro de red rechazando al móvil
+el atajo se saltaba la base de datos y la categoría, pedía concepto e importe,
+mandaba un cuerpo vacío y terminaba con «Apuntado» sin haber apuntado nada.
+
+Así que después de cada llamada, y antes de usar lo que devuelve, va esto:
+
+- **Establecer variable** `respuesta` (la respuesta entera)
+- **Obtener valor del diccionario** → la clave que se espera, en `respuesta`
+- **Establecer variable** `opciones` (o el nombre que toque en ese paso)
+- **Si** `opciones` *no tiene ningún valor*
+  - **Obtener valor del diccionario** → clave `error`, en `respuesta`
+  - **Mostrar alerta** con ese valor como mensaje
+  - **Detener este atajo**
+- **Fin de Si**
+
+En los pasos de abajo aparece resumido como *«comprobar y parar si falta»*.
+El atajo que genera el panel lo lleva ya puesto.
+
 **1. Elegir la base de datos**
 
 Va primero, antes del menú de tipo: así todo el bloque queda fuera de las ramas
@@ -132,11 +155,16 @@ y no hay riesgo de meter acciones dentro de una por error.
 - **Obtener contenido de la URL**
   - URL: `http://192.168.1.X:5000/api/portfolios-lista`
   - Método: `GET`
-- **Obtener valor del diccionario** → clave `nombres`
-- **Elegir de la lista**
+- **Establecer variable** `respuesta`
+- **Obtener valor del diccionario** → clave `nombres`, en `respuesta`
+- **Establecer variable** `opciones` → *comprobar y parar si falta*
+- **Elegir de la lista**, con `opciones` como entrada
 - **Establecer variable** `bbdd`
 
-Cuatro acciones y ya está: los endpoints aceptan tanto el id (`test2`) como el
+Con el «Si» en medio, «Elegir de la lista» ya no puede tomar la lista de la
+acción anterior: hay que ponerle `opciones` como entrada a mano.
+
+Cuatro acciones más el bloque y ya está: los endpoints aceptan tanto el id (`test2`) como el
 nombre visible (`Test2`, sin distinguir mayúsculas), así que el Atajo puede
 mandar directamente lo que elija el usuario y no tiene que traducir nada. La
 respuesta trae además `idPorNombre` y `portfolios` por si se quiere el id, pero
@@ -160,17 +188,19 @@ mayúscula también vale.
   - URL: `http://192.168.1.X:5000/api/categorias?portfolio=` + variable `bbdd`
     + `&tipo=` + variable `clase`
   - Método: `GET`
-- **Obtener valor del diccionario** → clave `lista`
-- **Elegir de la lista** → **Establecer variable** `categoria`
+- **Establecer variable** `respuesta`
+- **Obtener valor del diccionario** → clave `lista`, en `respuesta`
+- **Establecer variable** `opciones` → *comprobar y parar si falta*
+- **Elegir de la lista**, con `opciones` como entrada → **Establecer variable** `categoria`
 
 `?tipo=` hace que el servidor devuelva además `lista` con solo las categorías de
 ese tipo. Así el Atajo no necesita un segundo «Obtener valor del diccionario»
 usando una variable como clave, que era la acción más frágil de montar a mano:
 ahora todas las claves se teclean y las variables solo aparecen en la URL.
 
-Un `tipo` mal escrito devuelve 400 en vez de una lista vacía, a propósito: vacío
-haría que «Elegir de la lista» se saltara en silencio y el fallo aparecería dos
-pasos más abajo.
+Un `tipo` mal escrito devuelve 400 en vez de una lista vacía, a propósito: así
+el bloque de comprobación enseña el mensaje del servidor en vez de que «Elegir
+de la lista» se salte en silencio.
 
 Este es el punto clave del diseño: la lista sale de `gastos_tipos` /
 `ingresos_tipos`, así que una categoría añadida desde la web app aparece sola en
@@ -206,7 +236,8 @@ existía aún en la pestaña de Gastos se crea solo.
     con su variable como valor
 - **Establecer variable** `preparado`
 - **Obtener valor del diccionario** → clave `cuerpo`, en `preparado`
-  → **Establecer variable** `envio`
+  → **Establecer variable** `envio` → *comprobar y parar si falta* (aquí la
+  respuesta es `preparado`)
 - **Obtener valor del diccionario** → clave `firma`, en `preparado`
   → **Establecer variable** `sello`
 - **Obtener valor del diccionario** → clave `timestamp`, en `preparado`
@@ -246,8 +277,15 @@ opción `JSON` el cuerpo se reserializa y la firma falla con 401.
 
 **9. Confirmar**
 
-- **Obtener valor del diccionario** → clave `movimiento.cantidad`
-- **Mostrar notificación** con ese valor, para ver de un vistazo que se guardó.
+- **Establecer variable** `resultado`
+- **Obtener valor del diccionario** → clave `movimiento.cantidad`, en `resultado`
+- **Establecer variable** `cantidad` → *comprobar y parar si falta* (la
+  respuesta es `resultado`)
+- **Mostrar notificación** «Apuntado» con el concepto y el importe.
+
+La notificación solo llega si la respuesta trae el movimiento creado. Antes se
+mostraba siempre, y un 401 de firma o un 403 del filtro de red terminaban en
+«Apuntado» con la base de datos intacta.
 
 ## Ponerlo en el Centro de Control
 
@@ -266,8 +304,14 @@ botón de Acción (Ajustes → Botón de Acción → Atajo).
 | 404 | Portfolio inexistente | El `id` enviado no está en `/api/portfolios-lista` |
 | 400 | JSON mal formado o campos inválidos | Comillas o barras invertidas en el concepto; `tipo` que no es `gasto`/`ingreso`; importe cero o negativo |
 
-El mensaje concreto viene en el campo `error` de la respuesta, así que si algo
-no cuadra, muestra el contenido de la última petición en una notificación.
+El mensaje concreto viene en el campo `error` de la respuesta, y es el que
+enseña la alerta del atajo cuando se para. Si el atajo **pide concepto e
+importe sin haber preguntado antes la base de datos ni la categoría**, es una
+versión anterior sin las comprobaciones: las dos listas llegaron vacías porque
+el servidor rechazó las llamadas (casi siempre un 403 del filtro de red o un
+404 por `activado = false`) y Atajos se las saltó sin decir nada. Descarga el
+atajo otra vez desde **Ajustes > API** y usa **Probar** en ese mismo panel: dice
+con qué IP te ve el servidor y si pasa el filtro.
 
 > **`/api/movimiento` no se puede probar desde el navegador.** Solo acepta POST,
 > y la barra de direcciones hace GET: siempre responderá error, aunque todo esté

@@ -31,6 +31,22 @@ no hace falta conocerlas: basta con un número que se incrementa y que toda
 sesión lleva grabado. Las que traigan un número viejo dejan de valer, sin
 mantener una lista de sesiones activas que habría que ir podando.
 
+**Varias sesiones a la vez.** Cada login genera su propio identificador y no
+toca los de los demás: el móvil, el portátil y una pestaña en el trabajo son
+tres sesiones independientes, y cerrar una no cierra las otras. Lo único que
+las echa a todas es cambiar las credenciales. La cookie es **permanente**
+(lleva fecha de caducidad, a un año): sin ella, el navegador la trataba como
+«de sesión» y la tiraba al cerrarse, que en el móvil pasa solo, y el usuario
+tenía que volver a entrar cada dos por tres. Lo que decide si sigue valiendo es
+lo de aquí abajo, no el navegador.
+
+**La caducidad por inactividad la fija Ajustes > Seguridad**, no config.ini:
+es una decisión del usuario, no del despliegue, y por defecto está en «no
+cerrar». Se lee de `ajustes.json` en cada petición, con el mtime en caché para
+no parsearlo mil veces. El tope absoluto (`[seguridad] sesion_maxima_minutos`)
+sí sigue en config.ini, apagado por defecto: es el freno que un despliegue
+puede querer poner por encima de lo que elija el usuario.
+
 **Qué pasa al actualizar.** Las cookies emitidas por la versión anterior no
 llevan identificador ni marcas de tiempo, así que se rechazan y hay que volver a
 entrar una vez. Es lo correcto: son precisamente las que no se pueden caducar.
@@ -70,6 +86,52 @@ MAX_REVOCADOS = 5000
 # Cuánto se recuerda un identificador revocado cuando no hay caducidad absoluta
 # configurada. Sin un límite, la lista solo podría crecer.
 RETENCION_POR_DEFECTO = 30 * 24 * 3600
+
+# Vida de la cookie en el navegador. Es solo eso: cuándo la tira el navegador
+# por su cuenta. Que siga valiendo lo decide `motivoInvalidez` en cada petición.
+COOKIE_DIAS = 365
+
+# Minutos de inactividad que admite Ajustes > Seguridad. 0 es «no cerrar».
+INACTIVIDAD_OPCIONES = (0, 15, 30, 60, 240, 480, 1440)
+
+# Clave en ajustes.json. Es la misma que ya usaba el temporizador del navegador,
+# para que el usuario tenga un único sitio donde elegirlo: ahora lo comprueba
+# también el servidor, que es lo que hace que valga aunque la pestaña esté
+# cerrada o el aparato apagado.
+CLAVE_INACTIVIDAD = "bloqueoInactividad"
+
+_cache_inactividad = {"firma": None, "segundos": 0}
+
+
+def inactividadSegundos() -> int:
+    """Segundos sin actividad tras los que caduca la sesión; 0 si no caduca.
+
+    Nunca lanza: un ajustes.json ilegible o sin la clave equivale a «no cerrar»,
+    que es el valor por defecto y el que menos daño hace si algo falla.
+    """
+    try:
+        st = paths.AJUSTES_JSON.stat()
+    except OSError:
+        return 0
+    # Ruta incluida en la firma: los tests redirigen AJUSTES_JSON a un temporal
+    # distinto en cada caso, y dos ficheros recién escritos pueden compartir
+    # mtime en un sistema de ficheros de resolución gruesa.
+    firma = (str(paths.AJUSTES_JSON), st.st_mtime_ns, st.st_size)
+    if _cache_inactividad["firma"] == firma:
+        return _cache_inactividad["segundos"]
+
+    segundos = 0
+    try:
+        datos = json.loads(paths.AJUSTES_JSON.read_text("utf-8"))
+        minutos = int(datos.get(CLAVE_INACTIVIDAD, 0)) if isinstance(datos, dict) else 0
+        if minutos in INACTIVIDAD_OPCIONES:
+            segundos = minutos * 60
+    except (OSError, ValueError, TypeError):
+        segundos = 0
+
+    _cache_inactividad["firma"] = firma
+    _cache_inactividad["segundos"] = segundos
+    return segundos
 
 
 # ── Estado compartido ─────────────────────────────────────────────────────────
@@ -158,7 +220,7 @@ def _retencion() -> float:
     la de inactividad, y si tampoco la hay, a un plazo fijo.
     """
     return float(settings.sesionMaximaSegundos()
-                 or settings.sesionInactividadSegundos()
+                 or inactividadSegundos()
                  or RETENCION_POR_DEFECTO)
 
 
@@ -248,7 +310,7 @@ def motivoInvalidez(sesion) -> str | None:
     if creada > ahora + 60 or vista > ahora + 60:
         return "marcas de tiempo en el futuro"
 
-    inactividad = settings.sesionInactividadSegundos()
+    inactividad = inactividadSegundos()
     if inactividad and ahora - vista > inactividad:
         return f"inactiva más de {inactividad}s"
 
@@ -276,6 +338,7 @@ def refrescar(sesion) -> None:
 
 
 __all__ = [
-    "CREADA", "EPOCA", "SID", "VISTA",
-    "abrir", "cerrar", "invalidarTodas", "leerEstado", "motivoInvalidez", "refrescar",
+    "COOKIE_DIAS", "CREADA", "EPOCA", "INACTIVIDAD_OPCIONES", "SID", "VISTA",
+    "abrir", "cerrar", "inactividadSegundos", "invalidarTodas", "leerEstado",
+    "motivoInvalidez", "refrescar",
 ]

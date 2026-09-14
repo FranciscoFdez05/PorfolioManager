@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.1.0-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.1.1-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 [![SQLite](https://img.shields.io/badge/sqlite-3.40%2B-lightgrey)](Dockerfile)
@@ -196,7 +196,7 @@ Con Docker, `config.ini` va montado en el contenedor: editarlo surte efecto al r
 | `[gunicorn]` | Workers, hilos, timeouts |
 | `[rutas]` | Dónde viven `data/`, `logs/` y `API/` (en Docker las fijan los volúmenes) |
 | `[seguridad]` | CSP, límites de escritura, sesión |
-| `[backups]` | Copias a conservar y timeouts de SQLite |
+| `[backups]` | Timeouts de SQLite al copiar o reparar (`max_copias` es obsoleto: el límite se fija en Ajustes) |
 | `[atajo]` | Endpoints del Atajo de iOS y redes permitidas |
 | `[mercado]` | Proveedores, caducidad de cotizaciones, peticiones en paralelo |
 | `[actualizacion]` | Si se comprueba en GitHub que hay versión nueva, y de qué rama |
@@ -231,7 +231,7 @@ Mientras ese vigilante no esté instalado, el panel lo dice en vez de dejar el b
 
 **Antes de pulsar, el panel dice si hay algo que traer.** Lee `python/core/version.py` de la rama en GitHub y lo compara con la versión instalada:
 
-- **Hay actualización** — el botón pasa a «Actualizar a la 2.1.0».
+- **Hay actualización** — el botón pasa a «Actualizar a la 2.1.1».
 - **Al día** — pulsar reconstruiría la misma versión. Es legítimo (rehacer la imagen, aplicar un `.env` nuevo), pero el modal lo avisa para que nadie se coma dos minutos de reinicio creyendo que trae novedades.
 
 Esto sí lo hace la aplicación por su cuenta: es una lectura, no una actualización, así que funciona aunque el vigilante no esté instalado. La respuesta se guarda seis horas —el panel se recarga cada cinco segundos mientras dura una actualización— y **Comprobar si hay versión nueva** salta esa caché. Se configura en `[actualizacion]`: la rama consultada tiene que ser la del checkout del servidor, o estarías comparando con una versión que tu `git pull` no va a traer. Con `comprobar_version = false` el servidor no hace ninguna llamada saliente por esto y el panel deja de mostrar la línea.
@@ -297,12 +297,12 @@ PORTFOLIO_VERSION=<versión-anterior> docker compose up -d --no-build
 **Si lo subía** — los datos ya están migrados, así que hay que restaurar también el fichero. Antes de migrar, la aplicación deja una copia identificable y **fuera de la rotación de backups**:
 
 ```
-data/backups/<portfolio>_pre-esquema-1-a-2_2026-08-25_193000.db
+data/backups/auto/<portfolio>_pre-esquema-1-a-2_2026-08-25_193000.db
 ```
 
 ```bash
 docker compose down
-cp data/backups/principal_pre-esquema-1-a-2_*.db data/portfolios/principal.db
+cp data/backups/auto/principal_pre-esquema-1-a-2_*.db data/portfolios/principal.db
 rm -f data/portfolios/principal.db-wal data/portfolios/principal.db-shm
 git checkout v<versión-anterior>
 PORTFOLIO_VERSION=<versión-anterior> docker compose up -d --no-build
@@ -606,14 +606,14 @@ El intervalo y el alcance (solo el portfolio activo o todos) se eligen en **Ajus
 ## Base de datos y backups
 
 - **BD activa:** `data/portfolios/<id>.db` (una por portfolio; `data/portfolio.db` es solo el fichero heredado de versiones anteriores)
-- **Backups automáticos diarios:** `data/backups/auto/` — se conservan los últimos 14
-- **Backups manuales:** `data/backups/` (ZIP con todos los portfolios, ajustes y preferencias)
+- **Backups:** `data/backups/` — ZIP con todos los portfolios, ajustes y preferencias. Los del botón se llaman `backup_<fecha>.zip`; los de la frecuencia de **Auto-backup** llevan `_auto` y salen en la misma lista de Ajustes, desde donde se restauran. **Límite de backups** rota unos y otros
+- **Copias previas a una migración de esquema:** `data/backups/auto/` — exentas de rotación (ver más abajo). Ahí quedan también los `.db` diarios que hacía el auto-backup hasta la 2.1.0; siguen valiendo como último recurso si la BD activa aparece dañada
 - **Copias previas a una restauración:** `data/pre_restore/<fecha>/` — se crean solas antes de sobrescribir nada, por si restauras el backup equivocado
 - **Temporales y bloqueos:** `data/tmp/` — copias a medio hacer y los ficheros con los que los dos workers de gunicorn se coordinan. Se puede vaciar con el servidor parado; no contiene nada que se necesite conservar
 
 Al arrancar se verifica la integridad de la BD activa (`integrity_check` + `foreign_key_check`). Si falla, se intenta reparar y, si no es posible, se restaura desde el backup automático válido más reciente.
 
-El esquema se actualiza solo. Lleva su número en `PRAGMA user_version`, y antes de subirlo se guarda una copia identificable y **exenta de la rotación** — `data/backups/<portfolio>_pre-esquema-N-a-M_*.db` — que es el punto de retorno si una actualización sale mal. El detalle está en [Actualizar](#actualizar).
+El esquema se actualiza solo. Lleva su número en `PRAGMA user_version`, y antes de subirlo se guarda una copia identificable y **exenta de la rotación** — `data/backups/auto/<portfolio>_pre-esquema-N-a-M_*.db` — que es el punto de retorno si una actualización sale mal. El detalle está en [Actualizar](#actualizar).
 
 Dentro de la BD del portfolio hay dos tablas que son **caché y no datos del usuario** — `fx_rates` (tipos de cambio históricos) y `benchmark_prices` (cierres de los índices). Se pueden borrar sin perder nada: se vuelven a bajar, a costa de gastar cuota del proveedor. Los `portfolio_snapshots`, en cambio, no se reconstruyen, así que el purgado desde Ajustes vuelca antes una copia en JSON a `data/pre_restore/`.
 

@@ -1043,8 +1043,15 @@ async function initAjustesLogic() {
         const base = filename
             .replace(/^(backup|portfolio)_/, "")
             .replace(/\.(zip|db)$/, "")
+            .replace(/_auto$/, "")
             .replace(/_(\d{2})-(\d{2})-(\d{2})$/, " $1:$2:$3")
         return isZip ? base : `${base} (legacy)`
+    }
+
+    // Las copias del scheduler llevan `_auto` en el nombre: mismo zip que las
+    // manuales, pero conviene que en la lista se vea cual es cual.
+    function _esBackupAutomatico(filename) {
+        return /_auto\.zip$/.test(filename)
     }
 
     function renderBackups(backups) {
@@ -1060,6 +1067,12 @@ async function initAjustesLogic() {
             const label = document.createElement("span")
             label.className = "ajustesBackupName"
             label.textContent = _backupDisplayName(filename)
+            if (_esBackupAutomatico(filename)) {
+                const tag = document.createElement("span")
+                tag.className = "ajustesBackupTag"
+                tag.textContent = "auto"
+                label.appendChild(tag)
+            }
             const restoreBtn = document.createElement("button")
             restoreBtn.className = "ajustesRestoreBtn"
             restoreBtn.textContent = "Restaurar"

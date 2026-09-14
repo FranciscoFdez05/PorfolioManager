@@ -56,6 +56,54 @@ def test_el_atajo_es_un_plist_con_las_cuatro_llamadas():
     assert urls[3] == f"{BASE}/api/movimiento"
 
 
+def test_cada_llamada_al_servidor_para_el_atajo_si_falla():
+    """Atajos no trata un 403 o un 404 como error: el JSON del fallo sigue su
+    curso, «Elegir de la lista» con una lista vacía no pregunta nada y el atajo
+    acababa en «Apuntado» sin haber apuntado. Después de cada llamada tiene que
+    haber un «Si … no tiene valor» que enseñe el `error` del servidor y pare."""
+    acciones = _acciones()
+    ids = [a["WFWorkflowActionIdentifier"] for a in acciones]
+
+    for indice, accion in enumerate(acciones):
+        if "WFURL" not in accion["WFWorkflowActionParameters"]:
+            continue
+        # Las seis acciones siguientes a la llamada: guardar, leer, guardar, Si…
+        ventana = acciones[indice + 1:indice + 12]
+        si = next(a for a in ventana if a["WFWorkflowActionIdentifier"] == "is.workflow.actions.conditional")
+        assert si["WFWorkflowActionParameters"]["WFControlFlowMode"] == 0
+        assert si["WFWorkflowActionParameters"]["WFCondition"] == atajo_shortcut._NO_TIENE_VALOR
+        grupo = si["WFWorkflowActionParameters"]["GroupingIdentifier"]
+        cuerpo = [a["WFWorkflowActionIdentifier"] for a in ventana[ventana.index(si) + 1:]]
+        assert "is.workflow.actions.alert" in cuerpo
+        assert "is.workflow.actions.exit" in cuerpo
+        cierre = next(
+            a for a in ventana[ventana.index(si) + 1:]
+            if a["WFWorkflowActionIdentifier"] == "is.workflow.actions.conditional"
+        )
+        assert cierre["WFWorkflowActionParameters"] == {"GroupingIdentifier": grupo, "WFControlFlowMode": 2}
+
+    # Los bloques no se anidan ni se cruzan.
+    abiertos = []
+    for a in acciones:
+        if a["WFWorkflowActionIdentifier"] == "is.workflow.actions.conditional":
+            p = a["WFWorkflowActionParameters"]
+            if p["WFControlFlowMode"] == 0:
+                abiertos.append(p["GroupingIdentifier"])
+            else:
+                assert abiertos.pop() == p["GroupingIdentifier"]
+    assert abiertos == []
+    assert ids.count("is.workflow.actions.conditional") == 8   # cuatro llamadas, dos por bloque
+
+
+def test_elegir_de_la_lista_lee_de_la_variable_y_no_de_la_accion_anterior():
+    """Con el «Si» en medio, la acción anterior a «Elegir» ya no es la lista."""
+    for a in _acciones():
+        if a["WFWorkflowActionIdentifier"] == "is.workflow.actions.choosefromlist":
+            if a["WFWorkflowActionParameters"]["WFChooseFromListActionPrompt"] == "¿Gasto o ingreso?":
+                continue   # esa lista sale de un texto partido, sin servidor de por medio
+            assert a["WFWorkflowActionParameters"]["WFInput"]["Value"]["VariableName"] == "opciones"
+
+
 def test_el_envio_va_como_archivo_y_no_como_json():
     """Es el detalle que rompe el atajo sin dejar rastro: con `Json`, Atajos
     vuelve a serializar el cuerpo, cambian los bytes y la firma deja de valer.

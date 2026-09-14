@@ -16,9 +16,112 @@ Cada versión indica **si toca el esquema de la base de datos**, porque es lo qu
 decide cómo se deshace la actualización:
 
 - **No lo toca** → basta con volver a la imagen anterior.
-- **Lo sube** → al migrar se guarda `data/backups/<portfolio>_pre-esquema-N-a-M_*.db`,
+- **Lo sube** → al migrar se guarda `data/backups/auto/<portfolio>_pre-esquema-N-a-M_*.db`,
   exento de rotación. Volver atrás es levantar la imagen anterior y restaurar
   ese fichero.
+
+---
+
+## [2.1.1] — 2026-09-14
+
+**La sesión deja de cerrarse sola y cada aparato tiene la suya.** Pasaban dos
+cosas. La cookie no era permanente —sin fecha de caducidad—, y eso el navegador
+lo interpreta como «bórrala al cerrar»: en el móvil, donde las pestañas se
+cierran solas, cada vuelta a la aplicación era volver a entrar, y daba la
+impresión de que abrir sesión en un aparato echaba al otro. Y por debajo,
+`config.ini` traía de fábrica un cierre por inactividad de cuatro horas y un
+tope de doce desde el login, así que hasta la sesión del portátil se caía a lo
+largo del día.
+
+Ahora la cookie lleva un año de vida y cada login es una sesión independiente:
+el móvil, el portátil y una pestaña en el trabajo conviven, y cerrar sesión en
+uno solo cierra ese. Lo que las echa a todas sigue siendo cambiar la
+contraseña. El cierre por inactividad pasa a **Ajustes › Seguridad › Cierre por
+inactividad**, con «No cerrar» por defecto; es el mismo ajuste que ya existía
+en Cuenta como «Bloqueo por inactividad», solo que ahora lo comprueba también
+el servidor en cada petición —antes solo lo hacía un temporizador de la pestaña
+abierta— y admite hasta un día. El tope absoluto desde el login se queda en
+`config.ini` como freno opcional del despliegue, apagado por defecto.
+
+**El Atajo de iOS avisa cuando el servidor le dice que no.** Atajos no trata
+un 403 o un 404 como un error: se queda con el JSON del fallo, «Obtener valor
+del diccionario» no encuentra la clave y sale vacío, y «Elegir de la lista»
+con una lista vacía no pregunta nada y sigue. Con el filtro de red rechazando
+al móvil —o con la función apagada—, el atajo se saltaba la base de datos y la
+categoría, pedía concepto e importe, mandaba un cuerpo vacío y terminaba con
+la notificación de «Apuntado» sin haber apuntado nada. Ahora, después de cada
+llamada al servidor, comprueba que ha llegado lo que esperaba y, si no, enseña
+el mensaje de error del servidor («Origen no autorizado», «Recurso no
+encontrado», «Firma inválida»…) y se detiene ahí. Hay que **volver a descargar
+el atajo desde Ajustes › API** para tener la versión con las comprobaciones.
+
+**El auto-backup se ve y se puede restaurar.** Con una frecuencia puesta en
+Ajustes, la copia automática sí se hacía, pero no era la misma que la del
+botón: dejaba un `.db` por portfolio en `data/backups/auto/`, una carpeta que
+la lista de «Copias de seguridad» no mira y desde la que no hay botón de
+restaurar. Para quien la tenía activada era como si no existiera. Ahora el
+scheduler hace exactamente la copia de «Crear backup ahora» —todos los
+portfolios, ajustes, preferencias y manifest— en `data/backups/`, con `_auto`
+en el nombre. Sale en la misma lista con una etiqueta, se restaura con el mismo
+botón y la rota el mismo «Límite de backups».
+
+Lo que quedaba en `data/backups/auto/` no se toca: las copias previas a una
+migración de esquema siguen ahí, exentas de rotación, y los `.db` diarios de
+la versión anterior se siguen leyendo como último recurso si la base activa
+aparece dañada al arrancar. Ese camino de emergencia lee ahora también los
+zips.
+
+**El ojo de la pantalla de acceso vuelve a enseñar la contraseña.** El botón
+llevaba su código en un atributo `onclick=`, y la Content-Security-Policy de la
+aplicación no admite scripts en línea sin nonce: el navegador lo bloqueaba y lo
+único que quedaba era un aviso en la consola. Pulsarlo no hacía nada. Ahora el
+manejador va en un `<script>` con el nonce de cada petición, que es como ya se
+hacía con el botón de imprimir del informe de renta, y la vista de login lo
+rellena igual que `index.html`.
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano. Las sesiones abiertas con la 2.1.0
+siguen valiendo, pero solo las que se abran a partir de ahora sobreviven al
+cierre del navegador: conviene salir y volver a entrar una vez en cada aparato.
+En `config.ini`, `[backups] max_copias` y `[seguridad]
+sesion_inactividad_minutos` dejan de tener efecto —los dos se fijan ahora en
+Ajustes— y `sesion_maxima_minutos` pasa a 0; si tienes el fichero editado a
+mano, revisa esos tres.
+
+### Corregido
+
+- **La sesión se cerraba sola y no convivía con la de otro aparato.** Cookie
+  permanente (un año) y sin cierre por inactividad ni tope absoluto de fábrica.
+  Cada login es una sesión aparte; el logout solo cierra la suya.
+
+- **El Atajo de iOS se para y enseña el error del servidor** en vez de
+  saltarse las listas y decir «Apuntado». Cuatro bloques «Si … no tiene
+  valor», uno por llamada. Receta manual de `docs/atajo-ios.md` actualizada.
+
+- **Las copias automáticas aparecen en «Copias de seguridad».** Mismo zip que
+  el botón, con la etiqueta *auto*, restaurable desde la lista. Antes iban a
+  `data/backups/auto/` como `.db` sueltos, invisibles desde la aplicación.
+
+- **Mostrar/ocultar contraseña en el login.** El botón del ojo no respondía
+  porque la CSP bloqueaba su `onclick`. Pasa a un script con nonce y funciona
+  con la política tal cual está, sin abrir `'unsafe-inline'`.
+
+### Cambiado
+
+- **«Cierre por inactividad» se muda de Cuenta a Seguridad** y lo aplica el
+  servidor: vale aunque la pestaña esté cerrada o el aparato apagado. Opciones
+  nuevas de 8 horas y 1 día. El valor guardado se conserva; el de fábrica es
+  «No cerrar».
+
+- **Una sola rotación.** «Límite de backups» de Ajustes gobierna las copias
+  manuales y las automáticas. `[backups] max_copias` queda obsoleto; se
+  mantiene en el catálogo para que un `config.ini` antiguo no dé avisos.
+
+- **La primera pasada tras actualizar no duplica la copia de hoy.** Si en
+  `data/backups/auto/` ya hay un `.db` diario de hoy, cuenta como hecha.
 
 ---
 

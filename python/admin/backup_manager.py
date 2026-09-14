@@ -2,9 +2,13 @@
 Backup automático de la base de datos activa.
 - Verifica integridad al arrancar (integrity_check + foreign_key_check)
 - Si la BD está dañada: intenta reparar; si falla, restaura desde el backup más reciente
-- Crea backup diario de TODOS los portfolios (no solo el activo)
-- Incluye portfolios.json y JSONs de configuración en el backup diario
-- Mantiene los últimos [backups] max_copias backups diarios (config.ini)
+- Cuando toca según la frecuencia de Ajustes, crea la misma copia completa que
+  «Crear backup ahora» (todos los portfolios, ajustes y preferencias), con
+  `_auto` en el nombre, en data/backups/: aparece en la lista de Ajustes y se
+  restaura desde ahí. La rotación es la de «Límite de backups».
+- data/backups/auto/ queda para las copias previas a una migración de esquema
+  (exentas de rotación) y para los `.db` diarios de versiones anteriores, que
+  se siguen leyendo como último recurso si la BD activa aparece dañada.
 """
 import json
 import logging
@@ -13,17 +17,16 @@ import shutil
 import sqlite3
 import threading
 import time
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
 from core import paths, settings
 from core.bloqueo import exclusivo
-from core.escritura import escribirJsonAtomico, temporalPara
+from core.escritura import temporalPara
 from core.paths import (
     AUTO_BACKUPS_DIR as _BACKUP_DIR,
     JSON_DIR as _JSON_DIR,
-    PORTFOLIOS_DIR as _PORTFOLIOS_DIR,
-    PORTFOLIOS_META_FILE as _META_FILE,
 )
 
 log = logging.getLogger(__name__)
@@ -45,19 +48,30 @@ def _configured_backup_days() -> int:
 
 
 def _last_backup_date():
-    """Fecha de la última copia automática válida, de cualquier portfolio."""
-    latest = None
-    if not _BACKUP_DIR.exists():
-        return None
-    for path in _BACKUP_DIR.glob("*.db"):
-        match = re.match(r"^.+_(\d{4}-\d{2}-\d{2})\.db$", path.name)
+    """Fecha de la última copia automática, en cualquiera de sus dos formatos.
+
+    Los zips `backup_<fecha>_auto.zip` de data/backups/ son los actuales; los
+    `<portfolio>_AAAA-MM-DD.db` de data/backups/auto/ los hacía la versión
+    anterior. Se miran los dos para que, al actualizar, la primera pasada no
+    haga una copia de más si ya había una de hoy.
+    """
+    fechas = []
+    for path in paths.BACKUPS_DIR.glob("backup_*_auto.zip"):
+        match = re.match(r"^backup_(\d{2}-\d{2}-\d{4})_\d{2}-\d{2}-\d{2}_auto\.zip$", path.name)
         if match:
             try:
-                value = datetime.strptime(match.group(1), "%Y-%m-%d").date()
+                fechas.append(datetime.strptime(match.group(1), "%d-%m-%Y").date())
             except ValueError:
-                continue
-            latest = max(latest, value) if latest else value
-    return latest
+                pass
+    if _BACKUP_DIR.exists():
+        for path in _BACKUP_DIR.glob("*.db"):
+            match = re.match(r"^.+_(\d{4}-\d{2}-\d{2})\.db$", path.name)
+            if match:
+                try:
+                    fechas.append(datetime.strptime(match.group(1), "%Y-%m-%d").date())
+                except ValueError:
+                    pass
+    return max(fechas) if fechas else None
 
 
 def _backup_is_due() -> bool:
@@ -66,11 +80,6 @@ def _backup_is_due() -> bool:
         return False
     last = _last_backup_date()
     return last is None or (datetime.now().date() - last).days >= days
-
-
-def _backup_name(db_path: Path) -> str:
-    today = datetime.now().strftime("%Y-%m-%d")
-    return f"{db_path.stem}_{today}.db"
 
 
 def _dated_backups(db_stem: str):
@@ -121,22 +130,6 @@ def check_integrity(db_path: Path) -> bool:
                 conn.close()
             except Exception:
                 pass
-
-
-def _rotate(db_stem: str):
-    """Elimina los backups automáticos que sobran, según [backups] max_copias."""
-    backups = _dated_backups(db_stem)
-    today_name = f"{db_stem}_{datetime.now().strftime('%Y-%m-%d')}.db"
-    while len(backups) > settings.maxCopiasBackup():
-        oldest = backups.pop(0)
-        # Salvaguarda: nunca borrar el backup de hoy, es el único fresco.
-        if oldest.name == today_name:
-            continue
-        try:
-            oldest.unlink()
-            log.info(f"[backup] Eliminado backup antiguo: {oldest.name}")
-        except Exception as e:
-            log.warning(f"[backup] No se pudo eliminar {oldest.name}: {e}")
 
 
 def _checkpoint_and_copy(db_path: Path, backup_path: Path):
@@ -207,10 +200,10 @@ def run_startup_backup(db_path: Path):
     que solo copiaba el portfolio activo.
 
     1. Verifica integridad del DB activo. Si falla: repara o restaura desde backup.
-    2. Cuando corresponde, crea backup de TODOS los portfolios.
-    3. Guarda backup de configuración (portfolios.json + ajustes + prefs).
-    4. Inserta snapshot diario si no existe.
-    5. Rota backups antiguos.
+    2. Cuando corresponde, crea la copia completa (portfolios + configuración)
+       en data/backups/, la misma que el botón de Ajustes, y rota según
+       «Límite de backups».
+    3. Inserta snapshot diario si no existe.
     """
     db_path = Path(db_path)
     if not db_path.exists():
@@ -244,25 +237,23 @@ def _run_startup_backup_locked(db_path: Path):
     if not _backup_is_due():
         return False
 
-    # ── 2. Backup diario de TODOS los portfolios ────────────────────────────
-    if _PORTFOLIOS_DIR.exists():
-        for db_file in sorted(_PORTFOLIOS_DIR.glob("*.db")):
-            backup_path = _BACKUP_DIR / _backup_name(db_file)
-            if not backup_path.exists():
-                try:
-                    _checkpoint_and_copy(db_file, backup_path)
-                    log.info(f"[backup] Backup creado: {backup_path.name}")
-                except Exception as e:
-                    log.error(f"[backup] Error al crear backup de {db_file.name}: {e}")
-            _rotate(db_file.stem)
+    # ── 2. Copia completa, la misma que «Crear backup ahora» ────────────────
+    # Import local: routes.backup importa de este módulo, y al revés no puede
+    # ser al cargar. Es el mismo zip y la misma rotación que el botón; hasta la
+    # 2.1.0 el automático dejaba un .db por portfolio en backups/auto/, que
+    # la lista de Ajustes no enseñaba y desde la que no se podía restaurar.
+    from routes.backup import crear_backup_automatico
 
-    # ── 3. Backup de configuración ──────────────────────────────────────────
-    today = datetime.now().strftime("%Y-%m-%d")
-    config_backup = _BACKUP_DIR / f"config_{today}.json"
-    if not config_backup.exists():
-        _backup_config(config_backup)
+    try:
+        nombre = crear_backup_automatico()
+        log.info(f"[backup] Copia automática creada: {nombre}")
+    except Exception as e:
+        # Se deja sin copia y se vuelve a intentar en la siguiente pasada del
+        # scheduler: _last_backup_date no verá ninguna de hoy.
+        log.error(f"[backup] Error al crear la copia automática: {e}")
+        return False
 
-    # ── 4. Snapshot diario ──────────────────────────────────────────────────
+    # ── 3. Snapshot diario ──────────────────────────────────────────────────
     _ensure_daily_snapshot(db_path)
     return True
 
@@ -314,66 +305,52 @@ def start_scheduler(interval_seconds: int = 3600):
     _scheduler_thread.start()
 
 
-def _backup_config(dest: Path):
-    """Guarda portfolios.json + ajustes.json + prefs en un único JSON."""
-    bundle = {}
-    try:
-        if _META_FILE.exists():
-            bundle["portfolios_meta"] = json.loads(_META_FILE.read_text("utf-8"))
-    except Exception:
-        pass
-    try:
-        ajustes_path = _JSON_DIR / "ajustes.json"
-        if ajustes_path.exists():
-            bundle["ajustes"] = json.loads(ajustes_path.read_text("utf-8"))
-    except Exception:
-        pass
-    try:
-        prefs = {}
-        for prefs_file in sorted(_JSON_DIR.glob("prefs_*.json")):
-            try:
-                prefs[prefs_file.stem] = json.loads(prefs_file.read_text("utf-8"))
-            except Exception:
-                pass
-        if prefs:
-            bundle["prefs"] = prefs
-    except Exception:
-        pass
+def _candidatos_de_restauracion(db_stem: str):
+    """Copias de `db_stem` de las que se puede recuperar, de más nueva a más vieja.
 
-    if not bundle:
-        return
-
-    try:
-        escribirJsonAtomico(dest, bundle)
-        log.info(f"[backup] Config backup creado: {dest.name}")
-    except OSError as e:
-        log.error(f"[backup] Error al crear config backup: {e}")
-
-    # Rotar config backups
-    config_backups = sorted(_BACKUP_DIR.glob("config_*.json"))
-    while len(config_backups) > settings.maxCopiasBackup():
-        oldest = config_backups.pop(0)
+    Genera pares (nombre, ruta a un .db ya extraído). Primero los zips de
+    data/backups/ —automáticos y manuales, que para esto valen igual—, sacando
+    de cada uno la entrada `portfolios/<stem>.db` a un temporal; después los
+    `.db` diarios de versiones anteriores que sigan en backups/auto/.
+    """
+    zips = sorted(paths.BACKUPS_DIR.glob("backup_*.zip"), key=_fecha_del_zip, reverse=True)
+    for ruta_zip in zips:
         try:
-            oldest.unlink()
-        except Exception:
-            pass
+            with zipfile.ZipFile(str(ruta_zip)) as zf:
+                entrada = f"portfolios/{db_stem}.db"
+                if entrada not in zf.namelist():
+                    continue
+                with temporalPara(paths.BACKUPS_DIR / f"{db_stem}.db", directorio=paths.TMP_DIR) as tmp:
+                    tmp.write_bytes(zf.read(entrada))
+                    yield ruta_zip.name, tmp
+        except (OSError, zipfile.BadZipFile) as e:
+            log.warning(f"[backup] {ruta_zip.name} no se puede leer: {e}")
+    for candidato in reversed(_dated_backups(db_stem)):
+        yield candidato.name, candidato
+
+
+def _fecha_del_zip(ruta: Path):
+    match = re.search(r"(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})", ruta.name)
+    try:
+        return datetime.strptime(match.group(1), "%d-%m-%Y_%H-%M-%S") if match else datetime.min
+    except ValueError:
+        return datetime.min
 
 
 def _restore_from_latest_auto_backup(db_path: Path):
-    """Restaura db_path desde el backup automático válido más reciente."""
-    candidates = list(reversed(_dated_backups(db_path.stem)))
-    for candidate in candidates:
+    """Restaura db_path desde la copia válida más reciente."""
+    for nombre, candidate in _candidatos_de_restauracion(db_path.stem):
         if check_integrity(candidate):
             try:
                 corrupted_copy = _BACKUP_DIR / f"{db_path.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
                 shutil.copy2(str(db_path), str(corrupted_copy))
                 shutil.copy2(str(candidate), str(db_path))
                 _remove_wal_sidecars(db_path)
-                log.info(f"[backup] Restaurado desde backup automático: {candidate.name}")
+                log.info(f"[backup] Restaurado desde la copia: {nombre}")
                 return
             except Exception as e:
-                log.error(f"[backup] Error restaurando desde {candidate.name}: {e}")
-    log.error(f"[backup] No se encontró ningún backup automático válido para {db_path.name}")
+                log.error(f"[backup] Error restaurando desde {nombre}: {e}")
+    log.error(f"[backup] No se encontró ninguna copia válida para {db_path.name}")
 
 
 def _ensure_daily_snapshot(db_path: Path):

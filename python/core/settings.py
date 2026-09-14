@@ -155,12 +155,13 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("seguridad", "hash_iteraciones", ENTERO, 600_000, env="HASH_ITERACIONES",
            minimo=100_000, maximo=10_000_000,
            descripcion="Iteraciones PBKDF2-SHA256 de la contraseña de acceso."),
-    Ajuste("seguridad", "sesion_inactividad_minutos", ENTERO, 240, env="SESION_INACTIVIDAD_MINUTOS",
+    # La caducidad por inactividad ya no está aquí: se elige en Ajustes >
+    # Seguridad (core/sesion.py la lee de ajustes.json). Este es el tope
+    # absoluto, que un despliegue puede querer por encima de lo que elija el
+    # usuario; apagado por defecto.
+    Ajuste("seguridad", "sesion_maxima_minutos", ENTERO, 0, env="SESION_MAXIMA_MINUTOS",
            minimo=0, maximo=525_600,
-           descripcion="Minutos sin actividad tras los que caduca la sesión. 0 la deja sin caducidad."),
-    Ajuste("seguridad", "sesion_maxima_minutos", ENTERO, 720, env="SESION_MAXIMA_MINUTOS",
-           minimo=0, maximo=525_600,
-           descripcion="Duración máxima de una sesión desde el login, haya actividad o no. 0 lo desactiva."),
+           descripcion="Duración máxima de una sesión desde el login, haya actividad o no. 0 (defecto) lo desactiva."),
     Ajuste("seguridad", "escrituras_por_minuto", ENTERO, 120, env="ESCRITURAS_POR_MINUTO",
            minimo=0, maximo=100_000,
            descripcion="Peticiones de escritura (POST/PUT/PATCH/DELETE) por IP y minuto. 0 desactiva el límite."),
@@ -189,8 +190,11 @@ CATALOGO: tuple[Ajuste, ...] = (
            descripcion="Fichero con la clave HMAC, relativo a la raíz. La clave nunca va en config.ini."),
 
     # [backups]
+    # Sin efecto desde la 2.1.1: la copia automática es el mismo zip que la
+    # manual y la rota «Límite de backups» de Ajustes. Se conserva en el catálogo
+    # para que un config.ini que aún lo lleve siga validando sin avisos.
     Ajuste("backups", "max_copias", ENTERO, 14, env="BACKUPS_MAX_COPIAS", minimo=1, maximo=3650,
-           descripcion="Backups diarios que se conservan por portfolio antes de rotar."),
+           descripcion="Obsoleto: el límite de copias se fija en Ajustes > Datos."),
     Ajuste("backups", "sqlite_timeout_segundos", ENTERO, 15, env="BACKUPS_SQLITE_TIMEOUT",
            minimo=1, maximo=600,
            descripcion="Espera máxima por el lock de SQLite al copiar o reparar una BD."),
@@ -373,11 +377,6 @@ def metodoHashPassword() -> str:
     return f"pbkdf2:sha256:{obtener('seguridad.hash_iteraciones')}"
 
 
-def sesionInactividadSegundos() -> int:
-    """Segundos sin actividad tras los que la sesión deja de valer. 0 lo desactiva."""
-    return obtener("seguridad.sesion_inactividad_minutos") * 60
-
-
 def sesionMaximaSegundos() -> int:
     """Duración máxima de una sesión desde el login, se use o no. 0 lo desactiva."""
     return obtener("seguridad.sesion_maxima_minutos") * 60
@@ -397,10 +396,6 @@ def cspActivada() -> bool:
 
 def cspOrigenesScripts() -> list:
     return obtener("seguridad.csp_origenes_scripts")
-
-
-def maxCopiasBackup() -> int:
-    return obtener("backups.max_copias")
 
 
 def backupSqliteTimeout() -> int:

@@ -6,6 +6,9 @@ cuerpo, límite de escrituras y cabeceras de respuesta. `core.seguridad_app` lo
 monta sobre una app mínima para poder comprobarlo sin tocar `data/`.
 """
 
+import json
+import time
+
 import pytest
 from flask import Blueprint, jsonify
 
@@ -255,6 +258,80 @@ def test_la_csp_se_puede_desactivar_para_depurar(cliente_autenticado, bp_prueba,
 # cliente siga siendo la suya y no la del proxy, porque de esa IP dependen el
 # límite de escrituras, el bloqueo por intentos de login y el filtro de red del
 # Atajo de iOS.
+
+# ── Varias sesiones y caducidad ──────────────────────────────────────────────
+# El login real vive en routes/auth.py; aquí se sella la sesión igual que él
+# (`sesion.abrir`) y se comprueba contra un endpoint protegido, que es donde
+# `require_login` decide si sigue valiendo.
+
+def _entrar(app):
+    from core import sesion
+
+    client = app.test_client()
+    with client.session_transaction() as sesion_prueba:
+        sesion_prueba["logged_in"] = True
+        sesion_prueba.permanent = True
+        sesion.abrir(sesion_prueba)
+    return client
+
+
+def test_dos_dispositivos_tienen_sesiones_independientes(crear_app, bp_prueba):
+    """Entrar desde el móvil no echa al portátil, y cerrar en uno no cierra el otro."""
+    from routes.auth import auth_bp
+
+    app = crear_app(bp_prueba, auth_bp)
+    portatil = _entrar(app)
+    movil = _entrar(app)
+    assert portatil.get("/api/prueba").status_code == 200
+    assert movil.get("/api/prueba").status_code == 200
+
+    movil.get("/logout")
+
+    assert portatil.get("/api/prueba").status_code == 200
+    assert movil.get("/api/prueba").status_code == 401
+
+
+def test_por_defecto_la_sesion_no_caduca_por_inactividad(crear_app, bp_prueba, datos_aislados):
+    """«No cerrar» es el valor de fábrica: sin tocar Ajustes, una sesión de hace
+    un mes sigue valiendo mientras no se cierre ni cambien las credenciales."""
+    from core import sesion
+
+    client = _entrar(crear_app(bp_prueba))
+    with client.session_transaction() as sesion_prueba:
+        sesion_prueba[sesion.VISTA] = time.time() - 30 * 24 * 3600
+        sesion_prueba[sesion.CREADA] = time.time() - 30 * 24 * 3600
+
+    assert client.get("/api/prueba").status_code == 200
+
+
+def test_la_inactividad_se_lee_de_ajustes(crear_app, bp_prueba, datos_aislados):
+    """El plazo lo fija Ajustes > Seguridad y lo aplica el servidor, no solo la pestaña."""
+    from core import sesion
+
+    datos_aislados["ajustes"].write_text(json.dumps({"bloqueoInactividad": 15}), "utf-8")
+
+    client = _entrar(crear_app(bp_prueba))
+    with client.session_transaction() as sesion_prueba:
+        sesion_prueba[sesion.VISTA] = time.time() - 14 * 60
+    assert client.get("/api/prueba").status_code == 200
+
+    with client.session_transaction() as sesion_prueba:
+        sesion_prueba[sesion.VISTA] = time.time() - 16 * 60
+    assert client.get("/api/prueba").status_code == 401
+
+
+def test_un_valor_de_inactividad_fuera_de_la_lista_no_cierra_nada(crear_app, bp_prueba, datos_aislados):
+    """Un ajustes.json editado a mano con un número raro no puede dejar fuera al usuario."""
+    from core import sesion
+
+    datos_aislados["ajustes"].write_text(json.dumps({"bloqueoInactividad": 7}), "utf-8")
+
+    client = _entrar(crear_app(bp_prueba))
+    with client.session_transaction() as sesion_prueba:
+        sesion_prueba[sesion.VISTA] = time.time() - 3600
+
+    assert client.get("/api/prueba").status_code == 200
+
 
 def test_sin_https_la_cookie_de_sesion_no_lleva_secure(crear_app, bp_prueba):
     """Marcarla Secure sobre HTTP haría que el navegador la tirase: sin login."""
