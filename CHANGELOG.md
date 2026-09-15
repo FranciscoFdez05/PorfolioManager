@@ -22,6 +22,20 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.1.2] — 2026-09-15
+
+_En preparación._
+
+**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
+esta actualización es volver a la imagen anterior, sin tocar los datos.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Corregido
+
+---
+
 ## [2.1.1] — 2026-09-14
 
 **La sesión deja de cerrarse sola y cada aparato tiene la suya.** Pasaban dos
