@@ -2320,6 +2320,12 @@ function getCryptoRowCommissionFiat(row = {}) {
     return row.comisionesFiat ?? ""
 }
 
+// Comisión en € de una operación spot (Cripto › Operaciones). Siempre va en
+// euros, sea cual sea el par: así la etiqueta el formulario.
+function getOperationRowFiatCommission(row = {}) {
+    return Math.max(0, parseLooseNumber(row.comisionesFiat || "") || 0)
+}
+
 function deriveAssetBaseSymbolFromData(assetOrDataset = {}) {
     const marketSymbol = String(
         assetOrDataset.marketSymbol ||
@@ -2643,16 +2649,29 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
                 continue
             }
 
-            const totalCost = await convertAmountForDisplay(
-                parseLooseNumber(operationRow.total || "") || 0,
-                normalizeCurrencyCode(operationRow.currency || operationRow.precioCurrency || targetCurrency),
-                targetCurrency
-            )
             const executionPrice = await convertAmountForDisplay(
                 parseLooseNumber(operationRow.precioOrden || "") || 0,
                 normalizeCurrencyCode(operationRow.precioCurrency || operationRow.currency || targetCurrency),
                 targetCurrency
             )
+            // El coste del lote es lo pagado por las monedas (precio de
+            // ejecución × cantidad) más la comisión en €, igual que el capital
+            // bruto de una compra spot. No se usa el "Total" tecleado porque
+            // unas veces incluye la comisión y otras no. Si falta el precio se
+            // recurre al total como antes.
+            const fiatCommission = await convertAmountForDisplay(
+                getOperationRowFiatCommission(operationRow),
+                "EUR",
+                targetCurrency
+            )
+            const totalCost =
+                executionPrice > 0
+                    ? executionPrice * quantity + fiatCommission
+                    : await convertAmountForDisplay(
+                          parseLooseNumber(operationRow.total || "") || 0,
+                          normalizeCurrencyCode(operationRow.currency || operationRow.precioCurrency || targetCurrency),
+                          targetCurrency
+                      )
 
             lots.push({
                 remaining: netParticipaciones,
@@ -2774,6 +2793,18 @@ async function buildOverviewRow(asset) {
           completedOperationsImpact.commissionTotal +
           transaccionesImpact.commissionTotal
         : 0
+    // Las comisiones € de las operaciones spot completadas cuentan como las de
+    // cualquier compra: su lote ya las lleva en el coste bruto y aquí se
+    // descuentan para el neto y el precio medio.
+    const comisionesFiatOperaciones = isCrypto
+        ? (
+              await Promise.all(
+                  completedOperationsImpact.rows
+                      .filter((row) => String(row.orden || "").trim().toLowerCase() === "compra")
+                      .map((row) => convertAmountForDisplay(getOperationRowFiatCommission(row), "EUR", assetCurrency))
+              )
+          ).reduce((total, value) => total + value, 0)
+        : 0
     const comisionesFiat = isCrypto
         ? (
               await Promise.all(
@@ -2782,7 +2813,7 @@ async function buildOverviewRow(asset) {
                       return await convertCryptoRowMoneyToAssetCurrency(feeAmount, row, assetCurrency)
                   })
               )
-          ).reduce((total, value) => total + value, 0)
+          ).reduce((total, value) => total + value, 0) + comisionesFiatOperaciones
         : rows.reduce((total, row) => total + (parseLooseNumber(row.comisiones || "") || 0), 0)
     const invertidoNeto = invertidoBruto - comisionesFiat
     const valorActual = parseLooseNumber(asset.price || "") || 0

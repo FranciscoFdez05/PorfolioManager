@@ -22,6 +22,26 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.1.4] — 2026-09-17
+
+**Esquema de base de datos:** no lo toca (sigue en la versión **5**). Para
+deshacer la actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Corregido
+
+**Precio medio de compra con operaciones spot completadas.** El lote de una
+operación completada (Cripto › Operaciones) se valoraba con el campo «Total»,
+que se teclea a mano y unas veces incluye la comisión en € y otras no, y esa
+comisión no se descontaba en ningún sitio: la columna COMIS. marcaba 0,00 € y el
+precio medio salía por encima del precio de orden (85,13 € en una compra a
+85,00 €). Ahora el lote vale precio de orden × cantidad más la comisión en €,
+igual que una compra spot, y esa comisión entra en COMIS. y se descuenta del
+invertido neto. El precio medio vuelve a coincidir con el precio de ejecución.
+Si la operación no tiene precio se sigue usando el «Total».
+
 ## [2.1.3] — 2026-09-17
 
 **Esquema de base de datos:** sube a la versión **5** (venía de la 4). La
