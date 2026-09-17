@@ -1,10 +1,10 @@
-"""Planes de inversión y planes de aportación periódica (DCA).
+"""Planes de inversión.
 
 Son la única parte de la aplicación que guarda *intención* en vez de hechos: lo
 que se piensa hacer con un activo (a qué precio entrar, a qué precio recoger el
-beneficio, con cuánto capital) y con qué periodicidad aportar. Por eso no pasan
-por `asset_store` ni entran en el cálculo de rendimiento ni en el FIFO fiscal:
-un plan que no se ha ejecutado no es una operación.
+beneficio, con cuánto capital). Por eso no pasan por `asset_store` ni entran en
+el cálculo de rendimiento ni en el FIFO fiscal: un plan que no se ha ejecutado no
+es una operación.
 
 Cada plan cuelga de un activo (`asset_id`, con FK y ON DELETE CASCADE): se
 consulta desde su ficha, así que uno huérfano no tendría dónde verse.
@@ -34,25 +34,6 @@ _PLAN_COLUMNS = (
     ("estado",          "estado"),
     ("fecha_objetivo",  "fechaObjetivo"),
     ("notas",           "notas"),
-)
-
-_DCA_COLUMNS = (
-    ("id",               "id"),
-    ("asset_id",         "assetId"),
-    ("nombre",           "nombre"),
-    ("symbol",           "symbol"),
-    ("ticker",           "ticker"),
-    ("market_provider",  "marketProvider"),
-    ("tv_symbol",        "tvSymbol"),
-    ("currency",         "currency"),
-    ("importe",          "importe"),
-    ("frecuencia",       "frecuencia"),
-    ("fecha_inicio",     "fechaInicio"),
-    ("fecha_fin",        "fechaFin"),
-    ("aportes_objetivo", "aportesObjetivo"),
-    ("precio_maximo",    "precioMaximo"),
-    ("estado",           "estado"),
-    ("notas",            "notas"),
 )
 
 
@@ -122,12 +103,3 @@ def read_planes():
 @transactional
 def write_planes(rows):
     _escribir("planes_inversion", _PLAN_COLUMNS, rows)
-
-
-def read_dca():
-    return _leer("dca_planes", _DCA_COLUMNS)
-
-
-@transactional
-def write_dca(rows):
-    _escribir("dca_planes", _DCA_COLUMNS, rows)

@@ -745,16 +745,24 @@
 }
 
 /* ── Desglose activo / divisa ──────────────────────────────────────────────
-   Va debajo del P&L de la ficha. Solo aparece cuando el activo está en otra
-   moneda: para uno en euros el efecto divisa es cero y la línea sería ruido. */
+   Va detrás del P&L de la ficha, en su misma línea. Solo aparece cuando el
+   activo está en otra moneda: para uno en euros el efecto divisa es cero y la
+   línea sería ruido.
+
+   Sin partir y en horizontal: apilado hacía crecer la tarjeta a lo alto y, con
+   ella, toda la fila de la cabecera. La raya de la izquierda lo separa del
+   importe sin meter otro elemento por medio. */
 
 .assetStatDivisa {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: baseline;
     gap: 10px;
-    margin-top: 4px;
+    margin-left: 4px;
+    padding-left: 10px;
+    border-left: 1px solid var(--border-mid);
     font-size: 0.72rem;
+    white-space: nowrap;
 }
 
 .assetStatDivisaItem {
@@ -762,6 +770,7 @@
     align-items: baseline;
     gap: 4px;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .assetStatDivisaLabel {

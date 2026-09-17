@@ -1,4 +1,4 @@
-"""Pruebas de /api/planes y /api/dca.
+"""Pruebas de /api/planes.
 
 Lo que hay que asegurar aquí no es aritmética —el servidor no calcula nada de
 un plan— sino que la normalización hace su trabajo: un estado inventado, un
@@ -128,14 +128,12 @@ def test_borrar_el_activo_se_lleva_sus_planes(cliente):
 
     client, cabeceras = cliente
     _guardar(client, cabeceras, "/api/planes", {"id": "x", "assetId": "oro", "nombre": "Oro"})
-    _guardar(client, cabeceras, "/api/dca", {"id": "y", "assetId": "oro", "importe": "100"})
 
     conn = get_db()
     conn.execute("DELETE FROM activos WHERE id = 'oro'")
     conn.commit()
 
     assert client.get("/api/planes").get_json()["rows"] == []
-    assert client.get("/api/dca").get_json()["rows"] == []
 
 
 def test_un_plan_sin_id_recibe_uno(cliente):
@@ -159,65 +157,3 @@ def test_una_nota_kilometrica_se_rechaza(cliente):
 def test_rows_tiene_que_ser_una_lista(cliente):
     client, cabeceras = cliente
     assert client.post("/api/planes", json={"rows": "no"}, headers=cabeceras).status_code == 400
-
-
-# ── DCA ──────────────────────────────────────────────────────────────────────
-
-def test_un_plan_dca_se_guarda_y_se_recupera_igual(cliente):
-    client, cabeceras = cliente
-    dca = {
-        "id": "dca-msci", "assetId": "bitcoin", "nombre": "World mensual",
-        "importe": "300", "frecuencia": "Mensual", "fechaInicio": "01-01-2026",
-        "aportesObjetivo": "24", "estado": "Activo",
-    }
-    assert _guardar(client, cabeceras, "/api/dca", dca).status_code == 200
-
-    guardado = client.get("/api/dca").get_json()["rows"][0]
-    assert guardado["frecuencia"] == "Mensual"
-    assert guardado["aportesObjetivo"] == "24"
-    assert guardado["assetId"] == "bitcoin"
-
-
-def test_el_numero_de_aportes_no_numerico_se_rechaza(cliente):
-    client, cabeceras = cliente
-    respuesta = _guardar(
-        client, cabeceras, "/api/dca", {"id": "x", "assetId": "bitcoin", "aportesObjetivo": "muchos"},
-    )
-
-    assert respuesta.status_code == 400
-
-
-def test_el_numero_de_aportes_vacio_se_admite(cliente):
-    """Un DCA indefinido —aportar hasta nuevo aviso— es un caso legítimo."""
-    client, cabeceras = cliente
-    fila = _guardar(
-        client, cabeceras, "/api/dca", {"id": "x", "assetId": "bitcoin", "aportesObjetivo": ""},
-    ).get_json()["rows"][0]
-
-    assert fila["aportesObjetivo"] == ""
-
-
-def test_una_frecuencia_inventada_cae_a_mensual(cliente):
-    client, cabeceras = cliente
-    fila = _guardar(
-        client, cabeceras, "/api/dca",
-        {"id": "x", "assetId": "bitcoin", "frecuencia": "Cada luna llena"},
-    ).get_json()["rows"][0]
-
-    assert fila["frecuencia"] == "Mensual"
-
-
-def test_un_plan_dca_sin_activo_se_rechaza(cliente):
-    client, cabeceras = cliente
-    respuesta = _guardar(client, cabeceras, "/api/dca", {"id": "x", "importe": "100"})
-
-    assert respuesta.status_code == 400
-
-
-def test_los_dos_recursos_no_se_pisan(cliente):
-    client, cabeceras = cliente
-    _guardar(client, cabeceras, "/api/planes", {"id": "plan-1", "assetId": "bitcoin", "nombre": "Plan"})
-    _guardar(client, cabeceras, "/api/dca", {"id": "dca-1", "assetId": "bitcoin", "nombre": "DCA"})
-
-    assert len(client.get("/api/planes").get_json()["rows"]) == 1
-    assert len(client.get("/api/dca").get_json()["rows"]) == 1

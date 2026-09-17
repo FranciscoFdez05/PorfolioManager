@@ -236,6 +236,38 @@ def test_una_bd_sin_dias_cobro_gana_la_columna_al_migrar(temp_db):
     assert conexion.execute("SELECT COUNT(*) FROM mensualidades").fetchone()[0] == 1
 
 
+def test_la_tabla_de_planes_dca_se_borra_al_migrar(temp_db):
+    """El paso 5, sobre una base que todavía tiene la tabla del DCA retirado.
+
+    Se recrea porque `_SCHEMA` ya no la crea: sin esto la prueba pasaría sin
+    haber migrado nada. Los pasos 2 y 3 sí la siguen creando, que es el caso real
+    de una base antigua.
+    """
+    from core import db
+
+    conexion = db.get_db()
+    conexion.execute("CREATE TABLE dca_planes (id TEXT PRIMARY KEY, asset_id TEXT NOT NULL)")
+    conexion.execute("INSERT INTO dca_planes (id, asset_id) VALUES ('dca-1', 'bitcoin')")
+
+    db._esquema_5(conexion)
+
+    tablas = {f[0] for f in conexion.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    assert "dca_planes" not in tablas
+
+    # Idempotente: una base que ya no la tiene pasa por aquí sin quejarse.
+    db._esquema_5(conexion)
+
+
+def test_una_bd_al_dia_no_tiene_la_tabla_del_dca(temp_db):
+    """Una base nueva no llega a tenerla: el paso 2 la crea y el 5 la borra."""
+    from core import db
+
+    tablas = {f[0] for f in db.get_db().execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+
+    assert "dca_planes" not in tablas
+    assert "planes_inversion" in tablas, "los planes de inversión sí se quedan"
+
+
 def test_el_numero_de_version_cubre_todos_los_pasos_registrados():
     """Subir un paso y olvidar ESQUEMA_VERSION dejaría la migración sin aplicarse."""
     from core import db

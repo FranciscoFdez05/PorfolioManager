@@ -228,11 +228,69 @@ body {
     flex-wrap: nowrap;
     overflow-x: auto;
     overflow-y: hidden;
-    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+
+    /* La barra de la derecha se queda con parte del ancho, así que las últimas
+       tarjetas se salen casi siempre. Antes la barra de desplazamiento estaba
+       escondida y lo que sobraba no había manera de verlo.
+
+       El relleno de abajo es donde se dibuja y el margen negativo se lo
+       descuenta a la fila: sin eso el panel superior daría un salto de 6px en
+       cuanto sobrara una tarjeta, que es casi siempre. Cabe porque .topBar ya
+       reserva 8px de relleno inferior. */
+    padding-bottom: 6px;
+    margin-bottom: -6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
 }
 
 .metrics::-webkit-scrollbar {
-    display: none;
+    height: 6px;
+}
+
+.metrics::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.metrics::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.metrics::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* La mano solo aparece cuando de verdad sobra algo que arrastrar: en una
+   ventana ancha, donde las tarjetas caben, la fila no es agarrable y decir lo
+   contrario con el cursor sería mentir. Las pone initMetricsScroll(). */
+.metrics.metricsScrollable {
+    cursor: grab;
+}
+
+.metrics.metricsDragging {
+    cursor: grabbing;
+    /* Sin esto, arrastrar por encima de un importe lo selecciona en azul en vez
+       de mover la fila. */
+    user-select: none;
+}
+
+/* Difuminado en el borde por el que sigue habiendo tarjetas. Una tarjeta
+   cortada en seco parece el final de la fila; desvanecida se lee como que hay
+   más detrás. Las clases las pone initMetricsScroll() según el desplazamiento. */
+.metrics.metricsFadeStart {
+    mask-image: linear-gradient(to right, transparent 0, #000 28px);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px);
+}
+
+.metrics.metricsFadeEnd {
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+}
+
+.metrics.metricsFadeStart.metricsFadeEnd {
+    mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
 }
 
 .metricBox {

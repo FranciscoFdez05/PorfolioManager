@@ -1,6 +1,6 @@
-/* Planes de inversión y DCA
+/* Planes de inversión
    ─────────────────────────────────────────────────────────────────
-   Las dos pestañas viven dentro de la ficha de cada activo, así que la
+   La pestaña vive dentro de la ficha de cada activo, así que la
    caja de fuera (.assetTabPanel) ya la pone activos.css. Las tarjetas
    reutilizan a propósito las clases de Activos (.avCard, .avCardMetrics,
    .avBadge…): son la misma pieza con otro contenido, y compartirlas hace
@@ -10,10 +10,9 @@
 
 /* ── Caja de la pestaña ── */
 /* La pestaña de compras es una tabla a sangre y por eso .assetTabPanel no
-   lleva relleno; estas dos no son una tabla, así que se lo ponen ellas. Sin
-   esto los filtros salen pegados a la barra de pestañas y al borde de la caja. */
-#assetPlanesSection,
-#assetDcaSection {
+   lleva relleno; esta no es una tabla, así que se lo pone ella. Sin esto los
+   filtros salen pegados a la barra de pestañas y al borde de la caja. */
+#assetPlanesSection {
     padding: 18px;
 }
 
@@ -42,9 +41,8 @@
     margin-bottom: 18px;
 }
 
-/* Se dimensionan por su contenido y no se estiran: son tres en la pestaña de
-   planes y cinco en la de DCA, y repartiendo el ancho entre tres salían tres
-   cajas enormes con un número diminuto dentro. */
+/* Se dimensionan por su contenido y no se estiran: repartiendo el ancho entre
+   tres salían tres cajas enormes con un número diminuto dentro. */
 .planKpi {
     display: flex;
     flex-direction: column;
@@ -104,18 +102,6 @@
     border-radius: 20px;
     border: 1px solid;
     white-space: nowrap;
-}
-
-.planDirDca {
-    color: var(--text-muted);
-    border-color: var(--border-mid);
-    background: var(--bg-inset);
-}
-
-.planPorAporte {
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--text-dim);
 }
 
 /* ── Aviso de la tarjeta ── */
@@ -235,56 +221,6 @@
     line-height: 1.4;
 }
 
-/* ── Calendario de aportes ── */
-.planCalendarioNota {
-    margin: 0;
-    font-size: 0.75rem;
-    line-height: 1.45;
-    color: var(--text-muted);
-}
-
-.planCalendarioWrap {
-    overflow-x: auto;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
-}
-
-.planCalendario {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.78rem;
-}
-
-.planCalendario th {
-    text-align: left;
-    padding: 8px 10px;
-    background: var(--bg-inset);
-    color: var(--text-dim);
-    font-size: 0.66rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    border-bottom: 1px solid var(--border-soft);
-    white-space: nowrap;
-}
-
-.planCalendario td {
-    padding: 7px 10px;
-    color: var(--text-subtle);
-    border-bottom: 1px solid var(--border-soft);
-    white-space: nowrap;
-}
-
-.planCalendario tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.planCalendarioVacio {
-    white-space: normal;
-    color: var(--text-dim);
-    text-align: center;
-    padding: 16px 12px;
-}
-
 /* ── Tema claro ── */
 html[data-theme="light"] .planKpi {
     background: #ffffff;
@@ -304,17 +240,6 @@ html[data-theme="light"] .planDestacadoValor {
 }
 html[data-theme="light"] .planTrack {
     background: #f1f5f9;
-    border-color: #e2e8f0;
-}
-html[data-theme="light"] .planCalendario td {
-    color: #334155;
-    border-bottom-color: #f1f5f9;
-}
-html[data-theme="light"] .planCalendario th {
-    background: #f8fafc;
-    border-bottom-color: #e2e8f0;
-}
-html[data-theme="light"] .planCalendarioWrap {
     border-color: #e2e8f0;
 }
 
@@ -337,16 +262,5 @@ html[data-theme="black"] .planDestacadoValor {
 }
 html[data-theme="black"] .planTrack {
     background: #0e0e10;
-    border-color: #222228;
-}
-html[data-theme="black"] .planCalendario th {
-    background: #131316;
-    border-bottom-color: #222228;
-}
-html[data-theme="black"] .planCalendario td {
-    color: #dcdce8;
-    border-bottom-color: #222228;
-}
-html[data-theme="black"] .planCalendarioWrap {
     border-color: #222228;
 }

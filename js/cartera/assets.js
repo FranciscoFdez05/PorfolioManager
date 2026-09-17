@@ -1017,6 +1017,140 @@ function renderAssetTransaccionesSection(asset) {
     bindTableSort(section.querySelector("table"), "assetTransacciones")
 }
 
+// Pestaña "Todos": las procedencias de un mismo activo en una sola tabla
+// ordenada por fecha, con una columna que dice de dónde sale cada fila. Es solo
+// una vista: no recalcula nada ni añade nada a los totales, que siguen saliendo
+// de sus tablas de origen.
+const ASSET_TODOS_ORIGENES = {
+    spot: { etiqueta: "Compra spot", clase: "todosOrigenSpot" },
+    operacion: { etiqueta: "Operación spot", clase: "todosOrigenOperacion" }
+}
+
+function buildAssetTodosRows(asset) {
+    const currency = normalizeCurrencyCode(asset?.currency || "EUR")
+    const assetType = asset?.type || "cripto"
+    const filas = []
+
+    getPrimaryAssetRows(asset).forEach((row) => {
+        const rowCurrency = normalizeAssetRowCurrency(row.currency, currency)
+        filas.push({
+            origen: "spot",
+            fecha: row.fechaOperacion || "",
+            tipo: row.tipoOperacion || "Compra",
+            participaciones: formatAssetParticipationValue(row.participaciones, assetType),
+            precio: formatCellMoneyValue(
+                row.precioParticipacion,
+                getAssetTableMoneyCurrency(assetType, "precioParticipacion", currency, rowCurrency)
+            ),
+            importe: formatCellMoneyValue(
+                row.capitalInvertidoBruto,
+                getAssetTableMoneyCurrency(assetType, "capitalInvertidoBruto", currency, rowCurrency)
+            ),
+            comisionesCripto: parseLooseNumber(getCryptoRowCommissionCrypto(row))
+                ? formatAssetCommissionValue(getCryptoRowCommissionCrypto(row))
+                : "",
+            comisionesFiat: formatCellMoneyValue(
+                getCryptoRowCommissionFiat(row),
+                getAssetTableMoneyCurrency(assetType, "comisionesFiat", currency, rowCurrency)
+            ),
+            estado: ""
+        })
+    })
+
+    const completadas = getCompletedOperationsCryptoImpact(asset)
+    ;(completadas.rows || []).forEach((row) => {
+        filas.push({
+            origen: "operacion",
+            fecha: row.fechaApertura || "",
+            tipo: row.orden || "",
+            participaciones: formatOperationsQuantity(row.cantidad),
+            precio: formatOperationsMoney(row.precioOrden, row.precioCurrency || currency),
+            importe: formatOperationsMoney(row.total, row.currency || currency),
+            comisionesCripto: formatOperationsQuantity(row.comisionesCripto),
+            comisionesFiat: formatOperationsMoney(row.comisionesFiat, "EUR"),
+            estado: row.estado || ""
+        })
+    })
+
+    // Más reciente arriba. Las filas sin fecha legible se van al final en vez de
+    // colarse en el año 1970.
+    return filas.sort((a, b) => {
+        const fechaA = parseAssetOperationDate(a.fecha)
+        const fechaB = parseAssetOperationDate(b.fecha)
+        if (!Number.isFinite(fechaA)) return Number.isFinite(fechaB) ? 1 : 0
+        if (!Number.isFinite(fechaB)) return -1
+        return fechaB - fechaA
+    })
+}
+
+function renderAssetTodosSection(asset) {
+    const section = document.getElementById("assetTodosSection")
+    const tabBtn = document.getElementById("todosTabBtn")
+
+    if (!section) return
+
+    const filas = buildAssetTodosRows(asset)
+    const origenes = new Set(filas.map((fila) => fila.origen))
+
+    // Con un solo origen esta pestaña sería la de al lado con una columna de
+    // más. Solo tiene sentido cuando hay algo que mezclar.
+    if (origenes.size < 2) {
+        section.innerHTML = ""
+        if (tabBtn) tabBtn.classList.add("hidden")
+        return
+    }
+
+    const isCrypto = isCryptoAssetType(asset?.type)
+
+    if (tabBtn) {
+        tabBtn.classList.remove("hidden")
+        tabBtn.textContent = `Todos (${filas.length})`
+    }
+
+    const rowsHtml = filas
+        .map((fila) => {
+            const origen = ASSET_TODOS_ORIGENES[fila.origen] || { etiqueta: fila.origen, clase: "" }
+            const tipo = String(fila.tipo || "").trim()
+            const tipoClass = tipo.toLowerCase() === "venta" ? "opRowVenta" : "opRowCompra"
+            return `
+            <tr>
+                <td><span class="todosOrigenBadge ${origen.clase}">${escapeHtml(origen.etiqueta)}</span></td>
+                <td>${escapeHtml(fila.fecha || "")}</td>
+                <td class="${tipoClass}">${escapeHtml(tipo)}</td>
+                <td>${fila.participaciones || ""}</td>
+                <td>${fila.precio || ""}</td>
+                <td>${fila.importe || ""}</td>
+                ${isCrypto ? `<td data-field="comisionesCripto">${fila.comisionesCripto || ""}</td>` : ""}
+                <td data-field="comisionesFiat">${fila.comisionesFiat || ""}</td>
+                <td>${escapeHtml(fila.estado || "")}</td>
+            </tr>
+        `
+        })
+        .join("")
+
+    section.innerHTML = `
+        <div class="assetTableWrapper">
+            <table class="assetOperationsTable assetTodosTable">
+                <thead>
+                    <tr>
+                        <th class="mThSort" data-sortkey="0">Origen<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="1">Fecha<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="2">Tipo<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="3">Participaciones<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="4">Precio<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="5">Importe<span class="mSortArrow"></span></th>
+                        ${isCrypto ? '<th class="mThSort" data-sortkey="6">Comisiones cripto<span class="mSortArrow"></span></th>' : ""}
+                        <th class="mThSort" data-sortkey="${isCrypto ? 7 : 6}">Comisiones<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="${isCrypto ? 8 : 7}">Estado<span class="mSortArrow"></span></th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHtml}</tbody>
+            </table>
+        </div>
+    `
+    bindTableSort(section.querySelector("table"), "assetTodos")
+}
+
 function renderAssetVentasSection(asset) {
     const section = document.getElementById("assetVentasSection")
     const tabBtn = document.getElementById("ventasTabBtn")
@@ -1494,11 +1628,10 @@ async function renderAssetsList(assets) {
                         assetId = d.asset?.id || slugId
                     }
                 }
-                currentAssetId = assetId
-                const assetData = await loadAssetData(assetId)
-                await updateAssetDetail(assetData)
-                await renderAssetsList(await loadAssetsList())
-                if (tvSym) openTVChartModal(tvSym, nombre)
+                // El activo de la watchlist acaba de nacer en la base de datos:
+                // se abre su ficha, como cualquier otro del lateral.
+                clearNavSelection()
+                await selectAsset(assetId)
             } catch (err) {
                 console.error("Error abriendo activo de watchlist:", err)
             }
@@ -2965,16 +3098,18 @@ function renderAssetTablePage(asset) {
                         <span class="assetStatLabel">Capital invertido</span>
                         <span class="assetStatValue" id="assetStatInvertido">—</span>
                     </div>
-                    <div class="assetStatCard">
+                    <div class="assetStatCard assetStatCardPnL">
                         <span class="assetStatLabel">Ganancia / Pérdida Total</span>
                         <div class="assetStatValueRow">
                             <span class="assetStatValue" id="assetStatPnL">—</span>
                             <span class="assetStatSub" id="assetStatPnLPct">—</span>
+                            <!-- Desglose activo/divisa. Solo aparece si el activo
+                                 está en otra moneda: para uno en euros el efecto
+                                 divisa es cero y la línea sería ruido. Va dentro
+                                 de la misma fila que el importe para que la
+                                 tarjeta crezca a lo ancho y no a lo alto. -->
+                            <div class="assetStatDivisa hidden" id="assetStatDivisa"></div>
                         </div>
-                        <!-- Desglose activo/divisa. Solo aparece si el activo
-                             está en otra moneda: para uno en euros el efecto
-                             divisa es cero y la línea sería ruido. -->
-                        <div class="assetStatDivisa hidden" id="assetStatDivisa"></div>
                     </div>
                 </div>
                 <div class="assetHeaderRight">
@@ -3008,15 +3143,17 @@ function renderAssetTablePage(asset) {
 
             <div class="assetTabsContainer">
                 <div class="assetTabsNav">
+                    <button class="assetTabBtn hidden" id="todosTabBtn" data-tab="todos">Todos</button>
                     <button class="assetTabBtn assetTabActive" data-tab="spot">Compras spot</button>
                     <button class="assetTabBtn hidden" id="completadasTabBtn" data-tab="completadas">Operaciones Spot</button>
                     <button class="assetTabBtn hidden" id="transaccionesTabBtn" data-tab="transacciones">Transacciones</button>
                     <button class="assetTabBtn" id="ventasTabBtn" data-tab="ventas">Ventas</button>
                     <button class="assetTabBtn" id="planesTabBtn" data-tab="planes">Planes</button>
-                    <button class="assetTabBtn" id="dcaTabBtn" data-tab="dca">DCA</button>
                     <button class="assetTabsNavAction hidden" id="assetAddVentaNavBtn" type="button"><span class="assetBtnIcon">+</span> Añadir venta</button>
                     <button class="assetTabsNavAction hidden" id="assetAddPlanNavBtn" type="button"><span class="assetBtnIcon">+</span> Nuevo plan</button>
-                    <button class="assetTabsNavAction hidden" id="assetAddDcaNavBtn" type="button"><span class="assetBtnIcon">+</span> Nuevo plan DCA</button>
+                </div>
+                <div class="assetTabPanel hidden" data-tab="todos">
+                    <div id="assetTodosSection"></div>
                 </div>
                 <div class="assetTabPanel" data-tab="spot">
                     <div class="assetTableWrapper">
@@ -3025,7 +3162,6 @@ function renderAssetTablePage(asset) {
                                 <tr>
                                     <th class="mThSort" data-sortkey="fechaOperacion">Fecha operación<span class="mSortArrow"></span></th>
                                     <th class="mThSort" data-sortkey="tipoOperacion">Tipo de operación<span class="mSortArrow"></span></th>
-                                    ${isCrypto ? '<th class="mThSort" data-sortkey="exchange">Exchange<span class="mSortArrow"></span></th>' : ""}
                                     <th class="mThSort" data-sortkey="participaciones">Participaciones<span class="mSortArrow"></span></th>
                                     <th class="mThSort" data-sortkey="precioParticipacion">Precio Participación<span class="mSortArrow"></span></th>
                                     ${isCrypto ? '<th class="mThSort" data-sortkey="currency">Moneda fiat<span class="mSortArrow"></span></th>' : ""}
@@ -3052,9 +3188,6 @@ function renderAssetTablePage(asset) {
                 <div class="assetTabPanel hidden" data-tab="planes">
                     <div id="assetPlanesSection"></div>
                 </div>
-                <div class="assetTabPanel hidden" data-tab="dca">
-                    <div id="assetDcaSection"></div>
-                </div>
             </div>
         </section>
     `
@@ -3065,11 +3198,12 @@ function renderAssetTablePage(asset) {
     renderAssetCompletedOperationsSection(asset)
     renderAssetTransaccionesSection(asset)
     renderAssetVentasSection(asset)
+    renderAssetTodosSection(asset)
     setupAssetTabs(asset)
     _assetBindSort(asset.id)
     initAssetTableLogic(asset)
 
-    // Planes de inversión y DCA: lo que se piensa hacer con ESTE activo. Van
+    // Planes de inversión: lo que se piensa hacer con ESTE activo. Van
     // después de pintar la ficha porque sus tarjetas leen de ella el precio
     // actual, y sin `await` porque nada de lo de arriba depende de ellas.
     initAssetPlanesLogic(asset)
@@ -3094,7 +3228,6 @@ function setActiveAssetTab(tab) {
     })
     document.getElementById("assetAddVentaNavBtn")?.classList.toggle("hidden", tab !== "ventas")
     document.getElementById("assetAddPlanNavBtn")?.classList.toggle("hidden", tab !== "planes")
-    document.getElementById("assetAddDcaNavBtn")?.classList.toggle("hidden", tab !== "dca")
 }
 
 function setupAssetTabs(asset) {
@@ -3109,7 +3242,6 @@ function setupAssetTabs(asset) {
 
     nav.querySelector("#assetAddVentaNavBtn")?.addEventListener("click", () => openAssetAddVentaModal(asset))
     nav.querySelector("#assetAddPlanNavBtn")?.addEventListener("click", () => planAbrirEditor())
-    nav.querySelector("#assetAddDcaNavBtn")?.addEventListener("click", () => dcaAbrirEditor())
 }
 
 function renderAssetRows(rows) {
@@ -3147,7 +3279,6 @@ function renderAssetRows(rows) {
         rowElement.innerHTML = `
             <td data-field="fechaOperacion">${escapeHtml(rowData.fechaOperacion || "")}</td>
             <td data-field="tipoOperacion">${escapeHtml(rowData.tipoOperacion || "Compra")}</td>
-            ${isCrypto ? `<td data-field="exchange">${escapeHtml(rowData.exchange || "")}</td>` : ""}
             <td data-field="participaciones">${formatAssetParticipationValue(rowData.participaciones, assetType)}</td>
             <td data-field="precioParticipacion">${moneyMono(rowData.precioParticipacion, "precioParticipacion")}</td>
             ${isCrypto ? `<td data-field="currency">${escapeHtml(rowCurrency)}</td>` : ""}

@@ -519,28 +519,6 @@ CREATE TABLE IF NOT EXISTS planes_inversion (
     sort_order      INTEGER NOT NULL DEFAULT 0
 );
 
--- Planes de aportación periódica. Solo guarda la *regla* (cuánto, cada cuánto,
--- desde cuándo); el calendario de aportes se deriva de ella al pintarlo, para
--- que cambiar la periodicidad no obligue a reescribir filas ya guardadas.
-CREATE TABLE IF NOT EXISTS dca_planes (
-    id               TEXT PRIMARY KEY,
-    asset_id         TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
-    nombre           TEXT NOT NULL DEFAULT '',
-    symbol           TEXT NOT NULL DEFAULT '',
-    ticker           TEXT NOT NULL DEFAULT '',
-    market_provider  TEXT NOT NULL DEFAULT '',
-    tv_symbol        TEXT NOT NULL DEFAULT '',
-    currency         TEXT NOT NULL DEFAULT 'EUR',
-    importe          TEXT NOT NULL DEFAULT '',
-    frecuencia       TEXT NOT NULL DEFAULT 'Mensual',
-    fecha_inicio     TEXT NOT NULL DEFAULT '',
-    fecha_fin        TEXT NOT NULL DEFAULT '',
-    aportes_objetivo TEXT NOT NULL DEFAULT '',
-    precio_maximo    TEXT NOT NULL DEFAULT '',
-    estado           TEXT NOT NULL DEFAULT 'Activo',
-    notas            TEXT NOT NULL DEFAULT '',
-    sort_order       INTEGER NOT NULL DEFAULT 0
-);
 """
 
 
@@ -562,7 +540,7 @@ CREATE TABLE IF NOT EXISTS dca_planes (
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 4
+ESQUEMA_VERSION = 5
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1035,6 +1013,29 @@ def _esquema_4(conn):
     columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(mensualidades)")}
     if "dias_cobro" not in columnas:
         conn.execute("ALTER TABLE mensualidades ADD COLUMN dias_cobro TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(5)
+def _esquema_5(conn):
+    """Se retiran los planes de aportación periódica (DCA).
+
+    La función se quita entera de la aplicación, así que su tabla deja de tener
+    quien la lea o la escriba. Se borra en vez de dejarla ahí: una tabla que nada
+    usa es esquema muerto, y quien mire la base dentro de un año no tiene forma
+    de saber si está viva.
+
+    Los pasos 2 y 3 siguen creándola y reconstruyéndola porque son historia: una
+    base antigua pasa por ellos antes de llegar aquí. Para una base nueva el
+    efecto neto es no tenerla nunca.
+
+    Esto **sí borra datos**: los planes DCA guardados se pierden. No hay paso
+    inverso; la vuelta atrás es restaurar la copia previa que se guarda sola
+    antes de migrar (`data/backups/auto/<portfolio>_pre-esquema-4-a-5_*.db`).
+
+    Las compras de la ficha no se tocan: un aporte que se hubiera registrado como
+    compra sigue siendo una compra normal y ahí se queda.
+    """
+    conn.execute("DROP TABLE IF EXISTS dca_planes")
 
 
 def get_db() -> sqlite3.Connection:

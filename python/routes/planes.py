@@ -1,29 +1,26 @@
-"""Planes de inversión y planes DCA.
+"""Planes de inversión.
 
-Dos recursos con la misma forma: el cliente maneja la lista completa (añadir,
-editar, borrar y reordenar son la misma acción para él) y la envía entera. El
-servidor no calcula nada aquí —el porcentaje que falta para el objetivo o el
-próximo aporte dependen del precio del momento, que ya se pide aparte— pero sí
-normaliza: los desplegables entran acotados a sus opciones y el resto de campos
-se recortan, para que en la base no acabe ni un estado inventado ni una nota de
-un megabyte.
+El cliente maneja la lista completa (añadir, editar, borrar y reordenar son la
+misma acción para él) y la envía entera. El servidor no calcula nada aquí —el
+porcentaje que falta para el objetivo depende del precio del momento, que ya se
+pide aparte— pero sí normaliza: los desplegables entran acotados a sus opciones
+y el resto de campos se recortan, para que en la base no acabe ni un estado
+inventado ni una nota de un megabyte.
 
-`assetId` es obligatorio en los dos: un plan se consulta desde la ficha de su
-activo, así que uno sin activo se guardaría en un sitio del que no se puede
-salir. La tabla lo refuerza con una clave foránea.
+`assetId` es obligatorio: un plan se consulta desde la ficha de su activo, así
+que uno sin activo se guardaría en un sitio del que no se puede salir. La tabla
+lo refuerza con una clave foránea.
 """
 
 from flask import Blueprint, jsonify
 
-from core.validation import as_int, as_rows, as_text, json_body, one_of
-from stores.planes_store import read_dca, read_planes, write_dca, write_planes
+from core.validation import as_rows, as_text, json_body, one_of
+from stores.planes_store import read_planes, write_planes
 
 planes_bp = Blueprint("planes", __name__)
 
 _HORIZONTES = {"Corto", "Medio", "Largo"}
 _ESTADOS_PLAN = {"Pendiente", "En curso", "Cumplido", "Cancelado"}
-_FRECUENCIAS = {"Semanal", "Quincenal", "Mensual", "Trimestral"}
-_ESTADOS_DCA = {"Activo", "Pausado", "Finalizado"}
 
 # Ni el nombre ni la nota son campos de importe: 120 y 500 caracteres son de
 # sobra para lo que cabe en una tarjeta, y evitan que un pegado accidental se
@@ -71,27 +68,6 @@ def _sanear_plan(fila, indice):
     }
 
 
-def _sanear_dca(fila, indice):
-    # El número de aportes va por `as_int` y vuelve a texto: es un contador, y
-    # dejarlo pasar como cadena libre permitiría guardar "muchos" como objetivo
-    # y que la barra de progreso del cliente saliera con NaN.
-    objetivo = as_int(fila.get("aportesObjetivo"), "aportesObjetivo", minimum=0, maximum=1000)
-
-    return {
-        **_mercado(fila),
-        "id":              _identificador(fila, indice, "dca"),
-        "nombre":          as_text(fila.get("nombre"), "nombre", max_length=_MAX_NOMBRE),
-        "importe":         as_text(fila.get("importe"), "importe", max_length=_MAX_IMPORTE),
-        "frecuencia":      one_of(fila.get("frecuencia"), _FRECUENCIAS, "frecuencia", default="Mensual"),
-        "fechaInicio":     as_text(fila.get("fechaInicio"), "fechaInicio", max_length=20),
-        "fechaFin":        as_text(fila.get("fechaFin"), "fechaFin", max_length=20),
-        "aportesObjetivo": "" if objetivo is None else str(objetivo),
-        "precioMaximo":    as_text(fila.get("precioMaximo"), "precioMaximo", max_length=_MAX_IMPORTE),
-        "estado":          one_of(fila.get("estado"), _ESTADOS_DCA, "estado", default="Activo"),
-        "notas":           as_text(fila.get("notas"), "notas", max_length=_MAX_NOTAS),
-    }
-
-
 @planes_bp.route("/api/planes", methods=["GET"])
 def getPlanes():
     return jsonify(read_planes())
@@ -102,17 +78,4 @@ def savePlanes():
     filas = as_rows(json_body().get("rows"), "rows", max_rows=500)
     saneadas = [_sanear_plan(fila, indice) for indice, fila in enumerate(filas)]
     write_planes(saneadas)
-    return jsonify({"ok": True, "rows": saneadas})
-
-
-@planes_bp.route("/api/dca", methods=["GET"])
-def getDca():
-    return jsonify(read_dca())
-
-
-@planes_bp.route("/api/dca", methods=["POST"])
-def saveDca():
-    filas = as_rows(json_body().get("rows"), "rows", max_rows=500)
-    saneadas = [_sanear_dca(fila, indice) for indice, fila in enumerate(filas)]
-    write_dca(saneadas)
     return jsonify({"ok": True, "rows": saneadas})

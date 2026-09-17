@@ -22,17 +22,44 @@ decide cómo se deshace la actualización:
 
 ---
 
-## [2.1.2] — 2026-09-15
+## [2.1.3] — 2026-09-17
 
-_En preparación._
-
-**Esquema de base de datos:** no se toca. Sigue en la versión 4, así que deshacer
-esta actualización es volver a la imagen anterior, sin tocar los datos.
+**Esquema de base de datos:** sube a la versión **5** (venía de la 4). La
+migración borra la tabla `dca_planes` y se aplica sola al arrancar; antes de
+tocarla se guarda `data/backups/auto/<portfolio>_pre-esquema-4-a-5_*.db`, exento
+de rotación. **Esta migración borra datos**: los planes DCA guardados se pierden
+y no hay paso inverso, así que volver atrás es levantar la imagen anterior y
+restaurar ese fichero. Las compras de la ficha no se tocan.
 
 **Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
 Ajustes › Datos. Nada que editar a mano.
 
-### Corregido
+### Añadido
+
+**Pestaña «Todos» en la ficha del activo.** Junta en una tabla ordenada por fecha
+las compras spot y las operaciones spot completadas, con una columna que dice de
+dónde sale cada fila. Aparece solo cuando hay más de un origen que mezclar.
+
+### Eliminado
+
+**Se retiran los planes de aportación periódica (DCA).** Se va la pestaña de la
+ficha del activo, su tabla `dca_planes` con los planes guardados y `/api/dca`.
+Los planes de inversión se quedan como estaban.
+
+### Cambiado
+
+- La barra de métricas de arriba se puede desplazar de lado: arrastrando con el
+  botón izquierdo, con la rueda del ratón o con su barra, que antes estaba
+  oculta. Lo que quedaba tapado por el panel lateral o por el borde de la
+  pantalla ya se alcanza.
+- Pulsar un activo en el panel lateral abre su ficha, en vez del gráfico.
+- Todos los botones de añadir fila dicen lo mismo, «Añadir fila»: había once que
+  llevaban un «+» delante y tres que no.
+- Los filtros de Planes usan el mismo estilo que los del resto de la aplicación.
+- La tarjeta de Ganancia / Pérdida ya no estira de alto toda la fila de la
+  cabecera cuando el activo está en otra moneda: el desglose activo/divisa va en
+  la misma línea que el importe.
+- Compras spot deja de tener columna «Exchange» en los activos cripto.
 
 ---
 

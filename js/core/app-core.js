@@ -104,6 +104,7 @@ function applyTopMetricsVisibility() {
         const visible = id in cfg ? cfg[id] : !_TOP_METRICS_DEFAULT_HIDDEN.has(id)
         box.classList.toggle("metricHidden", !visible)
     })
+    window._refreshMetricsScroll?.()
 }
 
 function moduloDePagina(page) {
@@ -205,6 +206,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const confirmModalCancelButton = document.getElementById("confirmModalCancelBtn")
 
     initSidePanel(toggleButton, sideWrapper)
+    initMetricsScroll(document.querySelector(".metrics"), sideWrapper)
     initNavigation(navButtons, contentArea)
     initResizeHandles()
     initAddAssetButton(addAssetButton, assetModalOverlay, assetNameInput, assetTypeSelect, assetTickerInput)
@@ -599,6 +601,98 @@ const PAGE_HTML_VERSION = "20260826b"
 
 window._viewAllPortfolios = localStorage.getItem("viewAllPortfolios") === "1"
 
+/**
+ * Desplazamiento lateral del panel de métricas.
+ *
+ * La fila tiene veinte tarjetas y el ancho que le queda depende de si el panel
+ * lateral está abierto: con él desplegado las últimas caen fuera, y con él
+ * plegado caen fuera igual en cuanto la ventana es estrecha. El CSS ya la deja
+ * desplazarse, pero un ratón corriente no tiene eje horizontal que girar, así
+ * que aquí la rueda vertical se traduce a desplazamiento lateral.
+ *
+ * Un trackpad sí manda eje horizontal propio: cuando viene, no se toca nada y se
+ * deja pasar el gesto tal cual.
+ *
+ * Y se puede arrastrar con el botón izquierdo, que es la forma directa de
+ * moverla: se agarra la fila y se lleva. El recorrido lo acota el navegador a lo
+ * que ocupan las tarjetas, y al soltar se queda donde se deje —no hay inercia ni
+ * vuelta atrás— porque el desplazamiento se escribe tal cual, sin `smooth`.
+ */
+function initMetricsScroll(metrics, sideWrapper) {
+    if (!metrics) return
+
+    const sobrante = () => metrics.scrollWidth - metrics.clientWidth
+
+    const actualizarBordes = () => {
+        // 1px de holgura: a fondo de recorrido el navegador deja restos
+        // decimales y sin el margen el difuminado del final no se apaga nunca.
+        const sobra = sobrante()
+        metrics.classList.toggle("metricsScrollable", sobra > 1)
+        metrics.classList.toggle("metricsFadeStart", metrics.scrollLeft > 1)
+        metrics.classList.toggle("metricsFadeEnd", metrics.scrollLeft < sobra - 1)
+    }
+
+    metrics.addEventListener(
+        "wheel",
+        (evento) => {
+            if (evento.deltaX !== 0) return
+            if (sobrante() <= 0) return
+            evento.preventDefault()
+            metrics.scrollLeft += evento.deltaY
+        },
+        { passive: false }
+    )
+
+    // ── Arrastre con el botón izquierdo ──
+    let xInicial = 0
+    let scrollInicial = 0
+    let arrastrando = false
+
+    metrics.addEventListener("pointerdown", (evento) => {
+        if (evento.button !== 0 || sobrante() <= 0) return
+        arrastrando = true
+        xInicial = evento.clientX
+        scrollInicial = metrics.scrollLeft
+        metrics.classList.add("metricsDragging")
+        metrics.setPointerCapture(evento.pointerId)
+    })
+
+    metrics.addEventListener("pointermove", (evento) => {
+        if (!arrastrando) return
+        // El navegador ya recorta el valor a [0, sobrante]: el arrastre no puede
+        // pasar de la última tarjeta ni de la primera.
+        metrics.scrollLeft = scrollInicial - (evento.clientX - xInicial)
+    })
+
+    const soltar = (evento) => {
+        if (!arrastrando) return
+        arrastrando = false
+        metrics.classList.remove("metricsDragging")
+        metrics.releasePointerCapture?.(evento.pointerId)
+    }
+
+    metrics.addEventListener("pointerup", soltar)
+    metrics.addEventListener("pointercancel", soltar)
+
+    // Arrastrar sobre texto dispara el arrastre nativo del navegador y se lleva
+    // el gesto a medias; la selección la corta el CSS de .metricsDragging.
+    metrics.addEventListener("dragstart", (evento) => evento.preventDefault())
+
+    metrics.addEventListener("scroll", actualizarBordes, { passive: true })
+    window.addEventListener("resize", actualizarBordes)
+
+    // Plegar el lateral ensancha la fila con una transición: lo que vale es el
+    // ancho de después, no el del momento del clic.
+    sideWrapper?.addEventListener("transitionend", (evento) => {
+        if (evento.propertyName === "width") actualizarBordes()
+    })
+
+    // Encender o apagar tarjetas desde Ajustes cambia lo que sobra, y eso pasa
+    // por applyTopMetricsVisibility(), que llama aquí.
+    window._refreshMetricsScroll = actualizarBordes
+    actualizarBordes()
+}
+
 function initSidePanel(toggleButton, sideWrapper) {
     if (!toggleButton || !sideWrapper) {
         return
@@ -656,21 +750,14 @@ function initAssetSelector(assetButtons) {
             }
             const assetId = button.dataset.assetId || ""
             if (!assetId) return
-            currentAssetId = assetId
-            const assetData = await loadAssetData(assetId)
-            await updateAssetDetail(assetData)
-            await renderAssetsList(await loadAssetsList())
+
+            // Pulsar un activo del lateral abre su ficha, igual que pulsarlo en
+            // la tabla de Vista general. Antes abría el gráfico de TradingView
+            // encima de la página, que es mirar el activo sin poder tocarlo; el
+            // gráfico sigue a un clic, en el título de la propia ficha.
+            clearNavSelection()
+            await selectAsset(assetId)
             restartAssetRotationBar()
-            const assetForTV = {
-                tvSymbol: button.dataset.tvSymbol || "",
-                marketSymbol: button.dataset.marketSymbol || "",
-                finnhubSymbol: button.dataset.marketSymbol || "",
-                marketProvider: button.dataset.marketProvider || "",
-                symbol: button.dataset.assetSymbol || "",
-                name: button.dataset.assetName || ""
-            }
-            const tvSym = buildTVSymbol(assetForTV)
-            if (tvSym) openTVChartModal(tvSym, button.dataset.assetName || button.dataset.assetSymbol || "")
         })
     })
 }

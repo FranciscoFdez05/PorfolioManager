@@ -650,11 +650,24 @@ body.asset-rotation-halted .detailRotationBar span {
     line-height: 1.2;
 }
 
+/* En una línea y sin partir. La tarjeta de P&L puede llevar detrás el desglose
+   activo/divisa, y si la fila se parte crece a lo alto: como .assetStatsPanel
+   estira todas las tarjetas a la misma altura, una sola fila de más deja el
+   resto de la cabecera con el doble de alto y medio vacío. */
 .assetStatValueRow {
     display: flex;
     align-items: baseline;
     gap: 6px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+}
+
+/* Las demás tarjetas miden lo mismo siempre; esta es la única que a veces lleva
+   el desglose detrás, así que es la única a la que se le deja crecer, y solo a
+   lo ancho. Sin desglose —un activo en euros— se queda en los 180px de todas. */
+.assetStatCardPnL {
+    width: auto;
+    min-width: 180px;
 }
 
 .assetStatSub {
@@ -1541,6 +1554,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 }
 
 .overviewFilterOption,
+.planFilterBtn,
 .activosFilterBtn,
 .bonosFilterBtn,
 .pmFilterBtn,
@@ -1566,6 +1580,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 }
 
 .overviewFilterOption input,
+.planFilterBtn input,
 .activosFilterBtn input,
 .bonosFilterBtn input,
 .pmFilterBtn input,
@@ -1576,6 +1591,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 
 /* dot de color antes del texto */
 .overviewFilterOption::before,
+.planFilterBtn::before,
 .activosFilterBtn::before,
 .bonosFilterBtn::before,
 .pmFilterBtn::before,
@@ -1630,6 +1646,57 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 }
 .overviewFilterOption:has(input[value="comoditis"]:checked) {
     border-color: #e0c06844;
+}
+
+/* Filtros de Planes. Son botones y no casillas —se elige un estado, no varios—,
+   así que el estado marcado va en .active en vez de en :has(). Los colores del
+   punto son los mismos con los que se pinta cada estado en la tarjeta del plan,
+   para que el filtro y lo filtrado hablen el mismo idioma. */
+.planFilterBtn {
+    /* El chip base es un <label>; como <button> hay que apagarle lo suyo. */
+    font-family: inherit;
+    line-height: 1.2;
+}
+
+.planFilterBtn.active {
+    color: var(--text-subtle);
+    border-color: var(--btn-border-hover);
+    background: var(--bg-surface);
+}
+
+.planFilterBtn[data-estado="all"].active::before {
+    background: #8899bb;
+}
+.planFilterBtn[data-estado="all"].active {
+    border-color: #8899bb44;
+}
+
+.planFilterBtn[data-estado="Cumplido"].active::before {
+    background: #2ecc71;
+}
+.planFilterBtn[data-estado="Cumplido"].active {
+    border-color: #2ecc7144;
+}
+
+.planFilterBtn[data-estado="Pendiente"].active::before {
+    background: #f5a524;
+}
+.planFilterBtn[data-estado="Pendiente"].active {
+    border-color: #f5a52444;
+}
+
+.planFilterBtn[data-estado="Cancelado"].active::before {
+    background: #64748b;
+}
+.planFilterBtn[data-estado="Cancelado"].active {
+    border-color: #64748b44;
+}
+
+.planFilterBtn[data-estado="En curso"].active::before {
+    background: #3b82f6;
+}
+.planFilterBtn[data-estado="En curso"].active {
+    border-color: #3b82f644;
 }
 
 /* operaciones crypto – dots */
@@ -3628,4 +3695,29 @@ html[data-theme="black"] .segHideBtn:hover {
 .catAddBtn:hover {
     border-color: var(--accent);
     color: var(--text-bright);
+}
+
+/* ── Pestaña "Todos" de la ficha ──
+   Una tabla con filas de tres sitios distintos. El color del distintivo es lo
+   único que las separa de un vistazo, así que va en el propio texto y no en un
+   fondo opaco: la tabla ya tiene rayado y un bloque de color por fila la
+   emborrona. Los tonos son los mismos que usan sus pestañas de origen. */
+.todosOrigenBadge {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 20px;
+    border: 1px solid currentColor;
+    white-space: nowrap;
+}
+
+.todosOrigenSpot {
+    color: #4caf82;
+}
+
+.todosOrigenOperacion {
+    color: #5b9bd5;
 }

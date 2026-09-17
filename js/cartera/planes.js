@@ -1,12 +1,11 @@
-// Planes de inversión y planes de aportación periódica (DCA).
+// Planes de inversión.
 //
-// Viven dentro de la ficha de cada activo, como dos pestañas más junto a
+// Viven dentro de la ficha de cada activo, como una pestaña más junto a
 // "Compras spot" y "Ventas": el activo dice lo que se tiene y el plan lo que se
 // piensa hacer con él. Por eso todo plan cuelga de un activo (`assetId`) y por
-// eso no comparten almacenamiento con las operaciones (tablas
-// `planes_inversion` y `dca_planes`, vía /api/planes y /api/dca): un plan NO
-// cuenta como operación, no toca el rendimiento, ni el FIFO fiscal, ni los
-// snapshots.
+// eso no comparte almacenamiento con las operaciones (tabla `planes_inversion`,
+// vía /api/planes): un plan NO cuenta como operación, no toca el rendimiento, ni
+// el FIFO fiscal, ni los snapshots.
 //
 // Un plan de inversión tampoco es una operativa de trading: es una compra a
 // plazo escrita antes de hacerla. No tiene dirección corta ni stop loss, y por
@@ -23,8 +22,6 @@
 
 const PLAN_ESTADOS = ["Pendiente", "En curso", "Cumplido", "Cancelado"]
 const PLAN_HORIZONTES = ["Corto", "Medio", "Largo"]
-const DCA_FRECUENCIAS = ["Semanal", "Quincenal", "Mensual", "Trimestral"]
-const DCA_ESTADOS = ["Activo", "Pausado", "Finalizado"]
 
 const PLAN_ESTADO_COLORS = {
     Pendiente: "#f5a524",
@@ -33,27 +30,10 @@ const PLAN_ESTADO_COLORS = {
     Cancelado: "#64748b"
 }
 
-const DCA_ESTADO_COLORS = {
-    Activo: "#2ecc71",
-    Pausado: "#f5a524",
-    Finalizado: "#64748b"
-}
-
-// Aportes al año de cada periodicidad. Se usa para la equivalencia mensual, que
-// es lo único que permite comparar en la misma unidad un plan semanal con uno
-// trimestral.
-const DCA_APORTES_ANUALES = {
-    Semanal: 52,
-    Quincenal: 26,
-    Mensual: 12,
-    Trimestral: 4
-}
-
 // Las dos listas se guardan enteras aunque en pantalla solo se vea la parte de
 // un activo: el servidor recibe siempre la lista completa, así que perder de
 // vista los planes de los demás activos los borraría al guardar.
 let _planesRows = []
-let _dcaRows = []
 let _planesCargados = false
 
 // Activo cuya ficha está abierta. Es el que filtra las dos rejillas y el que
@@ -61,21 +41,14 @@ let _planesCargados = false
 let _planesAsset = null
 
 let _planesFilterEstado = "all"
-let _dcaFilterEstado = "all"
 
 // ── Datos ────────────────────────────────────────────────────────────────────
 
 async function planesCargarTodo() {
-    const [planes, dca] = await Promise.all([
-        fetch("/api/planes")
-            .then((r) => (r.ok ? r.json() : { rows: [] }))
-            .catch(() => ({ rows: [] })),
-        fetch("/api/dca")
-            .then((r) => (r.ok ? r.json() : { rows: [] }))
-            .catch(() => ({ rows: [] }))
-    ])
+    const planes = await fetch("/api/planes")
+        .then((r) => (r.ok ? r.json() : { rows: [] }))
+        .catch(() => ({ rows: [] }))
     _planesRows = Array.isArray(planes.rows) ? planes.rows : []
-    _dcaRows = Array.isArray(dca.rows) ? dca.rows : []
     _planesCargados = true
 }
 
@@ -104,18 +77,9 @@ function planesGuardarPlanes() {
     return planesGuardarLista("/api/planes", _planesRows, "el plan de inversión")
 }
 
-function planesGuardarDca() {
-    return planesGuardarLista("/api/dca", _dcaRows, "el plan DCA")
-}
-
 function planesDelActivo() {
     const id = _planesAsset?.id
     return id ? _planesRows.filter((row) => row.assetId === id) : []
-}
-
-function dcaDelActivo() {
-    const id = _planesAsset?.id
-    return id ? _dcaRows.filter((row) => row.assetId === id) : []
 }
 
 /** Campos que el plan copia del activo del que cuelga. */
@@ -171,27 +135,6 @@ function planHoy() {
 
 function planDiasEntre(desde, hasta) {
     return Math.round((hasta - desde) / 86400000)
-}
-
-/**
- * Fecha del aporte número `indice` (0 = el primero) contando desde `inicio`.
- *
- * Se calcula desde el origen en vez de ir sumando periodos uno a uno para que no
- * se acumule el desfase de los meses: doce sumas de "30 días" no son un año, y
- * un plan mensual empezado el día 31 tiene que caer el último día de febrero y
- * volver al 31 en marzo, no quedarse en el 28 para siempre.
- */
-function dcaFechaAporte(inicio, frecuencia, indice) {
-    if (frecuencia === "Semanal" || frecuencia === "Quincenal") {
-        const dias = (frecuencia === "Semanal" ? 7 : 14) * indice
-        return new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + dias)
-    }
-
-    const saltoMeses = (frecuencia === "Trimestral" ? 3 : 1) * indice
-    const objetivo = new Date(inicio.getFullYear(), inicio.getMonth() + saltoMeses, 1)
-    const ultimoDia = new Date(objetivo.getFullYear(), objetivo.getMonth() + 1, 0).getDate()
-    objetivo.setDate(Math.min(inicio.getDate(), ultimoDia))
-    return objetivo
 }
 
 // ── Cálculo de un plan de inversión ──────────────────────────────────────────
@@ -254,99 +197,6 @@ function planCalcular(row) {
         progreso: posicion(actual),
         aviso
     }
-}
-
-// ── Cálculo de un plan DCA ───────────────────────────────────────────────────
-
-// Tope de iteraciones al recorrer el calendario. Un plan semanal indefinido
-// empezado hace diez años son ~520 aportes; 2.000 cubre cualquier caso real y
-// evita que una fecha de inicio absurda (año 1900) cuelgue la pestaña.
-const DCA_MAX_APORTES = 2000
-
-function dcaCalcular(row) {
-    const { precio: actual, currency } = planPrecioActual()
-    const importe = planNumero(row.importe)
-    const objetivo = planNumero(row.aportesObjetivo)
-    const precioMaximo = planNumero(row.precioMaximo)
-    const frecuencia = DCA_FRECUENCIAS.includes(row.frecuencia) ? row.frecuencia : "Mensual"
-    const inicio = planFechaADate(row.fechaInicio)
-    const fin = planFechaADate(row.fechaFin)
-    const hoy = planHoy()
-
-    const tope = objetivo && objetivo > 0 ? Math.min(objetivo, DCA_MAX_APORTES) : DCA_MAX_APORTES
-
-    let realizados = 0
-    let proximo = null
-
-    if (inicio) {
-        for (let indice = 0; indice < tope; indice += 1) {
-            const fecha = dcaFechaAporte(inicio, frecuencia, indice)
-            if (fin && fecha > fin) break
-            if (fecha <= hoy) {
-                realizados += 1
-                continue
-            }
-            proximo = fecha
-            break
-        }
-    }
-
-    // Un plan pausado o finalizado no tiene siguiente aporte: lo que se enseña es
-    // lo que llevaba hecho, no lo que tocaría si siguiera corriendo.
-    if (row.estado !== "Activo") proximo = null
-
-    const invertido = importe !== null ? importe * realizados : null
-    const planificado = importe !== null && objetivo ? importe * objetivo : null
-    const aportesAno = DCA_APORTES_ANUALES[frecuencia] || 12
-    const equivalenteMensual = importe !== null ? (importe * aportesAno) / 12 : null
-    const unidadesPorAporte = importe !== null && actual ? importe / actual : null
-    const progreso = objetivo ? Math.min(100, (realizados / objetivo) * 100) : null
-    const diasParaProximo = proximo ? planDiasEntre(hoy, proximo) : null
-    const porEncimaDelMaximo = precioMaximo !== null && actual !== null && actual > precioMaximo
-
-    return {
-        actual,
-        currency,
-        importe,
-        objetivo,
-        precioMaximo,
-        frecuencia,
-        inicio,
-        fin,
-        realizados,
-        proximo,
-        diasParaProximo,
-        invertido,
-        planificado,
-        equivalenteMensual,
-        unidadesPorAporte,
-        progreso,
-        porEncimaDelMaximo
-    }
-}
-
-/** Los `cuantos` próximos aportes, para el calendario de la ficha. */
-function dcaProximosAportes(row, cuantos = 12) {
-    const calculo = dcaCalcular(row)
-    if (!calculo.inicio || calculo.importe === null) return []
-
-    const tope =
-        calculo.objetivo && calculo.objetivo > 0 ? Math.min(calculo.objetivo, DCA_MAX_APORTES) : DCA_MAX_APORTES
-    const filas = []
-
-    for (let indice = calculo.realizados; indice < tope && filas.length < cuantos; indice += 1) {
-        const fecha = dcaFechaAporte(calculo.inicio, calculo.frecuencia, indice)
-        if (calculo.fin && fecha > calculo.fin) break
-        filas.push({
-            numero: indice + 1,
-            fecha,
-            importe: calculo.importe,
-            acumulado: calculo.importe * (indice + 1),
-            unidades: calculo.actual ? calculo.importe / calculo.actual : null
-        })
-    }
-
-    return filas
 }
 
 // ── Formateo ─────────────────────────────────────────────────────────────────
@@ -452,76 +302,6 @@ function planConstruirTarjeta(row) {
     return tarjeta
 }
 
-// ── Tarjeta de un plan DCA ───────────────────────────────────────────────────
-
-function dcaTextoProximo(row, calculo) {
-    if (calculo.proximo === null) {
-        return row.estado === "Activo" ? "Sin aportes pendientes" : `Plan ${String(row.estado).toLowerCase()}`
-    }
-    if (calculo.diasParaProximo === 0) return "Hoy"
-    if (calculo.diasParaProximo === 1) return "Mañana"
-    return `En ${calculo.diasParaProximo} días`
-}
-
-function dcaConstruirTarjeta(row) {
-    const c = dcaCalcular(row)
-    const color = DCA_ESTADO_COLORS[row.estado] || "#64748b"
-
-    const tarjeta = document.createElement("div")
-    tarjeta.className = "avCard planCard"
-    tarjeta.dataset.dcaId = row.id
-    tarjeta.style.setProperty("--av-color", color)
-
-    const barra =
-        c.progreso === null
-            ? ""
-            : `
-        <div class="planTrack" title="Aportes realizados sobre el objetivo">
-            <div class="planTrackFill" style="width:${c.progreso.toFixed(2)}%;background:${color}"></div>
-        </div>
-        <div class="planTrackLabels">
-            <span>${c.realizados} hechos</span>
-            <span>${c.objetivo} objetivo</span>
-        </div>`
-
-    tarjeta.innerHTML = `
-        <div class="avCardTop">
-            <span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${escapeHtml(row.estado || "Activo")}</span>
-            <div class="avCardActions planCardActions">
-                <span class="planDirBadge planDirDca">${escapeHtml(c.frecuencia)}</span>
-                ${planMenuTarjeta(row.id, `<button type="button" class="rowMenuItem planActionBtn dcaCalendarBtn" data-plan-id="${escapeAttr(row.id)}">Ver calendario</button>`)}
-            </div>
-        </div>
-        <div class="avCardName">${escapeHtml(row.nombre || row.symbol || "Plan DCA")}</div>
-        <div class="avCardPrice">${planImporte(c.importe, c.currency)}<span class="planPorAporte"> / aporte</span></div>
-
-        ${c.porEncimaDelMaximo ? `<div class="planAviso planAvisoMaximo">Por encima del precio máximo</div>` : ""}
-
-        <div class="planDestacado">
-            <span class="planDestacadoLabel">Próximo aporte</span>
-            <span class="planDestacadoValor">${escapeHtml(dcaTextoProximo(row, c))}</span>
-        </div>
-        ${barra}
-
-        <div class="avCardMetrics planCardMetrics">
-            ${planMetrica("Fecha próxima", c.proximo ? planFormatearFecha(c.proximo) : "—")}
-            ${planMetrica("Aportes hechos", c.objetivo ? `${c.realizados} / ${c.objetivo}` : String(c.realizados))}
-            ${planMetrica("Aportado est.", planImporte(c.invertido, c.currency))}
-            ${planMetrica("Total planificado", planImporte(c.planificado, c.currency))}
-            ${planMetrica("Equiv. mensual", planImporte(c.equivalenteMensual, c.currency))}
-            ${planMetrica("Precio actual", planImporte(c.actual, c.currency))}
-            ${planMetrica("Unidades/aporte", c.unidadesPorAporte === null ? "—" : formatShareQuantity(c.unidadesPorAporte))}
-            ${planMetrica("Precio máximo", planImporte(c.precioMaximo, c.currency))}
-        </div>
-
-        ${row.notas ? `<div class="planNota">${escapeHtml(row.notas)}</div>` : ""}
-        <div class="avCardUpdated">Inicio: ${escapeHtml(row.fechaInicio || "—")}${row.fechaFin ? ` · Fin: ${escapeHtml(row.fechaFin)}` : ""}</div>
-        <div class="avCardBar" style="background:${color}"></div>
-    `
-
-    return tarjeta
-}
-
 // ── Resumen de la pestaña ────────────────────────────────────────────────────
 
 function planKpi(etiqueta, valor, clase = "") {
@@ -560,43 +340,10 @@ function planesRenderKpis(filas) {
     `
 }
 
-function dcaRenderKpis(filas) {
-    const contenedor = document.getElementById("dcaKpis")
-    if (!contenedor) return
-
-    const { currency } = planPrecioActual()
-    let mensual = 0
-    let aportado = 0
-    let planificado = 0
-    let activos = 0
-
-    for (const row of filas) {
-        const c = dcaCalcular(row)
-        if (row.estado === "Activo") {
-            activos += 1
-            if (c.equivalenteMensual !== null) mensual += c.equivalenteMensual
-        }
-        if (c.invertido !== null) aportado += c.invertido
-        if (c.planificado !== null) planificado += c.planificado
-    }
-
-    contenedor.innerHTML = `
-        ${planKpi("Planes activos", String(activos))}
-        ${planKpi("Aportación mensual", planImporte(mensual, currency))}
-        ${planKpi("Aportado hasta hoy", planImporte(aportado, currency))}
-        ${planKpi("Total planificado", planificado ? planImporte(planificado, currency) : "—")}
-        ${planKpi("Queda por aportar", planificado ? planImporte(Math.max(0, planificado - aportado), currency) : "—")}
-    `
-}
-
 // ── Render de las rejillas ───────────────────────────────────────────────────
 
 function planesFiltrados() {
     return planesDelActivo().filter((row) => _planesFilterEstado === "all" || row.estado === _planesFilterEstado)
-}
-
-function dcaFiltrados() {
-    return dcaDelActivo().filter((row) => _dcaFilterEstado === "all" || row.estado === _dcaFilterEstado)
 }
 
 /** Deja en la pestaña el número de planes del activo, como hace la de Ventas. */
@@ -637,19 +384,6 @@ function planesRender() {
     })
     planesRenderKpis(filas)
     planesEtiquetaPestana("planesTabBtn", "Planes", planesDelActivo().length)
-}
-
-function dcaRender() {
-    const filas = dcaFiltrados()
-    planesPintarRejilla({
-        gridId: "dcaGrid",
-        vacioId: "dcaEmpty",
-        contadorId: "dcaCount",
-        filas,
-        construir: dcaConstruirTarjeta
-    })
-    dcaRenderKpis(filas)
-    planesEtiquetaPestana("dcaTabBtn", "DCA", dcaDelActivo().length)
 }
 
 // ── Campos del formulario ────────────────────────────────────────────────────
@@ -832,148 +566,6 @@ function planCambiarEstado(planId) {
     showToast(`Plan "${row.nombre || row.symbol}": ${row.estado}`)
 }
 
-// ── Plan DCA: alta, edición y borrado ────────────────────────────────────────
-
-function dcaAbrirEditor(planId = null) {
-    if (!_planesAsset) return
-
-    const existente = planId ? _dcaRows.find((row) => row.id === planId) : null
-    const row = existente || {
-        id: planNuevoId("dca"),
-        frecuencia: "Mensual",
-        estado: "Activo",
-        fechaInicio: todayDateString()
-    }
-
-    const nombreActivo = _planesAsset.name || _planesAsset.symbol || ""
-    const { currency } = planPrecioActual()
-
-    const campos = `
-        ${planCampoTexto("dcaFormNombre", "Nombre del plan", row.nombre, { placeholder: `${nombreActivo} mensual`, pista: `El plan es de ${nombreActivo}. Sin nombre se queda con el del activo.` })}
-        ${planCampoTexto("dcaFormImporte", "Importe por aporte", row.importe, { placeholder: "300", pista: `En ${currency}, la moneda del activo.` })}
-        ${planCampoSelect("dcaFormFrecuencia", "Frecuencia", row.frecuencia || "Mensual", DCA_FRECUENCIAS)}
-        ${planCampoTexto("dcaFormInicio", "Fecha de inicio", row.fechaInicio, { placeholder: "dd-mm-aaaa" })}
-        ${planCampoTexto("dcaFormFin", "Fecha de fin", row.fechaFin, { placeholder: "dd-mm-aaaa", pista: "Opcional. Vacío = plan indefinido." })}
-        ${planCampoTexto("dcaFormObjetivo", "Nº de aportes objetivo", row.aportesObjetivo, { placeholder: "24", pista: "Opcional. Es lo que llena la barra de progreso." })}
-        ${planCampoTexto("dcaFormMaximo", "Precio máximo de compra", row.precioMaximo, { placeholder: "Opcional", pista: "Avisa en la tarjeta cuando la cotización lo supera." })}
-        ${planCampoSelect("dcaFormEstado", "Estado", row.estado || "Activo", DCA_ESTADOS)}
-        ${planCampoNotas("dcaFormNotas", row.notas)}
-    `
-
-    planAbrirModal({
-        titulo: existente ? "Editar plan DCA" : `Nuevo plan DCA · ${nombreActivo}`,
-        campos,
-        onGuardar: async () => {
-            const objetivo = planLeer("dcaFormObjetivo")
-            if (objetivo && parseLooseNumber(objetivo) === null) {
-                showToast("El número de aportes objetivo tiene que ser un número", { type: "warning" })
-                return
-            }
-
-            const actualizado = {
-                ...planDatosDelActivo(),
-                id: row.id,
-                nombre: planLeer("dcaFormNombre") || nombreActivo,
-                importe: planLeer("dcaFormImporte"),
-                frecuencia: planLeer("dcaFormFrecuencia"),
-                fechaInicio: planLeer("dcaFormInicio"),
-                fechaFin: planLeer("dcaFormFin"),
-                aportesObjetivo: objetivo,
-                precioMaximo: planLeer("dcaFormMaximo"),
-                estado: planLeer("dcaFormEstado"),
-                notas: document.getElementById("dcaFormNotas")?.value.trim() || ""
-            }
-
-            const indice = _dcaRows.findIndex((fila) => fila.id === row.id)
-            if (indice >= 0) _dcaRows[indice] = actualizado
-            else _dcaRows.push(actualizado)
-
-            planCerrarModal()
-            dcaRender()
-            planesGuardarDca()
-        },
-        onEliminar: existente ? () => dcaEliminar(row.id) : null
-    })
-}
-
-function dcaEliminar(planId) {
-    const row = _dcaRows.find((fila) => fila.id === planId)
-    if (!row) return
-
-    planCerrarModal()
-    openConfirmModal({
-        title: "Eliminar plan DCA",
-        message: `¿Quieres eliminar el plan "${row.nombre || row.symbol || planId}"?`,
-        confirmLabel: "Sí, eliminar",
-        confirmSide: "right",
-        onConfirm: async () => {
-            _dcaRows = _dcaRows.filter((fila) => fila.id !== planId)
-            dcaRender()
-            await planesGuardarDca()
-        }
-    })
-}
-
-function dcaDuplicar(planId) {
-    const indice = _dcaRows.findIndex((fila) => fila.id === planId)
-    if (indice < 0) return
-
-    const row = _dcaRows[indice]
-    _dcaRows.splice(indice + 1, 0, {
-        ...row,
-        id: planNuevoId("dca"),
-        nombre: `${row.nombre || row.symbol} (copia)`
-    })
-    dcaRender()
-    planesGuardarDca()
-}
-
-// ── Calendario de aportes ────────────────────────────────────────────────────
-
-function dcaAbrirCalendario(planId) {
-    const row = _dcaRows.find((fila) => fila.id === planId)
-    if (!row) return
-
-    const c = dcaCalcular(row)
-    const proximos = dcaProximosAportes(row, 12)
-
-    const filas = proximos.length
-        ? proximos
-              .map(
-                  (aporte) => `
-            <tr>
-                <td>${aporte.numero}</td>
-                <td>${planFormatearFecha(aporte.fecha)}</td>
-                <td>${planImporte(aporte.importe, c.currency)}</td>
-                <td>${planImporte(aporte.acumulado, c.currency)}</td>
-                <td>${aporte.unidades === null ? "—" : formatShareQuantity(aporte.unidades)}</td>
-            </tr>`
-              )
-              .join("")
-        : `<tr><td colspan="5" class="planCalendarioVacio">No quedan aportes pendientes. Revisa la fecha de inicio, el estado del plan o el número de aportes objetivo.</td></tr>`
-
-    planAbrirModal({
-        titulo: `Calendario · ${row.nombre || row.symbol || "Plan DCA"}`,
-        etiquetaGuardar: "Cerrar",
-        campos: `
-            <p class="planCalendarioNota">
-                Las unidades son una estimación al precio de hoy (${planImporte(c.actual, c.currency)}). El precio real
-                de cada aporte será otro: de eso se trata al promediar.
-            </p>
-            <div class="planCalendarioWrap">
-                <table class="planCalendario">
-                    <thead>
-                        <tr><th>#</th><th>Fecha</th><th>Importe</th><th>Acumulado</th><th>Unidades est.</th></tr>
-                    </thead>
-                    <tbody>${filas}</tbody>
-                </table>
-            </div>`,
-        onGuardar: planCerrarModal
-    })
-
-    document.getElementById("planModalCancelBtn")?.remove()
-}
-
 // ── Interacción ──────────────────────────────────────────────────────────────
 
 function planAbrirGrafico(row) {
@@ -992,7 +584,17 @@ function planAbrirGrafico(row) {
     openTVChartModal(simbolo, row.nombre || row.symbol || simbolo)
 }
 
-function planesManejarClickTarjeta(evento, { rows, atributo, editar, eliminar, duplicar, extra }) {
+/**
+ * Clic en una tarjeta de plan.
+ *
+ * `alPulsar` es lo que hace pulsar la tarjeta por fuera de sus botones: abre el
+ * gráfico, que es lo que interesa en un plan de inversión, porque lo que se mira
+ * ahí es a qué precio va.
+ */
+function planesManejarClickTarjeta(
+    evento,
+    { rows, atributo, editar, eliminar, duplicar, extra, alPulsar = planAbrirGrafico }
+) {
     const boton = evento.target.closest(".planActionBtn")
 
     if (boton) {
@@ -1010,7 +612,7 @@ function planesManejarClickTarjeta(evento, { rows, atributo, editar, eliminar, d
     if (!tarjeta) return
 
     const row = rows().find((fila) => fila.id === tarjeta.dataset[atributo])
-    if (row) planAbrirGrafico(row)
+    if (row) alPulsar(row)
 }
 
 // ── Pestañas dentro de la ficha del activo ───────────────────────────────────
@@ -1019,7 +621,7 @@ function planFiltrosHtml(id, estados) {
     const botones = [{ valor: "all", texto: "Todos" }, ...estados]
         .map(
             ({ valor, texto }) =>
-                `<button type="button" class="filterDropBtn${valor === "all" ? " active" : ""}" data-estado="${escapeAttr(valor)}">${escapeHtml(texto)}</button>`
+                `<button type="button" class="planFilterBtn${valor === "all" ? " active" : ""}" data-estado="${escapeAttr(valor)}">${escapeHtml(texto)}</button>`
         )
         .join("")
 
@@ -1058,9 +660,9 @@ function planesMontarSeccion({
         <p class="overviewEmpty hidden" id="${vacioId}">${escapeHtml(vacio)}</p>`
 
     seccion.querySelector(`#${filtrosId}`).addEventListener("click", (evento) => {
-        const boton = evento.target.closest(".filterDropBtn")
+        const boton = evento.target.closest(".planFilterBtn")
         if (!boton) return
-        seccion.querySelectorAll(".filterDropBtn").forEach((otro) => {
+        seccion.querySelectorAll(".planFilterBtn").forEach((otro) => {
             otro.classList.toggle("active", otro === boton)
         })
         alFiltrar(boton.dataset.estado)
@@ -1074,14 +676,13 @@ function planesMontarSeccion({
  * Se llama desde `renderAssetTablePage()`, con el activo ya pintado: las
  * tarjetas leen de él el precio actual y la moneda.
  *
- * Las dos listas se piden una sola vez por sesión. Solo se tocan desde aquí, así
- * que volver a pedirlas al abrir cada activo serían dos peticiones por ficha
- * para recibir exactamente lo que ya está en memoria.
+ * La lista se pide una sola vez por sesión. Solo se toca desde aquí, así que
+ * volver a pedirla al abrir cada activo sería una petición por ficha para
+ * recibir exactamente lo que ya está en memoria.
  */
 async function initAssetPlanesLogic(asset) {
     _planesAsset = asset || null
     _planesFilterEstado = "all"
-    _dcaFilterEstado = "all"
 
     const planes = planesMontarSeccion({
         seccionId: "assetPlanesSection",
@@ -1109,36 +710,9 @@ async function initAssetPlanesLogic(asset) {
             })
     })
 
-    planesMontarSeccion({
-        seccionId: "assetDcaSection",
-        filtrosId: "dcaEstadoFilters",
-        kpisId: "dcaKpis",
-        gridId: "dcaGrid",
-        vacioId: "dcaEmpty",
-        contadorId: "dcaCount",
-        filtros: DCA_ESTADOS.map((estado) => ({ valor: estado, texto: estado })),
-        vacio: "Este activo no tiene ningún plan de aportación periódica. Crea uno para fijar cuánto aportas, cada cuánto y hasta cuándo.",
-        alFiltrar: (estado) => {
-            _dcaFilterEstado = estado
-            dcaRender()
-        },
-        alHacerClick: (evento) =>
-            planesManejarClickTarjeta(evento, {
-                rows: () => _dcaRows,
-                atributo: "dcaId",
-                editar: dcaAbrirEditor,
-                eliminar: dcaEliminar,
-                duplicar: dcaDuplicar,
-                extra: (boton, id) => {
-                    if (boton.classList.contains("dcaCalendarBtn")) dcaAbrirCalendario(id)
-                }
-            })
-    })
-
     if (!planes) return
 
     if (!_planesCargados) await planesCargarTodo()
 
     planesRender()
-    dcaRender()
 }

@@ -1145,6 +1145,7 @@ html[data-theme="light"] .filterDropSep {
 
 /* ── Light theme: Vista General filters ── */
 html[data-theme="light"] .overviewFilterOption,
+html[data-theme="light"] .planFilterBtn,
 html[data-theme="light"] .activosFilterBtn,
 html[data-theme="light"] .bonosFilterBtn,
 html[data-theme="light"] .mNavTab,
@@ -1154,6 +1155,7 @@ html[data-theme="light"] .mActivosFilterBtn {
     color: #64748b;
 }
 html[data-theme="light"] .overviewFilterOption:has(input:checked),
+html[data-theme="light"] .planFilterBtn.active,
 html[data-theme="light"] .activosFilterBtn.active,
 html[data-theme="light"] .activosFilterBtn:has(input:checked),
 html[data-theme="light"] .bonosFilterBtn.active,
@@ -1167,6 +1169,7 @@ html[data-theme="light"] .mActivosFilterBtn:has(input:checked) {
     border-color: #cbd5e1;
 }
 html[data-theme="light"] .overviewFilterOption::before,
+html[data-theme="light"] .planFilterBtn::before,
 html[data-theme="light"] .activosFilterBtn::before,
 html[data-theme="light"] .bonosFilterBtn::before,
 html[data-theme="light"] .mNavTab::before,
@@ -1174,6 +1177,7 @@ html[data-theme="light"] .mActivosFilterBtn::before {
     background: #cbd5e1;
 }
 html[data-theme="light"] .overviewFilterOption:hover,
+html[data-theme="light"] .planFilterBtn:hover,
 html[data-theme="light"] .activosFilterBtn:hover,
 html[data-theme="light"] .bonosFilterBtn:hover,
 html[data-theme="light"] .mNavTab:hover,
@@ -1448,6 +1452,7 @@ html[data-theme="black"] .filterDropSep {
 
 /* ── Black theme: Vista General filters ── */
 html[data-theme="black"] .overviewFilterOption,
+html[data-theme="black"] .planFilterBtn,
 html[data-theme="black"] .activosFilterBtn,
 html[data-theme="black"] .bonosFilterBtn,
 html[data-theme="black"] .mNavTab,
@@ -1457,6 +1462,7 @@ html[data-theme="black"] .mActivosFilterBtn {
     color: #50505e;
 }
 html[data-theme="black"] .overviewFilterOption:has(input:checked),
+html[data-theme="black"] .planFilterBtn.active,
 html[data-theme="black"] .activosFilterBtn.active,
 html[data-theme="black"] .activosFilterBtn:has(input:checked),
 html[data-theme="black"] .bonosFilterBtn.active,
@@ -1469,6 +1475,7 @@ html[data-theme="black"] .mActivosFilterBtn:has(input:checked) {
     color: #dcdce8;
 }
 html[data-theme="black"] .overviewFilterOption::before,
+html[data-theme="black"] .planFilterBtn::before,
 html[data-theme="black"] .activosFilterBtn::before,
 html[data-theme="black"] .bonosFilterBtn::before,
 html[data-theme="black"] .mNavTab::before,
@@ -1476,6 +1483,7 @@ html[data-theme="black"] .mActivosFilterBtn::before {
     background: #222;
 }
 html[data-theme="black"] .overviewFilterOption:hover,
+html[data-theme="black"] .planFilterBtn:hover,
 html[data-theme="black"] .activosFilterBtn:hover,
 html[data-theme="black"] .bonosFilterBtn:hover,
 html[data-theme="black"] .mNavTab:hover,
@@ -3437,6 +3445,11 @@ html[data-theme="black"] .portfolioFileInput {
     .metrics {
         order: 2;
         width: 100%;
+
+        /* Aquí el panel superior se parte en varias filas: el margen negativo
+           que esconde la barra de desplazamiento metería la fila de métricas
+           debajo de la siguiente, así que se deja ocupar sus 6px. */
+        margin-bottom: 0;
     }
 
     .searchContainer input {

@@ -42,25 +42,7 @@ const PLAN = {
 // al servidor en cuanto se guarde cualquier cosa desde aquí.
 const PLAN_AJENO = { ...PLAN, id: "plan-2", assetId: "otro", nombre: "Oro a 5.000" }
 
-const DCA = {
-    id: "dca-1",
-    assetId: "bitcoin",
-    nombre: "Bitcoin mensual",
-    symbol: "BTC",
-    ticker: "BTC-USD",
-    marketProvider: "yahoo",
-    currency: "EUR",
-    importe: "300",
-    frecuencia: "Mensual",
-    fechaInicio: "15-01-2026",
-    fechaFin: "",
-    aportesObjetivo: "24",
-    precioMaximo: "",
-    estado: "Activo",
-    notas: ""
-}
-
-/** Respuestas de /api/planes y /api/dca, y captura de lo que se guarda.
+/** Respuesta de /api/planes y captura de lo que se guarda.
  *
  * Las filas se copian en cada respuesta porque varias pruebas las modifican
  * para simular una edición; sin la copia, una prueba llegaría a la siguiente
@@ -76,9 +58,6 @@ function fetchFalso(guardados) {
                 ok: true,
                 json: () => Promise.resolve({ rows: [{ ...PLAN }, { ...PLAN_AJENO }] })
             })
-        }
-        if (String(url).startsWith("/api/dca")) {
-            return Promise.resolve({ ok: true, json: () => Promise.resolve({ rows: [{ ...DCA }] }) })
         }
         // Tipos de cambio y demás: sin red, la pestaña tiene que aguantar.
         return Promise.resolve({ ok: false, json: () => Promise.resolve({ ok: false }) })
@@ -103,7 +82,6 @@ beforeEach(async () => {
     // Las listas se piden una sola vez por sesión; cada prueba parte de cero.
     _planesCargados = false
     _planesRows = []
-    _dcaRows = []
 
     renderAssetTablePage({ ...ACTIVO })
     await initAssetPlanesLogic({ ...ACTIVO })
@@ -114,10 +92,9 @@ afterEach(() => {
 })
 
 describe("pestañas de la ficha", () => {
-    it("la ficha abre en Compras spot y esconde las de planes", () => {
+    it("la ficha abre en Compras spot y esconde la de planes", () => {
         expect(document.querySelector('.assetTabPanel[data-tab="spot"]').classList.contains("hidden")).toBe(false)
         expect(document.querySelector('.assetTabPanel[data-tab="planes"]').classList.contains("hidden")).toBe(true)
-        expect(document.querySelector('.assetTabPanel[data-tab="dca"]').classList.contains("hidden")).toBe(true)
     })
 
     it("la pestaña de Planes cambia de panel y saca su botón de alta", () => {
@@ -125,13 +102,10 @@ describe("pestañas de la ficha", () => {
 
         expect(document.querySelector('.assetTabPanel[data-tab="planes"]').classList.contains("hidden")).toBe(false)
         expect(document.getElementById("assetAddPlanNavBtn").classList.contains("hidden")).toBe(false)
-        // Y el de la otra pestaña se queda escondido.
-        expect(document.getElementById("assetAddDcaNavBtn").classList.contains("hidden")).toBe(true)
     })
 
-    it("cada pestaña lleva en el rótulo cuántos planes tiene el activo", () => {
+    it("la pestaña lleva en el rótulo cuántos planes tiene el activo", () => {
         expect(document.getElementById("planesTabBtn").textContent).toBe("Planes (1)")
-        expect(document.getElementById("dcaTabBtn").textContent).toBe("DCA (1)")
     })
 })
 
@@ -160,13 +134,6 @@ describe("tarjetas", () => {
         expect(etiquetas).not.toContain("Ratio B/R")
         expect(etiquetas).not.toContain("Riesgo")
         expect(tarjeta.querySelector(".planDirBadge")).toBeNull()
-    })
-
-    it("pinta un plan DCA con su próximo aporte", () => {
-        const tarjeta = document.querySelector("#dcaGrid .planCard")
-
-        expect(tarjeta.dataset.dcaId).toBe("dca-1")
-        expect(tarjeta.querySelector(".planDestacadoLabel").textContent).toBe("Próximo aporte")
     })
 
     it("escapa el contenido que escribe el usuario", () => {
@@ -270,22 +237,5 @@ describe("edición", () => {
         await vi.waitFor(() => expect(guardados).toHaveLength(1))
 
         expect(guardados[0].body.rows[0].estado).toBe("Cumplido")
-    })
-})
-
-describe("calendario del plan DCA", () => {
-    it("lista los próximos aportes con su acumulado", () => {
-        vi.useFakeTimers()
-        vi.setSystemTime(new Date(2026, 2, 20))
-        try {
-            document.querySelector("#dcaGrid .dcaCalendarBtn").click()
-        } finally {
-            vi.useRealTimers()
-        }
-
-        const filas = document.querySelectorAll(".planCalendario tbody tr")
-        expect(filas).toHaveLength(12)
-        expect(filas[0].children[0].textContent).toBe("4")
-        expect(filas[0].children[1].textContent).toBe("15-04-2026")
     })
 })
