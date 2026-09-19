@@ -22,6 +22,37 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.2.1] — 2026-09-19
+
+**Esquema de base de datos:** no lo toca (sigue en la versión **6**). Para
+deshacer la actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Cambiado
+
+**Redes del Atajo, una por línea.** En Ajustes › API, «Desde qué redes se
+aceptan las peticiones» deja de ser un campo de texto con CIDRs separados por
+comas y pasa a ser una lista: cada red en su línea, con lo que significa al
+lado («solo esta IP», «toda la red · 256 direcciones») y un botón **Quitar**
+que guarda al momento. El botón **Añadir red o IP…** abre un diálogo donde se
+escribe la IP del aparato y se elige **Solo esta IP** o **Toda su red** (la
+/24 de esa IP); quien sepa CIDR puede escribir la red directamente y se guarda
+ajustada a su máscara (`192.168.1.5/24` → `192.168.1.0/24`). Debajo, «Añadir
+sin teclear» ofrece la IP del navegador y las que el servidor ha rechazado.
+Con la lista vacía se vuelve a los rangos de `config.ini`, y la propia lista
+dice cuáles son. El botón «Permitir» de las IPs rechazadas abre este mismo
+diálogo.
+
+**Calendario del dinero, más sitio para los meses.** Las cuatro tarjetas del
+resumen anual (Ingresos, Gastos, Mensualidades, Balance) son más bajas, y los
+años van en una fila y los filtros de tipo (Todo, Gastos, Ingresos,
+Mensualidades) en otra debajo.
+
+**Tabla de movimientos más alta.** La lista de gastos y la de ingresos del mes
+enseñan más filas antes de empezar a desplazarse (612 px en vez de 498).
+
 ## [2.2.0] — 2026-09-19
 
 **Esquema de base de datos:** sube a la versión **6** (venía de la 5). La

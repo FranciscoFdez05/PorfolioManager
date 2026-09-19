@@ -1467,18 +1467,14 @@
 
                         <div class="ajustesField">
                             <div class="ajustesLabelRow">
-                                <label class="ajustesLabel" for="ajustesAtajoRedesInput">Desde qué redes se aceptan las peticiones</label>
+                                <span class="ajustesLabel">Desde qué redes se aceptan las peticiones</span>
+                                <button id="ajustesAtajoRedesAnadirBtn" class="ajustesTlsAvisoBtn" type="button">Añadir red o IP…</button>
                             </div>
-                            <div class="ajustesInputRow">
-                                <input id="ajustesAtajoRedesInput" class="ajustesInput" type="text" autocomplete="off"
-                                       placeholder="192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12">
-                            </div>
+                            <div class="ajustesAtajoRedesLista" id="ajustesAtajoRedesLista"></div>
                             <div class="ajustesFieldHint">
-                                En notación CIDR, separadas por comas. Una IP suelta se escribe con <code>/32</code>
-                                (<code>192.168.1.100/32</code>); una red entera, con la máscara de la red
-                                (<code>172.16.1.0/24</code>). Se rechaza <strong>toda</strong> petición que llegue
-                                desde fuera de estos rangos. Lo que escribas aquí <strong>sustituye</strong> a los
-                                rangos de <code>config.ini</code>; déjalo vacío para volver a ellos.
+                                Se rechaza <strong>toda</strong> petición que llegue desde fuera de estos rangos.
+                                Lo que pongas aquí <strong>sustituye</strong> a los rangos de <code>config.ini</code>;
+                                quítalos todos para volver a ellos.
                             </div>
                         </div>
 

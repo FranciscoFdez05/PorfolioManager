@@ -1960,3 +1960,101 @@ html[data-theme="light"] .ajustesPassModalText {
 html[data-theme="light"] .ajustesPassModalError {
     color: #dc2626;
 }
+
+/* ── Redes desde las que se acepta el Atajo ───────────────────────────────────
+   Una red por línea, con lo que significa al lado, en vez de un campo de texto
+   con CIDRs separados por comas. La misma lista sale en la sección y en el
+   popup que las edita. */
+#ajustesAtajoRedesAnadirBtn {
+    margin-left: auto;
+}
+.ajustesAtajoRedesLista {
+    margin-top: 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg-inset);
+    padding: 2px 12px;
+}
+.ajustesAtajoRedFila {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--border-soft);
+}
+.ajustesAtajoRedFila:last-child {
+    border-bottom: 0;
+}
+.ajustesAtajoRedFila code {
+    flex: 0 0 auto;
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+/* El botón no baja de línea: si no cabe todo, se recorta la explicación. */
+.ajustesAtajoRedDetalle {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-muted);
+}
+.ajustesAtajoRedFila .ajustesTlsAvisoBtn {
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+.ajustesAtajoRedesVacio {
+    padding: 9px 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+/* El popup: la lista de arriba, un campo para añadir con sus dos botones, y
+   las IPs que ya conoce el servidor para añadirlas de un toque. Va por encima
+   del panel de Ajustes, como el de la contraseña. */
+.ajustesRedesModal {
+    width: min(560px, 100%);
+}
+.ajustesRedesModal .ajustesAtajoRedesLista {
+    margin: 0 0 16px;
+}
+.ajustesRedesModalAnadir {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.ajustesRedesModalAnadir .assetModalInput {
+    flex: 1 1 180px;
+    margin-bottom: 0;
+}
+.ajustesRedesModalAnadir .ajustesTlsAvisoBtn {
+    height: 38px;
+}
+.ajustesRedesModalAnadir .ajustesTlsAvisoBtn[hidden] {
+    display: none;
+}
+.ajustesRedesModalAnadir .ajustesTlsAvisoBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.ajustesRedesModal .ajustesPassModalError {
+    margin: 8px 0 0;
+}
+.ajustesRedesModalSugerencias:not(:empty) {
+    margin-top: 16px;
+    border-top: 1px solid var(--border-soft);
+    padding-top: 12px;
+}
+.ajustesRedesModalSugTitulo {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.ajustesRedesModal .assetModalActions {
+    margin-top: 18px;
+}

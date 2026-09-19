@@ -1327,7 +1327,8 @@ async function initAjustesLogic() {
     const atajoMsg = document.getElementById("ajustesAtajoMsg")
     const atajoPruebaRes = document.getElementById("ajustesAtajoPruebaRes")
     const atajoRecetaEl = document.getElementById("ajustesAtajoReceta")
-    const atajoRedesInput = document.getElementById("ajustesAtajoRedesInput")
+    const atajoRedesLista = document.getElementById("ajustesAtajoRedesLista")
+    const atajoRedesAnadirBtn = document.getElementById("ajustesAtajoRedesAnadirBtn")
     const atajoExigirFirmaEl = document.getElementById("ajustesAtajoExigirFirma")
     const atajoAvisoFirmaEl = document.getElementById("ajustesAtajoAvisoFirma")
     const atajoAccesoBtn = document.getElementById("ajustesAtajoAccesoBtn")
@@ -1341,11 +1342,14 @@ async function initAjustesLogic() {
     const atajoPasoProbarDetalle = document.getElementById("ajustesAtajoPasoProbarDetalle")
     const atajoRedesBtn = document.getElementById("ajustesAtajoRedesBtn")
     const atajoCopiarBtn = document.getElementById("ajustesAtajoCopiarBtn")
-    const atajoAvanzadoEl = document.getElementById("ajustesAtajoAvanzado")
 
     // Lo último que devolvió el servidor: los botones de «Permitir» lo
     // necesitan para saber qué rangos hay y si se exige firma.
     let _atajoUltimo = null
+    // Las redes guardadas en Ajustes (vacío = las de config.ini) y las de
+    // config.ini, para decir a qué se vuelve al vaciar la lista.
+    let _redesAjustes = []
+    let _redesConfig = []
 
     function _pasoAtajo(id, estado) {
         const li = document.getElementById(id)
@@ -1506,19 +1510,357 @@ async function initAjustesLogic() {
         if (atajoExigirFirmaEl) atajoExigirFirmaEl.checked = acceso.exigirFirma !== false
         if (atajoAvisoFirmaEl) atajoAvisoFirmaEl.hidden = acceso.exigirFirma !== false
 
-        // Solo se rellena si el usuario no ha escrito nada: al repintar tras
-        // guardar, machacar lo que tenga a medias sería perder su trabajo.
-        if (atajoRedesInput && !atajoRedesInput.value.trim()) {
-            // De config.ini no se copia nada al campo: dejarlo vacío es lo que
-            // significa «lo que diga config.ini», y rellenarlo lo congelaría
-            // aquí sin que nadie lo hubiera pedido.
-            atajoRedesInput.value = acceso.origenRedes === "ajustes" ? (data.redes || []).join(", ") : ""
-        }
-        if (atajoRedesInput) {
-            atajoRedesInput.placeholder = (acceso.redesConfig || []).join(", ") || "192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12"
-        }
+        // De config.ini no se copia nada a la lista: una lista vacía es lo que
+        // significa «lo que diga config.ini», y rellenarla lo congelaría aquí
+        // sin que nadie lo hubiera pedido.
+        _redesAjustes = acceso.origenRedes === "ajustes" ? [...(data.redes || [])] : []
+        _redesConfig = [...(acceso.redesConfig || [])]
+        _pintarRedesAtajo()
 
         _pintarRechazadasAtajo(data)
+    }
+
+    // --- Lista de redes permitidas ---
+    // Lo que hay guardado en Ajustes, una por línea y con lo que significa en
+    // palabras: «solo esta IP» o «toda la red». El CIDR a pelo, en un campo de
+    // texto separado por comas, obligaba a saber qué es una /32 antes de poder
+    // dejar entrar al móvil.
+    function _pintarRedesAtajo() {
+        if (!atajoRedesLista) return
+        atajoRedesLista.innerHTML = ""
+
+        if (!_redesAjustes.length) {
+            const vacio = document.createElement("div")
+            vacio.className = "ajustesAtajoRedesVacio"
+            vacio.textContent = _redesConfig.length
+                ? `Ninguna aquí: se usan los rangos de config.ini (${_redesConfig.join(", ")}).`
+                : "Ninguna aquí ni en config.ini: no se acepta a nadie."
+            atajoRedesLista.appendChild(vacio)
+            return
+        }
+
+        for (const cidr of _redesAjustes) {
+            atajoRedesLista.appendChild(_filaRed(cidr, (btn) => _quitarRedAtajo(cidr, btn)))
+        }
+    }
+
+    // Una línea de la lista: el rango, lo que significa, y el botón de quitar.
+    // La usan la sección y el popup, que enseñan lo mismo.
+    function _filaRed(cidr, onQuitar) {
+        const fila = document.createElement("div")
+        fila.className = "ajustesAtajoRedFila"
+
+        const code = document.createElement("code")
+        code.textContent = cidr
+        fila.appendChild(code)
+
+        const detalle = document.createElement("span")
+        detalle.className = "ajustesAtajoRedDetalle"
+        detalle.textContent = _describirRed(cidr)
+        detalle.title = detalle.textContent
+        fila.appendChild(detalle)
+
+        const quitar = document.createElement("button")
+        quitar.type = "button"
+        quitar.className = "ajustesTlsAvisoBtn"
+        quitar.textContent = "Quitar"
+        quitar.addEventListener("click", () => onQuitar(quitar))
+        fila.appendChild(quitar)
+
+        return fila
+    }
+
+    // Quitar es guardar, igual que permitir: una fila menos y el servidor ya
+    // no la acepta. Si era la última se vuelve a config.ini, y eso se dice.
+    async function _quitarRedAtajo(cidr, btn) {
+        const redes = _redesAjustes.filter((r) => r !== cidr)
+        const ok = await _guardarRedesAtajo(redes, btn)
+        if (ok) {
+            showMsg(atajoAccesoMsg, redes.length ? `${cidr} quitada` : "Sin redes aquí: se usan las de config.ini", "ok")
+        }
+    }
+
+    // Lo que significa un rango, dicho para quien no sabe CIDR. Para IPv4 se
+    // cuenta cuántas direcciones caben; para IPv6 no tiene sentido contarlas.
+    function _describirRed(cidr) {
+        const [ip, pref] = String(cidr).split("/")
+        const prefijo = Number(pref)
+        if (ip.includes(":")) return prefijo === 128 ? "solo esta IP" : "red IPv6"
+        if (prefijo === 32) return "solo esta IP"
+        if (prefijo === 24) return "toda la red · 256 direcciones"
+        if (Number.isNaN(prefijo)) return "red"
+        return `red · ${Math.pow(2, 32 - prefijo).toLocaleString("es-ES")} direcciones`
+    }
+
+    // Deja el rango como lo va a guardar el servidor: 192.168.1.5/24 pasa a
+    // 192.168.1.0/24. Así la lista del popup enseña lo que de verdad se
+    // permite, no lo que se tecleó. Devuelve null si no es una red válida.
+    function _normalizarRed(texto) {
+        const limpio = String(texto || "").trim()
+        if (!limpio) return null
+        const [ip, pref, ...resto] = limpio.split("/")
+        if (resto.length) return null
+
+        if (ip.includes(":")) {
+            if (!/^[0-9a-fA-F:.]+$/.test(ip) || ip.split("::").length > 2) return null
+            const prefijo = pref === undefined ? 128 : Number(pref)
+            if (!Number.isInteger(prefijo) || prefijo < 0 || prefijo > 128) return null
+            return `${ip.toLowerCase()}/${prefijo}`
+        }
+
+        const partes = ip.split(".")
+        if (partes.length !== 4 || partes.some((p) => !/^\d{1,3}$/.test(p) || Number(p) > 255)) return null
+        const prefijo = pref === undefined ? 32 : Number(pref)
+        if (!Number.isInteger(prefijo) || prefijo < 0 || prefijo > 32) return null
+
+        const valor = partes.reduce((acc, p) => acc * 256 + Number(p), 0)
+        const mascara = prefijo === 0 ? 0 : (0xffffffff << (32 - prefijo)) >>> 0
+        const base = (valor & mascara) >>> 0
+        const red = [24, 16, 8, 0].map((d) => (base >>> d) & 255).join(".")
+        return `${red}/${prefijo}`
+    }
+
+    // Guarda la lista tal cual y repinta con lo que devuelve el servidor. Es el
+    // camino por el que cambian las redes desde el popup y desde «Quitar»; la
+    // firma se manda como esté el interruptor, sin tocarla.
+    async function _guardarRedesAtajo(redes, btn) {
+        const exigirFirma = atajoExigirFirmaEl ? !!atajoExigirFirmaEl.checked : true
+        if (btn) btn.disabled = true
+        showMsg(atajoAccesoMsg, "Guardando…", "")
+        try {
+            const res = await fetch("/api/atajo/acceso", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ exigirFirma, redes })
+            })
+            const data = await res.json()
+            if (!data.ok) {
+                showMsg(atajoAccesoMsg, data.error || "No se ha podido guardar", "error")
+                return false
+            }
+            _pintarAtajo(data)
+            showMsg(atajoAccesoMsg, "Guardado", "ok")
+            return true
+        } catch {
+            showMsg(atajoAccesoMsg, "Error de red", "error")
+            return false
+        } finally {
+            if (btn) btn.disabled = false
+        }
+    }
+
+    // --- Popup de redes ---
+    // Se escribe la IP del aparato y se elige si entra ella sola o toda su
+    // wifi; quien sepa CIDR puede escribir la red directamente. Se parte de lo
+    // que hay guardado y no se toca nada hasta pulsar Guardar.
+    function _abrirModalRedes() {
+        document.getElementById("ajustesRedesModalOverlay")?.remove()
+
+        const redes = [..._redesAjustes]
+        const data = _atajoUltimo || {}
+
+        const overlay = document.createElement("div")
+        overlay.id = "ajustesRedesModalOverlay"
+        overlay.className = "modalOverlay ajustesPassModalOverlay"
+
+        const modal = document.createElement("div")
+        modal.className = "assetModal ajustesRedesModal"
+        modal.setAttribute("role", "dialog")
+        modal.setAttribute("aria-modal", "true")
+        modal.innerHTML = `
+            <h3 class="assetModalTitle">Redes desde las que se acepta</h3>
+            <p class="ajustesPassModalText">
+                Una por línea. Se acepta toda petición que llegue desde cualquiera de ellas y se
+                rechaza el resto. Lo más fácil es poner la IP del iPhone y elegir si entra solo él
+                o cualquier aparato de su wifi.
+            </p>
+            <div class="ajustesAtajoRedesLista" id="ajustesRedesModalLista"></div>
+
+            <label class="assetModalLabel" for="ajustesRedesModalInput">Añadir</label>
+            <div class="ajustesRedesModalAnadir">
+                <input id="ajustesRedesModalInput" class="assetModalInput" type="text" autocomplete="off"
+                       spellcheck="false" placeholder="192.168.1.25 o 10.0.0.0/8">
+                <button type="button" class="ajustesTlsAvisoBtn" id="ajustesRedesModalSolo">Solo esta IP</button>
+                <button type="button" class="ajustesTlsAvisoBtn" id="ajustesRedesModalRed">Toda su red</button>
+            </div>
+            <div class="ajustesFieldHint" id="ajustesRedesModalHint"></div>
+            <p class="ajustesPassModalError hidden" id="ajustesRedesModalError"></p>
+
+            <div class="ajustesRedesModalSugerencias" id="ajustesRedesModalSugerencias"></div>
+
+            <div class="assetModalActions ajustesPassModalActions">
+                <button type="button" class="cancelButton" id="ajustesRedesModalCancelar" data-no-autohide="true">Cancelar</button>
+                <button type="button" class="primaryButton" id="ajustesRedesModalGuardar" data-no-autohide="true">Guardar</button>
+            </div>
+        `
+
+        const lista = modal.querySelector("#ajustesRedesModalLista")
+        const input = modal.querySelector("#ajustesRedesModalInput")
+        const btnSolo = modal.querySelector("#ajustesRedesModalSolo")
+        const btnRed = modal.querySelector("#ajustesRedesModalRed")
+        const hint = modal.querySelector("#ajustesRedesModalHint")
+        const errorEl = modal.querySelector("#ajustesRedesModalError")
+        const sugerencias = modal.querySelector("#ajustesRedesModalSugerencias")
+        const btnGuardar = modal.querySelector("#ajustesRedesModalGuardar")
+
+        const cerrar = () => {
+            overlay.remove()
+            document.removeEventListener("keydown", onKey)
+        }
+        const onKey = (event) => {
+            if (event.key === "Escape") cerrar()
+        }
+        const mostrarError = (msg) => {
+            errorEl.textContent = msg
+            errorEl.classList.toggle("hidden", !msg)
+        }
+
+        const pintarLista = () => {
+            lista.innerHTML = ""
+            if (!redes.length) {
+                const vacio = document.createElement("div")
+                vacio.className = "ajustesAtajoRedesVacio"
+                vacio.textContent = _redesConfig.length
+                    ? `Ninguna. Al guardar así se vuelve a los rangos de config.ini (${_redesConfig.join(", ")}).`
+                    : "Ninguna. Al guardar así no se acepta a nadie."
+                lista.appendChild(vacio)
+                return
+            }
+            for (const cidr of redes) {
+                lista.appendChild(
+                    _filaRed(cidr, () => {
+                        redes.splice(redes.indexOf(cidr), 1)
+                        pintarLista()
+                        pintarSugerencias()
+                    })
+                )
+            }
+        }
+
+        const anadir = (cidr) => {
+            const limpio = _normalizarRed(cidr)
+            if (!limpio) {
+                mostrarError("Eso no es una IP ni una red. Se escriben como 192.168.1.25 o 192.168.1.0/24.")
+                input.focus()
+                return
+            }
+            mostrarError("")
+            if (!redes.includes(limpio)) redes.push(limpio)
+            input.value = ""
+            actualizarBotones()
+            pintarLista()
+            pintarSugerencias()
+            input.focus()
+        }
+
+        // Lo escrito decide qué botones tienen sentido: con una IP suelta se
+        // elige entre ella y su red; con una red ya escrita solo cabe añadirla.
+        const actualizarBotones = () => {
+            const texto = input.value.trim()
+            const esRed = texto.includes("/")
+            const esIpv6 = texto.includes(":")
+            btnSolo.textContent = esRed ? "Añadir" : "Solo esta IP"
+            btnRed.hidden = esRed
+            btnRed.disabled = esIpv6
+            btnRed.title = esIpv6 ? "Para IPv6 escribe la red con su prefijo" : ""
+            hint.textContent = esRed
+                ? "Se guardará la red tal cual, ajustada a su máscara."
+                : "«Solo esta IP» deja entrar a ese aparato y a ningún otro. «Toda su red» deja entrar a cualquiera de su wifi (la /24, 256 direcciones)."
+        }
+
+        // Tu IP y las que el servidor ha rechazado, para no tener que
+        // teclearlas: es de donde sale casi todo lo que se añade aquí.
+        const pintarSugerencias = () => {
+            sugerencias.innerHTML = ""
+            const candidatas = []
+            if (data.verTe?.ip) candidatas.push({ ip: data.verTe.ip, texto: "Este navegador" })
+            for (const fila of data.rechazadas || []) {
+                if (!candidatas.some((c) => c.ip === fila.ip)) candidatas.push({ ip: fila.ip, texto: "Rechazada" })
+            }
+            const pendientes = candidatas.filter((c) => {
+                const sola = _cidrDeIp(c.ip)
+                const red = _redDeIp(c.ip)
+                return !redes.includes(sola) && !(red && redes.includes(red))
+            })
+            if (!pendientes.length) return
+
+            const titulo = document.createElement("div")
+            titulo.className = "ajustesRedesModalSugTitulo"
+            titulo.textContent = "Añadir sin teclear"
+            sugerencias.appendChild(titulo)
+
+            for (const c of pendientes) {
+                const fila = document.createElement("div")
+                fila.className = "ajustesAtajoRechazo"
+                const code = document.createElement("code")
+                code.textContent = c.ip
+                fila.appendChild(code)
+                const detalle = document.createElement("span")
+                detalle.className = "ajustesAtajoRechazoDetalle"
+                detalle.textContent = c.texto
+                fila.appendChild(detalle)
+                const acciones = document.createElement("span")
+                acciones.className = "ajustesAtajoRechazoAcciones"
+                const solo = document.createElement("button")
+                solo.type = "button"
+                solo.className = "ajustesTlsAvisoBtn"
+                solo.textContent = "Solo esta IP"
+                solo.addEventListener("click", () => anadir(_cidrDeIp(c.ip)))
+                acciones.appendChild(solo)
+                const red = _redDeIp(c.ip)
+                if (red) {
+                    const toda = document.createElement("button")
+                    toda.type = "button"
+                    toda.className = "ajustesTlsAvisoBtn"
+                    toda.textContent = `Toda su red (${red})`
+                    toda.addEventListener("click", () => anadir(red))
+                    acciones.appendChild(toda)
+                }
+                fila.appendChild(acciones)
+                sugerencias.appendChild(fila)
+            }
+        }
+
+        btnSolo.addEventListener("click", () => anadir(input.value))
+        btnRed.addEventListener("click", () => {
+            const red = _redDeIp(input.value.trim())
+            if (!red) {
+                mostrarError("Escribe una IPv4 para poder deducir su red.")
+                input.focus()
+                return
+            }
+            anadir(red)
+        })
+        input.addEventListener("input", () => {
+            mostrarError("")
+            actualizarBotones()
+        })
+        // Enter añade lo escrito, que es lo que se espera en una lista.
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault()
+                anadir(input.value)
+            }
+        })
+        modal.querySelector("#ajustesRedesModalCancelar").addEventListener("click", cerrar)
+        btnGuardar.addEventListener("click", async () => {
+            // Lo que quede en el campo sin añadir no se pierde en silencio.
+            if (input.value.trim()) {
+                mostrarError("Hay una IP escrita sin añadir: pulsa «Solo esta IP», «Toda su red» o borra el campo.")
+                input.focus()
+                return
+            }
+            const ok = await _guardarRedesAtajo(redes, btnGuardar)
+            if (ok) cerrar()
+        })
+        document.addEventListener("keydown", onKey)
+
+        actualizarBotones()
+        pintarLista()
+        pintarSugerencias()
+        overlay.appendChild(modal)
+        document.body.appendChild(overlay)
+        input.focus()
     }
 
     // --- IPs que el filtro ha rechazado ---
@@ -1605,9 +1947,6 @@ async function initAjustesLogic() {
                 showMsg(atajoMsg, nuevo.error || "No se ha podido guardar", "error")
                 return
             }
-            // El campo de abajo se repinta con lo guardado, no con lo que
-            // tuviera a medias: acaba de cambiar por otro camino.
-            if (atajoRedesInput) atajoRedesInput.value = ""
             _pintarAtajo(nuevo)
             showMsg(atajoMsg, `${cidr} permitida`, "ok")
         } catch {
@@ -1628,16 +1967,13 @@ async function initAjustesLogic() {
     }
 
     async function _guardarAccesoAtajo() {
-        const redes = (atajoRedesInput?.value || "")
-            .split(/[\n,;]+/)
-            .map((r) => r.trim())
-            .filter(Boolean)
+        const redes = [..._redesAjustes]
         const exigirFirma = !!atajoExigirFirmaEl?.checked
 
         // Se pregunta solo al quitarla, y se dice lo que se pierde en concreto,
         // no un «¿seguro?»: lo que hay que poder valorar es el alcance.
         if (!exigirFirma) {
-            const rangos = redes.join(", ") || (atajoRedesInput?.placeholder ?? "los de config.ini")
+            const rangos = redes.join(", ") || _redesConfig.join(", ") || "los rangos de config.ini"
             const aviso =
                 "Vas a aceptar peticiones sin comprobar quién las manda.\n\n" +
                 `Cualquiera que alcance este puerto desde ${rangos} podrá apuntar movimientos en tu base de datos.\n\n` +
@@ -1815,15 +2151,8 @@ async function initAjustesLogic() {
     if (atajoClaveBtn) atajoClaveBtn.addEventListener("click", _generarClaveAtajo)
     if (atajoAccesoBtn) atajoAccesoBtn.addEventListener("click", _guardarAccesoAtajo)
     if (atajoRechazadasBtn) atajoRechazadasBtn.addEventListener("click", loadAtajo)
-    if (atajoRedesBtn) {
-        atajoRedesBtn.addEventListener("click", () => {
-            if (atajoAvanzadoEl) atajoAvanzadoEl.open = true
-            if (atajoRedesInput) {
-                atajoRedesInput.scrollIntoView({ behavior: "smooth", block: "center" })
-                atajoRedesInput.focus()
-            }
-        })
-    }
+    if (atajoRedesBtn) atajoRedesBtn.addEventListener("click", _abrirModalRedes)
+    if (atajoRedesAnadirBtn) atajoRedesAnadirBtn.addEventListener("click", _abrirModalRedes)
     if (atajoCopiarBtn) {
         atajoCopiarBtn.addEventListener("click", async () => {
             const url = atajoUrlEl?.textContent || ""

@@ -16,12 +16,12 @@
     margin-top: -6px;
 }
 
-/* ── Barra superior: años + tipos ── */
+/* ── Barra superior: años arriba, tipos debajo ── */
 .calFinTopBar {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
 }
 
 .calFinYearList {
@@ -139,14 +139,14 @@
 .calFinSummary {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 12px;
+    gap: 10px;
 }
 
 .calFinCard {
-    padding: 14px 16px;
+    padding: 9px 12px;
     border: 1px solid var(--border-mid);
     border-left-width: 3px;
-    border-radius: 12px;
+    border-radius: 10px;
     background: var(--bg-panel);
 }
 
@@ -165,16 +165,16 @@
 .calFinCardLabel {
     margin: 0;
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.07em;
     text-transform: uppercase;
 }
 
 .calFinCardValue {
-    margin: 6px 0 2px;
+    margin: 3px 0 1px;
     color: var(--text-bright);
-    font-size: 22px;
+    font-size: 17px;
     font-weight: 700;
     letter-spacing: -0.01em;
 }
@@ -189,7 +189,7 @@
 .calFinCardHint {
     margin: 0;
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 11px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

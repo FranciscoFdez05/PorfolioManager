@@ -141,7 +141,7 @@
 .ingresosMovementsWrapper {
     overflow-y: auto;
     overflow-x: hidden;
-    max-height: 498px;
+    max-height: 612px;
 }
 
 .ingresosAnnualWrapper::-webkit-scrollbar,
