@@ -276,6 +276,21 @@ def test_el_panel_devuelve_el_estado(cliente_autenticado, bp_atajo):
     assert datos["urlBase"].endswith("localhost")
 
 
+def test_el_panel_lista_las_ips_rechazadas(cliente_autenticado, bp_atajo):
+    """Lo que hace falta para permitir al móvil sin ir al log."""
+    from core import red_local
+
+    client, _cab, _app = cliente_autenticado(bp_atajo)
+    red_local.olvidarRechazos()
+    red_local.registrarRechazo("172.16.1.10", "GET", "/api/portfolios-lista")
+
+    datos = client.get("/api/atajo").get_json()
+
+    assert [r["ip"] for r in datos["rechazadas"]] == ["172.16.1.10"]
+    assert datos["rechazadas"][0]["ruta"] == "/api/portfolios-lista"
+    assert "permitida" in datos["rechazadas"][0]
+
+
 def test_generar_la_clave_desde_el_panel_la_deja_utilizable(cliente_autenticado, bp_atajo, clave_aislada):
     client, cab, _app = cliente_autenticado(bp_atajo)
 

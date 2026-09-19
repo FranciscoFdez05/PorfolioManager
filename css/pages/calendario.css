@@ -1,0 +1,620 @@
+/* Calendario del dinero (Gastos › Calendario)
+   ─────────────────────────────────────────────────────────────────
+   Doce meses del año con lo que entró y salió cada día, y el detalle
+   del día elegido al lado. Es la misma rejilla que el calendario de
+   Mensualidades (css/pages/gastos.css), con una diferencia: aquí un
+   día puede llevar varios importes, uno por tipo, y el color dice de
+   qué tipo es cada uno. Esos tres colores son los de Ahorro: verde
+   lo que entra, rojo lo que sale, azul las suscripciones. */
+
+.calFinPage {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-right: 18px;
+    flex: 1;
+    margin-top: -6px;
+}
+
+/* ── Barra superior: años + tipos ── */
+.calFinTopBar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.calFinYearList {
+    display: flex;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.calFinYearBtn {
+    min-width: 64px;
+    height: 36px;
+    padding: 0 14px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+}
+
+.calFinYearBtn:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--btn-border-hover);
+}
+
+.calFinYearBtn.active {
+    background: var(--btn-active-bg);
+    border-color: var(--btn-active-border);
+    color: var(--btn-active-text);
+}
+
+/* Los chips heredan el chip con punto de color de components.css
+   (.calFinChip va en la misma lista que .activosFilterBtn). Aquí solo
+   va lo que es de esta página: qué color lleva cada tipo. */
+.calFinFilters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.calFinChip {
+    font-family: inherit;
+    line-height: 1.2;
+}
+
+.calFinChip.active {
+    color: var(--text-subtle);
+    border-color: var(--btn-border-hover);
+    background: var(--bg-surface);
+    font-weight: 600;
+}
+
+.calFinChip[data-cal-type="all"]::before {
+    background: #8899bb55;
+}
+.calFinChip[data-cal-type="gastos"]::before {
+    background: #f8717155;
+}
+.calFinChip[data-cal-type="ingresos"]::before {
+    background: #4ade8055;
+}
+.calFinChip[data-cal-type="mensualidades"]::before {
+    background: #60a5fa55;
+}
+
+.calFinChip[data-cal-type="all"].active::before {
+    background: #8899bb;
+}
+.calFinChip[data-cal-type="all"].active {
+    border-color: #8899bb44;
+}
+.calFinChip[data-cal-type="gastos"].active::before {
+    background: #f87171;
+}
+.calFinChip[data-cal-type="gastos"].active {
+    border-color: #f8717144;
+}
+.calFinChip[data-cal-type="ingresos"].active::before {
+    background: #4ade80;
+}
+.calFinChip[data-cal-type="ingresos"].active {
+    border-color: #4ade8044;
+}
+.calFinChip[data-cal-type="mensualidades"].active::before {
+    background: #60a5fa;
+}
+.calFinChip[data-cal-type="mensualidades"].active {
+    border-color: #60a5fa44;
+}
+
+/* ── Colores por tipo ──
+   Un importe lleva siempre el color de su tipo, esté en la celda, en la
+   cabecera del mes o en el panel lateral. */
+.calFinTipo-gastos {
+    color: #f87171;
+}
+.calFinTipo-ingresos {
+    color: #4ade80;
+}
+.calFinTipo-mensualidades {
+    color: #60a5fa;
+}
+.calFinPositivo {
+    color: #4ade80;
+}
+.calFinNegativo {
+    color: #f87171;
+}
+
+/* ── Tarjetas del año ── */
+.calFinSummary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.calFinCard {
+    padding: 14px 16px;
+    border: 1px solid var(--border-mid);
+    border-left-width: 3px;
+    border-radius: 12px;
+    background: var(--bg-panel);
+}
+
+.calFinCard-ingresos,
+.calFinCard-positivo {
+    border-left-color: #4ade80;
+}
+.calFinCard-gastos,
+.calFinCard-negativo {
+    border-left-color: #f87171;
+}
+.calFinCard-mensualidades {
+    border-left-color: #60a5fa;
+}
+
+.calFinCardLabel {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.calFinCardValue {
+    margin: 6px 0 2px;
+    color: var(--text-bright);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.calFinCard-positivo .calFinCardValue {
+    color: #4ade80;
+}
+.calFinCard-negativo .calFinCardValue {
+    color: #f87171;
+}
+
+.calFinCardHint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Calendario ── */
+.calFinCalendar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 14px;
+    align-items: start;
+}
+
+.calFinGrid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.calFinMonth {
+    padding: 10px 10px 8px;
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    background: var(--bg-panel);
+}
+
+.calFinMonthEmpty {
+    opacity: 0.5;
+}
+
+.calFinMonthHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.calFinMonthName {
+    color: var(--text-bright);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.calFinMonthTotals {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 2px 8px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.calFinMonthTotal {
+    white-space: nowrap;
+}
+
+.calFinWeekdays,
+.calFinDays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
+}
+
+.calFinWeekdays {
+    margin-bottom: 3px;
+}
+
+.calFinWeekdays span {
+    color: var(--text-dim);
+    font-size: 9.5px;
+    font-weight: 700;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.calFinDay {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-height: 30px;
+    padding: 2px 1px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 10.5px;
+    line-height: 1.1;
+}
+
+.calFinDayBlank {
+    min-height: 0;
+}
+
+.calFinDayNum {
+    font-weight: 600;
+}
+
+.calFinDayEmpty {
+    background: var(--bg-inset);
+}
+
+.calFinDayFilled {
+    cursor: pointer;
+    color: var(--text-bright);
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease;
+}
+
+/* Dinero que ya se movió. */
+.calFinDayPast {
+    background: rgba(148, 163, 184, 0.14);
+    border-color: rgba(148, 163, 184, 0.28);
+}
+
+/* Cargos que aún no han llegado: previsión, no historia. */
+.calFinDayNext {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.calFinDayNext .calFinDayAmount {
+    opacity: 0.8;
+}
+
+.calFinDayFilled:hover {
+    border-color: var(--accent);
+}
+
+.calFinDayToday .calFinDayNum {
+    color: var(--accent-hover);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.calFinDaySelected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.calFinDayAmount {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 8.5px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calFinDayCount {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    min-width: 13px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background: var(--accent-dark);
+    color: #fff;
+    font-size: 8.5px;
+    font-weight: 700;
+    line-height: 13px;
+    text-align: center;
+}
+
+.calFinNoDay {
+    margin: 8px 0 0;
+    color: var(--text-muted);
+    font-size: 10.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Panel lateral ── */
+.calFinSide {
+    position: sticky;
+    top: 12px;
+    padding: 14px;
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    background: var(--bg-panel);
+}
+
+.calFinSideLabel {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.calFinSideLabelSpaced {
+    margin-top: 14px;
+}
+
+.calFinSideTitle {
+    margin: 4px 0 10px;
+    color: var(--text-bright);
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.calFinSideList {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.calFinSideItem {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-bright);
+}
+
+.calFinSideItemPaused {
+    opacity: 0.55;
+}
+
+/* El punto lleva el color del tipo por background: la clase de tipo pone
+   color, y un span vacío no tiene texto que pintar. */
+.calFinSideDot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+
+.calFinSideItem .calFinSideDot {
+    margin-right: 0;
+    align-self: center;
+}
+
+.calFinSideName {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calFinSideDate {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.calFinSideAmount {
+    margin-left: auto;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.calFinSideDate + .calFinSideAmount {
+    margin-left: 0;
+}
+
+.calFinSideTotal {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 10px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-mid);
+    color: var(--text-bright);
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.calFinSideTotal + .calFinSideTotal {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: none;
+}
+
+.calFinSideBalance {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-mid);
+}
+
+.calFinSideHint {
+    margin: 12px 0 0;
+    color: var(--text-muted);
+    font-size: 11.5px;
+}
+
+.calFinEmpty {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 34px 16px;
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    background: var(--bg-panel);
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+}
+
+/* ── Ojo cerrado ── */
+body.money-hidden .calFinCardValue,
+body.money-hidden .calFinMonthTotal,
+body.money-hidden .calFinDayAmount,
+body.money-hidden .calFinSideAmount,
+body.money-hidden .calFinSideTotal span:last-child {
+    filter: blur(6px);
+    user-select: none;
+    pointer-events: none;
+}
+
+@media (max-width: 1400px) {
+    .calFinGrid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1200px) {
+    .calFinSummary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .calFinCalendar {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .calFinSide {
+        position: static;
+    }
+}
+
+@media (max-width: 900px) {
+    .calFinGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* ── Tema claro ──
+   El tema claro no redefine variables sino clases (ver themes.css), así
+   que sin esto las cajas saldrían negras sobre blanco. */
+html[data-theme="light"] .calFinYearBtn {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #1e293b;
+}
+html[data-theme="light"] .calFinYearBtn:hover {
+    background: #e8edf5;
+    border-color: #cbd5e1;
+}
+html[data-theme="light"] .calFinYearBtn.active {
+    background: #1e293b;
+    border-color: #334155;
+    color: #ffffff;
+}
+html[data-theme="light"] .calFinCard,
+html[data-theme="light"] .calFinMonth,
+html[data-theme="light"] .calFinSide,
+html[data-theme="light"] .calFinEmpty {
+    background: #ffffff;
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .calFinCard {
+    border-left-width: 3px;
+}
+html[data-theme="light"] .calFinCardLabel,
+html[data-theme="light"] .calFinCardHint,
+html[data-theme="light"] .calFinMonthTotals,
+html[data-theme="light"] .calFinNoDay,
+html[data-theme="light"] .calFinSideLabel,
+html[data-theme="light"] .calFinSideDate,
+html[data-theme="light"] .calFinSideHint,
+html[data-theme="light"] .calFinEmpty {
+    color: #64748b;
+}
+html[data-theme="light"] .calFinCardValue,
+html[data-theme="light"] .calFinMonthName,
+html[data-theme="light"] .calFinSideTitle,
+html[data-theme="light"] .calFinSideItem,
+html[data-theme="light"] .calFinSideTotal,
+html[data-theme="light"] .calFinDayFilled {
+    color: #1e293b;
+}
+html[data-theme="light"] .calFinWeekdays span,
+html[data-theme="light"] .calFinDay {
+    color: #94a3b8;
+}
+html[data-theme="light"] .calFinDayEmpty {
+    background: #f8fafc;
+}
+html[data-theme="light"] .calFinDayPast {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+html[data-theme="light"] .calFinDayNext {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+}
+html[data-theme="light"] .calFinSideTotal,
+html[data-theme="light"] .calFinSideBalance {
+    border-color: #e2e8f0;
+}
+/* Los colores de tipo, un punto más oscuros para leerse sobre blanco. */
+html[data-theme="light"] .calFinTipo-gastos,
+html[data-theme="light"] .calFinNegativo,
+html[data-theme="light"] .calFinCard-negativo .calFinCardValue {
+    color: #dc2626;
+}
+html[data-theme="light"] .calFinTipo-ingresos,
+html[data-theme="light"] .calFinPositivo,
+html[data-theme="light"] .calFinCard-positivo .calFinCardValue {
+    color: #16a34a;
+}
+html[data-theme="light"] .calFinTipo-mensualidades {
+    color: #2563eb;
+}

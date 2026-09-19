@@ -22,6 +22,99 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.2.0] — 2026-09-19
+
+**Esquema de base de datos:** sube a la versión **6** (venía de la 5). La
+migración añade la columna `nota` a `gastos_rows` e `ingresos_rows`, vacía en
+las filas que ya había, y se aplica sola al arrancar; antes se guarda
+`data/backups/auto/<portfolio>_pre-esquema-5-a-6_*.db`, exento de rotación. No
+toca ni borra ninguna fila: volver atrás es levantar la imagen anterior, que
+ignora la columna sobrante, o restaurar ese fichero.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Añadido
+
+**Nota en cada gasto e ingreso.** El formulario de Añadir/Editar gasto y el de
+ingreso llevan un campo **Nota** (opcional, hasta 300 caracteres). La tabla
+del mes no la enseña: pulsar una fila abre un detalle con la fecha, el
+concepto, el tipo, la cantidad y la nota —o «Sin nota»—, con **Editar** a
+mano. El menú «···» de la fila sigue igual y no abre el detalle. El CSV del
+mes incorpora la columna Nota.
+
+**Contraseña para las claves de API del ZIP.** Con «Incluir las claves de
+API» marcado, Exportar como ZIP abre un diálogo que ofrece ponerles una
+contraseña (opcional: se puede seguir sin ella, como hasta ahora). Con
+contraseña, las claves van cifradas con una clave derivada de ella (PBKDF2 +
+Fernet, en `claves-api.cifradas.json`) y el resto del ZIP —base de datos,
+ajustes, preferencias— sigue igual. Al importar un ZIP así, la aplicación pide
+la contraseña antes de tocar nada; si es incorrecta lo dice y la vuelve a
+pedir, y quien no la tenga puede importar el resto sin las claves.
+
+**«Concepto» en vez de «Nombre».** La cabecera de la tabla de gastos y la de
+ingresos, la etiqueta del formulario y el CSV del mes dicen Concepto, que es
+lo que es. La columna de la base de datos sigue llamándose `nombre`.
+
+**Calendario del dinero.** Gastos › Calendario enseña los doce meses del año
+con lo que entró y salió cada día: los movimientos de Gastos e Ingresos en el
+día de su fecha, los cargos de las mensualidades y las ganancias recurrentes en
+su día de cobro. Tres chips —Gastos, Ingresos, Mensualidades— eligen qué se ve,
+solos o combinados, y cada importe lleva el color de su tipo. Pulsar un día
+lista sus apuntes con el balance; sin día elegido, el panel lateral resume el
+año y los próximos cargos. Arriba, cuatro tarjetas con ingresos, gastos,
+mensualidades y balance del año. No guarda nada: lee los mismos datos que las
+pantallas de Gastos e Ingresos, así que lo que se apunte allí aparece aquí.
+
+**El Atajo de iOS se monta en cuatro pasos.** Ajustes › API › Atajo de iOS
+deja de ser un bloque de texto con botones sueltos y pasa a ser una lista de
+cuatro pasos —clave de firma, desde dónde se acepta, instalar en el iPhone,
+comprobar—, cada uno con un círculo que dice en qué estado está (verde hecho,
+ámbar pide algo, rojo roto, gris aún no), una línea que dice qué, y el botón
+que lo resuelve al lado. La dirección que llevará el atajo tiene su botón de
+**Copiar**. Las redes, el interruptor de la firma y los avisos largos quedan
+en un desplegable «Redes, firma y detalles», que **Editar redes** abre
+directamente. Las dos secciones técnicas de Ajustes —HTTPS y Atajo— se pintan
+bien en el tema claro, que hasta ahora les dejaba las cajas negras.
+
+**Las IPs rechazadas, en el paso 2, con un botón que las permite.** El panel
+lista las direcciones que el filtro ha rechazado desde que arrancó el servidor
+—cuándo, qué ruta y cuántas veces— con **Permitir** (la IP) y **Su red** (la
+subred `/24`). Un toque y se guarda: no hay que escribir nada ni pasar por
+«Guardar acceso». Es lo que hacía falta cuando el iPhone llega desde otra
+subred de la misma wifi (invitados, un punto de acceso con su propio DHCP):
+antes había que ir al log a buscar `rechazada desde`, y escribir mal la máscara
+(`172.16.1.0/32` en vez de `/24`) dejaba al móvil igual de fuera. Se parte de
+los rangos que se están aplicando, así que permitir una IP nueva nunca quita
+la wifi que ya estaba.
+
+### Cambiado
+
+**La ficha del activo abre en «Todos».** La pestaña que junta compras spot y
+operaciones spot pasa a ser la primera y la que se ve al abrir la ficha, y ya
+no desaparece cuando solo hay un origen: con una sola procedencia lista esas
+filas, y sin ninguna lo dice. Compras spot, Operaciones Spot y el resto siguen
+donde estaban.
+
+**Las redes permitidas de fábrica son las tres privadas enteras.** `[atajo]
+redes_permitidas` pasa de `192.168.1.0/24, 10.0.0.0/24` a `192.168.0.0/16,
+10.0.0.0/8, 172.16.0.0/12`: cualquier subred de una wifi doméstica y cualquier
+túnel de WireGuard entran sin tocar nada. Ninguno de esos rangos se alcanza
+desde Internet, y la firma sigue siendo la barrera que prueba quién escribe.
+Quien tuviera el valor anterior escrito en su `config.ini` o guardado desde
+Ajustes no cambia de comportamiento. El tope de rangos del panel sube de 20 a
+50.
+
+### Corregido
+
+**Coste de las operaciones spot completadas.** En Cripto › Operaciones el
+«Total» va sin la comisión en €: lo que sale de la cuenta es Total + comisión,
+igual que el saldo bloqueado de una compra activa. La 2.1.4 lo valoraba con
+precio de orden × cantidad y dejaba el Total fuera. Ahora el lote de una
+operación completada suma el Total y la comisión en € al invertido bruto, la
+comisión entra en COMIS. y el neto queda en el Total. Si la operación no tiene
+Total se recurre a precio × cantidad.
+
 ## [2.1.4] — 2026-09-17
 
 **Esquema de base de datos:** no lo toca (sigue en la versión **5**). Para

@@ -23,6 +23,7 @@ let ingresosPersistenceBound = false
 let sharedIngresosTypes = []
 let _ingresosDataLoaded = false
 let ingresosModalKeyHandler = null
+let ingresosDetailKeyHandler = null
 let recurrentesFilter = "todas"
 let recurrentesSearch = ""
 
@@ -500,6 +501,71 @@ function openRecurrenteFormModal(rowIndex = -1) {
     })
 }
 
+function closeIngresoDetailModal() {
+    document.getElementById("ingresosDetailModalOverlay")?.remove()
+    if (ingresosDetailKeyHandler) {
+        document.removeEventListener("keydown", ingresosDetailKeyHandler)
+        ingresosDetailKeyHandler = null
+    }
+}
+
+// Detalle de un ingreso del mes. Lee de la propia fila (dataset) y no del
+// índice: la tabla se pinta ordenada por fecha y el índice puede no coincidir
+// con el orden de los datos hasta que se sincronizan.
+function openIngresoDetailModal(rowElement) {
+    closeIngresosCreateModal()
+    closeIngresoDetailModal()
+
+    const rowIndex = Number(rowElement.dataset.rowIndex)
+    const nota = String(rowElement.dataset.nota || "").trim()
+    const cantidad = rowElement.dataset.cantidad ? formatCellEuroValue(rowElement.dataset.cantidad) : ""
+
+    const overlay = document.createElement("div")
+    overlay.id = "ingresosDetailModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal movDetailModal"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.setAttribute("aria-labelledby", "ingresosDetailModalTitle")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle" id="ingresosDetailModalTitle">Detalle del ingreso</h3>
+        <dl class="movDetailList">
+            <div class="movDetailItem"><dt>Fecha</dt><dd>${escapeIngresosHtml(rowElement.dataset.fecha || "—")}</dd></div>
+            <div class="movDetailItem"><dt>Concepto</dt><dd>${escapeIngresosHtml(rowElement.dataset.nombre || "—")}</dd></div>
+            <div class="movDetailItem"><dt>Tipo</dt><dd>${escapeIngresosHtml(rowElement.dataset.tipo || "—")}</dd></div>
+            <div class="movDetailItem"><dt>Cantidad</dt><dd class="movDetailAmount movDetailAmountPos">${escapeIngresosHtml(cantidad || "—")}</dd></div>
+        </dl>
+        <div class="movDetailNote${nota ? "" : " movDetailNoteEmpty"}">
+            <span class="movDetailNoteLabel">Nota</span>
+            <p class="movDetailNoteText">${nota ? escapeIngresosHtml(nota) : "Sin nota"}</p>
+        </div>
+        <div class="assetModalActions">
+            <button type="button" class="cancelButton" id="ingresosDetailCloseBtn">Cerrar</button>
+            <button type="button" class="primaryButton" id="ingresosDetailEditBtn">Editar</button>
+        </div>
+    `
+
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) closeIngresoDetailModal()
+    })
+    modal.querySelector("#ingresosDetailCloseBtn")?.addEventListener("click", closeIngresoDetailModal)
+    modal.querySelector("#ingresosDetailEditBtn")?.addEventListener("click", () => {
+        closeIngresoDetailModal()
+        openIngresoMovementModal(rowIndex)
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    ingresosDetailKeyHandler = (event) => {
+        if (event.key === "Escape") closeIngresoDetailModal()
+    }
+    document.addEventListener("keydown", ingresosDetailKeyHandler)
+    modal.querySelector("#ingresosDetailCloseBtn")?.focus()
+}
+
 function openIngresoMovementModal(rowIndex = -1) {
     const currentRows = currentIngresosData?.months?.[currentIngresosMonth]?.rows || []
     const isEdit = rowIndex >= 0
@@ -519,7 +585,7 @@ function openIngresoMovementModal(rowIndex = -1) {
             <label class="assetModalLabel" for="ingresosMovimientoFecha">Fecha</label>
             <input id="ingresosMovimientoFecha" class="assetModalInput" type="text" value="${escapeIngresosHtml(rowData.fecha || "")}" placeholder="dd-mm-aaaa">
 
-            <label class="assetModalLabel" for="ingresosMovimientoNombre">Nombre</label>
+            <label class="assetModalLabel" for="ingresosMovimientoNombre">Concepto</label>
             <input id="ingresosMovimientoNombre" class="assetModalInput" type="text" value="${escapeIngresosHtml(rowData.nombre || "")}" placeholder="Ej: Regalo Cumpleaños">
 
             <label class="assetModalLabel" for="ingresosMovimientoTipo">Tipo</label>
@@ -530,6 +596,9 @@ function openIngresoMovementModal(rowIndex = -1) {
 
             <label class="assetModalLabel" for="ingresosMovimientoCantidad">Cantidad</label>
             <input id="ingresosMovimientoCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeIngresosHtml(rowData.cantidad || "")}" placeholder="0,00">
+
+            <label class="assetModalLabel" for="ingresosMovimientoNota">Nota <span class="assetModalLabelHint">opcional</span></label>
+            <textarea id="ingresosMovimientoNota" class="assetModalInput movNotaInput" rows="3" maxlength="300" placeholder="Solo se ve al pulsar el ingreso en la tabla">${escapeIngresosHtml(rowData.nota || "")}</textarea>
         `,
         submitLabel: "Guardar",
         onSubmit: async ({ getValue, setFeedback }) => {
@@ -538,6 +607,7 @@ function openIngresoMovementModal(rowIndex = -1) {
             const tipo = normalizeIngresoTipo(getValue("ingresosMovimientoTipo"))
             const cantidadRaw = String(getValue("ingresosMovimientoCantidad")).trim()
             const cantidad = cantidadRaw ? formatCellEuroValue(cantidadRaw) : ""
+            const nota = String(getValue("ingresosMovimientoNota")).trim().slice(0, 300)
 
             if (!fecha && !nombre && !tipo && !cantidad) {
                 setFeedback("Introduce al menos un dato para el ingreso.", true)
@@ -549,7 +619,7 @@ function openIngresoMovementModal(rowIndex = -1) {
                 currentIngresosData.months[currentIngresosMonth] = { rows: [] }
             }
 
-            const nextRow = { fecha, nombre, tipo, cantidad }
+            const nextRow = { fecha, nombre, tipo, cantidad, nota }
 
             if (isEdit && currentIngresosData.months[currentIngresosMonth].rows[rowIndex]) {
                 currentIngresosData.months[currentIngresosMonth].rows[rowIndex] = nextRow
@@ -828,9 +898,10 @@ function downloadIngresosCsv() {
         monthRows.forEach((row) => {
             rows.push({
                 Fecha: row.fecha || "",
-                Nombre: row.nombre || "",
+                Concepto: row.nombre || "",
                 Tipo: normalizeIngresoTipo(row.tipo || ""),
-                Cantidad: parseEuroNumber(row.cantidad || "")
+                Cantidad: parseEuroNumber(row.cantidad || ""),
+                Nota: row.nota || ""
             })
         })
 
@@ -1559,11 +1630,14 @@ function ingresoParseDate(str) {
 
 function buildIngresoMovementRow(row = {}, rowIndex = -1) {
     const tr = document.createElement("tr")
+    tr.className = "movDetailRow"
     tr.dataset.rowIndex = String(rowIndex)
     tr.dataset.fecha = String(row.fecha || "")
     tr.dataset.nombre = String(row.nombre || "")
     tr.dataset.tipo = String(normalizeIngresoTipo(row.tipo || ""))
     tr.dataset.cantidad = String(row.cantidad || "")
+    // La nota no tiene columna: se guarda en la fila y se enseña en el detalle.
+    tr.dataset.nota = String(row.nota || "")
 
     tr.innerHTML = `
         <td data-field="fecha">${escapeIngresosHtml(row.fecha || "")}</td>
@@ -1592,7 +1666,13 @@ function handleIngresosMovementActionClick(event) {
     }
 
     const deleteButton = event.target.closest(".ingresosRowDeleteBtn")
-    if (!deleteButton) return
+    if (!deleteButton) {
+        // Pulsar la fila (fuera del menú de acciones) abre el detalle con la nota.
+        if (event.target.closest(".rowActionsCell")) return
+        const row = event.target.closest("tr.movDetailRow")
+        if (row) openIngresoDetailModal(row)
+        return
+    }
 
     const rowIndex = Number(deleteButton.dataset.rowIndex)
     const monthRows = currentIngresosData?.months?.[currentIngresosMonth]?.rows || []
@@ -1656,7 +1736,8 @@ function syncIngresosDataFromTables() {
                 cantidad:
                     rowElement.dataset.cantidad ||
                     rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() ||
-                    ""
+                    "",
+                nota: rowElement.dataset.nota || ""
             }))
             .filter((row) => row.fecha || row.nombre || row.tipo || parseEuroNumber(row.cantidad) !== 0)
     }

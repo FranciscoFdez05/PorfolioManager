@@ -258,6 +258,41 @@ def test_la_tabla_de_planes_dca_se_borra_al_migrar(temp_db):
     db._esquema_5(conexion)
 
 
+def test_la_nota_se_anade_a_gastos_e_ingresos_sin_tocar_las_filas(temp_db):
+    """El paso 6, sobre una base cuyas filas de gastos e ingresos no tenían nota."""
+    from core import db
+
+    conexion = db.get_db()
+    for tabla in ("gastos_rows", "ingresos_rows"):
+        conexion.execute(f"DROP TABLE {tabla}")
+        conexion.execute(f"""
+            CREATE TABLE {tabla} (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                year     TEXT NOT NULL,
+                month    TEXT NOT NULL,
+                fecha    TEXT NOT NULL DEFAULT '',
+                nombre   TEXT NOT NULL DEFAULT '',
+                tipo     TEXT NOT NULL DEFAULT '',
+                cantidad TEXT NOT NULL DEFAULT ''
+            )
+        """)
+        conexion.execute(
+            f"INSERT INTO {tabla} (year, month, fecha, nombre, tipo, cantidad) "
+            "VALUES ('2026', 'enero', '03-01-2026', 'Cobuco', 'Gasoil', '20,00 €')"
+        )
+
+    db._esquema_6(conexion)
+
+    for tabla in ("gastos_rows", "ingresos_rows"):
+        fila = conexion.execute(f"SELECT nombre, cantidad, nota FROM {tabla}").fetchone()
+        assert fila["nombre"] == "Cobuco" and fila["cantidad"] == "20,00 €"
+        assert fila["nota"] == "", "la fila antigua queda con la nota en blanco"
+
+    # Idempotente: una base en la versión 0 puede tener ya la columna.
+    db._esquema_6(conexion)
+    assert conexion.execute("SELECT COUNT(*) FROM gastos_rows").fetchone()[0] == 1
+
+
 def test_una_bd_al_dia_no_tiene_la_tabla_del_dca(temp_db):
     """Una base nueva no llega a tenerla: el paso 2 la crea y el 5 la borra."""
     from core import db

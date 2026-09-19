@@ -78,6 +78,63 @@ def test_el_403_dice_con_que_ip_te_ve_el_servidor(movimientos_app):
     assert "192.168" not in str(datos)
 
 
+def test_el_rechazo_queda_apuntado_para_el_panel(movimientos_app):
+    """Ajustes enseña las IPs rechazadas con un botón de permitirlas: es lo que
+    hace falta cuando el móvil llega desde otra subred de la misma wifi."""
+    from core import red_local
+
+    red_local.olvidarRechazos()
+    client = movimientos_app.test_client()
+    client.get("/api/portfolios-lista", environ_base={"REMOTE_ADDR": "172.16.1.10"})
+    client.get("/api/categorias", environ_base={"REMOTE_ADDR": "172.16.1.10"})
+    client.get("/api/categorias", environ_base={"REMOTE_ADDR": "8.8.8.8"})
+
+    filas = red_local.rechazosRecientes()
+
+    # Una fila por IP, la más reciente primero, con cuántas veces ha llamado.
+    assert [f["ip"] for f in filas] == ["8.8.8.8", "172.16.1.10"]
+    assert filas[1]["veces"] == 2
+    assert filas[1]["ruta"] == "/api/categorias"
+    assert filas[1]["permitida"] is False
+
+
+def test_una_ip_rechazada_pasa_a_permitida_al_ampliar_las_redes(movimientos_app, monkeypatch):
+    """`permitida` se calcula al consultar, no al rechazar: tras añadir el rango
+    la fila cambia sin esperar a que el móvil vuelva a llamar."""
+    from core import red_local
+
+    red_local.olvidarRechazos()
+    client = movimientos_app.test_client()
+    client.get("/api/categorias", environ_base={"REMOTE_ADDR": "172.16.1.10"})
+    assert red_local.rechazosRecientes()[0]["permitida"] is False
+
+    monkeypatch.setenv("MOVIMIENTOS_REDES_PERMITIDAS", "192.168.1.0/24,172.16.1.0/24")
+    assert red_local.rechazosRecientes()[0]["permitida"] is True
+
+
+def test_las_ips_permitidas_no_se_apuntan(movimientos_app):
+    from core import red_local
+
+    red_local.olvidarRechazos()
+    client = movimientos_app.test_client()
+    client.get("/api/categorias", environ_base={"REMOTE_ADDR": "192.168.1.20"})
+    assert red_local.rechazosRecientes() == []
+
+
+def test_de_fabrica_se_aceptan_las_tres_redes_privadas(movimientos_app, config_atajo, monkeypatch):
+    """Una wifi con varias subredes (invitados, un punto de acceso con su propio
+    DHCP, un router que reparte 172.16.x) no debe dejar al móvil fuera sin
+    haber tocado nada. Ninguno de esos rangos se alcanza desde Internet."""
+    monkeypatch.delenv("MOVIMIENTOS_REDES_PERMITIDAS", raising=False)
+    config_atajo("activado = true")
+
+    client = movimientos_app.test_client()
+    for ip in ["192.168.1.9", "192.168.50.9", "10.6.0.2", "172.16.1.10", "172.31.255.1"]:
+        assert client.get("/api/categorias", environ_base={"REMOTE_ADDR": ip}).status_code == 200, ip
+    for ip in ["8.8.8.8", "172.32.0.1", "127.0.0.1"]:
+        assert client.get("/api/categorias", environ_base={"REMOTE_ADDR": ip}).status_code == 403, ip
+
+
 def test_ip_se_comprueba_antes_que_la_firma(movimientos_app):
     """Una IP externa no debe poder ni siquiera sondear si su firma es válida."""
     client = movimientos_app.test_client()
@@ -372,7 +429,7 @@ def test_la_fila_guardada_cae_en_el_mes_correcto(movimientos_app):
         datos = read_gastos_year("2026")
 
     assert datos["months"]["agosto"]["rows"] == [
-        {"fecha": "09-08-2026", "nombre": "Repostaje", "tipo": "Gasoil", "cantidad": "60,00 €"}
+        {"fecha": "09-08-2026", "nombre": "Repostaje", "tipo": "Gasoil", "cantidad": "60,00 €", "nota": ""}
     ]
     # Y ningún otro mes se ha llevado la fila.
     otros = [mes for mes, datosMes in datos["months"].items() if mes != "agosto" and datosMes["rows"]]
@@ -404,7 +461,7 @@ def test_gasto_visible_para_la_web_app(movimientos_app):
 
     assert datos is not None
     filas = datos["months"]["mayo"]["rows"]
-    assert filas == [{"fecha": "01-05-2026", "nombre": "Piso", "tipo": "Alquiler", "cantidad": "800,00 €"}]
+    assert filas == [{"fecha": "01-05-2026", "nombre": "Piso", "tipo": "Alquiler", "cantidad": "800,00 €", "nota": ""}]
     assert "Alquiler" in datos["gastosTipos"]
 
 
@@ -422,7 +479,7 @@ def test_ingreso_visible_para_la_web_app(movimientos_app):
 
     assert datos is not None
     filas = datos["months"]["julio"]["rows"]
-    assert filas == [{"fecha": "20-07-2026", "nombre": "VWCE", "tipo": "Dividendos", "cantidad": "42,10 €"}]
+    assert filas == [{"fecha": "20-07-2026", "nombre": "VWCE", "tipo": "Dividendos", "cantidad": "42,10 €", "nota": ""}]
 
 
 # ── Selección de portfolio (base de datos) ───────────────────────────────────

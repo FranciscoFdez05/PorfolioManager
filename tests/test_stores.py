@@ -243,6 +243,35 @@ class TestSanitizeMonthRows:
     def test_entrada_no_lista(self):
         assert sanitize_month_rows(None) == []
 
+    def test_la_nota_se_recorta_y_sale_vacia_si_no_viene(self):
+        con_nota, sin_nota = sanitize_month_rows([{"nota": "  " + "n" * 500 + "  "}, {}])
+        assert len(con_nota["nota"]) <= 300
+        assert sin_nota["nota"] == ""
+
+
+class TestNotaDeMovimientosEnLaBase:
+    """La nota de un gasto o ingreso del mes hace el viaje completo por SQLite."""
+
+    @pytest.mark.parametrize("modulo", ["gastos_store", "ingresos_store"])
+    def test_la_nota_vuelve_tal_cual(self, temp_db, modulo):
+        import importlib
+
+        store = importlib.import_module(f"stores.{modulo}")
+        write_year = getattr(store, f"write_{modulo.split('_')[0]}_year")
+        read_year = getattr(store, f"read_{modulo.split('_')[0]}_year")
+
+        months = {mes: {"rows": []} for mes in MONTH_KEYS}
+        months["agosto"]["rows"] = [
+            {"fecha": "11-08-2026", "nombre": "Steam", "tipo": "Compras", "cantidad": "8,88 €", "nota": "Oferta de verano"},
+            {"fecha": "13-08-2026", "nombre": "Steam", "tipo": "Compras", "cantidad": "26,98 €"},
+        ]
+        write_year("2026", {"year": "2026", "months": months})
+
+        filas = read_year("2026")["months"]["agosto"]["rows"]
+
+        assert filas[0]["nota"] == "Oferta de verano"
+        assert filas[1]["nota"] == "", "sin nota se guarda y se lee en blanco, no None"
+
 
 class TestSanitizeGastosTypes:
     def test_desduplica_sin_distinguir_mayusculas(self):

@@ -30,6 +30,7 @@
     <link rel="stylesheet" href="css/pages/settings-overlay.css">
     <link rel="stylesheet" href="css/pages/ingresos-kpi.css">
     <link rel="stylesheet" href="css/pages/ahorro.css">
+    <link rel="stylesheet" href="css/pages/calendario.css">
     <link rel="stylesheet" href="css/pages/ventas.css">
     <link rel="stylesheet" href="css/themes.css">
     <!-- El marcador del atributo nonce lo sustituye serveIndex por el valor de
@@ -235,6 +236,7 @@
                         <button class="navBtn navDropdownItem" data-page="gastos">Gastos</button>
                         <button class="navBtn navDropdownItem" data-page="ingresos">Ingresos</button>
                         <button class="navBtn navDropdownItem" data-page="ahorro">Ahorro</button>
+                        <button class="navBtn navDropdownItem" data-page="calendario">Calendario</button>
                     </div>
                 </div>
 
@@ -1379,82 +1381,147 @@
                     <span class="ajustesBackupEmpty">Cargando…</span>
                 </div>
 
-                <dl class="ajustesAtajoDatos" id="ajustesAtajoDatos" hidden>
-                    <div><dt>Dirección que llevará el atajo</dt><dd id="ajustesAtajoUrl">—</dd></div>
-                    <div><dt>Redes desde las que se acepta</dt><dd id="ajustesAtajoRedes">—</dd></div>
-                    <div><dt>IP con la que te ve el servidor</dt><dd id="ajustesAtajoTuIp">—</dd></div>
-                    <div><dt>Margen de reloj</dt><dd id="ajustesAtajoTolerancia">—</dd></div>
-                </dl>
+                <!-- Los cuatro pasos, cada uno con su estado y su botón al lado: lo que
+                     hay que hacer se ve de un vistazo, y la letra pequeña va abajo. -->
+                <ol class="ajustesAtajoGuia" id="ajustesAtajoGuia" hidden>
+                    <li class="ajustesAtajoPaso" id="ajustesAtajoPasoClave" data-estado="pendiente">
+                        <span class="ajustesAtajoPasoNum">1</span>
+                        <div class="ajustesAtajoPasoCuerpo">
+                            <div class="ajustesAtajoPasoTitulo">Clave de firma</div>
+                            <div class="ajustesAtajoPasoDetalle" id="ajustesAtajoPasoClaveDetalle">—</div>
+                        </div>
+                        <div class="ajustesAtajoPasoAccion">
+                            <button id="ajustesAtajoClaveBtn" class="ajustesSecondaryBtn" type="button">Generar clave</button>
+                        </div>
+                    </li>
 
-                <div class="ajustesActions">
-                    <a id="ajustesAtajoDescargarBtn" class="ajustesAddBtn" href="/api/atajo/descargar" download>
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-                        Descargar el atajo
-                    </a>
-                    <button id="ajustesAtajoProbarBtn" class="ajustesSecondaryBtn" type="button">Probar</button>
-                    <button id="ajustesAtajoClaveBtn" class="ajustesSecondaryBtn" type="button">Generar clave</button>
-                    <span id="ajustesAtajoMsg" class="ajustesStatusMsg"></span>
-                </div>
+                    <li class="ajustesAtajoPaso" id="ajustesAtajoPasoRedes" data-estado="pendiente">
+                        <span class="ajustesAtajoPasoNum">2</span>
+                        <div class="ajustesAtajoPasoCuerpo">
+                            <div class="ajustesAtajoPasoTitulo">Desde dónde se acepta</div>
+                            <div class="ajustesAtajoPasoDetalle" id="ajustesAtajoPasoRedesDetalle">—</div>
+                            <div class="ajustesAtajoRechazadas" id="ajustesAtajoRechazadas" hidden>
+                                <div class="ajustesAtajoRechazadasCabecera">
+                                    <span>Han llamado y se han rechazado</span>
+                                    <button id="ajustesAtajoRechazadasBtn" class="ajustesTlsAvisoBtn" type="button">Actualizar</button>
+                                </div>
+                                <div id="ajustesAtajoRechazadasLista"></div>
+                                <div class="ajustesFieldHint">
+                                    Si aquí sale el iPhone, pulsa <strong>Permitir</strong>: se guarda al momento.
+                                    «Su red» permite la subred entera, para que no dependa de la IP que le toque.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ajustesAtajoPasoAccion">
+                            <button id="ajustesAtajoRedesBtn" class="ajustesSecondaryBtn" type="button">Editar redes</button>
+                        </div>
+                    </li>
 
-                <div class="ajustesAtajoPruebaRes" id="ajustesAtajoPruebaRes" hidden></div>
+                    <li class="ajustesAtajoPaso" id="ajustesAtajoPasoInstalar" data-estado="pendiente">
+                        <span class="ajustesAtajoPasoNum">3</span>
+                        <div class="ajustesAtajoPasoCuerpo">
+                            <div class="ajustesAtajoPasoTitulo">Instalar en el iPhone</div>
+                            <div class="ajustesAtajoPasoDetalle">
+                                Abre esta misma página en el iPhone y pulsa <strong>Descargar</strong>; iOS ofrece
+                                «Añadir atajo». Si no lo acepta, activa antes
+                                <em>Ajustes › Atajos › Permitir atajos no fiables</em>.
+                            </div>
+                            <div class="ajustesAtajoUrlFila">
+                                <span class="ajustesAtajoUrlEtiqueta">Llamará a</span>
+                                <code id="ajustesAtajoUrl">—</code>
+                                <button id="ajustesAtajoCopiarBtn" class="ajustesTlsAvisoBtn" type="button">Copiar</button>
+                            </div>
+                        </div>
+                        <div class="ajustesAtajoPasoAccion">
+                            <a id="ajustesAtajoDescargarBtn" class="ajustesAddBtn" href="/api/atajo/descargar" download>
+                                <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                                Descargar el atajo
+                            </a>
+                        </div>
+                    </li>
 
-                <div class="ajustesSectionDivider"></div>
-                <div class="ajustesField">
-                    <div class="ajustesLabelRow">
-                        <label class="ajustesLabel" for="ajustesAtajoRedesInput">Desde qué redes se aceptan las peticiones</label>
+                    <li class="ajustesAtajoPaso" id="ajustesAtajoPasoProbar" data-estado="pendiente">
+                        <span class="ajustesAtajoPasoNum">4</span>
+                        <div class="ajustesAtajoPasoCuerpo">
+                            <div class="ajustesAtajoPasoTitulo">Comprobar</div>
+                            <div class="ajustesAtajoPasoDetalle" id="ajustesAtajoPasoProbarDetalle">
+                                Recorre el mismo camino que el atajo —clave, redes, firma— sin apuntar nada.
+                            </div>
+                            <div class="ajustesAtajoPruebaRes" id="ajustesAtajoPruebaRes" hidden></div>
+                        </div>
+                        <div class="ajustesAtajoPasoAccion">
+                            <button id="ajustesAtajoProbarBtn" class="ajustesSecondaryBtn" type="button">Probar</button>
+                        </div>
+                    </li>
+                </ol>
+                <div class="ajustesAtajoMsgFila"><span id="ajustesAtajoMsg" class="ajustesStatusMsg"></span></div>
+
+                <details class="ajustesTlsAyuda ajustesAtajoAvanzado" id="ajustesAtajoAvanzado">
+                    <summary>Redes, firma y detalles</summary>
+                    <div class="ajustesTlsAyudaCuerpo">
+                        <dl class="ajustesAtajoDatos" id="ajustesAtajoDatos">
+                            <div><dt>Redes desde las que se acepta</dt><dd id="ajustesAtajoRedes">—</dd></div>
+                            <div><dt>IP con la que te ve el servidor</dt><dd id="ajustesAtajoTuIp">—</dd></div>
+                            <div><dt>Margen de reloj</dt><dd id="ajustesAtajoTolerancia">—</dd></div>
+                        </dl>
+
+                        <div class="ajustesField">
+                            <div class="ajustesLabelRow">
+                                <label class="ajustesLabel" for="ajustesAtajoRedesInput">Desde qué redes se aceptan las peticiones</label>
+                            </div>
+                            <div class="ajustesInputRow">
+                                <input id="ajustesAtajoRedesInput" class="ajustesInput" type="text" autocomplete="off"
+                                       placeholder="192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12">
+                            </div>
+                            <div class="ajustesFieldHint">
+                                En notación CIDR, separadas por comas. Una IP suelta se escribe con <code>/32</code>
+                                (<code>192.168.1.100/32</code>); una red entera, con la máscara de la red
+                                (<code>172.16.1.0/24</code>). Se rechaza <strong>toda</strong> petición que llegue
+                                desde fuera de estos rangos. Lo que escribas aquí <strong>sustituye</strong> a los
+                                rangos de <code>config.ini</code>; déjalo vacío para volver a ellos.
+                            </div>
+                        </div>
+
+                        <div class="ajustesSwitchRow">
+                            <div class="ajustesSwitchLabel">
+                                Exigir firma en las peticiones
+                                <small>Recomendado. Cada petición del Atajo va firmada con la clave de este servidor, así que llegar desde una red permitida no basta para escribir.</small>
+                            </div>
+                            <label class="ajustesSwitch">
+                                <input type="checkbox" id="ajustesAtajoExigirFirma" checked>
+                                <span class="ajustesSwitchTrack"></span>
+                            </label>
+                        </div>
+
+                        <div class="ajustesAtajoAviso peligro" id="ajustesAtajoAvisoFirma" hidden>
+                            <strong>Sin firma, la red es la única barrera.</strong>
+                            Cualquiera que alcance este puerto desde los rangos de arriba puede apuntar movimientos
+                            en tu base de datos: la petición deja de probar <em>quién</em> la manda y solo prueba
+                            <em>desde dónde</em> viene. En una wifi doméstica eso es quien esté en tu wifi. Es un
+                            apaño razonable mientras montas la clave, no un sitio donde quedarse.
+                        </div>
+
+                        <div class="ajustesActions">
+                            <button id="ajustesAtajoAccesoBtn" class="ajustesAddBtn" type="button">Guardar acceso</button>
+                            <span id="ajustesAtajoAccesoMsg" class="ajustesStatusMsg"></span>
+                        </div>
+
+                        <div class="ajustesAtajoAviso">
+                            <strong>La dirección va dentro del atajo.</strong>
+                            Encender o apagar el HTTPS cambia el esquema de esa dirección —de <code>http://</code> a
+                            <code>https://</code> y al revés—, y el atajo que ya tengas en el iPhone seguirá llamando al
+                            anterior, así que dejará de responder. Cuando cambies el HTTPS, vuelve a descargarlo aquí
+                            (o edita la URL dentro del atajo, en la acción «Obtener contenido de»). La API no exige
+                            cifrado: con el HTTPS apagado, el atajo entra por <code>http://</code> como siempre.
+                        </div>
+
+                        <div class="ajustesAtajoAviso">
+                            <strong>Regenerar la clave no obliga a rehacer el atajo.</strong>
+                            El atajo no guarda la clave: se la pide al servidor en cada uso. Y el fichero
+                            <code>.shortcut</code> tampoco la lleva dentro, solo la dirección del servidor.
+                        </div>
                     </div>
-                    <div class="ajustesInputRow">
-                        <input id="ajustesAtajoRedesInput" class="ajustesInput" type="text" autocomplete="off"
-                               placeholder="192.168.1.0/24, 10.0.0.0/24">
-                    </div>
-                    <div class="ajustesFieldHint">
-                        En notación CIDR, separadas por comas. Una IP suelta se escribe con <code>/32</code>
-                        (<code>192.168.1.100/32</code>). Se rechaza <strong>toda</strong> petición que llegue
-                        desde fuera de estos rangos, así que aquí tiene que estar la red de tu wifi —o la IP
-                        del iPhone—. Déjalo vacío para usar lo que diga <code>config.ini</code>.
-                    </div>
-                </div>
-
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Exigir firma en las peticiones
-                        <small>Recomendado. Cada petición del Atajo va firmada con la clave de este servidor, así que llegar desde una red permitida no basta para escribir.</small>
-                    </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="ajustesAtajoExigirFirma" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
-
-                <div class="ajustesAtajoAviso peligro" id="ajustesAtajoAvisoFirma" hidden>
-                    <strong>Sin firma, la red es la única barrera.</strong>
-                    Cualquiera que alcance este puerto desde los rangos de arriba puede apuntar movimientos
-                    en tu base de datos: la petición deja de probar <em>quién</em> la manda y solo prueba
-                    <em>desde dónde</em> viene. En una wifi doméstica eso es quien esté en tu wifi. Es un
-                    apaño razonable mientras montas la clave, no un sitio donde quedarse.
-                </div>
-
-                <div class="ajustesActions">
-                    <button id="ajustesAtajoAccesoBtn" class="ajustesAddBtn" type="button">Guardar acceso</button>
-                    <span id="ajustesAtajoAccesoMsg" class="ajustesStatusMsg"></span>
-                </div>
-
-                <div class="ajustesAtajoAviso">
-                    <strong>La dirección va dentro del atajo.</strong>
-                    Encender o apagar el HTTPS cambia el esquema de esa dirección —de <code>http://</code> a
-                    <code>https://</code> y al revés—, y el atajo que ya tengas en el iPhone seguirá llamando al
-                    anterior, así que dejará de responder. Cuando cambies el HTTPS, vuelve a descargarlo aquí
-                    (o edita la URL dentro del atajo, en la acción «Obtener contenido de»). La API no exige
-                    cifrado: con el HTTPS apagado, el atajo entra por <code>http://</code> como siempre.
-                </div>
-
-                <div class="ajustesAtajoAviso">
-                    <strong>Al abrirlo en el iPhone, iOS pedirá permiso.</strong>
-                    El atajo no va firmado por Apple —firmarlo exige sus claves—, así que hace falta
-                    <em>Ajustes › Atajos › Permitir atajos no fiables</em>, un interruptor que solo aparece
-                    después de haber ejecutado algún atajo alguna vez. Si iOS no lo acepta, móntalo a mano:
-                    son las mismas acciones, aquí abajo.
-                </div>
+                </details>
 
                 <details class="ajustesTlsAyuda ajustesAtajoReceta">
                     <summary>Montarlo a mano, paso a paso</summary>
@@ -1519,11 +1586,11 @@
                     <input id="ajustesExportClaves" type="checkbox">
                     <span>
                         <strong>Incluir las claves de API.</strong>
-                        Van <em>sin cifrar</em> dentro del ZIP: es lo que permite restaurarlas en un servidor
-                        recién instalado, donde la <code>SECRET_KEY</code> ya es otra y las cifradas no se
-                        podrían leer. A cambio, <strong>el archivo pasa a ser un secreto</strong>: quien lo
-                        tenga tiene tus claves de los proveedores y la del Atajo. Guárdalo como guardarías una
-                        contraseña.
+                        Es lo que permite restaurarlas en un servidor recién instalado, donde la
+                        <code>SECRET_KEY</code> ya es otra y las cifradas con ella no se podrían leer. Al
+                        exportar se te ofrece <em>ponerles una contraseña</em>, que se pedirá al importar.
+                        Sin contraseña van en claro y <strong>el archivo pasa a ser un secreto</strong>: quien lo
+                        tenga tiene tus claves de los proveedores y la del Atajo.
                     </span>
                 </label>
             </div>
@@ -1839,5 +1906,6 @@
 <script src="js/cartera/private-market.js"></script>
 <script src="js/cartera/planes.js"></script>
 <script src="js/finanzas/ahorro.js"></script>
+<script src="js/finanzas/calendario.js"></script>
 </body>
 </html>

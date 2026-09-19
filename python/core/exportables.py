@@ -15,9 +15,24 @@ claro** dentro del ZIP, porque cifradas solo se podrían restaurar en un servido
 que conservase la misma `SECRET_KEY`, que es justo el caso en el que no hacían
 falta. Eso convierte el ZIP en un secreto, así que **solo se incluyen si se
 piden explícitamente** y la interfaz lo advierte antes de descargar.
+
+Quien no quiera cargar con ese secreto puede ponerle una contraseña al
+exportar. Entonces las claves van cifradas con una clave derivada de esa
+contraseña (PBKDF2 + Fernet, lo mismo que protege `API/` en reposo, solo que
+con una contraseña que sabe la persona y no el servidor), en un fichero
+distinto para que la importación sepa que tiene que pedirla antes de tocar
+nada. El resto del ZIP —base de datos, ajustes— sigue igual: lo que lo hacía
+secreto eran las claves.
 """
 
+import base64
+import json
 import logging
+import os
+
+from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from core import firma_hmac, paths
 from core.secret_store import read_secret_lines, write_secret_lines
@@ -28,6 +43,13 @@ log = logging.getLogger(__name__)
 # Nombres de los ficheros dentro del ZIP.
 FICHERO_UI = "ui.json"
 FICHERO_CLAVES = "claves-api.json"
+FICHERO_CLAVES_CIFRADAS = "claves-api.cifradas.json"
+
+# Parámetros del cifrado con contraseña. El formato va escrito dentro del
+# fichero para poder cambiarlos sin dejar ilegibles los ZIP ya exportados.
+_FORMATO_CIFRADO = "pbkdf2-sha256+fernet"
+_ITERACIONES_CIFRADO = 600_000
+MAX_LARGO_CONTRASENA = 200
 
 # Topes del volcado de interfaz. Lo manda el navegador, así que entra sin
 # validar en un fichero que luego se guarda: sin límites, una pestaña con el
@@ -113,6 +135,53 @@ def clavesEnClaro() -> dict:
         claves[CLAVE_ATAJO] = [atajo[0]]
 
     return claves
+
+
+class ContrasenaIncorrecta(Exception):
+    """La contraseña no descifra el fichero de claves del ZIP."""
+
+
+def _fernetDeContrasena(contrasena: str, salt: bytes, iteraciones: int) -> Fernet:
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iteraciones)
+    return Fernet(base64.urlsafe_b64encode(kdf.derive(contrasena.encode("utf-8"))))
+
+
+def cifrarClaves(claves: dict, contrasena: str) -> dict:
+    """Las claves, cifradas con la contraseña, listas para escribirse como JSON.
+
+    Salt nuevo en cada export: dos ZIP con la misma contraseña no comparten
+    nada que permita atacar uno a partir del otro.
+    """
+    salt = os.urandom(16)
+    fernet = _fernetDeContrasena(contrasena, salt, _ITERACIONES_CIFRADO)
+    datos = json.dumps(claves, ensure_ascii=False).encode("utf-8")
+    return {
+        "formato": _FORMATO_CIFRADO,
+        "iteraciones": _ITERACIONES_CIFRADO,
+        "salt": base64.b64encode(salt).decode("ascii"),
+        "datos": fernet.encrypt(datos).decode("ascii"),
+    }
+
+
+def descifrarClaves(paquete, contrasena: str) -> dict:
+    """Lo inverso: el dict de claves en claro, o `ContrasenaIncorrecta`.
+
+    Un fichero mal formado se trata igual que una contraseña equivocada: en
+    los dos casos no hay claves que restaurar y la respuesta útil es la misma.
+    """
+    try:
+        if not isinstance(paquete, dict) or paquete.get("formato") != _FORMATO_CIFRADO:
+            raise ValueError("formato desconocido")
+        salt = base64.b64decode(str(paquete.get("salt", "")))
+        iteraciones = int(paquete.get("iteraciones", 0))
+        if len(salt) < 8 or not (1_000 <= iteraciones <= 5_000_000):
+            raise ValueError("parámetros fuera de rango")
+        fernet = _fernetDeContrasena(contrasena, salt, iteraciones)
+        datos = fernet.decrypt(str(paquete.get("datos", "")).encode("ascii"))
+        claves = json.loads(datos.decode("utf-8"))
+    except (InvalidToken, ValueError, TypeError) as error:
+        raise ContrasenaIncorrecta() from error
+    return claves if isinstance(claves, dict) else {}
 
 
 def restaurarClaves(claves) -> list:

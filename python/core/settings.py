@@ -177,7 +177,12 @@ CATALOGO: tuple[Ajuste, ...] = (
     # [atajo] — endpoints del Atajo de iOS
     Ajuste("atajo", "activado", BOOLEANO, True, env="MOVIMIENTOS_ACTIVADO",
            descripcion="Con false, los endpoints del Atajo responden 404 como si no existieran."),
-    Ajuste("atajo", "redes_permitidas", LISTA, ("192.168.1.0/24", "10.0.0.0/24"),
+    # Los tres rangos privados enteros (RFC 1918), no una /24 concreta: una
+    # wifi con varias subredes —invitados, un punto de acceso con su propio
+    # DHCP, un router que reparte 172.16.x— dejaba al móvil fuera de fábrica.
+    # Ninguno de estos rangos se enruta desde Internet, y la firma sigue
+    # siendo la barrera que prueba quién escribe.
+    Ajuste("atajo", "redes_permitidas", LISTA, ("192.168.0.0/16", "10.0.0.0/8", "172.16.0.0/12"),
            env="MOVIMIENTOS_REDES_PERMITIDAS", vaciarEsExplicito=True,
            descripcion="Redes CIDR aceptadas. Vacío no significa 'todas': no se acepta a nadie."),
     Ajuste("atajo", "tolerancia_segundos", ENTERO, 60, env="MOVIMIENTOS_TOLERANCIA_SEGUNDOS",

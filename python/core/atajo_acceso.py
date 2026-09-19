@@ -40,8 +40,9 @@ ATAJO_DIR = paths.DATA_DIR / "atajo"
 ACCESO_FILE = ATAJO_DIR / "acceso.json"
 
 # Tope de rangos. No hay límite técnico, pero una lista larga aquí suele ser un
-# pegado que no se ha revisado, y esto decide quién puede escribir.
-MAX_REDES = 20
+# pegado que no se ha revisado, y esto decide quién puede escribir. Cincuenta
+# da para una casa con varias subredes, IPs sueltas de cada aparato y el túnel.
+MAX_REDES = 50
 
 _POR_DEFECTO = {"exigirFirma": True, "redes": [], "actualizado": None}
 

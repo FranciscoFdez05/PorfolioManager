@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.1.4-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.2.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 [![SQLite](https://img.shields.io/badge/sqlite-3.40%2B-lightgrey)](Dockerfile)
@@ -32,7 +32,7 @@ Nada sale de tu red salvo las consultas de cotizaciones, y esas son opcionales: 
 - **Activos** — ficha por activo: compras/aportes, precio medio, rendimiento y, en los activos en divisa extranjera, el desglose entre **efecto activo** y **efecto divisa**
 - **Planes de inversión** — dentro de la ficha de cada activo: a qué precio entrar, a qué precio recoger el beneficio y con cuánto capital, con el porcentaje que falta desde el precio actual hasta cada uno y el aviso cuando la cotización entra en zona
 - **Planes DCA** — también por activo: aportación periódica con importe, frecuencia y horizonte, los aportes ya vencidos, el siguiente y el calendario de los doce próximos
-- **Gastos & Ingresos** — gastos por categoría, ingresos recurrentes y puntuales, y **mensualidades** (suscripciones) con día de cobro propio por mes y un calendario del año que dice qué se cobró cada día
+- **Gastos & Ingresos** — gastos por categoría, ingresos recurrentes y puntuales, y **mensualidades** (suscripciones) con día de cobro propio por mes y un calendario del año que dice qué se cobró cada día; un **calendario del dinero** junta gastos, ingresos y mensualidades día a día, con chips para elegir qué se ve
 - **Finanzas** — cuenta remunerada, dividendos, renta fija, bonos y ventas
 - **Ventas con FIFO fiscal español** — lotes, regla de los dos meses y escala del ahorro calculados en el servidor, con **informe anual de la Renta** en CSV y en HTML imprimible ([detalle](#ventas-y-fiscalidad-españa))
 - **Cripto** — stablecoins, operaciones, transacciones y conversiones
@@ -435,7 +435,7 @@ En `config.ini`, sección `[atajo]`:
 ```ini
 [atajo]
 activado = true
-redes_permitidas = 192.168.1.0/24, 10.0.0.0/24
+redes_permitidas = 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12
 tolerancia_segundos = 60
 max_texto_firma = 8192
 fichero_clave = API/movimientos.key
@@ -473,7 +473,7 @@ http://192.168.1.X:5000/api/categorias
 | Lo que ves | Qué significa |
 |---|---|
 | Un JSON con `categorias` | Todo correcto, ya puedes montar el Atajo |
-| `403 Origen no autorizado` | La IP del móvil no cae en `redes_permitidas` |
+| `403 Origen no autorizado` | La IP del móvil no cae en `redes_permitidas` (de fábrica, cualquier red privada: 192.168.x, 10.x y 172.16-31.x) |
 | `404 Recurso no encontrado` | `activado = false` en `config.ini` |
 | No carga nada | Cortafuegos del servidor, IP equivocada, o WireGuard desconectado |
 
@@ -483,7 +483,7 @@ http://192.168.1.X:5000/api/categorias
 { "ok": false, "error": "Origen no autorizado", "ip": "10.6.0.2" }
 ```
 
-Añade esa IP (o su rango) a `redes_permitidas`. Haz la prueba **dos veces, una por Wi-Fi y otra con la VPN conectada**: según si el túnel enmascara o enruta el tráfico, el móvil puede aparecer con su IP del túnel o con la del router, y así configuras los dos rangos de una vez. La misma información queda en el log:
+Añade esa IP (o su rango) a `redes_permitidas`. Más fácil: en Ajustes › API › Atajo de iOS, el paso 2 lista las IPs que el servidor ha rechazado desde que arrancó con un botón **Permitir** —o **Su red**, si tu wifi reparte más de una subred— que lo guarda al momento. Haz la prueba **dos veces, una por Wi-Fi y otra con la VPN conectada**: según si el túnel enmascara o enruta el tráfico, el móvil puede aparecer con su IP del túnel o con la del router, y así configuras los dos rangos de una vez. La misma información queda en el log:
 
 ```bash
 docker logs --tail=20 PorfolioManager | grep red_local
@@ -745,8 +745,15 @@ clave, que es un botón en ese mismo panel.
 El filtro de red no se puede quitar, y sigue siendo *fail-closed*: sin rangos
 válidos se rechaza todo. Los rangos se escriben ahora en el propio panel (en
 notación CIDR: `192.168.1.0/24`, o `192.168.1.100/32` para una IP suelta) y se
-guardan en `data/atajo/acceso.json`; dejarlo vacío vuelve a `[atajo]
-redes_permitidas` de `config.ini`.
+guardan en `data/atajo/acceso.json`; lo que se escriba ahí **sustituye** a
+`[atajo] redes_permitidas` de `config.ini`, y dejarlo vacío vuelve a él. De
+fábrica ese valor cubre las tres redes privadas enteras (192.168.x, 10.x y
+172.16-31.x), así que una wifi con varias subredes no deja al móvil fuera sin
+haber tocado nada. El panel es una lista de cuatro pasos —clave, redes,
+instalar, comprobar— con el estado de cada uno; el paso 2 lista las IPs que el
+filtro ha rechazado desde que arrancó el servidor, con un botón que permite
+cada una —o su subred— al momento: es lo que hay que mirar si el Atajo dice
+«Origen no autorizado».
 
 Con la firma desactivada, el arranque lo deja escrito en el log, igual que el
 aviso de HTTPS apagado. Si un día no recuerdas cómo quedó, ahí está.
@@ -922,7 +929,7 @@ python/
 js/
   core/              csrf, api, dom, app-core, shared-utils
   cartera/           assets, portfolios, private-market, planes
-  finanzas/          gastos, ingresos, ahorro, ventas, dividendos, intereses, bonos
+  finanzas/          gastos, ingresos, ahorro, calendario, ventas, dividendos, intereses, bonos
   cripto/            stablecoins, operaciones, transacciones, conversiones,
                      staking, earn, trading-journal
   analisis/          metricas, seguimiento, heatmap, herramientas

@@ -11,6 +11,7 @@ const _PAGE_DIRS = {
     gastos: "finanzas",
     ingresos: "finanzas",
     ahorro: "finanzas",
+    calendario: "finanzas",
     ventas: "finanzas",
     dividendos: "finanzas",
     intereses: "finanzas",
@@ -80,7 +81,7 @@ const _MODULE_PAGES = {
     panelSuperior: [],
     vistaGeneral: ["vistaGeneral"],
     activos: ["activos", "seguimiento", "heatmap"],
-    gastos: ["gastos", "ingresos"],
+    gastos: ["gastos", "ingresos", "calendario"],
     finanzas: ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
     cripto: ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
     herramientas: ["herramientas"],
@@ -988,6 +989,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initPrivateMarketLogic()
         } else if (page === "ahorro") {
             await initAhorroLogic()
+        } else if (page === "calendario") {
+            await initCalendarioLogic()
         }
     } catch (error) {
         console.error(error)

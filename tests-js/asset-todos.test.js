@@ -97,10 +97,10 @@ describe("orden de las pestañas", () => {
         expect(pestanas[1]).toBe("spot")
     })
 
-    // Abrir en Todos sería abrir en una pestaña que a veces no está.
-    it("la ficha sigue abriendo en Compras spot", () => {
-        expect(document.querySelector(".assetTabBtn.assetTabActive").dataset.tab).toBe("spot")
-        expect(document.querySelector('.assetTabPanel[data-tab="todos"]').classList.contains("hidden")).toBe(true)
+    it("la ficha abre en Todos", () => {
+        expect(document.querySelector(".assetTabBtn.assetTabActive").dataset.tab).toBe("todos")
+        expect(document.querySelector('.assetTabPanel[data-tab="todos"]').classList.contains("hidden")).toBe(false)
+        expect(document.querySelector('.assetTabPanel[data-tab="spot"]').classList.contains("hidden")).toBe(true)
     })
 })
 
@@ -125,10 +125,20 @@ describe("pestaña Todos", () => {
         expect(document.getElementById("todosTabBtn").classList.contains("hidden")).toBe(false)
     })
 
-    it("se esconde cuando el activo solo tiene compras spot", async () => {
+    // Es la pestaña de apertura: no puede desaparecer según lo que tenga el activo.
+    it("sigue ahí cuando el activo solo tiene compras spot", async () => {
         await montar({ ...ACTIVO, operationRows: [] })
 
-        expect(document.getElementById("todosTabBtn").classList.contains("hidden")).toBe(true)
-        expect(document.getElementById("assetTodosSection").innerHTML).toBe("")
+        expect(document.getElementById("todosTabBtn").classList.contains("hidden")).toBe(false)
+        expect(document.getElementById("todosTabBtn").textContent).toBe("Todos (1)")
+        expect(origenesPintados()).toEqual(["Compra spot"])
+    })
+
+    it("sin compras ni operaciones lo dice, en vez de dejar la pestaña vacía", async () => {
+        await montar({ ...ACTIVO, rows: [], operationRows: [] })
+
+        expect(document.getElementById("todosTabBtn").classList.contains("hidden")).toBe(false)
+        expect(document.getElementById("todosTabBtn").textContent).toBe("Todos")
+        expect(document.getElementById("assetTodosSection").textContent).toContain("todavía no tiene compras ni operaciones")
     })
 })

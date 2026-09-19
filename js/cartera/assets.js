@@ -883,6 +883,7 @@ async function updateAssetDetail(asset) {
 
     renderAssetCompletedOperationsSection(asset)
     renderAssetVentasSection(asset)
+    renderAssetTodosSection(asset)
 }
 
 function renderAssetCompletedOperationsSection(asset) {
@@ -1020,7 +1021,8 @@ function renderAssetTransaccionesSection(asset) {
 // Pestaña "Todos": las procedencias de un mismo activo en una sola tabla
 // ordenada por fecha, con una columna que dice de dónde sale cada fila. Es solo
 // una vista: no recalcula nada ni añade nada a los totales, que siguen saliendo
-// de sus tablas de origen.
+// de sus tablas de origen. Es la pestaña con la que se abre la ficha y está
+// siempre visible, aunque el activo solo tenga un origen o ninguna fila.
 const ASSET_TODOS_ORIGENES = {
     spot: { etiqueta: "Compra spot", clase: "todosOrigenSpot" },
     operacion: { etiqueta: "Operación spot", clase: "todosOrigenOperacion" }
@@ -1090,21 +1092,20 @@ function renderAssetTodosSection(asset) {
     if (!section) return
 
     const filas = buildAssetTodosRows(asset)
-    const origenes = new Set(filas.map((fila) => fila.origen))
-
-    // Con un solo origen esta pestaña sería la de al lado con una columna de
-    // más. Solo tiene sentido cuando hay algo que mezclar.
-    if (origenes.size < 2) {
-        section.innerHTML = ""
-        if (tabBtn) tabBtn.classList.add("hidden")
-        return
-    }
-
     const isCrypto = isCryptoAssetType(asset?.type)
 
     if (tabBtn) {
         tabBtn.classList.remove("hidden")
-        tabBtn.textContent = `Todos (${filas.length})`
+        tabBtn.textContent = filas.length ? `Todos (${filas.length})` : "Todos"
+    }
+
+    if (!filas.length) {
+        section.innerHTML = `
+            <div class="assetVentasEmpty">
+                <p class="assetVentasEmptyText">Este activo todavía no tiene compras ni operaciones.</p>
+            </div>
+        `
+        return
     }
 
     const rowsHtml = filas
@@ -2654,24 +2655,22 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
                 normalizeCurrencyCode(operationRow.precioCurrency || operationRow.currency || targetCurrency),
                 targetCurrency
             )
-            // El coste del lote es lo pagado por las monedas (precio de
-            // ejecución × cantidad) más la comisión en €, igual que el capital
-            // bruto de una compra spot. No se usa el "Total" tecleado porque
-            // unas veces incluye la comisión y otras no. Si falta el precio se
-            // recurre al total como antes.
+            // En Operaciones el "Total" va sin la comisión en €: lo que sale de
+            // la cuenta es Total + comisión, igual que el saldo bloqueado de una
+            // compra activa. Ese es el coste bruto del lote; la comisión se
+            // descuenta después para el neto y el precio medio, así que el neto
+            // queda en el Total. Si falta el Total se recurre a precio × cantidad.
             const fiatCommission = await convertAmountForDisplay(
                 getOperationRowFiatCommission(operationRow),
                 "EUR",
                 targetCurrency
             )
-            const totalCost =
-                executionPrice > 0
-                    ? executionPrice * quantity + fiatCommission
-                    : await convertAmountForDisplay(
-                          parseLooseNumber(operationRow.total || "") || 0,
-                          normalizeCurrencyCode(operationRow.currency || operationRow.precioCurrency || targetCurrency),
-                          targetCurrency
-                      )
+            const operationTotal = await convertAmountForDisplay(
+                parseLooseNumber(operationRow.total || "") || 0,
+                normalizeCurrencyCode(operationRow.currency || operationRow.precioCurrency || targetCurrency),
+                targetCurrency
+            )
+            const totalCost = (operationTotal > 0 ? operationTotal : executionPrice * quantity) + fiatCommission
 
             lots.push({
                 remaining: netParticipaciones,
@@ -2794,13 +2793,18 @@ async function buildOverviewRow(asset) {
           transaccionesImpact.commissionTotal
         : 0
     // Las comisiones € de las operaciones spot completadas cuentan como las de
-    // cualquier compra: su lote ya las lleva en el coste bruto y aquí se
-    // descuentan para el neto y el precio medio.
+    // cualquier compra: su lote las lleva sumadas al Total en el coste bruto y
+    // aquí se descuentan para el neto y el precio medio.
     const comisionesFiatOperaciones = isCrypto
         ? (
               await Promise.all(
                   completedOperationsImpact.rows
-                      .filter((row) => String(row.orden || "").trim().toLowerCase() === "compra")
+                      .filter(
+                          (row) =>
+                              String(row.orden || "")
+                                  .trim()
+                                  .toLowerCase() === "compra"
+                      )
                       .map((row) => convertAmountForDisplay(getOperationRowFiatCommission(row), "EUR", assetCurrency))
               )
           ).reduce((total, value) => total + value, 0)
@@ -3174,8 +3178,8 @@ function renderAssetTablePage(asset) {
 
             <div class="assetTabsContainer">
                 <div class="assetTabsNav">
-                    <button class="assetTabBtn hidden" id="todosTabBtn" data-tab="todos">Todos</button>
-                    <button class="assetTabBtn assetTabActive" data-tab="spot">Compras spot</button>
+                    <button class="assetTabBtn assetTabActive" id="todosTabBtn" data-tab="todos">Todos</button>
+                    <button class="assetTabBtn" data-tab="spot">Compras spot</button>
                     <button class="assetTabBtn hidden" id="completadasTabBtn" data-tab="completadas">Operaciones Spot</button>
                     <button class="assetTabBtn hidden" id="transaccionesTabBtn" data-tab="transacciones">Transacciones</button>
                     <button class="assetTabBtn" id="ventasTabBtn" data-tab="ventas">Ventas</button>
@@ -3183,10 +3187,10 @@ function renderAssetTablePage(asset) {
                     <button class="assetTabsNavAction hidden" id="assetAddVentaNavBtn" type="button"><span class="assetBtnIcon">+</span> Añadir venta</button>
                     <button class="assetTabsNavAction hidden" id="assetAddPlanNavBtn" type="button"><span class="assetBtnIcon">+</span> Nuevo plan</button>
                 </div>
-                <div class="assetTabPanel hidden" data-tab="todos">
+                <div class="assetTabPanel" data-tab="todos">
                     <div id="assetTodosSection"></div>
                 </div>
-                <div class="assetTabPanel" data-tab="spot">
+                <div class="assetTabPanel hidden" data-tab="spot">
                     <div class="assetTableWrapper">
                         <table class="assetOperationsTable">
                             <thead>

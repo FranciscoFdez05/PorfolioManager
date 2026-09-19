@@ -638,6 +638,34 @@ html[data-theme="light"] .assetModalTitle {
 html[data-theme="light"] .assetModalLabel {
     color: #475569;
 }
+html[data-theme="light"] .movDetailItem,
+html[data-theme="light"] .movDetailNote {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .movDetailNote {
+    border-left-color: #3b82f6;
+}
+html[data-theme="light"] .movDetailNoteEmpty {
+    border-left-color: #cbd5e1;
+}
+html[data-theme="light"] .movDetailItem dt,
+html[data-theme="light"] .movDetailNoteLabel {
+    color: #64748b;
+}
+html[data-theme="light"] .movDetailItem dd,
+html[data-theme="light"] .movDetailNoteText {
+    color: #0f172a;
+}
+html[data-theme="light"] .movDetailItem dd.movDetailAmount {
+    color: #dc2626;
+}
+html[data-theme="light"] .movDetailItem dd.movDetailAmountPos {
+    color: #16a34a;
+}
+html[data-theme="light"] .movDetailNoteEmpty .movDetailNoteText {
+    color: #94a3b8;
+}
 html[data-theme="light"] .cpHexRow {
     background: #f1f5f9;
     border-color: #e2e8f0;
@@ -1146,6 +1174,7 @@ html[data-theme="light"] .filterDropSep {
 /* ── Light theme: Vista General filters ── */
 html[data-theme="light"] .overviewFilterOption,
 html[data-theme="light"] .planFilterBtn,
+html[data-theme="light"] .calFinChip,
 html[data-theme="light"] .activosFilterBtn,
 html[data-theme="light"] .bonosFilterBtn,
 html[data-theme="light"] .mNavTab,
@@ -1156,6 +1185,7 @@ html[data-theme="light"] .mActivosFilterBtn {
 }
 html[data-theme="light"] .overviewFilterOption:has(input:checked),
 html[data-theme="light"] .planFilterBtn.active,
+html[data-theme="light"] .calFinChip.active,
 html[data-theme="light"] .activosFilterBtn.active,
 html[data-theme="light"] .activosFilterBtn:has(input:checked),
 html[data-theme="light"] .bonosFilterBtn.active,
@@ -1170,6 +1200,7 @@ html[data-theme="light"] .mActivosFilterBtn:has(input:checked) {
 }
 html[data-theme="light"] .overviewFilterOption::before,
 html[data-theme="light"] .planFilterBtn::before,
+html[data-theme="light"] .calFinChip::before,
 html[data-theme="light"] .activosFilterBtn::before,
 html[data-theme="light"] .bonosFilterBtn::before,
 html[data-theme="light"] .mNavTab::before,
@@ -1178,6 +1209,7 @@ html[data-theme="light"] .mActivosFilterBtn::before {
 }
 html[data-theme="light"] .overviewFilterOption:hover,
 html[data-theme="light"] .planFilterBtn:hover,
+html[data-theme="light"] .calFinChip:hover,
 html[data-theme="light"] .activosFilterBtn:hover,
 html[data-theme="light"] .bonosFilterBtn:hover,
 html[data-theme="light"] .mNavTab:hover,
@@ -1453,6 +1485,7 @@ html[data-theme="black"] .filterDropSep {
 /* ── Black theme: Vista General filters ── */
 html[data-theme="black"] .overviewFilterOption,
 html[data-theme="black"] .planFilterBtn,
+html[data-theme="black"] .calFinChip,
 html[data-theme="black"] .activosFilterBtn,
 html[data-theme="black"] .bonosFilterBtn,
 html[data-theme="black"] .mNavTab,
@@ -1463,6 +1496,7 @@ html[data-theme="black"] .mActivosFilterBtn {
 }
 html[data-theme="black"] .overviewFilterOption:has(input:checked),
 html[data-theme="black"] .planFilterBtn.active,
+html[data-theme="black"] .calFinChip.active,
 html[data-theme="black"] .activosFilterBtn.active,
 html[data-theme="black"] .activosFilterBtn:has(input:checked),
 html[data-theme="black"] .bonosFilterBtn.active,
@@ -1476,6 +1510,7 @@ html[data-theme="black"] .mActivosFilterBtn:has(input:checked) {
 }
 html[data-theme="black"] .overviewFilterOption::before,
 html[data-theme="black"] .planFilterBtn::before,
+html[data-theme="black"] .calFinChip::before,
 html[data-theme="black"] .activosFilterBtn::before,
 html[data-theme="black"] .bonosFilterBtn::before,
 html[data-theme="black"] .mNavTab::before,
@@ -1484,6 +1519,7 @@ html[data-theme="black"] .mActivosFilterBtn::before {
 }
 html[data-theme="black"] .overviewFilterOption:hover,
 html[data-theme="black"] .planFilterBtn:hover,
+html[data-theme="black"] .calFinChip:hover,
 html[data-theme="black"] .activosFilterBtn:hover,
 html[data-theme="black"] .bonosFilterBtn:hover,
 html[data-theme="black"] .mNavTab:hover,
@@ -3384,6 +3420,84 @@ html[data-theme="black"] .portfolioFileInput {
     color: #f87171;
     padding: 4px 0;
     margin-bottom: 4px;
+}
+
+/* ── Tema claro: HTTPS y Atajo de iOS ─────────────────────────────────────
+   Estas dos secciones se montaron sobre las variables del tema oscuro
+   (--bg-inset, --text-muted…), y el tema claro no redefine variables sino
+   clases: sin esto, sus cajas salían negras sobre blanco y el texto gris
+   claro sobre gris claro. */
+html[data-theme="light"] .ajustesTlsAyuda,
+html[data-theme="light"] .ajustesTlsGuia,
+html[data-theme="light"] .ajustesTlsPruebaRes,
+html[data-theme="light"] .ajustesAtajoGuia,
+html[data-theme="light"] .ajustesAtajoPruebaRes,
+html[data-theme="light"] .ajustesAtajoAviso,
+html[data-theme="light"] .ajustesAtajoRechazadas {
+    background: #f8f9fa;
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .ajustesAtajoPaso,
+html[data-theme="light"] .ajustesAtajoRechazo,
+html[data-theme="light"] .ajustesTlsPruebaFila {
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .ajustesAtajoPaso .ajustesAtajoRechazadas {
+    background: #ffffff;
+}
+html[data-theme="light"] .ajustesAtajoPasoNum {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #64748b;
+}
+html[data-theme="light"] .ajustesAtajoPaso[data-estado="ok"] .ajustesAtajoPasoNum,
+html[data-theme="light"] .ajustesAtajoPaso[data-estado="aviso"] .ajustesAtajoPasoNum,
+html[data-theme="light"] .ajustesAtajoPaso[data-estado="mal"] .ajustesAtajoPasoNum {
+    color: #ffffff;
+}
+html[data-theme="light"] .ajustesTlsAvisoBtn {
+    background: #ffffff;
+    border-color: #e2e8f0;
+    color: #475569;
+}
+html[data-theme="light"] .ajustesTlsAvisoBtn:hover {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #2563eb;
+}
+html[data-theme="light"] .ajustesTlsEstado,
+html[data-theme="light"] .ajustesAtajoEstado,
+html[data-theme="light"] .ajustesAtajoPasoDetalle,
+html[data-theme="light"] .ajustesAtajoRechazoDetalle,
+html[data-theme="light"] .ajustesAtajoAviso,
+html[data-theme="light"] .ajustesTlsAyudaCuerpo,
+html[data-theme="light"] .ajustesTlsGuia,
+html[data-theme="light"] .ajustesTlsPruebaDetalle,
+html[data-theme="light"] .ajustesAtajoDatos dt,
+html[data-theme="light"] .ajustesFieldHint {
+    color: #64748b;
+}
+html[data-theme="light"] .ajustesTlsEstadoTexto strong,
+html[data-theme="light"] .ajustesAtajoPasoTitulo,
+html[data-theme="light"] .ajustesAtajoPasoDetalle strong,
+html[data-theme="light"] .ajustesAtajoPasoDetalle em,
+html[data-theme="light"] .ajustesAtajoRechazadasCabecera,
+html[data-theme="light"] .ajustesAtajoAviso strong,
+html[data-theme="light"] .ajustesAtajoAviso em,
+html[data-theme="light"] .ajustesTlsGuia strong,
+html[data-theme="light"] .ajustesTlsGuia em,
+html[data-theme="light"] .ajustesTlsPruebaNombre,
+html[data-theme="light"] .ajustesTlsAyuda > summary,
+html[data-theme="light"] .ajustesAtajoUrlFila code,
+html[data-theme="light"] .ajustesAtajoDatos dd,
+html[data-theme="light"] .ajustesFieldHint strong,
+html[data-theme="light"] .ajustesSwitchLabel {
+    color: #0f172a;
+}
+html[data-theme="light"] .ajustesSwitchLabel small,
+html[data-theme="light"] .ajustesAtajoUrlEtiqueta,
+html[data-theme="light"] .ajustesAtajoExtra {
+    color: #64748b;
 }
 
 /* Botón deshabilitado en paso 3 */

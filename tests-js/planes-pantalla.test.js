@@ -92,8 +92,8 @@ afterEach(() => {
 })
 
 describe("pestañas de la ficha", () => {
-    it("la ficha abre en Compras spot y esconde la de planes", () => {
-        expect(document.querySelector('.assetTabPanel[data-tab="spot"]').classList.contains("hidden")).toBe(false)
+    it("la ficha abre en Todos y esconde la de planes", () => {
+        expect(document.querySelector('.assetTabPanel[data-tab="todos"]').classList.contains("hidden")).toBe(false)
         expect(document.querySelector('.assetTabPanel[data-tab="planes"]').classList.contains("hidden")).toBe(true)
     })
 

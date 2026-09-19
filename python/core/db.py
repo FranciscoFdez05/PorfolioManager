@@ -249,7 +249,8 @@ CREATE TABLE IF NOT EXISTS gastos_rows (
     fecha    TEXT NOT NULL DEFAULT '',
     nombre   TEXT NOT NULL DEFAULT '',
     tipo     TEXT NOT NULL DEFAULT '',
-    cantidad TEXT NOT NULL DEFAULT ''
+    cantidad TEXT NOT NULL DEFAULT '',
+    nota     TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS mensualidades (
@@ -290,7 +291,8 @@ CREATE TABLE IF NOT EXISTS ingresos_rows (
     fecha    TEXT NOT NULL DEFAULT '',
     nombre   TEXT NOT NULL DEFAULT '',
     tipo     TEXT NOT NULL DEFAULT '',
-    cantidad TEXT NOT NULL DEFAULT ''
+    cantidad TEXT NOT NULL DEFAULT '',
+    nota     TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS ingresos_recurrentes (
@@ -540,7 +542,7 @@ CREATE TABLE IF NOT EXISTS planes_inversion (
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 5
+ESQUEMA_VERSION = 6
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1036,6 +1038,24 @@ def _esquema_5(conn):
     compra sigue siendo una compra normal y ahí se queda.
     """
     conn.execute("DROP TABLE IF EXISTS dca_planes")
+
+
+@_migracion(6)
+def _esquema_6(conn):
+    """Nota libre en cada gasto e ingreso del mes.
+
+    Una columna de texto más en `gastos_rows` e `ingresos_rows`, vacía por
+    defecto. No se toca ninguna fila: las que ya había siguen igual, solo que
+    ahora con una nota en blanco. Volver atrás es levantar la imagen anterior;
+    la columna sobrante no molesta a un esquema que no la lee.
+
+    Idempotente a propósito: una base creada ya con este código trae la
+    columna desde `_SCHEMA` y aquí no hay nada que añadir.
+    """
+    for table in ("gastos_rows", "ingresos_rows"):
+        cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if "nota" not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN nota TEXT NOT NULL DEFAULT ''")
 
 
 def get_db() -> sqlite3.Connection:

@@ -77,6 +77,10 @@ def estado(urlBase: str = "") -> dict:
         # En texto: son los CIDR tal y como los entiende el filtro, que es lo
         # que hay que comparar con la IP que sale rechazada en el log.
         "redes": [str(red) for red in red_local.leerRedesPermitidas()],
+        # Qué IPs ha rechazado el filtro desde que arrancó el servidor. Es lo
+        # que hace falta para permitir al móvil sin ir al log: la que llega
+        # desde otra subred de la misma wifi aparece aquí con su botón.
+        "rechazadas": red_local.rechazosRecientes(),
         "tolerancia": firma_hmac.toleranciaSegundos(),
         "urlBase": urlBase,
         # Con qué política se están aceptando las peticiones ahora mismo. El

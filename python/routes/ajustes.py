@@ -587,6 +587,10 @@ def export_zip():
     peticion = peticion if isinstance(peticion, dict) else {}
     ui = exportables.sanearUi(peticion.get("ui"))
     incluirClaves = bool(peticion.get("incluirClaves"))
+    contrasena = peticion.get("contrasena")
+    contrasena = contrasena if isinstance(contrasena, str) else ""
+    if len(contrasena) > exportables.MAX_LARGO_CONTRASENA:
+        return jsonify({"ok": False, "error": "La contraseña es demasiado larga"}), 400
 
     json_bytes = json.dumps(export, ensure_ascii=False, indent=2).encode("utf-8")
 
@@ -612,12 +616,18 @@ def export_zip():
         if ui:
             zf.writestr(exportables.FICHERO_UI, json.dumps(ui, ensure_ascii=False, indent=2))
 
-        # Las claves van EN CLARO, y por eso solo si se piden: cifradas solo
-        # servirían para restaurar en un servidor con la misma SECRET_KEY, que
-        # es justo el caso en el que no se habían perdido.
+        # Las claves van EN CLARO, y por eso solo si se piden: cifradas con la
+        # SECRET_KEY solo servirían para restaurar en un servidor con la misma,
+        # que es justo el caso en el que no se habían perdido. Con contraseña
+        # van cifradas con ella, en un fichero aparte para que la importación
+        # sepa que tiene que pedirla.
         if incluirClaves:
             claves = exportables.clavesEnClaro()
-            if claves:
+            if claves and contrasena:
+                paquete = exportables.cifrarClaves(claves, contrasena)
+                zf.writestr(exportables.FICHERO_CLAVES_CIFRADAS, json.dumps(paquete, ensure_ascii=False, indent=2))
+                log.info("[export] ZIP generado con claves de API cifradas con contraseña (%d proveedores)", len(claves))
+            elif claves:
                 zf.writestr(exportables.FICHERO_CLAVES, json.dumps(claves, ensure_ascii=False, indent=2))
                 log.info("[export] ZIP generado CON claves de API en claro (%d proveedores)", len(claves))
 
@@ -790,6 +800,30 @@ def import_zip():
     ui_restaurada = {}
     claves_restauradas = []
 
+    # Claves protegidas con contraseña: se descifran ANTES de tocar nada. Si la
+    # contraseña falta o falla, la respuesta lo dice y la cartera sigue como
+    # estaba; el navegador la pide y vuelve a mandar el mismo ZIP. Quien no la
+    # tenga puede importar el resto sin las claves (`sinClaves`).
+    contrasena = request.form.get("contrasena", "")
+    sin_claves = request.form.get("sinClaves", "") == "1"
+    claves_descifradas = None
+    entrada_cifrada = next((n for n in names if Path(n).name == exportables.FICHERO_CLAVES_CIFRADAS), None)
+    if entrada_cifrada and not sin_claves:
+        if not contrasena:
+            return jsonify({
+                "ok": False, "necesitaContrasena": True,
+                "error": "El ZIP lleva las claves de API protegidas con contraseña",
+            }), 400
+        if len(contrasena) > exportables.MAX_LARGO_CONTRASENA:
+            return jsonify({"ok": False, "error": "La contraseña es demasiado larga"}), 400
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw_bytes), "r") as zf:
+                paquete = json.loads(zf.read(entrada_cifrada).decode("utf-8"))
+            claves_descifradas = exportables.descifrarClaves(paquete, contrasena)
+        except (exportables.ContrasenaIncorrecta, ValueError, UnicodeDecodeError):
+            log.warning("[import] Contraseña incorrecta para las claves del ZIP")
+            return jsonify({"ok": False, "necesitaContrasena": True, "error": "Contraseña incorrecta"}), 400
+
     try:
         buf = io.BytesIO(raw_bytes)
         with zipfile.ZipFile(buf, "r") as zf:
@@ -866,10 +900,12 @@ def import_zip():
             # con la SECRET_KEY de ESTA instalación: ese cambio de cifrado es lo
             # que hace que una copia sirva en un servidor recién montado.
             entrada_claves = next((n for n in names if Path(n).name == exportables.FICHERO_CLAVES), None)
-            if entrada_claves:
+            if claves_descifradas is not None:
+                claves_restauradas = exportables.restaurarClaves(claves_descifradas)
+            elif entrada_claves and not sin_claves:
                 claves_restauradas = exportables.restaurarClaves(json.loads(zf.read(entrada_claves).decode("utf-8")))
-                if claves_restauradas:
-                    log.info("[import] Claves de API restauradas: %s", ", ".join(claves_restauradas))
+            if claves_restauradas:
+                log.info("[import] Claves de API restauradas: %s", ", ".join(claves_restauradas))
 
             # Preferencias de interfaz: no se guardan aquí, se devuelven para
             # que las escriba el navegador, que es donde viven.

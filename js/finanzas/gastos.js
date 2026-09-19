@@ -24,6 +24,7 @@ let sharedGastosTypes = []
 let _gastosDataLoaded = false
 let _gastosHasPendingChanges = false
 let gastosModalKeyHandler = null
+let gastosDetailKeyHandler = null
 let gastosMensualidadesCollapsed = false
 // Las mensualidades pausadas se ocultan en la tabla anual salvo que se active
 // la opción del menú de la categoría (sus importes siguen contando en el total).
@@ -841,6 +842,75 @@ function openMensualidadFormModal(rowIndex = -1) {
     })
 }
 
+function closeGastoDetailModal() {
+    document.getElementById("gastosDetailModalOverlay")?.remove()
+    if (gastosDetailKeyHandler) {
+        document.removeEventListener("keydown", gastosDetailKeyHandler)
+        gastosDetailKeyHandler = null
+    }
+}
+
+// Detalle de un gasto del mes. Lee de la propia fila (dataset) y no del índice:
+// la tabla se pinta ordenada por fecha y el índice puede no coincidir con el
+// orden de los datos hasta que se sincronizan.
+function openGastoDetailModal(rowElement) {
+    closeGastosCreateModal()
+    closeGastoDetailModal()
+
+    const rowIndex = Number(rowElement.dataset.rowIndex)
+    const nota = String(rowElement.dataset.nota || "").trim()
+    const cantidad = rowElement.dataset.cantidad ? formatCellEuroValue(rowElement.dataset.cantidad) : ""
+
+    const overlay = document.createElement("div")
+    overlay.id = "gastosDetailModalOverlay"
+    overlay.className = "modalOverlay"
+
+    const modal = document.createElement("div")
+    modal.className = "assetModal movDetailModal"
+    modal.setAttribute("role", "dialog")
+    modal.setAttribute("aria-modal", "true")
+    modal.setAttribute("aria-labelledby", "gastosDetailModalTitle")
+    modal.innerHTML = `
+        <h3 class="assetModalTitle" id="gastosDetailModalTitle">Detalle del gasto</h3>
+        <dl class="movDetailList">
+            <div class="movDetailItem"><dt>Fecha</dt><dd>${escapeGastosHtml(rowElement.dataset.fecha || "—")}</dd></div>
+            <div class="movDetailItem"><dt>Concepto</dt><dd>${escapeGastosHtml(rowElement.dataset.nombre || "—")}</dd></div>
+            <div class="movDetailItem"><dt>Tipo</dt><dd>${escapeGastosHtml(rowElement.dataset.tipo || "—")}</dd></div>
+            <div class="movDetailItem"><dt>Cantidad</dt><dd class="movDetailAmount">${escapeGastosHtml(cantidad || "—")}</dd></div>
+        </dl>
+        <div class="movDetailNote${nota ? "" : " movDetailNoteEmpty"}">
+            <span class="movDetailNoteLabel">Nota</span>
+            <p class="movDetailNoteText">${nota ? escapeGastosHtml(nota) : "Sin nota"}</p>
+        </div>
+        <div class="assetModalActions">
+            <button type="button" class="cancelButton" id="gastosDetailCloseBtn">Cerrar</button>
+            <button type="button" class="primaryButton" id="gastosDetailEditBtn">Editar</button>
+        </div>
+    `
+
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) {
+            closeGastoDetailModal()
+        }
+    })
+    modal.querySelector("#gastosDetailCloseBtn")?.addEventListener("click", closeGastoDetailModal)
+    modal.querySelector("#gastosDetailEditBtn")?.addEventListener("click", () => {
+        closeGastoDetailModal()
+        openGastoMovementModal(rowIndex)
+    })
+
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    gastosDetailKeyHandler = (event) => {
+        if (event.key === "Escape") {
+            closeGastoDetailModal()
+        }
+    }
+    document.addEventListener("keydown", gastosDetailKeyHandler)
+    modal.querySelector("#gastosDetailCloseBtn")?.focus()
+}
+
 function openGastoMovementModal(rowIndex = -1) {
     const currentRows = currentGastosData?.months?.[currentGastosMonth]?.rows || []
     const isEdit = rowIndex >= 0
@@ -859,7 +929,7 @@ function openGastoMovementModal(rowIndex = -1) {
             <label class="assetModalLabel" for="gastosMovimientoFecha">Fecha</label>
             <input id="gastosMovimientoFecha" class="assetModalInput" type="text" value="${escapeGastosHtml(rowData.fecha || "")}" placeholder="dd-mm-aaaa">
 
-            <label class="assetModalLabel" for="gastosMovimientoNombre">Nombre</label>
+            <label class="assetModalLabel" for="gastosMovimientoNombre">Concepto</label>
             <input id="gastosMovimientoNombre" class="assetModalInput" type="text" value="${escapeGastosHtml(rowData.nombre || "")}" placeholder="Ej: Cena Mercadona">
 
             <label class="assetModalLabel" for="gastosMovimientoTipo">Tipo</label>
@@ -870,6 +940,9 @@ function openGastoMovementModal(rowIndex = -1) {
 
             <label class="assetModalLabel" for="gastosMovimientoCantidad">Cantidad</label>
             <input id="gastosMovimientoCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(rowData.cantidad || "")}" placeholder="0,00">
+
+            <label class="assetModalLabel" for="gastosMovimientoNota">Nota <span class="assetModalLabelHint">opcional</span></label>
+            <textarea id="gastosMovimientoNota" class="assetModalInput movNotaInput" rows="3" maxlength="300" placeholder="Solo se ve al pulsar el gasto en la tabla">${escapeGastosHtml(rowData.nota || "")}</textarea>
         `,
         submitLabel: "Guardar",
         onSubmit: async ({ getValue, setFeedback }) => {
@@ -878,6 +951,7 @@ function openGastoMovementModal(rowIndex = -1) {
             const tipo = normalizeGastoTipo(getValue("gastosMovimientoTipo"))
             const cantidadRaw = String(getValue("gastosMovimientoCantidad")).trim()
             const cantidad = cantidadRaw ? formatCellEuroValue(cantidadRaw) : ""
+            const nota = String(getValue("gastosMovimientoNota")).trim().slice(0, 300)
 
             if (!fecha && !nombre && !tipo && !cantidad) {
                 setFeedback("Introduce al menos un dato para el gasto.", true)
@@ -893,7 +967,8 @@ function openGastoMovementModal(rowIndex = -1) {
                 fecha,
                 nombre,
                 tipo,
-                cantidad
+                cantidad,
+                nota
             }
 
             if (isEdit && currentGastosData.months[currentGastosMonth].rows[rowIndex]) {
@@ -1198,9 +1273,10 @@ function downloadGastosCsv() {
         monthRows.forEach((row) => {
             rows.push({
                 Fecha: row.fecha || "",
-                Nombre: row.nombre || "",
+                Concepto: row.nombre || "",
                 Tipo: normalizeGastoTipo(row.tipo || ""),
-                Cantidad: parseEuroNumber(row.cantidad || "")
+                Cantidad: parseEuroNumber(row.cantidad || ""),
+                Nota: row.nota || ""
             })
         })
 
@@ -2313,11 +2389,14 @@ function gastoParseDate(str) {
 
 function buildGastoMovementRow(row = {}, rowIndex = -1) {
     const tr = document.createElement("tr")
+    tr.className = "movDetailRow"
     tr.dataset.rowIndex = String(rowIndex)
     tr.dataset.fecha = String(row.fecha || "")
     tr.dataset.nombre = String(row.nombre || "")
     tr.dataset.tipo = String(normalizeGastoTipo(row.tipo || ""))
     tr.dataset.cantidad = String(row.cantidad || "")
+    // La nota no tiene columna: se guarda en la fila y se enseña en el detalle.
+    tr.dataset.nota = String(row.nota || "")
 
     tr.innerHTML = `
         <td data-field="fecha">${escapeGastosHtml(row.fecha || "")}</td>
@@ -2348,6 +2427,14 @@ function handleGastosMovementActionClick(event) {
 
     const deleteButton = event.target.closest(".gastosRowDeleteBtn")
     if (!deleteButton) {
+        // Pulsar la fila (fuera del menú de acciones) abre el detalle con la nota.
+        if (event.target.closest(".rowActionsCell")) {
+            return
+        }
+        const row = event.target.closest("tr.movDetailRow")
+        if (row) {
+            openGastoDetailModal(row)
+        }
         return
     }
 
@@ -2427,7 +2514,8 @@ function syncGastosDataFromTables() {
                     cantidad:
                         rowElement.dataset.cantidad ||
                         rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() ||
-                        ""
+                        "",
+                    nota: rowElement.dataset.nota || ""
                 }
             })
             .filter((row) => row.fecha || row.nombre || row.tipo || parseEuroNumber(row.cantidad) !== 0)

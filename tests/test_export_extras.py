@@ -187,3 +187,117 @@ def test_sin_preferencias_no_se_mete_un_fichero_vacío(cliente_autenticado, bp_a
     res = client.post("/api/export/zip", headers=cab, json={"ui": {}})
 
     assert exportables.FICHERO_UI not in _nombres(res.data)
+
+
+# ── Claves protegidas con contraseña ──────────────────────────────────────────
+
+def test_cifrar_y_descifrar_devuelve_las_mismas_claves():
+    paquete = exportables.cifrarClaves({"finnhub": ["abc"], "atajo": ["k"]}, "secreta")
+
+    assert paquete["formato"] == "pbkdf2-sha256+fernet"
+    assert "abc" not in json.dumps(paquete)
+    assert exportables.descifrarClaves(paquete, "secreta") == {"finnhub": ["abc"], "atajo": ["k"]}
+
+
+def test_una_contraseña_equivocada_no_descifra_nada():
+    paquete = exportables.cifrarClaves({"finnhub": ["abc"]}, "secreta")
+
+    with pytest.raises(exportables.ContrasenaIncorrecta):
+        exportables.descifrarClaves(paquete, "otra")
+
+
+def test_un_paquete_manipulado_se_trata_como_contraseña_incorrecta():
+    """Salt de dos bytes, iteraciones absurdas o un formato inventado: ninguno
+    debe llegar a derivar una clave, y menos a tumbar la importación."""
+    for paquete in (
+        {"formato": "otro", "salt": "AAAA", "iteraciones": 600000, "datos": "x"},
+        {"formato": "pbkdf2-sha256+fernet", "salt": "AA==", "iteraciones": 600000, "datos": "x"},
+        {"formato": "pbkdf2-sha256+fernet", "salt": "AAAAAAAAAAAAAAAAAAAAAA==", "iteraciones": 10, "datos": "x"},
+        "no es un dict",
+    ):
+        with pytest.raises(exportables.ContrasenaIncorrecta):
+            exportables.descifrarClaves(paquete, "secreta")
+
+
+def test_con_contraseña_las_claves_van_cifradas_y_no_en_claro(cliente_autenticado, bp_ajustes, monkeypatch):
+    monkeypatch.setattr(exportables, "clavesEnClaro", lambda: {"finnhub": ["clave-de-verdad"]})
+    client, cab, _app = cliente_autenticado(bp_ajustes)
+
+    res = client.post("/api/export/zip", headers=cab, json={"incluirClaves": True, "contrasena": "secreta"})
+
+    nombres = _nombres(res.data)
+    assert exportables.FICHERO_CLAVES_CIFRADAS in nombres
+    assert exportables.FICHERO_CLAVES not in nombres
+    assert b"clave-de-verdad" not in res.data
+
+
+def test_una_contraseña_vacía_es_no_poner_contraseña(cliente_autenticado, bp_ajustes, monkeypatch):
+    monkeypatch.setattr(exportables, "clavesEnClaro", lambda: {"finnhub": ["clave-de-verdad"]})
+    client, cab, _app = cliente_autenticado(bp_ajustes)
+
+    res = client.post("/api/export/zip", headers=cab, json={"incluirClaves": True, "contrasena": ""})
+
+    assert exportables.FICHERO_CLAVES in _nombres(res.data)
+
+
+def _zip_con_claves_cifradas(contrasena="secreta"):
+    """Un ZIP de export mínimo: ajustes.json (para que valga) y las claves."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("ajustes.json", "{}")
+        paquete = exportables.cifrarClaves({"finnhub": ["clave-restaurada"]}, contrasena)
+        zf.writestr(exportables.FICHERO_CLAVES_CIFRADAS, json.dumps(paquete))
+    return buf.getvalue()
+
+
+def _importar(client, cab, datos, **campos):
+    return client.post(
+        "/api/import/zip",
+        data={"file": (io.BytesIO(datos), "export.zip"), **campos},
+        headers=cab, content_type="multipart/form-data",
+    )
+
+
+def test_importar_sin_contraseña_la_pide_y_no_toca_nada(cliente_autenticado, bp_ajustes, datos_aislados, temp_db, claves_aisladas):
+    client, cab, _app = cliente_autenticado(bp_ajustes)
+
+    res = _importar(client, cab, _zip_con_claves_cifradas())
+
+    assert res.status_code == 400
+    assert res.get_json()["necesitaContrasena"] is True
+    assert list(claves_aisladas.iterdir()) == [], "no se escribió ninguna clave"
+
+
+def test_una_contraseña_incorrecta_se_dice_y_se_vuelve_a_pedir(cliente_autenticado, bp_ajustes, datos_aislados, temp_db, claves_aisladas):
+    client, cab, _app = cliente_autenticado(bp_ajustes)
+
+    res = _importar(client, cab, _zip_con_claves_cifradas(), contrasena="otra")
+
+    datos = res.get_json()
+    assert res.status_code == 400
+    assert datos["necesitaContrasena"] is True
+    assert "incorrecta" in datos["error"].lower()
+    assert list(claves_aisladas.iterdir()) == []
+
+
+def test_con_la_contraseña_las_claves_se_restauran(cliente_autenticado, bp_ajustes, datos_aislados, temp_db, claves_aisladas):
+    from core.secret_store import read_secret_lines
+
+    client, cab, _app = cliente_autenticado(bp_ajustes)
+
+    res = _importar(client, cab, _zip_con_claves_cifradas(), contrasena="secreta")
+
+    assert res.status_code == 200
+    assert res.get_json()["claves"] == ["finnhub.key"]
+    assert read_secret_lines(claves_aisladas / "finnhub.key") == ["clave-restaurada"]
+
+
+def test_se_puede_importar_el_resto_sin_las_claves(cliente_autenticado, bp_ajustes, datos_aislados, temp_db, claves_aisladas):
+    """Quien ha perdido la contraseña no pierde también la cartera."""
+    client, cab, _app = cliente_autenticado(bp_ajustes)
+
+    res = _importar(client, cab, _zip_con_claves_cifradas(), sinClaves="1")
+
+    assert res.status_code == 200
+    assert res.get_json()["claves"] == []
+    assert list(claves_aisladas.iterdir()) == []

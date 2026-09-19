@@ -40,7 +40,7 @@ Todos los ajustes están en la sección `[atajo]` de `config.ini`:
 ```ini
 [atajo]
 activado = true
-redes_permitidas = 192.168.1.0/24, 10.0.0.0/24
+redes_permitidas = 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12
 tolerancia_segundos = 60
 max_texto_firma = 8192
 fichero_clave = API/movimientos.key
@@ -68,8 +68,9 @@ rango no obliga a reiniciar el servidor.
    python tools/generar_clave_movimientos.py
    ```
 
-2. Ajusta `redes_permitidas` en `config.ini` al `Address` real de tu interfaz
-   `wg0` de WireGuard.
+2. Comprueba que `redes_permitidas` cubre tu wifi y el `Address` de tu interfaz
+   `wg0` de WireGuard. De fábrica cubre cualquier red privada (192.168.x, 10.x y
+   172.16-31.x); estréchalo si quieres una subred o una IP concreta.
 
 3. Comprueba desde un equipo de la LAN:
 
@@ -298,7 +299,7 @@ botón de Acción (Ajustes → Botón de Acción → Atajo).
 | Código | Motivo | Dónde mirar |
 |---|---|---|
 | 404 | La función está apagada | `[atajo] activado` en `config.ini` |
-| 403 | La IP de origen no está en los rangos permitidos | La propia respuesta trae el campo `ip` con la dirección que ve el servidor: añádela a `[atajo] redes_permitidas` |
+| 403 | La IP de origen no está en los rangos permitidos | La propia respuesta trae el campo `ip` con la dirección que ve el servidor, y Ajustes › API › Atajo de iOS la lista en el paso 2 con un botón que la permite (o su subred) al momento |
 | 401 | Firma inválida, ausente, o timestamp fuera de ventana | El cuerpo enviado no es idéntico al firmado (paso 8: tiene que ir como *Archivo*) |
 | 503 | No hay clave de firma | Ejecuta `python tools/generar_clave_movimientos.py` |
 | 404 | Portfolio inexistente | El `id` enviado no está en `/api/portfolios-lista` |

@@ -1332,6 +1332,25 @@ async function initAjustesLogic() {
     const atajoAvisoFirmaEl = document.getElementById("ajustesAtajoAvisoFirma")
     const atajoAccesoBtn = document.getElementById("ajustesAtajoAccesoBtn")
     const atajoAccesoMsg = document.getElementById("ajustesAtajoAccesoMsg")
+    const atajoRechazadasEl = document.getElementById("ajustesAtajoRechazadas")
+    const atajoRechazadasLista = document.getElementById("ajustesAtajoRechazadasLista")
+    const atajoRechazadasBtn = document.getElementById("ajustesAtajoRechazadasBtn")
+    const atajoGuiaEl = document.getElementById("ajustesAtajoGuia")
+    const atajoPasoClaveDetalle = document.getElementById("ajustesAtajoPasoClaveDetalle")
+    const atajoPasoRedesDetalle = document.getElementById("ajustesAtajoPasoRedesDetalle")
+    const atajoPasoProbarDetalle = document.getElementById("ajustesAtajoPasoProbarDetalle")
+    const atajoRedesBtn = document.getElementById("ajustesAtajoRedesBtn")
+    const atajoCopiarBtn = document.getElementById("ajustesAtajoCopiarBtn")
+    const atajoAvanzadoEl = document.getElementById("ajustesAtajoAvanzado")
+
+    // Lo último que devolvió el servidor: los botones de «Permitir» lo
+    // necesitan para saber qué rangos hay y si se exige firma.
+    let _atajoUltimo = null
+
+    function _pasoAtajo(id, estado) {
+        const li = document.getElementById(id)
+        if (li) li.dataset.estado = estado
+    }
 
     let _atajoHayClave = false
 
@@ -1368,6 +1387,9 @@ async function initAjustesLogic() {
             '<span class="ajustesTlsPunto"></span><span class="ajustesTlsEstadoTexto">' + texto + "</span>"
 
         _atajoHayClave = !!(data.clave && data.clave.hay)
+        _atajoUltimo = data
+
+        _pintarPasosAtajo(data)
 
         if (atajoDatosEl) atajoDatosEl.hidden = false
         if (atajoUrlEl) atajoUrlEl.textContent = data.urlBase || "—"
@@ -1404,6 +1426,75 @@ async function initAjustesLogic() {
         _pintarRecetaAtajo(data.urlBase || "")
     }
 
+    // --- Los cuatro pasos ---
+    // Cada uno contesta una pregunta con un color: verde está hecho, ámbar
+    // pide algo, rojo está roto. El texto de al lado dice qué, y el botón de
+    // la derecha es lo que lo arregla. Así no hay que leer nada para saber
+    // por dónde va uno.
+    function _pintarPasosAtajo(data) {
+        if (!atajoGuiaEl) return
+        atajoGuiaEl.hidden = false
+
+        const sinFirma = !!(data.acceso && data.acceso.exigirFirma === false)
+        const clave = data.clave || {}
+
+        // 1. Clave
+        if (sinFirma) {
+            _pasoAtajo("ajustesAtajoPasoClave", "aviso")
+            _setTexto(atajoPasoClaveDetalle, "No se exige: las peticiones entran sin firmar. La clave no hace falta mientras esté así.")
+        } else if (clave.hay) {
+            _pasoAtajo("ajustesAtajoPasoClave", "ok")
+            _setTexto(atajoPasoClaveDetalle, clave.origen === "entorno"
+                ? `Generada. Sale de ${clave.detalle}, en el .env del servidor.`
+                : `Generada y guardada en ${clave.detalle}.`)
+        } else if (clave.origen === "ilegible") {
+            _pasoAtajo("ajustesAtajoPasoClave", "mal")
+            _setTexto(atajoPasoClaveDetalle, `No se puede leer. ${clave.detalle}`)
+        } else {
+            _pasoAtajo("ajustesAtajoPasoClave", "mal")
+            _setTexto(atajoPasoClaveDetalle, "Falta. Sin ella el servidor no puede comprobar quién manda cada petición y el atajo no envía nada.")
+        }
+
+        // 2. Redes
+        const redes = data.redes || []
+        const rechazadas = (data.rechazadas || []).filter((r) => !r.permitida)
+        const verTe = data.verTe || {}
+        if (!data.activado) {
+            _pasoAtajo("ajustesAtajoPasoRedes", "mal")
+            _setTexto(atajoPasoRedesDetalle, "El Atajo está desactivado en config.ini ([atajo] activado = false): estas rutas responden 404.")
+        } else if (!redes.length) {
+            _pasoAtajo("ajustesAtajoPasoRedes", "mal")
+            _setTexto(atajoPasoRedesDetalle, "No hay ninguna red permitida, y vacío no significa «todas»: no entra nadie.")
+        } else if (rechazadas.length) {
+            _pasoAtajo("ajustesAtajoPasoRedes", "aviso")
+            _setTexto(atajoPasoRedesDetalle, rechazadas.length === 1
+                ? `Alguien ha llamado desde ${rechazadas[0].ip} y se ha rechazado. Si es el iPhone, permítelo aquí debajo.`
+                : `${rechazadas.length} direcciones han llamado y se han rechazado. Si una es el iPhone, permítela aquí debajo.`)
+        } else if (verTe.ip && !verTe.permitida) {
+            _pasoAtajo("ajustesAtajoPasoRedes", "aviso")
+            _setTexto(atajoPasoRedesDetalle, `Se acepta desde ${redes.join(", ")}. Este navegador llega desde ${verTe.ip}, que queda fuera: si el iPhone está en la misma red, también quedará fuera.`)
+        } else {
+            _pasoAtajo("ajustesAtajoPasoRedes", "ok")
+            const origen = data.acceso && data.acceso.origenRedes === "ajustes" ? "guardado aquí" : "lo que dice config.ini"
+            _setTexto(atajoPasoRedesDetalle, `Se acepta desde ${redes.join(", ")} (${origen}). Nadie se ha quedado fuera desde que arrancó el servidor.`)
+        }
+
+        // 3. Instalar: se puede en cuanto hay clave (o no se exige) y redes.
+        const puedeInstalar = data.activado && redes.length > 0 && (clave.hay || sinFirma)
+        _pasoAtajo("ajustesAtajoPasoInstalar", puedeInstalar ? "ok" : "pendiente")
+
+        // 4. Probar: hasta que se pulsa, no se sabe.
+        if (!puedeInstalar) {
+            _pasoAtajo("ajustesAtajoPasoProbar", "pendiente")
+            if (atajoPruebaRes) atajoPruebaRes.hidden = true
+            _setTexto(atajoPasoProbarDetalle, "Recorre el mismo camino que el atajo —clave, redes, firma— sin apuntar nada.")
+        }
+    }
+
+    function _setTexto(el, texto) {
+        if (el) el.textContent = texto
+    }
+
     // --- Quién puede escribir por la API del Atajo ---
     // Las dos barreras que tienen esos endpoints, juntas y en la misma pantalla,
     // porque solo significan algo la una con la otra: quitar la firma deja la
@@ -1424,8 +1515,116 @@ async function initAjustesLogic() {
             atajoRedesInput.value = acceso.origenRedes === "ajustes" ? (data.redes || []).join(", ") : ""
         }
         if (atajoRedesInput) {
-            atajoRedesInput.placeholder = (acceso.redesConfig || []).join(", ") || "192.168.1.0/24"
+            atajoRedesInput.placeholder = (acceso.redesConfig || []).join(", ") || "192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12"
         }
+
+        _pintarRechazadasAtajo(data)
+    }
+
+    // --- IPs que el filtro ha rechazado ---
+    // Es la respuesta a «¿por qué no entra el móvil?» sin abrir el log: la IP
+    // con la que llega, y un botón que la permite en el acto. Lo típico es una
+    // wifi con más de una subred —invitados, un punto de acceso con su propio
+    // DHCP— y el iPhone llegando desde una que no está en los rangos.
+    function _pintarRechazadasAtajo(data) {
+        if (!atajoRechazadasEl || !atajoRechazadasLista) return
+        const filas = data.rechazadas || []
+        atajoRechazadasEl.hidden = filas.length === 0
+        atajoRechazadasLista.innerHTML = ""
+
+        for (const fila of filas) {
+            const div = document.createElement("div")
+            div.className = "ajustesAtajoRechazo" + (fila.permitida ? " permitida" : "")
+
+            const ip = document.createElement("code")
+            ip.textContent = fila.ip
+            div.appendChild(ip)
+
+            const detalle = document.createElement("span")
+            detalle.className = "ajustesAtajoRechazoDetalle"
+            const veces = fila.veces > 1 ? ` · ${fila.veces} veces` : ""
+            detalle.textContent = fila.permitida
+                ? `ya permitida · ${_haceCuanto(fila.ultima)}${veces}`
+                : `${_haceCuanto(fila.ultima)} · ${fila.metodo} ${fila.ruta}${veces}`
+            div.appendChild(detalle)
+
+            if (!fila.permitida) {
+                const acciones = document.createElement("span")
+                acciones.className = "ajustesAtajoRechazoAcciones"
+                acciones.appendChild(_botonPermitir("Permitir", _cidrDeIp(fila.ip)))
+                const red = _redDeIp(fila.ip)
+                if (red) acciones.appendChild(_botonPermitir(`Su red (${red})`, red))
+                div.appendChild(acciones)
+            }
+
+            atajoRechazadasLista.appendChild(div)
+        }
+    }
+
+    function _botonPermitir(texto, cidr) {
+        const btn = document.createElement("button")
+        btn.type = "button"
+        btn.className = "ajustesTlsAvisoBtn"
+        btn.textContent = texto
+        btn.addEventListener("click", () => _permitirRedAtajo(cidr, btn))
+        return btn
+    }
+
+    function _cidrDeIp(ip) {
+        return ip.includes(":") ? `${ip}/128` : `${ip}/32`
+    }
+
+    // La /24 de una IPv4: es lo que reparte cualquier router doméstico. Para
+    // IPv6 no se ofrece —la máscara depende del prefijo que dé el operador—.
+    function _redDeIp(ip) {
+        const partes = ip.split(".")
+        if (partes.length !== 4 || partes.some((p) => !/^\d{1,3}$/.test(p))) return null
+        return `${partes[0]}.${partes[1]}.${partes[2]}.0/24`
+    }
+
+    // Permitir es guardar: un toque y el móvil entra. Se parte de los rangos
+    // que se están aplicando —los guardados aquí o, si no hay, los de
+    // config.ini— porque lo que se guarda los sustituye: si no, permitir una
+    // IP nueva quitaría la wifi entera sin avisar. La firma se deja como esté.
+    async function _permitirRedAtajo(cidr, btn) {
+        const data = _atajoUltimo || {}
+        const base = [...(data.redes || [])]
+        if (!base.includes(cidr)) base.push(cidr)
+        const exigirFirma = !(data.acceso && data.acceso.exigirFirma === false)
+
+        if (btn) btn.disabled = true
+        showMsg(atajoMsg, `Permitiendo ${cidr}…`, "")
+        try {
+            const res = await fetch("/api/atajo/acceso", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ exigirFirma, redes: base })
+            })
+            const nuevo = await res.json()
+            if (!nuevo.ok) {
+                showMsg(atajoMsg, nuevo.error || "No se ha podido guardar", "error")
+                return
+            }
+            // El campo de abajo se repinta con lo guardado, no con lo que
+            // tuviera a medias: acaba de cambiar por otro camino.
+            if (atajoRedesInput) atajoRedesInput.value = ""
+            _pintarAtajo(nuevo)
+            showMsg(atajoMsg, `${cidr} permitida`, "ok")
+        } catch {
+            showMsg(atajoMsg, "Error de red", "error")
+        } finally {
+            if (btn) btn.disabled = false
+        }
+    }
+
+    function _haceCuanto(iso) {
+        const t = Date.parse(iso || "")
+        if (Number.isNaN(t)) return "—"
+        const seg = Math.max(0, Math.round((Date.now() - t) / 1000))
+        if (seg < 60) return "hace un momento"
+        if (seg < 3600) return `hace ${Math.round(seg / 60)} min`
+        if (seg < 86400) return `hace ${Math.round(seg / 3600)} h`
+        return `hace ${Math.round(seg / 86400)} d`
     }
 
     async function _guardarAccesoAtajo() {
@@ -1600,6 +1799,11 @@ async function initAjustesLogic() {
                 ;(data.pasos || []).forEach((paso) => atajoPruebaRes.appendChild(_filaPasoAtajo(paso)))
             }
 
+            _pasoAtajo("ajustesAtajoPasoProbar", data.ok ? "ok" : "mal")
+            _setTexto(atajoPasoProbarDetalle, data.ok
+                ? "Todo en orden: el servidor firma y verifica como lo hará con el atajo."
+                : "Hay algo sin configurar. Cada fila de abajo dice qué.")
+
             showMsg(atajoMsg, data.ok ? "Todo listo" : "Hay algo sin configurar", data.ok ? "ok" : "error")
         } catch {
             showMsg(atajoMsg, "Error de red", "error")
@@ -1610,6 +1814,27 @@ async function initAjustesLogic() {
 
     if (atajoClaveBtn) atajoClaveBtn.addEventListener("click", _generarClaveAtajo)
     if (atajoAccesoBtn) atajoAccesoBtn.addEventListener("click", _guardarAccesoAtajo)
+    if (atajoRechazadasBtn) atajoRechazadasBtn.addEventListener("click", loadAtajo)
+    if (atajoRedesBtn) {
+        atajoRedesBtn.addEventListener("click", () => {
+            if (atajoAvanzadoEl) atajoAvanzadoEl.open = true
+            if (atajoRedesInput) {
+                atajoRedesInput.scrollIntoView({ behavior: "smooth", block: "center" })
+                atajoRedesInput.focus()
+            }
+        })
+    }
+    if (atajoCopiarBtn) {
+        atajoCopiarBtn.addEventListener("click", async () => {
+            const url = atajoUrlEl?.textContent || ""
+            try {
+                await navigator.clipboard.writeText(url)
+                showMsg(atajoMsg, "Dirección copiada", "ok")
+            } catch {
+                showMsg(atajoMsg, "No se ha podido copiar; selecciónala a mano", "error")
+            }
+        })
+    }
     if (atajoExigirFirmaEl) {
         atajoExigirFirmaEl.addEventListener("change", () => {
             if (atajoAvisoFirmaEl) atajoAvisoFirmaEl.hidden = atajoExigirFirmaEl.checked
@@ -2726,12 +2951,136 @@ async function initAjustesLogic() {
             _doExport("/api/export/json", `portfolio-export-${date}.json`, exportJsonBtn)
         })
     }
+    // Popup de contraseña, compartido por exportar (ponerla) e importar
+    // (pedirla). Va por encima del panel de Ajustes (z-index 9000), que es
+    // desde donde se abre. `botones` es una lista de {etiqueta, clase, valor}:
+    // al pulsar uno se llama a onCerrar(valor, contrasena) con lo tecleado.
+    function _abrirModalContrasena({ titulo, texto, repetir = false, error = "", botones, onCerrar }) {
+        document.getElementById("ajustesPassModalOverlay")?.remove()
+
+        const overlay = document.createElement("div")
+        overlay.id = "ajustesPassModalOverlay"
+        overlay.className = "modalOverlay ajustesPassModalOverlay"
+
+        const modal = document.createElement("div")
+        modal.className = "assetModal ajustesPassModal"
+        modal.setAttribute("role", "dialog")
+        modal.setAttribute("aria-modal", "true")
+        modal.innerHTML = `
+            <h3 class="assetModalTitle">${titulo}</h3>
+            <p class="ajustesPassModalText">${texto}</p>
+            <label class="assetModalLabel" for="ajustesPassInput">Contraseña</label>
+            <input id="ajustesPassInput" class="assetModalInput" type="password" autocomplete="new-password" spellcheck="false">
+            ${
+                repetir
+                    ? `<label class="assetModalLabel" for="ajustesPassRepeat">Repite la contraseña</label>
+                       <input id="ajustesPassRepeat" class="assetModalInput" type="password" autocomplete="new-password" spellcheck="false">`
+                    : ""
+            }
+            <p class="ajustesPassModalError${error ? "" : " hidden"}" id="ajustesPassError">${error}</p>
+            <div class="assetModalActions ajustesPassModalActions">
+                ${botones
+                    .map(
+                        (b, i) =>
+                            `<button type="button" class="${b.clase}" data-pass-btn="${i}" data-no-autohide="true">${b.etiqueta}</button>`
+                    )
+                    .join("")}
+            </div>
+        `
+
+        const input = modal.querySelector("#ajustesPassInput")
+        const repeat = modal.querySelector("#ajustesPassRepeat")
+        const errorEl = modal.querySelector("#ajustesPassError")
+        const cerrar = () => {
+            overlay.remove()
+            document.removeEventListener("keydown", onKey)
+        }
+        const mostrarError = (msg) => {
+            errorEl.textContent = msg
+            errorEl.classList.remove("hidden")
+        }
+        const elegir = (indice) => {
+            const boton = botones[indice]
+            const contrasena = input.value
+            if (boton.necesitaContrasena) {
+                if (!contrasena) {
+                    mostrarError("Escribe una contraseña, o elige seguir sin ella.")
+                    input.focus()
+                    return
+                }
+                if (repeat && repeat.value !== contrasena) {
+                    mostrarError("Las dos contraseñas no coinciden.")
+                    repeat.focus()
+                    return
+                }
+            }
+            cerrar()
+            onCerrar(boton.valor, contrasena)
+        }
+        const onKey = (event) => {
+            if (event.key === "Escape") {
+                cerrar()
+                onCerrar("cancelar", "")
+            }
+        }
+
+        modal.querySelectorAll("[data-pass-btn]").forEach((btn) => {
+            btn.addEventListener("click", () => elegir(Number(btn.dataset.passBtn)))
+        })
+        // Enter en el campo equivale al botón principal.
+        ;[input, repeat].filter(Boolean).forEach((campo) => {
+            campo.addEventListener("keydown", (event) => {
+                if (event.key === "Enter") {
+                    event.preventDefault()
+                    elegir(botones.findIndex((b) => b.principal))
+                }
+            })
+        })
+        document.addEventListener("keydown", onKey)
+
+        overlay.appendChild(modal)
+        document.body.appendChild(overlay)
+        input.focus()
+    }
+
+    function _exportarZip(contrasena) {
+        const date = new Date().toISOString().slice(0, 10)
+        _doExport("/api/export/zip", `portfolio-export-${date}.zip`, exportZipBtn, {
+            ui: _volcarUi(),
+            incluirClaves: !!exportClavesChk?.checked,
+            contrasena: contrasena || ""
+        })
+    }
+
     if (exportZipBtn) {
         exportZipBtn.addEventListener("click", () => {
-            const date = new Date().toISOString().slice(0, 10)
-            _doExport("/api/export/zip", `portfolio-export-${date}.zip`, exportZipBtn, {
-                ui: _volcarUi(),
-                incluirClaves: !!exportClavesChk?.checked
+            // Sin claves dentro no hay nada que proteger: se descarga sin más.
+            if (!exportClavesChk?.checked) {
+                _exportarZip("")
+                return
+            }
+            _abrirModalContrasena({
+                titulo: "Proteger las claves de API",
+                texto:
+                    "El ZIP va a llevar tus claves de los proveedores y la del Atajo. Con contraseña " +
+                    "van cifradas y se pedirá al importar; sin ella, van en claro y el archivo es un secreto. " +
+                    "Si la olvidas, el resto del ZIP se puede importar igual, pero las claves no.",
+                repetir: true,
+                botones: [
+                    { etiqueta: "Cancelar", clase: "cancelButton", valor: "cancelar" },
+                    { etiqueta: "Sin contraseña", clase: "cancelButton", valor: "sin" },
+                    {
+                        etiqueta: "Con contraseña",
+                        clase: "primaryButton",
+                        valor: "con",
+                        principal: true,
+                        necesitaContrasena: true
+                    }
+                ],
+                onCerrar: (valor, contrasena) => {
+                    if (valor === "cancelar") return
+                    _exportarZip(valor === "con" ? contrasena : "")
+                }
             })
         })
     }
@@ -2761,14 +3110,44 @@ async function initAjustesLogic() {
         return escritas
     }
 
-    async function _doImport(url, file, btn) {
+    // Las claves del ZIP están protegidas: se pide la contraseña y se vuelve
+    // a mandar el mismo fichero con ella. El servidor no ha tocado nada aún.
+    function _pedirContrasenaImport(url, file, btn, error) {
+        showMsg(importMsg, "", "")
+        _abrirModalContrasena({
+            titulo: "Las claves de API van con contraseña",
+            texto:
+                "Este ZIP lleva las claves de API cifradas con la contraseña que se puso al exportar. " +
+                "Escríbela para restaurarlas, o importa el resto sin ellas.",
+            error: error || "",
+            botones: [
+                { etiqueta: "Cancelar", clase: "cancelButton", valor: "cancelar" },
+                { etiqueta: "Importar sin las claves", clase: "cancelButton", valor: "sin" },
+                { etiqueta: "Importar", clase: "primaryButton", valor: "con", principal: true, necesitaContrasena: true }
+            ],
+            onCerrar: (valor, contrasena) => {
+                if (valor === "cancelar") {
+                    showMsg(importMsg, "Importación cancelada", "")
+                    return
+                }
+                _doImport(url, file, btn, valor === "con" ? { contrasena } : { sinClaves: "1" })
+            }
+        })
+    }
+
+    async function _doImport(url, file, btn, extra = {}) {
         btn.disabled = true
         showMsg(importMsg, "Importando…", "")
         try {
             const form = new FormData()
             form.append("file", file)
+            Object.entries(extra).forEach(([clave, valor]) => form.append(clave, valor))
             const res = await fetch(url, { method: "POST", body: form })
             const data = await res.json()
+            if (!data.ok && data.necesitaContrasena) {
+                _pedirContrasenaImport(url, file, btn, extra.contrasena ? data.error : "")
+                return
+            }
             if (data.ok) {
                 // Una importación parcial no puede anunciarse como un éxito a
                 // secas: el usuario tiene que saber qué no ha entrado. Mismo

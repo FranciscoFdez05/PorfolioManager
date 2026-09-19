@@ -1555,6 +1555,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 
 .overviewFilterOption,
 .planFilterBtn,
+.calFinChip,
 .activosFilterBtn,
 .bonosFilterBtn,
 .pmFilterBtn,
@@ -1581,6 +1582,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 
 .overviewFilterOption input,
 .planFilterBtn input,
+.calFinChip input,
 .activosFilterBtn input,
 .bonosFilterBtn input,
 .pmFilterBtn input,
@@ -1592,6 +1594,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 /* dot de color antes del texto */
 .overviewFilterOption::before,
 .planFilterBtn::before,
+.calFinChip::before,
 .activosFilterBtn::before,
 .bonosFilterBtn::before,
 .pmFilterBtn::before,
@@ -1787,6 +1790,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 
 .overviewFilterOption:hover,
 .activosFilterBtn:hover,
+.calFinChip:hover,
 .bonosFilterBtn:hover,
 .mNavTab:hover,
 .mActivosFilterBtn:hover {
@@ -2859,6 +2863,112 @@ html[data-theme="black"] .segHideBtn:hover {
 .gastosCreateModalGridMonths {
     margin-top: 8px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ── Nota y detalle de un gasto/ingreso del mes ─────────────────── */
+
+/* La nota se escribe en el mismo formulario que el resto de campos, pero
+   con varias líneas: un input de una línea la haría ilegible. */
+.movNotaInput {
+    height: auto;
+    min-height: 76px;
+    padding: 10px 12px;
+    resize: vertical;
+    font-family: inherit;
+    line-height: 1.4;
+}
+
+/* La fila entera se puede pulsar para abrir el detalle. */
+.movDetailRow {
+    cursor: pointer;
+}
+
+.movDetailModal {
+    width: min(440px, 100%);
+}
+
+.movDetailList {
+    display: grid;
+    gap: 10px 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0 0 16px 0;
+}
+
+.movDetailItem {
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border-mid);
+    border-radius: 8px;
+    background: var(--bg-panel);
+}
+
+.movDetailItem dt {
+    margin: 0 0 4px 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.movDetailItem dd {
+    margin: 0;
+    color: var(--text-bright);
+    font-size: 15px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.movDetailItem dd.movDetailAmount {
+    font-variant-numeric: tabular-nums;
+    color: var(--color-neg-bright);
+}
+
+.movDetailItem dd.movDetailAmountPos {
+    color: var(--color-pos-bright);
+}
+
+.movDetailNote {
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-mid);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    background: var(--bg-panel);
+}
+
+.movDetailNoteLabel {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.movDetailNoteText {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.movDetailNoteEmpty {
+    border-left-color: var(--border-hard);
+}
+
+.movDetailNoteEmpty .movDetailNoteText {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+@media (max-width: 480px) {
+    .movDetailList {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ── Modal de mensualidades ─────────────────────────────────────── */

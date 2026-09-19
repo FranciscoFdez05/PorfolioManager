@@ -1397,6 +1397,64 @@
     color: var(--color-neg);
 }
 
+/* Las IPs que el filtro ha rechazado, con el botón de permitirlas al lado. Es
+   la misma pregunta que la IP de arriba —«¿desde dónde llega el móvil?»— pero
+   contestada para el móvil y no para el navegador, que es el que importa. */
+.ajustesAtajoRechazadas {
+    margin-top: 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg-inset);
+    padding: 10px 12px;
+}
+.ajustesAtajoRechazadas[hidden] {
+    display: none;
+}
+.ajustesAtajoRechazadasCabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.ajustesAtajoRechazo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 9px 0;
+    font-size: 12.5px;
+    border-bottom: 1px solid var(--border-soft);
+}
+.ajustesAtajoRechazo:last-child {
+    border-bottom: 0;
+}
+.ajustesAtajoRechazo code {
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--color-neg);
+}
+.ajustesAtajoRechazo.permitida code {
+    color: var(--color-pos);
+}
+.ajustesAtajoRechazoDetalle {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+.ajustesAtajoRechazoAcciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.ajustesAtajoRechazadas .ajustesFieldHint {
+    margin-top: 8px;
+}
+
 .ajustesAtajoAviso.peligro {
     border-color: rgba(231, 76, 60, 0.35);
     background: rgba(231, 76, 60, 0.08);
@@ -1633,8 +1691,158 @@
    lista de resultados de la prueba: son la misma pregunta —¿está esto listo, o
    me falta algo?— y contestarla de dos formas distintas obligaría a aprenderse
    dos lenguajes en la misma pantalla. */
-.ajustesSection > .ajustesAtajoPruebaRes {
+.ajustesAtajoPaso .ajustesAtajoPruebaRes {
+    margin-top: 10px;
+}
+
+/* Los cuatro pasos. Cada uno lleva su número en un círculo que cambia de
+   color con el estado —verde hecho, ámbar pide algo, rojo roto, gris aún
+   no—, el texto que dice qué, y a la derecha el botón que lo resuelve. La
+   pantalla se lee de arriba abajo como una lista de tareas, que es lo que es. */
+.ajustesAtajoGuia {
+    list-style: none;
+    margin: 16px 20px 0;
+    padding: 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-inset);
+    overflow: hidden;
+}
+.ajustesAtajoGuia[hidden] {
+    display: none;
+}
+/* El botón se pone a la derecha mientras cabe y baja debajo del texto cuando
+   no: la sección va a media pantalla en el escritorio y a pantalla entera en
+   el móvil, y con un ancho fijo una de las dos se rompía. */
+.ajustesAtajoPaso {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px 14px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-soft);
+}
+.ajustesAtajoPaso:last-child {
+    border-bottom: 0;
+}
+.ajustesAtajoPasoNum {
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+    background: var(--btn-bg);
+    border: 1px solid var(--border-soft);
+    margin-top: 1px;
+}
+.ajustesAtajoPaso[data-estado="ok"] .ajustesAtajoPasoNum {
+    color: #fff;
+    background: var(--color-pos);
+    border-color: var(--color-pos);
+    box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.18);
+}
+.ajustesAtajoPaso[data-estado="aviso"] .ajustesAtajoPasoNum {
+    color: #fff;
+    background: #f0a020;
+    border-color: #f0a020;
+    box-shadow: 0 0 0 3px rgba(240, 160, 32, 0.16);
+}
+.ajustesAtajoPaso[data-estado="mal"] .ajustesAtajoPasoNum {
+    color: #fff;
+    background: var(--color-neg);
+    border-color: var(--color-neg);
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.18);
+}
+.ajustesAtajoPasoCuerpo {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+.ajustesAtajoPasoTitulo {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.ajustesAtajoPasoDetalle {
+    margin-top: 3px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+.ajustesAtajoPasoDetalle strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+.ajustesAtajoPasoDetalle em {
+    font-style: normal;
+    color: var(--text-subtle);
+}
+.ajustesAtajoPasoAccion {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
+    margin-left: auto;
+}
+/* El rechazado va dentro del paso 2 y ya tiene fondo: sin doble marco. */
+.ajustesAtajoPaso .ajustesAtajoRechazadas {
+    margin-top: 10px;
+    background: var(--bg-elevated, transparent);
+}
+.ajustesAtajoUrlFila {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 12.5px;
+}
+.ajustesAtajoUrlEtiqueta {
+    color: var(--text-dim);
+}
+.ajustesAtajoUrlFila code {
+    font-family: monospace;
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+.ajustesAtajoMsgFila {
+    margin: 8px 20px 0;
+    min-height: 18px;
+}
+.ajustesAtajoMsgFila:empty {
+    display: none;
+}
+
+/* El desplegable de redes y firma. Dentro, los mismos bloques que antes
+   estaban sueltos en la sección, sin el canal de 20px que ya pone el marco. */
+.ajustesSection > .ajustesAtajoAvanzado {
     margin: 14px 20px 0;
+}
+.ajustesAtajoAvanzado .ajustesAtajoDatos,
+.ajustesAtajoAvanzado .ajustesAtajoAviso {
+    padding-left: 0;
+    padding-right: 0;
+    margin-left: 0;
+    margin-right: 0;
+}
+.ajustesAtajoAvanzado .ajustesAtajoAviso {
+    padding: 12px 14px;
+    margin-top: 12px;
+}
+.ajustesAtajoAvanzado .ajustesField {
+    margin-top: 14px;
+}
+.ajustesAtajoAvanzado .ajustesSwitchRow {
+    padding: 14px 0 4px;
+}
+.ajustesAtajoAvanzado .ajustesActions {
+    padding: 12px 0 4px;
 }
 
 .ajustesAtajoDatos {
@@ -1720,4 +1928,35 @@
     font-size: 12.5px;
     line-height: 1.55;
     color: var(--text-subtle);
+}
+
+/* ── Contraseña de las claves en el ZIP ───────────────────────────────────────
+   Popup que se abre desde Exportar (para ponerla) e Importar (para pedirla).
+   Ajustes es un panel a pantalla completa con z-index 9000, así que el popup
+   tiene que quedar por encima de él, no del contenido de detrás. */
+.ajustesPassModalOverlay {
+    z-index: 10000;
+}
+.ajustesPassModal {
+    width: min(500px, 100%);
+}
+.ajustesPassModalText {
+    margin: 0 0 16px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.6;
+}
+.ajustesPassModalError {
+    margin: -8px 0 12px;
+    color: var(--color-neg-bright);
+    font-size: 13px;
+}
+.ajustesPassModalActions .cancelButton:first-child {
+    margin-right: auto;
+}
+html[data-theme="light"] .ajustesPassModalText {
+    color: #475569;
+}
+html[data-theme="light"] .ajustesPassModalError {
+    color: #dc2626;
 }

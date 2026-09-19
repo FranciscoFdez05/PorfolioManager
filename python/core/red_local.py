@@ -22,6 +22,9 @@ en core/settings.py avisa al arrancar de esa combinación.
 import functools
 import ipaddress
 import logging
+import threading
+from collections import OrderedDict
+from datetime import UTC, datetime
 
 from flask import jsonify, request
 
@@ -30,6 +33,50 @@ from core import atajo_acceso, settings
 log = logging.getLogger(__name__)
 
 SECCION = "atajo"
+
+# Las últimas IPs rechazadas por este filtro, para que Ajustes las pueda enseñar
+# con un botón de «permitir» al lado. En memoria y no en disco: es un apunte de
+# diagnóstico —«¿desde qué dirección llega el móvil?»—, no un registro, y al
+# reiniciar basta con volver a lanzar el Atajo para que reaparezca. Una entrada
+# por IP, con la última vez, la ruta y cuántas veces; sin las rutas repetidas
+# de un mismo Atajo (lista, categorías, preparar…) ocupando cuatro filas.
+MAX_RECHAZOS = 20
+_rechazos = OrderedDict()
+_rechazosLock = threading.Lock()
+
+
+def registrarRechazo(ip, metodo, ruta):
+    if not ip:
+        return
+    with _rechazosLock:
+        previo = _rechazos.pop(ip, None)
+        _rechazos[ip] = {
+            "ip": ip,
+            "metodo": metodo,
+            "ruta": ruta,
+            "ultima": datetime.now(UTC).isoformat(timespec="seconds"),
+            "veces": (previo["veces"] if previo else 0) + 1,
+        }
+        while len(_rechazos) > MAX_RECHAZOS:
+            _rechazos.popitem(last=False)
+
+
+def rechazosRecientes():
+    """Las IPs rechazadas, la más reciente primero, y si ya estarían permitidas.
+
+    `permitida` se calcula ahora y no cuando se rechazó: así, tras añadir un
+    rango en Ajustes, la fila cambia a «ya permitida» sin esperar a que el
+    móvil vuelva a llamar.
+    """
+    with _rechazosLock:
+        filas = list(reversed(_rechazos.values()))
+    redes = leerRedesPermitidas()
+    return [{**fila, "permitida": ipEstaPermitida(fila["ip"], redes)} for fila in filas]
+
+
+def olvidarRechazos():
+    with _rechazosLock:
+        _rechazos.clear()
 
 
 def atajoActivado():
@@ -111,6 +158,7 @@ def soloRedLocal(func):
 
         if not ipEstaPermitida(ipCliente, redes):
             log.warning("[red_local] %s %s rechazada desde %s", request.method, request.path, ipCliente)
+            registrarRechazo(ipCliente, request.method, request.path)
             # Se devuelve la IP de origen para que configurar esto no exija
             # entrar por SSH a leer el log: basta abrir el endpoint desde el
             # móvil y ver con qué dirección llega. No revela nada que el

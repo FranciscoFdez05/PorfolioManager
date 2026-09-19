@@ -77,6 +77,7 @@ def sanitize_month_rows(rows):
             "nombre": str(row.get("nombre", ""))[:_MAX_NAME].strip(),
             "tipo": str(row.get("tipo", ""))[:_MAX_LABEL].strip(),
             "cantidad": str(row.get("cantidad", ""))[:_MAX_SHORT].strip(),
+            "nota": str(row.get("nota", ""))[:_MAX_NOTA].strip(),
         }
         for row in rows
     ]
@@ -233,12 +234,12 @@ def read_ingresos_year(year):
     months = {}
     for month in MONTH_KEYS:
         month_rows = conn.execute(
-            "SELECT fecha, nombre, tipo, cantidad FROM ingresos_rows "
+            "SELECT fecha, nombre, tipo, cantidad, nota FROM ingresos_rows "
             "WHERE year = ? AND month = ? ORDER BY id",
             (normalized, month)
         ).fetchall()
         months[month] = {"rows": [
-            {"fecha": r["fecha"], "nombre": r["nombre"], "tipo": r["tipo"], "cantidad": r["cantidad"]}
+            {"fecha": r["fecha"], "nombre": r["nombre"], "tipo": r["tipo"], "cantidad": r["cantidad"], "nota": r["nota"]}
             for r in month_rows
         ]}
 
@@ -291,9 +292,10 @@ def write_ingresos_year(year, data):
                 normalized, month,
                 row.get("fecha", ""), row.get("nombre", ""),
                 row.get("tipo", ""), row.get("cantidad", ""),
+                row.get("nota", ""),
             ))
     conn.executemany(
-        "INSERT INTO ingresos_rows (year, month, fecha, nombre, tipo, cantidad) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO ingresos_rows (year, month, fecha, nombre, tipo, cantidad, nota) VALUES (?, ?, ?, ?, ?, ?, ?)",
         rows_to_insert
     )
 
