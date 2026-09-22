@@ -80,12 +80,19 @@ html[data-theme="black"] .assetsListHeader {
 html[data-theme="black"] .detailRotationBar {
     background: #222228;
 }
-html[data-theme="black"] .sidebarDetailToggle,
+html[data-theme="black"] .sidebarChartBtn {
+    background: #17171b;
+    border-color: #222228;
+    color: #dcdce8;
+}
+html[data-theme="black"] .sidebarChartBtn:hover {
+    background: #1e1e22;
+    border-color: #2e2e36;
+}
 html[data-theme="black"] .sidebarFilterBar {
     background: #0e0e10;
     border-color: #222228;
 }
-html[data-theme="black"] .sidebarDetailBtn.active,
 html[data-theme="black"] .sidebarFilterBtn.active {
     background: #1e1e22;
     color: #f0f0f4;
@@ -443,16 +450,23 @@ html[data-theme="light"] .assetsListHeader {
 html[data-theme="light"] .detailRotationBar {
     background: #e2e8f0;
 }
-html[data-theme="light"] .sidebarDetailToggle,
+html[data-theme="light"] .sidebarChartBtn {
+    background: #ffffff;
+    border-color: #e2e8f0;
+    color: #1e293b;
+}
+html[data-theme="light"] .sidebarChartBtn:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
 html[data-theme="light"] .sidebarFilterBar {
     background: #f1f5f9;
     border-color: #e2e8f0;
 }
-html[data-theme="light"] .sidebarDetailBtn,
 html[data-theme="light"] .sidebarFilterBtn {
     color: #64748b;
 }
-html[data-theme="light"] .sidebarDetailBtn.active,
 html[data-theme="light"] .sidebarFilterBtn.active {
     background: #ffffff;
     color: #0f172a;

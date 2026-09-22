@@ -210,7 +210,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initMetricsScroll(document.querySelector(".metrics"), sideWrapper)
     initNavigation(navButtons, contentArea)
     initResizeHandles()
-    initSidebarDetailToggle()
+    initSidebarChartButton()
     initSidebarFilterBar()
     initAssetModal(
         assetModalOverlay,

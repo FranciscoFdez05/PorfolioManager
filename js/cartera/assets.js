@@ -834,7 +834,6 @@ async function updateAssetDetail(asset) {
     }
 
     _sidebarAssetActual = asset
-    renderSidebarAssetChart()
 
     renderAssetCompletedOperationsSection(asset)
     renderAssetVentasSection(asset)
@@ -4756,96 +4755,45 @@ function initEditAssetModal() {
     }
 }
 
-// ── Vista del panel lateral: ficha o gráfico ─────────────────────────────────
+// ── Gráfico del activo de la barra lateral ───────────────────────────────────
 //
-// La mitad de abajo de la barra enseña una cosa u otra del activo elegido: las
-// tarjetas de datos de siempre, o su gráfico de TradingView incrustado. La
-// elección se guarda porque es una preferencia de cómo se quiere trabajar, no
-// algo que se decida en cada activo.
+// El botón abre el mismo diálogo centrado que la ficha del activo y las
+// tarjetas de los planes. Se intentó incrustarlo en la propia barra y no vale:
+// en una columna de 300px el widget sale ilegible, así que el gráfico se mira
+// donde hay sitio para mirarlo.
 //
-// El <iframe> se crea al entrar en el gráfico y se destruye al salir: dejarlo
-// puesto cargaría TradingView en cada arranque aunque nadie lo mire, y con un
-// activo sin ticker no habría nada que enseñar.
-const _SIDEBAR_VISTA_KEY = "sidebarDetailView"
+// Se queda en el panel lo que la barra hace bien: identificar el activo y dar
+// sus números de un vistazo.
 
-// Activo que se está enseñando en el panel. Lo necesita el gráfico para saber
-// qué pintar cuando se cambia de vista sin cambiar de activo.
+// Activo que se está enseñando en el panel: es el que abre el botón.
 let _sidebarAssetActual = null
 
-function getSidebarDetailView() {
-    try {
-        return localStorage.getItem(_SIDEBAR_VISTA_KEY) === "grafico" ? "grafico" : "ficha"
-    } catch {
-        return "ficha"
-    }
-}
+function initSidebarChartButton() {
+    const boton = document.getElementById("sidebarChartBtn")
+    if (!boton) return
 
-function renderSidebarAssetChart() {
-    const contenedor = document.getElementById("detailChart")
-    if (!contenedor) return
-
-    const enGrafico = getSidebarDetailView() === "grafico"
-    contenedor.classList.toggle("hidden", !enGrafico)
-    document.getElementById("assetDetailView")?.classList.toggle("detailChartMode", enGrafico)
-
-    if (!enGrafico) {
-        contenedor.innerHTML = ""
-        return
-    }
-
-    if (!_sidebarAssetActual) {
-        contenedor.innerHTML = `<p class="detailChartAviso">Elige un activo para ver su gráfico.</p>`
-        return
-    }
-
-    // Hay que mirar el ticker y no lo que devuelve buildTVSymbol: cuando el
-    // activo no tiene ninguno, esa función cae al nombre en mayúsculas ("SIN
-    // TICKER") y el widget cargaría un símbolo que no existe en TradingView.
-    const tieneTicker = Boolean(
-        String(_sidebarAssetActual.tvSymbol || "").trim() ||
-            String(_sidebarAssetActual.marketSymbol || _sidebarAssetActual.finnhubSymbol || "").trim()
-    )
-    const simbolo = tieneTicker ? buildTVSymbol(_sidebarAssetActual) : ""
-
-    if (!simbolo) {
-        contenedor.dataset.simbolo = ""
-        contenedor.innerHTML = `<p class="detailChartAviso">Este activo no tiene ticker de mercado, así que no hay gráfico que enseñar. Se le pone uno desde Activos › Editar.</p>`
-        return
-    }
-
-    // Se repinta solo cuando cambia el símbolo: reasignar el mismo src recarga
-    // el widget entero y se ve el parpadeo en cada refresco de la barra.
-    if (contenedor.dataset.simbolo === simbolo && contenedor.querySelector("iframe")) return
-
-    contenedor.dataset.simbolo = simbolo
-    contenedor.innerHTML = `<iframe src="${buildTVIframeUrl(simbolo)}" frameborder="0" allowtransparency="true" scrolling="no" allowfullscreen title="Gráfico de ${escapeAttr(_sidebarAssetActual.name || simbolo)}"></iframe>`
-}
-
-function initSidebarDetailToggle() {
-    const grupo = document.getElementById("sidebarDetailToggle")
-    if (!grupo) return
-
-    const sincronizar = () => {
-        const vista = getSidebarDetailView()
-        grupo.querySelectorAll(".sidebarDetailBtn").forEach((boton) => {
-            boton.classList.toggle("active", boton.dataset.vista === vista)
-            boton.setAttribute("aria-pressed", String(boton.dataset.vista === vista))
-        })
-        renderSidebarAssetChart()
-    }
-
-    grupo.addEventListener("click", (evento) => {
-        const boton = evento.target.closest(".sidebarDetailBtn")
-        if (!boton) return
-        try {
-            localStorage.setItem(_SIDEBAR_VISTA_KEY, boton.dataset.vista)
-        } catch {
-            /* sin persistencia, la vista dura lo que la sesión */
+    boton.addEventListener("click", () => {
+        if (!_sidebarAssetActual) {
+            showToast("Elige un activo para ver su gráfico", { type: "warning" })
+            return
         }
-        sincronizar()
-    })
 
-    sincronizar()
+        // Hay que mirar el ticker y no lo que devuelve buildTVSymbol: cuando el
+        // activo no tiene ninguno, esa función cae al nombre en mayúsculas
+        // ("SIN TICKER") y el widget abriría un símbolo que no existe.
+        const tieneTicker = Boolean(
+            String(_sidebarAssetActual.tvSymbol || "").trim() ||
+                String(_sidebarAssetActual.marketSymbol || _sidebarAssetActual.finnhubSymbol || "").trim()
+        )
+        const simbolo = tieneTicker ? buildTVSymbol(_sidebarAssetActual) : ""
+
+        if (!simbolo) {
+            showToast("Este activo no tiene ticker de mercado con el que abrir el gráfico", { type: "warning" })
+            return
+        }
+
+        openTVChartModal(simbolo, _sidebarAssetActual.name || _sidebarAssetActual.symbol || simbolo)
+    })
 }
 
 function initAssetModal(

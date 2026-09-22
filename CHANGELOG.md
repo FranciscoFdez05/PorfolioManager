@@ -22,6 +22,25 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.3.1] — 2026-09-22
+
+**Esquema de base de datos:** no lo toca (sigue en la versión **7**). Para
+deshacer la actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Corregido
+
+**El gráfico de la barra lateral se abre en grande, no dentro de la barra.**
+En la 2.3.0 el botón del panel lateral incrustaba el gráfico de TradingView en
+la propia columna, y ahí no se ve nada: 300 px de ancho no dan para un gráfico
+de velas con sus ejes. El botón pasa a llamarse **Ver gráfico** y abre el mismo
+diálogo centrado que ya usaban la ficha del activo y las tarjetas de los
+planes. El panel lateral se queda siempre con la ficha —nombre, precio,
+posición, invertido, P/L, precio medio y comisiones—, que es lo que sí cabe
+ahí.
+
 ## [2.3.0] — 2026-09-22
 
 **Esquema de base de datos:** sube a la versión **7** (venía de la 6). La

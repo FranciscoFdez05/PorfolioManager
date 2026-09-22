@@ -267,12 +267,12 @@
             <div class="assetToolbar">
                 <!-- Alta de activos y refresco de cotizaciones viven en la
                      página Activos: aquí ocupaban la mitad de la barra para dos
-                     acciones que no son de consulta. En su sitio, lo que decide
-                     qué se ve debajo: la ficha de datos o el gráfico. -->
-                <div class="sidebarDetailToggle" id="sidebarDetailToggle" role="group" aria-label="Vista del activo">
-                    <button class="sidebarDetailBtn active" data-vista="ficha" type="button">Ficha</button>
-                    <button class="sidebarDetailBtn" data-vista="grafico" type="button">Gráfico</button>
-                </div>
+                     acciones que no son de consulta. En su sitio, el gráfico
+                     del activo que se esté mirando. -->
+                <button class="sidebarChartBtn" id="sidebarChartBtn" type="button" title="Ver el gráfico del activo">
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 12.5 6 8l3 2.5L14 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 4H14v3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>Ver gráfico</span>
+                </button>
                 <div class="sidebarFilterBar" id="sidebarFilterBar">
                     <button class="sidebarFilterBtn active" data-filter="portfolio" type="button">Portfolio</button>
                     <button class="sidebarFilterBtn" data-filter="watchlist" type="button">Watchlist</button>
@@ -332,10 +332,6 @@
                 <div class="detailMeta" id="detStatus">Sin datos de mercado</div>
                 <div class="detailMeta" id="detFinnhub">Ticker mercado: ---</div>
 
-                <!-- El gráfico del activo seleccionado. El <iframe> lo pone y lo
-                     quita el módulo: dejarlo fijo cargaría TradingView en cada
-                     arranque aunque la vista elegida sea la ficha. -->
-                <div class="detailChart hidden" id="detailChart"></div>
             </div>
         </aside>
     </div>
