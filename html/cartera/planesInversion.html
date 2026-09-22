@@ -1,0 +1,54 @@
+<div class="pinvPage">
+
+    <!-- Selector de plan y acciones. Queda fuera del scroll de la tabla: con
+         varios planes hay que poder cambiar de uno a otro sin subir. -->
+    <div class="pinvToolbar">
+        <div class="pinvPlanTabs" id="pinvPlanTabs"></div>
+        <div class="pinvToolbarActions">
+            <button type="button" id="pinvArchivoBtn" class="secondaryButton pinvArchivoBtn" title="Archivar planes, ver los archivados y recuperarlos">Archivados</button>
+            <button type="button" id="pinvCrearBtn" class="primaryButton">+ Crear plan</button>
+        </div>
+    </div>
+
+    <div class="pinvBody" id="pinvBody">
+        <div class="pinvMain">
+            <div class="pinvPlanHeader" id="pinvPlanHeader"></div>
+            <div class="pinvTableWrap" id="pinvTableWrap">
+                <table class="pinvTable" id="pinvTable">
+                    <thead>
+                        <tr>
+                            <th class="pinvThOrden">Orden</th>
+                            <th class="pinvThActivo">Activo</th>
+                            <th class="pinvThNum">Cantidad</th>
+                            <th class="pinvThNum">Precio</th>
+                            <th class="pinvThNum">Invertido bruto</th>
+                            <th class="pinvThNum">% invertido</th>
+                            <th class="pinvThEstado"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="pinvBodyRows"></tbody>
+                </table>
+                <p class="overviewEmpty hidden" id="pinvEmptyMsg"></p>
+            </div>
+        </div>
+
+        <aside class="pinvSide" id="pinvSide">
+            <div class="pinvChartCard">
+                <div class="pinvChartTitle">Estado del plan</div>
+                <div class="pinvChartWrap">
+                    <canvas id="pinvChart"></canvas>
+                    <div class="pinvChartCenter" id="pinvChartCenter"></div>
+                </div>
+                <div class="pinvChartLegend" id="pinvChartLegend"></div>
+            </div>
+
+            <!-- Reparto del plan entre sus activos. Usa los mismos dos colores
+                 que la dona de arriba, así que se lee con su leyenda. -->
+            <div class="pinvChartCard pinvRepartoCard" id="pinvRepartoCard">
+                <div class="pinvChartTitle">Reparto por activo</div>
+                <div class="pinvReparto" id="pinvReparto"></div>
+            </div>
+        </aside>
+    </div>
+
+</div>

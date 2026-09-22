@@ -1124,24 +1124,17 @@ function bindGastosEvents() {
         deleteYearButton.addEventListener("click", () => {
             openConfirmModal({
                 title: "Eliminar año",
-                message: `Vas a eliminar el año ${currentGastosYear}. ¿Quieres continuar?`,
+                message: `Vas a eliminar el año ${currentGastosYear} con todos sus gastos. Esto no se puede deshacer.`,
                 confirmLabel: "Eliminar",
                 confirmSide: "right",
+                requireText: String(currentGastosYear),
                 onConfirm: async () => {
-                    openConfirmModal({
-                        title: "Segunda verificación",
-                        message: `Esta acción borrará definitivamente el año ${currentGastosYear}. ¿Confirmas que quieres eliminarlo?`,
-                        confirmLabel: "Eliminar",
-                        confirmSide: "left",
-                        onConfirm: async () => {
-                            const response = await deleteGastosYearRequest(currentGastosYear)
-                            gastosYears = Array.isArray(response.years) ? response.years : await loadGastosYears()
-                            currentGastosYear = gastosYears[0]
-                            currentGastosView = "year"
-                            currentGastosMonth = "enero"
-                            await renderGastosYear(currentGastosYear)
-                        }
-                    })
+                    const response = await deleteGastosYearRequest(currentGastosYear)
+                    gastosYears = Array.isArray(response.years) ? response.years : await loadGastosYears()
+                    currentGastosYear = gastosYears[0]
+                    currentGastosView = "year"
+                    currentGastosMonth = "enero"
+                    await renderGastosYear(currentGastosYear)
                 }
             })
         })
@@ -2243,9 +2236,10 @@ function handleMensualidadesActionClick(event) {
 
     openConfirmModal({
         title: "Eliminar mensualidad",
-        message: `Vas a eliminar "${normalizeMensualidad(row).nombre}". ¿Quieres continuar?`,
+        message: `Vas a eliminar "${normalizeMensualidad(row).nombre}" y su historial de cobros. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
         confirmSide: "right",
+        requireText: normalizeMensualidad(row).nombre,
         onConfirm: async () => {
             currentGastosData.mensualidades.splice(index, 1)
             renderCurrentGastosView()

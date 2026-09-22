@@ -28,6 +28,18 @@
     overflow-x: hidden;
 }
 
+/* El refresco de cotizaciones, que antes estaba en la barra lateral. Va con su
+   icono y con el mismo alto que el botón de alta que tiene al lado. */
+.activosRefreshBtn {
+    gap: 7px;
+}
+
+.activosRefreshBtn svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+
 .activosToolbar {
     display: flex;
     align-items: center;
@@ -40,8 +52,7 @@
 
 #activosAddBtn,
 #seguimientoAddBtn,
-#addAssetBtn,
-#refreshSidebarMarketBtn,
+#activosRefreshBtn,
 #addAssetRowBtn,
 #addRowBtn,
 #addRowDividendoBtn,
@@ -83,8 +94,7 @@
 
 #activosAddBtn:hover,
 #seguimientoAddBtn:hover,
-#addAssetBtn:hover,
-#refreshSidebarMarketBtn:hover,
+#activosRefreshBtn:hover,
 #addAssetRowBtn:hover,
 #addRowBtn:hover,
 #addRowDividendoBtn:hover,

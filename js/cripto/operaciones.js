@@ -59,6 +59,7 @@ let operationsAssetRefreshTimeout = null
 let operationsPersistenceBound = false
 let currentOperationTypeFilter = new Set(OPERATION_ORDER_OPTIONS)
 let currentOperationStatusFilter = new Set(OPERATION_STATUS_OPTIONS)
+let collapsedOperationYears = new Set()
 let operationsAssets = []
 let operationsStablecoinsData = { catalog: [], enabledSymbols: [], rows: [] }
 let operationsTransaccionesRows = []
@@ -624,6 +625,7 @@ async function initOperationsPage(scope) {
     }
     currentOperationTypeFilter = loadOperationsFilterState("type", OPERATION_ORDER_OPTIONS)
     currentOperationStatusFilter = loadOperationsFilterState("status", OPERATION_STATUS_OPTIONS)
+    collapsedOperationYears = loadOperationsCollapsedYears()
     bindOperationsPersistenceGuards()
     window.flushPendingPageChanges = flushOperationsPendingChanges
     renderOperationsFilterState()
@@ -642,6 +644,7 @@ function bindOperationsEvents() {
     if (operationsBody && !operationsBody.dataset.bound) {
         operationsBody.dataset.bound = "true"
         operationsBody.addEventListener("click", handleOperationsDeleteClick)
+        operationsBody.addEventListener("change", handleOperationsStatusChange)
     }
 
     if (addButton && !addButton.dataset.bound) {
@@ -711,6 +714,29 @@ function loadOperationsFilterState(group, defaults) {
         /* ignorar */
     }
     return new Set(defaults)
+}
+
+function operationsCollapsedYearsStorageKey() {
+    return operationsScope === "cripto" ? "operationsCollapsedYears" : `operationsCollapsedYears_${operationsScope}`
+}
+
+function loadOperationsCollapsedYears() {
+    try {
+        const raw = localStorage.getItem(operationsCollapsedYearsStorageKey())
+        const parsed = raw ? JSON.parse(raw) : null
+        if (Array.isArray(parsed)) return new Set(parsed.map((year) => String(year)))
+    } catch {
+        /* ignorar */
+    }
+    return new Set()
+}
+
+function saveOperationsCollapsedYears() {
+    try {
+        localStorage.setItem(operationsCollapsedYearsStorageKey(), JSON.stringify([...collapsedOperationYears]))
+    } catch {
+        /* ignorar */
+    }
 }
 
 function saveOperationsFilterState() {
@@ -864,14 +890,43 @@ function groupCompletedOperationsByYear(rows = []) {
     })
 }
 
+// Las filas sin año legible van todas al mismo grupo, así que necesitan una
+// clave propia para poder plegarlo como los demás.
+function getOperationsYearKey(group = {}) {
+    return group.year || "sin-fecha"
+}
+
 function buildOperationsYearHeaderRow(group) {
     const columnCount = document.querySelector(".operationsTable thead tr")?.cells.length || 13
     const label = group.year || "Sin fecha"
     const count = group.rows.length
+    const collapsed = collapsedOperationYears.has(getOperationsYearKey(group))
     const tr = document.createElement("tr")
-    tr.className = "tableGroupRow operationsYearRow"
-    tr.innerHTML = `<td class="operationsYearHeader" colspan="${columnCount}">Completadas ${label} · ${count} ${count === 1 ? "operación" : "operaciones"}</td>`
+    tr.className = `tableGroupRow operationsYearRow${collapsed ? " operationsYearRowCollapsed" : ""}`
+    tr.dataset.year = getOperationsYearKey(group)
+    tr.innerHTML = `
+        <td class="operationsYearHeader" colspan="${columnCount}">
+            <button type="button" class="operationsYearToggle" aria-expanded="${collapsed ? "false" : "true"}">
+                <span class="operationsYearChevron" aria-hidden="true"></span>
+                <span>Completadas ${label} · ${count} ${count === 1 ? "operación" : "operaciones"}</span>
+            </button>
+        </td>`
     return tr
+}
+
+function toggleOperationsYearGroup(yearKey) {
+    if (!yearKey) {
+        return
+    }
+
+    if (collapsedOperationYears.has(yearKey)) {
+        collapsedOperationYears.delete(yearKey)
+    } else {
+        collapsedOperationYears.add(yearKey)
+    }
+
+    saveOperationsCollapsedYears()
+    renderOperationsTable()
 }
 
 function renderOperationsTable() {
@@ -905,6 +960,11 @@ function renderOperationsTable() {
 
     completedGroups.forEach((group) => {
         operationsBody.appendChild(buildOperationsYearHeaderRow(group))
+
+        if (collapsedOperationYears.has(getOperationsYearKey(group))) {
+            return
+        }
+
         group.rows.forEach((row) => {
             operationsBody.appendChild(buildOperationRow(row))
         })
@@ -959,7 +1019,7 @@ function buildOperationRow(row) {
         <td>${formatOperationsMoney(normalizedRow.total, normalizedRow.currency || "USD")}</td>
         <td data-field="comisionesCripto">${formatOperationsCryptoCommissionCell(normalizedRow)}</td>
         <td data-field="comisionesFiat">${formatOperationsMoney(normalizedRow.comisionesFiat, "EUR")}</td>
-        <td>${normalizedRow.estado || ""}</td>
+        <td class="operationsEstadoCell" data-field="estado">${formatOperationsStatusCell(normalizedRow)}</td>
         <td>${normalizedRow.fechaCierre || ""}</td>
         <td class="rowActionsCell">
             <div class="rowMenu">
@@ -1042,6 +1102,27 @@ function formatOperationsCryptoCommissionCell(row = {}) {
     return `<span class="operationsFeeAmount">${formattedAmount}${symbol ? ` ${symbol}` : ""}</span>${hint}`
 }
 
+function getOperationsStatusModifier(estado) {
+    return (
+        {
+            Activo: "activo",
+            Completado: "completado",
+            Cancelado: "cancelado"
+        }[estado] || "activo"
+    )
+}
+
+// El estado se cambia desde la propia tabla, sin abrir el modal de edición: la
+// celda pinta un selector con los tres estados y el cambio se guarda solo.
+function formatOperationsStatusCell(row = {}) {
+    const estado = OPERATION_STATUS_OPTIONS.includes(row.estado) ? row.estado : "Activo"
+    const options = OPERATION_STATUS_OPTIONS.map(
+        (option) => `<option value="${option}"${option === estado ? " selected" : ""}>${option}</option>`
+    ).join("")
+
+    return `<select class="operationsEstadoSelect is-${getOperationsStatusModifier(estado)}" data-row-id="${row.id}" title="Cambiar estado">${options}</select>`
+}
+
 function formatOperationsMoney(value, currency = "EUR") {
     const parsedValue = parseLooseNumber(value)
 
@@ -1050,6 +1131,74 @@ function formatOperationsMoney(value, currency = "EUR") {
     }
 
     return formatMoney(parsedValue, currency)
+}
+
+// El saldo de la stablecoin solo estorba cuando una compra se queda en Activo,
+// que es el estado que bloquea fondos. Lo consultan el modal y el selector de
+// la tabla, así que avisan igual desde los dos sitios.
+function getOperationsInsufficientBalanceMessage(rowData, rowId = "") {
+    if (rowData.estado !== "Activo" || rowData.orden !== "Compra") {
+        return ""
+    }
+
+    const symbol = getOperationStablecoinSymbol(rowData)
+    const required = parseLooseNumber(rowData.total) || 0
+
+    if (!symbol || required <= 0) {
+        return ""
+    }
+
+    const otherRows = getScopedOperationRows().filter((row) => row.id !== rowId)
+    const summary = buildOperationsStablecoinBalanceSummary(operationsStablecoinsData, otherRows)
+    const available = summary[symbol]?.available ?? 0
+
+    if (required <= available) {
+        return ""
+    }
+
+    return `Saldo insuficiente en ${symbol}. Disponible: ${formatMoney(available, "USD")} | Requerido: ${formatMoney(required, "USD")}`
+}
+
+function changeOperationRowStatus(rowId, nextStatus, select = null) {
+    const rows = currentOperationsData.rows || []
+    const rowIndex = rows.findIndex((row) => row.id === rowId)
+
+    if (rowIndex < 0 || !OPERATION_STATUS_OPTIONS.includes(nextStatus)) {
+        return
+    }
+
+    const previousStatus = rows[rowIndex].estado
+
+    if (previousStatus === nextStatus) {
+        return
+    }
+
+    const updatedRow = normalizeOperationRow({ ...rows[rowIndex], estado: nextStatus })
+    const balanceWarning = getOperationsInsufficientBalanceMessage(updatedRow, rowId)
+
+    if (balanceWarning) {
+        if (select) {
+            select.value = previousStatus
+        }
+
+        showOperationsPopup("Saldo insuficiente", balanceWarning)
+        return
+    }
+
+    rows[rowIndex] = updatedRow
+    renderOperationsTable()
+    scheduleOperationsAssetRefresh()
+    scheduleOperationsAutosave()
+}
+
+function handleOperationsStatusChange(event) {
+    const select = event.target.closest(".operationsEstadoSelect")
+
+    if (!select) {
+        return
+    }
+
+    changeOperationRowStatus(select.dataset.rowId, select.value, select)
 }
 
 function requestOperationRowDeletion(rowId) {
@@ -1091,6 +1240,12 @@ function requestOperationRowDeletion(rowId) {
 }
 
 function handleOperationsDeleteClick(event) {
+    const yearRow = event.target.closest(".operationsYearRow")
+    if (yearRow) {
+        toggleOperationsYearGroup(yearRow.dataset.year)
+        return
+    }
+
     const editButton = event.target.closest(".operacionRowEditBtn")
     if (editButton) {
         syncOperationsDataFromTable()
@@ -1322,26 +1477,11 @@ function saveOperacionRowFromModal() {
         fechaCierre: g("opModalFechaCierre")
     })
 
-    if (rowData.estado === "Activo" && rowData.orden === "Compra") {
-        const symbol = getOperationStablecoinSymbol(rowData)
-        const required = parseLooseNumber(rowData.total) || 0
+    const balanceWarning = getOperationsInsufficientBalanceMessage(rowData, rowId)
 
-        if (symbol && required > 0) {
-            const operationsRowsWithoutCurrent = getScopedOperationRows().filter((r) => r.id !== rowId)
-            const summary = buildOperationsStablecoinBalanceSummary(
-                operationsStablecoinsData,
-                operationsRowsWithoutCurrent
-            )
-            const available = summary[symbol]?.available ?? 0
-
-            if (required > available) {
-                showOperationsPopup(
-                    "Saldo insuficiente",
-                    `Saldo insuficiente en ${symbol}. Disponible: ${formatMoney(available, "USD")} | Requerido: ${formatMoney(required, "USD")}`
-                )
-                return
-            }
-        }
+    if (balanceWarning) {
+        showOperationsPopup("Saldo insuficiente", balanceWarning)
+        return
     }
 
     const rowIndex = (currentOperationsData.rows || []).findIndex((r) => r.id === rowId)

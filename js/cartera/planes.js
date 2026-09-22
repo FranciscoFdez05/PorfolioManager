@@ -526,12 +526,15 @@ function planEliminar(planId) {
     const row = _planesRows.find((fila) => fila.id === planId)
     if (!row) return
 
+    const nombre = row.nombre || row.symbol || planId
+
     planCerrarModal()
     openConfirmModal({
         title: "Eliminar plan",
-        message: `¿Quieres eliminar el plan "${row.nombre || row.symbol || planId}"?`,
-        confirmLabel: "Sí, eliminar",
+        message: `Vas a eliminar el plan "${nombre}". Esto no se puede deshacer.`,
+        confirmLabel: "Eliminar",
         confirmSide: "right",
+        requireText: nombre,
         onConfirm: async () => {
             _planesRows = _planesRows.filter((fila) => fila.id !== planId)
             planesRender()

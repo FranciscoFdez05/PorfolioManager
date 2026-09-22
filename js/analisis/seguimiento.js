@@ -355,19 +355,14 @@ function segRemoveItem(segId) {
 
     openConfirmModal({
         title: "Eliminar activo",
-        message: `¿Quieres eliminar "${itemName}" de la watchlist?`,
-        confirmLabel: "Sí, eliminar",
+        message: `Vas a eliminar "${itemName}" de la watchlist. Esto no se puede deshacer.`,
+        confirmLabel: "Eliminar",
         confirmSide: "right",
+        requireText: itemName,
         onConfirm: () => {
-            openConfirmModal({
-                title: "¿Estás seguro?",
-                message: `Esta acción eliminará "${itemName}" de la watchlist de forma definitiva. ¿Confirmas?`,
-                confirmLabel: "Sí, estoy seguro",
-                confirmSide: "right",
-                onConfirm: () => {
-                    segOpenDeleteTypeConfirm(segId, itemName)
-                }
-            })
+            const customs = segLoadCustomItems().filter((c) => c._segId !== segId)
+            segSaveCustomItems(customs)
+            segMergeAndRender(window._segPortfolioAssets || [])
         }
     })
 }
@@ -379,81 +374,21 @@ async function segDeleteWatchAsset(segId) {
 
     openConfirmModal({
         title: "Eliminar activo",
-        message: `¿Quieres eliminar "${itemName}" del portfolio y la watchlist?`,
-        confirmLabel: "Sí, eliminar",
+        message: `Vas a eliminar "${itemName}" del portfolio y de la watchlist: sus compras, operaciones y planes se borran con él. Esto no se puede deshacer.`,
+        confirmLabel: "Eliminar",
         confirmSide: "right",
-        onConfirm: () => {
-            openConfirmModal({
-                title: "¿Estás seguro?",
-                message: `Esta acción eliminará "${itemName}" de forma definitiva. ¿Confirmas?`,
-                confirmLabel: "Sí, estoy seguro",
-                confirmSide: "right",
-                onConfirm: async () => {
-                    try {
-                        const resp = await fetch(`/api/activos/${encodeURIComponent(assetId)}`, { method: "DELETE" })
-                        if (!resp.ok) throw new Error(await resp.text())
-                        if (typeof refreshAssetsSidebar === "function") await refreshAssetsSidebar()
-                        segMergeAndRender(
-                            (window._segPortfolioAssets || []).filter((a) => String(a.id) !== String(assetId))
-                        )
-                    } catch (e) {
-                        alert(`Error al eliminar: ${e.message}`)
-                    }
-                }
-            })
+        requireText: itemName,
+        onConfirm: async () => {
+            try {
+                const resp = await fetch(`/api/activos/${encodeURIComponent(assetId)}`, { method: "DELETE" })
+                if (!resp.ok) throw new Error(await resp.text())
+                if (typeof refreshAssetsSidebar === "function") await refreshAssetsSidebar()
+                segMergeAndRender((window._segPortfolioAssets || []).filter((a) => String(a.id) !== String(assetId)))
+            } catch (e) {
+                alert(`Error al eliminar: ${e.message}`)
+            }
         }
     })
-}
-
-function segOpenDeleteTypeConfirm(segId, itemName) {
-    const overlay = document.getElementById("segDeleteTypeOverlay")
-    const msg = document.getElementById("segDeleteTypeMsg")
-    const input = document.getElementById("segDeleteTypeInput")
-    const cancelBtn = document.getElementById("segDeleteTypeCancelBtn")
-    const okBtn = document.getElementById("segDeleteTypeOkBtn")
-    if (!overlay || !input) return
-
-    const expected = itemName.toUpperCase()
-    msg.textContent = `Escribe "${expected}" para confirmar la eliminación.`
-    input.value = ""
-    input.style.borderColor = ""
-    overlay.classList.remove("hidden")
-    setTimeout(() => input.focus(), 50)
-
-    function doDelete() {
-        if (input.value.trim() !== expected) {
-            input.style.borderColor = "var(--danger, #e74c3c)"
-            input.focus()
-            return
-        }
-        overlay.classList.add("hidden")
-        cleanup()
-        let customs = segLoadCustomItems()
-        customs = customs.filter((c) => c._segId !== segId)
-        segSaveCustomItems(customs)
-        segMergeAndRender(window._segPortfolioAssets || [])
-    }
-
-    function doCancel() {
-        overlay.classList.add("hidden")
-        cleanup()
-    }
-
-    function onKey(e) {
-        if (e.key === "Enter") doDelete()
-        if (e.key === "Escape") doCancel()
-    }
-
-    function cleanup() {
-        okBtn.removeEventListener("click", doDelete)
-        cancelBtn.removeEventListener("click", doCancel)
-        input.removeEventListener("keydown", onKey)
-        input.style.borderColor = ""
-    }
-
-    okBtn.addEventListener("click", doDelete)
-    cancelBtn.addEventListener("click", doCancel)
-    input.addEventListener("keydown", onKey)
 }
 
 function segRenderGrid() {

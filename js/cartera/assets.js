@@ -364,54 +364,6 @@ async function deleteAssetOnServer(assetId) {
     }
 }
 
-function openDeleteTypeConfirm(assetName, onConfirmed) {
-    const overlay = document.getElementById("deleteTypeOverlay")
-    const msg = document.getElementById("deleteTypeMsg")
-    const input = document.getElementById("deleteTypeInput")
-    const cancelBtn = document.getElementById("deleteTypeCancelBtn")
-    const okBtn = document.getElementById("deleteTypeOkBtn")
-    if (!overlay || !input) return
-
-    const expected = assetName.toUpperCase()
-    msg.textContent = `Escribe "${expected}" para confirmar la eliminación definitiva.`
-    input.value = ""
-    input.style.borderColor = ""
-    overlay.classList.remove("hidden")
-    setTimeout(() => input.focus(), 50)
-
-    function doConfirm() {
-        if (input.value.trim() !== expected) {
-            input.style.borderColor = "var(--danger, #e74c3c)"
-            input.focus()
-            return
-        }
-        overlay.classList.add("hidden")
-        cleanup()
-        onConfirmed()
-    }
-
-    function doCancel() {
-        overlay.classList.add("hidden")
-        cleanup()
-    }
-
-    function onKey(e) {
-        if (e.key === "Enter") doConfirm()
-        if (e.key === "Escape") doCancel()
-    }
-
-    function cleanup() {
-        okBtn.removeEventListener("click", doConfirm)
-        cancelBtn.removeEventListener("click", doCancel)
-        input.removeEventListener("keydown", onKey)
-        input.style.borderColor = ""
-    }
-
-    okBtn.addEventListener("click", doConfirm)
-    cancelBtn.addEventListener("click", doCancel)
-    input.addEventListener("keydown", onKey)
-}
-
 async function createAssetOnServer(
     name,
     type,
@@ -880,6 +832,9 @@ async function updateAssetDetail(asset) {
         const marketSymbol = asset.marketSymbol || asset.finnhubSymbol || "---"
         detFinnhub.textContent = `Ticker mercado: ${marketSymbol} · API: ${marketProvider}`
     }
+
+    _sidebarAssetActual = asset
+    renderSidebarAssetChart()
 
     renderAssetCompletedOperationsSection(asset)
     renderAssetVentasSection(asset)
@@ -4236,32 +4191,30 @@ function initAssetTableLogic(asset) {
                 )
             })
 
-            const detailAssetName = _activosAllAssets.find((a) => a.id === currentAssetId)?.name || currentAssetId
+            // El nombre sale de la propia ficha abierta y solo después de la
+            // lista de Activos: esa lista está vacía si no se ha pasado por esa
+            // página, y entonces el diálogo pedía teclear el identificador
+            // ("s-p-500") en vez del nombre que se está viendo.
+            const detailAssetName =
+                document.querySelector(".assetTablePage")?.dataset.assetName ||
+                _activosAllAssets.find((a) => a.id === currentAssetId)?.name ||
+                currentAssetId
             openConfirmModal({
                 title: "Eliminar activo",
                 message: hasContent
-                    ? `"${detailAssetName}" tiene contenido guardado. ¿Quieres eliminarlo igualmente?`
-                    : `¿Quieres eliminar "${detailAssetName}"?`,
-                confirmLabel: "Sí, eliminar",
+                    ? `"${detailAssetName}" tiene contenido guardado: sus compras, operaciones y planes se borran con él. Esto no se puede deshacer.`
+                    : `Vas a eliminar "${detailAssetName}". Esto no se puede deshacer.`,
+                confirmLabel: "Eliminar",
                 confirmSide: "right",
-                onConfirm: () => {
-                    openConfirmModal({
-                        title: "¿Estás seguro?",
-                        message: `Esta acción eliminará "${detailAssetName}" de forma definitiva y no se puede deshacer.`,
-                        confirmLabel: "Sí, estoy seguro",
-                        confirmSide: "right",
-                        onConfirm: () => {
-                            openDeleteTypeConfirm(detailAssetName, async () => {
-                                await deleteAssetOnServer(currentAssetId)
-                                currentAssetId = null
-                                const contentArea = document.getElementById("dynamicContent")
-                                if (contentArea) {
-                                    contentArea.innerHTML = `<div class="placeholderPage">Activo eliminado.</div>`
-                                }
-                                await refreshAssetsSidebar(null, false)
-                            })
-                        }
-                    })
+                requireText: detailAssetName,
+                onConfirm: async () => {
+                    await deleteAssetOnServer(currentAssetId)
+                    currentAssetId = null
+                    const contentArea = document.getElementById("dynamicContent")
+                    if (contentArea) {
+                        contentArea.innerHTML = `<div class="placeholderPage">Activo eliminado.</div>`
+                    }
+                    await refreshAssetsSidebar(null, false)
                 }
             })
         })
@@ -4451,12 +4404,44 @@ function alignConfirmModalToContent() {
     confirmModalOverlay.style.padding = `${top}px ${right}px ${bottom}px ${left}px`
 }
 
+// ── Confirmación escribiendo el nombre ───────────────────────────────────────
+//
+// Los borrados que se llevan otras cosas por delante —un activo con sus
+// compras, un año entero, una cuenta— piden teclear el nombre de lo que se
+// borra en vez de un simple "Sí, eliminar". Es el mismo trato que ya recibía
+// borrar un portfolio, y por el mismo motivo: no hay papelera, así que la única
+// defensa es que el gesto no se pueda hacer sin querer.
+//
+// Se compara sin distinguir mayúsculas ni espacios de más: lo que se busca es
+// una pausa para leer qué se está borrando, no un examen de mecanografía. Un
+// `requireText` vacío deja el diálogo exactamente como estaba.
+function _confirmTextoNormalizado(valor) {
+    return String(valor ?? "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+}
+
+function _confirmTextoCoincide() {
+    const exigido = confirmModalState?.requireText
+    if (!exigido) return true
+    const campo = document.getElementById("confirmModalTypeInput")
+    return _confirmTextoNormalizado(campo?.value) === _confirmTextoNormalizado(exigido)
+}
+
+/** Enciende el botón de confirmar solo cuando lo tecleado cuadra. */
+function _confirmSincronizarBoton() {
+    const boton = document.getElementById("confirmModalAcceptBtn")
+    if (boton) boton.disabled = !_confirmTextoCoincide()
+}
+
 function openConfirmModal({
     title = "Confirmar acción",
     message = "¿Seguro que quieres continuar?",
     confirmLabel = "Confirmar",
     onConfirm,
-    confirmSide = "left"
+    confirmSide = "left",
+    requireText = ""
 }) {
     const confirmModalOverlay = document.getElementById("confirmModalOverlay")
     const confirmModalTitle = document.getElementById("confirmModalTitle")
@@ -4478,9 +4463,24 @@ function openConfirmModal({
     confirmModalMessage.textContent = message
     confirmModalAcceptButton.textContent = confirmLabel
     confirmModalActions.classList.toggle("confirmPrimaryRight", confirmSide === "right")
+
+    const exigido = String(requireText || "").trim()
+    const caja = document.getElementById("confirmModalTypeBox")
+    const campo = document.getElementById("confirmModalTypeInput")
+    const nombre = document.getElementById("confirmModalTypeName")
+
+    if (caja && campo && nombre) {
+        caja.classList.toggle("hidden", !exigido)
+        nombre.textContent = exigido
+        campo.value = ""
+    }
+
     confirmModalOverlay.classList.remove("hidden")
     alignConfirmModalToContent()
-    confirmModalState = { onConfirm }
+    confirmModalState = { onConfirm, requireText: exigido }
+    _confirmSincronizarBoton()
+
+    if (exigido) campo?.focus()
 }
 
 function closeConfirmModal() {
@@ -4494,6 +4494,16 @@ function closeConfirmModal() {
     confirmModalOverlay.style.padding = ""
     document.querySelector(".confirmModalActions")?.classList.remove("confirmPrimaryRight")
     document.getElementById("confirmModalCancelBtn")?.classList.remove("hidden")
+
+    // El campo se limpia y el botón se rehabilita aquí: si el estado de un
+    // diálogo sobreviviera al cierre, el siguiente saldría bloqueado sin decir
+    // por qué.
+    document.getElementById("confirmModalTypeBox")?.classList.add("hidden")
+    const campo = document.getElementById("confirmModalTypeInput")
+    if (campo) campo.value = ""
+    const aceptar = document.getElementById("confirmModalAcceptBtn")
+    if (aceptar) aceptar.disabled = false
+
     confirmModalState = null
 }
 
@@ -4510,8 +4520,23 @@ function showAlert(message, title = "Aviso") {
 }
 
 function initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton) {
+    const campoConfirmacion = document.getElementById("confirmModalTypeInput")
+
+    if (campoConfirmacion) {
+        campoConfirmacion.addEventListener("input", _confirmSincronizarBoton)
+        campoConfirmacion.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter") return
+            event.preventDefault()
+            if (_confirmTextoCoincide()) confirmModalAcceptButton?.click()
+        })
+    }
+
     if (confirmModalAcceptButton) {
         confirmModalAcceptButton.addEventListener("click", async () => {
+            // Además del botón apagado: el clic puede llegar por teclado o por
+            // un script, y lo que no se puede es borrar sin que cuadre.
+            if (!_confirmTextoCoincide()) return
+
             const onConfirm = confirmModalState?.onConfirm
             closeConfirmModal()
 
@@ -4731,14 +4756,96 @@ function initEditAssetModal() {
     }
 }
 
-function initAddAssetButton(addAssetButton) {
-    if (!addAssetButton) {
+// ── Vista del panel lateral: ficha o gráfico ─────────────────────────────────
+//
+// La mitad de abajo de la barra enseña una cosa u otra del activo elegido: las
+// tarjetas de datos de siempre, o su gráfico de TradingView incrustado. La
+// elección se guarda porque es una preferencia de cómo se quiere trabajar, no
+// algo que se decida en cada activo.
+//
+// El <iframe> se crea al entrar en el gráfico y se destruye al salir: dejarlo
+// puesto cargaría TradingView en cada arranque aunque nadie lo mire, y con un
+// activo sin ticker no habría nada que enseñar.
+const _SIDEBAR_VISTA_KEY = "sidebarDetailView"
+
+// Activo que se está enseñando en el panel. Lo necesita el gráfico para saber
+// qué pintar cuando se cambia de vista sin cambiar de activo.
+let _sidebarAssetActual = null
+
+function getSidebarDetailView() {
+    try {
+        return localStorage.getItem(_SIDEBAR_VISTA_KEY) === "grafico" ? "grafico" : "ficha"
+    } catch {
+        return "ficha"
+    }
+}
+
+function renderSidebarAssetChart() {
+    const contenedor = document.getElementById("detailChart")
+    if (!contenedor) return
+
+    const enGrafico = getSidebarDetailView() === "grafico"
+    contenedor.classList.toggle("hidden", !enGrafico)
+    document.getElementById("assetDetailView")?.classList.toggle("detailChartMode", enGrafico)
+
+    if (!enGrafico) {
+        contenedor.innerHTML = ""
         return
     }
 
-    addAssetButton.addEventListener("click", () => {
-        openAssetModal()
+    if (!_sidebarAssetActual) {
+        contenedor.innerHTML = `<p class="detailChartAviso">Elige un activo para ver su gráfico.</p>`
+        return
+    }
+
+    // Hay que mirar el ticker y no lo que devuelve buildTVSymbol: cuando el
+    // activo no tiene ninguno, esa función cae al nombre en mayúsculas ("SIN
+    // TICKER") y el widget cargaría un símbolo que no existe en TradingView.
+    const tieneTicker = Boolean(
+        String(_sidebarAssetActual.tvSymbol || "").trim() ||
+            String(_sidebarAssetActual.marketSymbol || _sidebarAssetActual.finnhubSymbol || "").trim()
+    )
+    const simbolo = tieneTicker ? buildTVSymbol(_sidebarAssetActual) : ""
+
+    if (!simbolo) {
+        contenedor.dataset.simbolo = ""
+        contenedor.innerHTML = `<p class="detailChartAviso">Este activo no tiene ticker de mercado, así que no hay gráfico que enseñar. Se le pone uno desde Activos › Editar.</p>`
+        return
+    }
+
+    // Se repinta solo cuando cambia el símbolo: reasignar el mismo src recarga
+    // el widget entero y se ve el parpadeo en cada refresco de la barra.
+    if (contenedor.dataset.simbolo === simbolo && contenedor.querySelector("iframe")) return
+
+    contenedor.dataset.simbolo = simbolo
+    contenedor.innerHTML = `<iframe src="${buildTVIframeUrl(simbolo)}" frameborder="0" allowtransparency="true" scrolling="no" allowfullscreen title="Gráfico de ${escapeAttr(_sidebarAssetActual.name || simbolo)}"></iframe>`
+}
+
+function initSidebarDetailToggle() {
+    const grupo = document.getElementById("sidebarDetailToggle")
+    if (!grupo) return
+
+    const sincronizar = () => {
+        const vista = getSidebarDetailView()
+        grupo.querySelectorAll(".sidebarDetailBtn").forEach((boton) => {
+            boton.classList.toggle("active", boton.dataset.vista === vista)
+            boton.setAttribute("aria-pressed", String(boton.dataset.vista === vista))
+        })
+        renderSidebarAssetChart()
+    }
+
+    grupo.addEventListener("click", (evento) => {
+        const boton = evento.target.closest(".sidebarDetailBtn")
+        if (!boton) return
+        try {
+            localStorage.setItem(_SIDEBAR_VISTA_KEY, boton.dataset.vista)
+        } catch {
+            /* sin persistencia, la vista dura lo que la sesión */
+        }
+        sincronizar()
     })
+
+    sincronizar()
 }
 
 function initAssetModal(
@@ -5170,24 +5277,15 @@ async function avHandleCardClick(event) {
         const assetName = asset?.name || id
         openConfirmModal({
             title: "Eliminar activo",
-            message: `¿Quieres eliminar "${assetName}"?`,
-            confirmLabel: "Sí, eliminar",
+            message: `Vas a eliminar "${assetName}": sus compras, operaciones y planes se borran con él. Esto no se puede deshacer.`,
+            confirmLabel: "Eliminar",
             confirmSide: "right",
-            onConfirm: () => {
-                openConfirmModal({
-                    title: "¿Estás seguro?",
-                    message: `Esta acción eliminará "${assetName}" de forma definitiva y no se puede deshacer.`,
-                    confirmLabel: "Sí, estoy seguro",
-                    confirmSide: "right",
-                    onConfirm: () => {
-                        openDeleteTypeConfirm(assetName, async () => {
-                            await deleteAssetOnServer(id)
-                            _activosAllAssets = _activosAllAssets.filter((a) => a.id !== id)
-                            avRender()
-                            await refreshAssetsSidebar()
-                        })
-                    }
-                })
+            requireText: assetName,
+            onConfirm: async () => {
+                await deleteAssetOnServer(id)
+                _activosAllAssets = _activosAllAssets.filter((a) => a.id !== id)
+                avRender()
+                await refreshAssetsSidebar()
             }
         })
         return
@@ -5466,6 +5564,10 @@ async function initActivosPageLogic() {
 
     const addBtn = document.getElementById("activosAddBtn")
     if (addBtn) addBtn.addEventListener("click", () => openAssetModal())
+
+    // Antes vivía en la barra lateral. Aquí acompaña al alta: las dos cosas que
+    // se hacen *sobre* los activos están en la página de los activos.
+    initSidebarRefreshButton(document.getElementById("activosRefreshBtn"))
 
     avInitDragDrop()
 }

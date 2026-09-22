@@ -781,24 +781,17 @@ function bindIngresosEvents() {
         deleteYearButton.addEventListener("click", () => {
             openConfirmModal({
                 title: "Eliminar año",
-                message: `Vas a eliminar el año ${currentIngresosYear}. ¿Quieres continuar?`,
+                message: `Vas a eliminar el año ${currentIngresosYear} con todos sus ingresos. Esto no se puede deshacer.`,
                 confirmLabel: "Eliminar",
                 confirmSide: "right",
+                requireText: String(currentIngresosYear),
                 onConfirm: async () => {
-                    openConfirmModal({
-                        title: "Segunda verificación",
-                        message: `Esta acción borrará definitivamente el año ${currentIngresosYear}. ¿Confirmas que quieres eliminarlo?`,
-                        confirmLabel: "Eliminar",
-                        confirmSide: "left",
-                        onConfirm: async () => {
-                            const response = await deleteIngresosYearRequest(currentIngresosYear)
-                            ingresosYears = Array.isArray(response.years) ? response.years : await loadIngresosYears()
-                            currentIngresosYear = ingresosYears[0]
-                            currentIngresosView = "year"
-                            currentIngresosMonth = "enero"
-                            await renderIngresosYear(currentIngresosYear)
-                        }
-                    })
+                    const response = await deleteIngresosYearRequest(currentIngresosYear)
+                    ingresosYears = Array.isArray(response.years) ? response.years : await loadIngresosYears()
+                    currentIngresosYear = ingresosYears[0]
+                    currentIngresosView = "year"
+                    currentIngresosMonth = "enero"
+                    await renderIngresosYear(currentIngresosYear)
                 }
             })
         })
@@ -1486,9 +1479,10 @@ function handleRecurrentesActionClick(event) {
 
     openConfirmModal({
         title: "Eliminar ganancia recurrente",
-        message: `Vas a eliminar "${normalizeRecurrente(row).nombre}". ¿Quieres continuar?`,
+        message: `Vas a eliminar "${normalizeRecurrente(row).nombre}" y su historial. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
         confirmSide: "right",
+        requireText: normalizeRecurrente(row).nombre,
         onConfirm: async () => {
             currentIngresosData.recurrentes.splice(index, 1)
             renderCurrentIngresosView()

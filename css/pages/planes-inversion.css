@@ -1,0 +1,1068 @@
+/* Planes de inversión (menú superior › Planes)
+   ─────────────────────────────────────────────────────────────────
+   No confundir con css/pages/planes.css, que viste la pestaña de
+   planes dentro de la ficha de cada activo. Esta es una página
+   entera: selector de planes arriba, tabla de activos a la izquierda
+   (con scroll propio) y la gráfica de lo realizado a la derecha.
+   Los popups reutilizan las clases del modal de filas de Activos
+   (.assetRowModal…) y solo añaden lo que no existía: la lista de
+   activos con su scroll y el panel de operaciones de cada uno. */
+
+/* ── Página ── */
+/* No se estira hasta el alto de la ventana: crece con lo que hay dentro. Con
+   dos filas en la tabla, la caja terminaba a media pantalla dejando un hueco
+   vacío del tamaño del monitor. */
+.pinvPage {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 0 0 auto;
+    min-height: 0;
+}
+
+/* ── Barra: selector de planes + acciones ── */
+/* Sin `wrap`: la fila de planes se desplaza a lo ancho en vez de partir, para
+   que los botones de la derecha no bajen de línea al añadir planes. */
+.pinvToolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: nowrap;
+    flex: 0 0 auto;
+}
+
+.pinvPlanTabs {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+
+    /* El relleno es donde se dibuja la barra de desplazamiento y el margen
+       negativo se lo descuenta a la fila: sin eso, la barra daría un salto de
+       6px en cuanto sobrara un plan. Igual que en el panel de métricas. */
+    padding-bottom: 6px;
+    margin-bottom: -6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+
+.pinvPlanTabs::-webkit-scrollbar {
+    height: 6px;
+}
+
+.pinvPlanTabs::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.pinvPlanTabs::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.pinvPlanTabs::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* La mano solo cuando de verdad sobra algo que arrastrar. Las clases las pone
+   initScrollLateral(). */
+.pinvPlanTabs.pinvTabsScrollable {
+    cursor: grab;
+}
+
+.pinvPlanTabs.pinvTabsDragging {
+    cursor: grabbing;
+    user-select: none;
+}
+
+/* Difuminado en el borde por el que sigue habiendo planes: uno cortado en seco
+   parece el final de la fila; desvanecido se lee como que hay más detrás. */
+.pinvPlanTabs.pinvTabsFadeStart {
+    mask-image: linear-gradient(to right, transparent 0, #000 28px);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px);
+}
+
+.pinvPlanTabs.pinvTabsFadeEnd {
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+}
+
+.pinvPlanTabs.pinvTabsFadeStart.pinvTabsFadeEnd {
+    mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+}
+
+.pinvPlanTab {
+    flex: 0 0 auto;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--btn-border);
+    background: var(--btn-bg);
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.pinvPlanTab:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--btn-border-hover);
+    color: var(--text-primary);
+}
+
+.pinvPlanTab.active {
+    background: var(--btn-active-bg);
+    border-color: var(--btn-active-border);
+    color: var(--btn-active-text);
+}
+
+.pinvSinPlanes {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+}
+
+.pinvToolbarActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+/* ── Cuerpo: tabla + gráfica ── */
+.pinvBody {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    /* Cada columna mide su contenido en vez de igualarse a la más alta: si no,
+       la tabla se estiraba hasta el alto de la gráfica y al revés. */
+    align-items: start;
+    gap: 14px;
+    flex: 0 0 auto;
+    min-height: 0;
+}
+
+.pinvBodySinPlan .pinvSide {
+    opacity: 0.55;
+}
+
+.pinvMain {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* ── Cabecera del plan ── */
+.pinvPlanHeader {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    flex: 0 0 auto;
+}
+
+.pinvPlanHeader:empty {
+    display: none;
+}
+
+.pinvPlanTitulo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pinvPlanNombre {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pinvPlanMeta {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+}
+
+.pinvPlanKpis {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.pinvKpi {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 120px;
+    padding: 8px 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+}
+
+.pinvKpiLabel {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+}
+
+.pinvKpiValue {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.pinvPos {
+    color: var(--color-pos);
+}
+
+.pinvPlanAcciones {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pinvHeaderBtn {
+    padding: 7px 12px;
+    font-size: 0.8rem;
+}
+
+/* El ··· va al lado de "Editar plan": mismo alto y mismo radio, para que no
+   parezcan dos botones de distinta familia. */
+.pinvPlanAcciones .rowMenuTrigger {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+}
+
+/* ── Tabla de activos ── */
+/* La tabla es lo único que se desplaza: el selector de planes y la cabecera
+   quedan fijos arriba, y la gráfica a un lado. */
+/* Alto según las filas que haya, hasta doce (38px de cabecera + 12 × 46px);
+   a partir de ahí, scroll dentro de la caja. */
+.pinvTableWrap {
+    flex: 0 0 auto;
+    min-height: 0;
+    max-height: calc(38px + 12 * 46px);
+    overflow: auto;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-surface);
+}
+
+.pinvTable {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+}
+
+.pinvTable.hidden {
+    display: none;
+}
+
+/* Cada columna se queda con lo que ocupa su contenido y Activo se lleva el
+   resto (el `width: 1%` es lo que encoge a las demás hasta su mínimo). Los
+   importes van en cifras de ancho fijo, así que desplegar un activo no
+   recoloca las columnas aunque sus operaciones traigan otros números. */
+.pinvThOrden,
+.pinvTable th.pinvThNum,
+.pinvThEstado {
+    width: 1%;
+    white-space: nowrap;
+}
+
+.pinvTable th.pinvThNum {
+    text-align: right;
+}
+
+/* Mínimo real para la columna elástica: sin él, en una ventana estrecha el
+   reparto le daba lo que sobraba —a veces nada— y el nombre del activo se
+   quedaba en una letra. Con el mínimo, lo que no cabe se desplaza. */
+.pinvThActivo {
+    min-width: 190px;
+}
+
+.pinvTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    height: 38px;
+    padding: 0 12px;
+    text-align: left;
+    color: #7a8fb0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-soft);
+    white-space: nowrap;
+}
+
+/* Alto por fila en vez de relleno vertical: así la fila del activo y las de sus
+   operaciones tienen una altura estable, la pisen o no un badge o una barra. */
+.pinvTable tbody td {
+    height: 46px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border-inset);
+    color: var(--text-subtle);
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.pinvTdActivo {
+    max-width: 0;
+}
+
+.pinvTdNum {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* El flex va en un div y no en el <td>: una celda con display:flex deja de ser
+   celda de tabla, el navegador le genera una celda anónima alrededor y la fila
+   se desalinea (el texto se sale de su banda y pisa la fila siguiente). */
+.pinvCelda {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.pinvActivoNombre {
+    flex-shrink: 1;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pinvActivoSub {
+    flex-shrink: 4;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+/* Triángulo dibujado, no un glifo: ▸ y ▾ no miden lo mismo y el nombre del
+   activo se movía un pixel al desplegar. Este gira sobre su centro. */
+.pinvChevron {
+    flex-shrink: 0;
+    width: 0;
+    height: 0;
+    margin-right: 2px;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 5px solid var(--text-dim);
+    transition: transform 0.15s ease;
+}
+
+.pinvAssetRowOpen .pinvChevron,
+.pinvEditorActivoAbierto .pinvChevron {
+    transform: rotate(90deg);
+}
+
+/* Fila del activo: se pliega y despliega con un clic. */
+.pinvAssetRow {
+    cursor: pointer;
+}
+
+.pinvAssetRow:hover td {
+    background: var(--bg-elevated);
+}
+
+.pinvAssetRowOpen td {
+    background: var(--bg-elevated);
+    border-bottom-color: transparent;
+}
+
+/* Filas de las operaciones del activo desplegado: más bajas, más tenues y
+   sangradas justo lo que ocupan el triángulo y su hueco, para que la fecha
+   caiga debajo del nombre del activo. */
+.pinvOpRow td {
+    height: 38px;
+    background: var(--bg-inset);
+    font-size: 0.8rem;
+}
+
+.pinvCeldaOp {
+    padding-left: 15px;
+    border-left: 2px solid var(--border-mid);
+    margin-left: 4px;
+    min-height: 24px;
+}
+
+.pinvOpFecha {
+    color: var(--text-subtle);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pinvOpRow--cancelada td {
+    opacity: 0.55;
+    text-decoration: line-through;
+}
+
+.pinvOpRow--cancelada td .pinvEstado {
+    text-decoration: none;
+}
+
+.pinvOpRowVacia td {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+.pinvOpRowVacia .pinvCeldaOp {
+    white-space: normal;
+}
+
+.pinvTdEstado {
+    font-size: 0.74rem;
+    color: var(--text-dim);
+    text-align: right;
+}
+
+/* Orden: compra o venta, la primera columna. */
+.pinvOrden {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid;
+}
+
+.pinvOrdenCompra {
+    color: #4ade80;
+    border-color: rgba(46, 204, 113, 0.4);
+    background: rgba(46, 204, 113, 0.12);
+}
+
+.pinvOrdenVenta {
+    color: #f87171;
+    border-color: rgba(231, 76, 60, 0.4);
+    background: rgba(231, 76, 60, 0.12);
+}
+
+.pinvOrdenMixta {
+    color: var(--text-muted);
+    border-color: var(--border-hard);
+    background: rgba(148, 163, 184, 0.1);
+}
+
+/* Estado de cada operación: realizada o no. */
+.pinvEstado {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.pinvEstadoRealizada {
+    color: #4ade80;
+    background: rgba(46, 204, 113, 0.14);
+}
+
+.pinvEstadoPendiente {
+    color: #f87171;
+    background: rgba(231, 76, 60, 0.14);
+}
+
+.pinvEstadoCancelada {
+    color: var(--text-muted);
+    background: rgba(148, 163, 184, 0.14);
+}
+
+/* Barra de "% invertido" en la fila del activo. */
+.pinvTdPct {
+    min-width: 118px;
+}
+
+.pinvBar {
+    display: inline-block;
+    vertical-align: middle;
+    width: 60px;
+    height: 6px;
+    margin-right: 8px;
+    border-radius: 3px;
+    background: rgba(148, 163, 184, 0.18);
+    overflow: hidden;
+}
+
+.pinvBarFill {
+    display: block;
+    height: 100%;
+    background: var(--color-pos);
+    border-radius: 3px;
+}
+
+.pinvBarPct {
+    display: inline-block;
+    min-width: 44px;
+    text-align: right;
+}
+
+/* ── Gráfica ── */
+/* El `sticky` va en la columna y no en cada tarjeta: con dos tarjetas pegadas
+   ambas al borde superior, la de abajo se montaría encima de la de arriba al
+   desplazar. Así suben juntas y conservan su separación. */
+.pinvSide {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+    min-height: 0;
+}
+
+.pinvChartCard {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 16px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+}
+
+.pinvChartTitle {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+}
+
+.pinvChartWrap {
+    position: relative;
+    height: 220px;
+}
+
+.pinvChartCenter {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    pointer-events: none;
+}
+
+.pinvChartPct {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.pinvChartSub {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+.pinvChartLegend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pinvLegendRow {
+    display: grid;
+    grid-template-columns: 10px 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-subtle);
+}
+
+.pinvLegendDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.pinvLegendPct {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.pinvLegendVal {
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Reparto por activo ── */
+.pinvRepartoCard.hidden {
+    display: none;
+}
+
+.pinvReparto {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pinvRepartoFila {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.pinvRepartoCab {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.8rem;
+}
+
+.pinvRepartoNombre {
+    color: var(--text-subtle);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pinvRepartoValor {
+    flex-shrink: 0;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* El carril es el ancho del activo mayor; la barra, lo que pesa este dentro
+   del plan; y el relleno, la parte que ya está comprada. */
+.pinvRepartoCarril {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(148, 163, 184, 0.16);
+    overflow: hidden;
+}
+
+.pinvRepartoBarra {
+    position: relative;
+    height: 100%;
+    min-width: 2px;
+    border-radius: 4px;
+    background: #3b82f6;
+}
+
+.pinvRepartoHecho {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+    background: #2ecc71;
+}
+
+/* ── Popup: crear / editar plan ── */
+.pinvEditor {
+    width: min(640px, 100%);
+}
+
+/* Nombre y selector de activos quedan fuera del scroll de la lista. */
+.pinvEditorFijo {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 24px 12px;
+    flex-shrink: 0;
+}
+
+/* Lista de activos del plan: caben --pinv-visibles fichas plegadas antes de
+   empezar a desplazarse. 58px es la altura de una ficha plegada más su hueco. */
+.pinvEditorLista {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 24px 16px;
+    max-height: calc(var(--pinv-visibles, 5) * 58px);
+    min-height: 120px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+}
+
+/* Con un activo desplegado la lista crece para que sus operaciones y el
+   formulario de operación nueva quepan sin tener que desplazarse a ciegas. */
+.pinvEditorLista.pinvEditorListaAbierta {
+    max-height: min(62vh, calc(var(--pinv-visibles, 5) * 58px + 340px));
+}
+
+/* Desvanecido del borde inferior mientras quede lista por debajo (la clase la
+   pone el propio módulo al pintar y al desplazar). Va pegado con `sticky` y con
+   margen negativo para no ocupar sitio ni empujar a la última ficha. */
+.pinvEditorListaConMas::after {
+    content: "";
+    position: sticky;
+    bottom: 0;
+    flex-shrink: 0;
+    display: block;
+    height: 28px;
+    margin-top: -28px;
+    background: linear-gradient(to bottom, rgba(17, 24, 39, 0), var(--bg-surface));
+    pointer-events: none;
+}
+
+.pinvEditorVacio {
+    margin: 12px 0;
+}
+
+/* `flex-shrink: 0` no es decorativo: la lista es un contenedor flex en columna
+   con tope de altura, así que sin esto sus fichas se comprimen cuando la suma
+   pasa del tope —en vez de desbordar y dar scroll— y el contenido de la ficha
+   abierta (el formulario de operación nueva) se salía por debajo de su caja. */
+.pinvEditorActivo {
+    flex-shrink: 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-panel);
+    overflow: hidden;
+}
+
+.pinvEditorActivoAbierto {
+    border-color: var(--border-hard);
+}
+
+.pinvEditorActivoCab {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    min-height: 50px;
+    box-sizing: border-box;
+}
+
+.pinvEditorActivoCab:hover {
+    background: var(--bg-elevated);
+}
+
+.pinvEditorActivoNombre {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.pinvEditorActivoResumen {
+    font-size: 0.74rem;
+    color: var(--text-dim);
+    margin-right: auto;
+    white-space: nowrap;
+}
+
+.pinvVincularBtn {
+    padding: 5px 10px;
+    font-size: 0.74rem;
+    white-space: nowrap;
+}
+
+.pinvQuitarBtn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.pinvQuitarBtn:hover {
+    color: var(--color-neg-bright);
+    border-color: rgba(231, 76, 60, 0.4);
+    background: rgba(231, 76, 60, 0.12);
+}
+
+/* Panel de operaciones del activo dentro del popup. */
+.pinvEditorOps {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 12px 12px;
+    border-top: 1px solid var(--border-soft);
+    cursor: default;
+}
+
+.pinvEditorOpsTitulo {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    padding: 8px 0 4px;
+}
+
+.pinvOpCheck {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 38px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-inset);
+    font-size: 0.8rem;
+    color: var(--text-subtle);
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.pinvOpCheck:hover {
+    border-color: var(--border-hard);
+}
+
+/* Casilla propia: la nativa la dibuja cada sistema a su manera y salía como un
+   cuadro blanco de otro tamaño que el resto de la ficha. El check es una
+   imagen de fondo, el mismo recurso que usan los desplegables de la app. */
+.pinvOpCheck input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    border: 1px solid var(--btn-border);
+    border-radius: 5px;
+    background: var(--bg-inset);
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease;
+}
+
+.pinvOpCheck input[type="checkbox"]:hover {
+    border-color: var(--accent);
+}
+
+.pinvOpCheck input[type="checkbox"]:checked {
+    background: var(--accent)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M1 5l3.5 3.5L11 1.5'/%3E%3C/svg%3E")
+        no-repeat center;
+    background-size: 10px 8px;
+    border-color: var(--accent);
+}
+
+.pinvOpCheck input[type="checkbox"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.pinvOpCheck:has(input:checked) {
+    border-color: rgba(59, 130, 246, 0.45);
+    background: rgba(59, 130, 246, 0.07);
+}
+
+/* Hueco del ancho de la casilla en las filas que no la llevan (las nuevas):
+   sin él su texto empezaba 26px a la izquierda del de las demás. */
+.pinvOpHueco {
+    flex-shrink: 0;
+    width: 16px;
+}
+
+.pinvOpCheck .pinvEstado {
+    flex-shrink: 0;
+}
+
+.pinvOpCheckTexto {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pinvOpNueva {
+    cursor: default;
+    border-style: dashed;
+}
+
+/* Va después del texto, en el sitio del estado de las demás filas. */
+.pinvOpNuevaTag {
+    flex-shrink: 0;
+    font-size: 0.64rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 2px 6px;
+    border-radius: 6px;
+    color: #93c5fd;
+    background: rgba(59, 130, 246, 0.16);
+}
+
+.pinvEditorNota {
+    margin: 4px 0;
+    font-size: 0.74rem;
+    color: var(--text-dim);
+}
+
+/* Formulario de operación nueva: seis campos en dos filas. */
+.pinvNuevaForm {
+    margin-top: 6px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px dashed var(--border-mid);
+    background: var(--bg-inset);
+}
+
+.pinvNuevaCampos {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.pinvNuevaCampo {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.pinvNuevaCampo > span {
+    font-size: 0.64rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #5b7fa6;
+}
+
+.pinvNuevaCampo .assetRowModalInput,
+.pinvNuevaCampo .assetRowModalSelect {
+    height: 32px;
+    font-size: 13px;
+}
+
+/* El botón "Hoy" que añade shared-utils a los campos de fecha comparte el
+   ancho del campo. */
+.pinvNuevaCampo .dateFieldWrap {
+    display: flex;
+    gap: 4px;
+}
+
+.pinvNuevaAcciones {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.pinvNuevaAddBtn {
+    padding: 6px 12px;
+    font-size: 0.78rem;
+}
+
+/* ── Popup: archivo de planes ── */
+.pinvArchivo {
+    width: min(560px, 100%);
+}
+
+.pinvArchivoSeccion {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pinvArchivoTitulo {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+}
+
+.pinvArchivoTitulo span {
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: rgba(148, 163, 184, 0.16);
+    color: var(--text-muted);
+}
+
+.pinvArchivoFila {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-soft);
+    background: var(--bg-panel);
+}
+
+.pinvArchivoInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    margin-right: auto;
+}
+
+.pinvArchivoNombre {
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pinvArchivoMeta {
+    font-size: 0.74rem;
+    color: var(--text-dim);
+}
+
+.pinvArchivoAcciones {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.pinvArchivoAcciones button {
+    padding: 6px 10px;
+    font-size: 0.76rem;
+}
+
+/* ── Ocultar valores ── */
+body.money-hidden .pinvMoney {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* ── Pantallas estrechas: la gráfica pasa debajo de la tabla ── */
+@media (max-width: 1100px) {
+    .pinvBody {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .pinvSide {
+        position: static;
+    }
+
+    .pinvNuevaCampos {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}

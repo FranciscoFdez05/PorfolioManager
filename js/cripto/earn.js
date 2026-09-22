@@ -199,8 +199,9 @@ function deleteEarnCripto(id) {
     if (!cripto) return
     openConfirmModal({
         title: "Eliminar cripto/producto",
-        message: `¿Eliminar "${cripto.nombre}" y todos sus registros de earn?`,
+        message: `Vas a eliminar "${cripto.nombre}" y todos sus registros de earn. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
+        requireText: cripto.nombre,
         onConfirm: async () => {
             try {
                 _earnCriptos = _earnCriptos.filter((c) => c.id !== id)
@@ -511,8 +512,9 @@ function deleteCurrentEarnYear() {
     if (!earnCurrentYear) return
     openConfirmModal({
         title: "Eliminar año",
-        message: `¿Eliminar todas las filas del año ${earnCurrentYear}?`,
+        message: `Vas a eliminar todas las filas del año ${earnCurrentYear}. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
+        requireText: String(earnCurrentYear),
         onConfirm: async () => {
             try {
                 _earnRows = _earnRows.filter((r) => parseEarnYear(r.fecha) !== earnCurrentYear)

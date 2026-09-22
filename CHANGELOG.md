@@ -22,6 +22,116 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.3.0] — 2026-09-22
+
+**Esquema de base de datos:** sube a la versión **7** (venía de la 6). La
+migración crea tres tablas nuevas (`planes_cartera`, `planes_cartera_activos`
+y `planes_cartera_operaciones`) y no toca ninguna fila de las que ya había;
+se aplica sola al arrancar y antes se guarda
+`data/backups/auto/<portfolio>_pre-esquema-6-a-7_*.db`, exento de rotación.
+Volver atrás es levantar la imagen anterior, que ignora las tablas sobrantes,
+o restaurar ese fichero.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Añadido
+
+**Planes de inversión.** Botón **Planes** en el menú superior, entre Cripto y
+Herramientas. Un plan es un nombre y, debajo, los activos que se piensan
+comprar y con qué operaciones. Cada operación del plan es una fila real de
+Operaciones (la misma tabla que ven Cripto › Operaciones y Finanzas ›
+Operaciones): al montar el plan se vinculan las que ya están abiertas con ese
+activo o se crean nuevas, que nacen ahí con estado «Activo». Por eso el plan
+no lleva una marca de «realizado»: lo hecho es lo que en Operaciones está
+«Completado», y al completar una operación el plan lo refleja solo.
+
+- **Pantalla.** Selector de planes y botones **Archivados** y **Crear plan**
+  arriba, fijos. Cuando los planes no caben, su fila se desplaza a lo ancho
+  —con rueda, arrastre y difuminado en los bordes, igual que el panel superior
+  de métricas— en vez de partir en dos líneas y empujar a los botones. A la izquierda, la tabla de activos del plan con orden
+  (compra, venta o mixta), cantidad, precio medio, invertido bruto y **%
+  invertido** (lo realizado sobre lo planificado de ese activo); pulsar un
+  activo despliega sus operaciones con fecha, par, cantidad, precio, importe,
+  **% de la posición** dentro del activo y si está **realizada**, **no
+  realizada** o **cancelada**. La tabla es lo único que se desplaza. A la
+  derecha, una gráfica con lo realizado y lo que queda; el tooltip lista los
+  activos comprados o los que faltan por comprar, con su importe y su peso. La
+  tabla mide lo que midan sus filas y solo se desplaza al pasar de doce.
+  Debajo, **Reparto por activo**: una barra por activo cuya longitud dice
+  cuánto pesa dentro del plan —medida contra el activo más grande, no contra
+  el total— y cuyo relleno verde dice cuánto de ese activo está ya comprado.
+- **Crear y editar.** Popup con el nombre, un desplegable para añadir activos
+  y la lista de los elegidos, que a partir de cinco se desplaza (nombre y
+  desplegable quedan fuera del scroll). Pulsar un activo abre sus operaciones
+  abiertas para marcar las que entran en el plan y un formulario para crear
+  una nueva (orden, fecha, precio, cantidad, total y divisa; con dos de
+  precio, cantidad y total se calcula el tercero). Las nuevas se guardan en
+  Operaciones solo al pulsar Crear/Guardar: cancelar no deja nada.
+- **Archivo.** El botón **Archivados** abre la lista de planes activos y
+  archivados con **Archivar**, **Desarchivar** y **Eliminar**. Un plan
+  archivado sale del selector sin borrarse. Eliminar un plan no toca sus
+  operaciones.
+- Los importes se suman en euros con el tipo de cambio del servidor, para
+  poder mezclar en un plan activos en dólares y en euros. El módulo se puede
+  apagar desde Ajustes › Módulos, como los demás.
+- API: `GET`/`POST /api/planes-cartera`.
+
+No confundir con la pestaña **Planes** de la ficha de cada activo, que sigue
+igual: aquélla es una nota de precio de entrada y salida para un solo activo.
+
+**Borrar escribiendo el nombre.** Los borrados que se llevan otras cosas por
+delante ya no se confirman con un «Sí, eliminar»: hay que escribir el nombre
+de lo que se borra y hasta que no cuadra el botón está apagado. Se aplica a
+activo, plan (los dos), año (gastos, ingresos, ventas, dividendos, intereses,
+staking y earn), cuenta remunerada, cripto/producto de staking y earn,
+stablecoin, mensualidad, ganancia recurrente, inversión de mercado privado,
+trade, clave de API y copia de seguridad. Borrar un portfolio ya lo pedía y se
+queda como estaba. Las filas sueltas de una tabla (un gasto, un dividendo, una
+compra) siguen con la confirmación de siempre.
+
+- No distingue mayúsculas ni espacios de más, y **Intro** confirma cuando
+  cuadra. Si lo que se borra no tiene nombre —una inversión recién creada, un
+  trade sin moneda— sale el diálogo de siempre.
+- De paso desaparecen las confirmaciones encadenadas: donde antes salían dos y
+  hasta tres diálogos seguidos («¿Estás seguro?», «Segunda verificación»,
+  «Confirmación final») ahora sale uno solo que pide el nombre. Los dos
+  diálogos propios que ya hacían esto en Activos y en la Watchlist se retiran,
+  porque el diálogo común hace lo mismo.
+
+**Cambiar el estado de una operación desde la tabla.** En Cripto › Operaciones
+y en Finanzas › Operaciones la columna **Estado** lleva un selector con Activo,
+Completado y Cancelado: cambiarlo guarda solo, sin pasar por el menú de la fila
+ni por el diálogo de editar. La fila se recoloca al momento —las completadas se
+van a su grupo de año— y cancelar así no pregunta nada, porque se deshace
+eligiendo otra vez el estado anterior; el **Eliminar** definitivo sigue en el
+menú de la fila. Dejar una compra en Activo avisa si no hay saldo en la
+stablecoin del par, igual que al guardar desde el diálogo.
+
+**Años plegables en Operaciones.** Las cabeceras «Completadas <año>» recogen
+sus filas al pulsarlas, igual que los activos de un plan de inversión: el
+triángulo de la izquierda dice si el año está abierto, la cabecera sigue
+diciendo cuántas operaciones esconde y cada página (cripto y bolsa) recuerda
+los años que dejaste plegados.
+
+**La barra lateral enseña la ficha o el gráfico.** Arriba del todo, un
+conmutador **Ficha / Gráfico**: la ficha son las tarjetas de siempre (tipo,
+posición, invertido, P/L, precio medio, comisiones) y el gráfico es el de
+TradingView del activo elegido, incrustado en la propia barra. Lo elegido se
+recuerda, y el gráfico sigue al activo que se seleccione. Un activo sin ticker
+de mercado lo dice en vez de enseñar un gráfico vacío.
+
+**Añadir activo y actualizar cotizaciones se hacen desde Activos.** Los dos
+botones salen de la barra lateral, que se queda para consultar: **+ Añadir
+activo** ya estaba en la página de Activos y **Actualizar** se muda a su lado.
+El diálogo de alta y el refresco no cambian.
+
+### Corregido
+
+**Texto ilegible en los diálogos del tema claro.** El mensaje de los diálogos
+de confirmación se quedó sin color propio en el tema claro y salía casi blanco
+sobre el fondo blanco del diálogo. Afectaba a todos, no solo a los de borrado.
+
 ## [2.2.1] — 2026-09-19
 
 **Esquema de base de datos:** no lo toca (sigue en la versión **6**). Para

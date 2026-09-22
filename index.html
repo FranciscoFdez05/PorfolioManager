@@ -23,6 +23,7 @@
     <link rel="stylesheet" href="css/pages/metricas.css">
     <link rel="stylesheet" href="css/pages/activos.css">
     <link rel="stylesheet" href="css/pages/planes.css">
+    <link rel="stylesheet" href="css/pages/planes-inversion.css">
     <link rel="stylesheet" href="css/pages/bonos.css">
     <link rel="stylesheet" href="css/pages/mercado-privado.css">
     <link rel="stylesheet" href="css/pages/ajustes.css">
@@ -220,6 +221,7 @@
                     </div>
                 </div>
 
+                <button class="navBtn" data-page="planesInversion" data-module="planes">Planes</button>
                 <button class="navBtn" data-page="herramientas" data-module="herramientas">Herramientas</button>
                 <button class="navBtn" data-page="metricas" data-module="metricas">Métricas</button>
                 <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores">👁</button>
@@ -263,15 +265,13 @@
 
         <aside class="sidePanel" id="sidePanel">
             <div class="assetToolbar">
-                <div class="assetToolbarActions">
-                    <button id="addAssetBtn" class="primaryButton assetAddBtn" title="Añadir activo">
-                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                        <span>Añadir activo</span>
-                    </button>
-                    <button id="refreshSidebarMarketBtn" class="primaryButton assetAddBtn assetRefreshBtn" type="button" title="Actualizar cotizaciones">
-                        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13 2.5V5h-2.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        <span>Actualizar cotizaciones</span>
-                    </button>
+                <!-- Alta de activos y refresco de cotizaciones viven en la
+                     página Activos: aquí ocupaban la mitad de la barra para dos
+                     acciones que no son de consulta. En su sitio, lo que decide
+                     qué se ve debajo: la ficha de datos o el gráfico. -->
+                <div class="sidebarDetailToggle" id="sidebarDetailToggle" role="group" aria-label="Vista del activo">
+                    <button class="sidebarDetailBtn active" data-vista="ficha" type="button">Ficha</button>
+                    <button class="sidebarDetailBtn" data-vista="grafico" type="button">Gráfico</button>
                 </div>
                 <div class="sidebarFilterBar" id="sidebarFilterBar">
                     <button class="sidebarFilterBtn active" data-filter="portfolio" type="button">Portfolio</button>
@@ -331,6 +331,11 @@
                 </div>
                 <div class="detailMeta" id="detStatus">Sin datos de mercado</div>
                 <div class="detailMeta" id="detFinnhub">Ticker mercado: ---</div>
+
+                <!-- El gráfico del activo seleccionado. El <iframe> lo pone y lo
+                     quita el módulo: dejarlo fijo cargaría TradingView en cada
+                     arranque aunque la vista elegida sea la ficha. -->
+                <div class="detailChart hidden" id="detailChart"></div>
             </div>
         </aside>
     </div>
@@ -388,21 +393,18 @@
         <h3 class="assetModalTitle" id="confirmModalTitle">Confirmar acción</h3>
         <p class="assetModalMessage" id="confirmModalMessage">¿Seguro que quieres continuar?</p>
 
+        <!-- Confirmación escribiendo el nombre. Solo aparece cuando quien abre
+             el diálogo pasa `requireText`: lo usan los borrados que se llevan
+             otras cosas por delante (un activo, un año, una cuenta), no los de
+             una fila suelta. -->
+        <div class="confirmTypeBox hidden" id="confirmModalTypeBox">
+            <label class="confirmTypeLabel" for="confirmModalTypeInput">Escribe <b id="confirmModalTypeName"></b> para confirmar</label>
+            <input id="confirmModalTypeInput" class="assetModalInput confirmTypeInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false">
+        </div>
+
         <div class="assetModalActions confirmModalActions">
             <button id="confirmModalAcceptBtn" class="dangerButton">Eliminar</button>
             <button id="confirmModalCancelBtn" class="cancelButton">Cancelar</button>
-        </div>
-    </div>
-</div>
-
-<div class="modalOverlay hidden" id="deleteTypeOverlay">
-    <div class="assetModal" role="dialog" aria-modal="true">
-        <h3 class="assetModalTitle">Confirmar eliminación</h3>
-        <p id="deleteTypeMsg" style="margin:0 0 12px;color:var(--text-secondary);font-size:0.92em;line-height:1.5"></p>
-        <input id="deleteTypeInput" class="assetModalInput" type="text" placeholder="Escribe el nombre en MAYÚSCULAS..." autocomplete="off">
-        <div class="assetModalActions">
-            <button id="deleteTypeCancelBtn" class="cancelButton" type="button">Cancelar</button>
-            <button id="deleteTypeOkBtn" class="dangerButton" type="button">Eliminar definitivamente</button>
         </div>
     </div>
 </div>
@@ -1835,6 +1837,18 @@
 
                 <div class="ajustesSwitchRow">
                     <div class="ajustesSwitchLabel">
+                        Planes
+                        <small>Planes de inversión: qué activos comprar y con qué operaciones</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="moduloPlanes" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
                         Herramientas
                         <small>Calculadoras y utilidades</small>
                     </div>
@@ -1901,6 +1915,7 @@
 <script src="js/cartera/portfolios.js"></script>
 <script src="js/cartera/private-market.js"></script>
 <script src="js/cartera/planes.js"></script>
+<script src="js/cartera/planes-inversion.js"></script>
 <script src="js/finanzas/ahorro.js"></script>
 <script src="js/finanzas/calendario.js"></script>
 </body>

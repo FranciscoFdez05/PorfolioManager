@@ -618,8 +618,9 @@ function deleteCurrentDividendosYear() {
 
     openConfirmModal({
         title: "Eliminar año",
-        message: `¿Eliminar todas las filas del año ${currentDividendosYear}?`,
+        message: `Vas a eliminar todas las filas del año ${currentDividendosYear}. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
+        requireText: String(currentDividendosYear),
         onConfirm: async () => {
             try {
                 _allDividendosRows = _allDividendosRows.filter(

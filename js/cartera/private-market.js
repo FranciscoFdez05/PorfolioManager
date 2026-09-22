@@ -81,10 +81,16 @@ function _pmBuildRow(rowData, index) {
     `
     actionCell.querySelector(".avEditBtn").addEventListener("click", () => _pmOpenEditModal(index))
     actionCell.querySelector(".avDeleteBtn").addEventListener("click", () => {
+        // Una inversión recién añadida puede no tener nombre todavía; entonces
+        // no hay nada que teclear y el diálogo se queda en el de siempre.
+        const nombreInversion = String(rowData.nombre || "").trim()
         openConfirmModal({
             title: "Eliminar inversión",
-            message: "¿Quieres eliminar esta inversión?",
+            message: nombreInversion
+                ? `Vas a eliminar la inversión "${nombreInversion}" y todo su historial. Esto no se puede deshacer.`
+                : "¿Quieres eliminar esta inversión?",
             confirmLabel: "Eliminar",
+            requireText: nombreInversion,
             onConfirm: async () => {
                 const rows = _pmCollectRows()
                 rows.splice(index, 1)

@@ -193,8 +193,9 @@ function deleteCuenta(id) {
 
     openConfirmModal({
         title: "Eliminar cuenta",
-        message: `¿Eliminar la cuenta "${cuenta.nombre}" y todos sus datos?`,
+        message: `Vas a eliminar la cuenta "${cuenta.nombre}" y todos sus datos. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
+        requireText: cuenta.nombre,
         onConfirm: async () => {
             try {
                 _allCuentas = _allCuentas.filter((c) => c.id !== id)
@@ -641,8 +642,9 @@ function deleteCurrentInteresesYear() {
 
     openConfirmModal({
         title: "Eliminar año",
-        message: `¿Eliminar todas las filas del año ${currentInteresesYear}?`,
+        message: `Vas a eliminar todas las filas del año ${currentInteresesYear}. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
+        requireText: String(currentInteresesYear),
         onConfirm: async () => {
             try {
                 _allInteresesRows = _allInteresesRows.filter((r) => parseInteresYear(r.fecha) !== currentInteresesYear)

@@ -80,22 +80,15 @@ html[data-theme="black"] .assetsListHeader {
 html[data-theme="black"] .detailRotationBar {
     background: #222228;
 }
+html[data-theme="black"] .sidebarDetailToggle,
 html[data-theme="black"] .sidebarFilterBar {
     background: #0e0e10;
     border-color: #222228;
 }
+html[data-theme="black"] .sidebarDetailBtn.active,
 html[data-theme="black"] .sidebarFilterBtn.active {
     background: #1e1e22;
     color: #f0f0f4;
-}
-html[data-theme="black"] #refreshSidebarMarketBtn.assetRefreshBtn {
-    background: #17171b;
-    border-color: #2e2e36;
-    color: #dcdce8;
-}
-html[data-theme="black"] #refreshSidebarMarketBtn.assetRefreshBtn:hover {
-    background: #1e1e22;
-    border-color: #3a3a44;
 }
 html[data-theme="black"] .toggleButton {
     background: #131316;
@@ -189,6 +182,9 @@ html[data-theme="black"] .stablecoinModal {
     border-color: #222228;
 }
 html[data-theme="black"] .assetModalTitle {
+    color: #f0f0f4;
+}
+html[data-theme="black"] .confirmTypeLabel b {
     color: #f0f0f4;
 }
 html[data-theme="black"] .cpHexRow {
@@ -447,25 +443,19 @@ html[data-theme="light"] .assetsListHeader {
 html[data-theme="light"] .detailRotationBar {
     background: #e2e8f0;
 }
+html[data-theme="light"] .sidebarDetailToggle,
 html[data-theme="light"] .sidebarFilterBar {
     background: #f1f5f9;
     border-color: #e2e8f0;
 }
+html[data-theme="light"] .sidebarDetailBtn,
 html[data-theme="light"] .sidebarFilterBtn {
     color: #64748b;
 }
+html[data-theme="light"] .sidebarDetailBtn.active,
 html[data-theme="light"] .sidebarFilterBtn.active {
     background: #ffffff;
     color: #0f172a;
-}
-html[data-theme="light"] #refreshSidebarMarketBtn.assetRefreshBtn {
-    background: #ffffff;
-    border-color: #cbd5e1;
-    color: #334155;
-}
-html[data-theme="light"] #refreshSidebarMarketBtn.assetRefreshBtn:hover {
-    background: #f1f5f9;
-    border-color: #94a3b8;
 }
 html[data-theme="light"] .assetBtn {
     background: #f8f9fa;
@@ -633,6 +623,18 @@ html[data-theme="light"] .stablecoinModal {
     border-color: #e2e8f0;
 }
 html[data-theme="light"] .assetModalTitle {
+    color: #0f172a;
+}
+/* El mensaje se quedó sin color propio en el tema claro: el de base (#d7e3f6)
+   es casi blanco y sobre el diálogo blanco no se leía. Afecta a todos los
+   diálogos de confirmación, que es justo donde hay que leer qué se va a hacer. */
+html[data-theme="light"] .assetModalMessage {
+    color: #475569;
+}
+html[data-theme="light"] .confirmTypeLabel {
+    color: #64748b;
+}
+html[data-theme="light"] .confirmTypeLabel b {
     color: #0f172a;
 }
 html[data-theme="light"] .assetModalLabel {
@@ -917,6 +919,20 @@ html[data-theme="light"] .secondaryButton {
 html[data-theme="light"] .secondaryButton:hover {
     background: #e8edf5;
     border-color: #cbd5e1;
+}
+/* El ··· de la barra del plan va emparejado con «Editar plan», que aquí es
+   claro; su fondo de base (--bg-elevated) es oscuro en los tres temas. */
+html[data-theme="light"] .pinvPlanAcciones .rowMenuTrigger {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #475569;
+    box-shadow: none;
+}
+html[data-theme="light"] .pinvPlanAcciones .rowMenuTrigger:hover {
+    background: #e8edf5;
+    border-color: #cbd5e1;
+    color: #1e293b;
+    box-shadow: none;
 }
 html[data-theme="light"] .dangerButton {
     background: #fee2e2;
@@ -1271,6 +1287,106 @@ html[data-theme="light"] .bonosTab.active {
     background: rgba(59, 91, 219, 0.06);
 }
 
+/* ── Light theme: Planes de inversión ── */
+html[data-theme="light"] .pinvPlanTab {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #64748b;
+}
+html[data-theme="light"] .pinvPlanTab:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+html[data-theme="light"] .pinvPlanTab.active {
+    background: #3b5bdb;
+    border-color: #3b5bdb;
+    color: #ffffff;
+}
+html[data-theme="light"] .pinvPlanNombre,
+html[data-theme="light"] .pinvKpiValue,
+html[data-theme="light"] .pinvActivoNombre,
+html[data-theme="light"] .pinvChartPct,
+html[data-theme="light"] .pinvLegendPct,
+html[data-theme="light"] .pinvEditorActivoNombre,
+html[data-theme="light"] .pinvArchivoNombre {
+    color: #0f172a;
+}
+html[data-theme="light"] .pinvRepartoNombre {
+    color: #475569;
+}
+html[data-theme="light"] .pinvRepartoValor {
+    color: #0f172a;
+}
+html[data-theme="light"] .pinvKpi,
+html[data-theme="light"] .pinvTableWrap,
+html[data-theme="light"] .pinvChartCard {
+    background: #ffffff;
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .pinvTable thead th {
+    background: #f1f5f9;
+    color: #475569;
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .pinvTable tbody td,
+html[data-theme="light"] .pinvOpFecha,
+html[data-theme="light"] .pinvLegendRow {
+    color: #1e293b;
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .pinvAssetRow:hover td,
+html[data-theme="light"] .pinvAssetRowOpen td {
+    background: #f1f5f9;
+}
+html[data-theme="light"] .pinvOpRow td {
+    background: #f8fafc;
+}
+html[data-theme="light"] .pinvCeldaOp {
+    border-left-color: #e2e8f0;
+}
+/* La casilla se pinta con --bg-inset, que es oscuro en los tres temas. Solo la
+   vacía: marcada lleva el azul y el check blanco que pone la hoja de la
+   página, y aclararle el fondo aquí dejaría el check invisible. */
+html[data-theme="light"] .pinvOpCheck input[type="checkbox"]:not(:checked) {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+}
+html[data-theme="light"] .pinvOrdenCompra,
+html[data-theme="light"] .pinvEstadoRealizada {
+    color: #15803d;
+}
+html[data-theme="light"] .pinvOrdenVenta,
+html[data-theme="light"] .pinvEstadoPendiente {
+    color: #b91c1c;
+}
+html[data-theme="light"] .pinvOpNuevaTag {
+    color: #1d4ed8;
+}
+html[data-theme="light"] .pinvEditorActivo,
+html[data-theme="light"] .pinvArchivoFila {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .pinvEditorActivoCab:hover {
+    background: #f1f5f9;
+}
+html[data-theme="light"] .pinvEditorOps {
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .pinvOpCheck {
+    background: #ffffff;
+    border-color: #e2e8f0;
+    color: #1e293b;
+}
+html[data-theme="light"] .pinvNuevaForm {
+    background: #ffffff;
+    border-color: #cbd5e1;
+}
+/* El desvanecido tiene que morir en el color del propio diálogo. */
+html[data-theme="light"] .pinvEditorListaConMas::after {
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #ffffff);
+}
+
 /* ── Black theme: Métricas ── */
 html[data-theme="black"] .metricasKpiCard {
     background: #17171b;
@@ -1535,6 +1651,66 @@ html[data-theme="black"] .bonosSummaryCard {
 }
 html[data-theme="black"] .bonosSummaryLabel {
     color: #606070;
+}
+
+/* ── Black theme: Planes de inversión ── */
+html[data-theme="black"] .pinvPlanTab {
+    background: #17171b;
+    border-color: #222228;
+    color: #dcdce8;
+}
+html[data-theme="black"] .pinvPlanTab:hover {
+    background: #1e1e22;
+    border-color: #2e2e36;
+}
+html[data-theme="black"] .pinvPlanAcciones .rowMenuTrigger {
+    background: #17171b;
+    border-color: #222228;
+    color: #dcdce8;
+}
+html[data-theme="black"] .pinvPlanAcciones .rowMenuTrigger:hover {
+    background: #1e1e22;
+    border-color: #2e2e36;
+}
+html[data-theme="black"] .pinvKpi,
+html[data-theme="black"] .pinvTableWrap,
+html[data-theme="black"] .pinvChartCard,
+html[data-theme="black"] .pinvOpCheck {
+    background: #17171b;
+    border-color: #222228;
+}
+html[data-theme="black"] .pinvTable thead th {
+    background: #131316;
+    border-color: #222228;
+}
+html[data-theme="black"] .pinvTable tbody td {
+    border-color: #1c1c20;
+}
+html[data-theme="black"] .pinvAssetRow:hover td,
+html[data-theme="black"] .pinvAssetRowOpen td {
+    background: #1e1e22;
+}
+html[data-theme="black"] .pinvOpRow td,
+html[data-theme="black"] .pinvNuevaForm {
+    background: #0e0e10;
+}
+html[data-theme="black"] .pinvCeldaOp {
+    border-left-color: #2e2e36;
+}
+html[data-theme="black"] .pinvOpCheck input[type="checkbox"]:not(:checked) {
+    background-color: #0e0e10;
+    border-color: #2e2e36;
+}
+html[data-theme="black"] .pinvEditorActivo,
+html[data-theme="black"] .pinvArchivoFila {
+    background: #131316;
+    border-color: #222228;
+}
+html[data-theme="black"] .pinvEditorActivoCab:hover {
+    background: #1e1e22;
+}
+html[data-theme="black"] .pinvEditorListaConMas::after {
+    background: linear-gradient(to bottom, rgba(23, 23, 27, 0), #17171b);
 }
 
 /* ── Black theme: navMoneyToggleBtn ── */
@@ -2233,6 +2409,23 @@ html[data-theme="light"] .operationsTable tbody td {
     border-color: #e2e8f0;
 }
 
+html[data-theme="light"] .operationsEstadoSelect.is-activo {
+    color: #1d4ed8;
+    background-color: rgba(59, 130, 246, 0.12);
+}
+html[data-theme="light"] .operationsEstadoSelect.is-completado {
+    color: #15803d;
+    background-color: rgba(22, 163, 74, 0.12);
+}
+html[data-theme="light"] .operationsEstadoSelect.is-cancelado {
+    color: #b91c1c;
+    background-color: rgba(220, 38, 38, 0.12);
+}
+html[data-theme="light"] .operationsEstadoSelect option {
+    background-color: #ffffff;
+    color: #1e293b;
+}
+
 html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td,
 html[data-theme="light"] .interesesTable tbody tr:nth-child(odd) td,
 html[data-theme="light"] .dividendosTable tbody tr:nth-child(odd) td,
@@ -2313,6 +2506,11 @@ html[data-theme="black"] .operationsTable tbody td {
     background: #17171b;
     color: #dcdce8;
     border-color: #1c1c20;
+}
+
+html[data-theme="black"] .operationsEstadoSelect option {
+    background-color: #1e1e22;
+    color: #dcdce8;
 }
 
 html[data-theme="black"] .overviewTable tbody tr:nth-child(odd) td,

@@ -7,6 +7,19 @@
     padding: 3px;
 }
 
+/* Ficha / Gráfico. Misma pieza que la fila de Portfolio/Watchlist que tiene
+   debajo: son dos conmutadores hermanos y darles formas distintas solo haría
+   ruido en una barra estrecha. */
+.sidebarDetailToggle {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-inset, #0d0d0d);
+    border: 1px solid var(--border-inset);
+    border-radius: 9px;
+    padding: 3px;
+}
+
+.sidebarDetailBtn,
 .sidebarFilterBtn {
     flex: 1;
     padding: 6px 0;
@@ -25,11 +38,13 @@
     white-space: nowrap;
 }
 
+.sidebarDetailBtn:hover,
 .sidebarFilterBtn:hover {
     color: var(--text-primary);
     background: var(--bg-surface);
 }
 
+.sidebarDetailBtn.active,
 .sidebarFilterBtn.active {
     background: var(--bg-elevated, #1e1e1e);
     color: var(--text-bright);
@@ -99,67 +114,6 @@
     border-bottom: 1px solid var(--border-inset);
     background: var(--bg-panel);
     flex: 0 0 auto;
-}
-
-.assetToolbarActions {
-    display: flex;
-    gap: 6px;
-}
-
-.assetToolbar .assetAddBtn {
-    flex: 1 1 0;
-    min-width: 0;
-    height: 34px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: 9px;
-    white-space: nowrap;
-    overflow: hidden;
-}
-
-.assetAddBtn svg {
-    width: 14px;
-    height: 14px;
-    flex: 0 0 auto;
-}
-
-.assetAddBtn span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#addAssetBtn.assetAddBtn {
-    width: auto;
-    height: 34px !important;
-    flex: 0 0 auto;
-    padding: 0 12px;
-}
-
-#refreshSidebarMarketBtn.assetRefreshBtn {
-    background: var(--btn-bg);
-    color: var(--text-primary);
-    border: 1px solid var(--border-mid);
-    box-shadow: none;
-}
-
-#refreshSidebarMarketBtn.assetRefreshBtn:hover {
-    background: var(--btn-bg-hover);
-    border-color: var(--btn-border-hover);
-    color: var(--text-bright);
-}
-
-.assetRefreshBtn:active svg {
-    animation: assetRefreshSpin 0.8s linear infinite;
-}
-
-@keyframes assetRefreshSpin {
-    to {
-        transform: rotate(360deg);
-    }
 }
 
 .assetBtn {
@@ -353,6 +307,42 @@
     flex: 0 0 auto;
     overflow-y: auto;
     min-height: 0;
+}
+
+/* En modo gráfico se esconde la ficha y el hueco entero es para el widget: en
+   una columna estrecha, media ficha más medio gráfico no sirve para nada. El
+   nombre y el precio se quedan, que son los que dicen qué se está mirando. */
+.assetDetailView.detailChartMode .detailStats,
+.assetDetailView.detailChartMode .detailMeta {
+    display: none;
+}
+
+.detailChart {
+    flex: 1 1 auto;
+    min-height: 260px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg-surface);
+}
+
+.detailChart.hidden {
+    display: none;
+}
+
+.detailChart iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 260px;
+    border: 0;
+}
+
+.detailChartAviso {
+    margin: 0;
+    padding: 16px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
 }
 
 /* Barra de progreso de la rotación automática del detalle */
@@ -2763,6 +2753,51 @@ html[data-theme="black"] .segHideBtn:hover {
     color: #d7e3f6;
     font-size: 15px;
     line-height: 1.5;
+}
+
+/* ── Confirmar un borrado escribiendo el nombre ── */
+/* La caja solo se ve cuando el diálogo se abre con `requireText`. Va entre el
+   mensaje y los botones para que se lea primero qué se borra y después se
+   teclee. */
+.confirmTypeBox {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin: 0 0 18px 0;
+}
+
+.confirmTypeBox.hidden {
+    display: none;
+}
+
+.confirmTypeLabel {
+    font-size: 13px;
+    color: #9fb4d0;
+}
+
+.confirmTypeLabel b {
+    color: #ffffff;
+    font-weight: 600;
+    /* El nombre puede llevar espacios al principio o al final que importan
+       poco, pero también puede ser largo: que parta de línea antes que
+       desbordar el diálogo. */
+    overflow-wrap: anywhere;
+}
+
+.confirmTypeInput {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Botón de borrar mientras lo tecleado no cuadra. */
+.confirmModalActions .dangerButton:disabled,
+.confirmModalActions .dangerButton:disabled:hover {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: var(--btn-bg);
+    border-color: var(--btn-border);
+    color: var(--text-muted);
+    box-shadow: none;
 }
 
 .interesesCreateModal,

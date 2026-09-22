@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.2.1-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.3.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 [![SQLite](https://img.shields.io/badge/sqlite-3.40%2B-lightgrey)](Dockerfile)
@@ -30,8 +30,7 @@ Nada sale de tu red salvo las consultas de cotizaciones, y esas son opcionales: 
 
 - **Vista General** — resumen del portfolio con tabla de activos y métricas clave
 - **Activos** — ficha por activo: compras/aportes, precio medio, rendimiento y, en los activos en divisa extranjera, el desglose entre **efecto activo** y **efecto divisa**
-- **Planes de inversión** — dentro de la ficha de cada activo: a qué precio entrar, a qué precio recoger el beneficio y con cuánto capital, con el porcentaje que falta desde el precio actual hasta cada uno y el aviso cuando la cotización entra en zona
-- **Planes DCA** — también por activo: aportación periódica con importe, frecuencia y horizonte, los aportes ya vencidos, el siguiente y el calendario de los doce próximos
+- **Planes de inversión** — un plan con nombre agrupa los activos que se piensan comprar y las operaciones con las que se va a hacer, vinculando operaciones spot abiertas o creando nuevas; la tabla dice qué parte de cada activo está ya invertida y la gráfica cuánto del plan está realizado. Los planes se archivan sin borrarse. Aparte, la ficha de cada activo conserva su pestaña de planes de precio (a qué precio entrar, a qué precio recoger el beneficio y con cuánto capital)
 - **Gastos & Ingresos** — gastos por categoría, ingresos recurrentes y puntuales, y **mensualidades** (suscripciones) con día de cobro propio por mes y un calendario del año que dice qué se cobró cada día; un **calendario del dinero** junta gastos, ingresos y mensualidades día a día, con chips para elegir qué se ve
 - **Finanzas** — cuenta remunerada, dividendos, renta fija, bonos y ventas
 - **Ventas con FIFO fiscal español** — lotes, regla de los dos meses y escala del ahorro calculados en el servidor, con **informe anual de la Renta** en CSV y en HTML imprimible ([detalle](#ventas-y-fiscalidad-españa))
@@ -928,7 +927,7 @@ python/
 
 js/
   core/              csrf, api, dom, app-core, shared-utils
-  cartera/           assets, portfolios, private-market, planes
+  cartera/           assets, portfolios, private-market, planes, planes-inversion
   finanzas/          gastos, ingresos, ahorro, calendario, ventas, dividendos, intereses, bonos
   cripto/            stablecoins, operaciones, transacciones, conversiones,
                      staking, earn, trading-journal

@@ -395,8 +395,9 @@ async function initAjustesLogic() {
 
         openConfirmModal({
             title: "Eliminar clave",
-            message: `¿Eliminar la clave ${clave.vista} de ${nombre}?${aviso} Esta acción no se puede deshacer.`,
+            message: `Vas a eliminar la clave ${clave.vista} de ${nombre}.${aviso} Esta acción no se puede deshacer.`,
             confirmLabel: "Eliminar",
+            requireText: clave.vista,
             onConfirm: async () => {
                 fila.style.opacity = "0.4"
                 try {
@@ -1093,8 +1094,9 @@ async function initAjustesLogic() {
         const displayName = _backupDisplayName(filename)
         openConfirmModal({
             title: "Eliminar backup",
-            message: `¿Eliminar la copia "${displayName}"? Esta acción no se puede deshacer.`,
+            message: `Vas a eliminar la copia "${displayName}". Esta acción no se puede deshacer.`,
             confirmLabel: "Eliminar",
+            requireText: displayName,
             onConfirm: async () => {
                 itemEl.style.opacity = "0.4"
                 try {
@@ -3845,6 +3847,7 @@ const _MODULOS_MAP = {
     moduloGastos: "gastos",
     moduloFinanzas: "finanzas",
     moduloCripto: "cripto",
+    moduloPlanes: "planes",
     moduloHerramientas: "herramientas",
     moduloMetricas: "metricas"
 }

@@ -7,6 +7,7 @@ const _PAGE_DIRS = {
     activos: "cartera",
     vistaGeneral: "cartera",
     privateMarket: "cartera",
+    planesInversion: "cartera",
 
     gastos: "finanzas",
     ingresos: "finanzas",
@@ -84,6 +85,7 @@ const _MODULE_PAGES = {
     gastos: ["gastos", "ingresos", "calendario"],
     finanzas: ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
     cripto: ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
+    planes: ["planesInversion"],
     herramientas: ["herramientas"],
     metricas: ["metricas"]
 }
@@ -190,8 +192,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const sideWrapper = document.getElementById("sideWrapper")
     const navButtons = document.querySelectorAll(".navBtn")
     const contentArea = document.getElementById("dynamicContent")
-    const addAssetButton = document.getElementById("addAssetBtn")
-    const refreshSidebarMarketButton = document.getElementById("refreshSidebarMarketBtn")
     const assetModalOverlay = document.getElementById("assetModalOverlay")
     const confirmAssetModalButton = document.getElementById("confirmAssetModalBtn")
     const cancelAssetModalButton = document.getElementById("cancelAssetModalBtn")
@@ -210,8 +210,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initMetricsScroll(document.querySelector(".metrics"), sideWrapper)
     initNavigation(navButtons, contentArea)
     initResizeHandles()
-    initAddAssetButton(addAssetButton, assetModalOverlay, assetNameInput, assetTypeSelect, assetTickerInput)
-    initSidebarRefreshButton(refreshSidebarMarketButton)
+    initSidebarDetailToggle()
     initSidebarFilterBar()
     initAssetModal(
         assetModalOverlay,
@@ -619,27 +618,38 @@ window._viewAllPortfolios = localStorage.getItem("viewAllPortfolios") === "1"
  * que ocupan las tarjetas, y al soltar se queda donde se deje —no hay inercia ni
  * vuelta atrás— porque el desplazamiento se escribe tal cual, sin `smooth`.
  */
-function initMetricsScroll(metrics, sideWrapper) {
-    if (!metrics) return
+/**
+ * Scroll lateral con rueda, arrastre y difuminado en los bordes.
+ *
+ * Lo estrenó el panel superior de métricas y lo usa también la fila de planes:
+ * en los dos sitios hay una tira de elementos que no cabe y que no debe partir
+ * en dos líneas, porque al partir empuja lo que tiene al lado.
+ *
+ * `clases` son los nombres que se ponen y quitan según el estado, para que
+ * cada sitio conserve los suyos y su propio CSS. Devuelve la función que
+ * recalcula, que hay que llamar cuando cambie el contenido de la tira.
+ */
+function initScrollLateral(elemento, clases) {
+    if (!elemento) return () => {}
 
-    const sobrante = () => metrics.scrollWidth - metrics.clientWidth
+    const sobrante = () => elemento.scrollWidth - elemento.clientWidth
 
     const actualizarBordes = () => {
         // 1px de holgura: a fondo de recorrido el navegador deja restos
         // decimales y sin el margen el difuminado del final no se apaga nunca.
         const sobra = sobrante()
-        metrics.classList.toggle("metricsScrollable", sobra > 1)
-        metrics.classList.toggle("metricsFadeStart", metrics.scrollLeft > 1)
-        metrics.classList.toggle("metricsFadeEnd", metrics.scrollLeft < sobra - 1)
+        elemento.classList.toggle(clases.scrollable, sobra > 1)
+        elemento.classList.toggle(clases.inicio, elemento.scrollLeft > 1)
+        elemento.classList.toggle(clases.fin, elemento.scrollLeft < sobra - 1)
     }
 
-    metrics.addEventListener(
+    elemento.addEventListener(
         "wheel",
         (evento) => {
             if (evento.deltaX !== 0) return
             if (sobrante() <= 0) return
             evento.preventDefault()
-            metrics.scrollLeft += evento.deltaY
+            elemento.scrollLeft += evento.deltaY
         },
         { passive: false }
     )
@@ -649,38 +659,63 @@ function initMetricsScroll(metrics, sideWrapper) {
     let scrollInicial = 0
     let arrastrando = false
 
-    metrics.addEventListener("pointerdown", (evento) => {
+    elemento.addEventListener("pointerdown", (evento) => {
         if (evento.button !== 0 || sobrante() <= 0) return
         arrastrando = true
         xInicial = evento.clientX
-        scrollInicial = metrics.scrollLeft
-        metrics.classList.add("metricsDragging")
-        metrics.setPointerCapture(evento.pointerId)
+        scrollInicial = elemento.scrollLeft
+        elemento.classList.add(clases.arrastrando)
+        elemento.setPointerCapture(evento.pointerId)
     })
 
-    metrics.addEventListener("pointermove", (evento) => {
+    elemento.addEventListener("pointermove", (evento) => {
         if (!arrastrando) return
         // El navegador ya recorta el valor a [0, sobrante]: el arrastre no puede
-        // pasar de la última tarjeta ni de la primera.
-        metrics.scrollLeft = scrollInicial - (evento.clientX - xInicial)
+        // pasar del último elemento ni del primero.
+        elemento.scrollLeft = scrollInicial - (evento.clientX - xInicial)
     })
 
     const soltar = (evento) => {
         if (!arrastrando) return
         arrastrando = false
-        metrics.classList.remove("metricsDragging")
-        metrics.releasePointerCapture?.(evento.pointerId)
+        elemento.classList.remove(clases.arrastrando)
+        elemento.releasePointerCapture?.(evento.pointerId)
     }
 
-    metrics.addEventListener("pointerup", soltar)
-    metrics.addEventListener("pointercancel", soltar)
+    elemento.addEventListener("pointerup", soltar)
+    elemento.addEventListener("pointercancel", soltar)
 
     // Arrastrar sobre texto dispara el arrastre nativo del navegador y se lleva
-    // el gesto a medias; la selección la corta el CSS de .metricsDragging.
-    metrics.addEventListener("dragstart", (evento) => evento.preventDefault())
+    // el gesto a medias; la selección la corta el CSS del estado "arrastrando".
+    elemento.addEventListener("dragstart", (evento) => evento.preventDefault())
 
-    metrics.addEventListener("scroll", actualizarBordes, { passive: true })
-    window.addEventListener("resize", actualizarBordes)
+    elemento.addEventListener("scroll", actualizarBordes, { passive: true })
+
+    // El de la ventana se da de baja solo cuando la tira ya no está en la
+    // página: las de dentro de una página se crean de nuevo en cada visita y si
+    // no, se irían acumulando manejadores sobre nodos que ya no existen.
+    const alRedimensionar = () => {
+        if (!elemento.isConnected) {
+            window.removeEventListener("resize", alRedimensionar)
+            return
+        }
+        actualizarBordes()
+    }
+    window.addEventListener("resize", alRedimensionar)
+
+    actualizarBordes()
+    return actualizarBordes
+}
+
+function initMetricsScroll(metrics, sideWrapper) {
+    if (!metrics) return
+
+    const actualizarBordes = initScrollLateral(metrics, {
+        scrollable: "metricsScrollable",
+        inicio: "metricsFadeStart",
+        fin: "metricsFadeEnd",
+        arrastrando: "metricsDragging"
+    })
 
     // Plegar el lateral ensancha la fila con una transición: lo que vale es el
     // ancho de después, no el del momento del clic.
@@ -691,7 +726,6 @@ function initMetricsScroll(metrics, sideWrapper) {
     // Encender o apagar tarjetas desde Ajustes cambia lo que sobra, y eso pasa
     // por applyTopMetricsVisibility(), que llama aquí.
     window._refreshMetricsScroll = actualizarBordes
-    actualizarBordes()
 }
 
 function initSidePanel(toggleButton, sideWrapper) {
@@ -991,6 +1025,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initAhorroLogic()
         } else if (page === "calendario") {
             await initCalendarioLogic()
+        } else if (page === "planesInversion") {
+            await initPlanesInversionLogic()
         }
     } catch (error) {
         console.error(error)

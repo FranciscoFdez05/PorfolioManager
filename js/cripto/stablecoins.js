@@ -607,17 +607,11 @@ function requestStablecoinDeletion(stablecoinSymbol) {
     if (typeof openConfirmModal === "function") {
         openConfirmModal({
             title: "Eliminar stablecoin",
-            message: `Vas a eliminar ${stablecoinSymbol} del catálogo y borrar sus movimientos manuales. ¿Quieres continuar?`,
-            confirmLabel: "Continuar",
-            onConfirm: () => {
-                openConfirmModal({
-                    title: "Confirmación final",
-                    message: `Esta acción eliminará ${stablecoinSymbol} y no se puede deshacer fácilmente. ¿Confirmas el borrado?`,
-                    confirmLabel: "Eliminar",
-                    onConfirm: confirmDelete,
-                    confirmSide: "right"
-                })
-            }
+            message: `Vas a eliminar ${stablecoinSymbol} del catálogo y borrar sus movimientos manuales. Esto no se puede deshacer.`,
+            confirmLabel: "Eliminar",
+            confirmSide: "right",
+            requireText: stablecoinSymbol,
+            onConfirm: confirmDelete
         })
         return
     }

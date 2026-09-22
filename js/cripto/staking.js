@@ -199,8 +199,9 @@ function deleteStakingCripto(id) {
     if (!cripto) return
     openConfirmModal({
         title: "Eliminar cripto",
-        message: `¿Eliminar "${cripto.nombre}" y todos sus registros de staking?`,
+        message: `Vas a eliminar "${cripto.nombre}" y todos sus registros de staking. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
+        requireText: cripto.nombre,
         onConfirm: async () => {
             try {
                 _stakingCriptos = _stakingCriptos.filter((c) => c.id !== id)
@@ -507,8 +508,9 @@ function deleteCurrentStakingYear() {
     if (!stakingCurrentYear) return
     openConfirmModal({
         title: "Eliminar año",
-        message: `¿Eliminar todas las filas del año ${stakingCurrentYear}?`,
+        message: `Vas a eliminar todas las filas del año ${stakingCurrentYear}. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
+        requireText: String(stakingCurrentYear),
         onConfirm: async () => {
             try {
                 _stakingRows = _stakingRows.filter((r) => parseStakingYear(r.fecha) !== stakingCurrentYear)

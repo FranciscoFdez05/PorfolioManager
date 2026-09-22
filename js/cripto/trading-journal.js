@@ -520,10 +520,16 @@ function handleTradingTableClick(event) {
     if (deleteBtn) {
         const id = deleteBtn.dataset.tradeId
         if (!id) return
+        // El trade no tiene nombre: lo identifica su moneda, que es lo que se
+        // teclea. Sin moneda no hay nada que escribir y queda el diálogo llano.
+        const moneda = String(currentTradingData.rows.find((r) => r.id === id)?.moneda || "").trim()
         openConfirmModal({
             title: "Eliminar trade",
-            message: "¿Quieres eliminar este trade?",
+            message: moneda
+                ? `Vas a eliminar el trade de ${moneda}. Esto no se puede deshacer.`
+                : "¿Quieres eliminar este trade?",
             confirmLabel: "Eliminar",
+            requireText: moneda,
             onConfirm: () => {
                 currentTradingData.rows = currentTradingData.rows.filter((r) => r.id !== id)
                 renderTradingView()
@@ -627,10 +633,14 @@ async function openTradingModal(tradeId) {
 
     if (isEdit) {
         footer.querySelector("#tmDeleteBtn").addEventListener("click", () => {
+            const moneda = String(rowData.moneda || "").trim()
             openConfirmModal({
                 title: "Eliminar trade",
-                message: "¿Quieres eliminar este trade?",
+                message: moneda
+                    ? `Vas a eliminar el trade de ${moneda}. Esto no se puede deshacer.`
+                    : "¿Quieres eliminar este trade?",
                 confirmLabel: "Eliminar",
+                requireText: moneda,
                 onConfirm: () => {
                     currentTradingData.rows = currentTradingData.rows.filter((r) => r.id !== tradeId)
                     renderTradingView()

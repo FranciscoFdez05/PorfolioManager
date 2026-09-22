@@ -521,6 +521,39 @@ CREATE TABLE IF NOT EXISTS planes_inversion (
     sort_order      INTEGER NOT NULL DEFAULT 0
 );
 
+-- Planes de inversión de la cartera: un nombre y, debajo, los activos que se
+-- piensa comprar y con qué operaciones. A diferencia de `planes_inversion`
+-- (una nota de precio dentro de la ficha de un activo), aquí el plan agrupa
+-- varios activos y cada línea es una operación REAL de la tabla `operaciones`:
+-- una abierta que se vincula, o una nueva que se crea desde el plan. Así lo que
+-- está "realizado" no se marca a mano, sale del estado de la operación.
+--
+-- `operacion_id` no lleva clave foránea a propósito: `operaciones` se reescribe
+-- entera en cada guardado (DELETE + INSERT) y un ON DELETE CASCADE vaciaría el
+-- plan cada vez que se toca la tabla de operaciones. Un identificador que ya
+-- no exista se ignora al pintar y se limpia en el siguiente guardado.
+CREATE TABLE IF NOT EXISTS planes_cartera (
+    id         TEXT PRIMARY KEY,
+    nombre     TEXT NOT NULL DEFAULT '',
+    archivado  INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS planes_cartera_activos (
+    plan_id    TEXT NOT NULL REFERENCES planes_cartera(id) ON DELETE CASCADE,
+    asset_id   TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (plan_id, asset_id)
+);
+
+CREATE TABLE IF NOT EXISTS planes_cartera_operaciones (
+    plan_id      TEXT NOT NULL REFERENCES planes_cartera(id) ON DELETE CASCADE,
+    asset_id     TEXT NOT NULL,
+    operacion_id TEXT NOT NULL,
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (plan_id, operacion_id)
+);
+
 """
 
 
@@ -542,7 +575,7 @@ CREATE TABLE IF NOT EXISTS planes_inversion (
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 6
+ESQUEMA_VERSION = 7
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1056,6 +1089,40 @@ def _esquema_6(conn):
         cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
         if "nota" not in cols:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN nota TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(7)
+def _esquema_7(conn):
+    """Planes de inversión de la cartera.
+
+    Tres tablas nuevas y ninguna fila tocada: el plan, los activos que agrupa y
+    las operaciones (de `operaciones`) que cuelgan de cada activo. Se crean con
+    IF NOT EXISTS porque una base nueva ya las trae de `_SCHEMA`, y una que
+    venga de la versión 6 las recibe aquí. Volver atrás es levantar la imagen
+    anterior: las tres tablas sobran, pero no estorban a un esquema que no las
+    lee.
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS planes_cartera (
+            id         TEXT PRIMARY KEY,
+            nombre     TEXT NOT NULL DEFAULT '',
+            archivado  INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS planes_cartera_activos (
+            plan_id    TEXT NOT NULL REFERENCES planes_cartera(id) ON DELETE CASCADE,
+            asset_id   TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (plan_id, asset_id)
+        );
+        CREATE TABLE IF NOT EXISTS planes_cartera_operaciones (
+            plan_id      TEXT NOT NULL REFERENCES planes_cartera(id) ON DELETE CASCADE,
+            asset_id     TEXT NOT NULL,
+            operacion_id TEXT NOT NULL,
+            sort_order   INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (plan_id, operacion_id)
+        );
+    """)
 
 
 def get_db() -> sqlite3.Connection:

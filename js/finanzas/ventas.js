@@ -179,23 +179,14 @@ function bindVentasEvents() {
         deleteYearButton.addEventListener("click", () => {
             openConfirmModal({
                 title: "Eliminar año",
-                message: `Vas a eliminar el año ${currentVentasYear}. ¿Quieres continuar?`,
+                message: `Vas a eliminar el año ${currentVentasYear}. Sus ventas dejarán de consumir lotes, así que el coste FIFO de los años siguientes se recalculará. Esto no se puede deshacer.`,
                 confirmLabel: "Eliminar",
                 confirmSide: "right",
+                requireText: String(currentVentasYear),
                 onConfirm: async () => {
-                    openConfirmModal({
-                        title: "Segunda verificación",
-                        message: `Esta acción borrará definitivamente el año ${currentVentasYear}. Las ventas de ese ejercicio dejarán de consumir lotes, así que el coste FIFO de los años siguientes se recalculará. ¿Confirmas?`,
-                        confirmLabel: "Eliminar",
-                        confirmSide: "left",
-                        onConfirm: async () => {
-                            const response = await deleteVentasYearRequest(currentVentasYear)
-                            ventasYears = Array.isArray(response.years)
-                                ? response.years
-                                : (await loadVentasIndex()).years || []
-                            await renderVentasYear(ventasYears[0] || "2026")
-                        }
-                    })
+                    const response = await deleteVentasYearRequest(currentVentasYear)
+                    ventasYears = Array.isArray(response.years) ? response.years : (await loadVentasIndex()).years || []
+                    await renderVentasYear(ventasYears[0] || "2026")
                 }
             })
         })
