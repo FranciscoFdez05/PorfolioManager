@@ -22,6 +22,161 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.4.0] — 2026-09-24
+
+**Esquema de base de datos:** no lo toca (sigue en la versión **7**). Para
+deshacer la actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Añadido
+
+**Herramientas, ordenada por lo que contesta cada una.** Las calculadoras se
+agrupan en cinco categorías —**Proyección**, **Rendimiento**, **Cartera**,
+**Fiscal** y **Mercado**— en vez de en una fila única de ocho botones donde
+había que acordarse de cuál era cuál.
+
+**Rebalanceo** (Cartera). Agrupa la cartera por tipo de activo, la compara con
+el reparto objetivo que le pongas y dice qué mover para volver a él. Si indicas
+una aportación, el ajuste se hace **solo comprando** siempre que dé de sí:
+vender tiene peaje fiscal y comisiones, así que no se propone si se puede
+evitar. Cuando no hay más remedio que vender, lo dice y remite a «Simular
+venta».
+
+**Simular venta** (Fiscal). Qué pagarías si vendieras hoy: coste FIFO, qué
+lotes se consumen, si entra la regla de los dos meses y la cuota. No guarda
+nada. La aritmética no se repite —`GET /api/herramientas/simular-venta` llama a
+`stores/ventas_fifo.simular_venta()`, el mismo motor que liquida la tabla de
+ventas—, así que la simulación no puede desviarse de lo que sale al vender de
+verdad. La cuota es **incremental**: liquida el ejercicio con la venta y sin
+ella, y resta. Aplicar un tipo fijo a la ganancia daría otro número, porque la
+escala es progresiva y el saldo puede compensarse con pérdidas de ejercicios
+anteriores.
+
+**Precio medio, con tus compras de verdad.** Eliges el activo y trae sus
+compras ya guardadas —las de la ficha y las de operaciones cripto, que un
+activo puede tener de las dos— en lugar de teclearlas a mano.
+
+**Tus propias herramientas.** Cada fichero `.html` que dejes en
+`html/analisis/herramientas-extra/` es una calculadora más: sale en la
+categoría **Propias** con el mismo aspecto que las de serie. El servidor las
+descubre solo (`GET /api/herramientas-extra`) leyendo una cabecera de metadatos
+al principio del fichero; si hay un `.js` con el mismo nombre, se carga con
+ella. No hay nada que registrar ni ningún fichero de la aplicación que tocar,
+así que sobreviven a las actualizaciones. Guía en
+[docs/herramientas-extra.md](docs/herramientas-extra.md), con un ejemplo
+completo ya en la carpeta (la regla del 4).
+
+**Tres gráficos en la pestaña «Todos» de la ficha del activo.** En el hueco de
+la derecha, lo que la tabla tiene pero no enseña de un vistazo:
+
+- **Participaciones por origen** — cuánto de lo que hay en cartera viene de
+  compras spot, de operaciones spot y de transacciones.
+- **Ventas y ganancias realizadas** — en qué se reparte el dinero de lo ya
+  vendido: lo que costó comprarlo, los impuestos y lo que queda limpio. Si el
+  conjunto de ventas sale en pérdidas enseña el otro reparto, cuánto se
+  recuperó y cuánto se quedó por el camino.
+- **Capital invertido por año** — cuánto entró en el activo cada año, en una
+  rampa de azules del más antiguo al más reciente. Las compras anotadas en otra
+  moneda pasan por el cambio antes de sumarse.
+
+Cada tarjeta dice el total debajo y, cuando no hay nada que repartir —un activo
+sin ventas, por ejemplo—, lo explica en una frase en vez de dibujar un círculo
+vacío. Se pliegan pulsando su título y lo plegado se recuerda entre repintados,
+cambios de activo y recargas. Por debajo de 1180 px de ancho se colocan debajo
+del recuadro en vez de estrecharlo.
+
+**Resumen y leyenda en el mapa de calor.** Arriba a la derecha: cuántos activos
+se están viendo, cuánto valen y cuánto se mueven en euros —respetando los
+filtros, así que con solo «Cripto» marcado el resumen es el de la cripto— y la
+escala de color con sus topes. Pulsar una baldosa abre la ficha del activo,
+como pulsar su fila en Vista general.
+
+### Cambiado
+
+**Qué hace pulsar un activo de la barra lateral: ahora se elige.** Arriba de la
+barra, un conmutador **Activo / Gráfico** con la misma forma que el de
+Portfolio/Watchlist que tiene debajo. En **Activo** —lo de siempre y lo que
+viene puesto— pulsar un activo abre su ficha. En **Gráfico** abre su gráfico de
+TradingView en el diálogo centrado, sin moverse de la página en la que se
+estaba; el panel lateral se actualiza igual con el activo elegido. Lo elegido
+se recuerda, y un activo sin ticker de mercado lo dice en vez de abrir un
+gráfico vacío.
+
+**La tabla «Todos» de la ficha del activo, más fácil de leer.** Se queda con
+las siete columnas que se miran —Origen, Fecha, Tipo, Participaciones, Precio,
+Importe y Comisiones— y deja fuera «Comisiones cripto» y «Estado», que solo
+salían en algunos activos y descuadraban el ancho de todo lo demás. Las
+columnas pasan a tener un ancho fijo y el contenido va centrado, encabezado y
+valor en la misma vertical, con los números en cifras de ancho fijo para que
+los decimales caigan alineados.
+
+Para cuadrarla hay una rejilla de ajuste: `todosGrid()` en la consola dibuja en
+blanco el borde de cada celda y `todosGrid(false)` lo quita. No cambia ninguna
+medida, así que la tabla se ve igual con la rejilla puesta que sin ella.
+
+**«Compras spot» también dice cuántas filas tiene.** Era la única pestaña de la
+ficha sin el número entre paréntesis. Se actualiza al añadir y al borrar, y las
+filas recién añadidas, que están en blanco hasta que se rellenan, no cuentan.
+
+**La barra de Activos, más corta.** Fuera el botón **Actualizar**: las
+cotizaciones se refrescan solas y el refresco a mano sigue en Vista general.
+**+ Añadir activo** se va al extremo derecho, junto al selector de tarjetas o
+tabla, y deja la izquierda para los filtros y la búsqueda.
+
+**El mapa de calor: dos mapas bien separados.** El conmutador **Activos /
+Cuenta** sigue ahí, pero ahora cada lado es una pregunta distinta y se nota:
+
+- **Activos** — cómo va el activo en el mercado. La baldosa dice el símbolo, el
+  nombre, la variación del periodo y el **precio**.
+- **Cuenta** — cómo va **mi dinero** metido en él. La baldosa dice el símbolo,
+  el nombre, el porcentaje del periodo y **cuánto dinero es eso** —`+2,50 €`
+  debajo del `+2,40 %`—, y el resumen de la barra suma lo mismo.
+
+Las fechas —**Día**, **Semana**, **Mes**, **Año** y **YTD**— valen para los
+dos: lo que cambia al pulsar el conmutador no es el plazo, es la pregunta.
+Antes solo las tenía el mapa de los activos, y el de la cuenta las dejaba en
+gris con el rendimiento desde la compra como única lectura. Ese rendimiento
+acumulado no se pierde: está en el detalle al pasar el ratón, junto al precio,
+lo invertido, el valor actual y el peso en la cartera.
+
+El dinero movido es la diferencia con lo que valía al empezar el periodo, no el
+porcentaje aplicado al valor de ahora: ese porcentaje se calculó sobre el
+precio de antes, así que se pasaba. Con un +2 % la diferencia entre las dos
+cuentas es calderilla; con los porcentajes de tres cifras que salen en cripto
+eran decenas de euros inventados.
+
+La escala de color se ajusta al periodo —±3 % en el día, ±6 % en la semana,
+±10 % en el mes y ±25 % en el año y el YTD— y la leyenda dice en cuál está. Con
+una escala fija de ±10 %, un día normal salía entero en pastel: el que más
+subía y el que más bajaba se veían del mismo color.
+
+**El mapa de calor reparte mejor el espacio.** Las baldosas se calculan con el
+reparto «squarified» en vez de partir la lista en dos mitades: con la misma
+cartera la peor proporción de una baldosa baja de 3,9 a 1,8, así que se acabaron
+las tiras verticales donde no cabía ni el símbolo. Hay además un tamaño mínimo
+de baldosa, que pagan a prorrata las grandes, para que una posición pequeña se
+vea en lugar de quedarse en una raya. El cuerpo de letra del símbolo se mide
+contra el ancho real de la baldosa —era lo que dejaba a Alphabet en «GO…»—, las
+que tienen sitio añaden el nombre del activo bajo el símbolo («Oro» debajo de
+XAUEUR) y el mapa ocupa todo el alto de la ventana, como Activos y Seguimiento.
+
+Los importes del mapa —resumen, baldosas y detalle— se difuminan con el ojo de
+la barra superior, como el resto de la aplicación.
+
+### Corregido
+
+**Los gráficos de Herramientas se veían mal en los temas claro y negro.** Los
+colores salían de las variables de `:root`, y esos dos temas no las redefinen:
+sobrescriben clases. El resultado era la paleta oscura siempre, con la rejilla
+en azul marino sobre fondo claro y la leyenda casi invisible.
+
+**El mapa de calor acumulaba escuchadores.** Cada repintado —tocar un filtro,
+cambiar el tamaño de la ventana— enganchaba un `mousemove` nuevo al contenedor
+sin soltar los anteriores, porque vaciarlo no quita sus escuchadores. Ahora se
+engancha una sola vez.
+
 ## [2.3.1] — 2026-09-22
 
 **Esquema de base de datos:** no lo toca (sigue en la versión **7**). Para

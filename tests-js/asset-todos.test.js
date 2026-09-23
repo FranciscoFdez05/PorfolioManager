@@ -113,6 +113,24 @@ describe("compras spot", () => {
         expect(cabeceras).not.toContain("Exchange")
         expect(cabeceras).toContain("Moneda fiat")
     })
+
+    it("cuenta las filas en el rótulo de la pestaña", () => {
+        expect(document.getElementById("spotTabBtn").textContent).toBe("Compras spot (1)")
+    })
+
+    // El contador se rehace al pintar las filas, que es lo que pasa al añadir y
+    // al borrar; una fila recién añadida está en blanco y todavía no es una compra.
+    it("no cuenta las filas en blanco", () => {
+        renderAssetRows([COMPRA, { ...COMPRA, fechaOperacion: "11-02-2026" }, {}])
+
+        expect(document.getElementById("spotTabBtn").textContent).toBe("Compras spot (2)")
+    })
+
+    it("sin compras se queda sin número", async () => {
+        await montar({ ...ACTIVO, rows: [] })
+
+        expect(document.getElementById("spotTabBtn").textContent).toBe("Compras spot")
+    })
 })
 
 describe("pestaña Todos", () => {

@@ -5,6 +5,23 @@ let _hmData = null
 const _hmHistCache = {} // { period: { data: {id: pct}, ts: ms } }
 const _HM_HIST_TTL = 4 * 3600 * 1000
 
+// Separación entre baldosas, en píxeles. Antes el hueco lo hacía un PAD que
+// solo se restaba a uno de los lados del corte, así que el mapa tenía rayas en
+// unos sitios y en otros no.
+const HM_GAP = 3
+
+// Etiqueta del periodo para la barra de resumen.
+const HM_PERIOD_LABELS = { dia: "Hoy", semana: "Semana", mes: "Mes", anyo: "Año", ytd: "YTD" }
+
+// Dónde satura el color en cada periodo, en porcentaje. Un día bueno son unas
+// décimas y un año bueno un 25 %: con una escala fija el mapa del día salía
+// entero en pastel, con el que más sube y el que más baja del mismo color.
+const HM_PERIOD_SCALE = { dia: 3, semana: 6, mes: 10, anyo: 25, ytd: 25 }
+
+function hmEscala() {
+    return HM_PERIOD_SCALE[_hmPeriod] || 10
+}
+
 async function initHeatmapLogic() {
     _hmPeriod = "dia"
     _hmMetric = "cuenta"
@@ -36,8 +53,6 @@ async function initHeatmapLogic() {
             metricEl.querySelectorAll(".hmGroupBtn").forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _hmMetric = btn.dataset.metric
-            // Grey out periods group when cuenta is selected
-            periodsEl?.classList.toggle("hmGroupDisabled", _hmMetric === "cuenta")
             hmRender()
         })
     }
@@ -76,9 +91,6 @@ async function initHeatmapLogic() {
         })
     }
 
-    // Start with periods disabled since default metric is "cuenta"
-    periodsEl?.classList.add("hmGroupDisabled")
-
     await hmLoadData()
 
     requestAnimationFrame(() =>
@@ -93,8 +105,15 @@ async function initHeatmapLogic() {
             const container = document.getElementById("heatmapContainer")
             if (container) _hmObserver.observe(container)
 
+            // El gris de las baldosas planas depende del tema, y el tema se
+            // cambia desde un panel que se abre encima del mapa sin recargar la
+            // página: sin esto se quedarían con el color del tema anterior.
+            const _hmThemeObserver = new MutationObserver(hmRender)
+            _hmThemeObserver.observe(document.documentElement, { attributeFilter: ["data-theme"] })
+
             window._hmResizeCleanup = () => {
                 _hmObserver.disconnect()
+                _hmThemeObserver.disconnect()
                 clearTimeout(_hmRenderTimer)
                 document.getElementById("hmTooltip")?.remove()
             }
@@ -161,8 +180,7 @@ async function hmLoadData() {
                     invertidoEur,
                     cuentaPct,
                     hasCuenta,
-                    dia: hasMarket ? d1 : null,
-                    hasMarket
+                    dia: hasMarket ? d1 : null
                 }
             })
             .filter((d) => d.netoEur > 0.01 || d.invertidoEur > 0.01)
@@ -229,65 +247,58 @@ function hmRender() {
 
     if (!items.length) {
         container.innerHTML = '<div class="heatmapEmpty">No hay activos para mostrar</div>'
+        hmUpdateSummary([])
         return
     }
 
     const enriched = items
         .map((d) => {
-            let value, valueLabel, hasValue
-
-            if (_hmMetric === "cuenta") {
-                if (d.hasCuenta) {
-                    value = d.cuentaPct
-                    hasValue = true
-                    valueLabel = hmFormatPct(value)
-                } else if (d.hasMarket) {
-                    value = d.dia
-                    hasValue = true
-                    valueLabel = hmFormatPct(value)
-                } else {
-                    value = null
-                    hasValue = false
-                    valueLabel = "—"
-                }
+            // El periodo manda en los dos mapas: hoy con el dato de mercado del
+            // día y el resto con el histórico que sirve el API. Lo que cambia
+            // entre «Activos» y «Cuenta» no es el plazo, es la pregunta: cómo
+            // va el activo o cómo va mi dinero metido en él.
+            const periodo = _hmPeriod
+            let value
+            if (periodo === "dia") {
+                value = d.dia
             } else {
-                // activos: día usa datos reales; resto usa histórico real del API
-                if (_hmPeriod === "dia") {
-                    value = d.dia
-                    hasValue = d.dia !== null
-                } else {
-                    const histData = _hmHistCache[_hmPeriod]?.data || {}
-                    value = histData[d.id] ?? null
-                    hasValue = value !== null
-                }
-                valueLabel = hasValue ? hmFormatPct(value) : "N/D"
+                const histData = _hmHistCache[periodo]?.data || {}
+                value = histData[d.id] ?? null
             }
 
+            const hasValue = value !== null && value !== undefined && !isNaN(value)
+            const valueLabel = hasValue ? hmFormatPct(value) : "N/D"
             const size = Math.max(d.netoEur, 0.01)
 
-            // Money movement for tooltip
-            let moneyChange = null
-            if (_hmMetric === "cuenta" && d.hasCuenta) {
-                moneyChange = d.netoEur - d.invertidoEur
-            } else if (hasValue && value !== null && d.netoEur > 0) {
-                moneyChange = (d.netoEur * value) / 100
+            return {
+                ...d,
+                size,
+                value,
+                valueLabel,
+                hasValue,
+                moneyChange: hmMovimiento(d.netoEur, hasValue ? value : null)
             }
-
-            return { ...d, size, value, valueLabel, hasValue, moneyChange }
         })
         .sort((a, b) => b.size - a.size)
 
     const totalSize = enriched.reduce((s, d) => s + d.size, 0)
     if (totalSize === 0) {
         container.innerHTML = '<div class="heatmapEmpty">Sin datos</div>'
+        hmUpdateSummary([])
         return
     }
+
+    enriched.forEach((d) => {
+        d.weight = d.size / totalSize
+    })
+
+    hmUpdateSummary(enriched)
 
     const W = container.clientWidth || container.offsetWidth || 800
     const H = container.clientHeight || container.offsetHeight || 500
 
     const rects = hmSquarify(
-        enriched.map((d) => ({ ...d, area: (d.size / totalSize) * W * H })),
+        enriched.map((d) => ({ ...d, area: d.weight * W * H })),
         0,
         0,
         W,
@@ -295,11 +306,130 @@ function hmRender() {
     )
 
     container.innerHTML = ""
-    hmEnsureTooltip(container)
+    hmBindContainer(container)
     rects.forEach((rect) => container.appendChild(hmBuildCell(rect)))
 }
 
-function hmEnsureTooltip(container) {
+/**
+ * Cuánto dinero ha movido la posición en el periodo.
+ *
+ * No es `valor × porcentaje`: ese porcentaje se calculó sobre el precio de
+ * *antes*, así que multiplicarlo por el valor de ahora se pasa. Lo que se
+ * mueve es la diferencia con lo que valía al empezar el periodo, o sea
+ * `valor − valor / (1 + pct/100)`. Con un +2 % la diferencia entre las dos
+ * cuentas es calderilla, pero con los porcentajes de tres cifras que salen en
+ * cripto son decenas de euros inventados.
+ */
+function hmMovimiento(valorEur, pct) {
+    if (pct === null || pct === undefined || !valorEur) return null
+    const factor = 1 + pct / 100
+    if (factor <= 0) return null
+    return valorEur - valorEur / factor
+}
+
+/**
+ * La barra de resumen de la derecha: cuántos activos se están viendo, cuánto
+ * valen y cuánto se han movido en el periodo elegido.
+ *
+ * El mapa contesta «qué sube y qué baja», pero no «cuánto es eso»: el color de
+ * una baldosa pequeña con un +30 % pesa lo mismo a la vista que el de una
+ * grande con un +2 %, y en euros no se parecen en nada. El total va aquí para
+ * que el mapa se lea junto a su magnitud, y respeta los filtros: si solo está
+ * marcado «Cripto», el resumen es el de la cripto.
+ */
+function hmUpdateSummary(items) {
+    const countEl = document.getElementById("hmSumCount")
+    const valueEl = document.getElementById("hmSumValue")
+    const pnlEl = document.getElementById("hmSumPnl")
+    const pnlLabelEl = document.getElementById("hmSumPnlLabel")
+    if (!countEl || !valueEl || !pnlEl) return
+
+    countEl.textContent = String(items.length)
+    valueEl.textContent = items.length ? hmFormatEur(items.reduce((s, d) => s + d.netoEur, 0)) : "—"
+
+    if (pnlLabelEl) pnlLabelEl.textContent = HM_PERIOD_LABELS[_hmPeriod] || "Movimiento"
+
+    const tope = hmEscala()
+    const tickMin = document.getElementById("hmLegendMin")
+    const tickMax = document.getElementById("hmLegendMax")
+    if (tickMin) tickMin.textContent = `−${tope} %`
+    if (tickMax) tickMax.textContent = `+${tope} %`
+
+    let cambio = 0
+    let base = 0
+    let hayDatos = false
+
+    items.forEach((d) => {
+        if (!d.hasValue || d.moneyChange === null) return
+        cambio += d.moneyChange
+        base += d.netoEur - d.moneyChange
+        hayDatos = true
+    })
+
+    if (!hayDatos) {
+        pnlEl.textContent = "—"
+        pnlEl.className = "hmSumVal hmSumMoney"
+        return
+    }
+
+    const pct = base > 0 ? (cambio / base) * 100 : 0
+    pnlEl.textContent = `${hmFormatSignedEur(cambio)} (${hmFormatPct(pct)})`
+    pnlEl.className = "hmSumVal hmSumMoney " + (cambio < 0 ? "hmNeg" : cambio > 0 ? "hmPos" : "")
+}
+
+/**
+ * Engancha el tooltip y el clic al contenedor.
+ *
+ * Se hace **una vez** por contenedor, no en cada pintada: `hmRender` vacía el
+ * contenedor pero no sus escuchadores, así que la versión anterior sumaba un
+ * `mousemove` nuevo cada vez que se tocaba un filtro o se redimensionaba la
+ * ventana, y todos seguían vivos.
+ */
+function hmBindContainer(container) {
+    if (container.dataset.hmBound === "true") return
+    container.dataset.hmBound = "true"
+
+    container.addEventListener("mousemove", (e) => {
+        const tip = hmGetTooltip()
+        const cell = e.target.closest(".heatmapCell")
+        if (!cell || !cell._hmData) {
+            tip.classList.remove("hmTooltipVisible")
+            return
+        }
+
+        tip.innerHTML = hmTooltipHtml(cell._hmData)
+        tip.classList.add("hmTooltipVisible")
+
+        // Posición: sigue al cursor y se aparta de los bordes. La medida es la
+        // real del tooltip ya montado; antes eran dos números fijos que se
+        // quedaban cortos en cuanto cambiaba el contenido.
+        const margin = 12
+        const rect = tip.getBoundingClientRect()
+        let lx = e.clientX + margin
+        let ly = e.clientY + margin
+        if (lx + rect.width > window.innerWidth - 4) lx = e.clientX - rect.width - margin
+        if (ly + rect.height > window.innerHeight - 4) ly = e.clientY - rect.height - margin
+        tip.style.left = Math.max(4, lx) + "px"
+        tip.style.top = Math.max(4, ly) + "px"
+    })
+
+    container.addEventListener("mouseleave", () => hmGetTooltip().classList.remove("hmTooltipVisible"))
+
+    // Una baldosa es el activo: al pulsarla se abre su ficha, igual que al
+    // pulsar su fila en la vista general.
+    container.addEventListener("click", (e) => {
+        const cell = e.target.closest(".heatmapCell")
+        const id = cell?._hmData?.id
+        if (!id) return
+        hmGetTooltip().classList.remove("hmTooltipVisible")
+        if (typeof clearNavSelection === "function") clearNavSelection()
+        if (typeof selectAsset === "function") {
+            Promise.resolve(selectAsset(id)).catch((err) => console.error("No se pudo abrir el activo:", err))
+        }
+    })
+}
+
+function hmGetTooltip() {
     let tip = document.getElementById("hmTooltip")
     if (!tip) {
         tip = document.createElement("div")
@@ -307,101 +437,140 @@ function hmEnsureTooltip(container) {
         tip.className = "hmTooltip"
         document.body.appendChild(tip)
     }
+    return tip
+}
 
-    container.addEventListener("mousemove", (e) => {
-        const cell = e.target.closest(".heatmapCell")
-        if (!cell) {
-            tip.classList.remove("hmTooltipVisible")
-            return
-        }
+function hmTooltipHtml(d) {
+    const pctClass = !d.hasValue || d.value === null ? "" : d.value < 0 ? "hmTipNeg" : d.value > 0 ? "hmTipPos" : ""
+    const fila = (label, valor, cls = "", dinero = true) =>
+        `<span class="hmTipLabel">${label}</span><span class="hmTipVal ${dinero ? "hmTipMoneyVal" : ""} ${cls}">${valor}</span>`
 
-        const d = cell._hmData
-        if (!d) return
+    // Precio
+    const priceNum = parseFloat(String(d.price || "").replace(",", "."))
+    const priceStr =
+        !isNaN(priceNum) && priceNum > 0 ? fila("Precio", hmFormatPrice(priceNum, d.currency), "", false) : ""
 
-        const pctClass = !d.hasValue || d.value === null ? "" : d.value < 0 ? "hmTipNeg" : d.value > 0 ? "hmTipPos" : ""
+    // Lo del periodo elegido, que es lo que pinta el mapa
+    const etiquetaPeriodo = HM_PERIOD_LABELS[_hmPeriod] || "Movimiento"
+    const periodoRows =
+        d.hasValue && d.value !== null
+            ? fila(etiquetaPeriodo, d.valueLabel, pctClass, false) +
+              (d.moneyChange !== null ? fila("Movimiento", hmFormatSignedEur(d.moneyChange), pctClass) : "")
+            : fila(etiquetaPeriodo, "sin dato", "", false)
 
-        const fmtEur = (v) => v.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"
-        const fmtSigned = (v) => (v >= 0 ? "+" : "") + fmtEur(v)
+    // Y la posición, que no depende del periodo
+    let cuentaRows = ""
+    if (d.hasCuenta && d.netoEur > 0) {
+        const ganancia = d.netoEur - d.invertidoEur
+        const ganClass = ganancia < 0 ? "hmTipNeg" : ganancia > 0 ? "hmTipPos" : ""
+        cuentaRows =
+            fila("Invertido", hmFormatEur(d.invertidoEur)) +
+            fila("Valor actual", hmFormatEur(d.netoEur)) +
+            fila("Rendimiento", `${hmFormatSignedEur(ganancia)} (${hmFormatPct(d.cuentaPct)})`, ganClass)
+    }
 
-        // Price row
-        const priceNum = parseFloat(String(d.price || "").replace(",", "."))
-        const priceStr =
-            !isNaN(priceNum) && priceNum > 0
-                ? `<span class="hmTipLabel">Precio</span><span class="hmTipVal">${hmFormatPrice(priceNum, d.currency)}</span>`
-                : ""
+    // Peso en el mapa: explica el tamaño de la baldosa, que si no hay que
+    // adivinarlo comparándola con las de al lado.
+    const pesoRow = d.weight > 0 ? fila("Peso", hmFormatPct(d.weight * 100).replace("+", ""), "", false) : ""
 
-        // Cuenta rows (only when we hold the asset)
-        let cuentaRows = ""
-        if (d.hasCuenta && d.netoEur > 0) {
-            const ganancia = d.netoEur - d.invertidoEur
-            const ganClass = ganancia < 0 ? "hmTipNeg" : ganancia > 0 ? "hmTipPos" : ""
-            cuentaRows = `
-                <span class="hmTipLabel">Invertido</span><span class="hmTipVal">${fmtEur(d.invertidoEur)}</span>
-                <span class="hmTipLabel">Valor actual</span><span class="hmTipVal">${fmtEur(d.netoEur)}</span>
-                <span class="hmTipLabel">Ganancia</span><span class="hmTipVal ${ganClass}">${fmtSigned(ganancia)}</span>`
-        } else if (d.moneyChange !== null) {
-            cuentaRows = `<span class="hmTipLabel">Cambio</span><span class="hmTipVal ${pctClass}">${fmtSigned(d.moneyChange)}</span>`
-        }
-
-        // Rentabilidad row
-        const rentRow =
-            d.hasValue && d.value !== null
-                ? `<span class="hmTipLabel">Rentab.</span><span class="hmTipVal ${pctClass}">${d.valueLabel}</span>`
-                : ""
-
-        tip.innerHTML = `
-            <div class="hmTipName">${d.name}</div>
+    return `
+            <div class="hmTipName">${escapeHtml(d.name)}</div>
             <div class="hmTipDivider"></div>
-            <div class="hmTipGrid">${priceStr}${cuentaRows}${rentRow}</div>`
-
-        // Position: follow cursor, avoid edges
-        const margin = 12
-        const tw = 215,
-            th = d.hasCuenta && d.netoEur > 0 ? 148 : 90
-        let lx = e.clientX + margin
-        let ly = e.clientY + margin
-        if (lx + tw > window.innerWidth) lx = e.clientX - tw - margin
-        if (ly + th > window.innerHeight) ly = e.clientY - th - margin
-        tip.style.left = lx + "px"
-        tip.style.top = ly + "px"
-        tip.classList.add("hmTooltipVisible")
-    })
-
-    container.addEventListener("mouseleave", () => tip.classList.remove("hmTooltipVisible"))
+            <div class="hmTipGrid">${priceStr}${periodoRows}${cuentaRows}${pesoRow}</div>`
 }
 
 function hmBuildCell(rect) {
-    const { x, y, w, h, symbol, price, currency, value, valueLabel, hasValue } = rect
+    const { x, y, w, h, symbol, name, value, valueLabel, hasValue, moneyChange } = rect
 
-    const bg = hasValue && value !== null ? hmColorForValue(value) : "#252d3a"
+    const bg = hasValue && value !== null ? hmColorForValue(value) : hmNeutralColor()
+
+    // El hueco se reparte entre las dos baldosas vecinas, así que el mapa
+    // queda con una rejilla uniforme y sin perder los bordes exteriores.
+    const cw = Math.max(w - HM_GAP, 2)
+    const ch = Math.max(h - HM_GAP, 2)
 
     const el = document.createElement("div")
     el.className = "heatmapCell"
-    el.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;background:${bg};color:#fff;`
+    el.style.cssText = `left:${x + HM_GAP / 2}px;top:${y + HM_GAP / 2}px;width:${cw}px;height:${ch}px;background:${bg};color:#fff;`
     el._hmData = rect // attach data for tooltip (no title attribute needed)
 
-    const fontSize = hmFontSize(w, h, symbol.length)
-    let inner = `<span class="hmSymbol" style="font-size:${fontSize}px">${symbol}</span>`
+    const fontSize = hmFontSize(cw, ch, symbol.length ? symbol : name)
+    let inner = `<span class="hmSymbol" style="font-size:${fontSize}px">${escapeHtml(symbol)}</span>`
 
-    if (h >= 60 && w >= 50) {
-        const priceNum = parseFloat(String(price || "").replace(",", "."))
-        if (!isNaN(priceNum) && priceNum > 0) {
-            inner += `<span class="hmPrice">${hmFormatPrice(priceNum, currency)}</span>`
-        }
+    // El nombre, en cuanto hay sitio para una segunda línea: "XAUEUR" no dice
+    // lo que dice "Oro".
+    if (ch >= 60 && cw >= 72 && name && String(name).toUpperCase() !== String(symbol).toUpperCase()) {
+        inner += `<span class="hmName">${escapeHtml(name)}</span>`
     }
 
-    if (h >= 44 && w >= 44) {
-        const cls = !hasValue || value === null ? "hmNd" : value < 0 ? "hmNeg" : value > 0 ? "hmPos" : ""
+    const cls = !hasValue || value === null ? "hmNd" : value < 0 ? "hmNeg" : value > 0 ? "hmPos" : ""
+
+    if (ch >= 42 && cw >= 44) {
         inner += `<span class="hmValue ${cls}">${valueLabel}</span>`
+    }
+
+    // La tercera línea es la que distingue los dos mapas: en el de los activos,
+    // el precio de mercado; en el de la cuenta, el dinero que ha movido la
+    // posición en el periodo —un +0,4 % en la posición grande y un +12 % en la
+    // pequeña se parecen mucho más en euros de lo que parecen en color—.
+    if (ch >= 76 && cw >= 62) {
+        if (_hmMetric === "activos") {
+            const priceNum = parseFloat(String(rect.price || "").replace(",", "."))
+            if (!isNaN(priceNum) && priceNum > 0) {
+                inner += `<span class="hmPrice">${hmFormatPrice(priceNum, rect.currency)}</span>`
+            }
+        } else if (moneyChange !== null) {
+            inner += `<span class="hmMoney hmCellMoney ${cls}">${hmFormatSignedEur(moneyChange)}</span>`
+        }
     }
 
     el.innerHTML = inner
     return el
 }
+// El cuerpo se elige por lo que ocupa el símbolo de verdad, medido con el tipo
+// de letra de la página: "GOOGL" e "IIII" tienen las mismas letras y anchuras
+// muy distintas. Antes se descontaba una cantidad fija por letra, así que los
+// símbolos largos se pasaban de ancho y salían cortados ("GOOGL" → "GO…").
+function hmFontSize(w, h, symbol) {
+    const anchoA100 = hmMedirTexto(symbol)
+    const porAncho = anchoA100 > 0 ? ((w - 10) / anchoA100) * 100 : w
+    const porAlto = h * 0.4
+    return Math.max(9, Math.min(porAncho, porAlto, 52))
+}
 
-function hmFontSize(w, h, symLen) {
-    const base = Math.min(w * 0.35, h * 0.35, 56)
-    return Math.max(10, Math.min(base - Math.max(0, symLen - 3) * 3, 52))
+// Ancho del símbolo en negrita a 100px, en un lienzo fuera de pantalla. El
+// resultado se cachea: los mismos símbolos se vuelven a medir en cada pintada.
+const _hmAnchos = new Map()
+let _hmMeasureCtx = null
+let _hmMedicionIntentada = false
+
+function hmMedirTexto(texto) {
+    const clave = String(texto || "")
+    if (_hmAnchos.has(clave)) return _hmAnchos.get(clave)
+
+    if (!_hmMeasureCtx && !_hmMedicionIntentada) {
+        _hmMedicionIntentada = true
+        try {
+            _hmMeasureCtx = document.createElement("canvas").getContext("2d")
+            const familia = getComputedStyle(document.body).fontFamily || "sans-serif"
+            _hmMeasureCtx.font = `700 100px ${familia}`
+        } catch {
+            _hmMeasureCtx = null
+        }
+    }
+
+    // Sin canvas (entorno de pruebas) se vuelve a la estimación por letras.
+    const ancho = _hmMeasureCtx ? _hmMeasureCtx.measureText(clave).width : clave.length * 70
+    _hmAnchos.set(clave, ancho)
+    return ancho
+}
+
+function hmFormatEur(v) {
+    return (v || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €"
+}
+
+function hmFormatSignedEur(v) {
+    return (v >= 0 ? "+" : "") + hmFormatEur(v)
 }
 
 function hmFormatPct(v) {
@@ -428,11 +597,18 @@ function hmFormatPrice(num, currency) {
     return `${num.toLocaleString("es-ES", decimales)} ${currencySuffix(currency)}`
 }
 
+// Gris de "ni sube ni baja" (y de los que no tienen dato). En el tema claro el
+// azul oscuro de siempre cantaba como un agujero negro entre las baldosas de
+// color, así que ahí se usa un gris medio que aguanta el texto en blanco.
+function hmNeutralColor() {
+    return document.documentElement.getAttribute("data-theme") === "light" ? "#64748b" : "#252d3a"
+}
+
 function hmColorForValue(pct) {
-    if (pct === null || pct === undefined) return "#252d3a"
-    if (Math.abs(pct) < 0.04) return "#252d3a"
+    if (pct === null || pct === undefined) return hmNeutralColor()
+    if (Math.abs(pct) < hmEscala() / 250) return hmNeutralColor()
     // t: 0 = barely different from 0%, 1 = extreme move
-    const t = Math.min(Math.abs(pct) / 10, 1)
+    const t = Math.min(Math.abs(pct) / hmEscala(), 1)
     if (pct > 0)
         return hmBlend("#a5d6a7", "#43a047", "#1b5e20", t) // verde: pastel → oscuro
     else return hmBlend("#ef9a9a", "#e53935", "#b71c1c", t) // rojo:  pastel → oscuro
@@ -449,35 +625,123 @@ function hmHex(hex) {
     return { r: parseInt(hex.slice(1, 3), 16), g: parseInt(hex.slice(3, 5), 16), b: parseInt(hex.slice(5, 7), 16) }
 }
 
-// Binary space partition treemap
+/**
+ * Treemap «squarified» (Bruls, Huizing y Van Wijk).
+ *
+ * El reparto anterior partía la lista ordenada en dos mitades de área parecida
+ * y recurría. Es más corto, pero no mira la forma que le está saliendo a cada
+ * baldosa: en cuanto un activo pesa mucho más que sus vecinos, los pequeños se
+ * quedan con tiras verticales de treinta píxeles de ancho donde no cabe ni el
+ * símbolo. Este va llenando filas y solo cierra la fila cuando añadir un activo
+ * más empeoraría la peor proporción de la fila, que es justo lo que mantiene
+ * las baldosas cerca del cuadrado.
+ */
 function hmSquarify(items, x, y, w, h) {
-    if (!items.length) return []
-    if (items.length === 1) return [{ ...items[0], x, y, w, h }]
+    const out = []
+    let pendientes = hmMinimoVisible(
+        items.filter((d) => d.area > 0),
+        w,
+        h
+    )
+    let rx = x
+    let ry = y
+    let rw = w
+    let rh = h
 
-    const total = items.reduce((s, i) => s + i.area, 0)
-    if (total <= 0) return []
+    while (pendientes.length && rw > 0.5 && rh > 0.5) {
+        const lado = Math.min(rw, rh)
+        const fila = []
+        let areaFila = 0
+        let i = 0
 
-    let cum = 0,
-        splitIdx = 1
-    const half = total / 2
-    for (let i = 0; i < items.length - 1; i++) {
-        cum += items[i].area
-        if (cum >= half) {
-            splitIdx = i + 1
-            break
+        while (i < pendientes.length) {
+            const siguiente = areaFila + pendientes[i].area
+            if (
+                fila.length &&
+                hmWorstRatio(fila, areaFila, lado) <= hmWorstRatio([...fila, pendientes[i]], siguiente, lado)
+            ) {
+                break
+            }
+            fila.push(pendientes[i])
+            areaFila = siguiente
+            i++
         }
+
+        const horizontal = lado === rw
+        const grosor = Math.min(areaFila / lado, horizontal ? rh : rw)
+        let pos = 0
+
+        fila.forEach((item, idx) => {
+            const largo = idx === fila.length - 1 ? lado - pos : (item.area / areaFila) * lado
+            if (horizontal) {
+                out.push({ ...item, x: rx + pos, y: ry, w: Math.max(largo, 1), h: Math.max(grosor, 1) })
+            } else {
+                out.push({ ...item, x: rx, y: ry + pos, w: Math.max(grosor, 1), h: Math.max(largo, 1) })
+            }
+            pos += largo
+        })
+
+        if (horizontal) {
+            ry += grosor
+            rh -= grosor
+        } else {
+            rx += grosor
+            rw -= grosor
+        }
+
+        pendientes = pendientes.slice(i)
     }
 
-    const a = items.slice(0, splitIdx)
-    const b = items.slice(splitIdx)
-    const r = a.reduce((s, i) => s + i.area, 0) / total
-    const PAD = 1
+    return out
+}
 
-    if (w >= h) {
-        const sw = Math.max(1, w * r)
-        return [...hmSquarify(a, x, y, sw - PAD, h), ...hmSquarify(b, x + sw, y, w - sw, h)]
-    } else {
-        const sh = Math.max(1, h * r)
-        return [...hmSquarify(a, x, y, w, sh - PAD), ...hmSquarify(b, x, y + sh, w, h - sh)]
+// Área mínima por baldosa: unos 26x26 px, lo justo para que se vea que hay algo
+// y se pueda pasar el ratón por encima.
+const HM_AREA_MINIMA = 26 * 26
+
+/**
+ * Sube al mínimo las baldosas diminutas y descuenta lo prestado del resto.
+ *
+ * Una posición de dos euros junto a una de dos mil sale con un área de
+ * fracciones de píxel: el reparto se quedaba sin rectángulo antes de llegar a
+ * ella y el activo desaparecía del mapa sin decir nada. Es peor que verlo
+ * pequeño, porque el mapa dice «esto es toda tu cartera».
+ *
+ * El préstamo lo pagan las baldosas grandes a prorrata, así que el orden y las
+ * proporciones entre ellas no cambian. Si no hubiera de dónde sacarlo se deja
+ * el reparto tal cual: antes un mapa exacto que uno inventado.
+ */
+function hmMinimoVisible(items, w, h) {
+    if (!items.length) return items
+
+    const lienzo = w * h
+    if (lienzo <= 0) return items
+
+    // Entre todas las baldosas infladas no se pueden comer más de un cuarto del
+    // mapa, o una cartera de cien posiciones minúsculas lo aplanaría todo.
+    const minima = Math.min(HM_AREA_MINIMA, lienzo / (items.length * 4))
+    const pequenas = items.filter((d) => d.area < minima)
+    if (!pequenas.length) return items
+
+    const prestado = pequenas.reduce((s, d) => s + (minima - d.area), 0)
+    const areaGrandes = items.reduce((s, d) => s + (d.area >= minima ? d.area : 0), 0)
+    if (areaGrandes <= prestado) return items
+
+    const factor = (areaGrandes - prestado) / areaGrandes
+    return items.map((d) => (d.area < minima ? { ...d, area: minima } : { ...d, area: d.area * factor }))
+}
+
+// Peor proporción (largo/ancho) de una fila si se cierra con estas áreas.
+function hmWorstRatio(fila, areaFila, lado) {
+    if (!fila.length || areaFila <= 0 || lado <= 0) return Infinity
+    let max = -Infinity
+    let min = Infinity
+    for (const item of fila) {
+        if (item.area > max) max = item.area
+        if (item.area < min) min = item.area
     }
+    if (min <= 0) return Infinity
+    const s2 = areaFila * areaFila
+    const l2 = lado * lado
+    return Math.max((l2 * max) / s2, s2 / (l2 * min))
 }

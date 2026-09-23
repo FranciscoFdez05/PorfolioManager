@@ -80,15 +80,6 @@ html[data-theme="black"] .assetsListHeader {
 html[data-theme="black"] .detailRotationBar {
     background: #222228;
 }
-html[data-theme="black"] .sidebarChartBtn {
-    background: #17171b;
-    border-color: #222228;
-    color: #dcdce8;
-}
-html[data-theme="black"] .sidebarChartBtn:hover {
-    background: #1e1e22;
-    border-color: #2e2e36;
-}
 html[data-theme="black"] .sidebarFilterBar {
     background: #0e0e10;
     border-color: #222228;
@@ -449,16 +440,6 @@ html[data-theme="light"] .assetsListHeader {
 }
 html[data-theme="light"] .detailRotationBar {
     background: #e2e8f0;
-}
-html[data-theme="light"] .sidebarChartBtn {
-    background: #ffffff;
-    border-color: #e2e8f0;
-    color: #1e293b;
-}
-html[data-theme="light"] .sidebarChartBtn:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e1;
-    color: #0f172a;
 }
 html[data-theme="light"] .sidebarFilterBar {
     background: #f1f5f9;
@@ -2955,6 +2936,16 @@ body.money-hidden #assetStatPnLPct {
 
 /* ── money-hidden: páginas adicionales ── */
 
+/* mapa: resumen de la barra y euros del tooltip (los precios de mercado no,
+   que son dato público y no dicen cuánto se tiene) */
+body.money-hidden .hmSumMoney,
+body.money-hidden .hmCellMoney,
+body.money-hidden .hmTipMoneyVal {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
 /* activos grid cards */
 body.money-hidden .avMetricValue {
     filter: blur(7px);
@@ -3142,7 +3133,7 @@ body.money-hidden .assetCompletedOpsTable td:nth-child(8) {
     font-weight: 600;
 }
 
-/* Grupo toggle (Cuenta/Activos): activo en verde */
+/* Grupo toggle (Activos/Cuenta): activo en verde */
 .hmGroupToggle .hmGroupBtn.active {
     background: #065f46;
     color: #6ee7b7;
@@ -3160,18 +3151,85 @@ body.money-hidden .assetCompletedOpsTable td:nth-child(8) {
     color: #f3f4f6;
 }
 
-/* Grupo deshabilitado (periods cuando metric=cuenta) */
-.hmGroupDisabled {
-    opacity: 0.38;
-    pointer-events: none;
-}
-
 /* Separador visual entre grupos */
 .hmGroupSep {
     width: 1px;
     height: 22px;
     background: #1e293b;
     flex-shrink: 0;
+}
+
+/* Resumen y leyenda: van juntos al extremo derecho de la barra */
+.hmToolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+.hmSummary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #111827;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 4px 12px;
+}
+.hmSumItem {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
+}
+.hmSumLabel {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+}
+.hmSumVal {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+.hmSumVal.hmPos {
+    color: #4ade80;
+}
+.hmSumVal.hmNeg {
+    color: #f87171;
+}
+
+/* Leyenda del color. Los topes son los del degradado de hmColorForValue: a
+   partir de ±10 % el color ya no cambia. */
+.hmLegend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #111827;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 5px 10px;
+}
+.hmLegendTick {
+    font-size: 0.68rem;
+    color: #6b7280;
+    white-space: nowrap;
+}
+.hmLegendBar {
+    width: 132px;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(
+        90deg,
+        #b71c1c 0%,
+        #e53935 30%,
+        #ef9a9a 47%,
+        #252d3a 50%,
+        #a5d6a7 53%,
+        #43a047 70%,
+        #1b5e20 100%
+    );
 }
 
 .heatmapWrapper {
@@ -3182,7 +3240,11 @@ body.money-hidden .assetCompletedOpsTable td:nth-child(8) {
 .heatmapContainer {
     position: relative;
     width: 100%;
-    height: calc(100vh - 200px);
+    /* El alto lo pone el hueco que deja la barra de filtros (el envoltorio es
+       flex:1), no un cálculo sobre la altura de la ventana: ese se quedaba
+       corto y dejaba una franja muerta bajo el mapa, y más aún cuando la barra
+       pasaba a dos líneas. */
+    height: 100%;
     min-height: 360px;
     overflow: hidden;
 }
@@ -3212,6 +3274,23 @@ body.money-hidden .assetCompletedOpsTable td:nth-child(8) {
 }
 .heatmapCell:hover {
     filter: brightness(1.13);
+    border-color: rgba(255, 255, 255, 0.45);
+}
+.heatmapCell {
+    cursor: pointer;
+}
+/* El nombre solo aparece en las baldosas con sitio; lo decide el JS. */
+.hmName {
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.25;
+    opacity: 0.82;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    margin-top: 1px;
 }
 .hmSymbol {
     font-weight: 700;
@@ -3246,6 +3325,23 @@ body.money-hidden .assetCompletedOpsTable td:nth-child(8) {
 .hmValue.hmNd {
     opacity: 0.55;
 }
+/* El dinero movido en el periodo, bajo el porcentaje */
+.hmMoney {
+    font-size: 0.66em;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    opacity: 0.92;
+}
+.hmMoney.hmPos {
+    color: #bbf7d0;
+}
+.hmMoney.hmNeg {
+    color: #fecaca;
+}
+.hmMoney.hmNd {
+    opacity: 0.55;
+}
 
 /* ── Tema light ── */
 html[data-theme="light"] .hmGroup {
@@ -3278,6 +3374,37 @@ html[data-theme="light"] .hmGroupMulti .hmGroupBtn[data-type="all"].active {
 html[data-theme="light"] .hmGroupSep {
     background: #d1d9e6;
 }
+html[data-theme="light"] .hmSummary,
+html[data-theme="light"] .hmLegend {
+    background: #e8edf5;
+    border-color: #d1d9e6;
+}
+html[data-theme="light"] .hmSumLabel,
+html[data-theme="light"] .hmLegendTick {
+    color: #64748b;
+}
+html[data-theme="light"] .hmSumVal {
+    color: #1e293b;
+}
+html[data-theme="light"] .hmSumVal.hmPos {
+    color: #15803d;
+}
+html[data-theme="light"] .hmSumVal.hmNeg {
+    color: #b91c1c;
+}
+/* El centro de la escala es el mismo gris que usan las baldosas planas. */
+html[data-theme="light"] .hmLegendBar {
+    background: linear-gradient(
+        90deg,
+        #b71c1c 0%,
+        #e53935 30%,
+        #ef9a9a 47%,
+        #64748b 50%,
+        #a5d6a7 53%,
+        #43a047 70%,
+        #1b5e20 100%
+    );
+}
 
 /* ── Tema black ── */
 html[data-theme="black"] .hmGroup {
@@ -3293,6 +3420,15 @@ html[data-theme="black"] .hmGroupBtn:hover {
 }
 html[data-theme="black"] .heatmapContainer {
     background: #131316;
+}
+html[data-theme="black"] .hmSummary,
+html[data-theme="black"] .hmLegend {
+    background: #131316;
+    border-color: #1c1c20;
+}
+html[data-theme="black"] .hmSumLabel,
+html[data-theme="black"] .hmLegendTick {
+    color: #4b5563;
 }
 
 /* ── Heatmap tooltip ── */
@@ -3797,4 +3933,237 @@ html[data-theme="light"] .ajustesAtajoExtra {
     .metricValue {
         font-size: 12px;
     }
+}
+
+/* ── Temas claro y negro: Herramientas ────────────────────────────────────
+   Misma historia que las cajas de HTTPS y del Atajo de iOS: la página está
+   montada sobre las variables del tema oscuro y el tema claro no las
+   redefine, sino que sobrescribe clases. Sin esto, las tarjetas salían
+   azul marino sobre fondo blanco. */
+html[data-theme="light"] .herramientasNav {
+    background: #ffffff;
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .herramientaCategorias {
+    border-bottom-color: #e2e8f0;
+}
+html[data-theme="light"] .herramientaCatBtn {
+    color: #64748b;
+}
+html[data-theme="light"] .herramientaCatBtn.active {
+    color: #0f172a;
+    border-bottom-color: #3b82f6;
+}
+html[data-theme="light"] .hPrecargaMsg {
+    color: #94a3b8;
+}
+html[data-theme="light"] .herramientaBtn {
+    color: #64748b;
+}
+html[data-theme="light"] .herramientaBtn:hover:not(.active) {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+html[data-theme="light"] .herramientaBtn.active {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+    box-shadow: none;
+}
+html[data-theme="light"] .hPanelHead {
+    border-bottom-color: #e2e8f0;
+}
+html[data-theme="light"] .herramientaPanelTitle {
+    color: #0f172a;
+}
+html[data-theme="light"] .hPanelDesc,
+html[data-theme="light"] .hCardTitle,
+html[data-theme="light"] .hResultLabel,
+html[data-theme="light"] .herramientaField label,
+html[data-theme="light"] .hInputUnit,
+html[data-theme="light"] .hPrecioMedioTable th,
+html[data-theme="light"] .hPrecioMedioTable .hPmNum,
+html[data-theme="light"] .hRatioFuenteMsg {
+    color: #64748b;
+}
+html[data-theme="light"] .hCard,
+html[data-theme="light"] .herramientaResultCard {
+    background: #ffffff;
+    border-color: #e2e8f0;
+}
+html[data-theme="light"] .hResultCardAccent {
+    border-left-color: #3b82f6;
+}
+html[data-theme="light"] .herramientaBlock .hCardTitle,
+html[data-theme="light"] .hResultValue,
+html[data-theme="light"] .hPrecioMedioTable td,
+html[data-theme="light"] .hPrecioMedioTable .hPmTotal {
+    color: #0f172a;
+}
+html[data-theme="light"] .hResultPositive {
+    color: #16a34a;
+}
+html[data-theme="light"] .hResultNegative {
+    color: #dc2626;
+}
+html[data-theme="light"] .hRatioFuenteOk {
+    color: #16a34a;
+}
+html[data-theme="light"] .hRatioFuenteWarn {
+    color: #b45309;
+}
+html[data-theme="light"] .herramientaField input,
+html[data-theme="light"] .hPrecioInput {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+html[data-theme="light"] .herramientaField input:hover {
+    border-color: #94a3b8;
+}
+html[data-theme="light"] .hPrecioMedioTable th {
+    border-bottom-color: #e2e8f0;
+}
+html[data-theme="light"] .hPrecioMedioTable td {
+    border-bottom-color: #eef2f7;
+}
+html[data-theme="light"] .herramientaSecBtn {
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #1e293b;
+}
+html[data-theme="light"] .herramientaSecBtn:hover:not(:disabled) {
+    background: #e8edf5;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+html[data-theme="light"] .herramientaResetBtn {
+    border-color: #e2e8f0;
+    color: #64748b;
+}
+html[data-theme="light"] .hPlaceholder {
+    border-color: #cbd5e1;
+    color: #94a3b8;
+}
+html[data-theme="light"] .hPlaceholder strong {
+    color: #475569;
+}
+html[data-theme="light"] .hPrecioDeleteBtn {
+    color: #94a3b8;
+}
+html[data-theme="light"] .hRatioInfoPos {
+    background: #f0fdf4;
+    color: #15803d;
+}
+html[data-theme="light"] .hRatioInfoNeg {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+html[data-theme="black"] .herramientasNav {
+    background: #131316;
+    border-color: #1c1c20;
+}
+html[data-theme="black"] .herramientaCategorias {
+    border-bottom-color: #1c1c20;
+}
+html[data-theme="black"] .herramientaCatBtn {
+    color: #88889a;
+}
+html[data-theme="black"] .herramientaCatBtn.active {
+    color: #f0f0f4;
+    border-bottom-color: #3b82f6;
+}
+html[data-theme="black"] .hPrecargaMsg {
+    color: #6c6c7c;
+}
+html[data-theme="black"] .herramientaBtn {
+    color: #88889a;
+}
+html[data-theme="black"] .herramientaBtn:hover:not(.active) {
+    background: #1c1c20;
+    color: #dcdce8;
+}
+html[data-theme="black"] .herramientaBtn.active {
+    background: #1f1f25;
+    border-color: #2e2e36;
+    color: #f0f0f4;
+    box-shadow: none;
+}
+html[data-theme="black"] .hPanelHead {
+    border-bottom-color: #1c1c20;
+}
+html[data-theme="black"] .herramientaPanelTitle {
+    color: #f0f0f4;
+}
+html[data-theme="black"] .hPanelDesc,
+html[data-theme="black"] .hCardTitle,
+html[data-theme="black"] .hResultLabel,
+html[data-theme="black"] .herramientaField label,
+html[data-theme="black"] .hInputUnit,
+html[data-theme="black"] .hPrecioMedioTable th,
+html[data-theme="black"] .hPrecioMedioTable .hPmNum,
+html[data-theme="black"] .hRatioFuenteMsg {
+    color: #88889a;
+}
+html[data-theme="black"] .hCard,
+html[data-theme="black"] .herramientaResultCard {
+    background: #17171b;
+    border-color: #222228;
+}
+html[data-theme="black"] .hResultCardAccent {
+    border-left-color: #3b82f6;
+}
+html[data-theme="black"] .herramientaBlock .hCardTitle,
+html[data-theme="black"] .hResultValue,
+html[data-theme="black"] .hPrecioMedioTable td,
+html[data-theme="black"] .hPrecioMedioTable .hPmTotal {
+    color: #f0f0f4;
+}
+html[data-theme="black"] .hResultPositive {
+    color: #2ecc71;
+}
+html[data-theme="black"] .hResultNegative {
+    color: #e74c3c;
+}
+html[data-theme="black"] .hRatioFuenteOk {
+    color: #2ecc71;
+}
+html[data-theme="black"] .hRatioFuenteWarn {
+    color: #f39c12;
+}
+html[data-theme="black"] .herramientaField input,
+html[data-theme="black"] .hPrecioInput {
+    background: #0e0e10;
+    border-color: #2a2a32;
+    color: #dcdce8;
+}
+html[data-theme="black"] .herramientaField input:hover {
+    border-color: #3a3a44;
+}
+html[data-theme="black"] .hPrecioMedioTable th {
+    border-bottom-color: #222228;
+}
+html[data-theme="black"] .hPrecioMedioTable td {
+    border-bottom-color: #1c1c20;
+}
+html[data-theme="black"] .herramientaSecBtn {
+    background: #17171b;
+    border-color: #222228;
+    color: #dcdce8;
+}
+html[data-theme="black"] .herramientaSecBtn:hover:not(:disabled) {
+    background: #1f1f25;
+    border-color: #2e2e36;
+}
+html[data-theme="black"] .herramientaResetBtn {
+    border-color: #222228;
+    color: #88889a;
+}
+html[data-theme="black"] .hPlaceholder {
+    border-color: #26262e;
+    color: #6c6c7c;
+}
+html[data-theme="black"] .hPlaceholder strong {
+    color: #aaaab8;
 }

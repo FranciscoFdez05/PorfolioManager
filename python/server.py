@@ -27,6 +27,7 @@ from routes.auth import auth_bp
 from routes.backup import backup_bp
 from routes.categorias import categorias_bp
 from routes.gastos import gastos_bp
+from routes.herramientas import herramientas_bp
 from routes.ingresos import ingresos_bp
 from routes.market import market_bp
 from routes.movimientos import movimientos_bp
@@ -144,6 +145,7 @@ app.register_blueprint(ajustes_bp)
 app.register_blueprint(backup_bp)
 app.register_blueprint(categorias_bp)
 app.register_blueprint(gastos_bp)
+app.register_blueprint(herramientas_bp)
 app.register_blueprint(ingresos_bp)
 app.register_blueprint(market_bp)
 app.register_blueprint(movimientos_bp)

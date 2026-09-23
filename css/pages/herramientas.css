@@ -2,120 +2,268 @@
    ─────────────────────────────────────────────────────────────────
    Extraído de css/pages.css, que llegó a 7.022 líneas. El orden de
    los <link> en index.html reproduce el que tenían aquí, así que la
-   cascada es la misma que antes del troceado. */
+   cascada es la misma que antes del troceado.
 
-/* ── Herramientas ──────────────────────────────────────────────────────── */
+   Todo el color sale de las variables de css/variables.css: antes
+   había azules fijos (#7a8fb0, #1c2d45, #2a3a5a…) que en los temas
+   claro y negro se quedaban fuera de sitio. */
+
+/* ── Página ─────────────────────────────────────────────────────────────── */
 .herramientasPage {
     padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 18px;
 }
+
+/* ── Selector de herramienta ────────────────────────────────────────────── */
+/* Barra segmentada: el grupo se lee como un control único en vez de como
+   ocho botones sueltos. */
 .herramientasNav {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+}
+
+/* Nivel 1: la categoría, en forma de pestaña con filo de acento. */
+.herramientaCategorias {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 2px;
+    padding: 0 6px;
+    border-bottom: 1px solid var(--border-soft);
 }
-.herramientaBtn {
+
+.herramientaCatBtn {
     background: transparent;
-    border: 1px solid var(--btn-border);
+    border: none;
+    border-bottom: 2px solid transparent;
     color: var(--text-muted);
     font-size: 0.82rem;
-    padding: 7px 16px;
-    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: -1px;
     cursor: pointer;
+    white-space: nowrap;
     transition:
-        background 0.15s,
-        color 0.15s,
-        border-color 0.15s;
+        color 0.15s ease,
+        border-color 0.15s ease;
 }
-.herramientaBtn.active {
-    background: var(--border-soft);
-    color: var(--text-primary);
-    border-color: var(--btn-border-hover);
+
+.herramientaCatBtn:hover:not(.active) {
+    color: var(--text-subtle);
 }
+
+.herramientaCatBtn.active {
+    color: var(--text-bright);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+}
+
+/* Nivel 2: las herramientas de la categoría abierta. */
+.herramientaLista {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px;
+}
+
+.herramientaBtn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 7px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease,
+        border-color 0.15s ease;
+}
+
 .herramientaBtn:hover:not(.active) {
     background: var(--btn-bg-hover);
     color: var(--text-subtle);
+}
+
+.herramientaBtn.active {
+    background: var(--bg-elevated);
+    color: var(--text-bright);
+    border-color: var(--btn-border);
+    font-weight: 600;
+}
+
+.herramientaCatBtn:focus-visible,
+.herramientaBtn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
 }
 
 .herramientaPanel {
     display: none;
 }
 .herramientaPanel.active {
-    display: block;
-}
-
-.herramientaPanelTitle {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-subtle);
-    margin-bottom: 20px;
-}
-
-.herramientaBody {
     display: flex;
-    gap: 32px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* Cabecera: qué calcula la herramienta y con qué fórmula. Los ratios ponen
+   ahí sus acciones (cargar precios, editar referencia). */
+.hPanelHead {
+    display: flex;
     align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-soft);
+}
+.hPanelHeadText {
+    min-width: 0;
+}
+.herramientaPanelTitle {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+.hPanelDesc {
+    margin: 4px 0 0;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    line-height: 1.45;
+}
+.hPanelActions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ── Cuerpo: parámetros a la izquierda, resultados a la derecha ─────────── */
+.herramientaBody {
+    display: grid;
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
 }
 .herramientaBodyFull {
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
 }
 .herramientaBodyCols {
-    display: flex;
-    gap: 40px;
-    flex-wrap: wrap;
-    align-items: flex-start;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 18px;
+    align-items: stretch;
+}
+
+@media (max-width: 900px) {
+    .herramientaBody {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* ── Tarjeta ────────────────────────────────────────────────────────────── */
+.hCard {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    padding: 18px;
+}
+.hCardTitle {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+}
+.hChartCard {
+    padding: 16px 18px 12px;
 }
 
 .herramientaInputs {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    min-width: 240px;
+    gap: 12px;
+}
+.herramientaInputs .hCardTitle {
+    margin-bottom: 2px;
 }
 .herramientaBlock {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    background: var(--bg-panel);
-    border: 1px solid #1c2d45;
-    border-radius: 10px;
-    padding: 20px;
-    min-width: 260px;
+    gap: 12px;
 }
-.herramientaBlockTitle {
-    font-size: 0.82rem;
-    color: #7a8fb0;
-    font-weight: 500;
-    margin: 0;
+.herramientaBlock .hCardTitle {
+    margin-bottom: 2px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.85rem;
+    color: var(--text-subtle);
 }
+
+/* ── Campos ─────────────────────────────────────────────────────────────── */
 .herramientaField {
     display: flex;
     flex-direction: column;
     gap: 5px;
 }
 .herramientaField label {
-    font-size: 0.76rem;
-    color: #7a8fb0;
+    font-size: 0.72rem;
+    color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    font-weight: 500;
 }
+
+/* La unidad va dentro del campo, así la etiqueta no arrastra un "(€)" y todos
+   los importes quedan alineados. */
+.hInputWrap {
+    position: relative;
+    display: block;
+}
+.hInputUnit {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    pointer-events: none;
+    white-space: nowrap;
+}
+.hInputWrap input {
+    padding-right: 52px;
+}
+
 .herramientaField input {
-    background: var(--bg-panel);
-    border: 1px solid #2a3a5a;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-mid);
     color: var(--text-primary);
     font-size: 0.92rem;
-    padding: 8px 10px;
-    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+    padding: 9px 11px;
+    border-radius: 8px;
     outline: none;
     width: 100%;
     box-sizing: border-box;
-    transition: border-color 0.15s;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+.herramientaField input::placeholder {
+    color: var(--text-dim);
+    opacity: 0.7;
+}
+.herramientaField input:hover {
+    border-color: var(--btn-border-hover);
 }
 .herramientaField input:focus {
-    border-color: #3a7bd5;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
 }
 .herramientaField input[type="number"]::-webkit-outer-spin-button,
 .herramientaField input[type="number"]::-webkit-inner-spin-button {
@@ -127,6 +275,22 @@
     -moz-appearance: textfield;
     appearance: textfield;
 }
+
+/* ── Botones ────────────────────────────────────────────────────────────── */
+.hBtnRow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+.hBtnRowEnd {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
 .herramientaCalcBtn {
     background: var(--btn-active-bg);
     border: 1px solid var(--btn-active-border);
@@ -134,64 +298,110 @@
     font-size: 0.85rem;
     font-weight: 600;
     padding: 9px 20px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s;
-    align-self: flex-start;
-    margin-top: 4px;
-}
-.herramientaCalcBtn:hover {
-    background: #2563eb;
-}
-.herramientaSecBtn {
-    background: transparent;
-    border: 1px solid var(--btn-border);
-    color: var(--text-muted);
-    font-size: 0.82rem;
-    padding: 7px 14px;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     transition:
-        background 0.15s,
-        color 0.15s;
+        background 0.15s ease,
+        box-shadow 0.15s ease;
 }
-.herramientaSecBtn:hover {
+.herramientaCalcBtn:hover {
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.herramientaSecBtn {
+    background: var(--btn-bg);
+    border: 1px solid var(--btn-border);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    padding: 7px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease,
+        border-color 0.15s ease;
+}
+.herramientaSecBtn:hover:not(:disabled) {
     background: var(--btn-bg-hover);
     color: var(--text-subtle);
     border-color: var(--btn-border-hover);
 }
+.herramientaSecBtn:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+.herramientaResetBtn {
+    background: transparent;
+    border: 1px solid var(--border-mid);
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    padding: 7px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease,
+        border-color 0.15s ease;
+}
+.herramientaResetBtn:hover {
+    background: rgba(231, 76, 60, 0.08);
+    color: var(--color-neg);
+    border-color: rgba(231, 76, 60, 0.4);
+}
+.herramientaCalcBtn:focus-visible,
+.herramientaSecBtn:focus-visible,
+.herramientaResetBtn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
 
+/* ── Resultados ─────────────────────────────────────────────────────────── */
+.hResultsCol {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
 .herramientaResults {
-    flex: 1;
+    min-width: 0;
 }
 .herramientaResultGrid {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
+}
+.herramientaResults > :last-child {
+    margin-bottom: 0;
 }
 .herramientaResultCard {
     background: var(--bg-panel);
-    border: 1px solid #1c2d45;
-    border-radius: 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
     padding: 14px 18px;
-    min-width: 140px;
+    min-width: 0;
+}
+/* El dato principal de cada herramienta lleva un filo de acento a la
+   izquierda para que se distinga del resto de un vistazo. */
+.hResultCardAccent {
+    border-left: 3px solid var(--accent);
 }
 .hResultBig {
-    min-width: 200px;
     padding: 20px 24px;
 }
 .hResultLabel {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #7a8fb0;
+    color: var(--text-dim);
     margin-bottom: 6px;
+    line-height: 1.35;
 }
 .hResultValue {
-    font-size: 1.25rem;
+    font-size: 1.3rem;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
 }
 .hResultBig .hResultValue {
     font-size: 1.7rem;
@@ -203,11 +413,53 @@
     color: var(--color-neg);
 }
 
-/* Ratio Oro/Plata */
+/* ── Estado vacío ───────────────────────────────────────────────────────── */
+/* Antes de calcular, la columna derecha quedaba en blanco. El aviso se
+   esconde solo en cuanto el panel de resultados pierde .hidden. */
+.hPlaceholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-align: center;
+    min-height: 200px;
+    padding: 28px 20px;
+    border: 1px dashed var(--border-mid);
+    border-radius: 12px;
+    color: var(--text-dim);
+}
+.hPlaceholder svg {
+    width: 34px;
+    height: 34px;
+    opacity: 0.45;
+}
+.hPlaceholder p {
+    margin: 0;
+    font-size: 0.85rem;
+    max-width: 34ch;
+    line-height: 1.5;
+}
+.hPlaceholder strong {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+.hPlaceholderSlim {
+    min-height: 0;
+    padding: 14px;
+}
+.herramientaResults:not(.hidden) + .hPlaceholder {
+    display: none;
+}
+
+/* ── Mensajes de origen de precios (ratios) ─────────────────────────────── */
 .hRatioFuenteMsg {
-    font-size: 0.82rem;
-    margin-bottom: 0.5rem;
-    min-height: 1.2em;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--text-dim);
+}
+.hRatioFuenteMsg:empty {
+    display: none;
 }
 .hRatioFuenteOk {
     color: var(--color-pos);
@@ -217,21 +469,20 @@
 }
 
 .hRatioInterpretacion {
-    margin-top: 1rem;
-    padding: 0.75rem 1rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    line-height: 1.5;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 0.86rem;
+    line-height: 1.55;
 }
 .hRatioInfoPos {
-    background: #1a3a2a;
-    border-left: 3px solid #2ecc71;
-    color: #a8e6c1;
+    background: rgba(46, 204, 113, 0.1);
+    border-left: 3px solid var(--color-pos);
+    color: var(--color-pos-bright);
 }
 .hRatioInfoNeg {
-    background: #3a1a1a;
-    border-left: 3px solid #e74c3c;
-    color: #f0a0a0;
+    background: rgba(231, 76, 60, 0.1);
+    border-left: 3px solid var(--color-neg);
+    color: var(--color-neg-bright);
 }
 
 /* Spinner numérico en modales de herramientas */
@@ -251,152 +502,184 @@
     position: relative;
 }
 
-/* Precio Medio table */
+/* ── Traerse datos de la cartera ────────────────────────────────────────── */
+/* Fila de «elige un activo y cárgalo» del precio medio, y los mensajes de
+   resultado que acompañan a esa clase de acciones. */
+.hPrecargaFila {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.hPrecargaFila select,
+.hPrecargaFila .csWrapper {
+    flex: 0 0 auto;
+    width: 280px;
+    max-width: 100%;
+}
+
+.hPrecargaMsg {
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--text-dim);
+}
+
+.hPrecargaMsg:empty {
+    display: none;
+}
+
+/* ── Rebalanceo ─────────────────────────────────────────────────────────── */
+#hRebMsg {
+    display: block;
+    margin-bottom: 12px;
+}
+
+.hRebTable th:nth-child(1),
+.hRebTable td:nth-child(1) {
+    width: auto;
+    text-align: left;
+}
+
+.hRebTable th:nth-child(n + 2),
+.hRebTable td:nth-child(n + 2) {
+    text-align: right;
+}
+
+.hRebTable th:last-child,
+.hRebTable td:last-child {
+    width: 180px;
+}
+
+.hRebTable .hRebTipo {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.hRebTable .hRebValor,
+.hRebTable .hRebPeso,
+.hRebTable .hRebDesv,
+.hRebTable .hRebAccion {
+    font-variant-numeric: tabular-nums;
+}
+
+.hRebObjetivo {
+    width: 90px;
+}
+
+.hRebAportacionCampo {
+    max-width: 320px;
+    margin: 18px 0 4px;
+}
+
+/* ── Tabla de precio medio ──────────────────────────────────────────────── */
+.hTableWrap {
+    overflow-x: auto;
+}
 .hPrecioMedioTable {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.85rem;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
+}
+/* Acotado al panel: la tabla de compras se queda estrecha, pero las que
+   reutilizan estos estilos —rebalanceo y lotes consumidos— necesitan el ancho
+   completo y su última columna no es un botón de 40px. */
+#toolPrecioMedio .hPrecioMedioTable {
+    max-width: 620px;
+}
+/* Importes y cantidades a la derecha: así las cifras se comparan en columna. */
+.hPrecioMedioTable th:nth-child(2),
+.hPrecioMedioTable th:nth-child(3),
+.hPrecioMedioTable th:nth-child(4),
+.hPrecioMedioTable td:nth-child(2),
+.hPrecioMedioTable td:nth-child(3),
+.hPrecioMedioTable td:nth-child(4) {
+    text-align: right;
+}
+#toolPrecioMedio .hPrecioMedioTable th:last-child,
+#toolPrecioMedio .hPrecioMedioTable td:last-child {
+    width: 40px;
 }
 .hPrecioMedioTable th {
     text-align: left;
-    color: #7a8fb0;
-    font-size: 0.72rem;
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    padding: 8px 10px;
-    border-bottom: 1px solid #1c2d45;
+    padding: 0 10px 10px;
+    border-bottom: 1px solid var(--border-soft);
 }
 .hPrecioMedioTable td {
-    padding: 5px 10px;
-    border-bottom: 1px solid #131e30;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border-inset);
     color: var(--text-subtle);
     vertical-align: middle;
 }
+.hPrecioMedioTable tbody tr:last-child td {
+    border-bottom: none;
+}
 .hPrecioMedioTable .hPmNum {
-    color: #7a8fb0;
+    color: var(--text-dim);
     width: 32px;
+    font-variant-numeric: tabular-nums;
+}
+.hPrecioMedioTable .hPmTotal {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
 }
 .hPrecioInput {
-    background: var(--bg-panel);
-    border: 1px solid #2a3a5a;
+    text-align: right;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-mid);
     color: var(--text-primary);
     font-size: 0.85rem;
-    padding: 5px 8px;
-    border-radius: 5px;
+    font-variant-numeric: tabular-nums;
+    padding: 6px 9px;
+    border-radius: 7px;
     outline: none;
-    width: 110px;
+    width: 120px;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+.hPrecioInput::-webkit-outer-spin-button,
+.hPrecioInput::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+.hPrecioInput[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
 }
 .hPrecioInput:focus {
-    border-color: #3a7bd5;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
 }
 .hPrecioDeleteBtn {
     background: transparent;
     border: none;
-    color: var(--color-neg);
+    color: var(--text-dim);
     cursor: pointer;
     font-size: 0.8rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    opacity: 0.7;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
 }
 .hPrecioDeleteBtn:hover {
-    opacity: 1;
+    color: var(--color-neg);
     background: rgba(231, 76, 60, 0.08);
 }
 .hPrecioMedioActions {
     display: flex;
     gap: 10px;
     align-items: center;
-    margin-bottom: 18px;
-}
-.hBtnRow {
-    display: flex;
-    gap: 8px;
-    align-items: center;
     flex-wrap: wrap;
-    margin-top: 4px;
-}
-.herramientaResetBtn {
-    background: transparent;
-    border: 1px solid rgba(231, 76, 60, 0.25);
-    color: rgba(231, 76, 60, 0.6);
-    font-size: 0.82rem;
-    padding: 7px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition:
-        background 0.15s,
-        color 0.15s,
-        border-color 0.15s;
-}
-.herramientaResetBtn:hover {
-    background: rgba(231, 76, 60, 0.08);
-    color: var(--color-neg);
-    border-color: var(--color-neg);
-}
-
-/* Rent. Dividendo */
-.hDivSection {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    margin-bottom: 28px;
-}
-.hDivSectionHeader {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-.hDivSectionTitle {
-    font-size: 0.82rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: #7a8fb0;
-    font-weight: 500;
-}
-.hDivChartWrap {
-    position: relative;
-    min-height: 200px;
-    margin-bottom: 16px;
-}
-.hDivTable {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
-    margin-bottom: 8px;
-}
-.hDivTable th {
-    text-align: left;
-    color: #7a8fb0;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 8px 12px;
-    border-bottom: 1px solid #1c2d45;
-}
-.hDivTable td {
-    padding: 7px 12px;
-    border-bottom: 1px solid #131e30;
-    color: var(--text-subtle);
-    vertical-align: middle;
-}
-.hDivTable tbody tr:nth-child(odd) td {
-    background: #0d1520;
-}
-.hDivName {
-    font-weight: 500;
-}
-.hDivNum {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-.hDivPos {
-    color: var(--color-pos);
-    font-weight: 600;
-}
-.hDivNeg {
-    color: var(--color-neg);
 }
 
 .toolsPage {

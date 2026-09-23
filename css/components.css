@@ -1,3 +1,6 @@
+/* El de modo (Activo/Gráfico) y el de lista (Portfolio/Watchlist) son la misma
+   pieza repetida, así que comparten estilo; el hueco entre ambos lo pone el
+   gap de .assetToolbar. */
 .sidebarFilterBar {
     display: flex;
     gap: 2px;
@@ -5,43 +8,6 @@
     border: 1px solid var(--border-inset);
     border-radius: 9px;
     padding: 3px;
-}
-
-/* Abre el gráfico del activo del panel. No es un conmutador como la fila de
-   Portfolio/Watchlist que tiene debajo: es una acción, y por eso se distingue
-   de ella. */
-.sidebarChartBtn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    height: 32px;
-    padding: 0 14px;
-    border-radius: 9px;
-    border: 1px solid var(--border-mid);
-    background: var(--btn-bg);
-    color: var(--text-primary);
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.2px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition:
-        background 0.15s ease,
-        border-color 0.15s ease,
-        color 0.15s ease;
-}
-
-.sidebarChartBtn:hover {
-    background: var(--btn-bg-hover);
-    border-color: var(--accent);
-    color: var(--text-bright);
-}
-
-.sidebarChartBtn svg {
-    width: 15px;
-    height: 15px;
-    flex: 0 0 auto;
 }
 
 .sidebarFilterBtn {
@@ -80,7 +46,7 @@
     grid-template-columns: minmax(60px, 2fr) minmax(70px, 1.6fr) minmax(44px, 0.9fr) minmax(44px, 0.8fr);
     gap: 0 6px;
     align-items: center;
-    padding: 6px 12px 6px 14px;
+    padding: 10px 20px 10px 15px;
     flex: 0 0 auto;
     background: var(--bg-inset);
     border-bottom: 1px solid var(--border-inset);
@@ -3851,4 +3817,213 @@ html[data-theme="black"] .segHideBtn:hover {
 
 .todosOrigenOperacion {
     color: #5b9bd5;
+}
+
+/* La tabla de "Todos" se reparte el ancho en columnas fijas en vez de dejar que
+   cada celda lo negocie con su contenido: así los encabezados caen justo encima
+   de sus valores y las filas no bailan al cambiar de activo. Se centra todo —
+   encabezado y celda — porque con siete columnas de anchos parecidos queda más
+   legible que el texto pegado a la izquierda y los importes al extremo derecho.
+   El tope de ancho evita que en pantallas anchas las columnas se separen tanto
+   que haya que recorrer la fila con la vista. */
+.assetTodosTable {
+    width: 100%;
+    min-width: 620px;
+    table-layout: fixed;
+}
+
+.assetTodosTable thead th,
+.assetTodosTable tbody td {
+    padding: 11px 10px;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Los números con cifras de ancho fijo: los decimales quedan en la misma
+   columna vertical aunque cambie el importe. */
+.assetTodosTable thead th.todosColNum,
+.assetTodosTable tbody td.todosColNum {
+    font-variant-numeric: tabular-nums;
+}
+
+.assetTodosTable thead th.todosColOrigen {
+    width: 15%;
+}
+
+.assetTodosTable thead th.todosColFecha {
+    width: 13%;
+}
+
+.assetTodosTable thead th.todosColTipo {
+    width: 12%;
+}
+
+.assetTodosTable thead th.todosColParticipaciones {
+    width: 16%;
+}
+
+.assetTodosTable thead th.todosColPrecio {
+    width: 15%;
+}
+
+.assetTodosTable thead th.todosColImporte {
+    width: 15%;
+}
+
+.assetTodosTable thead th.todosColComisiones {
+    width: 14%;
+}
+
+/* La ficha reparte el ancho en dos: el recuadro de las pestañas a la izquierda,
+   que es lo que se viene a leer, y una columna de gráficos a la derecha con lo
+   que la tabla tiene pero no enseña de un vistazo. Los gráficos van fuera del
+   recuadro y no dentro: metidos entre sus bordes estiraban el panel mucho más
+   abajo de la última fila. En las pestañas que no son "Todos" no hay columna, y
+   el recuadro recupera el ancho entero. Por debajo de 1180 px los gráficos se
+   colocan debajo en vez de estrangular la tabla. */
+.assetTodosLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 18px;
+    align-items: start;
+}
+
+.assetTodosLayout.assetTodosLayoutFull {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.assetTodosLayout > .assetTabsContainer {
+    min-width: 0;
+}
+
+.todosChartsCol {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+
+.todosChartCard {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    padding: 14px 14px 12px;
+    color: #ccd6f6;
+}
+
+.todosChartHeading {
+    margin: 0;
+}
+
+/* El título entero es el botón de plegar: es el sitio donde se va a pulsar, y
+   así la zona sensible ocupa el ancho de la tarjeta en vez de un icono de 12 px. */
+.todosChartToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+}
+
+.todosChartToggle:hover .todosChartTitle,
+.todosChartToggle:hover .todosChartChevron {
+    color: #72a2ff;
+}
+
+.todosChartToggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 6px;
+}
+
+.todosChartTitle {
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #f8fbff;
+}
+
+.todosChartChevron {
+    font-size: 0.7rem;
+    line-height: 1;
+    color: #8fa3c4;
+    transition: transform 0.15s ease;
+}
+
+.todosChartCardPlegada .todosChartChevron {
+    transform: rotate(-90deg);
+}
+
+/* Plegada, la tarjeta se queda en su título: el cuerpo desaparece del todo para
+   que la columna encoja de verdad y no deje un hueco en blanco. */
+.todosChartBody {
+    margin-top: 10px;
+}
+
+.todosChartCardPlegada {
+    padding-bottom: 14px;
+}
+
+.todosChartCardPlegada .todosChartBody {
+    display: none;
+}
+
+/* Altura fija: el quesito y su leyenda los dibuja Chart.js dentro del canvas, y
+   sin una altura concreta el lienzo crece sin freno al ser responsive. */
+.todosChartBox {
+    position: relative;
+    height: 190px;
+    background: var(--bg-panel);
+    color: #ccd6f6;
+}
+
+.todosChartEmpty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    margin: 0;
+    padding: 0 10px;
+    text-align: center;
+    font-size: 0.78rem;
+    color: #8fa3c4;
+}
+
+.todosChartFoot {
+    margin: 10px 0 0;
+    font-size: 0.72rem;
+    text-align: center;
+    color: #8fa3c4;
+}
+
+@media (max-width: 1180px) {
+    .assetTodosLayout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .todosChartsCol {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+}
+
+/* Rejilla de ajuste: se enciende desde la consola con todosGrid() y marca en
+   blanco los límites de cada celda para cuadrar las columnas. Va con outline y
+   no con border para no empujar nada: la tabla mide igual encendida que
+   apagada, que es lo que hace que sirva para alinear. Cuando las columnas están
+   donde tienen que estar, todosGrid(false) y no queda rastro. */
+body.todosGridDebug .assetTodosTable thead th,
+body.todosGridDebug .assetTodosTable tbody td {
+    outline: 1px solid #fff;
+    outline-offset: -1px;
 }

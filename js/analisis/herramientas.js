@@ -2,42 +2,32 @@ let _herramientasChart = null
 let _hDivChart = null
 let _hPrecioMedioCount = 0
 
+// Colores del gráfico según el tema activo. Las variables de :root no sirven
+// aquí: los temas claro y negro no las redefinen, sobrescriben clases (ver el
+// bloque de Herramientas al final de css/themes.css), así que leerlas
+// devolvía siempre la paleta oscura y en el tema claro la rejilla salía azul
+// marino y la leyenda casi invisible.
+function hChartTheme() {
+    const tema = document.documentElement.getAttribute("data-theme")
+    if (tema === "light") return { text: "#0f172a", muted: "#64748b", grid: "#e2e8f0" }
+    if (tema === "black") return { text: "#f0f0f4", muted: "#88889a", grid: "#222228" }
+    return { text: "#ccd6f6", muted: "#94a3b8", grid: "#1e2d45" }
+}
+
 async function initHerramientasLogic() {
     window.flushPendingPageChanges = null
+    _hActivosCache = null
 
     // Las referencias históricas que fija el usuario se guardan, así que hay que
     // reflejarlas en las etiquetas al abrir la página.
     hRatioAplicarHistoricoLabels()
     hOroBtcAplicarRefLabels()
 
-    // ── Navegación entre herramientas ──────────────────────────────
-    document.querySelectorAll(".herramientaBtn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            document.querySelectorAll(".herramientaBtn").forEach((b) => b.classList.remove("active"))
-            document.querySelectorAll(".herramientaPanel").forEach((p) => {
-                p.classList.remove("active")
-                p.classList.add("hidden")
-            })
-            btn.classList.add("active")
-            const toolId = "tool" + btn.dataset.tool.charAt(0).toUpperCase() + btn.dataset.tool.slice(1)
-            const panel = document.getElementById(toolId)
-            if (panel) {
-                panel.classList.remove("hidden")
-                panel.classList.add("active")
-            }
-            if (btn.dataset.tool === "ratioOroBtc") {
-                const mb = window._monedaBase || "EUR"
-                document.querySelectorAll(".hOroBtcMonedaLabel").forEach((el) => {
-                    el.textContent = mb
-                })
-            }
-        })
-    })
-
-    // ── Botones Reiniciar ──────────────────────────────────────────
-    document.querySelectorAll(".herramientaResetBtn").forEach((btn) => {
-        btn.addEventListener("click", () => hResetPanel(btn.dataset.panel))
-    })
+    // ── Navegación, reinicio y Enter ───────────────────────────────
+    // Por delegación y no botón a botón: las herramientas que el usuario deja
+    // en html/analisis/herramientas-extra/ se montan después de esto, y con un
+    // listener por elemento se quedaban sin pestaña ni botón de reinicio.
+    hConectarPagina()
 
     // ── Interés Compuesto ──────────────────────────────────────────
     document.getElementById("hIntCalcBtn")?.addEventListener("click", hCalcInteresCompuesto)
@@ -66,6 +56,19 @@ async function initHerramientasLogic() {
     hInitPrecioMedio()
     document.getElementById("hPrecioAddRow")?.addEventListener("click", hAddPrecioMedioRow)
     document.getElementById("hPrecioCalcBtn")?.addEventListener("click", hCalcPrecioMedio)
+    document.getElementById("hPrecioCargarBtn")?.addEventListener("click", hPrecioCargarCompras)
+
+    // ── Rebalanceo ─────────────────────────────────────────────────
+    document.getElementById("hRebCargarBtn")?.addEventListener("click", hRebCargarCartera)
+    document.getElementById("hRebCalcBtn")?.addEventListener("click", hRebCalcular)
+
+    // ── Simular venta ──────────────────────────────────────────────
+    hSvPreparar()
+    document.getElementById("hSvCalcBtn")?.addEventListener("click", hSvCalcular)
+
+    // Los selectores de activo de las dos herramientas que leen la cartera.
+    // En segundo plano: si la API tarda o falla, el resto de la página ya está.
+    hCargarSelectoresDeActivos()
 
     // ── Rent. Dividendo ────────────────────────────────────────────
     document.getElementById("hDivLoadBtn")?.addEventListener("click", hLoadDividendos)
@@ -79,14 +82,704 @@ async function initHerramientasLogic() {
     document.getElementById("hOroBtcLoadBtn")?.addEventListener("click", hOroBtcLoadPrecios)
     document.getElementById("hOroBtcCalcBtn")?.addEventListener("click", hCalcOroBtc)
 
-    // ── Enter para calcular ────────────────────────────────────────
-    document.querySelectorAll(".herramientaPanel input").forEach((input) => {
-        input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                input.closest(".herramientaPanel")?.querySelector(".herramientaCalcBtn")?.click()
-            }
+    // ── Herramientas añadidas por el usuario ───────────────────────
+    // Lo último: si falla, las de serie ya están montadas y funcionando.
+    await hCargarHerramientasExtra()
+}
+
+// ── Navegación, reinicio y Enter ───────────────────────────────────────────
+
+function hConectarPagina() {
+    const pagina = document.querySelector(".herramientasPage")
+    if (!pagina) return
+
+    pagina.addEventListener("click", (e) => {
+        const categoria = e.target.closest(".herramientaCatBtn")
+        if (categoria) {
+            hAbrirCategoria(categoria.dataset.cat)
+            return
+        }
+
+        const pestana = e.target.closest(".herramientaBtn")
+        if (pestana) {
+            hAbrirHerramienta(pestana)
+            return
+        }
+
+        const reinicio = e.target.closest(".herramientaResetBtn")
+        if (reinicio) {
+            // Sin data-panel, el panel que lo contiene: así una herramienta
+            // añadida a mano no tiene que repetir su propio id en el botón.
+            hResetPanel(reinicio.dataset.panel || reinicio.closest(".herramientaPanel")?.id)
+        }
+    })
+
+    pagina.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter" || e.target.tagName !== "INPUT") return
+        e.target.closest(".herramientaPanel")?.querySelector(".herramientaCalcBtn")?.click()
+    })
+}
+
+function hAbrirCategoria(cat) {
+    document.querySelectorAll(".herramientaCatBtn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.cat === cat)
+    })
+
+    let primera = null
+    document.querySelectorAll(".herramientaLista .herramientaBtn").forEach((btn) => {
+        const suya = btn.dataset.cat === cat
+        btn.classList.toggle("hidden", !suya)
+        if (suya && !primera) primera = btn
+    })
+
+    // Cambiar de categoría sin abrir nada dejaría el panel de la anterior
+    // debajo de una fila que ya no lo contiene.
+    if (primera) hAbrirHerramienta(primera)
+}
+
+function hAbrirHerramienta(btn) {
+    document.querySelectorAll(".herramientaBtn").forEach((b) => b.classList.remove("active"))
+    document.querySelectorAll(".herramientaPanel").forEach((p) => {
+        p.classList.remove("active")
+        p.classList.add("hidden")
+    })
+    btn.classList.add("active")
+
+    // Las de serie derivan el id del panel de su data-tool; las añadidas por el
+    // usuario lo llevan puesto en data-panel.
+    const panelId = btn.dataset.panel || "tool" + btn.dataset.tool.charAt(0).toUpperCase() + btn.dataset.tool.slice(1)
+    const panel = document.getElementById(panelId)
+    if (panel) {
+        panel.classList.remove("hidden")
+        panel.classList.add("active")
+    }
+
+    if (btn.dataset.tool === "ratioOroBtc") {
+        const mb = window._monedaBase || "EUR"
+        document.querySelectorAll(".hOroBtcMonedaLabel").forEach((el) => {
+            el.textContent = mb
+        })
+    }
+}
+
+// ── Activos de la cartera ──────────────────────────────────────────────────
+// Los comparten el precio medio, el rebalanceo y la simulación de venta. Una
+// sola petición por visita a la página.
+
+let _hActivosCache = null
+
+async function hActivos() {
+    if (_hActivosCache) return _hActivosCache
+    const respuesta = await fetch("/api/activos")
+    if (!respuesta.ok) throw new Error("No se pudieron cargar los activos")
+    _hActivosCache = (await respuesta.json()).assets || []
+    return _hActivosCache
+}
+
+function hEtiquetaTipo(tipo) {
+    // La de la página de Activos, para que un tipo se llame igual en toda la
+    // aplicación. Si algún día deja de existir, el propio tipo sirve.
+    return typeof buildAssetTypeLabel === "function" ? buildAssetTypeLabel(tipo) : tipo
+}
+
+async function hCargarSelectoresDeActivos() {
+    let activos = []
+    try {
+        activos = await hActivos()
+    } catch (error) {
+        console.error(error)
+        return
+    }
+
+    const visibles = activos
+        .filter((a) => !a.hidden)
+        .sort((a, b) => (a.name || "").localeCompare(b.name || "", "es"))
+
+    document.querySelectorAll("#hPrecioActivo, #hSvActivo").forEach((select) => {
+        // La primera opción es el texto de «sin elegir» y se queda.
+        while (select.options.length > 1) select.remove(1)
+        visibles.forEach((activo) => {
+            const opcion = document.createElement("option")
+            opcion.value = activo.id
+            opcion.textContent = `${activo.name}${activo.symbol ? " · " + activo.symbol : ""}`
+            select.appendChild(opcion)
         })
     })
+}
+
+// ── Precio medio: traerse las compras ya guardadas ─────────────────────────
+// Las compras de la ficha viven en /api/activos/<id>; las de cripto, en las
+// operaciones. Se leen las dos fuentes porque un activo puede tener de ambas.
+
+async function hComprasDeActivo(assetId) {
+    const compras = []
+
+    const respuesta = await fetch(`/api/activos/${encodeURIComponent(assetId)}`)
+    if (respuesta.ok) {
+        const ficha = await respuesta.json()
+        ;(ficha.rows || []).forEach((fila) => {
+            if (String(fila.tipoOperacion || "").toLowerCase() !== "compra") return
+            const cantidad = parseEuroNumber(String(fila.participaciones || "0"))
+            if (cantidad <= 0) return
+            // En cripto se apunta el importe total y no el precio unitario, así
+            // que se deduce cuando falta.
+            let precio = parseEuroNumber(String(fila.precioParticipacion || "0"))
+            if (precio <= 0) {
+                const bruto = parseEuroNumber(String(fila.capitalInvertidoBruto || "0"))
+                precio = bruto > 0 ? bruto / cantidad : 0
+            }
+            if (precio > 0) compras.push({ precio, cantidad })
+        })
+    }
+
+    const opsResp = await fetch("/api/operaciones")
+    if (opsResp.ok) {
+        const { rows } = await opsResp.json()
+        ;(rows || []).forEach((fila) => {
+            if (fila.assetId !== assetId) return
+            if (String(fila.orden || "").toLowerCase() !== "compra") return
+            if (String(fila.estado || "").toLowerCase() !== "completado") return
+            const cantidad = parseEuroNumber(String(fila.cantidad || "0"))
+            if (cantidad <= 0) return
+            let precio = parseEuroNumber(String(fila.precioOrden || "0"))
+            if (precio <= 0) {
+                const total = parseEuroNumber(String(fila.total || "0"))
+                precio = total > 0 ? total / cantidad : 0
+            }
+            if (precio > 0) compras.push({ precio, cantidad })
+        })
+    }
+
+    return compras
+}
+
+async function hPrecioCargarCompras() {
+    const select = document.getElementById("hPrecioActivo")
+    const aviso = document.getElementById("hPrecioCargarMsg")
+    const boton = document.getElementById("hPrecioCargarBtn")
+    if (!select || !aviso) return
+
+    if (!select.value) {
+        aviso.textContent = "Elige antes un activo."
+        aviso.className = "hPrecargaMsg hRatioFuenteWarn"
+        return
+    }
+
+    boton.disabled = true
+    aviso.textContent = "Cargando…"
+    aviso.className = "hPrecargaMsg"
+
+    try {
+        const compras = await hComprasDeActivo(select.value)
+        if (!compras.length) {
+            aviso.textContent = "Ese activo no tiene compras guardadas."
+            aviso.className = "hPrecargaMsg hRatioFuenteWarn"
+            return
+        }
+
+        const cuerpo = document.getElementById("hPrecioMedioBody")
+        cuerpo.innerHTML = ""
+        _hPrecioMedioCount = 0
+        compras.forEach((compra) => {
+            hAddPrecioMedioRow()
+            const fila = cuerpo.lastElementChild
+            const [precio, cantidad] = fila.querySelectorAll("input")
+            precio.value = compra.precio
+            cantidad.value = compra.cantidad
+            hUpdatePmRowTotal(fila)
+        })
+
+        aviso.textContent = `${compras.length} compra${compras.length === 1 ? "" : "s"} cargada${compras.length === 1 ? "" : "s"}.`
+        aviso.className = "hPrecargaMsg hRatioFuenteOk"
+        hCalcPrecioMedio()
+    } catch (error) {
+        console.error(error)
+        aviso.textContent = "No se pudieron cargar las compras."
+        aviso.className = "hPrecargaMsg hRatioFuenteWarn"
+    } finally {
+        boton.disabled = false
+    }
+}
+
+// ── Rebalanceo ─────────────────────────────────────────────────────────────
+// Agrupa la cartera por tipo de activo y dice qué mover para volver al reparto
+// objetivo. Con aportación, el ajuste es solo a base de comprar: vender tiene
+// coste fiscal y comisiones, así que no se propone si se puede evitar.
+
+let _hRebTipos = []
+
+async function hRebCargarCartera() {
+    const boton = document.getElementById("hRebCargarBtn")
+    const aviso = document.getElementById("hRebMsg")
+    if (!boton || !aviso) return
+
+    boton.disabled = true
+    aviso.textContent = "Cargando…"
+    aviso.className = "hPrecargaMsg"
+
+    try {
+        const [activos, rendimientoResp] = await Promise.all([hActivos(), fetch("/api/activos/rendimiento-batch")])
+        if (!rendimientoResp.ok) throw new Error("rendimiento-batch")
+        const rendimiento = await rendimientoResp.json()
+
+        const porTipo = {}
+        let incompletos = 0
+        activos.forEach((activo) => {
+            const dato = rendimiento[activo.id]
+            if (!dato) return
+            // El valor viene en la moneda del activo; el desglose por divisa lo
+            // trae además en euros. Sin conversión disponible se usa el original
+            // y se avisa, que es mejor que dejar el activo fuera del reparto.
+            const divisa = dato.divisa
+            let valor = Number(dato.netoActual) || 0
+            if (divisa && divisa.completo) {
+                valor = parseFloat(divisa.valorEur) || 0
+            } else if (divisa && divisa.moneda && divisa.moneda !== "EUR") {
+                incompletos++
+            }
+            if (valor <= 0) return
+            const tipo = activo.type || "otros"
+            porTipo[tipo] = (porTipo[tipo] || 0) + valor
+        })
+
+        const total = Object.values(porTipo).reduce((a, b) => a + b, 0)
+        if (total <= 0) {
+            aviso.textContent = "No hay posiciones con valor en la cartera."
+            aviso.className = "hPrecargaMsg hRatioFuenteWarn"
+            return
+        }
+
+        _hRebTipos = Object.entries(porTipo)
+            .map(([tipo, valor]) => ({ tipo, etiqueta: hEtiquetaTipo(tipo), valor, peso: (valor / total) * 100 }))
+            .sort((a, b) => b.valor - a.valor)
+
+        hRebPintarTabla()
+        aviso.textContent =
+            `Cartera de ${formatEuro(total)} en ${_hRebTipos.length} tipo${_hRebTipos.length === 1 ? "" : "s"}.` +
+            (incompletos ? ` ${incompletos} activo(s) sin tipo de cambio: van en su moneda.` : "")
+        aviso.className = "hPrecargaMsg" + (incompletos ? " hRatioFuenteWarn" : " hRatioFuenteOk")
+    } catch (error) {
+        console.error(error)
+        aviso.textContent = "No se pudo leer la cartera."
+        aviso.className = "hPrecargaMsg hRatioFuenteWarn"
+    } finally {
+        boton.disabled = false
+    }
+}
+
+function hRebPintarTabla() {
+    const cuerpo = document.getElementById("hRebBody")
+    if (!cuerpo) return
+    cuerpo.innerHTML = ""
+
+    _hRebTipos.forEach((fila, indice) => {
+        const tr = document.createElement("tr")
+        tr.innerHTML = `
+            <td class="hRebTipo"></td>
+            <td class="hRebValor"></td>
+            <td class="hRebPeso"></td>
+            <td><input type="number" class="hPrecioInput hRebObjetivo" min="0" max="100" step="0.1"></td>
+            <td class="hRebDesv">---</td>
+            <td class="hRebAccion">---</td>
+        `
+        tr.querySelector(".hRebTipo").textContent = fila.etiqueta
+        tr.querySelector(".hRebValor").textContent = formatEuro(fila.valor)
+        tr.querySelector(".hRebPeso").textContent = fila.peso.toFixed(1) + " %"
+        // El objetivo arranca en el peso actual: así solo hay que tocar lo que
+        // se quiere cambiar, y la suma ya vale 100.
+        const objetivo = tr.querySelector(".hRebObjetivo")
+        objetivo.value = fila.peso.toFixed(1)
+        objetivo.dataset.indice = indice
+        objetivo.addEventListener("input", hRebActualizarSuma)
+        cuerpo.appendChild(tr)
+    })
+
+    hRebActualizarSuma()
+}
+
+function hRebObjetivos() {
+    return Array.from(document.querySelectorAll(".hRebObjetivo")).map((input) => parseFloat(input.value) || 0)
+}
+
+function hRebActualizarSuma() {
+    const aviso = document.getElementById("hRebSumaMsg")
+    if (!aviso) return
+    const suma = hRebObjetivos().reduce((a, b) => a + b, 0)
+    const desviada = Math.abs(suma - 100) > 0.5
+    aviso.textContent = `Suma de objetivos: ${suma.toFixed(1)} %` + (desviada ? " — tiene que sumar 100 %" : "")
+    aviso.className = "hPrecargaMsg" + (desviada ? " hRatioFuenteWarn" : " hRatioFuenteOk")
+}
+
+function hRebCalcular() {
+    if (!_hRebTipos.length) return
+
+    const objetivos = hRebObjetivos()
+    const suma = objetivos.reduce((a, b) => a + b, 0)
+    if (Math.abs(suma - 100) > 0.5) {
+        hRebActualizarSuma()
+        return
+    }
+
+    const aportacion = Math.max(0, parseFloat(document.getElementById("hRebAportacion").value) || 0)
+    const total = _hRebTipos.reduce((acumulado, fila) => acumulado + fila.valor, 0)
+    const totalFinal = total + aportacion
+
+    const deltas = _hRebTipos.map((fila, i) => (totalFinal * objetivos[i]) / 100 - fila.valor)
+
+    let acciones = deltas
+    if (aportacion > 0) {
+        // Solo comprar: se reparte la aportación entre los tipos que están por
+        // debajo, en proporción a lo que les falta. Si sobra dinero, el resto va
+        // según el objetivo.
+        const faltas = deltas.map((d) => Math.max(0, d))
+        const faltaTotal = faltas.reduce((a, b) => a + b, 0)
+        if (faltaTotal <= aportacion && faltaTotal > 0) {
+            const sobra = aportacion - faltaTotal
+            acciones = faltas.map((f, i) => f + (sobra * objetivos[i]) / 100)
+        } else if (faltaTotal > 0) {
+            acciones = faltas.map((f) => (f / faltaTotal) * aportacion)
+        } else {
+            acciones = objetivos.map((o) => (aportacion * o) / 100)
+        }
+    }
+
+    const filas = document.querySelectorAll("#hRebBody tr")
+    let mayorDesviacion = 0
+    let aMover = 0
+
+    _hRebTipos.forEach((fila, i) => {
+        const tr = filas[i]
+        if (!tr) return
+        const desviacion = fila.peso - objetivos[i]
+        if (Math.abs(desviacion) > Math.abs(mayorDesviacion)) mayorDesviacion = desviacion
+
+        const celdaDesv = tr.querySelector(".hRebDesv")
+        celdaDesv.textContent = (desviacion >= 0 ? "+" : "") + desviacion.toFixed(1) + " p.p."
+        celdaDesv.className = "hRebDesv " + (Math.abs(desviacion) < 0.5 ? "" : desviacion > 0 ? "hDivNeg" : "hDivPos")
+
+        const accion = acciones[i]
+        const celdaAccion = tr.querySelector(".hRebAccion")
+        if (Math.abs(accion) < 1) {
+            celdaAccion.textContent = "—"
+            celdaAccion.className = "hRebAccion"
+        } else if (accion > 0) {
+            celdaAccion.textContent = "Comprar " + formatEuro(accion)
+            celdaAccion.className = "hRebAccion hDivPos"
+            aMover += accion
+        } else {
+            celdaAccion.textContent = "Vender " + formatEuro(-accion)
+            celdaAccion.className = "hRebAccion hDivNeg"
+            aMover += -accion
+        }
+    })
+
+    document.getElementById("hRebTotal").textContent = formatEuro(totalFinal)
+    document.getElementById("hRebMover").textContent = formatEuro(aportacion > 0 ? aportacion : aMover / 2)
+    const maxDesv = document.getElementById("hRebMaxDesv")
+    maxDesv.textContent = (mayorDesviacion >= 0 ? "+" : "") + mayorDesviacion.toFixed(1) + " p.p."
+    maxDesv.className = "hResultValue " + (Math.abs(mayorDesviacion) < 1 ? "hResultPositive" : "hResultNegative")
+
+    const nota = document.getElementById("hRebNota")
+    if (Math.abs(mayorDesviacion) < 1) {
+        nota.textContent = "La cartera está en su objetivo: ninguna desviación llega a un punto porcentual."
+        nota.className = "hRatioInterpretacion hRatioInfoPos"
+    } else if (aportacion > 0) {
+        nota.textContent = `Con ${formatEuro(aportacion)} de aportación se corrige sin vender nada, así que no hay peaje fiscal ni comisiones de venta.`
+        nota.className = "hRatioInterpretacion hRatioInfoPos"
+    } else {
+        nota.textContent =
+            "Vender para rebalancear tributa: pasa la venta por «Simular venta» antes de decidir, " +
+            "o mira cuánta aportación haría falta para corregirlo comprando."
+        nota.className = "hRatioInterpretacion hRatioInfoNeg"
+    }
+
+    document.getElementById("hRebResults").classList.remove("hidden")
+}
+
+// ── Simular venta ──────────────────────────────────────────────────────────
+// El cálculo entero lo hace el servidor (/api/herramientas/simular-venta), que
+// reutiliza el mismo FIFO y la misma normativa que la pantalla de Ventas. Aquí
+// solo se recogen los datos y se pinta la respuesta.
+
+function hSvPreparar() {
+    const fecha = document.getElementById("hSvFecha")
+    if (fecha && !fecha.value) {
+        const hoy = new Date()
+        const dd = String(hoy.getDate()).padStart(2, "0")
+        const mm = String(hoy.getMonth() + 1).padStart(2, "0")
+        fecha.value = `${dd}-${mm}-${hoy.getFullYear()}`
+    }
+
+    const select = document.getElementById("hSvActivo")
+    if (select && !select._hSvEnganchado) {
+        select._hSvEnganchado = true
+        select.addEventListener("change", hSvActivoElegido)
+    }
+}
+
+async function hSvActivoElegido() {
+    const select = document.getElementById("hSvActivo")
+    const precio = document.getElementById("hSvPrecio")
+    if (!select || !precio || !select.value) return
+
+    const activo = (await hActivos()).find((a) => a.id === select.value)
+    if (!activo) return
+
+    // El precio de venta más probable es el de mercado guardado.
+    const actual = parseEuroNumber(String(activo.price || "0"))
+    if (actual > 0) precio.value = actual
+
+    // Las cifras salen en la moneda del activo, no siempre en euros.
+    const moneda = (activo.currency || "EUR").toUpperCase()
+    const simbolo = moneda === "EUR" ? "€" : moneda
+    document.querySelectorAll("#toolSimularVenta .hSvMoneda").forEach((el) => {
+        el.textContent = simbolo
+    })
+}
+
+async function hSvCalcular() {
+    const select = document.getElementById("hSvActivo")
+    const aviso = document.getElementById("hSvAviso")
+    const disponible = document.getElementById("hSvDisponible")
+    if (!select) return
+
+    if (!select.value) {
+        disponible.textContent = "Elige antes un activo."
+        disponible.className = "hPrecargaMsg hRatioFuenteWarn"
+        return
+    }
+
+    const parametros = new URLSearchParams({
+        activo: select.value,
+        cantidad: document.getElementById("hSvCantidad").value || "0",
+        precio: document.getElementById("hSvPrecio").value || "0",
+        comision: document.getElementById("hSvComision").value || "0",
+        fecha: document.getElementById("hSvFecha").value || ""
+    })
+
+    let datos
+    try {
+        const respuesta = await fetch(`/api/herramientas/simular-venta?${parametros}`)
+        datos = await respuesta.json()
+        if (!respuesta.ok || !datos.ok) {
+            disponible.textContent = datos.error || "No se pudo calcular la venta."
+            disponible.className = "hPrecargaMsg hRatioFuenteWarn"
+            return
+        }
+    } catch (error) {
+        console.error(error)
+        disponible.textContent = "No se pudo calcular la venta."
+        disponible.className = "hPrecargaMsg hRatioFuenteWarn"
+        return
+    }
+
+    const s = datos.simulacion
+    const moneda = document.querySelector("#toolSimularVenta .hSvMoneda")?.textContent || "€"
+    const importe = (valor) => formatEuro(parseFloat(valor) || 0).replace("€", moneda)
+
+    disponible.textContent = `Tienes ${parseFloat(s.disponible).toLocaleString("es-ES", { maximumFractionDigits: 8 })} uds.`
+    disponible.className = "hPrecargaMsg"
+
+    document.getElementById("hSvNeto").textContent = importe(s.neto)
+    document.getElementById("hSvCuota").textContent = importe(s.cuota)
+    document.getElementById("hSvBruto").textContent = importe(s.valorTransmision)
+    document.getElementById("hSvCoste").textContent = importe(s.costeAdquisicion)
+    document.getElementById("hSvTipo").textContent = (parseFloat(s.tipoEfectivo) || 0).toFixed(2) + " %"
+
+    const ganancia = parseFloat(s.ganancia) || 0
+    const celdaGanancia = document.getElementById("hSvGanancia")
+    celdaGanancia.textContent = importe(s.ganancia)
+    celdaGanancia.className = "hResultValue " + (ganancia >= 0 ? "hResultPositive" : "hResultNegative")
+
+    const lotes = document.getElementById("hSvLotes")
+    lotes.innerHTML = ""
+    ;(s.lotes || []).forEach((lote) => {
+        const tr = document.createElement("tr")
+        tr.innerHTML = "<td></td><td></td><td></td><td></td>"
+        const celdas = tr.querySelectorAll("td")
+        celdas[0].textContent = lote.fecha
+        celdas[1].textContent = parseFloat(lote.cantidad).toLocaleString("es-ES", { maximumFractionDigits: 8 })
+        celdas[2].textContent = importe(lote.costeUnitario)
+        celdas[3].textContent = importe(lote.coste)
+        lotes.appendChild(tr)
+    })
+
+    // Avisos: primero lo que impide fiarse del número, luego la norma que lo
+    // cambia, y si no hay nada de eso, la compensación que lo abarata.
+    const textos = []
+    let tono = "hRatioInfoNeg"
+    if (s.mensaje) {
+        textos.push(s.mensaje)
+    } else if (s.notaAntiaplicacion) {
+        textos.push(
+            `${s.notaAntiaplicacion} La pérdida no computa ahora (${importe(s.perdidaNoComputable)}): ` +
+            "se suma al coste de las participaciones recompradas y saldrá cuando las vendas."
+        )
+    } else if (parseFloat(s.compensadoAnteriores) > 0) {
+        textos.push(`Se compensan ${importe(s.compensadoAnteriores)} de pérdidas de ejercicios anteriores, y por eso el tipo efectivo baja.`)
+        tono = "hRatioInfoPos"
+    }
+
+    if (textos.length) {
+        aviso.textContent = textos.join(" ")
+        aviso.className = "hRatioInterpretacion " + tono
+        aviso.classList.remove("hidden")
+    } else {
+        aviso.classList.add("hidden")
+    }
+
+    document.getElementById("hSvResults").classList.remove("hidden")
+}
+
+// ── Herramientas añadidas por el usuario ───────────────────────────────────
+// Cada fichero .html de html/analisis/herramientas-extra/ es una herramienta
+// más. El servidor los descubre y los lista en /api/herramientas-extra (ver
+// python/routes/herramientas.py); aquí se les pone la pestaña y la cabecera
+// —con el mismo aspecto que las de serie— y se inyecta el cuerpo tal cual.
+// La guía para escribir una está en docs/herramientas-extra.md.
+
+const _herramientasExtraInit = {}
+const _herramientasExtraScripts = new Set()
+
+/**
+ * La llama el .js de cada herramienta para engancharse a su panel:
+ *
+ *     registrarHerramienta("mi-herramienta", (panel) => { ... })
+ *
+ * Se guarda además de ejecutarse porque el panel se construye de nuevo cada vez
+ * que se entra en la página, mientras que el script solo se descarga la primera.
+ */
+function registrarHerramienta(id, iniciar) {
+    if (typeof iniciar !== "function") return
+    _herramientasExtraInit[id] = iniciar
+    hIniciarHerramientaExtra(id)
+}
+
+function hIniciarHerramientaExtra(id) {
+    const panel = document.getElementById(`toolExtra-${id}`)
+    const iniciar = _herramientasExtraInit[id]
+    if (!panel || !iniciar || panel.dataset.iniciada === "1") return
+
+    panel.dataset.iniciada = "1"
+    try {
+        iniciar(panel)
+    } catch (error) {
+        // Una herramienta rota no puede llevarse por delante el resto de la
+        // página: se queda su panel puesto y sin funcionar, y el motivo sale
+        // por consola.
+        console.error(`La herramienta «${id}» falló al iniciarse:`, error)
+    }
+}
+
+async function hCargarHerramientasExtra() {
+    let lista = []
+    try {
+        const respuesta = await fetch("/api/herramientas-extra")
+        if (!respuesta.ok) return
+        lista = (await respuesta.json()).herramientas || []
+    } catch (error) {
+        console.error("No se pudieron listar las herramientas añadidas:", error)
+        return
+    }
+
+    for (const herramienta of lista) {
+        try {
+            await hMontarHerramientaExtra(herramienta)
+        } catch (error) {
+            console.error(`No se pudo montar la herramienta «${herramienta.id}»:`, error)
+        }
+    }
+}
+
+async function hMontarHerramientaExtra(herramienta) {
+    const nav = document.querySelector(".herramientasNav")
+    const contenido = document.getElementById("herramientasContent")
+    if (!nav || !contenido) return
+
+    const respuesta = await fetch(herramienta.html, { cache: "no-store" })
+    if (!respuesta.ok) throw new Error(`no se pudo leer ${herramienta.html}`)
+    const cuerpo = await respuesta.text()
+
+    const panel = document.createElement("div")
+    panel.className = "herramientaPanel hidden"
+    panel.id = `toolExtra-${herramienta.id}`
+    panel.append(hCabeceraHerramientaExtra(herramienta))
+
+    // El cuerpo va tal cual lo escribió el usuario; el título y la descripción
+    // como texto, que salen de los metadatos y no tienen por qué ser HTML.
+    const marco = document.createElement("div")
+    marco.className = "herramientaBody" + (herramienta.disposicion === "completo" ? " herramientaBodyFull" : "")
+    marco.innerHTML = cuerpo
+    panel.append(marco)
+    contenido.appendChild(panel)
+
+    const boton = document.createElement("button")
+    // Nace escondida: solo se ve al abrir su categoría.
+    boton.className = "herramientaBtn hidden"
+    boton.dataset.panel = panel.id
+    boton.dataset.cat = CATEGORIA_EXTRAS
+    boton.textContent = herramienta.titulo
+    hCategoriaDeExtras(nav).appendChild(boton)
+
+    if (!herramienta.js) return
+
+    if (_herramientasExtraScripts.has(herramienta.js)) {
+        // Ya se descargó en una visita anterior: basta con volver a engancharlo
+        // al panel nuevo.
+        hIniciarHerramientaExtra(herramienta.id)
+        return
+    }
+
+    _herramientasExtraScripts.add(herramienta.js)
+    await new Promise((resolve) => {
+        const script = document.createElement("script")
+        script.src = herramienta.js
+        script.onload = resolve
+        script.onerror = () => {
+            console.error(`No se pudo cargar ${herramienta.js}`)
+            resolve()
+        }
+        document.body.appendChild(script)
+    })
+}
+
+// Las añadidas por el usuario tienen su propia categoría, que se crea con la
+// primera: sin herramientas propias no debe aparecer una pestaña vacía.
+const CATEGORIA_EXTRAS = "propias"
+
+function hCategoriaDeExtras(nav) {
+    const categorias = nav.querySelector(".herramientaCategorias")
+    if (categorias && !categorias.querySelector(`[data-cat="${CATEGORIA_EXTRAS}"]`)) {
+        const boton = document.createElement("button")
+        boton.className = "herramientaCatBtn"
+        boton.dataset.cat = CATEGORIA_EXTRAS
+        boton.textContent = "Propias"
+        categorias.appendChild(boton)
+    }
+    return nav.querySelector(".herramientaLista")
+}
+
+function hCabeceraHerramientaExtra(herramienta) {
+    const cabecera = document.createElement("div")
+    cabecera.className = "hPanelHead"
+
+    const texto = document.createElement("div")
+    texto.className = "hPanelHeadText"
+
+    const titulo = document.createElement("h3")
+    titulo.className = "herramientaPanelTitle"
+    titulo.textContent = herramienta.titulo
+    texto.appendChild(titulo)
+
+    if (herramienta.descripcion) {
+        const descripcion = document.createElement("p")
+        descripcion.className = "hPanelDesc"
+        descripcion.textContent = herramienta.descripcion
+        texto.appendChild(descripcion)
+    }
+    cabecera.appendChild(texto)
+
+    return cabecera
 }
 
 // ── Reset ──────────────────────────────────────────────────────────────────
@@ -105,6 +798,25 @@ function hResetPanel(panelId) {
     }
     if (panelId === "toolPrecioMedio") {
         hInitPrecioMedio()
+        const msg = document.getElementById("hPrecioCargarMsg")
+        if (msg) msg.textContent = ""
+    }
+    if (panelId === "toolRebalanceo") {
+        _hRebTipos = []
+        const cuerpo = document.getElementById("hRebBody")
+        if (cuerpo) cuerpo.innerHTML = ""
+        const msg = document.getElementById("hRebMsg")
+        if (msg) msg.textContent = "Pulsa «Cargar mi cartera» para traer tus posiciones actuales."
+        const suma = document.getElementById("hRebSumaMsg")
+        if (suma) suma.textContent = ""
+    }
+    if (panelId === "toolSimularVenta") {
+        const lotes = document.getElementById("hSvLotes")
+        if (lotes) lotes.innerHTML = ""
+        document.getElementById("hSvAviso")?.classList.add("hidden")
+        const disponible = document.getElementById("hSvDisponible")
+        if (disponible) disponible.textContent = ""
+        hSvPreparar()
     }
     if (panelId === "toolRentDividendo") {
         if (_hDivChart) {
@@ -153,6 +865,7 @@ function hCalcInteresCompuesto() {
     const ctx = document.getElementById("hIntChart")
     if (!ctx) return
 
+    const tema = hChartTheme()
     _herramientasChart = new Chart(ctx, {
         type: "line",
         data: {
@@ -183,14 +896,14 @@ function hCalcInteresCompuesto() {
             maintainAspectRatio: false,
             animation: { duration: 300 },
             plugins: {
-                legend: { labels: { color: "#ccd6f6", font: { size: 12 }, padding: 12 } },
+                legend: { labels: { color: tema.text, font: { size: 12 }, padding: 12 } },
                 tooltip: { callbacks: { label: (c) => "  " + formatEuro(c.raw) } }
             },
             scales: {
-                x: { ticks: { color: "#7a8fb0", font: { size: 11 } }, grid: { color: "#1a2640" } },
+                x: { ticks: { color: tema.muted, font: { size: 11 } }, grid: { color: tema.grid } },
                 y: {
-                    ticks: { color: "#7a8fb0", font: { size: 11 }, callback: (v) => formatEuro(v) },
-                    grid: { color: "#1a2640" }
+                    ticks: { color: tema.muted, font: { size: 11 }, callback: (v) => formatEuro(v) },
+                    grid: { color: tema.grid }
                 }
             }
         }
@@ -351,6 +1064,7 @@ async function hLoadDividendos() {
             const netos = sorted.map(([, d]) => d.neto)
             const chartH = Math.max(200, sorted.length * 36)
             ctx.parentElement.style.height = chartH + "px"
+            const tema = hChartTheme()
 
             _hDivChart = new Chart(ctx, {
                 type: "bar",
@@ -380,15 +1094,15 @@ async function hLoadDividendos() {
                     maintainAspectRatio: false,
                     indexAxis: "y",
                     plugins: {
-                        legend: { labels: { color: "#ccd6f6", font: { size: 12 }, padding: 12 } },
+                        legend: { labels: { color: tema.text, font: { size: 12 }, padding: 12 } },
                         tooltip: { callbacks: { label: (c) => "  " + formatEuro(c.raw) } }
                     },
                     scales: {
                         x: {
-                            ticks: { color: "#7a8fb0", font: { size: 11 }, callback: (v) => formatEuro(v) },
-                            grid: { color: "#1a2640" }
+                            ticks: { color: tema.muted, font: { size: 11 }, callback: (v) => formatEuro(v) },
+                            grid: { color: tema.grid }
                         },
-                        y: { ticks: { color: "#ccd6f6", font: { size: 12 } }, grid: { color: "#1a2640" } }
+                        y: { ticks: { color: tema.text, font: { size: 12 } }, grid: { color: tema.grid } }
                     }
                 }
             })

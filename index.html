@@ -267,12 +267,14 @@
             <div class="assetToolbar">
                 <!-- Alta de activos y refresco de cotizaciones viven en la
                      página Activos: aquí ocupaban la mitad de la barra para dos
-                     acciones que no son de consulta. En su sitio, el gráfico
-                     del activo que se esté mirando. -->
-                <button class="sidebarChartBtn" id="sidebarChartBtn" type="button" title="Ver el gráfico del activo">
-                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 12.5 6 8l3 2.5L14 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 4H14v3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span>Ver gráfico</span>
-                </button>
+                     acciones que no son de consulta. En su sitio, qué hace
+                     pulsar un activo de la lista. Misma pieza que la fila de
+                     Portfolio/Watchlist de debajo, porque hace lo mismo:
+                     elegir entre dos modos. -->
+                <div class="sidebarFilterBar sidebarModeBar" id="sidebarAssetMode">
+                    <button class="sidebarFilterBtn active" data-modo="activo" type="button" title="Pulsar un activo abre su ficha">Activo</button>
+                    <button class="sidebarFilterBtn" data-modo="grafico" type="button" title="Pulsar un activo abre su gráfico">Gráfico</button>
+                </div>
                 <div class="sidebarFilterBar" id="sidebarFilterBar">
                     <button class="sidebarFilterBtn active" data-filter="portfolio" type="button">Portfolio</button>
                     <button class="sidebarFilterBtn" data-filter="watchlist" type="button">Watchlist</button>

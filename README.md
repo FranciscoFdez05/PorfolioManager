@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.3.1-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.4.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 [![SQLite](https://img.shields.io/badge/sqlite-3.40%2B-lightgrey)](Dockerfile)
@@ -38,7 +38,7 @@ Nada sale de tu red salvo las consultas de cotizaciones, y esas son opcionales: 
 - **Earn / Staking / Trading** — módulos adicionales para rendimientos cripto
 - **Métricas** — KPIs y gráficos interactivos, con **TWR, XIRR, máximo drawdown y volatilidad**, y comparación de la evolución contra un índice ([detalle](#rentabilidad-riesgo-y-comparación-con-índices))
 - **Histórico automático** — el servidor guarda los puntos de evolución en segundo plano, sin depender de que haya una pestaña abierta
-- **Herramientas** — utilidades varias
+- **Herramientas** — calculadoras agrupadas por lo que contestan: proyección (interés compuesto, regla del 72), rendimiento (rentabilidad, CAGR, dividendo), cartera (**precio medio** con tus compras reales y **rebalanceo** por tipo de activo), **fiscalidad** (simular una venta antes de hacerla) y ratios de mercado. Ampliables dejando un fichero en una carpeta ([guía](docs/herramientas-extra.md))
 - **Ajustes** — claves API, caducidad de cotizaciones, backup/restauración, tipos de cambio históricos y tema
 - **Atajo de iOS** — alta rápida de gastos e ingresos desde el Centro de Control, restringida a la LAN y a WireGuard ([guía](docs/atajo-ios.md))
 
@@ -533,6 +533,12 @@ El cálculo de ganancias y pérdidas patrimoniales vive en el servidor, no en el
 | `stores/ventas_fifo.py` | Línea temporal de cada activo: qué filas de la ficha, de las operaciones de cripto y de la tabla de ventas adquieren y cuáles transmiten. |
 
 El FIFO recorre **toda** la historia del activo, no solo las ventas del año abierto en pantalla — que era el error de fondo del cálculo anterior en el navegador: dos ejercicios distintos consumían los mismos lotes y el coste de adquisición salía duplicado. Las minusvalías ya no se recortan a cero, y vender más de lo que hay en cartera (o apuntar la misma venta en la ficha *y* en la tabla de ventas) sale como **incidencia** en vez de tragarse en silencio.
+
+### Simular una venta antes de hacerla
+
+**Herramientas › Fiscalidad › Simular venta** contesta qué pagarías si vendieras hoy: coste FIFO, lotes que se consumen, regla de los dos meses y cuota. No guarda nada y no repite la aritmética — `GET /api/herramientas/simular-venta` llama a `stores/ventas_fifo.simular_venta()`, el mismo motor que liquida la tabla de ventas.
+
+La cuota que devuelve es **incremental**: liquida el ejercicio con la venta y sin ella, y resta. Aplicar un tipo fijo a la ganancia daría otro número, porque la escala es progresiva y el saldo puede compensarse con pérdidas de ejercicios anteriores.
 
 ### Informe de la Renta
 

@@ -210,7 +210,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initMetricsScroll(document.querySelector(".metrics"), sideWrapper)
     initNavigation(navButtons, contentArea)
     initResizeHandles()
-    initSidebarChartButton()
+    initSidebarAssetMode()
     initSidebarFilterBar()
     initAssetModal(
         assetModalOverlay,
@@ -786,12 +786,14 @@ function initAssetSelector(assetButtons) {
             const assetId = button.dataset.assetId || ""
             if (!assetId) return
 
-            // Pulsar un activo del lateral abre su ficha, igual que pulsarlo en
-            // la tabla de Vista general. Antes abría el gráfico de TradingView
-            // encima de la página, que es mirar el activo sin poder tocarlo; el
-            // gráfico sigue a un clic, en el título de la propia ficha.
-            clearNavSelection()
-            await selectAsset(assetId)
+            // Lo que hace este clic lo decide el conmutador de la barra: abrir
+            // la ficha del activo (donde además se puede tocar) o solo su
+            // gráfico, sin moverse de la página en la que se estaba.
+            const enModoGrafico = getSidebarAssetMode() === "grafico"
+
+            if (!enModoGrafico) clearNavSelection()
+            const asset = await selectAsset(assetId, { abrirFicha: !enModoGrafico })
+            if (enModoGrafico) abrirGraficoDeActivo(asset)
             restartAssetRotationBar()
         })
     })
@@ -975,7 +977,11 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
 
         const mainContent = document.querySelector(".mainContent")
         if (mainContent) {
-            const gridPages = ["activos", "seguimiento"]
+            // Páginas que ocupan el alto de la ventana en vez de crecer con su
+            // contenido. El mapa de calor es una de ellas: sin altura firme en
+            // la cadena, su contenedor se queda en el min-height y el treemap
+            // se dibuja en una franja de 360 px con el resto en negro.
+            const gridPages = ["activos", "seguimiento", "heatmap"]
             mainContent.classList.toggle("gridPageActive", gridPages.includes(page))
         }
 

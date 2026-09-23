@@ -347,6 +347,156 @@ def calcular_todo():
     }
 
 
+# ── Simulación de una venta (herramienta) ────────────────────────────────────
+# La pantalla de Ventas contesta qué pasó; esto contesta qué pasaría. Va aquí y
+# no en la herramienta del navegador porque la respuesta depende del FIFO sobre
+# todo el histórico y de la escala del ahorro, y tener esa aritmética escrita
+# dos veces es la forma seguro de que un día dejen de coincidir.
+#
+# La cuota que se devuelve es **incremental**: se liquida el ejercicio con y sin
+# la venta simulada y se resta. Es lo que de verdad cuesta vender, porque la
+# escala es progresiva y el saldo puede compensarse con pérdidas de ejercicios
+# anteriores; un tipo fijo aplicado a la ganancia daría otro número.
+
+REF_SIMULACION = "simulacion"
+
+
+def _liquidar_con(por_activo, activos, ventas, invalidas, extra=None):
+    """Liquida todos los ejercicios, opcionalmente con una venta más.
+
+    `extra` es una `Operacion` que no está guardada en ninguna parte. No se
+    mezcla con `por_activo` para que la misma línea temporal pueda liquidarse
+    dos veces, con ella y sin ella.
+    """
+    por_ref = {}
+    activos_a_recorrer = set(por_activo)
+    if extra is not None:
+        activos_a_recorrer.add(extra.activo_id)
+
+    for activo_id in activos_a_recorrer:
+        operaciones = list(por_activo.get(activo_id, []))
+        if extra is not None and extra.activo_id == activo_id:
+            operaciones.append(extra)
+        tipo = activos.get(activo_id, {}).get("type", "")
+        resultados, _lotes = fiscal_es.calcular_con_normativa(operaciones, tipo)
+        for resultado in resultados:
+            por_ref[resultado.ref] = resultado
+
+    resultados_por_anio = {}
+    for fila in ventas:
+        if (fila["year"], fila["id"]) in invalidas:
+            continue
+        resultado = por_ref.get(f"venta:{fila['year']}:{fila['id']}")
+        if resultado is not None:
+            resultados_por_anio.setdefault(str(fila["year"]), []).append(resultado)
+
+    if extra is not None:
+        simulada = por_ref.get(REF_SIMULACION)
+        if simulada is not None:
+            resultados_por_anio.setdefault(str(extra.fecha.year), []).append(simulada)
+
+    return por_ref, fiscal_es.liquidar_ejercicios(resultados_por_anio)
+
+
+def simular_venta(asset_id, fecha_texto, cantidad, precio, comision=0):
+    """Qué saldría de vender ahora mismo. No guarda nada.
+
+    Devuelve `(dato, incidencia)`. La incidencia bloqueante (fecha ilegible,
+    activo inexistente…) viene con `dato` a None; las de reparto —vender más de
+    lo que hay, sin compras previas— llegan dentro del dato, porque el resto de
+    las cifras siguen siendo informativas.
+    """
+    activos = _cargar_activos()
+    activo = activos.get(asset_id)
+    if activo is None:
+        return None, INCIDENCIA_ACTIVO
+
+    cantidad = _num(cantidad)
+    precio = _num(precio)
+    comision = _num(comision)
+    if cantidad <= 0:
+        return None, INCIDENCIA_CANTIDAD
+    if precio < 0:
+        return None, INCIDENCIA_PRECIO
+
+    try:
+        fecha = fifo.parse_fecha(fecha_texto)
+    except fifo.FifoError:
+        return None, INCIDENCIA_FECHA
+
+    por_activo, activos = _operaciones_de_fichas()
+    ventas = _leer_ventas_crudas()
+    invalidas = _añadir_ventas(por_activo, ventas, activos)
+
+    operacion = Operacion(
+        ref=REF_SIMULACION,
+        activo_id=asset_id,
+        fecha=fecha,
+        tipo=TRANSMISION,
+        cantidad=cantidad,
+        importe=cantidad * precio,
+        comision=comision,
+        # Detrás de todo lo guardado: a igual fecha, lo real va primero.
+        orden=3_000_000,
+        origen="simulacion",
+        fiscal=True,
+    )
+
+    anio = str(fecha.year)
+    _, liquidaciones_sin = _liquidar_con(por_activo, activos, ventas, invalidas)
+    por_ref, liquidaciones_con = _liquidar_con(por_activo, activos, ventas, invalidas, operacion)
+
+    resultado = por_ref.get(REF_SIMULACION)
+    if resultado is None:
+        return None, INCIDENCIA_CANTIDAD
+
+    sin = liquidaciones_sin.get(anio)
+    con = liquidaciones_con.get(anio)
+    cuota_sin = sin.cuota if sin is not None else Decimal("0")
+    cuota_con = con.cuota if con is not None else Decimal("0")
+    cuota_venta = cuota_con - cuota_sin
+
+    compensado_sin = sin.compensado_anteriores if sin is not None else Decimal("0")
+    compensado_con = con.compensado_anteriores if con is not None else Decimal("0")
+
+    ganancia = resultado.ganancia_computable
+    valor_transmision = resultado.valor_transmision
+
+    dato = {
+        "activo": activo["name"],
+        "tipo": activo["type"],
+        "anio": anio,
+        "cantidad": _money(cantidad, escala="0.00000001"),
+        "disponible": _money(resultado.disponible_antes, escala="0.00000001"),
+        "valorTransmision": _money(valor_transmision),
+        "costeAdquisicion": _money(resultado.coste_adquisicion),
+        "ganancia": _money(ganancia),
+        "cuota": _money(cuota_venta),
+        "neto": _money(valor_transmision - cuota_venta),
+        # Tipo efectivo de ESTA venta, no el del tramo: con compensaciones de
+        # ejercicios anteriores puede salir muy por debajo de la escala.
+        "tipoEfectivo": _money((cuota_venta / ganancia * 100) if ganancia > 0 else Decimal("0")),
+        "perdidaNoComputable": _money(resultado.perdida_no_computable),
+        "notaAntiaplicacion": resultado.nota_antiaplicacion,
+        "compensadoAnteriores": _money(compensado_con - compensado_sin),
+        "cuotaEjercicioAntes": _money(cuota_sin),
+        "cuotaEjercicioDespues": _money(cuota_con),
+        "incidencia": resultado.incidencia,
+        "mensaje": mensaje_incidencia(resultado.incidencia),
+        "lotes": [
+            {
+                "fecha": consumo.fecha_adquisicion.strftime("%d-%m-%Y"),
+                "cantidad": _money(consumo.cantidad, escala="0.00000001"),
+                "costeUnitario": _money(consumo.coste_unitario, escala="0.0001"),
+                "coste": _money(consumo.coste),
+            }
+            for consumo in resultado.lotes
+        ],
+    }
+
+    return dato, ""
+
+
 def _serializar_fila(resultado, tramos):
     if resultado.incidencia:
         fila = fila_vacia(resultado.incidencia)

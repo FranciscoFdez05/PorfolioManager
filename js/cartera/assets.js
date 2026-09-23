@@ -1002,14 +1002,10 @@ function buildAssetTodosRows(asset) {
                 row.capitalInvertidoBruto,
                 getAssetTableMoneyCurrency(assetType, "capitalInvertidoBruto", currency, rowCurrency)
             ),
-            comisionesCripto: parseLooseNumber(getCryptoRowCommissionCrypto(row))
-                ? formatAssetCommissionValue(getCryptoRowCommissionCrypto(row))
-                : "",
-            comisionesFiat: formatCellMoneyValue(
+            comisiones: formatCellMoneyValue(
                 getCryptoRowCommissionFiat(row),
                 getAssetTableMoneyCurrency(assetType, "comisionesFiat", currency, rowCurrency)
-            ),
-            estado: ""
+            )
         })
     })
 
@@ -1022,9 +1018,7 @@ function buildAssetTodosRows(asset) {
             participaciones: formatOperationsQuantity(row.cantidad),
             precio: formatOperationsMoney(row.precioOrden, row.precioCurrency || currency),
             importe: formatOperationsMoney(row.total, row.currency || currency),
-            comisionesCripto: formatOperationsQuantity(row.comisionesCripto),
-            comisionesFiat: formatOperationsMoney(row.comisionesFiat, "EUR"),
-            estado: row.estado || ""
+            comisiones: formatOperationsMoney(row.comisionesFiat, "EUR")
         })
     })
 
@@ -1046,7 +1040,6 @@ function renderAssetTodosSection(asset) {
     if (!section) return
 
     const filas = buildAssetTodosRows(asset)
-    const isCrypto = isCryptoAssetType(asset?.type)
 
     if (tabBtn) {
         tabBtn.classList.remove("hidden")
@@ -1054,6 +1047,11 @@ function renderAssetTodosSection(asset) {
     }
 
     if (!filas.length) {
+        // Sin filas no hay nada que repartir, y los quesitos del activo
+        // anterior se quedarían colgando de unos canvas que ya no existen.
+        destroyAssetTodosCharts()
+        const columnaVacia = document.getElementById("assetTodosChartsCol")
+        if (columnaVacia) columnaVacia.innerHTML = ""
         section.innerHTML = `
             <div class="assetVentasEmpty">
                 <p class="assetVentasEmptyText">Este activo todavía no tiene compras ni operaciones.</p>
@@ -1069,15 +1067,13 @@ function renderAssetTodosSection(asset) {
             const tipoClass = tipo.toLowerCase() === "venta" ? "opRowVenta" : "opRowCompra"
             return `
             <tr>
-                <td><span class="todosOrigenBadge ${origen.clase}">${escapeHtml(origen.etiqueta)}</span></td>
-                <td>${escapeHtml(fila.fecha || "")}</td>
-                <td class="${tipoClass}">${escapeHtml(tipo)}</td>
-                <td>${fila.participaciones || ""}</td>
-                <td>${fila.precio || ""}</td>
-                <td>${fila.importe || ""}</td>
-                ${isCrypto ? `<td data-field="comisionesCripto">${fila.comisionesCripto || ""}</td>` : ""}
-                <td data-field="comisionesFiat">${fila.comisionesFiat || ""}</td>
-                <td>${escapeHtml(fila.estado || "")}</td>
+                <td class="todosColOrigen"><span class="todosOrigenBadge ${origen.clase}">${escapeHtml(origen.etiqueta)}</span></td>
+                <td class="todosColFecha">${escapeHtml(fila.fecha || "")}</td>
+                <td class="todosColTipo ${tipoClass}">${escapeHtml(tipo)}</td>
+                <td class="todosColNum todosColParticipaciones">${fila.participaciones || ""}</td>
+                <td class="todosColNum todosColPrecio">${fila.precio || ""}</td>
+                <td class="todosColNum todosColImporte">${fila.importe || ""}</td>
+                <td class="todosColNum todosColComisiones">${fila.comisiones || ""}</td>
             </tr>
         `
         })
@@ -1088,15 +1084,13 @@ function renderAssetTodosSection(asset) {
             <table class="assetOperationsTable assetTodosTable">
                 <thead>
                     <tr>
-                        <th class="mThSort" data-sortkey="0">Origen<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="1">Fecha<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="2">Tipo<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="3">Participaciones<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="4">Precio<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="5">Importe<span class="mSortArrow"></span></th>
-                        ${isCrypto ? '<th class="mThSort" data-sortkey="6">Comisiones cripto<span class="mSortArrow"></span></th>' : ""}
-                        <th class="mThSort" data-sortkey="${isCrypto ? 7 : 6}">Comisiones<span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="${isCrypto ? 8 : 7}">Estado<span class="mSortArrow"></span></th>
+                        <th class="mThSort todosColOrigen" data-sortkey="0">Origen<span class="mSortArrow"></span></th>
+                        <th class="mThSort todosColFecha" data-sortkey="1">Fecha<span class="mSortArrow"></span></th>
+                        <th class="mThSort todosColTipo" data-sortkey="2">Tipo<span class="mSortArrow"></span></th>
+                        <th class="mThSort todosColNum todosColParticipaciones" data-sortkey="3">Participaciones<span class="mSortArrow"></span></th>
+                        <th class="mThSort todosColNum todosColPrecio" data-sortkey="4">Precio<span class="mSortArrow"></span></th>
+                        <th class="mThSort todosColNum todosColImporte" data-sortkey="5">Importe<span class="mSortArrow"></span></th>
+                        <th class="mThSort todosColNum todosColComisiones" data-sortkey="6">Comisiones<span class="mSortArrow"></span></th>
                     </tr>
                 </thead>
                 <tbody>${rowsHtml}</tbody>
@@ -1104,6 +1098,410 @@ function renderAssetTodosSection(asset) {
         </div>
     `
     bindTableSort(section.querySelector("table"), "assetTodos")
+    applyAssetTodosGrid()
+    renderAssetTodosChartsColumn(asset)
+}
+
+// Los quesitos viven fuera del recuadro de la tabla, en su propia columna al
+// lado: dentro alargaban el panel muy por debajo de la última fila. Siguen
+// siendo cosa de "Todos", así que la columna se esconde al cambiar de pestaña.
+function renderAssetTodosChartsColumn(asset) {
+    const columna = document.getElementById("assetTodosChartsCol")
+    if (!columna) return
+
+    columna.innerHTML = `
+        ${buildAssetTodosChartCard("todosChartOrigen", "Participaciones por origen", "De dónde sale lo que hay ahora en cartera.")}
+        ${buildAssetTodosChartCard("todosChartVentas", "Ventas y ganancias realizadas", "En qué se reparte el dinero de lo ya vendido.")}
+        ${buildAssetTodosChartCard("todosChartAnios", "Capital invertido por año", "Cuánto entró en el activo cada año.")}
+    `
+
+    // El oyente va en la columna y no en cada botón: el HTML de dentro se rehace
+    // entero en cada repintado y así no hay que volver a engancharlos.
+    if (!columna.dataset.plegadoListo) {
+        columna.addEventListener("click", (evento) => {
+            const boton = evento.target.closest("[data-chart-toggle]")
+            if (boton) toggleAssetTodosChartCard(boton.dataset.chartToggle)
+        })
+        columna.dataset.plegadoListo = "1"
+    }
+
+    renderAssetTodosCharts(asset)
+}
+
+// Rejilla de ajuste de la pestaña "Todos". Dibuja en blanco el borde de cada
+// celda para ver dónde empieza y acaba cada columna mientras se cuadran anchos
+// y alineaciones; una vez encajadas se apaga y la tabla queda limpia. Se maneja
+// desde la consola: todosGrid() la enciende o apaga y todosGrid(false) la apaga
+// siempre. La preferencia se guarda para que aguante los repintados y recargas.
+const ASSET_TODOS_GRID_KEY = "assetTodosGrid"
+
+function isAssetTodosGridOn() {
+    try {
+        return localStorage.getItem(ASSET_TODOS_GRID_KEY) === "1"
+    } catch {
+        return false
+    }
+}
+
+function applyAssetTodosGrid() {
+    document.body.classList.toggle("todosGridDebug", isAssetTodosGridOn())
+}
+
+function toggleAssetTodosGrid(on) {
+    const activa = on === undefined ? !isAssetTodosGridOn() : Boolean(on)
+    try {
+        localStorage.setItem(ASSET_TODOS_GRID_KEY, activa ? "1" : "0")
+    } catch {
+        // Sin localStorage la rejilla vale igual, solo que no sobrevive a una recarga.
+    }
+    document.body.classList.toggle("todosGridDebug", activa)
+    return activa
+}
+
+window.todosGrid = toggleAssetTodosGrid
+
+// ── Gráficos de la pestaña "Todos" ──
+// Tres quesitos al lado de la tabla. Cada uno contesta algo que la tabla tiene
+// pero no enseña de un vistazo: de dónde salen las participaciones, en qué se
+// reparte el dinero de lo ya vendido y cuánto entró en el activo cada año. Los
+// tres son repartos de un total, que es para lo único que sirve un gráfico
+// circular; cuando no hay nada que repartir la tarjeta lo dice con una frase en
+// vez de dibujar un círculo vacío.
+//
+// Los colores están comprobados contra el fondo oscuro para que se distingan
+// también con daltonismo: verde, azul y naranja para los repartos por concepto,
+// y una rampa de azules para los años, que son una escala y no categorías
+// sueltas (un arcoíris por año no diría nada del orden).
+const ASSET_TODOS_CHART_COLORS = { verde: "#2e9e6b", azul: "#3a7bd5", naranja: "#d95926" }
+const ASSET_TODOS_YEAR_RAMP = [
+    [29, 79, 143],
+    [142, 192, 234]
+]
+
+let _assetTodosCharts = {}
+let _assetTodosChartsToken = 0
+
+// Cada tarjeta se puede plegar por su título y se queda plegada: la columna es
+// alta y no siempre interesan los tres quesitos a la vez. Lo plegado se guarda
+// para que aguante los repintados y el cambio de activo, que rehacen el HTML de
+// la columna entera.
+const ASSET_TODOS_CHARTS_COLLAPSED_KEY = "assetTodosChartsPlegados"
+
+function getAssetTodosCollapsedCharts() {
+    try {
+        const guardado = JSON.parse(localStorage.getItem(ASSET_TODOS_CHARTS_COLLAPSED_KEY) || "[]")
+        return new Set(Array.isArray(guardado) ? guardado.map(String) : [])
+    } catch {
+        return new Set()
+    }
+}
+
+function setAssetTodosChartCollapsed(id, plegada) {
+    const plegadas = getAssetTodosCollapsedCharts()
+
+    if (plegada) {
+        plegadas.add(id)
+    } else {
+        plegadas.delete(id)
+    }
+
+    try {
+        localStorage.setItem(ASSET_TODOS_CHARTS_COLLAPSED_KEY, JSON.stringify([...plegadas]))
+    } catch {
+        // Sin localStorage se pliega igual, solo que no dura hasta la próxima visita.
+    }
+}
+
+function buildAssetTodosChartCard(id, titulo, pie) {
+    const plegada = getAssetTodosCollapsedCharts().has(id)
+
+    return `
+        <article class="todosChartCard${plegada ? " todosChartCardPlegada" : ""}" data-chart="${id}">
+            <h4 class="todosChartHeading">
+                <button type="button" class="todosChartToggle" data-chart-toggle="${id}" aria-expanded="${plegada ? "false" : "true"}" aria-controls="${id}Body">
+                    <span class="todosChartTitle">${escapeHtml(titulo)}</span>
+                    <span class="todosChartChevron" aria-hidden="true">▾</span>
+                </button>
+            </h4>
+            <div class="todosChartBody" id="${id}Body">
+                <div class="todosChartBox" id="${id}Box"><canvas id="${id}"></canvas></div>
+                <p class="todosChartFoot" id="${id}Foot">${escapeHtml(pie)}</p>
+            </div>
+        </article>
+    `
+}
+
+// Un quesito dibujado dentro de una tarjeta plegada nace con el lienzo a cero,
+// así que al desplegar hay que decirle que vuelva a medirse.
+function toggleAssetTodosChartCard(id) {
+    const tarjeta = document.querySelector(`.todosChartCard[data-chart="${id}"]`)
+    const boton = tarjeta?.querySelector(".todosChartToggle")
+    if (!tarjeta) return
+
+    const plegada = tarjeta.classList.toggle("todosChartCardPlegada")
+    if (boton) boton.setAttribute("aria-expanded", plegada ? "false" : "true")
+    setAssetTodosChartCollapsed(id, plegada)
+
+    if (!plegada) _assetTodosCharts[id]?.resize()
+}
+
+function destroyAssetTodosCharts() {
+    Object.values(_assetTodosCharts).forEach((chart) => chart.destroy())
+    _assetTodosCharts = {}
+}
+
+function setAssetTodosChartFoot(id, texto) {
+    const pie = document.getElementById(`${id}Foot`)
+    if (pie) pie.textContent = texto
+}
+
+function setAssetTodosChartEmpty(id, mensaje) {
+    const caja = document.getElementById(`${id}Box`)
+    if (caja) caja.innerHTML = `<p class="todosChartEmpty">${escapeHtml(mensaje)}</p>`
+}
+
+// Solo entran las porciones con valor positivo: un quesito no sabe dibujar un
+// saldo negativo, y una porción a cero deja en la leyenda una etiqueta que no
+// se corresponde con nada. Devuelve el total repartido, o 0 si no había nada
+// que dibujar.
+function createAssetTodosDonut(id, partes, formatValue) {
+    const caja = document.getElementById(`${id}Box`)
+    const canvas = document.getElementById(id)
+
+    if (!caja || !canvas || typeof Chart === "undefined") return 0
+
+    const datos = partes.filter((parte) => Number.isFinite(parte.valor) && parte.valor > 0)
+    const total = datos.reduce((suma, parte) => suma + parte.valor, 0)
+
+    if (!datos.length || total <= 0) return 0
+
+    // El borde de las porciones va del color de fondo de la tarjeta para que
+    // quede un hueco real entre ellas; se lee del tema en curso, que la app
+    // tiene claro y oscuro.
+    const estilos = getComputedStyle(caja)
+
+    _assetTodosCharts[id] = new Chart(canvas, {
+        type: "doughnut",
+        data: {
+            labels: datos.map((parte) => parte.etiqueta),
+            datasets: [
+                {
+                    data: datos.map((parte) => parte.valor),
+                    backgroundColor: datos.map((parte) => parte.color),
+                    borderColor: estilos.backgroundColor,
+                    borderWidth: 2,
+                    hoverOffset: 8
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            cutout: "62%",
+            layout: { padding: 2 },
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: {
+                        color: estilos.color,
+                        font: { size: 11 },
+                        padding: 10,
+                        boxWidth: 10,
+                        usePointStyle: true,
+                        pointStyle: "circle"
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (contexto) => {
+                            const porcentaje = ((contexto.raw / total) * 100).toFixed(1).replace(".", ",")
+                            return ` ${formatValue(contexto.raw)}  (${porcentaje} %)`
+                        }
+                    }
+                }
+            }
+        }
+    })
+
+    return total
+}
+
+function buildAssetTodosOrigenPartes(asset) {
+    const spot = getPrimaryAssetRows(asset).reduce((total, row) => {
+        const cantidad = parseLooseNumber(row.participaciones) || 0
+        const esVenta =
+            String(row.tipoOperacion || "")
+                .trim()
+                .toLowerCase() === "venta"
+        return total + (esVenta ? -cantidad : cantidad)
+    }, 0)
+
+    return [
+        { etiqueta: "Compras spot", valor: spot, color: ASSET_TODOS_CHART_COLORS.verde },
+        {
+            etiqueta: "Operaciones spot",
+            valor: getCompletedOperationsCryptoImpact(asset).quantityDelta || 0,
+            color: ASSET_TODOS_CHART_COLORS.azul
+        },
+        {
+            etiqueta: "Transacciones",
+            valor: getTransaccionesCryptoImpact(asset).quantityDelta || 0,
+            color: ASSET_TODOS_CHART_COLORS.naranja
+        }
+    ]
+}
+
+// Lo vendido se reparte en tres: lo que costó comprarlo, lo que se lleva
+// Hacienda y lo que queda limpio. Si el conjunto de ventas sale en pérdidas ese
+// reparto no existe —no hay ganancia que trocear—, así que se enseña el otro:
+// cuánto del dinero puesto se recuperó y cuánto se quedó por el camino.
+function buildAssetTodosVentasPartes(asset) {
+    const rows = getAssetVentasRows(asset)
+    const suma = (campo) => rows.reduce((total, row) => total + (parseLooseNumber(row[campo]) || 0), 0)
+    const coste = suma("costeAdquisicion")
+    const ganancia = suma("dineroDeclarar")
+    const impuestos = suma("totalPagar")
+    const vendido = suma("bruto")
+    const cuenta = `${rows.length} venta${rows.length === 1 ? "" : "s"}`
+
+    if (ganancia < 0) {
+        return {
+            partes: [
+                { etiqueta: "Recuperado", valor: vendido, color: ASSET_TODOS_CHART_COLORS.azul },
+                { etiqueta: "Pérdida", valor: -ganancia, color: ASSET_TODOS_CHART_COLORS.naranja }
+            ],
+            pie: `${cuenta} · ${formatMoney(vendido, "EUR")} recuperados de ${formatMoney(coste, "EUR")}`
+        }
+    }
+
+    return {
+        partes: [
+            { etiqueta: "Coste de compra", valor: coste, color: ASSET_TODOS_CHART_COLORS.azul },
+            { etiqueta: "Ganancia neta", valor: ganancia - impuestos, color: ASSET_TODOS_CHART_COLORS.verde },
+            { etiqueta: "Impuestos", valor: impuestos, color: ASSET_TODOS_CHART_COLORS.naranja }
+        ],
+        pie: `${cuenta} · ${formatMoney(vendido, "EUR")} vendidos`
+    }
+}
+
+function assetTodosYearOf(fecha) {
+    const marca = parseAssetOperationDate(fecha)
+    return Number.isFinite(marca) ? String(new Date(marca).getFullYear()) : ""
+}
+
+// Del azul oscuro al claro, del año más antiguo al más reciente: la rampa se
+// lee como una línea de tiempo aunque las porciones estén en círculo.
+function assetTodosYearColor(indice, total) {
+    if (total <= 1) return ASSET_TODOS_CHART_COLORS.azul
+
+    const paso = indice / (total - 1)
+    const [desde, hasta] = ASSET_TODOS_YEAR_RAMP
+    const canales = desde.map((valor, i) => Math.round(valor + (hasta[i] - valor) * paso))
+    return `rgb(${canales.join(", ")})`
+}
+
+// Las compras pueden estar anotadas en otra moneda que el activo, así que cada
+// importe pasa por el cambio antes de sumarse: mezclar euros con dólares en el
+// mismo quesito daría un reparto inventado.
+async function buildAssetTodosAniosPartes(asset) {
+    const assetCurrency = normalizeCurrencyCode(asset?.currency || "EUR")
+    const compras = []
+
+    getPrimaryAssetRows(asset).forEach((row) => {
+        const esVenta =
+            String(row.tipoOperacion || "")
+                .trim()
+                .toLowerCase() === "venta"
+        if (esVenta) return
+
+        compras.push({
+            anio: assetTodosYearOf(row.fechaOperacion),
+            importe: parseLooseNumber(row.capitalInvertidoBruto) || 0,
+            currency: normalizeAssetRowCurrency(row.currency, assetCurrency)
+        })
+    })
+
+    getCompletedOperationsCryptoImpact(asset).rows.forEach((row) => {
+        const esCompra =
+            String(row.orden || "")
+                .trim()
+                .toLowerCase() === "compra"
+        if (!esCompra) return
+
+        compras.push({
+            anio: assetTodosYearOf(row.fechaApertura || row.fecha),
+            importe: parseLooseNumber(row.total) || 0,
+            currency: normalizeCurrencyCode(row.currency || assetCurrency)
+        })
+    })
+
+    const convertidas = await Promise.all(
+        compras
+            .filter((compra) => compra.anio && compra.importe > 0)
+            .map(async (compra) => ({
+                anio: compra.anio,
+                importe: await convertAmountForDisplay(compra.importe, compra.currency, assetCurrency)
+            }))
+    )
+
+    const porAnio = new Map()
+    convertidas.forEach((compra) => {
+        porAnio.set(compra.anio, (porAnio.get(compra.anio) || 0) + compra.importe)
+    })
+
+    const anios = [...porAnio.keys()].sort()
+    return anios.map((anio, indice) => ({
+        etiqueta: anio,
+        valor: porAnio.get(anio),
+        color: assetTodosYearColor(indice, anios.length)
+    }))
+}
+
+async function renderAssetTodosCharts(asset) {
+    destroyAssetTodosCharts()
+
+    const token = ++_assetTodosChartsToken
+    const assetType = asset?.type || "cripto"
+    const assetCurrency = normalizeCurrencyCode(asset?.currency || "EUR")
+
+    const totalOrigen = createAssetTodosDonut("todosChartOrigen", buildAssetTodosOrigenPartes(asset), (valor) =>
+        formatAssetParticipationValue(valor, assetType)
+    )
+    if (totalOrigen > 0) {
+        setAssetTodosChartFoot("todosChartOrigen", `Total: ${formatAssetParticipationValue(totalOrigen, assetType)}`)
+    } else {
+        setAssetTodosChartEmpty("todosChartOrigen", "Todavía no hay participaciones que repartir.")
+        setAssetTodosChartFoot("todosChartOrigen", "")
+    }
+
+    const ventas = buildAssetTodosVentasPartes(asset)
+    if (createAssetTodosDonut("todosChartVentas", ventas.partes, (valor) => formatMoney(valor, "EUR")) > 0) {
+        setAssetTodosChartFoot("todosChartVentas", ventas.pie)
+    } else {
+        setAssetTodosChartEmpty("todosChartVentas", "No hay ventas registradas de este activo.")
+        setAssetTodosChartFoot("todosChartVentas", "")
+    }
+
+    let anios = []
+    try {
+        anios = await buildAssetTodosAniosPartes(asset)
+    } catch (error) {
+        console.error("No se pudo repartir el capital invertido por año", error)
+    }
+
+    // Entre la espera del cambio de divisa y ahora la ficha puede haberse
+    // repintado —otro activo, o el mismo recargado—; si el turno ya no es el
+    // nuestro, los canvas que hay ahí abajo son de otro dibujo.
+    if (token !== _assetTodosChartsToken) return
+
+    const totalAnios = createAssetTodosDonut("todosChartAnios", anios, (valor) => formatMoney(valor, assetCurrency))
+    if (totalAnios > 0) {
+        setAssetTodosChartFoot("todosChartAnios", `Total: ${formatMoney(totalAnios, assetCurrency)}`)
+    } else {
+        setAssetTodosChartEmpty("todosChartAnios", "Sin compras con fecha para repartir por año.")
+        setAssetTodosChartFoot("todosChartAnios", "")
+    }
 }
 
 function renderAssetVentasSection(asset) {
@@ -1701,7 +2099,7 @@ async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTabl
     }
 }
 
-async function selectAsset(assetId) {
+async function selectAsset(assetId, { abrirFicha = true } = {}) {
     if (!assetId) {
         return
     }
@@ -1710,7 +2108,12 @@ async function selectAsset(assetId) {
     const assetData = await loadAssetData(assetId)
     await updateAssetDetail(assetData)
     await renderAssetsList(await loadAssetsList())
-    renderAssetTablePage(assetData)
+
+    if (abrirFicha) {
+        renderAssetTablePage(assetData)
+    }
+
+    return assetData
 }
 
 async function refreshOverviewIfVisible() {
@@ -2236,17 +2639,6 @@ function initSidebarFilterBar() {
         await renderAssetsList(assets)
     })
     bar.style.display = window._viewAllPortfolios ? "none" : ""
-}
-
-function initSidebarRefreshButton(buttonElement) {
-    if (!buttonElement || buttonElement.dataset.bound) {
-        return
-    }
-
-    buttonElement.dataset.bound = "true"
-    buttonElement.addEventListener("click", async () => {
-        await refreshOverviewMarketData(buttonElement)
-    })
 }
 
 function getSelectedOverviewTypes() {
@@ -3130,10 +3522,11 @@ function renderAssetTablePage(asset) {
                 </div>
             </div>
 
+            <div class="assetTodosLayout" id="assetTodosLayout">
             <div class="assetTabsContainer">
                 <div class="assetTabsNav">
                     <button class="assetTabBtn assetTabActive" id="todosTabBtn" data-tab="todos">Todos</button>
-                    <button class="assetTabBtn" data-tab="spot">Compras spot</button>
+                    <button class="assetTabBtn" id="spotTabBtn" data-tab="spot">Compras spot</button>
                     <button class="assetTabBtn hidden" id="completadasTabBtn" data-tab="completadas">Operaciones Spot</button>
                     <button class="assetTabBtn hidden" id="transaccionesTabBtn" data-tab="transacciones">Transacciones</button>
                     <button class="assetTabBtn" id="ventasTabBtn" data-tab="ventas">Ventas</button>
@@ -3178,6 +3571,8 @@ function renderAssetTablePage(asset) {
                     <div id="assetPlanesSection"></div>
                 </div>
             </div>
+            <aside class="todosChartsCol" id="assetTodosChartsCol"></aside>
+            </div>
         </section>
     `
 
@@ -3217,6 +3612,11 @@ function setActiveAssetTab(tab) {
     })
     document.getElementById("assetAddVentaNavBtn")?.classList.toggle("hidden", tab !== "ventas")
     document.getElementById("assetAddPlanNavBtn")?.classList.toggle("hidden", tab !== "planes")
+    // Los gráficos son de "Todos". En las demás pestañas no solo se esconden:
+    // el recuadro recupera el ancho completo, que si no queda un hueco de 340 px
+    // reservado para una columna que no está.
+    document.getElementById("assetTodosChartsCol")?.classList.toggle("hidden", tab !== "todos")
+    document.getElementById("assetTodosLayout")?.classList.toggle("assetTodosLayoutFull", tab !== "todos")
 }
 
 function setupAssetTabs(asset) {
@@ -3233,8 +3633,24 @@ function setupAssetTabs(asset) {
     nav.querySelector("#assetAddPlanNavBtn")?.addEventListener("click", () => planAbrirEditor())
 }
 
+// Una fila recién añadida está en blanco hasta que se rellena. No cuenta como
+// compra —ni para el contador de la pestaña ni para preguntar antes de borrarla—
+// porque todavía no dice nada.
+function isEmptyAssetRow(row) {
+    return !row || (!row.fechaOperacion && !row.participaciones && !row.capitalInvertidoBruto)
+}
+
+function updateAssetSpotTabCount() {
+    const tabBtn = document.getElementById("spotTabBtn")
+    if (!tabBtn) return
+
+    const cuenta = _assetDisplayRows.filter((row) => !isEmptyAssetRow(row)).length
+    tabBtn.textContent = cuenta ? `Compras spot (${cuenta})` : "Compras spot"
+}
+
 function renderAssetRows(rows) {
     _assetDisplayRows = Array.isArray(rows) ? [...rows] : []
+    updateAssetSpotTabCount()
     const assetOperationsBody = document.getElementById("assetOperationsBody")
     const assetPage = document.querySelector(".assetTablePage")
     const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
@@ -4129,9 +4545,8 @@ function initAssetTableLogic(asset) {
             if (deleteBtn) {
                 const idx = Number(deleteBtn.dataset.rowIndex)
                 const row = _assetDisplayRows[idx]
-                const isEmpty = !row || (!row.fechaOperacion && !row.participaciones && !row.capitalInvertidoBruto)
 
-                if (isEmpty) {
+                if (isEmptyAssetRow(row)) {
                     _assetDisplayRows.splice(idx, 1)
                     renderAssetRows(_assetDisplayRows)
                     scheduleAssetAutosave()
@@ -4755,45 +5170,71 @@ function initEditAssetModal() {
     }
 }
 
-// ── Gráfico del activo de la barra lateral ───────────────────────────────────
+// ── Qué hace pulsar un activo de la barra lateral ────────────────────────────
 //
-// El botón abre el mismo diálogo centrado que la ficha del activo y las
-// tarjetas de los planes. Se intentó incrustarlo en la propia barra y no vale:
-// en una columna de 300px el widget sale ilegible, así que el gráfico se mira
-// donde hay sitio para mirarlo.
+// Dos modos, y el conmutador de la barra elige: abrir la ficha del activo —la
+// ventana de siempre, donde además se puede tocar— o abrir solo su gráfico en
+// el diálogo centrado, para mirar precios sin salir de donde estabas.
 //
-// Se queda en el panel lo que la barra hace bien: identificar el activo y dar
-// sus números de un vistazo.
+// El gráfico va en el diálogo grande y no incrustado en la propia barra: en
+// una columna de 300px un gráfico de velas con sus ejes no se lee.
+const _SIDEBAR_MODO_KEY = "sidebarAssetMode"
 
-// Activo que se está enseñando en el panel: es el que abre el botón.
+// Activo que se está enseñando en el panel.
 let _sidebarAssetActual = null
 
-function initSidebarChartButton() {
-    const boton = document.getElementById("sidebarChartBtn")
-    if (!boton) return
+function getSidebarAssetMode() {
+    try {
+        return localStorage.getItem(_SIDEBAR_MODO_KEY) === "grafico" ? "grafico" : "activo"
+    } catch {
+        return "activo"
+    }
+}
 
-    boton.addEventListener("click", () => {
-        if (!_sidebarAssetActual) {
-            showToast("Elige un activo para ver su gráfico", { type: "warning" })
-            return
+/** Abre el gráfico de un activo, o dice por qué no puede. */
+function abrirGraficoDeActivo(asset) {
+    if (!asset) return
+
+    // Hay que mirar el ticker y no lo que devuelve buildTVSymbol: cuando el
+    // activo no tiene ninguno, esa función cae al nombre en mayúsculas ("SIN
+    // TICKER") y el widget abriría un símbolo que no existe en TradingView.
+    const tieneTicker = Boolean(
+        String(asset.tvSymbol || "").trim() || String(asset.marketSymbol || asset.finnhubSymbol || "").trim()
+    )
+    const simbolo = tieneTicker ? buildTVSymbol(asset) : ""
+
+    if (!simbolo) {
+        showToast("Este activo no tiene ticker de mercado con el que abrir el gráfico", { type: "warning" })
+        return
+    }
+
+    openTVChartModal(simbolo, asset.name || asset.symbol || simbolo)
+}
+
+function initSidebarAssetMode() {
+    const barra = document.getElementById("sidebarAssetMode")
+    if (!barra || barra.dataset.bound) return
+    barra.dataset.bound = "true"
+
+    const sincronizar = () => {
+        const modo = getSidebarAssetMode()
+        barra.querySelectorAll(".sidebarFilterBtn").forEach((boton) => {
+            boton.classList.toggle("active", boton.dataset.modo === modo)
+        })
+    }
+
+    barra.addEventListener("click", (evento) => {
+        const boton = evento.target.closest(".sidebarFilterBtn")
+        if (!boton) return
+        try {
+            localStorage.setItem(_SIDEBAR_MODO_KEY, boton.dataset.modo)
+        } catch {
+            /* sin persistencia, el modo dura lo que la sesión */
         }
-
-        // Hay que mirar el ticker y no lo que devuelve buildTVSymbol: cuando el
-        // activo no tiene ninguno, esa función cae al nombre en mayúsculas
-        // ("SIN TICKER") y el widget abriría un símbolo que no existe.
-        const tieneTicker = Boolean(
-            String(_sidebarAssetActual.tvSymbol || "").trim() ||
-                String(_sidebarAssetActual.marketSymbol || _sidebarAssetActual.finnhubSymbol || "").trim()
-        )
-        const simbolo = tieneTicker ? buildTVSymbol(_sidebarAssetActual) : ""
-
-        if (!simbolo) {
-            showToast("Este activo no tiene ticker de mercado con el que abrir el gráfico", { type: "warning" })
-            return
-        }
-
-        openTVChartModal(simbolo, _sidebarAssetActual.name || _sidebarAssetActual.symbol || simbolo)
+        sincronizar()
     })
+
+    sincronizar()
 }
 
 function initAssetModal(
@@ -5512,10 +5953,6 @@ async function initActivosPageLogic() {
 
     const addBtn = document.getElementById("activosAddBtn")
     if (addBtn) addBtn.addEventListener("click", () => openAssetModal())
-
-    // Antes vivía en la barra lateral. Aquí acompaña al alta: las dos cosas que
-    // se hacen *sobre* los activos están en la página de los activos.
-    initSidebarRefreshButton(document.getElementById("activosRefreshBtn"))
 
     avInitDragDrop()
 }

@@ -1,0 +1,75 @@
+<!-- herramienta
+titulo: Regla del 4 %
+descripcion: Capital necesario para vivir de la cartera y renta que daría la que ya tienes.
+-->
+
+<!--
+    Herramienta de ejemplo. Si no la quieres, borra este fichero y su .js: la
+    pestaña desaparece sola. Está escrita con las mismas clases que las
+    herramientas de serie, así que sirve de plantilla para la tuya.
+
+    Solo va aquí el CUERPO del panel: el título y la descripción de la cabecera
+    salen de los metadatos de arriba. Ver docs/herramientas-extra.md.
+-->
+
+<div class="hCard herramientaInputs">
+    <div class="hCardTitle">Parámetros</div>
+
+    <div class="herramientaField">
+        <label for="r4Gasto">Gasto anual</label>
+        <div class="hInputWrap">
+            <input type="number" id="r4Gasto" value="24000" min="0" step="100">
+            <span class="hInputUnit">€</span>
+        </div>
+    </div>
+
+    <div class="herramientaField">
+        <label for="r4Tasa">Tasa de retirada</label>
+        <div class="hInputWrap">
+            <input type="number" id="r4Tasa" value="4" min="0.1" max="20" step="0.1">
+            <span class="hInputUnit">%</span>
+        </div>
+    </div>
+
+    <div class="herramientaField">
+        <label for="r4Cartera">Cartera actual</label>
+        <div class="hInputWrap">
+            <input type="number" id="r4Cartera" value="0" min="0" step="100">
+            <span class="hInputUnit">€</span>
+        </div>
+    </div>
+
+    <div class="hBtnRow">
+        <button class="herramientaCalcBtn" id="r4CalcBtn">Calcular</button>
+        <button class="herramientaResetBtn">Reiniciar</button>
+    </div>
+</div>
+
+<div class="hResultsCol">
+    <div class="herramientaResults hidden" id="r4Results">
+        <div class="herramientaResultGrid">
+            <div class="herramientaResultCard hResultCardAccent">
+                <div class="hResultLabel">Capital necesario</div>
+                <div class="hResultValue hResultPositive" id="r4Capital">---</div>
+            </div>
+            <div class="herramientaResultCard">
+                <div class="hResultLabel">Renta mensual de tu cartera</div>
+                <div class="hResultValue" id="r4Renta">---</div>
+            </div>
+            <div class="herramientaResultCard">
+                <div class="hResultLabel">Camino recorrido</div>
+                <div class="hResultValue" id="r4Progreso">---</div>
+            </div>
+            <div class="herramientaResultCard">
+                <div class="hResultLabel">Lo que falta</div>
+                <div class="hResultValue" id="r4Falta">---</div>
+            </div>
+        </div>
+        <div class="hRatioInterpretacion" id="r4Nota"></div>
+    </div>
+
+    <div class="hPlaceholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18"/><path d="M16.5 7.5H10a2.5 2.5 0 0 0 0 5h4a2.5 2.5 0 0 1 0 5H7"/></svg>
+        <p>Pon tu gasto anual y pulsa <strong>Calcular</strong>.</p>
+    </div>
+</div>

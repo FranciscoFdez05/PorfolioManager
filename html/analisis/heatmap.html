@@ -11,8 +11,8 @@
         </div>
 
         <div class="hmGroup hmGroupToggle" id="heatmapMetric">
-            <button class="hmGroupBtn" data-metric="activos">Activos</button>
-            <button class="hmGroupBtn active" data-metric="cuenta">Cuenta</button>
+            <button class="hmGroupBtn" data-metric="activos" title="Cómo va el activo en el mercado: variación y precio">Activos</button>
+            <button class="hmGroupBtn active" data-metric="cuenta" title="Cómo va mi dinero: variación y euros movidos">Cuenta</button>
         </div>
 
         <div class="hmGroup hmGroupMulti" id="heatmapTypes">
@@ -21,6 +21,31 @@
             <button class="hmGroupBtn" data-type="acciones">Acciones</button>
             <button class="hmGroupBtn" data-type="etfs">ETFs</button>
             <button class="hmGroupBtn" data-type="comoditis">Comoditis</button>
+        </div>
+
+        <div class="hmToolbarRight">
+            <div class="hmSummary" id="hmSummary">
+                <span class="hmSumItem">
+                    <span class="hmSumLabel">Activos</span>
+                    <span class="hmSumVal" id="hmSumCount">—</span>
+                </span>
+                <span class="hmGroupSep"></span>
+                <span class="hmSumItem">
+                    <span class="hmSumLabel">Valor</span>
+                    <span class="hmSumVal hmSumMoney" id="hmSumValue">—</span>
+                </span>
+                <span class="hmGroupSep"></span>
+                <span class="hmSumItem">
+                    <span class="hmSumLabel" id="hmSumPnlLabel">Rendimiento</span>
+                    <span class="hmSumVal hmSumMoney" id="hmSumPnl">—</span>
+                </span>
+            </div>
+
+            <div class="hmLegend" title="El color es el movimiento del periodo y el tamaño, el valor actual del activo">
+                <span class="hmLegendTick" id="hmLegendMin">−10 %</span>
+                <span class="hmLegendBar" aria-hidden="true"></span>
+                <span class="hmLegendTick" id="hmLegendMax">+10 %</span>
+            </div>
         </div>
 
     </div>
