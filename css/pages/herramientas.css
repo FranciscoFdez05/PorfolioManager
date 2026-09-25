@@ -148,7 +148,11 @@
     display: grid;
     grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
     gap: 18px;
-    align-items: start;
+    /* stretch, no start: con "start" la tarjeta de parámetros y la de
+       resultados quedaban cada una con su alto de contenido, así que el lado
+       más corto dejaba un hueco vacío junto al otro en vez de terminar a la
+       misma altura. */
+    align-items: stretch;
 }
 .herramientaBodyFull {
     grid-template-columns: minmax(0, 1fr);
@@ -360,6 +364,14 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
+}
+/* Con `.herramientaBody` en `align-items: stretch`, `.hResultsCol` ya mide lo
+   mismo que la tarjeta de parámetros; que su único hijo visible (resultados o
+   placeholder) ocupe ese alto es lo que hace que ambas columnas terminen a la
+   misma altura en vez de solo la caja contenedora. */
+.hResultsCol > .herramientaResults,
+.hResultsCol > .hPlaceholder {
+    flex: 1;
 }
 .herramientaResults {
     min-width: 0;

@@ -7,8 +7,17 @@ _HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 def sanitize_color(value):
     s = str(value or "").strip()
     return s if _HEX_COLOR_RE.match(s) else ""
-ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd", "yahoo", "alphavantage"}
+ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd", "yahoo", "alphavantage", "tradingview"}
 EODHD_EXCHANGE_CODES = {"XETRA", "PA", "LSE", "US", "SW", "AS", "MC", "MI", "DU", "BE", "F", "MU", "ST", "VI", "LS", "FOREX", "CC"}
+# "MERCADO:TICKER" es ambiguo entre Finnhub (solo cripto, BINANCE:BTCUSDT) y
+# TradingView (cualquier cosa, NASDAQ:AAPL incluido). Estos prefijos no son
+# nada que Finnhub entienda con ese formato, así que ahí sí distinguen; el
+# resto (exchanges de cripto, desconocidos) se queda en Finnhub, como siempre.
+TRADINGVIEW_ONLY_EXCHANGE_PREFIXES = {
+    "NASDAQ", "NYSE", "AMEX", "ARCA", "BATS", "LSE", "XETR", "EURONEXT",
+    "TSX", "TSXV", "ASX", "HKEX", "BSE", "NSE", "SIX", "BME", "TSE",
+    "COMEX", "NYMEX", "CME", "CBOT", "INDEX",
+}
 
 _MAX_NAME = 120
 _MAX_SYMBOL = 40
@@ -71,7 +80,8 @@ def inferMarketProviderFromSymbol(symbol, fallback="finnhub"):
         return fallback
 
     if ":" in normalized_symbol:
-        return "finnhub"
+        exchange_prefix = normalized_symbol.split(":", 1)[0]
+        return "tradingview" if exchange_prefix in TRADINGVIEW_ONLY_EXCHANGE_PREFIXES else "finnhub"
 
     if "." in normalized_symbol:
         exchange_code = normalized_symbol.rsplit(".", 1)[-1]

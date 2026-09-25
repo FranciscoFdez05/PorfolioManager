@@ -11,12 +11,13 @@ const _HM_HIST_TTL = 4 * 3600 * 1000
 const HM_GAP = 3
 
 // Etiqueta del periodo para la barra de resumen.
-const HM_PERIOD_LABELS = { dia: "Hoy", semana: "Semana", mes: "Mes", anyo: "Año", ytd: "YTD" }
+const HM_PERIOD_LABELS = { dia: "Hoy", semana: "Semana", mes: "Mes", anyo: "Año", ytd: "YTD", todo: "Total" }
 
 // Dónde satura el color en cada periodo, en porcentaje. Un día bueno son unas
 // décimas y un año bueno un 25 %: con una escala fija el mapa del día salía
 // entero en pastel, con el que más sube y el que más baja del mismo color.
-const HM_PERIOD_SCALE = { dia: 3, semana: 6, mes: 10, anyo: 25, ytd: 25 }
+// «Todo» es desde la compra, así que va más holgado que el año.
+const HM_PERIOD_SCALE = { dia: 3, semana: 6, mes: 10, anyo: 25, ytd: 25, todo: 50 }
 
 function hmEscala() {
     return HM_PERIOD_SCALE[_hmPeriod] || 10
@@ -39,7 +40,7 @@ async function initHeatmapLogic() {
             periodsEl.querySelectorAll(".hmGroupBtn").forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _hmPeriod = btn.dataset.period
-            if (_hmPeriod !== "dia") {
+            if (_hmPeriod !== "dia" && _hmPeriod !== "todo") {
                 await hmLoadHistorical(_hmPeriod)
             }
             hmRender()
@@ -53,9 +54,11 @@ async function initHeatmapLogic() {
             metricEl.querySelectorAll(".hmGroupBtn").forEach((b) => b.classList.remove("active"))
             btn.classList.add("active")
             _hmMetric = btn.dataset.metric
+            hmSyncPeriodoTodo()
             hmRender()
         })
     }
+    hmSyncPeriodoTodo()
 
     if (typesEl) {
         typesEl.addEventListener("click", (e) => {
@@ -119,6 +122,37 @@ async function initHeatmapLogic() {
             }
         })
     )
+}
+
+/**
+ * «Todo» solo existe en el mapa de la cuenta: es lo que ha hecho cada posición
+ * desde que se compró, y en el de los activos no hay una fecha de inicio común.
+ * Si estaba elegido al pasar a «Activos», se vuelve a «Día».
+ */
+function hmSyncPeriodoTodo() {
+    const periodsEl = document.getElementById("heatmapPeriods")
+    const btnTodo = periodsEl?.querySelector('[data-period="todo"]')
+    if (!btnTodo) return
+
+    const disponible = _hmMetric === "cuenta"
+    btnTodo.classList.toggle("hidden", !disponible)
+    if (!disponible && _hmPeriod === "todo") {
+        _hmPeriod = "dia"
+        periodsEl
+            .querySelectorAll(".hmGroupBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.period === "dia"))
+    }
+}
+
+/**
+ * El porcentaje que pinta una baldosa en el periodo elegido: el cambio de
+ * mercado del día, el histórico que sirve el API o, en «Todo», el rendimiento
+ * de la posición desde la compra (valor actual contra invertido bruto).
+ */
+function hmValorPeriodo(d, periodo, histData = {}) {
+    if (periodo === "dia") return d.dia
+    if (periodo === "todo") return d.hasCuenta ? d.cuentaPct : null
+    return histData[d.id] ?? null
 }
 
 async function hmLoadData() {
@@ -257,14 +291,10 @@ function hmRender() {
             // día y el resto con el histórico que sirve el API. Lo que cambia
             // entre «Activos» y «Cuenta» no es el plazo, es la pregunta: cómo
             // va el activo o cómo va mi dinero metido en él.
+            // En «Todo» el movimiento sale igual a valor − invertido, porque
+            // el porcentaje ya es sobre lo invertido.
             const periodo = _hmPeriod
-            let value
-            if (periodo === "dia") {
-                value = d.dia
-            } else {
-                const histData = _hmHistCache[periodo]?.data || {}
-                value = histData[d.id] ?? null
-            }
+            const value = hmValorPeriodo(d, periodo, _hmHistCache[periodo]?.data)
 
             const hasValue = value !== null && value !== undefined && !isNaN(value)
             const valueLabel = hasValue ? hmFormatPct(value) : "N/D"
@@ -452,11 +482,15 @@ function hmTooltipHtml(d) {
 
     // Lo del periodo elegido, que es lo que pinta el mapa
     const etiquetaPeriodo = HM_PERIOD_LABELS[_hmPeriod] || "Movimiento"
+    // En «Todo» el periodo es la posición entera, que ya sale debajo como
+    // Rendimiento: se omite para no repetir el mismo número.
     const periodoRows =
-        d.hasValue && d.value !== null
-            ? fila(etiquetaPeriodo, d.valueLabel, pctClass, false) +
-              (d.moneyChange !== null ? fila("Movimiento", hmFormatSignedEur(d.moneyChange), pctClass) : "")
-            : fila(etiquetaPeriodo, "sin dato", "", false)
+        _hmPeriod === "todo" && d.hasCuenta && d.netoEur > 0
+            ? ""
+            : d.hasValue && d.value !== null
+              ? fila(etiquetaPeriodo, d.valueLabel, pctClass, false) +
+                (d.moneyChange !== null ? fila("Movimiento", hmFormatSignedEur(d.moneyChange), pctClass) : "")
+              : fila(etiquetaPeriodo, "sin dato", "", false)
 
     // Y la posición, que no depende del periodo
     let cuentaRows = ""

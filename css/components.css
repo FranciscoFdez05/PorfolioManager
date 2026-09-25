@@ -58,8 +58,8 @@
     user-select: none;
 }
 
-.assetsListHeader span:not(:first-child) {
-    text-align: right;
+.assetsListHeader span {
+    text-align: center;
 }
 
 .assetsList {
@@ -97,10 +97,12 @@
 .assetToolbar {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 10px 12px;
+    gap: 10px;
+    padding: 10px 14px;
     border-bottom: 1px solid var(--border-inset);
-    background: var(--bg-panel);
+    /* Mismo fondo que .topBar y .sideWrapper: la barra de tabs del sidebar es
+       la continuación visual de la cabecera superior, no un panel aparte. */
+    background: var(--bg-app);
     flex: 0 0 auto;
 }
 
@@ -238,6 +240,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: center;
     min-width: 0;
 }
 
@@ -248,7 +251,7 @@
     font-weight: 700;
     color: var(--text-bright);
     white-space: nowrap;
-    text-align: right;
+    text-align: center;
 }
 
 .assetBtnChange {
@@ -257,7 +260,7 @@
     font-size: 11px;
     color: var(--text-muted);
     white-space: nowrap;
-    text-align: right;
+    text-align: center;
 }
 
 .assetBtnChangePct {
@@ -266,7 +269,7 @@
     font-size: 11px;
     color: var(--text-muted);
     white-space: nowrap;
-    text-align: right;
+    text-align: center;
 }
 
 .assetBtnPrice,
@@ -292,7 +295,13 @@
     gap: 8px;
     border-top: 1px solid var(--border-mid);
     background: var(--bg-panel);
-    flex: 0 0 auto;
+    /* Altura por defecto fija (no "auto"): con el gráfico + 8 tarjetas de
+       stats el contenido real mide ~535px, y mostrarlo entero de entrada
+       dejaba la ficha empujada al fondo del sidebar. El resto queda a un
+       scroll dentro de la propia ficha (overflow-y). Arrastrando el tirador
+       (detailResizeHandle) se pisa este valor hasta DETAIL_MAX en
+       initResizeHandles (app-core.js). */
+    flex: 0 0 340px;
     overflow-y: auto;
     min-height: 0;
 }

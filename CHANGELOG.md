@@ -22,6 +22,78 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.5.0] — 2026-09-25
+
+**Esquema de base de datos:** no lo toca (sigue en la versión **7**). Para
+deshacer la actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Añadido
+
+**TradingView como quinto proveedor de cotizaciones.** Se puede buscar y
+enlazar un ticker de TradingView (`NASDAQ:AAPL`, `BINANCE:BTCUSDT`,
+`XETR:SAP`...) igual que ya se hacía con Finnhub, EODHD, Yahoo Finance o
+Alpha Vantage: un botón **Buscar TradingView** más en el alta y la edición de
+activos, que sale el primero si el activo todavía no tiene proveedor elegido,
+o el que ya tenga guardado si se está editando uno existente. No necesita API
+key ni cuenta. Buscar o pegar un ticker con mercado (`BITVAVO:BTCEUR`) filtra
+por ese mercado en vez de tratar los dos puntos como texto suelto, así que
+encuentra el activo correcto y no uno de otro mercado con el mismo símbolo.
+El **gráfico embebido de la ficha** (el iframe de TradingView, también el del
+diálogo «Gráfico» del panel lateral) usa ese mismo ticker de mercado cuando el
+activo no tiene un «Ticker TradingView» propio puesto a mano: antes, un activo
+dado de alta con este proveedor nuevo se quedaba sin esa rama y el iframe
+cargaba el símbolo del activo en vez de un ticker real de TradingView, así que
+el gráfico salía en blanco o con el instrumento equivocado. Ajustes › Datos ya
+incluye TradingView en el diagnóstico de proveedores.
+
+**Mapas: periodo «Todo» en el mapa de la cuenta.** Junto a Día, Semana, Mes,
+Año e YTD, un botón **Todo** que pinta cada posición con su rendimiento desde
+que se compró hasta hoy: valor actual contra invertido, los mismos números que
+el P/L de la ficha. La baldosa lleva el % y los euros ganados o perdidos, el
+resumen de arriba suma el total de lo filtrado y la escala de color llega al
+±50 %. Solo aparece en **Cuenta**: en **Activos** no hay una fecha de compra
+común, y si estaba elegido al cambiar, el mapa vuelve a **Día**.
+
+### Cambiado
+
+**Cotizaciones: caché y respaldo entre proveedores.** Antes de pedir una
+cotización se mira primero si hay un dato reciente en memoria (30 segundos por
+defecto, ajustable en `config.ini` › `[mercado] cotizacion_ttl_segundos`): si
+dashboard, cartera y gráfico piden el mismo activo casi a la vez, solo la
+primera petición llega de verdad al proveedor. Si el proveedor elegido falla
+por algo temporal (caída, límite de peticiones) y el ticker no está atado a la
+sintaxis de un proveedor concreto, se prueba automáticamente con los demás en
+vez de devolver el error directamente; un proveedor que acaba de dar un 429 se
+evita 5 minutos antes de volver a intentarlo, para no perder cuota gratuita en
+peticiones que ya se sabe que van a fallar. El botón **Actualizar cotización**
+de la ficha de un activo pide siempre un dato fresco, sin pasar por esa caché.
+
+**Planes: el reparto por activo pasa a ser una dona.** Una porción por activo
+con lo que tiene planificado, el total del plan en el centro y una leyenda con
+el % del plan y el importe de cada uno, en el mismo orden que la tabla. Cada
+activo sale con su color propio si lo tiene, y si no con la paleta de
+Métricas. Lo realizado de cada activo está en el tooltip de su porción y en el
+de su fila de la leyenda.
+
+### Corregido
+
+**Precio medio de las operaciones spot completadas, otra vez en el precio de
+ejecución.** La 2.2.0 pasó a valorar el lote con el «Total» de la operación
+dando por hecho que va sin la comisión en €, pero ese campo se teclea a mano y
+muchas veces la lleva dentro: una compra a 65.000 € con 0,45 € de comisión y
+Total 299,70 € sumaba la comisión dos veces y el precio medio salía en
+65.097,69 €. Vuelve el criterio de la 2.1.4: precio de orden × cantidad más la
+comisión en €. El Total solo se usa si la operación no tiene precio.
+
+**Herramientas: la tarjeta de parámetros y la de resultados no medían igual.**
+Con la vista todavía sin calcular, la tarjeta de la izquierda —cuatro o cinco
+campos— solía ser más alta que el aviso de la derecha, así que las dos
+terminaban en alturas distintas y quedaba un hueco vacío junto a la más corta.
+Ahora ambas ocupan el alto de la fila.
+
 ## [2.4.0] — 2026-09-24
 
 **Esquema de base de datos:** no lo toca (sigue en la versión **7**). Para

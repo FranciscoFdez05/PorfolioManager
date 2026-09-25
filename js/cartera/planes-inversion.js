@@ -32,12 +32,31 @@ const PINV_ACTIVOS_VISIBLES = 5
 const PINV_COLOR_REALIZADO = "#2ecc71"
 const PINV_COLOR_PENDIENTE = "#3b82f6"
 
+// Porciones del reparto por activo, cuando el activo no tiene color propio.
+// Es el arranque de la paleta de Métricas, para que un mismo plan se vea igual
+// en las dos páginas.
+const PINV_PALETA_REPARTO = [
+    "#3a7bd5",
+    "#f7931a",
+    "#2ecc71",
+    "#e74c3c",
+    "#9b59b6",
+    "#1abc9c",
+    "#e67e22",
+    "#00bcd4",
+    "#8bc34a",
+    "#ff5722",
+    "#e91e63",
+    "#673ab7"
+]
+
 let _pinvPlanes = []
 let _pinvActivos = []
 let _pinvOperaciones = []
 let _pinvPlanActual = null
 let _pinvDesplegados = new Set()
 let _pinvChart = null
+let _pinvRepartoChart = null
 
 // Recalcula el difuminado de los bordes de la fila de planes. La deja puesta
 // initScrollLateral() al montar la página.
@@ -76,7 +95,8 @@ async function pinvCargarTodo() {
             type: String(activo.type || "")
                 .trim()
                 .toLowerCase(),
-            currency: String(activo.currency || "EUR").trim()
+            currency: String(activo.currency || "EUR").trim(),
+            color: String(activo.color || "").trim()
         }))
         .filter((activo) => activo.id && activo.name)
         .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }))
@@ -617,52 +637,105 @@ function pinvRenderChart(calculo) {
 
 // ── Reparto por activo ───────────────────────────────────────────────────────
 
+function pinvColorReparto(activo, indice) {
+    return activo.activo?.color || PINV_PALETA_REPARTO[indice % PINV_PALETA_REPARTO.length]
+}
+
 /**
- * Una barra por activo: la longitud dice cuánto pesa dentro del plan y el
- * relleno verde, cuánto de ese activo está ya comprado.
- *
- * El ancho es proporcional al activo más grande y no al total del plan: con
- * cinco activos, repartir sobre el total deja a todos en barritas del 20 % y
- * no se aprecia cuál manda. Así el mayor llena la fila y los demás se leen
- * contra él.
- *
- * El orden es el del plan, el mismo de la tabla de la izquierda, para poder
- * mirar las dos cosas a la vez sin traducir posiciones.
+ * Dona con una porción por activo según lo que tiene planificado, y el total
+ * del plan en el centro. La leyenda va en el orden del plan, el mismo de la
+ * tabla de la izquierda, para poder mirar las dos cosas a la vez sin traducir
+ * posiciones. Lo realizado de cada activo sale en el tooltip y en el title de
+ * su fila.
  */
 function pinvRenderReparto(calculo) {
     const contenedor = document.getElementById("pinvReparto")
     const tarjeta = document.getElementById("pinvRepartoCard")
+    const canvas = document.getElementById("pinvRepartoChart")
+    const centro = document.getElementById("pinvRepartoCenter")
     if (!contenedor || !tarjeta) return
+
+    if (_pinvRepartoChart) {
+        _pinvRepartoChart.destroy()
+        _pinvRepartoChart = null
+    }
 
     const activos = calculo?.activos || []
     tarjeta.classList.toggle("hidden", !activos.length)
     if (!activos.length) {
         contenedor.innerHTML = ""
+        if (centro) centro.innerHTML = ""
         return
     }
 
-    const mayor = Math.max(...activos.map((activo) => activo.planificadoEur))
+    const total = calculo.planificadoEur
+    const colores = activos.map(pinvColorReparto)
+    const pctDelPlan = (activo) => (total > 0 ? (activo.planificadoEur / total) * 100 : 0)
+
+    if (centro) {
+        centro.innerHTML =
+            total > 0
+                ? `<span class="pinvRepartoTotal pinvMoney">${pinvEuros(total)}</span><span class="pinvChartSub">planificado</span>`
+                : `<span class="pinvChartSub">Sin importes</span>`
+    }
 
     contenedor.innerHTML = activos
-        .map((activo) => {
-            const peso = mayor > 0 ? (activo.planificadoEur / mayor) * 100 : 0
-            const hecho = activo.planificadoEur > 0 ? (activo.realizadoEur / activo.planificadoEur) * 100 : 0
+        .map((activo, indice) => {
             const detalle = `${activo.nombre}: ${pinvEuros(activo.realizadoEur)} de ${pinvEuros(activo.planificadoEur)} (${pinvPorcentaje(activo.pctInvertido)} realizado)`
 
             return `
-            <div class="pinvRepartoFila" title="${escapeAttr(detalle)}">
-                <div class="pinvRepartoCab">
-                    <span class="pinvRepartoNombre">${escapeHtml(activo.nombre)}</span>
-                    <span class="pinvRepartoValor pinvMoney">${activo.planificadoEur > 0 ? pinvEuros(activo.planificadoEur) : "—"}</span>
-                </div>
-                <div class="pinvRepartoCarril">
-                    <div class="pinvRepartoBarra" style="width:${peso.toFixed(2)}%">
-                        <span class="pinvRepartoHecho" style="width:${hecho.toFixed(2)}%"></span>
-                    </div>
-                </div>
+            <div class="pinvLegendRow pinvRepartoFila" title="${escapeAttr(detalle)}">
+                <span class="pinvLegendDot" style="background:${colores[indice]}"></span>
+                <span class="pinvRepartoNombre">${escapeHtml(activo.nombre)}</span>
+                <span class="pinvLegendPct">${total > 0 ? pinvPorcentaje(pctDelPlan(activo)) : "—"}</span>
+                <span class="pinvLegendVal pinvRepartoValor pinvMoney">${activo.planificadoEur > 0 ? pinvEuros(activo.planificadoEur) : "—"}</span>
             </div>`
         })
         .join("")
+
+    if (!canvas || total <= 0 || typeof Chart !== "function") return
+
+    _pinvRepartoChart = new Chart(canvas, {
+        type: "doughnut",
+        data: {
+            labels: activos.map((activo) => activo.nombre),
+            datasets: [
+                {
+                    data: activos.map((activo) => activo.planificadoEur),
+                    backgroundColor: colores,
+                    borderWidth: 0,
+                    hoverOffset: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "68%",
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    displayColors: false,
+                    // Opaco, como el de la dona de arriba: el total del centro
+                    // se transparentaba con el fondo por defecto.
+                    backgroundColor: "#0b1120",
+                    borderColor: "#273246",
+                    borderWidth: 1,
+                    padding: 10,
+                    callbacks: {
+                        title: (items) => items[0]?.label || "",
+                        label: (item) => {
+                            const activo = activos[item.dataIndex]
+                            return [
+                                `${pinvEuros(activo.planificadoEur)} · ${pinvPorcentaje(pctDelPlan(activo))} del plan`,
+                                `Realizado: ${pinvEuros(activo.realizadoEur)} (${pinvPorcentaje(activo.pctInvertido)})`
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+    })
 }
 
 // ── Render ───────────────────────────────────────────────────────────────────

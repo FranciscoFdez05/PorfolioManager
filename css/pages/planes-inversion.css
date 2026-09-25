@@ -622,62 +622,20 @@
     display: none;
 }
 
-.pinvReparto {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.pinvRepartoFila {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.pinvRepartoCab {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 0.8rem;
-}
-
-.pinvRepartoNombre {
-    color: var(--text-subtle);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.pinvRepartoValor {
-    flex-shrink: 0;
+/* Más pequeño que el % de la dona de arriba: un importe de cuatro cifras con
+   decimales no cabe a ese tamaño dentro del hueco. */
+.pinvRepartoTotal {
+    font-size: 1.1rem;
     font-weight: 700;
     color: var(--text-primary);
     font-variant-numeric: tabular-nums;
 }
 
-/* El carril es el ancho del activo mayor; la barra, lo que pesa este dentro
-   del plan; y el relleno, la parte que ya está comprada. */
-.pinvRepartoCarril {
-    height: 8px;
-    border-radius: 4px;
-    background: rgba(148, 163, 184, 0.16);
+.pinvRepartoNombre {
+    min-width: 0;
     overflow: hidden;
-}
-
-.pinvRepartoBarra {
-    position: relative;
-    height: 100%;
-    min-width: 2px;
-    border-radius: 4px;
-    background: #3b82f6;
-}
-
-.pinvRepartoHecho {
-    display: block;
-    height: 100%;
-    border-radius: 4px;
-    background: #2ecc71;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ── Popup: crear / editar plan ── */

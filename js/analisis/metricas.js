@@ -21,6 +21,8 @@ let _metricasDisplayType = "doughnut"
 let _metricasDistMetric = "netoActualEur"
 let _metricasGastosMonth = getChartPref("metricasGastosMonth", "all")
 let _metricasIngresosMonth = getChartPref("metricasIngresosMonth", "all")
+let _metricasSaldoMesMonth = getChartPref("metricasSaldoMesMonth", null)
+let _mSaldoMesCache = null
 let _metricasPayload = null
 let _metricasSortKey = getChartPref("metricasSortKey", "netoActualEur")
 let _metricasSortDir = getChartPref("metricasSortDir", "desc")
@@ -152,6 +154,47 @@ function mCreateChart(id, config) {
     if (!canvas) return
     mDestroyChart(id)
     _metricasCharts[id] = new Chart(canvas, config)
+}
+
+// Iguala el alto de las dos tarjetas de cada fila de gráficos: si una trae
+// una cabecera extra (toggle de meses, filtros de tipo...) que la otra no
+// tiene, su canvas queda más bajo sin ningún motivo relacionado con los
+// datos. Solo actúa en las filas marcadas con "mChartsGridEqualize" en el
+// HTML — las que tienen un gráfico "dinámico" de verdad (crece con el número
+// de filas, como Renta Fija/Bonos por instrumento o Rendimiento por activo:
+// también usan la clase metricasChartDynamic, pero ahí para el alto mínimo,
+// no para marcar que haya que igualar) se quedan fuera a propósito, porque
+// estirar la tarjeta corta dejaría un hueco vacío debajo — el motivo del
+// align-items:start de .metricasChartsGrid2 en metricas.css.
+function mEqualizeChartRowHeights() {
+    document.querySelectorAll(".metricasChartsGrid2.mChartsGridEqualize").forEach((grid) => {
+        const cards = [...grid.children].filter((c) => c.classList.contains("metricasChartCard"))
+        if (cards.length !== 2) return
+        if (cards.some((c) => c.offsetParent === null)) return
+
+        const wraps = cards.map((c) => c.querySelector(".metricasChartWrap"))
+        if (wraps.some((w) => !w)) return
+
+        // Vuelve a su alto base antes de medir: si no, un ajuste de una
+        // renderización anterior (otro año, otro mes, otra leyenda) se queda
+        // pegado aunque ya no haga falta.
+        wraps.forEach((w) => {
+            if (w.dataset.mBaseHeight === undefined) w.dataset.mBaseHeight = w.style.height || ""
+            w.style.height = w.dataset.mBaseHeight
+        })
+
+        const heights = cards.map((c) => c.getBoundingClientRect().height)
+        const diff = Math.round(Math.abs(heights[0] - heights[1]))
+        if (diff < 2) return
+
+        const shortIdx = heights[0] < heights[1] ? 0 : 1
+        const wrap = wraps[shortIdx]
+        const current = wrap.getBoundingClientRect().height
+        wrap.style.height = Math.round(current + diff) + "px"
+
+        const canvas = wrap.querySelector("canvas")
+        if (canvas?.id && _metricasCharts[canvas.id]) _metricasCharts[canvas.id].resize()
+    })
 }
 
 function mSetKpi(id, value, cls = "") {
@@ -716,6 +759,8 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
             }
         })
     }
+
+    mEqualizeChartRowHeights()
 }
 
 function mRenderRendTipos(summaries) {
@@ -1742,13 +1787,12 @@ function mRenderGastosCharts(yearData, totalMes, totalTipo) {
         },
         options: {
             ...M_CHART_DEFAULTS,
-            indexAxis: "y",
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
                 legend: { display: false },
                 tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
             },
-            scales: { x: mAxisX(), y: mAxisY(11) }
+            scales: { x: mAxisY(11), y: mAxisX() }
         }
     })
 
@@ -1779,6 +1823,8 @@ function mRenderGastosCharts(yearData, totalMes, totalTipo) {
 
         mRenderGastosTipoChart(monthTipo)
     }
+
+    mEqualizeChartRowHeights()
 }
 
 const M_GASTOS_TIPO_PALETTE = [
@@ -2255,13 +2301,12 @@ function mRenderIngresosCharts(ingresosYearData) {
         },
         options: {
             ...M_CHART_DEFAULTS,
-            indexAxis: "y",
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
                 legend: { display: false },
                 tooltip: { callbacks: { label: (c) => ` ${formatEuro(c.raw)}` } }
             },
-            scales: { x: mAxisX(), y: mAxisY(11) }
+            scales: { x: mAxisY(11), y: mAxisX() }
         }
     })
 
@@ -2298,6 +2343,8 @@ function mRenderIngresosCharts(ingresosYearData) {
     } else {
         mDestroyChart("mChartIngresosTipo")
     }
+
+    mEqualizeChartRowHeights()
 }
 
 function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
@@ -2748,6 +2795,187 @@ function mDrawComparativaLineChart(ingMonthly, gastosMonthly) {
             }
         }
     })
+}
+
+// ── evolución del saldo durante el mes ─────────────────────────────────────
+
+// Día a día: arranca en los ingresos del mes y va restando cada gasto en su
+// fecha; si un día no tiene gastos, el saldo se mantiene igual que el anterior.
+function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey) {
+    const monthIdx = M_GASTOS_KEYS.indexOf(monthKey)
+    const daysInMonth = new Date(Number(year), monthIdx + 1, 0).getDate()
+
+    let startBalance = 0
+    ;(ingresosYearData?.recurrentes || []).forEach((r) => {
+        startBalance += parseEuroNumber(r.meses?.[monthKey] || "")
+    })
+    ;(ingresosYearData?.months?.[monthKey]?.rows || []).forEach((r) => {
+        startBalance += parseEuroNumber(r.cantidad || "")
+    })
+
+    const gastoPorDia = Object.fromEntries(Array.from({ length: daysInMonth }, (_, i) => [i + 1, 0]))
+
+    if (isMensualidadMonthActive(gastosYearData, monthKey)) {
+        const mens = (gastosYearData?.mensualidades || []).reduce(
+            (s, m) => s + parseEuroNumber(m.meses?.[monthKey] || ""),
+            0
+        )
+        if (mens > 0) gastoPorDia[1] += mens
+    }
+    ;(gastosYearData?.months?.[monthKey]?.rows || []).forEach((row) => {
+        const val = parseEuroNumber(row.cantidad || "")
+        if (val <= 0) return
+        const day = parseInt((row.fecha || "").split("-")[0], 10)
+        gastoPorDia[day >= 1 && day <= daysInMonth ? day : 1] += val
+    })
+
+    const dayLabels = ["Inicio"]
+    const balances = [startBalance]
+    let running = startBalance
+    for (let d = 1; d <= daysInMonth; d++) {
+        running -= gastoPorDia[d] || 0
+        dayLabels.push(String(d))
+        balances.push(running)
+    }
+
+    return { dayLabels, balances, startBalance }
+}
+
+function mRenderSaldoMesChart(ingresosYearData, gastosYearData, year, monthKey) {
+    const { dayLabels, balances, startBalance } = mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey)
+
+    const notaEl = document.getElementById("mSaldoMesNota")
+    if (notaEl) {
+        const finBalance = balances[balances.length - 1]
+        notaEl.textContent = `Saldo inicial: ${formatEuro(startBalance)} · Saldo final: ${formatEuro(finBalance)}`
+    }
+
+    mCreateChart("mChartSaldoMes", {
+        type: "line",
+        data: {
+            labels: dayLabels,
+            datasets: [
+                {
+                    label: "Saldo",
+                    data: balances,
+                    stepped: true,
+                    borderColor: "#3a7bd5",
+                    backgroundColor: "rgba(58,123,213,0.14)",
+                    borderWidth: 2.5,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointBackgroundColor: "#3a7bd5",
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            ...M_CHART_DEFAULTS,
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+                ...M_CHART_DEFAULTS.plugins,
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: (items) => (items[0].label === "Inicio" ? "Inicio de mes" : `Día ${items[0].label}`),
+                        label: (c) => ` Saldo: ${formatEuro(c.raw)}`
+                    }
+                }
+            },
+            scales: {
+                x: mAxisX(),
+                y: { ...mAxisY(), ticks: { color: "#8899bb", callback: (v) => formatEuro(v) } }
+            }
+        }
+    })
+}
+
+function mSaldoMesDefaultMonth(year) {
+    const now = new Date()
+    if (Number(year) === now.getFullYear()) return M_GASTOS_KEYS[now.getMonth()]
+    return "enero"
+}
+
+function mRenderSaldoMes(ingresosYearsList, ingresosYearData, gastosYearData) {
+    const section = document.getElementById("mSectionSaldoMes")
+    if (!ingresosYearsList.length || !ingresosYearData) {
+        if (section) section.classList.add("hidden")
+        return
+    }
+    if (section) section.classList.remove("hidden")
+
+    const year = ingresosYearData.year
+    _mSaldoMesCache = { ingresosYearData, gastosYearData }
+
+    if (!_metricasSaldoMesMonth || !M_GASTOS_KEYS.includes(_metricasSaldoMesMonth)) {
+        _metricasSaldoMesMonth = mSaldoMesDefaultMonth(year)
+    }
+
+    const yearToggle = document.getElementById("mSaldoMesYearToggle")
+    if (yearToggle && !yearToggle.dataset.bound) {
+        yearToggle.dataset.bound = "true"
+        yearToggle.innerHTML = ingresosYearsList
+            .map((y) => `<button class="mToggleBtn${String(y) === String(year) ? " active" : ""}" data-saldomesyear="${y}">${y}</button>`)
+            .join("")
+        yearToggle.addEventListener("click", async (e) => {
+            const btn = e.target.closest("[data-saldomesyear]")
+            if (!btn) return
+            yearToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
+            btn.classList.add("active")
+            const newYear = btn.dataset.saldomesyear
+            _metricasSaldoMesMonth = mSaldoMesDefaultMonth(newYear)
+            setChartPref("metricasSaldoMesMonth", _metricasSaldoMesMonth)
+            const [newIng, newGas] = await Promise.all([
+                fetch(`/api/ingresos/${newYear}`)
+                    .then((r) => r.json())
+                    .catch(() => null),
+                fetch(`/api/gastos/${newYear}`)
+                    .then((r) => r.json())
+                    .catch(() => null)
+            ])
+            if (newIng) {
+                const monthToggle = document.getElementById("mSaldoMesMonthToggle")
+                if (monthToggle) {
+                    monthToggle.dataset.bound = ""
+                    monthToggle.innerHTML = ""
+                }
+                mRenderSaldoMes(ingresosYearsList, newIng, newGas)
+            }
+        })
+    } else if (yearToggle) {
+        yearToggle
+            .querySelectorAll(".mToggleBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.saldomesyear === String(year)))
+    }
+
+    const monthToggle = document.getElementById("mSaldoMesMonthToggle")
+    if (monthToggle && !monthToggle.dataset.bound) {
+        monthToggle.dataset.bound = "true"
+        monthToggle.innerHTML = M_GASTOS_KEYS.map(
+            (k, i) =>
+                `<button class="mToggleBtn${_metricasSaldoMesMonth === k ? " active" : ""}" data-saldomesmonth="${k}">${M_GASTOS_LABELS[i]}</button>`
+        ).join("")
+        monthToggle.addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-saldomesmonth]")
+            if (!btn) return
+            monthToggle.querySelectorAll(".mToggleBtn").forEach((b) => b.classList.remove("active"))
+            btn.classList.add("active")
+            _metricasSaldoMesMonth = btn.dataset.saldomesmonth
+            setChartPref("metricasSaldoMesMonth", _metricasSaldoMesMonth)
+            mRenderSaldoMesChart(
+                _mSaldoMesCache?.ingresosYearData,
+                _mSaldoMesCache?.gastosYearData,
+                _mSaldoMesCache?.ingresosYearData?.year,
+                _metricasSaldoMesMonth
+            )
+        })
+    } else if (monthToggle) {
+        monthToggle
+            .querySelectorAll(".mToggleBtn")
+            .forEach((b) => b.classList.toggle("active", b.dataset.saldomesmonth === _metricasSaldoMesMonth))
+    }
+
+    mRenderSaldoMesChart(ingresosYearData, gastosYearData, year, _metricasSaldoMesMonth)
 }
 
 // ── concentración top 10 ──────────────────────────────────────────────────
@@ -3403,22 +3631,10 @@ function mDrawAnualBarras(resumen) {
         }
     ]
 
-    if (!esPct) {
-        datasets.push({
-            label: "Tasa de ahorro (%)",
-            data: resumen.map((r) => (r.tasa !== null ? parseFloat(r.tasa.toFixed(1)) : null)),
-            type: "line",
-            borderColor: "#3a7bd5",
-            backgroundColor: "rgba(58,123,213,0.08)",
-            borderWidth: 2,
-            pointRadius: 4,
-            pointBackgroundColor: "#3a7bd5",
-            tension: 0.35,
-            spanGaps: false,
-            yAxisID: "yPct"
-        })
-    }
-
+    // La tasa de ahorro vive en el tooltip y como etiqueta sobre la barra de
+    // Ahorrado, no en un segundo eje: un gráfico con dos escalas (€ y %)
+    // inventa una correlación en la alineación de ambas que no está en los
+    // datos.
     const scales = esPct
         ? {
               x: { ...mAxisX(), stacked: true },
@@ -3435,21 +3651,40 @@ function mDrawAnualBarras(resumen) {
                   position: "left",
                   ticks: { color: "#ccd6f6", callback: (v) => formatEuro(v) },
                   grid: { color: "rgba(255,255,255,0.06)" }
-              },
-              yPct: {
-                  type: "linear",
-                  position: "right",
-                  ticks: { color: "#8899bb", callback: (v) => v.toFixed(0) + "%" },
-                  grid: { display: false }
               }
           }
+
+    // Etiqueta selectiva (una por barra, solo en € — en % ya se lee directo
+    // en el eje) con la tasa de ahorro encima de la barra de Ahorrado.
+    const tasaLabelPlugin = {
+        id: "mAnualTasaLabel",
+        afterDatasetsDraw(chart) {
+            if (esPct) return
+            const meta = chart.getDatasetMeta(1)
+            const { ctx } = chart
+            ctx.save()
+            ctx.font = "600 11px system-ui, -apple-system, sans-serif"
+            ctx.fillStyle = "#8899bb"
+            ctx.textAlign = "center"
+            meta.data.forEach((bar, i) => {
+                const r = resumen[i]
+                if (!r || r.tasa === null) return
+                ctx.textBaseline = r.ahorrado >= 0 ? "bottom" : "top"
+                const y = r.ahorrado >= 0 ? bar.y - 6 : bar.y + 6
+                ctx.fillText(`${r.tasa.toFixed(0)} %`, bar.x, y)
+            })
+            ctx.restore()
+        }
+    }
 
     mCreateChart("mChartAnualBarras", {
         type: "bar",
         data: { labels, datasets },
+        plugins: [tasaLabelPlugin],
         options: {
             ...M_CHART_DEFAULTS,
             interaction: { mode: "index", intersect: false },
+            layout: esPct ? {} : { padding: { top: 18 } },
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
                 tooltip: {
@@ -3460,14 +3695,16 @@ function mDrawAnualBarras(resumen) {
                     callbacks: {
                         label: (c) => {
                             if (c.raw === null) return ` ${c.dataset.label}: ---`
-                            if (esPct || c.dataset.yAxisID === "yPct")
-                                return ` ${c.dataset.label}: ${c.raw.toFixed(1).replace(".", ",")}%`
+                            if (esPct) return ` ${c.dataset.label}: ${c.raw.toFixed(1).replace(".", ",")}%`
                             return ` ${c.dataset.label}: ${formatEuro(c.raw)}`
                         },
                         afterBody: (items) => {
                             const r = resumen[items[0]?.dataIndex]
                             if (!r) return []
-                            return [`Ingresos: ${formatEuro(r.ingresos)}`]
+                            const tasa = r.tasa !== null ? `${r.tasa.toFixed(1).replace(".", ",")} %` : "---"
+                            return esPct
+                                ? [`Ingresos: ${formatEuro(r.ingresos)}`]
+                                : [`Ingresos: ${formatEuro(r.ingresos)}`, `Tasa de ahorro: ${tasa}`]
                         }
                     }
                 }
@@ -4048,6 +4285,7 @@ function mRenderAll(payload) {
     mRenderIngresos(ingresosYearData || null)
     mRenderIngresosSection(ingresosYearsList || [], ingresosYearData || null)
     mRenderComparativa(ingresosYearData || null, gastosYearData || null)
+    mRenderSaldoMes(ingresosYearsList || [], ingresosYearData || null, gastosYearData || null)
     mRenderTopTable(summaries)
     mRenderTrading(tradingRows || [])
     const liveValue = summaries.reduce((s, a) => s + a.netoActualEur, 0)
@@ -4391,6 +4629,7 @@ async function initMetricasLogic() {
     // sección valida después el año/mes contra los que existan en sus datos.
     _metricasGastosMonth = getChartPref("metricasGastosMonth", "all")
     _metricasIngresosMonth = getChartPref("metricasIngresosMonth", "all")
+    _metricasSaldoMesMonth = getChartPref("metricasSaldoMesMonth", null)
     _metricasInteresesYear = getChartPref("metricasInteresesYear", null)
     _metricasDivMensualYear = getChartPref("metricasDivMensualYear", null)
     _metricasDivYear = getChartPref("metricasDivYear", null)
@@ -4407,6 +4646,7 @@ async function initMetricasLogic() {
     _metricasComparativaExclude = new Set(window._metricasComparativaExcluded || [])
     _metricasSectionsCollapsed = new Set(window._metricasSectionsCollapsed || [])
     _mGastosChartsCache = null
+    _mSaldoMesCache = null
     _metricasPayload = null
 
     const loading = document.getElementById("metricasLoading")

@@ -159,7 +159,7 @@
                 <button class="mToggleBtn" data-charttype="bar">Barras</button>
             </div>
         </div>
-        <div class="metricasChartsGrid2">
+        <div class="metricasChartsGrid2 mChartsGridEqualize">
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Por tipo de activo</div>
                 <div class="metricasChartWrap" style="height:280px">
@@ -601,7 +601,7 @@
                 <div class="mToggleGroup" id="mGastosYearToggle"></div>
             </div>
         </div>
-        <div class="metricasChartsGrid2">
+        <div class="metricasChartsGrid2 mChartsGridEqualize">
             <div class="metricasChartCard">
                 <div class="metricasChartTitle" id="mGastosMesTitle">Gastos por mes</div>
                 <div class="metricasChartWrap metricasChartDynamic" id="mChartGastosMesWrap">
@@ -671,7 +671,7 @@
                 <div class="mToggleGroup" id="mIngresosYearToggle"></div>
             </div>
         </div>
-        <div class="metricasChartsGrid2">
+        <div class="metricasChartsGrid2 mChartsGridEqualize">
             <div class="metricasChartCard">
                 <div class="metricasChartTitle" id="mIngresosMesTitle">Ingresos por mes</div>
                 <div class="metricasChartWrap metricasChartDynamic" id="mChartIngresosMesWrap">
@@ -711,6 +711,25 @@
                 <div class="metricasChartWrap" style="height:260px">
                     <canvas id="mChartComparativaLinea"></canvas>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- -- Evolución del saldo durante el mes -------------------- -->
+    <div class="metricasSection" id="mSectionSaldoMes" data-mcat="ingresos">
+        <div class="metricasSectionHeader">
+            <div class="mGastosHeaderLeft">
+                <span class="metricasSectionTitle">Evolución del saldo durante el mes</span>
+                <div class="mToggleGroup" id="mSaldoMesYearToggle"></div>
+            </div>
+        </div>
+        <div class="mGastosMonthToggle" id="mSaldoMesMonthToggle"></div>
+        <div class="metricasChartsGrid1">
+            <div class="metricasChartCard">
+                <div class="metricasChartWrap" style="height:300px">
+                    <canvas id="mChartSaldoMes"></canvas>
+                </div>
+                <div class="mChartNota" id="mSaldoMesNota"></div>
             </div>
         </div>
     </div>

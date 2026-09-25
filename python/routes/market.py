@@ -13,6 +13,7 @@ from providers.finnhub_client import (
     fetch_exchange_rate,
     search_symbol,
 )
+from providers.tradingview_client import search_symbol as search_tradingview_symbol
 from providers.yahoo_finance_client import search_symbol as search_yahoo_symbol
 from stores import benchmark
 from stores.asset_store import listAssets
@@ -235,6 +236,20 @@ def searchAlphaVantageSymbol():
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})
+
+@market_bp.route("/api/tradingview/search", methods=["GET"])
+def searchTradingViewSymbol():
+    query = str(request.args.get("q", "")).strip()
+    assetName = str(request.args.get("assetName", "")).strip()
+    assetType = str(request.args.get("assetType", "")).strip()
+    results, error = search_tradingview_symbol(query, asset_name=assetName, preferred_asset_type=assetType)
+
+    if error:
+        statusCode = 503 if is_temporary_service_error(error) else 400
+        return jsonify({"ok": False, "error": error}), statusCode
+
+    return jsonify({"ok": True, "results": results})
+
 
 @market_bp.route("/api/market/quote", methods=["GET"])
 def getMarketQuote():

@@ -202,6 +202,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const searchAssetTickerEodhdButton = document.getElementById("searchAssetTickerEodhdBtn")
     const searchAssetTickerYahooButton = document.getElementById("searchAssetTickerYahooBtn")
     const searchAssetTickerAlphaVantageButton = document.getElementById("searchAssetTickerAlphaVantageBtn")
+    const searchAssetTickerTradingViewButton = document.getElementById("searchAssetTickerTradingViewBtn")
     const confirmModalOverlay = document.getElementById("confirmModalOverlay")
     const confirmModalAcceptButton = document.getElementById("confirmModalAcceptBtn")
     const confirmModalCancelButton = document.getElementById("confirmModalCancelBtn")
@@ -222,7 +223,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         searchAssetTickerFinnhubButton,
         searchAssetTickerEodhdButton,
         searchAssetTickerYahooButton,
-        searchAssetTickerAlphaVantageButton
+        searchAssetTickerAlphaVantageButton,
+        searchAssetTickerTradingViewButton
     )
     initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirmModalCancelButton)
     applyDensidadSidebar(localStorage.getItem("portfolioDensity") || "normal")
@@ -1245,7 +1247,10 @@ function initResizeHandles() {
     const SIDE_MIN = 220
     const SIDE_MAX = 600
     const DETAIL_MIN = 80
-    const DETAIL_MAX = 520
+    // La ficha ahora lleva gráfico TradingView + 8 tarjetas de stats: a 520px
+    // se quedaba corta y el gráfico salía cortado a media altura. Con 720px
+    // cabe todo sin desplazar, para quien quiera arrastrar hasta el tope.
+    const DETAIL_MAX = 720
 
     const sideWrapper = document.getElementById("sideWrapper")
     const sideHandle = document.getElementById("sideResizeHandle")

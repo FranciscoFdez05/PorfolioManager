@@ -89,13 +89,18 @@ html[data-theme="black"] .sidebarFilterBtn.active {
     color: #f0f0f4;
 }
 html[data-theme="black"] .toggleButton {
-    background: #131316;
-    color: #dcdce8;
-    box-shadow: 0 0 0 1px #222228;
+    background: linear-gradient(180deg, #1c1c20, #131316);
+    color: #9a9aa8;
+    box-shadow:
+        -1px 0 0 #222228,
+        -6px 0 14px rgba(0, 0, 0, 0.35);
 }
 html[data-theme="black"] .toggleButton:hover {
-    background: #17171b;
-    box-shadow: 0 0 0 1px #2e2e36;
+    background: linear-gradient(180deg, #1e1e22, #17171b);
+    color: #f0f0f4;
+    box-shadow:
+        -1px 0 0 var(--accent),
+        -6px 0 18px var(--accent-glow);
 }
 html[data-theme="black"] .assetBtn {
     background: #17171b;
@@ -427,7 +432,9 @@ html[data-theme="light"] .sidePanel {
     color: #0f172a;
 }
 html[data-theme="light"] .assetToolbar {
-    background: #f8f9fa;
+    /* Mismo blanco que .topBar: la barra de tabs del sidebar continúa la
+       cabecera superior en vez de leerse como un panel aparte. */
+    background: #ffffff;
     border-color: #e2e8f0;
 }
 html[data-theme="light"] .assetsList {
@@ -506,14 +513,18 @@ html[data-theme="light"] .detailStatValue {
     color: #0f172a;
 }
 html[data-theme="light"] .toggleButton {
-    background: #f1f5f9;
-    border-color: #e2e8f0;
-    color: #475569;
-    box-shadow: 0 0 0 1px #e2e8f0;
+    background: linear-gradient(180deg, #ffffff, #f1f5f9);
+    color: #64748b;
+    box-shadow:
+        -1px 0 0 #e2e8f0,
+        -6px 0 14px rgba(15, 23, 42, 0.08);
 }
 html[data-theme="light"] .toggleButton:hover {
-    background: #e8edf5;
-    box-shadow: 0 0 0 1px #cbd5e1;
+    background: linear-gradient(180deg, #ffffff, #e8edf5);
+    color: #1e293b;
+    box-shadow:
+        -1px 0 0 var(--accent),
+        -6px 0 18px rgba(59, 130, 246, 0.18);
 }
 
 html[data-theme="light"] .mainContent,
@@ -1306,10 +1317,7 @@ html[data-theme="light"] .pinvEditorActivoNombre,
 html[data-theme="light"] .pinvArchivoNombre {
     color: #0f172a;
 }
-html[data-theme="light"] .pinvRepartoNombre {
-    color: #475569;
-}
-html[data-theme="light"] .pinvRepartoValor {
+html[data-theme="light"] .pinvRepartoTotal {
     color: #0f172a;
 }
 html[data-theme="light"] .pinvKpi,

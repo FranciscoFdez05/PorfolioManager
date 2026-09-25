@@ -149,6 +149,20 @@ def is_temporary_service_error(error):
     return any(fragment in normalized_error for fragment in ("conectar", "divisa", "tard", "timeout"))
 
 
+def is_rate_limited_error(error):
+    """Si el error es un 429/cuota agotada, y no otra cosa.
+
+    Los mensajes no llevan un código de error propio, así que se distingue por
+    los fragmentos que ya escriben `_mensaje_http` de cada cliente: "límite" y
+    "cuota" (EODHD, Finnhub) o el "429" que queda tal cual en los proveedores
+    sin traducción específica (Yahoo, Alpha Vantage). Sirve para marcar el
+    proveedor como de reposo un rato y no insistir con él en la próxima
+    cotización (ver `stores.market_data`).
+    """
+    normalized_error = str(error or "").lower()
+    return any(fragment in normalized_error for fragment in ("límite", "cuota", "429"))
+
+
 def convert_asset_rows_currency(rows, source_currency, target_currency, asset_type="", fields=None):
     converted_rows = []
     normalized_asset_type = str(asset_type or "").strip().lower()

@@ -250,18 +250,16 @@ describe("tabla de activos", () => {
 })
 
 describe("reparto por activo", () => {
-    it("pinta una barra por activo con su importe planificado", () => {
-        const filas = document.querySelectorAll(".pinvRepartoFila")
-
+    it("pinta una fila de leyenda por activo con su parte del plan", () => {
         expect(textos(".pinvRepartoNombre")).toEqual(["Bitcoin", "S&P 500"])
         expect(textos(".pinvRepartoValor")).toEqual(["1000,00 €", "1000,00 €"])
-        // La mitad de cada activo está comprada, así que el relleno va a la mitad.
-        expect(filas[0].querySelector(".pinvRepartoHecho").style.width).toBe("50%")
+        expect(textos(".pinvRepartoFila .pinvLegendPct")).toEqual(["50 %", "50 %"])
+        expect(document.querySelector(".pinvRepartoTotal").textContent).toBe("2000,00 €")
     })
 
-    it("la barra se mide contra el activo con más dinero, no contra el total", () => {
+    it("el porcentaje es sobre el total del plan", () => {
         // Bitcoin 200 € y S&P 500 dos mil dólares (1.000 € al cambio de la
-        // prueba): el mayor llena la fila y el otro queda a su proporción.
+        // prueba): 200 de 1.200 y 1.000 de 1.200.
         const plan = {
             id: "plan-x",
             nombre: "Pesos distintos",
@@ -274,8 +272,14 @@ describe("reparto por activo", () => {
 
         pinvRenderReparto(pinvCalcularPlan(plan))
 
-        const barras = [...document.querySelectorAll(".pinvRepartoBarra")].map((b) => b.style.width)
-        expect(barras).toEqual(["20%", "100%"])
+        expect(textos(".pinvRepartoFila .pinvLegendPct")).toEqual(["16,7 %", "83,3 %"])
+    })
+
+    it("cada activo tiene su color, y el propio del activo manda", () => {
+        const calculo = pinvCalcularPlan(PLAN)
+        expect(pinvColorReparto(calculo.activos[0], 0)).toBe(PINV_PALETA_REPARTO[0])
+        expect(pinvColorReparto(calculo.activos[1], 1)).toBe(PINV_PALETA_REPARTO[1])
+        expect(pinvColorReparto({ activo: { color: "#123456" } }, 0)).toBe("#123456")
     })
 
     it("el detalle del activo va en el title de la fila", () => {

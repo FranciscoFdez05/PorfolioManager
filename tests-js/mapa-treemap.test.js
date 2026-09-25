@@ -150,3 +150,25 @@ describe("hmMovimiento", () => {
         expect(hmMovimiento(500, -140)).toBeNull()
     })
 })
+
+describe("hmValorPeriodo", () => {
+    const POSICION = { id: "btc", dia: -1.6, hasCuenta: true, cuentaPct: 13.2 }
+
+    it("en «Todo» pinta el rendimiento desde la compra", () => {
+        expect(hmValorPeriodo(POSICION, "todo")).toBe(13.2)
+        // Sin invertido no hay rendimiento que enseñar.
+        expect(hmValorPeriodo({ ...POSICION, hasCuenta: false }, "todo")).toBeNull()
+    })
+
+    it("en el resto de periodos usa el día o el histórico", () => {
+        expect(hmValorPeriodo(POSICION, "dia")).toBe(-1.6)
+        expect(hmValorPeriodo(POSICION, "mes", { btc: 4 })).toBe(4)
+        expect(hmValorPeriodo(POSICION, "mes")).toBeNull()
+    })
+
+    it("el movimiento de «Todo» es valor actual menos invertido", () => {
+        // 339,34 € de valor sobre 300,15 € invertidos.
+        const pct = ((339.34 - 300.15) / 300.15) * 100
+        expect(hmMovimiento(339.34, pct)).toBeCloseTo(39.19, 6)
+    })
+})

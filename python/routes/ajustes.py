@@ -181,12 +181,14 @@ def _enmascarar_clave(clave):
 
     Con las puntas se distingue una clave de otra —que es lo que hace falta para
     saber cuál de ellas es la que está fallando— sin dejar el valor entero
-    legible en pantalla a la espalda de cualquiera.
+    legible en pantalla a la espalda de cualquiera. El relleno usa guiones y no
+    el carácter «•»: al borrar una clave hay que teclear esta máscara tal cual
+    para confirmar, y «•» no está en ningún teclado.
     """
     if len(clave) <= 8:
         # Demasiado corta para dejar puntas sin regalar media clave.
-        return "•" * len(clave)
-    return f"{clave[:4]}{'•' * 6}{clave[-4:]}"
+        return "-" * len(clave)
+    return f"{clave[:4]}{'-' * 6}{clave[-4:]}"
 
 
 def _read_key_file(path):

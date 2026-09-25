@@ -4,10 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from core import dinero, pnl_divisa
 from core.db import get_db
-from providers.alpha_vantage_client import fetch_quote as fetch_av_quote
-from providers.eodhd_client import fetch_quote as fetch_eodhd_quote
-from providers.finnhub_client import convert_amount, convert_quote_currency, fetch_quote
-from providers.yahoo_finance_client import fetch_quote as fetch_yahoo_quote
+from providers.finnhub_client import convert_amount, convert_quote_currency
 from stores.asset_store import (
     deleteAssetFile,
     getAssetFile,
@@ -29,15 +26,13 @@ from stores.asset_utils import (
     slugify,
 )
 from stores.helpers import (
-    call_alpha_vantage_with_fallbacks,
-    call_eodhd_with_fallbacks,
-    call_finnhub_with_fallbacks,
     convert_asset_rows_currency,
     format_decimal,
     is_temporary_service_error,
     normalize_currency_code,
     parse_loose_number,
 )
+from stores.market_data import fetch_asset_quote
 
 activos_bp = Blueprint("activos", __name__)
 
@@ -349,14 +344,7 @@ def refreshActivoMarketData(assetId):
     if not marketSymbol:
         return jsonify({"ok": False, "error": "El activo no tiene ticker de mercado configurado"}), 400
 
-    if marketProvider == "eodhd":
-        quote, error = call_eodhd_with_fallbacks(lambda apiKey: fetch_eodhd_quote(marketSymbol, apiKey))
-    elif marketProvider == "yahoo":
-        quote, error = fetch_yahoo_quote(marketSymbol)
-    elif marketProvider == "alphavantage":
-        quote, error = call_alpha_vantage_with_fallbacks(lambda apiKey: fetch_av_quote(marketSymbol, apiKey))
-    else:
-        quote, error = call_finnhub_with_fallbacks(lambda apiKey: fetch_quote(marketSymbol, apiKey))
+    quote, error = fetch_asset_quote(marketSymbol, marketProvider, use_cache=False)
 
     if error:
         statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400

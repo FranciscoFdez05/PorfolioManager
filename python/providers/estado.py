@@ -192,6 +192,17 @@ def _probar_yahoo():
     )
 
 
+def _probar_tradingview():
+    fetch_json(
+        "https://scanner.tradingview.com/global/scan",
+        timeout=_TIMEOUT, provider="TradingView", retries=0,
+        json_body={
+            "symbols": {"tickers": ["NASDAQ:AAPL"], "query": {"types": []}},
+            "columns": ["close"],
+        },
+    )
+
+
 def _probar_divisas():
     fetch_json(
         "https://api.frankfurter.app/latest",
@@ -206,6 +217,7 @@ _PROVEEDORES = (
     ("eodhd",        "EODHD",          _probar_eodhd),
     ("alphavantage", "Alpha Vantage",  _probar_alpha_vantage),
     ("yahoo",        "Yahoo Finance",  _probar_yahoo),
+    ("tradingview",  "TradingView",    _probar_tradingview),
     ("divisas",      "Tipo de cambio", _probar_divisas),
 )
 

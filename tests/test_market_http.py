@@ -154,3 +154,40 @@ def test_build_url_sin_parametros():
     assert build_url("http://api.test/x") == "http://api.test/x"
     assert build_url("http://api.test/x", {}) == "http://api.test/x"
     assert build_url("http://api.test/x", {"a": "1"}) == "http://api.test/x?a=1"
+
+
+def test_json_body_manda_post_con_el_cuerpo_serializado(monkeypatch):
+    # El scanner de TradingView (tradingview_client.py) es el único que pide
+    # POST con cuerpo JSON en vez de query string; el resto de proveedores
+    # siguen en GET sin tocar este camino.
+    peticiones = []
+
+    def fake_urlopen(request, timeout=None):
+        peticiones.append(request)
+        return json_response({"ok": 1})
+
+    monkeypatch.setattr(market_http, "urlopen", fake_urlopen)
+
+    resultado = fetch_json("http://api.test/scan", json_body={"symbols": ["AAPL"]})
+
+    assert resultado == {"ok": 1}
+    assert len(peticiones) == 1
+    peticion = peticiones[0]
+    assert peticion.get_method() == "POST"
+    assert peticion.get_header("Content-type") == "application/json"
+    assert json.loads(peticion.data.decode("utf-8")) == {"symbols": ["AAPL"]}
+
+
+def test_sin_json_body_sigue_siendo_get(monkeypatch):
+    peticiones = []
+
+    def fake_urlopen(request, timeout=None):
+        peticiones.append(request)
+        return json_response({"ok": 1})
+
+    monkeypatch.setattr(market_http, "urlopen", fake_urlopen)
+
+    fetch_json("http://api.test/quote", {"symbol": "AAPL"})
+
+    assert peticiones[0].get_method() == "GET"
+    assert peticiones[0].data is None

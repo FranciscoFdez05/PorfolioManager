@@ -112,7 +112,7 @@ def test_la_lista_trae_cada_clave_enmascarada_y_entera(cliente):
     claves = _listar(client)["claves"]
 
     assert [c["indice"] for c in claves] == [0, 1]
-    assert claves[0]["vista"] == "abcd••••••mnop"
+    assert claves[0]["vista"] == "abcd------mnop"
     assert claves[0]["clave"] == "abcdefghijklmnop"
     assert claves[0]["longitud"] == 16
 
@@ -132,7 +132,7 @@ def test_una_clave_corta_no_deja_ver_ni_las_puntas(cliente):
     client, cabeceras, _rutas = cliente
     _anadir_claves(client, cabeceras, "12345678")
 
-    assert _listar(client)["claves"][0]["vista"] == "•" * 8
+    assert _listar(client)["claves"][0]["vista"] == "-" * 8
 
 
 def test_los_tres_proveedores_salen_aunque_no_tengan_claves(cliente):

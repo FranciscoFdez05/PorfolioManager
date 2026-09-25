@@ -701,6 +701,22 @@ async function searchAlphaVantageSymbolOnServer(query, { assetName = "", assetTy
     return await response.json()
 }
 
+async function searchTradingViewSymbolOnServer(query, { assetName = "", assetType = "" } = {}) {
+    const params = new URLSearchParams({ q: query })
+
+    if (assetName) params.set("assetName", assetName)
+    if (assetType) params.set("assetType", assetType)
+
+    const response = await fetch(`/api/tradingview/search?${params.toString()}`)
+
+    if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    return await response.json()
+}
+
 function extractApiErrorMessage(error) {
     const rawMessage = String(error?.message || "Error desconocido")
     const jsonStart = rawMessage.indexOf("{")
@@ -756,6 +772,18 @@ async function saveAssetOrderOnServer(orderedAssetIds) {
     return await response.json()
 }
 
+// Compartido entre la fila del sidebar y la ficha inferior: misma cuenta,
+// mismo signo, para que "Var. hoy" no cuente una historia distinta de la lista.
+function buildChangeMoneyDisplay(asset, displayPrice, currency) {
+    const changePctStr = String(asset?.change || "").trim()
+    const changePct = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
+    const changeAbs = Math.abs((displayPrice * changePct) / 100)
+    const changeSign = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
+    const changeClass = changePct < 0 ? "negative" : changePct > 0 ? "positive" : ""
+    const moneyStr = changePctStr ? `${changeSign}${formatMoney(changeAbs, currency)}` : "—"
+    return { changePctStr, changePct, changeClass, moneyStr }
+}
+
 async function updateAssetDetail(asset) {
     const detSymbol = document.getElementById("detSymbol")
     const detName = document.getElementById("detName")
@@ -769,8 +797,12 @@ async function updateAssetDetail(asset) {
     const detFees = document.getElementById("detFees")
     const detStatus = document.getElementById("detStatus")
     const detFinnhub = document.getElementById("detFinnhub")
+    const detChangeAbs = document.getElementById("detChangeAbs")
+    const detWeight = document.getElementById("detWeight")
     const summary = await buildOverviewRow(asset)
     const pnlBruto = summary.netoActual - summary.invertidoBruto
+    const displayPrice = await getAssetDisplayPriceValue(asset)
+    const displayCurrency = asset.currency || "EUR"
 
     if (detSymbol) {
         detSymbol.textContent = asset.symbol || "---"
@@ -781,8 +813,7 @@ async function updateAssetDetail(asset) {
     }
 
     if (detPrice) {
-        const displayPrice = await getAssetDisplayPriceValue(asset)
-        detPrice.textContent = formatMoney(displayPrice, asset.currency || "EUR")
+        detPrice.textContent = formatMoney(displayPrice, displayCurrency)
     }
 
     if (detChange) {
@@ -831,6 +862,22 @@ async function updateAssetDetail(asset) {
         ).toUpperCase()
         const marketSymbol = asset.marketSymbol || asset.finnhubSymbol || "---"
         detFinnhub.textContent = `Ticker mercado: ${marketSymbol} · API: ${marketProvider}`
+    }
+
+    if (detChangeAbs) {
+        const { moneyStr, changeClass } = buildChangeMoneyDisplay(asset, displayPrice, displayCurrency)
+        detChangeAbs.textContent = moneyStr
+        detChangeAbs.classList.toggle("negative", changeClass === "negative")
+    }
+
+    if (detWeight) {
+        const totalCuenta = window._lastPortfolioMetrics?.totalCuenta || 0
+        if (totalCuenta > 0) {
+            const euroMetrics = await buildSummaryMetricsInEuros(summary)
+            detWeight.textContent = formatPercent((euroMetrics.netoActualEur / totalCuenta) * 100)
+        } else {
+            detWeight.textContent = "---"
+        }
     }
 
     _sidebarAssetActual = asset
@@ -1792,12 +1839,11 @@ function _crearBotonDeActivo(asset, displayPrice, displayCurrency, { isStale, en
         window._viewAllPortfolios && asset.portfolioName
             ? `<span class="assetPortfolioBadge">${escapeHtml(asset.portfolioName)}</span>`
             : ""
-    const changePctStr = String(asset.change || "").trim()
-    const changePct = parseLooseNumber(changePctStr.replace(/%/g, "")) || 0
-    const changeAbs = Math.abs((displayPrice * changePct) / 100)
-    const changeSign = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
-    const changeClass = changePct < 0 ? "negative" : changePct > 0 ? "positive" : ""
-    const changeMoneyStr = changePctStr ? `${changeSign}${formatMoney(changeAbs, displayCurrency)}` : "—"
+    const { changePctStr, changeClass, moneyStr: changeMoneyStr } = buildChangeMoneyDisplay(
+        asset,
+        displayPrice,
+        displayCurrency
+    )
 
     // El ⚠ solo marca fallos del proveedor. Un precio parado por la pausa no es
     // un problema —lo ha pedido el usuario en Ajustes—, así que se queda en
@@ -2060,6 +2106,19 @@ function resetAssetDetailView() {
     if (detFinnhub) {
         detFinnhub.textContent = "Ticker mercado: ---"
     }
+
+    const detChangeAbs = document.getElementById("detChangeAbs")
+    if (detChangeAbs) {
+        detChangeAbs.textContent = "0,00 €"
+        detChangeAbs.classList.remove("negative")
+    }
+
+    const detWeight = document.getElementById("detWeight")
+    if (detWeight) {
+        detWeight.textContent = "---"
+    }
+
+    _sidebarAssetActual = null
 }
 
 async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTable = false) {
@@ -3001,22 +3060,26 @@ async function buildRemainingAssetLots(asset, targetCurrency = asset?.currency |
                 normalizeCurrencyCode(operationRow.precioCurrency || operationRow.currency || targetCurrency),
                 targetCurrency
             )
-            // En Operaciones el "Total" va sin la comisión en €: lo que sale de
-            // la cuenta es Total + comisión, igual que el saldo bloqueado de una
-            // compra activa. Ese es el coste bruto del lote; la comisión se
-            // descuenta después para el neto y el precio medio, así que el neto
-            // queda en el Total. Si falta el Total se recurre a precio × cantidad.
+            // El "Total" de Operaciones se teclea a mano y unas veces lleva la
+            // comisión en € dentro y otras no, así que no sirve de base: el lote
+            // vale precio de orden × cantidad más la comisión en €, igual que una
+            // compra spot. La comisión se descuenta después para el neto, y el
+            // precio medio queda en el precio de ejecución. Sin precio se
+            // recurre al Total.
             const fiatCommission = await convertAmountForDisplay(
                 getOperationRowFiatCommission(operationRow),
                 "EUR",
                 targetCurrency
             )
-            const operationTotal = await convertAmountForDisplay(
-                parseLooseNumber(operationRow.total || "") || 0,
-                normalizeCurrencyCode(operationRow.currency || operationRow.precioCurrency || targetCurrency),
-                targetCurrency
-            )
-            const totalCost = (operationTotal > 0 ? operationTotal : executionPrice * quantity) + fiatCommission
+            const operationTotal =
+                executionPrice > 0
+                    ? 0
+                    : await convertAmountForDisplay(
+                          parseLooseNumber(operationRow.total || "") || 0,
+                          normalizeCurrencyCode(operationRow.currency || operationRow.precioCurrency || targetCurrency),
+                          targetCurrency
+                      )
+            const totalCost = (executionPrice > 0 ? executionPrice * quantity : operationTotal) + fiatCommission
 
             lots.push({
                 remaining: netParticipaciones,
@@ -3813,7 +3876,20 @@ function inferMarketProviderFromSymbol(symbol, fallback = "finnhub") {
     }
 
     if (normalizedSymbol.includes(":")) {
-        return "finnhub"
+        // "MERCADO:TICKER" es ambiguo: Finnhub lo usa para cripto
+        // (BINANCE:BTCUSDT) y TradingView para cualquier cosa, acciones
+        // incluidas (NASDAQ:AAPL, XETR:SAP). Un prefijo de bolsa de acciones,
+        // índice o futuro no es nada que Finnhub entienda con ese formato, así
+        // que ahí sí se puede distinguir; el resto (exchanges de cripto,
+        // desconocidos) se queda en Finnhub, el valor de siempre.
+        const tvOnlyExchangePrefixes = new Set([
+            "NASDAQ", "NYSE", "AMEX", "ARCA", "BATS", "LSE", "XETR", "EURONEXT",
+            "TSX", "TSXV", "ASX", "HKEX", "BSE", "NSE", "SIX", "BME", "TSE",
+            "COMEX", "NYMEX", "CME", "CBOT", "INDEX"
+        ])
+        const exchangePrefix = normalizedSymbol.split(":")[0]
+
+        return tvOnlyExchangePrefixes.has(exchangePrefix) ? "tradingview" : "finnhub"
     }
 
     const eodhdExchangeCodes = new Set([
@@ -3843,6 +3919,21 @@ function inferMarketProviderFromSymbol(symbol, fallback = "finnhub") {
     }
 
     return normalizedFallback || "finnhub"
+}
+
+// Pone primero, dentro de la fila de botones "Buscar X", el proveedor que ya
+// tiene el activo (al editar) o el que se acaba de elegir en una búsqueda: es
+// el que de verdad se va a usar para cotizar, así que es el más probable que
+// vuelva a hacer falta si el usuario busca otra vez. Usa `order` en vez de
+// mover los nodos para que sea trivial de revertir (basta con volver a
+// llamarla con otro proveedor, o con "tradingview" para el orden de fábrica).
+function reorderProviderSearchButtons(containerId, preferredProvider) {
+    const container = document.getElementById(containerId)
+    if (!container) return
+
+    container.querySelectorAll("[data-provider]").forEach((button) => {
+        button.style.order = button.dataset.provider === preferredProvider ? "-1" : ""
+    })
 }
 
 function renderMarketSearchResults(container, results, onSelect) {
@@ -4037,6 +4128,47 @@ async function handleAlphaVantageSearch({
     }
 }
 
+async function handleTradingViewSearch({
+    query,
+    assetName = "",
+    assetType = "",
+    feedbackElement,
+    resultsElement,
+    onSelect
+}) {
+    const normalizedQuery = String(query || "").trim()
+
+    if (!normalizedQuery) {
+        setAssetSearchFeedback(feedbackElement, "Escribe el nombre o ticker del activo.", true)
+        renderMarketSearchResults(resultsElement, [], onSelect)
+        return
+    }
+
+    setAssetSearchFeedback(feedbackElement, "Buscando ticker en TradingView...")
+
+    try {
+        const response = await searchTradingViewSymbolOnServer(normalizedQuery, { assetName, assetType })
+        const results = Array.isArray(response.results) ? response.results : []
+
+        if (!results.length) {
+            setAssetSearchFeedback(
+                feedbackElement,
+                "No se encontraron resultados en TradingView para esa búsqueda.",
+                true
+            )
+            renderMarketSearchResults(resultsElement, [], onSelect)
+            return
+        }
+
+        setAssetSearchFeedback(feedbackElement, "Selecciona el ticker correcto de TradingView.")
+        renderMarketSearchResults(resultsElement, results, onSelect)
+    } catch (error) {
+        console.error(error)
+        setAssetSearchFeedback(feedbackElement, extractApiErrorMessage(error), true)
+        renderMarketSearchResults(resultsElement, [], onSelect)
+    }
+}
+
 async function refreshCurrentAssetMarketData({ feedbackElement = null, successMessage = "" } = {}) {
     if (!currentAssetId) {
         return
@@ -4089,6 +4221,12 @@ function openEditAssetModal(assetData = null) {
         assetPage?.dataset.assetMarketSymbol ||
         assetPage?.dataset.assetFinnhubSymbol ||
         ""
+    // Solo para decidir qué botón "Buscar X" sale primero: el proveedor que ya
+    // usa el activo para cotizar. No se guarda en el dataset del input, que
+    // `submitEditAssetModal` deja vacío a propósito hasta que el usuario elija
+    // uno de verdad (si no, "providerChanged" saltaría sin haber tocado nada).
+    const preferredProvider =
+        assetData?.marketProvider || assetPage?.dataset.assetMarketProvider || inferMarketProviderFromSymbol(currentTicker)
 
     if (!editAssetModalOverlay || !editAssetNameInput) {
         return
@@ -4099,6 +4237,7 @@ function openEditAssetModal(assetData = null) {
         editAssetTickerInput.value = currentTicker
         delete editAssetTickerInput.dataset.marketProvider
     }
+    reorderProviderSearchButtons("editAssetSearchActions", preferredProvider)
     const editTVTickerInput = document.getElementById("editAssetTVTickerInput")
     if (editTVTickerInput)
         editTVTickerInput.value = decodeTVTicker(assetData?.tvSymbol || assetPage?.dataset.assetTvSymbol || "")
@@ -4752,6 +4891,7 @@ function openAssetModal() {
     assetTypeSelect.dispatchEvent(new Event("change", { bubbles: true }))
     assetTickerInput.value = ""
     assetTickerInput.dataset.marketProvider = ""
+    reorderProviderSearchButtons("assetSearchActions", "tradingview")
     const tvTickerInput = document.getElementById("assetTVTickerInput")
     if (tvTickerInput) tvTickerInput.value = ""
     setAssetSearchFeedback(assetSearchFeedback, "")
@@ -5057,6 +5197,7 @@ function initEditAssetModal() {
     const editSearchEodhdButton = document.getElementById("editSearchAssetTickerEodhdBtn")
     const editSearchYahooButton = document.getElementById("editSearchAssetTickerYahooBtn")
     const editSearchAlphaVantageButton = document.getElementById("editSearchAssetTickerAlphaVantageBtn")
+    const editSearchTradingViewButton = document.getElementById("editSearchAssetTickerTradingViewBtn")
     const editAssetSearchFeedback = document.getElementById("editAssetSearchFeedback")
     const editAssetSearchResults = document.getElementById("editAssetSearchResults")
 
@@ -5096,6 +5237,7 @@ function initEditAssetModal() {
             editAssetTickerInput.dataset.marketProvider = String(result.provider || providerName)
                 .trim()
                 .toLowerCase()
+            reorderProviderSearchButtons("editAssetSearchActions", editAssetTickerInput.dataset.marketProvider)
         }
         setAssetSearchFeedback(editAssetSearchFeedback, `Ticker seleccionado (${providerName}): ${result.symbol}`)
         renderMarketSearchResults(editAssetSearchResults, [], () => {})
@@ -5165,6 +5307,23 @@ function initEditAssetModal() {
                 feedbackElement: editAssetSearchFeedback,
                 resultsElement: editAssetSearchResults,
                 onSelect: (result) => runEditTickerSelection(result, "Alpha Vantage")
+            })
+        })
+    }
+
+    if (editSearchTradingViewButton) {
+        editSearchTradingViewButton.addEventListener("click", async () => {
+            const typedTicker = editAssetTickerInput?.value.trim() || ""
+            const typedName = editAssetNameInput?.value.trim() || ""
+            const searchQuery = typedTicker || typedName
+
+            await handleTradingViewSearch({
+                query: searchQuery,
+                assetName: typedName,
+                assetType: "",
+                feedbackElement: editAssetSearchFeedback,
+                resultsElement: editAssetSearchResults,
+                onSelect: (result) => runEditTickerSelection(result, "TradingView")
             })
         })
     }
@@ -5247,7 +5406,8 @@ function initAssetModal(
     searchAssetTickerFinnhubButton,
     searchAssetTickerEodhdButton,
     searchAssetTickerYahooButton,
-    searchAssetTickerAlphaVantageButton
+    searchAssetTickerAlphaVantageButton,
+    searchAssetTickerTradingViewButton
 ) {
     const assetSearchFeedback = document.getElementById("assetSearchFeedback")
     const assetSearchResults = document.getElementById("assetSearchResults")
@@ -5298,6 +5458,7 @@ function initAssetModal(
             assetTickerInput.dataset.marketProvider = String(result.provider || providerName)
                 .trim()
                 .toLowerCase()
+            reorderProviderSearchButtons("assetSearchActions", assetTickerInput.dataset.marketProvider)
         }
 
         if (assetNameInput && !assetNameInput.value.trim()) {
@@ -5372,6 +5533,23 @@ function initAssetModal(
                 feedbackElement: assetSearchFeedback,
                 resultsElement: assetSearchResults,
                 onSelect: (result) => runTickerSelection(result, "Alpha Vantage")
+            })
+        })
+    }
+
+    if (searchAssetTickerTradingViewButton) {
+        searchAssetTickerTradingViewButton.addEventListener("click", async () => {
+            const typedTicker = assetTickerInput?.value.trim() || ""
+            const typedName = assetNameInput?.value.trim() || ""
+            const searchQuery = typedName || typedTicker
+
+            await handleTradingViewSearch({
+                query: searchQuery,
+                assetName: typedName,
+                assetType: assetTypeSelect?.value || "",
+                feedbackElement: assetSearchFeedback,
+                resultsElement: assetSearchResults,
+                onSelect: (result) => runTickerSelection(result, "TradingView")
             })
         })
     }
@@ -5783,6 +5961,12 @@ function buildTVSymbol(asset) {
     if (provider === "finnhub") {
         // Finnhub ya usa formato EXCHANGE:SYMBOL o solo SYMBOL
         if (mSym.includes(":")) return mSym
+        return mSym || uSym
+    }
+
+    if (provider === "tradingview") {
+        // El ticker de mercado YA es sintaxis de TradingView (MERCADO:SYMBOL):
+        // no hace falta traducir nada, es justo lo que pide este gráfico.
         return mSym || uSym
     }
 

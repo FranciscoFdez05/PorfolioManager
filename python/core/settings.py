@@ -214,6 +214,10 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("mercado", "historico_ttl_segundos", ENTERO, 4 * 3600, env="MERCADO_HISTORICO_TTL",
            minimo=0, maximo=30 * 24 * 3600,
            descripcion="Vida de la caché del histórico de precios. 0 desactiva la caché."),
+    Ajuste("mercado", "cotizacion_ttl_segundos", ENTERO, 30, env="MERCADO_COTIZACION_TTL",
+           minimo=0, maximo=3600,
+           descripcion="Vida de la caché de cotizaciones en memoria (dashboard, cartera y gráfico "
+                       "piden el mismo activo casi a la vez). 0 desactiva la caché."),
     Ajuste("mercado", "max_peticiones_paralelas", ENTERO, 6, env="MERCADO_MAX_PARALELAS", minimo=1, maximo=64,
            descripcion="Cotizaciones que se piden a la vez. Subirlo agota antes la cuota del proveedor."),
     Ajuste("mercado", "snapshot_intervalo_minimo_segundos", ENTERO, 60, env="MERCADO_SNAPSHOT_MIN",
@@ -417,6 +421,10 @@ def dbBusyTimeoutMs() -> int:
 
 def historicoTtlSegundos() -> int:
     return obtener("mercado.historico_ttl_segundos")
+
+
+def cotizacionTtlSegundos() -> int:
+    return obtener("mercado.cotizacion_ttl_segundos")
 
 
 def maxPeticionesParalelas() -> int:

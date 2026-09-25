@@ -67,6 +67,14 @@ class TestProveedorDeMercado:
         ("AAPL", "finnhub"),
         ("", "finnhub"),
         ("ALGO.INVENTADO", "finnhub"),
+        # "MERCADO:TICKER" con un prefijo que Finnhub no entiende en ese
+        # formato (bolsa de acciones, índice, futuro) es de TradingView, no de
+        # Finnhub -aunque siga habiendo dos puntos, como en el caso cripto de
+        # arriba, que sigue cayendo en Finnhub por ser un exchange conocido de
+        # ese proveedor.
+        ("NASDAQ:AAPL", "tradingview"),
+        ("XETR:SAP", "tradingview"),
+        ("COMEX:GC1!", "tradingview"),
     ])
     def test_inferencia_por_simbolo(self, symbol, expected):
         assert inferMarketProviderFromSymbol(symbol) == expected

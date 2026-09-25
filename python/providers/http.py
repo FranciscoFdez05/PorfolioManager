@@ -114,8 +114,8 @@ def build_url(url: str, params=None) -> str:
 
 
 def fetch_json(url, params=None, *, timeout=None, provider=None, headers=None,
-               retries=None):
-    """GET + parseo JSON con reintentos.
+               retries=None, json_body=None):
+    """GET (o POST con `json_body`) + parseo JSON con reintentos.
 
     `provider` es la etiqueta con la que se contabiliza la llamada en las
     estadísticas de uso de API (pantalla de Ajustes). Se registra una vez por
@@ -124,11 +124,20 @@ def fetch_json(url, params=None, *, timeout=None, provider=None, headers=None,
     `timeout` y `retries` a None (lo habitual) usan los valores de
     [proveedores] en config.ini; pasarlos explícitamente es para el caso puntual
     de una llamada que sabe que necesita otra cosa.
+
+    `json_body`, si se da, convierte la petición en POST con ese cuerpo
+    serializado a JSON (lo pide el scanner de TradingView; el resto de
+    proveedores solo usan `params` en la query string).
     """
     request_url = build_url(url, params)
     request_headers = _headers_base()
     if headers:
         request_headers.update(headers)
+
+    request_data = None
+    if json_body is not None:
+        request_data = json.dumps(json_body).encode("utf-8")
+        request_headers["Content-Type"] = "application/json"
 
     if timeout is None:
         timeout = settings.proveedorTimeout()
@@ -142,7 +151,7 @@ def fetch_json(url, params=None, *, timeout=None, provider=None, headers=None,
         if provider:
             record_api_call(provider)
         try:
-            request = Request(request_url, headers=request_headers)
+            request = Request(request_url, data=request_data, headers=request_headers)
             with urlopen(request, timeout=timeout) as response:
                 return _read_json(response, url)
         except HTTPError as error:

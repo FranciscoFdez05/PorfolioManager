@@ -42,11 +42,15 @@
                 <div class="pinvChartLegend" id="pinvChartLegend"></div>
             </div>
 
-            <!-- Reparto del plan entre sus activos. Usa los mismos dos colores
-                 que la dona de arriba, así que se lee con su leyenda. -->
+            <!-- Reparto del plan entre sus activos: una porción por activo con
+                 lo que tiene planificado y el total en el centro. -->
             <div class="pinvChartCard pinvRepartoCard" id="pinvRepartoCard">
                 <div class="pinvChartTitle">Reparto por activo</div>
-                <div class="pinvReparto" id="pinvReparto"></div>
+                <div class="pinvChartWrap">
+                    <canvas id="pinvRepartoChart"></canvas>
+                    <div class="pinvChartCenter" id="pinvRepartoCenter"></div>
+                </div>
+                <div class="pinvChartLegend" id="pinvReparto"></div>
             </div>
         </aside>
     </div>
