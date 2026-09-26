@@ -69,7 +69,8 @@ CREATE TABLE IF NOT EXISTS activos (
     status          TEXT NOT NULL DEFAULT 'Mercado abierto',
     last_updated    TEXT NOT NULL DEFAULT '',
     color           TEXT NOT NULL DEFAULT '',
-    tv_symbol       TEXT NOT NULL DEFAULT ''
+    tv_symbol       TEXT NOT NULL DEFAULT '',
+    convert_currency TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS activo_rows (
@@ -575,7 +576,7 @@ CREATE TABLE IF NOT EXISTS planes_cartera_operaciones (
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 7
+ESQUEMA_VERSION = 8
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1123,6 +1124,22 @@ def _esquema_7(conn):
             PRIMARY KEY (plan_id, operacion_id)
         );
     """)
+
+
+@_migracion(8)
+def _esquema_8(conn):
+    """Divisa de conversión de la cotización, por activo.
+
+    Antes la cotización se guardaba siempre en la divisa nativa del proveedor
+    (o, de rebote, en la que ya tuviera el activo si `refresh-market-data`
+    encontraba una distinta - un efecto implícito, no una opción). Esta
+    columna la hace explícita y opcional: vacía es "tal cual venga del
+    proveedor" (el comportamiento de siempre); con un código de divisa,
+    `fetch_asset_quote` convierte antes de guardar.
+    """
+    activos_cols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
+    if "convert_currency" not in activos_cols:
+        conn.execute("ALTER TABLE activos ADD COLUMN convert_currency TEXT NOT NULL DEFAULT ''")
 
 
 def get_db() -> sqlite3.Connection:

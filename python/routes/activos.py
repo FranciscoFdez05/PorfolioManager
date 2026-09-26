@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from core import dinero, pnl_divisa
 from core.db import get_db
-from providers.finnhub_client import convert_amount, convert_quote_currency
+from providers.finnhub_client import convert_amount
 from stores.asset_store import (
     deleteAssetFile,
     getAssetFile,
@@ -19,6 +19,7 @@ from stores.asset_utils import (
     _trunc,
     createDefaultAssetPayload,
     inferMarketProviderFromSymbol,
+    normalizeConvertCurrency,
     normalizeMarketProvider,
     sanitize_color,
     sanitizeAssetPayload,
@@ -344,23 +345,20 @@ def refreshActivoMarketData(assetId):
     if not marketSymbol:
         return jsonify({"ok": False, "error": "El activo no tiene ticker de mercado configurado"}), 400
 
-    quote, error = fetch_asset_quote(marketSymbol, marketProvider, use_cache=False)
+    convertCurrency = normalizeConvertCurrency(assetData.get("convertCurrency", ""))
+    quote, error = fetch_asset_quote(
+        marketSymbol, marketProvider, use_cache=False, target_currency=convertCurrency or None
+    )
 
     if error:
         statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
-    asset_currency = normalize_currency_code(assetData.get("currency") or "", fallback="")
-    if asset_currency and asset_currency != normalize_currency_code(quote.get("currency", ""), fallback=""):
-        converted, conv_error = convert_quote_currency(quote, asset_currency)
-        if not conv_error and converted:
-            quote = converted
-
     assetData["marketProvider"] = marketProvider
     assetData["marketSymbol"] = quote["symbol"]
     assetData["finnhubSymbol"] = quote["symbol"]
     assetData["price"] = quote["price"]
-    assetData["currency"] = asset_currency or quote["currency"]
+    assetData["currency"] = quote["currency"]
     assetData["change"] = quote["change"]
     assetData["status"] = quote["status"]
     assetData["lastUpdated"] = quote["lastUpdated"]

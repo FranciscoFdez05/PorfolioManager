@@ -8,6 +8,13 @@ def sanitize_color(value):
     s = str(value or "").strip()
     return s if _HEX_COLOR_RE.match(s) else ""
 ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd", "yahoo", "alphavantage", "tradingview"}
+# Debe coincidir con SUPPORTED_ASSET_CURRENCIES (routes/activos.py) y
+# SUPPORTED_DISPLAY_CURRENCIES (providers/finnhub_client.py): las tres listan
+# las mismas divisas por el mismo motivo -son las que el tipo de cambio en
+# tiempo real sabe convertir-, pero cada una vive en su capa (validación del
+# payload, filas históricas, conversión de cotización) y no merece la pena
+# la importación cruzada solo para no repetir cinco letras tres veces.
+ALLOWED_DISPLAY_CURRENCIES = {"EUR", "USD", "GBP", "CHF", "JPY"}
 EODHD_EXCHANGE_CODES = {"XETRA", "PA", "LSE", "US", "SW", "AS", "MC", "MI", "DU", "BE", "F", "MU", "ST", "VI", "LS", "FOREX", "CC"}
 # "MERCADO:TICKER" es ambiguo entre Finnhub (solo cripto, BINANCE:BTCUSDT) y
 # TradingView (cualquier cosa, NASDAQ:AAPL incluido). Estos prefijos no son
@@ -53,6 +60,19 @@ def normalizeAssetCurrency(assetData, fallback="EUR"):
     normalized = _trunc(raw, 10).strip().upper()
 
     return normalized if normalized.isalpha() and 2 <= len(normalized) <= 5 else fallback
+
+
+def normalizeConvertCurrency(value):
+    """Divisa a la que convertir la cotización, o cadena vacía si está apagado.
+
+    A diferencia de `normalizeAssetCurrency` (que siempre tiene que valer
+    algo), aquí "sin valor" es un estado legítimo y el que viene por defecto:
+    la cotización se guarda tal cual la da el proveedor. Un código no
+    reconocido se trata igual que vacío -apagado- en vez de dar error, porque
+    esto es una preferencia opcional, no un dato obligatorio del activo.
+    """
+    normalized = str(value or "").strip().upper()
+    return normalized if normalized in ALLOWED_DISPLAY_CURRENCIES else ""
 
 
 def sanitizeAssetType(assetType):
@@ -108,6 +128,7 @@ def createDefaultAssetPayload(name, assetType, assetId=None):
         "status": "Mercado abierto",
         "lastUpdated": "",
         "color": "",
+        "convertCurrency": "",
         "operationRows": [],
         "conversionRows": [],
         "rows": []
@@ -241,6 +262,7 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "lastUpdated": _trunc(requestData.get("lastUpdated", ""), _MAX_TEXT).strip(),
         "color": sanitize_color(requestData.get("color", "")),
         "tvSymbol": _trunc(requestData.get("tvSymbol", ""), _MAX_TICKER).strip(),
+        "convertCurrency": normalizeConvertCurrency(requestData.get("convertCurrency", "")),
         # El cliente reenvía el activo entero al guardar, así que si `hidden` no
         # se copia aquí el upsert lo reescribe a 0 y el activo oculto reaparece.
         "hidden": bool(requestData.get("hidden", False)),

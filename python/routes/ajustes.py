@@ -8,7 +8,7 @@ from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, request
 
-from core import exportables, paths, sesion, settings
+from core import exportables, paths, sesion, settings, telegram_notifier
 from core.db import get_active_db_path, get_db
 from core.errors import registrarFalloEscritura
 from core.escritura import escribirJsonAtomico, temporalPara
@@ -375,6 +375,45 @@ def get_api_estado():
     except Exception as error:
         log.warning("No se pudo comprobar el estado de los proveedores: %s", error)
         return jsonify({"ok": False, "error": str(error)[:200]}), 500
+
+
+@ajustes_bp.route("/api/settings/telegram", methods=["GET"])
+def get_telegram_settings():
+    token, chat_id = telegram_notifier.leerConfig()
+    return jsonify({
+        "ok": True,
+        "configurado": bool(token) and bool(chat_id),
+        # Igual que /api/settings/apikeys: instalación de un solo usuario en
+        # LAN cerrada, así que el valor completo se manda tal cual en vez de
+        # obligar a una petición aparte por cada vez que se quiera ver.
+        "token": token,
+        "chatId": chat_id,
+    })
+
+
+@ajustes_bp.route("/api/settings/telegram", methods=["POST"])
+def save_telegram_settings():
+    data = request.get_json(silent=True) or {}
+    token = str(data.get("token") or "").strip()
+    chat_id = str(data.get("chatId") or "").strip()
+    if not token or not chat_id:
+        return jsonify({"ok": False, "error": "Rellena el token del bot y el ID de chat"}), 400
+    telegram_notifier.escribirConfig(token, chat_id)
+    return jsonify({"ok": True})
+
+
+@ajustes_bp.route("/api/settings/telegram", methods=["DELETE"])
+def delete_telegram_settings():
+    telegram_notifier.borrarConfig()
+    return jsonify({"ok": True})
+
+
+@ajustes_bp.route("/api/settings/telegram/prueba", methods=["POST"])
+def test_telegram_settings():
+    ok, error = telegram_notifier.enviarPrueba()
+    if not ok:
+        return jsonify({"ok": False, "error": error}), 400
+    return jsonify({"ok": True})
 
 
 @ajustes_bp.route("/api/settings", methods=["POST"])

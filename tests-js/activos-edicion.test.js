@@ -58,7 +58,10 @@ const ACTIVO = {
 let peticiones = []
 
 /** Deja el modal de edición en pantalla con los valores que se van a guardar. */
-function montarModal({ nombre = "XRP", color = "#242222", ticker = "BINANCE:XRPEUR" } = {}) {
+function montarModal({
+    nombre = "XRP", color = "#242222", ticker = "BINANCE:XRPEUR",
+    convertCurrencyActivo = false, convertCurrencyValor = "EUR"
+} = {}) {
     document.body.innerHTML = `
         <div id="editAssetModalOverlay"></div>
         <input id="editAssetNameInput" value="${nombre}">
@@ -67,7 +70,16 @@ function montarModal({ nombre = "XRP", color = "#242222", ticker = "BINANCE:XRPE
         <input id="editAssetTVTickerInput" value="BITVAVO:XRPEUR">
         <div id="editAssetSearchFeedback"></div>
         <div id="editAssetSearchResults"></div>
+        <input type="checkbox" id="editAssetConvertCurrencyToggle" ${convertCurrencyActivo ? "checked" : ""}>
+        <select id="editAssetConvertCurrencySelect">
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+            <option value="GBP">GBP</option>
+            <option value="CHF">CHF</option>
+            <option value="JPY">JPY</option>
+        </select>
     `
+    document.getElementById("editAssetConvertCurrencySelect").value = convertCurrencyValor
 }
 
 /** La respuesta del servidor a cada petición, según el método. */
@@ -182,6 +194,42 @@ describe("guardar una edición", () => {
         expect(guardado().body.name).toBe("Ripple")
         expect(guardado().body.marketSymbol).toBe("KRAKEN:XRPEUR")
         expect(guardado().body.finnhubSymbol).toBe("KRAKEN:XRPEUR")
+    })
+
+    it("refresca el proveedor en la lista de Activos, no solo en el servidor", async () => {
+        // La columna «Provider» de la lista lee `_activosAllAssets`, una copia en
+        // memoria aparte del activo que se guarda. El merge que la actualiza tras
+        // guardar copiaba nombre, color y ticker pero no `marketProvider`, así que
+        // cambiar de proveedor se guardaba bien pero la lista seguía enseñando el
+        // viejo hasta recargar la página.
+        montarModal({ ticker: "NASDAQ:AAPL" })
+        _editingAsset = { ...ACTIVO }
+        _activosAllAssets = [{ ...ACTIVO, marketProvider: "eodhd" }]
+
+        await submitEditAssetModal()
+
+        // El GET simulado devuelve ACTIVO tal cual, con marketProvider "finnhub".
+        expect(_activosAllAssets[0].marketProvider).toBe("finnhub")
+    })
+
+    it("con el interruptor activado, guarda la divisa elegida", async () => {
+        montarModal({ convertCurrencyActivo: true, convertCurrencyValor: "GBP" })
+        _editingAsset = { ...ACTIVO }
+
+        await submitEditAssetModal()
+
+        expect(guardado().body.convertCurrency).toBe("GBP")
+    })
+
+    it("con el interruptor apagado, guarda la divisa vacía aunque el selector tenga un valor", async () => {
+        // El <select> conserva el último valor elegido aunque se apague el
+        // interruptor; lo que manda es el estado del interruptor, no el select.
+        montarModal({ convertCurrencyActivo: false, convertCurrencyValor: "USD" })
+        _editingAsset = { ...ACTIVO }
+
+        await submitEditAssetModal()
+
+        expect(guardado().body.convertCurrency).toBe("")
     })
 })
 

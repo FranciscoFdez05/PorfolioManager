@@ -586,6 +586,112 @@ async function initAjustesLogic() {
         )
     }
 
+    // --- Telegram ---
+    const telegramTokenInput = document.getElementById("ajustesTelegramToken")
+    const telegramChatIdInput = document.getElementById("ajustesTelegramChatId")
+    const telegramStatus = document.getElementById("ajustesTelegramStatus")
+    const telegramMsg = document.getElementById("ajustesTelegramMsg")
+    const guardarTelegramBtn = document.getElementById("ajustesGuardarTelegramBtn")
+    const probarTelegramBtn = document.getElementById("ajustesProbarTelegramBtn")
+    const borrarTelegramBtn = document.getElementById("ajustesBorrarTelegramBtn")
+
+    function setTelegramStatus(configurado) {
+        if (!telegramStatus) return
+        telegramStatus.textContent = configurado ? "✓ Configurado" : "✗ No configurado"
+        telegramStatus.className = "ajustesKeyStatus " + (configurado ? "ok" : "missing")
+    }
+
+    async function cargarTelegram() {
+        try {
+            const res = await fetch("/api/settings/telegram")
+            const data = await res.json()
+            if (!data.ok) return
+            setTelegramStatus(data.configurado)
+            if (telegramTokenInput) telegramTokenInput.value = data.token || ""
+            if (telegramChatIdInput) telegramChatIdInput.value = data.chatId || ""
+        } catch {
+            /* ignore */
+        }
+    }
+    cargarTelegram()
+
+    if (guardarTelegramBtn) {
+        guardarTelegramBtn.addEventListener("click", async () => {
+            const token = (telegramTokenInput?.value || "").trim()
+            const chatId = (telegramChatIdInput?.value || "").trim()
+            if (!token || !chatId) {
+                showMsg(telegramMsg, "Rellena el token y el ID de chat", "error")
+                return
+            }
+            guardarTelegramBtn.disabled = true
+            showMsg(telegramMsg, "Guardando…", "")
+            try {
+                const res = await fetch("/api/settings/telegram", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ token, chatId })
+                })
+                const data = await res.json()
+                if (data.ok) {
+                    setTelegramStatus(true)
+                    showMsg(telegramMsg, "Guardado", "ok")
+                } else {
+                    showMsg(telegramMsg, data.error || "Error al guardar", "error")
+                }
+            } catch {
+                showMsg(telegramMsg, "Error de red", "error")
+            } finally {
+                guardarTelegramBtn.disabled = false
+            }
+        })
+    }
+
+    if (probarTelegramBtn) {
+        probarTelegramBtn.addEventListener("click", async () => {
+            probarTelegramBtn.disabled = true
+            showMsg(telegramMsg, "Enviando…", "")
+            try {
+                const res = await fetch("/api/settings/telegram/prueba", { method: "POST" })
+                const data = await res.json()
+                showMsg(
+                    telegramMsg,
+                    data.ok ? "Mensaje enviado" : data.error || "Error al enviar",
+                    data.ok ? "ok" : "error"
+                )
+            } catch {
+                showMsg(telegramMsg, "Error de red", "error")
+            } finally {
+                probarTelegramBtn.disabled = false
+            }
+        })
+    }
+
+    if (borrarTelegramBtn) {
+        borrarTelegramBtn.addEventListener("click", () => {
+            openConfirmModal({
+                title: "Quitar Telegram",
+                message: "Se dejarán de enviar avisos por Telegram. Puedes volver a configurarlo cuando quieras.",
+                confirmLabel: "Quitar",
+                onConfirm: async () => {
+                    try {
+                        const res = await fetch("/api/settings/telegram", { method: "DELETE" })
+                        const data = await res.json()
+                        if (data.ok) {
+                            if (telegramTokenInput) telegramTokenInput.value = ""
+                            if (telegramChatIdInput) telegramChatIdInput.value = ""
+                            setTelegramStatus(false)
+                            showMsg(telegramMsg, "Eliminado", "ok")
+                        } else {
+                            showMsg(telegramMsg, data.error || "Error al eliminar", "error")
+                        }
+                    } catch {
+                        showMsg(telegramMsg, "Error de red", "error")
+                    }
+                }
+            })
+        })
+    }
+
     // --- Auto-backup ---
     const autoBackupSel = document.getElementById("ajustesAutoBackup")
     const guardarFreqBtn = document.getElementById("ajustesGuardarBackupFreqBtn")

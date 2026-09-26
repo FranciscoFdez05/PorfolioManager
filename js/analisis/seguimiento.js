@@ -1064,7 +1064,7 @@ async function initSeguimientoLogic() {
 
         segClearEditSearch()
 
-        if (allItem._fromPortfolio) {
+        if (allItem._fromPortfolio || allItem._fromOperaciones) {
             if (editModalTitle) editModalTitle.textContent = allItem.name || allItem.symbol || "Activo del portfolio"
             if (editPortfolioNote) editPortfolioNote.classList.remove("hidden")
             if (editCustomForm) editCustomForm.classList.add("hidden")
@@ -1109,7 +1109,7 @@ async function initSeguimientoLogic() {
         if (!_editingSegId) return
         const allItem = _segAllItems.find((i) => i._segId === _editingSegId)
 
-        if (allItem?._fromPortfolio) {
+        if (allItem?._fromPortfolio || allItem?._fromOperaciones) {
             const tvVal = editTVInput?.value.trim() || ""
             const overrides = JSON.parse(
                 localStorage.getItem(`seguimientoOverrides_${_segPid()}`) ||

@@ -76,7 +76,12 @@ MARKET_SUFFIX_CURRENCIES = {
     ".SW": "CHF",
     ".L": "GBP",
 }
-SUPPORTED_DISPLAY_CURRENCIES = {"EUR", "USD"}
+# Debe coincidir con ALLOWED_DISPLAY_CURRENCIES (stores/asset_utils.py) y
+# SUPPORTED_ASSET_CURRENCIES (routes/activos.py): las tres divisas que puede
+# elegir el usuario para convertir una cotización o cambiar la moneda de un
+# activo. Comprobado contra Frankfurter (la fuente principal, más abajo): las
+# cinco están soportadas sin problema, no es una limitación de la API.
+SUPPORTED_DISPLAY_CURRENCIES = {"EUR", "USD", "GBP", "CHF", "JPY"}
 SEARCH_QUERY_ALIASES = {}
 PREFERRED_EXCHANGES_BY_TYPE = {
     "acciones": {"XNYS", "XNAS", "NYSE", "NASDAQ", "ARCX", "BATS", "XNCM"},

@@ -436,6 +436,24 @@
         <div id="editAssetSearchFeedback" class="assetSearchFeedback hidden"></div>
         <div id="editAssetSearchResults" class="assetSearchResults hidden"></div>
 
+        <div class="assetConvertCurrencyRow">
+            <span class="assetConvertCurrencyLabel">
+                Convertir la cotización de divisa
+                <span class="assetModalLabelHint">tipo de cambio en tiempo real</span>
+            </span>
+            <label class="ajustesSwitch">
+                <input type="checkbox" id="editAssetConvertCurrencyToggle">
+                <span class="ajustesSwitchTrack"></span>
+            </label>
+        </div>
+        <select id="editAssetConvertCurrencySelect" class="assetModalInput hidden">
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+            <option value="GBP">GBP</option>
+            <option value="CHF">CHF</option>
+            <option value="JPY">JPY</option>
+        </select>
+
         <button type="button" class="assetModalLabel cpToggleLabel" id="editAssetColorToggle">
             <span>Color del activo</span>
             <span class="cpToggleBadge" id="editAssetColorBadge"></span>
@@ -590,6 +608,11 @@
             <button class="sttNavBtn" data-stt="api" type="button">
                 <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 7.5a5 5 0 1 0-5 5 5 5 0 0 0 5-5ZM7.5 12.5 4 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 16h2v2H4v-2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
                 API
+            </button>
+
+            <button class="sttNavBtn" data-stt="conexiones" type="button">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="7" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="7" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 10h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Conexiones
             </button>
 
             <button class="sttNavBtn" data-stt="datos" type="button">
@@ -1377,6 +1400,12 @@
                     </button>
                 </div>
             </div>
+        </div>
+
+        <!-- ── Conexiones ── -->
+        <div class="sttPage" id="sttPage-conexiones">
+            <h2 class="sttPageTitle">Conexiones</h2>
+
             <div class="ajustesSection" id="ajustesAtajoSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
@@ -1535,6 +1564,53 @@
                     <summary>Montarlo a mano, paso a paso</summary>
                     <div class="ajustesTlsAyudaCuerpo" id="ajustesAtajoReceta"></div>
                 </details>
+            </div>
+
+            <div class="ajustesSection" id="ajustesTelegramSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.5 2.5 2 9l5 1.8m10.5-8.3-3 13-6.2-4.7m9.2-8.3L6.8 12.1m0 0L6 17l2.6-3.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Telegram</div>
+                        <div class="ajustesSectionDesc">
+                            Avisa por Telegram cuando un proveedor de cotizaciones se queda sin cuota, deja de
+                            responder o falla. Crea un bot con <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a>
+                            y consigue tu ID de chat con <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a>.
+                        </div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesField">
+                    <div class="ajustesLabelRow">
+                        <label class="ajustesLabel" for="ajustesTelegramToken">Token del bot</label>
+                        <span class="ajustesKeyStatus" id="ajustesTelegramStatus"></span>
+                    </div>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesTelegramToken" class="ajustesInput" type="password" placeholder="123456789:AA…" autocomplete="off">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesTelegramToken" title="Mostrar/ocultar">
+                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="ajustesField">
+                    <div class="ajustesLabelRow">
+                        <label class="ajustesLabel" for="ajustesTelegramChatId">ID de chat</label>
+                    </div>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesTelegramChatId" class="ajustesInput" type="text" placeholder="123456789" autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="ajustesActions">
+                    <button id="ajustesGuardarTelegramBtn" class="ajustesAddBtn" type="button">Guardar</button>
+                    <button id="ajustesProbarTelegramBtn" class="ajustesSecondaryBtn" type="button">Enviar prueba</button>
+                    <button id="ajustesBorrarTelegramBtn" class="ajustesSecondaryBtn" type="button">Quitar</button>
+                    <span id="ajustesTelegramMsg" class="ajustesStatusMsg"></span>
+                </div>
             </div>
 
         </div>

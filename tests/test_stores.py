@@ -12,6 +12,7 @@ from stores.asset_utils import (
     createAssetSymbol,
     inferMarketProviderFromSymbol,
     normalizeAssetCurrency,
+    normalizeConvertCurrency,
     normalizeMarketProvider,
     sanitize_color,
     sanitizeAssetPayload,
@@ -78,6 +79,22 @@ class TestProveedorDeMercado:
     ])
     def test_inferencia_por_simbolo(self, symbol, expected):
         assert inferMarketProviderFromSymbol(symbol) == expected
+
+
+class TestDivisaDeConversion:
+    @pytest.mark.parametrize("raw,expected", [
+        ("EUR", "EUR"),
+        ("usd", "USD"),  # se normaliza a mayúsculas
+        (" gbp ", "GBP"),
+        ("CHF", "CHF"),
+        ("JPY", "JPY"),
+        ("", ""),
+        (None, ""),
+        ("XYZ", ""),  # no es una de las cinco soportadas: apagado, no error
+        ("BLOOMBERG", ""),
+    ])
+    def test_normaliza_o_apaga(self, raw, expected):
+        assert normalizeConvertCurrency(raw) == expected
 
 
 class TestColor:
@@ -337,3 +354,25 @@ class TestActivoOculto:
     def test_sin_hidden_el_activo_es_visible(self):
         payload, _ = sanitizeAssetPayload({"name": "Colgate", "type": "acciones", "rows": []})
         assert payload["hidden"] is False
+
+
+class TestConvertCurrencyEnElPayload:
+    """Igual que `hidden`: si el saneado no lo copia, se pierde en el upsert."""
+
+    def test_convert_currency_viaja_en_el_payload(self):
+        payload, error = sanitizeAssetPayload(
+            {"name": "Oro", "type": "comoditis", "convertCurrency": "eur", "rows": []}
+        )
+        assert error is None
+        assert payload["convertCurrency"] == "EUR"
+
+    def test_sin_convert_currency_queda_apagado(self):
+        payload, _ = sanitizeAssetPayload({"name": "Oro", "type": "comoditis", "rows": []})
+        assert payload["convertCurrency"] == ""
+
+    def test_valor_no_soportado_se_apaga_en_vez_de_dar_error(self):
+        payload, error = sanitizeAssetPayload(
+            {"name": "Oro", "type": "comoditis", "convertCurrency": "BLOOMBERG", "rows": []}
+        )
+        assert error is None
+        assert payload["convertCurrency"] == ""

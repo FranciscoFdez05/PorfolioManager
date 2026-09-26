@@ -188,21 +188,41 @@ def _score_result(symbol, description, raw_type, query_text, normalized_asset_na
     return score
 
 
-def enrich_search_results_with_quote(results, timeout=None):
-    enriched_results = []
+def _batch_fetch_quotes(symbols, timeout=None):
+    """Cotiza varios símbolos de una vez: una sola llamada al scanner, no una
+    por resultado. El scanner ya acepta una lista de `tickers`; usarla aquí es
+    lo que permite mirar más candidatos de golpe sin multiplicar peticiones.
+    """
+    if not symbols:
+        return {}
 
-    for item in results:
-        enriched_item = dict(item)
-        quote, error = fetch_quote(item.get("symbol", ""), timeout=timeout)
+    try:
+        payload = _fetch_json(
+            TRADINGVIEW_SCAN_URL,
+            json_body={
+                "symbols": {"tickers": symbols, "query": {"types": []}},
+                "columns": _SCAN_COLUMNS,
+            },
+            timeout=timeout,
+        )
+    except (HTTPError, URLError):
+        return {}
 
-        if not error and quote:
-            enriched_item["price"] = quote.get("price", "")
-            enriched_item["currency"] = quote.get("currency", "")
-            enriched_item["change"] = quote.get("change", "")
-
-        enriched_results.append(enriched_item)
-
-    return enriched_results
+    quotes = {}
+    for row in payload.get("data") or []:
+        symbol = row.get("s")
+        values = row.get("d") or []
+        if not symbol or len(values) < 3:
+            continue
+        current_price = float(values[0] or 0)
+        if current_price <= 0:
+            continue
+        quotes[symbol] = {
+            "price": _format_decimal(current_price),
+            "currency": str(values[2] or "").strip().upper(),
+            "change": _format_percent(float(values[1] or 0)),
+        }
+    return quotes
 
 
 def _search_symbol_request(text, exchange, timeout):
@@ -290,6 +310,27 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
         }))
 
     ranked_results.sort(key=lambda row: (-row[0], row[1]["symbol"]))
-    top_results = [item for _, item in ranked_results[:limit]]
 
-    return enrich_search_results_with_quote(top_results, timeout=timeout), None
+    # Se cotiza un grupo más amplio que lo que se va a enseñar (`_ENRICH_POOL`,
+    # no `limit`): mirar la cotización solo cambia si un resultado sale al
+    # final antes de saber si es el que sirve. Como GETTEX (algunos fondos) u
+    # OANDA (el par en EUR de una materia prima, no en USD) no están en el
+    # scanner gratuito aunque coticen en tradingview.com, sin este margen un
+    # resultado sin precio se quedaba en el hueco de otro mercado del mismo
+    # instrumento que sí lo tiene y rankeaba justo un poco peor.
+    _ENRICH_POOL = max(limit, 20)
+    candidates = [item for _, item in ranked_results[:_ENRICH_POOL]]
+    quotes = _batch_fetch_quotes([c["symbol"] for c in candidates], timeout=timeout)
+
+    for candidate in candidates:
+        quote = quotes.get(candidate["symbol"])
+        if quote:
+            candidate["price"] = quote["price"]
+            candidate["currency"] = quote["currency"]
+            candidate["change"] = quote["change"]
+
+    # Sort estable: a igualdad de "tiene cotización o no", se respeta el orden
+    # de relevancia que ya traían.
+    candidates.sort(key=lambda item: item["price"] == "")
+
+    return candidates[:limit], None

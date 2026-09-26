@@ -21,10 +21,10 @@ Dos cosas más viven aquí, ambas para gastar menos cuota gratuita:
 import time
 from threading import Lock
 
-from core import settings
+from core import settings, telegram_notifier
 from providers.alpha_vantage_client import fetch_quote as _fetch_av_quote
 from providers.eodhd_client import fetch_quote as _fetch_eodhd_quote
-from providers.finnhub_client import fetch_quote as _fetch_finnhub_quote
+from providers.finnhub_client import convert_quote_currency, fetch_quote as _fetch_finnhub_quote
 from providers.tradingview_client import fetch_quote as _fetch_tradingview_quote
 from providers.yahoo_finance_client import fetch_quote as _fetch_yahoo_quote
 from stores.asset_utils import EODHD_EXCHANGE_CODES, inferMarketProviderFromSymbol, normalizeMarketProvider
@@ -33,6 +33,7 @@ from stores.helpers import (
     call_eodhd_with_fallbacks,
     call_finnhub_with_fallbacks,
     is_rate_limited_error,
+    is_temporary_service_error,
 )
 
 _FETCHERS = {
@@ -55,6 +56,18 @@ _FALLBACK_ORDER = ("finnhub", "yahoo", "tradingview", "eodhd", "alphavantage")
 # Cuánto se evita un proveedor tras un 429/cuota agotada, para no perder una
 # petición del usuario intentando algo que ya sabemos que va a fallar.
 _RATE_LIMIT_COOLDOWN_SECONDS = 300
+
+# Nombre visible de cada proveedor para los avisos de Telegram (ver
+# core.telegram_notifier). Es el mismo criterio que providers/estado.py, pero
+# no se reutiliza ese diccionario: ahí las claves incluyen "divisas", que no
+# despacha cotizaciones aquí.
+_NOMBRE_PROVEEDOR = {
+    "eodhd": "EODHD",
+    "yahoo": "Yahoo Finance",
+    "alphavantage": "Alpha Vantage",
+    "finnhub": "Finnhub",
+    "tradingview": "TradingView",
+}
 
 _state_lock = Lock()
 _quote_cache: dict = {}          # f"{proveedor}:{symbol}" -> {"quote":, "ts":}
@@ -103,7 +116,7 @@ def _store_quote(cache_key, quote, ttl):
         _quote_cache[cache_key] = {"quote": quote, "ts": time.monotonic()}
 
 
-def fetch_asset_quote(symbol, provider=None, use_cache=True):
+def fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=None):
     """Cotización de un símbolo. Devuelve `(quote, error)` como los clientes.
 
     `use_cache=False` salta la lectura de caché sin desactivarla del todo: el
@@ -112,6 +125,15 @@ def fetch_asset_quote(symbol, provider=None, use_cache=True):
     "Actualizar cotización" (`routes/activos.py`), donde el usuario pide
     explícitamente un dato nuevo y devolverle el de hace unos segundos sería
     justo lo contrario de lo que pidió.
+
+    `target_currency`, si se da, convierte la cotización a esa divisa antes de
+    devolverla y de guardarla en caché -así un acierto de caché no repite la
+    conversión- usando el tipo de cambio en tiempo real. Es la divisa que el
+    activo tiene guardada en `convertCurrency`; vacío (el valor por defecto)
+    deja el precio tal cual lo da el proveedor, que es el comportamiento de
+    siempre. Si la conversión falla (divisa no soportada, servicio de cambio
+    caído), se devuelve la cotización sin convertir en vez de fallar entera
+    una petición que sí tiene un precio válido, solo que en otra divisa.
     """
     symbol = str(symbol or "").strip().upper()
     if not symbol:
@@ -120,9 +142,10 @@ def fetch_asset_quote(symbol, provider=None, use_cache=True):
     proveedor_principal = normalizeMarketProvider(
         str(provider or "").strip(), fallback=inferMarketProviderFromSymbol(symbol)
     )
+    target_currency = str(target_currency or "").strip().upper() or None
 
     ttl = settings.cotizacionTtlSegundos()
-    cache_key = f"{proveedor_principal}:{symbol}"
+    cache_key = f"{proveedor_principal}:{symbol}:{target_currency or 'nativa'}"
     if use_cache:
         cached_quote = _cached_quote(cache_key, ttl)
         if cached_quote is not None:
@@ -136,11 +159,22 @@ def fetch_asset_quote(symbol, provider=None, use_cache=True):
         quote, error = _FETCHERS[candidato](symbol)
 
         if not error:
+            telegram_notifier.notificar_recuperado(_NOMBRE_PROVEEDOR.get(candidato, candidato))
+            if target_currency and target_currency != str(quote.get("currency", "")).strip().upper():
+                converted, conv_error = convert_quote_currency(quote, target_currency)
+                if not conv_error and converted:
+                    quote = converted
             _store_quote(cache_key, quote, ttl)
             return quote, None
 
         if is_rate_limited_error(error):
             _mark_provider_rate_limited(candidato)
+            categoria = "cuota_agotada"
+        elif is_temporary_service_error(error):
+            categoria = "no_responde"
+        else:
+            categoria = "fallo"
+        telegram_notifier.notificar_problema(categoria, _NOMBRE_PROVEEDOR.get(candidato, candidato), error)
 
         last_error = error
 

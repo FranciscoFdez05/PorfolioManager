@@ -9,7 +9,8 @@ def readAssetFile(assetId):
 
     row = conn.execute(
         "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
-        "sort_order, price, currency, change, status, last_updated, color, tv_symbol, hidden "
+        "sort_order, price, currency, change, status, last_updated, color, tv_symbol, hidden, "
+        "convert_currency "
         "FROM activos WHERE id = ?",
         (safe_id,)
     ).fetchone()
@@ -34,6 +35,7 @@ def readAssetFile(assetId):
         "color": row["color"],
         "tvSymbol": row["tv_symbol"],
         "hidden": bool(row["hidden"]),
+        "convertCurrency": row["convert_currency"],
     }
 
     result["rows"] = [
@@ -138,15 +140,16 @@ def writeAssetFile(assetId, data):
     conn.execute(
         "INSERT INTO activos "
         "(id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, sort_order, "
-        "price, currency, change, status, last_updated, color, tv_symbol, hidden) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "price, currency, change, status, last_updated, color, tv_symbol, hidden, convert_currency) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT(id) DO UPDATE SET "
         "name=excluded.name, symbol=excluded.symbol, market_provider=excluded.market_provider, "
         "market_symbol=excluded.market_symbol, finnhub_symbol=excluded.finnhub_symbol, "
         "type=excluded.type, sort_order=excluded.sort_order, price=excluded.price, "
         "currency=excluded.currency, "
         "change=excluded.change, status=excluded.status, last_updated=excluded.last_updated, "
-        "color=excluded.color, tv_symbol=excluded.tv_symbol, hidden=excluded.hidden",
+        "color=excluded.color, tv_symbol=excluded.tv_symbol, hidden=excluded.hidden, "
+        "convert_currency=excluded.convert_currency",
         (
             safe_id,
             data.get("name", ""),
@@ -164,6 +167,7 @@ def writeAssetFile(assetId, data):
             data.get("color", ""),
             data.get("tvSymbol", ""),
             1 if data.get("hidden") else 0,
+            data.get("convertCurrency", ""),
         )
     )
 
@@ -230,7 +234,8 @@ def listAssets():
     conn = get_db()
     rows = conn.execute(
         "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
-        "sort_order, price, currency, change, status, last_updated, color, tv_symbol, hidden "
+        "sort_order, price, currency, change, status, last_updated, color, tv_symbol, hidden, "
+        "convert_currency "
         "FROM activos ORDER BY sort_order, symbol"
     ).fetchall()
 
@@ -316,6 +321,7 @@ def listAssets():
             "color": r["color"],
             "tvSymbol": r["tv_symbol"],
             "hidden": bool(r["hidden"]),
+            "convertCurrency": r["convert_currency"],
             "rendimiento": round(rdm, 2),
             "invertidoNeto": round(inverted_neto, 2),
             "rendimientoPct": round(rdm_pct, 2),

@@ -3518,7 +3518,7 @@ function renderAssetTablePage(asset) {
     }
 
     contentArea.innerHTML = `
-        <section class="assetTablePage" data-asset-id="${escapeHtml(asset.id)}" data-asset-type="${escapeHtml(asset.type)}" data-asset-name="${escapeHtml(asset.name)}" data-asset-symbol="${escapeHtml(asset.symbol)}" data-asset-price="${escapeHtml(asset.price || "0,00")}" data-asset-currency="${escapeHtml(asset.currency || "EUR")}" data-asset-change="${escapeHtml(asset.change || "+0,00%")}" data-asset-status="${escapeHtml(asset.status || "Mercado abierto")}" data-asset-last-updated="${escapeHtml(asset.lastUpdated || "")}" data-asset-market-provider="${escapeHtml(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || ""))}" data-asset-market-symbol="${escapeHtml(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-finnhub-symbol="${escapeHtml(asset.finnhubSymbol || "")}" data-asset-color="${escapeHtml(asset.color || "")}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}">
+        <section class="assetTablePage" data-asset-id="${escapeHtml(asset.id)}" data-asset-type="${escapeHtml(asset.type)}" data-asset-name="${escapeHtml(asset.name)}" data-asset-symbol="${escapeHtml(asset.symbol)}" data-asset-price="${escapeHtml(asset.price || "0,00")}" data-asset-currency="${escapeHtml(asset.currency || "EUR")}" data-asset-change="${escapeHtml(asset.change || "+0,00%")}" data-asset-status="${escapeHtml(asset.status || "Mercado abierto")}" data-asset-last-updated="${escapeHtml(asset.lastUpdated || "")}" data-asset-market-provider="${escapeHtml(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || ""))}" data-asset-market-symbol="${escapeHtml(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-finnhub-symbol="${escapeHtml(asset.finnhubSymbol || "")}" data-asset-color="${escapeHtml(asset.color || "")}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}" data-asset-convert-currency="${escapeHtml(asset.convertCurrency || "")}">
             <div class="assetPageHeader">
                 <div class="assetHeaderLeft">
                     <div class="assetTitleRow">
@@ -4238,6 +4238,15 @@ function openEditAssetModal(assetData = null) {
         delete editAssetTickerInput.dataset.marketProvider
     }
     reorderProviderSearchButtons("editAssetSearchActions", preferredProvider)
+    const currentConvertCurrency =
+        assetData?.convertCurrency || assetPage?.dataset.assetConvertCurrency || ""
+    const editConvertCurrencyToggle = document.getElementById("editAssetConvertCurrencyToggle")
+    const editConvertCurrencySelect = document.getElementById("editAssetConvertCurrencySelect")
+    if (editConvertCurrencyToggle && editConvertCurrencySelect) {
+        editConvertCurrencyToggle.checked = !!currentConvertCurrency
+        editConvertCurrencySelect.value = currentConvertCurrency || "EUR"
+        editConvertCurrencySelect.classList.toggle("hidden", !currentConvertCurrency)
+    }
     const editTVTickerInput = document.getElementById("editAssetTVTickerInput")
     if (editTVTickerInput)
         editTVTickerInput.value = decodeTVTicker(assetData?.tvSymbol || assetPage?.dataset.assetTvSymbol || "")
@@ -4269,10 +4278,11 @@ function closeEditAssetModal() {
 
 // Base sobre la que se guarda una edición del activo.
 //
-// El guardado reescribe el activo entero, y el modal solo edita cuatro campos
-// de cabecera: nombre, ticker, color y ticker de TradingView. Todo lo demás
-// —operaciones, conversiones, precio, divisa— tiene que viajar intacto o el
-// guardado lo borra. `buildCurrentAssetPayload` saca las filas de la tabla de
+// El guardado reescribe el activo entero, y el modal solo edita cinco campos
+// de cabecera: nombre, ticker, color, ticker de TradingView y la divisa de
+// conversión de la cotización. Todo lo demás —operaciones, conversiones,
+// precio— tiene que viajar intacto o el guardado lo borra.
+// `buildCurrentAssetPayload` saca las filas de la tabla de
 // operaciones, así que solo sirve con esa tabla en pantalla: desde la vista de
 // Activos, sin ella, devolvía un activo sin filas y cambiar el color se llevaba
 // por delante todo el historial de compras.
@@ -4316,6 +4326,9 @@ async function submitEditAssetModal() {
         .toLowerCase()
     const providerChanged = !!explicitProvider && explicitProvider !== currentProvider
     const newTVTicker = decodeTVTicker(document.getElementById("editAssetTVTickerInput")?.value)
+    const convertCurrencyToggle = document.getElementById("editAssetConvertCurrencyToggle")
+    const convertCurrencySelect = document.getElementById("editAssetConvertCurrencySelect")
+    const newConvertCurrency = convertCurrencyToggle?.checked ? convertCurrencySelect?.value || "" : ""
 
     if (!trimmedName) {
         editAssetNameInput.focus()
@@ -4327,7 +4340,8 @@ async function submitEditAssetModal() {
         newColor === (payload.color || "") &&
         newTicker === currentTicker &&
         !providerChanged &&
-        newTVTicker === (payload.tvSymbol || "")
+        newTVTicker === (payload.tvSymbol || "") &&
+        newConvertCurrency === (payload.convertCurrency || "")
     ) {
         closeEditAssetModal()
         return
@@ -4341,6 +4355,7 @@ async function submitEditAssetModal() {
     payload.marketSymbol = newTicker
     payload.finnhubSymbol = newTicker
     payload.tvSymbol = newTVTicker
+    payload.convertCurrency = newConvertCurrency
     if (explicitProvider) {
         payload.marketProvider = explicitProvider
     } else if (newTicker !== currentTicker) {
@@ -4367,7 +4382,9 @@ async function submitEditAssetModal() {
                 color: updatedAsset.color,
                 marketSymbol: updatedAsset.marketSymbol,
                 finnhubSymbol: updatedAsset.finnhubSymbol,
-                tvSymbol: updatedAsset.tvSymbol
+                marketProvider: updatedAsset.marketProvider,
+                tvSymbol: updatedAsset.tvSymbol,
+                convertCurrency: updatedAsset.convertCurrency
             }
         avRender()
     } else {
@@ -5217,6 +5234,14 @@ function initEditAssetModal() {
         })
     }
 
+    const editConvertCurrencyToggle = document.getElementById("editAssetConvertCurrencyToggle")
+    const editConvertCurrencySelect = document.getElementById("editAssetConvertCurrencySelect")
+    if (editConvertCurrencyToggle && editConvertCurrencySelect) {
+        editConvertCurrencyToggle.addEventListener("change", () => {
+            editConvertCurrencySelect.classList.toggle("hidden", !editConvertCurrencyToggle.checked)
+        })
+    }
+
     if (editAssetNameInput) {
         editAssetNameInput.addEventListener("keydown", async (event) => {
             if (event.key === "Enter") {
@@ -5239,7 +5264,11 @@ function initEditAssetModal() {
                 .toLowerCase()
             reorderProviderSearchButtons("editAssetSearchActions", editAssetTickerInput.dataset.marketProvider)
         }
-        setAssetSearchFeedback(editAssetSearchFeedback, `Ticker seleccionado (${providerName}): ${result.symbol}`)
+        const sinCotizacion = String(result.price || "").trim() === ""
+        const mensaje = sinCotizacion
+            ? `Ticker seleccionado (${providerName}): ${result.symbol} — sin cotización disponible, el precio no se actualizará solo`
+            : `Ticker seleccionado (${providerName}): ${result.symbol}`
+        setAssetSearchFeedback(editAssetSearchFeedback, mensaje, sinCotizacion)
         renderMarketSearchResults(editAssetSearchResults, [], () => {})
     }
 
@@ -5465,7 +5494,11 @@ function initAssetModal(
             assetNameInput.value = result.description
         }
 
-        setAssetSearchFeedback(assetSearchFeedback, `Ticker seleccionado (${providerName}): ${result.symbol}`)
+        const sinCotizacion = String(result.price || "").trim() === ""
+        const mensaje = sinCotizacion
+            ? `Ticker seleccionado (${providerName}): ${result.symbol} — sin cotización disponible, el precio no se actualizará solo`
+            : `Ticker seleccionado (${providerName}): ${result.symbol}`
+        setAssetSearchFeedback(assetSearchFeedback, mensaje, sinCotizacion)
         renderMarketSearchResults(assetSearchResults, [], () => {})
     }
 

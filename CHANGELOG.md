@@ -22,10 +22,34 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.6.0] — 2026-09-26
+
+**Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Añadido
+
+**Avisos por Telegram cuando falla un proveedor de cotizaciones.** Nueva
+sección en Ajustes › Conexiones para dar el token del bot y el ID de chat: se
+guardan cifrados igual que las claves de API, no en `ajustes.json`. Cuando un
+proveedor se queda sin cuota, deja de responder o falla al pedir una
+cotización real, llega un aviso a Telegram con el motivo; si después vuelve a
+responder, llega un segundo aviso diciéndolo. Un mismo aviso no se repite
+antes de 30 minutos, para que un refresco de cartera que reintenta el mismo
+proveedor en cada activo no acabe mandando un mensaje por activo. Un botón
+«Enviar prueba» comprueba la conexión sin esperar a que falle nada.
+
+---
+
 ## [2.5.0] — 2026-09-25
 
-**Esquema de base de datos:** no lo toca (sigue en la versión **7**). Para
-deshacer la actualización basta con volver a la imagen anterior.
+**Esquema de base de datos:** lo sube a la **8** (columna `convert_currency`
+en `activos`, vacía por defecto y sin tocar ninguna fila existente). Para
+deshacer la actualización, levantar la imagen anterior y restaurar
+`data/backups/auto/<portfolio>_pre-esquema-7-a-8_*.db`.
 
 **Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
 Ajustes › Datos. Nada que editar a mano.
@@ -46,8 +70,27 @@ diálogo «Gráfico» del panel lateral) usa ese mismo ticker de mercado cuando 
 activo no tiene un «Ticker TradingView» propio puesto a mano: antes, un activo
 dado de alta con este proveedor nuevo se quedaba sin esa rama y el iframe
 cargaba el símbolo del activo en vez de un ticker real de TradingView, así que
-el gráfico salía en blanco o con el instrumento equivocado. Ajustes › Datos ya
-incluye TradingView en el diagnóstico de proveedores.
+el gráfico salía en blanco o con el instrumento equivocado. No todos los
+listados tienen cotización disponible por esta vía -algunos brokers de CFD y
+bolsas regionales pequeñas (comprobado con GETTEX y con pares en EUR de
+algunos brokers de materias primas vía OANDA) no están en el buscador
+gratuito de TradingView aunque el instrumento cotice y se vea bien en su
+propia web-, así que entre varios listados del mismo activo se antepone el
+que sí tiene precio, aunque el buscador de TradingView lo devolviera en peor
+posición; si aun así ninguno lo tiene, el aviso lo dice explícitamente en vez
+de guardarlo sin más. Ajustes › Datos ya incluye TradingView en el diagnóstico de
+proveedores.
+
+**Convertir la cotización a otra divisa, en tiempo real.** Un interruptor
+nuevo en «Editar activo», junto al ticker: apagado (la opción por defecto) la
+cotización se guarda tal cual la da el proveedor, como siempre. Encendido, se
+elige una divisa (EUR, USD, GBP, CHF o JPY) y cada cotización que llega se
+convierte a esa divisa con el tipo de cambio del momento antes de guardarse
+-mismo mecanismo que ya usaba en solitario el botón «Actualizar cotización»,
+ahora explícito y disponible también para el resto de refrescos. Sirve, por
+ejemplo, para activos que un proveedor solo cotiza en dólares (los futuros de
+oro y plata de Yahoo Finance, `GC=F`/`SI=F`) y se quieren ver en euros sin
+depender de un proveedor con cuota mucho más corta.
 
 **Mapas: periodo «Todo» en el mapa de la cuenta.** Junto a Día, Semana, Mes,
 Año e YTD, un botón **Todo** que pinta cada posición con su rendimiento desde
@@ -79,6 +122,12 @@ Métricas. Lo realizado de cada activo está en el tooltip de su porción y en e
 de su fila de la leyenda.
 
 ### Corregido
+
+**La columna «Provider» de Activos no se actualizaba al cambiar de
+proveedor.** Editar un activo desde la lista guardaba bien el proveedor nuevo
+en el servidor, pero la copia en memoria que pinta esa lista solo se refrescaba
+con el nombre, el color y el ticker: el proveedor se quedaba con el valor
+viejo hasta recargar la página entera.
 
 **Precio medio de las operaciones spot completadas, otra vez en el precio de
 ejecución.** La 2.2.0 pasó a valorar el lote con el «Total» de la operación

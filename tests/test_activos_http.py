@@ -318,6 +318,67 @@ def test_refrescar_un_activo_inexistente_es_404(cliente):
     assert respuesta.status_code == 404
 
 
+def test_refrescar_pasa_convert_currency_a_fetch_asset_quote(cliente, monkeypatch):
+    """`convertCurrency` es la única preferencia del activo que este botón no
+    lee de sus propios parámetros de ruta: viaja en el propio registro, así
+    que hay que comprobar que de verdad llega a `fetch_asset_quote`."""
+    import routes.activos as activos_route
+
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Oro", tipo="comoditis", marketSymbol="GC=F", marketProvider="yahoo")
+    client.post(
+        "/api/activos/oro",
+        json={
+            "name": "Oro", "type": "comoditis", "marketSymbol": "GC=F",
+            "marketProvider": "yahoo", "convertCurrency": "eur", "rows": []
+        },
+        headers=cabeceras,
+    )
+
+    llamadas = []
+
+    def fake_fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=None):
+        llamadas.append((symbol, provider, target_currency))
+        return {
+            "symbol": symbol, "price": "4000,00", "currency": "EUR", "change": "+0,00%",
+            "status": "Cotización actualizada", "lastUpdated": "2026-01-01T00:00:00",
+            "marketData": {}
+        }, None
+
+    monkeypatch.setattr(activos_route, "fetch_asset_quote", fake_fetch_asset_quote)
+
+    respuesta = client.post("/api/activos/oro/refresh-market-data", headers=cabeceras)
+
+    assert respuesta.status_code == 200
+    assert llamadas == [("GC=F", "yahoo", "EUR")]
+    assert respuesta.get_json()["asset"]["currency"] == "EUR"
+
+
+def test_refrescar_sin_convert_currency_no_pide_conversion(cliente, monkeypatch):
+    import routes.activos as activos_route
+
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Apple", tipo="acciones", marketSymbol="AAPL", marketProvider="finnhub")
+
+    llamadas = []
+
+    def fake_fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=None):
+        llamadas.append(target_currency)
+        return {
+            "symbol": symbol, "price": "230,00", "currency": "USD", "change": "+0,00%",
+            "status": "Cotización actualizada", "lastUpdated": "2026-01-01T00:00:00",
+            "marketData": {}
+        }, None
+
+    monkeypatch.setattr(activos_route, "fetch_asset_quote", fake_fetch_asset_quote)
+
+    respuesta = client.post("/api/activos/apple/refresh-market-data", headers=cabeceras)
+
+    assert respuesta.status_code == 200
+    assert llamadas == [None]
+    assert respuesta.get_json()["asset"]["currency"] == "USD"
+
+
 # ── Rendimiento agregado ─────────────────────────────────────────────────────
 
 def _ficha_con_filas(client, cabeceras, nombre, precio, filas, tipo="acciones"):

@@ -2241,6 +2241,22 @@ table td.numCell [contenteditable="true"] {
     margin-left: 4px;
 }
 
+.assetConvertCurrencyRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 14px 0 8px;
+}
+.assetConvertCurrencyLabel {
+    color: #d7e3f6;
+    font-size: 14px;
+    font-weight: 700;
+}
+#editAssetConvertCurrencySelect {
+    margin-bottom: 8px;
+}
+
 .assetModalCsTrigger {
     display: flex;
     align-items: center;
