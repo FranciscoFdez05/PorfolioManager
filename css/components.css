@@ -577,12 +577,12 @@ body.asset-rotation-halted .detailRotationBar span {
     background: var(--bg-surface);
     border: 1px solid var(--border-mid);
     border-radius: 10px;
-    padding: 8px 14px;
+    padding: 10px 16px;
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    width: 180px;
-    flex: 0 0 auto;
+    gap: 4px;
+    flex: 1 1 180px;
+    min-width: 180px;
 }
 
 .assetStatLabel {
@@ -613,12 +613,13 @@ body.asset-rotation-halted .detailRotationBar span {
     white-space: nowrap;
 }
 
-/* Las demás tarjetas miden lo mismo siempre; esta es la única que a veces lleva
-   el desglose detrás, así que es la única a la que se le deja crecer, y solo a
-   lo ancho. Sin desglose —un activo en euros— se queda en los 180px de todas. */
+/* Todas las tarjetas crecen igual para llenar la cabecera, pero esta a veces
+   lleva detrás el desglose activo/divisa (en una sola línea, ver
+   .assetStatValueRow), así que le hace falta más hueco de partida que a las
+   demás para no verse apretada cuando aparece. */
 .assetStatCardPnL {
-    width: auto;
-    min-width: 180px;
+    flex-grow: 1.6;
+    min-width: 220px;
 }
 
 .assetStatSub {

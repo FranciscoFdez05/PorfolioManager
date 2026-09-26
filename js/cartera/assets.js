@@ -3531,16 +3531,16 @@ function renderAssetTablePage(asset) {
                 </div>
                 <div class="assetStatsPanel" id="assetStatsPanel">
                     <div class="assetStatCard">
+                        <span class="assetStatLabel">Precio actual</span>
+                        <span class="assetStatValue" id="assetStatPrecioActual">—</span>
+                    </div>
+                    <div class="assetStatCard">
                         <span class="assetStatLabel">Cantidad</span>
                         <span class="assetStatValue" id="assetStatCantidad">—</span>
                     </div>
                     <div class="assetStatCard">
                         <span class="assetStatLabel">Precio medio de compra</span>
                         <span class="assetStatValue" id="assetStatPrecioMedio">—</span>
-                    </div>
-                    <div class="assetStatCard">
-                        <span class="assetStatLabel">Precio actual</span>
-                        <span class="assetStatValue" id="assetStatPrecioActual">—</span>
                     </div>
                     <div class="assetStatCard">
                         <span class="assetStatLabel">Capital invertido</span>

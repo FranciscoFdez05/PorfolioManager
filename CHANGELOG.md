@@ -22,6 +22,26 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.8.1] — 2026-09-26
+
+**Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Corregido
+
+**La tarjeta «Precio actual» de la ficha del activo, reordenada y con más
+espacio.** Se movió delante de «Cantidad», junto al resto de datos de la
+posición, en vez de quedar suelta entre «Precio medio de compra» y «Capital
+invertido». Las tarjetas del panel ahora reparten el ancho disponible en vez
+de tener uno fijo, y la de ganancias/pérdidas —la única que a veces lleva el
+desglose activo/divisa detrás— parte con más hueco para no verse apretada
+cuando aparece.
+
+---
+
 ## [2.8.0] — 2026-09-26
 
 **Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la
