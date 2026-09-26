@@ -124,6 +124,13 @@
     opacity: 1;
 }
 
+.sttNavDivider {
+    height: 1px;
+    background: var(--border-soft);
+    margin: 8px 10px;
+    flex-shrink: 0;
+}
+
 .sttContent {
     flex: 1;
     min-width: 0;

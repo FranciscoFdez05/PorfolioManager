@@ -12,8 +12,9 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from admin.backup_manager import _remove_wal_sidecars
+from admin.backup_manager import _remove_wal_sidecars, _ruta_bloqueo
 from core import paths, settings
+from core.bloqueo import BloqueoOcupado, exclusivo
 from core.errors import mensajeAlmacenamiento, registrarFalloEscritura
 from core.escritura import escribirAtomico, limpiarTemporal, rutaTemporal, temporalPara
 from core.paths import (
@@ -28,12 +29,42 @@ from routes.ajustes import _read_ajustes
 
 log = logging.getLogger(__name__)
 
-# Serializa crear/restaurar/borrar backups. Dos restores simultáneos (o un
-# restore mientras se crea un backup) se pisaban los ficheros .db a medio
-# escribir y dejaban la BD activa corrupta.
+# Serializa crear/restaurar/borrar backups DENTRO de este proceso. Dos
+# restores simultáneos (o un restore mientras se crea un backup) se pisaban
+# los ficheros .db a medio escribir y dejaban la BD activa corrupta.
+#
+# No basta por sí solo: gunicorn levanta dos workers —dos procesos de Python,
+# cada uno con su propio `_BACKUP_LOCK`— y un restore en uno de ellos no
+# bloqueaba nada en el otro. Ahí es donde entra `_bloqueo_cruzado()`, el mismo
+# bloqueo de fichero que ya usa la copia automática del scheduler en
+# admin.backup_manager para lo mismo.
 _BACKUP_LOCK = threading.Lock()
 
 backup_bp = Blueprint("backup", __name__)
+
+
+@contextmanager
+def _bloqueo_cruzado():
+    """Bloqueo entre PROCESOS, compartido con la copia automática del scheduler.
+
+    `_BACKUP_LOCK` protege los hilos de este worker; esto protege del otro
+    worker de gunicorn, que corre en un proceso aparte y no ve ese Lock.
+    Comparte el mismo fichero que `admin.backup_manager._ruta_bloqueo()`
+    porque los dos tocan exactamente los mismos .db de data/portfolios.
+
+    Espera unos segundos en vez de rendirse al primer intento: una copia
+    automática dura poco, y merece la pena esperarla antes de decirle al
+    usuario que lo intente de nuevo.
+    """
+    with exclusivo(_ruta_bloqueo(), espera=30):
+        yield
+
+
+def _respuesta_bloqueo_ocupado():
+    return jsonify({
+        "ok": False,
+        "error": "Hay otra copia de seguridad en curso en el servidor; inténtalo de nuevo en unos segundos.",
+    }), 503
 
 
 # Las copias automáticas llevan el sufijo `_auto`: mismo formato y misma lista
@@ -130,6 +161,25 @@ def _sqlite_copy(src_path: Path, dst_path: Path):
                     conn.close()
                 except Exception:
                     pass
+
+
+def _reemplazar_atomico_via_sqlite(origen: Path, destino: Path):
+    """Sustituye `destino` por una copia de `origen`, sin dejarlo nunca a medias.
+
+    `_sqlite_copy(origen, destino)` a secas escribe directamente sobre
+    `destino` — que en un restore es el .db activo—: si la copia se
+    interrumpe (el worker de gunicorn muere por timeout, otro proceso tiene
+    el fichero bloqueado, el disco falla a mitad), lo que queda no es ni el
+    backup nuevo ni los datos antiguos, sino un portfolio roto. Aquí la copia
+    va primero a un temporal en la misma carpeta que `destino` —mismo
+    sistema de ficheros, para que el rename final sea atómico de verdad— y
+    solo se sustituye si termina bien.
+    """
+    with temporalPara(destino) as tmp:
+        _sqlite_copy(origen, tmp)
+        _remove_wal_sidecars(tmp)
+        tmp.replace(destino)
+    _remove_wal_sidecars(destino)
 
 
 def _safety_copy_before_restore() -> Path | None:
@@ -235,8 +285,11 @@ def _export_snapshots_json(db_path: Path) -> str:
 
 @backup_bp.route("/api/backup", methods=["POST"])
 def createBackup():
-    with _BACKUP_LOCK:
-        return _create_backup_locked()
+    try:
+        with _bloqueo_cruzado(), _BACKUP_LOCK:
+            return _create_backup_locked()
+    except BloqueoOcupado:
+        return _respuesta_bloqueo_ocupado()
 
 
 def crear_backup_automatico() -> str:
@@ -410,8 +463,11 @@ def listBackups():
 
 @backup_bp.route("/api/restore", methods=["POST"])
 def restoreBackup():
-    with _BACKUP_LOCK:
-        return _restore_locked()
+    try:
+        with _bloqueo_cruzado(), _BACKUP_LOCK:
+            return _restore_locked()
+    except BloqueoOcupado:
+        return _respuesta_bloqueo_ocupado()
 
 
 def es_backup_completo(nombres) -> bool:
@@ -435,8 +491,11 @@ def restaurar_backup_subido(zip_path: Path):
     respuesta es la misma que la de /api/restore —incluidos `safetyCopy` e
     `ignorados`—, que es justo lo que el usuario necesita saber.
     """
-    with _BACKUP_LOCK:
-        return _restaurar_archivo(zip_path, zip_path.name, es_zip=True)
+    try:
+        with _bloqueo_cruzado(), _BACKUP_LOCK:
+            return _restaurar_archivo(zip_path, zip_path.name, es_zip=True)
+    except BloqueoOcupado:
+        return _respuesta_bloqueo_ocupado()
 
 
 def _restore_locked():
@@ -508,8 +567,7 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
                         tmp_path = rutaTemporal(dst_path, directorio=_tmp_dir())
                         try:
                             tmp_path.write_bytes(raw)
-                            _sqlite_copy(tmp_path, dst_path)
-                            _remove_wal_sidecars(dst_path)
+                            _reemplazar_atomico_via_sqlite(tmp_path, dst_path)
                         except Exception as e:
                             # La cabecera "SQLite format 3" son 16 bytes: acertarla
                             # no garantiza que el resto del fichero sea legible.
@@ -598,8 +656,7 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
             # Formato legacy .db: restaura solo el portfolio activo
             from core.db import get_active_db_path
             active_db = get_active_db_path()
-            _sqlite_copy(backup_path, active_db)
-            _remove_wal_sidecars(active_db)
+            _reemplazar_atomico_via_sqlite(backup_path, active_db)
 
             ts_m = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', filename)
             if ts_m:
@@ -643,22 +700,25 @@ def deleteBackup(filename):
     if not backup_path.exists():
         return jsonify({"ok": False, "error": "Backup no encontrado"}), 404
 
-    with _BACKUP_LOCK:
-        # No dejar al usuario sin ningún backup: el último es la única red de
-        # seguridad frente a una corrupción o un borrado accidental.
-        if len(_list_backups()) <= 1:
-            return jsonify({
-                "ok": False,
-                "error": "No se puede eliminar el único backup existente",
-            }), 400
-        try:
-            backup_path.unlink(missing_ok=True)
-        except OSError as e:
-            log.exception("[backup] No se pudo eliminar %s", filename)
-            return jsonify({
-                "ok": False,
-                "error": mensajeAlmacenamiento(e, backup_path),
-            }), 500
+    try:
+        with _bloqueo_cruzado(), _BACKUP_LOCK:
+            # No dejar al usuario sin ningún backup: el último es la única red de
+            # seguridad frente a una corrupción o un borrado accidental.
+            if len(_list_backups()) <= 1:
+                return jsonify({
+                    "ok": False,
+                    "error": "No se puede eliminar el único backup existente",
+                }), 400
+            try:
+                backup_path.unlink(missing_ok=True)
+            except OSError as e:
+                log.exception("[backup] No se pudo eliminar %s", filename)
+                return jsonify({
+                    "ok": False,
+                    "error": mensajeAlmacenamiento(e, backup_path),
+                }), 500
+    except BloqueoOcupado:
+        return _respuesta_bloqueo_ocupado()
 
     # Borrar ajustes snapshot legacy si existe
     ts_m = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', filename)

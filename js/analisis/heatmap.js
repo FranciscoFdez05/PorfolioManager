@@ -210,6 +210,10 @@ async function hmLoadData() {
                     type: (asset.type || "acciones").toLowerCase(),
                     price: asset.price || "---",
                     currency: cur,
+                    marketSymbol: asset.marketSymbol || "",
+                    finnhubSymbol: asset.finnhubSymbol || "",
+                    marketProvider: asset.marketProvider || "",
+                    tvSymbol: asset.tvSymbol || "",
                     netoEur,
                     invertidoEur,
                     cuentaPct,
@@ -445,17 +449,15 @@ function hmBindContainer(container) {
 
     container.addEventListener("mouseleave", () => hmGetTooltip().classList.remove("hmTooltipVisible"))
 
-    // Una baldosa es el activo: al pulsarla se abre su ficha, igual que al
-    // pulsar su fila en la vista general.
+    // Una baldosa es el activo: al pulsarla se abre su gráfico de TradingView
+    // en el mismo modal flotante que usan Seguimiento y Planes.
     container.addEventListener("click", (e) => {
         const cell = e.target.closest(".heatmapCell")
-        const id = cell?._hmData?.id
-        if (!id) return
+        const d = cell?._hmData
+        if (!d) return
         hmGetTooltip().classList.remove("hmTooltipVisible")
-        if (typeof clearNavSelection === "function") clearNavSelection()
-        if (typeof selectAsset === "function") {
-            Promise.resolve(selectAsset(id)).catch((err) => console.error("No se pudo abrir el activo:", err))
-        }
+        const tvSym = typeof buildTVSymbol === "function" ? buildTVSymbol(d) : d.tvSymbol || d.marketSymbol || ""
+        if (tvSym && typeof openTVChartModal === "function") openTVChartModal(tvSym, d.name || d.symbol)
     })
 }
 

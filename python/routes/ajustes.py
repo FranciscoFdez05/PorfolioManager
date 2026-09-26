@@ -441,7 +441,7 @@ def save_settings():
     if "autoRefreshMinutes" in data:
         gcfg["autoRefreshMinutes"] = _as_int(data["autoRefreshMinutes"], 0, {0, 1, 5, 15, 30, 60})
     if "snapshotMinutes" in data:
-        gcfg["snapshotMinutes"] = _as_int(data["snapshotMinutes"], 60, {0, 5, 15, 30, 60, 240, 1440})
+        gcfg["snapshotMinutes"] = _as_int(data["snapshotMinutes"], 60, {0, 1, 5, 15, 30, 60, 240, 1440})
     if "snapshotAlcance" in data:
         alcance = str(data["snapshotAlcance"]).strip().lower()
         gcfg["snapshotAlcance"] = alcance if alcance in {"activo", "todos"} else "activo"

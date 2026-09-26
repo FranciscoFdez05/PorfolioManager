@@ -135,8 +135,12 @@ def test_las_copias_temporales_no_se_dejan_caer_en_portfolios(cliente):
     assert client.post("/api/backup", headers=cabeceras).get_json()["ok"] is True
 
     assert sorted(p.name for p in rutas["portfolios"].iterdir()) == ["principal.db"]
-    # Y el temporal tampoco se queda: ni el .db ni sus sidecars -wal/-shm.
-    assert list((rutas["data"] / "tmp").iterdir()) == []
+    # Y el temporal tampoco se queda: ni el .db ni sus sidecars -wal/-shm. El
+    # único fichero que sí es normal encontrar aquí es el lock entre procesos
+    # que comparte con la copia automática del scheduler (admin.backup_manager):
+    # no es un temporal a medio escribir, vive todo lo que vive el proceso.
+    restantes = [p.name for p in (rutas["data"] / "tmp").iterdir()]
+    assert restantes == ["backup-automatico.lock"]
 
 
 def test_un_fallo_de_permisos_se_devuelve_con_su_causa(cliente, monkeypatch):

@@ -3539,6 +3539,10 @@ function renderAssetTablePage(asset) {
                         <span class="assetStatValue" id="assetStatPrecioMedio">—</span>
                     </div>
                     <div class="assetStatCard">
+                        <span class="assetStatLabel">Precio actual</span>
+                        <span class="assetStatValue" id="assetStatPrecioActual">—</span>
+                    </div>
+                    <div class="assetStatCard">
                         <span class="assetStatLabel">Capital invertido</span>
                         <span class="assetStatValue" id="assetStatInvertido">—</span>
                     </div>
@@ -4825,12 +4829,14 @@ function refreshAssetHeaderStats(asset) {
         const netoEl = document.getElementById("assetStatNetoActual")
         const cantidadEl = document.getElementById("assetStatCantidad")
         const precioMedioEl = document.getElementById("assetStatPrecioMedio")
+        const precioActualEl = document.getElementById("assetStatPrecioActual")
         const invertidoEl = document.getElementById("assetStatInvertido")
         const pnlEl = document.getElementById("assetStatPnL")
         const pnlPctEl = document.getElementById("assetStatPnLPct")
         if (netoEl) netoEl.textContent = formatMoney(summary.netoActual, currency)
         if (cantidadEl) cantidadEl.textContent = formatAssetParticipationValue(summary.participaciones, asset.type)
         if (precioMedioEl) precioMedioEl.textContent = formatMoney(summary.promedioCompra, currency)
+        if (precioActualEl) precioActualEl.textContent = formatMoney(summary.valorActual, currency)
         if (invertidoEl) invertidoEl.textContent = formatMoney(summary.invertidoNeto, currency)
         if (pnlEl) {
             pnlEl.textContent = (pnl >= 0 ? "+" : "") + formatMoney(pnl, currency)

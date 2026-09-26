@@ -22,6 +22,59 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.8.0] — 2026-09-26
+
+**Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Añadido
+
+**«Precio actual» en la ficha del activo.** Junto a «Precio medio de compra»,
+una tarjeta nueva enseña la última cotización tal cual la tiene la aplicación
+—el mismo dato que ya usaba para calcular el valor de la posición—, para
+poder comparar de un vistazo lo que costó y lo que vale ahora sin tener que
+restarlo a mano.
+
+### Cambiado
+
+**Ajustes reorganizado.** «Tipos de cambio» pasa de API a Portfolio (va con
+la moneda base y las divisas fiat) y «Cambiar contraseña» pasa de Seguridad a
+Cuenta (junto a «Cambiar nombre de usuario»). El menú lateral agrupa ahora las
+pestañas por tema con un separador, y Portfolio, API y Datos quedan
+reordenadas para que ninguna de las dos columnas se quede mucho más larga que
+la otra. Automatización gana un intervalo de «1 min» para el refresco de
+precios y para el histórico de evolución del portfolio, y la sección de
+«Tipos de cambio» explica que el dato del BCE cambia una vez por día hábil,
+no cada vez que se comprueba.
+
+**El mapa de calor abre el gráfico, no la ficha.** Pulsar una baldosa lleva
+directo al gráfico de TradingView del activo, en el mismo modal flotante que
+ya usan Seguimiento y Planes, en vez de navegar a su ficha completa: para
+mirar un precio de un vistazo no hace falta salir del mapa.
+
+### Corregido
+
+**Un backup o un restore podían corromperse con dos workers de Gunicorn.**
+El bloqueo que serializaba crear, restaurar y borrar copias vivía en memoria
+de un solo proceso; con los dos workers que levanta Gunicorn, cada uno tenía
+el suyo y no se enteraba del otro, así que dos peticiones a la vez —una a
+cada worker— podían pisarse los mismos ficheros `.db` a medio escribir.
+Ahora comparten el mismo bloqueo de fichero entre procesos que ya usaba la
+copia automática del scheduler; si llega una petición mientras el bloqueo
+está ocupado, espera unos segundos antes de responder que se reintente.
+
+**Un restore interrumpido podía dejar la base de datos activa a medias.**
+Restaurar escribía directamente sobre el `.db` en uso: si el proceso moría a
+mitad de copia —timeout del worker, disco lleno, el fichero bloqueado por
+otro proceso—, no quedaban ni los datos nuevos ni los antiguos, sino un
+portfolio roto. Ahora la copia va primero a un temporal en el mismo disco y
+solo sustituye al activo con un movimiento atómico si termina bien.
+
+---
+
 ## [2.7.0] — 2026-09-26
 
 **Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la
