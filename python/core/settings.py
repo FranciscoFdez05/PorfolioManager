@@ -218,6 +218,14 @@ CATALOGO: tuple[Ajuste, ...] = (
            minimo=0, maximo=3600,
            descripcion="Vida de la caché de cotizaciones en memoria (dashboard, cartera y gráfico "
                        "piden el mismo activo casi a la vez). 0 desactiva la caché."),
+    Ajuste("mercado", "orden_respaldo", LISTA, ("finnhub", "yahoo", "tradingview", "eodhd", "alphavantage"),
+           env="MERCADO_ORDEN_RESPALDO", vaciarEsExplicito=True,
+           descripcion="Proveedores que se prueban, en este orden, cuando falla el del activo. Vacío: "
+                       "sin respaldo, solo el proveedor elegido."),
+    Ajuste("mercado", "reposo_limite_segundos", ENTERO, 300, env="MERCADO_REPOSO_LIMITE",
+           minimo=0, maximo=86400,
+           descripcion="Segundos que se deja de pedir a un proveedor tras un límite de peticiones "
+                       "(429/cuota). 0 no lo deja en reposo."),
     Ajuste("mercado", "max_peticiones_paralelas", ENTERO, 6, env="MERCADO_MAX_PARALELAS", minimo=1, maximo=64,
            descripcion="Cotizaciones que se piden a la vez. Subirlo agota antes la cuota del proveedor."),
     Ajuste("mercado", "snapshot_intervalo_minimo_segundos", ENTERO, 60, env="MERCADO_SNAPSHOT_MIN",
@@ -425,6 +433,14 @@ def historicoTtlSegundos() -> int:
 
 def cotizacionTtlSegundos() -> int:
     return obtener("mercado.cotizacion_ttl_segundos")
+
+
+def ordenRespaldoProveedores() -> list:
+    return obtener("mercado.orden_respaldo")
+
+
+def reposoLimiteSegundos() -> int:
+    return obtener("mercado.reposo_limite_segundos")
 
 
 def maxPeticionesParalelas() -> int:

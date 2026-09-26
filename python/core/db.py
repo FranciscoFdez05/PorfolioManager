@@ -1128,14 +1128,12 @@ def _esquema_7(conn):
 
 @_migracion(8)
 def _esquema_8(conn):
-    """Divisa de conversión de la cotización, por activo.
+    """Divisa fijada a mano para la cotización, por activo.
 
-    Antes la cotización se guardaba siempre en la divisa nativa del proveedor
-    (o, de rebote, en la que ya tuviera el activo si `refresh-market-data`
-    encontraba una distinta - un efecto implícito, no una opción). Esta
-    columna la hace explícita y opcional: vacía es "tal cual venga del
-    proveedor" (el comportamiento de siempre); con un código de divisa,
-    `fetch_asset_quote` convierte antes de guardar.
+    La cotización se guarda siempre convertida a la divisa del activo (que es
+    también la de lo invertido). Esta columna recuerda que el usuario la eligió
+    desde el interruptor de «Editar activo» y cuál: vacía, el activo conserva
+    la divisa que tenga; con un código, esa pasa a ser la del activo.
     """
     activos_cols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
     if "convert_currency" not in activos_cols:

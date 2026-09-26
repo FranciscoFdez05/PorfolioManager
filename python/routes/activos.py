@@ -16,10 +16,10 @@ from stores.asset_store import (
 )
 from stores.asset_utils import (
     _MAX_TICKER,
+    SUPPORTED_ASSET_CURRENCIES,
     _trunc,
     createDefaultAssetPayload,
     inferMarketProviderFromSymbol,
-    normalizeConvertCurrency,
     normalizeMarketProvider,
     sanitize_color,
     sanitizeAssetPayload,
@@ -36,8 +36,6 @@ from stores.helpers import (
 from stores.market_data import fetch_asset_quote
 
 activos_bp = Blueprint("activos", __name__)
-
-SUPPORTED_ASSET_CURRENCIES = {"EUR", "USD", "GBP", "CHF", "JPY"}
 
 
 @activos_bp.route("/api/activos", methods=["GET"])
@@ -325,6 +323,13 @@ def saveActivo(assetId):
         if campo not in requestData and isinstance(existing_asset.get(campo), list):
             payload[campo] = existing_asset[campo]
 
+    # Mismo caso para las preferencias de cabecera: el autoguardado de la ficha
+    # no las manda, y sin esto cada edición de una fila apagaba la conversión de
+    # divisa y volvía a mostrar un activo oculto.
+    for campo in ("convertCurrency", "hidden"):
+        if campo not in requestData and campo in existing_asset:
+            payload[campo] = existing_asset[campo]
+
     writeAssetFile(assetId, payload)
     return jsonify({"ok": True})
 
@@ -345,20 +350,36 @@ def refreshActivoMarketData(assetId):
     if not marketSymbol:
         return jsonify({"ok": False, "error": "El activo no tiene ticker de mercado configurado"}), 400
 
-    convertCurrency = normalizeConvertCurrency(assetData.get("convertCurrency", ""))
+    # La divisa del activo es también la de lo invertido: el rendimiento se
+    # calcula como precio por participaciones menos invertido sin convertir, así
+    # que el precio se guarda siempre en esa divisa, venga el ticker en la que
+    # venga. El interruptor "Convertir la cotización" del modal no se lee aquí:
+    # lo que hace es cambiar la divisa del activo (precio y compras a la vez,
+    # con `/currency`), y así nunca hay dos divisas distintas en juego.
+    targetCurrency = normalize_currency_code(assetData.get("currency", ""), fallback="EUR")
     quote, error = fetch_asset_quote(
-        marketSymbol, marketProvider, use_cache=False, target_currency=convertCurrency or None
+        marketSymbol, marketProvider, use_cache=False, target_currency=targetCurrency
     )
 
     if error:
         statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
+    # `fetch_asset_quote` devuelve la cotización sin convertir si falla el tipo
+    # de cambio. Aquí eso no sirve: se guardaría un precio en dólares con la
+    # etiqueta de euros. Mejor no tocar el precio y decirlo.
+    if normalize_currency_code(quote.get("currency", ""), fallback="") != targetCurrency:
+        return jsonify({
+            "ok": False,
+            "error": f"No se pudo convertir la cotización de {quote.get('currency')} a {targetCurrency}; "
+                     "se mantiene el último precio",
+        }), 503
+
     assetData["marketProvider"] = marketProvider
     assetData["marketSymbol"] = quote["symbol"]
     assetData["finnhubSymbol"] = quote["symbol"]
     assetData["price"] = quote["price"]
-    assetData["currency"] = quote["currency"]
+    assetData["currency"] = targetCurrency
     assetData["change"] = quote["change"]
     assetData["status"] = quote["status"]
     assetData["lastUpdated"] = quote["lastUpdated"]
@@ -423,6 +444,11 @@ def changeActivoCurrency(assetId):
         assetData["rows"] = converted_rows
 
     assetData["currency"] = target_currency
+    # Si el activo fija la divisa de la cotización, tiene que seguir siendo la
+    # del activo: la siguiente cotización llegaría en la vieja y el refresco la
+    # rechazaría por no coincidir.
+    if assetData.get("convertCurrency"):
+        assetData["convertCurrency"] = target_currency
     assetData["status"] = f"Activo convertido de {current_currency} a {target_currency}"
     writeAssetFile(assetId, assetData)
 

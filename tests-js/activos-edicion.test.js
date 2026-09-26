@@ -59,8 +59,11 @@ let peticiones = []
 
 /** Deja el modal de edición en pantalla con los valores que se van a guardar. */
 function montarModal({
-    nombre = "XRP", color = "#242222", ticker = "BINANCE:XRPEUR",
-    convertCurrencyActivo = false, convertCurrencyValor = "EUR"
+    nombre = "XRP",
+    color = "#242222",
+    ticker = "BINANCE:XRPEUR",
+    convertCurrencyActivo = false,
+    convertCurrencyValor = "EUR"
 } = {}) {
     document.body.innerHTML = `
         <div id="editAssetModalOverlay"></div>
@@ -219,6 +222,47 @@ describe("guardar una edición", () => {
         await submitEditAssetModal()
 
         expect(guardado().body.convertCurrency).toBe("GBP")
+    })
+
+    it("una divisa distinta de la del activo convierte el activo entero, no solo el precio", async () => {
+        // Lo invertido está en la divisa del activo: si solo cambiara la del
+        // precio, el rendimiento restaría dólares de euros.
+        montarModal({ convertCurrencyActivo: true, convertCurrencyValor: "USD" })
+        _editingAsset = { ...ACTIVO, currency: "EUR" }
+
+        await submitEditAssetModal()
+
+        const cambio = peticiones.find((p) => p.url.endsWith("/currency"))
+        expect(cambio?.body).toEqual({ currency: "USD" })
+    })
+
+    it("si la divisa elegida ya es la del activo, no toca las compras", async () => {
+        montarModal({ convertCurrencyActivo: true, convertCurrencyValor: "EUR" })
+        _editingAsset = { ...ACTIVO, currency: "EUR" }
+
+        await submitEditAssetModal()
+
+        expect(peticiones.find((p) => p.url.endsWith("/currency"))).toBeUndefined()
+    })
+
+    it("con un ticker nuevo pide la cotización al momento", async () => {
+        // Si no, el precio guardado seguiría siendo el del ticker anterior
+        // (otro proveedor, a veces otra divisa) hasta el siguiente refresco.
+        montarModal({ ticker: "OANDA:XAUUSD" })
+        _editingAsset = { ...ACTIVO }
+
+        await submitEditAssetModal()
+
+        expect(peticiones.some((p) => p.url.endsWith("/refresh-market-data"))).toBe(true)
+    })
+
+    it("sin cambiar el ticker no gasta una petición al proveedor", async () => {
+        montarModal()
+        _editingAsset = { ...ACTIVO }
+
+        await submitEditAssetModal()
+
+        expect(peticiones.some((p) => p.url.endsWith("/refresh-market-data"))).toBe(false)
     })
 
     it("con el interruptor apagado, guarda la divisa vacía aunque el selector tenga un valor", async () => {

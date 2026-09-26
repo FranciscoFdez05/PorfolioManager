@@ -318,65 +318,108 @@ def test_refrescar_un_activo_inexistente_es_404(cliente):
     assert respuesta.status_code == 404
 
 
-def test_refrescar_pasa_convert_currency_a_fetch_asset_quote(cliente, monkeypatch):
-    """`convertCurrency` es la única preferencia del activo que este botón no
-    lee de sus propios parámetros de ruta: viaja en el propio registro, así
-    que hay que comprobar que de verdad llega a `fetch_asset_quote`."""
+def _cotizacion(symbol, price, currency):
+    return {
+        "symbol": symbol, "price": price, "currency": currency, "change": "+0,00%",
+        "status": "Cotización actualizada", "lastUpdated": "2026-01-01T00:00:00",
+        "marketData": {}
+    }
+
+
+def test_refrescar_convierte_a_la_divisa_del_activo(cliente, monkeypatch):
+    """Un ticker en USD sobre un activo en EUR se guarda en EUR.
+
+    La divisa del activo es también la de lo invertido y el rendimiento resta
+    uno del otro sin convertir: si el precio se guardara en la divisa del
+    ticker, las compras en euros se leerían como dólares.
+    """
     import routes.activos as activos_route
 
     client, cabeceras = cliente
-    _crear(client, cabeceras, "Oro", tipo="comoditis", marketSymbol="GC=F", marketProvider="yahoo")
-    client.post(
-        "/api/activos/oro",
-        json={
-            "name": "Oro", "type": "comoditis", "marketSymbol": "GC=F",
-            "marketProvider": "yahoo", "convertCurrency": "eur", "rows": []
-        },
-        headers=cabeceras,
-    )
+    _crear(client, cabeceras, "Oro", tipo="comoditis", marketSymbol="OANDA:XAUUSD",
+           marketProvider="tradingview")
 
     llamadas = []
 
     def fake_fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=None):
         llamadas.append((symbol, provider, target_currency))
-        return {
-            "symbol": symbol, "price": "4000,00", "currency": "EUR", "change": "+0,00%",
-            "status": "Cotización actualizada", "lastUpdated": "2026-01-01T00:00:00",
-            "marketData": {}
-        }, None
+        return _cotizacion(symbol, "3789,52", target_currency), None
 
     monkeypatch.setattr(activos_route, "fetch_asset_quote", fake_fetch_asset_quote)
 
     respuesta = client.post("/api/activos/oro/refresh-market-data", headers=cabeceras)
 
     assert respuesta.status_code == 200
-    assert llamadas == [("GC=F", "yahoo", "EUR")]
-    assert respuesta.get_json()["asset"]["currency"] == "EUR"
+    assert llamadas == [("OANDA:XAUUSD", "tradingview", "EUR")]
+    activo = respuesta.get_json()["asset"]
+    assert activo["currency"] == "EUR"
+    assert activo["price"] == "3789,52"
 
 
-def test_refrescar_sin_convert_currency_no_pide_conversion(cliente, monkeypatch):
+def test_refrescar_sin_tipo_de_cambio_no_guarda_un_precio_en_otra_divisa(cliente, monkeypatch):
+    """Si la conversión falla, `fetch_asset_quote` devuelve la cotización en su
+    divisa original. Guardarla sería poner 4321 dólares con la etiqueta de
+    euros; se rechaza y el precio anterior se queda como estaba."""
     import routes.activos as activos_route
 
     client, cabeceras = cliente
-    _crear(client, cabeceras, "Apple", tipo="acciones", marketSymbol="AAPL", marketProvider="finnhub")
+    _crear(client, cabeceras, "Oro", tipo="comoditis", marketSymbol="GC=F", marketProvider="yahoo")
+    antes = client.get("/api/activos/oro", headers=cabeceras).get_json()
 
-    llamadas = []
+    monkeypatch.setattr(
+        activos_route, "fetch_asset_quote",
+        lambda symbol, provider=None, use_cache=True, target_currency=None: (
+            _cotizacion(symbol, "4321,20", "USD"), None
+        ),
+    )
 
-    def fake_fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=None):
-        llamadas.append(target_currency)
-        return {
-            "symbol": symbol, "price": "230,00", "currency": "USD", "change": "+0,00%",
-            "status": "Cotización actualizada", "lastUpdated": "2026-01-01T00:00:00",
-            "marketData": {}
-        }, None
+    respuesta = client.post("/api/activos/oro/refresh-market-data", headers=cabeceras)
 
-    monkeypatch.setattr(activos_route, "fetch_asset_quote", fake_fetch_asset_quote)
+    assert respuesta.status_code == 503
+    despues = client.get("/api/activos/oro", headers=cabeceras).get_json()
+    assert despues["price"] == antes["price"]
+    assert despues["currency"] == "EUR"
 
-    respuesta = client.post("/api/activos/apple/refresh-market-data", headers=cabeceras)
+
+def test_el_autoguardado_no_borra_convert_currency_ni_hidden(cliente):
+    """El autoguardado de la ficha reenvía el activo sin estas dos claves."""
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Oro", tipo="comoditis")
+    client.post("/api/activos/oro", json={
+        "name": "Oro", "type": "comoditis", "convertCurrency": "EUR", "hidden": True, "rows": []
+    }, headers=cabeceras)
+
+    client.post("/api/activos/oro", json={"name": "Oro", "type": "comoditis", "rows": []},
+                headers=cabeceras)
+
+    activo = client.get("/api/activos/oro", headers=cabeceras).get_json()
+    assert activo["convertCurrency"] == "EUR"
+    assert activo["hidden"] is True
+
+
+def test_cambiar_la_moneda_del_activo_arrastra_convert_currency(cliente, monkeypatch):
+    """Si la divisa fijada y la del activo se separaran, el siguiente refresco
+    guardaría el precio en una y las compras seguirían en la otra."""
+    from decimal import Decimal
+
+    import routes.activos as activos_route
+
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Oro", tipo="comoditis")
+    client.post("/api/activos/oro", json={
+        "name": "Oro", "type": "comoditis", "convertCurrency": "EUR", "rows": []
+    }, headers=cabeceras)
+    monkeypatch.setattr(activos_route, "convert_amount",
+                        lambda valor, origen, destino: (Decimal(valor) * Decimal("1.14"), None))
+    monkeypatch.setattr(activos_route, "convert_asset_rows_currency",
+                        lambda filas, *args, **kwargs: (filas, None))
+
+    respuesta = client.post("/api/activos/oro/currency", json={"currency": "USD"}, headers=cabeceras)
 
     assert respuesta.status_code == 200
-    assert llamadas == [None]
-    assert respuesta.get_json()["asset"]["currency"] == "USD"
+    activo = client.get("/api/activos/oro", headers=cabeceras).get_json()
+    assert activo["currency"] == "USD"
+    assert activo["convertCurrency"] == "USD"
 
 
 # ── Rendimiento agregado ─────────────────────────────────────────────────────
@@ -478,3 +521,82 @@ def test_borrar_un_activo_sin_csrf_es_403(cliente_autenticado, temp_db):
 
     client, _cabeceras, _app = cliente_autenticado(activos_bp)
     assert client.delete("/api/activos/apple").status_code == 403
+
+
+# ── Divisas del selector ─────────────────────────────────────────────────────
+
+@pytest.fixture
+def cliente_mercado(cliente_autenticado, monkeypatch):
+    from routes.market import market_bp
+
+    client, cabeceras, _app = cliente_autenticado(market_bp)
+    return client, cabeceras
+
+
+def test_las_divisas_salen_del_servicio_de_cambio(cliente_mercado, monkeypatch):
+    """Se ofrecen las del activo que el servicio publica, con su nombre."""
+    import routes.market as market_route
+
+    client, cabeceras = cliente_mercado
+    monkeypatch.setattr(market_route, "fetch_currencies", lambda: (
+        {"EUR": "Euro", "USD": "United States Dollar", "SEK": "Swedish Krona"}, None
+    ))
+
+    divisas = client.get("/api/divisas", headers=cabeceras).get_json()["divisas"]
+
+    # SEK la publica el servicio pero el activo no la admite; GBP, CHF y JPY al
+    # revés. Solo quedan las que cumplen las dos cosas.
+    assert divisas == [
+        {"code": "EUR", "name": "Euro"},
+        {"code": "USD", "name": "United States Dollar"},
+    ]
+
+
+def test_sin_servicio_de_cambio_se_ofrecen_las_del_activo(cliente_mercado, monkeypatch):
+    import routes.market as market_route
+
+    client, cabeceras = cliente_mercado
+    monkeypatch.setattr(market_route, "fetch_currencies",
+                        lambda: (None, "No se pudo conectar al servicio de cambio de divisa"))
+
+    respuesta = client.get("/api/divisas", headers=cabeceras).get_json()
+
+    assert [d["code"] for d in respuesta["divisas"]] == ["CHF", "EUR", "GBP", "JPY", "USD"]
+    assert "aviso" in respuesta
+
+
+def test_tipos_de_cambio_para_ajustes(cliente_mercado, monkeypatch):
+    import routes.market as market_route
+
+    client, cabeceras = cliente_mercado
+    pedidos = []
+
+    def fake_rates(base, targets, timeout=None):
+        pedidos.append((base, list(targets)))
+        return {"rates": {"USD": 1.14, "GBP": 0.86}, "fuente": "Frankfurter (referencia diaria del BCE)",
+                "fecha": "2026-09-25"}, None
+
+    monkeypatch.setattr(market_route, "fetch_exchange_rates", fake_rates)
+    monkeypatch.setattr(market_route, "fetch_currencies", lambda: ({"USD": "United States Dollar"}, None))
+
+    datos = client.get("/api/divisas/cambio?base=eur", headers=cabeceras).get_json()
+
+    assert datos["ok"] is True
+    assert datos["base"] == "EUR"
+    assert datos["fecha"] == "2026-09-25"
+    # Se pide a la vez el cambio a todas las demás divisas del activo.
+    assert pedidos == [("EUR", ["CHF", "GBP", "JPY", "USD"])]
+    assert {"code": "USD", "name": "United States Dollar", "rate": 1.14} in datos["cambios"]
+
+
+def test_tipos_de_cambio_sin_servicio_responde_503(cliente_mercado, monkeypatch):
+    import routes.market as market_route
+
+    client, cabeceras = cliente_mercado
+    monkeypatch.setattr(market_route, "fetch_exchange_rates",
+                        lambda base, targets, timeout=None: (None, "No se pudo conectar al servicio de cambio de divisa"))
+
+    respuesta = client.get("/api/divisas/cambio?base=EUR", headers=cabeceras)
+
+    assert respuesta.status_code == 503
+    assert "No se pudo conectar" in respuesta.get_json()["error"]

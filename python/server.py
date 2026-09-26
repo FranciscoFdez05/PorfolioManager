@@ -12,7 +12,7 @@ mimetypes.add_type("font/woff2", ".woff2")
 from dotenv import load_dotenv
 from flask import Flask, abort, g, make_response, send_from_directory
 
-from admin import snapshot_scheduler
+from admin import snapshot_scheduler, telegram_listener
 from admin.backup_manager import start_scheduler as start_backup_scheduler
 from admin.portfolios_manager import init_portfolios
 from core import atajo_acceso, csp, paths, seguridad_app, settings, tls
@@ -257,6 +257,10 @@ start_backup_scheduler()
 # solo existía mientras hubiera una pestaña abierta. Este hilo lo guarda desde
 # el servidor; con varios workers, el primero que reclama el hueco lo escribe.
 snapshot_scheduler.iniciar()
+# Escucha el /start del bot de Telegram: sin ese intercambio previo, Telegram
+# no deja que el bot le escriba primero a nadie. El hilo se queda dormido solo
+# comprobando cada rato si ya hay un bot configurado en Ajustes.
+telegram_listener.iniciar()
 
 # Reaplica en el proxy el estado de HTTPS guardado desde Ajustes. Va al final
 # porque no condiciona nada de lo anterior, y no aborta si el proxy no responde:

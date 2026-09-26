@@ -8,23 +8,12 @@ def sanitize_color(value):
     s = str(value or "").strip()
     return s if _HEX_COLOR_RE.match(s) else ""
 ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd", "yahoo", "alphavantage", "tradingview"}
-# Debe coincidir con SUPPORTED_ASSET_CURRENCIES (routes/activos.py) y
-# SUPPORTED_DISPLAY_CURRENCIES (providers/finnhub_client.py): las tres listan
-# las mismas divisas por el mismo motivo -son las que el tipo de cambio en
-# tiempo real sabe convertir-, pero cada una vive en su capa (validación del
-# payload, filas históricas, conversión de cotización) y no merece la pena
-# la importación cruzada solo para no repetir cinco letras tres veces.
-ALLOWED_DISPLAY_CURRENCIES = {"EUR", "USD", "GBP", "CHF", "JPY"}
+# Divisas en las que puede estar un activo (el menú «Moneda del activo» y el
+# interruptor de conversión de «Editar activo»). Es lo que admite el modelo de
+# datos del activo, no un límite de ninguna API: qué se puede convertir en cada
+# momento lo dice el servicio de tipos de cambio (`/api/divisas`).
+SUPPORTED_ASSET_CURRENCIES = {"EUR", "USD", "GBP", "CHF", "JPY"}
 EODHD_EXCHANGE_CODES = {"XETRA", "PA", "LSE", "US", "SW", "AS", "MC", "MI", "DU", "BE", "F", "MU", "ST", "VI", "LS", "FOREX", "CC"}
-# "MERCADO:TICKER" es ambiguo entre Finnhub (solo cripto, BINANCE:BTCUSDT) y
-# TradingView (cualquier cosa, NASDAQ:AAPL incluido). Estos prefijos no son
-# nada que Finnhub entienda con ese formato, así que ahí sí distinguen; el
-# resto (exchanges de cripto, desconocidos) se queda en Finnhub, como siempre.
-TRADINGVIEW_ONLY_EXCHANGE_PREFIXES = {
-    "NASDAQ", "NYSE", "AMEX", "ARCA", "BATS", "LSE", "XETR", "EURONEXT",
-    "TSX", "TSXV", "ASX", "HKEX", "BSE", "NSE", "SIX", "BME", "TSE",
-    "COMEX", "NYMEX", "CME", "CBOT", "INDEX",
-}
 
 _MAX_NAME = 120
 _MAX_SYMBOL = 40
@@ -72,7 +61,7 @@ def normalizeConvertCurrency(value):
     esto es una preferencia opcional, no un dato obligatorio del activo.
     """
     normalized = str(value or "").strip().upper()
-    return normalized if normalized in ALLOWED_DISPLAY_CURRENCIES else ""
+    return normalized if normalized in SUPPORTED_ASSET_CURRENCIES else ""
 
 
 def sanitizeAssetType(assetType):
@@ -100,8 +89,7 @@ def inferMarketProviderFromSymbol(symbol, fallback="finnhub"):
         return fallback
 
     if ":" in normalized_symbol:
-        exchange_prefix = normalized_symbol.split(":", 1)[0]
-        return "tradingview" if exchange_prefix in TRADINGVIEW_ONLY_EXCHANGE_PREFIXES else "finnhub"
+        return "finnhub"
 
     if "." in normalized_symbol:
         exchange_code = normalized_symbol.rsplit(".", 1)[-1]

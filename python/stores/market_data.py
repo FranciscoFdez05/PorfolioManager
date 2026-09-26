@@ -44,18 +44,9 @@ _FETCHERS = {
     "tradingview": lambda symbol: _fetch_tradingview_quote(symbol),
 }
 
-# Orden de respaldo para un símbolo portable. TradingView va detrás de Yahoo
-# porque, igual que Yahoo, no lleva clave ni cuota documentada -es el scanner
-# público de tradingview.com, no una API soportada-, así que se prueba antes
-# que los proveedores con clave propia pero después del que ya lleva más
-# tiempo probado en este dispatcher. Alpha Vantage va el último a propósito:
-# su plan gratuito da 25 peticiones AL DÍA, la cuota más corta de las cinco,
-# así que es el que menos conviene gastar de rebote.
-_FALLBACK_ORDER = ("finnhub", "yahoo", "tradingview", "eodhd", "alphavantage")
-
-# Cuánto se evita un proveedor tras un 429/cuota agotada, para no perder una
-# petición del usuario intentando algo que ya sabemos que va a fallar.
-_RATE_LIMIT_COOLDOWN_SECONDS = 300
+# El orden de respaldo entre proveedores y el reposo tras un límite de
+# peticiones son decisión del usuario: `[mercado] orden_respaldo` y
+# `reposo_limite_segundos` en config.ini (ver core/settings.py).
 
 # Nombre visible de cada proveedor para los avisos de Telegram (ver
 # core.telegram_notifier). Es el mismo criterio que providers/estado.py, pero
@@ -78,15 +69,19 @@ def _is_portable_symbol(symbol):
     """Si el símbolo no lleva atada la sintaxis de un proveedor concreto."""
     if ":" in symbol:
         return False
-    if "." in symbol and symbol.rsplit(".", 1)[-1] in EODHD_EXCHANGE_CODES:
-        return False
-    return True
+    return not ("." in symbol and symbol.rsplit(".", 1)[-1] in EODHD_EXCHANGE_CODES)
 
 
 def _fallback_chain(primary, symbol):
     if not _is_portable_symbol(symbol):
         return (primary,)
-    return (primary,) + tuple(p for p in _FALLBACK_ORDER if p != primary)
+    # Solo proveedores que existen: un nombre mal escrito en config.ini no puede
+    # romper la cotización, se ignora.
+    orden = [
+        p for p in (str(nombre).strip().lower() for nombre in settings.ordenRespaldoProveedores())
+        if p in _FETCHERS and p != primary
+    ]
+    return (primary, *dict.fromkeys(orden))
 
 
 def _is_provider_resting(provider):
@@ -95,8 +90,11 @@ def _is_provider_resting(provider):
 
 
 def _mark_provider_rate_limited(provider):
+    reposo = settings.reposoLimiteSegundos()
+    if reposo <= 0:
+        return
     with _state_lock:
-        _provider_resting_until[provider] = time.monotonic() + _RATE_LIMIT_COOLDOWN_SECONDS
+        _provider_resting_until[provider] = time.monotonic() + reposo
 
 
 def _cached_quote(cache_key, ttl):
@@ -128,12 +126,12 @@ def fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=Non
 
     `target_currency`, si se da, convierte la cotización a esa divisa antes de
     devolverla y de guardarla en caché -así un acierto de caché no repite la
-    conversión- usando el tipo de cambio en tiempo real. Es la divisa que el
-    activo tiene guardada en `convertCurrency`; vacío (el valor por defecto)
-    deja el precio tal cual lo da el proveedor, que es el comportamiento de
-    siempre. Si la conversión falla (divisa no soportada, servicio de cambio
-    caído), se devuelve la cotización sin convertir en vez de fallar entera
-    una petición que sí tiene un precio válido, solo que en otra divisa.
+    conversión- usando el tipo de cambio en tiempo real. El refresco de un
+    activo pasa aquí la divisa del activo (`routes/activos.py`); sin ella, el
+    precio sale tal cual lo da el proveedor. Si la conversión falla (divisa no
+    soportada, servicio de cambio caído), se devuelve la cotización sin
+    convertir en vez de fallar entera: quien necesite la divisa exacta tiene
+    que comprobar `quote["currency"]`, como hace ese refresco.
     """
     symbol = str(symbol or "").strip().upper()
     if not symbol:

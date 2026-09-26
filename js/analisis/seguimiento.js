@@ -166,6 +166,7 @@ function segRenderTable(filtered) {
     if (tableWrap) tableWrap.classList.remove("hidden")
     if (tableEmptyEl) tableEmptyEl.classList.add("hidden")
     function buildTableRow(item) {
+        const rank = filtered.indexOf(item) + 1
         const color = AV_SEG_TYPE_COLORS[item.type] || "#888"
         const typeLabel = AV_SEG_TYPE_LABELS[item.type] || item.type || ""
         const price = parseLooseNumber(item.price || "") || 0
@@ -195,6 +196,7 @@ function segRenderTable(filtered) {
                 </div>
             </div>`
         return `<tr class="avTableRow" data-seg-id="${escapeHtml(item._segId || "")}">
+            <td class="mTdRank">${rank}</td>
             <td><span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span></td>
             <td class="avTrName">${escapeHtml(item.name || item.symbol || "—")}</td>
             <td class="avTrProvider">${escapeHtml(ticker)}</td>
@@ -211,7 +213,7 @@ function segRenderTable(filtered) {
     const showSections = portfolioGroup.length > 0 && customGroup.length > 0
 
     if (showSections) {
-        const colSpan = 8
+        const colSpan = 9
         tbody.innerHTML =
             `<tr class="segTableSectionRow"><td colspan="${colSpan}" class="segTableSectionHeader">Portfolio &amp; Operaciones</td></tr>` +
             portfolioGroup.map(buildTableRow).join("") +
@@ -249,7 +251,7 @@ function segRenderTable(filtered) {
         })
     })
     const t = tbody.closest("table")
-    bindTableSort(t, "seguimientoTable")
+    bindTableSort(t, "seguimientoTableOrder")
     if (t._reSort) t._reSort()
 }
 

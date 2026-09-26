@@ -346,7 +346,7 @@
 .activosPage .activosTableWrap,
 .seguimientoPage .activosTableWrap {
     flex: 0 0 auto;
-    max-height: calc(100vh - 245px);
+    max-height: calc(100vh - 225px);
     overflow-y: auto;
     overflow-x: auto;
 }

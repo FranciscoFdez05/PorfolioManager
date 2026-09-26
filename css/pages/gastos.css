@@ -120,7 +120,7 @@
 .gastosMovementsWrapper {
     overflow-y: auto;
     overflow-x: hidden;
-    max-height: 612px;
+    max-height: 610px;
 }
 
 .gastosAnnualWrapper::-webkit-scrollbar,

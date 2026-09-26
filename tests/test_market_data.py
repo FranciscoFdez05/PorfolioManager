@@ -202,3 +202,41 @@ def test_limite_de_peticiones_deja_el_proveedor_en_reposo(monkeypatch):
     market_data.fetch_asset_quote("MSFT", "finnhub")
 
     assert len(finnhub_llamadas) == 1
+
+
+# ── Orden de respaldo y reposo: ajustes del usuario ──────────────────────────
+
+def test_el_orden_de_respaldo_sale_de_los_ajustes(monkeypatch):
+    llamadas = []
+    monkeypatch.setattr(settings, "ordenRespaldoProveedores", lambda: ["eodhd", "yahoo"])
+    monkeypatch.setattr(market_data, "call_finnhub_with_fallbacks",
+                        lambda cb: llamadas.append("finnhub") or (None, "No se pudo conectar con Finnhub"))
+    monkeypatch.setattr(market_data, "call_eodhd_with_fallbacks",
+                        lambda cb: llamadas.append("eodhd") or (None, "No se pudo conectar con EODHD"))
+    monkeypatch.setattr(market_data, "_fetch_yahoo_quote",
+                        lambda symbol: llamadas.append("yahoo") or (_quote(), None))
+
+    _quote_obtenida, error = market_data.fetch_asset_quote("AAPL", "finnhub")
+
+    assert error is None
+    assert llamadas == ["finnhub", "eodhd", "yahoo"]
+
+
+def test_un_proveedor_mal_escrito_en_el_orden_se_ignora(monkeypatch):
+    monkeypatch.setattr(settings, "ordenRespaldoProveedores", lambda: ["bloomberg", "YAHOO", "yahoo"])
+
+    assert market_data._fallback_chain("finnhub", "AAPL") == ("finnhub", "yahoo")
+
+
+def test_orden_de_respaldo_vacio_es_sin_respaldo(monkeypatch):
+    monkeypatch.setattr(settings, "ordenRespaldoProveedores", lambda: [])
+
+    assert market_data._fallback_chain("finnhub", "AAPL") == ("finnhub",)
+
+
+def test_reposo_cero_no_deja_el_proveedor_en_reposo(monkeypatch):
+    monkeypatch.setattr(settings, "reposoLimiteSegundos", lambda: 0)
+
+    market_data._mark_provider_rate_limited("finnhub")
+
+    assert not market_data._is_provider_resting("finnhub")

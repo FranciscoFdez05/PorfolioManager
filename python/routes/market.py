@@ -10,13 +10,16 @@ from providers.alpha_vantage_client import search_symbol as search_av_symbol
 from providers.eodhd_client import search_symbol as search_eodhd_symbol
 from providers.finnhub_client import (
     fetch_candle_close,
+    fetch_currencies,
     fetch_exchange_rate,
+    fetch_exchange_rates,
     search_symbol,
 )
 from providers.tradingview_client import search_symbol as search_tradingview_symbol
 from providers.yahoo_finance_client import search_symbol as search_yahoo_symbol
 from stores import benchmark
 from stores.asset_store import listAssets
+from stores.asset_utils import SUPPORTED_ASSET_CURRENCIES
 from stores.helpers import (
     call_alpha_vantage_with_fallbacks,
     call_eodhd_with_fallbacks,
@@ -51,6 +54,64 @@ def getExchangeRate():
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "source": source_currency, "target": target_currency, "rate": rate})
+
+
+@market_bp.route("/api/divisas", methods=["GET"])
+def listDivisas():
+    """Divisas a las que se puede pasar un activo ahora mismo, con su nombre.
+
+    Las que admite el activo, filtradas por las que publica hoy el servicio de
+    cambio: si dejara de convertir una, desaparece del selector en vez de
+    fallar al guardar. Sin respuesta del servicio se ofrecen todas las del
+    activo, y la conversión dirá en su momento si alguna no se puede hacer.
+    """
+    publicadas, error = fetch_currencies()
+    codigos = sorted(SUPPORTED_ASSET_CURRENCIES)
+
+    if error:
+        return jsonify({
+            "ok": True,
+            "divisas": [{"code": codigo, "name": codigo} for codigo in codigos],
+            "aviso": error,
+        })
+
+    return jsonify({
+        "ok": True,
+        "divisas": [{"code": codigo, "name": publicadas[codigo]} for codigo in codigos if codigo in publicadas],
+    })
+
+
+@market_bp.route("/api/divisas/cambio", methods=["GET"])
+def getCambiosDivisa():
+    """Comprobación del servicio de cambio para Ajustes: los tipos de `base` a
+    las demás divisas del activo, de dónde salen, de qué fecha son y cuánto
+    tardó en contestar. Es la misma fuente que usa la conversión de cotizaciones.
+    """
+    base = normalize_currency_code(request.args.get("base", ""), fallback="EUR")
+    if base not in SUPPORTED_ASSET_CURRENCIES:
+        return jsonify({"ok": False, "error": f"Divisa no admitida: {base}"}), 400
+
+    inicio = time.monotonic()
+    datos, error = fetch_exchange_rates(base, sorted(SUPPORTED_ASSET_CURRENCIES - {base}))
+    ms = round((time.monotonic() - inicio) * 1000)
+
+    if error:
+        return jsonify({"ok": False, "error": error, "ms": ms}), 503
+
+    nombres, _ = fetch_currencies()
+    nombres = nombres or {}
+    return jsonify({
+        "ok": True,
+        "base": base,
+        "fuente": datos["fuente"],
+        "fecha": datos["fecha"],
+        "ms": ms,
+        "comprobado": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "cambios": [
+            {"code": codigo, "name": nombres.get(codigo, codigo), "rate": rate}
+            for codigo, rate in sorted(datos["rates"].items())
+        ],
+    })
 
 
 @market_bp.route("/api/finnhub/search", methods=["GET"])

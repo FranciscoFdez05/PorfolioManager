@@ -3,7 +3,6 @@
 Nada sale a la red: se sustituye `providers.tradingview_client._fetch_json`.
 """
 
-import pytest
 
 from providers import tradingview_client
 
@@ -138,3 +137,169 @@ def test_search_symbol_prioriza_resultados_con_cotizacion_real(monkeypatch):
     # Una sola llamada al scanner para las dos, no una por resultado.
     assert len(llamadas_cotizacion) == 1
     assert set(llamadas_cotizacion[0]["symbols"]["tickers"]) == {"GETTEX:10AF", "LSIN:0E5R"}
+
+
+# ── Cruces que el scanner no tiene ───────────────────────────────────────────
+
+def _scanner_que_cotiza(precios):
+    """Doble del scanner: cotiza solo los tickers de `precios` y registra qué
+    se le pide. `precios` es `{ticker: (precio, variación %, divisa)}`."""
+    peticiones = []
+
+    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
+        tickers = json_body["symbols"]["tickers"]
+        peticiones.append(tickers)
+        return {"data": [
+            {"s": t, "d": [precios[t][0], precios[t][1], precios[t][2]]}
+            for t in tickers if t in precios
+        ]}
+
+    return fake_fetch, peticiones
+
+
+def test_un_cruce_en_eur_que_no_esta_se_calcula_con_el_par_en_usd(monkeypatch):
+    # Las cifras son las reales de OANDA: 4284,97 / 1,13911 = 3761,68, lo mismo
+    # que marca el gráfico de OANDA:XAUEUR en tradingview.com.
+    fake, peticiones = _scanner_que_cotiza({
+        "OANDA:XAUUSD": (4284.97, 0.26135991389396024, "USD"),
+        "OANDA:EURUSD": (1.13911, 0.09578039050280622, "USD"),
+    })
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+
+    quote, error = tradingview_client.fetch_quote("OANDA:XAUEUR")
+
+    assert error is None
+    assert quote["price"] == "3761,68"
+    assert quote["currency"] == "EUR"
+    assert quote["change"] == "+0,17%"
+    assert "OANDA:XAUUSD / OANDA:EURUSD" in quote["status"]
+    assert len(peticiones) == 2  # el ticker pedido, y luego las dos piezas juntas
+
+
+def test_sin_el_par_en_usd_del_mismo_mercado_se_queda_sin_cotizacion(monkeypatch):
+    # OANDA:XAGUSD no está en el scanner. No se busca la plata en otro sitio
+    # (un spot compuesto, otro bróker): eso sería decidir a mano de dónde sale
+    # el precio de un activo concreto.
+    fake, _ = _scanner_que_cotiza({
+        "TVC:SILVER": (64.2904, 0.72, "USD"),
+        "OANDA:EURUSD": (1.13911, 0.09, "USD"),
+    })
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+
+    quote, error = tradingview_client.fetch_quote("OANDA:XAGEUR")
+
+    assert quote is None
+    assert "no devolvió cotización" in error
+
+
+def test_el_sentido_del_cambio_se_toma_del_par_que_exista(monkeypatch):
+    # El mercado tiene USDJPY (yenes por dólar), no JPYUSD: se multiplica. No
+    # hay ninguna lista que diga qué divisas cotizan al revés.
+    fake, peticiones = _scanner_que_cotiza({
+        "OANDA:XAUUSD": (4000.0, 0.0, "USD"),
+        "OANDA:USDJPY": (150.0, 0.0, "JPY"),
+    })
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+
+    quote, _ = tradingview_client.fetch_quote("OANDA:XAUJPY")
+
+    assert quote["price"] == "600000,00"
+    assert quote["currency"] == "JPY"
+    assert set(peticiones[1]) == {"OANDA:XAUUSD", "OANDA:JPYUSD", "OANDA:USDJPY"}
+
+
+def test_el_cambio_se_busca_solo_en_el_mismo_mercado(monkeypatch):
+    fake, peticiones = _scanner_que_cotiza({
+        "SAXO:XAUUSD": (4000.0, 0.0, "USD"),
+        "OANDA:EURUSD": (1.1, 0.0, "USD"),  # otro mercado: no se usa
+    })
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+
+    quote, _ = tradingview_client.fetch_quote("SAXO:XAUEUR")
+
+    assert quote is None
+    assert all(t.startswith("SAXO:") for t in peticiones[1])
+
+
+def test_una_cotizacion_real_no_se_sustituye_por_la_calculada(monkeypatch):
+    fake, peticiones = _scanner_que_cotiza({"OANDA:XAUEUR": (3700.0, 0.0, "EUR")})
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+
+    quote, _ = tradingview_client.fetch_quote("OANDA:XAUEUR")
+
+    assert quote["price"] == "3700,00"
+    assert quote["status"] == "Cotización actualizada"
+    assert len(peticiones) == 1
+
+
+def test_sin_piezas_para_calcularlo_sigue_sin_cotizacion(monkeypatch):
+    fake, _ = _scanner_que_cotiza({})
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+
+    quote, error = tradingview_client.fetch_quote("OANDA:XAUEUR")
+
+    assert quote is None
+    assert "no devolvió cotización" in error
+
+
+def test_la_busqueda_calcula_el_cruce_que_falta(monkeypatch):
+    precios = {
+        "OANDA:XAUUSD": (4284.97, 0.26, "USD"),
+        "OANDA:EURUSD": (1.13911, 0.09, "USD"),
+    }
+
+    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
+        if json_body is None:
+            return {"symbols": [
+                {"symbol": "XAUEUR", "exchange": "OANDA", "description": "Gold/EUR",
+                 "type": "commodity", "currency_code": "EUR"},
+            ]}
+        tickers = json_body["symbols"]["tickers"]
+        return {"data": [{"s": t, "d": list(precios[t])} for t in tickers if t in precios]}
+
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+
+    results, error = tradingview_client.search_symbol("OANDA:XAUEUR")
+
+    assert error is None
+    assert results[0]["symbol"] == "OANDA:XAUEUR"
+    assert results[0]["price"] == "3761,68"
+    assert results[0]["currency"] == "EUR"
+
+
+def test_los_perpetuos_quedan_detras_del_activo(monkeypatch):
+    """Buscar "XAG" devolvía primero BINANCE:XAGUSDT.P y compañía."""
+    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
+        if json_body is None:
+            return {"symbols": [
+                {"symbol": "XAGUSDT.P", "exchange": "BINANCE", "description": "XAG / TetherUS PERPETUAL",
+                 "type": "swap", "currency_code": "USDT"},
+                {"symbol": "XAGUSD", "exchange": "OANDA", "description": "Silver",
+                 "type": "commodity", "currency_code": "USD"},
+            ]}
+        return {"data": [{"s": t, "d": [64.2, 0.1, "USD"]} for t in json_body["symbols"]["tickers"]]}
+
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+
+    results, _ = tradingview_client.search_symbol("XAG", preferred_asset_type="comoditis")
+
+    assert [r["symbol"] for r in results] == ["OANDA:XAGUSD", "BINANCE:XAGUSDT.P"]
+
+
+def test_sin_tipo_de_activo_manda_el_orden_de_tradingview(monkeypatch):
+    """Sin tipo elegido no hay preferencia por ninguna clase de instrumento."""
+    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
+        if json_body is None:
+            return {"symbols": [
+                {"symbol": "XAGUSDT.P", "exchange": "BINANCE", "description": "XAG / TetherUS PERPETUAL",
+                 "type": "swap", "currency_code": "USDT"},
+                {"symbol": "XAGUSD", "exchange": "OANDA", "description": "Silver",
+                 "type": "commodity", "currency_code": "USD"},
+            ]}
+        return {"data": [{"s": t, "d": [64.2, 0.1, "USD"]} for t in json_body["symbols"]["tickers"]]}
+
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+
+    results, _ = tradingview_client.search_symbol("XAG")
+
+    assert [r["symbol"] for r in results] == ["BINANCE:XAGUSDT.P", "OANDA:XAGUSD"]

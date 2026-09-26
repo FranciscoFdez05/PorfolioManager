@@ -615,34 +615,37 @@ async function initAjustesLogic() {
     }
     cargarTelegram()
 
+    // Guarda lo que haya en los campos. La usan tanto el botón "Guardar" como
+    // "Enviar prueba": probar sin haber guardado antes es justo lo que se
+    // esperaría de un botón que dice "enviar", así que prueba guarda primero
+    // en vez de devolver "falta configurar" con los datos ya escritos delante.
+    async function guardarTelegram() {
+        const token = (telegramTokenInput?.value || "").trim()
+        const chatId = (telegramChatIdInput?.value || "").trim()
+        if (!token || !chatId) {
+            return { ok: false, error: "Rellena el token y el ID de chat" }
+        }
+        try {
+            const res = await fetch("/api/settings/telegram", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token, chatId })
+            })
+            const data = await res.json()
+            if (data.ok) setTelegramStatus(true)
+            return data
+        } catch {
+            return { ok: false, error: "Error de red" }
+        }
+    }
+
     if (guardarTelegramBtn) {
         guardarTelegramBtn.addEventListener("click", async () => {
-            const token = (telegramTokenInput?.value || "").trim()
-            const chatId = (telegramChatIdInput?.value || "").trim()
-            if (!token || !chatId) {
-                showMsg(telegramMsg, "Rellena el token y el ID de chat", "error")
-                return
-            }
             guardarTelegramBtn.disabled = true
             showMsg(telegramMsg, "Guardando…", "")
-            try {
-                const res = await fetch("/api/settings/telegram", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ token, chatId })
-                })
-                const data = await res.json()
-                if (data.ok) {
-                    setTelegramStatus(true)
-                    showMsg(telegramMsg, "Guardado", "ok")
-                } else {
-                    showMsg(telegramMsg, data.error || "Error al guardar", "error")
-                }
-            } catch {
-                showMsg(telegramMsg, "Error de red", "error")
-            } finally {
-                guardarTelegramBtn.disabled = false
-            }
+            const data = await guardarTelegram()
+            showMsg(telegramMsg, data.ok ? "Guardado" : data.error || "Error al guardar", data.ok ? "ok" : "error")
+            guardarTelegramBtn.disabled = false
         })
     }
 
@@ -651,6 +654,13 @@ async function initAjustesLogic() {
             probarTelegramBtn.disabled = true
             showMsg(telegramMsg, "Enviando…", "")
             try {
+                // Si ya estaba configurado esto no cambia nada (mismo token y
+                // chatId); si no, deja guardado lo que se acaba de escribir.
+                const guardado = await guardarTelegram()
+                if (!guardado.ok) {
+                    showMsg(telegramMsg, guardado.error || "Error al guardar", "error")
+                    return
+                }
                 const res = await fetch("/api/settings/telegram/prueba", { method: "POST" })
                 const data = await res.json()
                 showMsg(
@@ -1417,6 +1427,126 @@ async function initAjustesLogic() {
     }
     loadApiEstado()
 
+    // --- Tipos de cambio ---
+    // Los que usa la aplicación al convertir, del mismo servicio y en el mismo
+    // orden (Frankfurter y, si falla, open.er-api.com). Sirve para ver si
+    // responde y de qué día es el dato: Frankfurter publica la referencia del
+    // BCE una vez por día hábil, así que el número no cambia de minuto a minuto.
+    const cambioBaseSel = document.getElementById("ajustesCambioBase")
+    const cambioListEl = document.getElementById("ajustesCambioList")
+    const cambioBtn = document.getElementById("ajustesCambioBtn")
+    const cambioMsg = document.getElementById("ajustesCambioMsg")
+    const cambioAuto = document.getElementById("ajustesCambioAuto")
+    let cambioTimer = null
+
+    const _formatoTipo = (rate) =>
+        Number(rate).toLocaleString("es-ES", { minimumFractionDigits: 4, maximumFractionDigits: 6 })
+
+    function _fechaDato(fecha) {
+        // Frankfurter da "2026-09-25"; open.er-api.com una fecha HTTP completa.
+        const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T00:00:00` : fecha)
+        return Number.isNaN(d.getTime()) ? fecha : d.toLocaleDateString("es-ES")
+    }
+
+    async function loadCambioBases() {
+        if (!cambioBaseSel) return
+        let divisas = []
+        try {
+            const res = await fetch("/api/divisas")
+            const data = await res.json()
+            divisas = data.divisas || []
+        } catch {
+            // Sin lista no hay de dónde elegir: se sigue con la moneda base.
+        }
+        const preferida = String(window._monedaBase || "").toUpperCase()
+        if (preferida && !divisas.some((d) => d.code === preferida))
+            divisas.unshift({ code: preferida, name: preferida })
+        cambioBaseSel.innerHTML = ""
+        divisas.forEach(({ code, name }) => {
+            const opt = document.createElement("option")
+            opt.value = code
+            opt.textContent = name && name !== code ? `${code} · ${name}` : code
+            cambioBaseSel.appendChild(opt)
+        })
+        if (preferida) cambioBaseSel.value = preferida
+        // El desplegable de Ajustes se construyó con el <select> aún vacío y
+        // solo refresca su etiqueta con "change"; lanzarlo pediría los tipos dos
+        // veces al abrir, así que se pone a mano.
+        const etiqueta = cambioBaseSel.closest(".ajustesDropWrapper")?.querySelector(".ajustesDropLabel")
+        if (etiqueta) etiqueta.textContent = cambioBaseSel.options[cambioBaseSel.selectedIndex]?.text || ""
+    }
+
+    function renderCambios(data) {
+        cambioListEl.innerHTML = ""
+        ;(data.cambios || []).forEach((c) => {
+            const row = document.createElement("div")
+            row.className = "ajustesApiEstadoRow"
+
+            const nombre = document.createElement("span")
+            nombre.className = "ajustesApiEstadoProvider"
+            nombre.textContent = `${c.code} · ${c.name}`
+            nombre.title = `1 ${data.base} = ${_formatoTipo(c.rate)} ${c.code}`
+
+            const tipo = document.createElement("span")
+            tipo.className = "ajustesApiEstadoBadge ok"
+            tipo.textContent = _formatoTipo(c.rate)
+
+            row.appendChild(nombre)
+            row.appendChild(tipo)
+            cambioListEl.appendChild(row)
+        })
+
+        const comprobado = new Date(data.comprobado)
+        const hora = Number.isNaN(comprobado.getTime()) ? "" : comprobado.toLocaleTimeString("es-ES")
+        const pie = document.createElement("div")
+        pie.className = "ajustesApiEstadoPie"
+        pie.textContent =
+            `${data.fuente} · dato del ${_fechaDato(data.fecha)} · respondió en ${data.ms} ms` +
+            (hora ? ` · comprobado a las ${hora}` : "")
+        cambioListEl.appendChild(pie)
+    }
+
+    async function loadCambios({ manual = false, inicial = false } = {}) {
+        if (!cambioListEl) return
+        // Con Ajustes cerrado no se gasta la petición del refresco automático.
+        if (!manual && !inicial && !cambioListEl.offsetParent) return
+        const base = cambioBaseSel?.value || window._monedaBase || ""
+        if (cambioBtn) cambioBtn.disabled = true
+        if (manual) showMsg(cambioMsg, "Comprobando…", "")
+        try {
+            const res = await fetch(`/api/divisas/cambio?base=${encodeURIComponent(base)}`)
+            const data = await res.json()
+            if (!data.ok) throw new Error(data.error || `HTTP ${res.status}`)
+            renderCambios(data)
+            if (manual) showMsg(cambioMsg, "Funciona", "ok")
+        } catch (error) {
+            cambioListEl.innerHTML = ""
+            const row = document.createElement("div")
+            row.className = "ajustesApiEstadoRow"
+            const nombre = document.createElement("span")
+            nombre.className = "ajustesApiEstadoProvider"
+            nombre.textContent = "Servicio de cambio"
+            const badge = document.createElement("span")
+            badge.className = "ajustesApiEstadoBadge caido"
+            badge.textContent = "No responde"
+            row.title = error.message
+            row.appendChild(nombre)
+            row.appendChild(badge)
+            cambioListEl.appendChild(row)
+            if (manual) showMsg(cambioMsg, error.message || "Error al comprobar", "error")
+        } finally {
+            if (cambioBtn) cambioBtn.disabled = false
+        }
+    }
+
+    cambioBtn?.addEventListener("click", () => loadCambios({ manual: true }))
+    cambioBaseSel?.addEventListener("change", () => loadCambios({ manual: true }))
+    cambioAuto?.addEventListener("change", () => {
+        clearInterval(cambioTimer)
+        cambioTimer = cambioAuto.checked ? setInterval(() => loadCambios(), 60_000) : null
+    })
+    loadCambioBases().then(() => loadCambios({ inicial: true }))
+
     // --- HTTPS ---
     // --- Atajo de iOS ---
     // El Atajo tenía todas sus piezas fuera de la vista: la clave en un fichero,
@@ -1553,18 +1683,27 @@ async function initAjustesLogic() {
         // 1. Clave
         if (sinFirma) {
             _pasoAtajo("ajustesAtajoPasoClave", "aviso")
-            _setTexto(atajoPasoClaveDetalle, "No se exige: las peticiones entran sin firmar. La clave no hace falta mientras esté así.")
+            _setTexto(
+                atajoPasoClaveDetalle,
+                "No se exige: las peticiones entran sin firmar. La clave no hace falta mientras esté así."
+            )
         } else if (clave.hay) {
             _pasoAtajo("ajustesAtajoPasoClave", "ok")
-            _setTexto(atajoPasoClaveDetalle, clave.origen === "entorno"
-                ? `Generada. Sale de ${clave.detalle}, en el .env del servidor.`
-                : `Generada y guardada en ${clave.detalle}.`)
+            _setTexto(
+                atajoPasoClaveDetalle,
+                clave.origen === "entorno"
+                    ? `Generada. Sale de ${clave.detalle}, en el .env del servidor.`
+                    : `Generada y guardada en ${clave.detalle}.`
+            )
         } else if (clave.origen === "ilegible") {
             _pasoAtajo("ajustesAtajoPasoClave", "mal")
             _setTexto(atajoPasoClaveDetalle, `No se puede leer. ${clave.detalle}`)
         } else {
             _pasoAtajo("ajustesAtajoPasoClave", "mal")
-            _setTexto(atajoPasoClaveDetalle, "Falta. Sin ella el servidor no puede comprobar quién manda cada petición y el atajo no envía nada.")
+            _setTexto(
+                atajoPasoClaveDetalle,
+                "Falta. Sin ella el servidor no puede comprobar quién manda cada petición y el atajo no envía nada."
+            )
         }
 
         // 2. Redes
@@ -1573,22 +1712,38 @@ async function initAjustesLogic() {
         const verTe = data.verTe || {}
         if (!data.activado) {
             _pasoAtajo("ajustesAtajoPasoRedes", "mal")
-            _setTexto(atajoPasoRedesDetalle, "El Atajo está desactivado en config.ini ([atajo] activado = false): estas rutas responden 404.")
+            _setTexto(
+                atajoPasoRedesDetalle,
+                "El Atajo está desactivado en config.ini ([atajo] activado = false): estas rutas responden 404."
+            )
         } else if (!redes.length) {
             _pasoAtajo("ajustesAtajoPasoRedes", "mal")
-            _setTexto(atajoPasoRedesDetalle, "No hay ninguna red permitida, y vacío no significa «todas»: no entra nadie.")
+            _setTexto(
+                atajoPasoRedesDetalle,
+                "No hay ninguna red permitida, y vacío no significa «todas»: no entra nadie."
+            )
         } else if (rechazadas.length) {
             _pasoAtajo("ajustesAtajoPasoRedes", "aviso")
-            _setTexto(atajoPasoRedesDetalle, rechazadas.length === 1
-                ? `Alguien ha llamado desde ${rechazadas[0].ip} y se ha rechazado. Si es el iPhone, permítelo aquí debajo.`
-                : `${rechazadas.length} direcciones han llamado y se han rechazado. Si una es el iPhone, permítela aquí debajo.`)
+            _setTexto(
+                atajoPasoRedesDetalle,
+                rechazadas.length === 1
+                    ? `Alguien ha llamado desde ${rechazadas[0].ip} y se ha rechazado. Si es el iPhone, permítelo aquí debajo.`
+                    : `${rechazadas.length} direcciones han llamado y se han rechazado. Si una es el iPhone, permítela aquí debajo.`
+            )
         } else if (verTe.ip && !verTe.permitida) {
             _pasoAtajo("ajustesAtajoPasoRedes", "aviso")
-            _setTexto(atajoPasoRedesDetalle, `Se acepta desde ${redes.join(", ")}. Este navegador llega desde ${verTe.ip}, que queda fuera: si el iPhone está en la misma red, también quedará fuera.`)
+            _setTexto(
+                atajoPasoRedesDetalle,
+                `Se acepta desde ${redes.join(", ")}. Este navegador llega desde ${verTe.ip}, que queda fuera: si el iPhone está en la misma red, también quedará fuera.`
+            )
         } else {
             _pasoAtajo("ajustesAtajoPasoRedes", "ok")
-            const origen = data.acceso && data.acceso.origenRedes === "ajustes" ? "guardado aquí" : "lo que dice config.ini"
-            _setTexto(atajoPasoRedesDetalle, `Se acepta desde ${redes.join(", ")} (${origen}). Nadie se ha quedado fuera desde que arrancó el servidor.`)
+            const origen =
+                data.acceso && data.acceso.origenRedes === "ajustes" ? "guardado aquí" : "lo que dice config.ini"
+            _setTexto(
+                atajoPasoRedesDetalle,
+                `Se acepta desde ${redes.join(", ")} (${origen}). Nadie se ha quedado fuera desde que arrancó el servidor.`
+            )
         }
 
         // 3. Instalar: se puede en cuanto hay clave (o no se exige) y redes.
@@ -1599,7 +1754,10 @@ async function initAjustesLogic() {
         if (!puedeInstalar) {
             _pasoAtajo("ajustesAtajoPasoProbar", "pendiente")
             if (atajoPruebaRes) atajoPruebaRes.hidden = true
-            _setTexto(atajoPasoProbarDetalle, "Recorre el mismo camino que el atajo —clave, redes, firma— sin apuntar nada.")
+            _setTexto(
+                atajoPasoProbarDetalle,
+                "Recorre el mismo camino que el atajo —clave, redes, firma— sin apuntar nada."
+            )
         }
     }
 
@@ -1684,7 +1842,11 @@ async function initAjustesLogic() {
         const redes = _redesAjustes.filter((r) => r !== cidr)
         const ok = await _guardarRedesAtajo(redes, btn)
         if (ok) {
-            showMsg(atajoAccesoMsg, redes.length ? `${cidr} quitada` : "Sin redes aquí: se usan las de config.ini", "ok")
+            showMsg(
+                atajoAccesoMsg,
+                redes.length ? `${cidr} quitada` : "Sin redes aquí: se usan las de config.ini",
+                "ok"
+            )
         }
     }
 
@@ -2244,9 +2406,12 @@ async function initAjustesLogic() {
             }
 
             _pasoAtajo("ajustesAtajoPasoProbar", data.ok ? "ok" : "mal")
-            _setTexto(atajoPasoProbarDetalle, data.ok
-                ? "Todo en orden: el servidor firma y verifica como lo hará con el atajo."
-                : "Hay algo sin configurar. Cada fila de abajo dice qué.")
+            _setTexto(
+                atajoPasoProbarDetalle,
+                data.ok
+                    ? "Todo en orden: el servidor firma y verifica como lo hará con el atajo."
+                    : "Hay algo sin configurar. Cada fila de abajo dice qué."
+            )
 
             showMsg(atajoMsg, data.ok ? "Todo listo" : "Hay algo sin configurar", data.ok ? "ok" : "error")
         } catch {
@@ -3560,7 +3725,13 @@ async function initAjustesLogic() {
             botones: [
                 { etiqueta: "Cancelar", clase: "cancelButton", valor: "cancelar" },
                 { etiqueta: "Importar sin las claves", clase: "cancelButton", valor: "sin" },
-                { etiqueta: "Importar", clase: "primaryButton", valor: "con", principal: true, necesitaContrasena: true }
+                {
+                    etiqueta: "Importar",
+                    clase: "primaryButton",
+                    valor: "con",
+                    principal: true,
+                    necesitaContrasena: true
+                }
             ],
             onCerrar: (valor, contrasena) => {
                 if (valor === "cancelar") {

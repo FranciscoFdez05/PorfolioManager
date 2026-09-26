@@ -22,6 +22,115 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.7.0] — 2026-09-26
+
+**Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano. Los dos ajustes nuevos de `config.ini`
+(`orden_respaldo` y `reposo_limite_segundos`) traen por defecto los valores que
+estaban fijados antes, así que no cambia nada hasta que los toques.
+
+### Añadido
+
+**Tipos de cambio en Ajustes › API.** Una sección nueva enseña los tipos que usa
+la aplicación para convertir: de la divisa de referencia que elijas (parte de tu
+moneda base) a las demás, con la fuente, la fecha del dato, lo que tardó en
+contestar y la hora de la comprobación. «Comprobar ahora» dice si el servicio
+responde, y un interruptor lo vuelve a pedir cada minuto mientras Ajustes esté
+abierto. El dato es la referencia diaria del BCE (vía Frankfurter): cambia una
+vez por día hábil, no de minuto a minuto.
+
+**El bot de Telegram contesta a `/start`.** Un hilo en segundo plano escucha los
+mensajes que le lleguen al bot: cuando el chat guardado en Ajustes le manda
+`/start` -paso obligatorio, porque Telegram no deja que un bot escriba primero a
+nadie- responde confirmando la conexión; si le escribe cualquier otro chat -el
+nombre de usuario del bot es público- lo ignora sin contestar nada, para no
+confirmarle a un desconocido que hay un bot de verdad al otro lado.
+
+**Columna «#» en Activos y Seguimiento.** Numera cada fila con su posición en
+la lista, en el orden en que la tienes.
+
+### Cambiado
+
+**El respaldo entre proveedores se configura.** Qué proveedores se prueban, y
+en qué orden, cuando falla el del activo (`[mercado] orden_respaldo` en
+`config.ini`), y cuánto se deja de pedir a uno tras un límite de peticiones
+(`reposo_limite_segundos`, 5 minutos por defecto). Estaban fijados en el código.
+
+**Las divisas del interruptor «Convertir la cotización» salen del servicio de
+cambio.** El selector ya no lleva una lista escrita en la página: ofrece las
+divisas que admite un activo y que el servicio de tipos de cambio publica en ese
+momento, con su nombre, y parte de la que ya tiene el activo. El tipo de cambio
+en sí tampoco tenía por qué ceñirse a una lista: se le pide al servicio y, si no
+conoce una divisa, es él quien lo dice.
+
+**«Enviar prueba» de Telegram, más útil.** Guarda lo que haya escrito en los
+campos si hace falta antes de probar, y si Telegram rechaza el mensaje porque el
+bot no puede escribir primero, lo dice con el paso que falta en vez de devolver
+el error en inglés tal cual.
+
+**La cabecera de la ficha del activo se actualiza al editar.** Cantidad, precio
+medio, capital invertido y ganancia se recalculan al añadir, editar o borrar una
+compra, sin tener que salir y volver a entrar en la ficha.
+
+**Tablas un poco más altas** en Activos y Métricas, y ajuste de alto en las de
+Gastos e Ingresos.
+
+### Corregido
+
+**`OANDA:XAUEUR` y otros cruces de divisa salían «sin cotización».** El
+buscador gratuito de TradingView no tiene esos cruces aunque se vean en su web.
+Ahora se calculan como lo hacen los propios brókers: el par en dólares del mismo
+mercado entre su tipo de cambio (`OANDA:XAUUSD / OANDA:EURUSD` da 3.761,68 €, lo
+mismo que marca el gráfico de `OANDA:XAUEUR`). No hay ninguna lista de activos,
+mercados ni divisas: todo sale del ticker elegido y de lo que devuelve la API, y
+el sentido del tipo de cambio (EURUSD, pero USDJPY) se toma del par que exista.
+Si al mercado le falta alguna pieza, el cruce sigue sin cotización: es el caso
+de la plata, que no está en dólares en el buscador gratuito de ningún bróker.
+Solo se calcula cuando falta la cotización directa, y el estado del activo dice
+de dónde sale («Cotización calculada (OANDA:XAUUSD / OANDA:EURUSD)»).
+
+**Buscar «XAG» en TradingView devolvía primero contratos de cripto.** Los
+perpetuos (`BINANCE:XAGUSDT.P`, `OKX:XAGUSDT.P`…) son derivados de exchanges de
+cripto, no plata. La búsqueda ahora ordena primero lo que la API marca como del
+tipo de activo que has elegido (acciones, ETF, cripto o materias primas) y
+dentro de eso por parecido con lo que has escrito; sin tipo elegido, manda el
+orden de TradingView. Salen fuera las listas de palabras y marcas que decidían
+el orden por el nombre del activo («gold», «silver», «ishares»…) y los puntos
+extra a mercados concretos del buscador de Finnhub (`OANDA:XAU_`, `BINANCE:`,
+`COINBASE:`). La búsqueda desde «Editar activo» se hacía además sin tipo de
+activo, así que esa preferencia no se aplicaba nunca al editar.
+
+**Cambiar el ticker a uno en otra divisa descuadraba el activo.** Desde la
+2.5.0, con la conversión de divisa apagada, refrescar un activo en euros con un
+ticker en dólares (`OANDA:XAUUSD`, `GC=F`) pasaba el activo entero a dólares.
+Pero la divisa del activo es también la de lo invertido, y el rendimiento resta
+uno de otro sin convertir: las compras hechas en euros pasaban a leerse como
+dólares. La cotización vuelve a guardarse siempre en la divisa del activo,
+venga el ticker en la que venga, y si el tipo de cambio no responde se mantiene
+el último precio en vez de guardar dólares con la etiqueta de euros.
+
+**El interruptor «Convertir la cotización de divisa» ahora fija la divisa del
+activo entero.** Elegir una divisa distinta de la que tiene el activo convierte
+precio y compras a la vez, igual que la opción «Moneda del activo» del menú de
+la ficha; cambiarla desde ese menú mueve también el interruptor. Antes podían
+quedar el precio en una divisa y las compras en otra.
+
+**La conversión de divisa se apagaba sola.** El guardado automático de la ficha
+del activo —al editar una compra o al pulsar «Actualizar cotización»— reenvía
+el activo sin ese dato, y el servidor lo tomaba como «apagado». Ahora conserva
+lo guardado cuando el campo no viene. Lo mismo pasaba con los activos ocultos,
+que volvían a aparecer tras editar una fila de su ficha.
+
+**Tras cambiar el ticker, el precio seguía siendo el del anterior** hasta el
+siguiente refresco, a veces de otro proveedor y en otra divisa. Al confirmar un
+ticker nuevo se pide la cotización al momento, y la lista de Activos recalcula
+valor y rendimiento con ella.
+
+---
+
 ## [2.6.0] — 2026-09-26
 
 **Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la

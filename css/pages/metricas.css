@@ -1085,7 +1085,7 @@ html[data-theme="black"] #mChartDivAxisWrap {
 
 .overviewPage .metricasTableCard {
     overflow: auto;
-    max-height: calc(100vh - 245px);
+    max-height: calc(100vh - 225px);
 }
 
 #overviewTable thead th {

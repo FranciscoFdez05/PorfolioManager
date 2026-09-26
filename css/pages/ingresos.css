@@ -141,7 +141,7 @@
 .ingresosMovementsWrapper {
     overflow-y: auto;
     overflow-x: hidden;
-    max-height: 612px;
+    max-height: 525px;
 }
 
 .ingresosAnnualWrapper::-webkit-scrollbar,
@@ -300,7 +300,6 @@
 }
 
 .ingresosMonthHeader {
-    padding: 8px 2px;
     color: var(--text-primary);
     font-size: 18px;
     font-weight: 700;

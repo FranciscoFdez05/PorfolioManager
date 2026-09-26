@@ -72,7 +72,7 @@ def test_detalla_los_lotes_que_consume(temp_db):
 
     dato, _ = ventas_fifo.simular_venta("acme", "01-09-2026", "15", "30")
 
-    assert [(l["fecha"], l["cantidad"]) for l in dato["lotes"]] == [
+    assert [(lote["fecha"], lote["cantidad"]) for lote in dato["lotes"]] == [
         ("01-01-2023", "10.00000000"),
         ("01-06-2023", "5.00000000"),
     ]

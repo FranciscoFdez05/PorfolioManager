@@ -59,9 +59,22 @@ _TYPE_MAP = {
     "bond": "bond",
     "economic": "economic",
     "option": "option",
+    "commodity": "commodity",
+    "swap": "perpetuo",
 }
 
 _TAG_RE = re.compile(r"</?em>")
+
+# El scanner gratuito no tiene todos los cruces de divisa que sí se ven en
+# tradingview.com: OANDA:XAUEUR no está pero OANDA:XAUUSD sí. Un cruce que falta
+# se calcula como lo calculan los propios brókers: el par en dólares del mismo
+# mercado entre su tipo de cambio. Comprobado contra el gráfico de OANDA:XAUEUR:
+# 4284,97 / 1,13911 = 3761,68, lo mismo que marca TradingView.
+#
+# No hay ninguna lista de activos, mercados ni divisas: todo sale del ticker que
+# eligió el usuario y de lo que devuelva la API. Si al mercado le falta el par
+# en dólares o el tipo de cambio, el cruce se queda sin cotización.
+_CROSS_RE = re.compile(r"^([A-Z]{3})([A-Z]{3})$")
 
 
 def _strip_markup(text):
@@ -75,6 +88,90 @@ def _map_type(raw_type):
 
 def _fetch_json(url, params=None, timeout=None, json_body=None, headers=None):
     return fetch_json(url, params, timeout=timeout, provider="TradingView", json_body=json_body, headers=headers)
+
+
+def _scan(tickers, timeout=None):
+    """`{ticker: (precio, variación %, divisa)}` de los que el scanner cotiza.
+
+    Una sola petición para todos. Deja pasar HTTPError/URLError: cada llamante
+    decide si eso es un error que enseñar o un "sin cotización".
+    """
+    if not tickers:
+        return {}
+
+    payload = _fetch_json(
+        TRADINGVIEW_SCAN_URL,
+        json_body={"symbols": {"tickers": list(tickers), "query": {"types": []}}, "columns": _SCAN_COLUMNS},
+        timeout=timeout,
+    )
+
+    cotizados = {}
+    for row in payload.get("data") or []:
+        values = row.get("d") or []
+        if not row.get("s") or len(values) < 3:
+            continue
+        price = float(values[0] or 0)
+        if price <= 0:
+            continue
+        cotizados[row["s"]] = (price, float(values[1] or 0), str(values[2] or "").strip().upper())
+    return cotizados
+
+
+def _cross_plan(ticker):
+    """Con qué tickers se calcula el cruce `MERCADO:BBBQQQ` si el scanner no lo
+    tiene, o None: `(par en USD, cambio QQQUSD, cambio USDQQQ, divisa QQQ)`.
+
+    Se piden las dos orientaciones del tipo de cambio porque cada divisa cotiza
+    en una (EURUSD pero USDJPY) y eso no se supone: se usa la que exista.
+    """
+    exchange, _, symbol = ticker.partition(":")
+    match = _CROSS_RE.match(symbol)
+    if not exchange or not match:
+        return None
+
+    base, target = match.groups()
+    if "USD" in (base, target):
+        return None  # ya es un par en dólares: no hay de dónde calcularlo
+
+    return f"{exchange}:{base}USD", f"{exchange}:{target}USD", f"{exchange}:USD{target}", target
+
+
+def _synthetic_quotes(tickers, timeout=None):
+    """Calcula los cruces que el scanner no tiene: `{ticker: (precio, variación %,
+    divisa, origen)}`. Una sola petición para todas las piezas que hagan falta."""
+    plans = {ticker: plan for ticker in tickers if (plan := _cross_plan(ticker))}
+    if not plans:
+        return {}
+
+    piezas = sorted({pieza for base, directo, inverso, _ in plans.values() for pieza in (base, directo, inverso)})
+    try:
+        cotizados = _scan(piezas, timeout)
+    except (HTTPError, URLError):
+        return {}
+
+    calculados = {}
+    for ticker, (base, directo, inverso, target) in plans.items():
+        if cotizados.get(base, (0, 0, ""))[2] != "USD":
+            continue
+        base_price, base_change, _ = cotizados[base]
+
+        # La variación del cruce no es la resta de las dos: se compone.
+        if directo in cotizados:  # QQQUSD: dólares por unidad, se divide
+            fx = directo
+            fx_price, fx_change, _ = cotizados[fx]
+            price = base_price / fx_price
+            change = ((1 + base_change / 100) / (1 + fx_change / 100) - 1) * 100
+        elif inverso in cotizados:  # USDQQQ: unidades por dólar, se multiplica
+            fx = inverso
+            fx_price, fx_change, _ = cotizados[fx]
+            price = base_price * fx_price
+            change = ((1 + base_change / 100) * (1 + fx_change / 100) - 1) * 100
+        else:
+            continue
+
+        calculados[ticker] = (price, change, target, f"{base} / {fx}")
+
+    return calculados
 
 
 def fetch_quote(symbol, timeout=None):
@@ -91,40 +188,34 @@ def fetch_quote(symbol, timeout=None):
         return None, "El ticker de TradingView necesita el mercado delante (p.ej. NASDAQ:AAPL)"
 
     try:
-        payload = _fetch_json(
-            TRADINGVIEW_SCAN_URL,
-            json_body={
-                "symbols": {"tickers": [normalized_symbol], "query": {"types": []}},
-                "columns": _SCAN_COLUMNS,
-            },
-            timeout=timeout,
-        )
+        cotizados = _scan([normalized_symbol], timeout)
     except HTTPError as error:
         return None, f"TradingView devolvió HTTP {error.code}"
     except URLError as error:
         return None, f"No se pudo conectar con TradingView: {error.reason}"
 
-    rows = payload.get("data") or []
-    values = (rows[0].get("d") or []) if rows else []
+    status = "Cotización actualizada"
+    if normalized_symbol in cotizados:
+        current_price, percent_change, currency = cotizados[normalized_symbol]
+        currency = currency or "USD"
+    else:
+        calculado = _synthetic_quotes([normalized_symbol], timeout).get(normalized_symbol)
+        if not calculado:
+            return None, "TradingView no devolvió cotización para ese ticker"
+        current_price, percent_change, currency, origen = calculado
+        # Se dice de dónde sale: no es la cotización de ese ticker en concreto
+        # sino la del par en dólares pasada por el cambio, y puede diferir en
+        # el diferencial del bróker.
+        status = f"Cotización calculada ({origen})"
 
-    if len(values) < 3:
-        return None, "TradingView no devolvió cotización para ese ticker"
-
-    current_price = float(values[0] or 0)
-    percent_change = float(values[1] or 0)
-    currency = str(values[2] or "USD").strip().upper()
-
-    if current_price <= 0:
-        return None, "TradingView no devolvió cotización para ese ticker"
-
-    previous_close = current_price / (1 + percent_change / 100) if percent_change not in (None, -100) else current_price
+    previous_close = current_price / (1 + percent_change / 100) if percent_change != -100 else current_price
 
     return {
         "symbol": normalized_symbol,
         "price": _format_decimal(current_price),
         "currency": currency,
         "change": _format_percent(percent_change),
-        "status": "Cotización actualizada",
+        "status": status,
         "lastUpdated": datetime.now().astimezone().isoformat(),
         "marketData": {
             "currentPrice": current_price,
@@ -134,18 +225,29 @@ def fetch_quote(symbol, timeout=None):
     }, None
 
 
-def _score_result(symbol, description, raw_type, query_text, normalized_asset_name="", preferred_asset_type="", rank_index=0):
+# Qué tipos de la API corresponden a cada tipo de activo de la aplicación (el
+# que eliges al crear el activo). Es la traducción entre el vocabulario de la
+# app y el de TradingView, no una preferencia por ningún activo, marca ni
+# mercado: qué resultado encaja lo deciden tu elección y el tipo que da la API.
+_TIPOS_API_POR_CATEGORIA = {
+    "acciones": {"stock", "dr"},
+    "etfs": {"fund", "structured"},
+    "cripto": {"crypto", "spot"},
+    "comoditis": {"commodity", "futures", "cfd"},
+}
+
+
+def _score_result(symbol, description, query_text, normalized_asset_name="", rank_index=0):
+    """Relevancia de un resultado, solo con lo que escribió el usuario y lo que
+    dice la API: sin listas de palabras, marcas ni mercados preferidos."""
     normalized_query = _normalize_text(query_text)
     compact_query = _compact_symbol(query_text)
     compact_symbol = _compact_symbol(symbol)
     normalized_description = _normalize_text(description)
 
-    # TradingView ya devuelve sus propios resultados ordenados por relevancia
-    # -y mezcla acciones con bonos, pares de cripto descatalogados, futuros...
-    # donde "contiene la palabra" empata a casi todos-. Este suelo, que baja
-    # con la posición original, hace que esa ordenación mande salvo que algo
-    # de aquí abajo encuentre una señal más fuerte (símbolo exacto, tipo
-    # preferido).
+    # TradingView ya devuelve sus propios resultados ordenados por relevancia.
+    # Este suelo, que baja con la posición original, hace que esa ordenación
+    # mande salvo que el símbolo o el nombre coincidan mejor con lo buscado.
     score = max(0, 200 - rank_index * 6)
 
     if compact_query:
@@ -162,29 +264,6 @@ def _score_result(symbol, description, raw_type, query_text, normalized_asset_na
         elif normalized_asset_name in normalized_description:
             score += 160
 
-    if preferred_asset_type == "etfs":
-        if raw_type in {"fund", "structured"}:
-            score += 280
-        elif any(token in normalized_description for token in ("etf", "etp", "ucits", "ishares", "xtrackers", "amundi", "vanguard", "spdr")):
-            score += 200
-        elif raw_type == "stock":
-            score += 40
-    elif preferred_asset_type == "acciones":
-        if raw_type == "stock":
-            score += 250
-        elif raw_type in {"crypto", "spot", "forex"}:
-            score -= 220
-    elif preferred_asset_type == "cripto":
-        if raw_type in {"crypto", "spot"}:
-            score += 280
-        elif raw_type in {"stock", "forex"}:
-            score -= 160
-    elif preferred_asset_type == "comoditis":
-        if raw_type in {"forex", "cfd", "futures"}:
-            score += 200
-        if any(token in normalized_description for token in ("gold", "silver", "oil", "brent", "crude", "commodity")):
-            score += 280
-
     return score
 
 
@@ -197,32 +276,24 @@ def _batch_fetch_quotes(symbols, timeout=None):
         return {}
 
     try:
-        payload = _fetch_json(
-            TRADINGVIEW_SCAN_URL,
-            json_body={
-                "symbols": {"tickers": symbols, "query": {"types": []}},
-                "columns": _SCAN_COLUMNS,
-            },
-            timeout=timeout,
-        )
+        cotizados = _scan(symbols, timeout)
     except (HTTPError, URLError):
         return {}
 
-    quotes = {}
-    for row in payload.get("data") or []:
-        symbol = row.get("s")
-        values = row.get("d") or []
-        if not symbol or len(values) < 3:
-            continue
-        current_price = float(values[0] or 0)
-        if current_price <= 0:
-            continue
-        quotes[symbol] = {
-            "price": _format_decimal(current_price),
-            "currency": str(values[2] or "").strip().upper(),
-            "change": _format_percent(float(values[1] or 0)),
+    # Los que el scanner no tiene y son un cruce calculable con piezas del mismo
+    # mercado (OANDA:XAUEUR) salen con precio en vez de "sin cotización".
+    faltan = [symbol for symbol in symbols if symbol not in cotizados]
+    for symbol, (price, change, currency, _origen) in _synthetic_quotes(faltan, timeout).items():
+        cotizados[symbol] = (price, change, currency)
+
+    return {
+        symbol: {
+            "price": _format_decimal(price),
+            "currency": currency,
+            "change": _format_percent(change),
         }
-    return quotes
+        for symbol, (price, change, currency) in cotizados.items()
+    }
 
 
 def _search_symbol_request(text, exchange, timeout):
@@ -277,6 +348,7 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
 
     raw_results = payload.get("symbols") or []
     normalized_asset_name = _normalize_text(asset_name)
+    tipos_categoria = _TIPOS_API_POR_CATEGORIA.get(str(preferred_asset_type or "").strip().lower())
     ranked_results = []
     seen_symbols = set()
 
@@ -296,8 +368,10 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
             continue
 
         seen_symbols.add(full_symbol)
-        score = _score_result(raw_symbol, description, raw_type, normalized_query, normalized_asset_name, preferred_asset_type, rank_index)
-        ranked_results.append((score, {
+        score = _score_result(raw_symbol, description, normalized_query, normalized_asset_name, rank_index)
+        # Sin tipo de activo elegido, todos cuentan igual.
+        en_categoria = raw_type in tipos_categoria if tipos_categoria else True
+        ranked_results.append((score, en_categoria, {
             "symbol": full_symbol,
             "displaySymbol": full_symbol,
             "description": description,
@@ -309,28 +383,31 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
             "change": ""
         }))
 
-    ranked_results.sort(key=lambda row: (-row[0], row[1]["symbol"]))
+    # Primero lo que la API marca como del tipo de activo elegido; dentro, por
+    # relevancia. Así, buscando "XAG" en un activo de materias primas, la plata
+    # de los brókers (tipo "commodity") va antes que los contratos perpetuos de
+    # los exchanges de cripto (tipo "swap"), sin nombrar a ninguno de los dos.
+    ranked_results.sort(key=lambda row: (not row[1], -row[0], row[2]["symbol"]))
 
     # Se cotiza un grupo más amplio que lo que se va a enseñar (`_ENRICH_POOL`,
     # no `limit`): mirar la cotización solo cambia si un resultado sale al
-    # final antes de saber si es el que sirve. Como GETTEX (algunos fondos) u
-    # OANDA (el par en EUR de una materia prima, no en USD) no están en el
-    # scanner gratuito aunque coticen en tradingview.com, sin este margen un
-    # resultado sin precio se quedaba en el hueco de otro mercado del mismo
-    # instrumento que sí lo tiene y rankeaba justo un poco peor.
+    # final antes de saber si es el que sirve. Hay listados que el scanner
+    # gratuito no tiene aunque coticen en tradingview.com, y sin este margen uno
+    # sin precio se quedaba en el hueco de otro mercado del mismo instrumento
+    # que sí lo tiene y rankeaba justo un poco peor.
     _ENRICH_POOL = max(limit, 20)
-    candidates = [item for _, item in ranked_results[:_ENRICH_POOL]]
-    quotes = _batch_fetch_quotes([c["symbol"] for c in candidates], timeout=timeout)
+    candidates = [(en_categoria, item) for _, en_categoria, item in ranked_results[:_ENRICH_POOL]]
+    quotes = _batch_fetch_quotes([item["symbol"] for _, item in candidates], timeout=timeout)
 
-    for candidate in candidates:
+    for _, candidate in candidates:
         quote = quotes.get(candidate["symbol"])
         if quote:
             candidate["price"] = quote["price"]
             candidate["currency"] = quote["currency"]
             candidate["change"] = quote["change"]
 
-    # Sort estable: a igualdad de "tiene cotización o no", se respeta el orden
-    # de relevancia que ya traían.
-    candidates.sort(key=lambda item: item["price"] == "")
+    # Sort estable: dentro del tipo de activo elegido va antes lo que tiene
+    # cotización, y a igualdad se respeta el orden de relevancia.
+    candidates.sort(key=lambda pair: (not pair[0], pair[1]["price"] == ""))
 
-    return candidates[:limit], None
+    return [item for _, item in candidates[:limit]], None

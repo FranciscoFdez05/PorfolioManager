@@ -91,6 +91,13 @@ def _enviar(token: str, chatId: str, texto: str) -> None:
         raise ValueError(cuerpo.get("description") or "Telegram rechazó el mensaje")
 
 
+_AVISO_SIN_START = (
+    'Telegram no deja que el bot escriba primero: abre el chat con tu bot '
+    '(busca el nombre de usuario que te dio @BotFather) y pulsa "Iniciar" '
+    'antes de volver a probar.'
+)
+
+
 def enviarPrueba():
     """Manda un mensaje de prueba ignorando el cooldown. Devuelve (ok, error)."""
     token, chatId = leerConfig()
@@ -100,11 +107,19 @@ def enviarPrueba():
         _enviar(token, chatId, "✅ PortfolioManager: conexión con Telegram correcta")
         return True, None
     except HTTPError as error:
+        descripcion = ""
         try:
-            detalle = error.read().decode("utf-8", errors="replace")
+            cuerpo = json.loads(error.read().decode("utf-8", errors="replace"))
+            descripcion = str(cuerpo.get("description") or "")
         except Exception:
-            detalle = str(error)
-        return False, f"Telegram devolvió HTTP {error.code}: {detalle[:200]}"
+            pass
+        # El caso más común con diferencia: el chat existe (el ID es correcto)
+        # pero esa persona nunca le ha escrito nada al bot, y Telegram no deja
+        # que un bot inicie la conversación. Sin esto, el error crudo de
+        # Telegram no dice qué hacer para arreglarlo.
+        if "initiate conversation" in descripcion.lower() or "bot was blocked" in descripcion.lower():
+            return False, _AVISO_SIN_START
+        return False, f"Telegram devolvió HTTP {error.code}: {descripcion or str(error)}"[:300]
     except URLError as error:
         return False, f"No se pudo conectar con Telegram: {error.reason}"
     except Exception as error:

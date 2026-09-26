@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 from datetime import datetime
 from urllib.error import HTTPError, URLError
 
@@ -76,12 +77,11 @@ MARKET_SUFFIX_CURRENCIES = {
     ".SW": "CHF",
     ".L": "GBP",
 }
-# Debe coincidir con ALLOWED_DISPLAY_CURRENCIES (stores/asset_utils.py) y
-# SUPPORTED_ASSET_CURRENCIES (routes/activos.py): las tres divisas que puede
-# elegir el usuario para convertir una cotización o cambiar la moneda de un
-# activo. Comprobado contra Frankfurter (la fuente principal, más abajo): las
-# cinco están soportadas sin problema, no es una limitación de la API.
-SUPPORTED_DISPLAY_CURRENCIES = {"EUR", "USD", "GBP", "CHF", "JPY"}
+FRANKFURTER_CURRENCIES_URL = "https://api.frankfurter.app/currencies"
+# La lista de divisas del servicio de cambio casi no cambia: se pide una vez al
+# día como mucho, en vez de en cada apertura del modal que la enseña.
+_CURRENCIES_TTL_SECONDS = 24 * 3600
+_currencies_cache = {"divisas": None, "ts": 0.0}
 SEARCH_QUERY_ALIASES = {}
 PREFERRED_EXCHANGES_BY_TYPE = {
     "acciones": {"XNYS", "XNAS", "NYSE", "NASDAQ", "ARCX", "BATS", "XNCM"},
@@ -157,9 +157,6 @@ def _score_remote_symbol(item, normalized_query, normalized_asset_name="", prefe
 
         if any(token in normalized_description for token in ("gold", "silver", "oil", "brent", "crude")):
             score += 220
-
-        if "XAU" in symbol:
-            score += 260
 
     if preferred_asset_type in PREFERRED_EXCHANGES_BY_TYPE and exchange in PREFERRED_EXCHANGES_BY_TYPE[preferred_asset_type]:
         score += 80
@@ -253,7 +250,9 @@ def _score_local_symbol(item, normalized_query, candidate_codes, normalized_asse
 
         weight = max(10, 60 - (index * 4))
 
-        if symbol.startswith(f"BINANCE:{code}") or symbol.startswith(f"COINBASE:{code}") or symbol.startswith(f"OANDA:{code}_"):
+        # El ticker empieza por el código buscado, sea cual sea el mercado: antes
+        # solo contaba en BINANCE, COINBASE y OANDA, una lista fija de mercados.
+        if symbol.split(":", 1)[-1].replace("_", "").startswith(code):
             score += weight + 90
 
         if compact_display.startswith(code):
@@ -290,9 +289,6 @@ def _score_local_symbol(item, normalized_query, candidate_codes, normalized_asse
 
         if any(token in normalized_description for token in ("gold", "silver", "oil", "brent", "crude")):
             score += 240
-
-        if symbol.startswith("OANDA:XAU_"):
-            score += 320
 
     return score
 
@@ -399,9 +395,9 @@ def fetch_exchange_rate(source_currency, target_currency, timeout=None):
     if source == target:
         return 1.0, None
 
-    if source not in SUPPORTED_DISPLAY_CURRENCIES or target not in SUPPORTED_DISPLAY_CURRENCIES:
-        return None, f"No hay conversión automática disponible de {source} a {target}"
-
+    # No hay lista propia de divisas "que funcionan": qué se puede convertir lo
+    # dice el servicio de cambio, y si no conoce una divisa contesta con error
+    # (que llega abajo como "No se pudo obtener el cambio").
     try:
         payload = _fetch_json(FRANKFURTER_LATEST_URL, {
             "from": source,
@@ -438,6 +434,67 @@ def fetch_exchange_rate(source_currency, target_currency, timeout=None):
         return None, f"No se pudo obtener el cambio {source}/{target}"
 
     return rate, None
+
+
+def fetch_exchange_rates(base_currency, target_currencies, timeout=None):
+    """Tipos de cambio de `base_currency` a varias divisas, en una petición.
+
+    Mismas fuentes y en el mismo orden que `fetch_exchange_rate` (Frankfurter y,
+    si falla, open.er-api.com), para que lo que se enseña en Ajustes sea lo que
+    de verdad se usa al convertir. Devuelve `(datos, error)` con
+    `datos = {"rates": {divisa: tipo}, "fuente": str, "fecha": str}`.
+    """
+    base = _normalize_currency_code(base_currency)
+    targets = [t for t in dict.fromkeys(_normalize_currency_code(t) for t in target_currencies) if t != base]
+    if not targets:
+        return {"rates": {}, "fuente": "", "fecha": ""}, None
+
+    try:
+        payload = _fetch_json(FRANKFURTER_LATEST_URL, {"from": base, "to": ",".join(targets)}, timeout=timeout)
+        rates = {t: float(r) for t, r in (payload.get("rates") or {}).items() if float(r or 0) > 0}
+        if rates:
+            return {"rates": rates, "fuente": "Frankfurter (referencia diaria del BCE)",
+                    "fecha": str(payload.get("date") or "")}, None
+    except (HTTPError, URLError, TimeoutError, ValueError):
+        pass
+
+    try:
+        payload = _fetch_json_absolute(f"{EXCHANGE_RATE_API_URL}/{base}", timeout=timeout)
+    except HTTPError as error:
+        return None, f"Cambio de divisa devolvió HTTP {error.code}"
+    except URLError:
+        return None, "No se pudo conectar al servicio de cambio de divisa"
+    except TimeoutError:
+        return None, "El servicio de cambio de divisa tardó demasiado en responder"
+
+    todas = payload.get("rates") or {}
+    rates = {t: float(todas[t]) for t in targets if float(todas.get(t) or 0) > 0}
+    if not rates:
+        return None, f"No se pudo obtener el cambio desde {base}"
+    return {"rates": rates, "fuente": "open.er-api.com (diario)",
+            "fecha": str(payload.get("time_last_update_utc") or "")}, None
+
+
+def fetch_currencies(timeout=None):
+    """Divisas que publica el servicio de cambio: `({código: nombre}, error)`."""
+    ahora = time.monotonic()
+    if _currencies_cache["divisas"] and ahora - _currencies_cache["ts"] < _CURRENCIES_TTL_SECONDS:
+        return dict(_currencies_cache["divisas"]), None
+
+    try:
+        payload = _fetch_json_absolute(FRANKFURTER_CURRENCIES_URL, timeout=timeout)
+    except HTTPError as error:
+        return None, f"El servicio de cambio de divisa devolvió HTTP {error.code}"
+    except (URLError, TimeoutError):
+        return None, "No se pudo conectar al servicio de cambio de divisa"
+
+    if not isinstance(payload, dict) or not payload:
+        return None, "El servicio de cambio de divisa no devolvió una respuesta válida"
+
+    divisas = {str(codigo).strip().upper(): str(nombre).strip() for codigo, nombre in payload.items()}
+    _currencies_cache["divisas"] = divisas
+    _currencies_cache["ts"] = ahora
+    return dict(divisas), None
 
 
 def convert_amount(value, source_currency, target_currency, timeout=None):

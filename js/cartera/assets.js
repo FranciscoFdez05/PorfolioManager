@@ -1839,11 +1839,11 @@ function _crearBotonDeActivo(asset, displayPrice, displayCurrency, { isStale, en
         window._viewAllPortfolios && asset.portfolioName
             ? `<span class="assetPortfolioBadge">${escapeHtml(asset.portfolioName)}</span>`
             : ""
-    const { changePctStr, changeClass, moneyStr: changeMoneyStr } = buildChangeMoneyDisplay(
-        asset,
-        displayPrice,
-        displayCurrency
-    )
+    const {
+        changePctStr,
+        changeClass,
+        moneyStr: changeMoneyStr
+    } = buildChangeMoneyDisplay(asset, displayPrice, displayCurrency)
 
     // El ⚠ solo marca fallos del proveedor. Un precio parado por la pausa no es
     // un problema —lo ha pedido el usuario en Ajustes—, así que se queda en
@@ -3809,6 +3809,7 @@ function buildCurrentAssetPayload() {
         lastUpdated: assetPage?.dataset.assetLastUpdated || "",
         color: assetPage?.dataset.assetColor || "",
         tvSymbol: assetPage?.dataset.assetTvSymbol || "",
+        convertCurrency: assetPage?.dataset.assetConvertCurrency || "",
         operationRows: currentAssetPersistedOperationRows,
         conversionRows: currentAssetPersistedConversionRows,
         order: Number(document.querySelector(`.assetBtn[data-asset-id="${currentAssetId}"]`)?.dataset.assetOrder || 0),
@@ -3876,20 +3877,7 @@ function inferMarketProviderFromSymbol(symbol, fallback = "finnhub") {
     }
 
     if (normalizedSymbol.includes(":")) {
-        // "MERCADO:TICKER" es ambiguo: Finnhub lo usa para cripto
-        // (BINANCE:BTCUSDT) y TradingView para cualquier cosa, acciones
-        // incluidas (NASDAQ:AAPL, XETR:SAP). Un prefijo de bolsa de acciones,
-        // índice o futuro no es nada que Finnhub entienda con ese formato, así
-        // que ahí sí se puede distinguir; el resto (exchanges de cripto,
-        // desconocidos) se queda en Finnhub, el valor de siempre.
-        const tvOnlyExchangePrefixes = new Set([
-            "NASDAQ", "NYSE", "AMEX", "ARCA", "BATS", "LSE", "XETR", "EURONEXT",
-            "TSX", "TSXV", "ASX", "HKEX", "BSE", "NSE", "SIX", "BME", "TSE",
-            "COMEX", "NYMEX", "CME", "CBOT", "INDEX"
-        ])
-        const exchangePrefix = normalizedSymbol.split(":")[0]
-
-        return tvOnlyExchangePrefixes.has(exchangePrefix) ? "tradingview" : "finnhub"
+        return "finnhub"
     }
 
     const eodhdExchangeCodes = new Set([
@@ -4201,6 +4189,32 @@ async function renameCurrentAsset() {
     openEditAssetModal()
 }
 
+// Las divisas del selector salen del servidor (las que admite el activo y el
+// servicio de cambio sabe convertir hoy), no de una lista en el HTML. La que ya
+// estuviera elegida se conserva aunque no venga en la respuesta.
+async function fillConvertCurrencyOptions(select, selected) {
+    let divisas = []
+    try {
+        const response = await fetch("/api/divisas")
+        if (response.ok) divisas = (await response.json()).divisas || []
+    } catch (error) {
+        console.error(error)
+    }
+
+    if (selected && !divisas.some((divisa) => divisa.code === selected)) {
+        divisas.push({ code: selected, name: selected })
+    }
+
+    select.innerHTML = ""
+    divisas.forEach(({ code, name }) => {
+        const option = document.createElement("option")
+        option.value = code
+        option.textContent = name && name !== code ? `${code} · ${name}` : code
+        select.appendChild(option)
+    })
+    if (selected) select.value = selected
+}
+
 function openEditAssetModal(assetData = null) {
     if (!currentAssetId) {
         return
@@ -4226,7 +4240,9 @@ function openEditAssetModal(assetData = null) {
     // `submitEditAssetModal` deja vacío a propósito hasta que el usuario elija
     // uno de verdad (si no, "providerChanged" saltaría sin haber tocado nada).
     const preferredProvider =
-        assetData?.marketProvider || assetPage?.dataset.assetMarketProvider || inferMarketProviderFromSymbol(currentTicker)
+        assetData?.marketProvider ||
+        assetPage?.dataset.assetMarketProvider ||
+        inferMarketProviderFromSymbol(currentTicker)
 
     if (!editAssetModalOverlay || !editAssetNameInput) {
         return
@@ -4238,14 +4254,15 @@ function openEditAssetModal(assetData = null) {
         delete editAssetTickerInput.dataset.marketProvider
     }
     reorderProviderSearchButtons("editAssetSearchActions", preferredProvider)
-    const currentConvertCurrency =
-        assetData?.convertCurrency || assetPage?.dataset.assetConvertCurrency || ""
+    const currentConvertCurrency = assetData?.convertCurrency || assetPage?.dataset.assetConvertCurrency || ""
     const editConvertCurrencyToggle = document.getElementById("editAssetConvertCurrencyToggle")
     const editConvertCurrencySelect = document.getElementById("editAssetConvertCurrencySelect")
     if (editConvertCurrencyToggle && editConvertCurrencySelect) {
         editConvertCurrencyToggle.checked = !!currentConvertCurrency
-        editConvertCurrencySelect.value = currentConvertCurrency || "EUR"
         editConvertCurrencySelect.classList.toggle("hidden", !currentConvertCurrency)
+        // Sin divisa fijada todavía, el selector parte de la que ya tiene el activo.
+        const assetCurrency = String(assetData?.currency || assetPage?.dataset.assetCurrency || "").toUpperCase()
+        fillConvertCurrencyOptions(editConvertCurrencySelect, currentConvertCurrency || assetCurrency)
     }
     const editTVTickerInput = document.getElementById("editAssetTVTickerInput")
     if (editTVTickerInput)
@@ -4370,6 +4387,30 @@ async function submitEditAssetModal() {
     if (currentName !== trimmedName && typeof renameCalendarioAsset === "function") {
         await renameCalendarioAsset(currentName, trimmedName)
     }
+
+    // La divisa elegida en el interruptor pasa a ser la del activo entero, no
+    // solo la del precio: lo invertido está en la divisa del activo y el
+    // rendimiento resta uno de otro sin convertir. Se hace con la misma ruta
+    // que el menú «Moneda del activo», que convierte precio y compras a la vez.
+    const currentCurrency = String(payload.currency || "EUR").toUpperCase()
+    const currencyChanged = !!newConvertCurrency && newConvertCurrency !== currentCurrency
+    if (currencyChanged) {
+        await changeAssetCurrencyOnServer(currentAssetId, newConvertCurrency)
+    }
+
+    // Con un ticker nuevo, el precio guardado todavía es el del anterior (otro
+    // proveedor, a veces otra divisa) hasta el siguiente refresco. Se pide ya,
+    // convertido a la divisa del activo. Si el proveedor falla no se deshace la
+    // edición: queda guardada y el precio se actualizará en el próximo refresco.
+    const tickerChanged = newTicker !== currentTicker || providerChanged
+    if (tickerChanged) {
+        try {
+            await refreshAssetMarketDataOnServer(currentAssetId)
+        } catch (error) {
+            console.error(error)
+        }
+    }
+
     const fromAvView = _editingAsset !== null
     closeEditAssetModal()
     const updatedAsset = await loadAssetData(currentAssetId)
@@ -4384,9 +4425,16 @@ async function submitEditAssetModal() {
                 finnhubSymbol: updatedAsset.finnhubSymbol,
                 marketProvider: updatedAsset.marketProvider,
                 tvSymbol: updatedAsset.tvSymbol,
-                convertCurrency: updatedAsset.convertCurrency
+                convertCurrency: updatedAsset.convertCurrency,
+                price: updatedAsset.price,
+                currency: updatedAsset.currency,
+                change: updatedAsset.change,
+                lastUpdated: updatedAsset.lastUpdated
             }
         avRender()
+        // Valor y rendimiento de la lista salen del precio: con otro precio u
+        // otra divisa, los de antes ya no valen.
+        if (tickerChanged || currencyChanged) avLoadMetrics()
     } else {
         await updateAssetDetail(updatedAsset)
         renderAssetTablePage(updatedAsset)
@@ -4591,6 +4639,7 @@ async function saveAssetRowFromModal() {
     renderAssetRows(_assetDisplayRows)
     closeAssetRowModal()
     scheduleAssetAutosave()
+    refreshAssetHeaderStats(buildCurrentAssetPayload())
 }
 
 function initAssetTableLogic(asset) {
@@ -4659,33 +4708,7 @@ function initAssetTableLogic(asset) {
         })
     })
 
-    buildOverviewRow(asset).then((summary) => {
-        if (document.querySelector(".assetTablePage")?.dataset.assetId !== asset.id) return
-        const currency = summary.currency
-        const pnl = summary.rendimiento
-        const pnlPct = summary.invertidoNeto > 0 ? (pnl / summary.invertidoNeto) * 100 : 0
-        const netoEl = document.getElementById("assetStatNetoActual")
-        const cantidadEl = document.getElementById("assetStatCantidad")
-        const precioMedioEl = document.getElementById("assetStatPrecioMedio")
-        const invertidoEl = document.getElementById("assetStatInvertido")
-        const pnlEl = document.getElementById("assetStatPnL")
-        const pnlPctEl = document.getElementById("assetStatPnLPct")
-        if (netoEl) netoEl.textContent = formatMoney(summary.netoActual, currency)
-        if (cantidadEl) cantidadEl.textContent = formatAssetParticipationValue(summary.participaciones, asset.type)
-        if (precioMedioEl) precioMedioEl.textContent = formatMoney(summary.promedioCompra, currency)
-        if (invertidoEl) invertidoEl.textContent = formatMoney(summary.invertidoNeto, currency)
-        if (pnlEl) {
-            pnlEl.textContent = (pnl >= 0 ? "+" : "") + formatMoney(pnl, currency)
-            pnlEl.classList.toggle("assetStatPositive", pnl > 0)
-            pnlEl.classList.toggle("assetStatNegative", pnl < 0)
-        }
-        if (pnlPctEl) {
-            pnlPctEl.textContent = (pnlPct >= 0 ? "▲ " : "▼ ") + Math.abs(pnlPct).toFixed(2) + "%"
-            pnlPctEl.classList.toggle("assetStatPositive", pnlPct > 0)
-            pnlPctEl.classList.toggle("assetStatNegative", pnlPct < 0)
-        }
-        renderAssetDivisaBreakdown(asset.id)
-    })
+    refreshAssetHeaderStats(asset)
 
     if (assetOperationsBody) {
         assetOperationsBody.addEventListener("click", (event) => {
@@ -4706,6 +4729,7 @@ function initAssetTableLogic(asset) {
                     _assetDisplayRows.splice(idx, 1)
                     renderAssetRows(_assetDisplayRows)
                     scheduleAssetAutosave()
+                    refreshAssetHeaderStats(buildCurrentAssetPayload())
                 } else {
                     openConfirmModal({
                         title: "Eliminar fila",
@@ -4715,6 +4739,7 @@ function initAssetTableLogic(asset) {
                             _assetDisplayRows.splice(idx, 1)
                             renderAssetRows(_assetDisplayRows)
                             scheduleAssetAutosave()
+                            refreshAssetHeaderStats(buildCurrentAssetPayload())
                         }
                     })
                 }
@@ -4789,6 +4814,36 @@ function initAssetTableLogic(asset) {
             })
         })
     }
+}
+
+function refreshAssetHeaderStats(asset) {
+    buildOverviewRow(asset).then((summary) => {
+        if (document.querySelector(".assetTablePage")?.dataset.assetId !== asset.id) return
+        const currency = summary.currency
+        const pnl = summary.rendimiento
+        const pnlPct = summary.invertidoNeto > 0 ? (pnl / summary.invertidoNeto) * 100 : 0
+        const netoEl = document.getElementById("assetStatNetoActual")
+        const cantidadEl = document.getElementById("assetStatCantidad")
+        const precioMedioEl = document.getElementById("assetStatPrecioMedio")
+        const invertidoEl = document.getElementById("assetStatInvertido")
+        const pnlEl = document.getElementById("assetStatPnL")
+        const pnlPctEl = document.getElementById("assetStatPnLPct")
+        if (netoEl) netoEl.textContent = formatMoney(summary.netoActual, currency)
+        if (cantidadEl) cantidadEl.textContent = formatAssetParticipationValue(summary.participaciones, asset.type)
+        if (precioMedioEl) precioMedioEl.textContent = formatMoney(summary.promedioCompra, currency)
+        if (invertidoEl) invertidoEl.textContent = formatMoney(summary.invertidoNeto, currency)
+        if (pnlEl) {
+            pnlEl.textContent = (pnl >= 0 ? "+" : "") + formatMoney(pnl, currency)
+            pnlEl.classList.toggle("assetStatPositive", pnl > 0)
+            pnlEl.classList.toggle("assetStatNegative", pnl < 0)
+        }
+        if (pnlPctEl) {
+            pnlPctEl.textContent = (pnlPct >= 0 ? "▲ " : "▼ ") + Math.abs(pnlPct).toFixed(2) + "%"
+            pnlPctEl.classList.toggle("assetStatPositive", pnlPct > 0)
+            pnlPctEl.classList.toggle("assetStatNegative", pnlPct < 0)
+        }
+        renderAssetDivisaBreakdown(asset.id)
+    })
 }
 
 function initAssetTypeCustomSelect() {
@@ -5234,6 +5289,12 @@ function initEditAssetModal() {
         })
     }
 
+    // El buscador ordena según el tipo de activo (una materia prima antes que un
+    // contrato perpetuo de un exchange de cripto, un fondo antes que una
+    // acción...). En el alta lo da el selector de tipo; aquí, el activo editado.
+    const editingAssetType = () =>
+        _editingAsset?.type || document.querySelector(".assetTablePage")?.dataset.assetType || ""
+
     const editConvertCurrencyToggle = document.getElementById("editAssetConvertCurrencyToggle")
     const editConvertCurrencySelect = document.getElementById("editAssetConvertCurrencySelect")
     if (editConvertCurrencyToggle && editConvertCurrencySelect) {
@@ -5281,7 +5342,7 @@ function initEditAssetModal() {
             await handleFinnhubSearch({
                 query: searchQuery,
                 assetName: typedName,
-                assetType: "",
+                assetType: editingAssetType(),
                 feedbackElement: editAssetSearchFeedback,
                 resultsElement: editAssetSearchResults,
                 onSelect: (result) => runEditTickerSelection(result, "Finnhub")
@@ -5298,7 +5359,7 @@ function initEditAssetModal() {
             await handleEodhdSearch({
                 query: searchQuery,
                 assetName: typedName,
-                assetType: "",
+                assetType: editingAssetType(),
                 feedbackElement: editAssetSearchFeedback,
                 resultsElement: editAssetSearchResults,
                 onSelect: (result) => runEditTickerSelection(result, "EODHD")
@@ -5315,7 +5376,7 @@ function initEditAssetModal() {
             await handleYahooSearch({
                 query: searchQuery,
                 assetName: typedName,
-                assetType: "",
+                assetType: editingAssetType(),
                 feedbackElement: editAssetSearchFeedback,
                 resultsElement: editAssetSearchResults,
                 onSelect: (result) => runEditTickerSelection(result, "Yahoo Finance")
@@ -5332,7 +5393,7 @@ function initEditAssetModal() {
             await handleAlphaVantageSearch({
                 query: searchQuery,
                 assetName: typedName,
-                assetType: "",
+                assetType: editingAssetType(),
                 feedbackElement: editAssetSearchFeedback,
                 resultsElement: editAssetSearchResults,
                 onSelect: (result) => runEditTickerSelection(result, "Alpha Vantage")
@@ -5349,7 +5410,7 @@ function initEditAssetModal() {
             await handleTradingViewSearch({
                 query: searchQuery,
                 assetName: typedName,
-                assetType: "",
+                assetType: editingAssetType(),
                 feedbackElement: editAssetSearchFeedback,
                 resultsElement: editAssetSearchResults,
                 onSelect: (result) => runEditTickerSelection(result, "TradingView")
@@ -5759,7 +5820,7 @@ function avRenderGrid() {
     grid.appendChild(frag)
 }
 
-function avBuildTableRow(asset) {
+function avBuildTableRow(asset, rank) {
     const color = AV_TYPE_COLORS[asset.type] || "#888"
     const typeLabel = AV_TYPE_LABELS[asset.type] || asset.type || ""
     const price = parseLooseNumber(asset.price || "") || 0
@@ -5801,6 +5862,7 @@ function avBuildTableRow(asset) {
     tr.className = `avTableRow${avIsOculto(asset) ? " avHidden" : ""}`
     tr.dataset.assetId = asset.id
     tr.innerHTML = `
+        <td class="mTdRank">${rank}</td>
         <td><span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span></td>
         <td class="avTrName">${asset.color ? `<span class="avColorDot avTrColorDot" style="background:${asset.color}" title="Color del activo"></span>` : ""}${escapeHtml(asset.name || asset.symbol || "Activo")}</td>
         <td class="avTrPrice">${formatMoney(price, currency)}</td>
@@ -5846,10 +5908,10 @@ function avRenderTable() {
     if (activosTableEmpty) activosTableEmpty.classList.add("hidden")
     if (activosTableWrap) activosTableWrap.classList.remove("hidden")
     const frag = document.createDocumentFragment()
-    filtered.forEach((a) => frag.appendChild(avBuildTableRow(a)))
+    filtered.forEach((a, idx) => frag.appendChild(avBuildTableRow(a, idx + 1)))
     tbody.appendChild(frag)
     const t = tbody.closest("table")
-    bindTableSort(t, "activosTable")
+    bindTableSort(t, "activosTableOrder")
     if (t._reSort) t._reSort()
 }
 

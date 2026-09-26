@@ -446,13 +446,7 @@
                 <span class="ajustesSwitchTrack"></span>
             </label>
         </div>
-        <select id="editAssetConvertCurrencySelect" class="assetModalInput hidden">
-            <option value="EUR">EUR</option>
-            <option value="USD">USD</option>
-            <option value="GBP">GBP</option>
-            <option value="CHF">CHF</option>
-            <option value="JPY">JPY</option>
-        </select>
+        <select id="editAssetConvertCurrencySelect" class="assetModalInput hidden"></select>
 
         <button type="button" class="assetModalLabel cpToggleLabel" id="editAssetColorToggle">
             <span>Color del activo</span>
@@ -1382,6 +1376,46 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
+                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 7h11l-3-3M16 13H5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Tipos de cambio</div>
+                        <div class="ajustesSectionDesc">Los que usa la aplicación para convertir cotizaciones y cambiar la moneda de un activo. Aquí se ve si el servicio responde, de dónde sale el dato y de qué día es.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Divisa de referencia
+                        <small>1 unidad de esta divisa, expresada en las demás.</small>
+                    </div>
+                    <select id="ajustesCambioBase" class="ajustesSelect" data-no-custom aria-label="Divisa de referencia"></select>
+                </div>
+                <div class="ajustesApiEstadoList" id="ajustesCambioList">
+                    <span class="ajustesBackupEmpty">Cargando…</span>
+                </div>
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Actualizar solo
+                        <small>Vuelve a pedir los tipos cada minuto mientras Ajustes esté abierto.</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="ajustesCambioAuto">
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesActions">
+                    <button id="ajustesCambioBtn" class="ajustesSecondaryBtn" type="button">
+                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c2 0 3.7.9 4.8 2.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M13.5 2.5V5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Comprobar ahora
+                    </button>
+                    <span id="ajustesCambioMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
                         <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 14l4-4 3 3 4-5 3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
                     </div>
                     <div class="ajustesSectionHeaderText">
@@ -1581,6 +1615,13 @@
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesAtajoAviso">
+                    <strong>Último paso, imprescindible:</strong> abre el chat con tu bot en Telegram
+                    (busca el nombre de usuario que te dio @BotFather) y pulsa «Iniciar». Un bot no puede
+                    escribirle primero a nadie, así que sin ese paso los avisos no llegan aunque todo esté
+                    bien guardado aquí. Si otra persona le escribe a tu bot, lo ignora sin responder.
+                </div>
 
                 <div class="ajustesField">
                     <div class="ajustesLabelRow">
