@@ -286,6 +286,106 @@ def test_los_perpetuos_quedan_detras_del_activo(monkeypatch):
     assert [r["symbol"] for r in results] == ["OANDA:XAGUSD", "BINANCE:XAGUSDT.P"]
 
 
+# ── Screener real (subidas/bajadas, amplitud de mercado) ────────────────────
+
+def test_fetch_screener_manda_filtro_orden_y_rango(monkeypatch):
+    peticiones = []
+
+    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
+        peticiones.append((url, json_body))
+        return {"totalCount": 2, "data": [{"s": "NASDAQ:AAA", "d": ["AAA", 10.0, 5.0]}]}
+
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+
+    filtro = [{"left": "market_cap_basic", "operation": "greater", "right": 1_000_000}]
+    payload = tradingview_client.fetch_screener(
+        filtro, ["name", "close", "change"], sort_by="change", sort_order="desc", limit=5,
+        instrument_types=["stock"],
+    )
+
+    assert len(peticiones) == 1
+    url, body = peticiones[0]
+    assert url == "https://scanner.tradingview.com/america/scan"
+    assert body["filter"] == filtro
+    assert body["sort"] == {"sortBy": "change", "sortOrder": "desc"}
+    assert body["range"] == [0, 5]
+    assert body["symbols"]["query"]["types"] == ["stock"]
+    assert payload["totalCount"] == 2
+
+
+def test_fetch_screener_sin_sort_no_lo_manda(monkeypatch):
+    peticiones = []
+    monkeypatch.setattr(
+        tradingview_client, "_fetch_json",
+        lambda url, params=None, timeout=None, json_body=None, headers=None: (peticiones.append(json_body) or {}),
+    )
+
+    tradingview_client.fetch_screener([], ["name"], limit=1)
+
+    assert "sort" not in peticiones[0]
+
+
+def test_fetch_quotes_es_un_envoltorio_de_scan(monkeypatch):
+    peticiones = []
+
+    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
+        peticiones.append(json_body["symbols"]["tickers"])
+        return {"data": [{"s": "SP:SPX", "d": [6700.0, 0.5, "USD"]}]}
+
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+
+    cotizados = tradingview_client.fetch_quotes(["SP:SPX"])
+
+    assert cotizados == {"SP:SPX": (6700.0, 0.5, "USD")}
+    assert peticiones[0] == ["SP:SPX"]
+
+
+# ── Fundamentales y técnico (página de Estadísticas de mercado) ─────────────
+
+def test_fetch_stats_junta_cada_columna_con_su_valor(monkeypatch):
+    peticiones = []
+
+    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
+        peticiones.append(json_body)
+        columnas = json_body["columns"]
+        valores = [42.0 if c == "market_cap_basic" else None for c in columnas]
+        return {"data": [{"s": "NASDAQ:AAPL", "d": valores}]}
+
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+
+    stats = tradingview_client.fetch_stats(["NASDAQ:AAPL"])
+
+    assert len(peticiones) == 1
+    assert stats["NASDAQ:AAPL"]["market_cap_basic"] == 42.0
+    # Un campo que no aplica a este instrumento (p.ej. sector de una cripto)
+    # llega como None tal cual lo da el scanner, no como un valor inventado.
+    assert stats["NASDAQ:AAPL"]["sector"] is None
+
+
+def test_fetch_stats_una_sola_peticion_para_varios_tickers(monkeypatch):
+    peticiones = []
+
+    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
+        peticiones.append(json_body["symbols"]["tickers"])
+        return {"data": []}
+
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+
+    tradingview_client.fetch_stats(["NASDAQ:AAPL", "NASDAQ:MSFT"])
+
+    assert len(peticiones) == 1
+    assert set(peticiones[0]) == {"NASDAQ:AAPL", "NASDAQ:MSFT"}
+
+
+def test_fetch_stats_sin_tickers_no_llama_a_la_red(monkeypatch):
+    def fake_fetch(*a, **kw):
+        raise AssertionError("no debería llamar a la red sin tickers")
+
+    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+
+    assert tradingview_client.fetch_stats([]) == {}
+
+
 def test_sin_tipo_de_activo_manda_el_orden_de_tradingview(monkeypatch):
     """Sin tipo elegido no hay preferencia por ninguna clase de instrumento."""
     def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):

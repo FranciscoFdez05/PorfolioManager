@@ -31,6 +31,8 @@ const _PAGE_DIRS = {
     metricas: "analisis",
     seguimiento: "analisis",
     heatmap: "analisis",
+    fundamentales: "analisis",
+    sentimiento: "analisis",
     herramientas: "analisis",
 
     ajustes: "sesion"
@@ -81,7 +83,7 @@ window.setChartPref = setChartPref
 const _MODULE_PAGES = {
     panelSuperior: [],
     vistaGeneral: ["vistaGeneral"],
-    activos: ["activos", "seguimiento", "heatmap"],
+    activos: ["activos", "seguimiento", "heatmap", "fundamentales", "sentimiento"],
     gastos: ["gastos", "ingresos", "calendario"],
     finanzas: ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
     cripto: ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
@@ -955,6 +957,11 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             window._hmResizeCleanup = null
         }
 
+        if (typeof window._smResizeCleanup === "function") {
+            window._smResizeCleanup()
+            window._smResizeCleanup = null
+        }
+
         if (typeof window.flushPendingPageChanges === "function") {
             try {
                 await window.flushPendingPageChanges()
@@ -1025,6 +1032,10 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initActivosPageLogic()
         } else if (page === "heatmap") {
             await initHeatmapLogic()
+        } else if (page === "fundamentales") {
+            await initFundamentalesLogic()
+        } else if (page === "sentimiento") {
+            await initSentimientoLogic()
         } else if (page === "seguimiento") {
             await initSeguimientoLogic()
         } else if (page === "privateMarket") {

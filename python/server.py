@@ -30,6 +30,7 @@ from routes.gastos import gastos_bp
 from routes.herramientas import herramientas_bp
 from routes.ingresos import ingresos_bp
 from routes.market import market_bp
+from routes.market_pulse import market_pulse_bp
 from routes.movimientos import movimientos_bp
 from routes.operaciones import operaciones_bp
 from routes.planes import planes_bp
@@ -148,6 +149,7 @@ app.register_blueprint(gastos_bp)
 app.register_blueprint(herramientas_bp)
 app.register_blueprint(ingresos_bp)
 app.register_blueprint(market_bp)
+app.register_blueprint(market_pulse_bp)
 app.register_blueprint(movimientos_bp)
 app.register_blueprint(operaciones_bp)
 app.register_blueprint(planes_bp)

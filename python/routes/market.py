@@ -1,6 +1,7 @@
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
+from urllib.error import HTTPError, URLError
 
 from flask import Blueprint, jsonify, request
 
@@ -15,7 +16,10 @@ from providers.finnhub_client import (
     fetch_exchange_rates,
     search_symbol,
 )
-from providers.tradingview_client import search_symbol as search_tradingview_symbol
+from providers.tradingview_client import (
+    fetch_stats as fetch_tradingview_stats,
+    search_symbol as search_tradingview_symbol,
+)
 from providers.yahoo_finance_client import search_symbol as search_yahoo_symbol
 from stores import benchmark
 from stores.asset_store import listAssets
@@ -310,6 +314,31 @@ def searchTradingViewSymbol():
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})
+
+
+@market_bp.route("/api/tradingview/stats", methods=["GET"])
+def getTradingViewStats():
+    """Fundamentales y técnico del scanner de TradingView, para la página de
+    Estadísticas de mercado.
+
+    Los tickers ya vienen resueltos por el frontend (`buildTVSymbol`, el mismo
+    que abre el gráfico de cada activo): aquí no se adivina ni se completa
+    ningún ticker, solo se pide al scanner lo que llega en la petición.
+    """
+    raw_symbols = str(request.args.get("symbols", "")).strip()
+    symbols = sorted({s.strip().upper() for s in raw_symbols.split(",") if s.strip()})
+
+    if not symbols:
+        return jsonify({"ok": False, "error": "symbols requerido"}), 400
+
+    try:
+        stats = fetch_tradingview_stats(symbols)
+    except HTTPError as error:
+        return jsonify({"ok": False, "error": f"TradingView devolvió HTTP {error.code}"}), 503
+    except URLError as error:
+        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {error.reason}"}), 503
+
+    return jsonify({"ok": True, "data": stats})
 
 
 @market_bp.route("/api/market/quote", methods=["GET"])

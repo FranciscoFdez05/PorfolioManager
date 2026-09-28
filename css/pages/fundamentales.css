@@ -1,0 +1,308 @@
+/* Fundamentales / Estadísticas de mercado
+   ─────────────────────────────────────────────────────────────────
+   Screener de solo lectura: fundamentales y técnico del scanner de
+   TradingView sobre los activos del portfolio. Reutiliza los mismos
+   componentes que Activos/Watchlist (.activosToolbar, .activosFilterBtn,
+   .activosTableWrap) y la tabla de Métricas (.metricasTable, .mThSort). */
+
+.fundamentalesPage {
+    padding: 0 0 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.fnToolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.fnUpdated {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+.fnRefreshBtn {
+    height: 32px !important;
+    padding: 0 12px !important;
+    font-size: 0.8rem !important;
+}
+
+.fnLegend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 0.74rem;
+    color: var(--text-dim);
+    padding: 0 2px 4px;
+}
+.fnLegend strong {
+    color: var(--text-muted);
+}
+
+.fnLoading {
+    padding: 40px 0;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+}
+
+/* ── Tabla ── */
+.fnTableWrap {
+    max-height: calc(100vh - 250px);
+}
+
+.fnTable {
+    font-size: 0.82rem;
+}
+
+.fnTable thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg-header);
+}
+
+.fnTable .fnColNum {
+    text-align: right;
+    white-space: nowrap;
+}
+.fnTable thead th.fnColNum {
+    text-align: right;
+}
+
+.fnColExpand {
+    width: 34px;
+    padding: 0 6px !important;
+}
+
+.fnRow td {
+    vertical-align: middle;
+}
+
+.fnRow {
+    cursor: pointer;
+}
+
+.fnRowNd {
+    opacity: 0.55;
+}
+
+.fnCellAsset {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 140px;
+}
+.fnAssetName {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+.fnAssetTicker {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+.fnCellSector {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 130px;
+}
+.fnSectorMain {
+    color: var(--text-subtle);
+}
+.fnSectorSub {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+.fnPos {
+    color: var(--color-pos-bright);
+}
+.fnNeg {
+    color: var(--color-neg-bright);
+}
+
+.fnNd {
+    color: var(--text-dim);
+    font-size: 0.76rem;
+}
+
+/* ── Insignia de tipo de activo (misma paleta que el resto de la app) ── */
+.fnTypeBadge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+.fnTypeBadge[data-type="acciones"] {
+    background: #3a7bd51f;
+    border-color: #3a7bd555;
+    color: #7aa8e8;
+}
+.fnTypeBadge[data-type="etfs"] {
+    background: #2ecc711f;
+    border-color: #2ecc7155;
+    color: #6fd99a;
+}
+.fnTypeBadge[data-type="cripto"] {
+    background: #f7931a1f;
+    border-color: #f7931a55;
+    color: #f0b563;
+}
+.fnTypeBadge[data-type="comoditis"] {
+    background: #e0c0681f;
+    border-color: #e0c06855;
+    color: #ddc584;
+}
+.fnTypeBadge[data-type="rentafija"],
+.fnTypeBadge[data-type="rentaFija"] {
+    background: #1abc9c1f;
+    border-color: #1abc9c55;
+    color: #5fd6c1;
+}
+
+/* ── Insignia de rating técnico ── */
+.fnRatingBadge {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.fnRatStrongBuy {
+    background: rgba(46, 204, 113, 0.22);
+    color: #4ade80;
+}
+.fnRatBuy {
+    background: rgba(46, 204, 113, 0.12);
+    color: #86e0a8;
+}
+.fnRatNeutral {
+    background: rgba(148, 163, 184, 0.18);
+    color: #cbd5e1;
+}
+.fnRatSell {
+    background: rgba(231, 76, 60, 0.12);
+    color: #f0958a;
+}
+.fnRatStrongSell {
+    background: rgba(231, 76, 60, 0.22);
+    color: #f87171;
+}
+.fnRatNd {
+    background: transparent;
+    color: var(--text-dim);
+}
+
+/* ── Botón de despliegue del técnico completo ── */
+.fnExpandBtn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid var(--border-soft);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    line-height: 1;
+    transition:
+        transform 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+.fnExpandBtn:hover {
+    border-color: var(--accent);
+    color: var(--accent-hover);
+}
+.fnExpandBtn.fnExpandOpen {
+    transform: rotate(180deg);
+    color: var(--accent-hover);
+}
+
+/* ── Panel de técnico completo ── */
+.fnDetailRow td {
+    background: var(--bg-inset);
+    padding: 14px 18px;
+    cursor: default;
+}
+.fnDetailRow:hover {
+    background: transparent;
+}
+
+.fnDetailGrid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+    gap: 20px;
+}
+
+.fnDetailCol h4 {
+    margin: 0 0 8px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #7a8fb0;
+    font-weight: 600;
+}
+
+.fnDetailLine,
+.fnDetailRow2 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    padding: 3px 0;
+    border-bottom: 1px dashed var(--border-soft);
+    color: var(--text-subtle);
+}
+.fnDetailLine span:first-child,
+.fnDetailRow2 span:first-child {
+    color: var(--text-dim);
+}
+.fnDetailLine span:last-child,
+.fnDetailRow2 span:last-child {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.fnDetailRow2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    text-align: right;
+}
+.fnDetailRow2 span:first-child {
+    text-align: left;
+    font-weight: 400;
+}
+.fnDetailHead {
+    border-bottom: 1px solid var(--border-mid);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.fnDetailHead span {
+    color: var(--text-dim) !important;
+    font-weight: 600 !important;
+}
+
+.fnDetailPivotMid span:last-child {
+    color: var(--accent-hover);
+}
+
+@media (max-width: 900px) {
+    .fnDetailGrid {
+        grid-template-columns: 1fr;
+    }
+}

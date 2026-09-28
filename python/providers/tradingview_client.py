@@ -32,7 +32,63 @@ from providers import (
 TRADINGVIEW_SCAN_URL = "https://scanner.tradingview.com/global/scan"
 TRADINGVIEW_SEARCH_URL = "https://symbol-search.tradingview.com/symbol_search/v3/"
 
+# El scanner por ticker (`TRADINGVIEW_SCAN_URL`, mercado "global") vale para
+# cotizar símbolos concretos, pero no hace screener: filtrar y ordenar todo un
+# mercado pide su propio endpoint regional (`.../america/scan`, `.../spain/scan`...).
+def screener_url(market="america"):
+    return f"https://scanner.tradingview.com/{market}/scan"
+
 _SCAN_COLUMNS = ["close", "change", "currency", "description", "exchange", "type"]
+
+# Columnas de fundamentales y técnico para la página de Estadísticas de
+# mercado. Son los mismos nombres de campo que usa el scanner público de
+# TradingView (los que alimentan sus propias tablas): no hay traducción ni
+# preferencia por ningún campo concreto, se piden tal cual los pide la página.
+_FUNDAMENTAL_COLUMNS = [
+    "market_cap_basic",
+    "aum",
+    "price_earnings_ttm",
+    "price_book_ratio",
+    "price_sales_ratio",
+    "earnings_per_share_basic_ttm",
+    "earnings_per_share_diluted_yoy_growth_ttm",
+    "dividend_yield_recent",
+    "debt_to_equity",
+    "return_on_equity",
+    "return_on_assets",
+    "sector",
+    "industry",
+    "country",
+]
+
+_TECHNICAL_COLUMNS = [
+    "Recommend.All",
+    "Recommend.MA",
+    "Recommend.Other",
+    "RSI",
+    "MACD.macd",
+    "MACD.signal",
+    "SMA20",
+    "SMA50",
+    "SMA100",
+    "SMA200",
+    "EMA20",
+    "EMA50",
+    "EMA100",
+    "EMA200",
+    "ADX",
+    "Stoch.K",
+    "Stoch.D",
+    "Pivot.M.Classic.R3",
+    "Pivot.M.Classic.R2",
+    "Pivot.M.Classic.R1",
+    "Pivot.M.Classic.Middle",
+    "Pivot.M.Classic.S1",
+    "Pivot.M.Classic.S2",
+    "Pivot.M.Classic.S3",
+]
+
+_STATS_COLUMNS = _SCAN_COLUMNS + _FUNDAMENTAL_COLUMNS + _TECHNICAL_COLUMNS
 
 # La búsqueda de TradingView contesta 403 a peticiones sin pinta de navegador
 # (a diferencia del scanner de cotizaciones, que no filtra por esto). No es un
@@ -115,6 +171,64 @@ def _scan(tickers, timeout=None):
             continue
         cotizados[row["s"]] = (price, float(values[1] or 0), str(values[2] or "").strip().upper())
     return cotizados
+
+
+def fetch_quotes(tickers, timeout=None):
+    """Envoltorio público de `_scan`, para catálogos curados (índices, ETF de
+    sector) que no son un activo del usuario y no necesitan los cruces
+    sintéticos de `fetch_quote` (esos solo tienen sentido para el ticker
+    exacto que pide un activo en concreto).
+    """
+    return _scan(tickers, timeout)
+
+
+def fetch_screener(filter_clauses, columns, sort_by=None, sort_order="desc", limit=50,
+                    instrument_types=None, market="america", timeout=None):
+    """Consulta real al screener de TradingView: filtro + orden sobre todo un
+    mercado, no una lista de tickers fijada de antemano. La usa
+    `stores.market_pulse` para "qué sube y qué baja hoy" y la amplitud de
+    mercado. Deja pasar HTTPError/URLError, igual que `_scan`.
+    """
+    payload = {
+        "filter": filter_clauses,
+        "options": {"lang": "en"},
+        "symbols": {"query": {"types": instrument_types or []}, "tickers": []},
+        "columns": columns,
+        "range": [0, max(1, limit)],
+    }
+    if sort_by:
+        payload["sort"] = {"sortBy": sort_by, "sortOrder": sort_order}
+
+    return _fetch_json(screener_url(market), json_body=payload, timeout=timeout, headers=_SEARCH_HEADERS)
+
+
+def fetch_stats(tickers, timeout=None):
+    """Fundamentales y técnico del scanner para varios tickers a la vez.
+
+    Una sola petición para todos, como `_batch_fetch_quotes`. Cada campo sale
+    tal cual lo devuelve el scanner: `None` cuando ese dato no existe para el
+    tipo de instrumento (una cripto no tiene sector, un índice no tiene PER),
+    nunca un valor inventado para rellenar el hueco. Deja pasar
+    HTTPError/URLError: quien llama decide si eso es un error que enseñar o
+    una fila sin datos.
+    """
+    if not tickers:
+        return {}
+
+    payload = _fetch_json(
+        TRADINGVIEW_SCAN_URL,
+        json_body={"symbols": {"tickers": list(tickers), "query": {"types": []}}, "columns": _STATS_COLUMNS},
+        timeout=timeout,
+    )
+
+    stats = {}
+    for row in payload.get("data") or []:
+        symbol = row.get("s")
+        values = row.get("d") or []
+        if not symbol:
+            continue
+        stats[symbol] = dict(zip(_STATS_COLUMNS, values, strict=False))
+    return stats
 
 
 def _cross_plan(ticker):

@@ -1,0 +1,631 @@
+/* Sentimiento y pulso del mercado
+   ─────────────────────────────────────────────────────────────────
+   Reutiliza los mismos bloques que Fundamentales/Métricas
+   (.activosToolbar, .fnLoading/.fnToolbarRight/.fnUpdated/.fnRefreshBtn,
+   .metricasSection, .metricasChartCard). Aquí solo van los componentes que
+   no existían: los dos medidores de sentimiento, las tarjetas de índices y
+   las listas de mayores subidas/bajadas. */
+
+.sentimientoPage {
+    padding: 0 0 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.sentimientoPage .activosToolbar {
+    padding-bottom: 14px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.smPageTitle {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.01em;
+}
+
+/* El título de sección hereda `.metricasSectionTitle`, que en Métricas lleva
+   una flecha de plegado (`::after`) porque ahí sí es clicable. Aquí no hay
+   ningún plegado enganchado, así que la flecha solo confundía: parecía un
+   control que no hacía nada. */
+.sentimientoPage .metricasSectionTitle::after {
+    content: none;
+}
+
+.sentimientoPage .metricasSectionHeader {
+    position: relative;
+    padding-left: 12px;
+}
+.sentimientoPage .metricasSectionHeader::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 2px;
+    bottom: 2px;
+    width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+}
+
+.smPos {
+    color: var(--color-pos-bright);
+}
+.smNeg {
+    color: var(--color-neg-bright);
+}
+
+/* `.metricasChartsGrid2` trae `align-items: start` a propósito (varias parejas
+   de Métricas combinan una tarjeta de alto fijo con una dinámica y no quieren
+   que la corta se estire). Aquí sí interesa que las dos tarjetas midan igual:
+   son el mismo tipo de contenido (un medidor), y con el `start` de base
+   quedaban con un salto de altura según cuánto ocupara cada una. */
+.metricasChartsGrid2.smEqualRow {
+    align-items: stretch;
+}
+.smEqualRow .smGaugeCard {
+    height: 100%;
+}
+
+/* ── Medidores (Fear & Greed / Amplitud) ── */
+.smGaugeCard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding-top: 22px;
+    padding-bottom: 26px;
+    position: relative;
+    overflow: hidden;
+}
+/* Un halo tenue detrás del medidor: sin él, el fondo plano de la tarjeta
+   hacía que el arco se viera como un dibujo suelto en vez de la pieza
+   principal de la tarjeta. */
+.smGaugeCard::before {
+    content: "";
+    position: absolute;
+    top: 8%;
+    left: 50%;
+    width: 340px;
+    height: 340px;
+    transform: translateX(-50%);
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0) 68%);
+    pointer-events: none;
+}
+.smGaugeCard > .metricasChartTitle {
+    flex-shrink: 0;
+    position: relative;
+}
+/* El título se queda arriba; el contenido (medidor o donut) se centra en el
+   resto del alto cuando la tarjeta se estira para igualar a su vecina. */
+#smFgWrap,
+#smBrWrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 auto;
+    width: 100%;
+    position: relative;
+}
+
+.smGaugeSvg {
+    width: 100%;
+    max-width: 300px;
+    height: auto;
+}
+
+.smGaugeScaleLabels text {
+    fill: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+#smFgNeedle {
+    transition: transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Sin `transform-box: view-box`, el origen por defecto en SVG es la caja
+       del propio trazo (fill-box), no el sistema de coordenadas del viewBox:
+       "110px 108px" se habría leído relativo a la cajita de la aguja, no al
+       centro del arco, y por eso giraba sobre un punto que no era (110,108). */
+    transform-box: view-box;
+    transform-origin: 110px 108px;
+}
+
+.smGaugeZones {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 236px;
+    margin: 6px auto 0;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-dim);
+    font-weight: 700;
+}
+.smGaugeZones span:nth-child(2) {
+    opacity: 0.75;
+}
+
+.smGaugeValue {
+    font-size: 3.1rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
+    margin-top: 8px;
+    font-variant-numeric: tabular-nums;
+    transition:
+        color 0.4s ease,
+        text-shadow 0.4s ease;
+}
+
+.smGaugeLabel {
+    font-size: 0.98rem;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+/* ── Donut de amplitud, con el porcentaje centrado en el hueco ── */
+.smBreadthDonutWrap {
+    position: relative;
+    width: 208px;
+    height: 208px;
+    margin: 4px auto 8px;
+}
+.smBreadthDonutWrap canvas {
+    filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35));
+}
+
+.smBreadthCenter {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.smBreadthCenterValue {
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    transition:
+        color 0.4s ease,
+        text-shadow 0.4s ease;
+}
+
+.smBreadthCenterUnit {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    font-weight: 700;
+    margin-top: 4px;
+}
+
+.smBreadthLegend {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    margin-top: 12px;
+}
+
+.smLegendRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--text-subtle);
+    background: var(--bg-header);
+    border: 1px solid var(--border-soft);
+    padding: 5px 11px;
+    border-radius: 20px;
+}
+.smLegendDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.smLegendPos {
+    background: #2ecc71;
+    box-shadow: 0 0 6px #2ecc7199;
+}
+.smLegendNeg {
+    background: #e74c3c;
+    box-shadow: 0 0 6px #e74c3c99;
+}
+.smLegendNd {
+    background: #64748b;
+}
+.smLegendCount {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.smBreadthNota {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    line-height: 1.4;
+    margin-top: 12px;
+    max-width: 260px;
+}
+
+/* ── Histórico del Fear & Greed ── */
+.smFgHistoryCard {
+    margin-top: 14px;
+}
+
+.smFgStatsStrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    padding-bottom: 16px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.smFgStatItem {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.smFgStatLabel {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.smFgStatPill {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Índices principales ── */
+.smIndexGroups {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.smIndexGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.smIndexGroupLabel {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #7a8fb0;
+    font-weight: 700;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.smIndexCards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 12px;
+}
+
+.smIndexCard {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-mid);
+    border-left: 3px solid var(--border-hard);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    cursor: pointer;
+    box-shadow:
+        0 1px 2px rgba(0, 0, 0, 0.25),
+        0 6px 14px rgba(0, 0, 0, 0.12);
+    transition:
+        transform 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+.smIndexCard:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.3),
+        0 10px 20px rgba(0, 0, 0, 0.18);
+}
+
+.smIndexCard[data-trend="pos"] {
+    border-left-color: #2ecc71;
+}
+.smIndexCard[data-trend="neg"] {
+    border-left-color: #e74c3c;
+}
+.smIndexCard[data-trend="nd"] {
+    border-left-color: var(--border-mid);
+    opacity: 0.7;
+}
+
+.smIndexLabel {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.smIndexPrice {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+.smIndexCurrency {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    margin-left: 3px;
+}
+
+.smIndexChange {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Sectores (treemap) ── */
+.smSectorTreemapWrap {
+    padding-top: 4px;
+    position: relative;
+}
+
+.smSectorTreemap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.smSectorCell {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    overflow: hidden;
+    border-radius: 6px;
+    box-sizing: border-box;
+    padding: 6px;
+    cursor: pointer;
+    color: #fff;
+    text-align: center;
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    transition:
+        filter 0.15s,
+        border-color 0.15s;
+}
+.smSectorCell:hover {
+    filter: brightness(1.14);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.smSectorCellLabel {
+    font-size: 0.86rem;
+    font-weight: 700;
+    line-height: 1.15;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.smSectorCellChange {
+    font-size: 0.78rem;
+    font-weight: 600;
+    opacity: 0.92;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.smSectorCellName {
+    font-size: 0.7rem;
+    font-weight: 500;
+    opacity: 0.85;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Selector de universo (S&P 500 / Cripto / Nasdaq 100) ── */
+.smUniverseToggle {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-header);
+    border: 1px solid var(--border-soft);
+    border-radius: 9px;
+    padding: 3px;
+}
+
+.smUniverseBtn {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s;
+}
+.smUniverseBtn:hover {
+    color: var(--text-subtle);
+}
+.smUniverseBtn.active {
+    background: var(--accent);
+    color: #fff;
+}
+
+.smSectorNota {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    margin-top: 10px;
+}
+
+/* ── Mayores subidas / bajadas ── */
+.smMoversTitle {
+    margin-bottom: 4px;
+}
+
+.smMoversList {
+    display: flex;
+    flex-direction: column;
+}
+
+.smMoverRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 6px;
+    border-bottom: 1px solid var(--bg-surface);
+    border-radius: 6px;
+    transition: background 0.12s ease;
+}
+.smMoverRow:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+.smMoverRow:last-child {
+    border-bottom: none;
+}
+
+.smMoverRank {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--bg-header);
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-dim);
+}
+
+.smMoverInfo {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: 1px;
+}
+.smMoverName {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.smMoverSector {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.smMoverPrice {
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.smMoverChange {
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    min-width: 68px;
+    text-align: center;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-variant-numeric: tabular-nums;
+}
+.smMoverChange.smPos {
+    background: rgba(46, 204, 113, 0.14);
+}
+.smMoverChange.smNeg {
+    background: rgba(231, 76, 60, 0.14);
+}
+
+/* ── RSI extremos ── */
+.smRsiBadge {
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    min-width: 52px;
+    text-align: center;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-subtle);
+    background: var(--bg-header);
+}
+.smRsiBadge.smRsiHot {
+    color: #f87171;
+    background: rgba(231, 76, 60, 0.14);
+}
+.smRsiBadge.smRsiCold {
+    color: #4ade80;
+    background: rgba(46, 204, 113, 0.14);
+}
+
+/* ── Volumen inusual ── */
+.smVolumeBadge {
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    min-width: 46px;
+    text-align: center;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-variant-numeric: tabular-nums;
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.14);
+}
+
+@media (max-width: 640px) {
+    .smIndexCards {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    }
+}

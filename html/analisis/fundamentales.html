@@ -1,0 +1,59 @@
+<div class="fundamentalesPage">
+
+    <div class="activosToolbar">
+        <div class="activosFilters" id="fnTypeFilters">
+            <label class="activosFilterBtn active" data-type="all"><input type="checkbox" checked><span>Todos</span></label>
+            <label class="activosFilterBtn" data-type="acciones"><input type="checkbox"><span>Acciones</span></label>
+            <label class="activosFilterBtn" data-type="etfs"><input type="checkbox"><span>ETFs</span></label>
+            <label class="activosFilterBtn" data-type="cripto"><input type="checkbox"><span>Cripto</span></label>
+            <label class="activosFilterBtn" data-type="comoditis"><input type="checkbox"><span>Comoditis</span></label>
+        </div>
+        <div class="filtersDivider"></div>
+        <input type="text" class="activosSearch" id="fnSearch" placeholder="Buscar activo, sector, ticker...">
+        <span class="activosCount" id="fnCount"></span>
+        <div class="fnToolbarRight">
+            <span class="fnUpdated" id="fnUpdated"></span>
+            <button class="secondaryButton fnRefreshBtn" id="fnRefreshBtn" type="button">↻ Actualizar</button>
+        </div>
+    </div>
+
+    <div class="fnLegend">
+        <span><strong>PER</strong> Precio/Beneficio</span>
+        <span><strong>P/VC</strong> Precio/Valor contable</span>
+        <span><strong>BPA</strong> Beneficio por acción</span>
+        <span><strong>ROE/ROA</strong> Rentabilidad s/patrimonio y activos</span>
+        <span><strong>RSI</strong> Índice de fuerza relativa</span>
+        <span>Datos de TradingView · pulsa un activo para ver el gráfico, o la flecha para ver el técnico completo</span>
+    </div>
+
+    <div id="fnLoading" class="fnLoading">Cargando fundamentales...</div>
+    <p class="overviewEmpty hidden" id="fnEmpty">No hay activos para mostrar con este filtro.</p>
+
+    <div class="activosTableWrap fnTableWrap hidden" id="fnTableWrap">
+        <table class="metricasTable fnTable" id="fnTable">
+            <thead>
+                <tr>
+                    <th class="mThSort" data-sortkey="0">Activo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Tipo<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2">Sector / Industria<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="3">Precio<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="4">Cambio<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5">Rating técnico<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="6">Cap. mercado (M)<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="7">PER<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="8">P/VC<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="9">P/Ventas<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="10">BPA<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="11">Yield div.<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="12">ROE<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="13">ROA<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="14">Deuda/Patr.<span class="mSortArrow"></span></th>
+                    <th class="mThSort fnColNum" data-sortkey="15">RSI (14)<span class="mSortArrow"></span></th>
+                    <th class="fnColExpand"></th>
+                </tr>
+            </thead>
+            <tbody id="fnTableBody"></tbody>
+        </table>
+    </div>
+
+</div>

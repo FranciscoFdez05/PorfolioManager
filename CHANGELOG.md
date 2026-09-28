@@ -22,6 +22,41 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.9.0] — 2026-09-28
+
+**Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Añadido
+
+**Página nueva: Fundamentales.** Un screener de solo lectura sobre los
+activos de tu cartera: capitalización, PER, P/VC, P/Ventas, BPA (con su
+crecimiento interanual en el tooltip), rentabilidad por dividendo, ROE, ROA,
+deuda/patrimonio, sector e industria, más una fila de técnico ampliable con
+el rating de TradingView, RSI, MACD, medias móviles, ADX, estocástico y los
+pivotes clásicos. Todo sale de TradingView por el mismo ticker que ya usa
+cada activo para abrir su gráfico; uno sin ticker de TradingView resuelto se
+enseña como tal, sin inventar ninguna cotización.
+
+**Página nueva: Sentimiento.** El pulso del mercado en general, no de tu
+cartera: el índice Fear & Greed de cripto —medidor y un histórico de doce
+meses con lo de ayer, la semana y el mes pasados, y el máximo y mínimo del
+año—, la amplitud de mercado en EE. UU. (cuántas acciones suben, bajan o
+están planas hoy), los índices principales por región (EE. UU., Europa, Asia
+y divisas, con clic para abrir su gráfico), un mosaico de «Distribución del
+mercado» que se cambia entre S&P 500 —por sector, con el tamaño real del
+patrimonio del ETF que lo sigue—, Nasdaq 100 y las mayores criptomonedas por
+capitalización —con tooltip al pasar el cursor y clic para abrir el
+gráfico—, las mayores subidas y bajadas del día, los extremos de RSI
+(sobrecompra y sobreventa) y el volumen inusual. La pertenencia al Nasdaq 100
+sale del propio dato de TradingView, no de una lista de cien tickers copiada
+a mano que se desactualizaría en el próximo rebalanceo del índice.
+
+---
+
 ## [2.8.1] — 2026-09-26
 
 **Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la

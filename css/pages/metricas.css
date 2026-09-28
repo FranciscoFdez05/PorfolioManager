@@ -981,13 +981,13 @@
     border-radius: 3px;
 }
 #mChartDivAxisWrap {
-    background: var(--bg-surface);
+    background: var(--bg-elevated);
 }
 html[data-theme="light"] #mChartDivAxisWrap {
     background: #ffffff;
 }
 html[data-theme="black"] #mChartDivAxisWrap {
-    background: #0a0a0a;
+    background: #17171b;
 }
 
 /* ── Table ── */

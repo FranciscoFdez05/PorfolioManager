@@ -1,0 +1,170 @@
+<div class="sentimientoPage">
+
+    <div class="activosToolbar">
+        <span class="metricasSectionTitle smPageTitle">Sentimiento y pulso del mercado</span>
+        <div class="fnToolbarRight">
+            <span class="fnUpdated" id="smUpdated"></span>
+            <button class="secondaryButton fnRefreshBtn" id="smRefreshBtn" type="button">↻ Actualizar</button>
+        </div>
+    </div>
+
+    <div id="smLoading" class="fnLoading">Cargando el pulso del mercado...</div>
+
+    <div id="smContent" class="hidden">
+
+        <!-- ── Sentimiento ── -->
+        <div class="metricasSection">
+            <div class="metricasSectionHeader">
+                <span class="metricasSectionTitle">Sentimiento</span>
+            </div>
+            <div class="metricasChartsGrid2 smEqualRow">
+                <div class="metricasChartCard smGaugeCard">
+                    <div class="metricasChartTitle">Fear &amp; Greed · Cripto</div>
+                    <div id="smFgEmpty" class="mEvolucionEmpty hidden"><span>Sin datos de Fear &amp; Greed ahora mismo.</span></div>
+                    <div id="smFgWrap">
+                        <svg id="smFgGauge" class="smGaugeSvg" viewBox="0 0 220 132" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="smFgArcGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#e74c3c"></stop>
+                                    <stop offset="25%" stop-color="#e8720e"></stop>
+                                    <stop offset="50%" stop-color="#94a3b8"></stop>
+                                    <stop offset="75%" stop-color="#8bc98a"></stop>
+                                    <stop offset="100%" stop-color="#2ecc71"></stop>
+                                </linearGradient>
+                                <filter id="smFgNeedleShadow" x="-60%" y="-60%" width="220%" height="220%">
+                                    <feDropShadow dx="0" dy="1" stdDeviation="1.6" flood-color="#000" flood-opacity="0.5"></feDropShadow>
+                                </filter>
+                                <filter id="smFgArcGlow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feGaussianBlur stdDeviation="2.5" result="blur"></feGaussianBlur>
+                                    <feMerge>
+                                        <feMergeNode in="blur"></feMergeNode>
+                                        <feMergeNode in="SourceGraphic"></feMergeNode>
+                                    </feMerge>
+                                </filter>
+                            </defs>
+
+                            <path d="M 28 108 A 82 82 0 0 1 192 108" fill="none" stroke="url(#smFgArcGradient)" stroke-width="18" stroke-linecap="round" filter="url(#smFgArcGlow)"></path>
+
+                            <g class="smGaugeScaleLabels">
+                                <text x="16" y="127">0</text>
+                                <text x="110" y="14" text-anchor="middle">50</text>
+                                <text x="204" y="127" text-anchor="end">100</text>
+                            </g>
+
+                            <path id="smFgNeedle" d="M 105.5 108 L 110 30 L 114.5 108 Z" fill="var(--text-primary)" filter="url(#smFgNeedleShadow)"></path>
+                            <circle cx="110" cy="108" r="10" fill="var(--bg-elevated)" stroke="var(--text-primary)" stroke-width="2"></circle>
+                            <circle cx="110" cy="108" r="4" fill="var(--text-primary)"></circle>
+                        </svg>
+                        <div class="smGaugeZones"><span>Miedo</span><span>Neutral</span><span>Codicia</span></div>
+                        <div class="smGaugeValue" id="smFgValue">--</div>
+                        <div class="smGaugeLabel" id="smFgLabel">--</div>
+                    </div>
+                </div>
+                <div class="metricasChartCard smGaugeCard">
+                    <div class="metricasChartTitle">Amplitud de mercado · EE. UU.</div>
+                    <div id="smBrEmpty" class="mEvolucionEmpty hidden"><span>Sin datos de amplitud ahora mismo.</span></div>
+                    <div id="smBrWrap">
+                        <div class="smBreadthDonutWrap">
+                            <canvas id="smBreadthChart"></canvas>
+                            <div class="smBreadthCenter">
+                                <span class="smBreadthCenterValue" id="smBrCenterValue">--</span>
+                                <span class="smBreadthCenterUnit">suben</span>
+                            </div>
+                        </div>
+                        <div class="smGaugeLabel" id="smBrLabel">--</div>
+                        <div class="smBreadthLegend" id="smBreadthLegend"></div>
+                        <div class="smBreadthNota">Acciones de NASDAQ/NYSE/AMEX con capitalización &gt; 2.000 M y volumen relevante.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="metricasChartCard smFgHistoryCard">
+                <div class="metricasChartTitle">Fear &amp; Greed · histórico (12 meses)</div>
+                <p class="overviewEmpty hidden" id="smFgHistEmpty">Sin histórico de Fear &amp; Greed ahora mismo.</p>
+                <div id="smFgHistWrap">
+                    <div class="smFgStatsStrip" id="smFgStatsStrip"></div>
+                    <div class="metricasChartWrap" style="height:230px">
+                        <canvas id="smFgHistChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Índices principales ── -->
+        <div class="metricasSection">
+            <div class="metricasSectionHeader">
+                <span class="metricasSectionTitle">Índices principales</span>
+            </div>
+            <div class="smIndexGroups" id="smIndexGroups"></div>
+        </div>
+
+        <!-- ── Distribución (S&P 500 / Cripto / Nasdaq 100) ── -->
+        <div class="metricasSection">
+            <div class="metricasSectionHeader">
+                <span class="metricasSectionTitle">Distribución del mercado · hoy</span>
+                <div class="smUniverseToggle" id="smUniverseToggle">
+                    <button type="button" class="smUniverseBtn active" data-universe="sp500">S&amp;P 500</button>
+                    <button type="button" class="smUniverseBtn" data-universe="nasdaq100">Nasdaq 100</button>
+                    <button type="button" class="smUniverseBtn" data-universe="cripto">Cripto</button>
+                </div>
+            </div>
+            <div class="metricasChartsGrid1">
+                <div class="metricasChartCard">
+                    <p class="overviewEmpty hidden" id="smSectorEmpty">Sin datos ahora mismo.</p>
+                    <div class="metricasChartWrap smSectorTreemapWrap" id="smSectorChartWrap" style="height:340px">
+                        <div class="smSectorTreemap" id="smSectorTreemap"></div>
+                    </div>
+                    <div class="smSectorNota" id="smSectorNota">El tamaño es el patrimonio del ETF que sigue ese sector (AUM); el color, la variación de hoy.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Mayores subidas / bajadas ── -->
+        <div class="metricasSection">
+            <div class="metricasSectionHeader">
+                <span class="metricasSectionTitle">Mayores subidas y bajadas · EE. UU., hoy</span>
+            </div>
+            <div class="metricasChartsGrid2">
+                <div class="metricasChartCard metricasTableCard">
+                    <div class="metricasChartTitle smMoversTitle">Suben más</div>
+                    <div class="smMoversList" id="smGainersList"></div>
+                </div>
+                <div class="metricasChartCard metricasTableCard">
+                    <div class="metricasChartTitle smMoversTitle">Bajan más</div>
+                    <div class="smMoversList" id="smLosersList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── RSI extremos ── -->
+        <div class="metricasSection">
+            <div class="metricasSectionHeader">
+                <span class="metricasSectionTitle">RSI extremos · EE. UU., hoy</span>
+            </div>
+            <div class="metricasChartsGrid2">
+                <div class="metricasChartCard metricasTableCard">
+                    <div class="metricasChartTitle smMoversTitle">Sobrecompra (RSI alto)</div>
+                    <div class="smMoversList" id="smRsiOverboughtList"></div>
+                </div>
+                <div class="metricasChartCard metricasTableCard">
+                    <div class="metricasChartTitle smMoversTitle">Sobreventa (RSI bajo)</div>
+                    <div class="smMoversList" id="smRsiOversoldList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Volumen inusual ── -->
+        <div class="metricasSection">
+            <div class="metricasSectionHeader">
+                <span class="metricasSectionTitle">Volumen inusual · EE. UU., hoy</span>
+            </div>
+            <div class="metricasChartsGrid1">
+                <div class="metricasChartCard metricasTableCard">
+                    <div class="smMoversList" id="smVolumeList"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>

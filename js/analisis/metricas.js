@@ -914,7 +914,7 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
 
     const ROW_H = 36
     const MAX_ROWS = 9
-    const AXIS_H = 58
+    const AXIS_H = 30
     const fullH = Math.max(MAX_ROWS * ROW_H, sorted.length * ROW_H)
     const wrapH = Math.min(fullH, MAX_ROWS * ROW_H) + AXIS_H
     const maxVal = values.length ? Math.max(...values) : 1
@@ -990,7 +990,7 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
                     legend: { display: false },
                     tooltip: { enabled: false }
                 },
-                layout: { padding: { left: mainLeft, right: rightPad, top: 4, bottom: 10 } },
+                layout: { padding: { left: mainLeft, right: rightPad, top: 2, bottom: 4 } },
                 scales: {
                     x: {
                         ticks: { color: "#8899bb", maxTicksLimit: 7 },
