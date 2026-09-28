@@ -220,3 +220,26 @@ class TestNormativa:
 
         assert datos["resumen"]["compensadoAnteriores"] == "1000.00"
         assert datos["resumen"]["base"] == "2000.00"
+
+
+class TestCache:
+    """`calcular_todo()` memoiza por hilo (ver el docstring en ventas_fifo.py).
+
+    Lo único que de verdad puede fallar con una caché es que se quede con un
+    dato viejo, así que lo que importa comprobar es precisamente el caso que
+    `refrescar_calculo()` NO cubre: un cambio en la ficha del activo, que es
+    la otra fuente de la línea temporal y que nadie invalida a mano.
+    """
+
+    def test_un_cambio_en_la_ficha_se_ve_sin_pasar_por_ventas_store(self, temp_db):
+        crear_activo(filas=[compra_ficha("01-01-2023", "5", "10")])
+        datos = guardar("2024", [venta("v1", "01-09-2024", "50", "30")])
+        assert datos["rows"][0]["incidencia"] == "stock_insuficiente"
+
+        # Se amplía la ficha del activo directamente, sin pasar por
+        # write_ventas_year/refrescar_calculo: ahora sí hay lotes para las 50.
+        crear_activo(filas=[compra_ficha("01-01-2023", "60", "10")])
+
+        datos = read_ventas_year("2024")
+        assert datos["rows"][0]["incidencia"] == ""
+        assert datos["rows"][0]["costeAdquisicion"] == "500.00"

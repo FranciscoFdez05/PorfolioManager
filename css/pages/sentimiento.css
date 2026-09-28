@@ -182,11 +182,18 @@
 }
 .smBreadthDonutWrap canvas {
     filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35));
+    /* Posicionado y por encima del texto central: si no, el tooltip de
+       Chart.js (dibujado dentro del propio canvas) queda tapado por el texto,
+       que al ser absolute siempre pintaría encima de un canvas estático. El
+       hueco de la dona sigue transparente, así que el texto se ve igual. */
+    position: relative;
+    z-index: 1;
 }
 
 .smBreadthCenter {
     position: absolute;
     inset: 0;
+    z-index: 0;
     display: flex;
     flex-direction: column;
     align-items: center;

@@ -223,10 +223,15 @@ def serveStatic(path):
         # que pasaba cuando todo js/ se servía con no-store.
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     elif ext in (".js", ".css"):
-        # Código propio: no-store. Antes las etiquetas llevaban además un `?v=`
-        # a mano que había que acordarse de subir en cada cambio; con no-store
-        # no aportaba nada y solo podía olvidarse, así que se quitaron.
-        response.headers["Cache-Control"] = "no-store"
+        # Código propio: no-cache (no "no-store"). send_from_directory ya manda
+        # ETag/Last-Modified basados en el fichero real, así que el navegador
+        # revalida en cada carga en vez de fiarse de un TTL; si el fichero no
+        # cambió, la respuesta es un 304 sin cuerpo. Mismo nivel de seguridad
+        # que no-store frente a servir una versión vieja, pero sin repetir la
+        # descarga completa de los ~35 scripts y ~20 hojas de estilo cuando no
+        # ha cambiado nada. No depende de acordarse de subir ningún `?v=` a
+        # mano: la revalidación la decide el propio fichero en disco.
+        response.headers["Cache-Control"] = "no-cache"
     return response
 
 

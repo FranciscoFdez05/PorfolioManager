@@ -330,13 +330,14 @@ def test_sin_ca_todavía_se_explica_en_vez_de_devolver_vacío(monkeypatch):
 
 # ── Arranque ──────────────────────────────────────────────────────────────────
 
-def test_al_arrancar_se_reaplica_el_estado_guardado(caddy):
+def test_al_arrancar_se_reaplica_el_estado_guardado(caddy, monkeypatch):
     """Caddy y el estado pueden separarse (contenedor recreado, arranque a mano).
 
     Si el proxy volviera a servir en claro con el estado diciendo que hay HTTPS,
     las cookies saldrían con Secure sobre una conexión que no lo es y nadie
     podría entrar.
     """
+    monkeypatch.setenv("PROXY_FIX_HOPS", "1")
     tls.guardarEstado(True, ["casa"])
     tls.converger()
 
@@ -348,6 +349,7 @@ def test_converger_no_impide_arrancar_si_el_proxy_está_caído(monkeypatch):
     def _muerto(*_a, **_k):
         raise OSError("connection refused")
 
+    monkeypatch.setenv("PROXY_FIX_HOPS", "1")
     monkeypatch.setattr(tls, "_admin", _muerto)
     monkeypatch.setattr(tls, "_ESPERA_REINTENTO", 0)
     tls.guardarEstado(True, ["casa"])
@@ -366,6 +368,7 @@ def test_converger_reintenta_mientras_el_proxy_arranca(monkeypatch):
             raise OSError("connection refused")
         return b"{}"
 
+    monkeypatch.setenv("PROXY_FIX_HOPS", "1")
     monkeypatch.setattr(tls, "_admin", _lento)
     monkeypatch.setattr(tls, "_ESPERA_REINTENTO", 0)
     tls.guardarEstado(True, ["casa"])
@@ -377,10 +380,23 @@ def test_converger_reintenta_mientras_el_proxy_arranca(monkeypatch):
 
 def test_con_https_impuesto_por_entorno_no_se_toca_el_proxy(caddy, monkeypatch):
     """Ahí el TLS lo lleva un proxy propio: reconfigurarlo lo machacaría."""
+    monkeypatch.setenv("PROXY_FIX_HOPS", "1")
     monkeypatch.setenv("HTTPS_ENABLED", "true")
     tls.converger()
 
     assert _ultimo_load(caddy) is None
+
+
+def test_converger_no_hace_nada_sin_proxy_delante(caddy, monkeypatch):
+    """La instalación sin Docker no tiene Caddy: sin esto, cada arranque se
+    comía hasta 8 s reintentando contra un `http://caddy:2019` que no
+    responde nunca en ese despliegue."""
+    monkeypatch.setenv("PROXY_FIX_HOPS", "0")
+    tls.guardarEstado(True, ["casa"])
+
+    tls.converger()
+
+    assert caddy == []
 
 
 def test_el_aviso_de_http_plano_solo_sale_sin_https():

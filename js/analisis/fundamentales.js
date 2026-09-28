@@ -39,7 +39,11 @@ async function initFundamentalesLogic() {
     const refreshBtn = document.getElementById("fnRefreshBtn")
     const tbody = document.getElementById("fnTableBody")
 
-    typeFiltersEl?.addEventListener("click", (e) => {
+    // "change" y no "click": un <label> con <input> dentro dispara el click del
+    // label Y el click sintético que el navegador reenvía al checkbox, así que
+    // un solo toque del usuario llegaba dos veces al delegado y el toggle se
+    // deshacía a sí mismo (por eso los botones parecían no responder).
+    typeFiltersEl?.addEventListener("change", (e) => {
         const label = e.target.closest(".activosFilterBtn")
         if (!label || !label.dataset.type) return
         const type = label.dataset.type
@@ -191,7 +195,7 @@ function fnRenderTable() {
     emptyEl?.classList.add("hidden")
     tableWrap?.classList.remove("hidden")
 
-    tbody.innerHTML = filtered.map((row) => fnBuildRowHtml(row)).join("")
+    tbody.innerHTML = filtered.map((row, idx) => fnBuildRowHtml(row, idx + 1)).join("")
 
     if (table && typeof bindTableSort === "function") {
         bindTableSort(table, "fundamentales")
@@ -199,7 +203,7 @@ function fnRenderTable() {
     }
 }
 
-function fnBuildRowHtml(row) {
+function fnBuildRowHtml(row, rank) {
     const stats = row.stats || {}
     const expanded = _fnExpandedIds.has(row.id)
     const rating = fnRatingInfo(stats["Recommend.All"])
@@ -210,6 +214,7 @@ function fnBuildRowHtml(row) {
 
     const mainRow = `
         <tr class="fnRow ${row.hasTicker ? "" : "fnRowNd"}" data-id="${escapeHtml(row.id)}">
+            <td class="mTdRank">${rank}</td>
             <td class="fnCellAsset">
                 <span class="fnAssetName">${escapeHtml(row.name)}</span>
                 <span class="fnAssetTicker">${escapeHtml(row.tvSymbol || row.symbol)}</span>
@@ -245,7 +250,7 @@ function fnBuildRowHtml(row) {
 
     const detailRow = hasTechnical
         ? `<tr class="fnDetailRow ${expanded ? "" : "hidden"}" data-detail-for="${escapeHtml(row.id)}">
-               <td colspan="17">${fnBuildDetailHtml(row)}</td>
+               <td colspan="18">${fnBuildDetailHtml(row)}</td>
            </tr>`
         : ""
 

@@ -1994,8 +1994,24 @@ async function renderAssetsList(assets) {
         }
     }
 
-    assetsList.innerHTML = ""
-    assetsList.appendChild(fragment)
+    // Comparar en un contenedor aparte, no ya insertado: montar el fragmento
+    // directamente en assetsList y comparar después habría sido el mismo
+    // reflujo que se quiere evitar. Se compara contra el innerHTML real de
+    // assetsList (no contra una copia aparte en una variable de módulo):
+    // si algo ajeno recrea ese nodo entre medias, una copia aparte podría
+    // decir "no ha cambiado" sobre un DOM que en realidad está vacío.
+    const contenedorTemporal = document.createElement("div")
+    contenedorTemporal.appendChild(fragment)
+    const htmlNuevo = contenedorTemporal.innerHTML
+
+    if (htmlNuevo === assetsList.innerHTML) {
+        // Nada distinto de lo ya pintado (caso normal del refresco periódico
+        // cuando los precios no se han movido): no tocar el DOM, para no
+        // perder el scroll ni el :hover ni repetir el rebind de abajo.
+        return
+    }
+
+    assetsList.innerHTML = htmlNuevo
 
     initAssetSelector([...assetsList.querySelectorAll(".assetBtn:not(.assetBtnSegCustom)")])
     assetsList.querySelectorAll(".assetBtnSegCustom").forEach((btn) => {
@@ -2123,10 +2139,16 @@ function resetAssetDetailView() {
 
 async function refreshAssetsSidebar(selectedAssetId = currentAssetId, renderTable = false) {
     try {
-        await loadVentasRowsForAssets()
-        await loadTransaccionesRowsForAssets()
-        await loadOperacionesRowsForAssets()
-        const assets = await loadAssetsList()
+        // Las tres primeras solo rellenan su propia caché de módulo
+        // (externalVentasRowsCache y compañía) y loadAssetsList pide algo
+        // distinto (/api/activos): no dependen entre sí, solo hace falta que
+        // las cuatro terminen antes de renderAssetsList, que es quien las lee.
+        const [, , , assets] = await Promise.all([
+            loadVentasRowsForAssets(),
+            loadTransaccionesRowsForAssets(),
+            loadOperacionesRowsForAssets(),
+            loadAssetsList()
+        ])
         await renderAssetsList(assets)
         await refreshTopPortfolioMetrics(assets)
         await refreshTopDividendosIntereses()

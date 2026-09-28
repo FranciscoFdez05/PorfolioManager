@@ -20,6 +20,7 @@ Eso es deliberado: antes el descuadre se tragaba en silencio y salían costes de
 adquisición inventados.
 """
 
+import threading
 from dataclasses import replace
 from decimal import Decimal
 
@@ -267,7 +268,44 @@ def cartera_viva():
     return cartera
 
 
+_cache_hilo = threading.local()
+
+
 def calcular_todo():
+    """Liquida todas las ventas de todos los ejercicios. Memoizado por hilo.
+
+    El cálculo depende de tres tablas (`activos`, las fichas de operaciones y
+    `ventas`) repartidas entre varias rutas, y este módulo ya viene escarmentado
+    de invalidar mal: "calcular un año aislado es justamente el fallo que tenía
+    la versión anterior" (ver más abajo). Enganchar la invalidación a mano en
+    cada punto de escritura de esas tablas sería el mismo tipo de fallo otra
+    vez, solo que repartido por más ficheros.
+
+    En vez de eso, la clave de caché es la propia foto de la base de datos:
+    `PRAGMA data_version` cambia en cuanto OTRA conexión confirma una escritura
+    (no la que pregunta: ese es justo el motivo de sumarle `total_changes`,
+    que sí cuenta las de esta conexión), y `id(conn)` de propina por si el hilo
+    recicla la conexión (`core/db.py`), para que una coincidencia de contador
+    tras el reciclaje no se lea como "no ha cambiado nada". Es por hilo (los
+    workers de gunicorn no comparten memoria, y cada hilo ya tiene su propia
+    conexión) y de un solo hueco: no hace falta guardar más de un resultado a
+    la vez.
+
+    Nadie fuera de este módulo debe mutar el diccionario devuelto: con caché,
+    ese mismo objeto se reparte entre peticiones.
+    """
+    conn = get_db()
+    clave = (id(conn), conn.execute("PRAGMA data_version").fetchone()[0], conn.total_changes)
+    if getattr(_cache_hilo, "clave", None) == clave:
+        return _cache_hilo.resultado
+
+    resultado = _calcular_todo_sin_cache()
+    _cache_hilo.clave = clave
+    _cache_hilo.resultado = resultado
+    return resultado
+
+
+def _calcular_todo_sin_cache():
     """Liquida todas las ventas de todos los ejercicios.
 
     Se calcula siempre sobre el histórico completo, nunca sobre un año suelto:

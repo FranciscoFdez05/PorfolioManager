@@ -25,6 +25,7 @@ El orden de registro importa y es el que había:
                           existía o si el token era válido.
 """
 
+import gzip
 import logging
 import os
 import secrets
@@ -75,6 +76,23 @@ UPLOAD_PATHS = ("/api/import/json", "/api/import/zip", "/api/portfolios/import")
 # estrecho que el general: cada una abre conexiones SQLite, vuelca el WAL y
 # escribe ficheros de decenas de MB.
 RUTAS_PESADAS = ("/api/backup", "/api/restore", "/api/import/", "/api/portfolios/import")
+
+# Tipos de respuesta que merece la pena comprimir: texto, que es justo lo que
+# manda el HTML/JS/CSS/JSON de la aplicación. Binarios (imágenes, zips de
+# backup) ya vienen comprimidos y gzip solo les añadiría trabajo.
+_TIPOS_COMPRIMIBLES = {
+    "text/html", "text/css", "text/plain", "text/xml",
+    "application/javascript", "application/json", "application/xml",
+    "image/svg+xml",
+}
+# Por debajo de esto la cabecera de gzip pesa más que lo que ahorra.
+_COMPRESION_MIN_BYTES = 500
+# Por encima, mejor no comprimir: `/api/export/json` puede rondar los 25 MB
+# (ver ajustes.py) generados ya en memoria como un único str, y bufferizar
+# encima la copia comprimida de un caso así, sobre una petición ocasional, no
+# compensa frente al coste de CPU y memoria. Los estáticos (JS/CSS, el grueso
+# del tráfico repetido) están muy por debajo de este tope.
+_COMPRESION_MAX_BYTES = 3 * 1024 * 1024
 
 # ── CSRF (double-submit cookie) ───────────────────────────────────────────────
 # SESSION_COOKIE_SAMESITE=Lax ya bloquea los POST cross-site en navegadores
@@ -271,6 +289,45 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
             response.headers["Content-Security-Policy"] = csp.construir(
                 g.get("csp_nonce", ""), _origenes_de_comprobacion()
             )
+        return response
+
+    @app.after_request
+    def comprimir_respuesta(response):
+        """Gzip para HTML/CSS/JS/JSON cuando el cliente lo acepta.
+
+        No hay por qué depender de que haya un proxy delante que comprima (Caddy
+        es opcional, ver `aplicar_proxy_inverso`): sin esto, una instalación sin
+        proxy —o con uno que no comprima— transfiere el JS/CSS propios enteros y
+        sin comprimir en cada carga.
+        """
+        vary = {v.strip() for v in response.headers.get("Vary", "").split(",") if v.strip()}
+        vary.add("Accept-Encoding")
+        response.headers["Vary"] = ", ".join(sorted(vary))
+
+        if (
+            response.status_code in (304, 206)
+            or "Content-Encoding" in response.headers
+            or response.mimetype not in _TIPOS_COMPRIMIBLES
+            or "gzip" not in request.headers.get("Accept-Encoding", "").lower()
+        ):
+            return response
+
+        # Los estáticos (send_from_directory) llegan aquí con
+        # direct_passthrough=True y ya con Content-Length calculado por
+        # Werkzeug: se mira antes de tocar el cuerpo para no bufferizar en
+        # memoria una respuesta que resulte demasiado grande para comprimir.
+        longitud = response.content_length
+        if longitud is None or not (_COMPRESION_MIN_BYTES <= longitud <= _COMPRESION_MAX_BYTES):
+            return response
+
+        # Los estáticos llegan en direct_passthrough (el fichero se sirve como
+        # iterador, no como bytes ya cargados): hay que desactivarlo para poder
+        # leer el cuerpo entero y sustituirlo por la versión comprimida.
+        response.direct_passthrough = False
+        cuerpo = response.get_data()
+        response.set_data(gzip.compress(cuerpo, compresslevel=6))
+        response.headers["Content-Encoding"] = "gzip"
+        response.headers["Content-Length"] = str(len(response.get_data()))
         return response
 
     return limite_escrituras, limite_pesadas

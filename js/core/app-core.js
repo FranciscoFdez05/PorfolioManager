@@ -234,8 +234,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyTopMetricsVisibility()
     applyModulesVisibility()
     applySidebarState(sideWrapper, toggleButton)
+    // refreshAssetsSidebar ya llama a refreshTopDividendosIntereses por dentro
+    // (nueve fetches en paralelo); repetirlo aquí los disparaba dos veces en
+    // cada arranque sin que cambiara nada entre medias.
     await refreshAssetsSidebar()
-    await refreshTopDividendosIntereses()
 
     initMoneyToggle()
     applyAssetRotation()
@@ -972,9 +974,11 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             }
         }
 
-        const response = await fetch(`${pageHtmlPath(page)}?v=${PAGE_HTML_VERSION}`, {
-            cache: "no-store"
-        })
+        // Sin "no-store": el servidor ya manda estos fragmentos con
+        // Cache-Control: no-cache (ETag/Last-Modified), así que el navegador
+        // revalida solo y, si no cambiaron, la respuesta es un 304 sin cuerpo
+        // en vez de repetir la descarga completa en cada cambio de sección.
+        const response = await fetch(`${pageHtmlPath(page)}?v=${PAGE_HTML_VERSION}`)
 
         if (!response.ok) {
             throw new Error(`No se pudo cargar ${page}.html`)

@@ -692,7 +692,18 @@ def converger() -> None:
     No aborta el arranque si falla: la aplicación tiene que poder levantar y
     contarlo en el log aunque el proxy esté caído, o no habría interfaz desde la
     que arreglarlo.
+
+    Con `proxy_saltos` a 0 (el defecto en la instalación sin Docker, donde no
+    hay ningún proxy) no hay Caddy con el que converger: intentarlo de todas
+    formas eran hasta 8 s de reintentos contra `http://caddy:2019` en cada
+    arranque, un host que en ese despliegue no va a responder nunca. Es la
+    misma señal que ya usa `aplicar_proxy_inverso` para decidir si hay proxy
+    delante.
     """
+    if not settings.proxySaltos():
+        log.info("[tls] Sin proxy delante (proxy_saltos=0): no hay nada que converger")
+        return
+
     estado = leerEstado()
     if settings.httpsActivado():
         # El HTTPS lo lleva un proxy configurado por .env (dominio público,

@@ -564,9 +564,21 @@
     height: 220px;
 }
 
+/* El canvas necesita quedar por encima del texto central en la pila de
+   apilamiento: si no, un elemento posicionado (el texto, absolute) siempre
+   pinta encima de uno estático (el canvas) aunque vaya antes en el DOM, y el
+   tooltip de Chart.js —que se dibuja dentro del propio canvas— queda tapado
+   por el texto de fondo. El hueco de la dona es transparente, así que el
+   texto se sigue viendo con normalidad; solo el tooltip pasa a estar encima. */
+.pinvChartWrap canvas {
+    position: relative;
+    z-index: 1;
+}
+
 .pinvChartCenter {
     position: absolute;
     inset: 0;
+    z-index: 0;
     display: flex;
     flex-direction: column;
     align-items: center;

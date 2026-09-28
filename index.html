@@ -43,12 +43,16 @@
     <script nonce="__CSP_NONCE__">
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
     </script>
-    <!-- Debe ir antes que cualquier script que llame a fetch() -->
-    <script src="js/core/csrf.js"></script>
+    <!-- Debe ir antes que cualquier script que llame a fetch(). Todos los
+         <script> de la página llevan `defer`: el navegador los descarga en
+         paralelo sin bloquear el pintado inicial, pero los sigue ejecutando en
+         el orden del documento justo antes de DOMContentLoaded, así que este
+         orden relativo (csrf → api → dom → el resto) se mantiene igual. -->
+    <script defer src="js/core/csrf.js"></script>
     <!-- api.js envuelve fetch DESPUÉS de csrf.js (sesión caducada, timeouts);
          dom.js expone escapeHtml y los helpers que usan todos los módulos. -->
-    <script src="js/core/api.js"></script>
-    <script src="js/core/dom.js"></script>
+    <script defer src="js/core/api.js"></script>
+    <script defer src="js/core/dom.js"></script>
 </head>
 <body>
 
@@ -2029,36 +2033,36 @@
     </div><!-- /.sttContent -->
 </div><!-- /.sttOverlay -->
 
-<script src="js/vendor/chart.umd.min.js?v=4.4.4"></script>
-<script src="js/core/app-core.js"></script>
-<script src="js/cartera/assets.js"></script>
-<script src="js/finanzas/intereses.js"></script>
-<script src="js/finanzas/dividendos.js"></script>
-<script src="js/finanzas/gastos.js"></script>
-<script src="js/finanzas/ingresos.js"></script>
-<script src="js/finanzas/categorias.js"></script>
-<script src="js/finanzas/ventas.js"></script>
-<script src="js/cripto/transacciones.js"></script>
-<script src="js/cripto/stablecoins.js"></script>
-<script src="js/cripto/operaciones.js"></script>
-<script src="js/cripto/trading-journal.js"></script>
-<script src="js/cripto/staking.js"></script>
-<script src="js/cripto/earn.js"></script>
-<script src="js/cripto/conversiones.js"></script>
-<script src="js/analisis/herramientas.js"></script>
-<script src="js/finanzas/bonos.js"></script>
-<script src="js/analisis/metricas.js"></script>
-<script src="js/ajustes/ajustes.js"></script>
-<script src="js/core/shared-utils.js"></script>
-<script src="js/analisis/heatmap.js"></script>
-<script src="js/analisis/seguimiento.js"></script>
-<script src="js/analisis/fundamentales.js"></script>
-<script src="js/analisis/sentimiento.js"></script>
-<script src="js/cartera/portfolios.js"></script>
-<script src="js/cartera/private-market.js"></script>
-<script src="js/cartera/planes.js"></script>
-<script src="js/cartera/planes-inversion.js"></script>
-<script src="js/finanzas/ahorro.js"></script>
-<script src="js/finanzas/calendario.js"></script>
+<script defer src="js/vendor/chart.umd.min.js?v=4.4.4"></script>
+<script defer src="js/core/app-core.js"></script>
+<script defer src="js/cartera/assets.js"></script>
+<script defer src="js/finanzas/intereses.js"></script>
+<script defer src="js/finanzas/dividendos.js"></script>
+<script defer src="js/finanzas/gastos.js"></script>
+<script defer src="js/finanzas/ingresos.js"></script>
+<script defer src="js/finanzas/categorias.js"></script>
+<script defer src="js/finanzas/ventas.js"></script>
+<script defer src="js/cripto/transacciones.js"></script>
+<script defer src="js/cripto/stablecoins.js"></script>
+<script defer src="js/cripto/operaciones.js"></script>
+<script defer src="js/cripto/trading-journal.js"></script>
+<script defer src="js/cripto/staking.js"></script>
+<script defer src="js/cripto/earn.js"></script>
+<script defer src="js/cripto/conversiones.js"></script>
+<script defer src="js/analisis/herramientas.js"></script>
+<script defer src="js/finanzas/bonos.js"></script>
+<script defer src="js/analisis/metricas.js"></script>
+<script defer src="js/ajustes/ajustes.js"></script>
+<script defer src="js/core/shared-utils.js"></script>
+<script defer src="js/analisis/heatmap.js"></script>
+<script defer src="js/analisis/seguimiento.js"></script>
+<script defer src="js/analisis/fundamentales.js"></script>
+<script defer src="js/analisis/sentimiento.js"></script>
+<script defer src="js/cartera/portfolios.js"></script>
+<script defer src="js/cartera/private-market.js"></script>
+<script defer src="js/cartera/planes.js"></script>
+<script defer src="js/cartera/planes-inversion.js"></script>
+<script defer src="js/finanzas/ahorro.js"></script>
+<script defer src="js/finanzas/calendario.js"></script>
 </body>
 </html>

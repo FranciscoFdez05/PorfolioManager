@@ -22,6 +22,56 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [2.9.1] — 2026-09-28
+
+**Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Añadido
+
+**Columna de posición en Fundamentales.** La tabla numera cada fila (#) para
+poder referirse a una posición del ranking sin contar a mano.
+
+### Cambiado
+
+**La aplicación carga y navega más rápido.** El JS y el CSS propios, y los
+fragmentos HTML de cada sección, se servían con `Cache-Control: no-store`:
+cada carga —y cada cambio de pantalla— los volvía a descargar enteros aunque
+no hubiera cambiado ni una línea. Ahora el navegador revalida contra el
+fichero real (ETag) y solo repite la descarga cuando de verdad cambió algo.
+Las respuestas propias también se comprimen con gzip cuando el navegador lo
+acepta, y los `<script>` de la página cargan con `defer` para no bloquear el
+primer pintado. El refresco del panel lateral de activos evita repintar la
+lista entera cuando ningún precio se ha movido, y dejó de repetir sin querer
+nueve peticiones (intereses, dividendos, bonos, gastos…) en cada arranque.
+
+**El cálculo fiscal de Ventas ya no se rehace de cero en cada lectura.** El
+reparto FIFO y la liquidación de todos los ejercicios se memorizan hasta que
+cambia algo en la base de datos (ventas, fichas de activos u operaciones), en
+vez de recalcular el histórico completo en cada visita a la pantalla.
+
+**Arrancar sin un proxy delante (instalación sin Docker) ya no pierde
+segundos al hacerlo.** La aplicación intentaba sincronizar el estado de HTTPS
+con Caddy aunque no hubiera ningún proxy configurado, y se comía hasta 8 s de
+reintentos contra una dirección que en ese despliegue no responde nunca.
+
+### Corregido
+
+**El filtro de tipo de Fundamentales no siempre respondía al primer toque.**
+Un `<label>` con el checkbox dentro dispara el click del label y el que el
+navegador reenvía al propio checkbox; los dos llegaban al mismo delegado y el
+segundo deshacía lo que acababa de hacer el primero.
+
+**El tooltip de los donuts (Planes de inversión, Sentimiento) quedaba tapado
+por el texto central.** Un elemento posicionado pinta siempre encima de uno
+estático aunque vaya antes en el DOM; el canvas necesitaba su propio
+`position: relative` para quedar por encima.
+
+---
+
 ## [2.9.0] — 2026-09-28
 
 **Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la
