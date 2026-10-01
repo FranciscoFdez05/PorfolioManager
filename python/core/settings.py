@@ -277,6 +277,34 @@ CATALOGO: tuple[Ajuste, ...] = (
            minimo=1.0, maximo=60.0,
            descripcion="Timeout de la consulta a GitHub. Hay alguien esperando a que pinte el panel."),
 
+    # [avisos] — lo que el servidor vigila por su cuenta y cuenta por Telegram.
+    # Qué tipos de aviso se mandan se elige en Ajustes > Telegram; aquí solo va
+    # lo que es de despliegue.
+    Ajuste("avisos", "alertas_intervalo_minutos", ENTERO, 5, env="AVISOS_ALERTAS_MINUTOS",
+           minimo=0, maximo=1440,
+           descripcion="Cada cuántos minutos se comprueban las alertas de precio de los activos. "
+                       "0 las deja de vigilar (siguen saltando al refrescar un precio a mano)."),
+    Ajuste("avisos", "espacio_minimo_mb", ENTERO, 1024, env="AVISOS_ESPACIO_MINIMO_MB",
+           minimo=0, maximo=10_000_000,
+           descripcion="Aviso por Telegram cuando el disco de datos baja de estos MB libres. 0 lo apaga."),
+
+    # [vigilante] — el proceso aparte que avisa si la aplicación no responde.
+    # Tiene que ser otro proceso: una aplicación caída no puede avisar de que
+    # está caída. Ver python/vigilante.py.
+    Ajuste("vigilante", "url", TEXTO, "", env="VIGILANTE_URL",
+           descripcion="Qué vigilar: una o varias «nombre=url» separadas por comas. Vacío = "
+                       "http://127.0.0.1:<puerto>/api/health de esta máquina."),
+    Ajuste("vigilante", "intervalo_segundos", ENTERO, 30, env="VIGILANTE_INTERVALO",
+           minimo=5, maximo=3600,
+           descripcion="Cada cuántos segundos se comprueba la aplicación."),
+    Ajuste("vigilante", "fallos_para_avisar", ENTERO, 3, env="VIGILANTE_FALLOS",
+           minimo=1, maximo=100,
+           descripcion="Comprobaciones fallidas seguidas antes de avisar. Evita el aviso por un "
+                       "reinicio de un par de segundos."),
+    Ajuste("vigilante", "recordatorio_minutos", ENTERO, 60, env="VIGILANTE_RECORDATORIO_MINUTOS",
+           minimo=0, maximo=10080,
+           descripcion="Mientras siga caída, cada cuántos minutos se repite el aviso. 0 no lo repite."),
+
     # [rutas] — las lee core.paths. Relativas a la raíz del proyecto, o
     # absolutas si se quiere sacar los datos fuera del directorio del código.
     Ajuste("rutas", "datos", TEXTO, "data", env="PORTFOLIO_DATA_DIR",
@@ -486,6 +514,29 @@ def proveedorMaxRespuestaBytes() -> int:
 def proveedorUserAgent() -> str:
     return obtener("proveedores.user_agent")
 
+def alertasIntervaloSegundos() -> int:
+    return obtener("avisos.alertas_intervalo_minutos") * 60
+
+
+def espacioMinimoBytes() -> int:
+    return obtener("avisos.espacio_minimo_mb") * 1024 * 1024
+
+
+def vigilanteUrl() -> str:
+    return obtener("vigilante.url")
+
+
+def vigilanteIntervalo() -> int:
+    return obtener("vigilante.intervalo_segundos")
+
+
+def vigilanteFallos() -> int:
+    return obtener("vigilante.fallos_para_avisar")
+
+
+def vigilanteRecordatorioSegundos() -> int:
+    return obtener("vigilante.recordatorio_minutos") * 60
+
 
 def comprobarVersionRemota() -> bool:
     return obtener("actualizacion.comprobar_version")
@@ -545,6 +596,9 @@ FIJADAS_POR_EL_DESPLIEGUE = frozenset({
     "PORTFOLIO_DATA_DIR",
     "PORTFOLIO_LOGS_DIR",
     "PORTFOLIO_API_DIR",
+    # El servicio `vigilante` de docker-compose.yml apunta a la aplicación por
+    # el nombre del servicio, no por localhost.
+    "VIGILANTE_URL",
 })
 
 

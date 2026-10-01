@@ -371,3 +371,72 @@ def test_cambiar_credenciales_sin_csrf_es_403(cliente_autenticado, credenciales)
     )
 
     assert respuesta.status_code == 403
+
+
+# ── Avisos por Telegram ──────────────────────────────────────────────────────
+
+@pytest.fixture
+def telegram(credenciales, monkeypatch):
+    """Telegram configurado sobre las rutas aisladas; devuelve lo que se enviaría."""
+    from core import telegram_notifier
+
+    telegram_notifier.reiniciar_para_pruebas()
+    telegram_notifier.escribirConfig("123456:ABC-token", "987654321")
+    mensajes = []
+    monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chat, texto: mensajes.append(texto))
+    yield mensajes
+    telegram_notifier.reiniciar_para_pruebas()
+
+
+def test_el_bloqueo_de_una_ip_se_cuenta_una_sola_vez(cliente, telegram, monkeypatch):
+    monkeypatch.setenv("MAX_INTENTOS_LOGIN", "3")
+    ip = {"REMOTE_ADDR": "192.168.1.99"}
+
+    for _ in range(6):
+        cliente.post("/login", data={"username": USUARIO, "password": "mal"}, environ_base=ip)
+
+    assert len(telegram) == 1
+    assert "192.168.1.99" in telegram[0] and "bloqueado" in telegram[0].lower()
+
+
+def test_los_fallos_sueltos_no_avisan(cliente, telegram, monkeypatch):
+    monkeypatch.setenv("MAX_INTENTOS_LOGIN", "5")
+
+    for _ in range(4):
+        cliente.post("/login", data={"username": USUARIO, "password": "mal"})
+
+    assert telegram == []
+
+
+def test_el_login_correcto_solo_avisa_si_se_ha_pedido(cliente, telegram, datos_aislados):
+    cliente.post("/login", data={"username": USUARIO, "password": CLAVE})
+    assert telegram == [], "por defecto avisar de cada login sería ruido"
+
+    datos_aislados["ajustes"].write_text(json.dumps({"telegramAvisos": {"sesion": True}}), "utf-8")
+    with cliente.session_transaction() as sesion:
+        sesion.clear()
+    cliente.post("/login", data={"username": USUARIO, "password": CLAVE})
+
+    assert len(telegram) == 1 and "Inicio de sesión" in telegram[0]
+
+
+def test_cambiar_la_contrasenia_se_cuenta(cliente_dentro, telegram):
+    client, cabeceras = cliente_dentro
+    client.post(
+        "/api/settings/credentials/password",
+        json={"currentPassword": CLAVE, "newPassword": "nueva-clave-larga"},
+        headers=cabeceras,
+    )
+
+    assert len(telegram) == 1 and "contraseña" in telegram[0]
+
+
+def test_una_contrasenia_actual_incorrecta_no_avisa_del_cambio(cliente_dentro, telegram):
+    client, cabeceras = cliente_dentro
+    client.post(
+        "/api/settings/credentials/password",
+        json={"currentPassword": "mal", "newPassword": "nueva-clave-larga"},
+        headers=cabeceras,
+    )
+
+    assert telegram == []

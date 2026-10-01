@@ -21,6 +21,18 @@ válida, `notificar_recuperado` manda un aviso de vuelta y libera su cooldown:
 así, si vuelve a fallar justo después, se avisa sin esperar el margen entero.
 Sin esto, la única forma de saber que un proveedor se había arreglado era
 comprobarlo a mano en Ajustes.
+
+**Avisos de otros sucesos.** Además de los proveedores, el servidor cuenta por
+aquí copias de seguridad, restauraciones, alertas de precio, bloqueos de login,
+arranques, disco casi lleno, versión nueva y el resumen diario. Todos pasan por
+`notificar(categoria, texto)`, que respeta dos decisiones del usuario: qué
+categorías quiere recibir (Ajustes > Telegram, `telegramAvisos` en
+`ajustes.json`) y el silencio temporal que pone `/silenciar` desde el chat. Lo
+segundo vive en un fichero de `data/tmp` y no en memoria porque el chat lo
+atiende un worker y los avisos salen de los dos.
+
+Lo que responde el bot a un comando no pasa por aquí: es la respuesta a una
+pregunta, no un aviso, y ni las categorías ni el silencio deben callarla.
 """
 
 import json
@@ -30,7 +42,7 @@ import urllib.request
 from threading import Lock
 from urllib.error import HTTPError, URLError
 
-from core import paths
+from core import paths, reclamo
 from core.secret_store import read_secret_lines, write_secret_lines
 
 log = logging.getLogger(__name__)
@@ -44,6 +56,25 @@ _PLANTILLAS = {
     "no_responde": "🔌 {sujeto} no responde",
     "fallo": "❌ Fallo de {sujeto}",
 }
+
+# Tipos de aviso que el usuario puede activar o apagar en Ajustes > Telegram:
+# clave -> (título que se enseña, ¿activado si no ha elegido nada?). El orden es
+# el de la pantalla. Un aviso de una clave que no esté aquí no se manda: mejor
+# eso que un tipo sin interruptor que nadie puede callar.
+CATEGORIAS_AVISO = {
+    "proveedores": ("Problemas con los proveedores de cotizaciones", True),
+    "backup": ("Copias de seguridad (creadas, fallidas, restauradas)", True),
+    "precios": ("Alertas de precio de los activos", True),
+    "seguridad": ("Seguridad (login bloqueado, cambio de contraseña)", True),
+    "sistema": ("Estado del servidor (arranque, disco, base de datos)", True),
+    "version": ("Hay una versión nueva publicada", True),
+    "sesion": ("Cada inicio de sesión correcto", False),
+    "resumen": ("Resumen diario de la cartera", False),
+}
+
+RESUMEN_HORA_DEFECTO = 21
+# Telegram rechaza mensajes de más de 4096 caracteres; se deja margen.
+_MAX_TEXTO = 4000
 
 _lock = Lock()
 _ultimoAviso: dict = {}
@@ -79,6 +110,9 @@ def configurado() -> bool:
 
 
 def _enviar(token: str, chatId: str, texto: str) -> None:
+    texto = str(texto)
+    if len(texto) > _MAX_TEXTO:
+        texto = texto[:_MAX_TEXTO - 1] + "…"
     payload = json.dumps({"chat_id": chatId, "text": texto}).encode("utf-8")
     request = urllib.request.Request(
         _API_URL.format(token=token),
@@ -140,6 +174,8 @@ def notificar_problema(categoria: str, sujeto: str, detalle: str = "") -> None:
     token, chatId = leerConfig()
     if not token or not chatId:
         return
+    if not _permitido("proveedores"):
+        return
 
     clave = (categoria, sujeto)
     ahora = time.monotonic()
@@ -181,6 +217,135 @@ def notificar_recuperado(sujeto: str) -> None:
         _enviar(token, chatId, f"✅ {sujeto} vuelve a responder")
     except Exception as error:
         log.warning("[telegram] No se pudo enviar el aviso de recuperación (%s): %s", sujeto, error)
+
+
+# ── Preferencias y silencio ───────────────────────────────────────────────────
+
+def _ajustesGuardados() -> dict:
+    """`ajustes.json` tal cual, o {} si no existe o no se puede leer.
+
+    Se lee el fichero y no `routes.ajustes._read_ajustes`: este módulo es de
+    `core`, que no importa de `routes`, y el vigilante lo carga solo, sin Flask.
+    """
+    try:
+        datos = json.loads(paths.AJUSTES_JSON.read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return datos if isinstance(datos, dict) else {}
+
+
+def preferencias() -> dict:
+    """Qué categorías de aviso están activadas: {categoria: bool}, todas presentes."""
+    guardadas = _ajustesGuardados().get("telegramAvisos")
+    guardadas = guardadas if isinstance(guardadas, dict) else {}
+    return {
+        clave: bool(guardadas[clave]) if clave in guardadas else defecto
+        for clave, (_titulo, defecto) in CATEGORIAS_AVISO.items()
+    }
+
+
+def resumenHora() -> int:
+    """Hora local (0-23) a la que sale el resumen diario."""
+    try:
+        hora = int(_ajustesGuardados().get("telegramResumenHora", RESUMEN_HORA_DEFECTO))
+    except (TypeError, ValueError):
+        return RESUMEN_HORA_DEFECTO
+    return hora if 0 <= hora <= 23 else RESUMEN_HORA_DEFECTO
+
+
+def _archivoSilencio():
+    return paths.TMP_DIR / "telegram-silencio"
+
+
+def silenciadoHasta() -> float:
+    """Instante (epoch) hasta el que los avisos están callados; 0 si no lo están."""
+    try:
+        hasta = float(_archivoSilencio().read_text("utf-8").strip())
+    except (OSError, ValueError):
+        return 0.0
+    return hasta if hasta > time.time() else 0.0
+
+
+def silenciar(segundos: float) -> float:
+    """Calla los avisos automáticos durante `segundos`. Devuelve el instante final."""
+    hasta = time.time() + max(0.0, float(segundos))
+    archivo = _archivoSilencio()
+    archivo.parent.mkdir(parents=True, exist_ok=True)
+    archivo.write_text(f"{hasta:.0f}", "utf-8")
+    return hasta
+
+
+def quitarSilencio() -> None:
+    try:
+        _archivoSilencio().unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _permitido(categoria: str) -> bool:
+    """¿Se puede mandar ahora un aviso de esta categoría?"""
+    if silenciadoHasta():
+        return False
+    return preferencias().get(categoria, False)
+
+
+# ── Avisos de sucesos ─────────────────────────────────────────────────────────
+
+def notificar(categoria: str, texto: str, *, clave: str | None = None,
+              cooldown: float = 0, compartido: bool = False) -> bool:
+    """Manda `texto` si hay Telegram, la categoría está activada y no hay silencio.
+
+    `clave` + `cooldown` evitan repetir el mismo aviso antes de `cooldown`
+    segundos. Con `compartido=True` esa espera se coordina entre los workers de
+    gunicorn (`core.reclamo`), imprescindible para lo que dispara cada uno por
+    su cuenta, como el arranque. Devuelve si se llegó a enviar. Nunca lanza: un
+    aviso que falla no puede tumbar el backup o el login que lo origina.
+    """
+    try:
+        if categoria not in CATEGORIAS_AVISO:
+            log.debug("[telegram] Categoría de aviso desconocida: %r", categoria)
+            return False
+
+        token, chatId = leerConfig()
+        if not token or not chatId or not _permitido(categoria):
+            return False
+
+        if clave is not None and cooldown > 0:
+            if compartido:
+                if not reclamo.reclamar(f"aviso-{clave}", cooldown):
+                    return False
+            else:
+                ahora = time.monotonic()
+                with _lock:
+                    anterior = _ultimoAviso.get(("evento", clave))
+                    if anterior is not None and ahora - anterior < cooldown:
+                        return False
+                    _ultimoAviso[("evento", clave)] = ahora
+
+        _enviar(token, chatId, texto)
+        return True
+    except Exception as error:
+        log.warning("[telegram] No se pudo enviar el aviso (%s): %s", categoria, error)
+        return False
+
+
+def responder(texto: str) -> bool:
+    """Manda `texto` al chat configurado sin pasar por categorías ni silencio."""
+    try:
+        token, chatId = leerConfig()
+        if not token or not chatId:
+            return False
+        _enviar(token, chatId, texto)
+        return True
+    except Exception as error:
+        log.warning("[telegram] No se pudo responder: %s", error)
+        return False
+
+
+def notificar_arranque(version: str) -> None:
+    """Aviso de servidor iniciado. Los dos workers llegan aquí; solo habla el primero."""
+    notificar("sistema", f"🟢 PortfolioManager {version} iniciado",
+              clave="arranque", cooldown=90, compartido=True)
 
 
 def reiniciar_para_pruebas() -> None:

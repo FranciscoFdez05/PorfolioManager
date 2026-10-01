@@ -28,10 +28,12 @@ hacer ya editando el código directamente.
 import logging
 import re
 from datetime import date
+from urllib.error import HTTPError, URLError
 
 from flask import Blueprint, jsonify, request
 
 from core.paths import BASE_DIR
+from providers import tradingview_client
 from stores import ventas_fifo
 
 log = logging.getLogger(__name__)
@@ -166,3 +168,29 @@ def getSimulacionVenta():
         }), 400
 
     return jsonify({"ok": True, "simulacion": dato})
+
+
+# ── Calculadora de capitalización ────────────────────────────────────────────
+# Precio, capitalización y suministro de un ticker ya resuelto por el buscador
+# del frontend. Aquí no se adivina ningún ticker ni se completa ningún dato: lo
+# que el scanner no publica llega como null y la herramienta pide el valor a mano.
+
+
+@herramientas_bp.route("/api/herramientas/capitalizacion", methods=["GET"])
+def getCapitalizacion():
+    ticker = (request.args.get("ticker") or "").strip().upper()
+    if not ticker:
+        return jsonify({"ok": False, "error": "Falta el ticker"}), 400
+
+    try:
+        datos = tradingview_client.fetch_capitalizacion([ticker])
+    except HTTPError as error:
+        return jsonify({"ok": False, "error": f"TradingView devolvió HTTP {error.code}"}), 503
+    except URLError as error:
+        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {error.reason}"}), 503
+
+    dato = datos.get(ticker)
+    if not dato or not dato["precio"]:
+        return jsonify({"ok": False, "error": "TradingView no devuelve cotización para ese ticker"}), 404
+
+    return jsonify({"ok": True, "ticker": ticker, **dato})

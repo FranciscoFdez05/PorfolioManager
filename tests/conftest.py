@@ -55,6 +55,14 @@ def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
     copias.mkdir(exist_ok=True)
     monkeypatch.setattr(backup_manager, "_BACKUP_DIR", copias, raising=False)
 
+    # Telegram lee su token de API/telegram.key. Sin esto, un test que provoque
+    # un aviso (una copia, un login bloqueado) sin pedir `datos_aislados` leería
+    # el API/ real de quien ejecuta la suite y, con SECRET_KEY exportada, mandaría
+    # mensajes de verdad a su chat.
+    claves_vacias = tmp_path_factory.getbasetemp() / "API_vacio"
+    claves_vacias.mkdir(exist_ok=True)
+    monkeypatch.setattr(paths, "API_DIR", claves_vacias, raising=False)
+
     # Estado de revocación de sesiones. Va aquí y no en `datos_aislados` por el
     # mismo motivo que los dos de arriba: lo escribe cualquier test que cierre
     # sesión o cambie credenciales, no solo los que piden rutas aisladas, y sin

@@ -555,6 +555,26 @@ CREATE TABLE IF NOT EXISTS planes_cartera_operaciones (
     PRIMARY KEY (plan_id, operacion_id)
 );
 
+-- Alertas de precio de un activo. Una alerta es «avísame cuando este activo
+-- llegue a X»: `condicion` puede ser sube_a (precio >= valor), baja_a
+-- (precio <= valor) o var_dia (variación del día, en valor absoluto, >= valor %).
+-- `valor` es TEXT como el resto de importes (ver core.dinero) y se guarda con
+-- punto decimal. Salta una sola vez: `disparada_ts` queda con la hora y no se
+-- vuelve a evaluar hasta que el usuario la reactiva, para que un precio que
+-- oscila alrededor del umbral no mande un mensaje por cada cruce.
+CREATE TABLE IF NOT EXISTS alertas_precio (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id       TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+    condicion      TEXT NOT NULL,
+    valor          TEXT NOT NULL,
+    nota           TEXT NOT NULL DEFAULT '',
+    activa         INTEGER NOT NULL DEFAULT 1,
+    creada_ts      INTEGER NOT NULL DEFAULT 0,
+    disparada_ts   INTEGER,
+    precio_disparo TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id, activa);
+
 """
 
 
@@ -576,7 +596,7 @@ CREATE TABLE IF NOT EXISTS planes_cartera_operaciones (
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 8
+ESQUEMA_VERSION = 9
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1138,6 +1158,31 @@ def _esquema_8(conn):
     activos_cols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
     if "convert_currency" not in activos_cols:
         conn.execute("ALTER TABLE activos ADD COLUMN convert_currency TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(9)
+def _esquema_9(conn):
+    """Alertas de precio por activo.
+
+    Una tabla nueva y ninguna fila tocada. Se crea con IF NOT EXISTS porque una
+    base nueva ya la trae de `_SCHEMA`, y una que venga de la versión 8 la
+    recibe aquí. Volver atrás es levantar la imagen anterior: la tabla sobra,
+    pero no estorba a un esquema que no la lee.
+    """
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS alertas_precio (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            asset_id       TEXT NOT NULL REFERENCES activos(id) ON DELETE CASCADE,
+            condicion      TEXT NOT NULL,
+            valor          TEXT NOT NULL,
+            nota           TEXT NOT NULL DEFAULT '',
+            activa         INTEGER NOT NULL DEFAULT 1,
+            creada_ts      INTEGER NOT NULL DEFAULT 0,
+            disparada_ts   INTEGER,
+            precio_disparo TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id, activa);
+    """)
 
 
 def get_db() -> sqlite3.Connection:

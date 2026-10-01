@@ -1,7 +1,7 @@
 # PorfolioManager
 
 [![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-2.9.1-blue)](CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versi%C3%B3n-3.0.0-blue)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
 [![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
 [![SQLite](https://img.shields.io/badge/sqlite-3.40%2B-lightgrey)](Dockerfile)
@@ -39,6 +39,7 @@ Nada sale de tu red salvo las consultas de cotizaciones, y esas son opcionales: 
 - **Métricas** — KPIs y gráficos interactivos, con **TWR, XIRR, máximo drawdown y volatilidad**, y comparación de la evolución contra un índice ([detalle](#rentabilidad-riesgo-y-comparación-con-índices))
 - **Histórico automático** — el servidor guarda los puntos de evolución en segundo plano, sin depender de que haya una pestaña abierta
 - **Herramientas** — calculadoras agrupadas por lo que contestan: proyección (interés compuesto, regla del 72), rendimiento (rentabilidad, CAGR, dividendo), cartera (**precio medio** con tus compras reales y **rebalanceo** por tipo de activo), **fiscalidad** (simular una venta antes de hacerla) y ratios de mercado. Ampliables dejando un fichero en una carpeta ([guía](docs/herramientas-extra.md))
+- **Telegram** — avisos de copias de seguridad, alertas de precio por activo, proveedores, seguridad y estado del servidor; comandos para consultarlo desde el móvil (`/estado`, `/cartera`, `/backup`…) y un vigilante que avisa si la aplicación deja de responder ([detalle](#telegram-avisos-alertas-de-precio-y-comandos))
 - **Ajustes** — claves API, caducidad de cotizaciones, backup/restauración, tipos de cambio históricos y tema
 - **Atajo de iOS** — alta rápida de gastos e ingresos desde el Centro de Control, restringida a la LAN y a WireGuard ([guía](docs/atajo-ios.md))
 
@@ -608,6 +609,59 @@ El intervalo y el alcance (solo el portfolio activo o todos) se eligen en **Ajus
 
 ---
 
+## Telegram: avisos, alertas de precio y comandos
+
+Un bot de Telegram (lo creas con [@BotFather](https://t.me/BotFather) y pegas el token y tu ID de chat en **Ajustes › Telegram**; el token se guarda cifrado en `API/telegram.key`) hace de canal del servidor hacia el móvil. Antes de nada, abre el chat con el bot y pulsa **Iniciar**: un bot no puede escribirle primero a nadie.
+
+**Qué avisa.** Cada tipo se activa o se apaga por separado en Ajustes › Telegram:
+
+| Tipo | Avisa de |
+|---|---|
+| Proveedores | cuota agotada, sin respuesta o fallo de un proveedor de cotizaciones, y cuando vuelve |
+| Copias de seguridad | copia manual o automática creada (tamaño, cuántas hay), copia fallida, restaurada o eliminada |
+| Alertas de precio | un activo alcanza el precio o la variación que pediste |
+| Seguridad | una IP agota los intentos de login, cambio de contraseña o de usuario |
+| Estado del servidor | servidor iniciado, base de datos dañada al arrancar (reparada o restaurada), disco casi lleno |
+| Versión nueva | hay una versión publicada más nueva que la instalada (una vez por versión) |
+| Inicio de sesión | cada login correcto (desactivado de fábrica) |
+| Resumen diario | valor, resultado y variación a 24 h de cada cartera, a la hora elegida (desactivado de fábrica) |
+
+**Alertas de precio.** Pestaña *Alertas* en la ficha de cada activo: precio igual o superior a X, igual o inferior a X, o variación del día de ±N %. El servidor las comprueba cada `[avisos] alertas_intervalo_minutos` aunque la web esté cerrada, pidiendo solo la cotización de los activos que tienen alguna alerta activa. Cada alerta salta **una vez** y queda marcada hasta que la reactives.
+
+**Comandos.** Escríbeselos al bot (solo contesta al chat guardado en Ajustes; a cualquier otro lo ignora sin responder):
+
+| Comando | Qué hace |
+|---|---|
+| `/status` (o `/estado`) | versión, base de datos, disco, última copia, hilos de fondo |
+| `/cartera` · `/activos` · `/precio btc` | valor de la cartera, cotizaciones |
+| `/alertas` | ver las alertas activas (se crean y borran desde la web) |
+| `/backup` · `/backups` | hacer una copia ahora, ver las últimas |
+| `/proveedores` | llamadas de hoy a cada proveedor |
+| `/comandos` | lista de comandos disponibles |
+
+### Aviso si la aplicación no responde
+
+La aplicación no puede avisar de que está caída, así que lo hace un proceso aparte: `python/vigilante.py`. Pregunta a `/api/health` cada `[vigilante] intervalo_segundos` y avisa tras `fallos_para_avisar` comprobaciones fallidas seguidas (distingue «no responde» de «responde pero degradado»), recuerda cada `recordatorio_minutos` mientras siga mal y cuenta cuánto duró cuando vuelve.
+
+- **Docker:** ya va incluido como el servicio `vigilante` de `docker-compose.yml`. Pregunta por Caddy —la misma puerta por la que entra el navegador—, así que también se entera de que el proxy se ha caído.
+- **Sin Docker:** lánzalo junto al servidor con `python python/vigilante.py` (otra terminal, o una tarea programada al iniciar el sistema / un servicio de systemd). Lee `.env` para poder descifrar el token.
+
+```ini
+[avisos]
+alertas_intervalo_minutos = 5      ; env AVISOS_ALERTAS_MINUTOS · 0 no las vigila
+espacio_minimo_mb = 1024           ; env AVISOS_ESPACIO_MINIMO_MB · aviso de disco casi lleno
+
+[vigilante]
+url =                              ; env VIGILANTE_URL · vacío = 127.0.0.1:<puerto>/api/health
+intervalo_segundos = 30            ; env VIGILANTE_INTERVALO
+fallos_para_avisar = 3             ; env VIGILANTE_FALLOS
+recordatorio_minutos = 60          ; env VIGILANTE_RECORDATORIO_MINUTOS · 0 no repite
+```
+
+Los avisos se activan o apagan por tipo en Ajustes › Telegram.
+
+---
+
 ## Base de datos y backups
 
 - **BD activa:** `data/portfolios/<id>.db` (una por portfolio; `data/portfolio.db` es solo el fichero heredado de versiones anteriores)
@@ -928,7 +982,9 @@ python/
   stores/            acceso a datos y sanitización por dominio; además
                      ventas_fifo, valoracion, market_data, fx_historico, benchmark
   providers/         clientes de cotizaciones + http/text comunes + api_stats
-  admin/             portfolios, backups, credenciales y snapshot_scheduler
+  admin/             portfolios, backups, credenciales, snapshot_scheduler y los
+                     hilos de Telegram (telegram_listener, telegram_comandos, avisos_scheduler)
+  vigilante.py       proceso aparte que avisa si la aplicación no responde
   routes/            un blueprint por área de la API
 
 js/

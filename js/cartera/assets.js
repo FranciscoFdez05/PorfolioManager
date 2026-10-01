@@ -3548,13 +3548,13 @@ function renderAssetTablePage(asset) {
                     </div>
                     <div class="assetPageSubtitle">${escapeHtml(asset.name)} · ${buildAssetTypeLabel(asset.type)}</div>
                     <div class="assetValueRow">
-                        <span class="assetValueAmount" id="assetStatNetoActual">—</span>
+                        <span class="assetValueAmount" id="assetStatPrecioActual">—</span>
                     </div>
                 </div>
                 <div class="assetStatsPanel" id="assetStatsPanel">
                     <div class="assetStatCard">
-                        <span class="assetStatLabel">Precio actual</span>
-                        <span class="assetStatValue" id="assetStatPrecioActual">—</span>
+                        <span class="assetStatLabel">Valor actual</span>
+                        <span class="assetStatValue" id="assetStatNetoActual">—</span>
                     </div>
                     <div class="assetStatCard">
                         <span class="assetStatLabel">Cantidad</span>
@@ -3620,6 +3620,7 @@ function renderAssetTablePage(asset) {
                     <button class="assetTabBtn hidden" id="transaccionesTabBtn" data-tab="transacciones">Transacciones</button>
                     <button class="assetTabBtn" id="ventasTabBtn" data-tab="ventas">Ventas</button>
                     <button class="assetTabBtn" id="planesTabBtn" data-tab="planes">Planes</button>
+                    <button class="assetTabBtn" id="alertasTabBtn" data-tab="alertas">Alertas</button>
                     <button class="assetTabsNavAction hidden" id="assetAddVentaNavBtn" type="button"><span class="assetBtnIcon">+</span> Añadir venta</button>
                     <button class="assetTabsNavAction hidden" id="assetAddPlanNavBtn" type="button"><span class="assetBtnIcon">+</span> Nuevo plan</button>
                 </div>
@@ -3659,6 +3660,9 @@ function renderAssetTablePage(asset) {
                 <div class="assetTabPanel hidden" data-tab="planes">
                     <div id="assetPlanesSection"></div>
                 </div>
+                <div class="assetTabPanel hidden" data-tab="alertas">
+                    <div id="assetAlertasSection"></div>
+                </div>
             </div>
             <aside class="todosChartsCol" id="assetTodosChartsCol"></aside>
             </div>
@@ -3680,6 +3684,10 @@ function renderAssetTablePage(asset) {
     // después de pintar la ficha porque sus tarjetas leen de ella el precio
     // actual, y sin `await` porque nada de lo de arriba depende de ellas.
     initAssetPlanesLogic(asset)
+
+    // Alertas de precio de ESTE activo: van aparte de los planes porque no
+    // dependen de la ficha (solo del id) y se comprueban en el servidor.
+    initAssetAlertasLogic(asset)
 
     const titleEl = document.querySelector(".assetPageTitle")
     if (titleEl) {

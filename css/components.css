@@ -493,9 +493,13 @@ body.asset-rotation-halted .detailRotationBar span {
 
 .assetPageHeader {
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 16px;
     flex-wrap: wrap;
+}
+
+.assetHeaderRight {
+    align-self: flex-start;
 }
 
 .assetHeaderLeft {
@@ -580,14 +584,15 @@ body.asset-rotation-halted .detailRotationBar span {
     padding: 10px 16px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    justify-content: center;
+    gap: 6px;
     flex: 1 1 180px;
     min-width: 180px;
 }
 
 .assetStatLabel {
     color: var(--text-dim);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.6px;
@@ -595,7 +600,7 @@ body.asset-rotation-halted .detailRotationBar span {
 
 .assetStatValue {
     color: var(--text-bright);
-    font-size: 14px;
+    font-size: 20px;
     font-weight: 700;
     letter-spacing: -0.2px;
     line-height: 1.2;
@@ -623,7 +628,7 @@ body.asset-rotation-halted .detailRotationBar span {
 }
 
 .assetStatSub {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.2px;
 }

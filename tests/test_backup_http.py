@@ -674,3 +674,103 @@ def test_un_zip_sin_nada_reconocible_se_rechaza(cliente_completo):
 
     assert respuesta.status_code == 400
     assert "no contiene" in respuesta.get_json()["error"]
+
+
+# ── Avisos por Telegram ──────────────────────────────────────────────────────
+
+@pytest.fixture
+def telegram(datos_aislados, monkeypatch):
+    """Telegram configurado sobre las rutas aisladas; devuelve lo que se enviaría."""
+    from core import telegram_notifier
+
+    monkeypatch.setenv("SECRET_KEY", "clave-de-pruebas-0123456789abcdef0123456789abcdef")
+    telegram_notifier.reiniciar_para_pruebas()
+    telegram_notifier.escribirConfig("123456:ABC-token", "987654321")
+    mensajes = []
+    monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chat, texto: mensajes.append(texto))
+    yield mensajes
+    telegram_notifier.reiniciar_para_pruebas()
+
+
+def test_crear_una_copia_manual_se_cuenta_por_telegram(cliente, telegram):
+    client, cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db")
+
+    nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
+
+    assert len(telegram) == 1
+    assert "manual" in telegram[0] and nombre in telegram[0]
+    assert "1 portfolio" in telegram[0] and "MB" in telegram[0]
+
+
+def test_una_copia_fallida_se_cuenta_por_telegram(cliente, telegram, monkeypatch):
+    from routes import backup as rutas_backup
+
+    client, cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db")
+
+    def _falla(*_a, **_k):
+        raise OSError("disco lleno")
+
+    monkeypatch.setattr(rutas_backup.zipfile, "ZipFile", _falla)
+
+    assert client.post("/api/backup", headers=cabeceras).status_code == 500
+    assert len(telegram) == 1 and "Ha fallado" in telegram[0]
+
+
+def test_la_copia_automatica_se_cuenta_por_telegram(cliente, telegram):
+    from routes.backup import crear_backup_automatico
+
+    _client, _cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db")
+
+    nombre = crear_backup_automatico()
+
+    assert len(telegram) == 1
+    assert "automática" in telegram[0] and nombre in telegram[0]
+
+
+def test_la_copia_automatica_fallida_se_cuenta_y_se_propaga(cliente, telegram, monkeypatch):
+    from routes import backup as rutas_backup
+
+    _client, _cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db")
+    monkeypatch.setattr(rutas_backup, "_escribir_backup", lambda automatico: (_ for _ in ()).throw(OSError("sin espacio")))
+
+    with pytest.raises(OSError):
+        rutas_backup.crear_backup_automatico()
+
+    assert len(telegram) == 1 and "sin espacio" in telegram[0]
+
+
+def test_restaurar_y_borrar_se_cuentan_por_telegram(cliente, telegram):
+    client, cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db")
+    primera = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
+    telegram.clear()
+
+    restaurada = client.post("/api/restore", json={"filename": primera}, headers=cabeceras)
+    assert restaurada.status_code == 200
+    assert len(telegram) == 1 and "restaurada" in telegram[0] and primera in telegram[0]
+
+    segunda = "backup_01-01-2020_00-00-00.zip"
+    (rutas["backups"] / segunda).write_bytes(b"PK\x05\x06" + b"\x00" * 18)
+    telegram.clear()
+    assert client.delete(f"/api/backups/{segunda}", headers=cabeceras).status_code == 200
+    assert len(telegram) == 1 and "eliminada" in telegram[0]
+
+
+def test_un_restore_de_un_zip_corrupto_no_dice_que_ha_restaurado(cliente, telegram):
+    client, cabeceras, rutas = cliente
+    (rutas["backups"] / "backup_01-01-2026_00-00-00.zip").write_bytes(b"esto no es un zip")
+
+    client.post("/api/restore", json={"filename": "backup_01-01-2026_00-00-00.zip"}, headers=cabeceras)
+
+    assert telegram == []
+
+
+def test_sin_telegram_configurado_las_copias_siguen_funcionando(cliente):
+    client, cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db")
+
+    assert client.post("/api/backup", headers=cabeceras).get_json()["ok"] is True

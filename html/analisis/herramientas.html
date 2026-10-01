@@ -31,6 +31,7 @@
 
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="ratioOroPlata">Ratio Oro/Plata</button>
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="ratioOroBtc">Oro / Bitcoin</button>
+            <button class="herramientaBtn hidden" data-cat="mercado" data-tool="capitalizacion">Capitalización objetivo</button>
         </div>
     </div>
 
@@ -744,6 +745,105 @@
             </div>
         </div>
 
+
+        <!-- ── Capitalización objetivo ──────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolCapitalizacion">
+            <div class="hPanelHead">
+                <div class="hPanelHeadText">
+                    <h3 class="herramientaPanelTitle">Capitalización objetivo</h3>
+                    <p class="hPanelDesc">Capitalización que necesita un activo para valer tu precio objetivo y cuántas veces es la de otros activos de referencia.</p>
+                </div>
+            </div>
+            <div class="herramientaBody">
+                <div class="hCard herramientaInputs">
+                    <div class="hCardTitle">Activo</div>
+                    <div class="herramientaField">
+                        <label for="hCapBuscarInput">Buscar activo</label>
+                        <div class="hCapBuscar">
+                            <input type="text" id="hCapBuscarInput" placeholder="Nombre o ticker (XRP, AAPL...)" autocomplete="off">
+                            <button class="herramientaSecBtn" id="hCapBuscarBtn" type="button">Buscar</button>
+                        </div>
+                        <div class="hCapResultados hidden" id="hCapResultados"></div>
+                    </div>
+                    <div class="hRatioFuenteMsg" id="hCapActivoMsg"></div>
+                    <div class="herramientaField">
+                        <label for="hCapPrecio">Precio actual</label>
+                        <div class="hInputWrap">
+                            <input type="number" id="hCapPrecio" value="" min="0" step="any" placeholder="Busca un activo o introdúcelo">
+                            <span class="hInputUnit hCapDivisa">divisa</span>
+                        </div>
+                    </div>
+                    <div class="herramientaField">
+                        <label for="hCapSuministro">Suministro (monedas o acciones)</label>
+                        <div class="hInputWrap">
+                            <input type="number" id="hCapSuministro" value="" min="0" step="any" placeholder="Busca un activo o introdúcelo">
+                            <span class="hInputUnit">uds.</span>
+                        </div>
+                    </div>
+                    <div class="herramientaField">
+                        <label for="hCapObjetivo">Precio objetivo</label>
+                        <div class="hInputWrap">
+                            <input type="number" id="hCapObjetivo" value="" min="0" step="any" placeholder="Ej: 100">
+                            <span class="hInputUnit hCapDivisa">divisa</span>
+                        </div>
+                    </div>
+
+                    <div class="hCardTitle hCapRefTitulo">Referencias</div>
+                    <div class="hCapRefLista" id="hCapRefLista"></div>
+                    <div class="herramientaField">
+                        <label for="hCapRefBuscarInput">Añadir referencia de mercado</label>
+                        <div class="hCapBuscar">
+                            <input type="text" id="hCapRefBuscarInput" placeholder="Bitcoin, Ethereum, S&amp;P 500..." autocomplete="off">
+                            <button class="herramientaSecBtn" id="hCapRefBuscarBtn" type="button">Buscar</button>
+                        </div>
+                        <div class="hCapResultados hidden" id="hCapRefResultados"></div>
+                    </div>
+                    <div class="herramientaField">
+                        <label for="hCapRefNombre">O con capitalización manual (oro, por ejemplo)</label>
+                        <div class="hCapBuscar">
+                            <input type="text" id="hCapRefNombre" placeholder="Nombre" autocomplete="off">
+                            <input type="number" id="hCapRefCapital" min="0" step="any" placeholder="Capitalización">
+                            <button class="herramientaSecBtn" id="hCapRefManualBtn" type="button">Añadir</button>
+                        </div>
+                        <div class="hCapNota">La capitalización manual se interpreta en <span class="hCapMonedaBase">moneda base</span>.</div>
+                    </div>
+                    <div class="hRatioFuenteMsg" id="hCapRefMsg"></div>
+
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hCapCalcBtn">Calcular</button>
+                        <button class="herramientaResetBtn" data-panel="toolCapitalizacion">Reiniciar</button>
+                    </div>
+                </div>
+                <div class="hResultsCol">
+                    <div class="herramientaResults hidden" id="hCapResults">
+                        <div class="herramientaResultGrid">
+                            <div class="herramientaResultCard hResultCardAccent">
+                                <div class="hResultLabel">Capitalización necesaria</div>
+                                <div class="hResultValue hResultPositive" id="hCapNecesaria">---</div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Capitalización actual</div>
+                                <div class="hResultValue" id="hCapActual">---</div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Lo que tiene que subir</div>
+                                <div class="hResultValue" id="hCapSubida">---</div>
+                            </div>
+                            <div class="herramientaResultCard">
+                                <div class="hResultLabel">Multiplicador del precio</div>
+                                <div class="hResultValue" id="hCapMultiplicador">---</div>
+                            </div>
+                        </div>
+                        <div class="hCapComparativa" id="hCapComparativa"></div>
+                        <div class="hRatioInterpretacion" id="hCapInterpretacion"></div>
+                    </div>
+                    <div class="hPlaceholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+                        <p>Busca un activo, indica tu precio objetivo y pulsa <strong>Calcular</strong>.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 

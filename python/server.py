@@ -12,16 +12,17 @@ mimetypes.add_type("font/woff2", ".woff2")
 from dotenv import load_dotenv
 from flask import Flask, abort, g, make_response, send_from_directory
 
-from admin import snapshot_scheduler, telegram_listener
+from admin import avisos_scheduler, snapshot_scheduler, telegram_listener
 from admin.backup_manager import start_scheduler as start_backup_scheduler
 from admin.portfolios_manager import init_portfolios
-from core import atajo_acceso, csp, paths, seguridad_app, settings, tls
+from core import atajo_acceso, csp, paths, seguridad_app, settings, telegram_notifier, tls
 from core.errors import register_error_handlers
 from core.paths import API_DIR, BASE_DIR, INDEX_FILE
-from core.version import insertar_version
+from core.version import __version__, insertar_version
 from routes.activos import activos_bp
 from routes.actualizacion import actualizacion_bp
 from routes.ajustes import ajustes_bp
+from routes.alertas import alertas_bp
 from routes.atajo import atajo_bp
 from routes.auth import auth_bp
 from routes.backup import backup_bp
@@ -143,6 +144,7 @@ app.register_blueprint(activos_bp)
 app.register_blueprint(atajo_bp)
 app.register_blueprint(actualizacion_bp)
 app.register_blueprint(ajustes_bp)
+app.register_blueprint(alertas_bp)
 app.register_blueprint(backup_bp)
 app.register_blueprint(categorias_bp)
 app.register_blueprint(gastos_bp)
@@ -268,6 +270,11 @@ snapshot_scheduler.iniciar()
 # no deja que el bot le escriba primero a nadie. El hilo se queda dormido solo
 # comprobando cada rato si ya hay un bot configurado en Ajustes.
 telegram_listener.iniciar()
+# Alertas de precio, resumen diario, versión nueva y disco: lo que el servidor
+# vigila por su cuenta y cuenta por Telegram (ver admin/avisos_scheduler.py).
+avisos_scheduler.iniciar()
+# Los dos workers llegan aquí; el aviso de arranque lo manda solo el primero.
+telegram_notifier.notificar_arranque(__version__)
 
 # Reaplica en el proxy el estado de HTTPS guardado desde Ajustes. Va al final
 # porque no condiciona nada de lo anterior, y no aborta si el proxy no responde:

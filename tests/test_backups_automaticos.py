@@ -106,3 +106,86 @@ def test_una_bd_danada_se_recupera_del_zip_mas_reciente(monkeypatch, tmp_path, d
     finally:
         conn.close()
     assert list((backups / "auto").glob("principal_CORRUPTED_*.db"))
+
+
+def _con_telegram(monkeypatch):
+    from core import telegram_notifier
+
+    monkeypatch.setenv("SECRET_KEY", "clave-de-pruebas-0123456789abcdef0123456789abcdef")
+    telegram_notifier.reiniciar_para_pruebas()
+    telegram_notifier.escribirConfig("123456:ABC-token", "987654321")
+    mensajes = []
+    monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chat, texto: mensajes.append(texto))
+    return mensajes
+
+
+def test_una_bd_danada_que_se_restaura_se_cuenta_por_telegram(monkeypatch, tmp_path, datos_aislados):
+    manager, db_path, _backups = _preparar(monkeypatch, tmp_path, 7, datos_aislados)
+    assert manager.run_startup_backup(db_path) is True
+    mensajes = _con_telegram(monkeypatch)
+
+    monkeypatch.setattr(manager, "_emergency_repair", lambda ruta: False)
+    db_path.write_bytes(b"esto no es una base de datos" * 100)
+    manager.run_startup_backup(db_path)
+
+    assert len(mensajes) == 1
+    assert "no se pudo reparar" in mensajes[0] and "restaurado" in mensajes[0]
+
+
+def test_una_bd_danada_sin_ninguna_copia_lo_dice(monkeypatch, tmp_path, datos_aislados):
+    manager, db_path, _backups = _preparar(monkeypatch, tmp_path, 0, datos_aislados)
+    mensajes = _con_telegram(monkeypatch)
+
+    monkeypatch.setattr(manager, "_emergency_repair", lambda ruta: False)
+    db_path.write_bytes(b"esto no es una base de datos" * 100)
+    manager.run_startup_backup(db_path)
+
+    assert len(mensajes) == 1 and "intervenir a mano" in mensajes[0]
+
+
+def test_una_bd_reparada_se_cuenta_por_telegram(monkeypatch, tmp_path, datos_aislados):
+    manager, db_path, _backups = _preparar(monkeypatch, tmp_path, 0, datos_aislados)
+    mensajes = _con_telegram(monkeypatch)
+
+    monkeypatch.setattr(manager, "_estado_integridad", lambda ruta: "dañada")
+    monkeypatch.setattr(manager, "_emergency_repair", lambda ruta: True)
+    manager.run_startup_backup(db_path)
+
+    assert len(mensajes) == 1 and "reparado sola" in mensajes[0]
+
+
+def test_una_bd_sana_no_manda_nada(monkeypatch, tmp_path, datos_aislados):
+    manager, db_path, _backups = _preparar(monkeypatch, tmp_path, 0, datos_aislados)
+    mensajes = _con_telegram(monkeypatch)
+
+    manager.run_startup_backup(db_path)
+
+    assert mensajes == []
+
+
+def test_una_bd_ocupada_no_se_toma_por_dañada(monkeypatch, tmp_path, datos_aislados):
+    manager, db_path, _backups = _preparar(monkeypatch, tmp_path, 0, datos_aislados)
+    mensajes = _con_telegram(monkeypatch)
+    llamadas = []
+
+    monkeypatch.setattr(manager, "_estado_integridad", lambda ruta: "ocupada")
+    monkeypatch.setattr(manager, "_emergency_repair", lambda ruta: llamadas.append(ruta) or True)
+    monkeypatch.setattr(manager, "_restore_from_latest_auto_backup", lambda ruta: llamadas.append(ruta) or True)
+    manager.run_startup_backup(db_path)
+
+    assert llamadas == [] and mensajes == []
+
+
+def test_la_restauracion_salta_copias_dañadas(monkeypatch, tmp_path, datos_aislados):
+    manager, db_path, _backups = _preparar(monkeypatch, tmp_path, 0, datos_aislados)
+    import shutil
+    buena = tmp_path / "buena.db"
+    shutil.copy2(str(db_path), str(buena))
+    mala = tmp_path / "mala.db"
+    mala.write_bytes(b"basura" * 200)
+    db_path.write_bytes(b"roto" * 200)
+
+    monkeypatch.setattr(manager, "_candidatos_de_restauracion", lambda stem: iter([("mala", mala), ("buena", buena)]))
+
+    assert manager._restore_from_latest_auto_backup(db_path) is True
+    assert manager.check_integrity(db_path) is True

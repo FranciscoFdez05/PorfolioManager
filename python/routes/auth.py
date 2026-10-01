@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from flask import Blueprint, g, jsonify, make_response, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from core import csp, sesion, settings
+from core import csp, sesion, settings, telegram_notifier
 from core.paths import AUTH_FILE as _AUTH_FILE, LOGIN_HTML
 
 auth_bp = Blueprint("auth", __name__)
@@ -76,6 +76,25 @@ def _record_failure(ip: str) -> None:
 def _clear_failures(ip: str) -> None:
     with _attempts_lock:
         _attempts.pop(ip, None)
+
+
+def _avisar_si_se_bloquea(ip: str) -> None:
+    """Cuenta por Telegram que una IP acaba de agotar sus intentos de login.
+
+    Se llama justo después de anotar un fallo: si con ese fallo la IP ha
+    quedado bloqueada, es el momento de avisar. Los intentos siguientes ya
+    rebotan contra el bloqueo sin pasar por aquí, así que no se repite. Alguien
+    probando contraseñas contra un servidor doméstico es exactamente lo que
+    quien lo administra quiere enterarse, y no lo vería hasta mirar el log.
+    """
+    locked = _seconds_locked_out(ip)
+    if locked:
+        telegram_notifier.notificar(
+            "seguridad",
+            f"🔐 Login bloqueado: la IP {ip} ha fallado {settings.maxIntentosLogin()} intentos seguidos.\n"
+            f"No podrá volver a probar en {locked // 60 + 1} min. Si no eras tú, cambia la contraseña.",
+            clave=f"login-bloqueo-{ip}", cooldown=settings.bloqueoSegundos(),
+        )
 
 
 # Solo se admite como destino tras el login una ruta relativa de este host.
@@ -209,10 +228,12 @@ def login():
                 # caducar la sesión y revocarla en el logout. Va después de
                 # clear() para que no herede nada de la sesión anterior.
                 sesion.abrir(session)
+                telegram_notifier.notificar("sesion", f"🔑 Inicio de sesión desde {ip}")
                 return redirect(_safe_next_url(request.args.get("next") or "/"))
 
             _record_failure(ip)
             logger.warning("Intento de login fallido desde %s", ip)
+            _avisar_si_se_bloquea(ip)
             error = "Usuario o contraseña incorrectos"
 
     html = LOGIN_HTML.read_text("utf-8")
@@ -297,11 +318,13 @@ def change_username():
     if not check_password_hash(password_hash, current_password):
         _record_failure(_client_ip())
         logger.warning("Contraseña actual incorrecta al cambiar el usuario desde %s", _client_ip())
+        _avisar_si_se_bloquea(_client_ip())
         return jsonify({"ok": False, "error": "Contraseña actual incorrecta"}), 400
 
     _clear_failures(_client_ip())
     _save_credentials(new_username, password_hash)
     _renovar_sesiones()
+    telegram_notifier.notificar("seguridad", f"🔐 Se ha cambiado el usuario de acceso (desde {_client_ip()}).")
     return jsonify({"ok": True})
 
 
@@ -322,10 +345,12 @@ def change_password():
     if not check_password_hash(password_hash, current_password):
         _record_failure(_client_ip())
         logger.warning("Contraseña actual incorrecta al cambiar la contraseña desde %s", _client_ip())
+        _avisar_si_se_bloquea(_client_ip())
         return jsonify({"ok": False, "error": "Contraseña actual incorrecta"}), 400
 
     _clear_failures(_client_ip())
     new_hash = generate_password_hash(new_password, method=settings.metodoHashPassword())
     _save_credentials(current_user, new_hash)
     _renovar_sesiones()
+    telegram_notifier.notificar("seguridad", f"🔐 Se ha cambiado la contraseña de acceso (desde {_client_ip()}).")
     return jsonify({"ok": True})

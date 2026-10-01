@@ -792,3 +792,247 @@
     font-size: 0.66rem;
     cursor: help;
 }
+
+/* ── Pestaña «Alertas» de la ficha de un activo ───────────────────────────── */
+
+.alertasPrecioPanel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 22px 24px;
+    max-width: 980px;
+}
+
+/* Formulario: una tarjeta con los campos en rejilla y el botón alineado abajo. */
+.alertasPrecioForm {
+    display: grid;
+    grid-template-columns: minmax(270px, 1.6fr) minmax(120px, 0.6fr) minmax(180px, 1.2fr) auto;
+    gap: 12px 14px;
+    align-items: end;
+    padding: 16px 18px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+}
+
+.alertasPrecioCampoWrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.alertasPrecioEtiqueta {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+
+/* Con el selector de la fila: .ajustesInput trae `flex: 1` y `height` propios, y
+   en una columna flex eso aplastaba el campo. */
+.alertasPrecioCampoWrap .alertasPrecioCampo {
+    width: 100%;
+    height: 40px;
+    flex: none;
+    box-sizing: border-box;
+}
+
+/* El desplegable propio de la app (csTrigger) con el mismo alto y aspecto que
+   los campos de al lado. */
+.alertasPrecioForm .csWrapper {
+    width: 100%;
+}
+
+.alertasPrecioForm .csTrigger {
+    height: 40px;
+    padding: 0 12px;
+    background: var(--bg-inset);
+    border-color: var(--border-soft);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+
+.alertasPrecioForm .csTrigger:hover {
+    border-color: var(--border-hard);
+}
+
+.alertasPrecioAnadir {
+    height: 40px;
+}
+
+.alertasPrecioMsg {
+    min-height: 1.1em;
+    margin: -6px 2px 0;
+    font-size: 0.8rem;
+    color: var(--color-pos-bright);
+}
+
+.alertasPrecioMsg.alertasPrecioMsgError {
+    color: var(--color-neg-bright);
+}
+
+.alertasPrecioLista {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.alertasPrecioItem {
+    display: grid;
+    grid-template-columns: 96px 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 18px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    border-left-width: 3px;
+    border-radius: 12px;
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease;
+}
+
+.alertasPrecioItem:hover {
+    background: var(--bg-elevated);
+}
+
+.alertasPrecioItem--activa {
+    border-left-color: var(--color-pos);
+}
+
+.alertasPrecioItem--pausada {
+    border-left-color: var(--border-hard);
+}
+
+.alertasPrecioItem--saltada {
+    border-left-color: var(--color-warn, #d9a441);
+}
+
+.alertasPrecioItem--pausada .alertasPrecioRegla {
+    color: var(--text-muted);
+}
+
+.alertasPrecioPildora {
+    justify-self: start;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.alertasPrecioPildora--activa {
+    color: var(--color-pos-bright);
+    background: rgba(46, 204, 113, 0.12);
+}
+
+.alertasPrecioPildora--pausada {
+    color: var(--text-muted);
+    background: rgba(148, 163, 184, 0.12);
+}
+
+.alertasPrecioPildora--saltada {
+    color: var(--color-warn, #d9a441);
+    background: rgba(217, 164, 65, 0.14);
+}
+
+.alertasPrecioRegla {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.alertasPrecioMeta,
+.alertasPrecioNota {
+    margin-top: 3px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+}
+
+.alertasPrecioNota {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.alertasPrecioAcciones {
+    display: flex;
+    gap: 8px;
+}
+
+.alertasPrecioBtn {
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.alertasPrecioBtnBorrar {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border-hard);
+    transition:
+        color 0.15s ease,
+        border-color 0.15s ease,
+        background 0.15s ease;
+}
+
+.alertasPrecioBtnBorrar:hover {
+    color: var(--color-neg-bright);
+    border-color: rgba(231, 76, 60, 0.5);
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.alertasPrecioVacio {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 28px 20px;
+    text-align: center;
+    border: 1px dashed var(--border-mid);
+    border-radius: 12px;
+    color: var(--text-dim);
+    font-size: 0.82rem;
+}
+
+.alertasPrecioVacio strong {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+    .alertasPrecioForm {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .alertasPrecioCampoCondicion,
+    .alertasPrecioCampoNota,
+    .alertasPrecioAnadir {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 640px) {
+    .alertasPrecioPanel {
+        padding: 14px 4px 18px;
+    }
+
+    .alertasPrecioForm {
+        grid-template-columns: 1fr;
+    }
+
+    .alertasPrecioItem {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .alertasPrecioAcciones .alertasPrecioBtn {
+        flex: 1;
+    }
+}

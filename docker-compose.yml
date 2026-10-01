@@ -150,6 +150,47 @@ services:
       retries: 3
       start_period: 10s
 
+  # ── Vigilante: avisa por Telegram si la aplicación deja de responder ────────
+  # Un contenedor propio y no un hilo de la aplicación: si esta se cuelga, se
+  # queda sin memoria o se para, un hilo de dentro se va con ella y nadie avisa.
+  # Usa la misma imagen y el mismo bot que los demás avisos (Ajustes > Telegram);
+  # sin Telegram configurado vigila pero no dice nada.
+  #
+  # Pregunta por la misma puerta por la que entra un navegador —Caddy— y no
+  # directamente a la aplicación: así también se entera de que se ha caído el
+  # proxy, y un 502 de Caddy (aplicación caída) cuenta como caída. Primero
+  # HTTPS y, si no hay, HTTP: el esquema lo elige el usuario en Ajustes.
+  #
+  # No depende de nadie (`depends_on`) a propósito: tiene que seguir vivo justo
+  # cuando lo demás no lo está.
+  vigilante:
+    container_name: PorfolioManager-vigilante
+    # La misma imagen que la aplicación. Lleva su `build` (la segunda vez sale de
+    # la caché de capas, es instantáneo) para que un primer `up` no intente
+    # descargar de un registro una imagen que todavía no se ha construido.
+    build: .
+    image: porfoliomanager:${PORTFOLIO_VERSION:-latest}
+    pull_policy: never
+    entrypoint: ["python", "/app/python/vigilante.py"]
+    env_file: .env
+    environment:
+      - PORT=${PORT:-5000}
+      - PORTFOLIO_DATA_DIR=/app/data
+      - PORTFOLIO_LOGS_DIR=/app/logs
+      - PORTFOLIO_API_DIR=/app/API
+      - VIGILANTE_URL=La aplicación=https://caddy:${PORT:-5000}/api/health|http://caddy:${PORT:-5000}/api/health
+    volumes:
+      - ./config.ini:/app/config.ini:ro
+      # Solo lo que necesita: el token de Telegram (cifrado) y los ajustes de
+      # qué avisos quiere el usuario. En solo lectura: este contenedor no
+      # escribe nada.
+      - ${PORTFOLIO_HOST_API_DIR:-./API}:/app/API:ro
+      - ${PORTFOLIO_HOST_DATA_DIR:-./data}:/app/data:ro
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   caddy_data:
   caddy_config:

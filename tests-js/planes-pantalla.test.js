@@ -71,6 +71,7 @@ beforeAll(() => {
     cargarScript("js/core/shared-utils.js")
     cargarScript("js/cartera/assets.js")
     cargarScript("js/cartera/planes.js")
+    cargarScript("js/cartera/alertas-precio.js")
 })
 
 beforeEach(async () => {

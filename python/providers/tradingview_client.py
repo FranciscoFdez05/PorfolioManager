@@ -35,6 +35,8 @@ TRADINGVIEW_SEARCH_URL = "https://symbol-search.tradingview.com/symbol_search/v3
 # El scanner por ticker (`TRADINGVIEW_SCAN_URL`, mercado "global") vale para
 # cotizar símbolos concretos, pero no hace screener: filtrar y ordenar todo un
 # mercado pide su propio endpoint regional (`.../america/scan`, `.../spain/scan`...).
+_CAP_COLUMNS = ["close", "currency", "market_cap_calc", "total_shares_outstanding", "description"]
+
 def screener_url(market="america"):
     return f"https://scanner.tradingview.com/{market}/scan"
 
@@ -229,6 +231,37 @@ def fetch_stats(tickers, timeout=None):
             continue
         stats[symbol] = dict(zip(_STATS_COLUMNS, values, strict=False))
     return stats
+
+
+def fetch_capitalizacion(tickers, timeout=None):
+    """Precio, divisa, capitalización y acciones/monedas en circulación.
+
+    Cada campo sale tal cual lo devuelve el scanner y es `None` cuando ese
+    instrumento no lo publica (el oro no tiene capitalización): no se estima ni
+    se rellena. Una sola petición para todos. Deja pasar HTTPError/URLError.
+    """
+    if not tickers:
+        return {}
+
+    payload = _fetch_json(
+        TRADINGVIEW_SCAN_URL,
+        json_body={"symbols": {"tickers": list(tickers), "query": {"types": []}}, "columns": _CAP_COLUMNS},
+        timeout=timeout,
+    )
+
+    datos = {}
+    for row in payload.get("data") or []:
+        if not row.get("s"):
+            continue
+        d = dict(zip(_CAP_COLUMNS, row.get("d") or [], strict=False))
+        datos[row["s"]] = {
+            "precio": d.get("close"),
+            "divisa": str(d.get("currency") or "").strip().upper() or None,
+            "capitalizacion": d.get("market_cap_calc"),
+            "suministro": d.get("total_shares_outstanding"),
+            "nombre": d.get("description"),
+        }
+    return datos
 
 
 def _cross_plan(ticker):

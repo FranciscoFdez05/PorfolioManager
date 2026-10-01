@@ -609,10 +609,81 @@ async function initAjustesLogic() {
             setTelegramStatus(data.configurado)
             if (telegramTokenInput) telegramTokenInput.value = data.token || ""
             if (telegramChatIdInput) telegramChatIdInput.value = data.chatId || ""
+            pintarAvisosTelegram(data.avisos || [], data.resumenHora)
         } catch {
             /* ignore */
         }
     }
+
+    // Qué tipos de aviso se mandan. Cada interruptor guarda por su cuenta, sin
+    // botón: es una preferencia, no un dato que se pueda dejar a medias como el
+    // token. Se manda el conjunto entero, que es lo que el servidor guarda.
+    const telegramAvisosBox = document.getElementById("ajustesTelegramAvisos")
+    const telegramAvisosMsg = document.getElementById("ajustesTelegramAvisosMsg")
+    const telegramResumenHora = document.getElementById("ajustesTelegramResumenHora")
+
+    async function guardarAvisosTelegram() {
+        const avisos = {}
+        telegramAvisosBox?.querySelectorAll("input[data-aviso]").forEach((input) => {
+            avisos[input.dataset.aviso] = input.checked
+        })
+        const resumenHora = Number(telegramResumenHora?.value || 21)
+        try {
+            const res = await fetch("/api/settings/telegram/avisos", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ avisos, resumenHora })
+            })
+            const data = await res.json()
+            showMsg(
+                telegramAvisosMsg,
+                data.ok ? "Guardado" : data.error || "Error al guardar",
+                data.ok ? "ok" : "error"
+            )
+        } catch {
+            showMsg(telegramAvisosMsg, "Error de red", "error")
+        }
+    }
+
+    function pintarAvisosTelegram(avisos, resumenHora) {
+        if (telegramAvisosBox) {
+            telegramAvisosBox.replaceChildren(
+                ...avisos.map((aviso) => {
+                    const fila = document.createElement("div")
+                    fila.className = "ajustesSwitchRow"
+
+                    const etiqueta = document.createElement("div")
+                    etiqueta.className = "ajustesSwitchLabel"
+                    etiqueta.textContent = aviso.titulo
+
+                    const interruptor = document.createElement("label")
+                    interruptor.className = "ajustesSwitch"
+                    const input = document.createElement("input")
+                    input.type = "checkbox"
+                    input.checked = !!aviso.activo
+                    input.dataset.aviso = aviso.clave
+                    input.addEventListener("change", guardarAvisosTelegram)
+                    const pista = document.createElement("span")
+                    pista.className = "ajustesSwitchTrack"
+                    interruptor.append(input, pista)
+
+                    fila.append(etiqueta, interruptor)
+                    return fila
+                })
+            )
+        }
+
+        if (telegramResumenHora && !telegramResumenHora.options.length) {
+            for (let hora = 0; hora < 24; hora++) {
+                telegramResumenHora.add(new Option(`${String(hora).padStart(2, "0")}:00`, String(hora)))
+            }
+            telegramResumenHora.addEventListener("change", guardarAvisosTelegram)
+        }
+        if (telegramResumenHora && Number.isInteger(resumenHora)) {
+            telegramResumenHora.value = String(resumenHora)
+        }
+    }
+
     cargarTelegram()
 
     // Guarda lo que haya en los campos. La usan tanto el botón "Guardar" como

@@ -21,7 +21,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from core import paths, settings
+from core import paths, settings, telegram_notifier
 from core.bloqueo import exclusivo
 from core.escritura import temporalPara
 from core.paths import (
@@ -111,25 +111,48 @@ def _remove_wal_sidecars(db_path: Path):
             log.warning(f"[backup] No se pudo eliminar {sidecar.name}: {e}")
 
 
+def _estado_integridad(db_path: Path) -> str:
+    """'ok', 'dañada' u 'ocupada'.
+
+    Distinguir la última importa: «database is locked» no dice nada sobre el
+    contenido del fichero, y tratarlo como corrupción hacía que un pico de
+    escritura de otro worker disparase una reparación —o una restauración— sobre
+    una base perfectamente sana. Se reintenta unas veces y, si sigue ocupada, se
+    devuelve 'ocupada' para que quien llama la deje en paz hasta la próxima pasada.
+    """
+    ultimo_error = None
+    for intento in range(3):
+        conn = None
+        try:
+            conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
+            result = conn.execute("PRAGMA integrity_check").fetchone()
+            if not (result and result[0] == "ok"):
+                return "dañada"
+            return "ok" if not conn.execute("PRAGMA foreign_key_check").fetchall() else "dañada"
+        except sqlite3.OperationalError as e:
+            ultimo_error = e
+            texto = str(e).lower()
+            if "locked" in texto or "busy" in texto:
+                time.sleep(1 + intento)
+                continue
+            log.error(f"[backup] Error comprobando integridad de {db_path.name}: {e}")
+            return "dañada"
+        except Exception as e:
+            log.error(f"[backup] Error comprobando integridad de {db_path.name}: {e}")
+            return "dañada"
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+    log.warning(f"[backup] {db_path.name} sigue ocupada, no se puede comprobar: {ultimo_error}")
+    return "ocupada"
+
+
 def check_integrity(db_path: Path) -> bool:
     """Devuelve True si la BD pasa integrity_check y foreign_key_check."""
-    conn = None
-    try:
-        conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
-        result = conn.execute("PRAGMA integrity_check").fetchone()
-        if not (result and result[0] == "ok"):
-            return False
-        fk_errors = conn.execute("PRAGMA foreign_key_check").fetchall()
-        return len(fk_errors) == 0
-    except Exception as e:
-        log.error(f"[backup] Error comprobando integridad de {db_path.name}: {e}")
-        return False
-    finally:
-        if conn is not None:
-            try:
-                conn.close()
-            except Exception:
-                pass
+    return _estado_integridad(db_path) == "ok"
 
 
 def _checkpoint_and_copy(db_path: Path, backup_path: Path):
@@ -221,18 +244,50 @@ def run_startup_backup(db_path: Path):
         return _run_startup_backup_locked(db_path)
 
 
+def _portfolios_a_vigilar(db_path: Path):
+    rutas = [db_path]
+    carpeta = getattr(paths, "PORTFOLIOS_DIR", None)
+    if carpeta and Path(carpeta).exists():
+        rutas += [r for r in sorted(Path(carpeta).glob("*.db")) if r != db_path]
+    return rutas
+
+
+def _vigilar_integridad(db_path: Path):
+    estado = _estado_integridad(db_path)
+    if estado == "ok":
+        log.info(f"[backup] Integridad OK: {db_path.name}")
+        return
+    if estado == "ocupada":
+        return
+
+    log.error(f"[backup] ¡INTEGRIDAD FALLIDA en {db_path.name}! Intentando reparación.")
+    if _emergency_repair(db_path):
+        telegram_notifier.notificar(
+            "sistema",
+            f"🚨 La base de datos {db_path.name} estaba dañada y se ha reparado sola.\n"
+            "La copia dañada se ha guardado por si hace falta. Revisa que los datos estén bien.",
+        )
+        return
+
+    log.error("[backup] Reparación fallida. Intentando restaurar desde backup automático.")
+    restaurada = _restore_from_latest_auto_backup(db_path)
+    telegram_notifier.notificar(
+        "sistema",
+        f"🚨 La base de datos {db_path.name} estaba dañada y no se pudo reparar.\n"
+        + ("Se ha restaurado desde la última copia válida: puede faltar lo último que guardaste."
+           if restaurada else "No se ha encontrado ninguna copia válida. Hay que intervenir a mano."),
+    )
+
+
 def _run_startup_backup_locked(db_path: Path):
     _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
-    # ── 1. Integridad del DB activo ─────────────────────────────────────────
-    if not check_integrity(db_path):
-        log.error(f"[backup] ¡INTEGRIDAD FALLIDA en {db_path.name}! Intentando reparación.")
-        repaired = _emergency_repair(db_path)
-        if not repaired:
-            log.error("[backup] Reparación fallida. Intentando restaurar desde backup automático.")
-            _restore_from_latest_auto_backup(db_path)
-    else:
-        log.info(f"[backup] Integridad OK: {db_path.name}")
+    # ── 1. Integridad de los portfolios ─────────────────────────────────────
+    # Todos, no solo el activo: una copia con un portfolio dañado se rechaza
+    # (ver `_escribir_backup`), y si nadie lo arreglaba las copias dejaban de
+    # hacerse sin que nadie lo notase.
+    for ruta in _portfolios_a_vigilar(db_path):
+        _vigilar_integridad(ruta)
 
     if not _backup_is_due():
         return False
@@ -338,19 +393,41 @@ def _fecha_del_zip(ruta: Path):
 
 
 def _restore_from_latest_auto_backup(db_path: Path):
-    """Restaura db_path desde la copia válida más reciente."""
+    """Restaura db_path desde la copia válida más reciente. True si lo consiguió.
+
+    La sustitución es atómica —temporal junto al destino y rename—: un `copy2`
+    directo sobre el .db activo, interrumpido a medias, dejaba una base peor que
+    la dañada. Y la copia de la dañada es de cortesía: que no se pueda hacer
+    (disco justo) no puede impedir la restauración. Lo copiado se vuelve a
+    comprobar antes de sustituir; si no pasa, se prueba con la copia anterior.
+    """
+    corrupted_copy = _BACKUP_DIR / f"{db_path.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    guardada = False
     for nombre, candidate in _candidatos_de_restauracion(db_path.stem):
-        if check_integrity(candidate):
-            try:
-                corrupted_copy = _BACKUP_DIR / f"{db_path.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-                shutil.copy2(str(db_path), str(corrupted_copy))
-                shutil.copy2(str(candidate), str(db_path))
+        if not check_integrity(candidate):
+            log.warning(f"[backup] La copia {nombre} tampoco pasa la integridad; se prueba la anterior.")
+            continue
+        try:
+            if not guardada:
+                try:
+                    shutil.copy2(str(db_path), str(corrupted_copy))
+                    guardada = True
+                except Exception as e:
+                    log.warning(f"[backup] No se pudo guardar la copia dañada: {e}")
+            with temporalPara(db_path) as tmp:
+                shutil.copy2(str(candidate), str(tmp))
+                if not check_integrity(tmp):
+                    log.error(f"[backup] La copia de {nombre} salió dañada al copiarla.")
+                    continue
                 _remove_wal_sidecars(db_path)
-                log.info(f"[backup] Restaurado desde la copia: {nombre}")
-                return
-            except Exception as e:
-                log.error(f"[backup] Error restaurando desde {nombre}: {e}")
+                tmp.replace(db_path)
+            _remove_wal_sidecars(db_path)
+            log.info(f"[backup] Restaurado desde la copia: {nombre}")
+            return True
+        except Exception as e:
+            log.error(f"[backup] Error restaurando desde {nombre}: {e}")
     log.error(f"[backup] No se encontró ninguna copia válida para {db_path.name}")
+    return False
 
 
 def _ensure_daily_snapshot(db_path: Path):

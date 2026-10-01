@@ -58,6 +58,12 @@ _GLOBAL_DEFAULTS = {
     "numLocale": "es-ES",
     "dateFormat": "DD/MM/YYYY",
     "maxBackups": 0,
+    # Qué tipos de aviso se mandan por Telegram: {categoria: bool}. Vacío = los
+    # de fábrica (ver core.telegram_notifier.CATEGORIAS_AVISO). Lo lee el propio
+    # notificador directamente del fichero; aquí solo hace falta que la clave
+    # sea conocida para que guardar otros ajustes no la descarte.
+    "telegramAvisos": {},
+    "telegramResumenHora": telegram_notifier.RESUMEN_HORA_DEFECTO,
 }
 
 # Claves por portfolio (cada DB tiene su propio archivo prefs_{id}.json)
@@ -380,6 +386,7 @@ def get_api_estado():
 @ajustes_bp.route("/api/settings/telegram", methods=["GET"])
 def get_telegram_settings():
     token, chat_id = telegram_notifier.leerConfig()
+    activos = telegram_notifier.preferencias()
     return jsonify({
         "ok": True,
         "configurado": bool(token) and bool(chat_id),
@@ -388,7 +395,42 @@ def get_telegram_settings():
         # obligar a una petición aparte por cada vez que se quiera ver.
         "token": token,
         "chatId": chat_id,
+        "avisos": [
+            {"clave": clave, "titulo": titulo, "activo": activos[clave]}
+            for clave, (titulo, _defecto) in telegram_notifier.CATEGORIAS_AVISO.items()
+        ],
+        "resumenHora": telegram_notifier.resumenHora(),
+        "silenciadoHasta": telegram_notifier.silenciadoHasta(),
     })
+
+
+@ajustes_bp.route("/api/settings/telegram/avisos", methods=["POST"])
+def save_telegram_avisos():
+    """Qué tipos de aviso se mandan y a qué hora sale el resumen diario."""
+    data = request.get_json(silent=True) or {}
+    gcfg = _read_ajustes()
+
+    if "avisos" in data:
+        raw = data["avisos"]
+        if not isinstance(raw, dict):
+            return jsonify({"ok": False, "error": "«avisos» debe ser un objeto {categoría: true/false}"}), 400
+        # Solo categorías conocidas: lo demás se descarta en vez de guardarse
+        # como una clave que nada lee.
+        actuales = telegram_notifier.preferencias()
+        for clave in telegram_notifier.CATEGORIAS_AVISO:
+            if clave in raw:
+                actuales[clave] = bool(raw[clave])
+        gcfg["telegramAvisos"] = actuales
+
+    if "resumenHora" in data:
+        gcfg["telegramResumenHora"] = max(0, min(23, _as_int(data["resumenHora"], telegram_notifier.RESUMEN_HORA_DEFECTO)))
+
+    try:
+        _write_ajustes(gcfg)
+    except OSError as error:
+        mensaje = registrarFalloEscritura(log, "No se pudieron guardar los avisos de Telegram", error, _AJUSTES_JSON)
+        return jsonify({"ok": False, "error": mensaje}), 500
+    return jsonify({"ok": True})
 
 
 @ajustes_bp.route("/api/settings/telegram", methods=["POST"])

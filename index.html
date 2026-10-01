@@ -1625,8 +1625,9 @@
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Telegram</div>
                         <div class="ajustesSectionDesc">
-                            Avisa por Telegram cuando un proveedor de cotizaciones se queda sin cuota, deja de
-                            responder o falla. Crea un bot con <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a>
+                            Avisos del servidor por Telegram (copias de seguridad, alertas de precio, proveedores,
+                            seguridad, disco…) y comandos para preguntarle por su estado desde el móvil. Crea un bot con
+                            <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a>
                             y consigue tu ID de chat con <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a>.
                         </div>
                     </div>
@@ -1669,6 +1670,45 @@
                     <button id="ajustesBorrarTelegramBtn" class="ajustesSecondaryBtn" type="button">Quitar</button>
                     <span id="ajustesTelegramMsg" class="ajustesStatusMsg"></span>
                 </div>
+
+                <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesField">
+                    <div class="ajustesLabelRow">
+                        <span class="ajustesLabel">Qué avisos quieres recibir</span>
+                        <span id="ajustesTelegramAvisosMsg" class="ajustesStatusMsg"></span>
+                    </div>
+                </div>
+                <div id="ajustesTelegramAvisos"></div>
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Hora del resumen diario
+                        <small>Solo se envía si tienes activado «Resumen diario de la cartera»</small>
+                    </div>
+                    <select id="ajustesTelegramResumenHora" class="ajustesSelect" data-no-custom aria-label="Hora del resumen diario"></select>
+                </div>
+
+                <details class="ajustesTlsAyuda">
+                    <summary>Comandos del bot y aviso de caída</summary>
+                    <div class="ajustesTlsAyudaCuerpo">
+                        <p>Escríbele a tu bot (solo te contesta a ti):</p>
+                        <ul id="ajustesTelegramComandos">
+                            <li><strong>/status</strong> — base de datos, disco, copias, hilos</li>
+                            <li><strong>/cartera</strong> — valor, invertido y resultado</li>
+                            <li><strong>/activos</strong> · <strong>/precio btc</strong> — cotizaciones</li>
+                            <li><strong>/alertas</strong> — alertas activas (se crean desde la ficha del activo)</li>
+                            <li><strong>/backup</strong> · <strong>/backups</strong> — copias de seguridad</li>
+                            <li><strong>/proveedores</strong> — llamadas de hoy a cada proveedor</li>
+                            <li><strong>/comandos</strong> — la lista completa</li>
+                        </ul>
+                        <p>
+                            <strong>¿Y si la aplicación se cae?</strong> No puede avisar ella misma, así que lo hace
+                            el servicio <code>vigilante</code>, un proceso aparte que pregunta a la aplicación cada
+                            30 s. Con Docker ya va incluido en <code>docker-compose.yml</code>. Sin Docker, lánzalo
+                            junto al servidor con <code>python python/vigilante.py</code>.
+                        </p>
+                    </div>
+                </details>
             </div>
 
         </div>
@@ -2062,6 +2102,7 @@
 <script defer src="js/cartera/private-market.js"></script>
 <script defer src="js/cartera/planes.js"></script>
 <script defer src="js/cartera/planes-inversion.js"></script>
+<script defer src="js/cartera/alertas-precio.js"></script>
 <script defer src="js/finanzas/ahorro.js"></script>
 <script defer src="js/finanzas/calendario.js"></script>
 </body>

@@ -840,3 +840,129 @@
         max-height: 500px;
     }
 }
+
+/* ── Capitalización objetivo ─────────────────────────────────────────── */
+.hCapBuscar {
+    display: flex;
+    gap: 8px;
+}
+
+.hCapBuscar input {
+    flex: 1;
+    min-width: 0;
+}
+
+.hCapResultados {
+    display: flex;
+    flex-direction: column;
+    margin-top: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
+    border-radius: 8px;
+}
+
+.hCapResultado {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--border, rgba(148, 163, 184, 0.15));
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.hCapResultado:last-child {
+    border-bottom: 0;
+}
+
+.hCapResultado:hover {
+    background: rgba(148, 163, 184, 0.12);
+}
+
+.hCapResultado span {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.hCapNota {
+    padding: 6px 2px;
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.hCapRefTitulo {
+    margin-top: 14px;
+}
+
+.hCapRefLista {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.hCapRef {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hCapRefNombre {
+    flex: 0 0 38%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+}
+
+.hCapRef input {
+    flex: 1;
+    min-width: 0;
+}
+
+.hCapQuitar {
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.hCapQuitar:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.hCapComparativa {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 14px 0;
+}
+
+.hCapComp {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
+    border-radius: 8px;
+}
+
+.hCapComp strong {
+    text-align: right;
+}
+
+.hCapComp small {
+    grid-column: 1 / -1;
+    color: var(--text-dim);
+}

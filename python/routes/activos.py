@@ -3,8 +3,9 @@ from decimal import Decimal
 from flask import Blueprint, jsonify, request
 
 from core import dinero, pnl_divisa
-from core.db import get_db
+from core.db import get_active_db_path, get_db
 from providers.finnhub_client import convert_amount
+from stores import alertas_store
 from stores.asset_store import (
     deleteAssetFile,
     getAssetFile,
@@ -385,7 +386,18 @@ def refreshActivoMarketData(assetId):
     assetData["lastUpdated"] = quote["lastUpdated"]
     updateAssetMarketData(assetId, assetData)
 
-    return jsonify({"ok": True, "asset": assetData, "marketData": quote["marketData"]})
+    # Un precio nuevo puede cumplir una alerta: se evalúa aquí, además de en el
+    # hilo de fondo, para que refrescar a mano (o el refresco automático de la
+    # web) no tenga que esperar a la siguiente pasada.
+    alertas = alertas_store.evaluar_activo(
+        slugify(assetId), quote["price"], alertas_store.cambio_desde_texto(quote["change"]),
+        cartera=get_active_db_path().stem,
+    )
+
+    return jsonify({
+        "ok": True, "asset": assetData, "marketData": quote["marketData"],
+        "alertasSaltadas": len(alertas),
+    })
 
 
 @activos_bp.route("/api/activos/<assetId>/currency", methods=["POST"])

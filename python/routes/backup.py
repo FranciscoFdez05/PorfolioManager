@@ -12,8 +12,8 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from admin.backup_manager import _remove_wal_sidecars, _ruta_bloqueo
-from core import paths, settings
+from admin.backup_manager import _remove_wal_sidecars, _ruta_bloqueo, check_integrity
+from core import paths, settings, telegram_notifier
 from core.bloqueo import BloqueoOcupado, exclusivo
 from core.errors import mensajeAlmacenamiento, registrarFalloEscritura
 from core.escritura import escribirAtomico, limpiarTemporal, rutaTemporal, temporalPara
@@ -283,6 +283,35 @@ def _export_snapshots_json(db_path: Path) -> str:
                 pass
 
 
+def _megas(nombre: str) -> str:
+    try:
+        return f"{(_BACKUP_DIR / nombre).stat().st_size / 1024 / 1024:.1f} MB".replace(".", ",")
+    except OSError:
+        return "tamaño desconocido"
+
+
+def _avisar_copia_creada(nombre: str, automatica: bool) -> None:
+    """Cuenta por Telegram que se ha hecho una copia, con su tamaño y cuántas hay."""
+    try:
+        portfolios = len(list(_PORTFOLIOS_DIR.glob("*.db"))) if _PORTFOLIOS_DIR.exists() else 0
+        telegram_notifier.notificar(
+            "backup",
+            f"💾 Copia de seguridad {'automática' if automatica else 'manual'} creada\n"
+            f"{nombre} · {_megas(nombre)} · {portfolios} portfolio(s)\n"
+            f"Copias guardadas: {len(_list_backups())}",
+        )
+    except Exception as error:
+        log.debug("[backup] No se pudo avisar de la copia: %s", error)
+
+
+def _avisar_copia_fallida(motivo, automatica: bool) -> None:
+    telegram_notifier.notificar(
+        "backup",
+        f"❌ Ha fallado la copia de seguridad {'automática' if automatica else 'manual'}\n"
+        f"{str(motivo)[:300]}",
+    )
+
+
 @backup_bp.route("/api/backup", methods=["POST"])
 def createBackup():
     try:
@@ -303,7 +332,31 @@ def crear_backup_automatico() -> str:
     registra y lo reintenta en la siguiente pasada.
     """
     with _BACKUP_LOCK:
-        return _escribir_backup(automatico=True)
+        try:
+            nombre = _escribir_backup(automatico=True)
+        except Exception as error:
+            _avisar_copia_fallida(error, automatica=True)
+            raise
+    _avisar_copia_creada(nombre, automatica=True)
+    return nombre
+
+
+def crear_backup_manual(avisar=True) -> str:
+    """Copia completa a petición, fuera de una petición HTTP (p. ej. `/backup` del bot).
+
+    Toma los mismos dos cerrojos que `POST /api/backup`. Lanza `BloqueoOcupado`
+    si otro proceso está copiando, y la excepción original si la copia falla.
+    Con `avisar=False` no manda el aviso de Telegram: quien la pide responde él.
+    """
+    with _bloqueo_cruzado(), _BACKUP_LOCK:
+        _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        listo, motivo = _preparar_destino()
+        if not listo:
+            raise OSError(motivo)
+        nombre = _escribir_backup(automatico=False)
+    if avisar:
+        _avisar_copia_creada(nombre, automatica=False)
+    return nombre
 
 
 def _preparar_destino():
@@ -357,6 +410,7 @@ def _create_backup_locked():
     listo, motivo = _preparar_destino()
     if not listo:
         log.error("[backup] Destino no escribible: %s", motivo)
+        _avisar_copia_fallida(motivo, automatica=False)
         return jsonify({"ok": False, "error": motivo}), 500
 
     try:
@@ -366,8 +420,10 @@ def _create_backup_locked():
         # "Error al crear backup" de la pantalla de Ajustes no distinguía entre
         # un volumen sin permisos, un disco lleno y una BD bloqueada.
         mensaje = registrarFalloEscritura(log, "[backup] Error creando backup", e, _BACKUP_DIR)
+        _avisar_copia_fallida(mensaje, automatica=False)
         return jsonify({"ok": False, "error": mensaje}), 500
 
+    _avisar_copia_creada(filename, automatica=False)
     return jsonify({"ok": True, "filename": filename, "backups": _list_backups()})
 
 
@@ -400,6 +456,12 @@ def _escribir_backup(*, automatico: bool) -> str:
             if _PORTFOLIOS_DIR.exists():
                 for db_file in sorted(_PORTFOLIOS_DIR.glob("*.db")):
                     with _copia_temporal(db_file) as copia:
+                        # Una copia dañada no entra: sustituiría en la rotación
+                        # a otras buenas y no serviría para restaurar nada.
+                        if not check_integrity(copia):
+                            raise RuntimeError(
+                                f"El portfolio {db_file.name} no pasa la comprobación de integridad"
+                            )
                         zf.write(str(copia), f"portfolios/{db_file.name}")
                     snap_json = _export_snapshots_json(db_file)
                     zf.writestr(f"snapshots/{db_file.stem}.json", snap_json)
@@ -669,6 +731,7 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
         mensaje = registrarFalloEscritura(
             log, f"[backup] Error en restore de {filename}", e, _PORTFOLIOS_DIR
         )
+        telegram_notifier.notificar("backup", f"❌ Ha fallado la restauración de {filename}\n{mensaje[:300]}")
         return jsonify({
             "ok": False,
             "error": mensaje,
@@ -681,6 +744,12 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
 
     if ignorados:
         log.warning("[backup] Restauración parcial: %d entradas ignoradas", len(ignorados))
+    telegram_notifier.notificar(
+        "backup",
+        f"♻️ Copia restaurada: {filename}"
+        + (f"\n⚠️ Restauración parcial: {len(ignorados)} entrada(s) ignorada(s)" if ignorados else "")
+        + (f"\nEl estado anterior quedó en {safety_dir}" if safety_dir else ""),
+    )
     return jsonify({
         "ok": True,
         "safetyCopy": str(safety_dir) if safety_dir else None,
@@ -719,6 +788,8 @@ def deleteBackup(filename):
                 }), 500
     except BloqueoOcupado:
         return _respuesta_bloqueo_ocupado()
+
+    telegram_notifier.notificar("backup", f"🗑 Copia eliminada: {filename}")
 
     # Borrar ajustes snapshot legacy si existe
     ts_m = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', filename)

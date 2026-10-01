@@ -22,6 +22,74 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [3.0.0] — 2026-10-01
+
+**Esquema de base de datos:** lo sube a la **9** (tabla nueva `alertas_precio`,
+sin tocar ninguna fila existente). Para deshacer la actualización, levantar la
+imagen anterior y restaurar `data/backups/auto/<portfolio>_pre-esquema-8-a-9_*.db`.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Con Docker, el `docker-up.sh` levanta además el servicio nuevo
+`vigilante` (ver más abajo). Nada que editar a mano.
+
+### Añadido
+
+**Alertas de precio en la ficha de cada activo.** Nueva pestaña «Alertas»:
+«avísame cuando llegue a X» (precio igual o superior, precio igual o inferior,
+o una variación del día de ±N %). Las comprueba el servidor cada
+`[avisos] alertas_intervalo_minutos` (5 por defecto) aunque no haya ninguna
+pestaña abierta, pidiendo la cotización solo de los activos que tienen alguna
+alerta activa, y también al refrescar un precio a mano. Cada alerta salta una
+sola vez y queda marcada con la hora y el precio que la disparó, hasta que se
+reactiva: un precio que oscila alrededor del umbral no llena el chat. Con dos
+workers de Gunicorn el aviso sale una sola vez: la base de datos decide quién
+reclama la alerta.
+
+**Muchos más avisos por Telegram.** Además de los problemas con los
+proveedores de cotizaciones: copia de seguridad creada (manual o automática,
+con tamaño y cuántas hay), copia fallida, copia restaurada o eliminada, base
+de datos dañada al arrancar (reparada, restaurada o sin copia válida), login
+bloqueado tras agotar los intentos, contraseña o usuario cambiados, servidor
+iniciado, disco casi lleno (`[avisos] espacio_minimo_mb`), versión nueva
+publicada y, si se activa, un resumen diario de cada cartera a la hora elegida
+y un aviso en cada inicio de sesión. Ajustes › Telegram permite activar o
+apagar cada tipo por separado.
+
+**Comandos en el chat del bot.** `/status` (o `/estado`; base de datos, disco, última copia,
+hilos de fondo), `/cartera`, `/activos`, `/precio btc`, `/alertas`,
+`/backup`,
+`/backups`, `/proveedores` y `/comandos`. El menú de
+comandos se registra solo en Telegram. Solo contesta al chat guardado en
+Ajustes; el resto se ignora sin responder, y un comando escrito hace más de
+cinco minutos (mientras el servidor estaba parado) no se ejecuta.
+
+**Aviso si la aplicación no responde.** Un proceso aparte, `python/vigilante.py`
+(en Docker, el servicio `vigilante` de `docker-compose.yml`), pregunta a
+`/api/health` cada 30 s y avisa por Telegram tras 3 comprobaciones fallidas
+seguidas, distingue «no responde» de «responde pero degradado», recuerda cada
+hora mientras siga mal y cuenta cuánto duró la caída cuando vuelve. Tiene que
+ser otro proceso: una aplicación caída no puede avisar de que está caída. Si
+Telegram tampoco es alcanzable en ese momento (una caída de internet), el aviso
+se reintenta. Se configura en `[vigilante]` de `config.ini`.
+
+### Cambiado
+
+**Un solo oyente de Telegram por bot.** Con dos workers de Gunicorn, los dos
+hilos hacían `getUpdates` a la vez: Telegram rechaza la segunda sesión (409) y,
+ahora que hay comandos, cada uno habría contestado por su cuenta. El oyente
+toma un bloqueo de fichero y el otro worker lo releva si el primero muere.
+
+**La suite de tests ya no lee el `API/` real.** Un test que provocase un aviso
+podía leer el `telegram.key` de quien ejecuta la suite y, con `SECRET_KEY`
+exportada, mandar mensajes de verdad.
+
+**Cabecera de la ficha de activo.** El precio actual pasa a ir bajo el nombre y
+la primera tarjeta muestra ahora el valor actual de la posición. Las tarjetas
+rellenan la altura de la cabecera, con el texto más grande y centrado, sin el
+hueco en blanco que quedaba debajo.
+
+---
+
 ## [2.9.1] — 2026-09-28
 
 **Esquema de base de datos:** no lo toca (sigue en la **8**). Para deshacer la

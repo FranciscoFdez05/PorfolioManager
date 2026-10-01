@@ -268,7 +268,8 @@ document.addEventListener("click", (e) => {
 })
 
 document.addEventListener("keydown", (event) => {
-    const editableCell = event.target.closest('td[contenteditable="true"]')
+    // `target` puede ser el propio document (un keydown sin foco), que no tiene `closest`.
+    const editableCell = event.target.closest?.('td[contenteditable="true"]')
     if (!editableCell || event.key !== "Enter") {
         return
     }
@@ -558,6 +559,10 @@ function runWithoutAlerts(callback) {
 }
 
 function hideAutoSaveButtons() {
+    // El observador de abajo sigue vivo mientras haya DOM; en las pruebas, el
+    // jsdom se cierra antes que sus últimos avisos y `document` ya no existe.
+    if (typeof document === "undefined") return
+
     document.querySelectorAll("button").forEach((button) => {
         if (button.textContent.trim().toLowerCase() === "guardar" && !button.dataset.noAutohide) {
             button.style.display = "none"
