@@ -22,6 +22,28 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [3.0.2] — 2026-10-02
+
+**Esquema de base de datos:** no lo toca (sigue en la **9**). Para deshacer la actualización basta
+con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Cambiado
+
+**Métricas › Evolución del saldo durante el mes.** Los ingresos con fecha suben
+el saldo en su día (antes entraban todos en el saldo inicial; ahora solo los
+recurrentes). Las mensualidades se reparten a partes iguales entre los días del
+mes, así que el saldo baja poco a poco en vez de caer el día 1. Al pasar el
+cursor por un día, el tooltip lista sus movimientos.
+
+**Crosshair en todos los gráficos de líneas.** Línea vertical en el punto activo
+y horizontal a la altura del cursor, como ya tenía Evolución del Portfolio.
+Barras y gráficos circulares quedan igual.
+
+---
+
 ## [3.0.1] — 2026-10-02
 
 **Esquema de base de datos:** no lo toca (sigue en la **9**). Para deshacer la actualización basta

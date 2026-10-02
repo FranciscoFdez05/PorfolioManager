@@ -2799,8 +2799,9 @@ function mDrawComparativaLineChart(ingMonthly, gastosMonthly) {
 
 // ── evolución del saldo durante el mes ─────────────────────────────────────
 
-// Día a día: arranca en los ingresos del mes y va restando cada gasto en su
-// fecha; si un día no tiene gastos, el saldo se mantiene igual que el anterior.
+// Día a día: arranca en los ingresos recurrentes del mes, suma cada ingreso en
+// su fecha y resta cada gasto en la suya; las mensualidades se reparten a
+// partes iguales entre todos los días del mes, así que el saldo baja poco a poco.
 function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey) {
     const monthIdx = M_GASTOS_KEYS.indexOf(monthKey)
     const daysInMonth = new Date(Number(year), monthIdx + 1, 0).getDate()
@@ -2809,40 +2810,57 @@ function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey
     ;(ingresosYearData?.recurrentes || []).forEach((r) => {
         startBalance += parseEuroNumber(r.meses?.[monthKey] || "")
     })
-    ;(ingresosYearData?.months?.[monthKey]?.rows || []).forEach((r) => {
-        startBalance += parseEuroNumber(r.cantidad || "")
+
+    const deltaPorDia = Array(daysInMonth + 1).fill(0)
+    const movs = Array.from({ length: daysInMonth + 1 }, () => [])
+    const dayOf = (fecha) => {
+        const d = parseInt(String(fecha || "").split("-")[0], 10)
+        return d >= 1 && d <= daysInMonth ? d : 1
+    }
+
+    ;(ingresosYearData?.months?.[monthKey]?.rows || []).forEach((row) => {
+        const val = parseEuroNumber(row.cantidad || "")
+        if (val <= 0) return
+        const d = dayOf(row.fecha)
+        deltaPorDia[d] += val
+        movs[d].push({ nombre: row.nombre || row.tipo || "Ingreso", importe: val })
     })
 
-    const gastoPorDia = Object.fromEntries(Array.from({ length: daysInMonth }, (_, i) => [i + 1, 0]))
-
     if (isMensualidadMonthActive(gastosYearData, monthKey)) {
-        const mens = (gastosYearData?.mensualidades || []).reduce(
-            (s, m) => s + parseEuroNumber(m.meses?.[monthKey] || ""),
-            0
-        )
-        if (mens > 0) gastoPorDia[1] += mens
+        ;(gastosYearData?.mensualidades || []).forEach((m) => {
+            const val = parseEuroNumber(m.meses?.[monthKey] || "")
+            if (val <= 0) return
+            const parte = val / daysInMonth
+            for (let d = 1; d <= daysInMonth; d++) {
+                deltaPorDia[d] -= parte
+                movs[d].push({ nombre: `${m.nombre || "Mensualidad"} (mensualidad)`, importe: -parte })
+            }
+        })
     }
     ;(gastosYearData?.months?.[monthKey]?.rows || []).forEach((row) => {
         const val = parseEuroNumber(row.cantidad || "")
         if (val <= 0) return
-        const day = parseInt((row.fecha || "").split("-")[0], 10)
-        gastoPorDia[day >= 1 && day <= daysInMonth ? day : 1] += val
+        const d = dayOf(row.fecha)
+        deltaPorDia[d] -= val
+        movs[d].push({ nombre: row.nombre || row.tipo || "Gasto", importe: -val })
     })
 
     const dayLabels = ["Inicio"]
     const balances = [startBalance]
+    const movimientos = [[]]
     let running = startBalance
     for (let d = 1; d <= daysInMonth; d++) {
-        running -= gastoPorDia[d] || 0
+        running += deltaPorDia[d]
         dayLabels.push(String(d))
         balances.push(running)
+        movimientos.push(movs[d])
     }
 
-    return { dayLabels, balances, startBalance }
+    return { dayLabels, balances, startBalance, movimientos }
 }
 
 function mRenderSaldoMesChart(ingresosYearData, gastosYearData, year, monthKey) {
-    const { dayLabels, balances, startBalance } = mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey)
+    const { dayLabels, balances, startBalance, movimientos } = mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey)
 
     const notaEl = document.getElementById("mSaldoMesNota")
     if (notaEl) {
@@ -2878,7 +2896,21 @@ function mRenderSaldoMesChart(ingresosYearData, gastosYearData, year, monthKey) 
                 tooltip: {
                     callbacks: {
                         title: (items) => (items[0].label === "Inicio" ? "Inicio de mes" : `Día ${items[0].label}`),
-                        label: (c) => ` Saldo: ${formatEuro(c.raw)}`
+                        label: (c) => ` Saldo: ${formatEuro(c.raw)}`,
+                        afterBody: (items) => {
+                            const lista = movimientos[items[0].dataIndex] || []
+                            if (!lista.length) return []
+                            const sinMens = lista.filter((m) => !m.nombre.endsWith("(mensualidad)"))
+                            const mens = lista.length - sinMens.length
+                            const lines = sinMens.map(
+                                (m) => `${m.importe > 0 ? "+" : "−"} ${m.nombre}: ${formatEuro(Math.abs(m.importe))}`
+                            )
+                            if (mens) {
+                                const tot = lista.filter((m) => m.nombre.endsWith("(mensualidad)")).reduce((x, m) => x + m.importe, 0)
+                                lines.push(`− Mensualidades (${mens}): ${formatEuro(Math.abs(tot))}`)
+                            }
+                            return ["", ...lines]
+                        }
                     }
                 }
             },

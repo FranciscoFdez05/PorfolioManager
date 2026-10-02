@@ -1500,3 +1500,56 @@ function applyBloqueoInactividad(minutes) {
     events.forEach((ev) => document.addEventListener(ev, resetTimer, { passive: true }))
     resetTimer()
 }
+
+// Crosshair global: línea vertical (en el punto activo) y horizontal (a la
+// altura del cursor) en todos los gráficos con ejes cartesianos. Los gráficos
+// que ya traen su propio plugin de crosshair se saltan para no dibujarlo doble.
+if (typeof Chart !== "undefined") {
+    const crosshairState = new WeakMap()
+    const hasOwnCrosshair = (chart) =>
+        (chart.config.plugins || []).some((p) => /crosshair/i.test(p?.id || ""))
+    const isCartesian = (chart) =>
+        chart.scales?.x && chart.scales?.y && chart.options?.indexAxis !== "y" && chart.config.type !== "bar"
+
+    Chart.register({
+        id: "globalCrosshair",
+        afterEvent(chart, args) {
+            if (hasOwnCrosshair(chart)) return
+            const e = args.event
+            const prev = crosshairState.get(chart)
+            if (e.type === "mouseout") {
+                if (prev != null) {
+                    crosshairState.delete(chart)
+                    args.changed = true
+                }
+                return
+            }
+            if (e.type !== "mousemove") return
+            crosshairState.set(chart, e.y)
+            args.changed = true
+        },
+        afterDraw(chart) {
+            if (hasOwnCrosshair(chart) || !isCartesian(chart)) return
+            const { ctx, chartArea, tooltip } = chart
+            const active = tooltip?.getActiveElements?.() || []
+            if (!active.length) return
+            const x = active[0].element.x
+            const y = crosshairState.get(chart)
+            ctx.save()
+            ctx.lineWidth = 1
+            ctx.strokeStyle = "rgba(200,210,255,0.25)"
+            ctx.setLineDash([4, 4])
+            ctx.beginPath()
+            ctx.moveTo(x, chartArea.top)
+            ctx.lineTo(x, chartArea.bottom)
+            ctx.stroke()
+            if (y != null && y >= chartArea.top && y <= chartArea.bottom) {
+                ctx.beginPath()
+                ctx.moveTo(chartArea.left, y)
+                ctx.lineTo(chartArea.right, y)
+                ctx.stroke()
+            }
+            ctx.restore()
+        }
+    })
+}
