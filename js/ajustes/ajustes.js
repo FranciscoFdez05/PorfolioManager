@@ -1452,6 +1452,24 @@ async function initAjustesLogic() {
         return `hace ${minutos} min`
     }
 
+    async function togglePausaApi(proveedor, boton) {
+        boton.disabled = true
+        try {
+            const res = await fetch("/api/settings/apis-pausadas", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ proveedor: proveedor.id, pausada: !proveedor.pausada })
+            })
+            const data = await res.json()
+            if (!data.ok) throw new Error(data.error || "")
+            // El estado cacheado se reetiqueta en el servidor: no gasta cuota.
+            await loadApiEstado()
+        } catch (error) {
+            boton.disabled = false
+            showMsg(apiEstadoMsg, error.message || "No se pudo cambiar", "error")
+        }
+    }
+
     function renderApiEstado(data) {
         const proveedores = data.proveedores || []
         apiEstadoListEl.innerHTML = ""
@@ -1484,6 +1502,19 @@ async function initAjustesLogic() {
                 row.appendChild(ms)
             }
             row.appendChild(badge)
+
+            if (p.pausable) {
+                const pausa = document.createElement("button")
+                pausa.type = "button"
+                pausa.className = "ajustesApiPausaBtn"
+                pausa.textContent = p.pausada ? "Reanudar" : "Pausar"
+                pausa.title = p.pausada
+                    ? `Volver a pedir cotizaciones a ${p.nombre}`
+                    : `Dejar de pedir cotizaciones a ${p.nombre} (sus claves se conservan)`
+                pausa.addEventListener("click", () => togglePausaApi(p, pausa))
+                row.appendChild(pausa)
+            }
+            if (p.pausada) row.classList.add("pausada")
             apiEstadoListEl.appendChild(row)
         })
 

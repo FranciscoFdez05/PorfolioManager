@@ -8,7 +8,7 @@ from pathlib import Path
 
 from flask import Blueprint, Response, jsonify, request
 
-from core import exportables, paths, sesion, settings, telegram_notifier
+from core import exportables, paths, proveedores_pausados, sesion, settings, telegram_notifier
 from core.db import get_active_db_path, get_db
 from core.errors import registrarFalloEscritura
 from core.escritura import escribirJsonAtomico, temporalPara
@@ -64,6 +64,9 @@ _GLOBAL_DEFAULTS = {
     # sea conocida para que guardar otros ajustes no la descarte.
     "telegramAvisos": {},
     "telegramResumenHora": telegram_notifier.RESUMEN_HORA_DEFECTO,
+    # Proveedores de cotizaciones pausados desde Ajustes > API (ver
+    # core.proveedores_pausados).
+    "apisPausadas": [],
 }
 
 # Claves por portfolio (cada DB tiene su propio archivo prefs_{id}.json)
@@ -381,6 +384,30 @@ def get_api_estado():
     except Exception as error:
         log.warning("No se pudo comprobar el estado de los proveedores: %s", error)
         return jsonify({"ok": False, "error": str(error)[:200]}), 500
+
+
+@ajustes_bp.route("/api/settings/apis-pausadas", methods=["POST"])
+def save_api_pausada():
+    """Pausa o reanuda un proveedor de cotizaciones: {proveedor, pausada}."""
+    data = request.get_json(silent=True) or {}
+    proveedor = str(data.get("proveedor") or "").strip().lower()
+    if proveedor not in proveedores_pausados.PAUSABLES:
+        return jsonify({"ok": False, "error": "Ese proveedor no se puede pausar"}), 400
+
+    pausados = set(proveedores_pausados.pausados())
+    if data.get("pausada"):
+        pausados.add(proveedor)
+    else:
+        pausados.discard(proveedor)
+
+    gcfg = _read_ajustes()
+    gcfg["apisPausadas"] = [p for p in proveedores_pausados.PAUSABLES if p in pausados]
+    try:
+        _write_ajustes(gcfg)
+    except OSError as error:
+        mensaje = registrarFalloEscritura(log, "No se pudo guardar la pausa del proveedor", error, _AJUSTES_JSON)
+        return jsonify({"ok": False, "error": mensaje}), 500
+    return jsonify({"ok": True, "pausados": gcfg["apisPausadas"]})
 
 
 @ajustes_bp.route("/api/settings/telegram", methods=["GET"])

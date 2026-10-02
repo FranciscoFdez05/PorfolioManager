@@ -33,6 +33,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Lock
 from urllib.error import HTTPError, URLError
 
+from core import proveedores_pausados
 from providers.http import fetch_json
 from stores import app_data
 
@@ -276,6 +277,26 @@ def _diagnosticar(id_proveedor, nombre, probar):
     return fin("ok", "Operativa", detalle_ok or "")
 
 
+def _diagnosticar_o_pausa(id_proveedor, nombre, probar):
+    # Un proveedor pausado no se sondea: sería gastar cuota en algo que el
+    # usuario ha apagado a propósito.
+    if proveedores_pausados.esta_pausado(id_proveedor):
+        return _fila(id_proveedor, nombre, "pausada", "Pausada", "Pausada desde Ajustes")
+    return _diagnosticar(id_proveedor, nombre, probar)
+
+
+def _con_pausa(proveedores):
+    """Marca `pausable` y `pausada` con el ajuste de ahora, no el de cuando se cacheó."""
+    pausados = proveedores_pausados.pausados()
+    filas = []
+    for fila in proveedores:
+        fila = dict(fila, pausable=fila["id"] in proveedores_pausados.PAUSABLES, pausada=fila["id"] in pausados)
+        if fila["pausada"] and fila["estado"] != "pausada":
+            fila.update(estado="pausada", etiqueta="Pausada", detalle="Pausada desde Ajustes", ms=0)
+        filas.append(fila)
+    return filas
+
+
 def comprobar():
     """Diagnostica todos los proveedores en paralelo, sin mirar la caché."""
     # En serie serían cinco timeouts encadenados: medio minuto con todo caído.
@@ -283,7 +304,7 @@ def comprobar():
     with ThreadPoolExecutor(max_workers=len(_PROVEEDORES)) as pool:
         # `map` conserva el orden de entrada, que es el declarado arriba: una
         # lista que se reordena sola según quién conteste antes sería ilegible.
-        return list(pool.map(lambda datos: _diagnosticar(*datos), _PROVEEDORES))
+        return list(pool.map(lambda datos: _diagnosticar_o_pausa(*datos), _PROVEEDORES))
 
 
 def obtener(forzar: bool = False) -> dict:
@@ -293,7 +314,7 @@ def obtener(forzar: bool = False) -> dict:
         fresco = _cache["proveedores"] and (ahora - _cache["momento"]) < TTL_CACHE
         if fresco and not forzar:
             return {
-                "proveedores": list(_cache["proveedores"]),
+                "proveedores": _con_pausa(_cache["proveedores"]),
                 "edadSegundos": round(ahora - _cache["momento"]),
                 "cacheado": True,
                 "ttlSegundos": TTL_CACHE,
@@ -306,7 +327,7 @@ def obtener(forzar: bool = False) -> dict:
         _cache["proveedores"] = proveedores
 
     return {
-        "proveedores": proveedores,
+        "proveedores": _con_pausa(proveedores),
         "edadSegundos": 0,
         "cacheado": False,
         "ttlSegundos": TTL_CACHE,

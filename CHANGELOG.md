@@ -22,6 +22,33 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [3.0.1] — 2026-10-02
+
+**Esquema de base de datos:** no lo toca (sigue en la **9**). Para deshacer la actualización basta
+con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Añadido
+
+**Pausar un proveedor desde Ajustes › API.** Cada fila de «Estado de las APIs»
+(salvo «Tipo de cambio») tiene un botón **Pausar / Reanudar**. Un proveedor
+pausado sale de la cadena de cotización y del sondeo de estado, así que no
+gasta cuota, y conserva sus claves. Se guarda en `apisPausadas` de
+`ajustes.json`. Solo afecta a cotizaciones y estado, no a la búsqueda de
+símbolos ni a los históricos.
+
+### Corregido
+
+**Avisos de Telegram de Finnhub a pares («Fallo» / «vuelve a responder»).**
+«No devolvió cotización» es el proveedor contestando bien sin conocer ese
+ticker, no una caída; ya no dispara aviso de proveedor. Los avisos de fallo
+reales indican ahora el activo («Al cotizar XXX: …»), y el error de Finnhub
+nombra el ticker y las causas probables.
+
+---
+
 ## [3.0.0] — 2026-10-01
 
 **Esquema de base de datos:** lo sube a la **9** (tabla nueva `alertas_precio`,

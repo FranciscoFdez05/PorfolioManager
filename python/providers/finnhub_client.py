@@ -371,7 +371,7 @@ def fetch_quote(symbol, api_key, timeout=None):
     previous_close = float(payload.get("pc") or 0)
 
     if current_price <= 0 and previous_close <= 0:
-        return None, "Finnhub no devolvió cotización para ese ticker"
+        return None, f"Finnhub no devolvió cotización para {normalized_symbol} (precio 0: ticker desconocido, fuera del plan gratuito o mercado sin datos)"
 
     return {
         "symbol": normalized_symbol,

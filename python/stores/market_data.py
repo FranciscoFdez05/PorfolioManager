@@ -21,7 +21,7 @@ Dos cosas más viven aquí, ambas para gastar menos cuota gratuita:
 import time
 from threading import Lock
 
-from core import settings, telegram_notifier
+from core import proveedores_pausados, settings, telegram_notifier
 from providers.alpha_vantage_client import fetch_quote as _fetch_av_quote
 from providers.eodhd_client import fetch_quote as _fetch_eodhd_quote
 from providers.finnhub_client import convert_quote_currency, fetch_quote as _fetch_finnhub_quote
@@ -151,7 +151,7 @@ def fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=Non
 
     last_error = None
     for candidato in _fallback_chain(proveedor_principal, symbol):
-        if _is_provider_resting(candidato):
+        if _is_provider_resting(candidato) or proveedores_pausados.esta_pausado(candidato):
             continue
 
         quote, error = _FETCHERS[candidato](symbol)
@@ -165,6 +165,15 @@ def fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=Non
             _store_quote(cache_key, quote, ttl)
             return quote, None
 
+        last_error = error
+
+        # «No devolvió cotización» es el proveedor contestando bien y sin
+        # conocer ese ticker: no es una caída suya. Avisar de ello hacía que
+        # cada activo sin datos disparase «Fallo de Finnhub» y, justo después,
+        # el siguiente activo bueno, «vuelve a responder».
+        if "no devolvió cotización" in str(error):
+            continue
+
         if is_rate_limited_error(error):
             _mark_provider_rate_limited(candidato)
             categoria = "cuota_agotada"
@@ -172,8 +181,10 @@ def fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=Non
             categoria = "no_responde"
         else:
             categoria = "fallo"
-        telegram_notifier.notificar_problema(categoria, _NOMBRE_PROVEEDOR.get(candidato, candidato), error)
+        telegram_notifier.notificar_problema(
+            categoria, _NOMBRE_PROVEEDOR.get(candidato, candidato), f"Al cotizar {symbol}: {error}"
+        )
 
-        last_error = error
-
+    if last_error is None and any(proveedores_pausados.esta_pausado(p) for p in _fallback_chain(proveedor_principal, symbol)):
+        return None, "Los proveedores de este activo están pausados (Ajustes > API)"
     return None, last_error or "Todos los proveedores de mercado están en reposo por límite de peticiones"

@@ -986,6 +986,30 @@
     color: var(--text-dim);
 }
 
+.ajustesApiEstadoBadge.pausada {
+    color: var(--text-dim);
+}
+
+.ajustesApiEstadoRow.pausada .ajustesApiEstadoProvider {
+    color: var(--text-muted);
+}
+
+.ajustesApiPausaBtn {
+    font: inherit;
+    font-size: 0.75rem;
+    padding: 2px 10px;
+    border-radius: 6px;
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.ajustesApiPausaBtn:hover:not(:disabled) {
+    color: var(--text-primary);
+    border-color: var(--text-dim);
+}
+
 .ajustesApiEstadoPie {
     color: var(--text-dim);
     font-size: 0.76rem;
