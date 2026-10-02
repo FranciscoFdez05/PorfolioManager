@@ -34,9 +34,9 @@ Ajustes › Datos. Nada que editar a mano.
 
 **Métricas › Evolución del saldo durante el mes.** Los ingresos con fecha suben
 el saldo en su día (antes entraban todos en el saldo inicial; ahora solo los
-recurrentes). Las mensualidades se reparten a partes iguales entre los días del
-mes, así que el saldo baja poco a poco en vez de caer el día 1. Al pasar el
-cursor por un día, el tooltip lista sus movimientos.
+recurrentes). Cada mensualidad se resta el día en que se cobra (su día de
+cobro del mes; el día 1 si no tiene). Al pasar el cursor por un día, el
+tooltip lista sus movimientos.
 
 **Crosshair en todos los gráficos de líneas.** Línea vertical en el punto activo
 y horizontal a la altura del cursor, como ya tenía Evolución del Portfolio.

@@ -2800,8 +2800,8 @@ function mDrawComparativaLineChart(ingMonthly, gastosMonthly) {
 // ── evolución del saldo durante el mes ─────────────────────────────────────
 
 // Día a día: arranca en los ingresos recurrentes del mes, suma cada ingreso en
-// su fecha y resta cada gasto en la suya; las mensualidades se reparten a
-// partes iguales entre todos los días del mes, así que el saldo baja poco a poco.
+// su fecha y resta cada gasto en la suya; las mensualidades se restan en
+// su día de cobro (el día 1 si no tiene).
 function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey) {
     const monthIdx = M_GASTOS_KEYS.indexOf(monthKey)
     const daysInMonth = new Date(Number(year), monthIdx + 1, 0).getDate()
@@ -2830,11 +2830,9 @@ function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey
         ;(gastosYearData?.mensualidades || []).forEach((m) => {
             const val = parseEuroNumber(m.meses?.[monthKey] || "")
             if (val <= 0) return
-            const parte = val / daysInMonth
-            for (let d = 1; d <= daysInMonth; d++) {
-                deltaPorDia[d] -= parte
-                movs[d].push({ nombre: `${m.nombre || "Mensualidad"} (mensualidad)`, importe: -parte })
-            }
+            const d = Math.min(Number(getMensualidadDiaMes(m, monthKey)) || 1, daysInMonth)
+            deltaPorDia[d] -= val
+            movs[d].push({ nombre: m.nombre || "Mensualidad", importe: -val })
         })
     }
     ;(gastosYearData?.months?.[monthKey]?.rows || []).forEach((row) => {
@@ -2900,15 +2898,9 @@ function mRenderSaldoMesChart(ingresosYearData, gastosYearData, year, monthKey) 
                         afterBody: (items) => {
                             const lista = movimientos[items[0].dataIndex] || []
                             if (!lista.length) return []
-                            const sinMens = lista.filter((m) => !m.nombre.endsWith("(mensualidad)"))
-                            const mens = lista.length - sinMens.length
-                            const lines = sinMens.map(
+                            const lines = lista.map(
                                 (m) => `${m.importe > 0 ? "+" : "−"} ${m.nombre}: ${formatEuro(Math.abs(m.importe))}`
                             )
-                            if (mens) {
-                                const tot = lista.filter((m) => m.nombre.endsWith("(mensualidad)")).reduce((x, m) => x + m.importe, 0)
-                                lines.push(`− Mensualidades (${mens}): ${formatEuro(Math.abs(tot))}`)
-                            }
                             return ["", ...lines]
                         }
                     }
