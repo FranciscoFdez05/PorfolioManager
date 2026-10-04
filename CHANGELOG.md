@@ -22,6 +22,22 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [3.0.3] — 2026-10-04
+
+**Esquema de base de datos:** no lo toca (sigue en la **9**). Para deshacer la actualización basta
+con volver a la imagen anterior.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Cambiado
+
+**Métricas › Evolución del saldo durante el mes.** La línea del saldo pasa de
+escalones a una curva suave (interpolación monótona, que no se sale de los
+valores reales entre un día y otro).
+
+---
+
 ## [3.0.2] — 2026-10-02
 
 **Esquema de base de datos:** no lo toca (sigue en la **9**). Para deshacer la actualización basta

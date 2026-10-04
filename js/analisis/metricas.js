@@ -2874,7 +2874,7 @@ function mRenderSaldoMesChart(ingresosYearData, gastosYearData, year, monthKey) 
                 {
                     label: "Saldo",
                     data: balances,
-                    stepped: true,
+                    cubicInterpolationMode: "monotone",
                     borderColor: "#3a7bd5",
                     backgroundColor: "rgba(58,123,213,0.14)",
                     borderWidth: 2.5,
