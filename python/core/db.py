@@ -70,7 +70,9 @@ CREATE TABLE IF NOT EXISTS activos (
     last_updated    TEXT NOT NULL DEFAULT '',
     color           TEXT NOT NULL DEFAULT '',
     tv_symbol       TEXT NOT NULL DEFAULT '',
-    convert_currency TEXT NOT NULL DEFAULT ''
+    convert_currency TEXT NOT NULL DEFAULT '',
+    -- Coste anual (TER) del fondo, en %. Es del activo y no de cada compra.
+    coste_anual     TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS activo_rows (
@@ -596,7 +598,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id,
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 9
+ESQUEMA_VERSION = 10
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1183,6 +1185,27 @@ def _esquema_9(conn):
         );
         CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id, activa);
     """)
+
+
+@_migracion(10)
+def _esquema_10(conn):
+    """Coste anual (TER) a nivel de activo.
+
+    Antes se tecleaba en cada compra, pero es una propiedad del fondo. Se
+    añade la columna y se parte del último valor que tuviera alguna compra del
+    activo. La columna vieja de `activo_rows` se queda sin leerse: borrarla no
+    aporta nada y cierra la vuelta atrás.
+    """
+    activos_cols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
+    if "coste_anual" not in activos_cols:
+        conn.execute("ALTER TABLE activos ADD COLUMN coste_anual TEXT NOT NULL DEFAULT ''")
+    conn.execute(
+        "UPDATE activos SET coste_anual = COALESCE(("
+        "SELECT r.coste_anual FROM activo_rows r "
+        "WHERE r.asset_id = activos.id AND r.coste_anual != '' "
+        "ORDER BY r.id DESC LIMIT 1), '') "
+        "WHERE coste_anual = ''"
+    )
 
 
 def get_db() -> sqlite3.Connection:

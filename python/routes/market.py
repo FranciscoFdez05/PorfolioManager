@@ -24,6 +24,7 @@ from providers.yahoo_finance_client import search_symbol as search_yahoo_symbol
 from stores import benchmark
 from stores.asset_store import listAssets
 from stores.asset_utils import SUPPORTED_ASSET_CURRENCIES
+from stores.divisas_historico import HistoricoInvalido, historico_par
 from stores.helpers import (
     call_alpha_vantage_with_fallbacks,
     call_eodhd_with_fallbacks,
@@ -83,6 +84,22 @@ def listDivisas():
         "ok": True,
         "divisas": [{"code": codigo, "name": publicadas[codigo]} for codigo in codigos if codigo in publicadas],
     })
+
+
+@market_bp.route("/api/divisas/historico", methods=["GET"])
+def getHistoricoDivisas():
+    """Serie de un par de divisas para el comparador de Herramientas."""
+    try:
+        datos, error = historico_par(
+            request.args.get("base"), request.args.get("quote"), request.args.get("rango", "1M")
+        )
+    except HistoricoInvalido as invalido:
+        return jsonify({"ok": False, "error": str(invalido)}), 400
+
+    if error:
+        return jsonify({"ok": False, "error": error}), 502
+
+    return jsonify({"ok": True, **datos})
 
 
 @market_bp.route("/api/divisas/cambio", methods=["GET"])

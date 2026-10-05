@@ -10,10 +10,14 @@
 
 /* ── Página ─────────────────────────────────────────────────────────────── */
 .herramientasPage {
-    padding: 20px;
+    /* Arriba apenas hay margen: la barra de navegación ya deja el suyo, y sumar
+       20 px más empujaba las herramientas altas (divisas, capitalización) fuera
+       de la ventana. */
+    padding: 4px 20px 16px;
+    margin-top: -10px;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 12px;
 }
 
 /* ── Selector de herramienta ────────────────────────────────────────────── */
@@ -107,7 +111,7 @@
 .herramientaPanel.active {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 12px;
 }
 
 /* Cabecera: qué calcula la herramienta y con qué fórmula. Los ratios ponen
@@ -118,7 +122,7 @@
     justify-content: space-between;
     gap: 16px;
     flex-wrap: wrap;
-    padding-bottom: 14px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--border-soft);
 }
 .hPanelHeadText {
@@ -132,7 +136,7 @@
     letter-spacing: -0.01em;
 }
 .hPanelDesc {
-    margin: 4px 0 0;
+    margin: 2px 0 0;
     font-size: 0.82rem;
     color: var(--text-dim);
     line-height: 1.45;
@@ -147,7 +151,7 @@
 .herramientaBody {
     display: grid;
     grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-    gap: 18px;
+    gap: 14px;
     /* stretch, no start: con "start" la tarjeta de parámetros y la de
        resultados quedaban cada una con su alto de contenido, así que el lado
        más corto dejaba un hueco vacío junto al otro en vez de terminar a la
@@ -910,24 +914,114 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-surface);
+}
+
+.hCapRefFija {
+    border-left: 3px solid var(--accent);
+}
+
+.hCapRefInfo {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 .hCapRefNombre {
-    flex: 0 0 38%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 13px;
+    font-weight: 600;
+    color: var(--text-bright);
 }
 
-.hCapRef input {
+.hCapRefInfo small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.hCapRefValor {
+    flex: 0 0 auto;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-bright);
+}
+
+.hCapRefSinDato {
+    font-weight: 500;
+    color: #f59e0b;
+}
+
+/* Títulos de los dos grupos de referencias. */
+.hCapRefGrupo {
+    margin: 4px 2px 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
+.hCapRefGrupo:first-child {
+    margin-top: 0;
+}
+
+/* Las añadidas por el usuario: nombre y quitar arriba, la capitalización debajo
+   con todo el ancho, para que un número de doce cifras se lea entero. */
+.hCapRefPropia {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 8px;
+}
+.hCapRefIncompleta {
+    border-color: rgba(245, 158, 11, 0.55);
+}
+.hCapRefCampo {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--bg-panel);
+    transition: border-color 0.15s;
+}
+.hCapRefCampo:focus-within {
+    border-color: var(--accent);
+}
+.hCapRefCampo input {
     flex: 1;
     min-width: 0;
+    padding: 7px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--text-bright);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+}
+.hCapRefDivisa {
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+.hCapRefAviso {
+    grid-column: 1 / -1;
+    font-size: 11px;
+    color: #f59e0b;
 }
 
 .hCapQuitar {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border: 0;
     border-radius: 6px;
     background: transparent;
@@ -935,6 +1029,9 @@
     font-size: 18px;
     line-height: 1;
     cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s;
 }
 
 .hCapQuitar:hover {
@@ -953,9 +1050,16 @@
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 2px 12px;
-    padding: 10px 12px;
-    border: 1px solid var(--border, rgba(148, 163, 184, 0.25));
-    border-radius: 8px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 10px;
+    background: var(--bg-panel);
+}
+
+.hCapComp > span {
+    font-weight: 600;
+    color: var(--text-bright);
 }
 
 .hCapComp strong {
@@ -965,4 +1069,233 @@
 .hCapComp small {
     grid-column: 1 / -1;
     color: var(--text-dim);
+}
+
+/* ── Comparador de divisas ──────────────────────────────────────────────── */
+.hFxSwap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+}
+.hFxSwap svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.25s;
+}
+.hFxSwap:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.hFxSwap:hover svg {
+    transform: rotate(180deg);
+}
+
+.hFxRate {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-surface);
+}
+.hFxRateMain {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    line-height: 1.25;
+}
+.hFxRateInv {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+.hFxRateFecha {
+    margin-top: 4px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+.hFxConvertido {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-bright);
+}
+
+.hFxMain {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+
+.hFxRangos {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.hFxRango {
+    padding: 6px 12px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-bright);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+}
+.hFxRango:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--btn-border-hover);
+}
+.hFxRango.active {
+    background: var(--btn-active-bg);
+    border-color: var(--btn-active-border);
+    color: var(--btn-active-text);
+}
+
+.hFxChartWrap {
+    height: 280px;
+}
+.hFxEstado {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    background: color-mix(in srgb, var(--bg-panel) 82%, transparent);
+}
+.hFxEstadoVisible {
+    display: flex;
+}
+.hFxEstadoError {
+    color: #f87171;
+}
+
+.hFxStats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 10px;
+    margin-top: 14px;
+}
+.hFxStat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.hFxStatLabel {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+}
+.hFxStatValue {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-bright);
+}
+
+.hFxVariaciones {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+}
+.hFxVar {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-surface);
+    text-align: left;
+    cursor: pointer;
+    transition:
+        border-color 0.15s,
+        background 0.15s;
+}
+.hFxVar:hover {
+    border-color: var(--accent);
+}
+.hFxVar.active {
+    border-color: var(--btn-active-border);
+    background: var(--btn-active-bg);
+}
+.hFxVarLabel {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+.hFxVarPct {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-bright);
+}
+.hFxVarRef {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+.hFxPos {
+    color: #34d399;
+}
+.hFxNeg {
+    color: #f87171;
+}
+
+.hFxStatDetalle {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+}
+.hFxVarDif {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+.hFxVarEfecto {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* Capitalización objetivo: los datos del activo y las referencias van en dos
+   tarjetas una junto a la otra, y los resultados ocupan el resto. En una sola
+   columna la tarjeta era tan alta que «Calcular» quedaba fuera de la ventana. */
+#toolCapitalizacion .herramientaBody {
+    grid-template-columns: minmax(250px, 300px) minmax(250px, 300px) minmax(0, 1fr);
+}
+#toolCapitalizacion .hCapRefTitulo {
+    margin-top: 0;
+}
+@media (max-width: 1250px) {
+    #toolCapitalizacion .herramientaBody {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    #toolCapitalizacion .hResultsCol {
+        grid-column: 1 / -1;
+    }
+}
+@media (max-width: 700px) {
+    #toolCapitalizacion .herramientaBody {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }

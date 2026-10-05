@@ -51,7 +51,7 @@ def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
     safe_id = slugify(asset_id)
     row = conn.execute(
         "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
-        "sort_order, price, currency, change, status, last_updated, color, tv_symbol "
+        "sort_order, price, currency, change, status, last_updated, color, tv_symbol, coste_anual "
         "FROM activos WHERE id = ?",
         (safe_id,)
     ).fetchone()
@@ -78,6 +78,7 @@ def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
         "lastUpdated": row["last_updated"],
         "color": row["color"],
         "tvSymbol": row["tv_symbol"],
+        "costeAnual": row["coste_anual"],
     }
 
     result["rows"] = [

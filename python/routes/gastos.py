@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 
+from stores.cuenta_ahorro_store import TIPO_AHORRO, asegurar_categorias
 from stores.gastos_store import (
     create_default_gastos_year,
     delete_gastos_year,
@@ -31,6 +32,9 @@ def getGastosYears():
 
 @gastos_bp.route("/api/gastos-tipos", methods=["GET"])
 def getGastosTipos():
+    # La categoría de la cuenta de ahorro está fija en el código: se da de alta
+    # aquí para que salga en el desplegable sin que nadie tenga que crearla.
+    asegurar_categorias()
     return jsonify({"types": read_gastos_types()})
 
 
@@ -38,6 +42,8 @@ def getGastosTipos():
 def saveGastosTipos():
     requestData = request.get_json(silent=True) or {}
     types = sanitize_gastos_types(requestData.get("types", []))
+    if TIPO_AHORRO.lower() not in {t.lower() for t in types}:
+        types.append(TIPO_AHORRO)
     write_gastos_types(types)
     return jsonify({"ok": True, "types": types})
 

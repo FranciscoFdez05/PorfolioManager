@@ -22,6 +22,72 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [3.1.0] — 2026-10-05
+
+**Esquema de base de datos:** lo sube a la **10** (columna nueva `coste_anual` en
+`activos`; se rellena con el último coste anual que tuviera alguna compra del
+activo y no se borra nada). Para deshacer la actualización, levantar la imagen
+anterior y restaurar `data/backups/auto/<portfolio>_pre-esquema-9-a-10_*.db`.
+
+**Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
+Ajustes › Datos. Nada que editar a mano.
+
+### Añadido
+
+**Gastos › Cuenta de ahorro.** Ventana nueva para el dinero apartado de la
+cuenta bancaria. Meter dinero en ella es un gasto en su día, mes y año; sacarlo
+es un ingreso. Los dos usan la categoría reservada «Cuenta de ahorro», fija en
+el código y protegida contra renombrar o eliminar, y también se pueden añadir
+desde Gastos e Ingresos eligiéndola. No tiene tablas propias.
+
+- Extracto anual de la cuenta bancaria, saldo total y gráfica mensual con
+  aportado y rendimientos (tooltip con el detalle de cada mes).
+- Cuentas remuneradas y dividendos vinculables desde `···` › Configurar cuenta.
+  Cada cuenta remunerada o los dividendos solo cuentan en una cuenta de ahorro.
+- Objetivo de ahorro con barra de progreso y estimación de cuándo se alcanza.
+- Aportación mensual automática: se crea sola al abrir la ventana, desde el mes
+  en que se activa. Lo que se borre no vuelve a crearse.
+- Varias cuentas de ahorro (principal, Viaje, Coche…), con alta, renombrado y
+  baja (esta última solo sin movimientos).
+- Editar movimientos, ordenar las tablas y descargar CSV.
+
+**Herramientas › Mercado › Divisas.** Comparador de divisas FIAT: eliges dos
+(EUR y USD, por ejemplo), ves la cotización, su inversa, una conversión de
+importes y la gráfica del par. El botón «Dar la vuelta» pasa de EUR/USD a
+USD/EUR al instante, sin volver a pedir nada. Periodos de 1 día, 1 semana,
+1, 3 y 6 meses, 1 y 5 años. El movimiento se ve en valor y en %: al pasar el
+ratón (desde el inicio y frente al punto anterior), en las estadísticas del
+periodo y en una tabla por día, semana, mes… que incluye lo que supone para la
+cantidad que estés convirtiendo. Los datos salen de Yahoo Finance, sin clave.
+
+### Cambiado
+
+**Ahorro y Métricas.** Lo que se aparta en una cuenta de ahorro ya no cuenta
+como gasto ni como ingreso en la tasa de ahorro, en los gráficos de gastos e
+ingresos, en el resumen anual ni en «Gastos (año)» / «Ingresos (año)» de la
+barra superior. El saldo mensual no cambia: sigue siendo el de la cuenta bancaria.
+
+**Herramientas › Capitalización objetivo.** Bitcoin y el oro están siempre
+como referencias, sin buscarlos: la capitalización de Bitcoin se pide en vivo a
+TradingView y la del oro se calcula como el oro extraído (~216.000 t, estimación
+del World Gold Council de 2023) por el precio de la onza en vivo. Las demás
+referencias las sigue añadiendo el usuario, y se muestran aparte, cada una en
+su tarjeta; las que vienen de una búsqueda se actualizan al calcular, salvo las
+que el usuario escribió a mano, y las que ahora son fijas se quitan de las
+guardadas para no salir dos veces. El precio actual ya puede ser cero: entonces
+el multiplicador y la subida salen como «—». Los datos del activo y las
+referencias van en dos tarjetas, para que entre todo en pantalla.
+
+**Gastos › tabla anual.** La primera columna es algo más ancha y la flecha de
+«Mensualidades» queda en la misma línea que el nombre.
+
+**ETFs › Coste anual.** Deja de ser una columna que se tecleaba en cada compra:
+es del fondo, así que se pide una sola vez al crear el activo (solo si el tipo
+es ETFs) y se puede cambiar desde «Editar activo». Se muestra en la cabecera de
+la ficha junto al resto de datos del ETF.
+
+---
+
 ## [3.0.3] — 2026-10-04
 
 **Esquema de base de datos:** no lo toca (sigue en la **9**). Para deshacer la actualización basta

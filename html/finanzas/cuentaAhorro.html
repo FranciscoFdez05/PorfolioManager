@@ -1,0 +1,80 @@
+<section class="cuentaAhorroPage">
+    <div class="cuentaAhorroCuentas" id="cuentaAhorroCuentas" hidden></div>
+
+    <div class="cuentaAhorroTopBar">
+        <div class="cuentaAhorroYearList" id="cuentaAhorroYearList"></div>
+        <div class="pageActionsMenu" id="cuentaAhorroActionsMenu">
+            <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
+            <div class="pageActionsDropdown" id="cuentaAhorroActionsDropdown">
+                <button id="cuentaAhorroAddBtn" class="pageActionsItem" type="button">Añadir movimiento</button>
+                <button id="cuentaAhorroConfigBtn" class="pageActionsItem" type="button">Configurar cuenta</button>
+                <button id="cuentaAhorroCsvBtn" class="pageActionsItem" type="button">Descargar CSV</button>
+                <div class="pageActionsDivider"></div>
+                <button id="cuentaAhorroNewAccountBtn" class="pageActionsItem" type="button">Nueva cuenta de ahorro</button>
+                <button id="cuentaAhorroRenameBtn" class="pageActionsItem" type="button">Renombrar cuenta</button>
+                <button id="cuentaAhorroDeleteBtn" class="pageActionsItem pageActionsItemDanger" type="button">Eliminar cuenta</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="cuentaAhorroLayout">
+        <div class="cuentaAhorroMain">
+            <div class="cuentaAhorroTabs">
+                <button class="gastosMonthTab active" type="button" data-cuenta-ahorro-tab="movimientos">Movimientos</button>
+                <button class="gastosMonthTab" type="button" data-cuenta-ahorro-tab="rendimientos">Cuenta remunerada / dividendos</button>
+            </div>
+
+            <div class="gastosMovementsWrapper cuentaAhorroTableWrapper">
+                <table class="gastosMovementsTable" id="cuentaAhorroTable">
+                    <thead id="cuentaAhorroHead"></thead>
+                    <tbody id="cuentaAhorroBody"></tbody>
+                </table>
+                <p class="overviewEmpty hidden" id="cuentaAhorroEmpty"></p>
+            </div>
+
+            <div class="gastosActions" id="cuentaAhorroActions">
+                <button id="cuentaAhorroAddRowBtn" class="primaryButton" type="button">Añadir movimiento</button>
+            </div>
+        </div>
+
+        <aside class="cuentaAhorroSide">
+            <div class="summaryCard cuentaAhorroCard">
+                <div class="summaryCardTitle">Cuenta bancaria · <span id="cuentaAhorroBancoYear"></span></div>
+                <dl class="cuentaAhorroStats">
+                    <div><dt>Ingresos</dt><dd class="cuentaAhorroPos" id="cuentaAhorroIngresos">—</dd></div>
+                    <div><dt>Gastos</dt><dd class="cuentaAhorroNeg" id="cuentaAhorroGastos">—</dd></div>
+                    <div><dt>Balance</dt><dd id="cuentaAhorroBalance">—</dd></div>
+                </dl>
+            </div>
+
+            <div class="summaryCard cuentaAhorroCard">
+                <div class="summaryCardTitle" id="cuentaAhorroTitulo">Cuenta de ahorro</div>
+                <div class="summaryCardValue" id="cuentaAhorroSaldo">—</div>
+
+                <div class="cuentaAhorroObjetivo" id="cuentaAhorroObjetivo" hidden>
+                    <div class="cuentaAhorroObjetivoTop">
+                        <span id="cuentaAhorroObjetivoTexto"></span>
+                        <strong id="cuentaAhorroObjetivoPct"></strong>
+                    </div>
+                    <div class="cuentaAhorroBarra"><div class="cuentaAhorroBarraRelleno" id="cuentaAhorroBarra"></div></div>
+                    <p class="cuentaAhorroObjetivoNota" id="cuentaAhorroObjetivoNota"></p>
+                </div>
+
+                <dl class="cuentaAhorroStats cuentaAhorroStatsSmall">
+                    <div><dt id="cuentaAhorroAnadidoLabel">Añadido</dt><dd class="cuentaAhorroPos" id="cuentaAhorroAnadido">—</dd></div>
+                    <div class="hidden" id="cuentaAhorroRetiradoRow"><dt>Retirado</dt><dd class="cuentaAhorroNeg" id="cuentaAhorroRetirado">—</dd></div>
+                    <div><dt>Cuenta remunerada</dt><dd class="cuentaAhorroPos" id="cuentaAhorroRemunerada">—</dd></div>
+                    <div class="hidden" id="cuentaAhorroDividendosRow"><dt>Dividendos</dt><dd class="cuentaAhorroPos" id="cuentaAhorroDividendos">—</dd></div>
+                </dl>
+                <div class="cuentaAhorroChartWrap">
+                    <svg class="cuentaAhorroChart" id="cuentaAhorroChart" viewBox="0 0 300 110" role="img" aria-label="Evolución del saldo durante el año"></svg>
+                    <div class="cuentaAhorroTooltip hidden" id="cuentaAhorroTooltip"></div>
+                </div>
+                <div class="cuentaAhorroLeyenda">
+                    <span class="cuentaAhorroLeyendaItem cuentaAhorroLeyendaSaldo">Saldo</span>
+                    <span class="cuentaAhorroLeyendaItem cuentaAhorroLeyendaAportado">Aportado</span>
+                </div>
+            </div>
+        </aside>
+    </div>
+</section>

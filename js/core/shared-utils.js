@@ -12,6 +12,36 @@
 // solo puede ser de miles, que es lo que se hacía y se conserva.
 const MILES_ES = /^-?\d{1,3}(\.\d{3})+$/
 
+// Categoría reservada de gastos e ingresos para los movimientos de la cuenta de
+// ahorro. Debe coincidir con TIPO_AHORRO y SEPARADOR de
+// stores/cuenta_ahorro_store.py. Las cuentas adicionales la llevan de prefijo:
+// "Cuenta de ahorro · Viaje".
+const AHORRO_TIPO_RESERVADO = "Cuenta de ahorro"
+const AHORRO_TIPO_SEPARADOR = " · "
+
+function esTipoAhorroReservado(valor) {
+    const texto = String(valor || "")
+        .trim()
+        .toLowerCase()
+    const base = AHORRO_TIPO_RESERVADO.toLowerCase()
+    return texto === base || texto.startsWith(base + AHORRO_TIPO_SEPARADOR)
+}
+
+// Copia del año de gastos o ingresos sin los movimientos de las cuentas de
+// ahorro. Meter dinero en ahorro es un gasto de la cuenta bancaria, pero no es
+// un gasto de verdad: contarlo hundía la tasa de ahorro justo al ahorrar.
+function sinMovimientosAhorro(data) {
+    if (!data || typeof data !== "object" || !data.months) return data
+
+    const months = {}
+    Object.entries(data.months).forEach(([key, month]) => {
+        months[key] = { ...month, rows: (month?.rows || []).filter((row) => !esTipoAhorroReservado(row?.tipo)) }
+    })
+
+    const sinTipo = (lista) => (Array.isArray(lista) ? lista.filter((tipo) => !esTipoAhorroReservado(tipo)) : lista)
+    return { ...data, months, gastosTipos: sinTipo(data.gastosTipos), ingresosTipos: sinTipo(data.ingresosTipos) }
+}
+
 function normalizeDecimalSeparators(text) {
     if (text.includes(",")) {
         return text.replaceAll(".", "").replace(",", ".")

@@ -263,8 +263,8 @@ function pinvEstadoOperacion(op) {
 /**
  * Un activo del plan con sus operaciones resueltas y sus totales.
  *
- * Las canceladas se enseñan pero no cuentan: ni en lo planificado ni en el
- * reparto de porcentajes. Lo realizado es lo que en Operaciones está
+ * Las canceladas se enseñan tachadas pero siguen formando parte del plan: cuentan
+ * como planificadas y sin realizar. Lo realizado es lo que en Operaciones está
  * "Completado". El precio medio se pondera por cantidad y sale en euros, que
  * es la única moneda en la que se pueden mezclar compras en dólares y en euros.
  */
@@ -284,23 +284,21 @@ function pinvCalcularActivo(planActivo) {
         const importeEur = pinvAEuros(importe, op.currency)
         const unidades = pinvNumero(op.cantidad) || 0
 
-        if (estado !== "cancelada") {
-            planificadoEur += importeEur
-            ordenes.add(op.orden === "Venta" ? "Venta" : "Compra")
-            if (estado === "realizada") realizadoEur += importeEur
-            // El precio medio solo se pondera con las operaciones que dicen
-            // cuántas unidades son: una con total y sin cantidad lo desviaría.
-            if (unidades > 0) {
-                cantidad += unidades
-                costeEur += importeEur
-            }
+        planificadoEur += importeEur
+        ordenes.add(op.orden === "Venta" ? "Venta" : "Compra")
+        if (estado === "realizada") realizadoEur += importeEur
+        // El precio medio solo se pondera con las operaciones que dicen
+        // cuántas unidades son: una con total y sin cantidad lo desviaría.
+        if (unidades > 0) {
+            cantidad += unidades
+            costeEur += importeEur
         }
 
         return { op, estado, importe, importeEur, unidades, pct: null }
     })
 
     for (const fila of filas) {
-        fila.pct = fila.estado !== "cancelada" && planificadoEur > 0 ? (fila.importeEur / planificadoEur) * 100 : null
+        fila.pct = planificadoEur > 0 ? (fila.importeEur / planificadoEur) * 100 : null
     }
 
     let orden = "—"
@@ -319,7 +317,7 @@ function pinvCalcularActivo(planActivo) {
         realizadoEur,
         pctInvertido: planificadoEur > 0 ? (realizadoEur / planificadoEur) * 100 : null,
         realizadas: filas.filter((fila) => fila.estado === "realizada").length,
-        vigentes: filas.filter((fila) => fila.estado !== "cancelada").length
+        vigentes: filas.length
     }
 }
 

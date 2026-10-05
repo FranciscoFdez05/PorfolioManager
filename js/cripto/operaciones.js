@@ -896,9 +896,11 @@ function getOperationsYearKey(group = {}) {
     return group.year || "sin-fecha"
 }
 
+const OPERATIONS_CANCELLED_GROUP_KEY = "canceladas"
+
 function buildOperationsYearHeaderRow(group) {
     const columnCount = document.querySelector(".operationsTable thead tr")?.cells.length || 13
-    const label = group.year || "Sin fecha"
+    const title = group.title || `Completadas ${group.year || "Sin fecha"}`
     const count = group.rows.length
     const collapsed = collapsedOperationYears.has(getOperationsYearKey(group))
     const tr = document.createElement("tr")
@@ -908,7 +910,7 @@ function buildOperationsYearHeaderRow(group) {
         <td class="operationsYearHeader" colspan="${columnCount}">
             <button type="button" class="operationsYearToggle" aria-expanded="${collapsed ? "false" : "true"}">
                 <span class="operationsYearChevron" aria-hidden="true"></span>
-                <span>Completadas ${label} · ${count} ${count === 1 ? "operación" : "operaciones"}</span>
+                <span>${title} · ${count} ${count === 1 ? "operación" : "operaciones"}</span>
             </button>
         </td>`
     return tr
@@ -951,14 +953,21 @@ function renderOperationsTable() {
     if (operacionesEmptyEl) operacionesEmptyEl.classList.add("hidden")
     if (operationsTableWrapper) operationsTableWrapper.classList.remove("hidden")
 
-    const openRows = rows.filter((row) => row.estado !== "Completado")
+    const openRows = rows.filter((row) => row.estado !== "Completado" && row.estado !== "Cancelado")
+    const cancelledRows = rows.filter((row) => row.estado === "Cancelado")
     const completedGroups = groupCompletedOperationsByYear(rows)
 
     openRows.forEach((row) => {
         operationsBody.appendChild(buildOperationRow(row))
     })
 
-    completedGroups.forEach((group) => {
+    // Activas arriba, canceladas en medio y completadas por año debajo. La clave
+    // del grupo no es un año, así que no choca con las de las completadas.
+    const sections = cancelledRows.length
+        ? [{ year: OPERATIONS_CANCELLED_GROUP_KEY, title: "Canceladas", rows: cancelledRows }, ...completedGroups]
+        : completedGroups
+
+    sections.forEach((group) => {
         operationsBody.appendChild(buildOperationsYearHeaderRow(group))
 
         if (collapsedOperationYears.has(getOperationsYearKey(group))) {

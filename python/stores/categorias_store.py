@@ -13,6 +13,7 @@ recurrentes (que guardan su categoría en una columna aparte).
 """
 
 from core.db import get_db, transaction
+from stores.cuenta_ahorro_store import TIPO_AHORRO, esTipoReservado
 
 TIPOS_VALIDOS = ("gasto", "ingreso")
 
@@ -132,6 +133,11 @@ def renombrarCategoria(tipo, origen, destino):
     origen = normalizarEtiqueta(origen, "de")
     destino = normalizarEtiqueta(destino, "a")
 
+    # La cuenta de ahorro reconoce sus movimientos por esta etiqueta: ni se
+    # puede renombrar ni usar de destino (fusionaría movimientos ajenos con ella).
+    if esTipoReservado(origen) or esTipoReservado(destino):
+        raise CategoriaInvalida(f"«{TIPO_AHORRO}» es una categoría reservada de la cuenta de ahorro")
+
     if origen == destino:
         return 0
 
@@ -177,6 +183,9 @@ def eliminarCategoria(tipo, etiqueta):
     """Borra la categoría del catálogo. Falla si está en uso en algún año."""
     tipo = normalizarTipo(tipo)
     etiqueta = normalizarEtiqueta(etiqueta, "label")
+
+    if esTipoReservado(etiqueta):
+        raise CategoriaInvalida(f"«{TIPO_AHORRO}» es una categoría reservada de la cuenta de ahorro")
 
     tablas = _TABLAS[tipo]
     tablaCatalogo, columnaCatalogo = tablas["catalogo"]

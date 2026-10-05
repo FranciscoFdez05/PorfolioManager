@@ -117,6 +117,7 @@ def createDefaultAssetPayload(name, assetType, assetId=None):
         "lastUpdated": "",
         "color": "",
         "convertCurrency": "",
+        "costeAnual": "",
         "operationRows": [],
         "conversionRows": [],
         "rows": []
@@ -251,6 +252,7 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "color": sanitize_color(requestData.get("color", "")),
         "tvSymbol": _trunc(requestData.get("tvSymbol", ""), _MAX_TICKER).strip(),
         "convertCurrency": normalizeConvertCurrency(requestData.get("convertCurrency", "")),
+        "costeAnual": _trunc(requestData.get("costeAnual", ""), _MAX_SHORT).strip(),
         # El cliente reenvía el activo entero al guardar, así que si `hidden` no
         # se copia aquí el upsert lo reescribe a 0 y el activo oculto reaparece.
         "hidden": bool(requestData.get("hidden", False)),

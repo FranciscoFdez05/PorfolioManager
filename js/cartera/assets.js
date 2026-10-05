@@ -370,14 +370,15 @@ async function createAssetOnServer(
     marketSymbol = "",
     marketProvider = "finnhub",
     color = "",
-    tvSymbol = ""
+    tvSymbol = "",
+    costeAnual = ""
 ) {
     const response = await fetch("/api/activos", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ name, type, marketSymbol, marketProvider, finnhubSymbol: marketSymbol, color, tvSymbol })
+        body: JSON.stringify({ name, type, marketSymbol, marketProvider, finnhubSymbol: marketSymbol, color, tvSymbol, costeAnual })
     })
 
     if (!response.ok) {
@@ -3540,7 +3541,7 @@ function renderAssetTablePage(asset) {
     }
 
     contentArea.innerHTML = `
-        <section class="assetTablePage" data-asset-id="${escapeHtml(asset.id)}" data-asset-type="${escapeHtml(asset.type)}" data-asset-name="${escapeHtml(asset.name)}" data-asset-symbol="${escapeHtml(asset.symbol)}" data-asset-price="${escapeHtml(asset.price || "0,00")}" data-asset-currency="${escapeHtml(asset.currency || "EUR")}" data-asset-change="${escapeHtml(asset.change || "+0,00%")}" data-asset-status="${escapeHtml(asset.status || "Mercado abierto")}" data-asset-last-updated="${escapeHtml(asset.lastUpdated || "")}" data-asset-market-provider="${escapeHtml(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || ""))}" data-asset-market-symbol="${escapeHtml(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-finnhub-symbol="${escapeHtml(asset.finnhubSymbol || "")}" data-asset-color="${escapeHtml(asset.color || "")}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}" data-asset-convert-currency="${escapeHtml(asset.convertCurrency || "")}">
+        <section class="assetTablePage" data-asset-id="${escapeHtml(asset.id)}" data-asset-type="${escapeHtml(asset.type)}" data-asset-name="${escapeHtml(asset.name)}" data-asset-symbol="${escapeHtml(asset.symbol)}" data-asset-price="${escapeHtml(asset.price || "0,00")}" data-asset-currency="${escapeHtml(asset.currency || "EUR")}" data-asset-change="${escapeHtml(asset.change || "+0,00%")}" data-asset-status="${escapeHtml(asset.status || "Mercado abierto")}" data-asset-last-updated="${escapeHtml(asset.lastUpdated || "")}" data-asset-market-provider="${escapeHtml(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || ""))}" data-asset-market-symbol="${escapeHtml(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-finnhub-symbol="${escapeHtml(asset.finnhubSymbol || "")}" data-asset-color="${escapeHtml(asset.color || "")}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}" data-asset-convert-currency="${escapeHtml(asset.convertCurrency || "")}" data-asset-coste-anual="${escapeHtml(asset.costeAnual || "")}">
             <div class="assetPageHeader">
                 <div class="assetHeaderLeft">
                     <div class="assetTitleRow">
@@ -3551,7 +3552,7 @@ function renderAssetTablePage(asset) {
                         <span class="assetValueAmount" id="assetStatPrecioActual">—</span>
                     </div>
                 </div>
-                <div class="assetStatsPanel" id="assetStatsPanel">
+                <div class="assetStatsPanel${isEtf ? " assetStatsPanelEtf" : ""}" id="assetStatsPanel">
                     <div class="assetStatCard">
                         <span class="assetStatLabel">Valor actual</span>
                         <span class="assetStatValue" id="assetStatNetoActual">—</span>
@@ -3568,6 +3569,16 @@ function renderAssetTablePage(asset) {
                         <span class="assetStatLabel">Capital invertido</span>
                         <span class="assetStatValue" id="assetStatInvertido">—</span>
                     </div>
+                    ${
+                        isEtf
+                            ? `<div class="assetStatCard">
+                        <span class="assetStatLabel">Coste anual</span>
+                        <span class="assetStatValue" id="assetStatCosteAnual">${
+                            String(asset.costeAnual || "").trim() ? formatCellPercentValue(asset.costeAnual) : "—"
+                        }</span>
+                    </div>`
+                            : ""
+                    }
                     <div class="assetStatCard assetStatCardPnL">
                         <span class="assetStatLabel">Ganancia / Pérdida Total</span>
                         <div class="assetStatValueRow">
@@ -3638,7 +3649,6 @@ function renderAssetTablePage(asset) {
                                     <th class="mThSort" data-sortkey="precioParticipacion">Precio Participación<span class="mSortArrow"></span></th>
                                     ${isCrypto ? '<th class="mThSort" data-sortkey="currency">Moneda fiat<span class="mSortArrow"></span></th>' : ""}
                                     <th class="mThSort" data-sortkey="capitalInvertidoBruto">Invertido bruto<span class="mSortArrow"></span></th>
-                                    ${isEtf ? '<th class="mThSort" data-sortkey="costeAnual">Coste Anual<span class="mSortArrow"></span></th>' : ""}
                                     ${isCrypto ? '<th class="mThSort" data-sortkey="comisionesCripto">Comisiones cripto<span class="mSortArrow"></span></th><th class="mThSort" data-sortkey="comisionesFiat">Comisiones fiat<span class="mSortArrow"></span></th>' : '<th class="mThSort" data-sortkey="comisiones">Comisiones<span class="mSortArrow"></span></th>'}
                                     <th class="mThSort" data-sortkey="capitalInvertidoNeto">Invertido neto<span class="mSortArrow"></span></th>
                                     <th class="rowActionsHeader"></th>
@@ -3753,10 +3763,6 @@ function renderAssetRows(rows) {
     const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
     const assetType = assetPage?.dataset.assetType || "acciones"
     const isCrypto = isCryptoAssetType(assetType)
-    const isEtf =
-        String(assetType || "")
-            .trim()
-            .toLowerCase() === "etfs"
 
     if (!assetOperationsBody) {
         return
@@ -3785,7 +3791,6 @@ function renderAssetRows(rows) {
             <td data-field="precioParticipacion">${moneyMono(rowData.precioParticipacion, "precioParticipacion")}</td>
             ${isCrypto ? `<td data-field="currency">${escapeHtml(rowCurrency)}</td>` : ""}
             <td data-field="capitalInvertidoBruto">${moneyMono(rowData.capitalInvertidoBruto, "capitalInvertidoBruto")}</td>
-            ${isEtf ? `<td data-field="costeAnual">${formatCellPercentValue(rowData.costeAnual)}</td>` : ""}
             ${
                 isCrypto
                     ? `<td data-field="comisionesCripto">${cryptoCommissionValue}</td><td data-field="comisionesFiat">${cryptoFiatCommissionValue}</td>`
@@ -3844,6 +3849,7 @@ function buildCurrentAssetPayload() {
         color: assetPage?.dataset.assetColor || "",
         tvSymbol: assetPage?.dataset.assetTvSymbol || "",
         convertCurrency: assetPage?.dataset.assetConvertCurrency || "",
+        costeAnual: assetPage?.dataset.assetCosteAnual || "",
         operationRows: currentAssetPersistedOperationRows,
         conversionRows: currentAssetPersistedConversionRows,
         order: Number(document.querySelector(`.assetBtn[data-asset-id="${currentAssetId}"]`)?.dataset.assetOrder || 0),
@@ -3862,8 +3868,7 @@ function updateAssetTableTotals() {
         const rowData = {
             participaciones: rowElement.querySelector('[data-field="participaciones"]')?.textContent || "",
             precioParticipacion: rowElement.querySelector('[data-field="precioParticipacion"]')?.textContent || "",
-            capitalInvertidoBruto: rowElement.querySelector('[data-field="capitalInvertidoBruto"]')?.textContent || "",
-            costeAnual: rowElement.querySelector('[data-field="costeAnual"]')?.textContent || ""
+            capitalInvertidoBruto: rowElement.querySelector('[data-field="capitalInvertidoBruto"]')?.textContent || ""
         }
         const bruto = getRowGrossAmount(rowData)
         const comisionesCell = rowElement.querySelector('[data-field="comisiones"], [data-field="comisionesFiat"]')
@@ -4289,6 +4294,12 @@ function openEditAssetModal(assetData = null) {
     }
     reorderProviderSearchButtons("editAssetSearchActions", preferredProvider)
     const currentConvertCurrency = assetData?.convertCurrency || assetPage?.dataset.assetConvertCurrency || ""
+    const editAssetType = String(assetData?.type || assetPage?.dataset.assetType || "").toLowerCase()
+    document.getElementById("editAssetCosteAnualField")?.classList.toggle("hidden", editAssetType !== "etfs")
+    const editCosteAnualInput = document.getElementById("editAssetCosteAnualInput")
+    if (editCosteAnualInput) {
+        editCosteAnualInput.value = assetData?.costeAnual ?? assetPage?.dataset.assetCosteAnual ?? ""
+    }
     const editConvertCurrencyToggle = document.getElementById("editAssetConvertCurrencyToggle")
     const editConvertCurrencySelect = document.getElementById("editAssetConvertCurrencySelect")
     if (editConvertCurrencyToggle && editConvertCurrencySelect) {
@@ -4380,6 +4391,10 @@ async function submitEditAssetModal() {
     const convertCurrencyToggle = document.getElementById("editAssetConvertCurrencyToggle")
     const convertCurrencySelect = document.getElementById("editAssetConvertCurrencySelect")
     const newConvertCurrency = convertCurrencyToggle?.checked ? convertCurrencySelect?.value || "" : ""
+    const newCosteAnual =
+        String(payload.type || "").toLowerCase() === "etfs"
+            ? document.getElementById("editAssetCosteAnualInput")?.value.trim() || ""
+            : payload.costeAnual || ""
 
     if (!trimmedName) {
         editAssetNameInput.focus()
@@ -4392,7 +4407,8 @@ async function submitEditAssetModal() {
         newTicker === currentTicker &&
         !providerChanged &&
         newTVTicker === (payload.tvSymbol || "") &&
-        newConvertCurrency === (payload.convertCurrency || "")
+        newConvertCurrency === (payload.convertCurrency || "") &&
+        newCosteAnual === (payload.costeAnual || "")
     ) {
         closeEditAssetModal()
         return
@@ -4407,6 +4423,7 @@ async function submitEditAssetModal() {
     payload.finnhubSymbol = newTicker
     payload.tvSymbol = newTVTicker
     payload.convertCurrency = newConvertCurrency
+    payload.costeAnual = newCosteAnual
     if (explicitProvider) {
         payload.marketProvider = explicitProvider
     } else if (newTicker !== currentTicker) {
@@ -4460,6 +4477,7 @@ async function submitEditAssetModal() {
                 marketProvider: updatedAsset.marketProvider,
                 tvSymbol: updatedAsset.tvSymbol,
                 convertCurrency: updatedAsset.convertCurrency,
+                costeAnual: updatedAsset.costeAnual,
                 price: updatedAsset.price,
                 currency: updatedAsset.currency,
                 change: updatedAsset.change,
@@ -4499,10 +4517,6 @@ function openAssetRowModal(rowIndex) {
     const assetPage = document.querySelector(".assetTablePage")
     const assetType = assetPage?.dataset.assetType || "acciones"
     const isCrypto = isCryptoAssetType(assetType)
-    const isEtf =
-        String(assetType || "")
-            .trim()
-            .toLowerCase() === "etfs"
     const isEdit = rowIndex >= 0
     const rowData = isEdit ? { ..._assetDisplayRows[rowIndex] } : {}
     const tipoVal = rowData.tipoOperacion || "Compra"
@@ -4552,15 +4566,6 @@ function openAssetRowModal(rowIndex) {
             <label class="assetRowModalLabel">Capital invertido bruto</label>
             <input id="arModalCapital" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.capitalInvertidoBruto || ""}">
         </div>
-        ${
-            isEtf
-                ? `
-        <div class="assetRowModalField">
-            <label class="assetRowModalLabel">Coste anual (%)</label>
-            <input id="arModalCosteAnual" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.costeAnual || ""}">
-        </div>`
-                : ""
-        }
         ${
             isCrypto
                 ? `
@@ -4641,10 +4646,6 @@ async function saveAssetRowFromModal() {
     const assetType = assetPage?.dataset.assetType || "acciones"
     const assetCurrency = assetPage?.dataset.assetCurrency || "EUR"
     const isCrypto = isCryptoAssetType(assetType)
-    const isEtf =
-        String(assetType || "")
-            .trim()
-            .toLowerCase() === "etfs"
     const rowIndex = Number(overlay?.dataset.rowIndex ?? -1)
 
     const g = (id) => document.getElementById(id)?.value.trim() || ""
@@ -4657,7 +4658,6 @@ async function saveAssetRowFromModal() {
         participaciones: g("arModalParticipaciones"),
         precioParticipacion: g("arModalPrecio"),
         capitalInvertidoBruto: g("arModalCapital"),
-        costeAnual: isEtf ? g("arModalCosteAnual") : "",
         comisiones: !isCrypto ? g("arModalComisiones") : "",
         comisionesFiat: isCrypto ? g("arModalComisionesFiat") : "",
         comisionesCripto: isCrypto ? g("arModalComisionesCripto") : "",
@@ -4975,6 +4975,13 @@ function initAssetTypeCustomSelect() {
     buildOptions()
 }
 
+// El coste anual (TER) es del fondo, no de cada compra: solo se pide al dar de
+// alta un ETF y el resto de tipos de activo no lo enseñan.
+function syncAssetCosteAnualField() {
+    const isEtf = document.getElementById("assetTypeSelect")?.value === "etfs"
+    document.getElementById("assetCosteAnualField")?.classList.toggle("hidden", !isEtf)
+}
+
 function openAssetModal() {
     const assetModalOverlay = document.getElementById("assetModalOverlay")
     const assetNameInput = document.getElementById("assetNameInput")
@@ -4999,6 +5006,9 @@ function openAssetModal() {
     assetTypeSelect.dispatchEvent(new Event("change", { bubbles: true }))
     assetTickerInput.value = ""
     assetTickerInput.dataset.marketProvider = ""
+    const costeAnualInput = document.getElementById("assetCosteAnualInput")
+    if (costeAnualInput) costeAnualInput.value = ""
+    syncAssetCosteAnualField()
     reorderProviderSearchButtons("assetSearchActions", "tradingview")
     const tvTickerInput = document.getElementById("assetTVTickerInput")
     if (tvTickerInput) tvTickerInput.value = ""
@@ -5242,6 +5252,7 @@ async function submitAssetModal() {
     const marketProvider = explicitProvider || inferMarketProviderFromSymbol(marketSymbol, "finnhub")
     const color = document.getElementById("assetColorInput")?.value || ASSET_COLOR_PALETTE[0]
     const tvSymbol = decodeTVTicker(document.getElementById("assetTVTickerInput")?.value)
+    const costeAnual = type === "etfs" ? document.getElementById("assetCosteAnualInput")?.value.trim() || "" : ""
 
     if (!name) {
         setAssetSearchFeedback(assetSearchFeedback, "Introduce el nombre del activo.", true)
@@ -5263,7 +5274,7 @@ async function submitAssetModal() {
 
     try {
         setAssetSearchFeedback(assetSearchFeedback, "")
-        const response = await createAssetOnServer(name, type, marketSymbol, marketProvider, color, tvSymbol)
+        const response = await createAssetOnServer(name, type, marketSymbol, marketProvider, color, tvSymbol, costeAnual)
         const createdAsset = response.asset
         closeAssetModal()
         currentAssetId = createdAsset.id
@@ -5550,6 +5561,8 @@ function initAssetModal(
             closeAssetModal()
         })
     }
+
+    assetTypeSelect?.addEventListener("change", syncAssetCosteAnualField)
 
     if (assetNameInput) {
         assetNameInput.addEventListener("keydown", async (event) => {

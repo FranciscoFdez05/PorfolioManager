@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 
+from stores.cuenta_ahorro_store import asegurar_categorias
 from stores.ingresos_store import (
     create_default_ingresos_year,
     delete_ingresos_year,
@@ -31,6 +32,9 @@ def getIngresosYears():
 
 @ingresos_bp.route("/api/ingresos-tipos", methods=["GET"])
 def getIngresosTipos():
+    # Igual que en gastos: la categoría de la cuenta de ahorro (las retiradas)
+    # está fija en el código y siempre figura en el catálogo.
+    asegurar_categorias()
     return jsonify({"types": read_ingresos_types()})
 
 

@@ -1,0 +1,457 @@
+/* Cuenta de ahorro: tabla de movimientos a la izquierda, extractos a la derecha.
+   Reutiliza las clases de Gastos (años, pestañas, tabla, menú ···). */
+
+.cuentaAhorroPage {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-right: 18px;
+    flex: 1;
+    margin-top: -6px;
+}
+
+.cuentaAhorroTopBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+/* Mismas medidas que los años de Gastos e Ingresos: una rejilla de 12 columnas
+   que deja a la derecha el hueco de la pestaña "Mensualidades" (unos 136 px más el
+   hueco de 16 px entre elementos), así cada año mide lo mismo que allí. */
+.cuentaAhorroYearList {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 5px;
+    flex: 1 1 auto;
+    margin-right: 152px;
+}
+
+.cuentaAhorroLayout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 16px;
+    align-items: start;
+}
+
+.cuentaAhorroMain {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+.cuentaAhorroTabs {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.cuentaAhorroTableWrapper {
+    min-height: 120px;
+}
+
+.cuentaAhorroTableWrapper .overviewEmpty {
+    padding: 18px 12px;
+    text-align: center;
+}
+
+/* Gastos fija 170/360/260/180 px por columna, que aquí no caben junto a los
+   extractos: el concepto se queda con el ancho sobrante. */
+#cuentaAhorroTable thead th,
+#cuentaAhorroTable tbody td {
+    width: auto;
+}
+#cuentaAhorroTable thead th:first-child,
+#cuentaAhorroTable tbody td:first-child {
+    width: 120px;
+}
+#cuentaAhorroTable thead th.numCol,
+#cuentaAhorroTable tbody td.numCell {
+    width: 140px;
+}
+#cuentaAhorroTable thead th.rowActionHeader,
+#cuentaAhorroTable tbody td.rowActionsCell {
+    width: 52px;
+}
+
+.cuentaAhorroSide {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.cuentaAhorroStats {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cuentaAhorroStats > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cuentaAhorroStats dt {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.cuentaAhorroStats dd {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-bright);
+}
+
+.cuentaAhorroStatsSmall dd {
+    font-size: 14px;
+}
+
+.cuentaAhorroStats > div.hidden {
+    display: none;
+}
+
+.cuentaAhorroPos {
+    color: #34d399 !important;
+}
+
+.cuentaAhorroNeg {
+    color: #f87171 !important;
+}
+
+.cuentaAhorroChart {
+    width: 100%;
+    height: auto;
+    margin-top: 6px;
+    overflow: visible;
+}
+
+.cuentaAhorroChartLine {
+    stroke: var(--accent);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.cuentaAhorroChartArea {
+    fill: var(--accent);
+    opacity: 0.12;
+}
+
+.cuentaAhorroChartDot {
+    fill: var(--accent);
+}
+
+.cuentaAhorroChartLabel {
+    fill: var(--text-muted);
+    font-size: 9px;
+}
+
+.cuentaAhorroCheck {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 2px;
+    color: var(--text-bright);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.cuentaAhorroHint {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin: 4px 0 10px;
+}
+
+@media (max-width: 1100px) {
+    .cuentaAhorroLayout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* ── Gráfica: guía y tooltip al pasar el ratón ── */
+.cuentaAhorroChartWrap {
+    position: relative;
+    margin-top: 6px;
+}
+
+.cuentaAhorroChartWrap .cuentaAhorroChart {
+    margin-top: 0;
+    cursor: crosshair;
+}
+
+.cuentaAhorroChartGuide {
+    stroke: var(--text-muted);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+    opacity: 0.6;
+}
+
+.cuentaAhorroChartDot.active {
+    r: 4;
+    stroke: var(--bg-surface);
+    stroke-width: 1.5;
+}
+
+.cuentaAhorroTooltip {
+    position: absolute;
+    bottom: calc(100% - 4px);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 10px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+    font-size: 12px;
+    color: var(--text-bright);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.cuentaAhorroTooltip.hidden {
+    display: none;
+}
+
+/* ── Casillas del modal de cuentas vinculadas: la fila entera es la tarjeta ── */
+.cuentaAhorroCheck {
+    gap: 12px;
+    margin: 6px 0;
+    padding: 10px 14px;
+    border: 1px solid var(--btn-border);
+    border-radius: 10px;
+    background: var(--btn-bg);
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+}
+
+.cuentaAhorroCheck:hover {
+    background: var(--btn-bg-hover);
+    border-color: var(--btn-border-hover);
+}
+
+.cuentaAhorroCheck:has(input:checked) {
+    background: var(--btn-active-bg);
+    border-color: var(--btn-active-border);
+}
+
+.cuentaAhorroCheck:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.cuentaAhorroCheck input {
+    appearance: none;
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    border: 2px solid var(--text-muted);
+    border-radius: 6px;
+    background: transparent;
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+}
+
+.cuentaAhorroCheck input::after {
+    content: "";
+    width: 10px;
+    height: 6px;
+    border-left: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+    transform: rotate(-45deg) translate(1px, -1px) scale(0);
+    transition: transform 0.12s;
+}
+
+.cuentaAhorroCheck input:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.cuentaAhorroCheck input:checked::after {
+    transform: rotate(-45deg) translate(1px, -1px) scale(1);
+}
+
+/* Vacía: solo queda el aviso con su línea discontinua. */
+.cuentaAhorroTableWrapper.cuentaAhorroVacio {
+    min-height: 0;
+    border: none;
+    background: none;
+}
+
+.cuentaAhorroVacio .gastosMovementsTable {
+    display: none;
+}
+
+/* Con la esquina redondeada, la línea discontinua deja el vértice sin trazo:
+   cuadrada se cierra siempre. */
+.cuentaAhorroVacio .overviewEmpty {
+    border-radius: 0;
+}
+
+/* Esquinas en "L" trazadas a mano: el patrón de guiones del borde no garantiza
+   un trazo en el vértice, y así las cuatro esquinas quedan siempre cerradas. */
+.cuentaAhorroVacio .overviewEmpty {
+    --esquina: linear-gradient(var(--btn-border), var(--btn-border));
+    background:
+        var(--esquina) top left / 8px 1px no-repeat,
+        var(--esquina) top left / 1px 8px no-repeat,
+        var(--esquina) top right / 8px 1px no-repeat,
+        var(--esquina) top right / 1px 8px no-repeat,
+        var(--esquina) bottom left / 8px 1px no-repeat,
+        var(--esquina) bottom left / 1px 8px no-repeat,
+        var(--esquina) bottom right / 8px 1px no-repeat,
+        var(--esquina) bottom right / 1px 8px no-repeat,
+        var(--bg-surface);
+    background-origin: border-box;
+}
+
+/* ── Selector de cuentas (solo con más de una) ── */
+.cuentaAhorroCuentas {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.cuentaAhorroCuentas[hidden] {
+    display: none;
+}
+
+/* ── Objetivo ── */
+.cuentaAhorroObjetivo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 2px 0 6px;
+}
+
+.cuentaAhorroObjetivo[hidden] {
+    display: none;
+}
+
+.cuentaAhorroObjetivoTop {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.cuentaAhorroObjetivoTop strong {
+    color: var(--text-bright);
+    font-size: 14px;
+}
+
+.cuentaAhorroBarra {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--bg-elevated);
+    overflow: hidden;
+}
+
+.cuentaAhorroBarraRelleno {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--accent);
+    transition: width 0.3s ease;
+}
+
+.cuentaAhorroBarraCompleta {
+    background: #34d399;
+}
+
+.cuentaAhorroObjetivoNota {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-muted);
+}
+
+/* ── Gráfica: segunda capa y leyenda ── */
+.cuentaAhorroChartLineAportado {
+    stroke: var(--text-muted);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 3;
+    stroke-linejoin: round;
+}
+
+.cuentaAhorroLeyenda {
+    display: flex;
+    gap: 14px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.cuentaAhorroLeyendaItem::before {
+    content: "";
+    display: inline-block;
+    width: 14px;
+    height: 0;
+    margin-right: 5px;
+    vertical-align: middle;
+    border-top: 2px solid var(--accent);
+}
+
+.cuentaAhorroLeyendaAportado::before {
+    border-top: 2px dashed var(--text-muted);
+}
+
+/* ── Modal de configuración ── */
+.cuentaAhorroConfigModal .gastosCreateModalBody {
+    max-height: 62vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.cuentaAhorroRecCampos {
+    display: grid;
+    grid-template-columns: 1fr 110px;
+    gap: 2px 10px;
+}
+
+.cuentaAhorroRecCampos .assetModalLabel {
+    grid-row: 1;
+}
+
+.cuentaAhorroRecCampos .assetModalLabel:nth-of-type(2),
+.cuentaAhorroRecCampos .assetModalLabel + input + .assetModalLabel {
+    grid-column: 2;
+}
+
+.cuentaAhorroRecCampos input:first-of-type {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.cuentaAhorroRecCampos input:last-of-type {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+.cuentaAhorroCheckBloqueada {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.cuentaAhorroCheckBloqueada input {
+    cursor: not-allowed;
+}
+
+.cuentaAhorroCheck small {
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 11px;
+}

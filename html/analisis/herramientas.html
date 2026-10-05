@@ -31,6 +31,7 @@
 
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="ratioOroPlata">Ratio Oro/Plata</button>
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="ratioOroBtc">Oro / Bitcoin</button>
+            <button class="herramientaBtn hidden" data-cat="mercado" data-tool="divisas">Divisas</button>
             <button class="herramientaBtn hidden" data-cat="mercado" data-tool="capitalizacion">Capitalización objetivo</button>
         </div>
     </div>
@@ -746,6 +747,73 @@
         </div>
 
 
+        <!-- ── Comparador de divisas ────────────────────────────────── -->
+        <div class="herramientaPanel hidden" id="toolDivisas">
+            <div class="hPanelHead">
+                <div class="hPanelHeadText">
+                    <h3 class="herramientaPanelTitle">Comparador de divisas</h3>
+                    <p class="hPanelDesc">Cotización de una divisa frente a otra y su evolución. Da la vuelta al par con un clic.</p>
+                </div>
+            </div>
+            <div class="herramientaBody">
+                <div class="hCard herramientaInputs">
+                    <div class="hCardTitle">Par</div>
+                    <div class="herramientaField">
+                        <label for="hFxBase">Divisa</label>
+                        <select id="hFxBase" aria-label="Divisa que se compara"></select>
+                    </div>
+                    <button type="button" class="hFxSwap" id="hFxSwap" title="Dar la vuelta al par" aria-label="Dar la vuelta al par">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>
+                        Dar la vuelta
+                    </button>
+                    <div class="herramientaField">
+                        <label for="hFxQuote">Contra</label>
+                        <select id="hFxQuote" aria-label="Divisa contra la que se compara"></select>
+                    </div>
+
+                    <div class="hFxRate">
+                        <div class="hFxRateMain" id="hFxRateMain">---</div>
+                        <div class="hFxRateInv" id="hFxRateInv"></div>
+                        <div class="hFxRateFecha" id="hFxRateFecha"></div>
+                    </div>
+
+                    <div class="hCardTitle">Convertir</div>
+                    <div class="herramientaField">
+                        <label for="hFxCantidad" id="hFxCantidadLabel">Cantidad</label>
+                        <div class="hInputWrap">
+                            <input type="number" id="hFxCantidad" value="100" min="0" step="any">
+                            <span class="hInputUnit" id="hFxCantidadUnit">---</span>
+                        </div>
+                    </div>
+                    <div class="hFxConvertido" id="hFxConvertido">---</div>
+                </div>
+
+                <div class="hFxMain">
+                    <div class="hCard hChartCard">
+                        <div class="hFxRangos" id="hFxRangos" role="tablist" aria-label="Periodo">
+                            <button type="button" class="hFxRango" data-rango="1D">1 día</button>
+                            <button type="button" class="hFxRango" data-rango="1S">1 semana</button>
+                            <button type="button" class="hFxRango active" data-rango="1M">1 mes</button>
+                            <button type="button" class="hFxRango" data-rango="3M">3 meses</button>
+                            <button type="button" class="hFxRango" data-rango="6M">6 meses</button>
+                            <button type="button" class="hFxRango" data-rango="1A">1 año</button>
+                            <button type="button" class="hFxRango" data-rango="5A">5 años</button>
+                        </div>
+                        <div class="herramientaChartWrap hFxChartWrap">
+                            <canvas id="hFxChart"></canvas>
+                            <div class="hFxEstado" id="hFxEstado"></div>
+                        </div>
+                        <div class="hFxStats" id="hFxStats"></div>
+                    </div>
+
+                    <div class="hCard">
+                        <div class="hCardTitle">Variación por periodo</div>
+                        <div class="hFxVariaciones" id="hFxVariaciones"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ── Capitalización objetivo ──────────────────────────────── -->
         <div class="herramientaPanel hidden" id="toolCapitalizacion">
             <div class="hPanelHead">
@@ -788,6 +856,14 @@
                         </div>
                     </div>
 
+
+                    <div class="hBtnRow">
+                        <button class="herramientaCalcBtn" id="hCapCalcBtn">Calcular</button>
+                        <button class="herramientaResetBtn" data-panel="toolCapitalizacion">Reiniciar</button>
+                    </div>
+                </div>
+
+                <div class="hCard herramientaInputs">
                     <div class="hCardTitle hCapRefTitulo">Referencias</div>
                     <div class="hCapRefLista" id="hCapRefLista"></div>
                     <div class="herramientaField">
@@ -808,11 +884,6 @@
                         <div class="hCapNota">La capitalización manual se interpreta en <span class="hCapMonedaBase">moneda base</span>.</div>
                     </div>
                     <div class="hRatioFuenteMsg" id="hCapRefMsg"></div>
-
-                    <div class="hBtnRow">
-                        <button class="herramientaCalcBtn" id="hCapCalcBtn">Calcular</button>
-                        <button class="herramientaResetBtn" data-panel="toolCapitalizacion">Reiniciar</button>
-                    </div>
                 </div>
                 <div class="hResultsCol">
                     <div class="herramientaResults hidden" id="hCapResults">

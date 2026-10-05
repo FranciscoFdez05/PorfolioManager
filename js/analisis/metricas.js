@@ -1672,7 +1672,8 @@ function mComputeGastosData(yearData) {
     return { totalMes, totalTipo, totalMensualidades, totalMovimientos }
 }
 
-function mRenderGastos(yearsList, yearData) {
+function mRenderGastos(yearsList, rawYearData) {
+    const yearData = sinMovimientosAhorro(rawYearData)
     const section = document.getElementById("mSectionGastos")
     const gastosKpiRow = document.querySelector(".metricasKpiRow[data-mcat='gastos']")
     if (!yearsList.length || !yearData) {
@@ -2347,7 +2348,8 @@ function mRenderIngresosCharts(ingresosYearData) {
     mEqualizeChartRowHeights()
 }
 
-function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
+function mRenderIngresosSection(ingresosYearsList, rawIngresosYearData) {
+    const ingresosYearData = sinMovimientosAhorro(rawIngresosYearData)
     const section = document.getElementById("mSectionIngresos")
     const ingresosKpiRow = document.querySelector(".metricasKpiRow[data-mcat='ingresos']")
     if (!ingresosYearsList.length || !ingresosYearData) {
@@ -2583,7 +2585,9 @@ function mDrawInteresesChart(cuentas, year) {
 
 // ── comparativa ingresos vs gastos ─────────────────────────────────────────
 
-function mRenderComparativa(ingresosYearData, gastosYearData) {
+function mRenderComparativa(rawIngresosYearData, rawGastosYearData) {
+    const ingresosYearData = sinMovimientosAhorro(rawIngresosYearData)
+    const gastosYearData = sinMovimientosAhorro(rawGastosYearData)
     const section = document.getElementById("mSectionComparativa")
     if (!ingresosYearData && !gastosYearData) {
         if (section) section.classList.add("hidden")
@@ -3385,7 +3389,9 @@ function mRenderRentabilidadAnual(snaps, currentValue, currentInvested, cobertur
 
 // ── tasa de ahorro mensual ────────────────────────────────────────────────
 
-function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
+function mRenderAhorro(rawIngresosYearData, rawGastosYearData, ahorroConfig) {
+    const ingresosYearData = sinMovimientosAhorro(rawIngresosYearData)
+    const gastosYearData = sinMovimientosAhorro(rawGastosYearData)
     const section = document.getElementById("mSectionAhorro")
     const kpiGroup = document.getElementById("mkpiGroupAhorro")
     const kpiSep = document.getElementById("mkpiSepAhorro")
@@ -3533,10 +3539,10 @@ let _mAnualResumenCache = []
 
 function mComputeResumenAnual(anualData) {
     return (anualData || [])
-        .map(({ year, gastosData, ingresosData }) => {
-            const { totalMes } = mComputeGastosData(gastosData)
+        .map(({ year, gastosData: rawGastos, ingresosData: rawIngresos }) => {
+            const { totalMes } = mComputeGastosData(sinMovimientosAhorro(rawGastos))
             const gastado = M_GASTOS_KEYS.reduce((s, k) => s + (totalMes[k] || 0), 0)
-            const ingMes = mComputeIngresosMonthly(ingresosData)
+            const ingMes = mComputeIngresosMonthly(sinMovimientosAhorro(rawIngresos))
             const ingresos = M_ING_KEYS.reduce((s, k) => s + (ingMes[k] || 0), 0)
             const ahorrado = ingresos - gastado
             return {

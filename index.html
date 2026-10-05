@@ -31,6 +31,7 @@
     <link rel="stylesheet" href="css/pages/settings-overlay.css">
     <link rel="stylesheet" href="css/pages/ingresos-kpi.css">
     <link rel="stylesheet" href="css/pages/ahorro.css">
+    <link rel="stylesheet" href="css/pages/cuentaAhorro.css">
     <link rel="stylesheet" href="css/pages/calendario.css">
     <link rel="stylesheet" href="css/pages/ventas.css">
     <link rel="stylesheet" href="css/pages/fundamentales.css">
@@ -246,6 +247,7 @@
                         <button class="navBtn navDropdownItem" data-page="gastos">Gastos</button>
                         <button class="navBtn navDropdownItem" data-page="ingresos">Ingresos</button>
                         <button class="navBtn navDropdownItem" data-page="ahorro">Ahorro</button>
+                        <button class="navBtn navDropdownItem" data-page="cuentaAhorro">Cuenta de ahorro</button>
                         <button class="navBtn navDropdownItem" data-page="calendario">Calendario</button>
                     </div>
                 </div>
@@ -374,6 +376,11 @@
             <option value="comoditis">Comoditis</option>
         </select>
 
+        <div id="assetCosteAnualField" class="hidden">
+            <label class="assetModalLabel" for="assetCosteAnualInput">Coste anual del ETF (%) <span class="assetModalLabelHint">(TER, opcional)</span></label>
+            <input id="assetCosteAnualInput" class="assetModalInput" type="text" inputmode="decimal" placeholder="Ej: 0,20">
+        </div>
+
         <label class="assetModalLabel" for="assetTickerInput">Ticker mercado</label>
         <input id="assetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
         <div class="assetSearchActions" id="assetSearchActions">
@@ -443,6 +450,11 @@
         </div>
         <div id="editAssetSearchFeedback" class="assetSearchFeedback hidden"></div>
         <div id="editAssetSearchResults" class="assetSearchResults hidden"></div>
+
+        <div id="editAssetCosteAnualField" class="hidden">
+            <label class="assetModalLabel" for="editAssetCosteAnualInput">Coste anual del ETF (%) <span class="assetModalLabelHint">(TER)</span></label>
+            <input id="editAssetCosteAnualInput" class="assetModalInput" type="text" inputmode="decimal" placeholder="Ej: 0,20">
+        </div>
 
         <div class="assetConvertCurrencyRow">
             <span class="assetConvertCurrencyLabel">
@@ -2090,6 +2102,7 @@
 <script defer src="js/cripto/earn.js"></script>
 <script defer src="js/cripto/conversiones.js"></script>
 <script defer src="js/analisis/herramientas.js"></script>
+<script defer src="js/analisis/herramientas-divisas.js"></script>
 <script defer src="js/finanzas/bonos.js"></script>
 <script defer src="js/analisis/metricas.js"></script>
 <script defer src="js/ajustes/ajustes.js"></script>
@@ -2104,6 +2117,7 @@
 <script defer src="js/cartera/planes-inversion.js"></script>
 <script defer src="js/cartera/alertas-precio.js"></script>
 <script defer src="js/finanzas/ahorro.js"></script>
+<script defer src="js/finanzas/cuentaAhorro.js"></script>
 <script defer src="js/finanzas/calendario.js"></script>
 </body>
 </html>

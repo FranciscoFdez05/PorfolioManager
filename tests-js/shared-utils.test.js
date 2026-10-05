@@ -203,3 +203,42 @@ describe("currencySuffix", () => {
         expect(formatMoney(1234.5, "USD")).toBe("1234,50 $")
     })
 })
+
+describe("categorías de la cuenta de ahorro", () => {
+    it.each([
+        ["Cuenta de ahorro", true],
+        ["  cuenta de AHORRO ", true],
+        ["Cuenta de ahorro · Viaje", true],
+        ["Cuenta de ahorro Viaje", false],
+        ["Ahorro", false],
+        ["", false]
+    ])("esTipoAhorroReservado(%j) → %s", (tipo, esperado) => {
+        expect(esTipoAhorroReservado(tipo)).toBe(esperado)
+    })
+
+    it("sinMovimientosAhorro quita sus filas y su categoría sin tocar el original", () => {
+        const anio = {
+            year: "2026",
+            gastosTipos: ["Comida", "Cuenta de ahorro", "Cuenta de ahorro · Viaje"],
+            months: {
+                enero: {
+                    rows: [
+                        { tipo: "Comida", cantidad: "10,00 €" },
+                        { tipo: "Cuenta de ahorro · Viaje", cantidad: "50,00 €" }
+                    ]
+                }
+            }
+        }
+
+        const limpio = sinMovimientosAhorro(anio)
+
+        expect(limpio.months.enero.rows).toEqual([{ tipo: "Comida", cantidad: "10,00 €" }])
+        expect(limpio.gastosTipos).toEqual(["Comida"])
+        expect(anio.months.enero.rows).toHaveLength(2)
+    })
+
+    it("sinMovimientosAhorro deja pasar lo que no es un año", () => {
+        expect(sinMovimientosAhorro(null)).toBeNull()
+        expect(sinMovimientosAhorro({ ok: false })).toEqual({ ok: false })
+    })
+})

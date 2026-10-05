@@ -1075,6 +1075,10 @@ function openRecurrenteEditModal(rowIndex) {
 function openIngresoTypeRenameModal(rowIndex) {
     const currentName = sharedIngresosTypes?.[rowIndex]
     if (!currentName) return
+    if (esTipoAhorroReservado(currentName)) {
+        alert(`«${currentName}» es la categoría de la cuenta de ahorro y no se puede renombrar.`)
+        return
+    }
 
     openIngresosCreateModal({
         title: "Renombrar ingreso",

@@ -191,14 +191,14 @@ describe("tabla de activos", () => {
         expect(btc[0]).toBe("Compra")
         expect(btc[1]).toContain("Bitcoin")
         expect(btc[1]).toContain("4 operaciones")
-        // La cancelada (1 BTC a 10.000) no cuenta ni en cantidad ni en importe.
-        expect(btc[2]).toBe("0,009")
-        // Precio medio ponderado solo con las que dicen cantidad: 500 € / 0,009.
-        expect(btc[3]).toBe("55.555,56 €")
-        expect(btc[4]).toBe("1000,00 €")
-        // Realizada la de 500 € sobre 1.000 € planificados.
-        expect(btc[5]).toContain("50 %")
-        expect(btc[6]).toBe("1/3 realizadas")
+        // La cancelada (1 BTC a 10.000) sigue en el plan, como no realizada.
+        expect(btc[2]).toBe("1,009")
+        // Precio medio ponderado solo con las que dicen cantidad.
+        expect(btc[3]).toBe("10.406,34 €")
+        expect(btc[4]).toBe("11.000,00 €")
+        // Realizada la de 500 € sobre 11.000 € planificados.
+        expect(btc[5]).toContain("4,5 %")
+        expect(btc[6]).toBe("1/4 realizadas")
     })
 
     it("convierte a euros los importes en otra divisa", () => {
@@ -218,7 +218,7 @@ describe("tabla de activos", () => {
         expect(primera[1]).toContain("01-09-2026")
         expect(primera[3]).toBe("50.000,00 €")
         expect(primera[4]).toBe("200,00 €")
-        expect(primera[5]).toBe("20 %")
+        expect(primera[5]).toBe("1,8 %")
         expect(primera[6]).toBe("No realizada")
 
         expect(textos('.pinvOpRow[data-asset-id="bitcoin"] .pinvEstado')).toEqual([
@@ -236,25 +236,40 @@ describe("tabla de activos", () => {
 
     it("la cabecera resume lo planificado y lo realizado del plan", () => {
         const kpis = textos(".pinvKpiValue")
-        expect(kpis[0]).toBe("2000,00 €")
+        expect(kpis[0]).toBe("12.000,00 €")
         expect(kpis[1]).toBe("500,00 €")
-        expect(kpis[2]).toBe("25 %")
-        expect(document.querySelector(".pinvChartPct").textContent).toBe("25 %")
+        expect(kpis[2]).toBe("4,2 %")
+        expect(document.querySelector(".pinvChartPct").textContent).toBe("4,2 %")
     })
 
     it("las líneas del tooltip dicen qué se ha comprado y qué queda", () => {
         const calculo = pinvCalcularPlan(PLAN)
         expect(pinvLineasTooltip(calculo, true)).toEqual(["Bitcoin: 500,00 € (100 %)"])
-        expect(pinvLineasTooltip(calculo, false)).toEqual(["Bitcoin: 500,00 € (33,3 %)", "S&P 500: 1000,00 € (66,7 %)"])
+        expect(pinvLineasTooltip(calculo, false)).toEqual(["Bitcoin: 10.500,00 € (91,3 %)", "S&P 500: 1000,00 € (8,7 %)"])
+    })
+})
+
+describe("operaciones eliminadas", () => {
+    it("una operación borrada de Operaciones desaparece del plan y no cuenta", () => {
+        const plan = {
+            id: "plan-y",
+            nombre: "Con borrada",
+            archivado: false,
+            activos: [{ assetId: "bitcoin", operaciones: ["op-btc-1", "op-ya-borrada"] }]
+        }
+        const calculo = pinvCalcularPlan(plan)
+
+        expect(calculo.activos[0].operaciones).toHaveLength(1)
+        expect(calculo.planificadoEur).toBe(200)
     })
 })
 
 describe("reparto por activo", () => {
     it("pinta una fila de leyenda por activo con su parte del plan", () => {
         expect(textos(".pinvRepartoNombre")).toEqual(["Bitcoin", "S&P 500"])
-        expect(textos(".pinvRepartoValor")).toEqual(["1000,00 €", "1000,00 €"])
-        expect(textos(".pinvRepartoFila .pinvLegendPct")).toEqual(["50 %", "50 %"])
-        expect(document.querySelector(".pinvRepartoTotal").textContent).toBe("2000,00 €")
+        expect(textos(".pinvRepartoValor")).toEqual(["11.000,00 €", "1000,00 €"])
+        expect(textos(".pinvRepartoFila .pinvLegendPct")).toEqual(["91,7 %", "8,3 %"])
+        expect(document.querySelector(".pinvRepartoTotal").textContent).toBe("12.000,00 €")
     })
 
     it("el porcentaje es sobre el total del plan", () => {
@@ -284,7 +299,7 @@ describe("reparto por activo", () => {
 
     it("el detalle del activo va en el title de la fila", () => {
         expect(document.querySelector(".pinvRepartoFila").getAttribute("title")).toBe(
-            "Bitcoin: 500,00 € de 1000,00 € (50 % realizado)"
+            "Bitcoin: 500,00 € de 11.000,00 € (4,5 % realizado)"
         )
     })
 

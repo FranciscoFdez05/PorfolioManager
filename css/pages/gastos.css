@@ -519,8 +519,14 @@
 
 .gastosAnnualTable th:first-child,
 .gastosAnnualTable td:first-child {
-    width: 114px;
-    min-width: 114px;
+    width: 140px;
+    min-width: 140px;
+}
+
+/* La flecha y el nombre de la sección van en una sola línea: antes la flecha
+   se quedaba sola encima de "Mensualidades". */
+.gastosAnnualTable td.gastosSectionToggle {
+    white-space: nowrap;
 }
 
 .gastosMonthHeader {

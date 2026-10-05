@@ -240,8 +240,11 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
     return top_results, None
 
 
-def fetch_price_series(symbol, from_ts, to_ts, timeout=None):
-    """Cierres diarios de un ticker entre dos fechas.
+def fetch_price_series(symbol, from_ts, to_ts, timeout=None, interval="1d"):
+    """Cierres de un ticker entre dos fechas, diarios salvo que se pida otro intervalo.
+
+    `interval` es el de Yahoo (`5m`, `30m`, `1h`, `1d`, `1wk`, `1mo`). Los
+    intradía solo existen para los últimos 60 o 730 días según el intervalo.
 
     Yahoo es el único de los cuatro proveedores conectados que sirve series
     largas sin clave ni cuota, y además cotiza los índices (^GSPC, ^STOXX50E…)
@@ -260,7 +263,7 @@ def fetch_price_series(symbol, from_ts, to_ts, timeout=None):
     try:
         payload = _fetch_json(
             f"{YAHOO_CHART_URL}/{quote(normalized_symbol, safe='=^')}",
-            {"period1": int(from_ts), "period2": int(to_ts), "interval": "1d"},
+            {"period1": int(from_ts), "period2": int(to_ts), "interval": interval},
             timeout=timeout,
         )
     except HTTPError as error:

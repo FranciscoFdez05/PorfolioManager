@@ -236,6 +236,8 @@ def createActivo():
     payload["order"] = len(listAssets())
     payload["color"] = sanitize_color(requestData.get("color", ""))
     payload["tvSymbol"] = _trunc(str(requestData.get("tvSymbol", "")), _MAX_TICKER).strip()
+    if assetType == "etfs":
+        payload["costeAnual"] = _trunc(str(requestData.get("costeAnual", "")), _MAX_TICKER).strip()
     writeAssetFile(assetId, payload)
 
     return jsonify({"ok": True, "asset": payload}), 201
@@ -327,7 +329,7 @@ def saveActivo(assetId):
     # Mismo caso para las preferencias de cabecera: el autoguardado de la ficha
     # no las manda, y sin esto cada edición de una fila apagaba la conversión de
     # divisa y volvía a mostrar un activo oculto.
-    for campo in ("convertCurrency", "hidden"):
+    for campo in ("convertCurrency", "hidden", "costeAnual"):
         if campo not in requestData and campo in existing_asset:
             payload[campo] = existing_asset[campo]
 

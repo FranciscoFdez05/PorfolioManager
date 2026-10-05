@@ -17,6 +17,7 @@ from core.secret_store import read_secret_lines, write_secret_lines
 from providers import estado as estado_proveedores
 from providers.api_stats import get_today_stats
 from stores import app_data
+from stores.cuenta_ahorro_store import normalizar_config
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +84,12 @@ _PORTFOLIO_DEFAULTS = {
     "topMetricsConfig": {},
     "modulosConfig": {},
     "ahorroConfig": {"objetivoAhorro": 30, "presupuesto": {}},
+    # Cuentas de ahorro: por cada una, qué cuentas remuneradas y dividendos
+    # cuentan, el objetivo y la aportación mensual (ver stores.cuenta_ahorro_store).
+    "cuentaAhorroConfig": {},
+    # Último mes con aportación automática creada, por cuenta. Solo lo escribe el
+    # servidor (no se lee ni se acepta desde la web): ver aplicar_recurrentes.
+    "cuentaAhorroGenerado": {},
 }
 
 _GLOBAL_KEYS    = set(_GLOBAL_DEFAULTS)
@@ -263,6 +270,7 @@ def get_settings():
         "topMetricsConfig":         pcfg.get("topMetricsConfig") or {},
         "modulosConfig":            pcfg.get("modulosConfig") or {},
         "ahorroConfig":             pcfg.get("ahorroConfig") or {"objetivoAhorro": 30, "presupuesto": {}},
+        "cuentaAhorroConfig":       normalizar_config(pcfg.get("cuentaAhorroConfig")),
     })
 
 
@@ -602,6 +610,8 @@ def save_settings():
                     if k_clean:
                         presupuesto[k_clean] = v_clean
             pcfg["ahorroConfig"] = {"objetivoAhorro": obj, "presupuesto": presupuesto}
+    if isinstance(data.get("cuentaAhorroConfig"), dict):
+        pcfg["cuentaAhorroConfig"] = normalizar_config(data["cuentaAhorroConfig"])
 
     try:
         _write_ajustes(gcfg)

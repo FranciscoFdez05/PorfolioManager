@@ -590,6 +590,25 @@ body.asset-rotation-halted .detailRotationBar span {
     min-width: 180px;
 }
 
+/* Con el coste anual, los ETFs llevan seis tarjetas: a 180px mínimos no caben
+   en una fila y la de ganancias caía a una segunda. Sin mínimo y sin partir,
+   se reparten el ancho disponible. */
+.assetStatsPanelEtf {
+    flex-wrap: nowrap;
+    min-width: 0;
+}
+
+.assetStatsPanelEtf .assetStatCard {
+    flex-basis: 0;
+    min-width: 0;
+    padding: 10px 12px;
+}
+
+.assetStatsPanelEtf .assetStatCardPnL {
+    flex-grow: 1.8;
+    min-width: 0;
+}
+
 .assetStatLabel {
     color: var(--text-dim);
     font-size: 11px;

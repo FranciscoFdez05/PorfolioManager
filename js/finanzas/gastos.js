@@ -1367,7 +1367,7 @@ function renderGastosAnnualTable() {
     mensualidadesRow.className = "gastosCategoryRow"
     const mensSectionHidden = isGastoTipoHidden(MENSUALIDADES_CATEGORIA)
     mensualidadesRow.innerHTML = `
-        <td class="gastosSectionToggle" data-gastos-toggle-mens="1">${gastosMensualidadesCollapsed ? "▸" : "▾"} ${MENSUALIDADES_CATEGORIA}</td>
+        <td class="gastosSectionToggle" data-gastos-toggle-mens="1">${gastosMensualidadesCollapsed ? "▾" : "▴"} ${MENSUALIDADES_CATEGORIA}</td>
         ${GASTOS_MONTHS.map((month) => `<td>${mensualidadesMonthTotals[month.key] ? formatEuro(mensualidadesMonthTotals[month.key]) : "- €"}</td>`).join("")}
         <td class="rowActionsCell">
             <div class="rowMenu">
@@ -1493,6 +1493,10 @@ function openMensualidadEditModal(rowIndex) {
 function openGastoTypeRenameModal(rowIndex) {
     const currentName = sharedGastosTypes?.[rowIndex]
     if (!currentName) return
+    if (esTipoAhorroReservado(currentName)) {
+        alert(`«${currentName}» es la categoría de la cuenta de ahorro y no se puede renombrar.`)
+        return
+    }
 
     openGastosCreateModal({
         title: "Renombrar gasto",
