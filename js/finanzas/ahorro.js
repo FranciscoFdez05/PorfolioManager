@@ -57,9 +57,8 @@ async function renderAhorroYear(year) {
         fetch(`/api/ingresos/${year}`).catch(() => null),
         fetch(`/api/gastos/${year}`).catch(() => null)
     ])
-    // Lo que se aparta en la cuenta de ahorro no es gasto: no cuenta aquí.
-    ahorroIngresosData = sinMovimientosAhorro(ingRes && ingRes.ok ? await ingRes.json() : null)
-    ahorroGastosData = sinMovimientosAhorro(gasRes && gasRes.ok ? await gasRes.json() : null)
+    ahorroIngresosData = ingRes && ingRes.ok ? await ingRes.json() : null
+    ahorroGastosData = gasRes && gasRes.ok ? await gasRes.json() : null
 
     renderAhorroYearList()
     renderAhorroMonthTabs()

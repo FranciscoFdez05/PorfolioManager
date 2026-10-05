@@ -1,0 +1,44 @@
+<section class="cuentasPage">
+    <div class="cuentasTopBar">
+        <div class="cuentasYearList" id="cuentasYearList"></div>
+        <div class="pageActionsMenu" id="cuentasActionsMenu">
+            <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
+            <div class="pageActionsDropdown" id="cuentasActionsDropdown">
+                <button id="cuentasNuevaTransferenciaBtn" class="pageActionsItem" type="button">Nueva transferencia</button>
+                <button id="cuentasNuevaCuentaBtn" class="pageActionsItem" type="button">Nueva cuenta</button>
+                <button id="cuentasCsvBtn" class="pageActionsItem" type="button">Descargar CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="cuentasLayout">
+        <div class="cuentasMain">
+            <div class="cuentasFiltro" id="cuentasFiltro" hidden>
+                <span>Mostrando solo los movimientos de</span>
+                <strong id="cuentasFiltroNombre"></strong>
+                <button type="button" class="cuentasFiltroQuitar" id="cuentasFiltroQuitar">Ver todas</button>
+            </div>
+
+            <div class="gastosMovementsWrapper cuentasTableWrapper">
+                <table class="gastosMovementsTable" id="cuentasTable">
+                    <thead id="cuentasHead"></thead>
+                    <tbody id="cuentasBody"></tbody>
+                </table>
+                <p class="overviewEmpty hidden" id="cuentasEmpty"></p>
+            </div>
+
+            <div class="gastosActions">
+                <button id="cuentasAddRowBtn" class="primaryButton" type="button">Nueva transferencia</button>
+            </div>
+        </div>
+
+        <aside class="cuentasSide">
+            <div class="summaryCard cuentasTotalCard">
+                <div class="summaryCardTitle">Total en cuentas</div>
+                <div class="summaryCardValue" id="cuentasTotal">—</div>
+                <p class="cuentasTotalNota">Suma de todas las cuentas a día de hoy. La bancaria incluye lo apuntado en Gastos e Ingresos.</p>
+            </div>
+            <div class="cuentasLista" id="cuentasLista"></div>
+        </aside>
+    </div>
+</section>

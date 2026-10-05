@@ -535,6 +535,7 @@ function openIngresoDetailModal(rowElement) {
             <div class="movDetailItem"><dt>Fecha</dt><dd>${escapeIngresosHtml(rowElement.dataset.fecha || "—")}</dd></div>
             <div class="movDetailItem"><dt>Concepto</dt><dd>${escapeIngresosHtml(rowElement.dataset.nombre || "—")}</dd></div>
             <div class="movDetailItem"><dt>Tipo</dt><dd>${escapeIngresosHtml(rowElement.dataset.tipo || "—")}</dd></div>
+            <div class="movDetailItem"><dt>Cobrado en</dt><dd>${escapeIngresosHtml(nombreDeCuenta(rowElement.dataset.cuenta || ""))}</dd></div>
             <div class="movDetailItem"><dt>Cantidad</dt><dd class="movDetailAmount movDetailAmountPos">${escapeIngresosHtml(cantidad || "—")}</dd></div>
         </dl>
         <div class="movDetailNote${nota ? "" : " movDetailNoteEmpty"}">
@@ -594,6 +595,9 @@ function openIngresoMovementModal(rowIndex = -1) {
                 ${typeOptions}
             </select>
 
+            <label class="assetModalLabel" for="ingresosMovimientoCuenta">Cobrado en</label>
+            ${construirSelectorCuenta("ingresosMovimientoCuenta", rowData.cuenta || "")}
+
             <label class="assetModalLabel" for="ingresosMovimientoCantidad">Cantidad</label>
             <input id="ingresosMovimientoCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeIngresosHtml(rowData.cantidad || "")}" placeholder="0,00">
 
@@ -605,6 +609,8 @@ function openIngresoMovementModal(rowIndex = -1) {
             const fecha = String(getValue("ingresosMovimientoFecha")).trim()
             const nombre = String(getValue("ingresosMovimientoNombre")).trim()
             const tipo = normalizeIngresoTipo(getValue("ingresosMovimientoTipo"))
+            // La cuenta bancaria es el vacío; las demás, su identificador.
+            const cuenta = String(getValue("ingresosMovimientoCuenta") || "")
             const cantidadRaw = String(getValue("ingresosMovimientoCantidad")).trim()
             const cantidad = cantidadRaw ? formatCellEuroValue(cantidadRaw) : ""
             const nota = String(getValue("ingresosMovimientoNota")).trim().slice(0, 300)
@@ -619,7 +625,7 @@ function openIngresoMovementModal(rowIndex = -1) {
                 currentIngresosData.months[currentIngresosMonth] = { rows: [] }
             }
 
-            const nextRow = { fecha, nombre, tipo, cantidad, nota }
+            const nextRow = { fecha, nombre, tipo, cantidad, nota, cuenta }
 
             if (isEdit && currentIngresosData.months[currentIngresosMonth].rows[rowIndex]) {
                 currentIngresosData.months[currentIngresosMonth].rows[rowIndex] = nextRow
@@ -706,6 +712,8 @@ async function deleteIngresosYearRequest(year) {
 async function initIngresosLogic() {
     ingresosYears = await loadIngresosYears()
     sharedIngresosTypes = await loadSharedIngresosTypes()
+    // Para el selector «Cobrado en» del popup y la columna «Cuenta».
+    await cargarCuentasDinero()
     currentIngresosYear = ingresosYears[0] || "2026"
     currentIngresosMonth = "enero"
     currentIngresosView = "year"
@@ -1075,10 +1083,6 @@ function openRecurrenteEditModal(rowIndex) {
 function openIngresoTypeRenameModal(rowIndex) {
     const currentName = sharedIngresosTypes?.[rowIndex]
     if (!currentName) return
-    if (esTipoAhorroReservado(currentName)) {
-        alert(`«${currentName}» es la categoría de la cuenta de ahorro y no se puede renombrar.`)
-        return
-    }
 
     openIngresosCreateModal({
         title: "Renombrar ingreso",
@@ -1600,8 +1604,26 @@ function renderIngresosMonthTable() {
     const totalTr = document.createElement("tr")
     totalTr.className = "ingresosTotalRow"
     totalTr.dataset.isTotal = "true"
-    totalTr.innerHTML = `<td colspan="3">Total</td><td class="numCell">${formatEuro(total)}</td><td class="rowActionsCell"></td>`
+    totalTr.innerHTML = `<td colspan="4">Total</td><td class="numCell">${formatEuro(total)}</td><td class="rowActionsCell"></td>`
     body.appendChild(totalTr)
+
+    renderIngresosMonthSide(rows)
+}
+
+// Al lado de la tabla del mes: de qué tipo han sido los ingresos y en qué cuenta han entrado.
+function renderIngresosMonthSide(rows) {
+    const lado = document.getElementById("ingresosResumenLado")
+    if (!lado) return
+    const mes = INGRESOS_MONTHS.find((m) => m.key === currentIngresosMonth)?.label || ""
+    lado.innerHTML =
+        buildDistribucionHtml(
+            `Ingresos por tipo · ${mes}`,
+            agruparImportes(rows, (row) => row.tipo)
+        ) +
+        buildDistribucionHtml(
+            "Ingresos por cuenta",
+            agruparImportes(rows, (row) => nombreDeCuenta(row.cuenta))
+        )
 }
 
 function sortIngresosByDate() {
@@ -1636,9 +1658,12 @@ function buildIngresoMovementRow(row = {}, rowIndex = -1) {
     tr.dataset.cantidad = String(row.cantidad || "")
     // La nota no tiene columna: se guarda en la fila y se enseña en el detalle.
     tr.dataset.nota = String(row.nota || "")
+    // Vacía = cuenta bancaria. Se conserva al guardar: la fila se reconstruye de aquí.
+    tr.dataset.cuenta = String(row.cuenta || "")
 
     tr.innerHTML = `
         <td data-field="fecha">${escapeIngresosHtml(row.fecha || "")}</td>
+        <td data-field="cuenta">${escapeIngresosHtml(nombreDeCuenta(row.cuenta))}</td>
         <td data-field="nombre">${escapeIngresosHtml(row.nombre || "")}</td>
         <td data-field="tipo">${escapeIngresosHtml(normalizeIngresoTipo(row.tipo || ""))}</td>
         <td data-field="cantidad">${formatCellEuroValue(row.cantidad || "")}</td>
@@ -1735,7 +1760,8 @@ function syncIngresosDataFromTables() {
                     rowElement.dataset.cantidad ||
                     rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() ||
                     "",
-                nota: rowElement.dataset.nota || ""
+                nota: rowElement.dataset.nota || "",
+                cuenta: rowElement.dataset.cuenta || ""
             }))
             .filter((row) => row.fecha || row.nombre || row.tipo || parseEuroNumber(row.cantidad) !== 0)
     }

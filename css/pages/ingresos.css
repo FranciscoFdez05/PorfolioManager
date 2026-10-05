@@ -114,7 +114,7 @@
 
 .ingresosMonthTab {
     min-width: auto;
-    height: 38px;
+    height: 34px;
     font-size: 14px;
     font-weight: 600;
     padding: 0 14px;
@@ -232,9 +232,9 @@
 }
 
 .ingresosMovementsTable tbody td {
-    padding: 6px 10px;
+    padding: 4px 10px;
     font-size: 14px;
-    height: 38px;
+    height: 34px;
 }
 
 .ingresosMovementsTable .rowActionsCell {
@@ -246,29 +246,42 @@
     width: 100%;
 }
 
-/* Columnas compactas y agrupadas a la izquierda: la de acciones absorbe el
-   ancho sobrante del panel en lugar de repartirlo entre todas (table-layout:fixed). */
+/* Anchos en porcentaje: el sobrante se reparte entre las columnas y los huecos
+   quedan parejos, en vez de acumularse en una sola. */
 .ingresosMovementsTable thead th:nth-child(1),
 .ingresosMovementsTable tbody td:nth-child(1) {
-    width: 170px;
+    width: 14%;
 }
 .ingresosMovementsTable thead th:nth-child(2),
 .ingresosMovementsTable tbody td:nth-child(2) {
-    width: 360px;
+    width: 19%;
 }
 .ingresosMovementsTable thead th:nth-child(3),
 .ingresosMovementsTable tbody td:nth-child(3) {
-    width: 260px;
+    width: 29%;
 }
 .ingresosMovementsTable thead th:nth-child(4),
 .ingresosMovementsTable tbody td:nth-child(4) {
-    width: 180px;
+    width: 19%;
+}
+.ingresosMovementsTable thead th:nth-child(5),
+.ingresosMovementsTable tbody td:nth-child(5) {
+    width: 15%;
 }
 
 .ingresosMovementsTable thead th.rowActionHeader,
 .ingresosMovementsTable tbody td.rowActionsCell {
-    width: auto;
+    width: 40px;
+    padding-left: 2px;
+    padding-right: 6px;
     text-align: right;
+}
+
+/* El primer y el último hueco (borde → fecha, cantidad → ···) no son mayores que
+   el de entre columnas: los márgenes también cuentan como espacio en blanco. */
+.ingresosMovementsTable thead th:first-child,
+.ingresosMovementsTable tbody td:first-child {
+    padding-left: 8px;
 }
 
 .ingresosSectionRow td {

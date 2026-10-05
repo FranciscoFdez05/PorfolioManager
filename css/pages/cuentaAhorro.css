@@ -455,3 +455,8 @@
     color: var(--text-muted);
     font-size: 11px;
 }
+
+.cuentaAhorroSinConcepto {
+    color: var(--text-dim);
+    font-style: italic;
+}

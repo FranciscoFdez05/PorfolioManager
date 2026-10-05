@@ -113,19 +113,23 @@
 
     <div class="ingresosMonthHeader hidden" id="ingresosMonthHeader"></div>
 
-    <div class="ingresosMovementsWrapper hidden" id="ingresosMovementsWrapper">
-        <table class="ingresosMovementsTable">
-            <thead>
-                <tr>
-                    <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="1">Concepto<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="2">Tipo<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="3">Cantidad<span class="mSortArrow"></span></th>
-                    <th class="rowActionHeader"></th>
-                </tr>
-            </thead>
-            <tbody id="ingresosMovementsBody"></tbody>
-        </table>
+    <div class="movMonthLayout">
+        <div class="ingresosMovementsWrapper hidden" id="ingresosMovementsWrapper">
+            <table class="ingresosMovementsTable">
+                <thead>
+                    <tr>
+                        <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="1">Cuenta<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="2">Concepto<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="3">Tipo<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="4">Cantidad<span class="mSortArrow"></span></th>
+                        <th class="rowActionHeader"></th>
+                    </tr>
+                </thead>
+                <tbody id="ingresosMovementsBody"></tbody>
+            </table>
+        </div>
+        <aside class="movResumenLado" id="ingresosResumenLado"></aside>
     </div>
 
     <div class="ingresosActions hidden" id="ingresosActions">

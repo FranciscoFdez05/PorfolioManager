@@ -253,6 +253,28 @@ CREATE TABLE IF NOT EXISTS gastos_rows (
     nombre   TEXT NOT NULL DEFAULT '',
     tipo     TEXT NOT NULL DEFAULT '',
     cantidad TEXT NOT NULL DEFAULT '',
+    nota     TEXT NOT NULL DEFAULT '',
+    cuenta   TEXT NOT NULL DEFAULT ''
+);
+
+-- Cuentas de dinero: la bancaria de Gastos e Ingresos, las de ahorro, los
+-- exchanges y los brokers. `tipo`: banco | ahorro | exchange | broker. El
+-- movimiento entre dos cuentas es una transferencia y no cuenta como gasto.
+CREATE TABLE IF NOT EXISTS cuentas (
+    id            TEXT PRIMARY KEY,
+    nombre        TEXT NOT NULL,
+    tipo          TEXT NOT NULL DEFAULT 'banco',
+    saldo_inicial TEXT NOT NULL DEFAULT '',
+    sort_order    INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS transferencias (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha    TEXT NOT NULL DEFAULT '',
+    origen   TEXT NOT NULL DEFAULT '',
+    destino  TEXT NOT NULL DEFAULT '',
+    cantidad TEXT NOT NULL DEFAULT '',
+    concepto TEXT NOT NULL DEFAULT '',
     nota     TEXT NOT NULL DEFAULT ''
 );
 
@@ -295,7 +317,8 @@ CREATE TABLE IF NOT EXISTS ingresos_rows (
     nombre   TEXT NOT NULL DEFAULT '',
     tipo     TEXT NOT NULL DEFAULT '',
     cantidad TEXT NOT NULL DEFAULT '',
-    nota     TEXT NOT NULL DEFAULT ''
+    nota     TEXT NOT NULL DEFAULT '',
+    cuenta   TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS ingresos_recurrentes (
@@ -598,7 +621,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id,
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 10
+ESQUEMA_VERSION = 11
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1206,6 +1229,135 @@ def _esquema_10(conn):
         "ORDER BY r.id DESC LIMIT 1), '') "
         "WHERE coste_anual = ''"
     )
+
+
+@_migracion(11)
+def _esquema_11(conn):
+    """Cuentas de dinero y transferencias entre ellas.
+
+    Hasta aquí, meter dinero en una cuenta de ahorro era un **gasto** con la
+    categoría reservada «Cuenta de ahorro» (y sacarlo, un **ingreso**), lo que
+    contaba como gasto algo que solo es dinero que cambia de sitio. Ahora cada
+    cuenta es una fila de `cuentas` y moverlo es una fila de `transferencias`.
+
+    Qué hace, en este orden:
+
+      * crea las dos tablas y la columna `cuenta` de gastos e ingresos (vacía =
+        cuenta bancaria, que es lo que eran todas hasta ahora);
+      * da de alta la cuenta bancaria y la de ahorro principal, y una cuenta de
+        ahorro por cada «Cuenta de ahorro · <nombre>» que hubiera;
+      * convierte cada gasto con esa categoría en una transferencia banco →
+        ahorro, y cada ingreso, en una ahorro → banco, **y borra la fila**: es
+        justo lo que deja de contar como gasto o ingreso;
+      * quita esas categorías del catálogo.
+
+    Los nombres y el separador están copiados aquí a propósito y no importados
+    de `stores`: una migración describe cómo eran los datos en ese momento, y
+    `core` no puede depender de `stores`.
+
+    Idempotente: sin filas con esa categoría no hay nada que convertir, y las
+    cuentas se dan de alta con INSERT OR IGNORE.
+    """
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS cuentas (
+            id            TEXT PRIMARY KEY,
+            nombre        TEXT NOT NULL,
+            tipo          TEXT NOT NULL DEFAULT 'banco',
+            saldo_inicial TEXT NOT NULL DEFAULT '',
+            sort_order    INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS transferencias (
+            id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha    TEXT NOT NULL DEFAULT '',
+            origen   TEXT NOT NULL DEFAULT '',
+            destino  TEXT NOT NULL DEFAULT '',
+            cantidad TEXT NOT NULL DEFAULT '',
+            concepto TEXT NOT NULL DEFAULT '',
+            nota     TEXT NOT NULL DEFAULT ''
+        );
+        """
+    )
+    for tabla in ("gastos_rows", "ingresos_rows"):
+        columnas = {fila[1] for fila in conn.execute(f"PRAGMA table_info({tabla})")}
+        if "cuenta" not in columnas:
+            conn.execute(f"ALTER TABLE {tabla} ADD COLUMN cuenta TEXT NOT NULL DEFAULT ''")
+
+    conn.execute(
+        "INSERT OR IGNORE INTO cuentas (id, nombre, tipo, sort_order) VALUES ('banco', 'Cuenta bancaria', 'banco', 0)"
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO cuentas (id, nombre, tipo, sort_order) VALUES ('ahorro', 'Cuenta de ahorro', 'ahorro', 1)"
+    )
+
+    base = "cuenta de ahorro"
+    separador = " · "
+    meses = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+    ]
+
+    def nombre_de_cuenta(tipo):
+        texto = str(tipo or "").strip()
+        if texto.lower() == base:
+            return ""
+        if texto.lower().startswith(base + separador):
+            return texto[len(base) + len(separador):].strip()
+        return None
+
+    def id_de_cuenta(nombre):
+        if not nombre:
+            return "ahorro"
+        existente = conn.execute(
+            "SELECT id FROM cuentas WHERE lower(nombre) = ?", (nombre.lower(),)
+        ).fetchone()
+        if existente:
+            return existente[0]
+        slug = "".join(c if c.isalnum() else "-" for c in nombre.lower()).strip("-") or "cuenta"
+        candidato, n = f"ahorro-{slug}", 2
+        while conn.execute("SELECT 1 FROM cuentas WHERE id = ?", (candidato,)).fetchone():
+            candidato = f"ahorro-{slug}-{n}"
+            n += 1
+        orden = conn.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cuentas").fetchone()[0]
+        conn.execute(
+            "INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES (?, ?, 'ahorro', ?)",
+            (candidato, nombre, orden),
+        )
+        return candidato
+
+    def fecha_de(fila):
+        if fila["fecha"]:
+            return fila["fecha"]
+        try:
+            return f"01-{meses.index(fila['month']) + 1:02d}-{fila['year']}"
+        except ValueError:
+            return ""
+
+    anterior = conn.row_factory
+    conn.row_factory = sqlite3.Row
+    try:
+        for tabla, hacia_ahorro in (("gastos_rows", True), ("ingresos_rows", False)):
+            filas = conn.execute(
+                f"SELECT id, year, month, fecha, nombre, tipo, cantidad, nota FROM {tabla} "
+                "WHERE lower(tipo) LIKE 'cuenta de ahorro%' ORDER BY id"
+            ).fetchall()
+            for fila in filas:
+                nombre = nombre_de_cuenta(fila["tipo"])
+                if nombre is None:
+                    continue
+                cuenta = id_de_cuenta(nombre)
+                origen, destino = ("banco", cuenta) if hacia_ahorro else (cuenta, "banco")
+                conn.execute(
+                    "INSERT INTO transferencias (fecha, origen, destino, cantidad, concepto, nota) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (fecha_de(fila), origen, destino, fila["cantidad"], fila["nombre"], fila["nota"]),
+                )
+                conn.execute(f"DELETE FROM {tabla} WHERE id = ?", (fila["id"],))
+    finally:
+        conn.row_factory = anterior
+
+    for catalogo in ("gastos_tipos", "ingresos_tipos"):
+        conn.execute(f"DELETE FROM {catalogo} WHERE lower(label) LIKE 'cuenta de ahorro%'")
 
 
 def get_db() -> sqlite3.Connection:

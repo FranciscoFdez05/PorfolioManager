@@ -24,6 +24,8 @@ let _metricasIngresosMonth = getChartPref("metricasIngresosMonth", "all")
 let _metricasSaldoMesMonth = getChartPref("metricasSaldoMesMonth", null)
 let _mSaldoMesCache = null
 let _metricasPayload = null
+// Transferencias entre cuentas: mueven el saldo de la cuenta bancaria sin ser gasto ni ingreso.
+let _metricasTransferencias = []
 let _metricasSortKey = getChartPref("metricasSortKey", "netoActualEur")
 let _metricasSortDir = getChartPref("metricasSortDir", "desc")
 let _metricasActivosFilter = new Set(["cripto", "acciones", "etfs", "comoditis", "rentaFija"])
@@ -283,6 +285,12 @@ async function buildMetricasPayload() {
     const intData = await intResp.json()
     const bonosData = await bonosResp.json()
     const rfData = await rfResp.json()
+
+    const transferenciasResp = await fetch("/api/transferencias").catch(() => null)
+    const transferenciasData = transferenciasResp ? await transferenciasResp.json().catch(() => null) : null
+    _metricasTransferencias = Array.isArray(transferenciasData?.transferencias)
+        ? transferenciasData.transferencias
+        : []
 
     const gastosYearsData = gastosYearsResp ? await gastosYearsResp.json().catch(() => ({ years: [] })) : { years: [] }
     const gastosYearsList = Array.isArray(gastosYearsData.years) ? gastosYearsData.years : []
@@ -1672,8 +1680,7 @@ function mComputeGastosData(yearData) {
     return { totalMes, totalTipo, totalMensualidades, totalMovimientos }
 }
 
-function mRenderGastos(yearsList, rawYearData) {
-    const yearData = sinMovimientosAhorro(rawYearData)
+function mRenderGastos(yearsList, yearData) {
     const section = document.getElementById("mSectionGastos")
     const gastosKpiRow = document.querySelector(".metricasKpiRow[data-mcat='gastos']")
     if (!yearsList.length || !yearData) {
@@ -2348,8 +2355,7 @@ function mRenderIngresosCharts(ingresosYearData) {
     mEqualizeChartRowHeights()
 }
 
-function mRenderIngresosSection(ingresosYearsList, rawIngresosYearData) {
-    const ingresosYearData = sinMovimientosAhorro(rawIngresosYearData)
+function mRenderIngresosSection(ingresosYearsList, ingresosYearData) {
     const section = document.getElementById("mSectionIngresos")
     const ingresosKpiRow = document.querySelector(".metricasKpiRow[data-mcat='ingresos']")
     if (!ingresosYearsList.length || !ingresosYearData) {
@@ -2585,9 +2591,7 @@ function mDrawInteresesChart(cuentas, year) {
 
 // ── comparativa ingresos vs gastos ─────────────────────────────────────────
 
-function mRenderComparativa(rawIngresosYearData, rawGastosYearData) {
-    const ingresosYearData = sinMovimientosAhorro(rawIngresosYearData)
-    const gastosYearData = sinMovimientosAhorro(rawGastosYearData)
+function mRenderComparativa(ingresosYearData, gastosYearData) {
     const section = document.getElementById("mSectionComparativa")
     if (!ingresosYearData && !gastosYearData) {
         if (section) section.classList.add("hidden")
@@ -2822,9 +2826,10 @@ function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey
         return d >= 1 && d <= daysInMonth ? d : 1
     }
 
+    // Lo cobrado en otra cuenta (ahorro, exchange…) no entra en la cuenta bancaria.
     ;(ingresosYearData?.months?.[monthKey]?.rows || []).forEach((row) => {
         const val = parseEuroNumber(row.cantidad || "")
-        if (val <= 0) return
+        if (val <= 0 || row.cuenta) return
         const d = dayOf(row.fecha)
         deltaPorDia[d] += val
         movs[d].push({ nombre: row.nombre || row.tipo || "Ingreso", importe: val })
@@ -2841,10 +2846,26 @@ function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey
     }
     ;(gastosYearData?.months?.[monthKey]?.rows || []).forEach((row) => {
         const val = parseEuroNumber(row.cantidad || "")
-        if (val <= 0) return
+        if (val <= 0 || row.cuenta) return
         const d = dayOf(row.fecha)
         deltaPorDia[d] -= val
         movs[d].push({ nombre: row.nombre || row.tipo || "Gasto", importe: -val })
+    })
+
+    // Dinero que sale hacia otras cuentas, o que vuelve de ellas.
+    _metricasTransferencias.forEach((t) => {
+        if (t.year !== String(year) || t.month !== monthKey) return
+        const val = parseEuroNumber(t.cantidad || "")
+        if (val <= 0) return
+        const signo = t.origen === "banco" ? -1 : t.destino === "banco" ? 1 : 0
+        if (!signo) return
+        const d = dayOf(t.fecha)
+        deltaPorDia[d] += signo * val
+        const otra = signo < 0 ? t.destino_nombre : t.origen_nombre
+        movs[d].push({
+            nombre: t.concepto || (signo < 0 ? `Transferencia a ${otra}` : `Transferencia desde ${otra}`),
+            importe: signo * val
+        })
     })
 
     const dayLabels = ["Inicio"]
@@ -3389,9 +3410,7 @@ function mRenderRentabilidadAnual(snaps, currentValue, currentInvested, cobertur
 
 // ── tasa de ahorro mensual ────────────────────────────────────────────────
 
-function mRenderAhorro(rawIngresosYearData, rawGastosYearData, ahorroConfig) {
-    const ingresosYearData = sinMovimientosAhorro(rawIngresosYearData)
-    const gastosYearData = sinMovimientosAhorro(rawGastosYearData)
+function mRenderAhorro(ingresosYearData, gastosYearData, ahorroConfig) {
     const section = document.getElementById("mSectionAhorro")
     const kpiGroup = document.getElementById("mkpiGroupAhorro")
     const kpiSep = document.getElementById("mkpiSepAhorro")
@@ -3539,10 +3558,10 @@ let _mAnualResumenCache = []
 
 function mComputeResumenAnual(anualData) {
     return (anualData || [])
-        .map(({ year, gastosData: rawGastos, ingresosData: rawIngresos }) => {
-            const { totalMes } = mComputeGastosData(sinMovimientosAhorro(rawGastos))
+        .map(({ year, gastosData, ingresosData }) => {
+            const { totalMes } = mComputeGastosData(gastosData)
             const gastado = M_GASTOS_KEYS.reduce((s, k) => s + (totalMes[k] || 0), 0)
-            const ingMes = mComputeIngresosMonthly(sinMovimientosAhorro(rawIngresos))
+            const ingMes = mComputeIngresosMonthly(ingresosData)
             const ingresos = M_ING_KEYS.reduce((s, k) => s + (ingMes[k] || 0), 0)
             const ahorrado = ingresos - gastado
             return {

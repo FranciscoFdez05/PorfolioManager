@@ -102,7 +102,6 @@ function ponerFeedbackCategorias(mensaje = "", esError = false) {
 }
 
 function construirFilaCategoria(panel, fila, indice, total) {
-    const reservada = esTipoAhorroReservado(fila.original)
     const enUso = fila.usos > 0
     const tituloUso = enUso
         ? `${fila.usos} movimiento${fila.usos === 1 ? "" : "s"} usan esta categoría`
@@ -112,12 +111,11 @@ function construirFilaCategoria(panel, fila, indice, total) {
         <li class="catRow">
             <input class="catInput" type="text" value="${escapeCategoriasHtml(fila.valor)}"
                    data-cat-input="${panel.clave}" data-cat-index="${indice}"
-                   ${reservada ? 'readonly title="Categoría reservada de la cuenta de ahorro"' : ""}
                    aria-label="Nombre de la categoría">
             <span class="catUso" title="${tituloUso}">${enUso ? fila.usos : ""}</span>
             <button type="button" class="catIconBtn" data-cat-move="${panel.clave}" data-cat-index="${indice}" data-cat-dir="up" ${indice === 0 ? "disabled" : ""} title="Subir">▲</button>
             <button type="button" class="catIconBtn" data-cat-move="${panel.clave}" data-cat-index="${indice}" data-cat-dir="down" ${indice === total - 1 ? "disabled" : ""} title="Bajar">▼</button>
-            <button type="button" class="catIconBtn catIconBtnDanger" data-cat-delete="${panel.clave}" data-cat-index="${indice}" ${enUso || reservada ? "disabled" : ""} title="${reservada ? "Reservada: no se puede eliminar" : enUso ? "En uso: no se puede eliminar" : "Eliminar"}">✕</button>
+            <button type="button" class="catIconBtn catIconBtnDanger" data-cat-delete="${panel.clave}" data-cat-index="${indice}" ${enUso ? "disabled" : ""} title="${enUso ? "En uso: no se puede eliminar" : "Eliminar"}">✕</button>
         </li>
     `
 }

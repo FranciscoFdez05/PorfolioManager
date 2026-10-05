@@ -86,19 +86,23 @@
 
     <div class="gastosMonthHeader hidden" id="gastosMonthHeader"></div>
 
-    <div class="gastosMovementsWrapper hidden" id="gastosMovementsWrapper">
-        <table class="gastosMovementsTable">
-            <thead>
-                <tr>
-                    <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="1">Concepto<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="2">Tipo<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="3">Cantidad<span class="mSortArrow"></span></th>
-                    <th class="rowActionHeader"></th>
-                </tr>
-            </thead>
-            <tbody id="gastosMovementsBody"></tbody>
-        </table>
+    <div class="movMonthLayout">
+        <div class="gastosMovementsWrapper hidden" id="gastosMovementsWrapper">
+            <table class="gastosMovementsTable">
+                <thead>
+                    <tr>
+                        <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="1">Cuenta<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="2">Concepto<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="3">Tipo<span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="4">Cantidad<span class="mSortArrow"></span></th>
+                        <th class="rowActionHeader"></th>
+                    </tr>
+                </thead>
+                <tbody id="gastosMovementsBody"></tbody>
+            </table>
+        </div>
+        <aside class="movResumenLado" id="gastosResumenLado"></aside>
     </div>
 
     <div class="gastosActions hidden" id="gastosActions">

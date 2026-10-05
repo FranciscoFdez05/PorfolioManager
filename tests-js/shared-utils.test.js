@@ -204,41 +204,57 @@ describe("currencySuffix", () => {
     })
 })
 
-describe("categorías de la cuenta de ahorro", () => {
-    it.each([
-        ["Cuenta de ahorro", true],
-        ["  cuenta de AHORRO ", true],
-        ["Cuenta de ahorro · Viaje", true],
-        ["Cuenta de ahorro Viaje", false],
-        ["Ahorro", false],
-        ["", false]
-    ])("esTipoAhorroReservado(%j) → %s", (tipo, esperado) => {
-        expect(esTipoAhorroReservado(tipo)).toBe(esperado)
+describe("cuentas de dinero", () => {
+    beforeAll(() => {
+        // Las ayudas leen la lista que cargó la página: aquí se rellena a mano.
+        window._cuentasDinero = [
+            { id: "banco", nombre: "Cuenta bancaria", tipo: "banco", tipo_etiqueta: "Banco" },
+            { id: "ahorro", nombre: "Cuenta de ahorro", tipo: "ahorro", tipo_etiqueta: "Ahorro" },
+            { id: "exchange-bi<nance", nombre: 'Bi"nance', tipo: "exchange", tipo_etiqueta: "Exchange" }
+        ]
     })
 
-    it("sinMovimientosAhorro quita sus filas y su categoría sin tocar el original", () => {
-        const anio = {
-            year: "2026",
-            gastosTipos: ["Comida", "Cuenta de ahorro", "Cuenta de ahorro · Viaje"],
-            months: {
-                enero: {
-                    rows: [
-                        { tipo: "Comida", cantidad: "10,00 €" },
-                        { tipo: "Cuenta de ahorro · Viaje", cantidad: "50,00 €" }
-                    ]
-                }
-            }
-        }
-
-        const limpio = sinMovimientosAhorro(anio)
-
-        expect(limpio.months.enero.rows).toEqual([{ tipo: "Comida", cantidad: "10,00 €" }])
-        expect(limpio.gastosTipos).toEqual(["Comida"])
-        expect(anio.months.enero.rows).toHaveLength(2)
+    it("la cuenta bancaria se llama así aunque no tenga identificador", () => {
+        expect(nombreDeCuenta("")).toBe("Cuenta bancaria")
+        expect(nombreDeCuenta("ahorro")).toBe("Cuenta de ahorro")
     })
 
-    it("sinMovimientosAhorro deja pasar lo que no es un año", () => {
-        expect(sinMovimientosAhorro(null)).toBeNull()
-        expect(sinMovimientosAhorro({ ok: false })).toEqual({ ok: false })
+    it("un identificador desconocido se enseña tal cual en vez de dejar un hueco", () => {
+        expect(nombreDeCuenta("fantasma")).toBe("fantasma")
+    })
+
+    it("el selector empieza por la cuenta bancaria, que vale vacío y es la elegida por defecto", () => {
+        const html = construirSelectorCuenta("cuenta")
+
+        expect(html).toContain('<option value="" selected>Cuenta bancaria</option>')
+        expect(html.indexOf("Cuenta bancaria")).toBeLessThan(html.indexOf("Cuenta de ahorro"))
+    })
+
+    it("el selector no repite la bancaria y marca la cuenta de la fila que se edita", () => {
+        const html = construirSelectorCuenta("cuenta", "ahorro")
+
+        expect(html.match(/Cuenta bancaria/g)).toHaveLength(1)
+        expect(html).toContain('<option value="ahorro" selected>Cuenta de ahorro (Ahorro)</option>')
+        expect(html).not.toContain('value="" selected')
+    })
+
+    it("el selector escapa los nombres", () => {
+        const html = construirSelectorCuenta("cuenta")
+
+        expect(html).toContain("Bi&quot;nance")
+        expect(html).toContain("exchange-bi&lt;nance")
+        expect(html).not.toContain('Bi"nance')
+    })
+})
+
+describe("cuenta bancaria renombrada", () => {
+    it("el selector y el nombre usan el que tenga la cuenta bancaria", () => {
+        const antes = window._cuentasDinero
+        window._cuentasDinero = [{ id: "banco", nombre: "BBVA nómina", tipo: "banco", tipo_etiqueta: "Banco" }]
+
+        expect(nombreDeCuenta("")).toBe("BBVA nómina")
+        expect(construirSelectorCuenta("cuenta")).toContain('<option value="" selected>BBVA nómina</option>')
+
+        window._cuentasDinero = antes
     })
 })

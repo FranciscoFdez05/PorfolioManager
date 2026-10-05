@@ -57,6 +57,7 @@ ATAJO_ENDPOINTS = {
     "movimientos.createMovimiento",
     "movimientos.getCategorias",
     "movimientos.getPortfoliosLista",
+    "movimientos.getCuentasLista",
     "movimientos.prepararMovimiento",
     "movimientos.firmarTexto",
 }

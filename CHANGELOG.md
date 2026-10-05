@@ -24,32 +24,83 @@ decide cómo se deshace la actualización:
 
 ## [3.1.0] — 2026-10-05
 
-**Esquema de base de datos:** lo sube a la **10** (columna nueva `coste_anual` en
-`activos`; se rellena con el último coste anual que tuviera alguna compra del
-activo y no se borra nada). Para deshacer la actualización, levantar la imagen
-anterior y restaurar `data/backups/auto/<portfolio>_pre-esquema-9-a-10_*.db`.
+**Esquema de base de datos:** lo sube a la **11** (desde la 9). Dos cambios:
+
+- Columna nueva `coste_anual` en `activos`; se rellena con el último coste anual
+  que tuviera alguna compra del activo y no se borra nada.
+- Cuentas de dinero: tablas nuevas `cuentas` y `transferencias`, y columna
+  `cuenta` en las filas de gastos e ingresos (vacía = cuenta bancaria, que es lo
+  que eran todas). **Mueve datos:** los gastos con la categoría «Cuenta de
+  ahorro» (aportaciones) y los ingresos con ella (retiradas) pasan a ser
+  transferencias y **se quitan de Gastos e Ingresos**, porque eran dinero que
+  cambiaba de sitio y no un gasto. Sin esas categorías no hay nada que mover.
+
+Para deshacer la actualización, levantar la imagen anterior y restaurar
+`data/backups/auto/<portfolio>_pre-esquema-9-a-11_*.db`.
 
 **Cómo se actualiza:** `git pull && ./docker-up.sh`, o el botón de
 Ajustes › Datos. Nada que editar a mano.
 
 ### Añadido
 
-**Gastos › Cuenta de ahorro.** Ventana nueva para el dinero apartado de la
-cuenta bancaria. Meter dinero en ella es un gasto en su día, mes y año; sacarlo
-es un ingreso. Los dos usan la categoría reservada «Cuenta de ahorro», fija en
-el código y protegida contra renombrar o eliminar, y también se pueden añadir
-desde Gastos e Ingresos eligiéndola. No tiene tablas propias.
+**Gastos › Cuentas.** Ventana nueva con las cuentas donde hay dinero: la cuenta
+bancaria de Gastos e Ingresos (la de siempre, y la base de todo), las de ahorro,
+los exchanges y los brokers. Se pueden añadir las que quieras, cada una con su
+tipo y un saldo inicial opcional, y la ventana enseña el saldo de cada una y el
+total.
 
-- Extracto anual de la cuenta bancaria, saldo total y gráfica mensual con
-  aportado y rendimientos (tooltip con el detalle de cada mes).
+- **Tipos de cuenta:** banco, ahorro, exchange, broker y metálico (el dinero en
+  efectivo).
+- **La cuenta bancaria se puede renombrar** (BBVA, Cuenta nómina…) y ponerle un
+  saldo inicial; no se puede eliminar. Los nombres de siempre («Cuenta
+  bancaria», «banco») siguen valiendo en la API del móvil.
+- **Mover dinero entre cuentas es una transferencia, no un gasto.** Banco →
+  exchange, banco → ahorro, ahorro → banco… viven en su propia tabla y no cuentan
+  en Gastos, en Ingresos ni en la tasa de ahorro. Se pueden añadir, editar,
+  eliminar, ordenar, filtrar por cuenta y descargar en CSV.
+- **Pagar con otra cuenta.** El popup de Gastos lleva «Pagado con» y el de
+  Ingresos «Cobrado en», con la cuenta bancaria por defecto (que es lo que eran
+  todos los anteriores). Las tablas de movimientos de Gastos e Ingresos tienen una
+  columna «Cuenta» —la segunda, tras la fecha— que en todos los anteriores pone la
+  cuenta bancaria. Un gasto pagado con la cuenta de ahorro sigue siendo un gasto de
+  su categoría, y cuenta en Gastos y en las métricas, pero baja el saldo de ese
+  ahorro y no el del banco.
+- **Cada mes de Gastos e Ingresos** tiene la tabla más compacta y, al lado, un
+  anillo con el reparto del mes por tipo y otro por cuenta (en qué se gastó y con
+  qué cuenta se pagó; qué tipo de ingreso fue y en qué cuenta entró más).
+- **El saldo mensual de Métricas** (la cuenta bancaria) tiene en cuenta las
+  transferencias y deja fuera lo pagado o cobrado con otras cuentas.
+
+**Gastos › Cuenta de ahorro.** Ventana para las cuentas de tipo ahorro: cada una
+es una cuenta de la ventana Cuentas y aquí se ve con más detalle.
+
+- Movimientos de la cuenta: las transferencias que entran y salen de ella, los
+  ingresos cobrados en ella y los gastos pagados con ella. Las transferencias se
+  añaden, editan y eliminan desde aquí; los gastos y los ingresos, donde se
+  apuntaron.
+- Extracto anual de la cuenta bancaria (ingresos, gastos y balance; las
+  transferencias no entran), saldo total y gráfica mensual con lo aportado y los
+  rendimientos.
 - Cuentas remuneradas y dividendos vinculables desde `···` › Configurar cuenta.
   Cada cuenta remunerada o los dividendos solo cuentan en una cuenta de ahorro.
 - Objetivo de ahorro con barra de progreso y estimación de cuándo se alcanza.
-- Aportación mensual automática: se crea sola al abrir la ventana, desde el mes
-  en que se activa. Lo que se borre no vuelve a crearse.
-- Varias cuentas de ahorro (principal, Viaje, Coche…), con alta, renombrado y
-  baja (esta última solo sin movimientos).
-- Editar movimientos, ordenar las tablas y descargar CSV.
+- Aportación mensual automática: se crea sola al abrir la ventana, como
+  transferencia desde la cuenta bancaria, desde el mes en que se activa. Lo que se
+  borre no vuelve a crearse.
+- Varias cuentas de ahorro (principal, Viaje, Coche…).
+- Ordenar las tablas y descargar CSV.
+
+**API del móvil (Atajo de iOS).** El movimiento acepta `cuenta` (con qué cuenta se
+paga o en cuál se cobra). Las cuentas para elegir salen de `/api/cuentas-lista`
+(nueva, por filtro de red local como `/api/portfolios-lista`, con `nombres` y la
+bancaria la primera) y también de la clave `cuentas` de `/api/categorias`. El Atajo
+que genera la app pregunta «¿En qué cuenta?»; los ya instalados siguen funcionando
+y apuntan a la cuenta bancaria. El concepto del movimiento ya es opcional: puede
+ir vacío y se apunta igual. La documentación del Atajo explica cómo añadirle la
+elección de cuenta a uno ya instalado.
+
+**Menú de Gastos.** Nuevo orden: Gastos, Ingresos, Calendario, Ahorro, Cuentas y
+Cuenta de ahorro.
 
 **Herramientas › Mercado › Divisas.** Comparador de divisas FIAT: eliges dos
 (EUR y USD, por ejemplo), ves la cotización, su inversa, una conversión de
@@ -62,10 +113,10 @@ cantidad que estés convirtiendo. Los datos salen de Yahoo Finance, sin clave.
 
 ### Cambiado
 
-**Ahorro y Métricas.** Lo que se aparta en una cuenta de ahorro ya no cuenta
-como gasto ni como ingreso en la tasa de ahorro, en los gráficos de gastos e
-ingresos, en el resumen anual ni en «Gastos (año)» / «Ingresos (año)» de la
-barra superior. El saldo mensual no cambia: sigue siendo el de la cuenta bancaria.
+**Ahorro y Métricas.** Meter dinero en una cuenta de ahorro ya no cuenta como
+gasto (ni sacarlo como ingreso): la tasa de ahorro, los gráficos de gastos e
+ingresos y «Gastos (año)» / «Ingresos (año)» de la barra superior solo suman lo
+que de verdad se ha gastado o ingresado.
 
 **Herramientas › Capitalización objetivo.** Bitcoin y el oro están siempre
 como referencias, sin buscarlos: la capitalización de Bitcoin se pide en vivo a

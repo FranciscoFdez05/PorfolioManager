@@ -88,6 +88,7 @@ rango no obliga a reiniciar el servidor.
 |---|---|---|
 | `GET /api/portfolios-lista` | IP | Elegir a qué base de datos van los datos |
 | `GET /api/categorias` | IP | Rellenar la lista de categorías en tiempo de ejecución |
+| `GET /api/cuentas-lista` | IP | Elegir con qué cuenta se paga o en cuál se cobra (Santander, Revolut, Trade Republic…) |
 | `POST /api/preparar` | IP | Construir el cuerpo JSON y firmarlo, para que el Atajo no escriba JSON a mano |
 | `POST /api/firmar` | IP | Firmar un texto ya construido (alternativa de bajo nivel) |
 | `POST /api/movimiento` | IP + firma HMAC | Guardar el movimiento |
@@ -101,7 +102,8 @@ escribe:
 - `GET /api/portfolios-lista` devuelve `{"portfolios": [{"id", "nombre",
   "activo"}], "activo": "<id>"}`. Como las categorías, se pide en tiempo de
   ejecución: si creas un portfolio nuevo desde la web, aparece solo en el Atajo.
-- `GET /api/categorias?portfolio=<id-o-nombre>` lee las categorías de esa base de datos.
+- `GET /api/categorias?portfolio=<id-o-nombre>` lee las categorías de esa base de datos
+  y devuelve también `cuentas` (ver «Elegir la cuenta»).
 - `POST /api/movimiento` acepta `"portfolio": "<id-o-nombre>"` **dentro del JSON**, no en
   la query string, para que quede cubierto por la firma: si viajara fuera,
   cualquiera podría redirigir el movimiento a otra base de datos sin invalidar
@@ -190,9 +192,19 @@ mayúscula también vale.
     + `&tipo=` + variable `clase`
   - Método: `GET`
 - **Establecer variable** `respuesta`
+- **Obtener valor del diccionario** → clave `cuentas`, en `respuesta`
+- **Establecer variable** `opciones` → *comprobar y parar si falta*
+- **Elegir de la lista**, con `opciones` como entrada («¿En qué cuenta?») →
+  **Establecer variable** `cuenta`
 - **Obtener valor del diccionario** → clave `lista`, en `respuesta`
 - **Establecer variable** `opciones` → *comprobar y parar si falta*
 - **Elegir de la lista**, con `opciones` como entrada → **Establecer variable** `categoria`
+
+`cuentas` es la lista de cuentas de dinero: la primera es **Cuenta bancaria** (la
+de siempre, y la que vale si no se manda nada) y después las demás que hayas
+creado en **Gastos › Cuentas** (ahorro, exchange, broker…). Es la cuenta **con la
+que se paga el gasto o en la que se cobra el ingreso**; la `categoria` es la de
+siempre, se elija la cuenta que se elija.
 
 `?tipo=` hace que el servidor devuelva además `lista` con solo las categorías de
 ese tipo. Así el Atajo no necesita un segundo «Obtener valor del diccionario»
@@ -210,6 +222,7 @@ el Atajo sin tocar nada.
 **4. Pedir concepto e importe**
 
 - **Pedir entrada** (Texto), «¿Concepto?» → **Establecer variable** `nombre`
+  (puede quedarse vacío: el movimiento se apunta igual, con el concepto en blanco)
 - **Pedir entrada** (Número), «¿Importe?» → **Establecer variable** `importe`
 
 **5. Fecha de hoy**
@@ -233,8 +246,9 @@ existía aún en la pestaña de Gastos se crea solo.
   - URL: `http://192.168.1.X:5000/api/preparar`
   - Método: `POST`
   - Cuerpo de la solicitud: `JSON`, con un campo de tipo Texto por dato:
-    `tipo`, `categoria`, `nombre`, `importe`, `fecha` y `portfolio`, cada uno
-    con su variable como valor
+    `tipo`, `categoria`, `cuenta`, `nombre`, `importe`, `fecha` y `portfolio`,
+    cada uno con su variable como valor (`cuenta` es opcional: sin él, la
+    cuenta bancaria)
 - **Establecer variable** `preparado`
 - **Obtener valor del diccionario** → clave `cuerpo`, en `preparado`
   → **Establecer variable** `envio` → *comprobar y parar si falta* (aquí la
@@ -303,7 +317,7 @@ botón de Acción (Ajustes → Botón de Acción → Atajo).
 | 401 | Firma inválida, ausente, o timestamp fuera de ventana | El cuerpo enviado no es idéntico al firmado (paso 8: tiene que ir como *Archivo*) |
 | 503 | No hay clave de firma | Ejecuta `python tools/generar_clave_movimientos.py` |
 | 404 | Portfolio inexistente | El `id` enviado no está en `/api/portfolios-lista` |
-| 400 | JSON mal formado o campos inválidos | Comillas o barras invertidas en el concepto; `tipo` que no es `gasto`/`ingreso`; importe cero o negativo |
+| 400 | JSON mal formado o campos inválidos | Comillas o barras invertidas en el concepto; `tipo` que no es `gasto`/`ingreso`; importe cero o negativo; `cuenta` que no existe (el mensaje dice cuáles valen) |
 
 El mensaje concreto viene en el campo `error` de la respuesta, y es el que
 enseña la alerta del atajo cuando se para. Si el atajo **pide concepto e
@@ -322,6 +336,123 @@ con qué IP te ve el servidor y si pasa el filtro.
 > Ojo a la diferencia entre los dos 404 posibles: si la respuesta trae
 > `requestId`, es Flask diciendo que la ruta no existe (código antiguo, falta
 > reiniciar el servidor). Si no lo trae, es el 404 de `activado = false`.
+
+## Elegir la cuenta: con cuál se paga o en cuál se cobra
+
+Cada gasto o ingreso va a una **cuenta**. Por defecto es la **cuenta bancaria**,
+que es donde está todo lo apuntado hasta ahora. Pero puede ser cualquiera de las
+que tengas en **Gastos › Cuentas**: una cuenta de ahorro, un exchange, un broker u
+otra cuenta bancaria. El movimiento sigue siendo un gasto (o un ingreso) de su
+categoría y cuenta en Gastos, Ingresos y las métricas igual que siempre; lo que
+cambia es **de qué cuenta sale o en cuál entra el dinero**:
+
+- un **gasto** pagado con la cuenta de ahorro baja el saldo de esa cuenta de
+  ahorro, no el del banco;
+- un **ingreso** cobrado en un exchange sube el saldo de ese exchange.
+
+> Mover dinero de una cuenta a otra (del banco al exchange, del banco al ahorro…)
+> **no es un gasto ni un ingreso**: es una *transferencia*, y se apunta en la web,
+> en Gastos › Cuentas. El Atajo apunta gastos e ingresos.
+
+### Qué manda el Atajo
+
+Un campo más en el cuerpo de `/api/preparar`, llamado **`cuenta`**, con el
+**nombre** de la cuenta tal como la devuelve el servidor (no distingue mayúsculas;
+también vale el identificador):
+
+| Valor de `cuenta` | A dónde va |
+|---|---|
+| (vacío o sin el campo) | Cuenta bancaria |
+| `Cuenta bancaria` | Cuenta bancaria |
+| `Cuenta de ahorro` | La cuenta de ahorro principal |
+| `Binance` (o el nombre que tengas) | Esa cuenta |
+
+No hace falta escribir ninguno a mano. Hay dos sitios de donde sacar la lista, los
+dos por filtro de red local y sin sesión:
+
+- **`GET /api/cuentas-lista?portfolio=<bbdd>`**: la dirección pensada para esto.
+  Devuelve las cuentas que tengas dadas de alta en la web (Gastos › Cuentas):
+
+  ```json
+  {
+    "cuentas": [{ "id": "banco", "nombre": "Santander", "tipo": "banco", "tipo_etiqueta": "Banco" }, …],
+    "nombres": ["Santander", "Cuenta de ahorro", "Revolut", "Trade Republic"],
+    "idPorNombre": { "Santander": "banco", "Trade Republic": "ahorro-trade-republic", … },
+    "predeterminada": "Santander"
+  }
+  ```
+
+  La clave que se usa en el Atajo es **`nombres`**, con la cuenta bancaria siempre
+  la primera. Es la misma forma que `/api/portfolios-lista`.
+- **`GET /api/categorias`**: trae la misma lista en su clave **`cuentas`**, por si
+  prefieres no hacer una petición más (es lo que usa el Atajo que genera la app).
+
+La lista se refresca sola al crear o renombrar una cuenta en la web. `/api/cuentas`,
+a secas, es la de la web y exige sesión iniciada: un Atajo no puede usarla.
+
+### Añadir la elección de cuenta a un Atajo que ya tienes
+
+Los Atajos instalados siguen funcionando sin tocar nada —apuntan a la cuenta
+bancaria—, así que esto solo hace falta si quieres poder elegir otra. Es descargar
+el Atajo nuevo desde **Ajustes > API > Atajo de iOS**, o añadirle tres acciones y
+un campo a mano:
+
+1. En la app **Atajos**, abre el atajo y pulsa **Editar**.
+2. Busca el bloque que pide las categorías: **Obtener contenido de la URL**
+   (`…/api/categorias?portfolio=…`) seguido de **Establecer variable** `respuesta`.
+3. Justo **debajo** de ese **Establecer variable** `respuesta`, añade (con la
+   variante de la nota de abajo si prefieres `/api/cuentas-lista`):
+   - **Obtener valor del diccionario** → *Obtener* **Valor** de la clave
+     `cuentas`, en la variable `respuesta`.
+   - **Establecer variable** `opciones`.
+   - **Elegir de la lista**, con la variable `opciones` como entrada. En
+     *Solicitar* escribe «¿En qué cuenta?».
+   - **Establecer variable** `cuenta`.
+
+   Si quieres la misma protección que el resto del atajo, pon entre
+   `opciones` y «Elegir de la lista» el bloque de comprobación (**Si**
+   `opciones` **no tiene valor** → **Mostrar alerta** con el error →
+   **Detener este atajo**), igual que en los demás pasos.
+4. Más abajo, en **Obtener contenido de la URL** de `…/api/preparar`, en
+   **Cuerpo de la solicitud** (tipo *JSON*) pulsa **Añadir nuevo campo**:
+   *Texto*, clave `cuenta`, y como valor la variable `cuenta`.
+5. Pulsa **OK** y ejecuta el atajo: ahora pregunta «¿En qué cuenta?» con
+   «Cuenta bancaria» la primera.
+
+**Variante con `/api/cuentas-lista`.** En vez de leer `cuentas` de `respuesta`, haz
+tu propia petición antes de elegir:
+
+1. **Obtener contenido de la URL** → `http://192.168.1.X:5000/api/cuentas-lista?portfolio=`
+   + variable `bbdd`, método `GET`.
+2. **Obtener valor del diccionario** → clave `nombres`, en esa respuesta →
+   **Establecer variable** `opciones` (con el bloque de comprobación si quieres).
+3. **Elegir de la lista** con `opciones` → **Establecer variable** `cuenta`, y el
+   campo `cuenta` del paso 4 igual que arriba.
+
+Detalles que conviene saber:
+
+- **El valor viaja tal cual lo elegiste** de la lista. No lo escribas a mano: un
+  texto que no sea una cuenta (por ejemplo «Mi hucha») devuelve 400 con la lista de
+  las que valen.
+- Si **renombras una cuenta** en la web, el atajo no hay que tocarlo: la lista se
+  pide en cada ejecución.
+
+### Un atajo solo para una cuenta
+
+Si siempre pagas con la misma cuenta, es más cómodo duplicar el atajo
+(*Duplicar* en la biblioteca de Atajos) y fijar la cuenta en lugar de preguntarla:
+
+1. Borra las acciones «¿En qué cuenta?» y la variable `cuenta`.
+2. En el campo `cuenta` del cuerpo de `/api/preparar`, escribe el nombre de la
+   cuenta directamente, por ejemplo `Cuenta de ahorro`.
+
+### Comprobarlo
+
+Desde cualquier navegador de la LAN, `http://192.168.1.X:5000/api/categorias`
+debe devolver la clave `cuentas`. Tras ejecutar el atajo, el movimiento aparece en
+Gastos o en Ingresos, en su mes, con una etiqueta con el nombre de la cuenta si no
+es la bancaria; y en la ventana de esa cuenta (por ejemplo Gastos › Cuenta de
+ahorro) como un movimiento más.
 
 ## Limitaciones conocidas
 

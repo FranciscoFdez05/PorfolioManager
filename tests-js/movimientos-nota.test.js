@@ -97,8 +97,8 @@ describe.each(Object.entries(PANTALLAS))("nota de un movimiento en %s", (nombre,
 
     it("la cabecera de la tabla dice Concepto, no Nombre", () => {
         const html = readFileSync(resolve(RAIZ, pantalla.html), "utf-8")
-        expect(html).toMatch(/data-sortkey="1">Concepto</)
-        expect(html).not.toMatch(/data-sortkey="1">Nombre</)
+        expect(html).toMatch(/data-sortkey="2">Concepto</)
+        expect(html).not.toMatch(/data-sortkey="2">Nombre</)
     })
 
     it("la fila lleva la nota pero no la enseña", () => {

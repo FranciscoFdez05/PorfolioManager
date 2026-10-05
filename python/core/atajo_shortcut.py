@@ -199,6 +199,19 @@ def acciones(urlBase: str) -> list:
             "WFHTTPMethod": "GET",
         }),
         _guardar("respuesta"),
+
+        # 3b. Con qué cuenta se paga el gasto o en cuál se cobra el ingreso: la
+        # bancaria (la primera, y la de siempre) o cualquier otra (ahorro,
+        # exchange, broker…). Sale de la misma respuesta que las categorías.
+        _valorDe("cuentas", "respuesta"),
+        _guardar("opciones"),
+        *_pararSiVacia("opciones", "respuesta", "No se pudieron leer las cuentas"),
+        _accion(_ELEGIR, {
+            "WFInput": _variable("opciones"),
+            "WFChooseFromListActionPrompt": "¿En qué cuenta?",
+        }),
+        _guardar("cuenta"),
+
         _valorDe("lista", "respuesta"),
         _guardar("opciones"),
         *_pararSiVacia("opciones", "respuesta", "No se pudieron leer las categorías"),
@@ -209,7 +222,7 @@ def acciones(urlBase: str) -> list:
         _guardar("categoria"),
 
         # 4. Concepto e importe.
-        _accion(_PREGUNTAR, {"WFAskActionPrompt": "¿Concepto?", "WFInputType": "Text"}),
+        _accion(_PREGUNTAR, {"WFAskActionPrompt": "¿Concepto? (puede ir vacío)", "WFInputType": "Text"}),
         _guardar("nombre"),
         _accion(_PREGUNTAR, {"WFAskActionPrompt": "¿Importe?", "WFInputType": "Number"}),
         _guardar("importe"),
@@ -225,6 +238,7 @@ def acciones(urlBase: str) -> list:
             "WFJSONValues": _campos([
                 ("tipo", _texto(("var", "tipo"))),
                 ("categoria", _texto(("var", "categoria"))),
+                ("cuenta", _texto(("var", "cuenta"))),
                 ("nombre", _texto(("var", "nombre"))),
                 ("importe", _texto(("var", "importe"))),
                 ("portfolio", _texto(("var", "bbdd"))),

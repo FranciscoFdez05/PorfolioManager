@@ -1,8 +1,8 @@
 // ===== CUENTAS DE AHORRO =====
-// Dinero apartado de la cuenta bancaria. Los movimientos son filas normales de
-// Gastos (aportación) e Ingresos (retirada) con la categoría reservada
-// AHORRO_TIPO_RESERVADO; esta ventana las lee de /api/cuenta-ahorro. La cuenta
-// principal usa la categoría tal cual y las demás la llevan de prefijo.
+// Una cuenta de ahorro es una cuenta de dinero más (ventana «Cuentas»). Sus
+// movimientos son las transferencias desde y hacia otras cuentas, los ingresos
+// cobrados en ella y los gastos pagados con ella; esta ventana los lee de
+// /api/cuenta-ahorro. Meter dinero en ahorro no es un gasto: es una transferencia.
 
 const CUENTA_AHORRO_MONTH_KEYS = [
     "enero",
@@ -21,12 +21,14 @@ const CUENTA_AHORRO_MONTH_KEYS = [
 const CUENTA_AHORRO_MONTH_LABELS = ["E", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
 // Meses que se promedian para estimar cuándo se alcanza el objetivo.
 const CUENTA_AHORRO_MESES_RITMO = 6
+const CUENTA_AHORRO_PRINCIPAL = "ahorro"
 
 let cuentaAhorroYear = null
 let cuentaAhorroYears = []
 let cuentaAhorroTab = "movimientos"
-let cuentaAhorroCuenta = ""
-let cuentaAhorroNombres = []
+let cuentaAhorroCuenta = CUENTA_AHORRO_PRINCIPAL
+let cuentaAhorroCuentas = []
+let cuentaAhorroTodas = []
 let cuentaAhorroMovs = []
 let cuentaAhorroRemuneradas = []
 let cuentaAhorroDividendos = []
@@ -42,8 +44,9 @@ const cuentaAhorroSort = {
 
 async function initCuentaAhorroLogic() {
     try {
-        const [movs, gasYears, ingYears, settings, intereses, dividendos] = await Promise.all([
+        const [movs, todas, gasYears, ingYears, settings, intereses, dividendos] = await Promise.all([
             Api.get("/api/cuenta-ahorro"),
+            Api.get("/api/cuentas").catch(() => ({ cuentas: [] })),
             Api.get("/api/gastos").catch(() => ({ years: [] })),
             Api.get("/api/ingresos").catch(() => ({ years: [] })),
             Api.get("/api/settings").catch(() => ({})),
@@ -52,6 +55,7 @@ async function initCuentaAhorroLogic() {
         ])
 
         applyCuentaAhorroData(movs)
+        cuentaAhorroTodas = Array.isArray(todas?.cuentas) ? todas.cuentas : []
         cuentaAhorroRemuneradas = Array.isArray(intereses?.cuentas) ? intereses.cuentas : []
         cuentaAhorroDividendos = Array.isArray(dividendos?.rows) ? dividendos.rows : []
         cuentaAhorroConfig = normalizeCuentaAhorroConfig(settings?.cuentaAhorroConfig)
@@ -62,7 +66,7 @@ async function initCuentaAhorroLogic() {
             String(Number(thisYear) + 1),
             ...(gasYears?.years || []),
             ...(ingYears?.years || []),
-            ...cuentaAhorroMovs.map((m) => m.year)
+            ...cuentaAhorroMovs.map((m) => m.year).filter(Boolean)
         ])
         cuentaAhorroYears = [...years].sort()
         cuentaAhorroYear = cuentaAhorroYears.includes(cuentaAhorroYear) ? cuentaAhorroYear : thisYear
@@ -80,21 +84,23 @@ async function initCuentaAhorroLogic() {
 
 function applyCuentaAhorroData(data) {
     cuentaAhorroMovs = Array.isArray(data?.movimientos) ? data.movimientos : []
-    cuentaAhorroNombres = Array.isArray(data?.cuentas) ? data.cuentas : []
-    if (!getCuentaAhorroNombres().some((n) => sameCuentaAhorro(n, cuentaAhorroCuenta))) cuentaAhorroCuenta = ""
+    cuentaAhorroCuentas = Array.isArray(data?.cuentas) ? data.cuentas : []
+    if (!cuentaAhorroCuentas.some((c) => c.id === cuentaAhorroCuenta)) {
+        cuentaAhorroCuenta = cuentaAhorroCuentas[0]?.id || CUENTA_AHORRO_PRINCIPAL
+    }
+}
+
+function getCuentaAhorroActual() {
+    return cuentaAhorroCuentas.find((c) => c.id === cuentaAhorroCuenta) || cuentaAhorroCuentas[0] || null
+}
+
+// Nombre con el que se guarda la configuración de la cuenta (la principal, vacío).
+function getCuentaAhorroClave(cuenta = getCuentaAhorroActual()) {
+    return cuenta?.clave ?? ""
 }
 
 function sameCuentaAhorro(a, b) {
     return String(a || "").toLowerCase() === String(b || "").toLowerCase()
-}
-
-// La cuenta principal ("") y después las demás.
-function getCuentaAhorroNombres() {
-    return ["", ...cuentaAhorroNombres]
-}
-
-function getCuentaAhorroLabel(nombre) {
-    return nombre || "Cuenta de ahorro"
 }
 
 function emptyCuentaAhorroCfg(nombre = "") {
@@ -132,9 +138,9 @@ function normalizeCuentaAhorroConfig(raw) {
     return { cuentas: entradas.map((e) => normalizeCuentaAhorroCfg(e, String(e?.nombre || ""))) }
 }
 
-function getCuentaAhorroCfg(nombre = cuentaAhorroCuenta) {
-    const found = cuentaAhorroConfig.cuentas.find((c) => sameCuentaAhorro(c.nombre, nombre))
-    return found || emptyCuentaAhorroCfg(nombre)
+function getCuentaAhorroCfg(clave = getCuentaAhorroClave()) {
+    const found = cuentaAhorroConfig.cuentas.find((c) => sameCuentaAhorro(c.nombre, clave))
+    return found || emptyCuentaAhorroCfg(clave)
 }
 
 function setCuentaAhorroCfg(cfg) {
@@ -148,18 +154,24 @@ async function saveCuentaAhorroConfig() {
 }
 
 function getCuentaAhorroMovs() {
-    return cuentaAhorroMovs.filter((m) => sameCuentaAhorro(m.cuenta, cuentaAhorroCuenta))
+    return cuentaAhorroMovs.filter((m) => m.cuenta === cuentaAhorroCuenta)
+}
+
+function getCuentaAhorroSaldoInicial() {
+    return parseEuroNumber(getCuentaAhorroActual()?.saldo_inicial || "")
 }
 
 // ── Datos ────────────────────────────────────────────────────────────────
 
 async function loadCuentaAhorroBanco(year) {
+    // Solo lo que pasa por la cuenta bancaria: lo pagado o cobrado con otra
+    // cuenta no mueve su saldo, y las mensualidades y recurrentes sí.
     const sumYear = (data, recurrentesKey) => {
         if (!data) return 0
         let total = 0
         CUENTA_AHORRO_MONTH_KEYS.forEach((month) => {
             ;(data.months?.[month]?.rows || []).forEach((row) => {
-                total += parseEuroNumber(row.cantidad || "")
+                if (!row.cuenta) total += parseEuroNumber(row.cantidad || "")
             })
             ;(data[recurrentesKey] || []).forEach((row) => {
                 total += parseEuroNumber(row.meses?.[month] || "")
@@ -172,6 +184,7 @@ async function loadCuentaAhorroBanco(year) {
         Api.get(`/api/ingresos/${encodeURIComponent(year)}`).catch(() => null),
         Api.get(`/api/gastos/${encodeURIComponent(year)}`).catch(() => null)
     ])
+
     cuentaAhorroBanco = {
         ingresos: sumYear(ingresos, "recurrentes"),
         gastos: sumYear(gastos, "mensualidades")
@@ -234,7 +247,7 @@ function buildCuentaAhorroFlows() {
     getCuentaAhorroMovs().forEach((m) => {
         const month = CUENTA_AHORRO_MONTH_KEYS.indexOf(m.month)
         if (month < 0) return
-        const sign = m.kind === "retiro" ? -1 : 1
+        const sign = m.kind === "salida" ? -1 : 1
         flows.push({
             type: "aporte",
             year: m.year,
@@ -279,28 +292,25 @@ async function refreshCuentaAhorro() {
 function renderCuentaAhorroCuentas() {
     const bar = document.getElementById("cuentaAhorroCuentas")
     if (bar) {
-        const nombres = getCuentaAhorroNombres()
-        bar.hidden = nombres.length < 2
+        bar.hidden = cuentaAhorroCuentas.length < 2
         bar.innerHTML = ""
-        nombres.forEach((nombre) => {
+        cuentaAhorroCuentas.forEach((cuenta) => {
             const btn = document.createElement("button")
             btn.type = "button"
-            btn.className = `gastosYearBtn${sameCuentaAhorro(nombre, cuentaAhorroCuenta) ? " active" : ""}`
-            btn.textContent = getCuentaAhorroLabel(nombre)
+            btn.className = `gastosYearBtn${cuenta.id === cuentaAhorroCuenta ? " active" : ""}`
+            btn.textContent = cuenta.nombre
             btn.addEventListener("click", async () => {
-                cuentaAhorroCuenta = nombre
+                cuentaAhorroCuenta = cuenta.id
                 await refreshCuentaAhorro()
             })
             bar.appendChild(btn)
         })
     }
 
-    // Renombrar y eliminar no valen para la cuenta principal.
-    const principal = cuentaAhorroCuenta === ""
-    ;["cuentaAhorroRenameBtn", "cuentaAhorroDeleteBtn"].forEach((id) => {
-        const btn = document.getElementById(id)
-        if (btn) btn.style.display = principal ? "none" : ""
-    })
+    // La cuenta de ahorro principal no se elimina.
+    const principal = cuentaAhorroCuenta === CUENTA_AHORRO_PRINCIPAL
+    const borrar = document.getElementById("cuentaAhorroDeleteBtn")
+    if (borrar) borrar.style.display = principal ? "none" : ""
 }
 
 function renderCuentaAhorroYears() {
@@ -336,6 +346,12 @@ function getCuentaAhorroMovimientosDelAnio() {
     return getCuentaAhorroMovs()
         .filter((m) => m.year === cuentaAhorroYear)
         .sort((a, b) => parseCuentaAhorroSortKey(b.fecha) - parseCuentaAhorroSortKey(a.fecha) || b.id - a.id)
+}
+
+// De dónde viene o a dónde va un movimiento, en una frase.
+function describeCuentaAhorroMovimiento(m) {
+    if (m.origen === "transferencia") return `${m.kind === "salida" ? "Hacia" : "Desde"} ${m.contraparte}`
+    return `${m.origen === "gasto" ? "Gasto" : "Ingreso"}${m.contraparte ? " · " + m.contraparte : ""}`
 }
 
 // Cabecera con columnas ordenables: la activa lleva una flecha con el sentido.
@@ -389,7 +405,7 @@ function renderCuentaAhorroTable() {
             [
                 { key: "fecha", label: "Fecha" },
                 { key: "nombre", label: "Concepto" },
-                { key: "tipo", label: "Tipo" },
+                { key: "detalle", label: "Detalle" },
                 { key: "cantidad", label: "Cantidad", num: true }
             ],
             '<th class="rowActionHeader"></th>'
@@ -398,35 +414,38 @@ function renderCuentaAhorroTable() {
         const rows = sortCuentaAhorroRows(getCuentaAhorroMovimientosDelAnio(), {
             fecha: (m) => parseCuentaAhorroSortKey(m.fecha),
             nombre: (m) => m.nombre || "",
-            tipo: (m) => m.kind,
-            cantidad: (m) => (m.kind === "retiro" ? -1 : 1) * parseEuroNumber(m.cantidad || "")
+            detalle: (m) => describeCuentaAhorroMovimiento(m),
+            cantidad: (m) => (m.kind === "salida" ? -1 : 1) * parseEuroNumber(m.cantidad || "")
         })
 
         body.innerHTML = rows
             .map((m) => {
-                const retiro = m.kind === "retiro"
+                const salida = m.kind === "salida"
                 const importe = parseEuroNumber(m.cantidad || "")
-                return `
-                    <tr class="movDetailRow" data-kind="${m.kind}" data-id="${m.id}" data-fecha="${escapeGastosHtml(m.fecha)}" data-cantidad="${escapeGastosHtml(m.cantidad)}" data-nombre="${escapeGastosHtml(m.nombre)}" data-nota="${escapeGastosHtml(m.nota)}">
-                        <td>${escapeGastosHtml(m.fecha)}</td>
-                        <td title="${escapeGastosHtml(m.nota)}">${escapeGastosHtml(m.nombre)}</td>
-                        <td>${retiro ? "Retirada" : "Ingreso"}</td>
-                        <td class="numCell ${retiro ? "cuentaAhorroNeg" : "cuentaAhorroPos"}">${formatCuentaAhorroSigned(retiro ? -importe : importe)}</td>
-                        <td class="rowActionsCell">
-                            <div class="rowMenu">
+                const editable = m.origen === "transferencia"
+                // Los gastos y los ingresos se editan donde se apuntaron.
+                const menu = editable
+                    ? `<div class="rowMenu">
                                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                                 <div class="rowMenuDropdown">
                                     <button type="button" class="rowMenuItem" data-cuenta-ahorro-edit>Editar</button>
                                     <hr>
                                     <button type="button" class="rowMenuItem rowMenuItemDanger" data-cuenta-ahorro-delete>Eliminar</button>
                                 </div>
-                            </div>
-                        </td>
+                            </div>`
+                    : ""
+                return `
+                    <tr class="movDetailRow" data-origen="${m.origen}" data-id="${m.id}" data-kind="${m.kind}" data-contraparte="${escapeGastosHtml(m.contraparte_id || "")}" data-fecha="${escapeGastosHtml(m.fecha)}" data-cantidad="${escapeGastosHtml(m.cantidad)}" data-nombre="${escapeGastosHtml(m.nombre)}" data-nota="${escapeGastosHtml(m.nota)}">
+                        <td>${escapeGastosHtml(m.fecha)}</td>
+                        <td title="${escapeGastosHtml(m.nota)}">${m.nombre ? escapeGastosHtml(m.nombre) : '<span class="cuentaAhorroSinConcepto">Sin concepto</span>'}</td>
+                        <td>${escapeGastosHtml(describeCuentaAhorroMovimiento(m))}</td>
+                        <td class="numCell ${salida ? "cuentaAhorroNeg" : "cuentaAhorroPos"}">${formatCuentaAhorroSigned(salida ? -importe : importe)}</td>
+                        <td class="rowActionsCell">${menu}</td>
                     </tr>`
             })
             .join("")
 
-        empty.textContent = `No hay movimientos de la cuenta de ahorro en ${cuentaAhorroYear}.`
+        empty.textContent = `No hay movimientos de esta cuenta en ${cuentaAhorroYear}.`
         empty.classList.toggle("hidden", rows.length > 0)
         syncEmpty(rows.length === 0)
         return
@@ -453,6 +472,7 @@ function renderCuentaAhorroTable() {
         if (splitCuentaAhorroFecha(row.fecha)?.year !== cuentaAhorroYear) return
         rows.push({ fecha: row.fecha, origen: `Dividendo · ${row.instrumento || "—"}`, importe })
     })
+
     const ordenadas = sortCuentaAhorroRows(rows, {
         fecha: (r) => parseCuentaAhorroSortKey(r.fecha),
         origen: (r) => r.origen,
@@ -490,6 +510,9 @@ function renderCuentaAhorroSummary() {
 
     const bancoYear = document.getElementById("cuentaAhorroBancoYear")
     if (bancoYear) bancoYear.textContent = cuentaAhorroYear
+    const bancoNombre = document.getElementById("cuentaAhorroBancoNombre")
+    if (bancoNombre)
+        bancoNombre.textContent = cuentaAhorroTodas.find((c) => c.id === "banco")?.nombre || "Cuenta bancaria"
 
     const balance = cuentaAhorroBanco.ingresos - cuentaAhorroBanco.gastos
     set("cuentaAhorroIngresos", formatEuro(cuentaAhorroBanco.ingresos))
@@ -504,19 +527,20 @@ function renderCuentaAhorroSummary() {
     const hastaAnio = flows.filter((f) => Number(f.year) <= year)
     const delAnio = flows.filter((f) => Number(f.year) === year)
 
-    const saldo = sum(hastaAnio.filter((f) => f.type === "aporte"))
+    const saldoInicial = getCuentaAhorroSaldoInicial()
+    const saldo = saldoInicial + sum(hastaAnio.filter((f) => f.type === "aporte"))
     const anadido = sum(delAnio.filter((f) => f.type === "aporte" && f.importe > 0))
     const retirado = -sum(delAnio.filter((f) => f.type === "aporte" && f.importe < 0))
     const remunerada = sum(delAnio.filter((f) => f.type === "remunerada"))
     const dividendos = sum(delAnio.filter((f) => f.type === "dividendo"))
     const rendimientos = sum(hastaAnio.filter((f) => f.type !== "aporte"))
-    // La cifra principal es todo lo que hay: aportaciones netas más lo que han
-    // rendido las cuentas vinculadas.
+    // La cifra principal es todo lo que hay: lo que se ha metido y sacado más lo
+    // que han rendido las cuentas vinculadas.
     const total = saldo + rendimientos
 
-    set("cuentaAhorroTitulo", getCuentaAhorroLabel(cuentaAhorroCuenta))
+    set("cuentaAhorroTitulo", getCuentaAhorroActual()?.nombre || "Cuenta de ahorro")
     set("cuentaAhorroSaldo", formatEuro(total))
-    set("cuentaAhorroAnadidoLabel", `Añadido en ${cuentaAhorroYear}`)
+    set("cuentaAhorroAnadidoLabel", `Entradas en ${cuentaAhorroYear}`)
     set("cuentaAhorroAnadido", formatCuentaAhorroSigned(anadido))
     set("cuentaAhorroRetirado", formatEuro(-retirado))
     show("cuentaAhorroRetiradoRow", retirado > 0)
@@ -525,7 +549,7 @@ function renderCuentaAhorroSummary() {
     show("cuentaAhorroDividendosRow", cfg.incluirDividendos)
 
     renderCuentaAhorroObjetivo(cfg, total, flows, year)
-    renderCuentaAhorroChart(flows, year)
+    renderCuentaAhorroChart(flows, year, saldoInicial)
 }
 
 // Barra de progreso hacia el objetivo y una estimación de cuándo se alcanza.
@@ -580,7 +604,7 @@ function renderCuentaAhorroObjetivo(cfg, total, flows, year) {
 }
 
 // Saldo con rendimientos y lo aportado al cierre de cada mes del año seleccionado.
-function renderCuentaAhorroChart(flows, year) {
+function renderCuentaAhorroChart(flows, year, saldoInicial = 0) {
     const svg = document.getElementById("cuentaAhorroChart")
     if (!svg) return
 
@@ -594,9 +618,9 @@ function renderCuentaAhorroChart(flows, year) {
     const added = CUENTA_AHORRO_MONTH_KEYS.map((_, i) =>
         flows.filter((f) => Number(f.year) === year && f.month === i).reduce((acc, f) => acc + f.importe, 0)
     )
-    const values = CUENTA_AHORRO_MONTH_KEYS.map((_, i) => (i > lastMonth ? null : upTo(i, () => true)))
+    const values = CUENTA_AHORRO_MONTH_KEYS.map((_, i) => (i > lastMonth ? null : saldoInicial + upTo(i, () => true)))
     const aportado = CUENTA_AHORRO_MONTH_KEYS.map((_, i) =>
-        i > lastMonth ? null : upTo(i, (f) => f.type === "aporte")
+        i > lastMonth ? null : saldoInicial + upTo(i, (f) => f.type === "aporte")
     )
 
     const W = 300
@@ -651,20 +675,40 @@ function renderCuentaAhorroChart(flows, year) {
 // ── Acciones ─────────────────────────────────────────────────────────────
 
 async function reloadCuentaAhorroMovs() {
-    applyCuentaAhorroData(await Api.get("/api/cuenta-ahorro"))
+    const [movs, todas] = await Promise.all([
+        Api.get("/api/cuenta-ahorro"),
+        Api.get("/api/cuentas").catch(() => ({ cuentas: cuentaAhorroTodas }))
+    ])
+    applyCuentaAhorroData(movs)
+    cuentaAhorroTodas = Array.isArray(todas?.cuentas) ? todas.cuentas : cuentaAhorroTodas
 }
 
-// Con `edit` (los datos de la fila) el modal edita ese movimiento en vez de crear uno.
+// Con `edit` (los datos de la fila) el modal edita esa transferencia en vez de crear una.
 function openCuentaAhorroMovimientoModal(edit = null) {
-    const retiro = edit?.kind === "retiro"
+    const actual = getCuentaAhorroActual()
+    if (!actual) return
+
+    const saliendo = edit?.kind === "salida"
+    const otras = cuentaAhorroTodas.filter((c) => c.id !== actual.id)
+    const contraparteActual = edit?.contraparte || "banco"
+    const opcionesCuenta = otras
+        .map(
+            (c) =>
+                `<option value="${escapeGastosHtml(c.id)}"${c.id === contraparteActual ? " selected" : ""}>${escapeGastosHtml(c.nombre)} (${escapeGastosHtml(c.tipo_etiqueta || c.tipo)})</option>`
+        )
+        .join("")
+
     openGastosCreateModal({
-        title: edit ? "Editar movimiento" : `Añadir movimiento · ${getCuentaAhorroLabel(cuentaAhorroCuenta)}`,
+        title: edit ? "Editar transferencia" : `Añadir movimiento · ${actual.nombre}`,
         bodyHtml: `
             <label class="assetModalLabel" for="cuentaAhorroMovKind">Operación</label>
             <select id="cuentaAhorroMovKind" class="assetModalSelect">
-                <option value="ingreso"${retiro ? "" : " selected"}>Ingresar en la cuenta de ahorro (sale de la cuenta bancaria)</option>
-                <option value="retiro"${retiro ? " selected" : ""}>Retirar de la cuenta de ahorro (entra en la cuenta bancaria)</option>
+                <option value="entrada"${saliendo ? "" : " selected"}>Ingresar dinero en esta cuenta</option>
+                <option value="salida"${saliendo ? " selected" : ""}>Retirar dinero de esta cuenta</option>
             </select>
+
+            <label class="assetModalLabel" for="cuentaAhorroMovContraparte">Con la cuenta</label>
+            <select id="cuentaAhorroMovContraparte" class="assetModalSelect">${opcionesCuenta}</select>
 
             <label class="assetModalLabel" for="cuentaAhorroMovFecha">Fecha</label>
             <input id="cuentaAhorroMovFecha" class="assetModalInput" type="text" value="${escapeGastosHtml(edit?.fecha || todayDateString())}" placeholder="dd-mm-aaaa">
@@ -680,32 +724,24 @@ function openCuentaAhorroMovimientoModal(edit = null) {
         `,
         submitLabel: "Guardar",
         onSubmit: async ({ getValue, setFeedback }) => {
-            const campos = {
+            const entra = getValue("cuentaAhorroMovKind") === "entrada"
+            const contraparte = getValue("cuentaAhorroMovContraparte") || "banco"
+            const cuerpo = {
+                origen: entra ? contraparte : actual.id,
+                destino: entra ? actual.id : contraparte,
                 fecha: getValue("cuentaAhorroMovFecha").trim(),
-                nombre: getValue("cuentaAhorroMovNombre").trim(),
+                concepto: getValue("cuentaAhorroMovNombre").trim(),
                 cantidad: getValue("cuentaAhorroMovCantidad").trim(),
                 nota: getValue("cuentaAhorroMovNota").trim()
             }
-            const kind = getValue("cuentaAhorroMovKind")
 
             try {
                 const res = edit
-                    ? await Api.post("/api/cuenta-ahorro/movimientos/editar", {
-                          ...campos,
-                          kind: edit.kind,
-                          id: Number(edit.id),
-                          fechaOriginal: edit.fecha,
-                          cantidadOriginal: edit.cantidad,
-                          kindNuevo: kind
-                      })
-                    : await Api.post("/api/cuenta-ahorro/movimientos", {
-                          ...campos,
-                          kind,
-                          cuenta: cuentaAhorroCuenta
-                      })
+                    ? await Api.put(`/api/transferencias/${Number(edit.id)}`, cuerpo)
+                    : await Api.post("/api/transferencias", cuerpo)
 
                 await reloadCuentaAhorroMovs()
-                const year = res?.movimiento?.year
+                const year = res?.transferencia?.year
                 if (year && !cuentaAhorroYears.includes(year)) {
                     cuentaAhorroYears = [...cuentaAhorroYears, year].sort()
                 }
@@ -723,17 +759,12 @@ function openCuentaAhorroMovimientoModal(edit = null) {
 
 function deleteCuentaAhorroMovimiento(row) {
     openConfirmModal({
-        title: "Eliminar movimiento",
-        message: "Se borrará también de Gastos o de Ingresos, donde está registrado. No se puede deshacer.",
+        title: "Eliminar transferencia",
+        message: "Se borrará también de la ventana Cuentas, donde está registrada. No se puede deshacer.",
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {
-                await Api.post("/api/cuenta-ahorro/movimientos/eliminar", {
-                    kind: row.dataset.kind,
-                    id: Number(row.dataset.id),
-                    fecha: row.dataset.fecha,
-                    cantidad: row.dataset.cantidad
-                })
+                await Api.del(`/api/transferencias/${Number(row.dataset.id)}`)
             } catch (error) {
                 showError("No se pudo eliminar el movimiento", error)
             }
@@ -749,12 +780,12 @@ function downloadCuentaAhorroCsv() {
         return {
             Fecha: m.fecha,
             Concepto: m.nombre,
-            Tipo: m.kind === "retiro" ? "Retirada" : "Ingreso",
-            Cantidad: m.kind === "retiro" ? -importe : importe,
+            Detalle: describeCuentaAhorroMovimiento(m),
+            Cantidad: m.kind === "salida" ? -importe : importe,
             Nota: m.nota || ""
         }
     })
-    const cuenta = (cuentaAhorroCuenta || "principal").toLowerCase().replace(/[^a-z0-9áéíóúñü]+/gi, "-")
+    const cuenta = (getCuentaAhorroActual()?.nombre || "ahorro").toLowerCase().replace(/[^a-z0-9áéíóúñü]+/gi, "-")
     downloadCsvFile(`cuenta-ahorro-${cuenta}-${cuentaAhorroYear}.csv`, rows)
 }
 
@@ -771,8 +802,10 @@ function buildCuentaAhorroCheck({ attrs, checked, label, bloqueadaPor = "" }) {
 // Una cuenta remunerada o los dividendos solo pueden contar en una cuenta de
 // ahorro: en dos se sumarían dos veces.
 function findCuentaAhorroOtraCon(predicado) {
-    const otra = cuentaAhorroConfig.cuentas.find((c) => !sameCuentaAhorro(c.nombre, cuentaAhorroCuenta) && predicado(c))
-    return otra ? getCuentaAhorroLabel(otra.nombre) : ""
+    const clave = getCuentaAhorroClave()
+    const otra = cuentaAhorroConfig.cuentas.find((c) => !sameCuentaAhorro(c.nombre, clave) && predicado(c))
+    if (!otra) return ""
+    return cuentaAhorroCuentas.find((c) => sameCuentaAhorro(getCuentaAhorroClave(c), otra.nombre))?.nombre || ""
 }
 
 // El servidor guarda los importes con punto ("12000.00"); en pantalla, como se escriben.
@@ -783,7 +816,10 @@ function toCuentaAhorroInput(valor) {
 }
 
 function openCuentaAhorroConfigModal() {
-    const cfg = getCuentaAhorroCfg()
+    const actual = getCuentaAhorroActual()
+    if (!actual) return
+    const clave = getCuentaAhorroClave(actual)
+    const cfg = getCuentaAhorroCfg(clave)
     const lista = cuentaAhorroRemuneradas.length
         ? cuentaAhorroRemuneradas
               .map((c) =>
@@ -800,21 +836,21 @@ function openCuentaAhorroConfigModal() {
     const rec = cfg.recurrente
 
     openGastosCreateModal({
-        title: `Configurar · ${getCuentaAhorroLabel(cuentaAhorroCuenta)}`,
+        title: `Configurar · ${actual.nombre}`,
         modalClass: "cuentaAhorroConfigModal",
         bodyHtml: `
             <p class="assetModalLabel">Objetivo de ahorro</p>
             <input id="cuentaAhorroCfgObjetivo" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(toCuentaAhorroInput(cfg.objetivo))}" placeholder="Sin objetivo (€)">
 
             <p class="assetModalLabel">Aportación mensual automática</p>
-            ${buildCuentaAhorroCheck({ attrs: 'id="cuentaAhorroCfgRecActiva"', checked: rec.activa, label: "Ingresar una cantidad fija cada mes" })}
+            ${buildCuentaAhorroCheck({ attrs: 'id="cuentaAhorroCfgRecActiva"', checked: rec.activa, label: "Transferir una cantidad fija cada mes desde la cuenta bancaria" })}
             <div class="cuentaAhorroRecCampos">
                 <label class="assetModalLabel" for="cuentaAhorroCfgRecImporte">Cantidad</label>
                 <input id="cuentaAhorroCfgRecImporte" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(toCuentaAhorroInput(rec.importe))}" placeholder="0,00">
                 <label class="assetModalLabel" for="cuentaAhorroCfgRecDia">Día del mes</label>
                 <input id="cuentaAhorroCfgRecDia" class="assetModalInput" type="number" min="1" max="31" value="${Number(rec.dia) || 1}">
             </div>
-            <p class="cuentaAhorroHint">Se registra sola en Gastos al abrir esta ventana, desde el mes en que la activas. Si borras una, no vuelve a crearse.</p>
+            <p class="cuentaAhorroHint">Se registra sola como transferencia al abrir esta ventana, desde el mes en que la activas. Si borras una, no vuelve a crearse.</p>
 
             <p class="assetModalLabel">Cuentas remuneradas</p>
             ${lista}
@@ -840,7 +876,7 @@ function openCuentaAhorroConfigModal() {
             const dia = Math.max(1, Math.min(31, Number(modal.querySelector("#cuentaAhorroCfgRecDia")?.value) || 1))
 
             const next = {
-                nombre: cuentaAhorroCuenta,
+                nombre: clave,
                 objetivo: modal.querySelector("#cuentaAhorroCfgObjetivo")?.value.trim() || "",
                 remuneradas: [...modal.querySelectorAll("[data-cuenta-id]:checked")].map((i) => i.dataset.cuentaId),
                 incluirDividendos: Boolean(modal.querySelector("#cuentaAhorroCfgDividendos")?.checked),
@@ -899,30 +935,25 @@ function addCuentaAhorro() {
     openCuentaAhorroNombreModal({
         title: "Nueva cuenta de ahorro",
         onSubmit: async (nombre) => {
-            const res = await Api.post("/api/cuenta-ahorro/cuentas", { nombre })
+            const res = await Api.post("/api/cuentas", { nombre, tipo: "ahorro" })
             await reloadCuentaAhorroMovs()
-            cuentaAhorroCuenta = res?.nombre || nombre
+            cuentaAhorroCuenta = res?.cuenta?.id || cuentaAhorroCuenta
             await refreshCuentaAhorro()
         }
     })
 }
 
 function renameCuentaAhorro() {
-    if (!cuentaAhorroCuenta) return
-    const actual = cuentaAhorroCuenta
+    const actual = getCuentaAhorroActual()
+    if (!actual) return
     openCuentaAhorroNombreModal({
         title: "Renombrar cuenta",
-        valor: actual,
+        valor: actual.nombre,
         onSubmit: async (nombre) => {
-            const res = await Api.post("/api/cuenta-ahorro/cuentas/renombrar", { de: actual, a: nombre })
-            const nuevo = res?.nombre || nombre
-
-            const cfg = getCuentaAhorroCfg(actual)
-            cuentaAhorroConfig.cuentas = cuentaAhorroConfig.cuentas.filter((c) => !sameCuentaAhorro(c.nombre, actual))
-            setCuentaAhorroCfg({ ...cfg, nombre: nuevo })
-            await saveCuentaAhorroConfig()
-
-            cuentaAhorroCuenta = nuevo
+            await Api.put(`/api/cuentas/${encodeURIComponent(actual.id)}`, { nombre })
+            // El servidor mueve la configuración de la cuenta al nombre nuevo: se vuelve a leer.
+            const settings = await Api.get("/api/settings").catch(() => ({}))
+            cuentaAhorroConfig = normalizeCuentaAhorroConfig(settings?.cuentaAhorroConfig)
             await reloadCuentaAhorroMovs()
             await refreshCuentaAhorro()
         }
@@ -930,28 +961,29 @@ function renameCuentaAhorro() {
 }
 
 function deleteCuentaAhorro() {
-    if (!cuentaAhorroCuenta) return
-    const nombre = cuentaAhorroCuenta
+    const actual = getCuentaAhorroActual()
+    if (!actual || actual.protegida) return
+    const clave = getCuentaAhorroClave(actual)
     openConfirmModal({
         title: "Eliminar cuenta",
-        message: `Vas a eliminar la cuenta «${nombre}». Solo se puede si no tiene movimientos.`,
+        message: `Vas a eliminar la cuenta «${actual.nombre}». Solo se puede si no tiene movimientos.`,
         confirmLabel: "Eliminar",
         onConfirm: async () => {
             try {
-                await Api.post("/api/cuenta-ahorro/cuentas/eliminar", { nombre })
+                await Api.del(`/api/cuentas/${encodeURIComponent(actual.id)}`)
             } catch (error) {
                 showError("No se pudo eliminar la cuenta", error)
                 return
             }
 
-            cuentaAhorroConfig.cuentas = cuentaAhorroConfig.cuentas.filter((c) => !sameCuentaAhorro(c.nombre, nombre))
+            cuentaAhorroConfig.cuentas = cuentaAhorroConfig.cuentas.filter((c) => !sameCuentaAhorro(c.nombre, clave))
             try {
                 await saveCuentaAhorroConfig()
             } catch (error) {
                 showError("La cuenta se eliminó, pero no se pudo limpiar su configuración", error)
             }
 
-            cuentaAhorroCuenta = ""
+            cuentaAhorroCuenta = CUENTA_AHORRO_PRINCIPAL
             await reloadCuentaAhorroMovs()
             await refreshCuentaAhorro()
         }
@@ -1053,7 +1085,7 @@ function bindCuentaAhorroChartHover() {
             <span>Saldo: ${formatEuro(data.values[i])}</span>
             <span>Aportado: ${formatEuro(data.aportado[i])}</span>
             <span>Rendimientos: ${formatCuentaAhorroSigned(rendimiento)}</span>
-            <span class="${cls}">Añadido este mes: ${formatCuentaAhorroSigned(delta)}</span>`
+            <span class="${cls}">Movimiento del mes: ${formatCuentaAhorroSigned(delta)}</span>`
         tip.classList.remove("hidden")
 
         const wrap = svg.parentElement.getBoundingClientRect()

@@ -12,34 +12,45 @@
 // solo puede ser de miles, que es lo que se hacía y se conserva.
 const MILES_ES = /^-?\d{1,3}(\.\d{3})+$/
 
-// Categoría reservada de gastos e ingresos para los movimientos de la cuenta de
-// ahorro. Debe coincidir con TIPO_AHORRO y SEPARADOR de
-// stores/cuenta_ahorro_store.py. Las cuentas adicionales la llevan de prefijo:
-// "Cuenta de ahorro · Viaje".
-const AHORRO_TIPO_RESERVADO = "Cuenta de ahorro"
-const AHORRO_TIPO_SEPARADOR = " · "
+// Cuentas de dinero: la bancaria (la de Gastos e Ingresos, y la de siempre), las
+// de ahorro, los exchanges, los brokers… Gastos e Ingresos las piden para elegir
+// con qué cuenta se paga un gasto o en cuál se cobra un ingreso; la bancaria es
+// la de por defecto y en las filas se guarda como el vacío.
+window._cuentasDinero = window._cuentasDinero || []
 
-function esTipoAhorroReservado(valor) {
-    const texto = String(valor || "")
-        .trim()
-        .toLowerCase()
-    const base = AHORRO_TIPO_RESERVADO.toLowerCase()
-    return texto === base || texto.startsWith(base + AHORRO_TIPO_SEPARADOR)
+async function cargarCuentasDinero() {
+    try {
+        const datos = await Api.get("/api/cuentas")
+        window._cuentasDinero = Array.isArray(datos?.cuentas) ? datos.cuentas : []
+    } catch (error) {
+        // Sin la lista el popup sigue funcionando con la cuenta bancaria.
+        console.error("No se pudieron cargar las cuentas:", error)
+    }
+    return window._cuentasDinero
 }
 
-// Copia del año de gastos o ingresos sin los movimientos de las cuentas de
-// ahorro. Meter dinero en ahorro es un gasto de la cuenta bancaria, pero no es
-// un gasto de verdad: contarlo hundía la tasa de ahorro justo al ahorrar.
-function sinMovimientosAhorro(data) {
-    if (!data || typeof data !== "object" || !data.months) return data
+// La cuenta bancaria se puede renombrar: su nombre sale de la lista, no está escrito aquí.
+function nombreDeCuentaBancaria() {
+    return window._cuentasDinero.find((cuenta) => cuenta.id === "banco")?.nombre || "Cuenta bancaria"
+}
 
-    const months = {}
-    Object.entries(data.months).forEach(([key, month]) => {
-        months[key] = { ...month, rows: (month?.rows || []).filter((row) => !esTipoAhorroReservado(row?.tipo)) }
-    })
+function nombreDeCuenta(id) {
+    if (!id) return nombreDeCuentaBancaria()
+    return window._cuentasDinero.find((cuenta) => cuenta.id === id)?.nombre || id
+}
 
-    const sinTipo = (lista) => (Array.isArray(lista) ? lista.filter((tipo) => !esTipoAhorroReservado(tipo)) : lista)
-    return { ...data, months, gastosTipos: sinTipo(data.gastosTipos), ingresosTipos: sinTipo(data.ingresosTipos) }
+// Selector «Cuenta» de los popups: la bancaria primero y vacía, después las demás.
+function construirSelectorCuenta(selectId, actual = "") {
+    const esc = (texto) =>
+        String(texto).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+    const opciones = window._cuentasDinero
+        .filter((cuenta) => cuenta.id !== "banco")
+        .map((cuenta) => {
+            const etiqueta = `${cuenta.nombre} (${cuenta.tipo_etiqueta || cuenta.tipo})`
+            return `<option value="${esc(cuenta.id)}"${cuenta.id === actual ? " selected" : ""}>${esc(etiqueta)}</option>`
+        })
+        .join("")
+    return `<select id="${selectId}" class="assetModalSelect"><option value=""${actual ? "" : " selected"}>${esc(nombreDeCuentaBancaria())}</option>${opciones}</select>`
 }
 
 function normalizeDecimalSeparators(text) {
@@ -1150,3 +1161,92 @@ new MutationObserver((mutations) => {
 
 document.querySelectorAll("select:not([data-no-custom])").forEach(_buildCustomSelect)
 document.querySelectorAll("input[placeholder]").forEach(_buildDateTodayButton)
+
+// ── Distribución en donut ──────────────────────────────────────────────────
+// Usada por los meses de Gastos e Ingresos: un anillo con el reparto de un total
+// y, debajo, la leyenda con el importe y el porcentaje de cada parte.
+
+const DISTRIBUCION_COLORES = [
+    "#60a5fa",
+    "#34d399",
+    "#fbbf24",
+    "#f87171",
+    "#c084fc",
+    "#22d3ee",
+    "#fb923c",
+    "#a3e635",
+    "#f472b6",
+    "#94a3b8"
+]
+// Cuántas partes se enseñan por separado; el resto se junta en «Otros».
+const DISTRIBUCION_MAX_PARTES = 7
+
+// Suma los importes de las filas por la clave que dé `claveFn`.
+function agruparImportes(filas, claveFn) {
+    const totales = new Map()
+    ;(filas || []).forEach((fila) => {
+        const importe = parseEuroNumber(fila.cantidad || "")
+        if (!(importe > 0)) return
+        const clave = String(claveFn(fila) || "").trim() || "Sin tipo"
+        totales.set(clave, (totales.get(clave) || 0) + importe)
+    })
+    return [...totales].map(([label, value]) => ({ label, value }))
+}
+
+function buildDistribucionHtml(titulo, partes, textoVacio = "Sin movimientos este mes") {
+    const esc = (texto) =>
+        String(texto).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+    const cabecera = `<div class="movResumenTitulo">${esc(titulo)}</div>`
+
+    const ordenadas = (partes || []).filter((p) => p.value > 0).sort((a, b) => b.value - a.value)
+    const total = ordenadas.reduce((acc, p) => acc + p.value, 0)
+    if (!(total > 0))
+        return `<div class="movResumenCard">${cabecera}<p class="movResumenVacio">${esc(textoVacio)}</p></div>`
+
+    let visibles = ordenadas
+    if (ordenadas.length > DISTRIBUCION_MAX_PARTES) {
+        const resto = ordenadas.slice(DISTRIBUCION_MAX_PARTES - 1)
+        visibles = [
+            ...ordenadas.slice(0, DISTRIBUCION_MAX_PARTES - 1),
+            { label: `Otros (${resto.length})`, value: resto.reduce((acc, p) => acc + p.value, 0) }
+        ]
+    }
+
+    const radio = 44
+    const circunferencia = 2 * Math.PI * radio
+    let acumulado = 0
+    const porcentaje = (valor) => `${((valor / total) * 100).toFixed(1).replace(".", ",")}%`
+
+    const segmentos = visibles
+        .map((parte, i) => {
+            const largo = (parte.value / total) * circunferencia
+            const color = DISTRIBUCION_COLORES[i % DISTRIBUCION_COLORES.length]
+            const circulo = `<circle cx="60" cy="60" r="${radio}" fill="none" stroke="${color}" stroke-width="18" stroke-dasharray="${largo.toFixed(2)} ${(circunferencia - largo).toFixed(2)}" stroke-dashoffset="${(-acumulado).toFixed(2)}" transform="rotate(-90 60 60)"><title>${esc(parte.label)}: ${formatEuro(parte.value)} (${porcentaje(parte.value)})</title></circle>`
+            acumulado += largo
+            return circulo
+        })
+        .join("")
+
+    const leyenda = visibles
+        .map(
+            (parte, i) => `
+                <li>
+                    <span class="movLeyendaPunto" style="background:${DISTRIBUCION_COLORES[i % DISTRIBUCION_COLORES.length]}"></span>
+                    <span class="movLeyendaNombre" title="${esc(parte.label)}">${esc(parte.label)}</span>
+                    <span class="movLeyendaImporte">${formatEuro(parte.value)}</span>
+                    <span class="movLeyendaPct">${porcentaje(parte.value)}</span>
+                </li>`
+        )
+        .join("")
+
+    return `
+        <div class="movResumenCard">
+            ${cabecera}
+            <svg class="movDonut" viewBox="0 0 120 120" role="img" aria-label="${esc(titulo)}">
+                ${segmentos}
+                <text x="60" y="58" text-anchor="middle" class="movDonutTotal">${formatEuro(total)}</text>
+                <text x="60" y="72" text-anchor="middle" class="movDonutEtiqueta">total</text>
+            </svg>
+            <ul class="movLeyenda">${leyenda}</ul>
+        </div>`
+}

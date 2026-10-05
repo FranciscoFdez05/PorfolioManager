@@ -1,152 +1,162 @@
-"""Cuenta de ahorro: los movimientos son filas de gastos (aportar) e ingresos (retirar)."""
+"""Configuración por cuenta de ahorro y aportación mensual automática."""
+
+import datetime
 
 import pytest
 
 
 @pytest.fixture
 def cliente(cliente_autenticado, datos_aislados, temp_db, monkeypatch):
+    from routes.ajustes import ajustes_bp
     from routes.cuenta_ahorro import cuenta_ahorro_bp
-    from routes.gastos import gastos_bp
-    from routes.ingresos import ingresos_bp
+    from routes.cuentas import cuentas_bp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
 
-    client, cabeceras, _app = cliente_autenticado(cuenta_ahorro_bp, gastos_bp, ingresos_bp)
+    client, cabeceras, _app = cliente_autenticado(ajustes_bp, cuenta_ahorro_bp, cuentas_bp)
     return client, cabeceras
 
 
-def _anadir(client, cabeceras, **campos):
-    return client.post("/api/cuenta-ahorro/movimientos", json=campos, headers=cabeceras)
+# ── Configuración ────────────────────────────────────────────────────────────
+
+def test_la_configuracion_antigua_pasa_a_la_cuenta_principal():
+    from stores.cuenta_ahorro_store import normalizar_config
+
+    cfg = normalizar_config({"cuentasRemuneradas": ["a", "a", " b ", ""], "incluirDividendos": 1})
+
+    assert len(cfg["cuentas"]) == 1
+    principal = cfg["cuentas"][0]
+    assert principal["nombre"] == ""
+    assert principal["remuneradas"] == ["a", "b"]
+    assert principal["incluirDividendos"] is True
 
 
-def test_una_aportacion_es_un_gasto_en_su_dia_mes_y_anio(cliente):
+def test_la_configuracion_se_normaliza_al_guardar(cliente):
     client, cabeceras = cliente
 
-    res = _anadir(client, cabeceras, kind="ingreso", fecha="15-03-2027", cantidad="1500", nombre="Marzo")
-
-    assert res.status_code == 201
-    gastos = client.get("/api/gastos/2027").get_json()
-    fila = gastos["months"]["marzo"]["rows"][0]
-    assert fila["fecha"] == "15-03-2027"
-    assert fila["tipo"] == "Cuenta de ahorro"
-    assert fila["cantidad"] == "1.500,00 €"
-    # Y no aparece en ningún otro mes ni en ingresos.
-    assert gastos["months"]["abril"]["rows"] == []
-    assert client.get("/api/ingresos/2027").get_json()["months"]["marzo"]["rows"] == []
-
-
-def test_una_retirada_es_un_ingreso(cliente):
-    client, cabeceras = cliente
-
-    _anadir(client, cabeceras, kind="retiro", fecha="02-06-2026", cantidad="250,50")
-
-    fila = client.get("/api/ingresos/2026").get_json()["months"]["junio"]["rows"][0]
-    assert fila["tipo"] == "Cuenta de ahorro"
-    assert fila["cantidad"] == "250,50 €"
-    assert fila["nombre"] == "Retirada de cuenta de ahorro"
-
-
-def test_el_listado_trae_aportaciones_y_retiradas_de_todos_los_anios(cliente):
-    client, cabeceras = cliente
-    _anadir(client, cabeceras, kind="ingreso", fecha="01-01-2026", cantidad="100")
-    _anadir(client, cabeceras, kind="retiro", fecha="01-02-2027", cantidad="40")
-
-    movs = client.get("/api/cuenta-ahorro").get_json()["movimientos"]
-
-    assert [(m["kind"], m["year"], m["month"]) for m in movs] == [
-        ("ingreso", "2026", "enero"),
-        ("retiro", "2027", "febrero"),
-    ]
-
-
-def test_un_gasto_con_la_categoria_reservada_tambien_cuenta(cliente):
-    """Añadido desde la ventana de Gastos, sin pasar por esta API."""
-    client, cabeceras = cliente
     client.post(
-        "/api/gastos/2026",
-        json={"year": "2026", "months": {"mayo": {"rows": [
-            {"fecha": "05-05-2026", "nombre": "Hucha", "tipo": "Cuenta de ahorro", "cantidad": "30,00 €"}
-        ]}}},
+        "/api/settings",
+        json={"cuentaAhorroConfig": {"cuentas": [
+            {"nombre": "", "objetivo": "12.000,50",
+             "recurrente": {"activa": 1, "importe": "300", "dia": 45, "desde": "2026-10"}},
+            {"nombre": "  Viaje ", "remuneradas": ["x"], "objetivo": "abc"},
+            {"nombre": "viaje"},
+        ]}},
         headers=cabeceras,
     )
 
-    movs = client.get("/api/cuenta-ahorro").get_json()["movimientos"]
-
-    assert [(m["kind"], m["nombre"]) for m in movs] == [("ingreso", "Hucha")]
-
-
-def test_la_categoria_reservada_siempre_esta_en_los_catalogos(cliente):
-    client, _cabeceras = cliente
-
-    assert "Cuenta de ahorro" in client.get("/api/gastos-tipos").get_json()["types"]
-    assert "Cuenta de ahorro" in client.get("/api/ingresos-tipos").get_json()["types"]
+    cuentas = client.get("/api/settings").get_json()["cuentaAhorroConfig"]["cuentas"]
+    assert [c["nombre"] for c in cuentas] == ["", "Viaje"]
+    assert cuentas[0]["objetivo"] == "12000.50"
+    assert cuentas[0]["recurrente"] == {"activa": True, "importe": "300.00", "dia": 31, "desde": "2026-10"}
+    assert cuentas[1]["objetivo"] == ""
 
 
-def test_guardar_el_catalogo_sin_la_categoria_reservada_no_la_pierde(cliente):
+# ── Aportación mensual automática ────────────────────────────────────────────
+
+def _config(clave="", **rec):
+    base = {"activa": True, "importe": "300", "dia": 5, "desde": "2026-01"}
+    base.update(rec)
+    return {"cuentas": [{"nombre": clave, "recurrente": base}]}
+
+
+def _transferencias():
+    from stores.cuentas_store import listar_transferencias
+
+    return listar_transferencias()
+
+
+def test_la_aportacion_automatica_es_una_transferencia_desde_el_banco(temp_db):
+    from stores.cuenta_ahorro_store import aplicar_recurrentes
+
+    generado, creados = aplicar_recurrentes(_config(), {}, hoy=datetime.date(2026, 3, 10))
+
+    assert [t["fecha"] for t in creados] == ["05-01-2026", "05-02-2026", "05-03-2026"]
+    assert generado == {"_": "2026-03"}
+    assert {(t["origen"], t["destino"], t["cantidad"]) for t in _transferencias()} == {
+        ("banco", "ahorro", "300,00 €")
+    }
+
+
+def test_la_aportacion_automatica_no_cuenta_como_gasto(temp_db):
+    from core.db import get_db
+    from stores.cuenta_ahorro_store import aplicar_recurrentes
+
+    aplicar_recurrentes(_config(), {}, hoy=datetime.date(2026, 3, 10))
+
+    assert get_db().execute("SELECT COUNT(*) FROM gastos_rows").fetchone()[0] == 0
+
+
+def test_la_aportacion_automatica_es_idempotente_y_respeta_lo_borrado(temp_db):
+    from stores.cuenta_ahorro_store import aplicar_recurrentes
+    from stores.cuentas_store import eliminar_transferencia
+
+    hoy = datetime.date(2026, 3, 10)
+    generado, creados = aplicar_recurrentes(_config(), {}, hoy=hoy)
+    eliminar_transferencia(creados[0]["id"])
+
+    generado, creados = aplicar_recurrentes(_config(), generado, hoy=hoy)
+
+    assert creados == []
+    assert len(_transferencias()) == 2
+
+
+def test_la_aportacion_automatica_no_adelanta_el_dia_del_mes(temp_db):
+    from stores.cuenta_ahorro_store import aplicar_recurrentes
+
+    generado, creados = aplicar_recurrentes(_config(desde="2026-03"), {}, hoy=datetime.date(2026, 3, 4))
+    assert creados == [] and generado == {}
+
+    generado, creados = aplicar_recurrentes(_config(desde="2026-03"), generado, hoy=datetime.date(2026, 3, 5))
+    assert [t["fecha"] for t in creados] == ["05-03-2026"]
+
+
+def test_la_aportacion_automatica_ajusta_el_dia_a_meses_cortos(temp_db):
+    from stores.cuenta_ahorro_store import aplicar_recurrentes
+
+    _gen, creados = aplicar_recurrentes(_config(dia=31, desde="2026-02"), {}, hoy=datetime.date(2026, 2, 28))
+
+    assert [t["fecha"] for t in creados] == ["28-02-2026"]
+
+
+def test_una_cuenta_sin_la_aportacion_activa_no_genera_nada(temp_db):
+    from stores.cuenta_ahorro_store import aplicar_recurrentes
+
+    _gen, creados = aplicar_recurrentes(_config(activa=False), {}, hoy=datetime.date(2026, 3, 10))
+    assert creados == []
+
+
+def test_la_aportacion_va_a_la_cuenta_de_ahorro_que_toca(temp_db):
+    from stores.cuenta_ahorro_store import aplicar_recurrentes
+    from stores.cuentas_store import crear_cuenta
+
+    viaje = crear_cuenta("Viaje", "ahorro")
+
+    aplicar_recurrentes(_config("Viaje"), {}, hoy=datetime.date(2026, 1, 10))
+
+    assert [t["destino"] for t in _transferencias()] == [viaje["id"]]
+
+
+def test_una_cuenta_de_la_configuracion_que_ya_no_existe_se_ignora(temp_db):
+    from stores.cuenta_ahorro_store import aplicar_recurrentes
+
+    _gen, creados = aplicar_recurrentes(_config("Borrada"), {}, hoy=datetime.date(2026, 3, 10))
+
+    assert creados == []
+
+
+def test_abrir_la_ventana_aplica_la_aportacion_automatica_una_sola_vez(cliente):
     client, cabeceras = cliente
-
-    client.post("/api/gastos-tipos", json={"types": ["Café"]}, headers=cabeceras)
-
-    assert "Cuenta de ahorro" in client.get("/api/gastos-tipos").get_json()["types"]
-
-
-@pytest.mark.parametrize(
-    "campos",
-    [
-        {"kind": "otro", "cantidad": "10"},
-        {"kind": "ingreso", "cantidad": "abc"},
-        {"kind": "ingreso", "cantidad": "0"},
-        {"kind": "ingreso", "cantidad": "-5"},
-        {"kind": "ingreso", "cantidad": "10", "fecha": "31-02-2026"},
-        {"kind": "ingreso", "cantidad": "10", "fecha": "ayer"},
-    ],
-)
-def test_los_datos_invalidos_se_rechazan(cliente, campos):
-    client, cabeceras = cliente
-
-    assert _anadir(client, cabeceras, **campos).status_code == 400
-    assert client.get("/api/cuenta-ahorro").get_json()["movimientos"] == []
-
-
-def test_eliminar_borra_la_fila_de_gastos(cliente):
-    client, cabeceras = cliente
-    mov = _anadir(client, cabeceras, kind="ingreso", fecha="10-04-2026", cantidad="75").get_json()["movimiento"]
-
-    res = client.post(
-        "/api/cuenta-ahorro/movimientos/eliminar",
-        json={"kind": "ingreso", "id": mov["id"], "fecha": mov["fecha"], "cantidad": mov["cantidad"]},
+    hoy = datetime.date.today()
+    client.post(
+        "/api/settings",
+        json={"cuentaAhorroConfig": _config(dia=1, desde=f"{hoy.year:04d}-{hoy.month:02d}")},
         headers=cabeceras,
     )
 
-    assert res.status_code == 200
-    assert client.get("/api/gastos/2026").get_json()["months"]["abril"]["rows"] == []
+    primera = client.get("/api/cuenta-ahorro").get_json()["movimientos"]
+    segunda = client.get("/api/cuenta-ahorro").get_json()["movimientos"]
 
-
-def test_eliminar_no_toca_una_fila_que_ha_heredado_el_id(cliente):
-    """Gastos reescribe el año al guardar y los ids cambian: no vale borrar solo por id."""
-    client, cabeceras = cliente
-    mov = _anadir(client, cabeceras, kind="ingreso", fecha="10-04-2026", cantidad="75").get_json()["movimiento"]
-
-    res = client.post(
-        "/api/cuenta-ahorro/movimientos/eliminar",
-        json={"kind": "ingreso", "id": mov["id"], "fecha": "10-04-2026", "cantidad": "99,00 €"},
-        headers=cabeceras,
-    )
-
-    assert res.status_code == 404
-    assert len(client.get("/api/cuenta-ahorro").get_json()["movimientos"]) == 1
-
-
-def test_la_categoria_reservada_no_se_puede_renombrar_ni_eliminar(temp_db):
-    from stores.categorias_store import CategoriaInvalida, eliminarCategoria, renombrarCategoria
-    from stores.cuenta_ahorro_store import asegurar_categorias
-
-    asegurar_categorias()
-
-    with pytest.raises(CategoriaInvalida):
-        renombrarCategoria("gasto", "Cuenta de ahorro", "Hucha")
-    with pytest.raises(CategoriaInvalida):
-        renombrarCategoria("gasto", "Otra", "cuenta de AHORRO")
-    with pytest.raises(CategoriaInvalida):
-        eliminarCategoria("ingreso", "Cuenta de ahorro")
+    assert len(primera) == 1 and len(segunda) == 1
+    assert primera[0]["nombre"] == "Ahorro mensual"

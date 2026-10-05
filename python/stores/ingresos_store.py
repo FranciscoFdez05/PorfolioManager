@@ -1,4 +1,5 @@
 from core.db import get_db, transactional
+from stores.cuentas_store import cuentas_validas_para_filas, normalizar_cuenta_de_fila
 
 _MAX_LABEL = 80
 _MAX_NAME = 120
@@ -78,6 +79,7 @@ def sanitize_month_rows(rows):
             "tipo": str(row.get("tipo", ""))[:_MAX_LABEL].strip(),
             "cantidad": str(row.get("cantidad", ""))[:_MAX_SHORT].strip(),
             "nota": str(row.get("nota", ""))[:_MAX_NOTA].strip(),
+            "cuenta": str(row.get("cuenta", ""))[:_MAX_SHORT * 2].strip(),
         }
         for row in rows
     ]
@@ -234,12 +236,15 @@ def read_ingresos_year(year):
     months = {}
     for month in MONTH_KEYS:
         month_rows = conn.execute(
-            "SELECT fecha, nombre, tipo, cantidad, nota FROM ingresos_rows "
+            "SELECT fecha, nombre, tipo, cantidad, nota, cuenta FROM ingresos_rows "
             "WHERE year = ? AND month = ? ORDER BY id",
             (normalized, month)
         ).fetchall()
         months[month] = {"rows": [
-            {"fecha": r["fecha"], "nombre": r["nombre"], "tipo": r["tipo"], "cantidad": r["cantidad"], "nota": r["nota"]}
+            {
+                "fecha": r["fecha"], "nombre": r["nombre"], "tipo": r["tipo"],
+                "cantidad": r["cantidad"], "nota": r["nota"], "cuenta": r["cuenta"],
+            }
             for r in month_rows
         ]}
 
@@ -285,6 +290,7 @@ def write_ingresos_year(year, data):
         ]
     )
 
+    validas = cuentas_validas_para_filas(conn)
     rows_to_insert = []
     for month in MONTH_KEYS:
         for row in data.get("months", {}).get(month, {}).get("rows", []):
@@ -293,9 +299,11 @@ def write_ingresos_year(year, data):
                 row.get("fecha", ""), row.get("nombre", ""),
                 row.get("tipo", ""), row.get("cantidad", ""),
                 row.get("nota", ""),
+                normalizar_cuenta_de_fila(row.get("cuenta"), validas),
             ))
     conn.executemany(
-        "INSERT INTO ingresos_rows (year, month, fecha, nombre, tipo, cantidad, nota) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO ingresos_rows (year, month, fecha, nombre, tipo, cantidad, nota, cuenta) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         rows_to_insert
     )
 

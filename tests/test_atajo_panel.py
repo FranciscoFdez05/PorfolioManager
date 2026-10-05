@@ -92,7 +92,9 @@ def test_cada_llamada_al_servidor_para_el_atajo_si_falla():
             else:
                 assert abiertos.pop() == p["GroupingIdentifier"]
     assert abiertos == []
-    assert ids.count("is.workflow.actions.conditional") == 8   # cuatro llamadas, dos por bloque
+    # Cuatro llamadas más la lectura de cuentas, que sale de la respuesta de
+    # categorías: cinco bloques, dos «Si» por bloque.
+    assert ids.count("is.workflow.actions.conditional") == 10
 
 
 def test_elegir_de_la_lista_lee_de_la_variable_y_no_de_la_accion_anterior():
@@ -146,7 +148,7 @@ def test_el_movimiento_no_lleva_fecha():
     )
     campos = [c["WFKey"]["Value"]["string"] for c in preparar["WFJSONValues"]["Value"]["WFDictionaryFieldValueItems"]]
 
-    assert campos == ["tipo", "categoria", "nombre", "importe", "portfolio"]
+    assert campos == ["tipo", "categoria", "cuenta", "nombre", "importe", "portfolio"]
     assert "fecha" not in campos
 
 

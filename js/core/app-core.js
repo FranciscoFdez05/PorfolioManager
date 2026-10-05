@@ -13,6 +13,7 @@ const _PAGE_DIRS = {
     ingresos: "finanzas",
     ahorro: "finanzas",
     cuentaAhorro: "finanzas",
+    cuentas: "finanzas",
     calendario: "finanzas",
     ventas: "finanzas",
     dividendos: "finanzas",
@@ -85,7 +86,7 @@ const _MODULE_PAGES = {
     panelSuperior: [],
     vistaGeneral: ["vistaGeneral"],
     activos: ["activos", "seguimiento", "heatmap", "fundamentales", "sentimiento"],
-    gastos: ["gastos", "ingresos", "cuentaAhorro", "calendario"],
+    gastos: ["gastos", "ingresos", "cuentas", "cuentaAhorro", "calendario"],
     finanzas: ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
     cripto: ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
     planes: ["planesInversion"],
@@ -1049,6 +1050,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initAhorroLogic()
         } else if (page === "cuentaAhorro") {
             await initCuentaAhorroLogic()
+        } else if (page === "cuentas") {
+            await initCuentasLogic()
         } else if (page === "calendario") {
             await initCalendarioLogic()
         } else if (page === "planesInversion") {
@@ -1203,23 +1206,19 @@ async function refreshTopDividendosIntereses() {
             0
         )
 
-        // Sin lo que se aparta en las cuentas de ahorro: no es gasto ni ingreso.
-        const gastosReales = sinMovimientosAhorro(gastosData)
-        const ingresosReales = sinMovimientosAhorro(ingresosData)
-
         let totalGastos = 0
-        if (gastosReales?.months) {
+        if (gastosData?.months) {
             _MONTH_KEYS.forEach((m) => {
-                ;(gastosReales.months[m]?.rows || []).forEach((r) => {
+                ;(gastosData.months[m]?.rows || []).forEach((r) => {
                     totalGastos += parseEuroNumber(r.cantidad || "")
                 })
             })
         }
 
         let totalIngresos = 0
-        if (ingresosReales?.months) {
+        if (ingresosData?.months) {
             _MONTH_KEYS.forEach((m) => {
-                ;(ingresosReales.months[m]?.rows || []).forEach((r) => {
+                ;(ingresosData.months[m]?.rows || []).forEach((r) => {
                     totalIngresos += parseEuroNumber(r.cantidad || "")
                 })
             })

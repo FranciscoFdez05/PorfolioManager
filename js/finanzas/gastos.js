@@ -876,6 +876,7 @@ function openGastoDetailModal(rowElement) {
             <div class="movDetailItem"><dt>Fecha</dt><dd>${escapeGastosHtml(rowElement.dataset.fecha || "—")}</dd></div>
             <div class="movDetailItem"><dt>Concepto</dt><dd>${escapeGastosHtml(rowElement.dataset.nombre || "—")}</dd></div>
             <div class="movDetailItem"><dt>Tipo</dt><dd>${escapeGastosHtml(rowElement.dataset.tipo || "—")}</dd></div>
+            <div class="movDetailItem"><dt>Pagado con</dt><dd>${escapeGastosHtml(nombreDeCuenta(rowElement.dataset.cuenta || ""))}</dd></div>
             <div class="movDetailItem"><dt>Cantidad</dt><dd class="movDetailAmount">${escapeGastosHtml(cantidad || "—")}</dd></div>
         </dl>
         <div class="movDetailNote${nota ? "" : " movDetailNoteEmpty"}">
@@ -938,6 +939,9 @@ function openGastoMovementModal(rowIndex = -1) {
                 ${typeOptions}
             </select>
 
+            <label class="assetModalLabel" for="gastosMovimientoCuenta">Pagado con</label>
+            ${construirSelectorCuenta("gastosMovimientoCuenta", rowData.cuenta || "")}
+
             <label class="assetModalLabel" for="gastosMovimientoCantidad">Cantidad</label>
             <input id="gastosMovimientoCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(rowData.cantidad || "")}" placeholder="0,00">
 
@@ -949,6 +953,8 @@ function openGastoMovementModal(rowIndex = -1) {
             const fecha = String(getValue("gastosMovimientoFecha")).trim()
             const nombre = String(getValue("gastosMovimientoNombre")).trim()
             const tipo = normalizeGastoTipo(getValue("gastosMovimientoTipo"))
+            // La cuenta bancaria es el vacío; las demás, su identificador.
+            const cuenta = String(getValue("gastosMovimientoCuenta") || "")
             const cantidadRaw = String(getValue("gastosMovimientoCantidad")).trim()
             const cantidad = cantidadRaw ? formatCellEuroValue(cantidadRaw) : ""
             const nota = String(getValue("gastosMovimientoNota")).trim().slice(0, 300)
@@ -968,7 +974,8 @@ function openGastoMovementModal(rowIndex = -1) {
                 nombre,
                 tipo,
                 cantidad,
-                nota
+                nota,
+                cuenta
             }
 
             if (isEdit && currentGastosData.months[currentGastosMonth].rows[rowIndex]) {
@@ -1038,6 +1045,7 @@ async function deleteGastosYearRequest(year) {
 async function initGastosLogic() {
     gastosYears = await loadGastosYears()
     sharedGastosTypes = await loadSharedGastosTypes()
+    await cargarCuentasDinero()
     currentGastosYear = gastosYears[0] || "2026"
     currentGastosMonth = "enero"
     currentGastosView = "year"
@@ -1493,10 +1501,6 @@ function openMensualidadEditModal(rowIndex) {
 function openGastoTypeRenameModal(rowIndex) {
     const currentName = sharedGastosTypes?.[rowIndex]
     if (!currentName) return
-    if (esTipoAhorroReservado(currentName)) {
-        alert(`«${currentName}» es la categoría de la cuenta de ahorro y no se puede renombrar.`)
-        return
-    }
 
     openGastosCreateModal({
         title: "Renombrar gasto",
@@ -2359,8 +2363,26 @@ function renderGastosMonthTable() {
     const totalTr = document.createElement("tr")
     totalTr.className = "gastosTotalRow"
     totalTr.dataset.isTotal = "true"
-    totalTr.innerHTML = `<td colspan="3">Total</td><td class="numCell">${formatEuro(total)}</td><td class="rowActionsCell"></td>`
+    totalTr.innerHTML = `<td colspan="4">Total</td><td class="numCell">${formatEuro(total)}</td><td class="rowActionsCell"></td>`
     body.appendChild(totalTr)
+
+    renderGastosMonthSide(rows)
+}
+
+// Al lado de la tabla del mes: en qué se ha gastado y con qué cuenta se ha pagado.
+function renderGastosMonthSide(rows) {
+    const lado = document.getElementById("gastosResumenLado")
+    if (!lado) return
+    const mes = GASTOS_MONTHS.find((m) => m.key === currentGastosMonth)?.label || ""
+    lado.innerHTML =
+        buildDistribucionHtml(
+            `Gastos por tipo · ${mes}`,
+            agruparImportes(rows, (row) => row.tipo)
+        ) +
+        buildDistribucionHtml(
+            "Gastos por cuenta",
+            agruparImportes(rows, (row) => nombreDeCuenta(row.cuenta))
+        )
 }
 
 function sortGastosByDate() {
@@ -2395,9 +2417,12 @@ function buildGastoMovementRow(row = {}, rowIndex = -1) {
     tr.dataset.cantidad = String(row.cantidad || "")
     // La nota no tiene columna: se guarda en la fila y se enseña en el detalle.
     tr.dataset.nota = String(row.nota || "")
+    // Vacía = cuenta bancaria. Se conserva al guardar: la fila se reconstruye de aquí.
+    tr.dataset.cuenta = String(row.cuenta || "")
 
     tr.innerHTML = `
         <td data-field="fecha">${escapeGastosHtml(row.fecha || "")}</td>
+        <td data-field="cuenta">${escapeGastosHtml(nombreDeCuenta(row.cuenta))}</td>
         <td data-field="nombre">${escapeGastosHtml(row.nombre || "")}</td>
         <td data-field="tipo">${escapeGastosHtml(normalizeGastoTipo(row.tipo || ""))}</td>
         <td data-field="cantidad">${formatCellEuroValue(row.cantidad || "")}</td>
@@ -2513,7 +2538,8 @@ function syncGastosDataFromTables() {
                         rowElement.dataset.cantidad ||
                         rowElement.querySelector('[data-field="cantidad"]')?.textContent.trim() ||
                         "",
-                    nota: rowElement.dataset.nota || ""
+                    nota: rowElement.dataset.nota || "",
+                    cuenta: rowElement.dataset.cuenta || ""
                 }
             })
             .filter((row) => row.fecha || row.nombre || row.tipo || parseEuroNumber(row.cantidad) !== 0)

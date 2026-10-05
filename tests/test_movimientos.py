@@ -342,7 +342,6 @@ def test_sin_clave_configurada_503(movimientos_app, monkeypatch):
     {"tipo": "gasto", "nombre": "x", "importe": "no-es-un-numero"},
     {"tipo": "gasto", "nombre": "x", "importe": 0},
     {"tipo": "gasto", "nombre": "x", "importe": -5},
-    {"tipo": "gasto", "nombre": "", "importe": 5},
     {"tipo": "gasto", "nombre": "x", "importe": 5, "fecha": "2026/03/04"},
     {"tipo": "gasto", "nombre": "x", "importe": 5, "fecha": "32-03-2026"},
 ])
@@ -429,7 +428,7 @@ def test_la_fila_guardada_cae_en_el_mes_correcto(movimientos_app):
         datos = read_gastos_year("2026")
 
     assert datos["months"]["agosto"]["rows"] == [
-        {"fecha": "09-08-2026", "nombre": "Repostaje", "tipo": "Gasoil", "cantidad": "60,00 €", "nota": ""}
+        {"fecha": "09-08-2026", "nombre": "Repostaje", "tipo": "Gasoil", "cantidad": "60,00 €", "nota": "", "cuenta": ""}
     ]
     # Y ningún otro mes se ha llevado la fila.
     otros = [mes for mes, datosMes in datos["months"].items() if mes != "agosto" and datosMes["rows"]]
@@ -461,7 +460,9 @@ def test_gasto_visible_para_la_web_app(movimientos_app):
 
     assert datos is not None
     filas = datos["months"]["mayo"]["rows"]
-    assert filas == [{"fecha": "01-05-2026", "nombre": "Piso", "tipo": "Alquiler", "cantidad": "800,00 €", "nota": ""}]
+    assert filas == [
+        {"fecha": "01-05-2026", "nombre": "Piso", "tipo": "Alquiler", "cantidad": "800,00 €", "nota": "", "cuenta": ""}
+    ]
     assert "Alquiler" in datos["gastosTipos"]
 
 
@@ -479,7 +480,9 @@ def test_ingreso_visible_para_la_web_app(movimientos_app):
 
     assert datos is not None
     filas = datos["months"]["julio"]["rows"]
-    assert filas == [{"fecha": "20-07-2026", "nombre": "VWCE", "tipo": "Dividendos", "cantidad": "42,10 €", "nota": ""}]
+    assert filas == [
+        {"fecha": "20-07-2026", "nombre": "VWCE", "tipo": "Dividendos", "cantidad": "42,10 €", "nota": "", "cuenta": ""}
+    ]
 
 
 # ── Selección de portfolio (base de datos) ───────────────────────────────────
@@ -831,7 +834,6 @@ def test_preparar_descarta_campos_desconocidos(movimientos_app):
 
 @pytest.mark.parametrize("campos", [
     {"tipo": "transferencia", "nombre": "x", "importe": 1},
-    {"tipo": "gasto", "nombre": "", "importe": 1},
     {"tipo": "gasto", "nombre": "x", "importe": -3},
     {"tipo": "gasto", "nombre": "x", "importe": 1, "fecha": "2026/03/04"},
 ])

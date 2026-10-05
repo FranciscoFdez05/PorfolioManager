@@ -32,6 +32,7 @@ from core.firma_hmac import (
     verificarPeticionFirmada,
 )
 from core.red_local import soloRedLocal
+from stores.cuentas_store import ETIQUETAS_TIPO, ID_BANCO, etiquetas_de_cuentas, listar_cuentas
 from stores.movimientos_store import (
     TIPOS_VALIDOS,
     DatosMovimientoInvalidos,
@@ -64,7 +65,7 @@ def _avisarSinFirma() -> None:
 # Campos que /api/preparar acepta y serializa. Cualquier otra clave que mande el
 # cliente se descarta: el cuerpo firmado solo puede contener lo que el endpoint
 # de alta va a leer.
-CAMPOS_MOVIMIENTO = ("tipo", "categoria", "nombre", "importe", "fecha", "portfolio")
+CAMPOS_MOVIMIENTO = ("tipo", "categoria", "cuenta", "nombre", "importe", "fecha", "portfolio")
 
 
 def _resolverPortfolio(pid):
@@ -180,6 +181,42 @@ def getPortfoliosLista():
     })
 
 
+@movimientos_bp.route("/api/cuentas-lista", methods=["GET"])
+@soloRedLocal
+def getCuentasLista():
+    """Cuentas entre las que elegir con cuál se paga o en cuál se cobra, para el Atajo.
+
+    Como `/api/portfolios-lista`: la lista se pide en cada ejecución, de modo que
+    una cuenta creada o renombrada en la web aparece sola. `/api/cuentas` es la de
+    la web y exige sesión, que un Atajo no tiene; esta va por filtro de red local.
+
+    Acepta ?portfolio=<id-o-nombre>: cada base de datos tiene sus cuentas.
+    Se sirve también la lista plana de `nombres` y el diccionario que los traduce a
+    identificador, el mismo patrón que usa el Atajo con los portfolios.
+    """
+    rutaPortfolio, errorPortfolio = _resolverPortfolio(request.args.get("portfolio"))
+    if errorPortfolio:
+        return errorPortfolio
+
+    if rutaPortfolio is None:
+        cuentas = listar_cuentas()
+    else:
+        with open_db_at(rutaPortfolio) as conn:
+            cuentas = listar_cuentas(conn)
+
+    return jsonify({
+        "cuentas": [
+            {"id": c["id"], "nombre": c["nombre"], "tipo": c["tipo"], "tipo_etiqueta": ETIQUETAS_TIPO.get(c["tipo"], c["tipo"])}
+            for c in cuentas
+        ],
+        # La bancaria es la primera y la de por defecto: Atajos presenta la lista
+        # tal cual, y el primer elemento es el que se pulsa sin pensar.
+        "nombres": [c["nombre"] for c in cuentas],
+        "idPorNombre": {c["nombre"]: c["id"] for c in cuentas},
+        "predeterminada": next((c["nombre"] for c in cuentas if c["id"] == ID_BANCO), ""),
+    })
+
+
 @movimientos_bp.route("/api/categorias", methods=["GET"])
 @soloRedLocal
 def getCategorias():
@@ -190,6 +227,11 @@ def getCategorias():
 
     Acepta ?portfolio=<id-o-nombre> porque cada base de datos tiene sus
     categorías; sin el parámetro se lee la activa.
+
+    Devuelve además `cuentas`: la cuenta bancaria (la primera, y la de por
+    defecto) y las demás cuentas (ahorro, exchange, broker…), tal como hay que
+    mandarlas en el campo `cuenta` del movimiento: la que paga el gasto o cobra
+    el ingreso.
 
     Acepta también ?tipo=gasto|ingreso y entonces añade `lista` con solo las de
     ese tipo. Existe para el Atajo de iOS: sin esto tenía que hacer un segundo
@@ -213,16 +255,18 @@ def getCategorias():
 
     if rutaPortfolio is None:
         categorias = leerCategorias()
+        cuentas = etiquetas_de_cuentas()
     else:
         with open_db_at(rutaPortfolio) as conn:
             categorias = leerCategorias(conn=conn)
+            cuentas = etiquetas_de_cuentas(conn)
 
     todas = sorted(
         {etiqueta for lista in categorias.values() for etiqueta in lista},
         key=lambda texto: texto.lower(),
     )
 
-    respuesta = {"categorias": categorias, "todas": todas}
+    respuesta = {"categorias": categorias, "todas": todas, "cuentas": cuentas}
 
     if tipoPedido:
         respuesta["tipo"] = tipoPedido

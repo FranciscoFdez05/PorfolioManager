@@ -14,6 +14,7 @@ una fila con otro formato se ordenaría y sumaría mal.
 from datetime import date, datetime
 
 from core.db import get_db, transaction
+from stores.cuentas_store import CuentaInvalida, resolver_cuenta
 from stores.gastos_store import MONTH_KEYS
 
 TIPOS_VALIDOS = ("ingreso", "gasto")
@@ -120,11 +121,24 @@ def sanitizarMovimiento(payload):
 
     tipo = normalizarTipo(payload.get("tipo"))
     fecha = normalizarFecha(payload.get("fecha"))
+    categoria = normalizarTexto(payload.get("categoria"), _MAX_CATEGORIA, "categoria")
+
+    # La cuenta es con la que se paga el gasto o en la que se cobra el ingreso:
+    # la bancaria si no se dice otra cosa (el vacío), o cualquiera de las demás
+    # por su nombre. La categoría es la de siempre. Mover dinero de una cuenta a
+    # otra no se apunta aquí: son transferencias, que se hacen desde la web.
+    try:
+        cuenta = resolver_cuenta(payload.get("cuenta"))
+    except CuentaInvalida as error:
+        raise DatosMovimientoInvalidos(str(error)) from None
 
     return {
         "tipo": tipo,
-        "categoria": normalizarTexto(payload.get("categoria"), _MAX_CATEGORIA, "categoria"),
-        "nombre": normalizarTexto(payload.get("nombre"), _MAX_NOMBRE, "nombre", obligatorio=True),
+        "categoria": categoria,
+        "cuenta": cuenta,
+        # El concepto es opcional: un gasto apuntado de prisa desde el móvil vale
+        # con la categoría y el importe, y la fila entra con el concepto en blanco.
+        "nombre": normalizarTexto(payload.get("nombre"), _MAX_NOMBRE, "nombre"),
         "importe": normalizarImporte(payload.get("importe")),
         "fecha": fecha,
     }
@@ -138,9 +152,10 @@ def _insertarMovimiento(conn, movimiento, tablas, year, month, fechaTabla, canti
         conn.execute("INSERT OR IGNORE INTO gastos_years (year) VALUES (?)", (year,))
 
     cursor = conn.execute(
-        f"INSERT INTO {tablas['filas']} (year, month, fecha, nombre, tipo, cantidad) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (year, month, fechaTabla, movimiento["nombre"], movimiento["categoria"], cantidad),
+        f"INSERT INTO {tablas['filas']} (year, month, fecha, nombre, tipo, cantidad, cuenta) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (year, month, fechaTabla, movimiento["nombre"], movimiento["categoria"], cantidad,
+         movimiento.get("cuenta", "")),
     )
 
     # Una categoría nueva escrita desde el Atajo se registra en el catálogo
@@ -188,6 +203,7 @@ def crearMovimiento(movimiento, conn=None):
         "year": year,
         "month": month,
         "cantidad": cantidad,
+        "cuenta": movimiento.get("cuenta", ""),
     }
 
 
