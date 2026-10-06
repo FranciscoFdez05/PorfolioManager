@@ -26,13 +26,16 @@ secreto eran las claves.
 """
 
 import base64
+import hashlib
 import json
 import logging
 import os
+import re
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from werkzeug.security import _hash_internal
 
 from core import firma_hmac, paths
 from core.secret_store import read_secret_lines, write_secret_lines
@@ -182,6 +185,88 @@ def descifrarClaves(paquete, contrasena: str) -> dict:
     except (InvalidToken, ValueError, TypeError) as error:
         raise ContrasenaIncorrecta() from error
     return claves if isinstance(claves, dict) else {}
+
+
+# ── Claves en las copias de seguridad ────────────────────────────────────────
+#
+# La copia automática no tiene la contraseña de la web en claro —solo se guarda
+# su hash—, así que no puede cifrar las claves «con la contraseña» como hace el
+# export manual. Se cifra con lo que sí hay: el resumen PBKDF2/scrypt de esa
+# contraseña. El fichero lleva el método y la sal (no son secretos) y, para
+# abrirlo, basta repetir el cálculo con la contraseña de la web: nadie que solo
+# tenga el ZIP puede hacerlo sin adivinarla, y la contraseña no se guarda en
+# ningún sitio recuperable.
+
+FORMATO_CLAVES_APP = "hash-app+fernet"
+_RE_METODO_HASH = re.compile(r"^(?:scrypt:(\d{1,6}):(\d{1,2}):(\d{1,2})|pbkdf2:sha(?:256|512):(\d{1,8}))$")
+
+
+def _fernetDeHashApp(metodo: str, sal: str, resumen: str | None = None, contrasena: str | None = None) -> Fernet:
+    """Fernet derivado del resumen de la contraseña de la web.
+
+    Con `resumen` (el guardado en el servidor) se usa tal cual; con `contrasena`
+    se recalcula. El método sale de un fichero ajeno, así que se limita a los
+    dos de werkzeug y a costes razonables antes de ejecutarlo.
+    """
+    coincide = _RE_METODO_HASH.match(metodo or "")
+    if not coincide or not sal or len(sal) > 256:
+        raise ValueError("método de resumen no admitido")
+    if metodo.startswith("scrypt"):
+        n, r, p = (int(g) for g in coincide.groups()[:3])
+        if n > 2**18 or r > 32 or p > 16:
+            raise ValueError("coste de resumen excesivo")
+    elif int(coincide.group(4)) > 5_000_000:
+        raise ValueError("coste de resumen excesivo")
+
+    if resumen is None:
+        resumen, _ = _hash_internal(metodo, sal, contrasena or "")
+    material = hashlib.sha256(b"portfolio-backup-claves-v1" + bytes.fromhex(resumen)).digest()
+    return Fernet(base64.urlsafe_b64encode(material))
+
+
+def cifrarClavesConHashApp(claves: dict, hash_app: str) -> dict:
+    """Las claves, cifradas con el hash de la contraseña de la web, listas como JSON."""
+    metodo, sal, resumen = hash_app.split("$", 2)
+    fernet = _fernetDeHashApp(metodo, sal, resumen=resumen)
+    datos = json.dumps(claves, ensure_ascii=False).encode("utf-8")
+    return {
+        "formato": FORMATO_CLAVES_APP,
+        "metodo": metodo,
+        "salt": sal,
+        "datos": fernet.encrypt(datos).decode("ascii"),
+    }
+
+
+def esPaqueteDeHashApp(paquete) -> bool:
+    return isinstance(paquete, dict) and paquete.get("formato") == FORMATO_CLAVES_APP
+
+
+def descifrarClavesConHashApp(paquete, hash_app: str | None = None, contrasena: str | None = None) -> dict:
+    """Abre un paquete de `cifrarClavesConHashApp`.
+
+    Se prueba primero con el hash actual (`hash_app`), que sirve si la contraseña
+    no ha cambiado desde la copia y evita pedirla; si no, hace falta la
+    `contrasena` con la que se hizo. Lanza `ContrasenaIncorrecta` si ninguna vale.
+    """
+    try:
+        metodo, sal = str(paquete.get("metodo", "")), str(paquete.get("salt", ""))
+        datos = str(paquete.get("datos", "")).encode("ascii")
+        intentos = []
+        if hash_app and hash_app.count("$") == 2:
+            m, s, resumen = hash_app.split("$", 2)
+            if (m, s) == (metodo, sal):
+                intentos.append(dict(resumen=resumen))
+        if contrasena:
+            intentos.append(dict(contrasena=contrasena))
+        for intento in intentos:
+            try:
+                claves = json.loads(_fernetDeHashApp(metodo, sal, **intento).decrypt(datos).decode("utf-8"))
+            except InvalidToken:
+                continue
+            return claves if isinstance(claves, dict) else {}
+    except (ValueError, TypeError, AttributeError) as error:
+        raise ContrasenaIncorrecta() from error
+    raise ContrasenaIncorrecta()
 
 
 def restaurarClaves(claves) -> list:

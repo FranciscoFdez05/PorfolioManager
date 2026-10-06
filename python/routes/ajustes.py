@@ -39,6 +39,8 @@ DEFAULT_SNAPSHOT_MINUTES = 60
 
 _GLOBAL_DEFAULTS = {
     "autoBackupDays": 0,
+    # Si las copias llevan dentro las claves de API (cifradas con la contraseña de la web).
+    "backupIncluirClaves": False,
     "staleHours": 24,
     "autoRefreshMinutes": 0,
     "snapshotMinutes": DEFAULT_SNAPSHOT_MINUTES,
@@ -239,6 +241,7 @@ def get_settings():
         "alphaVantageKeyCount":  len([k for k in alphavantage_raw.splitlines() if k.strip()]),
         # Globales
         "autoBackupDays":        _as_int(gcfg.get("autoBackupDays"), 0),
+        "backupIncluirClaves":   bool(gcfg.get("backupIncluirClaves", False)),
         "staleHours":            _as_int(gcfg.get("staleHours"), 24),
         "autoRefreshMinutes":    _as_int(gcfg.get("autoRefreshMinutes"), 0),
         "snapshotMinutes":       _as_int(gcfg.get("snapshotMinutes"), 60),
@@ -513,6 +516,8 @@ def save_settings():
     # ── Globales ──────────────────────────────────────────
     if "autoBackupDays" in data:
         gcfg["autoBackupDays"] = max(0, min(365, _as_int(data["autoBackupDays"], 0)))
+    if "backupIncluirClaves" in data:
+        gcfg["backupIncluirClaves"] = data["backupIncluirClaves"] is True
     if "staleHours" in data:
         gcfg["staleHours"] = max(1, min(8760, _as_int(data["staleHours"], 24)))
     if "autoRefreshMinutes" in data:

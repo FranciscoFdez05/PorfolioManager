@@ -39,6 +39,8 @@ import json
 import logging
 import time
 import urllib.request
+import uuid
+from pathlib import Path
 from threading import Lock
 from urllib.error import HTTPError, URLError
 
@@ -326,6 +328,59 @@ def notificar(categoria: str, texto: str, *, clave: str | None = None,
         return True
     except Exception as error:
         log.warning("[telegram] No se pudo enviar el aviso (%s): %s", categoria, error)
+        return False
+
+
+_API_DOC_URL = "https://api.telegram.org/bot{token}/sendDocument"
+# Límite de Telegram para ficheros subidos por un bot.
+MAX_BYTES_DOCUMENTO = 50 * 1024 * 1024
+_TIMEOUT_DOCUMENTO = 120.0
+
+
+def _enviar_documento(token: str, chatId: str, ruta, texto: str) -> None:
+    ruta = Path(ruta)
+    limite = uuid.uuid4().hex
+    cabecera = b"".join(
+        (f"--{limite}\r\nContent-Disposition: form-data; name=\"{nombre}\"\r\n\r\n{valor}\r\n").encode("utf-8")
+        for nombre, valor in (("chat_id", chatId), ("caption", str(texto)[:1000]))
+    ) + (
+        f"--{limite}\r\nContent-Disposition: form-data; name=\"document\"; "
+        f"filename=\"{ruta.name}\"\r\nContent-Type: application/zip\r\n\r\n"
+    ).encode("utf-8")
+    cuerpo = cabecera + ruta.read_bytes() + f"\r\n--{limite}--\r\n".encode("utf-8")
+    request = urllib.request.Request(
+        _API_DOC_URL.format(token=token),
+        data=cuerpo,
+        headers={"Content-Type": f"multipart/form-data; boundary={limite}"},
+    )
+    with urllib.request.urlopen(request, timeout=_TIMEOUT_DOCUMENTO) as response:
+        respuesta = json.loads(response.read().decode("utf-8"))
+    if not respuesta.get("ok"):
+        raise ValueError(respuesta.get("description") or "Telegram rechazó el fichero")
+
+
+def notificar_archivo(categoria: str, ruta, texto: str) -> bool:
+    """Manda un fichero (con `texto` de pie) con las mismas reglas que `notificar`.
+
+    Si pesa más de lo que admite Telegram no se intenta: se avisa con un mensaje
+    para que no parezca que la copia salió. Devuelve si se mandó algo al chat
+    (fichero o ese mensaje). Nunca lanza.
+    """
+    try:
+        if categoria not in CATEGORIAS_AVISO:
+            return False
+        token, chatId = leerConfig()
+        if not token or not chatId or not _permitido(categoria):
+            return False
+        tamano = Path(ruta).stat().st_size
+        if tamano > MAX_BYTES_DOCUMENTO:
+            _enviar(token, chatId, f"{texto}\n⚠️ No se ha podido adjuntar: pesa {tamano / 1024 / 1024:.0f} MB y "
+                                   "Telegram admite 50 MB como máximo.")
+            return True
+        _enviar_documento(token, chatId, ruta, texto)
+        return True
+    except Exception as error:
+        log.warning("[telegram] No se pudo enviar el fichero (%s): %s", categoria, error)
         return False
 
 

@@ -13,7 +13,7 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from admin.backup_manager import _remove_wal_sidecars, _ruta_bloqueo, check_integrity
-from core import paths, settings, telegram_notifier
+from core import exportables, paths, settings, telegram_notifier
 from core.bloqueo import BloqueoOcupado, exclusivo
 from core.errors import mensajeAlmacenamiento, registrarFalloEscritura
 from core.escritura import escribirAtomico, limpiarTemporal, rutaTemporal, temporalPara
@@ -304,6 +304,47 @@ def _avisar_copia_creada(nombre: str, automatica: bool) -> None:
         log.debug("[backup] No se pudo avisar de la copia: %s", error)
 
 
+def _enviar_copia_a_telegram(nombre: str) -> None:
+    """Manda el ZIP de una copia automática al chat de Telegram.
+
+    Si el fichero no sale (sin Telegram, categoría apagada, error de red) se
+    cae al aviso de texto de siempre, para que al menos conste que se hizo.
+    """
+    portfolios = len(list(_PORTFOLIOS_DIR.glob("*.db"))) if _PORTFOLIOS_DIR.exists() else 0
+    claves = " · con claves de API" if _incluir_claves() else ""
+    pie = (f"💾 Copia de seguridad automática\n{nombre} · {_megas(nombre)} · "
+           f"{portfolios} portfolio(s){claves}")
+    if not telegram_notifier.notificar_archivo("backup", _BACKUP_DIR / nombre, pie):
+        _avisar_copia_creada(nombre, automatica=True)
+
+
+def _incluir_claves() -> bool:
+    return bool(_read_ajustes().get("backupIncluirClaves"))
+
+
+def _claves_cifradas_para_zip() -> bytes | None:
+    """`claves-api.cifradas.json` listo para meter en el ZIP, o None si no procede.
+
+    Procede si el usuario lo ha pedido en Ajustes y hay contraseña de acceso
+    configurada (con las credenciales por defecto no hay nada con lo que cifrar).
+    Falla hacia «sin claves» y lo deja en el log: una copia sin claves sirve; una
+    con las claves sin proteger no debe existir nunca.
+    """
+    if not _incluir_claves():
+        return None
+    from routes.auth import _load_credentials
+
+    usuario, hash_app = _load_credentials()
+    if usuario == "__no_user__":
+        log.warning("[backup] Se piden las claves en la copia pero no hay contraseña de acceso: se omiten")
+        return None
+    claves = exportables.clavesEnClaro()
+    if not claves:
+        return None
+    paquete = exportables.cifrarClavesConHashApp(claves, hash_app)
+    return json.dumps(paquete, ensure_ascii=False).encode("utf-8")
+
+
 def _avisar_copia_fallida(motivo, automatica: bool) -> None:
     telegram_notifier.notificar(
         "backup",
@@ -337,7 +378,7 @@ def crear_backup_automatico() -> str:
         except Exception as error:
             _avisar_copia_fallida(error, automatica=True)
             raise
-    _avisar_copia_creada(nombre, automatica=True)
+    _enviar_copia_a_telegram(nombre)
     return nombre
 
 
@@ -480,11 +521,17 @@ def _escribir_backup(*, automatico: bool) -> str:
                 for prefs_file in sorted(_JSON_DIR.glob("prefs_*.json")):
                     zf.write(str(prefs_file), f"prefs/{prefs_file.name}")
 
+            # Claves de API, cifradas con el hash de la contraseña de la web
+            claves = _claves_cifradas_para_zip()
+            if claves is not None:
+                zf.writestr(exportables.FICHERO_CLAVES_CIFRADAS, claves)
+
             # Manifest con metadatos del backup
             manifest = {
                 "created_at": datetime.now().isoformat(),
                 "version": 2,
                 "portfolios": portfolio_names,
+                "claves": claves is not None,
             }
             zf.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False))
 
@@ -592,12 +639,19 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
         except zipfile.BadZipFile:
             return jsonify({"ok": False, "error": "El backup no es un ZIP válido"}), 400
 
+    # Las claves se abren ANTES de tocar nada, por lo mismo que se valida el zip:
+    # si hace falta una contraseña que no llega, se pide y no se ha cambiado nada.
+    claves, rechazo = _claves_del_zip(backup_path) if es_zip else (None, None)
+    if rechazo is not None:
+        return rechazo
+
     safety_dir = _safety_copy_before_restore()
 
     # Entradas del zip que no se han podido restaurar. Se acumulan en vez de
     # abortar: si el backup trae cinco portfolios y uno está dañado, interesa
     # recuperar los otros cuatro y saber cuál falta, no perderlo todo.
     ignorados: list[str] = []
+    claves_restauradas: list[str] = []
 
     from core.db import invalidate_all_connections
     invalidate_all_connections()
@@ -664,6 +718,11 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
                 # Restaurar ajustes.json
                 if "ajustes.json" in names:
                     escribirAtomico(_AJUSTES_SRC, zf.read("ajustes.json"))
+
+                # Claves de API: entran en claro y salen cifradas con la
+                # SECRET_KEY de esta instalación.
+                if claves:
+                    claves_restauradas = exportables.restaurarClaves(claves)
 
                 # Restaurar preferencias por-portfolio
                 for name in names:
@@ -756,7 +815,48 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
         # El frontend debe avisar si la restauración fue parcial: un "ok" a
         # secas después de perder un portfolio sería el peor resultado posible.
         "ignorados": ignorados,
+        "claves": claves_restauradas,
     })
+
+
+def _claves_del_zip(zip_path: Path):
+    """(claves, None) si el ZIP las trae y se han podido abrir; (None, None) si no
+    hay que restaurarlas; (None, respuesta) si hay que parar y pedir la contraseña.
+
+    Se prueba primero con el hash actual de la contraseña de la web, así que una
+    copia hecha con la contraseña de hoy se restaura sin preguntar nada. Si la
+    contraseña ha cambiado desde entonces, el navegador la pide y reenvía.
+    """
+    cuerpo = request.get_json(silent=True) or {}
+    contrasena = str(request.form.get("contrasena") or cuerpo.get("contrasena") or "")
+    sin_claves = str(request.form.get("sinClaves") or cuerpo.get("sinClaves") or "") in {"1", "true", "True"}
+    if sin_claves:
+        return None, None
+
+    try:
+        with zipfile.ZipFile(str(zip_path), "r") as zf:
+            if exportables.FICHERO_CLAVES_CIFRADAS not in zf.namelist():
+                return None, None
+            paquete = json.loads(zf.read(exportables.FICHERO_CLAVES_CIFRADAS).decode("utf-8"))
+    except (OSError, ValueError, zipfile.BadZipFile):
+        return None, (jsonify({"ok": False, "error": "No se pueden leer las claves del backup"}), 400)
+
+    if not exportables.esPaqueteDeHashApp(paquete):
+        return None, None
+
+    from routes.auth import _load_credentials
+
+    try:
+        return exportables.descifrarClavesConHashApp(
+            paquete, hash_app=_load_credentials()[1], contrasena=contrasena[:exportables.MAX_LARGO_CONTRASENA]
+        ), None
+    except exportables.ContrasenaIncorrecta:
+        return None, (jsonify({
+            "ok": False,
+            "necesitaContrasena": True,
+            "error": "Contraseña incorrecta" if contrasena else
+                     "El backup lleva las claves de API protegidas con la contraseña de la web",
+        }), 400)
 
 
 @backup_bp.route("/api/backups/<filename>", methods=["DELETE"])

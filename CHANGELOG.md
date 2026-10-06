@@ -22,6 +22,19 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [3.2.0] — 2026-10-06
+
+**Esquema de base de datos:** no lo toca (sigue en la **11**).
+
+- La copia de seguridad automática se envía al bot de Telegram como ZIP (si hay
+  Telegram configurado y el aviso «Copias de seguridad» está activo). Si pesa más
+  de 50 MB, o la subida falla, se manda solo el aviso de texto.
+- Ajustes › Auto-backup: opción **Incluir las claves de API en las copias**. Van
+  cifradas dentro del ZIP con el resumen de la contraseña de la web, de modo que
+  al restaurar se pide esa contraseña (si no ha cambiado desde la copia, no).
+  «Restaurar» y «Importar ZIP» devuelven las claves a `API/` cifradas con la
+  `SECRET_KEY` de la instalación, o permiten restaurar sin ellas.
+
 ## [3.1.0] — 2026-10-05
 
 **Esquema de base de datos:** lo sube a la **11** (desde la 9). Dos cambios:

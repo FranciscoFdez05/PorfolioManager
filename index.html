@@ -1776,6 +1776,16 @@
                         <option value="30">Cada mes</option>
                     </select>
                 </div>
+                <label class="ajustesExportClaves" for="ajustesBackupClaves">
+                    <input id="ajustesBackupClaves" type="checkbox">
+                    <span>
+                        <strong>Incluir las claves de API en las copias.</strong>
+                        Van cifradas dentro del ZIP con tu <em>contraseña de acceso a la web</em>: para
+                        restaurarlas se pide esa misma contraseña (si no ha cambiado desde la copia, no se
+                        pregunta). Sin esta opción, la copia no lleva ninguna clave.
+                    </span>
+                </label>
+                <div class="ajustesSectionDesc">Con Telegram configurado y el aviso de «Copias de seguridad» activado, cada copia automática se envía al bot como archivo ZIP.</div>
                 <div class="ajustesActions">
                     <button id="ajustesGuardarBackupFreqBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
                     <span id="ajustesBackupFreqMsg" class="ajustesStatusMsg"></span>

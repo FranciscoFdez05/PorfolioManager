@@ -786,6 +786,9 @@ async function initAjustesLogic() {
 
     if (autoBackupSel) setSelect(autoBackupSel, settings.autoBackupDays ?? 0)
 
+    const backupClavesChk = document.getElementById("ajustesBackupClaves")
+    if (backupClavesChk) backupClavesChk.checked = !!settings.backupIncluirClaves
+
     if (guardarFreqBtn) {
         guardarFreqBtn.addEventListener("click", async () => {
             guardarFreqBtn.disabled = true
@@ -794,7 +797,10 @@ async function initAjustesLogic() {
                 const res = await fetch("/api/settings", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ autoBackupDays: Number(autoBackupSel?.value || 0) })
+                    body: JSON.stringify({
+                        autoBackupDays: Number(autoBackupSel?.value || 0),
+                        backupIncluirClaves: !!backupClavesChk?.checked
+                    })
                 })
                 const data = await res.json()
                 showMsg(backupFreqMsg, data.ok ? "Guardado" : "Error", data.ok ? "ok" : "error")
@@ -1313,16 +1319,53 @@ async function initAjustesLogic() {
         })
     }
 
-    async function _doRestore(filename, btn) {
+    // La copia lleva las claves de API cifradas con la contraseña de la web y la
+    // actual ya no las abre (se cambió después de hacerla): se pide la de
+    // entonces y se reenvía. El servidor no ha tocado nada todavía.
+    function _pedirContrasenaRestore(filename, btn, error) {
+        showMsg(backupMsg, "", "")
+        _abrirModalContrasena({
+            titulo: "Las claves de API van con contraseña",
+            texto:
+                "Esta copia lleva las claves de API cifradas con la contraseña de la web que había al " +
+                "crearla. Escríbela para restaurarlas, o restaura el resto sin las claves.",
+            error: error || "",
+            botones: [
+                { etiqueta: "Cancelar", clase: "cancelButton", valor: "cancelar" },
+                { etiqueta: "Restaurar sin las claves", clase: "cancelButton", valor: "sin" },
+                {
+                    etiqueta: "Restaurar",
+                    clase: "primaryButton",
+                    valor: "con",
+                    principal: true,
+                    necesitaContrasena: true
+                }
+            ],
+            onCerrar: (valor, contrasena) => {
+                if (valor === "cancelar") {
+                    showMsg(backupMsg, "Restauración cancelada", "")
+                    return
+                }
+                _doRestore(filename, btn, valor === "con" ? { contrasena } : { sinClaves: true })
+            }
+        })
+    }
+
+    async function _doRestore(filename, btn, extra = {}) {
         btn.disabled = true
         showMsg(backupMsg, "Restaurando…", "")
         try {
             const res = await fetch("/api/restore", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ filename })
+                body: JSON.stringify({ filename, ...extra })
             })
             const data = await res.json()
+            if (!data.ok && data.necesitaContrasena) {
+                btn.disabled = false
+                _pedirContrasenaRestore(filename, btn, extra.contrasena ? data.error : "")
+                return
+            }
             if (data.ok) {
                 // El servidor puede haber saltado entradas dañadas del zip y
                 // seguir adelante con el resto. Un "Restaurado" a secas después
