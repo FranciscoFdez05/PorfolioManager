@@ -355,3 +355,13 @@
     margin-top: 2px;
     line-height: 1.2;
 }
+
+/* Nota al pie de un bloque, bajo sus controles: mismo sangrado que los campos
+   y sin el borde ni el relleno de una descripción de cabecera. */
+.sttOverlay .ajustesSection > .ajustesNota,
+.sttOverlay .ajustesSection > .ajustesFieldHint {
+    padding: 0 24px 4px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--text-muted);
+}

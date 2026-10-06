@@ -49,12 +49,16 @@ function _initSttShell() {
             document.querySelectorAll(".sttPage").forEach((p) => p.classList.remove("active"))
             btn.classList.add("active")
             const page = document.getElementById("sttPage-" + btn.dataset.stt)
-            if (page) page.classList.add("active")
+            if (page) {
+                page.classList.add("active")
+                _balancearAlMostrar(page)
+            }
         })
     })
 
     // Section drag-to-reorder
     document.querySelectorAll(".sttPage").forEach(_initSectionDrag)
+    _balancearAlMostrar(document.querySelector(".sttPage.active"))
 
     // Prevent "no-drop" cursor when hovering gaps/title inside the overlay
     document.getElementById("sttOverlay")?.addEventListener("dragover", (e) => {
@@ -70,7 +74,51 @@ function _saveSectionOrder(pageEl) {
     const data = [...pageEl.querySelectorAll(":scope > .sttCol")].map((col) =>
         [...col.querySelectorAll(":scope > .ajustesSection")].map(_sectionTitle).filter(Boolean)
     )
-    localStorage.setItem("sttSectionOrder-" + pageEl.id, JSON.stringify(data))
+    localStorage.setItem(_ORDER_KEY + pageEl.id, JSON.stringify(data))
+}
+
+// La clave lleva versión: el orden guardado por el reparto antiguo (mitad y
+// mitad por número de bloques) dejaba una columna mucho más larga que la otra, y
+// al respetarlo se seguirían viendo esos huecos. Cualquier arrastre nuevo se
+// guarda con la clave actual.
+const _ORDER_KEY = "sttSectionOrder2-"
+
+// Reparto por defecto de una página: los bloques siguen en el orden del HTML
+// —que los agrupa por tema— y se cortan en el punto que deja las dos columnas
+// con la altura más parecida, para que no quede un hueco al pie de una de ellas.
+// Solo se puede medir con la página visible, así que se hace al mostrarla; si el
+// usuario ya la ha ordenado a mano, no se toca.
+function _balancearPagina(pageEl) {
+    if (!pageEl || localStorage.getItem(_ORDER_KEY + pageEl.id)) return
+    const cols = [...pageEl.querySelectorAll(":scope > .sttCol")]
+    if (cols.length !== 2) return
+    const secciones = cols.flatMap((c) => [...c.querySelectorAll(":scope > .ajustesSection")])
+    const alturas = secciones.map((s) => s.offsetHeight)
+    if (!alturas.length || alturas.some((h) => h <= 0)) return
+
+    const total = alturas.reduce((a, b) => a + b, 0)
+    let acumulado = 0
+    let corte = 0
+    let mejor = Infinity
+    for (let k = 0; k <= alturas.length; k++) {
+        const dif = Math.abs(acumulado - (total - acumulado))
+        if (dif < mejor) {
+            mejor = dif
+            corte = k
+        }
+        acumulado += alturas[k] || 0
+    }
+    secciones.forEach((s, i) => (i < corte ? cols[0] : cols[1]).appendChild(s))
+}
+
+// Las listas (copias, proveedores…) se rellenan después de abrir la página y
+// cambian su altura: se vuelve a repartir una vez pasado ese primer momento.
+function _balancearAlMostrar(pageEl) {
+    if (!pageEl) return
+    requestAnimationFrame(() => _balancearPagina(pageEl))
+    setTimeout(() => {
+        if (pageEl.classList.contains("active")) _balancearPagina(pageEl)
+    }, 700)
 }
 
 const _dragPlaceholder = (() => {
@@ -92,7 +140,7 @@ function _buildPageColumns(pageEl) {
     const col1 = document.createElement("div")
     col1.className = "sttCol"
 
-    const raw = localStorage.getItem("sttSectionOrder-" + pageEl.id)
+    const raw = localStorage.getItem(_ORDER_KEY + pageEl.id)
     if (raw) {
         try {
             const data = JSON.parse(raw)

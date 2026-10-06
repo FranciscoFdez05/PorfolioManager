@@ -34,6 +34,13 @@ decide cómo se deshace la actualización:
   al restaurar se pide esa contraseña (si no ha cambiado desde la copia, no).
   «Restaurar» y «Importar ZIP» devuelven las claves a `API/` cifradas con la
   `SECRET_KEY` de la instalación, o permiten restaurar sin ellas.
+- Ajustes: las columnas de cada página se reparten por altura y no por número
+  de bloques, para que no quede un hueco al pie de una de ellas. El orden que se
+  hubiera guardado arrastrando bloques se descarta una vez (la clave de
+  `localStorage` lleva ahora versión); los arrastres nuevos se respetan.
+- Ajustes: «Actualizar la aplicación» pasa de Datos a Automatización, y Tipos de
+  cambio se coloca junto a Moneda base en Portfolio. Las notas al pie de bloque
+  llevan el mismo sangrado que los campos (clase `.ajustesNota`).
 
 ## [3.1.0] — 2026-10-05
 
