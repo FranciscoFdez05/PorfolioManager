@@ -292,6 +292,9 @@ async function buildMetricasPayload() {
         ? transferenciasData.transferencias
         : []
 
+    // Los popups muestran la cuenta de cada movimiento: hace falta su nombre.
+    if (!window._cuentasDinero.length) await cargarCuentasDinero()
+
     const gastosYearsData = gastosYearsResp ? await gastosYearsResp.json().catch(() => ({ years: [] })) : { years: [] }
     const gastosYearsList = Array.isArray(gastosYearsData.years) ? gastosYearsData.years : []
     // Si el usuario dejó seleccionado otro año, se carga ese en vez del último.
@@ -1972,6 +1975,7 @@ function openGastosTipoPopup(tipoLabel) {
                         fecha: "—",
                         mes: M_GASTOS_LABELS[M_GASTOS_KEYS.indexOf(mk)] || mk,
                         nombre: m.nombre || "—",
+                        cuenta: nombreDeCuenta(m.cuenta),
                         cantidad: val
                     })
             })
@@ -1984,6 +1988,7 @@ function openGastosTipoPopup(tipoLabel) {
                         fecha: r.fecha || "—",
                         mes: M_GASTOS_LABELS[M_GASTOS_KEYS.indexOf(mk)] || mk,
                         nombre: r.nombre || "—",
+                        cuenta: nombreDeCuenta(r.cuenta),
                         cantidad: parseEuroNumber(r.cantidad || "")
                     })
                 }
@@ -2005,6 +2010,7 @@ function openGastosTipoPopup(tipoLabel) {
             <td>${r.fecha}</td>
             <td>${r.mes}</td>
             <td>${r.nombre}</td>
+            <td>${escapeGastosHtml(r.cuenta)}</td>
             <td style="text-align:right">${formatEuro(r.cantidad)}</td>
         </tr>`
         )
@@ -2036,6 +2042,7 @@ function openGastosTipoPopup(tipoLabel) {
                     <col style="width:130px">
                     <col style="width:80px">
                     <col>
+                    <col style="width:170px">
                     <col style="width:110px">
                 </colgroup>
                 <thead>
@@ -2043,12 +2050,13 @@ function openGastosTipoPopup(tipoLabel) {
                         <th class="mThSort" data-sortkey="0">Fecha <span class="mSortArrow"></span></th>
                         <th class="mThSort" data-sortkey="1">Mes <span class="mSortArrow"></span></th>
                         <th class="mThSort" data-sortkey="2" style="text-align:left">Concepto <span class="mSortArrow"></span></th>
-                        <th class="mThSort" data-sortkey="3" style="text-align:right">Importe <span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="3" style="text-align:left">Cuenta <span class="mSortArrow"></span></th>
+                        <th class="mThSort" data-sortkey="4" style="text-align:right">Importe <span class="mSortArrow"></span></th>
                     </tr>
                 </thead>
                 <tbody>${tableRows}
                     <tr class="gtTotalRow" id="gtTotalRow">
-                        <td colspan="3"><strong>Total</strong></td>
+                        <td colspan="4"><strong>Total</strong></td>
                         <td style="text-align:right" id="gtTotalCell"><strong>${formatEuro(total)}</strong></td>
                     </tr>
                 </tbody>

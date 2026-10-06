@@ -22,6 +22,19 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [3.2.3] — 2026-10-06
+
+**Esquema de base de datos:** no lo toca (sigue en la **12**).
+
+- Gastos e Ingresos: corregido un fallo al editar un movimiento. Al guardar, la
+  fila se buscaba por su posición en la lista, que dejaba de valer si la tabla
+  estaba ordenada: se sobrescribía otra fila (y el cambio, por ejemplo de
+  cuenta, no se veía) o se añadía una copia. Ahora se localiza por su contenido.
+  Además, pulsar varias veces «Guardar» ya no crea movimientos repetidos.
+- Cuentas: las columnas Cantidad y Comisión mantienen ancho y alineación a la
+  derecha aunque una transferencia no tenga comisión («—»).
+- Métricas: el detalle de gastos por tipo muestra la cuenta de cada movimiento.
+
 ## [3.2.2] — 2026-10-06
 
 **Esquema de base de datos:** no lo toca (sigue en la **12**).

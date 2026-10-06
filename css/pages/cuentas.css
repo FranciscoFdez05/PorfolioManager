@@ -114,6 +114,16 @@
 #cuentasTable tbody td.rowActionsCell {
     width: 52px;
 }
+/* Cantidad y Comisión (5.ª y 6.ª): ancho y alineación fijos por posición, que no
+   dependan del contenido de la celda (con «—» en vez de importe se descolocaba). */
+#cuentasTable thead th:nth-child(5),
+#cuentasTable thead th:nth-child(6),
+#cuentasTable tbody td:nth-child(5),
+#cuentasTable tbody td:nth-child(6) {
+    width: 130px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
 
 .cuentasSinConcepto {
     color: var(--text-dim);

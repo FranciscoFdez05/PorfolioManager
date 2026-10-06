@@ -235,7 +235,11 @@ function openIngresosCreateModal({ title, bodyHtml, onSubmit, onReady, submitLab
     }
 
     modal.querySelector("#ingresosCreateModalCancelBtn")?.addEventListener("click", closeIngresosCreateModal)
+    let guardando = false
     modal.querySelector("#ingresosCreateModalSaveBtn")?.addEventListener("click", async () => {
+        // Un segundo clic mientras se guarda crearía otra fila igual.
+        if (guardando) return
+        guardando = true
         const getValue = (id) => modal.querySelector(`#${id}`)?.value ?? ""
         try {
             const shouldClose = await onSubmit({ getValue, setFeedback, modal })
@@ -243,6 +247,8 @@ function openIngresosCreateModal({ title, bodyHtml, onSubmit, onReady, submitLab
         } catch (error) {
             console.error(error)
             setFeedback("No se pudo guardar.", true)
+        } finally {
+            guardando = false
         }
     })
 
@@ -620,6 +626,10 @@ function openIngresoMovementModal(rowIndex = -1) {
                 return false
             }
 
+            // La sincronización reconstruye las filas en el orden de la tabla (que puede
+            // estar ordenada) y descarta las vacías: el índice de antes ya no vale.
+            // Se localiza la fila editada por su contenido original.
+            const original = isEdit ? currentRows[rowIndex] : null
             syncIngresosDataFromTables()
             if (!currentIngresosData.months[currentIngresosMonth]) {
                 currentIngresosData.months[currentIngresosMonth] = { rows: [] }
@@ -627,8 +637,21 @@ function openIngresoMovementModal(rowIndex = -1) {
 
             const nextRow = { fecha, nombre, tipo, cantidad, nota, cuenta }
 
-            if (isEdit && currentIngresosData.months[currentIngresosMonth].rows[rowIndex]) {
-                currentIngresosData.months[currentIngresosMonth].rows[rowIndex] = nextRow
+            const rowsNow = currentIngresosData.months[currentIngresosMonth].rows
+            const editIndex = original
+                ? rowsNow.findIndex(
+                      (r) =>
+                          (r.fecha || "") === (original.fecha || "") &&
+                          (r.nombre || "") === (original.nombre || "") &&
+                          normalizeIngresoTipo(r.tipo || "") === normalizeIngresoTipo(original.tipo || "") &&
+                          (r.cantidad || "") === (original.cantidad || "") &&
+                          (r.nota || "") === (original.nota || "") &&
+                          (r.cuenta || "") === (original.cuenta || "")
+                  )
+                : -1
+
+            if (editIndex >= 0) {
+                rowsNow[editIndex] = nextRow
             } else {
                 currentIngresosData.months[currentIngresosMonth].rows.push(nextRow)
             }

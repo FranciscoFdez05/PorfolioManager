@@ -488,7 +488,11 @@ function openGastosCreateModal({ title, bodyHtml, onSubmit, onReady, submitLabel
     })
 
     modal.querySelector("#gastosCreateModalCancelBtn")?.addEventListener("click", closeGastosCreateModal)
+    let guardando = false
     modal.querySelector("#gastosCreateModalSaveBtn")?.addEventListener("click", async () => {
+        // Un segundo clic mientras se guarda crearía otra fila igual.
+        if (guardando) return
+        guardando = true
         const getValue = (id) => modal.querySelector(`#${id}`)?.value ?? ""
 
         try {
@@ -499,6 +503,8 @@ function openGastosCreateModal({ title, bodyHtml, onSubmit, onReady, submitLabel
         } catch (error) {
             console.error(error)
             setFeedback("No se pudo guardar.", true)
+        } finally {
+            guardando = false
         }
     })
 
@@ -964,6 +970,10 @@ function openGastoMovementModal(rowIndex = -1) {
                 return false
             }
 
+            // La sincronización reconstruye las filas en el orden de la tabla (que puede
+            // estar ordenada) y descarta las vacías: el índice de antes ya no vale.
+            // Se localiza la fila editada por su contenido original.
+            const original = isEdit ? currentRows[rowIndex] : null
             syncGastosDataFromTables()
             if (!currentGastosData.months[currentGastosMonth]) {
                 currentGastosData.months[currentGastosMonth] = { rows: [] }
@@ -978,8 +988,21 @@ function openGastoMovementModal(rowIndex = -1) {
                 cuenta
             }
 
-            if (isEdit && currentGastosData.months[currentGastosMonth].rows[rowIndex]) {
-                currentGastosData.months[currentGastosMonth].rows[rowIndex] = nextRow
+            const rowsNow = currentGastosData.months[currentGastosMonth].rows
+            const editIndex = original
+                ? rowsNow.findIndex(
+                      (r) =>
+                          (r.fecha || "") === (original.fecha || "") &&
+                          (r.nombre || "") === (original.nombre || "") &&
+                          normalizeGastoTipo(r.tipo || "") === normalizeGastoTipo(original.tipo || "") &&
+                          (r.cantidad || "") === (original.cantidad || "") &&
+                          (r.nota || "") === (original.nota || "") &&
+                          (r.cuenta || "") === (original.cuenta || "")
+                  )
+                : -1
+
+            if (editIndex >= 0) {
+                rowsNow[editIndex] = nextRow
             } else {
                 currentGastosData.months[currentGastosMonth].rows.push(nextRow)
             }
