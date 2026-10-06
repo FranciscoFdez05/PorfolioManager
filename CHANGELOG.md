@@ -22,6 +22,33 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [3.2.2] — 2026-10-06
+
+**Esquema de base de datos:** no lo toca (sigue en la **12**).
+
+- Ajustes: al arrastrar un panel para reordenarlo, el propio panel se coloca en
+  vivo en el hueco donde va a caer (con borde discontinuo), como las tarjetas de
+  Activos, en lugar de la línea azul de antes. Si se suelta fuera de una columna,
+  el panel vuelve a su sitio.
+
+## [3.2.1] — 2026-10-06
+
+**Esquema de base de datos:** lo sube a la **12** (desde la 11). Columna nueva
+`comision` en `transferencias`, vacía por defecto: ninguna transferencia
+existente cambia.
+
+- Las transferencias entre cuentas pueden llevar **comisión**, que va por su
+  lado y no se mezcla con el importe: con importe 149 y comisión 1,49, la cuenta
+  de destino recibe 149 y las comisiones suman 1,49. La comisión se descuenta
+  además del saldo de la cuenta de origen.
+- Se refleja en Cuentas (columna nueva «Comisión», campo en el formulario y en el
+  CSV, una tarjeta «Comisiones pagadas» y el detalle de cada cuenta, separado de
+  entradas y salidas), en la lista de movimientos de la cuenta de ahorro (como un
+  movimiento «Comisión · hacia …») y en la curva del saldo mensual de Métricas.
+
+Para deshacer la actualización, levantar la imagen anterior y restaurar
+`data/backups/auto/<portfolio>_pre-esquema-11-a-12_*.db`.
+
 ## [3.2.0] — 2026-10-06
 
 **Esquema de base de datos:** no lo toca (sigue en la **11**).

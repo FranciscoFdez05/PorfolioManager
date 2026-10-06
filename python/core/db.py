@@ -275,7 +275,8 @@ CREATE TABLE IF NOT EXISTS transferencias (
     destino  TEXT NOT NULL DEFAULT '',
     cantidad TEXT NOT NULL DEFAULT '',
     concepto TEXT NOT NULL DEFAULT '',
-    nota     TEXT NOT NULL DEFAULT ''
+    nota     TEXT NOT NULL DEFAULT '',
+    comision TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS mensualidades (
@@ -621,7 +622,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id,
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 11
+ESQUEMA_VERSION = 12
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1358,6 +1359,20 @@ def _esquema_11(conn):
 
     for catalogo in ("gastos_tipos", "ingresos_tipos"):
         conn.execute(f"DELETE FROM {catalogo} WHERE lower(label) LIKE 'cuenta de ahorro%'")
+
+
+@_migracion(12)
+def _esquema_12(conn):
+    """Comisión de las transferencias entre cuentas.
+
+    Una columna de texto vacía por defecto (= sin comisión), así que ninguna
+    transferencia existente cambia. La paga la cuenta de origen además de la
+    cantidad. Volver atrás es levantar la imagen anterior: la columna sobra y no
+    estorba a un código que no la lee.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(transferencias)")}
+    if "comision" not in columnas:
+        conn.execute("ALTER TABLE transferencias ADD COLUMN comision TEXT NOT NULL DEFAULT ''")
 
 
 def get_db() -> sqlite3.Connection:

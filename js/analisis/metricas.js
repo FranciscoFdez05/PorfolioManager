@@ -2866,6 +2866,13 @@ function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey
             nombre: t.concepto || (signo < 0 ? `Transferencia a ${otra}` : `Transferencia desde ${otra}`),
             importe: signo * val
         })
+
+        // La comisión sale de la cuenta de origen además de la cantidad.
+        const comision = parseEuroNumber(t.comision || "")
+        if (comision > 0 && t.origen === "banco") {
+            deltaPorDia[d] -= comision
+            movs[d].push({ nombre: `Comisión${t.concepto ? " · " + t.concepto : ""}`, importe: -comision })
+        }
     })
 
     const dayLabels = ["Inicio"]

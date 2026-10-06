@@ -8,7 +8,10 @@ su propia tabla (`transferencias`), y no cuentan en las cifras de gastos.
 
 Qué mueve el saldo de una cuenta:
 
-  * las transferencias que entran y salen de ella;
+  * las transferencias que entran y salen de ella. Una transferencia puede llevar
+    comisión: la cantidad es lo que recibe la cuenta de destino y lo que sale del
+    origen, y la comisión se anota **aparte** (`comisiones`) y se descuenta
+    también del origen, sin mezclarse con las salidas;
   * los ingresos que se registran como cobrados en ella y los gastos pagados con
     ella (`gastos_rows.cuenta` / `ingresos_rows.cuenta`; vacío = bancaria);
   * en la bancaria, además, las mensualidades y los ingresos recurrentes, que no
@@ -261,6 +264,19 @@ def modificar_cuenta(cuenta_id, nombre=None, saldo_inicial=None):
     return obtener_cuenta(cuenta_id, conn)
 
 
+@transactional
+def reordenar_cuentas(ids):
+    """Guarda el orden elegido por el usuario. Las cuentas que no vengan en `ids`
+    (creadas mientras tanto) se quedan al final, en su orden de siempre."""
+    conn = get_db()
+    existentes = [c["id"] for c in listar_cuentas(conn)]
+    pedidas = [i for i in dict.fromkeys(ids or []) if i in existentes]
+    resto = [i for i in existentes if i not in pedidas]
+    for orden, cuenta_id in enumerate(pedidas + resto, start=1):
+        conn.execute("UPDATE cuentas SET sort_order = ? WHERE id = ?", (orden, cuenta_id))
+    conn.commit()
+
+
 def _usos(cuenta_id, conn):
     # En las filas, la cuenta bancaria es el vacío; el resto, su identificador.
     total = conn.execute(
@@ -310,6 +326,7 @@ def _fila_a_transferencia(fila, nombres):
         "origen_nombre": nombres.get(fila["origen"], fila["origen"]),
         "destino_nombre": nombres.get(fila["destino"], fila["destino"]),
         "cantidad": fila["cantidad"],
+        "comision": fila["comision"],
         "concepto": fila["concepto"],
         "nota": fila["nota"],
     }
@@ -319,12 +336,25 @@ def listar_transferencias(conn=None):
     conn = conn or get_db()
     nombres = {c["id"]: c["nombre"] for c in listar_cuentas(conn)}
     filas = conn.execute(
-        "SELECT id, fecha, origen, destino, cantidad, concepto, nota FROM transferencias ORDER BY id"
+        "SELECT id, fecha, origen, destino, cantidad, comision, concepto, nota FROM transferencias ORDER BY id"
     ).fetchall()
     return [_fila_a_transferencia(f, nombres) for f in filas]
 
 
-def _preparar_transferencia(origen, destino, fecha, cantidad, concepto, nota, conn):
+def _comision(valor):
+    """Texto canónico de la comisión: vacío si no hay (o es 0), nunca negativa."""
+    if valor is None or str(valor).strip() == "":
+        return ""
+    try:
+        importe = aDecimal(valor, "comisión")
+    except ImporteInvalido:
+        raise CuentaInvalida("La comisión no es un número válido") from None
+    if importe < 0:
+        raise CuentaInvalida("La comisión no puede ser negativa")
+    return formatear_importe(importe) if importe else ""
+
+
+def _preparar_transferencia(origen, destino, fecha, cantidad, concepto, nota, comision, conn):
     ids = {c["id"] for c in listar_cuentas(conn)}
     origen = str(origen or "").strip() or ID_BANCO
     destino = str(destino or "").strip() or ID_BANCO
@@ -342,34 +372,37 @@ def _preparar_transferencia(origen, destino, fecha, cantidad, concepto, nota, co
         formatear_importe(importe),
         str(concepto or "").strip()[:120],
         str(nota or "").strip()[:300],
+        _comision(comision),
     )
 
 
 @transactional
-def crear_transferencia(origen, destino, fecha, cantidad, concepto="", nota=""):
+def crear_transferencia(origen, destino, fecha, cantidad, concepto="", nota="", comision=""):
     conn = get_db()
-    origen, destino, fecha, cantidad, concepto, nota = _preparar_transferencia(
-        origen, destino, fecha, cantidad, concepto, nota, conn
+    origen, destino, fecha, cantidad, concepto, nota, comision = _preparar_transferencia(
+        origen, destino, fecha, cantidad, concepto, nota, comision, conn
     )
     cursor = conn.execute(
-        "INSERT INTO transferencias (fecha, origen, destino, cantidad, concepto, nota) VALUES (?, ?, ?, ?, ?, ?)",
-        (fecha, origen, destino, cantidad, concepto, nota),
+        "INSERT INTO transferencias (fecha, origen, destino, cantidad, concepto, nota, comision) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (fecha, origen, destino, cantidad, concepto, nota, comision),
     )
     conn.commit()
     return next(t for t in listar_transferencias(conn) if t["id"] == cursor.lastrowid)
 
 
 @transactional
-def modificar_transferencia(transferencia_id, origen, destino, fecha, cantidad, concepto="", nota=""):
+def modificar_transferencia(transferencia_id, origen, destino, fecha, cantidad, concepto="", nota="", comision=""):
     conn = get_db()
     if not conn.execute("SELECT 1 FROM transferencias WHERE id = ?", (transferencia_id,)).fetchone():
         return None
-    origen, destino, fecha, cantidad, concepto, nota = _preparar_transferencia(
-        origen, destino, fecha, cantidad, concepto, nota, conn
+    origen, destino, fecha, cantidad, concepto, nota, comision = _preparar_transferencia(
+        origen, destino, fecha, cantidad, concepto, nota, comision, conn
     )
     conn.execute(
-        "UPDATE transferencias SET fecha = ?, origen = ?, destino = ?, cantidad = ?, concepto = ?, nota = ? WHERE id = ?",
-        (fecha, origen, destino, cantidad, concepto, nota, transferencia_id),
+        "UPDATE transferencias SET fecha = ?, origen = ?, destino = ?, cantidad = ?, concepto = ?, nota = ?, "
+        "comision = ? WHERE id = ?",
+        (fecha, origen, destino, cantidad, concepto, nota, comision, transferencia_id),
     )
     conn.commit()
     return next(t for t in listar_transferencias(conn) if t["id"] == transferencia_id)
@@ -398,13 +431,15 @@ def _ya_ocurrido(year, month, hoy):
 
 
 def saldos(conn=None, hoy=None):
-    """Saldo de cada cuenta a día de hoy: `{id: {inicial, entradas, salidas, saldo}}`."""
+    """Saldo de cada cuenta a día de hoy: `{id: {inicial, entradas, salidas, comisiones, saldo}}`."""
     conn = conn or get_db()
     hoy = hoy or datetime.date.today()
     cuentas = listar_cuentas(conn)
-    acumulado = {c["id"]: {"entradas": Decimal(0), "salidas": Decimal(0)} for c in cuentas}
+    acumulado = {
+        c["id"]: {"entradas": Decimal(0), "salidas": Decimal(0), "comisiones": Decimal(0)} for c in cuentas
+    }
 
-    for fila in conn.execute("SELECT fecha, origen, destino, cantidad FROM transferencias").fetchall():
+    for fila in conn.execute("SELECT fecha, origen, destino, cantidad, comision FROM transferencias").fetchall():
         year, month = _year_month(fila["fecha"])
         if year and not _ya_ocurrido(year, month, hoy):
             continue
@@ -413,6 +448,8 @@ def saldos(conn=None, hoy=None):
             acumulado[fila["destino"]]["entradas"] += importe
         if fila["origen"] in acumulado:
             acumulado[fila["origen"]]["salidas"] += importe
+            # La comisión se cuenta aparte: no es dinero que llegue a otra cuenta.
+            acumulado[fila["origen"]]["comisiones"] += _decimal(fila["comision"])
 
     for tabla, campo in (("ingresos_rows", "entradas"), ("gastos_rows", "salidas")):
         for fila in conn.execute(f"SELECT year, month, cantidad, cuenta FROM {tabla}").fetchall():
@@ -436,7 +473,8 @@ def saldos(conn=None, hoy=None):
             "inicial": inicial,
             "entradas": datos["entradas"],
             "salidas": datos["salidas"],
-            "saldo": inicial + datos["entradas"] - datos["salidas"],
+            "comisiones": datos["comisiones"],
+            "saldo": inicial + datos["entradas"] - datos["salidas"] - datos["comisiones"],
         }
     return resultado
 
@@ -467,8 +505,25 @@ def movimientos_de_cuenta(cuenta_id, conn=None):
             "month": t["month"],
             "nombre": t["concepto"],
             "cantidad": t["cantidad"],
+            "comision": t["comision"],
             "nota": t["nota"],
         })
+        # La comisión sale de la cuenta de origen como un movimiento propio, para
+        # que el saldo y las listas cuadren con lo que de verdad pagó esa cuenta.
+        if not entra and _decimal(t["comision"]) > 0:
+            movimientos.append({
+                "origen": "comision",
+                "id": t["id"],
+                "kind": "salida",
+                "contraparte_id": otra,
+                "contraparte": nombres.get(otra, otra),
+                "fecha": t["fecha"],
+                "year": t["year"],
+                "month": t["month"],
+                "nombre": f"Comisión · {t['concepto']}" if t["concepto"] else "Comisión",
+                "cantidad": t["comision"],
+                "nota": t["nota"],
+            })
 
     for tabla, origen, kind in (("ingresos_rows", "ingreso", "entrada"), ("gastos_rows", "gasto", "salida")):
         for fila in conn.execute(

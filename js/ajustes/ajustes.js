@@ -121,13 +121,9 @@ function _balancearAlMostrar(pageEl) {
     }, 700)
 }
 
-const _dragPlaceholder = (() => {
-    const el = document.createElement("div")
-    el.className = "ajustesDragPlaceholder"
-    return el
-})()
-
 let _dragSrc = null
+let _dragHome = null
+let _dragDropped = false
 
 const _HANDLE_SVG = `<svg viewBox="0 0 10 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="2.5" cy="2" r="1.5"/><circle cx="7.5" cy="2" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="14" r="1.5"/><circle cx="7.5" cy="14" r="1.5"/></svg>`
 
@@ -192,6 +188,8 @@ function _initColDrag(colEl, pageEl) {
 
         sec.addEventListener("dragstart", (e) => {
             _dragSrc = sec
+            _dragDropped = false
+            _dragHome = { parent: sec.parentElement, next: sec.nextElementSibling }
             e.dataTransfer.effectAllowed = "move"
             requestAnimationFrame(() => sec.classList.add("ajustesDragging"))
         })
@@ -199,8 +197,10 @@ function _initColDrag(colEl, pageEl) {
         sec.addEventListener("dragend", () => {
             sec.setAttribute("draggable", "false")
             sec.classList.remove("ajustesDragging")
-            _dragPlaceholder.remove()
+            // Arrastre cancelado: el panel vuelve a su sitio
+            if (!_dragDropped && _dragHome) _dragHome.parent.insertBefore(sec, _dragHome.next)
             _dragSrc = null
+            _dragHome = null
         })
     })
 
@@ -209,26 +209,20 @@ function _initColDrag(colEl, pageEl) {
         e.preventDefault()
         e.dataTransfer.dropEffect = "move"
 
-        const target = e.target.closest(".ajustesSection")
-        if (target && target !== _dragSrc && target.parentElement === colEl) {
-            const rect = target.getBoundingClientRect()
-            const before = e.clientY < rect.top + rect.height / 2
-            if (before) target.before(_dragPlaceholder)
-            else target.after(_dragPlaceholder)
-        } else if (!target || target === _dragSrc) {
-            const last = [...colEl.querySelectorAll(":scope > .ajustesSection")].filter((s) => s !== _dragSrc).pop()
-            if (last) last.after(_dragPlaceholder)
-            else colEl.prepend(_dragPlaceholder)
-        }
+        // El propio panel hace de previsión: se coloca en vivo en el hueco donde caerá.
+        const others = [...colEl.querySelectorAll(":scope > .ajustesSection")].filter((s) => s !== _dragSrc)
+        const reference = others.find((s) => {
+            const rect = s.getBoundingClientRect()
+            return e.clientY < rect.top + rect.height / 2
+        })
+        moveDraggedAssetPreview(colEl, _dragSrc, reference || null)
     })
 
     colEl.addEventListener("drop", (e) => {
         if (!_dragSrc) return
         e.preventDefault()
-        if (_dragPlaceholder.parentElement) {
-            _dragPlaceholder.replaceWith(_dragSrc)
-            _saveSectionOrder(pageEl)
-        }
+        _dragDropped = true
+        _saveSectionOrder(pageEl)
     })
 }
 

@@ -64,15 +64,21 @@ function cntRenderCuentas() {
     const suma = cntCuentas.reduce((acc, c) => acc + parseEuroNumber(c.saldo), 0)
     if (total) total.textContent = formatEuro(suma)
 
+    // Las comisiones van por su lado: no son entradas ni salidas de ninguna cuenta.
+    const comisiones = cntCuentas.reduce((acc, c) => acc + parseEuroNumber(c.comisiones), 0)
+    const totalComisiones = document.getElementById("cuentasComisiones")
+    if (totalComisiones) totalComisiones.textContent = formatEuro(comisiones)
+
     lista.innerHTML = cntCuentas
         .map((c) => {
             const saldo = parseEuroNumber(c.saldo)
             const entradas = parseEuroNumber(c.entradas)
             const salidas = parseEuroNumber(c.salidas)
+            const comisiones = parseEuroNumber(c.comisiones)
             const inicial = parseEuroNumber(c.saldo_inicial)
             const activa = c.id === cntFiltro
             return `
-                <div class="cntCuenta${activa ? " activa" : ""}" data-cuenta="${escapeGastosHtml(c.id)}" title="Ver solo los movimientos de esta cuenta">
+                <div class="cntCuenta${activa ? " activa" : ""}" data-cuenta="${escapeGastosHtml(c.id)}" draggable="true" title="Ver solo los movimientos de esta cuenta. Arrastra para reordenar">
                     <div class="cntCuentaCab">
                         <span class="cntCuentaNombre">${escapeGastosHtml(c.nombre)}</span>
                         <span class="cntTipo cntTipo-${escapeGastosHtml(c.tipo)}">${escapeGastosHtml(c.tipo_etiqueta || c.tipo)}</span>
@@ -89,11 +95,67 @@ function cntRenderCuentas() {
                     <div class="cntCuentaDetalle">
                         <span class="cuentasPos">${cntSigned(entradas)}</span>
                         <span class="cuentasNeg">${formatEuro(-salidas)}</span>
+                        ${comisiones ? `<span class="cuentasNeg" title="Comisiones pagadas por esta cuenta">Comisiones ${formatEuro(-comisiones)}</span>` : ""}
                         ${inicial ? `<span>Saldo inicial ${formatEuro(inicial)}</span>` : ""}
                     </div>
                 </div>`
         })
         .join("")
+}
+
+// Arrastrar y soltar como las tarjetas de Activos: la tarjeta se coloca en vivo
+// en el hueco donde caerá; al soltar se guarda el orden y, si se cancela, vuelve.
+function cntBindOrden(lista) {
+    if (!lista) return
+    let origen = null
+    let soltada = false
+
+    lista.addEventListener("dragstart", (event) => {
+        origen = event.target.closest?.(".cntCuenta") || null
+        if (!origen) return
+        soltada = false
+        event.dataTransfer.effectAllowed = "move"
+        event.dataTransfer.setData("text/plain", origen.dataset.cuenta)
+        // El estilo de hueco se aplica tras generar la imagen de arrastre.
+        const tarjeta = origen
+        requestAnimationFrame(() => tarjeta.classList.add("arrastrando"))
+    })
+
+    lista.addEventListener("dragend", () => {
+        origen?.classList.remove("arrastrando")
+        origen = null
+        if (!soltada) cntRenderCuentas()
+        soltada = false
+    })
+
+    lista.addEventListener("dragover", (event) => {
+        if (!origen) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = "move"
+        const siguiente = [...lista.querySelectorAll(".cntCuenta")]
+            .filter((c) => c !== origen)
+            .find((c) => {
+                const caja = c.getBoundingClientRect()
+                return event.clientY < caja.top + caja.height / 2
+            })
+        moveDraggedAssetPreview(lista, origen, siguiente || null)
+    })
+
+    lista.addEventListener("drop", async (event) => {
+        if (!origen) return
+        event.preventDefault()
+        soltada = true
+        const ids = [...lista.querySelectorAll(".cntCuenta")].map((el) => el.dataset.cuenta)
+        if (ids.join("|") === cntCuentas.map((c) => c.id).join("|")) return
+        try {
+            await Api.put("/api/cuentas/orden", { ids })
+            cntCuentas = ids.map((id) => cntCuentas.find((c) => c.id === id)).filter(Boolean)
+            window._cuentasDinero = cntCuentas
+        } catch (error) {
+            showError("No se pudo guardar el orden de las cuentas", error)
+            cntRenderCuentas()
+        }
+    })
 }
 
 function cntTipoOptions(actual = "exchange") {
@@ -201,7 +263,8 @@ function cntHead() {
         ["origen", "Origen"],
         ["destino", "Destino"],
         ["concepto", "Concepto"],
-        ["cantidad", "Cantidad", true]
+        ["cantidad", "Cantidad", true],
+        ["comision", "Comisión", true]
     ]
     const celdas = columnas
         .map(([key, label, num]) => {
@@ -226,7 +289,8 @@ function cntRenderTabla() {
         origen: (t) => t.origen_nombre || "",
         destino: (t) => t.destino_nombre || "",
         concepto: (t) => t.concepto || "",
-        cantidad: (t) => parseEuroNumber(t.cantidad)
+        cantidad: (t) => parseEuroNumber(t.cantidad),
+        comision: (t) => parseEuroNumber(t.comision)
     }
     const signo = cntSort.dir === "asc" ? 1 : -1
     const filas = [...cntTransferenciasVisibles()].sort((a, b) => {
@@ -245,6 +309,7 @@ function cntRenderTabla() {
                     <td>${escapeGastosHtml(t.destino_nombre)}</td>
                     <td title="${escapeGastosHtml(t.nota)}">${t.concepto ? escapeGastosHtml(t.concepto) : '<span class="cuentasSinConcepto">Sin concepto</span>'}</td>
                     <td class="numCell">${formatEuro(parseEuroNumber(t.cantidad))}</td>
+                    <td class="numCell">${parseEuroNumber(t.comision) > 0 ? `<span class="cuentasNeg">${formatEuro(parseEuroNumber(t.comision))}</span>` : '<span class="cuentasSinConcepto">—</span>'}</td>
                     <td class="rowActionsCell">
                         <div class="rowMenu">
                             <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
@@ -304,12 +369,15 @@ function cntAbrirModalTransferencia(transferencia = null) {
             <label class="assetModalLabel" for="cntTransCantidad">Cantidad</label>
             <input id="cntTransCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(transferencia?.cantidad || "")}" placeholder="0,00">
 
+            <label class="assetModalLabel" for="cntTransComision">Comisión <span class="assetModalLabelHint">opcional · la paga la cuenta de origen</span></label>
+            <input id="cntTransComision" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(transferencia?.comision || "")}" placeholder="0,00">
+
             <label class="assetModalLabel" for="cntTransConcepto">Concepto <span class="assetModalLabelHint">opcional</span></label>
             <input id="cntTransConcepto" class="assetModalInput" type="text" maxlength="120" value="${escapeGastosHtml(transferencia?.concepto || "")}" placeholder="Ej: Compra de cripto">
 
             <label class="assetModalLabel" for="cntTransNota">Nota <span class="assetModalLabelHint">opcional</span></label>
             <textarea id="cntTransNota" class="assetModalInput movNotaInput" rows="2" maxlength="300">${escapeGastosHtml(transferencia?.nota || "")}</textarea>
-            <p class="cuentasHint">Mover dinero entre tus cuentas no es un gasto ni un ingreso: no cuenta en Gastos, Ingresos ni en la tasa de ahorro.</p>
+            <p class="cuentasHint">Mover dinero entre tus cuentas no es un gasto ni un ingreso: no cuenta en Gastos, Ingresos ni en la tasa de ahorro. La comisión se suma a lo que sale de la cuenta de origen; la de destino recibe solo la cantidad.</p>
         `,
         submitLabel: "Guardar",
         onSubmit: async ({ getValue, setFeedback }) => {
@@ -318,6 +386,7 @@ function cntAbrirModalTransferencia(transferencia = null) {
                 destino: getValue("cntTransDestino"),
                 fecha: getValue("cntTransFecha").trim(),
                 cantidad: getValue("cntTransCantidad").trim(),
+                comision: getValue("cntTransComision").trim(),
                 concepto: getValue("cntTransConcepto").trim(),
                 nota: getValue("cntTransNota").trim()
             }
@@ -364,6 +433,7 @@ function cntDescargarCsv() {
         Destino: t.destino_nombre,
         Concepto: t.concepto,
         Cantidad: parseEuroNumber(t.cantidad),
+        Comision: parseEuroNumber(t.comision),
         Nota: t.nota || ""
     }))
     downloadCsvFile(`transferencias${cntYear ? "-" + cntYear : ""}.csv`, filas)
@@ -419,6 +489,8 @@ function cntBind() {
         if (event.target.closest("[data-cnt-editar]")) cntAbrirModalTransferencia(transferencia)
         else if (event.target.closest("[data-cnt-eliminar]")) cntEliminarTransferencia(transferencia)
     })
+
+    cntBindOrden(document.getElementById("cuentasLista"))
 
     document.getElementById("cuentasLista")?.addEventListener("click", (event) => {
         const tarjeta = event.target.closest("[data-cuenta]")

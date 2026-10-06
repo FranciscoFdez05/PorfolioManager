@@ -351,6 +351,7 @@ function getCuentaAhorroMovimientosDelAnio() {
 // De dónde viene o a dónde va un movimiento, en una frase.
 function describeCuentaAhorroMovimiento(m) {
     if (m.origen === "transferencia") return `${m.kind === "salida" ? "Hacia" : "Desde"} ${m.contraparte}`
+    if (m.origen === "comision") return `Comisión · hacia ${m.contraparte}`
     return `${m.origen === "gasto" ? "Gasto" : "Ingreso"}${m.contraparte ? " · " + m.contraparte : ""}`
 }
 
@@ -435,7 +436,7 @@ function renderCuentaAhorroTable() {
                             </div>`
                     : ""
                 return `
-                    <tr class="movDetailRow" data-origen="${m.origen}" data-id="${m.id}" data-kind="${m.kind}" data-contraparte="${escapeGastosHtml(m.contraparte_id || "")}" data-fecha="${escapeGastosHtml(m.fecha)}" data-cantidad="${escapeGastosHtml(m.cantidad)}" data-nombre="${escapeGastosHtml(m.nombre)}" data-nota="${escapeGastosHtml(m.nota)}">
+                    <tr class="movDetailRow" data-origen="${m.origen}" data-id="${m.id}" data-kind="${m.kind}" data-contraparte="${escapeGastosHtml(m.contraparte_id || "")}" data-fecha="${escapeGastosHtml(m.fecha)}" data-cantidad="${escapeGastosHtml(m.cantidad)}" data-comision="${escapeGastosHtml(m.comision || "")}" data-nombre="${escapeGastosHtml(m.nombre)}" data-nota="${escapeGastosHtml(m.nota)}">
                         <td>${escapeGastosHtml(m.fecha)}</td>
                         <td title="${escapeGastosHtml(m.nota)}">${m.nombre ? escapeGastosHtml(m.nombre) : '<span class="cuentaAhorroSinConcepto">Sin concepto</span>'}</td>
                         <td>${escapeGastosHtml(describeCuentaAhorroMovimiento(m))}</td>
@@ -719,6 +720,9 @@ function openCuentaAhorroMovimientoModal(edit = null) {
             <label class="assetModalLabel" for="cuentaAhorroMovCantidad">Cantidad</label>
             <input id="cuentaAhorroMovCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(edit?.cantidad || "")}" placeholder="0,00">
 
+            <label class="assetModalLabel" for="cuentaAhorroMovComision">Comisión <span class="assetModalLabelHint">opcional · la paga la cuenta de origen</span></label>
+            <input id="cuentaAhorroMovComision" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(edit?.comision || "")}" placeholder="0,00">
+
             <label class="assetModalLabel" for="cuentaAhorroMovNota">Nota <span class="assetModalLabelHint">opcional</span></label>
             <textarea id="cuentaAhorroMovNota" class="assetModalInput movNotaInput" rows="2" maxlength="300">${escapeGastosHtml(edit?.nota || "")}</textarea>
         `,
@@ -732,6 +736,7 @@ function openCuentaAhorroMovimientoModal(edit = null) {
                 fecha: getValue("cuentaAhorroMovFecha").trim(),
                 concepto: getValue("cuentaAhorroMovNombre").trim(),
                 cantidad: getValue("cuentaAhorroMovCantidad").trim(),
+                comision: getValue("cuentaAhorroMovComision").trim(),
                 nota: getValue("cuentaAhorroMovNota").trim()
             }
 

@@ -43,21 +43,17 @@
     cursor: grab;
 }
 
+/* Hueco de previsión: el panel arrastrado se coloca donde caerá, como las tarjetas de Activos */
 .ajustesSection.ajustesDragging {
-    opacity: 0.45;
     cursor: grabbing;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    border-style: dashed;
+    border-color: var(--accent);
+    background: var(--bg-elevated);
+    box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-.ajustesDragPlaceholder {
-    break-inside: avoid;
-    height: 3px;
-    background: var(--accent);
-    border-radius: 2px;
-    margin: 8px 0;
-    pointer-events: none;
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.55);
-    flex-shrink: 0;
+.ajustesSection.ajustesDragging > * {
+    opacity: 0.35;
 }
 
 /* Drag handle */

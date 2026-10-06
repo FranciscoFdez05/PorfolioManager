@@ -21,6 +21,7 @@ from stores.cuentas_store import (
     modificar_cuenta,
     modificar_transferencia,
     obtener_cuenta,
+    reordenar_cuentas,
     saldos,
 )
 
@@ -40,6 +41,7 @@ def _con_saldo(cuenta, calculados):
         "tipo_etiqueta": ETIQUETAS_TIPO.get(cuenta["tipo"], cuenta["tipo"]),
         "entradas": aTexto(datos["entradas"], decimales=2) if datos else "0.00",
         "salidas": aTexto(datos["salidas"], decimales=2) if datos else "0.00",
+        "comisiones": aTexto(datos["comisiones"], decimales=2) if datos else "0.00",
         "saldo": aTexto(datos["saldo"], decimales=2) if datos else "0.00",
     }
 
@@ -81,6 +83,16 @@ def addCuenta():
     return jsonify({"ok": True, "cuenta": cuenta}), 201
 
 
+@cuentas_bp.route("/api/cuentas/orden", methods=["PUT"])
+def ordenCuentas():
+    datos = request.get_json(silent=True) or {}
+    ids = datos.get("ids")
+    if not isinstance(ids, list):
+        return _error("Falta la lista de cuentas")
+    reordenar_cuentas([str(i) for i in ids])
+    return jsonify({"ok": True})
+
+
 @cuentas_bp.route("/api/cuentas/<cuenta_id>", methods=["PUT"])
 def editCuenta(cuenta_id):
     datos = request.get_json(silent=True) or {}
@@ -117,7 +129,7 @@ def addTransferencia():
     try:
         transferencia = crear_transferencia(
             datos.get("origen"), datos.get("destino"), datos.get("fecha"),
-            datos.get("cantidad"), datos.get("concepto"), datos.get("nota"),
+            datos.get("cantidad"), datos.get("concepto"), datos.get("nota"), datos.get("comision"),
         )
     except CuentaInvalida as error:
         return _error(error)
@@ -130,7 +142,7 @@ def editTransferencia(transferencia_id):
     try:
         transferencia = modificar_transferencia(
             transferencia_id, datos.get("origen"), datos.get("destino"), datos.get("fecha"),
-            datos.get("cantidad"), datos.get("concepto"), datos.get("nota"),
+            datos.get("cantidad"), datos.get("concepto"), datos.get("nota"), datos.get("comision"),
         )
     except CuentaInvalida as error:
         return _error(error)

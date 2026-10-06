@@ -173,6 +173,19 @@
     border-color: var(--btn-border-hover);
 }
 
+/* Hueco de previsión: la tarjeta arrastrada se coloca donde caerá, como en Activos */
+.cntCuenta.arrastrando {
+    cursor: grabbing;
+    border-style: dashed;
+    border-color: var(--accent);
+    background: var(--bg-elevated);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.cntCuenta.arrastrando > * {
+    opacity: 0.35;
+}
+
 .cntCuenta.activa {
     border-color: var(--btn-active-border);
     background: var(--btn-active-bg);
