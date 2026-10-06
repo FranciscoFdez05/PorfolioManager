@@ -34,14 +34,14 @@
 
         <aside class="cuentasSide">
             <div class="summaryCard cuentasTotalCard">
-                <div class="summaryCardTitle">Total en cuentas</div>
-                <div class="summaryCardValue" id="cuentasTotal">—</div>
-                <p class="cuentasTotalNota">Suma de todas las cuentas a día de hoy. La bancaria incluye lo apuntado en Gastos e Ingresos.</p>
-            </div>
-            <div class="summaryCard cuentasComisionesCard">
-                <div class="summaryCardTitle">Comisiones pagadas</div>
-                <div class="summaryCardValue cuentasNeg" id="cuentasComisiones">—</div>
-                <p class="cuentasTotalNota">Suma de las comisiones de las transferencias. Van aparte del importe: la cuenta de destino recibe la cantidad entera.</p>
+                <div class="cuentasTotalBloque" title="Suma de todas las cuentas a día de hoy. La bancaria incluye lo apuntado en Gastos e Ingresos.">
+                    <div class="summaryCardTitle">Total en cuentas</div>
+                    <div class="summaryCardValue" id="cuentasTotal">—</div>
+                </div>
+                <div class="cuentasTotalBloque" title="Suma de las comisiones de las transferencias. Van aparte del importe: la cuenta de destino recibe la cantidad entera.">
+                    <div class="summaryCardTitle">Comisiones pagadas</div>
+                    <div class="summaryCardValue cuentasNeg" id="cuentasComisiones">—</div>
+                </div>
             </div>
             <div class="cuentasLista" id="cuentasLista"></div>
         </aside>

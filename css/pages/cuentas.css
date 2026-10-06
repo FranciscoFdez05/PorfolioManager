@@ -142,11 +142,15 @@
     gap: 12px;
 }
 
-.cuentasTotalNota {
-    margin: 0;
-    font-size: 12px;
-    line-height: 1.4;
-    color: var(--text-muted);
+/* El total y las comisiones comparten bloque, uno a cada lado. */
+.cuentasTotalCard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.cuentasTotalBloque {
+    min-width: 0;
 }
 
 .cuentasLista {

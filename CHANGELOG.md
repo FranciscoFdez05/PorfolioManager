@@ -30,6 +30,9 @@ decide cómo se deshace la actualización:
   vivo en el hueco donde va a caer (con borde discontinuo), como las tarjetas de
   Activos, en lugar de la línea azul de antes. Si se suelta fuera de una columna,
   el panel vuelve a su sitio.
+- Cuentas: «Total en cuentas» y «Comisiones pagadas» comparten un mismo bloque
+  arriba del lateral, uno a cada lado, y sin el texto explicativo (queda como
+  ayuda al pasar el ratón). Cada cuenta sigue en su bloque independiente.
 
 ## [3.2.1] — 2026-10-06
 
@@ -42,7 +45,7 @@ existente cambia.
   de destino recibe 149 y las comisiones suman 1,49. La comisión se descuenta
   además del saldo de la cuenta de origen.
 - Se refleja en Cuentas (columna nueva «Comisión», campo en el formulario y en el
-  CSV, una tarjeta «Comisiones pagadas» y el detalle de cada cuenta, separado de
+  CSV, el total de comisiones pagadas y el detalle de cada cuenta, separado de
   entradas y salidas), en la lista de movimientos de la cuenta de ahorro (como un
   movimiento «Comisión · hacia …») y en la curva del saldo mensual de Métricas.
 
