@@ -202,11 +202,12 @@ function cntAbrirModalCuenta(cuenta = null) {
             <input id="cntCuentaSaldo" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(cuenta ? cntSaldoInicialTexto(cuenta) : "")}" placeholder="0,00">
             <p class="cuentasHint">Lo que ya había en la cuenta antes de empezar a apuntar movimientos. Las cuentas de ahorro aparecen también en la ventana Cuenta de ahorro.</p>
 
-            <p class="cuentasHint">${
-                cuenta?.remunerada
-                    ? "Es una cuenta remunerada: sus intereses (Finanzas › Cuenta Remunerada) se suman a su saldo."
-                    : "Para que sea remunerada o de ahorro, elígela en Finanzas › Cuenta Remunerada o Cuenta de ahorro."
-            }</p>
+            <label class="assetModalLabel">Cuenta remunerada</label>
+            <label class="cuentaAhorroCheck">
+                <input id="cntCuentaRemunerada" type="checkbox"${cuenta?.remunerada ? " checked" : ""}>
+                <span>Esta cuenta es remunerada</span>
+            </label>
+            <p class="cuentasHint">Sus intereses (Finanzas › Cuenta Remunerada) se suman al saldo. Al desmarcarla se conservan los intereses apuntados, sin vincular.</p>
 
             <label class="assetModalLabel">Dividendos</label>
             <label class="cuentaAhorroCheck">
@@ -222,9 +223,16 @@ function cntAbrirModalCuenta(cuenta = null) {
                 saldoInicial: getValue("cntCuentaSaldo").trim(),
                 dividendos: Boolean(modal.querySelector("#cntCuentaDividendos")?.checked)
             }
+            const remunerada = Boolean(modal.querySelector("#cntCuentaRemunerada")?.checked)
             try {
-                if (cuenta) await Api.put(`/api/cuentas/${encodeURIComponent(cuenta.id)}`, cuerpo)
-                else await Api.post("/api/cuentas", { ...cuerpo, tipo: getValue("cntCuentaTipo") })
+                if (cuenta) {
+                    if (remunerada && !cuenta.remunerada) cuerpo.remunerada = await cntCrearRemunerada(cuerpo.nombre)
+                    else if (!remunerada && cuenta.remunerada) cuerpo.remunerada = ""
+                    await Api.put(`/api/cuentas/${encodeURIComponent(cuenta.id)}`, cuerpo)
+                } else {
+                    if (remunerada) cuerpo.remunerada = await cntCrearRemunerada(cuerpo.nombre)
+                    await Api.post("/api/cuentas", { ...cuerpo, tipo: getValue("cntCuentaTipo") })
+                }
                 await cntRecargar()
                 cntRender()
                 return true
@@ -234,6 +242,16 @@ function cntAbrirModalCuenta(cuenta = null) {
             }
         }
     })
+}
+
+// Da de alta una remunerada sin vincular (con el nombre de la cuenta) y devuelve
+// su id; el vínculo lo hace luego el guardado de la cuenta.
+async function cntCrearRemunerada(nombre) {
+    const data = await Api.get("/api/intereses")
+    const cuentas = Array.isArray(data?.cuentas) ? data.cuentas : []
+    const id = "cuenta-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+    await Api.post("/api/intereses", { cuentas: [...cuentas, { id, nombre, cuenta: "", rows: [] }] })
+    return id
 }
 
 function cntSaldoInicialTexto(cuenta) {

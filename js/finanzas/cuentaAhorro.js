@@ -40,6 +40,7 @@ let cuentaAhorroChartData = null
 // Orden de cada tabla; se mantiene al cambiar de año, de cuenta o de pestaña.
 const cuentaAhorroSort = {
     movimientos: { key: "fecha", dir: "desc" },
+    gastos: { key: "fecha", dir: "desc" },
     rendimientos: { key: "fecha", dir: "desc" }
 }
 
@@ -345,9 +346,14 @@ function formatCuentaAhorroSigned(value) {
     return (value > 0 ? "+" : "") + formatEuro(value)
 }
 
-function getCuentaAhorroMovimientosDelAnio() {
+// Transferencias entre cuentas (y sus comisiones) o gastos e ingresos pagados y cobrados en la cuenta.
+function esCuentaAhorroGastoIngreso(m) {
+    return m.origen === "gasto" || m.origen === "ingreso"
+}
+
+function getCuentaAhorroMovimientosDelAnio(gastos = cuentaAhorroTab === "gastos") {
     return getCuentaAhorroMovs()
-        .filter((m) => m.year === cuentaAhorroYear)
+        .filter((m) => m.year === cuentaAhorroYear && esCuentaAhorroGastoIngreso(m) === gastos)
         .sort((a, b) => parseCuentaAhorroSortKey(b.fecha) - parseCuentaAhorroSortKey(a.fecha) || b.id - a.id)
 }
 
@@ -404,7 +410,8 @@ function renderCuentaAhorroTable() {
     const syncEmpty = (isEmpty) =>
         empty.closest(".cuentaAhorroTableWrapper")?.classList.toggle("cuentaAhorroVacio", isEmpty)
 
-    if (cuentaAhorroTab === "movimientos") {
+    if (cuentaAhorroTab === "movimientos" || cuentaAhorroTab === "gastos") {
+        const gastosTab = cuentaAhorroTab === "gastos"
         head.innerHTML = buildCuentaAhorroHead(
             [
                 { key: "fecha", label: "Fecha" },
@@ -449,7 +456,9 @@ function renderCuentaAhorroTable() {
             })
             .join("")
 
-        empty.textContent = `No hay movimientos de esta cuenta en ${cuentaAhorroYear}.`
+        empty.textContent = gastosTab
+            ? `No hay gastos ni ingresos de esta cuenta en ${cuentaAhorroYear}.`
+            : `No hay movimientos entre cuentas en ${cuentaAhorroYear}.`
         empty.classList.toggle("hidden", rows.length > 0)
         syncEmpty(rows.length === 0)
         return

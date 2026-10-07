@@ -65,6 +65,12 @@ vinculadas a cualquier cuenta.
   remunerada y, en la que los cobra, los **dividendos** pasados a euros (hasta
   el mes actual). La tarjeta los desglosa. Antes solo los sumaba la ventana
   Cuenta de ahorro y las dos cifras de la misma cuenta no coincidían.
+- Cuentas › Nueva/Editar cuenta: casilla **Cuenta remunerada**. Al marcarla se
+  crea una remunerada con el nombre de la cuenta y se vincula a ella; al
+  desmarcarla se desvincula y se conservan los intereses apuntados.
+- Cuenta de ahorro: nueva pestaña **Gastos e ingresos**, con los gastos e
+  ingresos pagados y cobrados en la cuenta. Movimientos queda solo para las
+  transferencias entre cuentas y sus comisiones.
 
 ### Cambiado
 
@@ -73,6 +79,8 @@ vinculadas a cualquier cuenta.
   se pasan solos a la base al abrir Cuentas o Cuenta de ahorro; si una cuenta
   tenía varias remuneradas, se queda con la primera. Lo mismo con la casilla
   «Incluir los dividendos», que pasa a ser la de la cuenta.
+- Cuenta de ahorro: la tabla se ajusta al contenido (sin altura mínima) y la
+  columna del concepto tiene un ancho propio.
 
 ### Corregido
 

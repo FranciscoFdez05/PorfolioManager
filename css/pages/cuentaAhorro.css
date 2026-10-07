@@ -50,7 +50,7 @@
 }
 
 .cuentaAhorroTableWrapper {
-    min-height: 120px;
+    min-height: 0;
 }
 
 .cuentaAhorroTableWrapper .overviewEmpty {
@@ -60,9 +60,16 @@
 
 /* Gastos fija 170/360/260/180 px por columna, que aquí no caben junto a los
    extractos: el concepto se queda con el ancho sobrante. */
+#cuentaAhorroTable {
+    table-layout: auto;
+}
 #cuentaAhorroTable thead th,
 #cuentaAhorroTable tbody td {
     width: auto;
+}
+#cuentaAhorroTable thead th:nth-child(2),
+#cuentaAhorroTable tbody td:nth-child(2) {
+    width: 30%;
 }
 #cuentaAhorroTable thead th:first-child,
 #cuentaAhorroTable tbody td:first-child {
