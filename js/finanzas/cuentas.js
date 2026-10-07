@@ -75,6 +75,8 @@ function cntRenderCuentas() {
             const entradas = parseEuroNumber(c.entradas)
             const salidas = parseEuroNumber(c.salidas)
             const comisiones = parseEuroNumber(c.comisiones)
+            const intereses = parseEuroNumber(c.intereses)
+            const dividendos = parseEuroNumber(c.dividendos_cobrados)
             const inicial = parseEuroNumber(c.saldo_inicial)
             const activa = c.id === cntFiltro
             return `
@@ -86,7 +88,7 @@ function cntRenderCuentas() {
                             <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                             <div class="rowMenuDropdown">
                                 <button type="button" class="rowMenuItem" data-cnt-editar-cuenta>Editar</button>
-                                ${c.tipo === "ahorro" ? '<button type="button" class="rowMenuItem" data-cnt-abrir-ahorro>Abrir cuenta de ahorro</button>' : ""}
+                                ${c.ahorro ? '<button type="button" class="rowMenuItem" data-cnt-abrir-ahorro>Abrir cuenta de ahorro</button>' : ""}
                                 ${c.protegida ? "" : '<hr><button type="button" class="rowMenuItem rowMenuItemDanger" data-cnt-eliminar-cuenta>Eliminar</button>'}
                             </div>
                         </div>
@@ -98,9 +100,25 @@ function cntRenderCuentas() {
                         ${comisiones ? `<span class="cuentasNeg" title="Comisiones pagadas por esta cuenta">Comisiones ${formatEuro(-comisiones)}</span>` : ""}
                         ${inicial ? `<span>Saldo inicial ${formatEuro(inicial)}</span>` : ""}
                     </div>
+                    ${intereses || dividendos ? `<div class="cntCuentaDetalle">
+                        ${intereses ? `<span class="cuentasPos" title="Intereses netos de la cuenta remunerada vinculada">Intereses ${cntSigned(intereses)}</span>` : ""}
+                        ${dividendos ? `<span class="cuentasPos" title="Dividendos cobrados, en euros">Dividendos ${cntSigned(dividendos)}</span>` : ""}
+                    </div>` : ""}
+                    ${cntVinculosTexto(c)}
                 </div>`
         })
         .join("")
+}
+
+// Los papeles de la cuenta: de ahorro, remunerada y
+// la que cobra los dividendos.
+function cntVinculosTexto(cuenta) {
+    const partes = []
+    if (cuenta.ahorro) partes.push("Cuenta de ahorro")
+    if (cuenta.remunerada) partes.push("Remunerada")
+    if (cuenta.dividendos) partes.push("Dividendos")
+    if (!partes.length) return ""
+    return `<div class="cntCuentaRemunerada" title="Papeles de esta cuenta">${escapeGastosHtml(partes.join(" · "))}</div>`
 }
 
 // Arrastrar y soltar como las tarjetas de Activos: la tarjeta se coloca en vivo
@@ -167,8 +185,9 @@ function cntTipoOptions(actual = "exchange") {
         .join("")
 }
 
-// Sin `cuenta` crea una; con ella, edita el nombre y el saldo inicial (el tipo
-// no se cambia: una cuenta de ahorro que pasara a exchange saldría de su ventana).
+// Sin `cuenta` crea una; con ella, edita el nombre, el saldo inicial y si cobra
+// los dividendos (el tipo no se cambia). Que sea remunerada o de ahorro se
+// decide en sus ventanas, eligiendo allí esta cuenta.
 function cntAbrirModalCuenta(cuenta = null) {
     openGastosCreateModal({
         title: cuenta ? "Editar cuenta" : "Nueva cuenta",
@@ -182,12 +201,26 @@ function cntAbrirModalCuenta(cuenta = null) {
             <label class="assetModalLabel" for="cntCuentaSaldo">Saldo inicial <span class="assetModalLabelHint">opcional</span></label>
             <input id="cntCuentaSaldo" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(cuenta ? cntSaldoInicialTexto(cuenta) : "")}" placeholder="0,00">
             <p class="cuentasHint">Lo que ya había en la cuenta antes de empezar a apuntar movimientos. Las cuentas de ahorro aparecen también en la ventana Cuenta de ahorro.</p>
+
+            <p class="cuentasHint">${
+                cuenta?.remunerada
+                    ? "Es una cuenta remunerada: sus intereses (Finanzas › Cuenta Remunerada) se suman a su saldo."
+                    : "Para que sea remunerada o de ahorro, elígela en Finanzas › Cuenta Remunerada o Cuenta de ahorro."
+            }</p>
+
+            <label class="assetModalLabel">Dividendos</label>
+            <label class="cuentaAhorroCheck">
+                <input id="cntCuentaDividendos" type="checkbox"${cuenta?.dividendos ? " checked" : ""}>
+                <span>Cobrar en esta cuenta los dividendos de mis activos</span>
+            </label>
+            <p class="cuentasHint">Se suman al saldo de la cuenta, pasados a euros.</p>
         `,
         submitLabel: "Guardar",
-        onSubmit: async ({ getValue, setFeedback }) => {
+        onSubmit: async ({ modal, getValue, setFeedback }) => {
             const cuerpo = {
                 nombre: getValue("cntCuentaNombre").trim(),
-                saldoInicial: getValue("cntCuentaSaldo").trim()
+                saldoInicial: getValue("cntCuentaSaldo").trim(),
+                dividendos: Boolean(modal.querySelector("#cntCuentaDividendos")?.checked)
             }
             try {
                 if (cuenta) await Api.put(`/api/cuentas/${encodeURIComponent(cuenta.id)}`, cuerpo)
@@ -212,8 +245,9 @@ function cntSaldoInicialTexto(cuenta) {
 function cntEliminarCuenta(cuenta) {
     openConfirmModal({
         title: "Eliminar cuenta",
-        message: `Vas a eliminar la cuenta «${cuenta.nombre}». Solo se puede si no tiene movimientos.`,
+        message: `Vas a eliminar la cuenta «${cuenta.nombre}». Solo se puede si no tiene movimientos. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
+        requireText: cuenta.nombre,
         onConfirm: async () => {
             try {
                 await Api.del(`/api/cuentas/${encodeURIComponent(cuenta.id)}`)

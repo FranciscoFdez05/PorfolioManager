@@ -30,7 +30,8 @@ def test_sin_configurar_devuelve_no_configurado(cliente):
 
     assert datos["ok"] is True
     assert datos["configurado"] is False
-    assert datos["token"] == ""
+    assert datos["hayToken"] is False
+    assert "token" not in datos
     assert datos["chatId"] == ""
 
 
@@ -55,7 +56,10 @@ def test_guardar_y_leer_config(cliente):
 
     datos = client.get("/api/settings/telegram").get_json()
     assert datos["configurado"] is True
-    assert datos["token"] == "123456:ABC-token"
+    # Solo la máscara: el token entero ya no sale hacia el navegador.
+    assert "token" not in datos
+    assert datos["hayToken"] is True
+    assert "123456:ABC-token" not in str(datos)
     assert datos["chatId"] == "987654321"
 
 
@@ -184,3 +188,16 @@ def test_guardar_otros_ajustes_no_borra_los_avisos_elegidos(cliente):
     datos = client.get("/api/settings/telegram").get_json()
     assert {a["clave"]: a["activo"] for a in datos["avisos"]}["backup"] is False
     assert datos["resumenHora"] == 7
+
+
+def test_guardar_con_el_token_vacio_conserva_el_guardado(cliente):
+    """El formulario ya no recibe el token: vacío significa «el que hay»."""
+    from core import telegram_notifier
+
+    client, cabeceras, _rutas = cliente
+    client.post("/api/settings/telegram", json={"token": "123456:ABC-token", "chatId": "1"}, headers=cabeceras)
+
+    respuesta = client.post("/api/settings/telegram", json={"token": "", "chatId": "2"}, headers=cabeceras)
+
+    assert respuesta.get_json()["ok"] is True
+    assert telegram_notifier.leerConfig() == ("123456:ABC-token", "2")

@@ -289,20 +289,20 @@ function buildTransaccionRow(row) {
         ""
     tr.dataset.transaccionId = row.id
     tr.innerHTML = `
-        <td>${row.fechaOperacion || ""}</td>
+        <td>${escapeHtml(row.fechaOperacion)}</td>
         <td>${formatTransaccionesNumber(row.total)}</td>
         <td>${formatTransaccionesNumber(row.comisionRed)}</td>
         <td>${walletLabel}</td>
         <td>${escapeHtml(row.walletDestino || "")}</td>
-        <td class="transaccionHashCell" data-full-value="${escapeHtml(hashTransaccion)}" title="Haz clic para copiar el hash completo">${formatHashTransaccionDisplay(hashTransaccion)}</td>
+        <td class="transaccionHashCell" data-full-value="${escapeHtml(hashTransaccion)}" title="Haz clic para copiar el hash completo">${escapeHtml(formatHashTransaccionDisplay(hashTransaccion))}</td>
         <td>${escapeHtml(row.nota || "")}</td>
         <td class="rowActionsCell">
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
-                    <button type="button" class="rowMenuItem assetRowEditBtn transaccionRowEditBtn avActionBtn avEditBtn" data-row-id="${row.id}">Editar</button>
+                    <button type="button" class="rowMenuItem assetRowEditBtn transaccionRowEditBtn avActionBtn avEditBtn" data-row-id="${escapeHtml(row.id)}">Editar</button>
                     <hr>
-                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn transaccionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${row.id}">Eliminar</button>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn transaccionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${escapeHtml(row.id)}">Eliminar</button>
                 </div>
             </div>
         </td>
@@ -467,21 +467,21 @@ function openTransaccionRowModal(rowId) {
 
     const walletOptions = TRANSACCION_WALLET_OPTIONS.map(
         (opt) =>
-            `<option value="${opt.value}"${rowData.walletTipo === opt.value ? " selected" : ""}>${opt.label}</option>`
+            `<option value="${escapeHtml(opt.value)}"${rowData.walletTipo === opt.value ? " selected" : ""}>${escapeHtml(opt.label)}</option>`
     ).join("")
 
     const fieldsHtml = `
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Fecha operación</label>
-            <input id="txModalFecha" class="assetRowModalInput" type="text" value="${rowData.fechaOperacion || ""}" placeholder="dd-mm-aaaa">
+            <input id="txModalFecha" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.fechaOperacion)}" placeholder="dd-mm-aaaa">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Total cripto</label>
-            <input id="txModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.total || ""}">
+            <input id="txModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.total)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Comisión red</label>
-            <input id="txModalComision" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.comisionRed || ""}">
+            <input id="txModalComision" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.comisionRed)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Wallet</label>
@@ -491,15 +491,15 @@ function openTransaccionRowModal(rowId) {
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Wallet destino</label>
-            <input id="txModalWalletDestino" class="assetRowModalInput" type="text" value="${rowData.walletDestino || ""}">
+            <input id="txModalWalletDestino" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.walletDestino)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Hash transacción</label>
-            <input id="txModalHash" class="assetRowModalInput" type="text" value="${rowData.hashTransaccion || ""}">
+            <input id="txModalHash" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.hashTransaccion)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Nota</label>
-            <input id="txModalNota" class="assetRowModalInput" type="text" value="${rowData.nota || ""}">
+            <input id="txModalNota" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.nota)}">
         </div>
     `
 

@@ -40,8 +40,11 @@ function scriptsDeLaPagina() {
 let fallo = null
 
 beforeAll(() => {
-    // Chart.js se carga del CDN en la página; aquí basta con que exista.
+    // Chart.js se carga de js/vendor en la página; aquí basta con que exista
+    // con lo que los módulos usan al cargarse (app-core.js registra su plugin
+    // de crosshair con Chart.register).
     globalThis.Chart = class {
+        static register() {}
         destroy() {}
         update() {}
     }

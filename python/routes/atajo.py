@@ -11,16 +11,16 @@ no puede mantener una cookie.
     POST /api/atajo/acceso      firma exigida o no, y desde qué redes se acepta
     GET  /api/atajo/descargar   el fichero .shortcut para el iPhone
 
-**Por qué la descarga pide sesión** aunque el fichero no lleve secretos dentro:
-contiene la dirección por la que se entra al servidor, y no hay razón para
-regalarla a quien pase por el puerto.
+**Por qué la descarga pide sesión:** el fichero lleva dentro el token de
+dispositivo (`X-Atajo-Token`), que es lo que autoriza al Atajo a apuntar
+movimientos. Es un secreto, y quien lo tenga puede escribir desde la LAN.
 """
 
 import logging
 
 from flask import Blueprint, jsonify, make_response, request
 
-from core import atajo, atajo_acceso, atajo_shortcut, red_local, tls
+from core import atajo, atajo_acceso, atajo_shortcut, firma_hmac, red_local, tls
 from core.errors import ValidationError
 
 log = logging.getLogger(__name__)
@@ -53,7 +53,11 @@ def _comoTeVeElServidor() -> dict:
     entonces esto es la única barrera que queda—.
     """
     ip = red_local.obtenerIpCliente()
-    return {"ip": ip or "desconocida", "permitida": red_local.ipEstaPermitida(ip)}
+    return {
+        "ip": ip or "desconocida",
+        "permitida": red_local.ipEstaPermitida(ip),
+        "redInterna": red_local.pareceRedInternaDeDocker(ip),
+    }
 
 
 @atajo_bp.route("/api/atajo", methods=["GET"])
@@ -107,12 +111,26 @@ def post_clave():
     """Genera la clave de firma, o la rehace si ya había una.
 
     No pide confirmación aquí: la pide la interfaz, que es donde se puede
-    explicar qué implica. Rehacerla invalida las firmas en vuelo —ninguna, en la
-    práctica: viven segundos— pero no obliga a rehacer el Atajo del iPhone,
-    porque el Atajo no guarda la clave.
+    explicar qué implica. Rehacerla cambia el token de dispositivo que va dentro
+    del Atajo, así que **revoca el Atajo instalado**: hay que volver a
+    descargarlo. Es la forma de dejar fuera a un iPhone perdido.
     """
     fichero = atajo.generarClave()
     return jsonify({"ok": True, "verTe": _comoTeVeElServidor(), "fichero": fichero, **atajo.estado(_urlBase())})
+
+
+@atajo_bp.route("/api/atajo/token", methods=["POST"])
+def post_token():
+    """El token de dispositivo, para montar el Atajo a mano.
+
+    POST y no GET: pasa por el CSRF, no se queda en el historial ni en cachés, y
+    solo sale cuando alguien pulsa «Mostrar» (no viaja con cada carga del panel).
+    """
+    try:
+        token = firma_hmac.tokenDispositivo()
+    except firma_hmac.ErrorFirma as error:
+        return jsonify({"ok": False, "error": error.mensaje}), error.status
+    return jsonify({"ok": True, "cabecera": firma_hmac.CABECERA_TOKEN, "token": token})
 
 
 @atajo_bp.route("/api/atajo/prueba", methods=["POST"])
@@ -128,7 +146,17 @@ def get_descargar():
     `application/octet-stream` a propósito: con un tipo que iOS crea saber
     mostrar, Safari lo abre como texto en vez de ofrecer «Abrir en Atajos».
     """
-    cuerpo = atajo_shortcut.construir(_urlBase())
+    token = ""
+    if atajo_acceso.exigirFirma():
+        try:
+            token = firma_hmac.tokenDispositivo()
+        except firma_hmac.ErrorFirma:
+            # Sin clave no hay token, y un Atajo sin token fallaría en la primera
+            # llamada: mejor decirlo aquí que descargar un fichero inútil.
+            raise ValidationError(
+                "Genera primero la clave de firma: el Atajo lleva dentro un token derivado de ella."
+            ) from None
+    cuerpo = atajo_shortcut.construir(_urlBase(), token)
 
     respuesta = make_response(cuerpo)
     respuesta.headers["Content-Type"] = "application/octet-stream"

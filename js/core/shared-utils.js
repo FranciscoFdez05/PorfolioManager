@@ -41,8 +41,7 @@ function nombreDeCuenta(id) {
 
 // Selector «Cuenta» de los popups: la bancaria primero y vacía, después las demás.
 function construirSelectorCuenta(selectId, actual = "") {
-    const esc = (texto) =>
-        String(texto).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+    const esc = escapeHtml
     const opciones = window._cuentasDinero
         .filter((cuenta) => cuenta.id !== "banco")
         .map((cuenta) => {
@@ -988,6 +987,8 @@ function _buildCustomSelect(select) {
     }
 
     function chooseOption(opt) {
+        // Una opción deshabilitada se enseña (dice por qué no vale), pero no se elige.
+        if (opt.disabled) return
         select.value = opt.value
         select.dispatchEvent(new Event("change", { bubbles: true }))
         syncLabel()
@@ -1000,7 +1001,7 @@ function _buildCustomSelect(select) {
         Array.from(select.options).forEach((opt) => {
             if (!opt.value && !opt.text.trim()) return
             const item = document.createElement("div")
-            item.className = "csOption" + (opt.selected ? " csSelected" : "")
+            item.className = "csOption" + (opt.selected ? " csSelected" : "") + (opt.disabled ? " csDisabled" : "")
             item.dataset.val = opt.value
             item.textContent = opt.text
             item.addEventListener("mousedown", (e) => {
@@ -1194,8 +1195,7 @@ function agruparImportes(filas, claveFn) {
 }
 
 function buildDistribucionHtml(titulo, partes, textoVacio = "Sin movimientos este mes") {
-    const esc = (texto) =>
-        String(texto).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+    const esc = escapeHtml
     const cabecera = `<div class="movResumenTitulo">${esc(titulo)}</div>`
 
     const ordenadas = (partes || []).filter((p) => p.value > 0).sort((a, b) => b.value - a.value)

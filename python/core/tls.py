@@ -42,9 +42,11 @@ que activar el HTTPS no mueve la dirección: `http://IP:5000` pasa a ser
 `https://IP:5000`. Y ese puerto deja de aceptar texto plano, que era el objetivo.
 """
 
+import ipaddress
 import json
 import logging
 import os
+import re
 import socket
 import ssl
 import time
@@ -54,6 +56,7 @@ import urllib.request
 from datetime import UTC, datetime
 
 from core import paths, settings
+from core.escritura import escribirJsonAtomico
 
 log = logging.getLogger(__name__)
 
@@ -128,12 +131,10 @@ def guardarEstado(activado: bool, nombres: list[str]) -> dict:
         "nombres": list(nombres),
         "actualizado": datetime.now(UTC).isoformat(timespec="seconds"),
     }
-    TLS_DIR.mkdir(parents=True, exist_ok=True)
     # Escritura atómica: un corte de corriente a medias dejaría un JSON truncado,
-    # y este fichero decide si las cookies salen con Secure.
-    tmp = ESTADO_FILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(estado, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(ESTADO_FILE)
+    # y este fichero decide si las cookies salen con Secure. Temporal único por
+    # proceso e hilo (core.escritura), no un `.json.tmp` fijo.
+    escribirJsonAtomico(ESTADO_FILE, estado)
     return estado
 
 
@@ -170,11 +171,34 @@ def normalizarNombres(nombres) -> list[str]:
         # que Caddy montase un sitio en un puerto que no está publicado.
         if nombre.count(":") == 1:
             nombre = nombre.split(":")[0]
-        if not nombre or any(c in nombre for c in " \t\"'{}"):
+        nombre = nombre.strip("[]")
+        # Lista blanca y no negra: el nombre acaba escrito tal cual en el
+        # Caddyfile, y filtrar solo espacios, comillas y llaves dejaba pasar
+        # saltos de línea, «#» y cualquier otra cosa que Caddy interprete.
+        if not _esNombreValido(nombre):
             continue
         if nombre not in limpios:
             limpios.append(nombre)
     return limpios
+
+
+# Etiquetas de un nombre de host (letras, dígitos y guion; el guion bajo se
+# admite porque hay nombres de LAN que lo usan), opcionalmente con un comodín
+# delante («*.casa.lan»), que Caddy entiende.
+_RE_NOMBRE_HOST = re.compile(
+    r"^(\*\.)?(?=.{1,253}$)[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?(?:\.[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?)*$"
+)
+
+
+def _esNombreValido(nombre: str) -> bool:
+    """Una IP (v4 o v6) o un nombre de host bien formado."""
+    if not nombre:
+        return False
+    try:
+        ipaddress.ip_address(nombre)
+        return True
+    except ValueError:
+        return bool(_RE_NOMBRE_HOST.match(nombre))
 
 
 def cubre(nombres: list[str], nombre: str) -> bool:

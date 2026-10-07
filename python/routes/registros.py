@@ -20,6 +20,7 @@ from stores.app_data import (
     writeStakingFile,
     writeTransaccionesFile,
 )
+from stores.cuentas_store import CuentaInvalida, listar_cuentas
 
 registros_bp = Blueprint("registros", __name__)
 
@@ -44,8 +45,14 @@ def saveIntereses():
     sanitizedCuentas = []
 
     for cuenta in cuentas:
+        # Un elemento que no es un objeto (`{"cuentas": [1]}`) daba un 500 en `.get`.
+        if not isinstance(cuenta, dict):
+            return jsonify({"ok": False, "error": "Cada cuenta debe ser un objeto"}), 400
+        filas = cuenta.get("rows", [])
+        if not isinstance(filas, list) or not all(isinstance(row, dict) for row in filas):
+            return jsonify({"ok": False, "error": "rows debe ser una lista de objetos"}), 400
         sanitizedRows = []
-        for row in cuenta.get("rows", []):
+        for row in filas:
             sanitizedRows.append({
                 "fecha": str(row.get("fecha", "")).strip(),
                 "acumulado": str(row.get("acumulado", "")).strip(),
@@ -54,10 +61,14 @@ def saveIntereses():
         sanitizedCuentas.append({
             "id": str(cuenta.get("id", "")).strip(),
             "nombre": str(cuenta.get("nombre", "")).strip(),
+            "cuenta": str(cuenta.get("cuenta") or "").strip(),
             "rows": sanitizedRows
         })
 
-    writeInteresesFile({"cuentas": sanitizedCuentas})
+    try:
+        writeInteresesFile({"cuentas": sanitizedCuentas})
+    except CuentaInvalida as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
     return jsonify({"ok": True})
 
 
@@ -83,14 +94,21 @@ def saveDividendos():
 
     if not isinstance(rows, list):
         return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+    if not all(isinstance(row, dict) for row in rows):
+        # Una fila que no es un objeto llegaba a row.get(...) y daba un 500.
+        return jsonify({"ok": False, "error": "Cada fila debe ser un objeto"}), 400
 
     sanitizedRows = []
 
     _valid_currencies = {"EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK",
                           "HKD", "SGD", "MXN", "BRL", "INR", "CNY", "KRW", "TRY", "PLN", "CZK"}
+    # Una cuenta que ya no existe se queda en blanco: el dividendo vuelve a ir a
+    # la que cobra los dividendos, en vez de quedar apuntando a ninguna parte.
+    cuentas_validas = {c["id"] for c in listar_cuentas()}
     for row in rows:
         md = str(row.get("monedaDividendo", "USD")).strip().upper()
         mt = str(row.get("monedaTotal",     "EUR")).strip().upper()
+        cuenta = str(row.get("cuenta", "") or "").strip()
         sanitizedRows.append({
             "fecha": str(row.get("fecha", "")).strip(),
             "instrumento": str(row.get("instrumento", "")).strip(),
@@ -100,6 +118,7 @@ def saveDividendos():
             "total": str(row.get("total", "")).strip(),
             "monedaDividendo": md if md.isalpha() and 2 <= len(md) <= 5 else "USD",
             "monedaTotal":     mt if mt.isalpha() and 2 <= len(mt) <= 5 else "EUR",
+            "cuenta": cuenta if cuenta in cuentas_validas else "",
         })
 
     writeDividendosFile({"rows": sanitizedRows})
@@ -138,6 +157,9 @@ def saveTransacciones():
 
     if not isinstance(rows, list):
         return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+    if not all(isinstance(row, dict) for row in rows):
+        # Una fila que no es un objeto llegaba a row.get(...) y daba un 500.
+        return jsonify({"ok": False, "error": "Cada fila debe ser un objeto"}), 400
 
     sanitizedRows = []
 
@@ -175,6 +197,9 @@ def saveBonos():
 
     if not isinstance(rows, list):
         return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+    if not all(isinstance(row, dict) for row in rows):
+        # Una fila que no es un objeto llegaba a row.get(...) y daba un 500.
+        return jsonify({"ok": False, "error": "Cada fila debe ser un objeto"}), 400
 
     sanitizedRows = []
 
@@ -218,6 +243,9 @@ def saveRentaFija():
 
     if not isinstance(rows, list):
         return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+    if not all(isinstance(row, dict) for row in rows):
+        # Una fila que no es un objeto llegaba a row.get(...) y daba un 500.
+        return jsonify({"ok": False, "error": "Cada fila debe ser un objeto"}), 400
 
     sanitizedRows = []
 
@@ -258,6 +286,9 @@ def savePrivateMarket():
 
     if not isinstance(rows, list):
         return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+    if not all(isinstance(row, dict) for row in rows):
+        # Una fila que no es un objeto llegaba a row.get(...) y daba un 500.
+        return jsonify({"ok": False, "error": "Cada fila debe ser un objeto"}), 400
 
     _VALID_TIPOS = {"pe", "vc", "credito", "inmobiliario", "infraestructura", "otros"}
 

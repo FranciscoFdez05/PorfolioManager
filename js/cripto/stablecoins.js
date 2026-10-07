@@ -434,11 +434,6 @@ function bindStablecoinsEvents() {
 
     if (modalOverlay && !modalOverlay.dataset.bound) {
         modalOverlay.dataset.bound = "true"
-        modalOverlay.addEventListener("click", (event) => {
-            if (event.target === modalOverlay) {
-                closeStablecoinModal()
-            }
-        })
     }
 
     if (searchButton && !searchButton.dataset.bound) {
@@ -549,10 +544,10 @@ function renderStablecoinsSummary() {
             card.innerHTML = `
             <div class="stablecoinSummaryHeader">
                 <div class="stablecoinSummaryHeaderCopy">
-                    <h4>${item.symbol}</h4>
+                    <h4>${escapeHtml(item.symbol)}</h4>
                     <span>Saldo disponible</span>
                 </div>
-                <button type="button" class="stablecoinSummaryDeleteBtn" data-symbol="${item.symbol}" title="Eliminar stablecoin">×</button>
+                <button type="button" class="stablecoinSummaryDeleteBtn" data-symbol="${escapeHtml(item.symbol)}" title="Eliminar stablecoin">×</button>
             </div>
             <div class="stablecoinSummaryMain">${formatMoney(item.available, "USD")}</div>
             <div class="stablecoinSummaryMeta">
@@ -653,10 +648,10 @@ function buildStablecoinRow(row) {
     const tr = document.createElement("tr")
     tr.dataset.stablecoinRowId = row.id
     tr.innerHTML = `
-        <td>${row.stablecoinSymbol || ""}</td>
-        <td>${row.fecha || ""}</td>
-        <td>${row.tipo || ""}</td>
-        <td>${row.currency || ""}</td>
+        <td>${escapeHtml(row.stablecoinSymbol)}</td>
+        <td>${escapeHtml(row.fecha)}</td>
+        <td>${escapeHtml(row.tipo)}</td>
+        <td>${escapeHtml(row.currency)}</td>
         <td>${formatStablecoinQuantity(row.cantidad)}</td>
         <td>${formatOperationsMoney(row.precio, row.currency || "USD")}</td>
         <td>${formatOperationsMoney(row.total, row.currency || "USD")}</td>
@@ -666,9 +661,9 @@ function buildStablecoinRow(row) {
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
-                    <button type="button" class="rowMenuItem assetRowEditBtn stablecoinRowEditBtn avActionBtn avEditBtn" data-row-id="${row.id}">Editar</button>
+                    <button type="button" class="rowMenuItem assetRowEditBtn stablecoinRowEditBtn avActionBtn avEditBtn" data-row-id="${escapeHtml(row.id)}">Editar</button>
                     <hr>
-                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn stablecoinRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${row.id}">Eliminar</button>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn stablecoinRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${escapeHtml(row.id)}">Eliminar</button>
                 </div>
             </div>
         </td>
@@ -946,7 +941,7 @@ function openStablecoinRowModal(rowId) {
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Fecha</label>
-            <input id="scModalFecha" class="assetRowModalInput" type="text" value="${rowData.fecha || ""}" placeholder="dd-mm-aaaa">
+            <input id="scModalFecha" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.fecha)}" placeholder="dd-mm-aaaa">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Tipo</label>
@@ -962,23 +957,23 @@ function openStablecoinRowModal(rowId) {
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Cantidad</label>
-            <input id="scModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.cantidad || ""}">
+            <input id="scModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.cantidad)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Precio unitario</label>
-            <input id="scModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.precio || "")}">
+            <input id="scModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(stripCurrencyText(rowData.precio || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Total fiat</label>
-            <input id="scModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.total || "")}">
+            <input id="scModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(stripCurrencyText(rowData.total || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Comisiones</label>
-            <input id="scModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.comisiones || "")}">
+            <input id="scModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(stripCurrencyText(rowData.comisiones || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Nota</label>
-            <input id="scModalNota" class="assetRowModalInput" type="text" value="${rowData.nota || ""}">
+            <input id="scModalNota" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.nota)}">
         </div>
     `
 

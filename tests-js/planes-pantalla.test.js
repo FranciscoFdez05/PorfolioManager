@@ -7,7 +7,7 @@
 // devuelve `null` y la pestaña se queda en blanco—, así que la prueba monta la
 // ficha real de un activo y ejercita `initAssetPlanesLogic()` sobre ella.
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 const ACTIVO = {
     id: "bitcoin",
@@ -69,7 +69,7 @@ let guardados = []
 beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
-    cargarScript("js/cartera/assets.js")
+    cargarModulo("js/cartera/assets.js")
     cargarScript("js/cartera/planes.js")
     cargarScript("js/cartera/alertas-precio.js")
 })

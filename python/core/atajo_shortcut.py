@@ -6,10 +6,14 @@ túnel, el puerto y —desde que el HTTPS se enciende desde Ajustes— el esquem
 fichero fijo en el repositorio obligaría a editar tres acciones a mano en el
 iPhone, que es justo donde se equivoca todo el mundo.
 
-**Qué NO lleva dentro: la clave de firma.** El Atajo no la necesita, porque pide
-la firma a `/api/preparar` en cada ejecución. Así que este fichero no es un
-secreto: se puede guardar en Archivos o mandar por AirDrop sin exponer nada. Lo
-único que contiene es la dirección del servidor.
+**Qué lleva dentro: el token de dispositivo, no la clave de firma.** El Atajo
+no puede calcular un HMAC, así que pide la firma a `/api/preparar` en cada
+ejecución. Antes ese endpoint firmaba para cualquiera de la LAN, y la firma no
+autenticaba nada; ahora todas las llamadas llevan `X-Atajo-Token`, un valor
+derivado de la clave (core/firma_hmac.tokenDispositivo) que solo tiene quien
+descargó este fichero con la sesión abierta. **El fichero es por tanto un
+secreto**: guárdalo como una contraseña. Rehacer la clave en Ajustes revoca el
+token, y hay que volver a descargar el Atajo.
 
 **El formato.** Un `.shortcut` es un plist con la lista de acciones. Se genera en
 XML y **sin firmar**, porque firmarlo exige las claves de Apple. Un atajo sin
@@ -155,7 +159,7 @@ def _pararSiVacia(variable, respuesta, titulo):
     ]
 
 
-def acciones(urlBase: str) -> list:
+def acciones(urlBase: str, token: str = "") -> list:
     """Las acciones del Atajo, en el orden en que se ejecutan.
 
     El orden no es libre: elegir la base de datos va lo primero, antes de nada
@@ -163,14 +167,24 @@ def acciones(urlBase: str) -> list:
     fecha no se pregunta ni se calcula —la pone el servidor con el día en que
     llega la petición—, que es lo que hace que apuntar un gasto quepa en una
     pulsación desde el Centro de Control.
+
+    `token` va en la cabecera `X-Atajo-Token` de todas las llamadas. Vacío solo
+    cuando la firma está desactivada en Ajustes (el servidor no lo pide).
     """
     base = urlBase.rstrip("/")
+    conToken = [("X-Atajo-Token", _texto(token))] if token else []
+
+    def _get(url):
+        parametros = {"WFURL": url, "WFHTTPMethod": "GET"}
+        if conToken:
+            parametros["WFHTTPHeaders"] = _campos(conToken)
+        return _accion(_URL, parametros)
 
     return [
         # 1. En qué base de datos, de las que tenga el servidor. La lista se
         # guarda y se comprueba antes de elegir: «Elegir de la lista» con una
         # lista vacía no pregunta, y el atajo seguiría como si nada.
-        _accion(_URL, {"WFURL": _texto(f"{base}/api/portfolios-lista"), "WFHTTPMethod": "GET"}),
+        _get(_texto(f"{base}/api/portfolios-lista")),
         _guardar("respuesta"),
         _valorDe("nombres", "respuesta"),
         _guardar("opciones"),
@@ -192,12 +206,7 @@ def acciones(urlBase: str) -> list:
         # 3. Las categorías vivas de esa base de datos y ese tipo. Con `?tipo=`
         # el servidor devuelve `lista` ya filtrada, así que todas las claves se
         # teclean y las variables solo aparecen en la URL.
-        _accion(_URL, {
-            "WFURL": _texto(
-                f"{base}/api/categorias?portfolio=", ("var", "bbdd"), "&tipo=", ("var", "tipo")
-            ),
-            "WFHTTPMethod": "GET",
-        }),
+        _get(_texto(f"{base}/api/categorias?portfolio=", ("var", "bbdd"), "&tipo=", ("var", "tipo"))),
         _guardar("respuesta"),
 
         # 3b. Con qué cuenta se paga el gasto o en cuál se cobra el ingreso: la
@@ -235,6 +244,7 @@ def acciones(urlBase: str) -> list:
             "WFURL": _texto(f"{base}/api/preparar"),
             "WFHTTPMethod": "POST",
             "WFHTTPBodyType": "Json",
+            **({"WFHTTPHeaders": _campos(conToken)} if conToken else {}),
             "WFJSONValues": _campos([
                 ("tipo", _texto(("var", "tipo"))),
                 ("categoria", _texto(("var", "categoria"))),
@@ -265,6 +275,7 @@ def acciones(urlBase: str) -> list:
                 ("Content-Type", _texto("application/json")),
                 ("X-Signature", _texto(("var", "sello"))),
                 ("X-Timestamp", _texto(("var", "marca"))),
+                *conToken,
             ]),
         }),
 
@@ -282,10 +293,10 @@ def acciones(urlBase: str) -> list:
     ]
 
 
-def construir(urlBase: str) -> bytes:
+def construir(urlBase: str, token: str = "") -> bytes:
     """El `.shortcut` completo, listo para descargar."""
     atajo = {
-        "WFWorkflowActions": acciones(urlBase),
+        "WFWorkflowActions": acciones(urlBase, token),
         "WFWorkflowClientVersion": "1146.7",
         "WFWorkflowHasOutputFallback": False,
         "WFWorkflowHasShortcutInputVariables": False,

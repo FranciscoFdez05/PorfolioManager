@@ -97,7 +97,7 @@ function renderConversionesAssetOptions(assets) {
     assetSelect.innerHTML = assets
         .map(
             (asset) => `
-        <option value="${asset.id}">${asset.name}</option>
+        <option value="${escapeHtml(asset.id)}">${escapeHtml(asset.name)}</option>
     `
         )
         .join("")
@@ -122,8 +122,8 @@ function renderConversionesSelectedAsset(asset) {
 
     container.innerHTML = `
         <div class="toolsSelectedLabel">Conversiones del activo</div>
-        <div class="toolsSelectedValue">${asset.name}</div>
-        <div class="toolsSelectedMeta">${baseSymbol} convertidos / Convertidos a ${baseSymbol}</div>
+        <div class="toolsSelectedValue">${escapeHtml(asset.name)}</div>
+        <div class="toolsSelectedMeta">${escapeHtml(baseSymbol)} convertidos / Convertidos a ${escapeHtml(baseSymbol)}</div>
     `
 }
 
@@ -177,17 +177,17 @@ function buildConversionesRowElement(row = {}, asset = conversionesCurrentAsset)
         : "cvTipoBadge"
 
     rowElement.innerHTML = `
-        <td data-field="fecha">${row.fecha || ""}</td>
-        <td data-field="par">${row.par || ""}</td>
-        <td data-field="tipo" data-value="${row.tipo || ""}"><span class="${tipoBadgeClass}">${row.tipo || ""}</span></td>
+        <td data-field="fecha">${escapeHtml(row.fecha)}</td>
+        <td data-field="par">${escapeHtml(row.par)}</td>
+        <td data-field="tipo" data-value="${escapeHtml(row.tipo)}"><span class="${tipoBadgeClass}">${escapeHtml(row.tipo)}</span></td>
         <td data-field="cantidad">${formatAssetParticipationValue(row.cantidad || "", "cripto")}</td>
         <td class="rowActionsCell">
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
-                    <button type="button" class="rowMenuItem assetRowEditBtn conversionRowEditBtn avActionBtn avEditBtn" data-row-id="${rowElement.dataset.rowId}">Editar</button>
+                    <button type="button" class="rowMenuItem assetRowEditBtn conversionRowEditBtn avActionBtn avEditBtn" data-row-id="${escapeHtml(rowElement.dataset.rowId)}">Editar</button>
                     <hr>
-                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn conversionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${rowElement.dataset.rowId}">Eliminar</button>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn conversionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${escapeHtml(rowElement.dataset.rowId)}">Eliminar</button>
                 </div>
             </div>
         </td>
@@ -306,22 +306,22 @@ function openConversiónRowModal(rowId) {
     const fieldsHtml = `
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Fecha</label>
-            <input id="cvModalFecha" class="assetRowModalInput" type="text" value="${rowData.fecha}" placeholder="dd-mm-aaaa">
+            <input id="cvModalFecha" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.fecha)}" placeholder="dd-mm-aaaa">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Par</label>
-            <input id="cvModalPar" class="assetRowModalInput" type="text" value="${rowData.par}">
+            <input id="cvModalPar" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.par)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Tipo</label>
             <select id="cvModalTipo" class="assetRowModalSelect">
-                <option value="${convertedInLabel}"${selectedTipo === convertedInLabel ? " selected" : ""}>${convertedInLabel} (Comprar)</option>
-                <option value="${convertedOutLabel}"${selectedTipo === convertedOutLabel ? " selected" : ""}>${convertedOutLabel} (Vender)</option>
+                <option value="${escapeHtml(convertedInLabel)}"${selectedTipo === convertedInLabel ? " selected" : ""}>${escapeHtml(convertedInLabel)} (Comprar)</option>
+                <option value="${escapeHtml(convertedOutLabel)}"${selectedTipo === convertedOutLabel ? " selected" : ""}>${escapeHtml(convertedOutLabel)} (Vender)</option>
             </select>
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Cantidad</label>
-            <input id="cvModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.cantidad}">
+            <input id="cvModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.cantidad)}">
         </div>
     `
 
@@ -403,7 +403,7 @@ function saveConversiónRowFromModal() {
                     ? "cvTipoBadge cvTipoBadgeIn"
                     : "cvTipoBadge cvTipoBadgeOut"
                 : "cvTipoBadge"
-            tipoCell.innerHTML = `<span class="${badgeClass}">${newTipo}</span>`
+            tipoCell.innerHTML = `<span class="${badgeClass}">${escapeHtml(newTipo)}</span>`
         }
         if (cantidadCell) cantidadCell.textContent = g("cvModalCantidad")
     } else {

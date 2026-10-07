@@ -1,5 +1,5 @@
 from core.db import get_db, transactional
-from core.fifo import FifoError, parse_decimal
+from stores import rendimiento_activo
 from stores.asset_utils import slugify
 
 
@@ -53,11 +53,14 @@ def readAssetFile(assetId):
             "comisionesFiat": r["comisiones_fiat"],
             "comisionesCripto": r["comisiones_cripto"],
             "comisionesSatoshis": r["comisiones_satoshis"],
+            "fxRate": r["fx_rate"],
+            "fxFecha": r["fx_fecha"],
+            "fxOrigen": r["fx_origen"],
         }
         for r in conn.execute(
             "SELECT fecha_operacion, tipo_operacion, exchange, currency, participaciones, "
             "precio_participacion, capital_invertido_bruto, coste_anual, comisiones, "
-            "comisiones_fiat, comisiones_cripto, comisiones_satoshis "
+            "comisiones_fiat, comisiones_cripto, comisiones_satoshis, fx_rate, fx_fecha, fx_origen "
             "FROM activo_rows WHERE asset_id = ? ORDER BY id",
             (safe_id,)
         ).fetchall()
@@ -81,10 +84,14 @@ def readAssetFile(assetId):
             "currency": r["currency"],
             "estado": r["estado"],
             "fechaCierre": r["fecha_cierre"],
+            "fxRate": r["fx_rate"],
+            "fxFecha": r["fx_fecha"],
+            "fxOrigen": r["fx_origen"],
         }
         for r in conn.execute(
             "SELECT id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
-            "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre "
+            "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, "
+            "fecha_cierre, fx_rate, fx_fecha, fx_origen "
             "FROM activo_operation_rows WHERE asset_id = ? ORDER BY rowid",
             (safe_id,)
         ).fetchall()
@@ -133,10 +140,41 @@ def updateAssetMarketData(assetId, data):
     conn.commit()
 
 
+def _fx_previos(conn, tabla, columna_fecha, safe_id):
+    """Tipos de cambio ya anotados en las filas de un activo, por (fecha, divisa).
+
+    El tipo depende solo de la fecha y de la divisa de la operación, así que es
+    la clave con la que una fila reescrita puede heredarlo: si el usuario cambia
+    la fecha o la divisa, la fila vuelve a quedar pendiente, que es lo correcto.
+    """
+    return {
+        (r["fecha"], r["currency"]): (r["fx_rate"], r["fx_fecha"], r["fx_origen"])
+        for r in conn.execute(
+            f"SELECT {columna_fecha} AS fecha, currency, fx_rate, fx_fecha, fx_origen "
+            f"FROM {tabla} WHERE asset_id = ? AND fx_rate != ''",
+            (safe_id,),
+        )
+    }
+
+
+def _fx_de_fila(fila, previos, fecha, divisa):
+    """El trío fx de la fila: el que trae, o el anotado antes para su fecha y divisa.
+
+    Las filas llegan del navegador sin estas columnas (el formulario no las
+    edita): reescribirlas sin heredarlas borraba el tipo histórico en cada
+    guardado del activo, y también en cada GET /api/operaciones.
+    """
+    if str(fila.get("fxRate") or "").strip():
+        return (str(fila.get("fxRate")), str(fila.get("fxFecha") or ""), str(fila.get("fxOrigen") or ""))
+    return previos.get((fecha, divisa), ("", "", ""))
+
+
 @transactional
 def writeAssetFile(assetId, data):
     conn = get_db()
     safe_id = slugify(assetId)
+    fx_filas = _fx_previos(conn, "activo_rows", "fecha_operacion", safe_id)
+    fx_operaciones = _fx_previos(conn, "activo_operation_rows", "fecha_apertura", safe_id)
 
     conn.execute(
         "INSERT INTO activos "
@@ -178,14 +216,15 @@ def writeAssetFile(assetId, data):
         "INSERT INTO activo_rows "
         "(asset_id, fecha_operacion, tipo_operacion, exchange, currency, participaciones, "
         "precio_participacion, capital_invertido_bruto, coste_anual, comisiones, "
-        "comisiones_fiat, comisiones_cripto, comisiones_satoshis) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "comisiones_fiat, comisiones_cripto, comisiones_satoshis, fx_rate, fx_fecha, fx_origen) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (safe_id, r.get("fechaOperacion", ""), r.get("tipoOperacion", ""),
              r.get("exchange", ""), r.get("currency", "EUR"), r.get("participaciones", ""),
              r.get("precioParticipacion", ""), r.get("capitalInvertidoBruto", ""),
              r.get("costeAnual", ""), r.get("comisiones", ""), r.get("comisionesFiat", ""),
-             r.get("comisionesCripto", ""), r.get("comisionesSatoshis", ""))
+             r.get("comisionesCripto", ""), r.get("comisionesSatoshis", ""),
+             *_fx_de_fila(r, fx_filas, r.get("fechaOperacion", ""), r.get("currency", "EUR")))
             for r in data.get("rows", [])
         ]
     )
@@ -194,15 +233,17 @@ def writeAssetFile(assetId, data):
     conn.executemany(
         "INSERT INTO activo_operation_rows "
         "(id, asset_id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
-        "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre, "
+        "fx_rate, fx_fecha, fx_origen) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), safe_id, r.get("activo", ""), r.get("fechaApertura", ""),
              r.get("par", ""), r.get("stablecoinSymbol", ""), r.get("orden", "Compra"),
              r.get("precioOrden", ""), r.get("precioCurrency", "EUR"), r.get("cantidad", ""),
              r.get("comisionesCripto", ""), r.get("comisionesFiat", ""),
              r.get("total", ""), r.get("currency", "EUR"),
-             r.get("estado", "Activo"), r.get("fechaCierre", ""))
+             r.get("estado", "Activo"), r.get("fechaCierre", ""),
+             *_fx_de_fila(r, fx_operaciones, r.get("fechaApertura", ""), r.get("currency", "EUR")))
             for r in data.get("operationRows", [])
         ]
     )
@@ -219,17 +260,6 @@ def writeAssetFile(assetId, data):
     )
 
     conn.commit()
-
-
-def _parse_num(value):
-    # Se delega en el parser del motor fiscal para que la ficha y las ventas
-    # lean exactamente los mismos números. La versión anterior de esta función
-    # devolvía 0 ante un importe con divisa ("25,00 €") y machacaba el punto
-    # decimal de los valores ya serializados ("1234.56" -> 123456).
-    try:
-        return float(parse_decimal(value))
-    except (FifoError, TypeError, ValueError):
-        return 0.0
 
 
 def listAssets():
@@ -270,41 +300,14 @@ def listAssets():
     result = []
     for r in rows:
         asset_id = r["id"]
-        is_crypto = str(r["type"] or "").strip().lower() == "cripto"
-        current_price = _parse_num(r["price"])
-
-        total_partic = 0.0
-        total_invertido = 0.0
-        total_comis = 0.0
-
-        for row in rows_by_asset.get(asset_id, []):
-            tipo = str(row["tipo_operacion"] or "").strip().lower()
-            partic = _parse_num(row["participaciones"])
-            capital = _parse_num(row["capital_invertido_bruto"])
-            comis = _parse_num(row["comisiones"])
-            comis_fiat = _parse_num(row["comisiones_fiat"])
-            if tipo == "venta":
-                total_partic -= partic
-            else:
-                total_partic += partic
-                total_invertido += capital
-                total_comis += comis_fiat if is_crypto else comis
-
-        for op in op_rows_by_asset.get(asset_id, []):
-            orden = str(op["orden"] or "").strip().lower()
-            cantidad = _parse_num(op["cantidad"])
-            comis_cripto = _parse_num(op["comisiones_cripto"])
-            total_fiat = _parse_num(op["total"])
-            if orden == "venta":
-                total_partic -= cantidad + comis_cripto
-            else:
-                total_partic += max(0.0, cantidad - comis_cripto)
-                total_invertido += total_fiat
-
-        inverted_neto = max(0.0, total_invertido - total_comis)
-        neto_actual = max(0.0, total_partic) * current_price
-        rdm = neto_actual - inverted_neto
-        rdm_pct = (rdm / inverted_neto * 100) if inverted_neto > 0 else 0.0
+        # El mismo cálculo que la tabla principal (rendimiento-batch): en Decimal
+        # y con el mismo lector de importes. Antes eran dos copias, esta en float.
+        totales = rendimiento_activo.calcular(
+            rows_by_asset.get(asset_id, []),
+            op_rows_by_asset.get(asset_id, []),
+            str(r["type"] or "").strip().lower() == "cripto",
+            r["price"],
+        ).para_json()
 
         result.append({
             "id": asset_id,
@@ -325,9 +328,9 @@ def listAssets():
             "hidden": bool(r["hidden"]),
             "convertCurrency": r["convert_currency"],
             "costeAnual": r["coste_anual"],
-            "rendimiento": round(rdm, 2),
-            "invertidoNeto": round(inverted_neto, 2),
-            "rendimientoPct": round(rdm_pct, 2),
+            "rendimiento": totales["rendimiento"],
+            "invertidoNeto": totales["invertidoNeto"],
+            "rendimientoPct": totales["rendimientoPct"],
             "hasRows": asset_id in assets_with_rows,
         })
 

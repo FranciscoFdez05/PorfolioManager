@@ -254,4 +254,55 @@ describe("red de seguridad sobre fetch() directo", () => {
 
         expect(destinos).toHaveLength(0)
     })
+
+    it("una lectura suelta de /api/ lleva un timeout", async () => {
+        fetchFalso.mockResolvedValue(respuesta())
+
+        await window.fetch("/api/gastos")
+
+        expect(fetchFalso.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal)
+    })
+
+    it("una escritura no lleva timeout y una señal propia se respeta", async () => {
+        fetchFalso.mockResolvedValue(respuesta())
+        const propia = new AbortController().signal
+
+        await window.fetch("/api/gastos", { method: "POST" })
+        await window.fetch("/api/gastos", { signal: propia })
+
+        expect(fetchFalso.mock.calls[0][1]?.signal).toBeUndefined()
+        expect(fetchFalso.mock.calls[1][1].signal).toBe(propia)
+    })
+
+    it("un 403 en una escritura se repite una vez (token CSRF renovado)", async () => {
+        fetchFalso.mockResolvedValueOnce(respuesta({ status: 403 })).mockResolvedValueOnce(respuesta({ status: 200 }))
+
+        const r = await window.fetch("/api/gastos", { method: "POST", body: "{}" })
+
+        expect(r.status).toBe(200)
+        expect(fetchFalso).toHaveBeenCalledTimes(2)
+    })
+
+    it("un segundo 403 no se repite más, y una lectura con 403 no se repite", async () => {
+        fetchFalso.mockResolvedValue(respuesta({ status: 403 }))
+
+        const escritura = await window.fetch("/api/gastos", { method: "POST" })
+        expect(escritura.status).toBe(403)
+        expect(fetchFalso).toHaveBeenCalledTimes(2)
+
+        await window.fetch("/api/gastos")
+        expect(fetchFalso).toHaveBeenCalledTimes(3)
+    })
+
+    it("un 429 avisa de cuánto esperar", async () => {
+        const avisos = []
+        window.showToast = (mensaje) => avisos.push(mensaje)
+        fetchFalso.mockResolvedValue(respuesta({ status: 429, headers: { "Retry-After": "12" } }))
+
+        await window.fetch("/api/gastos", { method: "POST" })
+
+        expect(avisos).toHaveLength(1)
+        expect(avisos[0]).toContain("12 s")
+        delete window.showToast
+    })
 })

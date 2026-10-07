@@ -72,18 +72,53 @@ def leer_objetivos(texto: str, puerto: int) -> list:
 
 # ── Una comprobación ──────────────────────────────────────────────────────────
 
-def sondear(urls, timeout=_TIMEOUT_SONDA):
+# Raíz de la CA interna de Caddy (`tls internal`). docker-compose monta el
+# volumen de datos de Caddy en solo lectura en /caddy-data para que el vigilante
+# pueda comprobar que quien contesta es de verdad ese Caddy.
+_CA_POR_DEFECTO = "/caddy-data/caddy/pki/authorities/local/root.crt"
+_avisado_sin_ca = False
+
+
+def contexto_tls(ruta_ca=None):
+    """Contexto TLS para sondear el proxy.
+
+    Con la CA de Caddy a mano se verifica la cadena: un equipo de la red interna
+    que se hiciera pasar por el proxy ya no contaría como «la aplicación
+    responde». El nombre no se comprueba porque el certificado se emite para los
+    nombres que el usuario escribió en Ajustes, y el vigilante llama a `caddy`.
+    Se cargan también las raíces del sistema, por si el HTTPS es de una CA
+    pública (`HTTPS_ENABLED` con Let's Encrypt).
+
+    Sin el fichero (fuera de Docker, o sin el volumen montado) se sigue como
+    antes, sin verificar: un vigilante que diese por caída una aplicación sana
+    solo porque no encuentra la CA sería peor. Se avisa una vez en el log.
+    """
+    global _avisado_sin_ca
+    import os
+
+    ruta = ruta_ca or os.environ.get("VIGILANTE_CA", _CA_POR_DEFECTO)
+    if ruta and os.path.isfile(ruta):
+        contexto = ssl.create_default_context()
+        contexto.load_verify_locations(cafile=ruta)
+        contexto.check_hostname = False
+        contexto.verify_mode = ssl.CERT_REQUIRED
+        return contexto
+
+    if not _avisado_sin_ca:
+        _avisado_sin_ca = True
+        log.warning("Sin la CA de Caddy (%s): el certificado del proxy no se verifica.", ruta)
+    return ssl._create_unverified_context()
+
+
+def sondear(urls, timeout=_TIMEOUT_SONDA, contexto=None):
     """(estado, detalle) tras preguntar a las URL en orden. Nunca lanza."""
-    contexto_sin_verificar = ssl._create_unverified_context()
+    contexto = contexto or contexto_tls()
     resultado = (CAIDO, "sin respuesta")
 
     for url in urls:
         peticion = Request(url, headers={"User-Agent": "PorfolioManager-vigilante"})
         try:
-            # Sin verificar el certificado: el HTTPS del proyecto lo firma la CA
-            # interna de Caddy, que este proceso no conoce. Aquí se comprueba
-            # que el servidor contesta, no a quién pertenece su certificado.
-            with urlopen(peticion, timeout=timeout, context=contexto_sin_verificar):
+            with urlopen(peticion, timeout=timeout, context=contexto):
                 return OK, ""
         except HTTPError as error:
             if error.code == 503:

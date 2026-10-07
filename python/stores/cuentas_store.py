@@ -19,6 +19,17 @@ Qué mueve el saldo de una cuenta:
   * el saldo inicial que se le haya puesto, para no tener que registrar toda la
     historia.
 
+Ser de ahorro o remunerada no es un tipo de cuenta sino un papel que se le da a
+una cuenta que ya existe: `cuentas.ahorro` la saca en la ventana Cuenta de
+ahorro, y una cuenta remunerada (ventana Cuenta Remunerada) es siempre una
+de estas cuentas, vinculada por la tabla `cuenta_remunerada_vinculo`: una por
+cuenta y una cuenta por remunerada. Y una
+de ellas puede cobrar los dividendos (`cuentas.dividendos`; si son varias, la
+primera por orden es la de los dividendos sin cuenta apuntada). Lo que rinden
+—los intereses netos de su remunerada y los dividendos que cobra, pasados a
+euros— es dinero de esa cuenta y forma parte de su saldo
+(`rendimientos`).
+
 Solo cuenta lo que ya ha ocurrido (hasta el mes actual incluido): un recurrente
 de diciembre no es dinero que ya esté en la cuenta en octubre.
 """
@@ -129,6 +140,14 @@ def _decimal(texto):
 # lectura que abriera una transacción de escritura dejaría la base bloqueada para
 # los demás hilos hasta el siguiente commit.
 
+_SELECT_CUENTAS = (
+    "SELECT c.id, c.nombre, c.tipo, c.saldo_inicial, c.dividendos, c.ahorro, v.remunerada_id, r.nombre AS remunerada_nombre "
+    "FROM cuentas c "
+    "LEFT JOIN cuenta_remunerada_vinculo v ON v.cuenta_id = c.id "
+    "LEFT JOIN cuentas_remuneradas r ON r.id = v.remunerada_id"
+)
+
+
 def _fila_a_cuenta(fila):
     return {
         "id": fila["id"],
@@ -136,22 +155,22 @@ def _fila_a_cuenta(fila):
         "tipo": fila["tipo"],
         "saldo_inicial": fila["saldo_inicial"],
         "protegida": fila["id"] in (ID_BANCO, ID_AHORRO),
+        "remunerada": fila["remunerada_id"] or "",
+        "remunerada_nombre": fila["remunerada_nombre"] or "",
+        "dividendos": bool(fila["dividendos"]),
+        "ahorro": bool(fila["ahorro"]),
     }
 
 
 def listar_cuentas(conn=None):
     conn = conn or get_db()
-    filas = conn.execute(
-        "SELECT id, nombre, tipo, saldo_inicial FROM cuentas ORDER BY sort_order, rowid"
-    ).fetchall()
+    filas = conn.execute(f"{_SELECT_CUENTAS} ORDER BY c.sort_order, c.rowid").fetchall()
     return [_fila_a_cuenta(f) for f in filas]
 
 
 def obtener_cuenta(cuenta_id, conn=None):
     conn = conn or get_db()
-    fila = conn.execute(
-        "SELECT id, nombre, tipo, saldo_inicial FROM cuentas WHERE id = ?", (cuenta_id,)
-    ).fetchone()
+    fila = conn.execute(f"{_SELECT_CUENTAS} WHERE c.id = ?", (cuenta_id,)).fetchone()
     return _fila_a_cuenta(fila) if fila else None
 
 
@@ -219,8 +238,102 @@ def _id_nuevo(nombre, tipo, conn):
     return candidato
 
 
+# ── Vínculo con las cuentas remuneradas ─────────────────────────────────────
+
+def listar_remuneradas(conn=None):
+    """Las cuentas remuneradas, cada una con la cuenta de dinero a la que va ('' si ninguna)."""
+    conn = conn or get_db()
+    filas = conn.execute(
+        "SELECT r.id, COALESCE(c.nombre, r.nombre) AS nombre, COALESCE(v.cuenta_id, '') AS cuenta_id, "
+        "COALESCE(c.nombre, '') AS cuenta_nombre "
+        "FROM cuentas_remuneradas r "
+        "LEFT JOIN cuenta_remunerada_vinculo v ON v.remunerada_id = r.id "
+        "LEFT JOIN cuentas c ON c.id = v.cuenta_id "
+        "ORDER BY r.sort_order, r.rowid"
+    ).fetchall()
+    return [
+        {"id": f["id"], "nombre": f["nombre"], "cuenta": f["cuenta_id"], "cuenta_nombre": f["cuenta_nombre"]}
+        for f in filas
+    ]
+
+
+def _vincular(cuenta_id, remunerada_id, conn):
+    """Deja `cuenta_id` con `remunerada_id` ('' = sin remunerada).
+
+    Una remunerada que ya está en otra cuenta no se mueve sin más: se rechaza y
+    hay que quitarla antes de allí, para que un descuido no cambie la otra cuenta.
+    """
+    remunerada_id = str(remunerada_id or "").strip()
+    if remunerada_id:
+        fila = conn.execute("SELECT nombre FROM cuentas_remuneradas WHERE id = ?", (remunerada_id,)).fetchone()
+        if fila is None:
+            raise CuentaInvalida("La cuenta remunerada no existe")
+        otra = conn.execute(
+            "SELECT c.nombre FROM cuenta_remunerada_vinculo v JOIN cuentas c ON c.id = v.cuenta_id "
+            "WHERE v.remunerada_id = ? AND v.cuenta_id <> ?",
+            (remunerada_id, cuenta_id),
+        ).fetchone()
+        if otra is not None:
+            raise CuentaInvalida(
+                f"La cuenta remunerada «{fila['nombre']}» ya está vinculada a «{otra['nombre']}». "
+                "Quítala de allí primero."
+            )
+    conn.execute("DELETE FROM cuenta_remunerada_vinculo WHERE cuenta_id = ?", (cuenta_id,))
+    if remunerada_id:
+        conn.execute(
+            "INSERT INTO cuenta_remunerada_vinculo (remunerada_id, cuenta_id) VALUES (?, ?)",
+            (remunerada_id, cuenta_id),
+        )
+
+
+def _marcar_dividendos(cuenta_id, cobra, conn):
+    """Deja que `cuenta_id` cobre (o no) los dividendos.
+
+    Pueden cobrarlos varias: cada dividendo va a una sola (la que trae apuntada o,
+    sin ella, la primera marcada), así que no se suma dos veces.
+    """
+    conn.execute("UPDATE cuentas SET dividendos = ? WHERE id = ?", (1 if cobra else 0, cuenta_id))
+
+
 @transactional
-def crear_cuenta(nombre, tipo, saldo_inicial=""):
+def importar_dividendos(cuenta_id):
+    """Pasa a la base la casilla antigua de dividendos de la ventana de ahorro.
+
+    Solo si ninguna cuenta los cobra todavía: un cambio hecho ya en la base
+    manda sobre la configuración vieja. Devuelve si se ha marcado.
+    """
+    conn = get_db()
+    if conn.execute("SELECT 1 FROM cuentas WHERE dividendos = 1").fetchone():
+        return False
+    cursor = conn.execute("UPDATE cuentas SET dividendos = 1 WHERE id = ?", (cuenta_id,))
+    conn.commit()
+    return cursor.rowcount > 0
+
+
+@transactional
+def importar_vinculos(pares):
+    """Da de alta los vínculos `(cuenta_id, remunerada_id)` que quepan.
+
+    Para pasar a la tabla los que había en la configuración antigua: se saltan
+    los que chocan con uno ya hecho (la cuenta o la remunerada ya tienen pareja)
+    o apuntan a algo que no existe. Devuelve cuántos se han creado.
+    """
+    conn = get_db()
+    creados = 0
+    for cuenta_id, remunerada_id in pares:
+        cursor = conn.execute(
+            "INSERT OR IGNORE INTO cuenta_remunerada_vinculo (remunerada_id, cuenta_id) "
+            "SELECT r.id, c.id FROM cuentas_remuneradas r, cuentas c WHERE r.id = ? AND c.id = ?",
+            (remunerada_id, cuenta_id),
+        )
+        creados += cursor.rowcount
+    conn.commit()
+    return creados
+
+
+@transactional
+def crear_cuenta(nombre, tipo, saldo_inicial="", remunerada="", dividendos=False, ahorro=None):
+    """Crea una cuenta. `ahorro=None` la saca en la ventana de ahorro si es de tipo ahorro."""
     nombre = normalizar_nombre(nombre)
     if not nombre:
         raise CuentaInvalida("Escribe un nombre para la cuenta")
@@ -232,18 +345,24 @@ def crear_cuenta(nombre, tipo, saldo_inicial=""):
     inicial = _saldo_inicial(saldo_inicial)
     orden = conn.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM cuentas").fetchone()[0]
     cuenta_id = _id_nuevo(nombre, tipo, conn)
+    es_ahorro = tipo == "ahorro" if ahorro is None else bool(ahorro)
     conn.execute(
-        "INSERT INTO cuentas (id, nombre, tipo, saldo_inicial, sort_order) VALUES (?, ?, ?, ?, ?)",
-        (cuenta_id, nombre, tipo, inicial, orden),
+        "INSERT INTO cuentas (id, nombre, tipo, saldo_inicial, sort_order, ahorro) VALUES (?, ?, ?, ?, ?, ?)",
+        (cuenta_id, nombre, tipo, inicial, orden, 1 if es_ahorro else 0),
     )
+    _vincular(cuenta_id, remunerada, conn)
+    _marcar_dividendos(cuenta_id, bool(dividendos), conn)
     conn.commit()
     return obtener_cuenta(cuenta_id, conn)
 
 
 @transactional
-def modificar_cuenta(cuenta_id, nombre=None, saldo_inicial=None):
-    """Cambia el nombre y/o el saldo inicial. El tipo no se cambia: pasar una
-    cuenta de ahorro a exchange la sacaría de la ventana de ahorro con su historia."""
+def modificar_cuenta(cuenta_id, nombre=None, saldo_inicial=None, remunerada=None, dividendos=None, ahorro=None):
+    """Cambia el nombre, el saldo inicial, la cuenta remunerada vinculada, si
+    cobra los dividendos y/o si es de ahorro (`None` deja cada uno como está;
+    `remunerada=''` la desvincula). El tipo no se cambia. La cuenta de ahorro
+    principal no deja de serlo: la ventana de ahorro guarda su configuración
+    con ella."""
     conn = get_db()
     cuenta = obtener_cuenta(cuenta_id, conn)
     if cuenta is None:
@@ -260,6 +379,15 @@ def modificar_cuenta(cuenta_id, nombre=None, saldo_inicial=None):
         conn.execute(
             "UPDATE cuentas SET saldo_inicial = ? WHERE id = ?", (_saldo_inicial(saldo_inicial), cuenta_id)
         )
+
+    if remunerada is not None:
+        _vincular(cuenta_id, remunerada, conn)
+    if dividendos is not None:
+        _marcar_dividendos(cuenta_id, bool(dividendos), conn)
+    if ahorro is not None:
+        if not ahorro and cuenta_id == ID_AHORRO:
+            raise CuentaInvalida(f"«{cuenta['nombre']}» es la cuenta de ahorro principal y no se puede quitar")
+        conn.execute("UPDATE cuentas SET ahorro = ? WHERE id = ?", (1 if ahorro else 0, cuenta_id))
     conn.commit()
     return obtener_cuenta(cuenta_id, conn)
 
@@ -282,7 +410,9 @@ def _usos(cuenta_id, conn):
     total = conn.execute(
         "SELECT COUNT(*) FROM transferencias WHERE origen = ? OR destino = ?", (cuenta_id, cuenta_id)
     ).fetchone()[0]
-    for tabla in ("gastos_rows", "ingresos_rows"):
+    # También los dividendos que cobró (columna `cuenta`): borrarla los dejaba
+    # apuntando a una cuenta que ya no existe y pasaban a otra sin avisar.
+    for tabla in ("gastos_rows", "ingresos_rows", "dividendos"):
         total += conn.execute(f"SELECT COUNT(*) FROM {tabla} WHERE cuenta = ?", (cuenta_id,)).fetchone()[0]
     return total
 
@@ -430,14 +560,91 @@ def _ya_ocurrido(year, month, hoy):
         return True
 
 
-def saldos(conn=None, hoy=None):
-    """Saldo de cada cuenta a día de hoy: `{id: {inicial, entradas, salidas, comisiones, saldo}}`."""
+def _anio_mes(texto):
+    """`(año, clave del mes)` de una fecha dd-mm-aaaa, aaaa-mm-dd, mm-aaaa o
+    aaaa-mm (las que aceptan intereses y dividendos); `("", "")` si no se entiende."""
+    partes = re.split(r"[-/.]", str(texto or "").strip())
+    if not 2 <= len(partes) <= 3 or not all(p.isdigit() for p in partes):
+        return "", ""
+    if len(partes[0]) == 4:
+        anio, mes = partes[0], partes[1]
+    else:
+        anio, mes = partes[-1], partes[-2]
+    if len(anio) != 4 or not 1 <= int(mes) <= 12:
+        return "", ""
+    return anio, MONTH_KEYS[int(mes) - 1]
+
+
+def _cambio_a_euros():
+    """Convierte a euros con el tipo de hoy, pidiendo cada divisa una sola vez.
+
+    Sin servicio de cambio se cuenta 1:1, como la ventana de ahorro y la
+    valoración de la cartera: mejor una cifra aproximada que un saldo que salta
+    según responda o no el proveedor.
+    """
+    from providers.finnhub_client import fetch_exchange_rate
+
+    tipos = {"EUR": Decimal(1)}
+
+    def a_euros(importe, moneda):
+        divisa = str(moneda or "EUR").strip().upper() or "EUR"
+        if divisa not in tipos:
+            rate, error = fetch_exchange_rate(divisa, "EUR")
+            tipos[divisa] = Decimal(str(rate)) if not error and rate and rate > 0 else Decimal(1)
+        return importe * tipos[divisa]
+
+    return a_euros
+
+
+def rendimientos(conn=None, hoy=None, a_euros=None):
+    """Lo que han rendido las cuentas, hasta el mes actual: `{id: {intereses, dividendos}}`.
+
+    Los intereses son los netos (acumulado menos impuestos) de la remunerada
+    vinculada; los dividendos, el total cobrado, en euros, y solo en la cuenta
+    que los cobra. Las cuentas sin nada no aparecen.
+    """
+    conn = conn or get_db()
+    hoy = hoy or datetime.date.today()
+    resultado = {}
+
+    for fila in conn.execute(
+        "SELECT v.cuenta_id, i.fecha, i.acumulado, i.impuestos FROM intereses_v2 i "
+        "JOIN cuenta_remunerada_vinculo v ON v.remunerada_id = i.cuenta_id"
+    ).fetchall():
+        year, month = _anio_mes(fila["fecha"])
+        if not year or not _ya_ocurrido(year, month, hoy):
+            continue
+        datos = resultado.setdefault(fila["cuenta_id"], {"intereses": Decimal(0), "dividendos": Decimal(0)})
+        datos["intereses"] += _decimal(fila["acumulado"]) - _decimal(fila["impuestos"])
+
+    # Cada dividendo va a la cuenta que trae apuntada; los que no la tienen (o la
+    # tienen de una cuenta borrada) van a la que cobra los dividendos, si hay.
+    cobra = conn.execute("SELECT id FROM cuentas WHERE dividendos = 1 ORDER BY sort_order, rowid").fetchone()
+    existentes = {fila["id"] for fila in conn.execute("SELECT id FROM cuentas").fetchall()}
+    for fila in conn.execute("SELECT fecha, total, moneda_total, cuenta FROM dividendos").fetchall():
+        destino = fila["cuenta"] if fila["cuenta"] in existentes else (cobra["id"] if cobra is not None else None)
+        if destino is None:
+            continue
+        year, month = _anio_mes(fila["fecha"])
+        if not year or not _ya_ocurrido(year, month, hoy):
+            continue
+        a_euros = a_euros or _cambio_a_euros()
+        datos = resultado.setdefault(destino, {"intereses": Decimal(0), "dividendos": Decimal(0)})
+        datos["dividendos"] += a_euros(_decimal(fila["total"]), fila["moneda_total"])
+
+    return resultado
+
+
+def saldos(conn=None, hoy=None, a_euros=None):
+    """Saldo de cada cuenta a día de hoy:
+    `{id: {inicial, entradas, salidas, comisiones, intereses, dividendos, saldo}}`."""
     conn = conn or get_db()
     hoy = hoy or datetime.date.today()
     cuentas = listar_cuentas(conn)
     acumulado = {
         c["id"]: {"entradas": Decimal(0), "salidas": Decimal(0), "comisiones": Decimal(0)} for c in cuentas
     }
+    rendido = rendimientos(conn, hoy, a_euros)
 
     for fila in conn.execute("SELECT fecha, origen, destino, cantidad, comision FROM transferencias").fetchall():
         year, month = _year_month(fila["fecha"])
@@ -469,12 +676,17 @@ def saldos(conn=None, hoy=None):
     for cuenta in cuentas:
         datos = acumulado[cuenta["id"]]
         inicial = _decimal(cuenta["saldo_inicial"])
+        extra = rendido.get(cuenta["id"], {})
+        intereses = extra.get("intereses", Decimal(0))
+        dividendos = extra.get("dividendos", Decimal(0))
         resultado[cuenta["id"]] = {
             "inicial": inicial,
             "entradas": datos["entradas"],
             "salidas": datos["salidas"],
             "comisiones": datos["comisiones"],
-            "saldo": inicial + datos["entradas"] - datos["salidas"] - datos["comisiones"],
+            "intereses": intereses,
+            "dividendos": dividendos,
+            "saldo": inicial + datos["entradas"] - datos["salidas"] - datos["comisiones"] + intereses + dividendos,
         }
     return resultado
 

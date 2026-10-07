@@ -270,9 +270,14 @@ def _entrar(app):
     client = app.test_client()
     with client.session_transaction() as sesion_prueba:
         sesion_prueba["logged_in"] = True
+        sesion_prueba["csrf_token"] = "token-de-prueba"
         sesion_prueba.permanent = True
         sesion.abrir(sesion_prueba)
     return client
+
+
+def _salir(client):
+    return client.post("/logout", headers={"X-CSRF-Token": "token-de-prueba"})
 
 
 def test_dos_dispositivos_tienen_sesiones_independientes(crear_app, bp_prueba):
@@ -285,7 +290,7 @@ def test_dos_dispositivos_tienen_sesiones_independientes(crear_app, bp_prueba):
     assert portatil.get("/api/prueba").status_code == 200
     assert movil.get("/api/prueba").status_code == 200
 
-    movil.get("/logout")
+    _salir(movil)
 
     assert portatil.get("/api/prueba").status_code == 200
     assert movil.get("/api/prueba").status_code == 401

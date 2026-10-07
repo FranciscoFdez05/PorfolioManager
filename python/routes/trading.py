@@ -21,6 +21,9 @@ def saveTrading():
 
     if not isinstance(rows, list):
         return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+    if not all(isinstance(row, dict) for row in rows):
+        # Una fila que no es un objeto llegaba a row.get(...) y daba un 500.
+        return jsonify({"ok": False, "error": "Cada fila debe ser un objeto"}), 400
 
     sanitized = []
     for index, row in enumerate(rows):

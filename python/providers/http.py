@@ -39,6 +39,30 @@ log = logging.getLogger(__name__)
 _RETRYABLE_STATUS = {408, 425, 429, 500, 502, 503, 504}
 
 
+def motivo_conexion(error, proveedor="") -> str:
+    """El motivo de un fallo de conexión, dicho en corto y sin datos internos.
+
+    `error.reason` es el texto del sistema operativo («[WinError 10061] No se
+    puede establecer una conexión…», direcciones de proxy, rutas de
+    certificados) y llegaba tal cual al navegador dentro del mensaje de error.
+    Al usuario le sirve la categoría; el detalle completo va al log.
+    """
+    razon = getattr(error, "reason", error)
+    texto = str(razon).lower()
+    log.warning("Fallo de conexión%s: %s", f" con {proveedor}" if proveedor else "", razon)
+    if isinstance(razon, TimeoutError) or "timed out" in texto or "tiempo de espera" in texto:
+        return "tiempo de espera agotado"
+    if "refused" in texto or "10061" in texto or "denegó" in texto:
+        return "conexión rechazada"
+    if "getaddrinfo" in texto or "name or service" in texto or "11001" in texto or "nodename" in texto:
+        return "no se encuentra el servidor (DNS)"
+    if "certificate" in texto or "ssl" in texto:
+        return "error de certificado TLS"
+    if "unreachable" in texto or "inalcanzable" in texto:
+        return "red inalcanzable"
+    return "error de red"
+
+
 def _headers_base():
     return {
         "User-Agent": settings.proveedorUserAgent(),

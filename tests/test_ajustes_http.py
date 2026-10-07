@@ -95,26 +95,70 @@ def _anadir_claves(client, cabeceras, *claves, campo="finnhubKey"):
 
 
 def _listar(client, proveedor="finnhub"):
-    return client.get("/api/settings/apikeys").get_json()["proveedores"][proveedor]
+    """El listado, con el valor de cada clave pedido aparte como hace el ojo.
+
+    El listado ya no trae el valor (solo máscara y huella); estos tests
+    comprueban qué claves hay, así que lo completan con /apikey/ver.
+    """
+    from tests.conftest import CSRF_PRUEBA
+
+    info = client.get("/api/settings/apikeys").get_json()["proveedores"][proveedor]
+    for clave in info["claves"]:
+        respuesta = client.post(
+            "/api/settings/apikey/ver",
+            json={"proveedor": proveedor, "huella": clave["huella"]},
+            headers={"X-CSRF-Token": CSRF_PRUEBA},
+        )
+        clave["clave"] = respuesta.get_json()["clave"]
+    return info
 
 
-def test_la_lista_trae_cada_clave_enmascarada_y_entera(cliente):
-    """Enmascarada para pintarla; entera para que el ojo no vuelva al servidor.
+def test_la_lista_trae_cada_clave_enmascarada_y_sin_su_valor(cliente):
+    """Enmascarada para pintarla; el valor se pide aparte, clave a clave.
 
-    Mandar el valor completo es una decisión con supuesto detrás —LAN cerrada,
-    un solo usuario, sin salida a internet—: pedirlo aparte no protegería de
-    nada que la propia conexión no expusiera ya, y metía una petición por cada
-    pulsación del ojo.
+    Antes iba entero en el listado y quedaban todas las claves en la memoria de
+    la pestaña cada vez que se abría Ajustes.
     """
     client, cabeceras, _rutas = cliente
     _anadir_claves(client, cabeceras, "abcdefghijklmnop", "1234567890123456")
 
-    claves = _listar(client)["claves"]
+    respuesta = client.get("/api/settings/apikeys")
+    claves = respuesta.get_json()["proveedores"]["finnhub"]["claves"]
 
     assert [c["indice"] for c in claves] == [0, 1]
     assert claves[0]["vista"] == "abcd------mnop"
-    assert claves[0]["clave"] == "abcdefghijklmnop"
     assert claves[0]["longitud"] == 16
+    assert "clave" not in claves[0]
+    assert b"abcdefghijklmnop" not in respuesta.data
+
+    ver = client.post("/api/settings/apikey/ver",
+                      json={"proveedor": "finnhub", "huella": claves[0]["huella"]}, headers=cabeceras)
+    assert ver.get_json() == {"ok": True, "clave": "abcdefghijklmnop"}
+    assert ver.headers.get("Cache-Control") == "no-store"
+
+
+def test_ver_una_clave_exige_csrf_y_una_huella_existente(cliente):
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "abcdefghijklmnop")
+
+    assert client.post("/api/settings/apikey/ver",
+                       json={"proveedor": "finnhub", "huella": "0" * 16}).status_code == 403
+    assert client.post("/api/settings/apikey/ver",
+                       json={"proveedor": "finnhub", "huella": "0" * 16}, headers=cabeceras).status_code == 404
+    assert client.post("/api/settings/apikey/ver",
+                       json={"proveedor": "otro", "huella": "x"}, headers=cabeceras).status_code == 400
+
+
+def test_borrar_por_huella(cliente):
+    client, cabeceras, _rutas = cliente
+    _anadir_claves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb")
+    huella = client.get("/api/settings/apikeys").get_json()["proveedores"]["finnhub"]["claves"][1]["huella"]
+
+    respuesta = client.delete("/api/settings/apikey", json={"proveedor": "finnhub", "huella": huella},
+                              headers=cabeceras)
+
+    assert respuesta.get_json() == {"ok": True, "restantes": 1}
+    assert [c["clave"] for c in _listar(client)["claves"]] == ["primera-clave-aa"]
 
 
 def test_la_lista_de_claves_no_se_queda_en_ninguna_cache(cliente):

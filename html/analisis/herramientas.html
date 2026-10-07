@@ -625,7 +625,7 @@
                 </div>
                 <div class="hPanelActions">
                     <button class="herramientaSecBtn" id="hRatioLoadBtn">Cargar precios guardados</button>
-                    <button class="herramientaSecBtn" id="hRatioEditHistBtn" onclick="hRatioAbrirEditor()">Ratio histórico: <span id="hRatioHistLabel">60</span></button>
+                    <button class="herramientaSecBtn" id="hRatioEditHistBtn">Ratio histórico: <span id="hRatioHistLabel">60</span></button>
                 </div>
             </div>
             <div class="herramientaBody">
@@ -690,7 +690,7 @@
                 </div>
                 <div class="hPanelActions">
                     <button class="herramientaSecBtn" id="hOroBtcLoadBtn">Cargar precios guardados</button>
-                    <button class="herramientaSecBtn" id="hOroBtcEditHistBtn" onclick="hOroBtcAbrirEditor()">Ratio ref.: <span id="hOroBtcHistLabel">20</span> oz</button>
+                    <button class="herramientaSecBtn" id="hOroBtcEditHistBtn">Ratio ref.: <span id="hOroBtcHistLabel">20</span> oz</button>
                 </div>
             </div>
             <div class="herramientaBody">
@@ -878,7 +878,7 @@
                         <label for="hCapRefNombre">O con capitalización manual (oro, por ejemplo)</label>
                         <div class="hCapBuscar">
                             <input type="text" id="hCapRefNombre" placeholder="Nombre" autocomplete="off">
-                            <input type="number" id="hCapRefCapital" min="0" step="any" placeholder="Capitalización">
+                            <input type="number" id="hCapRefCapital" aria-label="Capitalización" min="0" step="any" placeholder="Capitalización">
                             <button class="herramientaSecBtn" id="hCapRefManualBtn" type="button">Añadir</button>
                         </div>
                         <div class="hCapNota">La capitalización manual se interpreta en <span class="hCapMonedaBase">moneda base</span>.</div>
@@ -928,8 +928,8 @@
             <input type="number" id="hRatioHistInput" min="1" step="1" value="60" placeholder="Ej: 60">
         </div>
         <div class="hBtnRow">
-            <button class="herramientaCalcBtn" data-no-autohide="true" onclick="hRatioGuardarHistorico()">Guardar</button>
-            <button class="herramientaResetBtn" onclick="hRatioCerrarEditor()">Cancelar</button>
+            <button class="herramientaCalcBtn" id="hRatioGuardarHistBtn" data-no-autohide="true">Guardar</button>
+            <button class="herramientaResetBtn" id="hRatioCancelarHistBtn">Cancelar</button>
         </div>
     </div>
 </div>
@@ -944,8 +944,8 @@
             <input type="number" id="hOroBtcHistInput" min="1" step="1" value="20" placeholder="Ej: 20">
         </div>
         <div class="hBtnRow">
-            <button class="herramientaCalcBtn" data-no-autohide="true" onclick="hOroBtcGuardarRef()">Guardar</button>
-            <button class="herramientaResetBtn" onclick="hOroBtcCerrarEditor()">Cancelar</button>
+            <button class="herramientaCalcBtn" id="hOroBtcGuardarRefBtn" data-no-autohide="true">Guardar</button>
+            <button class="herramientaResetBtn" id="hOroBtcCancelarRefBtn">Cancelar</button>
         </div>
     </div>
 </div>

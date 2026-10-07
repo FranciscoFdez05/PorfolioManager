@@ -37,12 +37,10 @@ const CATEGORIAS_PANELES = [
 ]
 
 function escapeCategoriasHtml(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;")
+    // Alias del escapeHtml común (js/core/dom.js). Había una copia por
+    // módulo y no todas escapaban las comillas, que es lo que importa en
+    // un atributo value="…".
+    return escapeHtml(value)
 }
 
 function normalizarCategoriaTexto(value) {

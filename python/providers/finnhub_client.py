@@ -105,66 +105,73 @@ def _normalize_currency_code(currency, fallback="EUR"):
     return normalized or fallback
 
 
+# Puntos según el tipo de resultado, para cada tipo de activo buscado. Se
+# aplica la primera fila que coincide (eran ramas if/elif).
+_PUNTOS_POR_TIPO = {
+    "acciones": ((("common stock", "adr", "etp", "etf"), 220), (("crypto", "forex"), -220)),
+    "etfs": ((("etf", "etp", "fund"), 320), (("common stock",), 60), (("crypto", "forex"), -320)),
+    "cripto": ((("crypto",), 220), (("common stock", "forex"), -160)),
+    "comoditis": ((("forex",), 260), (("common stock",), -180)),
+}
+_PALABRAS_COMODITIS = ("gold", "silver", "oil", "brent", "crude")
+_PALABRAS_FONDO = ("etf", "fund", "ucits", "ishares", "vanguard", "invesco", "spdr", "xtrackers", "amundi")
+
+
+def _puntos_por_busqueda(normalized_query, compact_symbol, compact_display, symbol, normalized_description):
+    if not normalized_query:
+        return 0
+    puntos = 0
+    if normalized_query in (compact_symbol, compact_display):
+        puntos += 500
+    if compact_symbol.startswith(normalized_query) or compact_display.startswith(normalized_query):
+        puntos += 200
+    if normalized_query in normalized_description:
+        puntos += 180
+    if normalized_query in _normalize_text(symbol):
+        puntos += 140
+    return puntos
+
+
+def _puntos_por_nombre(normalized_asset_name, normalized_description):
+    if not normalized_asset_name:
+        return 0
+    if normalized_asset_name == normalized_description:
+        return 260
+    return 180 if normalized_asset_name in normalized_description else 0
+
+
+def _puntos_por_tipo(preferred_asset_type, result_type, normalized_description):
+    puntos = next(
+        (valor for tipos, valor in _PUNTOS_POR_TIPO.get(preferred_asset_type, ()) if result_type in tipos), 0
+    )
+    if preferred_asset_type == "comoditis" and any(p in normalized_description for p in _PALABRAS_COMODITIS):
+        puntos += 220
+    return puntos
+
+
+def _puntos_por_mercado(preferred_asset_type, exchange, normalized_description):
+    puntos = 0
+    if exchange in PREFERRED_EXCHANGES_BY_TYPE.get(preferred_asset_type, ()):
+        puntos += 80
+    if preferred_asset_type in {"acciones", "etfs"} and any(p in normalized_description for p in _PALABRAS_FONDO):
+        puntos += 70 if preferred_asset_type == "etfs" else 20
+    return puntos
+
+
 def _score_remote_symbol(item, normalized_query, normalized_asset_name="", preferred_asset_type=""):
     symbol = str(item.get("symbol", "")).strip().upper()
     display_symbol = str(item.get("displaySymbol", symbol)).strip().upper()
-    description = str(item.get("description", "")).strip()
+    normalized_description = _normalize_text(str(item.get("description", "")).strip())
     result_type = str(item.get("type", "")).strip().lower()
     exchange = str(item.get("exchange", "")).strip().upper()
-    compact_symbol = _compact_symbol(symbol)
-    compact_display = _compact_symbol(display_symbol)
-    normalized_description = _normalize_text(description)
-    score = 0
 
-    if normalized_query:
-        if compact_symbol == normalized_query or compact_display == normalized_query:
-            score += 500
-        if compact_symbol.startswith(normalized_query) or compact_display.startswith(normalized_query):
-            score += 200
-        if normalized_query in normalized_description:
-            score += 180
-        if normalized_query in _normalize_text(symbol):
-            score += 140
-
-    if normalized_asset_name:
-        if normalized_asset_name == normalized_description:
-            score += 260
-        elif normalized_asset_name in normalized_description:
-            score += 180
-
-    if preferred_asset_type == "acciones":
-        if result_type in {"common stock", "adr", "etp", "etf"}:
-            score += 220
-        elif result_type in {"crypto", "forex"}:
-            score -= 220
-    elif preferred_asset_type == "etfs":
-        if result_type in {"etf", "etp", "fund"}:
-            score += 320
-        elif result_type == "common stock":
-            score += 60
-        elif result_type in {"crypto", "forex"}:
-            score -= 320
-    elif preferred_asset_type == "cripto":
-        if result_type == "crypto":
-            score += 220
-        elif result_type in {"common stock", "forex"}:
-            score -= 160
-    elif preferred_asset_type == "comoditis":
-        if result_type == "forex":
-            score += 260
-        elif result_type == "common stock":
-            score -= 180
-
-        if any(token in normalized_description for token in ("gold", "silver", "oil", "brent", "crude")):
-            score += 220
-
-    if preferred_asset_type in PREFERRED_EXCHANGES_BY_TYPE and exchange in PREFERRED_EXCHANGES_BY_TYPE[preferred_asset_type]:
-        score += 80
-
-    if preferred_asset_type in {"acciones", "etfs"} and any(token in normalized_description for token in ("etf", "fund", "ucits", "ishares", "vanguard", "invesco", "spdr", "xtrackers", "amundi")):
-        score += 70 if preferred_asset_type == "etfs" else 20
-
-    return score
+    return (
+        _puntos_por_busqueda(normalized_query, _compact_symbol(symbol), _compact_symbol(display_symbol),
+                             symbol, normalized_description)
+        + _puntos_por_nombre(normalized_asset_name, normalized_description)
+        + _puntos_por_tipo(preferred_asset_type, result_type, normalized_description)
+        + _puntos_por_mercado(preferred_asset_type, exchange, normalized_description)
+    )
 
 
 def _extract_code_candidates(query_text, remote_results):

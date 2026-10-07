@@ -34,6 +34,7 @@ from flask import Blueprint, jsonify, request
 
 from core.paths import BASE_DIR
 from providers import tradingview_client
+from providers.http import motivo_conexion
 from stores import ventas_fifo
 
 log = logging.getLogger(__name__)
@@ -187,7 +188,7 @@ def getCapitalizacion():
     except HTTPError as error:
         return jsonify({"ok": False, "error": f"TradingView devolvió HTTP {error.code}"}), 503
     except URLError as error:
-        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {error.reason}"}), 503
+        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {motivo_conexion(error, 'TradingView')}"}), 503
 
     dato = datos.get(ticker)
     if not dato or not dato["precio"]:

@@ -66,6 +66,11 @@ _PLANTILLAS = {
 CATEGORIAS_AVISO = {
     "proveedores": ("Problemas con los proveedores de cotizaciones", True),
     "backup": ("Copias de seguridad (creadas, fallidas, restauradas)", True),
+    # Aparte y apagado de fábrica: es el ZIP con todas las carteras (y las
+    # claves si se incluyen) subido a los servidores de Telegram, que no cifra
+    # los chats con bots de extremo a extremo. Antes salía con el aviso de
+    # «backup», encendido por defecto, en cuanto se configuraba el bot.
+    "backupFichero": ("Enviar el fichero de cada copia automática (todos tus datos)", False),
     "precios": ("Alertas de precio de los activos", True),
     "seguridad": ("Seguridad (login bloqueado, cambio de contraseña)", True),
     "sistema": ("Estado del servidor (arranque, disco, base de datos)", True),
@@ -157,7 +162,8 @@ def enviarPrueba():
             return False, _AVISO_SIN_START
         return False, f"Telegram devolvió HTTP {error.code}: {descripcion or str(error)}"[:300]
     except URLError as error:
-        return False, f"No se pudo conectar con Telegram: {error.reason}"
+        from providers.http import motivo_conexion
+        return False, f"No se pudo conectar con Telegram: {motivo_conexion(error, 'Telegram')}"
     except Exception as error:
         return False, str(error)[:200]
 
@@ -341,13 +347,13 @@ def _enviar_documento(token: str, chatId: str, ruta, texto: str) -> None:
     ruta = Path(ruta)
     limite = uuid.uuid4().hex
     cabecera = b"".join(
-        (f"--{limite}\r\nContent-Disposition: form-data; name=\"{nombre}\"\r\n\r\n{valor}\r\n").encode("utf-8")
+        (f"--{limite}\r\nContent-Disposition: form-data; name=\"{nombre}\"\r\n\r\n{valor}\r\n").encode()
         for nombre, valor in (("chat_id", chatId), ("caption", str(texto)[:1000]))
     ) + (
         f"--{limite}\r\nContent-Disposition: form-data; name=\"document\"; "
         f"filename=\"{ruta.name}\"\r\nContent-Type: application/zip\r\n\r\n"
-    ).encode("utf-8")
-    cuerpo = cabecera + ruta.read_bytes() + f"\r\n--{limite}--\r\n".encode("utf-8")
+    ).encode()
+    cuerpo = cabecera + ruta.read_bytes() + f"\r\n--{limite}--\r\n".encode()
     request = urllib.request.Request(
         _API_DOC_URL.format(token=token),
         data=cuerpo,

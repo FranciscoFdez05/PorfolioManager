@@ -30,7 +30,8 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
+    flex: 1;
 }
 
 .cuentasMain {
@@ -269,6 +270,14 @@
     gap: 4px 12px;
     font-size: 12px;
     color: var(--text-muted);
+}
+
+.cntCuentaRemunerada {
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 @media (max-width: 1100px) {

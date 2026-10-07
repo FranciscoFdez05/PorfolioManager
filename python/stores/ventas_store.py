@@ -140,16 +140,30 @@ def write_ventas_year(year, data):
     # y depender de lo que mande el cliente la dejaba vacía o desfasada.
     nombres = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM activos")}
 
+    # El tipo de cambio de cada venta lo rellena fx_historico y el formulario no
+    # lo manda: reescribir el ejercicio sin heredarlo lo borraba en cada guardado.
+    # Depende de la fecha y de la divisa, que en una venta es la de su activo.
+    fx_previos = {
+        (r["fecha"], r["asset_id"]): (r["fx_rate"], r["fx_fecha"], r["fx_origen"])
+        for r in conn.execute(
+            "SELECT fecha, asset_id, fx_rate, fx_fecha, fx_origen FROM ventas "
+            "WHERE year = ? AND fx_rate != ''",
+            (normalized,),
+        )
+    }
+
     conn.execute("INSERT OR IGNORE INTO ventas_years (year) VALUES (?)", (normalized,))
     conn.execute("DELETE FROM ventas WHERE year = ?", (normalized,))
     conn.executemany(
-        "INSERT INTO ventas (id, year, fecha, asset_id, activo, cantidad, valor_venta, comision_venta) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO ventas (id, year, fecha, asset_id, activo, cantidad, valor_venta, comision_venta, "
+        "fx_rate, fx_fecha, fx_origen) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), normalized, r.get("fecha", ""), r.get("assetId", ""),
              nombres.get(r.get("assetId", ""), r.get("activo", "")),
              r.get("cantidad", ""), r.get("valorVenta", ""),
-             r.get("comisionVenta", ""))
+             r.get("comisionVenta", ""),
+             *fx_previos.get((r.get("fecha", ""), r.get("assetId", "")), ("", "", "")))
             for r in data.get("rows", [])
         ]
     )

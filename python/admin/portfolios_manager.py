@@ -1,11 +1,15 @@
+import functools
 import json
 import logging
 import re
 import shutil
+import threading
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
 from core import settings
+from core.bloqueo import exclusivo
 from core.escritura import escribirJsonAtomico
 from core.paths import (
     DELETED_DIR as _DELETED_DIR,
@@ -39,13 +43,149 @@ def _write_meta(data):
     escribirJsonAtomico(_META_FILE, data)
 
 
+# ── Cerrojo del índice ───────────────────────────────────────────────────────
+# Crear, importar, activar, renombrar y borrar leen portfolios.json, lo
+# modifican y lo vuelven a escribir. Sin cerrojo, dos altas simultáneas
+# elegían el mismo id, la segunda borraba el .db que la primera acababa de
+# crear y el índice podía perder una de las dos. El Lock cubre los hilos de
+# este proceso; el fichero de bloqueo, el otro worker de gunicorn.
+_indice_lock = threading.Lock()
+
+
+@contextmanager
+def bloqueo_indice():
+    with _indice_lock, exclusivo(_META_FILE.with_name("portfolios.lock"), espera=10):
+        yield
+
+
+def _con_indice_bloqueado(funcion):
+    @functools.wraps(funcion)
+    def envoltura(*args, **kwargs):
+        with bloqueo_indice():
+            return funcion(*args, **kwargs)
+    return envoltura
+
+
+def _id_libre(meta, name: str) -> str:
+    """Id derivado del nombre que no use ningún portfolio ni ningún fichero.
+
+    Se mira también el disco: un .db huérfano (de un alta que se cortó a medias)
+    no aparece en el índice, y antes se borraba sin más para reutilizar su id.
+    """
+    base_id = _safe_id(name)
+    pid = base_id
+    existentes = {p["id"] for p in meta["portfolios"]}
+    contador = 2
+    while pid in existentes or (_PORTFOLIOS_DIR / f"{pid}.db").exists():
+        pid = f"{base_id}_{contador}"
+        contador += 1
+    return pid
+
+
+class NombreDuplicado(ValueError):
+    """Ya hay un portfolio con ese nombre visible. Las rutas responden 409."""
+
+
+def _nombre_en_uso(meta, name: str, salvo_id=None) -> bool:
+    buscado = name.strip().casefold()
+    return any(
+        str(p.get("name", "")).strip().casefold() == buscado and p.get("id") != salvo_id
+        for p in meta["portfolios"]
+    )
+
+
+def _nombre_libre(meta, name: str) -> str:
+    """`name`, o `name (2)`, `name (3)`… el primero que no use ningún portfolio."""
+    candidato, contador = name, 2
+    while _nombre_en_uso(meta, candidato):
+        sufijo = f" ({contador})"
+        candidato = f"{name[:50 - len(sufijo)]}{sufijo}"
+        contador += 1
+    return candidato
+
+
+def registrar_portfolio(name: str, colocar, renombrar_si_existe=False) -> str:
+    """Da de alta un portfolio de forma atómica respecto a las demás altas.
+
+    `colocar(destino)` deja el .db en su sitio (crearlo vacío, mover uno
+    importado). Elegir el id, colocar el fichero y apuntarlo en el índice van
+    bajo el mismo cerrojo.
+
+    El nombre visible no se puede repetir: el Atajo de iOS elige la cartera por
+    su nombre, y con dos «Carrera» escribía en la primera que encontrase. Diez
+    altas simultáneas con el mismo nombre creaban diez. Un alta normal falla con
+    NombreDuplicado; una importación (`renombrar_si_existe`) se queda con
+    «nombre (2)», porque restaurar una copia no debería fallar por eso.
+    """
+    with bloqueo_indice():
+        meta = get_portfolios()
+        if _nombre_en_uso(meta, name):
+            if not renombrar_si_existe:
+                raise NombreDuplicado(f"Ya existe un portfolio llamado «{name}»")
+            name = _nombre_libre(meta, name)
+        pid = _id_libre(meta, name)
+        _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
+        colocar(_PORTFOLIOS_DIR / f"{pid}.db")
+        meta["portfolios"].append({"id": pid, "name": name})
+        _write_meta(meta)
+    return pid
+
+
 def _safe_id(name: str) -> str:
     return re.sub(r"[^a-z0-9_-]", "_", name.lower().strip())[:40] or "portfolio"
 
 
 def _set_active(db_path: Path):
-    from core.db import set_active_db_path
+    global _firma_vista
+    from core.db import registrar_resolutor_activo, set_active_db_path
     set_active_db_path(db_path)
+    # Lo que hay ahora en portfolios.json es justo lo que se acaba de fijar:
+    # solo un cambio posterior (de otro proceso) obliga a releerlo.
+    _firma_vista = _firma_meta()
+    registrar_resolutor_activo(_activo_segun_meta)
+
+
+# Firma de portfolios.json la última vez que este proceso lo leyó para saber
+# cuál es el activo. Mientras no cambie, no hay nada que releer: el coste por
+# llamada es un stat().
+_firma_vista = None
+_firma_lock = threading.Lock()
+
+
+def _firma_meta():
+    try:
+        st = _META_FILE.stat()
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size, st.st_ino)
+
+
+def _activo_segun_meta(actual: Path):
+    """Ruta del portfolio activo si otro proceso la ha cambiado, o None.
+
+    Cada worker de gunicorn guarda su propia copia de la BD activa
+    (core/db.py). El cambio de portfolio se escribe en portfolios.json, que sí
+    es común, así que basta con releerlo cuando su firma cambia.
+    """
+    global _firma_vista
+    firma = _firma_meta()
+    if firma is None or firma == _firma_vista:
+        return None
+
+    with _firma_lock:
+        if firma == _firma_vista:
+            return None
+        meta = _read_meta()
+        if meta is None:
+            return None
+        _firma_vista = firma
+        try:
+            destino = _portfolio_db_path(str(meta.get("active") or ""))
+        except ValueError:
+            return None
+        if destino == Path(actual) or not destino.exists():
+            return None
+        return destino
 
 
 def _migrate_legacy_gastos(active_db_path: Path):
@@ -267,27 +407,11 @@ def create_portfolio(name: str) -> str:
     if not name:
         raise ValueError("El nombre no puede estar vacío")
 
-    meta = get_portfolios()
-    base_id = _safe_id(name)
-    pid = base_id
-    existing_ids = {p["id"] for p in meta["portfolios"]}
-    counter = 2
-    while pid in existing_ids:
-        pid = f"{base_id}_{counter}"
-        counter += 1
-
-    _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
-
     from core.db import init_db_at_path
-    new_db = _PORTFOLIOS_DIR / f"{pid}.db"
-    new_db.unlink(missing_ok=True)
-    init_db_at_path(new_db)
-
-    meta["portfolios"].append({"id": pid, "name": name})
-    _write_meta(meta)
-    return pid
+    return registrar_portfolio(name, init_db_at_path)
 
 
+@_con_indice_bloqueado
 def switch_portfolio(pid: str):
     meta = get_portfolios()
     ids = {p["id"] for p in meta["portfolios"]}
@@ -367,6 +491,7 @@ def get_portfolio_db_path(pid: str) -> Path:
     return _portfolio_db_path(pid)
 
 
+@_con_indice_bloqueado
 def delete_portfolio(pid: str):
     meta = get_portfolios()
     if pid not in {p["id"] for p in meta["portfolios"]}:
@@ -392,12 +517,20 @@ def delete_portfolio(pid: str):
                 shutil.move(str(sidecar), str(_DELETED_DIR / f"{pid}_{ts}.db{suffix}"))
 
 
+@_con_indice_bloqueado
 def rename_portfolio(pid: str, new_name: str):
+    """Cambia el nombre visible, bajo el cerrojo del índice como las altas.
+
+    El cerrojo no es reentrante: no se puede llamar desde otra función que ya lo
+    tenga tomado.
+    """
     new_name = new_name.strip()[:50]
     if not new_name:
         raise ValueError("El nombre no puede estar vacío")
 
     meta = get_portfolios()
+    if _nombre_en_uso(meta, new_name, salvo_id=pid):
+        raise NombreDuplicado(f"Ya existe un portfolio llamado «{new_name}»")
     for p in meta["portfolios"]:
         if p["id"] == pid:
             p["name"] = new_name

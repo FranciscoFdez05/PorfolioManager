@@ -192,7 +192,7 @@ CATALOGO: tuple[Ajuste, ...] = (
            minimo=1, maximo=1_048_576,
            descripcion="Caracteres que /api/firmar acepta firmar de una vez."),
     Ajuste("atajo", "fichero_clave", TEXTO, "API/movimientos.key", env="MOVIMIENTOS_FICHERO_CLAVE",
-           descripcion="Fichero con la clave HMAC, relativo a la raíz. La clave nunca va en config.ini."),
+           descripcion="Fichero con la clave HMAC, relativo al directorio de claves. La clave nunca va en config.ini."),
 
     # [backups]
     # Sin efecto desde la 2.1.1: la copia automática es el mismo zip que la

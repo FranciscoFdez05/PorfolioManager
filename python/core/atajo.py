@@ -97,9 +97,9 @@ def estado(urlBase: str = "") -> dict:
 def generarClave() -> str:
     """Crea una clave de firma nueva y la guarda cifrada. Devuelve el fichero.
 
-    Rehacerla invalida las firmas anteriores, pero **no obliga a rehacer el
-    Atajo**: el Atajo no guarda la clave, la pide a `/api/preparar` en cada
-    ejecución. Por eso el panel puede ofrecer el botón sin letra pequeña.
+    Rehacerla invalida las firmas anteriores y **revoca el Atajo instalado**: el
+    token de dispositivo que lleva dentro se deriva de la clave. Hay que volver a
+    descargarlo; es la manera de dejar fuera a un iPhone perdido.
     """
     ruta = firma_hmac.rutaFicheroClave()
     firma_hmac.escribirClaveNueva(ruta)

@@ -6,10 +6,15 @@ bancaria—, más los ingresos cobrados y los gastos pagados con ella, que se
 anotan en Ingresos y Gastos eligiendo esa cuenta. Meter dinero en ahorro **no es
 un gasto**: es una transferencia.
 
-Lo que este módulo añade a eso es lo propio de la ventana de ahorro: el objetivo,
-las cuentas remuneradas y los dividendos vinculados, y la aportación mensual
-automática. Todo eso es configuración por cuenta y vive en los ajustes del
-portfolio, no en la base de datos.
+Lo que este módulo añade a eso es lo propio de la ventana de ahorro: el objetivo
+y la aportación mensual automática. Eso es configuración por cuenta y vive en
+los ajustes del portfolio, no en la base de datos.
+
+La cuenta remunerada de cada cuenta y la cuenta que cobra los dividendos ya no
+están aquí: son de la cuenta, en la base (`cuentas_store`), valen para cualquier
+tipo de cuenta y entran en su saldo. Antes se guardaban en esta configuración,
+por nombre de cuenta; `vinculos_de_config` y `dividendos_de_config` sacan lo
+antiguo para pasarlo a la base.
 """
 
 import calendar
@@ -42,7 +47,8 @@ def clave_de_cuenta(cuenta):
 
 
 def cuentas_de_ahorro(conn=None):
-    return [c for c in listar_cuentas(conn) if c["tipo"] == "ahorro"]
+    """Las cuentas elegidas como de ahorro, sean del tipo que sean."""
+    return [c for c in listar_cuentas(conn) if c["ahorro"]]
 
 
 def buscar_por_clave(clave, conn=None):
@@ -75,28 +81,63 @@ def _importe_canonico(valor):
 def _cuenta_vacia(nombre):
     return {
         "nombre": nombre,
-        "remuneradas": [],
-        "incluirDividendos": False,
         "objetivo": "",
         "recurrente": {"activa": False, "importe": "", "dia": 1, "desde": ""},
     }
 
 
+def _entradas(raw):
+    """Las entradas por cuenta de una configuración, en la forma nueva o la antigua
+    (una sola cuenta, con `cuentasRemuneradas` e `incluirDividendos` en la raíz)."""
+    raw = raw if isinstance(raw, dict) else {}
+    if isinstance(raw.get("cuentas"), list):
+        return raw["cuentas"]
+    return [{
+        "nombre": "",
+        "remuneradas": raw.get("cuentasRemuneradas", []),
+        "incluirDividendos": raw.get("incluirDividendos", False),
+    }]
+
+
+def vinculos_de_config(raw, conn=None):
+    """Los vínculos cuenta ↔ remunerada que guardaba la configuración antigua.
+
+    Lista de `(id de cuenta, id de remunerada)`, en el orden en que estaban: si
+    una cuenta tenía varias, la tabla nueva se quedará con la primera que quepa.
+    """
+    pares = []
+    for entrada in _entradas(raw)[:_MAX_CUENTAS]:
+        if not isinstance(entrada, dict):
+            continue
+        ids = entrada.get("remuneradas")
+        if not isinstance(ids, list) or not ids:
+            continue
+        cuenta = buscar_por_clave(normalizar_nombre(entrada.get("nombre")), conn)
+        if cuenta is None:
+            continue
+        pares.extend((cuenta["id"], str(rid).strip()) for rid in ids[:100] if str(rid).strip())
+    return pares
+
+
+def dividendos_de_config(raw, conn=None):
+    """Identificador de la cuenta que tenía marcados los dividendos en la
+    configuración antigua, o `None`."""
+    for entrada in _entradas(raw)[:_MAX_CUENTAS]:
+        if isinstance(entrada, dict) and entrada.get("incluirDividendos"):
+            cuenta = buscar_por_clave(normalizar_nombre(entrada.get("nombre")), conn)
+            if cuenta is not None:
+                return cuenta["id"]
+    return None
+
+
 def normalizar_config(raw):
     """Configuración de las cuentas de ahorro, con la forma que guarda y lee todo.
 
-    Acepta también la forma antigua (una sola cuenta, con `cuentasRemuneradas` e
-    `incluirDividendos` en la raíz), que pasa a ser la cuenta principal.
+    Acepta también la forma antigua, que pasa a ser la cuenta principal. Las
+    remuneradas y los dividendos se quitan: viven en la base (ver
+    `vinculos_de_config` y `dividendos_de_config`).
     """
-    raw = raw if isinstance(raw, dict) else {}
-    if isinstance(raw.get("cuentas"), list):
-        entradas = raw["cuentas"]
-    else:
-        entradas = [{
-            "nombre": "",
-            "remuneradas": raw.get("cuentasRemuneradas", []),
-            "incluirDividendos": raw.get("incluirDividendos", False),
-        }]
+    entradas = _entradas(raw)
 
     cuentas = []
     vistos = set()
@@ -108,13 +149,6 @@ def normalizar_config(raw):
             continue
         vistos.add(nombre.lower())
 
-        remuneradas = []
-        origen = entrada.get("remuneradas", [])
-        for cid in (origen if isinstance(origen, list) else [])[:100]:
-            cid = str(cid).strip()[:120]
-            if cid and cid not in remuneradas:
-                remuneradas.append(cid)
-
         rec = entrada.get("recurrente") if isinstance(entrada.get("recurrente"), dict) else {}
         try:
             dia = max(1, min(31, int(rec.get("dia", 1))))
@@ -124,8 +158,6 @@ def normalizar_config(raw):
 
         cuentas.append({
             "nombre": nombre,
-            "remuneradas": remuneradas,
-            "incluirDividendos": bool(entrada.get("incluirDividendos", False)),
             "objetivo": _importe_canonico(entrada.get("objetivo")),
             "recurrente": {
                 "activa": bool(rec.get("activa", False)),

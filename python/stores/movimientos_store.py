@@ -13,7 +13,9 @@ una fila con otro formato se ordenaría y sumaría mal.
 
 from datetime import date, datetime
 
+from core import dinero
 from core.db import get_db, transaction
+from stores import revisiones
 from stores.cuentas_store import CuentaInvalida, resolver_cuenta
 from stores.gastos_store import MONTH_KEYS
 
@@ -24,8 +26,8 @@ _MAX_NOMBRE = 120
 
 # Cada tipo de movimiento escribe en su propio juego de tablas.
 _TABLAS_POR_TIPO = {
-    "gasto": {"filas": "gastos_rows", "tipos": "gastos_tipos"},
-    "ingreso": {"filas": "ingresos_rows", "tipos": "ingresos_tipos"},
+    "gasto": {"filas": "gastos_rows", "tipos": "gastos_tipos", "revision": "gastos"},
+    "ingreso": {"filas": "ingresos_rows", "tipos": "ingresos_tipos", "revision": "ingresos"},
 }
 
 
@@ -43,27 +45,26 @@ def normalizarTipo(valor):
 
 
 def normalizarImporte(valor):
-    """Acepta número o cadena numérica y devuelve un float positivo."""
+    """Acepta número o cadena numérica y devuelve un `Decimal` positivo con dos decimales.
+
+    Usa el lector de `core.dinero`, el mismo que el resto de la aplicación: el
+    Atajo manda texto («12,50», «12.50», «1.234,50 €») y antes se convertía con
+    un `float` propio que rechazaba el separador de miles.
+    """
     if isinstance(valor, bool) or valor is None or valor == "":
         raise DatosMovimientoInvalidos("El campo 'importe' es obligatorio y debe ser numérico")
 
-    if isinstance(valor, (int, float)):
-        importe = float(valor)
-    else:
-        # El Atajo envía el importe como texto; se admite coma decimal.
-        texto = str(valor).strip().replace("€", "").replace(" ", "").replace(",", ".")
-        try:
-            importe = float(texto)
-        except ValueError:
-            raise DatosMovimientoInvalidos("El campo 'importe' debe ser numérico") from None
-
-    if importe != importe or importe in (float("inf"), float("-inf")):
+    importe = dinero.aDecimalONulo(valor)
+    if importe is None:
+        raise DatosMovimientoInvalidos("El campo 'importe' debe ser numérico")
+    if not importe.is_finite():
         raise DatosMovimientoInvalidos("El campo 'importe' debe ser un número finito")
 
+    importe = dinero.redondear(importe)
     if importe <= 0:
         raise DatosMovimientoInvalidos("El campo 'importe' debe ser mayor que cero")
 
-    return round(importe, 2)
+    return importe
 
 
 # ISO primero y luego el formato español. No son ambiguos entre sí: el año de
@@ -104,18 +105,22 @@ def normalizarTexto(valor, maximo, campo, obligatorio=False):
 
 
 def formatearImporteEuro(importe):
-    """Convierte 1234.5 en '1.234,50 €', el formato que renderiza el frontend."""
-    formateado = f"{importe:,.2f}"
-    # f-string da formato inglés (1,234.50): se intercambian los separadores.
-    return formateado.replace(",", "\x00").replace(".", ",").replace("\x00", ".") + " €"
+    """Convierte 1234.5 en '1.234,50 €', el formato que pinta la tabla de Gastos e Ingresos."""
+    return dinero.aTextoEs(importe, decimales=2, miles=True) + " €"
 
 
 def formatearFechaTabla(fecha):
     return fecha.strftime("%d-%m-%Y")
 
 
-def sanitizarMovimiento(payload):
-    """Valida el JSON recibido y devuelve el movimiento ya normalizado."""
+def sanitizarMovimiento(payload, conn=None):
+    """Valida el JSON recibido y devuelve el movimiento ya normalizado.
+
+    `conn` es la cartera donde se va a apuntar: la cuenta se busca en ella. Sin
+    él se usaba siempre la activa, y una cuenta que solo existe en la cartera de
+    destino se rechazaba (o, con el mismo nombre y otro id, se guardaba un id
+    que en esa cartera no significa nada).
+    """
     if not isinstance(payload, dict):
         raise DatosMovimientoInvalidos("El cuerpo debe ser un objeto JSON")
 
@@ -128,7 +133,7 @@ def sanitizarMovimiento(payload):
     # por su nombre. La categoría es la de siempre. Mover dinero de una cuenta a
     # otra no se apunta aquí: son transferencias, que se hacen desde la web.
     try:
-        cuenta = resolver_cuenta(payload.get("cuenta"))
+        cuenta = resolver_cuenta(payload.get("cuenta"), conn)
     except CuentaInvalida as error:
         raise DatosMovimientoInvalidos(str(error)) from None
 
@@ -166,6 +171,10 @@ def _insertarMovimiento(conn, movimiento, tablas, year, month, fechaTabla, canti
             (movimiento["categoria"],),
         )
 
+    # Una pestaña con este año abierto tiene ahora una copia sin esta fila: al
+    # guardarla recibirá un 409 y fusionará en vez de borrarla.
+    revisiones.avanzar(conn, tablas["revision"], year)
+
     return cursor.lastrowid
 
 
@@ -198,7 +207,9 @@ def crearMovimiento(movimiento, conn=None):
         "tipo": movimiento["tipo"],
         "categoria": movimiento["categoria"],
         "nombre": movimiento["nombre"],
-        "importe": movimiento["importe"],
+        # Número en el JSON de respuesta (el Atajo lo enseña): se convierte
+        # una sola vez, aquí, sobre el valor ya redondeado.
+        "importe": float(dinero.redondear(movimiento["importe"])),
         "fecha": fecha.isoformat(),
         "year": year,
         "month": month,

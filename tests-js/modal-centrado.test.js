@@ -11,13 +11,13 @@
 // una es exactamente lo que rompe la otra.
 import { beforeAll, beforeEach, describe, expect, it } from "vitest"
 
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
     cargarScript("js/core/app-core.js")
-    cargarScript("js/cartera/assets.js")
+    cargarModulo("js/cartera/assets.js")
 })
 
 // jsdom no hace layout: `getBoundingClientRect` devuelve ceros y la función se

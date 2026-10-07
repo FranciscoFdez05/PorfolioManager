@@ -1016,27 +1016,27 @@ function buildOperationRow(row) {
     const tr = document.createElement("tr")
     tr.dataset.operationId = normalizedRow.id
     tr.innerHTML = `
-        <td>${normalizedRow.activo || ""}</td>
-        <td>${normalizedRow.fechaApertura || ""}</td>
-        <td>${normalizedRow.par || ""}</td>
+        <td>${escapeHtml(normalizedRow.activo)}</td>
+        <td>${escapeHtml(normalizedRow.fechaApertura)}</td>
+        <td>${escapeHtml(normalizedRow.par)}</td>
         <td class="operationsTickerCell">
             <span class="operationsTickerPrice"></span>
         </td>
-        <td>${normalizedRow.orden || ""}</td>
+        <td>${escapeHtml(normalizedRow.orden)}</td>
         <td>${formatOperationsMoney(normalizedRow.precioOrden, normalizedRow.precioCurrency || "USD")}</td>
         <td>${formatOperationsQuantity(normalizedRow.cantidad)}</td>
         <td>${formatOperationsMoney(normalizedRow.total, normalizedRow.currency || "USD")}</td>
         <td data-field="comisionesCripto">${formatOperationsCryptoCommissionCell(normalizedRow)}</td>
         <td data-field="comisionesFiat">${formatOperationsMoney(normalizedRow.comisionesFiat, "EUR")}</td>
         <td class="operationsEstadoCell" data-field="estado">${formatOperationsStatusCell(normalizedRow)}</td>
-        <td>${normalizedRow.fechaCierre || ""}</td>
+        <td>${escapeHtml(normalizedRow.fechaCierre)}</td>
         <td class="rowActionsCell">
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
-                    <button type="button" class="rowMenuItem assetRowEditBtn operacionRowEditBtn avActionBtn avEditBtn" data-row-id="${normalizedRow.id}">Editar</button>
+                    <button type="button" class="rowMenuItem assetRowEditBtn operacionRowEditBtn avActionBtn avEditBtn" data-row-id="${escapeHtml(normalizedRow.id)}">Editar</button>
                     <hr>
-                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn operacionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${normalizedRow.id}" title="${actionTitle}">${actionLabel}</button>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn operacionRowDeleteBtn avActionBtn avDeleteBtn" data-row-id="${escapeHtml(normalizedRow.id)}" title="${actionTitle}">${actionLabel}</button>
                 </div>
             </div>
         </td>
@@ -1108,7 +1108,7 @@ function formatOperationsCryptoCommissionCell(row = {}) {
             ? `<span class="operationsFeeHint">≈ ${formatMoney(amount * price, priceCurrency)}</span>`
             : ""
 
-    return `<span class="operationsFeeAmount">${formattedAmount}${symbol ? ` ${symbol}` : ""}</span>${hint}`
+    return `<span class="operationsFeeAmount">${formattedAmount}${symbol ? ` ${escapeHtml(symbol)}` : ""}</span>${hint}`
 }
 
 function getOperationsStatusModifier(estado) {
@@ -1129,7 +1129,7 @@ function formatOperationsStatusCell(row = {}) {
         (option) => `<option value="${option}"${option === estado ? " selected" : ""}>${option}</option>`
     ).join("")
 
-    return `<select class="operationsEstadoSelect is-${getOperationsStatusModifier(estado)}" data-row-id="${row.id}" title="Cambiar estado">${options}</select>`
+    return `<select class="operationsEstadoSelect is-${getOperationsStatusModifier(estado)}" data-row-id="${escapeHtml(row.id)}" title="Cambiar estado">${options}</select>`
 }
 
 function formatOperationsMoney(value, currency = "EUR") {
@@ -1342,13 +1342,21 @@ function openOperacionRowModal(rowId) {
         : createEmptyOperationRow()
 
     const assetOptions = getScopedOperationAssets()
-        .map((a) => `<option value="${a.id}"${rowData.assetId === a.id ? " selected" : ""}>${a.name}</option>`)
+        .map(
+            (a) =>
+                `<option value="${escapeHtml(a.id)}"${rowData.assetId === a.id ? " selected" : ""}>${escapeHtml(a.name)}</option>`
+        )
         .join("")
     const pairOptions = getOperationPairOptions(rowData.assetId)
     const selectedPair = pairOptions.includes(rowData.par) ? rowData.par : pairOptions[0] || ""
     const pairOptionsHtml = pairOptions.length
-        ? pairOptions.map((p) => `<option value="${p}"${p === selectedPair ? " selected" : ""}>${p}</option>`).join("")
-        : `<option value="${rowData.par || ""}">${rowData.par || "Sin pares"}</option>`
+        ? pairOptions
+              .map(
+                  (p) =>
+                      `<option value="${escapeHtml(p)}"${p === selectedPair ? " selected" : ""}>${escapeHtml(p)}</option>`
+              )
+              .join("")
+        : `<option value="${escapeHtml(rowData.par)}">${escapeHtml(rowData.par || "Sin pares")}</option>`
 
     const fieldsHtml = `
         <div class="assetRowModalField">
@@ -1360,7 +1368,7 @@ function openOperacionRowModal(rowId) {
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Fecha apertura</label>
-            <input id="opModalFecha" class="assetRowModalInput" type="text" value="${rowData.fechaApertura || ""}" placeholder="dd-mm-aaaa">
+            <input id="opModalFecha" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.fechaApertura)}" placeholder="dd-mm-aaaa">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Par</label>
@@ -1376,23 +1384,23 @@ function openOperacionRowModal(rowId) {
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Precio orden</label>
-            <input id="opModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.precioOrden || "")}">
+            <input id="opModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(stripCurrencyText(rowData.precioOrden || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Cantidad</label>
-            <input id="opModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.cantidad || ""}">
+            <input id="opModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.cantidad)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">${operationsScope === "bolsa" ? "Comisiones en títulos" : "Comisiones cripto"}</label>
-            <input id="opModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.comisionesCripto || ""}">
+            <input id="opModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.comisionesCripto)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Comisiones €</label>
-            <input id="opModalComisionesFiat" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.comisionesFiat || "")}">
+            <input id="opModalComisionesFiat" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(stripCurrencyText(rowData.comisionesFiat || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Total</label>
-            <input id="opModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${stripCurrencyText(rowData.total || "")}">
+            <input id="opModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(stripCurrencyText(rowData.total || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Estado</label>
@@ -1402,7 +1410,7 @@ function openOperacionRowModal(rowId) {
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Fecha cierre</label>
-            <input id="opModalFechaCierre" class="assetRowModalInput" type="text" value="${rowData.fechaCierre || ""}" placeholder="dd-mm-aaaa">
+            <input id="opModalFechaCierre" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.fechaCierre)}" placeholder="dd-mm-aaaa">
         </div>
     `
 
@@ -1441,7 +1449,7 @@ function openOperacionRowModal(rowId) {
         const pairs = getOperationPairOptions(assetId)
         const parSelect = fields.querySelector("#opModalPar")
         parSelect.innerHTML = pairs.length
-            ? pairs.map((p) => `<option value="${p}">${p}</option>`).join("")
+            ? pairs.map((p) => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join("")
             : `<option value="">Sin pares</option>`
     })
 

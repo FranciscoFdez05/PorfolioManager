@@ -1,6 +1,11 @@
 # Dependencias solo de desarrollo/CI. La imagen Docker instala únicamente
 # requirements.txt, así que nada de esto llega a producción.
--r requirements.txt
+#
+# Apunta a requirements.in y no al .txt: el .txt lleva hashes, y pip exige que
+# o todos los requisitos de una misma instalación los lleven o ninguno. Por eso
+# se instala en dos pasos (ver CONTRIBUTING.md): primero el .txt, con las
+# versiones exactas de producción, y luego este, que ya las encuentra puestas.
+-r requirements.in
 
 pytest>=8.3.0
 pytest-cov>=6.0.0

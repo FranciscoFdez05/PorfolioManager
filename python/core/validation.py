@@ -20,6 +20,18 @@ DEFAULT_MAX_LENGTH = 512
 MAX_ROWS = 10_000
 
 
+def normalize_year(year_value):
+    """Año de cuatro dígitos como texto, o None si no lo es.
+
+    Vivía duplicada, idéntica, en stores/gastos_store.py y
+    stores/ingresos_store.py; las dos lo siguen exportando desde aquí.
+    """
+    text = str(year_value or "").strip()
+    if not text.isdigit() or len(text) != 4:
+        return None
+    return text
+
+
 def json_body(required=True) -> dict:
     """Cuerpo JSON de la petición actual como dict.
 

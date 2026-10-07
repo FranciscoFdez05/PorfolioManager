@@ -136,6 +136,23 @@ def construir(anio, filas, resumen):
 
 # ── CSV ───────────────────────────────────────────────────────────────────────
 
+# Lo que Excel y LibreOffice interpretan como el comienzo de una fórmula.
+_INICIO_FORMULA = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _texto_csv(valor):
+    """Texto escrito por el usuario, a salvo de ejecutarse como fórmula.
+
+    Un activo llamado `=HYPERLINK("http://…";"ver")` salía tal cual en el CSV y
+    la hoja de cálculo lo ejecutaba al abrirlo. El apóstrofo inicial lo deja
+    como texto. Solo se aplica a lo que escribe el usuario (nombres, fechas
+    tal cual se teclearon): los importes los genera `_es()` y un negativo
+    tiene que seguir siendo un número.
+    """
+    texto = "" if valor is None else str(valor)
+    return "'" + texto if texto.startswith(_INICIO_FORMULA) else texto
+
+
 def a_csv(informe):
     """CSV con separador ';' y coma decimal: lo que espera Excel en español.
 
@@ -154,9 +171,9 @@ def a_csv(informe):
     escritor.writerow([etiqueta for _clave, etiqueta in COLUMNAS_DETALLE])
     for fila in informe["detalle"]:
         escritor.writerow([
-            fila.get("fecha", "") if clave == "fecha" else
-            fila.get("activo", "") if clave == "activo" else
-            fila.get("cantidad", "") if clave == "cantidad" else
+            _texto_csv(fila.get("fecha", "")) if clave == "fecha" else
+            _texto_csv(fila.get("activo", "")) if clave == "activo" else
+            _texto_csv(fila.get("cantidad", "")) if clave == "cantidad" else
             _es(fila.get(clave))
             for clave, _etiqueta in COLUMNAS_DETALLE
         ])
@@ -197,7 +214,7 @@ def a_csv(informe):
         escritor.writerow(["FILAS EXCLUIDAS DEL CÁLCULO"])
         escritor.writerow(["Fecha", "Elemento patrimonial", "Motivo"])
         for fila in informe["incidencias"]:
-            escritor.writerow([fila.get("fecha", ""), fila.get("activo", ""),
+            escritor.writerow([_texto_csv(fila.get("fecha", "")), _texto_csv(fila.get("activo", "")),
                                fila.get("mensaje", "")])
 
     escritor.writerow([])

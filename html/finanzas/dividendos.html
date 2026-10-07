@@ -1,11 +1,16 @@
 <div class="dividendosLayout">
     <div class="interesesYearBar">
+        <div class="cuentasBar hidden">
+            <div class="cuentasList" id="dividendosCuentasList"></div>
+        </div>
         <div class="interesesYearList" id="dividendosYearList"></div>
         <div class="interesesMenuWrapper">
             <button class="interesesMenuBtn" id="dividendosMenuBtn" type="button" title="Acciones">···</button>
             <div class="interesesMenuDropdown hidden" id="dividendosMenuDropdown">
                 <button id="addDividendosYearBtn" class="interesesMenuOption" type="button">+ Añadir año</button>
                 <button id="deleteDividendosYearBtn" class="interesesMenuOption interesesMenuOptionDanger" type="button">Eliminar año</button>
+                <div class="interesesMenuDivider"></div>
+                <button id="addDividendosCuentaBtn" class="interesesMenuOption" type="button">+ Añadir cuenta de dividendos</button>
             </div>
         </div>
     </div>

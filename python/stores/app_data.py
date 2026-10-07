@@ -2,13 +2,12 @@ import logging
 import os
 import re
 
+from core import paths
 from core.db import get_db, init_db, transactional
-from core.paths import BASE_DIR
 from core.secret_store import read_secret_lines
 
 log = logging.getLogger(__name__)
 
-apiDir = BASE_DIR / "API"
 _eodhdKeyRotationIndex = 0
 _alphaVantageKeyRotationIndex = 0
 
@@ -87,23 +86,64 @@ def readInteresesFile():
                 "SELECT id, nombre FROM cuentas_remuneradas ORDER BY sort_order, rowid"
             ).fetchall()
 
+    # Cada remunerada es una cuenta de «Cuentas»: se llama como ella. Las de
+    # antes de que fuera así pueden no tener cuenta (`cuenta` vacío).
+    vinculos = {
+        f["remunerada_id"]: (f["cuenta_id"], f["nombre"])
+        for f in conn.execute(
+            "SELECT v.remunerada_id, v.cuenta_id, c.nombre FROM cuenta_remunerada_vinculo v "
+            "JOIN cuentas c ON c.id = v.cuenta_id"
+        ).fetchall()
+    }
+
     result = []
     for c in cuentas:
         filas = conn.execute(
             "SELECT fecha, acumulado, impuestos FROM intereses_v2 WHERE cuenta_id = ? ORDER BY id",
             (c["id"],)
         ).fetchall()
+        cuenta_id, cuenta_nombre = vinculos.get(c["id"], ("", ""))
         result.append({
             "id": c["id"],
-            "nombre": c["nombre"],
+            "nombre": cuenta_nombre or c["nombre"],
+            "cuenta": cuenta_id,
             "rows": [{"fecha": r["fecha"], "acumulado": r["acumulado"], "impuestos": r["impuestos"]} for r in filas]
         })
 
     return {"cuentas": result}
 
 
+def _vincular_remunerada(conn, remunerada_id, cuenta_id):
+    """Hace de `cuenta_id` (una cuenta de «Cuentas») la cuenta de la remunerada.
+
+    La remunerada puede cambiar de cuenta; la cuenta de destino, en cambio, no
+    puede tener ya otra remunerada. Devuelve el nombre de la cuenta.
+    """
+    from stores.cuentas_store import CuentaInvalida
+
+    fila = conn.execute("SELECT nombre FROM cuentas WHERE id = ?", (cuenta_id,)).fetchone()
+    if fila is None:
+        raise CuentaInvalida("La cuenta elegida no existe")
+    otra = conn.execute(
+        "SELECT 1 FROM cuenta_remunerada_vinculo WHERE cuenta_id = ? AND remunerada_id <> ?",
+        (cuenta_id, remunerada_id),
+    ).fetchone()
+    if otra is not None:
+        raise CuentaInvalida(f"«{fila['nombre']}» ya es una cuenta remunerada")
+    conn.execute("DELETE FROM cuenta_remunerada_vinculo WHERE remunerada_id = ?", (remunerada_id,))
+    conn.execute(
+        "INSERT INTO cuenta_remunerada_vinculo (remunerada_id, cuenta_id) VALUES (?, ?)", (remunerada_id, cuenta_id)
+    )
+    return fila["nombre"]
+
+
 @transactional
 def writeInteresesFile(data):
+    """Guarda las cuentas remuneradas y sus intereses.
+
+    Una entrada con `cuenta` la vincula a esa cuenta de «Cuentas» (y toma su
+    nombre); sin la clave, el vínculo que tuviera se queda como está.
+    """
     conn = get_db()
     cuentas = data.get("cuentas", [])
 
@@ -118,10 +158,17 @@ def writeInteresesFile(data):
         nombre = str(cuenta.get("nombre", "")).strip()
         if not cid:
             continue
+        # Upsert y no INSERT OR REPLACE: REPLACE borra la fila antes de volver a
+        # escribirla, y ese borrado deshacía el vínculo con su cuenta de dinero.
         conn.execute(
-            "INSERT OR REPLACE INTO cuentas_remuneradas (id, nombre, sort_order) VALUES (?, ?, ?)",
+            "INSERT INTO cuentas_remuneradas (id, nombre, sort_order) VALUES (?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET nombre = excluded.nombre, sort_order = excluded.sort_order",
             (cid, nombre, i)
         )
+        cuenta_id = str(cuenta.get("cuenta") or "").strip()
+        if cuenta_id:
+            nombre_cuenta = _vincular_remunerada(conn, cid, cuenta_id)
+            conn.execute("UPDATE cuentas_remuneradas SET nombre = ? WHERE id = ?", (nombre_cuenta, cid))
         conn.execute("DELETE FROM intereses_v2 WHERE cuenta_id = ?", (cid,))
         rows = cuenta.get("rows", [])
         if rows:
@@ -138,7 +185,7 @@ def writeInteresesFile(data):
 def readDividendosFile():
     conn = get_db()
     rows = conn.execute(
-        "SELECT fecha, instrumento, acciones, dividendo_accion, impuestos, total, moneda_dividendo, moneda_total FROM dividendos ORDER BY id"
+        "SELECT fecha, instrumento, acciones, dividendo_accion, impuestos, total, moneda_dividendo, moneda_total, cuenta FROM dividendos ORDER BY id"
     ).fetchall()
     return {"rows": [
         {
@@ -153,6 +200,7 @@ def readDividendosFile():
             # y devolvería el fallback casi siempre (de ahí el noqa: SIM118).
             "monedaDividendo": r["moneda_dividendo"] if "moneda_dividendo" in r.keys() else "USD",  # noqa: SIM118
             "monedaTotal": r["moneda_total"] if "moneda_total" in r.keys() else "EUR",  # noqa: SIM118
+            "cuenta": r["cuenta"] or "",
         }
         for r in rows
     ]}
@@ -163,11 +211,11 @@ def writeDividendosFile(data):
     conn = get_db()
     conn.execute("DELETE FROM dividendos")
     conn.executemany(
-        "INSERT INTO dividendos (fecha, instrumento, acciones, dividendo_accion, impuestos, total, moneda_dividendo, moneda_total) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO dividendos (fecha, instrumento, acciones, dividendo_accion, impuestos, total, moneda_dividendo, moneda_total, cuenta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("fecha", ""), r.get("instrumento", ""), r.get("acciones", ""),
              r.get("dividendoAccion", ""), r.get("impuestos", ""), r.get("total", ""),
-             r.get("monedaDividendo", "USD"), r.get("monedaTotal", "EUR"))
+             r.get("monedaDividendo", "USD"), r.get("monedaTotal", "EUR"), r.get("cuenta", ""))
             for r in data.get("rows", [])
         ]
     )
@@ -731,12 +779,15 @@ def readApiKeysConOrigen(proveedor):
     usadas no tuvieran nada que ver.
     """
     variable, fichero, admiteVarias = API_KEY_SOURCES[proveedor]
-    delFichero = _sin_ejemplos(_read_api_keys(apiDir / fichero), f"una clave de {fichero}")
+    # `paths.API_DIR` y no `<raíz>/API`: Ajustes guarda las claves en el
+    # directorio de [rutas] claves, y leerlas de otro sitio hacía que, con esa
+    # ruta cambiada, las guardadas no se usaran nunca.
+    delFichero = _sin_ejemplos(_read_api_keys(paths.API_DIR / fichero), f"una clave de {fichero}")
 
     # Compatibilidad: la clave de Finnhub se aceptaba en twelvedata.key, y ese
     # fichero sigue leyéndose cuando finnhub.key está vacío.
     if proveedor == "finnhub" and not delFichero:
-        delFichero = _sin_ejemplos(_read_api_keys(apiDir / "twelvedata.key"), "una clave de twelvedata.key")
+        delFichero = _sin_ejemplos(_read_api_keys(paths.API_DIR / "twelvedata.key"), "una clave de twelvedata.key")
 
     delEntorno = _clavesDeEntorno(variable, admiteVarias)
 

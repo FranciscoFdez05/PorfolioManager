@@ -19,5 +19,17 @@ venv/
 logs/
 data/
 
+# Solo de desarrollo: ni las dependencias de Node ni las pruebas ni la carpeta
+# de la auditoría tienen que entrar en la imagen (node_modules solo, cientos
+# de MB).
+node_modules/
+tests/
+tests-js/
+auditoria/
+.pytest_cache/
+.ruff_cache/
+coverage.xml
+.coverage
+
 # Evitar que claves locales entren en la imagen
 API/*.key

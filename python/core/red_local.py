@@ -21,14 +21,17 @@ en core/settings.py avisa al arrancar de esa combinación.
 
 import functools
 import ipaddress
+import json
 import logging
 import threading
 from collections import OrderedDict
 from datetime import UTC, datetime
+from pathlib import Path
 
 from flask import jsonify, request
 
 from core import atajo_acceso, settings
+from core.escritura import escribirJsonAtomico
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +82,86 @@ def olvidarRechazos():
         _rechazos.clear()
 
 
+# ── Nombres de host admitidos (DNS rebinding) ─────────────────────────────────
+# El filtro de IP no basta frente a una web maliciosa visitada desde la LAN: su
+# dominio puede pasar a resolver a la IP de este servidor (DNS rebinding) y el
+# navegador de la víctima hace entonces peticiones «del mismo origen» que salen
+# de una IP permitida. Lo que delata esas peticiones es la cabecera Host, que
+# lleva el dominio del atacante. Se admiten:
+#
+#   - IPs literales y `localhost`: con ellas no hay dominio que reapuntar.
+#   - Los nombres por los que ya se ha entrado CON SESIÓN iniciada. Se aprenden
+#     solos (lo anota require_login en core/seguridad_app.py): el dominio de un
+#     atacante nunca llega con la cookie de sesión de esta aplicación, y así no
+#     hay que mantener ninguna lista a mano.
+MAX_HOSTS = 20
+_hostsCache = {"firma": None, "hosts": frozenset()}
+_hostsLock = threading.Lock()
+
+
+def _ficheroHosts():
+    # Se deriva de ACCESO_FILE en cada llamada para seguir a donde apunte (los
+    # tests lo redirigen a un temporal).
+    return atajo_acceso.ACCESO_FILE.parent / "hosts.json"
+
+
+def nombreDeHost(cabeceraHost) -> str:
+    """El nombre de la cabecera Host, sin puerto y en minúsculas."""
+    texto = str(cabeceraHost or "").strip().lower()
+    if texto.startswith("["):                        # IPv6: [::1]:5000
+        return texto[1:texto.find("]")] if "]" in texto else ""
+    if texto.count(":") == 1:                        # nombre:puerto o ipv4:puerto
+        texto = texto.rsplit(":", 1)[0]
+    return texto.rstrip(".")
+
+
+def _esDireccionDirecta(nombre) -> bool:
+    if nombre == "localhost":
+        return True
+    try:
+        ipaddress.ip_address(nombre)
+        return True
+    except ValueError:
+        return False
+
+
+def hostsConocidos() -> frozenset:
+    ruta = _ficheroHosts()
+    try:
+        st = ruta.stat()
+    except OSError:
+        return frozenset()
+    firma = (str(ruta), st.st_mtime_ns, st.st_size)
+    if firma != _hostsCache["firma"]:
+        try:
+            datos = json.loads(ruta.read_text("utf-8"))
+            hosts = frozenset(str(h) for h in datos.get("hosts", []) if str(h).strip())
+        except (OSError, ValueError, AttributeError):
+            hosts = frozenset()
+        _hostsCache.update(firma=firma, hosts=hosts)
+    return _hostsCache["hosts"]
+
+
+def anotarHostConSesion(cabeceraHost) -> None:
+    """Recuerda el nombre por el que ha entrado una sesión válida."""
+    nombre = nombreDeHost(cabeceraHost)
+    if not nombre or _esDireccionDirecta(nombre) or nombre in hostsConocidos():
+        return
+    with _hostsLock:
+        hosts = [h for h in hostsConocidos() if h != nombre] + [nombre]
+        try:
+            escribirJsonAtomico(_ficheroHosts(), {"hosts": hosts[-MAX_HOSTS:]})
+        except OSError as error:
+            log.warning("[red_local] No se pudo guardar el host %s: %s", nombre, error)
+            return
+    log.info("[red_local] Nombre de host admitido para el Atajo: %s", nombre)
+
+
+def hostAdmitido(cabeceraHost) -> bool:
+    nombre = nombreDeHost(cabeceraHost)
+    return bool(nombre) and (_esDireccionDirecta(nombre) or nombre in hostsConocidos())
+
+
 def atajoActivado():
     return settings.obtener("atajo.activado")
 
@@ -124,6 +207,35 @@ def ipEstaPermitida(ipCliente, redes=None):
     return any(direccion in red for red in redes)
 
 
+# Rangos que reparte Docker a sus redes (el puente por defecto es 172.17/16, las
+# redes de compose van de 172.18 a 172.31) y el de Docker Desktop. 172.16/16 no
+# está: es el primero que se usa en redes domésticas o de empresa de ese bloque.
+_REDES_INTERNAS_DOCKER = tuple(
+    ipaddress.ip_network(r)
+    for r in ("172.17.0.0/16", "172.18.0.0/15", "172.20.0.0/14", "172.24.0.0/13", "192.168.65.0/24")
+)
+
+
+def pareceRedInternaDeDocker(ipCliente) -> bool:
+    """¿La IP con la que llega la petición es la de una red interna de Docker?
+
+    Solo dentro de un contenedor. Cuando pasa, la IP real del cliente se ha
+    perdido por el camino (docker-proxy, Docker Desktop, o `PROXY_FIX_HOPS` sin
+    poner con Caddy delante): todos los clientes se ven con esa IP y el filtro de
+    red no distingue a nadie. El panel lo avisa junto a «IP con la que te ve el
+    servidor».
+    """
+    if not Path("/.dockerenv").exists():
+        return False
+    try:
+        direccion = ipaddress.ip_address(str(ipCliente or "").strip())
+    except ValueError:
+        return False
+    if direccion.version == 6 and direccion.ipv4_mapped is not None:
+        direccion = direccion.ipv4_mapped
+    return any(direccion in red for red in _REDES_INTERNAS_DOCKER)
+
+
 def obtenerIpCliente():
     """IP de origen de la petición.
 
@@ -167,6 +279,17 @@ def soloRedLocal(func):
                 "ok": False,
                 "error": "Origen no autorizado",
                 "ip": ipCliente or "",
+            }), 403
+
+        if not hostAdmitido(request.host):
+            nombre = nombreDeHost(request.host)
+            log.warning("[red_local] %s %s rechazada: Host %r no reconocido", request.method, request.path, nombre)
+            return jsonify({
+                "ok": False,
+                "error": (
+                    f"La dirección «{nombre}» no está reconocida. Entra una vez en la aplicación "
+                    "con esa misma dirección y la sesión iniciada, y vuelve a lanzar el Atajo."
+                ),
             }), 403
 
         return func(*args, **kwargs)

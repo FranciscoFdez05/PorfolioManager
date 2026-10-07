@@ -113,6 +113,11 @@ init_portfolios()
 app = Flask(__name__, static_folder=None)
 
 _secret_key = os.environ.get("SECRET_KEY", "").strip()
+# La de .env.example es pública: con ella cualquiera firma una cookie de sesión
+# válida sin contraseña y descifra auth.dat y API/*.key. docker-setup la
+# sustituye, pero copiar el ejemplo a mano arrancaba sin decir nada. Una clave
+# corta tampoco: es la que firma la sesión y deriva el cifrado de los secretos.
+seguridad_app.rechazar_secret_key_insegura(_secret_key)
 if not _secret_key:
     logging.critical(
         "SECRET_KEY no configurada. Se usará una clave temporal: las sesiones serán "
@@ -301,4 +306,10 @@ if __name__ == "__main__":
     # Servidor de desarrollo. En Docker manda gunicorn (ver entrypoint.sh), que
     # lee los mismos valores de config.ini.
     logging.info("HTTP — %s:%s", settings.host(), settings.puerto())
+    # El servidor de desarrollo anunciaba «Werkzeug/x.y Python/x.y» en cada
+    # respuesta. En Docker contesta gunicorn tras Caddy y no dan versiones.
+    from werkzeug.serving import WSGIRequestHandler
+
+    WSGIRequestHandler.server_version = "PorfolioManager"
+    WSGIRequestHandler.sys_version = ""
     app.run(host=settings.host(), port=settings.puerto(), debug=settings.modoDebug())

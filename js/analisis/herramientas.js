@@ -23,6 +23,16 @@ async function initHerramientasLogic() {
     hRatioAplicarHistoricoLabels()
     hOroBtcAplicarRefLabels()
 
+    // Los editores de las referencias se abrían con onclick="…" en el HTML, y
+    // la CSP (script-src sin 'unsafe-inline') bloquea esos manejadores: los
+    // botones no hacían nada. Se enganchan aquí, como el resto.
+    document.getElementById("hRatioEditHistBtn")?.addEventListener("click", hRatioAbrirEditor)
+    document.getElementById("hRatioGuardarHistBtn")?.addEventListener("click", hRatioGuardarHistorico)
+    document.getElementById("hRatioCancelarHistBtn")?.addEventListener("click", hRatioCerrarEditor)
+    document.getElementById("hOroBtcEditHistBtn")?.addEventListener("click", hOroBtcAbrirEditor)
+    document.getElementById("hOroBtcGuardarRefBtn")?.addEventListener("click", hOroBtcGuardarRef)
+    document.getElementById("hOroBtcCancelarRefBtn")?.addEventListener("click", hOroBtcCerrarEditor)
+
     // ── Navegación, reinicio y Enter ───────────────────────────────
     // Por delegación y no botón a botón: las herramientas que el usuario deja
     // en html/analisis/herramientas-extra/ se montan después de esto, y con un
@@ -205,9 +215,7 @@ async function hCargarSelectoresDeActivos() {
         return
     }
 
-    const visibles = activos
-        .filter((a) => !a.hidden)
-        .sort((a, b) => (a.name || "").localeCompare(b.name || "", "es"))
+    const visibles = activos.filter((a) => !a.hidden).sort((a, b) => (a.name || "").localeCompare(b.name || "", "es"))
 
     document.querySelectorAll("#hPrecioActivo, #hSvActivo").forEach((select) => {
         // La primera opción es el texto de «sin elegir» y se queda.
@@ -627,10 +635,12 @@ async function hSvCalcular() {
     } else if (s.notaAntiaplicacion) {
         textos.push(
             `${s.notaAntiaplicacion} La pérdida no computa ahora (${importe(s.perdidaNoComputable)}): ` +
-            "se suma al coste de las participaciones recompradas y saldrá cuando las vendas."
+                "se suma al coste de las participaciones recompradas y saldrá cuando las vendas."
         )
     } else if (parseFloat(s.compensadoAnteriores) > 0) {
-        textos.push(`Se compensan ${importe(s.compensadoAnteriores)} de pérdidas de ejercicios anteriores, y por eso el tipo efectivo baja.`)
+        textos.push(
+            `Se compensan ${importe(s.compensadoAnteriores)} de pérdidas de ejercicios anteriores, y por eso el tipo efectivo baja.`
+        )
         tono = "hRatioInfoPos"
     }
 
@@ -1058,8 +1068,8 @@ async function hLoadDividendos() {
         sorted.forEach(([name, d]) => {
             const tr = document.createElement("tr")
             tr.innerHTML = `
-                <td class="hDivName">${name}</td>
-                <td class="hDivNum">${d.count}</td>
+                <td class="hDivName">${escapeHtml(name)}</td>
+                <td class="hDivNum">${escapeHtml(d.count)}</td>
                 <td class="hDivNum">${formatEuro(d.bruto)}</td>
                 <td class="hDivNum hDivNeg">${formatEuro(d.retencion)}</td>
                 <td class="hDivNum hDivPos">${formatEuro(d.neto)}</td>
@@ -1478,8 +1488,12 @@ function hCapIniciar() {
     // En segundo plano: la página no espera a TradingView para abrirse.
     hCapCargarFijas()
 
-    document.getElementById("hCapBuscarBtn")?.addEventListener("click", () => hCapBuscar("hCapBuscarInput", "hCapResultados", hCapElegirActivo))
-    document.getElementById("hCapRefBuscarBtn")?.addEventListener("click", () => hCapBuscar("hCapRefBuscarInput", "hCapRefResultados", hCapAnadirRef))
+    document
+        .getElementById("hCapBuscarBtn")
+        ?.addEventListener("click", () => hCapBuscar("hCapBuscarInput", "hCapResultados", hCapElegirActivo))
+    document
+        .getElementById("hCapRefBuscarBtn")
+        ?.addEventListener("click", () => hCapBuscar("hCapRefBuscarInput", "hCapRefResultados", hCapAnadirRef))
     document.getElementById("hCapRefManualBtn")?.addEventListener("click", hCapAnadirRefManual)
     document.getElementById("hCapCalcBtn")?.addEventListener("click", hCapCalcular)
 
@@ -1587,7 +1601,11 @@ async function hCapElegirActivo(resultado) {
     hCapMensaje("hCapActivoMsg", "Cargando " + resultado.symbol + "...")
     try {
         const d = await hCapConsultar(resultado.symbol)
-        _hCapActivo = { ticker: d.ticker, nombre: d.nombre || resultado.description, divisa: d.divisa || resultado.currency || "" }
+        _hCapActivo = {
+            ticker: d.ticker,
+            nombre: d.nombre || resultado.description,
+            divisa: d.divisa || resultado.currency || ""
+        }
         hCapPonerDivisa(_hCapActivo.divisa)
         document.getElementById("hCapPrecio").value = d.precio
         document.getElementById("hCapSuministro").value = d.suministro || ""
@@ -1666,7 +1684,9 @@ async function hCapAnadirRef(resultado) {
         hCapRenderRefs()
         hCapMensaje(
             "hCapRefMsg",
-            d.capitalizacion ? "" : "TradingView no publica la capitalización de ese activo: escríbela a mano en su fila.",
+            d.capitalizacion
+                ? ""
+                : "TradingView no publica la capitalización de ese activo: escríbela a mano en su fila.",
             d.capitalizacion ? "" : "aviso"
         )
     } catch (error) {
@@ -1693,7 +1713,8 @@ function hCapRenderRefs() {
     const lista = document.getElementById("hCapRefLista")
     if (!lista) return
 
-    const grupo = (texto) => Object.assign(document.createElement("div"), { className: "hCapRefGrupo", textContent: texto })
+    const grupo = (texto) =>
+        Object.assign(document.createElement("div"), { className: "hCapRefGrupo", textContent: texto })
 
     const filasFijas = _hCapFijas.map((ref) => {
         const fila = document.createElement("div")
@@ -1706,7 +1727,8 @@ function hCapRenderRefs() {
         nombre.className = "hCapRefNombre"
         nombre.textContent = ref.nombre
         const etiqueta = document.createElement("small")
-        etiqueta.textContent = ref.estado === "ok" ? "En vivo" : ref.estado === "cargando" ? "Consultando…" : "No disponible ahora"
+        etiqueta.textContent =
+            ref.estado === "ok" ? "En vivo" : ref.estado === "cargando" ? "Consultando…" : "No disponible ahora"
         info.append(nombre, etiqueta)
 
         const valor = document.createElement("span")
@@ -1782,7 +1804,9 @@ function hCapRenderRefs() {
     lista.replaceChildren(
         grupo("Siempre presentes"),
         ...filasFijas,
-        ...(propias.length ? [grupo("Añadidas por ti"), ...propias] : [hCapNota("Añade más abajo las que quieras comparar.")])
+        ...(propias.length
+            ? [grupo("Añadidas por ti"), ...propias]
+            : [hCapNota("Añade más abajo las que quieras comparar.")])
     )
 }
 
@@ -1841,13 +1865,16 @@ async function hCapCalcular() {
     actualEl.title = hCapFmtCompleto(actual, divisa)
     const subidaEl = document.getElementById("hCapSubida")
     subidaEl.textContent =
-        subida === null ? "—" : (subida >= 0 ? "+" : "") + subida.toLocaleString("es-ES", { maximumFractionDigits: 1 }) + " %"
+        subida === null
+            ? "—"
+            : (subida >= 0 ? "+" : "") + subida.toLocaleString("es-ES", { maximumFractionDigits: 1 }) + " %"
     subidaEl.className = "hResultValue " + (subida === null ? "" : subida >= 0 ? "hResultPositive" : "hResultNegative")
     document.getElementById("hCapMultiplicador").textContent =
         multiplicador === null ? "—" : "×" + multiplicador.toLocaleString("es-ES", { maximumFractionDigits: 2 })
 
     // Las fijas se piden en vivo; si llevan rato cargadas se refrescan.
-    if (Date.now() - _hCapFijasHora > H_CAP_FIJAS_CADUCIDAD_MS) await Promise.all([hCapCargarFijas(), hCapRefrescarPropias()])
+    if (Date.now() - _hCapFijasHora > H_CAP_FIJAS_CADUCIDAD_MS)
+        await Promise.all([hCapCargarFijas(), hCapRefrescarPropias()])
     const sinDato = _hCapFijas.filter((ref) => ref.estado === "error").map((ref) => ref.nombre)
 
     // Cada referencia se lleva a la divisa del activo antes de compararlas.
@@ -1879,7 +1906,10 @@ async function hCapCalcular() {
             const veces = document.createElement("strong")
             veces.textContent = f.veces.toLocaleString("es-ES", { maximumFractionDigits: 2 }) + " veces"
             const detalle = document.createElement("small")
-            detalle.textContent = (f.veces >= 1 ? "supera su capitalización (" : "queda por debajo de su capitalización (") + hCapFmt(f.capitalRef, divisa) + ")"
+            detalle.textContent =
+                (f.veces >= 1 ? "supera su capitalización (" : "queda por debajo de su capitalización (") +
+                hCapFmt(f.capitalRef, divisa) +
+                ")"
             fila.append(nombre, veces, detalle)
             return fila
         })

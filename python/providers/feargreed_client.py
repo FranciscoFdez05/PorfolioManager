@@ -9,6 +9,7 @@ se recalcula nada aquí: se enseña tal cual lo publica la fuente, que es la
 from urllib.error import HTTPError, URLError
 
 from providers import fetch_json
+from providers.http import motivo_conexion
 
 FEAR_GREED_URL = "https://api.alternative.me/fng/"
 
@@ -34,7 +35,7 @@ def fetch_history(days=30, timeout=None):
     except HTTPError as error:
         return [], f"Fear & Greed devolvió HTTP {error.code}"
     except URLError as error:
-        return [], f"No se pudo conectar con Fear & Greed: {error.reason}"
+        return [], f"No se pudo conectar con Fear & Greed: {motivo_conexion(error, 'Fear & Greed')}"
 
     filas = payload.get("data") or []
     serie = [punto for fila in filas if (punto := _fila_a_punto(fila)) is not None]

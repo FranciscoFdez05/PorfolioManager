@@ -58,6 +58,9 @@ def saveOperaciones():
 
     if not isinstance(rows, list):
         return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+    if not all(isinstance(row, dict) for row in rows):
+        # Una fila que no es un objeto llegaba a row.get(...) y daba un 500.
+        return jsonify({"ok": False, "error": "Cada fila debe ser un objeto"}), 400
 
     sanitizedRows = []
 
@@ -142,6 +145,73 @@ def getStablecoins():
     return jsonify({"catalog": catalog, "enabledSymbols": enabled_symbols, "rows": rows})
 
 
+def _catalogo_de_simbolos(simbolos):
+    catalogo = [_sanitize_stablecoin_catalog_entry({"symbol": s}) for s in simbolos]
+    return [entrada for entrada in catalogo if entrada]
+
+
+def _catalogo_saneado(catalog):
+    """Entradas del catálogo normalizadas y sin símbolos repetidos."""
+    saneado, simbolos = [], []
+    for entry in catalog:
+        normalizada = _sanitize_stablecoin_catalog_entry(entry if isinstance(entry, dict) else {"symbol": entry})
+        if normalizada and normalizada["symbol"] not in simbolos:
+            simbolos.append(normalizada["symbol"])
+            saneado.append(normalizada)
+    return saneado
+
+
+def _activados_saneados(enabled_symbols, simbolos_catalogo):
+    """Símbolos activados, normalizados, sin repetir y presentes en el catálogo (si lo hay)."""
+    activados = []
+    for symbol in enabled_symbols:
+        normalizado = _normalize_stablecoin_symbol(symbol)
+        if not normalizado or (simbolos_catalogo and normalizado not in simbolos_catalogo):
+            continue
+        if normalizado not in activados:
+            activados.append(normalizado)
+    return activados
+
+
+def _simbolos_de_filas(rows):
+    simbolos = []
+    for row in rows:
+        normalizado = _normalize_stablecoin_symbol(row.get("stablecoinSymbol", ""))
+        if normalizado and normalizado not in simbolos:
+            simbolos.append(normalizado)
+    return simbolos
+
+
+def _fila_stablecoin(index, row, activados, simbolos_catalogo):
+    stablecoin_symbol = _normalize_stablecoin_symbol(row.get("stablecoinSymbol", ""))
+    if not stablecoin_symbol or (simbolos_catalogo and stablecoin_symbol not in simbolos_catalogo):
+        stablecoin_symbol = activados[0] if activados else (simbolos_catalogo[0] if simbolos_catalogo else "")
+
+    movement_type = str(row.get("tipo", "Compra")).strip().capitalize()
+    if movement_type == "Gasto":
+        movement_type = "Venta"
+    if movement_type not in {"Compra", "Venta"}:
+        movement_type = "Compra"
+
+    currency = str(row.get("currency", "USD")).strip().upper()
+    if currency not in {"EUR", "USD"}:
+        currency = "USD"
+
+    id_por_defecto = f"stablecoin-{index + 1}"
+    return {
+        "id": str(row.get("id", id_por_defecto)).strip() or id_por_defecto,
+        "stablecoinSymbol": stablecoin_symbol,
+        "fecha": str(row.get("fecha", "")).strip(),
+        "tipo": movement_type,
+        "cantidad": str(row.get("cantidad", "")).strip(),
+        "precio": str(row.get("precio", "")).strip(),
+        "total": str(row.get("total", "")).strip(),
+        "comisiones": str(row.get("comisiones", "")).strip(),
+        "currency": currency,
+        "nota": str(row.get("nota", "")).strip(),
+    }
+
+
 @operaciones_bp.route("/api/stablecoins", methods=["POST"])
 def saveStablecoins():
     requestData = request.get_json(silent=True) or {}
@@ -157,93 +227,23 @@ def saveStablecoins():
 
     if not isinstance(rows, list):
         return jsonify({"ok": False, "error": "rows debe ser una lista"}), 400
+    if not all(isinstance(row, dict) for row in rows):
+        # Una fila que no es un objeto llegaba a row.get(...) y daba un 500.
+        return jsonify({"ok": False, "error": "Cada fila debe ser un objeto"}), 400
 
-    sanitized_catalog = []
-    catalog_symbols = []
+    sanitized_catalog = _catalogo_saneado(catalog)
+    activados = _activados_saneados(enabled_symbols, [e["symbol"] for e in sanitized_catalog])
 
-    for entry in catalog:
-        normalized_entry = _sanitize_stablecoin_catalog_entry(
-            entry if isinstance(entry, dict) else {"symbol": entry}
-        )
-
-        if not normalized_entry or normalized_entry["symbol"] in catalog_symbols:
-            continue
-
-        catalog_symbols.append(normalized_entry["symbol"])
-        sanitized_catalog.append(normalized_entry)
-
-    sanitized_enabled_symbols = []
-
-    for symbol in enabled_symbols:
-        normalized_symbol = _normalize_stablecoin_symbol(symbol)
-
-        if not normalized_symbol:
-            continue
-
-        if catalog_symbols and normalized_symbol not in catalog_symbols:
-            continue
-
-        if normalized_symbol not in sanitized_enabled_symbols:
-            sanitized_enabled_symbols.append(normalized_symbol)
-
-    if not sanitized_catalog and sanitized_enabled_symbols:
-        sanitized_catalog = [_sanitize_stablecoin_catalog_entry({"symbol": s}) for s in sanitized_enabled_symbols]
-        sanitized_catalog = [entry for entry in sanitized_catalog if entry]
-        catalog_symbols = [entry["symbol"] for entry in sanitized_catalog]
-
+    # Sin catálogo, se deduce: primero de los símbolos activados y, si tampoco
+    # hay, de los que aparecen en las filas.
     if not sanitized_catalog:
-        inferred_symbols = []
-
-        for row in rows:
-            normalized_symbol = _normalize_stablecoin_symbol(row.get("stablecoinSymbol", ""))
-
-            if normalized_symbol and normalized_symbol not in inferred_symbols:
-                inferred_symbols.append(normalized_symbol)
-
-        if inferred_symbols:
-            sanitized_catalog = [_sanitize_stablecoin_catalog_entry({"symbol": s}) for s in inferred_symbols]
-            sanitized_catalog = [entry for entry in sanitized_catalog if entry]
-            catalog_symbols = [entry["symbol"] for entry in sanitized_catalog]
-
-    sanitized_rows = []
-
-    for index, row in enumerate(rows):
-        stablecoin_symbol = _normalize_stablecoin_symbol(row.get("stablecoinSymbol", ""))
-        movement_type = str(row.get("tipo", "Compra")).strip().capitalize()
-        currency = str(row.get("currency", "USD")).strip().upper()
-
-        if not stablecoin_symbol or (catalog_symbols and stablecoin_symbol not in catalog_symbols):
-            stablecoin_symbol = (
-                sanitized_enabled_symbols[0] if sanitized_enabled_symbols
-                else (catalog_symbols[0] if catalog_symbols else "")
-            )
-
-        if movement_type == "Gasto":
-            movement_type = "Venta"
-
-        if movement_type not in {"Compra", "Venta"}:
-            movement_type = "Compra"
-
-        if currency not in {"EUR", "USD"}:
-            currency = "USD"
-
-        sanitized_rows.append({
-            "id": str(row.get("id", f"stablecoin-{index + 1}")).strip() or f"stablecoin-{index + 1}",
-            "stablecoinSymbol": stablecoin_symbol,
-            "fecha": str(row.get("fecha", "")).strip(),
-            "tipo": movement_type,
-            "cantidad": str(row.get("cantidad", "")).strip(),
-            "precio": str(row.get("precio", "")).strip(),
-            "total": str(row.get("total", "")).strip(),
-            "comisiones": str(row.get("comisiones", "")).strip(),
-            "currency": currency,
-            "nota": str(row.get("nota", "")).strip()
-        })
+        sanitized_catalog = _catalogo_de_simbolos(activados or _simbolos_de_filas(rows))
+    catalog_symbols = [entry["symbol"] for entry in sanitized_catalog]
 
     payload = {
         "catalog": sanitized_catalog,
-        "enabledSymbols": sanitized_enabled_symbols,
-        "rows": sanitized_rows
+        "enabledSymbols": activados,
+        "rows": [_fila_stablecoin(i, row, activados, catalog_symbols) for i, row in enumerate(rows)],
     }
     writeStablecoinsFile(payload)
     return jsonify({"ok": True, "data": payload})

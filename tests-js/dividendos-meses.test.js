@@ -79,7 +79,7 @@ describe("el mes sale de la fecha de cobro", () => {
 })
 
 describe("vista del año", () => {
-    it("abre un bloque por mes, en orden y con el número de cobros", () => {
+    it("lista las filas corridas por mes, sin separadores", () => {
         _allDividendosRows = [
             dividendo("11-03-2026", "Chevron"),
             dividendo("12-02-2026", "Apple"),
@@ -88,8 +88,8 @@ describe("vista del año", () => {
 
         renderFilteredDividendos()
 
-        expect(textos(".dividendosGroupName")).toEqual(["Febrero", "Marzo"])
-        expect(textos(".dividendosGroupMeta")).toEqual(["1 cobro", "2 cobros"])
+        expect(document.querySelectorAll(".tableGroupRow")).toHaveLength(0)
+        expect(instrumentosVisibles()).toEqual(["Apple", "Chevron", "Microsoft"])
     })
 
     it("ordena las filas por día dentro de su mes", () => {
@@ -104,15 +104,14 @@ describe("vista del año", () => {
         expect(instrumentosVisibles()).toEqual(["Chevron", "McDonald's", "NVIDIA"])
     })
 
-    it("deja las filas sin fecha legible en su propio bloque, al final", () => {
+    it("deja las filas sin fecha legible al final", () => {
         // Antes se perdían de vista: sin año que las filtrara no aparecían por
-        // ningún lado. Ahora tienen bloque propio mientras se corrige la fecha.
+        // ningún lado. Ahora van al final mientras se corrige la fecha.
         _allDividendosRows = [dividendo("", "Sin apuntar"), dividendo("12-02-2026", "Apple")]
         currentDividendosYear = null
 
         renderFilteredDividendos()
 
-        expect(textos(".dividendosGroupName")).toEqual(["Febrero", "Sin fecha"])
         expect(instrumentosVisibles()).toEqual(["Apple", "Sin apuntar"])
     })
 
@@ -121,7 +120,7 @@ describe("vista del año", () => {
 
         renderFilteredDividendos()
 
-        expect(textos(".dividendosGroupMeta")).toEqual(["1 cobro"])
+        expect(instrumentosVisibles()).toEqual(["Apple"])
     })
 })
 
@@ -187,6 +186,6 @@ describe("pestañas de mes", () => {
 
         document.querySelectorAll(".dividendosMonthTab")[2].click()
         expect(currentDividendosMonth).toBeNull()
-        expect(textos(".dividendosGroupName")).toEqual(["Febrero", "Marzo"])
+        expect(instrumentosVisibles()).toEqual(["Apple", "Chevron"])
     })
 })

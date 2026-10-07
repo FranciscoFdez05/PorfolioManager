@@ -1,4 +1,3 @@
-import base64
 import hmac
 import json
 import logging
@@ -7,19 +6,47 @@ import re
 import secrets
 import threading
 import time
+from contextlib import contextmanager
+from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet, InvalidToken
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from flask import Blueprint, g, jsonify, make_response, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from core import csp, sesion, settings, telegram_notifier
+from core import csp, paths, sesion, settings, telegram_notifier
+from core.bloqueo import exclusivo
+from core.escritura import escribirAtomico, escribirJsonAtomico
 from core.paths import AUTH_FILE as _AUTH_FILE, LOGIN_HTML
+from core.secret_store import fernetDeSecretKey
 
 auth_bp = Blueprint("auth", __name__)
 
 _DEFAULT_HASH = generate_password_hash(secrets.token_hex(32), method=settings.metodoHashPassword())
+
+_senuelos: dict[str, str] = {}
+
+
+def _senuelo(password_hash: str) -> str:
+    """Hash de una contraseña aleatoria con el mismo método que `password_hash`.
+
+    Se comprueba contra él cuando el usuario no coincide, para que esa
+    comprobación cueste lo mismo que la de verdad. Se calcula una vez por método.
+    """
+    metodo = password_hash.split("$", 1)[0] if "$" in password_hash else ""
+    if metodo not in _senuelos:
+        try:
+            _senuelos[metodo] = generate_password_hash(secrets.token_hex(16), method=metodo)
+        except (ValueError, TypeError):
+            _senuelos[metodo] = _DEFAULT_HASH
+    return _senuelos[metodo]
+
+
+# Política de credenciales al cambiarlas. No se aplica a la contraseña actual
+# (quien ya la tiene puede seguir entrando), solo a la nueva. El máximo evita que
+# un texto enorme convierta cada comprobación del hash en trabajo inútil.
+MIN_LARGO_CONTRASENA = 10
+MAX_LARGO_CONTRASENA = 256
+MAX_LARGO_USUARIO = 64
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +55,44 @@ logger = logging.getLogger(__name__)
 # /login. El número de intentos y la duración del bloqueo salen de [seguridad]
 # en config.ini: endurecerlos no debería obligar a tocar código.
 #
-# El contador vive en memoria del proceso, igual que el de core/rate_limit.py y
-# por el mismo motivo (no meter Redis en un despliegue que es un contenedor y un
-# fichero SQLite). La consecuencia hay que tenerla presente al elegir el número:
-# gunicorn corre con varios workers y cada uno lleva su cuenta, así que los
-# intentos que de verdad hacen falta para bloquear una IP son los configurados
-# multiplicados por el número de workers. La primera barrera del despliegue es
-# que solo se llega desde la LAN o por WireGuard.
-_attempts: dict[str, list] = {}   # ip -> [nº fallos, instante del último fallo]
+# El contador se guarda en un fichero de data/tmp con cerrojo entre procesos.
+# Vivía en la memoria de cada worker de gunicorn, y entonces los intentos que de
+# verdad hacían falta para bloquear una IP eran los configurados multiplicados
+# por el número de workers (16 con los 2 de serie, y se reiniciaba con cada
+# worker nuevo). Los instantes son de reloj de pared (time.time) porque el
+# monotónico no se puede comparar entre procesos.
+#
+# Si el cerrojo no se consigue a tiempo se usa la memoria del proceso, como
+# antes: un disco lento no puede dejar el login sin ningún límite.
+_attempts: dict[str, list] = {}   # respaldo en memoria: ip -> [nº fallos, instante del último]
 _attempts_lock = threading.Lock()
+
+
+def _fichero_intentos():
+    return paths.TMP_DIR / "login-intentos.json"
+
+
+@contextmanager
+def _intentos():
+    """El registro de intentos, compartido entre procesos; se guarda al salir."""
+    ruta = _fichero_intentos()
+    with _attempts_lock, exclusivo(ruta.with_suffix(".lock"), espera=5, obligatorio=False) as conseguido:
+        if not conseguido:
+            yield _attempts
+            return
+        try:
+            datos = json.loads(ruta.read_text("utf-8"))
+            if not isinstance(datos, dict):
+                datos = {}
+        except (OSError, ValueError):
+            datos = {}
+        antes = json.dumps(datos, sort_keys=True)
+        yield datos
+        if json.dumps(datos, sort_keys=True) != antes:
+            try:
+                escribirJsonAtomico(ruta, datos, indent=None)
+            except OSError as error:
+                logger.warning("No se pudo guardar el registro de intentos de login: %s", error)
 
 
 def _client_ip() -> str:
@@ -46,36 +102,35 @@ def _client_ip() -> str:
 def _seconds_locked_out(ip: str) -> int:
     """Segundos que quedan de bloqueo para esta IP, 0 si puede intentarlo."""
     lockout = settings.bloqueoSegundos()
-    with _attempts_lock:
-        entry = _attempts.get(ip)
+    with _intentos() as intentos:
+        entry = intentos.get(ip)
         if not entry or entry[0] < settings.maxIntentosLogin():
             return 0
-        elapsed = time.monotonic() - entry[1]
+        elapsed = time.time() - entry[1]
         if elapsed >= lockout:
-            _attempts.pop(ip, None)
+            intentos.pop(ip, None)
             return 0
         return int(lockout - elapsed)
 
 
 def _record_failure(ip: str) -> None:
     lockout = settings.bloqueoSegundos()
-    with _attempts_lock:
-        entry = _attempts.get(ip)
-        if entry and time.monotonic() - entry[1] < lockout:
-            entry[0] += 1
-            entry[1] = time.monotonic()
+    with _intentos() as intentos:
+        entry = intentos.get(ip)
+        if entry and time.time() - entry[1] < lockout:
+            intentos[ip] = [entry[0] + 1, time.time()]
         else:
-            _attempts[ip] = [1, time.monotonic()]
-        # Evitar que el diccionario crezca sin límite con IPs falsificadas
-        if len(_attempts) > settings.maxIpsVigiladas():
-            cutoff = time.monotonic() - lockout
-            for stale in [k for k, v in _attempts.items() if v[1] < cutoff]:
-                _attempts.pop(stale, None)
+            intentos[ip] = [1, time.time()]
+        # Evitar que el registro crezca sin límite con muchas IPs distintas
+        if len(intentos) > settings.maxIpsVigiladas():
+            cutoff = time.time() - lockout
+            for stale in [k for k, v in intentos.items() if v[1] < cutoff]:
+                intentos.pop(stale, None)
 
 
 def _clear_failures(ip: str) -> None:
-    with _attempts_lock:
-        _attempts.pop(ip, None)
+    with _intentos() as intentos:
+        intentos.pop(ip, None)
 
 
 def _avisar_si_se_bloquea(ip: str) -> None:
@@ -119,24 +174,16 @@ def _safe_next_url(next_url: str) -> str:
 
 def _get_fernet() -> Fernet | None:
     """Devuelve una instancia Fernet derivada de SECRET_KEY, o None si no hay clave."""
-    secret = os.environ.get("SECRET_KEY", "").strip().encode()
-    if not secret:
-        return None
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=b"portfolio-auth-v1",
-        iterations=200_000,
-    )
-    key = base64.urlsafe_b64encode(kdf.derive(secret))
-    return Fernet(key)
+    return fernetDeSecretKey(b"portfolio-auth-v1")
 
 
 # ── Persistencia ──────────────────────────────────────────────────────────────
 
 def _load_credentials() -> tuple[str, str]:
     """Devuelve (username, password_hash). Orden: auth.json (cifrado) > env vars > admin/admin."""
+    ilegible = False
     if _AUTH_FILE.exists():
+        ilegible = True  # hasta que se demuestre lo contrario
         try:
             raw = _AUTH_FILE.read_bytes()
             fernet = _get_fernet()
@@ -158,13 +205,20 @@ def _load_credentials() -> tuple[str, str]:
                         _save_credentials(u, h)
                         logger.info("auth.json migrado a formato cifrado")
                 return u, h
-        except Exception:
-            pass
+        except Exception as error:
+            # Antes se tragaba en silencio y el login pasaba a usar las
+            # credenciales del .env sin que nada lo dijera.
+            logger.error(
+                "No se pudo leer %s (%s). Se usan las credenciales de LOGIN_USERNAME/"
+                "LOGIN_PASSWORD_HASH si están definidas.", _AUTH_FILE.name, error,
+            )
 
     # Env vars (Docker / .env)
     u = os.environ.get("LOGIN_USERNAME", "").strip()
     h = os.environ.get("LOGIN_PASSWORD_HASH", "").strip()
     if u and h:
+        if ilegible:
+            _apartar_auth_ilegible()
         _save_credentials(u, h)
         return u, h
 
@@ -175,14 +229,33 @@ def _load_credentials() -> tuple[str, str]:
     return "__no_user__", _DEFAULT_HASH
 
 
+def _apartar_auth_ilegible() -> None:
+    """Renombra un auth.dat que no se puede leer en vez de sobrescribirlo.
+
+    Lo normal es que la SECRET_KEY haya cambiado: el fichero está bien, solo que
+    cifrado con otra clave. Sobrescribirlo con las credenciales del .env
+    devolvía en silencio la contraseña a la de la instalación y destruía la
+    buena; recuperando la SECRET_KEY anterior ya no había vuelta atrás. Así queda
+    al lado, con fecha, y se puede volver a poner en su sitio.
+    """
+    destino = _AUTH_FILE.with_name(f"{_AUTH_FILE.name}.ilegible-{time.strftime('%Y%m%d-%H%M%S')}")
+    try:
+        os.replace(_AUTH_FILE, destino)
+        logger.error(
+            "%s no se podía leer y se ha apartado como %s antes de escribir las credenciales "
+            "del .env. Si cambiaste la SECRET_KEY, recupera la anterior y devuélvelo a su nombre.",
+            _AUTH_FILE.name, destino.name,
+        )
+    except OSError as error:
+        logger.error("No se pudo apartar %s (%s); se sobrescribirá.", _AUTH_FILE.name, error)
+
+
 def _save_credentials(username: str, password_hash: str) -> None:
     payload = json.dumps({"username": username, "password_hash": password_hash}).encode()
     fernet = _get_fernet()
-    _AUTH_FILE.parent.mkdir(parents=True, exist_ok=True)
-    if fernet:
-        _AUTH_FILE.write_bytes(fernet.encrypt(payload))
-    else:
-        _AUTH_FILE.write_bytes(payload)
+    # Atómica: un corte a mitad de un write_bytes() dejaba auth.dat truncado, y
+    # a partir de ahí se entraba con las credenciales del .env o con ninguna.
+    escribirAtomico(_AUTH_FILE, fernet.encrypt(payload) if fernet else payload, permisos=0o600)
 
 
 # ── Rutas ─────────────────────────────────────────────────────────────────────
@@ -197,6 +270,12 @@ def login():
         return redirect(_safe_next_url(request.args.get("next") or "/"))
 
     error = None
+    if request.method == "POST" and not _mismo_origen():
+        # Login CSRF: otra web podía enviar este formulario y dejar al usuario
+        # dentro de la aplicación con una cuenta elegida por ella.
+        logger.warning("Login rechazado: el formulario llega desde otro origen (%s)",
+                       request.headers.get("Origin") or request.headers.get("Referer"))
+        return "Origen no permitido", 403
     if request.method == "POST":
         ip = _client_ip()
         locked = _seconds_locked_out(ip)
@@ -215,7 +294,13 @@ def login():
             user_ok = hmac.compare_digest(
                 username.encode("utf-8"), expected_user.encode("utf-8")
             )
-            if user_ok and check_password_hash(password_hash, password):
+            # El hash se comprueba siempre, también con un usuario equivocado:
+            # cortocircuitar con `and` hacía que la respuesta tardase ~100 ms
+            # menos cuando el usuario no existía, y eso lo delataba. El señuelo
+            # usa el mismo método y coste que el hash guardado; con uno de coste
+            # distinto, la diferencia de tiempo se invertía pero seguía ahí.
+            pass_ok = check_password_hash(password_hash if user_ok else _senuelo(password_hash), password)
+            if user_ok and pass_ok:
                 _clear_failures(ip)
                 session.clear()
                 session["logged_in"] = True
@@ -256,8 +341,26 @@ def login():
     return response
 
 
-@auth_bp.route("/logout")
+def _mismo_origen() -> bool:
+    """¿La petición sale de una página de este mismo host?
+
+    Los navegadores mandan `Origin` en todo POST de formulario. Sin él (un
+    cliente que no es un navegador) se mira `Referer`, y sin ninguno de los dos
+    se deja pasar: no hay una página ajena de por medio que pueda hacer CSRF.
+    """
+    procedencia = request.headers.get("Origin") or request.headers.get("Referer")
+    if not procedencia or procedencia == "null":
+        return procedencia != "null"
+    return urlsplit(procedencia).netloc.lower() == (request.host or "").lower()
+
+
+@auth_bp.route("/logout", methods=["GET", "POST"])
 def logout():
+    # Cerrar sesión solo por POST, que pasa por el CSRF de core/seguridad_app.
+    # Por GET bastaba un <img src="/logout"> en cualquier web para echar al
+    # usuario. Un GET (un marcador antiguo) vuelve a la aplicación sin tocar nada.
+    if request.method != "POST":
+        return redirect("/" if session.get("logged_in") else url_for("auth.login"))
     # `sesion.cerrar` y no `session.clear()`: vaciar la cookie solo afecta al
     # navegador que la pidió. Cualquier copia de esa misma cookie seguía siendo
     # válida después de cerrar sesión, porque nada del lado del servidor la
@@ -277,6 +380,17 @@ def _renovar_sesiones() -> None:
     """
     sesion.invalidarTodas()
     sesion.abrir(session)
+
+
+def _cuerpo_dict() -> dict:
+    datos = request.get_json(silent=True)
+    return datos if isinstance(datos, dict) else {}
+
+
+def _texto(valor) -> str:
+    """Cadena o vacío: un número o una lista llegaban a check_password_hash y
+    terminaban en un 500."""
+    return valor if isinstance(valor, str) else ""
 
 
 def _rechazar_si_bloqueado():
@@ -307,12 +421,14 @@ def change_username():
     if bloqueado:
         return bloqueado
 
-    data = request.get_json(silent=True) or {}
-    current_password = data.get("currentPassword", "")
-    new_username     = data.get("newUsername", "").strip()
+    data = _cuerpo_dict()
+    current_password = _texto(data.get("currentPassword"))
+    new_username     = _texto(data.get("newUsername")).strip()
 
     if not new_username:
         return jsonify({"ok": False, "error": "El nuevo usuario no puede estar vacío"}), 400
+    if len(new_username) > MAX_LARGO_USUARIO:
+        return jsonify({"ok": False, "error": f"El usuario no puede pasar de {MAX_LARGO_USUARIO} caracteres"}), 400
 
     _current_user, password_hash = _load_credentials()
     if not check_password_hash(password_hash, current_password):
@@ -334,12 +450,19 @@ def change_password():
     if bloqueado:
         return bloqueado
 
-    data = request.get_json(silent=True) or {}
-    current_password = data.get("currentPassword", "")
+    data = _cuerpo_dict()
+    current_password = _texto(data.get("currentPassword"))
     new_password     = data.get("newPassword", "")
 
-    if not new_password:
+    if not isinstance(new_password, str) or not new_password:
         return jsonify({"ok": False, "error": "La nueva contraseña no puede estar vacía"}), 400
+    if len(new_password) < MIN_LARGO_CONTRASENA:
+        return jsonify({
+            "ok": False,
+            "error": f"La nueva contraseña debe tener al menos {MIN_LARGO_CONTRASENA} caracteres",
+        }), 400
+    if len(new_password) > MAX_LARGO_CONTRASENA:
+        return jsonify({"ok": False, "error": "La nueva contraseña es demasiado larga"}), 400
 
     current_user, password_hash = _load_credentials()
     if not check_password_hash(password_hash, current_password):

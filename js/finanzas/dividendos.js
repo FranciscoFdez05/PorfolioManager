@@ -24,6 +24,193 @@ let currentDividendosYear = null
 // null = año completo; si no, la clave del mes ("01".."12") que se está viendo.
 let currentDividendosMonth = null
 let _dividendosTotalsToken = 0
+// Cuentas de «Cuentas» y la que se está viendo ("" = todas).
+let _dividendosCuentas = []
+let currentDividendosCuenta = ""
+
+// Cuenta a la que va un dividendo: la que trae apuntada o, si no tiene (o era
+// de una cuenta que ya no existe), la primera que cobra los dividendos. "" si no hay.
+function getDividendoCuentaId(row) {
+    if (row?.cuenta && _dividendosCuentas.some((c) => c.id === row.cuenta)) return row.cuenta
+    return _dividendosCuentas.find((c) => c.dividendos)?.id || ""
+}
+
+function renderDividendosCuentasBar() {
+    const list = document.getElementById("dividendosCuentasList")
+    if (!list) return
+
+    const usadas = new Set(_allDividendosRows.map(getDividendoCuentaId).filter(Boolean))
+    const cuentas = _dividendosCuentas.filter((c) => usadas.has(c.id) || c.dividendos)
+    if (currentDividendosCuenta && !cuentas.some((c) => c.id === currentDividendosCuenta)) {
+        currentDividendosCuenta = ""
+    }
+
+    list.innerHTML = ""
+    // Sin cuentas que distinguir no hace falta la barra.
+    list.parentElement?.classList.toggle("hidden", !cuentas.length)
+
+    ;[{ id: "", nombre: "Todas" }, ...cuentas].forEach((cuenta) => {
+        const item = document.createElement("div")
+        item.className = `cuentaItem${cuenta.id === currentDividendosCuenta ? " active" : ""}`
+        item.innerHTML = `<span class="cuentaItemName">${escapeHtml(cuenta.nombre)}</span>${
+            cuenta.id
+                ? `<div class="cuentaItemActions">
+                <button type="button" class="cuentaItemRenameBtn" data-id="${escapeHtml(cuenta.id)}" title="Cambiar de cuenta">✎</button>
+                <button type="button" class="cuentaItemDeleteBtn" data-id="${escapeHtml(cuenta.id)}" title="Quitar de las cuentas de dividendos">✕</button>
+            </div>`
+                : ""
+        }`
+        item.addEventListener("click", (e) => {
+            if (e.target.closest(".cuentaItemRenameBtn") || e.target.closest(".cuentaItemDeleteBtn")) return
+            currentDividendosCuenta = cuenta.id
+            currentDividendosMonth = null
+            renderFilteredDividendos()
+        })
+        list.appendChild(item)
+    })
+}
+
+async function setDividendosCuentaCobra(id, cobra) {
+    await Api.put(`/api/cuentas/${encodeURIComponent(id)}`, { dividendos: cobra })
+    const cuenta = _dividendosCuentas.find((c) => c.id === id)
+    if (cuenta) cuenta.dividendos = cobra
+}
+
+// Elegir la cuenta de «Cuentas» que pasa a cobrar dividendos. Solo se ofrecen
+// las que no los cobran ya.
+function openDividendosCuentaPicker({ title, onConfirm }) {
+    const libres = _dividendosCuentas.filter((c) => !c.dividendos)
+    const opciones = libres
+        .map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.nombre)}</option>`)
+        .join("")
+
+    openGastosCreateModal({
+        title,
+        bodyHtml: libres.length
+            ? `
+            <label class="assetModalLabel" for="dividendosCuentaSelect">Cuenta</label>
+            <select id="dividendosCuentaSelect" class="assetModalSelect">${opciones}</select>
+            <p class="cuentasHint">Una de tus cuentas de Finanzas › Cuentas. Sus dividendos se suman a su saldo. Para una cuenta nueva, créala antes allí.</p>`
+            : `<p class="cuentasHint">Todas tus cuentas cobran ya dividendos. Crea otra en Finanzas › Cuentas.</p>`,
+        submitLabel: "Guardar",
+        onSubmit: async ({ getValue, setFeedback }) => {
+            const elegida = libres.find((c) => c.id === getValue("dividendosCuentaSelect"))
+            if (!elegida) {
+                setFeedback("Elige una cuenta.", true)
+                return false
+            }
+            try {
+                await onConfirm(elegida)
+                return true
+            } catch (error) {
+                setFeedback(error?.message || "No se pudo guardar.", true)
+                return false
+            }
+        }
+    })
+}
+
+function addDividendosCuenta() {
+    openDividendosCuentaPicker({
+        title: "Nueva cuenta de dividendos",
+        onConfirm: async (elegida) => {
+            await setDividendosCuentaCobra(elegida.id, true)
+            currentDividendosCuenta = elegida.id
+            renderFilteredDividendos()
+        }
+    })
+}
+
+// «Cambiar de cuenta»: la nueva pasa a cobrar los dividendos de la anterior, que
+// deja de cobrarlos.
+function renameDividendosCuenta(id) {
+    const vieja = _dividendosCuentas.find((c) => c.id === id)
+    if (!vieja) return
+    openDividendosCuentaPicker({
+        title: `Cuenta de «${vieja.nombre}»`,
+        onConfirm: async (elegida) => {
+            await setDividendosCuentaCobra(elegida.id, true)
+            try {
+                _allDividendosRows.forEach((row) => {
+                    if (getDividendoCuentaId(row) === id) row.cuenta = elegida.id
+                })
+                await saveDividendosDataToServer()
+                await setDividendosCuentaCobra(id, false)
+            } catch (error) {
+                await setDividendosCuentaCobra(elegida.id, false).catch(() => {})
+                throw error
+            }
+            if (currentDividendosCuenta === id) currentDividendosCuenta = elegida.id
+            renderFilteredDividendos()
+        }
+    })
+}
+
+function deleteDividendosCuenta(id) {
+    const cuenta = _dividendosCuentas.find((c) => c.id === id)
+    if (!cuenta) return
+
+    openConfirmModal({
+        title: "Quitar cuenta",
+        message: `«${cuenta.nombre}» dejará de cobrar dividendos y los que tenía apuntados pasan a la cuenta por defecto. La cuenta sigue en Cuentas.`,
+        confirmLabel: "Quitar",
+        onConfirm: async () => {
+            try {
+                await setDividendosCuentaCobra(id, false)
+                _allDividendosRows.forEach((row) => {
+                    if (row.cuenta === id) row.cuenta = ""
+                })
+                await saveDividendosDataToServer()
+                if (currentDividendosCuenta === id) currentDividendosCuenta = ""
+                renderFilteredDividendos()
+            } catch (error) {
+                console.error(error)
+                alert("No se pudo quitar la cuenta: " + (error?.message || error))
+            }
+        }
+    })
+}
+
+function bindDividendosCuentasActions() {
+    const list = document.getElementById("dividendosCuentasList")
+    if (list && !list.dataset.bound) {
+        list.dataset.bound = "true"
+        list.addEventListener("click", (e) => {
+            const renameBtn = e.target.closest(".cuentaItemRenameBtn")
+            if (renameBtn) {
+                e.stopPropagation()
+                renameDividendosCuenta(renameBtn.dataset.id)
+                return
+            }
+            const deleteBtn = e.target.closest(".cuentaItemDeleteBtn")
+            if (deleteBtn) {
+                e.stopPropagation()
+                deleteDividendosCuenta(deleteBtn.dataset.id)
+            }
+        })
+    }
+
+    const addBtn = document.getElementById("addDividendosCuentaBtn")
+    if (addBtn && !addBtn.dataset.bound) {
+        addBtn.dataset.bound = "true"
+        addBtn.addEventListener("click", () => {
+            if (typeof closeDividendosMenu === "function") closeDividendosMenu()
+            addDividendosCuenta()
+        })
+    }
+}
+
+function buildDividendosCuentaOptions(selectedId) {
+    const porDefecto = _dividendosCuentas.find((c) => c.dividendos)
+    const vacio = porDefecto ? `Por defecto (${porDefecto.nombre})` : "Sin cuenta"
+    const opts = _dividendosCuentas
+        .map(
+            (c) =>
+                `<option value="${escapeHtml(c.id)}"${c.id === selectedId ? " selected" : ""}>${escapeHtml(c.nombre)}</option>`
+        )
+        .join("")
+    return `<option value="">${escapeHtml(vacio)}</option>${opts}`
+}
 
 // Manda la fecha de cobro: el mes de cada dividendo se deduce de ella, así que
 // lo que ya estaba guardado se clasifica igual que lo que se meta a partir de
@@ -164,6 +351,10 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
         <h3 class="assetModalTitle">${isEdit ? "Editar dividendo" : "Añadir dividendo"}</h3>
         <label class="assetModalLabel" for="dividendoFechaInput">Fecha</label>
         <input id="dividendoFechaInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.fecha || "")}" placeholder="dd-mm-aaaa">
+        <label class="assetModalLabel" for="dividendoCuentaInput">Cuenta</label>
+        <select id="dividendoCuentaInput" class="assetModalSelect">
+            ${buildDividendosCuentaOptions(isEdit ? rowData.cuenta || "" : currentDividendosCuenta)}
+        </select>
         <label class="assetModalLabel" for="dividendoInstrumentoInput">Instrumento</label>
         <select id="dividendoInstrumentoInput" class="assetModalSelect">
             ${buildDividendosInstrumentoOptions(rowData.instrumento || "")}
@@ -201,11 +392,6 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
         node.classList.toggle("error", Boolean(message && isError))
     }
 
-    overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) {
-            // closeDividendosModal() // Deshabilitado para evitar cierre accidental
-        }
-    })
 
     modal.querySelector("#dividendosModalCancelBtn")?.addEventListener("click", closeDividendosModal)
 
@@ -229,8 +415,11 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
             return
         }
 
+        const cuenta = modal.querySelector("#dividendoCuentaInput")?.value || ""
+
         const nextRow = {
             fecha,
+            cuenta,
             instrumento,
             acciones,
             dividendoAccion,
@@ -297,8 +486,14 @@ async function renderDividendosTable() {
         return
     }
 
-    const [dividendosData, assetsList] = await Promise.all([loadDividendosData(), loadAssetsList().catch(() => [])])
+    const [dividendosData, assetsList, cuentasData] = await Promise.all([
+        loadDividendosData(),
+        loadAssetsList().catch(() => []),
+        Api.get("/api/cuentas").catch(() => ({ cuentas: [] }))
+    ])
+    _dividendosCuentas = Array.isArray(cuentasData?.cuentas) ? cuentasData.cuentas : []
     _dividendosAssets = assetsList.filter((a) => a.type === "acciones" || a.type === "etfs")
+    bindDividendosCuentasActions()
     renderDividendosRowsFromData(dividendosData)
 }
 
@@ -317,6 +512,7 @@ function getDividendosRowsOfYear() {
     return _allDividendosRows
         .map((r, i) => ({ r, i }))
         .filter(({ r }) => !currentDividendosYear || parseDividendoYear(r.fecha) === currentDividendosYear)
+        .filter(({ r }) => !currentDividendosCuenta || getDividendoCuentaId(r) === currentDividendosCuenta)
         .sort(compareDividendosByDate)
 }
 
@@ -409,20 +605,6 @@ function renderDividendosScope() {
         : `Año completo${anio}`
 }
 
-function buildDividendosMonthGroupRow(monthKey, count) {
-    const columnCount = document.querySelector(".dividendosTable thead tr")?.cells.length || 7
-    const tr = document.createElement("tr")
-    tr.className = "tableGroupRow dividendosMonthRow"
-    tr.innerHTML = `
-        <td class="dividendosGroupHeader" colspan="${columnCount}">
-            <span class="dividendosGroupName">${escapeHtml(getDividendosMonthLabel(monthKey))}</span>
-            <span class="dividendosGroupMeta">${count} ${count === 1 ? "cobro" : "cobros"}</span>
-            <span class="dividendosGroupTotal" data-mes="${escapeHtml(monthKey)}"></span>
-        </td>
-    `
-    return tr
-}
-
 function buildDividendosRow(rowData, globalIndex) {
     const rowElement = document.createElement("tr")
     rowElement.dataset.globalIndex = String(globalIndex)
@@ -459,6 +641,7 @@ function renderFilteredDividendos() {
 
     const years = getDividendosYears(_allDividendosRows)
     renderDividendosYearBar(years)
+    renderDividendosCuentasBar()
     renderDividendosMonthTabs()
 
     const entriesOfYear = getDividendosRowsOfYear()
@@ -493,16 +676,13 @@ function renderFilteredDividendos() {
     if (currentDividendosMonth) {
         visible.forEach(({ r, i }) => dividendosBody.appendChild(buildDividendosRow(r, i)))
     } else {
-        // Vista del año: cada mes abre su bloque, para leer la tabla por meses
-        // en vez de como una lista corrida.
-        groupDividendosByMonth(visible).forEach((entries, monthKey) => {
-            dividendosBody.appendChild(buildDividendosMonthGroupRow(monthKey, entries.length))
+        // Vista del año: filas corridas, ordenadas por mes, sin separadores.
+        groupDividendosByMonth(visible).forEach((entries) => {
             entries.forEach(({ r, i }) => dividendosBody.appendChild(buildDividendosRow(r, i)))
         })
     }
 
-    // Si había una ordenación elegida en las cabeceras, se reaplica dentro de
-    // cada bloque de mes (bindTableSort respeta las filas .tableGroupRow).
+    // Si había una ordenación elegida en las cabeceras, se reaplica.
     document.querySelector(".dividendosTable")?._reSort?.()
 
     updateDividendosTotals()
@@ -587,16 +767,6 @@ async function updateDividendosTotals() {
     if (impuestosResumen) impuestosResumen.textContent = fmt(sumar(seleccion, "impuestos"))
     // La métrica de cabecera es del año entero: abrir un mes no la cambia.
     if (topTotalDividendos) topTotalDividendos.textContent = fmt(sumar(amounts, "total"))
-
-    document.querySelectorAll(".dividendosGroupTotal").forEach((node) => {
-        const mes = node.dataset.mes
-        node.textContent = fmt(
-            sumar(
-                amounts.filter((x) => x.mes === mes),
-                "total"
-            )
-        )
-    })
 }
 
 function addNewDividendosRow() {

@@ -59,6 +59,7 @@ import time
 
 from core import paths, settings
 from core.bloqueo import BloqueoOcupado, exclusivo
+from core.escritura import escribirJsonAtomico
 
 log = logging.getLogger(__name__)
 
@@ -83,13 +84,15 @@ REFRESCO_SEGUNDOS = 60
 # petición y no puede crecer sin fin si alguien automatiza logins y logouts.
 MAX_REVOCADOS = 5000
 
-# Cuánto se recuerda un identificador revocado cuando no hay caducidad absoluta
-# configurada. Sin un límite, la lista solo podría crecer.
-RETENCION_POR_DEFECTO = 30 * 24 * 3600
-
 # Vida de la cookie en el navegador. Es solo eso: cuándo la tira el navegador
 # por su cuenta. Que siga valiendo lo decide `motivoInvalidez` en cada petición.
 COOKIE_DIAS = 365
+
+# Cuánto se recuerda un identificador revocado cuando no hay caducidad absoluta
+# configurada: lo que puede vivir una copia de la cookie. Era de 30 días, y la
+# cookie vale 365: pasado el mes, una copia robada antes del logout volvía a
+# servir.
+RETENCION_POR_DEFECTO = COOKIE_DIAS * 24 * 3600
 
 # Minutos de inactividad que admite Ajustes > Seguridad. 0 es «no cerrar».
 INACTIVIDAD_OPCIONES = (0, 15, 30, 60, 240, 480, 1440)
@@ -185,10 +188,9 @@ def _guardarEstado(estado: dict) -> bool:
     puede es callarlo, porque el usuario creería que ha echado a alguien.
     """
     try:
-        SESION_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = ESTADO_FILE.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps(estado, ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(ESTADO_FILE)
+        # core.escritura y no un `.json.tmp` fijo: con dos workers, los dos
+        # escribían el mismo temporal y renombraban encima la mezcla.
+        escribirJsonAtomico(ESTADO_FILE, estado)
         return True
     except OSError as e:
         log.error("[sesion] No se pudo guardar estado.json (%s): la revocación no persiste", e)
@@ -216,12 +218,15 @@ def _retencion() -> float:
     """Cuánto tiene sentido recordar un identificador revocado.
 
     Pasada la caducidad absoluta, la cookie ya no vale por sí sola y guardarla
-    en la lista no aporta nada. Sin caducidad absoluta configurada se recurre a
-    la de inactividad, y si tampoco la hay, a un plazo fijo.
+    en la lista no aporta nada. Sin caducidad absoluta configurada, lo que vive
+    la cookie.
+
+    La inactividad no sirve aquí, aunque se usaba: es un ajuste que el usuario
+    puede alargar o quitar después, y en cuanto lo hacía, las cookies revocadas
+    que ya se habían olvidado volvían a valer.
     """
-    return float(settings.sesionMaximaSegundos()
-                 or inactividadSegundos()
-                 or RETENCION_POR_DEFECTO)
+    maxima = settings.sesionMaximaSegundos()
+    return float(min(maxima, RETENCION_POR_DEFECTO) if maxima else RETENCION_POR_DEFECTO)
 
 
 def _podar(estado: dict) -> None:

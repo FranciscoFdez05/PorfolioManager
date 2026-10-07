@@ -12,9 +12,10 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from admin.backup_manager import _remove_wal_sidecars, _ruta_bloqueo, check_integrity
-from core import exportables, paths, settings, telegram_notifier
+from admin.backup_manager import _remove_wal_sidecars, _ruta_bloqueo, check_integrity, problema_de_portfolio
+from core import clave_copias, exportables, paths, settings, telegram_notifier, zip_seguro
 from core.bloqueo import BloqueoOcupado, exclusivo
+from core.copia_sqlite import copiar as copiar_sqlite
 from core.errors import mensajeAlmacenamiento, registrarFalloEscritura
 from core.escritura import escribirAtomico, limpiarTemporal, rutaTemporal, temporalPara
 from core.paths import (
@@ -25,7 +26,7 @@ from core.paths import (
     PORTFOLIOS_DIR as _PORTFOLIOS_DIR,
     PORTFOLIOS_META_FILE as _META_FILE,
 )
-from routes.ajustes import _read_ajustes
+from routes.ajustes import _RE_SAFE_PREFS_NAME, _read_ajustes
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +78,6 @@ _RE_SAFE_DB_NAME = re.compile(r'^[A-Za-z0-9_-]{1,64}\.db$')
 # Mismo alfabeto que exige admin.portfolios_manager para un id de portfolio: de
 # ahí sale un nombre de fichero, así que ni barras ni puntos ni mayúsculas.
 _RE_SAFE_PORTFOLIO_ID = re.compile(r'^[a-z0-9_-]{1,64}$')
-_RE_SAFE_PREFS_NAME = re.compile(r'^prefs_[A-Za-z0-9_-]{1,64}\.json$')
 
 
 def _problema_del_indice(crudo: bytes) -> str | None:
@@ -145,38 +145,31 @@ def _list_backups():
     return sorted(files, key=_parse_dt, reverse=True)
 
 
-def _sqlite_copy(src_path: Path, dst_path: Path):
-    src = dst = None
-    try:
-        src = sqlite3.connect(str(src_path), timeout=settings.backupSqliteTimeout())
-        dst = sqlite3.connect(str(dst_path), timeout=settings.backupSqliteTimeout())
-        dst.execute(f"PRAGMA busy_timeout={settings.backupSqliteTimeout() * 1000}")
-        src.backup(dst)
-        dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        dst.commit()
-    finally:
-        for conn in (dst, src):
-            if conn is not None:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-
-
 def _reemplazar_atomico_via_sqlite(origen: Path, destino: Path):
-    """Sustituye `destino` por una copia de `origen`, sin dejarlo nunca a medias.
+    """Sustituye el contenido de `destino` por el de `origen`, sin dejarlo a medias.
 
-    `_sqlite_copy(origen, destino)` a secas escribe directamente sobre
-    `destino` — que en un restore es el .db activo—: si la copia se
-    interrumpe (el worker de gunicorn muere por timeout, otro proceso tiene
-    el fichero bloqueado, el disco falla a mitad), lo que queda no es ni el
-    backup nuevo ni los datos antiguos, sino un portfolio roto. Aquí la copia
-    va primero a un temporal en la misma carpeta que `destino` —mismo
-    sistema de ficheros, para que el rename final sea atómico de verdad— y
-    solo se sustituye si termina bien.
+    Si `destino` ya existe se copia **dentro del mismo fichero** con la API de
+    backup de SQLite. Esa copia va en una transacción de escritura del destino:
+    si se corta (timeout del worker, disco), SQLite la deshace al reabrir y
+    queda la base anterior entera. Y, a diferencia de un rename, la ven al
+    instante las conexiones que el otro worker de gunicorn tenga abiertas: con
+    `tmp.replace(destino)` esas conexiones seguían escribiendo en el inodo ya
+    desvinculado hasta notar la generación nueva, y lo que escribiesen en ese
+    intervalo se perdía. Es lo mismo que hace ya la importación de un ZIP.
+
+    Solo si SQLite no puede copiar sobre la base en uso (p. ej. tamaños de
+    página distintos con el destino en WAL) se cae a la vía anterior: copia a un
+    temporal en la misma carpeta y rename atómico.
     """
+    if destino.exists():
+        try:
+            copiar_sqlite(origen, destino)
+            return
+        except sqlite3.Error as error:
+            log.warning("[backup] No se pudo copiar sobre %s (%s); se sustituye el fichero", destino.name, error)
+
     with temporalPara(destino) as tmp:
-        _sqlite_copy(origen, tmp)
+        copiar_sqlite(origen, tmp)
         _remove_wal_sidecars(tmp)
         tmp.replace(destino)
     _remove_wal_sidecars(destino)
@@ -196,7 +189,7 @@ def _safety_copy_before_restore() -> Path | None:
     try:
         dest_dir.mkdir(parents=True, exist_ok=True)
         for db_file in sorted(_PORTFOLIOS_DIR.glob("*.db")):
-            _sqlite_copy(db_file, dest_dir / db_file.name)
+            copiar_sqlite(db_file, dest_dir / db_file.name)
         if _META_FILE.exists():
             shutil.copy2(str(_META_FILE), str(dest_dir / "portfolios.json"))
         if _AJUSTES_SRC.exists():
@@ -206,6 +199,38 @@ def _safety_copy_before_restore() -> Path | None:
     except Exception as e:
         log.error(f"[backup] No se pudo crear la copia previa al restore: {e}")
         return None
+
+
+@contextmanager
+def bloqueo_restauracion():
+    """Los dos cerrojos de /api/restore, para quien sustituya datos fuera de él.
+
+    «Importar ZIP» e «Importar JSON» sobrescriben la cartera activa igual que
+    una restauración, pero no tomaban ningún cerrojo: podían cruzarse con una
+    copia automática o con un restore del otro worker. Lanza BloqueoOcupado
+    si no se consigue a tiempo.
+    """
+    with _bloqueo_cruzado(), _BACKUP_LOCK:
+        yield
+
+
+def copia_previa_obligatoria() -> tuple[Path | None, bool]:
+    """Copia del estado actual antes de sustituirlo: `(carpeta, ok)`.
+
+    `ok` es False solo si había portfolios que proteger y no se pudo copiarlos.
+    En ese caso quien llama no debe seguir: lo que viniera después no tendría
+    vuelta atrás.
+    """
+    copia = _safety_copy_before_restore()
+    return copia, copia is not None or not _PORTFOLIOS_DIR.exists()
+
+
+def respuesta_sin_copia_previa():
+    return jsonify({
+        "ok": False,
+        "error": "No se pudo guardar una copia del estado actual, así que no se ha cambiado nada. "
+                 "Revisa el espacio libre y los permisos de data/.",
+    }), 500
 
 
 def _tmp_dir(crear=True) -> Path:
@@ -237,7 +262,7 @@ def _copia_temporal(src_path: Path):
     era gratis en un PC y no lo es en el servidor doméstico donde corre esto.
     """
     with temporalPara(src_path, directorio=_tmp_dir()) as tmp_path:
-        _sqlite_copy(src_path, tmp_path)
+        copiar_sqlite(src_path, tmp_path)
         yield tmp_path
 
 
@@ -314,7 +339,7 @@ def _enviar_copia_a_telegram(nombre: str) -> None:
     claves = " · con claves de API" if _incluir_claves() else ""
     pie = (f"💾 Copia de seguridad automática\n{nombre} · {_megas(nombre)} · "
            f"{portfolios} portfolio(s){claves}")
-    if not telegram_notifier.notificar_archivo("backup", _BACKUP_DIR / nombre, pie):
+    if not telegram_notifier.notificar_archivo("backupFichero", _BACKUP_DIR / nombre, pie):
         _avisar_copia_creada(nombre, automatica=True)
 
 
@@ -325,13 +350,19 @@ def _incluir_claves() -> bool:
 def _claves_cifradas_para_zip() -> bytes | None:
     """`claves-api.cifradas.json` listo para meter en el ZIP, o None si no procede.
 
-    Procede si el usuario lo ha pedido en Ajustes y hay contraseña de acceso
-    configurada (con las credenciales por defecto no hay nada con lo que cifrar).
-    Falla hacia «sin claves» y lo deja en el log: una copia sin claves sirve; una
-    con las claves sin proteger no debe existir nunca.
+    Procede si el usuario lo ha pedido en Ajustes. Se cifran con la contraseña
+    propia de las copias si la hay y, si no, con el hash de la contraseña de
+    acceso a la web (con las credenciales por defecto no hay nada con lo que
+    cifrar). Falla hacia «sin claves» y lo deja en el log: una copia sin claves
+    sirve; una con las claves sin proteger no debe existir nunca.
     """
     if not _incluir_claves():
         return None
+    if clave_copias.configurada():
+        claves = exportables.clavesEnClaro()
+        paquete = clave_copias.cifrar(claves) if claves else None
+        return json.dumps(paquete, ensure_ascii=False).encode("utf-8") if paquete else None
+
     from routes.auth import _load_credentials
 
     usuario, hash_app = _load_credentials()
@@ -426,10 +457,21 @@ def _limpiar_temporales_huerfanos(antiguedad_segundos=3600):
     de datos ocupando disco.
     """
     limite = time.time() - antiguedad_segundos
-    try:
-        candidatos = list(_tmp_dir(crear=False).glob("_bak_*"))
-    except OSError:
-        return
+    candidatos = []
+    # Los temporales de copia se llaman ya `.<destino>.<pid>-<hilo>-<hex>.tmp`
+    # (core.escritura.rutaTemporal), más los sidecars -wal/-shm que SQLite deja
+    # al lado; `_bak_*` es el nombre de versiones anteriores. El ZIP a medio
+    # escribir se queda en la carpeta de copias como `_tmp_backup_*.zip`. Antes
+    # solo se buscaba `_bak_*` y nada de lo que se crea hoy se barría nunca.
+    for carpeta, patrones in (
+        (_tmp_dir(crear=False), ("_bak_*", ".*.tmp", ".*.tmp-wal", ".*.tmp-shm", ".*.tmp-journal")),
+        (_BACKUP_DIR, ("_tmp_backup_*.zip",)),
+    ):
+        for patron in patrones:
+            try:
+                candidatos.extend(carpeta.glob(patron))
+            except OSError:
+                continue
     for viejo in candidatos:
         try:
             if viejo.stat().st_mtime < limite:
@@ -621,6 +663,168 @@ def _restore_locked():
     return _restaurar_archivo(backup_path, filename, es_zip=bool(_RE_ZIP.match(filename)))
 
 
+def _validar_zip_de_copia(backup_path: Path):
+    """Respuesta de error si el ZIP no se puede restaurar, o None.
+
+    Se valida ANTES de tocar nada: si está corrupto se abortaba a mitad de la
+    restauración, con parte de los portfolios ya sobrescritos.
+    """
+    try:
+        with zipfile.ZipFile(str(backup_path), "r") as zf:
+            # Antes que testzip(), que descomprime todo para validar el CRC.
+            zip_seguro.comprobar(zf)
+            bad = zf.testzip()
+            if bad:
+                return jsonify({"ok": False, "error": f"Backup corrupto: {bad}"}), 400
+    except zipfile.BadZipFile:
+        return jsonify({"ok": False, "error": "El backup no es un ZIP válido"}), 400
+    except zip_seguro.ZipNoAdmitido as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+    return None
+
+
+def _restaurar_una_base(zf, name: str, ignorados: list) -> None:
+    # Path(...).name descarta cualquier ../ del nombre de entrada
+    db_name = Path(name).name
+    if not _RE_SAFE_DB_NAME.match(db_name):
+        log.warning(f"[backup] Entrada de zip ignorada por nombre inseguro: {name}")
+        ignorados.append(f"{name}: nombre no admisible")
+        return
+    dst_path = _PORTFOLIOS_DIR / db_name
+    # El temporal va a data/tmp: `_restore_tmp_<x>.db` en data/portfolios
+    # entraba en los `glob("*.db")` como un portfolio más mientras duraba la
+    # restauración. Se extrae a disco, no a memoria (ver core/zip_seguro.py).
+    tmp_path = rutaTemporal(dst_path, directorio=_tmp_dir())
+    try:
+        zip_seguro.extraer(zf, name, tmp_path)
+        # La misma validación que «Importar cartera» e «Importar ZIP»: la
+        # cabecera sola (16 bytes) no dice si el resto del fichero es legible ni
+        # si es un portfolio, y una base dañada sustituía a una buena.
+        problema = problema_de_portfolio(tmp_path, exigir_activos=False)
+        if problema:
+            log.warning(f"[backup] Entrada {name} ignorada: {problema}")
+            ignorados.append(f"{name}: {problema}")
+            return
+        _reemplazar_atomico_via_sqlite(tmp_path, dst_path)
+    except Exception as e:
+        # La cabecera "SQLite format 3" son 16 bytes: acertarla no garantiza que
+        # el resto del fichero sea legible. Antes, una sola entrada así abortaba
+        # la restauración completa y dejaba los portfolios ya procesados
+        # mezclados con los que aún no se habían tocado. Ahora se salta y se
+        # informa de cuál falló.
+        log.error(f"[backup] No se pudo restaurar {name}: {e}")
+        ignorados.append(f"{name}: {e}")
+    finally:
+        limpiarTemporal(tmp_path)
+
+
+def _restaurar_indice(zf, names, ignorados: list) -> None:
+    """portfolios.json, con escritura atómica.
+
+    Es el único contenido del zip que se usa como ruta: de aquí sale el id del
+    portfolio activo, y con él el fichero .db que la aplicación abrirá al
+    arrancar. Los .db y los prefs ya se filtran por nombre; esto es lo mismo
+    para el índice, y hace falta desde que se puede importar un zip que no ha
+    generado esta instalación. Un índice que no pase se ignora y se dice: mejor
+    quedarse con el que ya había que restaurar uno que apunta fuera del
+    directorio de datos.
+    """
+    if "portfolios.json" not in names:
+        return
+    meta_cruda = zf.read("portfolios.json")
+    problema = _problema_del_indice(meta_cruda)
+    if problema:
+        log.warning("[backup] portfolios.json ignorado: %s", problema)
+        ignorados.append(f"portfolios.json: {problema}")
+    else:
+        escribirAtomico(_META_FILE, meta_cruda)
+
+
+def _restaurar_prefs(zf, names, ignorados: list) -> None:
+    for name in names:
+        if not (name.startswith("prefs/") and name.endswith(".json")):
+            continue
+        prefs_name = Path(name).name
+        if not _RE_SAFE_PREFS_NAME.match(prefs_name):
+            log.warning(f"[backup] Entrada de prefs ignorada por nombre inseguro: {name}")
+            ignorados.append(f"{name}: nombre no admisible")
+            continue
+        escribirAtomico(_JSON_DIR / prefs_name, zf.read(name))
+
+
+def _restaurar_snapshots_de(zf, name: str) -> None:
+    """Snapshots desde el JSON de seguridad, solo si la base restaurada no tiene."""
+    db_path = _PORTFOLIOS_DIR / f"{Path(name).stem}.db"
+    if not db_path.exists():
+        return
+    conn = None
+    try:
+        snap_data = json.loads(zf.read(name).decode("utf-8"))
+        if not isinstance(snap_data, list) or not snap_data:
+            return
+        conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
+        if conn.execute("SELECT 1 FROM portfolio_snapshots LIMIT 1").fetchone():
+            return
+        conn.executemany(
+            "INSERT OR IGNORE INTO portfolio_snapshots (ts, total_value, total_invested) VALUES (?,?,?)",
+            [(r["ts"], r["v"], r["i"]) for r in snap_data if isinstance(r, dict) and "ts" in r],
+        )
+        conn.commit()
+    except Exception as e:
+        log.warning(f"[backup] No se pudieron restaurar snapshots de {name}: {e}")
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def _restaurar_desde_zip(backup_path: Path, claves, ignorados: list) -> list:
+    """Todo lo que trae una copia completa. Devuelve las claves restauradas."""
+    claves_restauradas = []
+    with zipfile.ZipFile(str(backup_path), "r") as zf:
+        names = zf.namelist()
+
+        _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
+        for name in names:
+            if name.startswith("portfolios/") and name.endswith(".db"):
+                _restaurar_una_base(zf, name, ignorados)
+
+        _restaurar_indice(zf, names, ignorados)
+        if "ajustes.json" in names:
+            escribirAtomico(_AJUSTES_SRC, zf.read("ajustes.json"))
+        # Claves de API: entran en claro y salen cifradas con la SECRET_KEY de
+        # esta instalación.
+        if claves:
+            claves_restauradas = exportables.restaurarClaves(claves)
+        _restaurar_prefs(zf, names, ignorados)
+        for name in names:
+            if name.startswith("snapshots/") and name.endswith(".json"):
+                _restaurar_snapshots_de(zf, name)
+
+    # Re-activar el portfolio que estaba activo en el backup
+    try:
+        from admin.portfolios_manager import init_portfolios
+        init_portfolios()
+    except Exception:
+        pass
+    return claves_restauradas
+
+
+def _restaurar_db_suelto(backup_path: Path, filename: str) -> None:
+    """Formato legacy .db: restaura solo el portfolio activo."""
+    from core.db import get_active_db_path
+
+    _reemplazar_atomico_via_sqlite(backup_path, get_active_db_path())
+    ts_m = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', filename)
+    if ts_m:
+        ajustes_bak = _BACKUP_DIR / f"ajustes_{ts_m.group(1)}.json"
+        if ajustes_bak.exists():
+            _AJUSTES_SRC.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ajustes_bak, _AJUSTES_SRC)
+
+
 def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
     """El restore propiamente dicho, ya con el fichero localizado.
 
@@ -628,16 +832,10 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
     de la lista de Ajustes y subir ese mismo zip por «Importar ZIP». Antes cada
     uno tenía su propia idea de qué hacer con el fichero.
     """
-    # Validar el zip ANTES de tocar nada: si está corrupto se abortaba a mitad
-    # de la restauración, con parte de los portfolios ya sobrescritos.
     if es_zip:
-        try:
-            with zipfile.ZipFile(str(backup_path), "r") as zf:
-                bad = zf.testzip()
-                if bad:
-                    return jsonify({"ok": False, "error": f"Backup corrupto: {bad}"}), 400
-        except zipfile.BadZipFile:
-            return jsonify({"ok": False, "error": "El backup no es un ZIP válido"}), 400
+        rechazo = _validar_zip_de_copia(backup_path)
+        if rechazo is not None:
+            return rechazo
 
     # Las claves se abren ANTES de tocar nada, por lo mismo que se valida el zip:
     # si hace falta una contraseña que no llega, se pide y no se ha cambiado nada.
@@ -645,7 +843,12 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
     if rechazo is not None:
         return rechazo
 
-    safety_dir = _safety_copy_before_restore()
+    # Sin copia previa no se sigue: antes se continuaba igualmente y un restore
+    # equivocado ya no tenía vuelta atrás.
+    safety_dir, copia_ok = copia_previa_obligatoria()
+    if not copia_ok:
+        return respuesta_sin_copia_previa()
+    copia = str(safety_dir) if safety_dir else None
 
     # Entradas del zip que no se han podido restaurar. Se acumulan en vez de
     # abortar: si el backup trae cinco portfolios y uno está dañado, interesa
@@ -655,148 +858,17 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
 
     from core.db import invalidate_all_connections
     invalidate_all_connections()
-
     try:
         if es_zip:
-            with zipfile.ZipFile(str(backup_path), "r") as zf:
-                names = zf.namelist()
-
-                # Restaurar cada portfolio DB
-                _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
-                for name in names:
-                    if name.startswith("portfolios/") and name.endswith(".db"):
-                        # Path(...).name descarta cualquier ../ del nombre de entrada
-                        db_name = Path(name).name
-                        if not _RE_SAFE_DB_NAME.match(db_name):
-                            log.warning(f"[backup] Entrada de zip ignorada por nombre inseguro: {name}")
-                            ignorados.append(f"{name}: nombre no admisible")
-                            continue
-                        dst_path = _PORTFOLIOS_DIR / db_name
-                        raw = zf.read(name)
-                        if not raw.startswith(b"SQLite format 3\x00"):
-                            log.warning(f"[backup] Entrada {name} no es un SQLite válido, ignorada")
-                            ignorados.append(f"{name}: no es un fichero SQLite")
-                            continue
-                        # El temporal va a data/tmp: `_restore_tmp_<x>.db` en
-                        # data/portfolios entraba en los `glob("*.db")` como un
-                        # portfolio más mientras duraba la restauración.
-                        tmp_path = rutaTemporal(dst_path, directorio=_tmp_dir())
-                        try:
-                            tmp_path.write_bytes(raw)
-                            _reemplazar_atomico_via_sqlite(tmp_path, dst_path)
-                        except Exception as e:
-                            # La cabecera "SQLite format 3" son 16 bytes: acertarla
-                            # no garantiza que el resto del fichero sea legible.
-                            # Antes, una sola entrada así abortaba la restauración
-                            # completa y dejaba los portfolios ya procesados
-                            # mezclados con los que aún no se habían tocado. Ahora
-                            # se salta y se informa de cuál falló.
-                            log.error(f"[backup] No se pudo restaurar {name}: {e}")
-                            ignorados.append(f"{name}: {e}")
-                        finally:
-                            limpiarTemporal(tmp_path)
-
-                # Restaurar portfolios.json (escritura atómica)
-                #
-                # Es el único contenido del zip que se usa como ruta: de aquí
-                # sale el id del portfolio activo, y con él el fichero .db que
-                # la aplicación abrirá al arrancar. Los .db y los prefs ya se
-                # filtran por nombre; esto es lo mismo para el índice, y hace
-                # falta desde que se puede importar un zip que no ha generado
-                # esta instalación. Un índice que no pase se ignora y se dice:
-                # mejor quedarse con el que ya había que restaurar uno que
-                # apunta fuera del directorio de datos.
-                if "portfolios.json" in names:
-                    meta_cruda = zf.read("portfolios.json")
-                    problema = _problema_del_indice(meta_cruda)
-                    if problema:
-                        log.warning("[backup] portfolios.json ignorado: %s", problema)
-                        ignorados.append(f"portfolios.json: {problema}")
-                    else:
-                        escribirAtomico(_META_FILE, meta_cruda)
-
-                # Restaurar ajustes.json
-                if "ajustes.json" in names:
-                    escribirAtomico(_AJUSTES_SRC, zf.read("ajustes.json"))
-
-                # Claves de API: entran en claro y salen cifradas con la
-                # SECRET_KEY de esta instalación.
-                if claves:
-                    claves_restauradas = exportables.restaurarClaves(claves)
-
-                # Restaurar preferencias por-portfolio
-                for name in names:
-                    if name.startswith("prefs/") and name.endswith(".json"):
-                        prefs_name = Path(name).name
-                        if not _RE_SAFE_PREFS_NAME.match(prefs_name):
-                            log.warning(f"[backup] Entrada de prefs ignorada por nombre inseguro: {name}")
-                            ignorados.append(f"{name}: nombre no admisible")
-                            continue
-                        escribirAtomico(_JSON_DIR / prefs_name, zf.read(name))
-
-                # Restaurar snapshots desde JSON de seguridad si el DB restaurado quedó vacío
-                for name in names:
-                    if name.startswith("snapshots/") and name.endswith(".json"):
-                        stem = Path(name).stem
-                        db_path = _PORTFOLIOS_DIR / f"{stem}.db"
-                        if not db_path.exists():
-                            continue
-                        conn = None
-                        try:
-                            snap_data = json.loads(zf.read(name).decode("utf-8"))
-                            if not isinstance(snap_data, list) or not snap_data:
-                                continue
-                            conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
-                            has_rows = conn.execute(
-                                "SELECT 1 FROM portfolio_snapshots LIMIT 1"
-                            ).fetchone()
-                            if not has_rows:
-                                conn.executemany(
-                                    "INSERT OR IGNORE INTO portfolio_snapshots (ts, total_value, total_invested) VALUES (?,?,?)",
-                                    [(r["ts"], r["v"], r["i"]) for r in snap_data
-                                     if isinstance(r, dict) and "ts" in r]
-                                )
-                                conn.commit()
-                        except Exception as e:
-                            log.warning(f"[backup] No se pudieron restaurar snapshots de {name}: {e}")
-                        finally:
-                            if conn is not None:
-                                try:
-                                    conn.close()
-                                except Exception:
-                                    pass
-
-            # Re-activar el portfolio que estaba activo en el backup
-            try:
-                from admin.portfolios_manager import init_portfolios
-                init_portfolios()
-            except Exception:
-                pass
-
+            claves_restauradas = _restaurar_desde_zip(backup_path, claves, ignorados)
         else:
-            # Formato legacy .db: restaura solo el portfolio activo
-            from core.db import get_active_db_path
-            active_db = get_active_db_path()
-            _reemplazar_atomico_via_sqlite(backup_path, active_db)
-
-            ts_m = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', filename)
-            if ts_m:
-                ajustes_bak = _BACKUP_DIR / f"ajustes_{ts_m.group(1)}.json"
-                if ajustes_bak.exists():
-                    _AJUSTES_SRC.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(ajustes_bak, _AJUSTES_SRC)
-
+            _restaurar_db_suelto(backup_path, filename)
     except Exception as e:
         mensaje = registrarFalloEscritura(
             log, f"[backup] Error en restore de {filename}", e, _PORTFOLIOS_DIR
         )
         telegram_notifier.notificar("backup", f"❌ Ha fallado la restauración de {filename}\n{mensaje[:300]}")
-        return jsonify({
-            "ok": False,
-            "error": mensaje,
-            "safetyCopy": str(safety_dir) if safety_dir else None,
-            "ignorados": ignorados,
-        }), 500
+        return jsonify({"ok": False, "error": mensaje, "safetyCopy": copia, "ignorados": ignorados}), 500
     finally:
         # Los .db han cambiado bajo los pies de las conexiones cacheadas
         invalidate_all_connections()
@@ -811,7 +883,7 @@ def _restaurar_archivo(backup_path: Path, filename: str, *, es_zip: bool):
     )
     return jsonify({
         "ok": True,
-        "safetyCopy": str(safety_dir) if safety_dir else None,
+        "safetyCopy": copia,
         # El frontend debe avisar si la restauración fue parcial: un "ok" a
         # secas después de perder un portfolio sería el peor resultado posible.
         "ignorados": ignorados,
@@ -841,6 +913,9 @@ def _claves_del_zip(zip_path: Path):
     except (OSError, ValueError, zipfile.BadZipFile):
         return None, (jsonify({"ok": False, "error": "No se pueden leer las claves del backup"}), 400)
 
+    if isinstance(paquete, dict) and paquete.get("formato") == clave_copias.FORMATO:
+        return _abrir_claves_con_contrasena_de_copias(paquete, contrasena)
+
     if not exportables.esPaqueteDeHashApp(paquete):
         return None, None
 
@@ -857,6 +932,86 @@ def _claves_del_zip(zip_path: Path):
             "error": "Contraseña incorrecta" if contrasena else
                      "El backup lleva las claves de API protegidas con la contraseña de la web",
         }), 400)
+
+
+def _abrir_claves_con_contrasena_de_copias(paquete, contrasena: str):
+    """(claves, None) o (None, respuesta) para un ZIP con la contraseña propia de las copias.
+
+    Si la sal es la de este servidor se abre sin preguntar; si no (otro servidor, o
+    la contraseña se cambió después), hace falta la contraseña de entonces.
+    """
+    claves = clave_copias.abrir_sin_contrasena(paquete)
+    if claves is not None:
+        return claves, None
+    try:
+        return exportables.descifrarClaves(paquete, contrasena[:exportables.MAX_LARGO_CONTRASENA]), None
+    except exportables.ContrasenaIncorrecta:
+        return None, (jsonify({
+            "ok": False,
+            "necesitaContrasena": True,
+            "error": "Contraseña incorrecta" if contrasena else
+                     "El backup lleva las claves de API protegidas con la contraseña de las copias",
+        }), 400)
+
+
+@backup_bp.route("/api/backup/contrasena", methods=["POST"])
+def fijarContrasenaCopias():
+    cuerpo = request.get_json(silent=True) or {}
+    contrasena = cuerpo.get("contrasena")
+    problema = clave_copias.validar(contrasena)
+    if problema:
+        return jsonify({"ok": False, "error": problema}), 400
+    try:
+        clave_copias.fijar(contrasena)
+    except clave_copias.SinSecretKey:
+        return jsonify({
+            "ok": False,
+            "error": "Define SECRET_KEY en el servidor: sin ella la contraseña no se puede guardar protegida",
+        }), 400
+    except OSError as e:
+        return jsonify({"ok": False, "error": mensajeAlmacenamiento(e, DATA_DIR)}), 500
+    return jsonify({"ok": True, "configurada": True})
+
+
+@backup_bp.route("/api/backup/contrasena/ver", methods=["POST"])
+def verContrasenaCopias():
+    """La contraseña de las copias, tras confirmar la contraseña de acceso a la web.
+
+    Comparte el contador de intentos con /login: es otro sitio donde probarla.
+    """
+    from werkzeug.security import check_password_hash
+
+    from routes import auth
+
+    bloqueado = auth._rechazar_si_bloqueado()
+    if bloqueado:
+        return bloqueado
+    actual = auth._texto(auth._cuerpo_dict().get("currentPassword"))
+    _usuario, hash_app = auth._load_credentials()
+    if not check_password_hash(hash_app, actual):
+        auth._record_failure(auth._client_ip())
+        auth._avisar_si_se_bloquea(auth._client_ip())
+        return jsonify({"ok": False, "error": "Contraseña de acceso incorrecta"}), 400
+    auth._clear_failures(auth._client_ip())
+
+    contrasena = clave_copias.contrasena_guardada()
+    if contrasena is None:
+        return jsonify({
+            "ok": False,
+            "error": "No hay contraseña guardada que mostrar: vuelve a fijarla",
+        }), 404
+    respuesta = jsonify({"ok": True, "contrasena": contrasena})
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta
+
+
+@backup_bp.route("/api/backup/contrasena", methods=["DELETE"])
+def quitarContrasenaCopias():
+    try:
+        clave_copias.quitar()
+    except OSError as e:
+        return jsonify({"ok": False, "error": mensajeAlmacenamiento(e, DATA_DIR)}), 500
+    return jsonify({"ok": True, "configurada": False})
 
 
 @backup_bp.route("/api/backups/<filename>", methods=["DELETE"])

@@ -29,9 +29,17 @@ vez. Si tu iPhone lo rechaza, o si prefieres entender cada acción antes de
 usarla, el resto de este documento es la misma receta a mano: son exactamente
 las mismas acciones y en el mismo orden.
 
-El atajo generado **no lleva la clave dentro**: la pide a `/api/preparar` en cada
-ejecución. Por eso se puede guardar en Archivos o pasar por AirDrop sin exponer
-nada, y por eso regenerar la clave desde el panel no obliga a rehacerlo.
+El atajo generado **no lleva la clave de firma**, pero sí un **token de acceso**
+(`X-Atajo-Token`) que manda en todas sus llamadas. Sin él, cualquier equipo de
+tu red podía pedirle a `/api/preparar` una firma válida y apuntar movimientos:
+la firma no probaba quién escribía. El token se deriva de la clave, así que:
+
+- **el fichero `.shortcut` es un secreto**: guárdalo como una contraseña;
+- **regenerar la clave lo revoca**: el atajo instalado deja de funcionar y hay
+  que volver a descargarlo (es lo que hay que hacer si pierdes el iPhone).
+
+Para montarlo a mano, el valor sale en Ajustes › API › Atajo de iOS ›
+*Montarlo a mano* › **Mostrar**.
 
 ## Configuración
 
@@ -72,26 +80,30 @@ rango no obliga a reiniciar el servidor.
    `wg0` de WireGuard. De fábrica cubre cualquier red privada (192.168.x, 10.x y
    172.16-31.x); estréchalo si quieres una subred o una IP concreta.
 
-3. Comprueba desde un equipo de la LAN:
+3. Comprueba desde un equipo de la LAN (con el token de Ajustes › API):
 
    ```
-   curl http://192.168.1.X:5000/api/categorias
+   curl -H "X-Atajo-Token: <token>" http://192.168.1.X:5000/api/categorias
    ```
 
    Debe responder 200 con las categorías. Si responde 403, la IP de origen no
-   cae dentro de los rangos configurados; si responde 404, `activado` está en
-   `false`.
+   cae dentro de los rangos configurados; si responde 401, falta el token o no
+   es el actual; si responde 404, `activado` está en `false`.
 
-## Los cuatro endpoints
+## Los endpoints
+
+Con la firma exigida (lo recomendado), **todos** piden además el token en la
+cabecera `X-Atajo-Token`. Si desactivas la firma en Ajustes, tampoco se pide el
+token y la red de origen queda como única barrera.
 
 | Endpoint | Protección | Para qué lo usa el Atajo |
 |---|---|---|
-| `GET /api/portfolios-lista` | IP | Elegir a qué base de datos van los datos |
-| `GET /api/categorias` | IP | Rellenar la lista de categorías en tiempo de ejecución |
-| `GET /api/cuentas-lista` | IP | Elegir con qué cuenta se paga o en cuál se cobra (Santander, Revolut, Trade Republic…) |
-| `POST /api/preparar` | IP | Construir el cuerpo JSON y firmarlo, para que el Atajo no escriba JSON a mano |
-| `POST /api/firmar` | IP | Firmar un texto ya construido (alternativa de bajo nivel) |
-| `POST /api/movimiento` | IP + firma HMAC | Guardar el movimiento |
+| `GET /api/portfolios-lista` | IP + token | Elegir a qué base de datos van los datos |
+| `GET /api/categorias` | IP + token | Rellenar la lista de categorías en tiempo de ejecución |
+| `GET /api/cuentas-lista` | IP + token | Elegir con qué cuenta se paga o en cuál se cobra (Santander, Revolut, Trade Republic…) |
+| `POST /api/preparar` | IP + token | Construir el cuerpo JSON y firmarlo, para que el Atajo no escriba JSON a mano |
+| `POST /api/firmar` | IP + token | Firmar un texto ya construido (alternativa de bajo nivel) |
+| `POST /api/movimiento` | IP + token + firma HMAC | Guardar el movimiento |
 
 ## Varias bases de datos
 
@@ -126,6 +138,10 @@ con la ventana de 60 segundos.
 
 Sustituye `192.168.1.X:5000` por la IP y el puerto reales de tu servidor. Por
 WireGuard usarás la IP del túnel, no la de la LAN.
+
+**Cada «Obtener contenido de la URL» lleva la cabecera `X-Atajo-Token`** con el
+token de Ajustes › API (despliega *Mostrar más* en la acción para ver las
+cabeceras). En los pasos de abajo no se repite.
 
 **0. El bloque que va después de cada llamada al servidor**
 
@@ -285,6 +301,7 @@ y exige que el texto enviado luego sea idéntico byte a byte.
     - `Content-Type` = `application/json`
     - `X-Timestamp` = variable `marca`
     - `X-Signature` = variable `sello`
+    - `X-Atajo-Token` = el token
   - Cuerpo de la solicitud: `Archivo` → variable `envio`
 
 «Archivo» es lo que envía el texto crudo sin que Atajos lo reinterprete. Con la
@@ -314,7 +331,10 @@ botón de Acción (Ajustes → Botón de Acción → Atajo).
 |---|---|---|
 | 404 | La función está apagada | `[atajo] activado` en `config.ini` |
 | 403 | La IP de origen no está en los rangos permitidos | La propia respuesta trae el campo `ip` con la dirección que ve el servidor, y Ajustes › API › Atajo de iOS la lista en el paso 2 con un botón que la permite (o su subred) al momento |
+| 403 | «La dirección … no está reconocida» | El Atajo usa un nombre de host (por ejemplo `nas.casa` o un dominio de DuckDNS) por el que todavía no se ha entrado a la aplicación. Abre la web con esa misma dirección e inicia sesión una vez: el nombre queda admitido. Las IPs y `localhost` valen siempre |
+| 401 | «Este Atajo no lleva el token» o «El token del Atajo no es válido» | Atajo anterior a la versión con token, o clave regenerada desde entonces. Vuelve a descargarlo desde Ajustes › API |
 | 401 | Firma inválida, ausente, o timestamp fuera de ventana | El cuerpo enviado no es idéntico al firmado (paso 8: tiene que ir como *Archivo*) |
+| 401 | «Petición repetida» | Cada petición firmada vale una sola vez. Vuelve a lanzar el Atajo, que firma de nuevo |
 | 503 | No hay clave de firma | Ejecuta `python tools/generar_clave_movimientos.py` |
 | 404 | Portfolio inexistente | El `id` enviado no está en `/api/portfolios-lista` |
 | 400 | JSON mal formado o campos inválidos | Comillas o barras invertidas en el concepto; `tipo` que no es `gasto`/`ingreso`; importe cero o negativo; `cuenta` que no existe (el mensaje dice cuáles valen) |

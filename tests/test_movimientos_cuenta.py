@@ -7,6 +7,8 @@ import time
 
 import pytest
 
+from tests.conftest import ClienteAtajo
+
 CLAVE = "clave-de-prueba-0123456789abcdef"
 IP = "192.168.1.50"
 
@@ -26,7 +28,7 @@ def app(temp_db, monkeypatch):
     app.config["TESTING"] = True
     register_error_handlers(app)
     app.register_blueprint(movimientos_bp)
-    return app
+    return ClienteAtajo.instalar(app)
 
 
 def _enviar(client, payload):

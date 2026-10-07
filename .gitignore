@@ -71,3 +71,11 @@ htmlcov/
 # Salidas de las pruebas del frontend (vitest)
 coverage/
 .vitest/
+
+# =========================
+# AUDITORIA (local)
+# =========================
+# Informe, evidencias, pruebas de ataque y venv de la auditoria de calidad y
+# seguridad. Solo sirve en esta maquina: las correcciones y sus tests ya estan
+# en el codigo, y el informe describe como atacar la aplicacion.
+auditoria/

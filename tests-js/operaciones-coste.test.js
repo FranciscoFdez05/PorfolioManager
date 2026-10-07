@@ -6,7 +6,7 @@
 // medio el de ejecución. El Total solo cuenta si no hay precio. Se fija aquí
 // porque ya se cambió de criterio dos veces.
 import { beforeAll, describe, expect, it } from "vitest"
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 const OPERACION = {
     id: "op-1",
@@ -39,7 +39,7 @@ const ACTIVO = {
 beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
-    cargarScript("js/cartera/assets.js")
+    cargarModulo("js/cartera/assets.js")
 })
 
 describe("operación spot completada", () => {

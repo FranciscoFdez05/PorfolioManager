@@ -33,12 +33,10 @@ import os
 import re
 
 from cryptography.fernet import Fernet, InvalidToken
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from werkzeug.security import _hash_internal
 
 from core import firma_hmac, paths
-from core.secret_store import read_secret_lines, write_secret_lines
+from core.secret_store import fernetDerivado, read_secret_lines, write_secret_lines
 from stores import app_data
 
 log = logging.getLogger(__name__)
@@ -145,8 +143,7 @@ class ContrasenaIncorrecta(Exception):
 
 
 def _fernetDeContrasena(contrasena: str, salt: bytes, iteraciones: int) -> Fernet:
-    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iteraciones)
-    return Fernet(base64.urlsafe_b64encode(kdf.derive(contrasena.encode("utf-8"))))
+    return fernetDerivado(contrasena.encode("utf-8"), salt, iteraciones)
 
 
 def cifrarClaves(claves: dict, contrasena: str) -> dict:
@@ -198,6 +195,9 @@ def descifrarClaves(paquete, contrasena: str) -> dict:
 # ningún sitio recuperable.
 
 FORMATO_CLAVES_APP = "hash-app+fernet"
+# El máximo que admite `[seguridad] hash_iteraciones` (core/settings.py): una copia
+# hecha con la configuración más dura de esta misma aplicación tiene que abrirse.
+_MAX_ITERACIONES_PBKDF2 = 10_000_000
 _RE_METODO_HASH = re.compile(r"^(?:scrypt:(\d{1,6}):(\d{1,2}):(\d{1,2})|pbkdf2:sha(?:256|512):(\d{1,8}))$")
 
 
@@ -213,9 +213,13 @@ def _fernetDeHashApp(metodo: str, sal: str, resumen: str | None = None, contrase
         raise ValueError("método de resumen no admitido")
     if metodo.startswith("scrypt"):
         n, r, p = (int(g) for g in coincide.groups()[:3])
-        if n > 2**18 or r > 32 or p > 16:
+        # scrypt reserva 128·N·r bytes por intento. Con los topes de antes
+        # (N=2^18, r=32) eran 1 GiB, repetido p veces, a partir de un número
+        # escrito en un ZIP ajeno. werkzeug usa N=2^15, r=8, p=1: se deja el
+        # doble de margen (64 MiB) y nada más.
+        if n > 2**16 or r > 8 or p > 2:
             raise ValueError("coste de resumen excesivo")
-    elif int(coincide.group(4)) > 5_000_000:
+    elif int(coincide.group(4)) > _MAX_ITERACIONES_PBKDF2:
         raise ValueError("coste de resumen excesivo")
 
     if resumen is None:
@@ -255,9 +259,9 @@ def descifrarClavesConHashApp(paquete, hash_app: str | None = None, contrasena: 
         if hash_app and hash_app.count("$") == 2:
             m, s, resumen = hash_app.split("$", 2)
             if (m, s) == (metodo, sal):
-                intentos.append(dict(resumen=resumen))
+                intentos.append({"resumen": resumen})
         if contrasena:
-            intentos.append(dict(contrasena=contrasena))
+            intentos.append({"contrasena": contrasena})
         for intento in intentos:
             try:
                 claves = json.loads(_fernetDeHashApp(metodo, sal, **intento).decrypt(datos).decode("utf-8"))

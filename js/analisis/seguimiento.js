@@ -117,13 +117,13 @@ function segBuildCard(item) {
 
     card.innerHTML = `
         <div class="avCardTop">
-            <span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span>
+            <span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${escapeHtml(typeLabel)}</span>
             <div class="avCardActions">${actionBtns}</div>
         </div>
         <div class="avCardSymbol">${escapeHtml(item.symbol || item.name || "")}</div>
         <div class="avCardName">${escapeHtml(item.name || item.symbol || "Activo")}</div>
         <div class="avCardPrice">${price > 0 ? formatMoney(price, currency) : "—"}</div>
-        <div class="avCardTicker">${provider || ticker || (item._fromPortfolio ? "Sin ticker" : "Sin datos en vivo")}</div>
+        <div class="avCardTicker">${escapeHtml(provider || ticker || (item._fromPortfolio ? "Sin ticker" : "Sin datos en vivo"))}</div>
         <div class="avCardMetrics">
             <div class="avMetricItem">
                 <span class="avMetricLabel">Cambio día</span>
@@ -197,13 +197,13 @@ function segRenderTable(filtered) {
             </div>`
         return `<tr class="avTableRow" data-seg-id="${escapeHtml(item._segId || "")}">
             <td class="mTdRank">${rank}</td>
-            <td><span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${typeLabel}</span></td>
+            <td><span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${escapeHtml(typeLabel)}</span></td>
             <td class="avTrName">${escapeHtml(item.name || item.symbol || "—")}</td>
             <td class="avTrProvider">${escapeHtml(ticker)}</td>
             <td class="avTrPrice">${price > 0 ? formatMoney(price, currency) : "—"}</td>
             <td class="avTrRend ${changeClass}">${changeMoneyStr}</td>
             <td class="avTrRend ${changeClass}">${changePctDisp}</td>
-            <td class="avTrProvider">${provider || "—"}</td>
+            <td class="avTrProvider">${escapeHtml(provider || "—")}</td>
             <td class="avTrActions">${removeCell}</td>
         </tr>`
     }
@@ -666,9 +666,6 @@ async function initSeguimientoLogic() {
 
     hiddenBtn?.addEventListener("click", segOpenHiddenModal)
     hiddenCloseBtn?.addEventListener("click", () => hiddenModalOverlay?.classList.add("hidden"))
-    hiddenModalOverlay?.addEventListener("click", (e) => {
-        if (e.target === hiddenModalOverlay) hiddenModalOverlay.classList.add("hidden")
-    })
 
     const updateSegFilterLabel = () => {
         const btn = document.getElementById("seguimientoFilterDropBtn")

@@ -303,16 +303,16 @@ function buildTradingRow(row, num) {
     const gNetaNum = parseTradingAmount(row.ganancia_neta)
     const gNetaFmt =
         gNetaNum !== null
-            ? `${gNetaNum >= 0 ? "+" : ""}${gNetaNum.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.capital_currency || ""}`
+            ? `${gNetaNum >= 0 ? "+" : ""}${gNetaNum.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${escapeHtml(row.capital_currency)}`
             : ""
 
     tr.innerHTML = `
         <td class="tradingNumCell">${num}</td>
-        <td>${row.fecha || ""}</td>
-        <td><span class="tradingTipoBadge tradingTipo${row.tipo}">${row.tipo}</span></td>
-        <td class="tradingMonedaCell">${row.moneda || ""}</td>
-        <td><span class="tradingDirBadge tradingDir${row.direccion}">${row.direccion}</span></td>
-        <td><span class="tradingResultBadge ${esProfit ? "tradingProfit" : "tradingPerdida"}">${row.resultado}</span></td>
+        <td>${escapeHtml(row.fecha)}</td>
+        <td><span class="tradingTipoBadge tradingTipo${escapeHtml(row.tipo)}">${escapeHtml(row.tipo)}</span></td>
+        <td class="tradingMonedaCell">${escapeHtml(row.moneda)}</td>
+        <td><span class="tradingDirBadge tradingDir${escapeHtml(row.direccion)}">${escapeHtml(row.direccion)}</span></td>
+        <td><span class="tradingResultBadge ${esProfit ? "tradingProfit" : "tradingPerdida"}">${escapeHtml(row.resultado)}</span></td>
         <td class="${roiNum !== null ? (roiNum >= 0 ? "tradingPos" : "tradingNeg") : ""}">${formatTradingPct(row.roi)}</td>
         <td class="${gananciaNum !== null ? (gananciaNum >= 0 ? "tradingPos" : "tradingNeg") : ""}">${formatTradingPct(row.ganancia)}</td>
         <td class="${gNetaNum !== null ? (gNetaNum >= 0 ? "tradingPos" : "tradingNeg") : ""}">${gNetaFmt}</td>
@@ -320,9 +320,9 @@ function buildTradingRow(row, num) {
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
-                    <button type="button" class="rowMenuItem assetRowEditBtn tradingRowEditBtn avActionBtn avEditBtn" data-trade-id="${row.id}">Editar</button>
+                    <button type="button" class="rowMenuItem assetRowEditBtn tradingRowEditBtn avActionBtn avEditBtn" data-trade-id="${escapeHtml(row.id)}">Editar</button>
                     <hr>
-                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn tradingRowDeleteBtn avActionBtn avDeleteBtn" data-trade-id="${row.id}">Eliminar</button>
+                    <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn tradingRowDeleteBtn avActionBtn avDeleteBtn" data-trade-id="${escapeHtml(row.id)}">Eliminar</button>
                 </div>
             </div>
         </td>
@@ -399,15 +399,15 @@ function buildHaciendaYearTable(rows, year) {
         <div class="tradingHaciendaSummary">
             <div class="tradingHaciendaKpi">
                 <span class="tradingHaciendaKpiLabel">Total trades</span>
-                <span class="tradingHaciendaKpiVal">${rows.length}</span>
+                <span class="tradingHaciendaKpiVal">${escapeHtml(rows.length)}</span>
             </div>
             <div class="tradingHaciendaKpi">
                 <span class="tradingHaciendaKpiLabel">Ganadoras</span>
-                <span class="tradingHaciendaKpiVal tradingPos">${profits.length}</span>
+                <span class="tradingHaciendaKpiVal tradingPos">${escapeHtml(profits.length)}</span>
             </div>
             <div class="tradingHaciendaKpi">
                 <span class="tradingHaciendaKpiLabel">Perdedoras</span>
-                <span class="tradingHaciendaKpiVal tradingNeg">${perdidas.length}</span>
+                <span class="tradingHaciendaKpiVal tradingNeg">${escapeHtml(perdidas.length)}</span>
             </div>
             <div class="tradingHaciendaKpi">
                 <span class="tradingHaciendaKpiLabel">Ganancia % acumulada</span>
@@ -430,16 +430,16 @@ function buildHaciendaYearTable(rows, year) {
             const gNetaN = parseTradingAmount(row.ganancia_neta)
             const gNetaF =
                 gNetaN !== null
-                    ? `${gNetaN >= 0 ? "+" : ""}${gNetaN.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.capital_currency || ""}`
+                    ? `${gNetaN >= 0 ? "+" : ""}${gNetaN.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${escapeHtml(row.capital_currency)}`
                     : ""
             return `
             <tr>
                 <td class="tradingNumCell">${idx + 1}</td>
-                <td>${row.fecha || ""}</td>
-                <td><span class="tradingTipoBadge tradingTipo${row.tipo}">${row.tipo}</span></td>
-                <td class="tradingMonedaCell">${row.moneda || ""}</td>
-                <td><span class="tradingDirBadge tradingDir${row.direccion}">${row.direccion}</span></td>
-                <td><span class="tradingResultBadge ${esProfit ? "tradingProfit" : "tradingPerdida"}">${row.resultado}</span></td>
+                <td>${escapeHtml(row.fecha)}</td>
+                <td><span class="tradingTipoBadge tradingTipo${escapeHtml(row.tipo)}">${escapeHtml(row.tipo)}</span></td>
+                <td class="tradingMonedaCell">${escapeHtml(row.moneda)}</td>
+                <td><span class="tradingDirBadge tradingDir${escapeHtml(row.direccion)}">${escapeHtml(row.direccion)}</span></td>
+                <td><span class="tradingResultBadge ${esProfit ? "tradingProfit" : "tradingPerdida"}">${escapeHtml(row.resultado)}</span></td>
                 <td class="${(parseTradingPercent(row.roi) || 0) >= 0 ? "tradingPos" : "tradingNeg"}">${formatTradingPct(row.roi)}</td>
                 <td class="${(parseTradingPercent(row.ganancia) || 0) >= 0 ? "tradingPos" : "tradingNeg"}">${formatTradingPct(row.ganancia)}</td>
                 <td class="${gNetaN !== null ? (gNetaN >= 0 ? "tradingPos" : "tradingNeg") : ""}">${gNetaF}</td>
@@ -572,7 +572,7 @@ async function openTradingModal(tradeId) {
     fields.innerHTML = `
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Fecha</label>
-            <input id="tmFecha" class="assetRowModalInput" type="text" value="${rowData.fecha}" placeholder="dd-mm-aaaa">
+            <input id="tmFecha" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.fecha)}" placeholder="dd-mm-aaaa">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Tipo trade</label>
@@ -582,7 +582,7 @@ async function openTradingModal(tradeId) {
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Moneda</label>
-            <input id="tmMoneda" class="assetRowModalInput" type="text" value="${rowData.moneda}" placeholder="BTC, ETH...">
+            <input id="tmMoneda" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.moneda)}" placeholder="BTC, ETH...">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Dirección</label>
@@ -600,22 +600,22 @@ async function openTradingModal(tradeId) {
             <label class="assetRowModalLabel">Capital</label>
             <div class="tmCapitalRow">
                 <select id="tmCapitalCurrency" class="assetRowModalSelect tmCapitalCurrencySelect">${currencySelect}</select>
-                <input id="tmCapital" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.capital}" placeholder="500">
+                <input id="tmCapital" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.capital)}" placeholder="500">
             </div>
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">ROI (%)</label>
-            <input id="tmRoi" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.roi}" placeholder="22">
+            <input id="tmRoi" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.roi)}" placeholder="22">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Ganancia (%)</label>
-            <input id="tmGanancia" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.ganancia}" placeholder="0.44">
+            <input id="tmGanancia" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.ganancia)}" placeholder="0.44">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Ganancia neta</label>
             <div class="tmCapitalRow">
-                <input id="tmGananciaNeta" class="assetRowModalInput" type="text" inputmode="decimal" value="${rowData.ganancia_neta}" placeholder="110">
-                <span class="tmCurrencyLabel">${rowData.capital_currency}</span>
+                <input id="tmGananciaNeta" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.ganancia_neta)}" placeholder="110">
+                <span class="tmCurrencyLabel">${escapeHtml(rowData.capital_currency)}</span>
             </div>
         </div>
     `

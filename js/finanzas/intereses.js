@@ -1,7 +1,9 @@
 // ===== CUENTAS REMUNERADAS =====
+// Una cuenta remunerada es siempre una cuenta de la ventana «Cuentas»: se elige
+// una que ya existe, se llama como ella y sus intereses entran en su saldo.
 
 let interesesModalKeyHandler = null
-let _allCuentas = [] // [{ id, nombre, rows: [...] }]
+let _allCuentas = [] // [{ id, nombre, cuenta, rows: [...] }]; `cuenta` = id en «Cuentas»
 let currentCuentaId = null
 let _allInteresesRows = [] // referencia a la cuenta activa
 let currentInteresesYear = null
@@ -30,10 +32,13 @@ function renderCuentasSidebar() {
         const item = document.createElement("div")
         item.className = `cuentaItem${cuenta.id === currentCuentaId ? " active" : ""}`
         item.dataset.cuentaId = cuenta.id
+        // Las de antes de que tuvieran que ser una cuenta pueden no tenerla todavía.
+        const sinCuenta = !cuenta.cuenta
+        const titulo = sinCuenta ? `${cuenta.nombre} · sin cuenta: elígela con ✎` : cuenta.nombre
         item.innerHTML = `
-            <span class="cuentaItemName" title="${escapeInteresesHtml(cuenta.nombre)}">${escapeInteresesHtml(cuenta.nombre)}</span>
+            <span class="cuentaItemName" title="${escapeInteresesHtml(titulo)}">${escapeInteresesHtml(cuenta.nombre)}${sinCuenta ? " ⚠" : ""}</span>
             <div class="cuentaItemActions">
-                <button type="button" class="cuentaItemRenameBtn" data-id="${cuenta.id}" title="Renombrar">✎</button>
+                <button type="button" class="cuentaItemRenameBtn" data-id="${cuenta.id}" title="Cambiar de cuenta">✎</button>
                 <button type="button" class="cuentaItemDeleteBtn" data-id="${cuenta.id}" title="Eliminar">✕</button>
             </div>
         `
@@ -80,9 +85,6 @@ function openInteresesErrorModal(message, error = null) {
 
     const close = () => overlay.remove()
     modal.querySelector("#interesesErrorCloseBtn").addEventListener("click", close)
-    overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) close()
-    })
     document.addEventListener("keydown", function handler(e) {
         if (e.key === "Escape" || e.key === "Enter") {
             close()
@@ -141,48 +143,94 @@ function openCuentaNameModal({ title, defaultValue = "", onConfirm }) {
         if (e.key === "Escape") close()
     })
 
-    overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) close()
-    })
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
     modal.querySelector("#cuentaNameInput")?.focus()
     modal.querySelector("#cuentaNameInput")?.select()
 }
 
-function addCuenta() {
-    openCuentaNameModal({
-        title: "Nueva cuenta remunerada",
-        onConfirm: async (nombre) => {
-            const newCuenta = { id: generateCuentaId(), nombre, rows: [] }
-            _allCuentas.push(newCuenta)
-            selectCuenta(newCuenta.id)
+// Elegir la cuenta de «Cuentas» que es (o pasa a ser) remunerada. Solo se
+// ofrecen las que no lo son ya, más la actual.
+async function openCuentaRemuneradaPicker({ title, actual = null, onConfirm }) {
+    let cuentas = []
+    try {
+        const data = await Api.get("/api/cuentas")
+        cuentas = Array.isArray(data?.cuentas) ? data.cuentas : []
+    } catch (error) {
+        openInteresesErrorModal("No se pudieron cargar las cuentas.", error)
+        return
+    }
+
+    const libres = cuentas.filter((c) => !c.remunerada || c.remunerada === actual?.id)
+    const opciones = libres
+        .map(
+            (c) =>
+                `<option value="${escapeInteresesHtml(c.id)}"${c.id === actual?.cuenta ? " selected" : ""}>${escapeInteresesHtml(c.nombre)}</option>`
+        )
+        .join("")
+
+    openGastosCreateModal({
+        title,
+        bodyHtml: libres.length
+            ? `
+            <label class="assetModalLabel" for="cuentaRemuneradaSelect">Cuenta</label>
+            <select id="cuentaRemuneradaSelect" class="assetModalSelect">${opciones}</select>
+            <p class="cuentasHint">Una de tus cuentas de Finanzas › Cuentas. Sus intereses se suman a su saldo. Para una cuenta nueva, créala antes allí.</p>`
+            : `<p class="cuentasHint">Todas tus cuentas son ya remuneradas. Crea otra en Finanzas › Cuentas.</p>`,
+        submitLabel: "Guardar",
+        onSubmit: async ({ getValue, setFeedback }) => {
+            const elegida = libres.find((c) => c.id === getValue("cuentaRemuneradaSelect"))
+            if (!elegida) {
+                setFeedback("Elige una cuenta.", true)
+                return false
+            }
             try {
-                await saveInteresesDataToServer()
+                await onConfirm(elegida)
+                return true
             } catch (error) {
-                console.error(error)
-                openInteresesErrorModal("No se pudo guardar la nueva cuenta.", error)
+                setFeedback(error?.message || "No se pudo guardar.", true)
+                return false
             }
         }
     })
 }
 
-function renameCuenta(id) {
-    const cuenta = _allCuentas.find((c) => c.id === id)
-    if (!cuenta) return
-    openCuentaNameModal({
-        title: "Renombrar cuenta",
-        defaultValue: cuenta.nombre,
-        onConfirm: async (nombre) => {
-            if (nombre === cuenta.nombre) return
-            cuenta.nombre = nombre
-            renderCuentasSidebar()
+function addCuenta() {
+    openCuentaRemuneradaPicker({
+        title: "Nueva cuenta remunerada",
+        onConfirm: async (elegida) => {
+            const newCuenta = { id: generateCuentaId(), nombre: elegida.nombre, cuenta: elegida.id, rows: [] }
+            _allCuentas.push(newCuenta)
             try {
                 await saveInteresesDataToServer()
             } catch (error) {
-                console.error(error)
-                openInteresesErrorModal("No se pudo guardar el nombre.", error)
+                _allCuentas = _allCuentas.filter((c) => c !== newCuenta)
+                throw error
             }
+            selectCuenta(newCuenta.id)
+        }
+    })
+}
+
+// El nombre es el de la cuenta: «renombrar» es cambiarla por otra (o elegirla,
+// si es de las antiguas que no tenían).
+function renameCuenta(id) {
+    const cuenta = _allCuentas.find((c) => c.id === id)
+    if (!cuenta) return
+    openCuentaRemuneradaPicker({
+        title: `Cuenta de «${cuenta.nombre}»`,
+        actual: cuenta,
+        onConfirm: async (elegida) => {
+            const antes = { nombre: cuenta.nombre, cuenta: cuenta.cuenta }
+            cuenta.nombre = elegida.nombre
+            cuenta.cuenta = elegida.id
+            try {
+                await saveInteresesDataToServer()
+            } catch (error) {
+                Object.assign(cuenta, antes)
+                throw error
+            }
+            renderCuentasSidebar()
         }
     })
 }
@@ -193,7 +241,7 @@ function deleteCuenta(id) {
 
     openConfirmModal({
         title: "Eliminar cuenta",
-        message: `Vas a eliminar la cuenta "${cuenta.nombre}" y todos sus datos. Esto no se puede deshacer.`,
+        message: `Vas a quitar «${cuenta.nombre}» de las cuentas remuneradas y borrar todos sus intereses. La cuenta sigue en Cuentas. Esto no se puede deshacer.`,
         confirmLabel: "Eliminar",
         requireText: cuenta.nombre,
         onConfirm: async () => {
@@ -284,12 +332,10 @@ function renderInteresesYearBar(years) {
 }
 
 function escapeInteresesHtml(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;")
+    // Alias del escapeHtml común (js/core/dom.js). Había una copia por
+    // módulo y no todas escapaban las comillas, que es lo que importa en
+    // un atributo value="…".
+    return escapeHtml(value)
 }
 
 // ----- Modal añadir/editar fila -----
@@ -341,11 +387,6 @@ function openInteresesModal(globalIndex = -1, defaultFecha = "") {
         node.classList.toggle("error", Boolean(message && isError))
     }
 
-    overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) {
-            // cerrar deshabilitado para evitar pérdida accidental
-        }
-    })
 
     modal.querySelector("#interesesModalCancelBtn")?.addEventListener("click", closeInteresesModal)
     modal.querySelector("#interesesModalSaveBtn")?.addEventListener("click", async () => {
@@ -487,7 +528,7 @@ function renderFilteredIntereses() {
     visible.forEach(({ r: rowData, i: globalIndex }) => {
         const rowElement = document.createElement("tr")
         rowElement.innerHTML = `
-            <td data-field="fecha">${rowData.fecha || ""}</td>
+            <td data-field="fecha">${escapeHtml(rowData.fecha || "")}</td>
             <td data-field="acumulado">${formatCellEuroValue(rowData.acumulado)}</td>
             <td data-field="impuestos">${formatCellEuroValue(rowData.impuestos)}</td>
             <td class="rowTotal">0,00 €</td>
@@ -520,7 +561,13 @@ async function saveInteresesDataToServer() {
 
     if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        let mensaje = `HTTP ${response.status}: ${errorText}`
+        try {
+            mensaje = JSON.parse(errorText)?.error || mensaje
+        } catch {
+            // No era JSON: se queda el texto tal cual.
+        }
+        throw new Error(mensaje)
     }
 }
 

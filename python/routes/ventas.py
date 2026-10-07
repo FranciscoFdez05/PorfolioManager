@@ -1,3 +1,5 @@
+from datetime import date
+
 from flask import Blueprint, Response, g, jsonify
 
 from core import csp, informe_renta
@@ -21,7 +23,7 @@ ventas_bp = Blueprint("ventas", __name__)
 
 @ventas_bp.route("/api/ventas", methods=["GET"])
 def getVentas():
-    default_year = "2026"
+    default_year = str(date.today().year)
     years = migrate_legacy_ventas_if_needed(default_year)
     # Un solo cálculo para todo: el FIFO es global y recalcularlo por año
     # daría, además de lento, resultados distintos según el orden de lectura.
@@ -56,7 +58,7 @@ def createVentasYear():
 
 @ventas_bp.route("/api/ventas/<year>", methods=["GET"])
 def getVentasYear(year):
-    migrate_legacy_ventas_if_needed(normalize_year(year) or "2026")
+    migrate_legacy_ventas_if_needed(normalize_year(year) or str(date.today().year))
     data = read_ventas_year(year)
 
     if data is None:
@@ -159,7 +161,8 @@ def deleteVentasYear(year):
     remaining_years = list_ventas_years()
 
     if not remaining_years:
-        write_ventas_year("2026", create_default_ventas_year("2026"))
-        remaining_years = ["2026"]
+        actual = str(date.today().year)
+        write_ventas_year(actual, create_default_ventas_year(actual))
+        remaining_years = [actual]
 
     return jsonify({"ok": True, "years": remaining_years})

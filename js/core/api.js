@@ -219,15 +219,72 @@
     window.ApiError = ApiError
 
     // ── Red de seguridad para el código que aún llama a fetch() directamente ──
-    // Los módulos existentes hacen `fetch("/api/…")` sin comprobar el 401. Sin
-    // esto, una sesión caducada les rompe el `.json()` con un error opaco.
-    // Interceptar aquí cubre las ~165 llamadas de una vez.
+    // Los módulos existentes hacen `fetch("/api/…")` sin comprobar el 401, sin
+    // timeout y sin tratar el 403 ni el 429. Interceptar aquí cubre las ~225
+    // llamadas de una vez:
+    //
+    //   - 401: al login, conservando la página.
+    //   - Lecturas de /api/ colgadas: se cortan a los 60 s (las del proveedor
+    //     de cotizaciones con reintentos rondan los 30). Las escrituras no se
+    //     cortan: una subida o una restauración pueden tardar más, y abortarlas
+    //     a medias no las deshace en el servidor.
+    //   - 403 en una escritura: casi siempre el token CSRF ha cambiado (otra
+    //     pestaña, un reinicio). La propia respuesta 403 trae la cookie nueva y
+    //     el servidor rechazó la petición antes de procesarla, así que se
+    //     repite una vez y sin más.
+    //   - 429: se avisa de cuánto esperar en vez de dejar un error genérico.
+    const LECTURA_TIMEOUT_MS = 60000
     const wrappedFetch = window.fetch.bind(window)
+
+    function urlDe(input) {
+        return typeof input === "string" ? input : (input && input.url) || ""
+    }
+
+    function metodoDe(input, init) {
+        return ((init && init.method) || (input && input.method) || "GET").toUpperCase()
+    }
+
+    function esDeLaApi(url) {
+        try {
+            const destino = new URL(url, window.location.href)
+            return destino.origin === window.location.origin && destino.pathname.indexOf("/api/") === 0
+        } catch {
+            return false
+        }
+    }
+
+    function avisar(mensaje) {
+        if (typeof window.showToast === "function") window.showToast(mensaje, { type: "error" })
+    }
+
     window.fetch = function (input, init) {
-        return wrappedFetch(input, init).then(function (response) {
+        const url = urlDe(input)
+        const metodo = metodoDe(input, init)
+        const api = esDeLaApi(url)
+        let opciones = init
+
+        if (
+            api &&
+            IDEMPOTENT_METHODS[metodo] &&
+            !(init && init.signal) &&
+            typeof AbortSignal !== "undefined" &&
+            typeof AbortSignal.timeout === "function"
+        ) {
+            opciones = Object.assign({}, init, { signal: AbortSignal.timeout(LECTURA_TIMEOUT_MS) })
+        }
+
+        return wrappedFetch(input, opciones).then(function (response) {
+            if (!api) return response
             if (response.status === 401) {
-                const url = typeof input === "string" ? input : (input && input.url) || ""
-                if (url.indexOf("/api/") !== -1) goToLogin()
+                goToLogin()
+            } else if (response.status === 403 && !IDEMPOTENT_METHODS[metodo] && !(init && init._reintentoCsrf)) {
+                return wrappedFetch(input, Object.assign({}, opciones, { _reintentoCsrf: true }))
+            } else if (response.status === 429) {
+                const espera = parseInt(response.headers.get("Retry-After") || "", 10)
+                avisar(
+                    "Demasiadas peticiones seguidas" +
+                        (espera > 0 ? ": espera " + espera + " s antes de volver a intentarlo." : ".")
+                )
             }
             return response
         })

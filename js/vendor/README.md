@@ -15,21 +15,29 @@ Se sirven desde aquí y no desde un CDN por tres motivos:
 
 ## Inventario
 
-| Fichero | Versión | Origen |
-|---|---|---|
-| `chart.umd.min.js` | 4.4.4 | `https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js` |
+| Fichero | Versión | Origen | SHA-256 |
+|---|---|---|---|
+| `chart.umd.min.js` | 4.5.1 | `package/dist/chart.umd.min.js` del paquete npm `chart.js@4.5.1` (integridad del registro `sha512-GIjfiT9dbmHRiYi6Nl2yFCq7kkwdkp1W/lp2J99rX0yo9tgJGn3lKQATztIjb5tVtevcBtIdICNWqlq5+E8/Pw==`) | `48444a82d4edcb5bec0f1965faacdde18d9c17db3063d042abada2f705c9f54a` |
 
 ## Cómo actualizar
 
+Desde el paquete publicado en npm y no desde el CDN: `npm pack` comprueba el
+fichero descargado contra la integridad que publica el registro, y el CDN sirve
+una copia regenerada sobre la que no hay nada que comprobar.
+
 ```sh
-curl -sSL -o js/vendor/chart.umd.min.js \
-  "https://cdn.jsdelivr.net/npm/chart.js@<version>/dist/chart.umd.min.js"
+cd "$(mktemp -d)"
+npm view chart.js version dist.integrity        # versión e integridad publicadas
+npm pack chart.js@<version>                      # descarga y verifica el .tgz
+tar -xzf chart.js-<version>.tgz
+cp package/dist/chart.umd.min.js <proyecto>/js/vendor/chart.umd.min.js
+sha256sum <proyecto>/js/vendor/chart.umd.min.js
 ```
 
-Después actualiza la tabla de arriba y el `?v=` de la etiqueta `<script>` en
-`index.html`: es lo único que invalida la caché del navegador para este fichero
-(a diferencia del resto de `js/`, que el servidor envía con `no-store`).
+Después actualiza la tabla de arriba (versión, integridad y SHA-256) y el `?v=`
+de la etiqueta `<script>` en `index.html`: es lo único que invalida la caché del
+navegador para este fichero (el servidor lo envía con caché de un año).
 
-`tests/test_vendor.py` comprueba que el fichero existe, que la versión declarada
-en esta tabla es la que dice el propio fichero y que `index.html` no ha vuelto a
-apuntar a un CDN.
+`tests/test_csp.py` comprueba que el fichero existe, que la versión declarada
+en esta tabla es la que dice el propio fichero, que `index.html` la pide con ese
+`?v=` y que no ha vuelto a apuntar a un CDN.

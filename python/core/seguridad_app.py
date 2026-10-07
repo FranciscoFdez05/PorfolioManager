@@ -32,8 +32,9 @@ import secrets
 from datetime import timedelta
 
 from flask import abort, g, make_response, redirect, request, session, url_for
+from flask.sessions import SecureCookieSessionInterface
 
-from core import csp, sesion, settings, tls
+from core import csp, red_local, sesion, settings, tls
 from core.rate_limit import LimitadorVentana
 
 log = logging.getLogger(__name__)
@@ -46,7 +47,9 @@ log = logging.getLogger(__name__)
 # script admin/setup_password.py, no una ruta). Se retira: una entrada que no
 # corresponde a ningún endpoint no protege nada hoy, pero deja preparado que el
 # día que alguien añada un `setup` al blueprint nazca público sin querer.
-PUBLIC_ENDPOINTS = {"auth.login", "auth.logout", "salud.getHealth"}
+# `auth.logout` ya no está: cerrar sesión es un POST que pasa por el CSRF
+# como cualquier otra escritura (antes un GET desde otra web bastaba).
+PUBLIC_ENDPOINTS = {"auth.login", "salud.getHealth"}
 # Endpoints del Atajo de iOS. No pueden usar la sesión ni el token CSRF (un
 # Atajo no mantiene cookies), así que quedan fuera de require_login y de
 # verify_csrf y se autentican por su cuenta: filtro de IP en core/red_local.py
@@ -104,6 +107,36 @@ _COMPRESION_MAX_BYTES = 3 * 1024 * 1024
 CSRF_COOKIE = "csrf_token"
 CSRF_HEADER = "X-CSRF-Token"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+
+
+# ── SECRET_KEY ────────────────────────────────────────────────────────────────
+# Los valores de ejemplo que se han publicado en .env.example. Están aquí y no
+# se leen de ese fichero porque en Docker no se copia a la imagen.
+SECRET_KEYS_DE_EJEMPLO = frozenset({"cambia_esto_por_una_clave_aleatoria_larga"})
+SECRET_KEY_MIN_CARACTERES = 32
+
+
+def rechazar_secret_key_insegura(clave: str) -> None:
+    """Aborta el arranque con una SECRET_KEY de ejemplo o demasiado corta.
+
+    Vacía no se rechaza: entonces el servidor genera una temporal y lo avisa en
+    el log (sirve para probar). Lo que no puede pasar es arrancar con una clave
+    que conoce cualquiera que haya leído el repositorio.
+    """
+    if not clave:
+        return
+    if clave in SECRET_KEYS_DE_EJEMPLO or clave.lower().startswith("cambia_esto"):
+        raise SystemExit(
+            "SECRET_KEY es la de ejemplo de .env.example: con ella cualquiera puede abrir "
+            "una sesión sin contraseña. Genera una con: "
+            "python -c \"import secrets; print(secrets.token_hex(32))\" y ponla en .env."
+        )
+    if len(clave) < SECRET_KEY_MIN_CARACTERES:
+        raise SystemExit(
+            f"SECRET_KEY tiene {len(clave)} caracteres; hacen falta al menos "
+            f"{SECRET_KEY_MIN_CARACTERES}. Genera una con: "
+            "python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
 
 
 def token_csrf_actual() -> str:
@@ -186,15 +219,29 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
     def enforce_body_limit():
         """Aplica el tope estricto a todo salvo a los endpoints de subida.
 
-        MAX_CONTENT_LENGTH es global en Werkzeug 3.0 (no es escribible por
-        petición), así que se fija al máximo de subida y aquí se restringe el
-        resto.
+        MAX_CONTENT_LENGTH (el de la app) se fija al máximo de subida, y aquí se
+        restringe el resto. Mirar solo `Content-Length` no bastaba: con
+        `Transfer-Encoding: chunked` no hay cabecera de longitud y un cuerpo de
+        12 MB llegaba entero a la vista. Fijar `request.max_content_length`
+        (Flask ≥ 3.1) hace que el propio lector corte en el tope, venga como
+        venga el cuerpo.
         """
         if request.path in UPLOAD_PATHS:
             return
+        tope = settings.maxCuerpoBytes()
+        request.max_content_length = tope
         longitud = request.content_length
-        if longitud is not None and longitud > settings.maxCuerpoBytes():
+        if longitud is not None and longitud > tope:
             abort(413)
+        if longitud is None and request.method not in SAFE_METHODS:
+            # Con chunked, Werkzeug corta en el tope pero en silencio: la vista
+            # recibía un JSON truncado y lo trataba como vacío. Se lee aquí (como
+            # mucho `tope` bytes, queda en caché para la vista) y, si aún quedaba
+            # cuerpo, se responde 413 como con Content-Length.
+            request.get_data(cache=True)
+            if request.stream.read(1):
+                abort(413)
+        return None
 
     @app.before_request
     def limit_writes():
@@ -204,6 +251,12 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
         # intentos fallidos y correctos; contarlo dos veces solo daría 429 donde
         # ya hay un mensaje de bloqueo escrito para el usuario.
         if request.endpoint == "auth.login":
+            return
+        # Sin sesión (y fuera del Atajo, que se autentica por su cuenta) la
+        # petición acaba en el 401 de require_login sin tocar nada. Contarla
+        # aquí dejaba que cualquiera agotase el cupo de la IP y el usuario
+        # legítimo detrás de esa misma IP (NAT, proxy) recibiera 429.
+        if not session.get("logged_in") and request.endpoint not in ATAJO_ENDPOINTS:
             return
 
         ip = _ip_cliente()
@@ -241,6 +294,27 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
             return _sin_sesion()
 
         sesion.refrescar(session)
+        # El nombre por el que entra una sesión válida es legítimo por
+        # definición: el Atajo lo admitirá después (ver core/red_local.py).
+        red_local.anotarHostConSesion(request.host)
+
+    @app.before_request
+    def exigir_objeto_json():
+        """Un cuerpo JSON de escritura tiene que ser un objeto.
+
+        Ninguna ruta acepta otra cosa, pero casi todas hacían
+        `request.get_json(silent=True) or {}` y luego `.get(...)`: con `[1]` o
+        `"x"` eso era un AttributeError y un 500 (79 rutas lo daban en la
+        auditoría). Rechazarlo aquí, con un 400 que dice qué pasa, cubre las
+        que existen y las que se añadan. Un JSON ilegible no se toca: cada
+        ruta ya lo trata como cuerpo vacío.
+        """
+        if request.method in SAFE_METHODS or not request.is_json:
+            return None
+        datos = request.get_json(silent=True)
+        if datos is not None and not isinstance(datos, dict):
+            return make_response({"ok": False, "error": "El cuerpo JSON debe ser un objeto"}, 400)
+        return None
 
     def _sin_sesion():
         if request.path.startswith("/api/") or request.is_json:
@@ -255,7 +329,8 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
                 token_csrf_actual(),
                 httponly=False,          # el JS debe poder leerla para reenviarla
                 samesite=app.config["SESSION_COOKIE_SAMESITE"],
-                secure=app.config["SESSION_COOKIE_SECURE"],
+                # Mismo criterio que la cookie de sesión (_SesionConSecureDinamico).
+                secure=tls.httpsActivo(),
             )
         return response
 
@@ -378,6 +453,13 @@ def aplicar_proxy_inverso(app) -> int:
     return saltos
 
 
+class _SesionConSecureDinamico(SecureCookieSessionInterface):
+    """La cookie de sesión lleva Secure según el estado del HTTPS en cada momento."""
+
+    def get_cookie_secure(self, app):
+        return tls.httpsActivo()
+
+
 def aplicar_configuracion_sesion(app):
     """Cookies de sesión y topes de cuerpo. Separado de `instalar` porque son
     valores de `app.config`, no manejadores, y algún test quiere lo uno sin lo
@@ -403,6 +485,12 @@ def aplicar_configuracion_sesion(app):
     # Sale de core.tls y no de settings porque el interruptor está en Ajustes: el
     # ajuste de config.ini es solo el override de despliegue.
     app.config["SESSION_COOKIE_SECURE"] = tls.httpsActivo()
+    # Lo de arriba es solo el valor inicial. Con varios workers, activar el
+    # HTTPS desde Ajustes solo reasignaba app.config en el worker que atendía
+    # esa petición: el otro seguía emitiendo la cookie sin Secure (o con Secure
+    # por HTTP al desactivarlo, y el login entraba en bucle). La interfaz de
+    # sesión lo pregunta en cada respuesta, igual que ya hace la cabecera HSTS.
+    app.session_interface = _SesionConSecureDinamico()
     # REMEMBER_COOKIE_* no lo usa nada hoy: no hay Flask-Login ni "recordarme",
     # el login abre una sesión no permanente. Se fijan igualmente porque el día
     # que se añada, los valores de fábrica de esa extensión son un año de

@@ -116,4 +116,15 @@ describe("orden de carga de index.html", () => {
         const repetidos = scripts.filter((s, i) => scripts.indexOf(s) !== i)
         expect(repetidos).toEqual([])
     })
+
+    it("todos los ficheros de js/ se cargan desde index.html", () => {
+        // assets.js, metricas.js y ajustes.js se partieron en varios ficheros
+        // que comparten el ámbito global. Uno que se quede fuera de index.html
+        // no da ningún error al cargar: falla la primera vez que alguien llama
+        // a una de sus funciones.
+        const sinCargar = scriptsDeLaAplicacion()
+            .map(rutaRelativa)
+            .filter((ruta) => !scripts.includes(ruta))
+        expect(sinCargar).toEqual([])
+    })
 })

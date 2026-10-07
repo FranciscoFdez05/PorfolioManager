@@ -454,11 +454,6 @@ function planAbrirModal({ titulo, campos, onGuardar, etiquetaGuardar = "Guardar"
     overlay.querySelector("#planModalSaveBtn").addEventListener("click", onGuardar)
     overlay.querySelector("#planModalDeleteBtn")?.addEventListener("click", onEliminar)
 
-    // Clic fuera de la ficha: cerrar. Dentro no, porque el desplegable de los
-    // <select> personalizados se pinta en el <body> y su clic burbujea hasta aquí.
-    overlay.addEventListener("click", (evento) => {
-        if (evento.target === overlay) planCerrarModal()
-    })
 
     document.body.appendChild(overlay)
 }

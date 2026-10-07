@@ -14,6 +14,8 @@ import { beforeAll, describe, expect, it } from "vitest"
 import { cargarScript } from "./cargar.js"
 
 beforeAll(() => {
+    // dom.js va antes, como en index.html: shared-utils escapa con su escapeHtml.
+    cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
 })
 

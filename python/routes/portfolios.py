@@ -8,14 +8,17 @@ from flask import Blueprint, jsonify, request, send_file
 
 from admin.portfolios_manager import (
     _PORTFOLIOS_DIR,
+    NombreDuplicado,
     _safe_id,
     create_portfolio,
     delete_portfolio,
     get_portfolios,
+    registrar_portfolio,
     rename_portfolio,
     switch_portfolio,
 )
-from core import paths, settings
+from core import paths, settings, zip_seguro
+from core.copia_sqlite import copiar as copiar_sqlite
 from core.escritura import limpiarTemporal, rutaTemporal, temporalPara
 from stores.asset_utils import slugify
 
@@ -26,24 +29,6 @@ def _open_portfolio_db(db_file):
     conn = sqlite3.connect(str(db_file), check_same_thread=False, timeout=settings.backupSqliteTimeout())
     conn.row_factory = sqlite3.Row
     return conn
-
-
-def _sqlite_backup(src_path: Path, dst_path: Path):
-    """Copia consistente de un .db (incluye el WAL pendiente)."""
-    src = dst = None
-    try:
-        src = sqlite3.connect(str(src_path), timeout=settings.backupSqliteTimeout())
-        dst = sqlite3.connect(str(dst_path), timeout=settings.backupSqliteTimeout())
-        src.backup(dst)
-        dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        dst.commit()
-    finally:
-        for conn in (dst, src):
-            if conn is not None:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
 
 
 def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
@@ -165,6 +150,8 @@ def new_portfolio():
     try:
         pid = create_portfolio(name)
         return jsonify({"ok": True, "id": pid})
+    except NombreDuplicado as e:
+        return jsonify({"ok": False, "error": str(e)}), 409
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
@@ -200,6 +187,8 @@ def rename(pid):
     try:
         rename_portfolio(pid, name)
         return jsonify({"ok": True})
+    except NombreDuplicado as e:
+        return jsonify({"ok": False, "error": str(e)}), 409
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
@@ -227,7 +216,7 @@ def export_portfolio(pid):
     # escribían el mismo fichero. rutaTemporal añade el hilo y un aleatorio.
     with temporalPara(db_file, directorio=Path(tempfile.gettempdir())) as tmp_path:
         try:
-            _sqlite_backup(db_file, tmp_path)
+            copiar_sqlite(db_file, tmp_path)
             payload = tmp_path.read_bytes()
         except Exception as e:
             return jsonify({"ok": False, "error": f"No se pudo exportar: {e}"}), 500
@@ -240,35 +229,41 @@ def export_portfolio(pid):
     )
 
 
-def _db_de_un_zip(datos: bytes):
-    """Saca la base de datos de un ZIP de la aplicación. Devuelve (bytes, error).
+def _db_de_un_zip(origen, destino: Path):
+    """Extrae a `destino` la base de datos de un ZIP de la aplicación. Devuelve el error o None.
 
     Vale tanto el ZIP de «Exportar ZIP» —que lleva el `.db` en la raíz— como una
     copia de seguridad de una sola cartera, que lo lleva bajo `portfolios/`. Si
     la copia trae varias, no hay forma de adivinar cuál se quiere: se dice cuáles
     hay y se manda a Restaurar, que es lo que recupera todas de una vez.
+
+    Se extrae a disco y con los límites de core/zip_seguro.py: antes se leía
+    entera a memoria, y un ZIP pequeño con gigas de ceros tumbaba el worker.
     """
     try:
-        with zipfile.ZipFile(io.BytesIO(datos), "r") as zf:
+        with zipfile.ZipFile(origen, "r") as zf:
+            zip_seguro.comprobar(zf)
             dañada = zf.testzip()
             if dañada:
-                return None, f"El ZIP está dañado: {dañada}"
+                return f"El ZIP está dañado: {dañada}"
             bases = [n for n in zf.namelist() if n.endswith(".db")]
             if not bases:
-                return None, "El ZIP no contiene ninguna base de datos"
+                return "El ZIP no contiene ninguna base de datos"
             if len(bases) > 1:
                 nombres = ", ".join(sorted(Path(n).stem for n in bases))
-                return None, (
+                return (
                     f"El ZIP contiene varias carteras ({nombres}). Para recuperarlas "
                     "todas usa Ajustes → Copias de seguridad → Restaurar."
                 )
-            contenido = zf.read(bases[0])
+            zip_seguro.extraer(zf, bases[0], destino)
     except zipfile.BadZipFile:
-        return None, "El archivo no es un ZIP válido"
+        return "El archivo no es un ZIP válido"
+    except zip_seguro.ZipNoAdmitido as error:
+        return str(error)
 
-    if not contenido.startswith(b"SQLite format 3"):
-        return None, "Lo que hay dentro del ZIP no es una base de datos SQLite"
-    return contenido, None
+    if not zip_seguro.esSqlite(destino):
+        return "Lo que hay dentro del ZIP no es una base de datos SQLite"
+    return None
 
 
 @portfolios_bp.route("/api/portfolios/import", methods=["POST"])
@@ -288,27 +283,11 @@ def import_portfolio():
     header = file.read(4)
     file.seek(0)
 
-    if header.startswith(b"PK"):
-        contenido, error = _db_de_un_zip(file.read())
-        if error:
-            return jsonify({"ok": False, "error": error}), 400
-        file = io.BytesIO(contenido)
-    elif not file.read(16).startswith(b"SQLite format 3"):
+    es_zip = header.startswith(b"PK")
+    if not es_zip and not file.read(16).startswith(b"SQLite format 3"):
         return jsonify({"ok": False, "error": "El fichero no es una base de datos SQLite válida"}), 400
     file.seek(0)
 
-    # Generar ID y guardar
-    meta = get_portfolios()
-    base_id = _safe_id(name)
-    pid = base_id
-    existing_ids = {p["id"] for p in meta["portfolios"]}
-    counter = 2
-    while pid in existing_ids:
-        pid = f"{base_id}_{counter}"
-        counter += 1
-
-    _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
-    dest = _PORTFOLIOS_DIR / f"{pid}.db"
     # Guardar en temporal y validar antes de publicarlo como portfolio: escribir
     # directamente en dest dejaba un .db corrupto en data/portfolios si la
     # validación fallaba y el unlink no llegaba a ejecutarse.
@@ -316,12 +295,17 @@ def import_portfolio():
     # medio subir lo veía como un portfolio más cualquier `glob("*.db")` —la
     # copia automática, el backup manual, la rotación—, y con ficheros de
     # decenas de MB esa ventana dura segundos, no un instante.
-    tmp_dest = rutaTemporal(dest, directorio=paths.TMP_DIR)
+    # El id se elige después, ya validado y bajo el cerrojo del índice
+    # (admin.portfolios_manager.registrar_portfolio): elegirlo aquí, sin
+    # cerrojo, dejaba que dos importaciones simultáneas se quedaran con el mismo.
+    tmp_dest = rutaTemporal(_PORTFOLIOS_DIR / "importacion.db", directorio=paths.TMP_DIR)
     try:
-        if hasattr(file, "save"):
-            file.save(str(tmp_dest))
+        if es_zip:
+            error = _db_de_un_zip(file.stream, tmp_dest)
+            if error:
+                return jsonify({"ok": False, "error": error}), 400
         else:
-            tmp_dest.write_bytes(file.read())
+            file.save(str(tmp_dest))
 
         # Verificar integridad de verdad: antes se ejecutaba el PRAGMA pero
         # nunca se miraba el resultado, así que cualquier BD que se pudiera
@@ -343,15 +327,11 @@ def import_portfolio():
                 except Exception:
                     pass
 
-        tmp_dest.replace(dest)
+        pid = registrar_portfolio(name[:50], lambda destino: tmp_dest.replace(destino), renombrar_si_existe=True)
     except Exception as e:
         return jsonify({"ok": False, "error": f"No se pudo importar: {e}"}), 400
     finally:
         limpiarTemporal(tmp_dest)
-
-    meta["portfolios"].append({"id": pid, "name": name})
-    from admin.portfolios_manager import _write_meta
-    _write_meta(meta)
 
     return jsonify({"ok": True, "id": pid})
 

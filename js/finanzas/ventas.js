@@ -14,12 +14,10 @@ let currentVentasYear = null
 let ventasModalKeyHandler = null
 
 function escapeVentasHtml(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;")
+    // Alias del escapeHtml común (js/core/dom.js). Había una copia por
+    // módulo y no todas escapaban las comillas, que es lo que importa en
+    // un atributo value="…".
+    return escapeHtml(value)
 }
 
 async function loadVentasIndex() {
@@ -281,11 +279,6 @@ function openVentasModal(rowIndex = -1) {
         node.classList.toggle("error", Boolean(message && isError))
     }
 
-    overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) {
-            // closeVentasModal() // Deshabilitado para evitar cierre accidental
-        }
-    })
 
     modal.querySelector("#ventasModalCancelBtn")?.addEventListener("click", closeVentasModal)
     modal.querySelector("#ventasModalSaveBtn")?.addEventListener("click", async () => {

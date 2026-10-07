@@ -5,8 +5,12 @@ import sqlite3
 
 import pytest
 
+from tests import test_cuentas
 from tests.test_cuentas import _cuenta, _guardar_gastos, _saldo, _transferir  # noqa: F401
-from tests.test_cuentas import cliente  # noqa: F401  (fixture)
+
+# La fixture se reutiliza asignándola, no importándola por nombre: un import
+# que luego reaparece como parámetro de los tests es un F811 para ruff.
+cliente = test_cuentas.cliente
 
 HOY = datetime.date(2026, 10, 5)
 

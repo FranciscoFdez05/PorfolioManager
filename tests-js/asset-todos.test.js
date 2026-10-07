@@ -4,7 +4,7 @@
 // salen de sitios distintos del código. Lo que se comprueba aquí es esa costura,
 // que es donde una fila se queda fuera sin que nada falle.
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 const COMPRA = {
     fechaOperacion: "10-02-2026",
@@ -62,7 +62,7 @@ function fetchFalso() {
 beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
-    cargarScript("js/cartera/assets.js")
+    cargarModulo("js/cartera/assets.js")
     cargarScript("js/cripto/operaciones.js")
     cargarScript("js/cartera/planes.js")
     cargarScript("js/cartera/alertas-precio.js")

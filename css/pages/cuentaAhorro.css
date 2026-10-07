@@ -32,7 +32,8 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;
     gap: 16px;
-    align-items: start;
+    align-items: stretch;
+    flex: 1;
 }
 
 .cuentaAhorroMain {
@@ -319,10 +320,19 @@
 }
 
 /* ── Selector de cuentas (solo con más de una) ── */
+/* Cada cuenta mide lo que ocupa su nombre, como en Cuenta remunerada. */
 .cuentaAhorroCuentas {
     display: flex;
     gap: 5px;
     flex-wrap: wrap;
+}
+
+.cuentaAhorroCuentas .gastosYearBtn {
+    flex: 0 0 auto;
+    width: auto;
+    padding-left: 14px;
+    padding-right: 14px;
+    white-space: nowrap;
 }
 
 .cuentaAhorroCuentas[hidden] {

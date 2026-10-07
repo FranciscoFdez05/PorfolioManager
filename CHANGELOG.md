@@ -22,6 +22,194 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.0.0] — 2026-10-07
+
+**Esquema de base de datos:** lo sube al **17** (desde la 12; tablas nuevas
+`cuenta_remunerada_vinculo` y `revisiones_anuales`, y columnas `cuentas.dividendos`,
+`cuentas.ahorro` y `dividendos.cuenta`; `cuentas.ahorro` se marca en las cuentas que
+ya eran de tipo ahorro, y no se toca ninguna otra fila). Para deshacer la
+actualización, levantar la imagen anterior y restaurar
+`data/backups/auto/<portfolio>_pre-esquema-12-a-17_*.db`.
+
+Correcciones de una auditoría de calidad y seguridad, y cuentas remuneradas
+vinculadas a cualquier cuenta.
+
+> **Hay que volver a descargar el Atajo de iOS** (Ajustes › API › Atajo de iOS).
+> Ahora lleva dentro un token de acceso y el servidor lo exige; el atajo
+> instalado responderá «Este Atajo no lleva el token de acceso» hasta que se
+> sustituya. El fichero `.shortcut` pasa a ser un secreto.
+
+### Añadido
+
+- Ajustes › Auto-backup: **contraseña de las copias** para las claves de API. Sustituye a la
+  de acceso a la web al cifrarlas en el ZIP (automático y manual). Se guarda cifrada
+  con la `SECRET_KEY` en `data/backup_clave.dat` (junto a su clave derivada, PBKDF2
+  600.000 iteraciones); «Ver guardada» la muestra 30 s tras pedir la contraseña de la web. Al restaurar en este servidor no se pregunta;
+  en otro, o tras cambiarla, se pide la de entonces. Requiere `SECRET_KEY`.
+- Cuentas › Nueva/Editar cuenta: desplegable **Cuenta remunerada** para
+  vincular una de Finanzas › Cuenta Remunerada a la cuenta, sea del tipo que
+  sea (banco, ahorro, exchange, broker, metálico). Una remunerada por cuenta y
+  una cuenta por remunerada, garantizado por la base de datos; las que ya están
+  en otra cuenta salen deshabilitadas. La tarjeta de la cuenta dice cuál lleva.
+- Cuenta Remunerada y Cuenta de ahorro ya no crean cuentas propias: **se elige
+  una cuenta que ya existe en Cuentas**. Una remunerada se llama como su
+  cuenta (✎ la cambia por otra); las antiguas sin cuenta salen con ⚠ hasta que
+  se les elija una. «Añadir cuenta de ahorro» marca una cuenta existente, de
+  cualquier tipo, y «Quitar de cuentas de ahorro» la desmarca sin borrarla.
+  Por eso el desplegable de remunerada desaparece de Cuentas › Editar y de
+  Configurar cuenta, que ahora solo dicen si la cuenta lo es.
+- Eliminar una cuenta en Cuentas pide escribir su nombre para confirmar.
+- Cuentas › Nueva/Editar cuenta: casilla **Dividendos** para que una cuenta (de
+  cualquier tipo, como mucho una) cobre los dividendos de los activos.
+- El saldo de cada cuenta en Cuentas incluye ya los **intereses netos** de su
+  remunerada y, en la que los cobra, los **dividendos** pasados a euros (hasta
+  el mes actual). La tarjeta los desglosa. Antes solo los sumaba la ventana
+  Cuenta de ahorro y las dos cifras de la misma cuenta no coincidían.
+
+### Cambiado
+
+- La ventana Cuenta de ahorro usa ese mismo vínculo (en ··· › Configurar
+  cuenta es ahora un desplegable). Los vínculos que había en su configuración
+  se pasan solos a la base al abrir Cuentas o Cuenta de ahorro; si una cuenta
+  tenía varias remuneradas, se queda con la primera. Lo mismo con la casilla
+  «Incluir los dividendos», que pasa a ser la de la cuenta.
+
+### Corregido
+
+- Carteras con varios workers: al cambiar de cartera, el otro worker de
+  gunicorn seguía leyendo y **escribiendo en la anterior**. Ahora cada proceso
+  vuelve a leer `portfolios.json` cuando cambia y sigue a la cartera activa.
+- «Importar ZIP» ya no sustituye la cartera activa por cualquier SQLite (una
+  vacía incluida): comprueba que sea un portfolio íntegro, toma el mismo
+  cerrojo que la restauración y guarda antes una copia del estado actual en
+  `data/pre_restore/`. Si esa copia no se puede hacer, no se importa nada.
+  «Importar JSON» también guarda la copia. Restaurar ya no sigue adelante sin
+  copia previa.
+- Las tres vías que abren ZIP subidos (importar, restaurar, importar cartera)
+  rechazan los que se descomprimirían de forma desproporcionada antes de
+  descomprimir nada, y extraen las bases de datos a disco en vez de a memoria.
+  Un ZIP de 1 MB con 1 GB de ceros llevaba el proceso a 2 GB.
+- Atajo de iOS: cada petición firmada vale una sola vez (antes se podía
+  reenviar durante toda la ventana de tolerancia y cada envío creaba otro
+  movimiento), y `X-Timestamp: inf` responde 401 en vez de 500.
+- CI: `ruff`, `prettier --check` y `vitest` vuelven a pasar.
+- Restaurar o reparar una base sustituye el fichero: ahora todos los workers
+  reabren sus conexiones (antes el otro seguía escribiendo en el fichero
+  anterior y esas escrituras se perdían al reiniciar).
+- Un `ajustes.json` con valores de forma inesperada (importado, restaurado o
+  editado a mano) ya no deja Ajustes en error 500: esos valores vuelven al de
+  fábrica al leerlos.
+- Ninguna ruta devuelve ya 500 por un cuerpo JSON que no es un objeto, ni por
+  filas que no son objetos, ni por tipos raros en Ajustes o en el cambio de
+  credenciales: es un 400 que dice qué pasa.
+- Altas, importaciones, renombrados y borrados de carteras simultáneos ya no se
+  pisan: id único y ningún `.db` borrado para reutilizar su nombre.
+- Las claves de API se leen del mismo directorio en el que se guardan
+  (`[rutas] claves`); la del Atajo, también.
+- Escritura atómica de `auth.dat`; si no se puede leer, queda en el log.
+- El log de migraciones dice de qué versión a qué versión va cada paso.
+- Interfaz: las lecturas de la API se cortan a los 60 s, un 403 por token CSRF
+  caducado se repite solo y un 429 dice cuánto esperar.
+
+### Mantenimiento
+
+- `js/cartera/assets.js` (6.400 líneas), `js/analisis/metricas.js` (6.000) y
+  `js/ajustes/ajustes.js` (4.400) se han partido en ficheros de menos de 1.600
+  líneas. En Ajustes, cada panel es ahora una función propia en lugar de un
+  bloque dentro de una única función de 3.900 líneas. El código no cambia de
+  comportamiento; una prueba comprueba que todo fichero de `js/` se carga desde
+  `index.html`.
+- Ninguna función de Python supera ya complejidad 30 (salvo la migración
+  histórica del esquema 1): `save_settings`, la restauración de copias, la
+  importación de ZIP, el guardado de stablecoins y la puntuación de símbolos de
+  Finnhub se han partido. Los dos últimos se verificaron contra la versión
+  anterior con miles de entradas aleatorias.
+- Código duplicado unificado: copia consistente de SQLite (había 4 versiones),
+  derivación de claves PBKDF2→Fernet (3), escrituras atómicas de JSON (3 más),
+  `normalize_year` y el patrón de nombres de preferencias. La clave derivada de
+  SECRET_KEY se cachea en vez de recalcularse en cada lectura de un secreto.
+- Pruebas nuevas para `POST /api/stablecoins`, que no tenía ninguna.
+
+### Seguridad
+
+- Atajo de iOS: los endpoints sin sesión solo responden a IPs, a `localhost` y
+  a los nombres de host por los que ya se ha entrado con sesión iniciada. Cierra
+  el DNS rebinding desde una web visitada en la LAN. **Si el Atajo usa un nombre
+  de host**, abre la web una vez con ese nombre e inicia sesión tras actualizar.
+- Lo que escribe el usuario (nombres, notas, fechas, pares…) se escapa antes de
+  pintarse en Operaciones, Conversiones, Stablecoins, Trading, Transacciones,
+  Mercado privado, Bonos, Herramientas, Métricas, Ajustes y Carteras. La CSP ya
+  impedía que se ejecutara, pero el HTML se colaba en la página.
+- Cerrar sesión es un POST con token CSRF (antes un enlace o una imagen de otra
+  web podía cerrarla) y el login rechaza formularios enviados desde otro origen.
+- El tiempo de respuesta del login ya no delata si el usuario existe.
+- Las sesiones cerradas dejan de valer durante toda la vida de la cookie (antes
+  la revocación se olvidaba a los 30 días).
+- La contraseña nueva debe tener al menos 10 caracteres; el usuario, como mucho 64.
+- Ajustes › API ya no recibe las claves completas al abrirse: el valor de cada
+  una se pide al pulsar el ojo.
+- El tope de 5 MB por petición se aplica también a los cuerpos en chunked.
+- El informe fiscal en CSV neutraliza las fórmulas (`=`, `+`, `-`, `@`) en los
+  textos escritos por el usuario.
+- Se acotan los costes de scrypt que se aceptan al abrir las claves de un ZIP.
+- Docker: el contenedor principal arranca con `no-new-privileges` y la imagen ya
+  no incluye `node_modules`, las pruebas ni la carpeta de auditoría.
+
+Segunda ronda de la auditoría (7 de octubre):
+
+- **Tipo de cambio histórico de las compras:** se borraba cada vez que se abría
+  Cartera, Operaciones, Herramientas o Seguimiento (`GET /api/operaciones`
+  reescribía todos los activos) y en cada guardado de un activo o del ejercicio
+  de ventas. Ahora se conserva mientras no cambien la fecha ni la divisa de la
+  operación. Los tipos ya perdidos se recuperan con «Rellenar tipos» en Ajustes.
+- `GET /api/operaciones` ya no reescribe los activos: solo actualiza las
+  operaciones completadas que hayan cambiado, en una transacción.
+- **Gastos e ingresos que desaparecían:** guardar un año con la pestaña abierta
+  desde antes borraba lo que hubiera entrado entretanto (por el Atajo, otra
+  pestaña u otro dispositivo). Cada año lleva ahora una revisión: el guardado
+  sobre una copia antigua se rechaza y la pestaña combina sus cambios con los
+  del servidor antes de repetirlo, avisando.
+- **Atajo de iOS:** cualquier equipo de la red local podía pedir una firma a
+  `/api/preparar` y apuntar movimientos sin conocer la clave. Todas las rutas
+  del Atajo exigen ahora el token de dispositivo que va dentro del `.shortcut`;
+  regenerar la clave lo revoca. La cuenta del movimiento se busca en la cartera
+  de destino, no en la activa.
+- El servidor no arranca con la `SECRET_KEY` de `.env.example` ni con una de
+  menos de 32 caracteres: con la de ejemplo se podía abrir sesión sin contraseña.
+- Se escapa el texto de usuario en las pantallas que aún lo pintaban como HTML
+  (intereses, transacciones, stablecoins, ficha del activo, seguimiento,
+  métricas, mensajes de error de carteras y nombres del certificado).
+- Herramientas: los botones «Ratio histórico» y «Ratio ref.» no hacían nada (la
+  CSP bloqueaba sus `onclick`).
+- La copia previa a una migración se hace de la base que se migra, no de la
+  activa, y cada paso de migración es atómico.
+- `/api/fx/rellenar` ya no bloquea las demás escrituras mientras descarga
+  tipos de la red, y para a los 60 s dejando el resto para la siguiente pasada.
+- Las peticiones sin sesión no gastan el cupo de escrituras de la IP.
+- El token del bot de Telegram ya no viaja al navegador (solo su máscara).
+- Telegram: enviar el fichero de cada copia automática es una opción aparte y
+  viene **apagada**; el aviso de texto sigue saliendo.
+- Los nombres del certificado HTTPS solo admiten IPs y nombres de host válidos.
+- Los ZIP con ficheros de ajustes de más de 4 MB o con miles de entradas se rechazan.
+- La limpieza de temporales de copias huérfanos vuelve a encontrarlos.
+- La caché de variaciones históricas distingue de cartera y se invalida en
+  todos los workers.
+- Si `auth.dat` no se puede leer, se aparta como `auth.dat.ilegible-<fecha>`
+  en vez de sobrescribirlo con las credenciales del `.env`.
+- El bloqueo de login tras varios intentos se comparte entre workers.
+- La cookie de sesión y la de CSRF llevan `Secure` según el estado actual del
+  HTTPS en todos los workers.
+- Restaurar una copia completa comprueba la integridad de cada base, y se
+  restaura sobre el mismo fichero para que el otro worker vea el cambio al momento.
+- No se pueden crear ni renombrar dos carteras con el mismo nombre.
+- Varias rutas devolvían 500 con listas de elementos que no son objetos.
+- Los errores de conexión con proveedores ya no muestran el texto del sistema
+  operativo; el detalle queda en el log.
+- Al borrar el último año de gastos, ingresos o ventas se crea el año en curso
+  (antes, siempre 2026).
+- Docker: rotación de logs, límites de memoria y procesos, y 30 s para que
+  gunicorn termine lo que tenga en curso al parar.
+
 ## [3.2.3] — 2026-10-06
 
 **Esquema de base de datos:** no lo toca (sigue en la **12**).

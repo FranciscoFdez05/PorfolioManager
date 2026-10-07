@@ -24,10 +24,11 @@ preferible a interpolar un tipo que nunca existió.
 """
 
 import logging
+import time
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
-from core.db import get_db
+from core.db import get_db, transaction
 from providers.yahoo_finance_client import fetch_price_series
 
 log = logging.getLogger(__name__)
@@ -171,7 +172,14 @@ def _divisa_de_activos():
     }
 
 
-def rellenar_pendientes(limite=500, permitir_descarga=True):
+# Tiempo máximo que una pasada dedica a pedir tipos a la red. Gunicorn mata el
+# worker a los 120 s (`[gunicorn] timeout`): sin tope, un lote grande con el
+# proveedor lento perdía todo lo resuelto. Lo que no quepa queda para la
+# siguiente llamada, que es como ya funciona el relleno por lotes.
+SEGUNDOS_MAX_POR_PASADA = 60
+
+
+def rellenar_pendientes(limite=500, permitir_descarga=True, segundos_max=SEGUNDOS_MAX_POR_PASADA):
     """Completa `fx_rate` en las operaciones que no lo tienen.
 
     Se hace por lotes y no de golpe: el histórico completo de una cartera con
@@ -181,6 +189,12 @@ def rellenar_pendientes(limite=500, permitir_descarga=True):
 
     Las operaciones ya en euros se marcan con tipo 1 sin consultar a nadie:
     dejarlas vacías haría que cada pasada volviera a mirarlas.
+
+    Dos fases: primero se resuelven los tipos (que pueden ir a la red) **sin
+    ninguna transacción abierta**, y después se escriben todos en una sola y
+    corta. Antes el primer UPDATE abría la transacción y la dejaba abierta
+    mientras se descargaban los siguientes: el resto de escrituras de la
+    aplicación esperaban `busy_timeout` y fallaban con «database is locked».
     """
     conn = get_db()
     divisas = _divisa_de_activos()
@@ -189,6 +203,9 @@ def rellenar_pendientes(limite=500, permitir_descarga=True):
     # Caché por (moneda, fecha) dentro de la propia pasada: una cartera real
     # tiene muchas operaciones del mismo día y la misma divisa.
     memoria = {}
+    # (tabla, rowid, rate, fecha_usada, origen) que se escriben al final.
+    actualizaciones = []
+    fin = time.monotonic() + max(1, segundos_max)
 
     for tabla, columna_fecha, columna_divisa in _TABLAS:
         cols = {row[1] for row in conn.execute(f"PRAGMA table_info({tabla})")}
@@ -217,6 +234,8 @@ def rellenar_pendientes(limite=500, permitir_descarga=True):
 
             clave = (moneda, dia)
             if clave not in memoria:
+                if time.monotonic() > fin:
+                    break  # sin tiempo para más descargas: el resto, en la siguiente pasada
                 memoria[clave] = tasa(moneda, dia, permitir_descarga=permitir_descarga)
             rate, origen, fecha_usada = memoria[clave]
 
@@ -224,18 +243,26 @@ def rellenar_pendientes(limite=500, permitir_descarga=True):
                 fallidas += 1
                 continue
 
-            conn.execute(
-                f"UPDATE {tabla} SET fx_rate = ?, fx_fecha = ?, fx_origen = ? WHERE rowid = ?",
-                (f"{rate:.8f}", fecha_usada or dia.isoformat(), origen, fila["fila_id"]),
+            actualizaciones.append(
+                (tabla, fila["fila_id"], f"{rate:.8f}", fecha_usada or dia.isoformat(), origen)
             )
             resueltas += 1
 
             if resueltas + fallidas >= limite:
                 break
-        if resueltas + fallidas >= limite:
+        if resueltas + fallidas >= limite or time.monotonic() > fin:
             break
 
-    conn.commit()
+    if actualizaciones:
+        with transaction() as escritura:
+            for tabla, fila_id, rate, fecha_usada, origen in actualizaciones:
+                # `tabla` sale de _TABLAS (constantes del módulo), no de fuera.
+                escritura.execute(
+                    f"UPDATE {tabla} SET fx_rate = ?, fx_fecha = ?, fx_origen = ? WHERE rowid = ?",
+                    (rate, fecha_usada, origen, fila_id),
+                )
+    elif conn.in_transaction:
+        conn.commit()
     return {"resueltas": resueltas, "fallidas": fallidas, "pendientes": contar_pendientes()}
 
 

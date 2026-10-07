@@ -879,13 +879,25 @@ escrituras_pesadas_por_hora = 30    ; backup, restauración e importación
 **Backend**
 
 ```bash
-pip install -r requirements-dev.txt
+pip install -r requirements.txt       # versiones exactas, con hashes
+pip install -r requirements-dev.txt   # herramientas (en otro paso: este no lleva hashes)
 
 pytest                      # suite completa
 pytest -m "not network"     # lo que corre en CI
 pytest --cov --cov-report=term-missing   # cobertura por módulo
 ruff check .                # lint
 ruff check . --fix          # correcciones automáticas
+```
+
+**Dependencias de producción.** Se declaran en `requirements.in` (lo que se usa
+directamente, con sus mínimos) y se instalan desde `requirements.txt`, que se
+genera a partir de él con versiones exactas y hashes. Dependabot actualiza los
+dos a la vez. Para añadir o subir una a mano:
+
+```bash
+pip install pip-tools
+pip-compile --generate-hashes --strip-extras --no-emit-index-url \
+            --output-file=requirements.txt requirements.in      # añade --upgrade-package <nombre> para subir una
 ```
 
 **Frontend** — no hay empaquetado: `js/` se sirve tal cual con etiquetas `<script>`, así que `package.json` solo trae linter, formateador y las pruebas.

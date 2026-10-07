@@ -22,13 +22,16 @@ petición legítima de una inventada, y dejar pasar sería peor que un error.
 
 import hashlib
 import hmac
+import json
 import logging
 import os
 import secrets
 import time
+from pathlib import Path
 
-from core import settings
-from core.paths import rutaDesdeBase
+from core import paths, settings
+from core.bloqueo import BloqueoOcupado, exclusivo
+from core.escritura import escribirJsonAtomico
 from core.secret_store import read_secret_lines, write_secret_lines
 
 log = logging.getLogger(__name__)
@@ -49,7 +52,21 @@ class ErrorFirma(Exception):
 
 
 def rutaFicheroClave():
-    return rutaDesdeBase(settings.obtener("atajo.fichero_clave"))
+    """Fichero de la clave HMAC.
+
+    Las rutas relativas son relativas al directorio de claves ([rutas] claves),
+    donde viven las demás. Antes lo eran a la raíz del proyecto: con ese
+    directorio movido (un volumen aparte, por ejemplo), la clave del Atajo se
+    seguía buscando en `<raíz>/API`. El valor de siempre, `API/movimientos.key`,
+    se entiende como «movimientos.key en el directorio de claves», que es lo
+    que significaba con la configuración por defecto.
+    """
+    ruta = Path(settings.obtener("atajo.fichero_clave")).expanduser()
+    if ruta.is_absolute():
+        return ruta
+    if ruta.parts and ruta.parts[0] == "API":
+        ruta = Path(*ruta.parts[1:]) if len(ruta.parts) > 1 else Path("movimientos.key")
+    return paths.API_DIR / ruta
 
 
 def toleranciaSegundos():
@@ -136,6 +153,42 @@ def calcularFirma(mensaje, clave=None):
     return hmac.new(clave, mensaje, hashlib.sha256).hexdigest()
 
 
+# ── Token de dispositivo ──────────────────────────────────────────────────────
+# La firma sola no autenticaba a nadie: el Atajo no puede calcular un HMAC, así
+# que se la pedía a /api/preparar, y ese endpoint firmaba para cualquiera que
+# llegase desde una red permitida. Cualquier equipo de la LAN podía apuntar
+# gastos sin conocer la clave. El token es el secreto que sí lleva el Atajo: va
+# dentro del .shortcut (que solo se descarga con sesión) y se manda en todas las
+# llamadas. Se deriva de la clave de firma, así que rehacer la clave en Ajustes
+# lo revoca sin guardar nada más.
+CABECERA_TOKEN = "X-Atajo-Token"
+_CONTEXTO_TOKEN = b"PorfolioManager/atajo/token-dispositivo/v1"
+
+
+def tokenDispositivo(clave=None):
+    """El token que el Atajo tiene que mandar en `X-Atajo-Token`."""
+    if clave is None:
+        clave = obtenerClaveSecreta()
+    return hmac.new(clave, _CONTEXTO_TOKEN, hashlib.sha256).hexdigest()
+
+
+def verificarTokenDispositivo(cabeceras):
+    """ErrorFirma(401) si falta el token o no es el de esta instalación."""
+    recibido = str(cabeceras.get(CABECERA_TOKEN, "") or "").strip().lower()
+    # La clave se lee antes: si falta, el error es 503 (configuración), no 401.
+    esperado = tokenDispositivo()
+    if not recibido:
+        raise ErrorFirma(
+            "Este Atajo no lleva el token de acceso. Vuelve a descargarlo desde "
+            "Ajustes > API > Atajo de iOS."
+        )
+    if not hmac.compare_digest(recibido, esperado):
+        raise ErrorFirma(
+            "El token del Atajo no es válido (¿se rehízo la clave?). Vuelve a "
+            "descargarlo desde Ajustes > API > Atajo de iOS."
+        )
+
+
 def construirMensaje(timestamp, cuerpoRaw):
     """Concatena timestamp y cuerpo tal y como se firman.
 
@@ -159,7 +212,9 @@ def verificarTimestamp(valorCabecera, ahora=None):
     try:
         # El Atajo puede mandar "1754640000.123": se trunca a segundos.
         timestamp = int(float(texto))
-    except ValueError:
+    except (ValueError, OverflowError):
+        # OverflowError: "inf" es un float válido pero no cabe en un int, y
+        # sin capturarlo la petición acababa en un 500 en vez de en un 401.
         raise ErrorFirma("X-Timestamp inválido") from None
 
     if ahora is None:
@@ -192,4 +247,43 @@ def verificarPeticionFirmada(cabeceras, cuerpoRaw, ahora=None):
     if not hmac.compare_digest(firmaRecibida, firmaEsperada):
         raise ErrorFirma("Firma inválida")
 
+    marcarFirmaUsada(firmaEsperada, timestamp)
     return timestamp
+
+
+# ── Firmas de un solo uso ─────────────────────────────────────────────────────
+# El timestamp limita cuánto vale una petición capturada, pero no cuántas veces:
+# dentro de la ventana de tolerancia, la misma petición firmada se podía
+# reenviar y cada envío creaba otro movimiento. Se recuerdan las firmas ya
+# aceptadas hasta que su timestamp sale de la ventana. Va a disco y con bloqueo
+# entre procesos porque con dos workers la repetición podía entrar por el otro.
+
+
+def _ficheroFirmasUsadas():
+    # Se lee `paths.TMP_DIR` en cada llamada para seguir a donde apunte (los
+    # tests lo redirigen a un temporal).
+    return paths.TMP_DIR / "atajo-firmas-usadas.json"
+
+
+def marcarFirmaUsada(firma, timestamp, ahora=None):
+    """Anota `firma` como usada. ErrorFirma(401) si ya lo estaba."""
+    ruta = _ficheroFirmasUsadas()
+    ahora = time.time() if ahora is None else ahora
+    try:
+        with exclusivo(ruta.with_suffix(".lock"), espera=5):
+            try:
+                usadas = json.loads(ruta.read_text("utf-8"))
+                if not isinstance(usadas, dict):
+                    usadas = {}
+            except (OSError, ValueError):
+                usadas = {}
+
+            usadas = {f: caduca for f, caduca in usadas.items()
+                      if isinstance(caduca, (int, float)) and caduca > ahora}
+            if firma in usadas:
+                raise ErrorFirma("Petición repetida: esta firma ya se usó")
+
+            usadas[firma] = int(timestamp) + toleranciaSegundos() + 1
+            escribirJsonAtomico(ruta, usadas, indent=None)
+    except BloqueoOcupado:
+        raise ErrorFirma("Servidor ocupado; inténtalo de nuevo", status=503) from None

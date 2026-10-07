@@ -58,18 +58,13 @@ async function initPortfolioSwitcher() {
                 pConfirmOverlay.classList.add("hidden")
                 pConfirmOk.removeEventListener("click", onOk)
                 pConfirmCancel.removeEventListener("click", onCancel)
-                pConfirmOverlay.removeEventListener("click", onBg)
                 resolve(result)
             }
             const onOk = () => cleanup(true)
             const onCancel = () => cleanup(false)
-            const onBg = (e) => {
-                if (e.target === pConfirmOverlay) cleanup(false)
-            }
 
             pConfirmOk.addEventListener("click", onOk)
             pConfirmCancel.addEventListener("click", onCancel)
-            pConfirmOverlay.addEventListener("click", onBg)
         })
     }
 
@@ -122,9 +117,6 @@ async function initPortfolioSwitcher() {
             }
             document.getElementById("pDelCancel3").onclick = () => closeDelete(false)
 
-            pDeleteOverlay.onclick = (e) => {
-                if (e.target === pDeleteOverlay) closeDelete(false)
-            }
         })
     }
 
@@ -196,7 +188,7 @@ async function initPortfolioSwitcher() {
                 closeMenu()
                 const ok = await portfolioConfirm(
                     "Exportar portfolio",
-                    `¿Descargar <strong>${p.name}</strong> como fichero <code>.db</code>?`,
+                    `¿Descargar <strong>${escapeHtml(p.name)}</strong> como fichero <code>.db</code>?`,
                     "Descargar"
                 )
                 if (ok) window.location.href = `/api/portfolios/${p.id}/export`
@@ -272,7 +264,7 @@ async function initPortfolioSwitcher() {
                 }
                 window.location.reload()
             } else {
-                await portfolioConfirm("Error", data.error || "Error al cambiar portfolio", "Aceptar")
+                await portfolioConfirm("Error", escapeHtml(data.error || "Error al cambiar portfolio"), "Aceptar")
             }
         } catch (_) {
             await portfolioConfirm("Error", "Error de conexión al cambiar portfolio", "Aceptar")
@@ -283,7 +275,7 @@ async function initPortfolioSwitcher() {
         try {
             const res = await fetch(`/api/portfolios/${pid}`, { method: "DELETE" })
             const data = await res.json()
-            if (!data.ok) await portfolioConfirm("Error", data.error || "Error al eliminar", "Aceptar")
+            if (!data.ok) await portfolioConfirm("Error", escapeHtml(data.error || "Error al eliminar"), "Aceptar")
             await loadPortfolios()
         } catch (_) {}
     }
@@ -312,10 +304,6 @@ async function initPortfolioSwitcher() {
             openModal("create")
         })
     if (cancelBtn) cancelBtn.addEventListener("click", closeModal)
-    if (modalOverlay)
-        modalOverlay.addEventListener("click", (e) => {
-            if (e.target === modalOverlay) closeModal()
-        })
     if (nameInput)
         nameInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter") confirmBtn.click()
@@ -338,7 +326,7 @@ async function initPortfolioSwitcher() {
                     if (data.ok) {
                         closeModal()
                         await loadPortfolios()
-                    } else await portfolioConfirm("Error", data.error || "Error al renombrar", "Aceptar")
+                    } else await portfolioConfirm("Error", escapeHtml(data.error || "Error al renombrar"), "Aceptar")
                 } catch (_) {}
             } else {
                 try {
@@ -352,13 +340,13 @@ async function initPortfolioSwitcher() {
                         closeModal()
                         const ok = await portfolioConfirm(
                             "Portfolio creado",
-                            `Portfolio <strong>${name}</strong> creado. ¿Cambiar a él ahora?`,
+                            `Portfolio <strong>${escapeHtml(name)}</strong> creado. ¿Cambiar a él ahora?`,
                             "Cambiar ahora"
                         )
                         if (ok) await switchPortfolio(data.id)
                         else await loadPortfolios()
                     } else {
-                        await portfolioConfirm("Error", data.error || "Error al crear", "Aceptar")
+                        await portfolioConfirm("Error", escapeHtml(data.error || "Error al crear"), "Aceptar")
                     }
                 } catch (_) {}
             }
@@ -388,10 +376,6 @@ async function initPortfolioSwitcher() {
     }
 
     if (cancelImportBtn) cancelImportBtn.addEventListener("click", closeImportModal)
-    if (importOverlay)
-        importOverlay.addEventListener("click", (e) => {
-            if (e.target === importOverlay) closeImportModal()
-        })
 
     if (importFileInput) {
         importFileInput.addEventListener("change", () => {
@@ -429,7 +413,7 @@ async function initPortfolioSwitcher() {
                     closeImportModal()
                     const ok = await portfolioConfirm(
                         "Portfolio importado",
-                        `Portfolio <strong>${name}</strong> importado correctamente. ¿Cambiar a él ahora?`,
+                        `Portfolio <strong>${escapeHtml(name)}</strong> importado correctamente. ¿Cambiar a él ahora?`,
                         "Cambiar ahora"
                     )
                     if (ok) await switchPortfolio(data.id)

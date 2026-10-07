@@ -10,7 +10,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 
@@ -150,7 +150,7 @@ beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
     cargarScript("js/core/app-core.js")
-    cargarScript("js/cartera/assets.js")
+    cargarModulo("js/cartera/assets.js")
     cargarScript("js/cartera/planes-inversion.js")
 })
 

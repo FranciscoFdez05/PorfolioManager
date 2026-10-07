@@ -92,12 +92,10 @@ function renderStakingYearBar(years) {
 }
 
 function escapeStakingHtml(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;")
+    // Alias del escapeHtml común (js/core/dom.js). Había una copia por
+    // módulo y no todas escapaban las comillas, que es lo que importa en
+    // un atributo value="…".
+    return escapeHtml(value)
 }
 
 // ----- Modal nombre cripto -----
@@ -145,9 +143,6 @@ function openStakingNameModal({ title, defaultValue = "", onConfirm }) {
     modal.querySelector("#stakingNameInput").addEventListener("keydown", (e) => {
         if (e.key === "Enter") doConfirm()
         if (e.key === "Escape") close()
-    })
-    overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) close()
     })
     overlay.appendChild(modal)
     document.body.appendChild(overlay)

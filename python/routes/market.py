@@ -1,3 +1,5 @@
+import logging
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -5,8 +7,8 @@ from urllib.error import HTTPError, URLError
 
 from flask import Blueprint, jsonify, request
 
-from core import dinero, settings
-from core.db import get_db
+from core import dinero, paths, settings
+from core.db import get_active_db_path, get_db
 from providers.alpha_vantage_client import search_symbol as search_av_symbol
 from providers.eodhd_client import search_symbol as search_eodhd_symbol
 from providers.finnhub_client import (
@@ -16,6 +18,7 @@ from providers.finnhub_client import (
     fetch_exchange_rates,
     search_symbol,
 )
+from providers.http import motivo_conexion
 from providers.tradingview_client import (
     fetch_stats as fetch_tradingview_stats,
     search_symbol as search_tradingview_symbol,
@@ -35,7 +38,29 @@ from stores.helpers import (
 )
 from stores.market_data import fetch_asset_quote
 
-_hist_cache = {}   # {period: {"data": {...}, "ts": float}}
+log = logging.getLogger(__name__)
+
+# {(ruta de la cartera, periodo): {"data": {...}, "ts": float, "marca": float}}
+# La cartera va en la clave: con solo el periodo, tras cambiar de cartera se
+# servían durante horas las variaciones de los activos de la anterior.
+_hist_cache = {}
+
+
+def _fichero_invalidacion():
+    return paths.TMP_DIR / "historico-invalidado"
+
+
+def _marca_invalidacion() -> float:
+    """Cuándo se invalidó la caché por última vez, en cualquier worker.
+
+    La caché vive en la memoria de cada proceso, y /invalidate solo vaciaba la
+    del worker que atendía la petición: el otro seguía sirviendo lo viejo. Con
+    una marca en disco (un stat por petición) todos se enteran.
+    """
+    try:
+        return _fichero_invalidacion().stat().st_mtime
+    except OSError:
+        return 0.0
 
 market_bp = Blueprint("market", __name__)
 
@@ -161,8 +186,10 @@ def getHistoricalChanges():
     # TTL 0 en [mercado] historico_ttl_segundos desactiva la caché: útil para
     # depurar sin tener que esperar a que caduque.
     ttl = settings.historicoTtlSegundos()
-    cached = _hist_cache.get(period)
-    if ttl > 0 and cached and time.time() - cached["ts"] < ttl:
+    clave = (str(get_active_db_path()), period)
+    marca = _marca_invalidacion()
+    cached = _hist_cache.get(clave)
+    if ttl > 0 and cached and cached.get("marca") == marca and time.time() - cached["ts"] < ttl:
         return jsonify({"ok": True, "data": cached["data"], "cached": True})
 
     now = datetime.utcnow()
@@ -238,7 +265,7 @@ def getHistoricalChanges():
                 if pct is not None:
                     result[asset_id] = pct
 
-    _hist_cache[period] = {"data": result, "ts": time.time()}
+    _hist_cache[clave] = {"data": result, "ts": time.time(), "marca": marca}
     return jsonify({"ok": True, "data": result, "cached": False})
 
 
@@ -271,6 +298,15 @@ def getBenchmark():
 @market_bp.route("/api/historical-changes/invalidate", methods=["POST"])
 def invalidateHistoricalCache():
     _hist_cache.clear()
+    # Para los demás workers: su caché se descarta al ver la marca nueva.
+    try:
+        ruta = _fichero_invalidacion()
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.touch()
+        ahora = time.time()
+        os.utime(ruta, (ahora, ahora))
+    except OSError as error:
+        log.warning("No se pudo marcar la caché de variaciones como invalidada: %s", error)
     return jsonify({"ok": True})
 
 
@@ -353,7 +389,7 @@ def getTradingViewStats():
     except HTTPError as error:
         return jsonify({"ok": False, "error": f"TradingView devolvió HTTP {error.code}"}), 503
     except URLError as error:
-        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {error.reason}"}), 503
+        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {motivo_conexion(error, 'TradingView')}"}), 503
 
     return jsonify({"ok": True, "data": stats})
 

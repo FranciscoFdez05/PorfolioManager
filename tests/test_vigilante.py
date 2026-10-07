@@ -337,3 +337,49 @@ def test_por_defecto_avisa_por_el_bot_de_ajustes_sin_pasar_por_las_categorias(da
 
     assert vigilante._enviar_por_telegram("🔴 caída") is True
     assert enviados == ["🔴 caída"]
+
+
+# ── TLS hacia el proxy ───────────────────────────────────────────────────────
+
+def _ca_de_prueba(ruta):
+    """Una raíz autofirmada cualquiera, para tener un fichero de CA válido."""
+    import datetime
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    clave = ec.generate_private_key(ec.SECP256R1())
+    nombre = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "CA de prueba")])
+    ahora = datetime.datetime.now(datetime.UTC)
+    certificado = (
+        x509.CertificateBuilder().subject_name(nombre).issuer_name(nombre)
+        .public_key(clave.public_key()).serial_number(1)
+        .not_valid_before(ahora).not_valid_after(ahora + datetime.timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(clave, hashes.SHA256())
+    )
+    ruta.write_bytes(certificado.public_bytes(serialization.Encoding.PEM))
+    return ruta
+
+
+def test_con_la_ca_de_caddy_se_verifica_el_certificado(tmp_path):
+    import ssl
+
+    from vigilante import contexto_tls
+
+    contexto = contexto_tls(str(_ca_de_prueba(tmp_path / "root.crt")))
+
+    assert contexto.verify_mode == ssl.CERT_REQUIRED
+    # El certificado es para los nombres de Ajustes, no para `caddy`.
+    assert contexto.check_hostname is False
+
+
+def test_sin_la_ca_no_se_da_por_caida_una_aplicacion_sana(tmp_path):
+    """Fuera de Docker no hay CA montada: se sigue sondeando, sin verificar."""
+    import ssl
+
+    from vigilante import contexto_tls
+
+    assert contexto_tls(str(tmp_path / "no-existe.crt")).verify_mode == ssl.CERT_NONE

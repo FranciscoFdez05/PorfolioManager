@@ -13,6 +13,7 @@ recurrentes (que guardan su categoría en una columna aparte).
 """
 
 from core.db import get_db, transaction
+from stores import revisiones
 
 TIPOS_VALIDOS = ("gasto", "ingreso")
 
@@ -169,6 +170,14 @@ def renombrarCategoria(tipo, origen, destino):
         conn.execute(
             f"INSERT OR IGNORE INTO {tablaCatalogo} ({columnaCatalogo}) VALUES (?)", (destino,)
         )
+
+        # Las filas de todos los años han cambiado: una pestaña con cualquiera de
+        # ellos abierto desharía el renombrado al guardar su copia.
+        ambito = "gastos" if tipo == "gasto" else "ingresos"
+        for (year,) in conn.execute(
+            f"SELECT DISTINCT year FROM {tablaFilas} UNION SELECT DISTINCT year FROM {tablaRec}"
+        ).fetchall():
+            revisiones.avanzar(conn, ambito, year)
 
         return cursorFilas.rowcount
 

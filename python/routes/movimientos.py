@@ -10,6 +10,7 @@ se protegen con dos barreras propias:
 Ambas se comprueban antes de tocar la base de datos.
 """
 
+import functools
 import json
 import logging
 import time
@@ -30,6 +31,7 @@ from core.firma_hmac import (
     construirMensaje,
     maxTextoFirma,
     verificarPeticionFirmada,
+    verificarTokenDispositivo,
 )
 from core.red_local import soloRedLocal
 from stores.cuentas_store import ETIQUETAS_TIPO, ID_BANCO, etiquetas_de_cuentas, listar_cuentas
@@ -68,6 +70,30 @@ def _avisarSinFirma() -> None:
 CAMPOS_MOVIMIENTO = ("tipo", "categoria", "cuenta", "nombre", "importe", "fecha", "portfolio")
 
 
+def conTokenDeDispositivo(func):
+    """Exige el token del Atajo (`X-Atajo-Token`) cuando la firma está exigida.
+
+    Va en los seis endpoints, también en los que solo leen: sin él, cualquiera
+    desde una red permitida listaba carteras, cuentas y categorías, y pedía a
+    /api/preparar una firma válida para escribir. Con la firma desactivada desde
+    Ajustes no se exige tampoco el token: esa decisión ya deja la red de origen
+    como única barrera, y se avisa de ello en el panel y en el arranque.
+    """
+
+    @functools.wraps(func)
+    def envoltura(*args, **kwargs):
+        if atajo_acceso.exigirFirma():
+            try:
+                verificarTokenDispositivo(request.headers)
+            except ErrorFirma as error:
+                log.warning("[movimientos] %s %s rechazada desde %s: %s",
+                            request.method, request.path, request.remote_addr, error.mensaje)
+                return jsonify({"ok": False, "error": error.mensaje}), error.status
+        return func(*args, **kwargs)
+
+    return envoltura
+
+
 def _resolverPortfolio(pid):
     """Traduce un id **o nombre** de portfolio a la ruta de su .db.
 
@@ -94,6 +120,7 @@ def _resolverPortfolio(pid):
 
 @movimientos_bp.route("/api/movimiento", methods=["POST"])
 @soloRedLocal
+@conTokenDeDispositivo
 def createMovimiento():
     # get_data() cachea el cuerpo, así que get_json() más abajo sigue funcionando.
     cuerpoRaw = request.get_data(cache=True)
@@ -109,26 +136,27 @@ def createMovimiento():
 
     payload = request.get_json(silent=True)
 
-    if payload is None:
-        return jsonify({"ok": False, "error": "El cuerpo debe ser JSON válido"}), 400
-
-    try:
-        movimiento = sanitizarMovimiento(payload)
-    except DatosMovimientoInvalidos as error:
-        return jsonify({"ok": False, "error": str(error)}), 400
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "error": "El cuerpo debe ser un objeto JSON"}), 400
 
     # El portfolio viaja dentro del JSON, no en la query string, para que quede
     # cubierto por la firma: si no, cualquiera podría redirigir el movimiento a
-    # otra base de datos sin invalidar el HMAC.
+    # otra base de datos sin invalidar el HMAC. Se resuelve antes de validar
+    # porque la cuenta se busca en esa cartera, no en la activa.
     rutaPortfolio, errorPortfolio = _resolverPortfolio(payload.get("portfolio"))
     if errorPortfolio:
         return errorPortfolio
 
-    if rutaPortfolio is None:
-        creado = crearMovimiento(movimiento)
-    else:
-        with open_db_at(rutaPortfolio) as conn:
-            creado = crearMovimiento(movimiento, conn=conn)
+    try:
+        if rutaPortfolio is None:
+            movimiento = sanitizarMovimiento(payload)
+            creado = crearMovimiento(movimiento)
+        else:
+            with open_db_at(rutaPortfolio) as conn:
+                movimiento = sanitizarMovimiento(payload, conn=conn)
+                creado = crearMovimiento(movimiento, conn=conn)
+    except DatosMovimientoInvalidos as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
 
     creado["portfolio"] = str(payload.get("portfolio") or "").strip() or (get_active_portfolio_id() or "")
     log.info(
@@ -141,6 +169,7 @@ def createMovimiento():
 
 @movimientos_bp.route("/api/portfolios-lista", methods=["GET"])
 @soloRedLocal
+@conTokenDeDispositivo
 def getPortfoliosLista():
     """Portfolios disponibles, para que el Atajo tampoco los lleve escritos.
 
@@ -183,6 +212,7 @@ def getPortfoliosLista():
 
 @movimientos_bp.route("/api/cuentas-lista", methods=["GET"])
 @soloRedLocal
+@conTokenDeDispositivo
 def getCuentasLista():
     """Cuentas entre las que elegir con cuál se paga o en cuál se cobra, para el Atajo.
 
@@ -219,6 +249,7 @@ def getCuentasLista():
 
 @movimientos_bp.route("/api/categorias", methods=["GET"])
 @soloRedLocal
+@conTokenDeDispositivo
 def getCategorias():
     """Categorías vivas de la base de datos, para que el Atajo no las hardcodee.
 
@@ -277,6 +308,7 @@ def getCategorias():
 
 @movimientos_bp.route("/api/preparar", methods=["POST"])
 @soloRedLocal
+@conTokenDeDispositivo
 def prepararMovimiento():
     """Construye el cuerpo JSON del movimiento y lo firma, en una sola llamada.
 
@@ -306,16 +338,21 @@ def prepararMovimiento():
             continue
         datos[campo] = valor if isinstance(valor, (int, float)) and not isinstance(valor, bool) else str(valor)
 
-    # Se valida antes de firmar: así un fallo del usuario sale aquí con un
-    # mensaje claro en vez de convertirse en un 400 opaco en /api/movimiento.
-    try:
-        sanitizarMovimiento(datos)
-    except DatosMovimientoInvalidos as error:
-        return jsonify({"ok": False, "error": str(error)}), 400
-
-    _, errorPortfolio = _resolverPortfolio(datos.get("portfolio"))
+    rutaPortfolio, errorPortfolio = _resolverPortfolio(datos.get("portfolio"))
     if errorPortfolio:
         return errorPortfolio
+
+    # Se valida antes de firmar, y contra la cartera de destino: así un fallo del
+    # usuario sale aquí con un mensaje claro en vez de convertirse en un 400
+    # opaco en /api/movimiento.
+    try:
+        if rutaPortfolio is None:
+            sanitizarMovimiento(datos)
+        else:
+            with open_db_at(rutaPortfolio) as conn:
+                sanitizarMovimiento(datos, conn=conn)
+    except DatosMovimientoInvalidos as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
 
     cuerpo = json.dumps(datos, sort_keys=True, separators=(",", ":"))
 
@@ -334,6 +371,7 @@ def prepararMovimiento():
 
 @movimientos_bp.route("/api/firmar", methods=["POST"])
 @soloRedLocal
+@conTokenDeDispositivo
 def firmarTexto():
     """Calcula el HMAC que el Atajo no puede calcular por su cuenta.
 

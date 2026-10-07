@@ -17,6 +17,9 @@ let ingresosYears = []
 let currentIngresosYear = null
 let currentIngresosMonth = "enero"
 let currentIngresosData = null
+// Copia de lo último que se leyó o se guardó en el servidor. Ante un 409 (el
+// año cambió desde otro sitio) es la base de la fusión: ver core/fusion-anual.js.
+let ingresosBaseSnapshot = null
 let currentIngresosView = "year"
 let ingresosAutosaveTimeout = null
 let ingresosPersistenceBound = false
@@ -159,12 +162,10 @@ function normalizeComparableIngresoText(value) {
 }
 
 function escapeIngresosHtml(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;")
+    // Alias del escapeHtml común (js/core/dom.js). Había una copia por
+    // módulo y no todas escapaban las comillas, que es lo que importa en
+    // un atributo value="…".
+    return escapeHtml(value)
 }
 
 function ensureIngresosDataShape(data) {
@@ -554,9 +555,6 @@ function openIngresoDetailModal(rowElement) {
         </div>
     `
 
-    overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) closeIngresoDetailModal()
-    })
     modal.querySelector("#ingresosDetailCloseBtn")?.addEventListener("click", closeIngresoDetailModal)
     modal.querySelector("#ingresosDetailEditBtn")?.addEventListener("click", () => {
         closeIngresoDetailModal()
@@ -719,7 +717,54 @@ async function saveIngresosYear(year, payload, options = {}) {
     })
     if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        const error = new Error(`HTTP ${response.status}: ${errorText}`)
+        error.status = response.status
+        throw error
+    }
+    return await response.json().catch(() => null)
+}
+
+// Tras un guardado correcto: la revisión nueva y la base para la próxima fusión
+// son las de lo que se acaba de mandar, no las de lo que haya ahora en pantalla.
+function anotarGuardadoIngresos(enviado, respuesta) {
+    if (!Number.isInteger(respuesta?.revision)) {
+        return
+    }
+    enviado.revision = respuesta.revision
+    ingresosBaseSnapshot = enviado
+    if (currentIngresosData && currentIngresosData.year === enviado.year) {
+        currentIngresosData.revision = respuesta.revision
+    }
+}
+
+async function guardarIngresosConRevision(options = {}) {
+    const year = currentIngresosYear
+    const enviado = clonarDatosAnuales(currentIngresosData)
+
+    try {
+        anotarGuardadoIngresos(enviado, await saveIngresosYear(year, enviado, options))
+    } catch (error) {
+        // Con keepalive la página puede estar cerrándose: no hay tiempo de
+        // fusionar. La revisión no avanza, así que el próximo guardado volverá a
+        // chocar y fusionará entonces; en el servidor no se ha borrado nada.
+        if (error?.status !== 409 || options.keepalive) {
+            throw error
+        }
+
+        const servidor = ensureIngresosDataShape(await loadIngresosYear(year))
+        const sigueAbierto = currentIngresosData?.year === year
+        if (sigueAbierto) syncIngresosDataFromTables()
+        const local = sigueAbierto ? currentIngresosData : enviado
+        const fusionado = fusionarAnioTresVias(ingresosBaseSnapshot, local, servidor, "recurrentes", "ingresosTipos")
+        ingresosBaseSnapshot = clonarDatosAnuales(servidor)
+        if (sigueAbierto) currentIngresosData = fusionado
+
+        const aEnviar = clonarDatosAnuales(fusionado)
+        anotarGuardadoIngresos(aEnviar, await saveIngresosYear(year, aEnviar))
+        if (sigueAbierto) renderCurrentIngresosView()
+        showToast("Este año había cambiado desde otro sitio (el Atajo, otra pestaña…). Se han combinado los cambios.", {
+            type: "warning"
+        })
     }
 }
 
@@ -858,6 +903,7 @@ function bindIngresosEvents() {
 async function renderIngresosYear(year) {
     _ingresosDataLoaded = false
     currentIngresosData = ensureIngresosDataShape(await loadIngresosYear(year))
+    ingresosBaseSnapshot = clonarDatosAnuales(currentIngresosData)
     currentIngresosYear = currentIngresosData.year
     _ingresosDataLoaded = true
     renderIngresosYearButtons()
@@ -1826,7 +1872,7 @@ async function persistCurrentIngresosData(options = {}) {
     currentIngresosData.ingresosTipos = [...sharedIngresosTypes]
     window.clearTimeout(ingresosAutosaveTimeout)
     await persistSharedIngresosTypes()
-    await saveIngresosYear(currentIngresosYear, currentIngresosData, options)
+    await guardarIngresosConRevision(options)
 }
 
 async function flushIngresosPendingChanges() {
@@ -1841,7 +1887,7 @@ function bindIngresosPersistenceGuards() {
     window.addEventListener("beforeunload", () => {
         if (!currentIngresosYear || !currentIngresosData || !_ingresosDataLoaded) return
         syncIngresosDataFromTables()
-        saveIngresosYear(currentIngresosYear, currentIngresosData, { keepalive: true }).catch((error) => {
+        guardarIngresosConRevision({ keepalive: true }).catch((error) => {
             console.error("Error al guardar ingresos al cerrar:", error)
         })
     })
@@ -1855,7 +1901,7 @@ function bindIngresosPersistenceGuards() {
         )
             return
         syncIngresosDataFromTables()
-        saveIngresosYear(currentIngresosYear, currentIngresosData, { keepalive: true }).catch((error) => {
+        guardarIngresosConRevision({ keepalive: true }).catch((error) => {
             console.error("Error al guardar ingresos al cambiar de ventana:", error)
         })
     })

@@ -19,14 +19,14 @@
 //      edición y repite lo que respondió el servidor.
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 beforeAll(() => {
     // El orden es el de index.html.
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
     cargarScript("js/core/app-core.js")
-    cargarScript("js/cartera/assets.js")
+    cargarModulo("js/cartera/assets.js")
 })
 
 /** El activo tal y como lo devuelve GET /api/activos/<id>. */

@@ -92,8 +92,7 @@ def test_un_usuario_con_acentos_no_provoca_un_500(cliente):
     respuesta = cliente.post("/login", data={"username": "ñandú", "password": CLAVE})
 
     assert respuesta.status_code == 200
-    from routes import auth
-    assert auth._attempts  # el intento sí quedó registrado
+    assert _registro()  # el intento sí quedó registrado
 
 
 def test_la_pagina_de_login_no_se_guarda_en_cache(cliente):
@@ -132,10 +131,14 @@ def test_con_sesion_abierta_login_devuelve_a_la_aplicacion(cliente):
 
 
 def test_logout_cierra_la_sesion(cliente):
+    from core import sesion as sesion_app
+
     with cliente.session_transaction() as sesion:
         sesion["logged_in"] = True
+        sesion["csrf_token"] = "token-de-prueba"
+        sesion_app.abrir(sesion)
 
-    respuesta = cliente.get("/logout")
+    respuesta = cliente.post("/logout", headers={"X-CSRF-Token": "token-de-prueba"})
 
     assert respuesta.status_code == 302
     with cliente.session_transaction() as sesion:
@@ -217,8 +220,7 @@ def test_un_login_correcto_limpia_los_fallos_previos(cliente, monkeypatch):
     cliente.post("/login", data={"username": USUARIO, "password": "mal"}, environ_base=ip)
     cliente.post("/login", data={"username": USUARIO, "password": CLAVE}, environ_base=ip)
 
-    from routes import auth
-    assert "192.168.1.101" not in auth._attempts
+    assert "192.168.1.101" not in _registro()
 
 
 def test_el_registro_de_intentos_no_crece_sin_limite(monkeypatch):
@@ -229,13 +231,31 @@ def test_el_registro_de_intentos_no_crece_sin_limite(monkeypatch):
 
     monkeypatch.setenv("MAX_IPS_VIGILADAS", "20")
     monkeypatch.setenv("BLOQUEO_SEGUNDOS", "1")
-    auth._attempts.clear()
+    viejos = {f"10.0.0.{i}": [1, time.time() - 100] for i in range(30)}  # ya caducados
+    auth._fichero_intentos().write_text(json.dumps(viejos), encoding="utf-8")
 
-    for i in range(30):
-        auth._attempts[f"10.0.0.{i}"] = [1, time.monotonic() - 100]  # ya caducados
     auth._record_failure("10.9.9.9")
 
-    assert len(auth._attempts) < 30
+    assert len(_registro()) < 30
+
+
+def test_el_bloqueo_no_depende_de_la_memoria_del_proceso(cliente, monkeypatch):
+    """Con varios workers cada uno llevaba su cuenta: 8 intentos por worker.
+
+    El registro vive ahora en un fichero compartido. Vaciar la memoria del
+    proceso (lo que vería otro worker, o uno recién arrancado) no lo levanta.
+    """
+    from routes import auth
+
+    monkeypatch.setenv("MAX_INTENTOS_LOGIN", "2")
+    ip = {"REMOTE_ADDR": "192.168.1.150"}
+    for _ in range(2):
+        cliente.post("/login", data={"username": USUARIO, "password": "mal"}, environ_base=ip)
+    auth._attempts.clear()
+
+    respuesta = cliente.post("/login", data={"username": USUARIO, "password": CLAVE}, environ_base=ip)
+
+    assert "Demasiados intentos" in respuesta.get_data(as_text=True)
 
 
 # ── Almacenamiento de credenciales ───────────────────────────────────────────
@@ -440,3 +460,11 @@ def test_una_contrasenia_actual_incorrecta_no_avisa_del_cambio(cliente_dentro, t
     )
 
     assert telegram == []
+
+
+def _registro():
+    """El registro de intentos de login tal como lo ven todos los workers."""
+    from routes import auth
+
+    ruta = auth._fichero_intentos()
+    return json.loads(ruta.read_text("utf-8")) if ruta.exists() else {}

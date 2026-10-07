@@ -1,4 +1,6 @@
 from core.db import get_db, transactional
+from core.validation import normalize_year
+from stores import revisiones
 from stores.cuentas_store import cuentas_validas_para_filas, normalizar_cuenta_de_fila
 
 _MAX_LABEL = 80
@@ -42,13 +44,6 @@ def normalize_dia_cobro(value):
     return str(day) if 1 <= day <= 31 else ""
 
 
-def normalize_year(year_value):
-    text = str(year_value or "").strip()
-    if not text.isdigit() or len(text) != 4:
-        return None
-    return text
-
-
 def build_empty_month_summary():
     return dict.fromkeys(MONTH_KEYS, "")
 
@@ -67,9 +62,15 @@ def create_default_ingresos_year(year):
     }
 
 
+def _dict(valor):
+    return valor if isinstance(valor, dict) else {}
+
+
 def sanitize_month_rows(rows):
     if not isinstance(rows, list):
         return []
+    # Un elemento que no es un objeto (`[1, "x"]`) llegaba a `row.get` y daba 500.
+    rows = [row for row in rows if isinstance(row, dict)]
     if len(rows) > 1000:
         rows = rows[:1000]
     return [
@@ -88,6 +89,7 @@ def sanitize_month_rows(rows):
 def sanitize_recurrentes_rows(rows):
     if not isinstance(rows, list):
         return []
+    rows = [row for row in rows if isinstance(row, dict)]
     if len(rows) > 100:
         rows = rows[:100]
 
@@ -116,7 +118,7 @@ def sanitize_recurrentes_rows(rows):
             "activa": bool(row.get("activa", True)),
             "nota": str(row.get("nota", ""))[:_MAX_NOTA].strip(),
             "meses": {
-                month: str(row.get("meses", {}).get(month, ""))[:_MAX_SHORT].strip()
+                month: str(_dict(row.get("meses")).get(month, ""))[:_MAX_SHORT].strip()
                 for month in MONTH_KEYS
             },
         }
@@ -152,7 +154,7 @@ def sanitize_ingresos_payload(payload, fallback_year=None):
 
     sanitized_months = {}
     for month in MONTH_KEYS:
-        month_data = payload.get("months", {}).get(month, {})
+        month_data = _dict(_dict(payload.get("months")).get(month))
         sanitized_rows = sanitize_month_rows(month_data.get("rows", []))
         sanitized_months[month] = {"rows": sanitized_rows}
 
@@ -253,16 +255,24 @@ def read_ingresos_year(year):
         "ingresosTipos": read_ingresos_types(),
         "recurrentes": recurrentes,
         "months": months,
+        "revision": revisiones.leer(conn, "ingresos", normalized),
     }
 
 
 @transactional
-def write_ingresos_year(year, data):
+def write_ingresos_year(year, data, revision_esperada=None):
+    """Sustituye el año entero. Devuelve la revisión nueva.
+
+    Con `revision_esperada` lanza ConflictoRevision si el año cambió desde que
+    el cliente lo leyó (ver stores/revisiones.py).
+    """
     normalized = normalize_year(year)
     if not normalized:
-        return
+        return None
 
     conn = get_db()
+    revisiones.tomar_bloqueo(conn)
+    revisiones.comprobar(conn, "ingresos", normalized, revision_esperada)
     conn.execute("DELETE FROM ingresos_rows WHERE year = ?", (normalized,))
     conn.execute("DELETE FROM ingresos_recurrentes WHERE year = ?", (normalized,))
 
@@ -314,7 +324,9 @@ def write_ingresos_year(year, data):
             [(t,) for t in data["ingresosTipos"] if t not in existing]
         )
 
+    nueva = revisiones.avanzar(conn, "ingresos", normalized)
     conn.commit()
+    return nueva
 
 
 @transactional
@@ -326,5 +338,7 @@ def delete_ingresos_year(year):
     conn = get_db()
     r1 = conn.execute("DELETE FROM ingresos_rows WHERE year = ?", (normalized,))
     r2 = conn.execute("DELETE FROM ingresos_recurrentes WHERE year = ?", (normalized,))
+    # Una pestaña que aún tenga el año abierto no debe poder resucitarlo al guardar.
+    revisiones.avanzar(conn, "ingresos", normalized)
     conn.commit()
     return (r1.rowcount + r2.rowcount) > 0

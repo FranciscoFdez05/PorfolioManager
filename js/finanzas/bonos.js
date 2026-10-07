@@ -251,7 +251,7 @@ function openBonosEditModal(rowIndex = -1) {
         <h3 class="assetModalTitle">${isEdit ? "Editar registro" : "Nuevo registro"}</h3>
 
         <label class="assetModalLabel" for="bonosFechaInput">Fecha</label>
-        <input id="bonosFechaInput" class="assetModalInput" type="text" value="${rowData.fecha || ""}" placeholder="dd-mm-aaaa">
+        <input id="bonosFechaInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.fecha)}" placeholder="dd-mm-aaaa">
 
         <label class="assetModalLabel" for="bonosTipoSelect">Tipo</label>
         <select id="bonosTipoSelect" class="assetModalSelect">
@@ -271,13 +271,13 @@ function openBonosEditModal(rowIndex = -1) {
         </select>
 
         <label class="assetModalLabel" for="bonosInstrumentoInput">Instrumento</label>
-        <input id="bonosInstrumentoInput" class="assetModalInput" type="text" value="${rowData.instrumento || ""}" placeholder="Ej: Bonos del Estado">
+        <input id="bonosInstrumentoInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.instrumento)}" placeholder="Ej: Bonos del Estado">
 
         <label class="assetModalLabel" for="bonosCuponInput">Cupón / Rentabilidad</label>
-        <input id="bonosCuponInput" class="assetModalInput" type="text" value="${rowData.cupon || ""}" placeholder="Ej: 3,5%">
+        <input id="bonosCuponInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.cupon)}" placeholder="Ej: 3,5%">
 
         <label class="assetModalLabel" for="bonosVencimientoInput">Vencimiento</label>
-        <input id="bonosVencimientoInput" class="assetModalInput" type="text" value="${rowData.vencimiento || ""}" placeholder="dd-mm-aaaa">
+        <input id="bonosVencimientoInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.vencimiento)}" placeholder="dd-mm-aaaa">
 
         <label class="assetModalLabel" for="bonosInvertidoInput">Invertido</label>
         <input id="bonosInvertidoInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.invertido ? formatCellEuroValue(rowData.invertido) : ""}" placeholder="0,00">

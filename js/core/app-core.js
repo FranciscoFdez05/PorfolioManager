@@ -1060,7 +1060,7 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
     } catch (error) {
         console.error(error)
         const details = error instanceof Error ? error.message : "Error desconocido"
-        contentArea.innerHTML = `<div class="pageError">Error de carga: no se pudo abrir ${page}.html<br><small>${details}</small></div>`
+        contentArea.innerHTML = `<div class="pageError">Error de carga: no se pudo abrir ${escapeHtml(page)}.html<br><small>${escapeHtml(details)}</small></div>`
     }
 }
 
@@ -1499,7 +1499,13 @@ function applyBloqueoInactividad(minutes) {
     function resetTimer() {
         if (_inactivityTimer) clearTimeout(_inactivityTimer)
         _inactivityTimer = setTimeout(() => {
-            window.location.href = "/logout"
+            // POST: /logout ya no cierra la sesión por GET (lo podía provocar
+            // cualquier web). csrf.js añade el token a esta petición.
+            fetch("/logout", { method: "POST", redirect: "manual" })
+                .catch(() => {})
+                .finally(() => {
+                    window.location.href = "/login"
+                })
         }, ms)
     }
 
@@ -1512,8 +1518,7 @@ function applyBloqueoInactividad(minutes) {
 // que ya traen su propio plugin de crosshair se saltan para no dibujarlo doble.
 if (typeof Chart !== "undefined") {
     const crosshairState = new WeakMap()
-    const hasOwnCrosshair = (chart) =>
-        (chart.config.plugins || []).some((p) => /crosshair/i.test(p?.id || ""))
+    const hasOwnCrosshair = (chart) => (chart.config.plugins || []).some((p) => /crosshair/i.test(p?.id || ""))
     const isCartesian = (chart) =>
         chart.scales?.x && chart.scales?.y && chart.options?.indexAxis !== "y" && chart.config.type !== "bar"
 

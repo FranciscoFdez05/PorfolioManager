@@ -33,6 +33,7 @@ import logging
 from datetime import UTC, datetime
 
 from core import paths, settings
+from core.escritura import escribirJsonAtomico
 
 log = logging.getLogger(__name__)
 
@@ -80,12 +81,11 @@ def guardar(exigirFirma: bool, redes: list[str]) -> dict:
         "redes": list(redes),
         "actualizado": datetime.now(UTC).isoformat(timespec="seconds"),
     }
-    ATAJO_DIR.mkdir(parents=True, exist_ok=True)
     # Escritura atómica: un corte a medias dejaría un JSON truncado, y este
-    # fichero decide quién puede escribir en la base de datos.
-    tmp = ACCESO_FILE.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(estado, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(ACCESO_FILE)
+    # fichero decide quién puede escribir en la base de datos. Con el temporal
+    # de core.escritura (único por proceso e hilo), no un `.json.tmp` fijo que
+    # los dos workers pisaban.
+    escribirJsonAtomico(ACCESO_FILE, estado)
     return estado
 
 

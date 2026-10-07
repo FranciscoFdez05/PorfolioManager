@@ -27,7 +27,13 @@ const FN_RATING_TIERS = [
     { min: -Infinity, label: "Venta fuerte", cls: "fnRatStrongSell" }
 ]
 
-const FN_TYPE_LABELS = { acciones: "Acciones", etfs: "ETFs", cripto: "Cripto", comoditis: "Comoditis", rentaFija: "Renta fija" }
+const FN_TYPE_LABELS = {
+    acciones: "Acciones",
+    etfs: "ETFs",
+    cripto: "Cripto",
+    comoditis: "Comoditis",
+    rentaFija: "Renta fija"
+}
 
 async function initFundamentalesLogic() {
     _fnActiveTypes = new Set(["all"])
@@ -177,7 +183,8 @@ function fnRenderTable() {
     const filtered = _fnRows.filter((row) => {
         if (!_fnActiveTypes.has("all") && !_fnActiveTypes.has(row.type)) return false
         if (_fnSearch) {
-            const haystack = `${row.name} ${row.symbol} ${row.tvSymbol} ${row.stats?.sector || ""} ${row.stats?.industry || ""}`.toLowerCase()
+            const haystack =
+                `${row.name} ${row.symbol} ${row.tvSymbol} ${row.stats?.sector || ""} ${row.stats?.industry || ""}`.toLowerCase()
             if (!haystack.includes(_fnSearch)) return false
         }
         return true
@@ -337,7 +344,11 @@ function fnPrice(value, currency) {
 function fnMarketCap(value, currency) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
-    return (num / 1e6).toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " " + currencySuffix(currency)
+    return (
+        (num / 1e6).toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) +
+        " " +
+        currencySuffix(currency)
+    )
 }
 
 function fnMoneyFull(value, currency, decimals = 0) {
@@ -376,5 +387,7 @@ function fnPercentSigned(value, decimals = 2) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
     const sign = num > 0 ? "+" : ""
-    return sign + num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %"
+    return (
+        sign + num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %"
+    )
 }

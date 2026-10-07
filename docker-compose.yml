@@ -1,3 +1,13 @@
+# Logs de Docker con rotación. Sin `logging:`, el driver json-file no tiene
+# tope de tamaño y los logs de los tres contenedores crecían sin límite en el
+# disco del host. 5 ficheros de 10 MB por contenedor es de sobra para mirar qué
+# pasó ayer. Se cambian en .env (LOG_MAX_SIZE / LOG_MAX_FILE).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: ${LOG_MAX_SIZE:-10m}
+    max-file: "${LOG_MAX_FILE:-5}"
+
 services:
   porfoliomanager:
     # Nombre que se verá en `docker ps` y Docker Desktop.
@@ -74,6 +84,21 @@ services:
       # Ajustes acaban en API/*.key: sin volumen se perderían en cada rebuild.
       - ${PORTFOLIO_HOST_API_DIR:-./API}:/app/API
     restart: unless-stopped
+    # Igual que el vigilante: ningún proceso del contenedor puede ganar
+    # privilegios (setuid) después de arrancar. gosu no lo necesita: arranca
+    # como root y solo los suelta.
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
+    # Topes para que un fallo (un bucle, una importación desbocada) no se lleve
+    # por delante la memoria o los procesos del servidor doméstico entero. Son
+    # holgados: una copia de seguridad de varias carteras cabe de sobra. Se
+    # ajustan en .env si hiciera falta.
+    mem_limit: ${PORTFOLIO_MEM_LIMIT:-1g}
+    pids_limit: ${PORTFOLIO_PIDS_LIMIT:-256}
+    # Tiempo para que gunicorn termine las peticiones en curso (una copia, una
+    # importación) antes de que Docker lo mate al parar o actualizar.
+    stop_grace_period: 30s
     healthcheck:
       # /api/health y no /login: la página de login se sirve leyendo un HTML del
       # disco, así que respondía 200 con la base de datos corrupta o sin montar.
@@ -108,6 +133,11 @@ services:
     # aplicación sigue creyendo que hay HTTPS y emite cookies `Secure` que el
     # navegador descarta: nadie podría iniciar sesión.
     command: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile --resume
+    logging: *logging
+    mem_limit: ${CADDY_MEM_LIMIT:-256m}
+    pids_limit: 100
+    security_opt:
+      - no-new-privileges:true
     ports:
       # El MISMO puerto de siempre. Activar el HTTPS no mueve la dirección: solo
       # cambia el esquema, de http:// a https://.
@@ -186,10 +216,16 @@ services:
       # escribe nada.
       - ${PORTFOLIO_HOST_API_DIR:-./API}:/app/API:ro
       - ${PORTFOLIO_HOST_DATA_DIR:-./data}:/app/data:ro
+      # La CA interna de Caddy, para verificar el certificado del proxy al
+      # sondearlo (python/vigilante.py · contexto_tls). Solo lectura.
+      - caddy_data:/caddy-data:ro
     restart: unless-stopped
     read_only: true
     security_opt:
       - no-new-privileges:true
+    logging: *logging
+    mem_limit: 128m
+    pids_limit: 50
 
 volumes:
   caddy_data:

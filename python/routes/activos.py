@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request
 from core import dinero, pnl_divisa
 from core.db import get_active_db_path, get_db
 from providers.finnhub_client import convert_amount
-from stores import alertas_store
+from stores import alertas_store, rendimiento_activo
 from stores.asset_store import (
     deleteAssetFile,
     getAssetFile,
@@ -106,71 +106,35 @@ def getRendimientoBatch():
     # resuelven fuera del bucle para no repetir la consulta por cada activo.
     fx_actuales = _tipos_actuales({str(a["currency"] or "EUR").upper() for a in assets})
 
+    # Dos consultas para toda la cartera, no dos por activo: con decenas de
+    # activos esto se llamaba en cada carga de la tabla principal.
+    filas_por_activo = {}
+    for fila in conn.execute(
+        "SELECT asset_id, tipo_operacion, participaciones, capital_invertido_bruto, "
+        "comisiones, comisiones_fiat, fx_rate FROM activo_rows ORDER BY id"
+    ):
+        filas_por_activo.setdefault(fila["asset_id"], []).append(fila)
+    ops_por_activo = {}
+    for op in conn.execute(
+        "SELECT asset_id, orden, cantidad, comisiones_cripto, total FROM activo_operation_rows "
+        "WHERE estado = 'Completado'"
+    ):
+        ops_por_activo.setdefault(op["asset_id"], []).append(op)
+
     for asset in assets:
         asset_id = asset["id"]
-        asset_type = str(asset["type"] or "").strip().lower()
-        is_crypto = asset_type == "cripto"
-        current_price = parse_loose_number(asset["price"]) or Decimal("0")
-
-        rows = conn.execute(
-            "SELECT tipo_operacion, participaciones, capital_invertido_bruto, "
-            "comisiones, comisiones_fiat, fx_rate FROM activo_rows WHERE asset_id = ?",
-            (asset_id,)
-        ).fetchall()
-
-        op_rows = conn.execute(
-            "SELECT orden, cantidad, comisiones_cripto, total FROM activo_operation_rows "
-            "WHERE asset_id = ? AND estado = 'Completado'",
-            (asset_id,)
-        ).fetchall()
-
-        # Decimal y no float: estos tres acumuladores recorren todas las filas
-        # de un activo, y en coma flotante el error de cada suma se arrastra
-        # hasta el total invertido que se enseña en la tabla principal.
-        total_participaciones = Decimal("0")
-        total_invertido_bruto = Decimal("0")
-        total_comisiones_fiat = Decimal("0")
-
-        for row in rows:
-            tipo = str(row["tipo_operacion"] or "").strip().lower()
-            partic = parse_loose_number(row["participaciones"]) or Decimal("0")
-            capital = parse_loose_number(row["capital_invertido_bruto"]) or Decimal("0")
-            comis = parse_loose_number(row["comisiones"]) or Decimal("0")
-            comis_fiat = parse_loose_number(row["comisiones_fiat"]) or Decimal("0")
-
-            if tipo == "venta":
-                total_participaciones -= partic
-            else:
-                total_participaciones += partic
-                total_invertido_bruto += capital
-                total_comisiones_fiat += comis_fiat if is_crypto else comis
-
-        for op in op_rows:
-            orden = str(op["orden"] or "").strip().lower()
-            cantidad = parse_loose_number(op["cantidad"]) or Decimal("0")
-            comis_cripto = parse_loose_number(op["comisiones_cripto"]) or Decimal("0")
-            total_fiat = parse_loose_number(op["total"]) or Decimal("0")
-
-            if orden == "venta":
-                total_participaciones -= cantidad + comis_cripto
-            else:
-                total_participaciones += max(Decimal("0"), cantidad - comis_cripto)
-                total_invertido_bruto += total_fiat
-
-        inverted_neto = max(Decimal("0"), total_invertido_bruto - total_comisiones_fiat)
-        neto_actual = max(Decimal("0"), total_participaciones) * current_price
-        rendimiento = neto_actual - inverted_neto
-        rendimiento_pct = (rendimiento / inverted_neto * 100) if inverted_neto > 0 else Decimal("0")
-
-        # `float` solo aquí, al serializar: el JSON de esta ruta lleva números
-        # y el frontend los espera así. Todo el cálculo de arriba es Decimal, y
-        # la conversión se hace una vez sobre el valor ya redondeado.
-        result[asset_id] = {
-            "rendimiento": float(dinero.redondear(rendimiento)),
-            "invertidoNeto": float(dinero.redondear(inverted_neto)),
-            "rendimientoPct": float(dinero.redondear(rendimiento_pct)),
-            "netoActual": float(dinero.redondear(neto_actual)),
-        }
+        rows = filas_por_activo.get(asset_id, [])
+        current_price = rendimiento_activo.numero(asset["price"])
+        # El cálculo es el de stores/rendimiento_activo, el mismo que usa la
+        # lista de activos: antes había una copia aquí y otra allí.
+        totales = rendimiento_activo.calcular(
+            rows,
+            ops_por_activo.get(asset_id, []),
+            str(asset["type"] or "").strip().lower() == "cripto",
+            asset["price"],
+        )
+        result[asset_id] = totales.para_json()
+        total_participaciones = totales.participaciones
 
         # Desglose activo/divisa. Las cifras de arriba están en la moneda del
         # activo y se mantienen tal cual —cambiarlas rompería la tabla que ya

@@ -30,7 +30,8 @@
     min-width: 0;
 }
 
-.dividendosTableWrapper {
+html .dividendosTableWrapper {
+    max-height: calc(100vh - 307px);
     position: relative;
     border: 1px solid var(--border-soft);
     border-radius: 10px;
@@ -221,4 +222,35 @@
     letter-spacing: 0.06em;
     text-align: center;
     text-transform: uppercase;
+}
+
+/* Cuentas y años comparten fila: cada barra por separado dejaba medio ancho vacío. */
+.dividendosLayout .interesesYearBar > .cuentasBar {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 45%;
+}
+
+/* Una sola línea: si no caben, se desplazan de lado en vez de saltar de fila. */
+.dividendosLayout .interesesYearBar .cuentasList,
+.dividendosLayout .interesesYearBar .interesesYearList {
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    padding-bottom: 4px;
+}
+
+.dividendosLayout .interesesYearBar .cuentaItem,
+.dividendosLayout .interesesYearBar .interesesYearList > * {
+    flex-shrink: 0;
+}
+
+.dividendosLayout .interesesYearBar > .interesesYearList {
+    flex: 1 1 0;
+}
+
+.dividendosLayout .interesesYearBar > .cuentasBar:not(.hidden) + .interesesYearList {
+    padding-left: 16px;
+    border-left: 1px solid var(--border-soft);
 }

@@ -2,6 +2,7 @@ from urllib.error import HTTPError, URLError
 
 from flask import Blueprint, jsonify, request
 
+from providers.http import motivo_conexion
 from stores import market_pulse
 
 market_pulse_bp = Blueprint("market_pulse", __name__)
@@ -10,7 +11,7 @@ market_pulse_bp = Blueprint("market_pulse", __name__)
 def _tradingview_error_message(error):
     if isinstance(error, HTTPError):
         return f"TradingView devolvió HTTP {error.code}"
-    return f"No se pudo conectar con TradingView: {error.reason}"
+    return f"No se pudo conectar con TradingView: {motivo_conexion(error, 'TradingView')}"
 
 
 @market_pulse_bp.route("/api/market/pulse", methods=["GET"])

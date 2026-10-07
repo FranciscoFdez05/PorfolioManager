@@ -12,6 +12,7 @@ from providers import (
     normalize_text as _normalize_text,
 )
 from providers.api_stats import record_api_call
+from providers.http import motivo_conexion
 
 YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
@@ -269,7 +270,7 @@ def fetch_price_series(symbol, from_ts, to_ts, timeout=None, interval="1d"):
     except HTTPError as error:
         return [], f"Yahoo Finance devolvió HTTP {error.code}"
     except URLError as error:
-        return [], f"No se pudo conectar con Yahoo Finance: {error.reason}"
+        return [], f"No se pudo conectar con Yahoo Finance: {motivo_conexion(error, 'Yahoo Finance')}"
     except Exception as error:
         return [], f"Error al obtener el histórico de Yahoo Finance: {error}"
 
@@ -315,7 +316,7 @@ def fetch_quote(symbol, timeout=None):
     except HTTPError as error:
         return None, f"Yahoo Finance devolvió HTTP {error.code}"
     except URLError as error:
-        return None, f"No se pudo conectar con Yahoo Finance: {error.reason}"
+        return None, f"No se pudo conectar con Yahoo Finance: {motivo_conexion(error, 'Yahoo Finance')}"
     except Exception as error:
         return None, f"Error al obtener cotización de Yahoo Finance: {error}"
 

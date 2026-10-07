@@ -48,6 +48,9 @@ MODULOS_FRONTERA = [
     "routes/activos.py",
     "routes/snapshots.py",
     "stores/valoracion.py",
+    "stores/asset_store.py",
+    "stores/movimientos_store.py",
+    "stores/rendimiento_activo.py",
 ]
 
 

@@ -112,7 +112,9 @@ function _pmBuildRow(rowData, index) {
 
     const cells = [
         { text: rowData.fecha || "" },
-        { html: `<span class="pmTipoPill pmTipoPill--${tipo}">${_PM_TIPO_LABELS[tipo] || tipo}</span>` },
+        {
+            html: `<span class="pmTipoPill pmTipoPill--${escapeHtml(tipo)}">${escapeHtml(_PM_TIPO_LABELS[tipo] || tipo)}</span>`
+        },
         { text: rowData.nombre || "" },
         { text: rowData.gestor || "" },
         { text: rowData.vintage || "" },
@@ -226,19 +228,19 @@ function _pmOpenEditModal(rowIndex = -1) {
         <h3 class="assetModalTitle">${isEdit ? "Editar inversión" : "Nueva inversión"}</h3>
 
         <label class="assetModalLabel" for="pmFechaInput">Fecha de entrada</label>
-        <input id="pmFechaInput" class="assetModalInput" type="text" value="${rowData.fecha || ""}" placeholder="dd-mm-aaaa">
+        <input id="pmFechaInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.fecha)}" placeholder="dd-mm-aaaa">
 
         <label class="assetModalLabel" for="pmTipoSelect">Tipo</label>
         <select id="pmTipoSelect" class="assetModalSelect">${tipoOptions}</select>
 
         <label class="assetModalLabel" for="pmNombreInput">Nombre del fondo / inversión</label>
-        <input id="pmNombreInput" class="assetModalInput" type="text" value="${rowData.nombre || ""}" placeholder="Ej: Carlyle Partners VII">
+        <input id="pmNombreInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.nombre)}" placeholder="Ej: Carlyle Partners VII">
 
         <label class="assetModalLabel" for="pmGestorInput">Gestor / GP</label>
-        <input id="pmGestorInput" class="assetModalInput" type="text" value="${rowData.gestor || ""}" placeholder="Ej: The Carlyle Group">
+        <input id="pmGestorInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.gestor)}" placeholder="Ej: The Carlyle Group">
 
         <label class="assetModalLabel" for="pmVintageInput">Vintage (año)</label>
-        <input id="pmVintageInput" class="assetModalInput" type="text" value="${rowData.vintage || ""}" placeholder="Ej: 2023">
+        <input id="pmVintageInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.vintage)}" placeholder="Ej: 2023">
 
         <label class="assetModalLabel" for="pmCurrencySelect">Moneda</label>
         <select id="pmCurrencySelect" class="assetModalSelect">${currencyOptions}</select>
@@ -256,7 +258,7 @@ function _pmOpenEditModal(rowIndex = -1) {
         <input id="pmValorActualInput" class="assetModalInput" type="text" inputmode="decimal" value="${rowData.valorActual ? formatCellEuroValue(rowData.valorActual) : ""}" placeholder="0,00">
 
         <label class="assetModalLabel" for="pmNotaInput">Nota</label>
-        <input id="pmNotaInput" class="assetModalInput" type="text" value="${rowData.nota || ""}" placeholder="Opcional">
+        <input id="pmNotaInput" class="assetModalInput" type="text" value="${escapeHtml(rowData.nota)}" placeholder="Opcional">
 
         <div class="assetModalActions">
             <button type="button" id="pmModalCancelBtn" class="cancelButton">Cancelar</button>

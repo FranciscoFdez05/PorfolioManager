@@ -12,6 +12,8 @@ import time
 
 import pytest
 
+from tests.conftest import ClienteAtajo
+
 CLAVE = "clave-de-prueba-0123456789abcdef"
 
 
@@ -32,7 +34,7 @@ def movimientos_app(temp_db, monkeypatch):
     app.config["TESTING"] = True
     register_error_handlers(app)
     app.register_blueprint(movimientos_bp)
-    return app
+    return ClienteAtajo.instalar(app)
 
 
 def _firmar(timestamp, cuerpo, clave=CLAVE):
@@ -999,3 +1001,84 @@ def test_sin_firma_exigida_no_hace_falta_ni_clave(movimientos_app, sin_firma, mo
     )
 
     assert respuesta.status_code == 201
+
+
+# ── Token de dispositivo ─────────────────────────────────────────────────────
+# Antes /api/preparar firmaba para cualquiera que llegase desde una red
+# permitida, y con esa firma /api/movimiento aceptaba el alta: la clave no
+# probaba quién escribía. Ahora todas las rutas del Atajo piden el token que va
+# dentro del .shortcut.
+
+@pytest.mark.parametrize("ruta,metodo", [
+    ("/api/portfolios-lista", "get"),
+    ("/api/cuentas-lista", "get"),
+    ("/api/categorias", "get"),
+    ("/api/preparar", "post"),
+    ("/api/firmar", "post"),
+    ("/api/movimiento", "post"),
+])
+def test_sin_token_ninguna_ruta_del_atajo_responde(movimientos_app, ruta, metodo):
+    client = movimientos_app.test_client()
+    respuesta = getattr(client, metodo)(
+        ruta, json={}, headers={"X-Atajo-Token": ""}, environ_base={"REMOTE_ADDR": "192.168.1.50"},
+    )
+    assert respuesta.status_code == 401
+    assert "token" in respuesta.get_json()["error"]
+
+
+def test_un_token_falso_no_vale(movimientos_app):
+    client = movimientos_app.test_client()
+    respuesta = client.get(
+        "/api/categorias", headers={"X-Atajo-Token": "0" * 64}, environ_base={"REMOTE_ADDR": "192.168.1.50"},
+    )
+    assert respuesta.status_code == 401
+
+
+def test_el_oraculo_de_firma_ya_no_sirve_sin_token(movimientos_app):
+    """El ataque de la auditoría: pedir la firma a /api/preparar y usarla."""
+    client = movimientos_app.test_client()
+    sinToken = {"X-Atajo-Token": ""}
+    preparado = client.post(
+        "/api/preparar", json={"tipo": "gasto", "nombre": "Intruso", "importe": 1},
+        headers=sinToken, environ_base={"REMOTE_ADDR": "192.168.1.50"},
+    )
+    assert preparado.status_code == 401
+    assert "firma" not in (preparado.get_json() or {})
+
+
+def test_rehacer_la_clave_revoca_el_token(movimientos_app, monkeypatch):
+    from core import firma_hmac
+
+    tokenViejo = firma_hmac.tokenDispositivo()
+    monkeypatch.setenv("MOVIMIENTOS_SECRET_KEY", "otra-clave-0123456789abcdef-otra")
+    client = movimientos_app.test_client()
+
+    respuesta = client.get(
+        "/api/categorias", headers={"X-Atajo-Token": tokenViejo}, environ_base={"REMOTE_ADDR": "192.168.1.50"},
+    )
+
+    assert respuesta.status_code == 401
+
+
+def test_con_la_firma_desactivada_no_se_pide_token(movimientos_app, sin_firma):
+    client = movimientos_app.test_client()
+    respuesta = client.get(
+        "/api/categorias", headers={"X-Atajo-Token": ""}, environ_base={"REMOTE_ADDR": "192.168.1.50"},
+    )
+    assert respuesta.status_code == 200
+
+
+# ── Revisión del año ─────────────────────────────────────────────────────────
+
+def test_un_alta_del_atajo_avanza_la_revision_del_anio(movimientos_app):
+    """Es lo que hace que la pestaña de Gastos abierta no lo borre al guardar."""
+    from stores import revisiones
+
+    antes = revisiones.actual("gastos", "2026")
+    respuesta = _enviar(
+        movimientos_app.test_client(),
+        {"tipo": "gasto", "nombre": "Pan", "importe": 1, "fecha": "2026-03-04"},
+    )
+
+    assert respuesta.status_code == 201
+    assert revisiones.actual("gastos", "2026") == antes + 1

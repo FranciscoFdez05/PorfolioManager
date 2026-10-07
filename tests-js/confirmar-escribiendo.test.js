@@ -7,7 +7,7 @@
 // dejando el botón bloqueado en un diálogo que no pide nada.
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 function montarDom() {
     document.body.innerHTML = `
@@ -47,7 +47,7 @@ beforeAll(() => {
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
     cargarScript("js/core/app-core.js")
-    cargarScript("js/cartera/assets.js")
+    cargarModulo("js/cartera/assets.js")
 })
 
 beforeEach(() => {

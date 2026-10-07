@@ -267,7 +267,10 @@ function smFgStatsStripHtml(historia) {
         { label: "Ayer", punto: historia[1] },
         { label: "Hace 1 semana", punto: historia[7] },
         { label: "Hace 1 mes", punto: historia[29] },
-        { label: "Máximo · 12 meses", punto: historia.reduce((max, p) => (p.valor > max.valor ? p : max), historia[0]) },
+        {
+            label: "Máximo · 12 meses",
+            punto: historia.reduce((max, p) => (p.valor > max.valor ? p : max), historia[0])
+        },
         { label: "Mínimo · 12 meses", punto: historia.reduce((min, p) => (p.valor < min.valor ? p : min), historia[0]) }
     ].filter((item) => item.punto)
 
@@ -347,7 +350,8 @@ function smRenderFearGreedHistory(historia, error) {
                 tooltip: {
                     ...SM_TOOLTIP_BASE,
                     callbacks: {
-                        title: (items) => cronologica[items[0].dataIndex] && smFgDateLabel(cronologica[items[0].dataIndex].timestamp),
+                        title: (items) =>
+                            cronologica[items[0].dataIndex] && smFgDateLabel(cronologica[items[0].dataIndex].timestamp),
                         label: (ctx) => ` ${ctx.raw} · ${smFearGreedLabel(cronologica[ctx.dataIndex].clasificacion)}`
                     }
                 }
@@ -510,7 +514,10 @@ function smIndexCardHtml(item) {
 
 function smIndexValue(value, currency) {
     const decimals = Math.abs(value) >= 1000 ? 0 : 2
-    const formatted = value.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    const formatted = value.toLocaleString("es-ES", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    })
     if (!currency) return formatted
     return `${formatted}<span class="smIndexCurrency">${escapeHtml(currencySuffix(currency))}</span>`
 }
@@ -519,7 +526,9 @@ function smPercentSigned(value, decimals = 2) {
     const num = typeof value === "number" ? value : parseFloat(value)
     if (value === null || value === undefined || isNaN(num)) return "—"
     const sign = num > 0 ? "+" : ""
-    return sign + num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %"
+    return (
+        sign + num.toLocaleString("es-ES", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " %"
+    )
 }
 
 // ── Distribución del mercado (treemap: S&P 500 / Cripto / Nasdaq 100) ──────
@@ -541,7 +550,8 @@ const SM_UNIVERSE_SCALE = { sp500: 3, nasdaq100: 4, cripto: 8 }
 const SM_UNIVERSE_NOTES = {
     sp500: "El tamaño es el patrimonio del ETF que sigue ese sector (AUM); el color, la variación de hoy.",
     cripto: "El tamaño es la capitalización de mercado; el color, la variación de hoy. Una fila por moneda, aunque cotice en varios exchanges.",
-    nasdaq100: "El tamaño es la capitalización de mercado; el color, la variación de hoy. Pertenencia al Nasdaq 100 según TradingView."
+    nasdaq100:
+        "El tamaño es la capitalización de mercado; el color, la variación de hoy. Pertenencia al Nasdaq 100 según TradingView."
 }
 
 let _smUniverse = "sp500"
@@ -765,7 +775,8 @@ function smGetSectorTooltip() {
 
 function smSectorTooltipHtml(d) {
     const pctClass = d.change > 0 ? "hmTipPos" : d.change < 0 ? "hmTipNeg" : ""
-    const fila = (label, valor, cls = "") => `<span class="hmTipLabel">${label}</span><span class="hmTipVal ${cls}">${valor}</span>`
+    const fila = (label, valor, cls = "") =>
+        `<span class="hmTipLabel">${label}</span><span class="hmTipVal ${cls}">${valor}</span>`
 
     const priceRow = d.price !== null && d.price !== undefined ? fila("Precio", smIndexValue(d.price, d.currency)) : ""
     const changeRow = fila("Variación hoy", smPercentSigned(d.change), pctClass)
@@ -856,7 +867,10 @@ function smSquarify(items, x, y, w, h) {
 
         while (i < pendientes.length) {
             const siguiente = areaFila + pendientes[i].area
-            if (fila.length && smWorstRatio(fila, areaFila, lado) <= smWorstRatio([...fila, pendientes[i]], siguiente, lado)) {
+            if (
+                fila.length &&
+                smWorstRatio(fila, areaFila, lado) <= smWorstRatio([...fila, pendientes[i]], siguiente, lado)
+            ) {
                 break
             }
             fila.push(pendientes[i])
@@ -919,8 +933,12 @@ function smRenderMovers(movers) {
         return
     }
 
-    gainersEl.innerHTML = (movers.subidas || []).map((row, idx) => smMoverRowHtml(row, idx)).join("") || '<p class="overviewEmpty">Sin datos.</p>'
-    losersEl.innerHTML = (movers.bajadas || []).map((row, idx) => smMoverRowHtml(row, idx)).join("") || '<p class="overviewEmpty">Sin datos.</p>'
+    gainersEl.innerHTML =
+        (movers.subidas || []).map((row, idx) => smMoverRowHtml(row, idx)).join("") ||
+        '<p class="overviewEmpty">Sin datos.</p>'
+    losersEl.innerHTML =
+        (movers.bajadas || []).map((row, idx) => smMoverRowHtml(row, idx)).join("") ||
+        '<p class="overviewEmpty">Sin datos.</p>'
 }
 
 function smMoverRowHtml(row, idx) {
@@ -950,8 +968,12 @@ function smRenderRsi(rsi) {
         return
     }
 
-    overEl.innerHTML = (rsi.sobrecompra || []).map((row, idx) => smRsiRowHtml(row, idx)).join("") || '<p class="overviewEmpty">Sin datos.</p>'
-    underEl.innerHTML = (rsi.sobreventa || []).map((row, idx) => smRsiRowHtml(row, idx)).join("") || '<p class="overviewEmpty">Sin datos.</p>'
+    overEl.innerHTML =
+        (rsi.sobrecompra || []).map((row, idx) => smRsiRowHtml(row, idx)).join("") ||
+        '<p class="overviewEmpty">Sin datos.</p>'
+    underEl.innerHTML =
+        (rsi.sobreventa || []).map((row, idx) => smRsiRowHtml(row, idx)).join("") ||
+        '<p class="overviewEmpty">Sin datos.</p>'
 }
 
 function smRsiRowHtml(row, idx) {
@@ -982,7 +1004,8 @@ function smRenderUnusualVolume(rows) {
         return
     }
 
-    el.innerHTML = rows.map((row, idx) => smVolumeRowHtml(row, idx)).join("") || '<p class="overviewEmpty">Sin datos.</p>'
+    el.innerHTML =
+        rows.map((row, idx) => smVolumeRowHtml(row, idx)).join("") || '<p class="overviewEmpty">Sin datos.</p>'
 }
 
 function smVolumeRowHtml(row, idx) {

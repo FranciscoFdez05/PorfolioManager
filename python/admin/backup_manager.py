@@ -23,6 +23,7 @@ from pathlib import Path
 
 from core import paths, settings, telegram_notifier
 from core.bloqueo import exclusivo
+from core.copia_sqlite import copiar as copiar_sqlite
 from core.escritura import temporalPara
 from core.paths import (
     AUTO_BACKUPS_DIR as _BACKUP_DIR,
@@ -155,6 +156,46 @@ def check_integrity(db_path: Path) -> bool:
     return _estado_integridad(db_path) == "ok"
 
 
+def problema_de_portfolio(db_path: Path, exigir_activos: bool = True) -> str | None:
+    """Motivo por el que un .db subido no puede ocupar el lugar de un portfolio.
+
+    None si es una base SQLite íntegra con la tabla `activos`. Lo comparten
+    «Importar cartera» e «Importar ZIP»: el segundo aceptaba cualquier SQLite
+    —incluida una vacía— y con ella sustituía la cartera activa entera.
+
+    `exigir_activos=False` lo usa la restauración de una copia completa: ahí
+    cada base sale de una copia de esta misma aplicación y lo que faltaba era
+    comprobar que fuese legible entera (antes solo se miraba la cabecera).
+    """
+    try:
+        with open(db_path, "rb") as f:
+            if not f.read(16).startswith(b"SQLite format 3\x00"):
+                return "El fichero no es una base de datos SQLite"
+    except OSError as e:
+        return f"No se pudo leer la base de datos: {e}"
+
+    conn = None
+    try:
+        conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
+        # El fichero viene de fuera (una copia, un ZIP de otra persona): que su
+        # esquema no pueda ejecutar funciones desde vistas o disparadores
+        # mientras se inspecciona.
+        conn.execute("PRAGMA trusted_schema=OFF")
+        result = conn.execute("PRAGMA integrity_check").fetchone()
+        if not result or result[0] != "ok":
+            return "La base de datos está corrupta"
+        if exigir_activos and not conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='activos'"
+        ).fetchone():
+            return "El fichero no es un portfolio de esta aplicación"
+    except sqlite3.DatabaseError as e:
+        return f"La base de datos no se puede abrir: {e}"
+    finally:
+        if conn is not None:
+            conn.close()
+    return None
+
+
 def _checkpoint_and_copy(db_path: Path, backup_path: Path):
     """Copia consistente vía API de backup de SQLite (incluye WAL pendiente)
     a un temporal y rename atómico al destino.
@@ -165,25 +206,8 @@ def _checkpoint_and_copy(db_path: Path, backup_path: Path):
     dos procesos y renombraban encima la mezcla.
     """
     with temporalPara(backup_path) as tmp:
-        src = dst = None
-        try:
-            src = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
-            dst = sqlite3.connect(str(tmp), timeout=settings.backupSqliteTimeout())
-            src.backup(dst)
-            dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            dst.commit()
-            dst.close()
-            dst = None
-            src.close()
-            src = None
-            tmp.replace(backup_path)
-        finally:
-            for conn in (dst, src):
-                if conn is not None:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
+        copiar_sqlite(db_path, tmp)
+        tmp.replace(backup_path)
 
 
 def backup_previo_a_migracion(db_path: Path, desde: int, hasta: int):
@@ -392,6 +416,13 @@ def _fecha_del_zip(ruta: Path):
         return datetime.min
 
 
+def _avisar_sustitucion() -> None:
+    """El .db se acaba de sustituir por otro fichero: que todos los procesos
+    reabran sus conexiones (ver core.db.invalidate_all_connections)."""
+    from core.db import invalidate_all_connections
+    invalidate_all_connections()
+
+
 def _restore_from_latest_auto_backup(db_path: Path):
     """Restaura db_path desde la copia válida más reciente. True si lo consiguió.
 
@@ -422,6 +453,7 @@ def _restore_from_latest_auto_backup(db_path: Path):
                 _remove_wal_sidecars(db_path)
                 tmp.replace(db_path)
             _remove_wal_sidecars(db_path)
+            _avisar_sustitucion()
             log.info(f"[backup] Restaurado desde la copia: {nombre}")
             return True
         except Exception as e:
@@ -493,6 +525,7 @@ def _reparar_en(db_path: Path, repair_path: Path, corrupted_backup: Path) -> boo
             shutil.copy2(str(db_path), str(corrupted_backup))
             shutil.move(str(repair_path), str(db_path))
             _remove_wal_sidecars(db_path)
+            _avisar_sustitucion()
             log.info(f"[backup] Reparación automática OK. Corrupta guardada en {corrupted_backup.name}")
             return True
         else:

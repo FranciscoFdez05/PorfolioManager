@@ -1,5 +1,8 @@
+from datetime import date
+
 from flask import Blueprint, jsonify, request
 
+from stores import revisiones
 from stores.gastos_store import (
     create_default_gastos_year,
     delete_gastos_year,
@@ -21,7 +24,7 @@ def getGastosYears():
     years = list_gastos_years()
 
     if not years:
-        default_year = "2026"
+        default_year = str(date.today().year)
         payload = create_default_gastos_year(default_year)
         write_gastos_year(default_year, payload)
         years = [default_year]
@@ -76,8 +79,19 @@ def saveGastosYear(year):
     if error:
         return jsonify({"ok": False, "error": error}), 400
 
-    write_gastos_year(year, payload)
-    return jsonify({"ok": True})
+    try:
+        esperada = revisiones.revision_de_peticion(requestData)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    try:
+        nueva = write_gastos_year(year, payload, revision_esperada=esperada)
+    except revisiones.ConflictoRevision as conflicto:
+        return jsonify({
+            "ok": False, "conflicto": True, "revision": conflicto.actual,
+            "error": "Este año ha cambiado desde otro sitio (otra pestaña, otro dispositivo o el Atajo)",
+        }), 409
+    return jsonify({"ok": True, "revision": nueva})
 
 
 @gastos_bp.route("/api/gastos/<year>", methods=["DELETE"])
@@ -93,8 +107,8 @@ def deleteGastosYear(year):
     remaining_years = list_gastos_years()
 
     if not remaining_years:
-        payload = create_default_gastos_year("2026")
-        write_gastos_year("2026", payload)
-        remaining_years = ["2026"]
+        actual = str(date.today().year)
+        write_gastos_year(actual, create_default_gastos_year(actual))
+        remaining_years = [actual]
 
     return jsonify({"ok": True, "years": remaining_years})

@@ -11,8 +11,12 @@ import zipfile
 import pytest
 from werkzeug.security import generate_password_hash
 
-from tests.test_backup_http import _crear_db  # noqa: F401  (fixture helper)
-from tests.test_backup_http import cliente  # noqa: F401  (fixture)
+from tests import test_backup_http
+from tests.test_backup_http import _crear_db
+
+# La fixture se reutiliza asignándola, no importándola por nombre: un import
+# que luego reaparece como parámetro de los tests es un F811 para ruff.
+cliente = test_backup_http.cliente
 
 
 def _poner_contrasena(monkeypatch, rutas, contrasena="la-clave-de-la-web"):
@@ -152,7 +156,7 @@ def test_la_copia_automatica_se_envia_como_fichero_a_telegram(con_claves, monkey
     from core import telegram_notifier
     from routes import backup
 
-    client, cabeceras, rutas = con_claves
+    _ajustes(con_claves[2], telegramAvisos={"backupFichero": True})
     telegram_notifier.reiniciar_para_pruebas()
     telegram_notifier.escribirConfig("123456:ABC-token", "987654321")
     enviados, textos = [], []
@@ -189,6 +193,7 @@ def test_un_zip_demasiado_grande_avisa_en_vez_de_intentar_subirlo(con_claves, mo
     from core import telegram_notifier
     from routes import backup
 
+    _ajustes(con_claves[2], telegramAvisos={"backupFichero": True})
     telegram_notifier.reiniciar_para_pruebas()
     telegram_notifier.escribirConfig("123456:ABC-token", "987654321")
     textos = []
@@ -204,7 +209,7 @@ def test_un_zip_demasiado_grande_avisa_en_vez_de_intentar_subirlo(con_claves, mo
 def test_el_ajuste_se_guarda_y_se_lee(cliente):
     from routes.ajustes import ajustes_bp
 
-    client, cabeceras, rutas = cliente
+    client, cabeceras, _rutas = cliente
     client.application.register_blueprint(ajustes_bp)
     assert client.get("/api/settings").get_json()["backupIncluirClaves"] is False
     assert client.post("/api/settings", json={"backupIncluirClaves": True}, headers=cabeceras).get_json()["ok"]
@@ -212,3 +217,94 @@ def test_el_ajuste_se_guarda_y_se_lee(cliente):
     # Un valor que no es booleano de verdad no lo activa
     client.post("/api/settings", json={"backupIncluirClaves": "false"}, headers=cabeceras)
     assert client.get("/api/settings").get_json()["backupIncluirClaves"] is False
+
+def test_de_fabrica_la_copia_no_se_sube_a_telegram(con_claves, monkeypatch):
+    """Subir el ZIP (todas las carteras) a Telegram es opt-in: solo sale el aviso de texto."""
+    from core import telegram_notifier
+    from routes import backup
+
+    telegram_notifier.reiniciar_para_pruebas()
+    telegram_notifier.escribirConfig("123456:ABC-token", "987654321")
+    textos = []
+    monkeypatch.setattr(telegram_notifier, "_enviar_documento",
+                        lambda *a: pytest.fail("no debería subir el fichero sin pedirlo"))
+    monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chat, texto: textos.append(texto))
+
+    backup.crear_backup_automatico()
+
+    assert len(textos) == 1 and "automática" in textos[0]
+
+
+# ── Contraseña propia de las copias ─────────────────────────────────────────
+
+def test_el_formato_de_la_contrasena_de_copias_es_el_del_export_manual():
+    from core import clave_copias, exportables
+
+    assert clave_copias.FORMATO == exportables._FORMATO_CIFRADO
+    assert clave_copias.ITERACIONES == exportables._ITERACIONES_CIFRADO
+
+
+def test_fijar_contrasena_valida_el_largo_y_no_guarda_la_contrasena(con_claves):
+    client, cabeceras, rutas = con_claves
+    r = client.post("/api/backup/contrasena", json={"contrasena": "corta"}, headers=cabeceras)
+    assert r.status_code == 400 and not (rutas["data"] / "backup_clave.dat").exists()
+
+    r = client.post("/api/backup/contrasena", json={"contrasena": "una-contrasena-larga"}, headers=cabeceras)
+    assert r.status_code == 200 and r.get_json()["configurada"] is True
+    # ni la contraseña ni la clave derivada quedan legibles en el disco
+    fichero = (rutas["data"] / "backup_clave.dat").read_bytes()
+    assert fichero.startswith(b"ENC1:") and b"una-contrasena-larga" not in fichero
+
+    r = client.delete("/api/backup/contrasena", headers=cabeceras)
+    assert r.get_json()["configurada"] is False and not (rutas["data"] / "backup_clave.dat").exists()
+
+
+def test_la_copia_usa_la_contrasena_de_copias_y_no_la_de_la_web(con_claves, monkeypatch):
+    from core import exportables
+
+    client, cabeceras, rutas = con_claves
+    client.post("/api/backup/contrasena", json={"contrasena": "una-contrasena-larga"}, headers=cabeceras)
+    _ajustes(rutas, backupIncluirClaves=True)
+    nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
+    ruta = rutas["backups"] / nombre
+    with zipfile.ZipFile(ruta) as zf:
+        paquete = json.loads(zf.read("claves-api.cifradas.json"))
+    assert b"CLAVE-SECRETA-FINNHUB" not in ruta.read_bytes()
+    assert exportables.descifrarClaves(paquete, "una-contrasena-larga")["finnhub"] == ["CLAVE-SECRETA-FINNHUB"]
+    with pytest.raises(exportables.ContrasenaIncorrecta):
+        exportables.descifrarClaves(paquete, "la-clave-de-la-web")
+
+    # En este servidor, con la misma contraseña, se restaura sin preguntar
+    (rutas["claves"] / "finnhub.key").unlink()
+    r = client.post("/api/restore", json={"filename": nombre}, headers=cabeceras)
+    assert r.status_code == 200 and r.get_json()["claves"] == ["finnhub.key"]
+
+
+def test_si_cambia_la_contrasena_de_copias_se_pide_la_de_entonces(con_claves):
+    client, cabeceras, rutas = con_claves
+    client.post("/api/backup/contrasena", json={"contrasena": "contrasena-de-ayer"}, headers=cabeceras)
+    _ajustes(rutas, backupIncluirClaves=True)
+    nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
+    client.post("/api/backup/contrasena", json={"contrasena": "contrasena-de-hoy!"}, headers=cabeceras)
+    (rutas["claves"] / "finnhub.key").unlink()
+
+    r = client.post("/api/restore", json={"filename": nombre}, headers=cabeceras)
+    assert r.status_code == 400 and r.get_json()["necesitaContrasena"] is True
+    r = client.post("/api/restore", json={"filename": nombre, "contrasena": "mal-mal-mal"}, headers=cabeceras)
+    assert r.status_code == 400 and r.get_json()["error"] == "Contraseña incorrecta"
+    r = client.post("/api/restore", json={"filename": nombre, "contrasena": "contrasena-de-ayer"}, headers=cabeceras)
+    assert r.status_code == 200 and r.get_json()["claves"] == ["finnhub.key"]
+
+
+def test_ver_la_contrasena_de_copias_exige_la_contrasena_de_la_web(con_claves):
+    client, cabeceras, _rutas = con_claves
+    client.post("/api/backup/contrasena", json={"contrasena": "una-contrasena-larga"}, headers=cabeceras)
+
+    r = client.post("/api/backup/contrasena/ver", json={"currentPassword": "mal"}, headers=cabeceras)
+    assert r.status_code == 400 and "contrasena" not in r.get_json()
+    r = client.post("/api/backup/contrasena/ver", json={}, headers=cabeceras)
+    assert r.status_code == 400
+
+    r = client.post("/api/backup/contrasena/ver", json={"currentPassword": "la-clave-de-la-web"}, headers=cabeceras)
+    assert r.status_code == 200 and r.get_json()["contrasena"] == "una-contrasena-larga"
+    assert r.headers["Cache-Control"] == "no-store"

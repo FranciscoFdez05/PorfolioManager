@@ -10,7 +10,7 @@
 // hay que dejar el hueco en blanco, no rellenarlo con un cero que se lee como un
 // dato bueno.
 import { beforeAll, beforeEach, describe, expect, it } from "vitest"
-import { cargarScript } from "./cargar.js"
+import { cargarModulo, cargarScript } from "./cargar.js"
 
 beforeAll(() => {
     // El orden es el de index.html: planes.js usa `escapeHtml` de dom.js,
@@ -18,7 +18,7 @@ beforeAll(() => {
     // assets.js.
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
-    cargarScript("js/cartera/assets.js")
+    cargarModulo("js/cartera/assets.js")
     cargarScript("js/cartera/planes.js")
 })
 

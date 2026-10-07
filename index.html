@@ -261,9 +261,24 @@
             <!-- Versión en curso. El marcador lo sustituye el servidor al
                  servir la página (core/version.py), igual que el nonce de CSP:
                  así se sabe qué hay desplegado sin abrir /api/health y sin
-                 gastar una petición más en cada carga. -->
-            <span class="appVersion" id="appVersion" title="Versión de PorfolioManager">__APP_VERSION__</span>
+                 gastar una petición más en cada carga. Al pulsarla abre
+                 #versionPopover; el punto ámbar sale si hay versión nueva. -->
+            <button class="appVersion" id="appVersion" type="button" title="Versión de PorfolioManager" aria-haspopup="dialog" aria-expanded="false" aria-controls="versionPopover">__APP_VERSION__</button>
         </nav>
+
+        <!-- Fuera de nav.tabs: la barra desplaza en horizontal y recortaría un
+             desplegable que viviera dentro. Se coloca con position: fixed. -->
+        <div class="versionPopover hidden" id="versionPopover" role="dialog" aria-label="Versión de la aplicación">
+            <div class="versionPopoverTitulo">PorfolioManager</div>
+            <div class="ajustesUpdateVersion">Versión instalada: <strong data-upd="version">—</strong></div>
+            <div class="ajustesUpdateVersion" data-upd="publicadaFila" hidden>Última publicada: <strong data-upd="publicada">—</strong><span class="ajustesUpdateEtiqueta" data-upd="etiqueta" hidden></span></div>
+            <div class="ajustesAviso" data-upd="aviso" hidden></div>
+            <div class="versionPopoverAcciones">
+                <button class="secondaryButton" data-upd="checkBtn" type="button">Comprobar versiones</button>
+                <button class="primaryButton" data-upd="btn" type="button"><span data-upd="btnTexto">Actualizar ahora</span></button>
+            </div>
+            <span class="ajustesStatusMsg" data-upd="msg"></span>
+        </div>
 
         <main class="mainContent" id="mainContent">
             <section id="dynamicContent" class="contentArea"></section>
@@ -468,7 +483,7 @@
                 <span class="ajustesSwitchTrack"></span>
             </label>
         </div>
-        <select id="editAssetConvertCurrencySelect" class="assetModalInput hidden"></select>
+        <select id="editAssetConvertCurrencySelect" aria-label="Divisa a la que convertir" class="assetModalInput hidden"></select>
 
         <button type="button" class="assetModalLabel cpToggleLabel" id="editAssetColorToggle">
             <span>Color del activo</span>
@@ -518,7 +533,7 @@
         <p class="assetModalMessage" id="pConfirmMsg"></p>
         <div class="assetModalActions">
             <button id="pConfirmCancel" class="cancelButton">Cancelar</button>
-            <button id="pConfirmOk" class="primaryButton" data-no-autohide="true"></button>
+            <button id="pConfirmOk" aria-label="Confirmar" class="primaryButton" data-no-autohide="true"></button>
         </div>
     </div>
 </div>
@@ -548,7 +563,7 @@
         <div id="pDelStep3" class="hidden">
             <h3 class="assetModalTitle">Confirmación final</h3>
             <p class="assetModalMessage">Escribe <strong id="pDelNameConfirm"></strong> para confirmar la eliminación:</p>
-            <input id="pDelNameInput" class="assetModalInput" type="text" autocomplete="off">
+            <input id="pDelNameInput" aria-label="Escribe el nombre del portfolio para confirmar" class="assetModalInput" type="text" autocomplete="off">
             <div class="assetModalActions">
                 <button id="pDelCancel3" class="cancelButton">Cancelar</button>
                 <button id="pDelConfirmFinal" class="dangerButton" disabled data-no-autohide="true">Eliminar definitivamente</button>
@@ -1138,8 +1153,8 @@
                 <div class="ajustesField">
                     <label class="ajustesLabel">Añadir divisa</label>
                     <div class="ajustesInputRow">
-                        <input id="ajustesDivisaCode" class="ajustesInput" type="text" placeholder="Código (SEK)" maxlength="5" style="width:130px;flex:none;text-transform:uppercase">
-                        <input id="ajustesDivisaName" class="ajustesInput" type="text" placeholder="Nombre (Corona sueca)">
+                        <input id="ajustesDivisaCode" aria-label="Código de la divisa" class="ajustesInput" type="text" placeholder="Código (SEK)" maxlength="5" style="width:130px;flex:none;text-transform:uppercase">
+                        <input id="ajustesDivisaName" aria-label="Nombre de la divisa" class="ajustesInput" type="text" placeholder="Nombre (Corona sueca)">
                         <button id="ajustesDivisaAddBtn" class="ajustesAddBtn" type="button">Añadir</button>
                     </div>
                     <span id="ajustesDivisaMsg" class="ajustesStatusMsg"></span>
@@ -1611,7 +1626,7 @@
                         <div class="ajustesSwitchRow">
                             <div class="ajustesSwitchLabel">
                                 Exigir firma en las peticiones
-                                <small>Recomendado. Cada petición del Atajo va firmada con la clave de este servidor, así que llegar desde una red permitida no basta para escribir.</small>
+                                <small>Recomendado. Cada petición del Atajo lleva su token de acceso y va firmada con la clave de este servidor, así que llegar desde una red permitida no basta para leer ni para escribir.</small>
                             </div>
                             <label class="ajustesSwitch">
                                 <input type="checkbox" id="ajustesAtajoExigirFirma" checked>
@@ -1642,9 +1657,11 @@
                         </div>
 
                         <div class="ajustesAtajoAviso">
-                            <strong>Regenerar la clave no obliga a rehacer el atajo.</strong>
-                            El atajo no guarda la clave: se la pide al servidor en cada uso. Y el fichero
-                            <code>.shortcut</code> tampoco la lleva dentro, solo la dirección del servidor.
+                            <strong>El fichero del atajo es un secreto, y regenerar la clave lo revoca.</strong>
+                            El <code>.shortcut</code> lleva dentro un token de acceso derivado de la clave: es lo que
+                            impide que cualquier otro equipo de tu red apunte movimientos. Guárdalo como una
+                            contraseña. Si pierdes el iPhone, regenera la clave: el atajo instalado dejará de
+                            funcionar y tendrás que volver a descargarlo aquí.
                         </div>
                     </div>
                 </details>
@@ -1804,11 +1821,29 @@
                     <input id="ajustesBackupClaves" type="checkbox">
                     <span>
                         <strong>Incluir las claves de API en las copias.</strong>
-                        Van cifradas dentro del ZIP con tu <em>contraseña de acceso a la web</em>: para
-                        restaurarlas se pide esa misma contraseña (si no ha cambiado desde la copia, no se
-                        pregunta). Sin esta opción, la copia no lleva ninguna clave.
+                        Van cifradas dentro del ZIP con la <em>contraseña de las copias</em> si la defines
+                        abajo y, si no, con tu <em>contraseña de acceso a la web</em>. Para restaurarlas se
+                        pide esa contraseña (en este servidor, si no ha cambiado, no se pregunta). Sin esta
+                        opción, la copia no lleva ninguna clave.
                     </span>
                 </label>
+                <div class="ajustesField">
+                    <label class="ajustesLabel" for="ajustesBackupContrasena">Contraseña de las copias <span id="ajustesBackupContrasenaEstado"></span></label>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesBackupContrasena" class="ajustesInput" type="password" placeholder="Nueva contraseña (mín. 8 caracteres)…" autocomplete="new-password" maxlength="200">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesBackupContrasena" title="Mostrar/ocultar">
+                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        </button>
+                    </div>
+                    <div class="ajustesInputRow" style="margin-top:10px">
+                        <button id="ajustesBackupContrasenaVerBtn" class="cancelButton" type="button" data-no-autohide="true" hidden>Ver guardada</button>
+                        <button id="ajustesBackupContrasenaFijarBtn" class="primaryButton" type="button" data-no-autohide="true">Fijar</button>
+                        <button id="ajustesBackupContrasenaQuitarBtn" class="cancelButton" type="button" data-no-autohide="true" hidden>Quitar</button>
+                    </div>
+                    <span id="ajustesBackupContrasenaMsg" class="ajustesStatusMsg"></span>
+                </div>
+                <div class="ajustesNota">Solo protege las claves de API. Se guarda cifrada con la SECRET_KEY del servidor y puedes volver a verla con «Ver guardada» (te pide tu contraseña de acceso a la web). Sin ella no podrás abrir las claves de una copia en otro servidor. Cambiarla no afecta a las copias ya hechas.</div>
                 <div class="ajustesNota">Con Telegram configurado y el aviso de «Copias de seguridad» activado, cada copia automática se envía al bot como archivo ZIP.</div>
                 <div class="ajustesActions">
                     <button id="ajustesGuardarBackupFreqBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
@@ -1899,8 +1934,8 @@
                         <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 2h7l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7 10V6M5 7.5 7 5.5l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         Importar ZIP
                     </button>
-                    <input id="ajustesImportJsonInput" type="file" accept=".json" style="display:none">
-                    <input id="ajustesImportZipInput" type="file" accept=".zip" style="display:none">
+                    <input id="ajustesImportJsonInput" aria-label="Fichero JSON a importar" type="file" accept=".json" style="display:none">
+                    <input id="ajustesImportZipInput" aria-label="Fichero ZIP a importar" type="file" accept=".zip" style="display:none">
                     <span id="ajustesImportMsg" class="ajustesStatusMsg"></span>
                 </div>
             </div>
@@ -2097,9 +2132,15 @@
     </div><!-- /.sttContent -->
 </div><!-- /.sttOverlay -->
 
-<script defer src="js/vendor/chart.umd.min.js?v=4.4.4"></script>
+<script defer src="js/vendor/chart.umd.min.js?v=4.5.1"></script>
 <script defer src="js/core/app-core.js"></script>
 <script defer src="js/cartera/assets.js"></script>
+<script defer src="js/cartera/assets-todos.js"></script>
+<script defer src="js/cartera/assets-sidebar.js"></script>
+<script defer src="js/cartera/assets-resumen.js"></script>
+<script defer src="js/cartera/assets-ficha.js"></script>
+<script defer src="js/cartera/assets-modales.js"></script>
+<script defer src="js/cartera/activos-pagina.js"></script>
 <script defer src="js/finanzas/intereses.js"></script>
 <script defer src="js/finanzas/dividendos.js"></script>
 <script defer src="js/finanzas/gastos.js"></script>
@@ -2117,8 +2158,20 @@
 <script defer src="js/analisis/herramientas-divisas.js"></script>
 <script defer src="js/finanzas/bonos.js"></script>
 <script defer src="js/analisis/metricas.js"></script>
+<script defer src="js/analisis/metricas-graficos.js"></script>
+<script defer src="js/analisis/metricas-flujos.js"></script>
+<script defer src="js/analisis/metricas-rentabilidad.js"></script>
+<script defer src="js/analisis/metricas-init.js"></script>
+<script defer src="js/analisis/metricas-evolucion.js"></script>
+<script defer src="js/ajustes/ajustes-api.js"></script>
+<script defer src="js/ajustes/ajustes-telegram.js"></script>
+<script defer src="js/ajustes/ajustes-general.js"></script>
+<script defer src="js/ajustes/ajustes-copias.js"></script>
+<script defer src="js/ajustes/ajustes-acceso.js"></script>
+<script defer src="js/ajustes/ajustes-actualizacion.js"></script>
 <script defer src="js/ajustes/ajustes.js"></script>
 <script defer src="js/core/shared-utils.js"></script>
+<script defer src="js/core/fusion-anual.js"></script>
 <script defer src="js/analisis/heatmap.js"></script>
 <script defer src="js/analisis/seguimiento.js"></script>
 <script defer src="js/analisis/fundamentales.js"></script>

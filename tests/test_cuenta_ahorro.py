@@ -28,8 +28,9 @@ def test_la_configuracion_antigua_pasa_a_la_cuenta_principal():
     assert len(cfg["cuentas"]) == 1
     principal = cfg["cuentas"][0]
     assert principal["nombre"] == ""
-    assert principal["remuneradas"] == ["a", "b"]
-    assert principal["incluirDividendos"] is True
+    # Las remuneradas y los dividendos ya no se guardan aquí: son de la cuenta, en la base.
+    assert "remuneradas" not in principal
+    assert "incluirDividendos" not in principal
 
 
 def test_la_configuracion_se_normaliza_al_guardar(cliente):

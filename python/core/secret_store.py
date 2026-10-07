@@ -10,6 +10,7 @@ formato cifrado en la siguiente escritura, así que no hace falta reconfigurar
 nada al actualizar.
 """
 import base64
+import functools
 import logging
 import os
 import tempfile
@@ -27,12 +28,42 @@ _ENCRYPTED_PREFIX = b"ENC1:"
 _SALT = b"portfolio-apikeys-v1"
 
 
-def _get_fernet() -> Fernet | None:
-    secret = os.environ.get("SECRET_KEY", "").strip().encode()
-    if not secret:
+# Iteraciones de PBKDF2 para las claves derivadas de SECRET_KEY. Cambiarlas deja
+# ilegibles auth.dat y API/*.key ya guardados: no es un ajuste.
+_ITERACIONES_SECRET_KEY = 200_000
+
+
+def fernetDerivado(secreto: bytes, salt: bytes, iteraciones: int) -> Fernet:
+    """Fernet con una clave PBKDF2-HMAC-SHA256 derivada de `secreto`.
+
+    Es la única derivación del proyecto: había tres copias (aquí, en
+    routes/auth.py y en core/exportables.py) que tenían que coincidir byte a
+    byte para que los ficheros ya cifrados siguieran abriéndose.
+    """
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=iteraciones)
+    return Fernet(base64.urlsafe_b64encode(kdf.derive(secreto)))
+
+
+@functools.lru_cache(maxsize=8)
+def _fernetCacheado(secreto: bytes, salt: bytes) -> Fernet:
+    return fernetDerivado(secreto, salt, _ITERACIONES_SECRET_KEY)
+
+
+def fernetDeSecretKey(salt: bytes) -> Fernet | None:
+    """Fernet derivado de SECRET_KEY para un propósito (`salt`), o None sin clave.
+
+    Se cachea por (clave, salt): antes cada lectura de un secreto repetía las
+    200.000 iteraciones, y se leen varios en cada carga de Ajustes y en cada
+    petición del Atajo. Si SECRET_KEY cambia, cambia la entrada de la caché.
+    """
+    secreto = os.environ.get("SECRET_KEY", "").strip().encode()
+    if not secreto:
         return None
-    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=_SALT, iterations=200_000)
-    return Fernet(base64.urlsafe_b64encode(kdf.derive(secret)))
+    return _fernetCacheado(secreto, salt)
+
+
+def _get_fernet() -> Fernet | None:
+    return fernetDeSecretKey(_SALT)
 
 
 def read_secret_lines(path: Path) -> list:

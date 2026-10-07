@@ -28,6 +28,7 @@ from providers import (
     format_percent as _format_percent,
     normalize_text as _normalize_text,
 )
+from providers.http import motivo_conexion
 
 TRADINGVIEW_SCAN_URL = "https://scanner.tradingview.com/global/scan"
 TRADINGVIEW_SEARCH_URL = "https://symbol-search.tradingview.com/symbol_search/v3/"
@@ -339,7 +340,7 @@ def fetch_quote(symbol, timeout=None):
     except HTTPError as error:
         return None, f"TradingView devolvió HTTP {error.code}"
     except URLError as error:
-        return None, f"No se pudo conectar con TradingView: {error.reason}"
+        return None, f"No se pudo conectar con TradingView: {motivo_conexion(error, 'TradingView')}"
 
     status = "Cotización actualizada"
     if normalized_symbol in cotizados:
@@ -491,7 +492,7 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
     except HTTPError as error:
         return None, f"TradingView devolvió HTTP {error.code}"
     except URLError as error:
-        return None, f"No se pudo conectar con TradingView: {error.reason}"
+        return None, f"No se pudo conectar con TradingView: {motivo_conexion(error, 'TradingView')}"
 
     raw_results = payload.get("symbols") or []
     normalized_asset_name = _normalize_text(asset_name)

@@ -1,5 +1,6 @@
 // ===== CUENTAS DE AHORRO =====
-// Una cuenta de ahorro es una cuenta de dinero más (ventana «Cuentas»). Sus
+// Una cuenta de ahorro es una cuenta de dinero más (ventana «Cuentas») que se ha
+// elegido como de ahorro: aquí no se crean cuentas, se escogen de las que hay. Sus
 // movimientos son las transferencias desde y hacia otras cuentas, los ingresos
 // cobrados en ella y los gastos pagados con ella; esta ventana los lee de
 // /api/cuenta-ahorro. Meter dinero en ahorro no es un gasto: es una transferencia.
@@ -106,8 +107,6 @@ function sameCuentaAhorro(a, b) {
 function emptyCuentaAhorroCfg(nombre = "") {
     return {
         nombre,
-        remuneradas: [],
-        incluirDividendos: false,
         objetivo: "",
         recurrente: { activa: false, importe: "", dia: 1, desde: "" }
     }
@@ -118,8 +117,6 @@ function normalizeCuentaAhorroCfg(raw, nombre) {
     const rec = raw?.recurrente || {}
     return {
         nombre,
-        remuneradas: Array.isArray(raw?.remuneradas) ? raw.remuneradas.map(String) : [],
-        incluirDividendos: Boolean(raw?.incluirDividendos),
         objetivo: String(raw?.objetivo || ""),
         recurrente: {
             activa: Boolean(rec.activa),
@@ -130,11 +127,10 @@ function normalizeCuentaAhorroCfg(raw, nombre) {
     }
 }
 
-// Acepta la forma antigua (una cuenta con cuentasRemuneradas / incluirDividendos).
+// Acepta la forma antigua (una sola cuenta, sin lista). Las remuneradas y los
+// dividendos ya no están aquí: son de la cuenta, en la base, y entran en su saldo.
 function normalizeCuentaAhorroConfig(raw) {
-    const entradas = Array.isArray(raw?.cuentas)
-        ? raw.cuentas
-        : [{ nombre: "", remuneradas: raw?.cuentasRemuneradas, incluirDividendos: raw?.incluirDividendos }]
+    const entradas = Array.isArray(raw?.cuentas) ? raw.cuentas : [{ nombre: "" }]
     return { cuentas: entradas.map((e) => normalizeCuentaAhorroCfg(e, String(e?.nombre || ""))) }
 }
 
@@ -209,13 +205,20 @@ function getCuentaAhorroRateToEur(from) {
 
 // Los dividendos se cobran en cualquier divisa; la cuenta de ahorro es en euros.
 async function loadCuentaAhorroDividendos() {
-    if (!getCuentaAhorroCfg().incluirDividendos) {
+    if (!getCuentaAhorroActual()) {
         cuentaAhorroDivEur = []
         return
     }
 
+    // Cada dividendo va a la cuenta que trae apuntada; los que no la tienen (o la
+    // tienen de una cuenta borrada) van a la primera que cobra los dividendos.
+    const actual = getCuentaAhorroActual()
+    const porDefecto = cuentaAhorroTodas.find((c) => c.dividendos)
+    const esDeEsta = (row) =>
+        cuentaAhorroTodas.some((c) => c.id === row.cuenta) ? row.cuenta === actual.id : porDefecto?.id === actual.id
+
     cuentaAhorroDivEur = await Promise.all(
-        cuentaAhorroDividendos.map(async (row) => {
+        cuentaAhorroDividendos.filter(esDeEsta).map(async (row) => {
             const rate = await getCuentaAhorroRateToEur(row.monedaTotal)
             return { row, importe: (parseLooseNumber(row.total || "") ?? 0) * rate }
         })
@@ -234,10 +237,10 @@ function parseCuentaAhorroSortKey(fecha) {
     return p ? new Date(Number(p.year), p.month, p.day || 1).getTime() : 0
 }
 
-// Cuentas remuneradas que cuentan para la cuenta seleccionada.
+// La cuenta remunerada vinculada a la cuenta seleccionada (como lista: 0 o 1).
 function getCuentaAhorroRemuneradasVinculadas() {
-    const ids = getCuentaAhorroCfg().remuneradas
-    return cuentaAhorroRemuneradas.filter((cuenta) => ids.includes(cuenta.id))
+    const id = getCuentaAhorroActual()?.remunerada
+    return id ? cuentaAhorroRemuneradas.filter((cuenta) => cuenta.id === id) : []
 }
 
 // Todo lo que entra o sale de la cuenta seleccionada, con su año y mes.
@@ -307,7 +310,7 @@ function renderCuentaAhorroCuentas() {
         })
     }
 
-    // La cuenta de ahorro principal no se elimina.
+    // La cuenta de ahorro principal no se quita.
     const principal = cuentaAhorroCuenta === CUENTA_AHORRO_PRINCIPAL
     const borrar = document.getElementById("cuentaAhorroDeleteBtn")
     if (borrar) borrar.style.display = principal ? "none" : ""
@@ -491,8 +494,8 @@ function renderCuentaAhorroTable() {
         )
         .join("")
 
-    const cfg = getCuentaAhorroCfg()
-    const sinVincular = cfg.remuneradas.length === 0 && !cfg.incluirDividendos
+    const actual = getCuentaAhorroActual()
+    const sinVincular = !actual?.remunerada && !actual?.dividendos && !cuentaAhorroDivEur.length
     empty.textContent = sinVincular
         ? "No hay cuentas vinculadas. Elígelas en ··· › Configurar cuenta."
         : `No hay ingresos de cuenta remunerada ni dividendos en ${cuentaAhorroYear}.`
@@ -547,7 +550,7 @@ function renderCuentaAhorroSummary() {
     show("cuentaAhorroRetiradoRow", retirado > 0)
     set("cuentaAhorroRemunerada", formatCuentaAhorroSigned(remunerada))
     set("cuentaAhorroDividendos", formatCuentaAhorroSigned(dividendos))
-    show("cuentaAhorroDividendosRow", cfg.incluirDividendos)
+    show("cuentaAhorroDividendosRow", Boolean(getCuentaAhorroActual()?.dividendos) || cuentaAhorroDivEur.length > 0)
 
     renderCuentaAhorroObjetivo(cfg, total, flows, year)
     renderCuentaAhorroChart(flows, year, saldoInicial)
@@ -804,15 +807,6 @@ function buildCuentaAhorroCheck({ attrs, checked, label, bloqueadaPor = "" }) {
         </label>`
 }
 
-// Una cuenta remunerada o los dividendos solo pueden contar en una cuenta de
-// ahorro: en dos se sumarían dos veces.
-function findCuentaAhorroOtraCon(predicado) {
-    const clave = getCuentaAhorroClave()
-    const otra = cuentaAhorroConfig.cuentas.find((c) => !sameCuentaAhorro(c.nombre, clave) && predicado(c))
-    if (!otra) return ""
-    return cuentaAhorroCuentas.find((c) => sameCuentaAhorro(getCuentaAhorroClave(c), otra.nombre))?.nombre || ""
-}
-
 // El servidor guarda los importes con punto ("12000.00"); en pantalla, como se escriben.
 function toCuentaAhorroInput(valor) {
     return String(valor || "")
@@ -825,18 +819,11 @@ function openCuentaAhorroConfigModal() {
     if (!actual) return
     const clave = getCuentaAhorroClave(actual)
     const cfg = getCuentaAhorroCfg(clave)
-    const lista = cuentaAhorroRemuneradas.length
-        ? cuentaAhorroRemuneradas
-              .map((c) =>
-                  buildCuentaAhorroCheck({
-                      attrs: `data-cuenta-id="${escapeGastosHtml(c.id)}"`,
-                      checked: cfg.remuneradas.includes(c.id),
-                      label: c.nombre || "Cuenta remunerada",
-                      bloqueadaPor: findCuentaAhorroOtraCon((o) => o.remuneradas.includes(c.id))
-                  })
-              )
-              .join("")
-        : `<p class="cuentaAhorroHint">Todavía no hay cuentas remuneradas. Créalas en Finanzas › Cuenta Remunerada.</p>`
+    // Que la cuenta sea remunerada se decide en Finanzas › Cuenta Remunerada,
+    // eligiéndola allí: aquí solo se dice si lo es.
+    const lista = actual.remunerada
+        ? `<p class="cuentaAhorroHint">«${escapeGastosHtml(actual.nombre)}» es una cuenta remunerada: sus intereses (Finanzas › Cuenta Remunerada) entran en ella.</p>`
+        : `<p class="cuentaAhorroHint">«${escapeGastosHtml(actual.nombre)}» no es remunerada. Para que lo sea, elígela en Finanzas › Cuenta Remunerada.</p>`
 
     const rec = cfg.recurrente
 
@@ -857,14 +844,13 @@ function openCuentaAhorroConfigModal() {
             </div>
             <p class="cuentaAhorroHint">Se registra sola como transferencia al abrir esta ventana, desde el mes en que la activas. Si borras una, no vuelve a crearse.</p>
 
-            <p class="assetModalLabel">Cuentas remuneradas</p>
+            <p class="assetModalLabel">Cuenta remunerada</p>
             ${lista}
             <p class="assetModalLabel">Dividendos</p>
             ${buildCuentaAhorroCheck({
                 attrs: 'id="cuentaAhorroCfgDividendos"',
-                checked: cfg.incluirDividendos,
-                label: "Incluir los dividendos de mis activos",
-                bloqueadaPor: findCuentaAhorroOtraCon((o) => o.incluirDividendos)
+                checked: Boolean(actual.dividendos),
+                label: "Cobrar en esta cuenta los dividendos de mis activos"
             })}
         `,
         submitLabel: "Guardar",
@@ -883,8 +869,6 @@ function openCuentaAhorroConfigModal() {
             const next = {
                 nombre: clave,
                 objetivo: modal.querySelector("#cuentaAhorroCfgObjetivo")?.value.trim() || "",
-                remuneradas: [...modal.querySelectorAll("[data-cuenta-id]:checked")].map((i) => i.dataset.cuentaId),
-                incluirDividendos: Boolean(modal.querySelector("#cuentaAhorroCfgDividendos")?.checked),
                 recurrente: {
                     activa,
                     importe,
@@ -894,7 +878,14 @@ function openCuentaAhorroConfigModal() {
                 }
             }
 
+            const dividendos = Boolean(modal.querySelector("#cuentaAhorroCfgDividendos")?.checked)
+
             try {
+                // Primero lo que es de la cuenta (los dividendos): si el servidor
+                // lo rechaza no se guarda nada.
+                if (dividendos !== Boolean(actual.dividendos)) {
+                    await Api.put(`/api/cuentas/${encodeURIComponent(actual.id)}`, { dividendos })
+                }
                 setCuentaAhorroCfg(next)
                 await saveCuentaAhorroConfig()
                 // Abrir la lista es lo que crea las aportaciones automáticas.
@@ -936,14 +927,37 @@ function openCuentaAhorroNombreModal({ title, valor = "", onSubmit }) {
     })
 }
 
+// Una cuenta de ahorro se escoge entre las de «Cuentas» que todavía no lo son.
 function addCuentaAhorro() {
-    openCuentaAhorroNombreModal({
-        title: "Nueva cuenta de ahorro",
-        onSubmit: async (nombre) => {
-            const res = await Api.post("/api/cuentas", { nombre, tipo: "ahorro" })
-            await reloadCuentaAhorroMovs()
-            cuentaAhorroCuenta = res?.cuenta?.id || cuentaAhorroCuenta
+    const libres = cuentaAhorroTodas.filter((c) => !c.ahorro)
+    const opciones = libres
+        .map((c) => `<option value="${escapeGastosHtml(c.id)}">${escapeGastosHtml(c.nombre)}</option>`)
+        .join("")
+    openGastosCreateModal({
+        title: "Añadir cuenta de ahorro",
+        bodyHtml: libres.length
+            ? `
+            <label class="assetModalLabel" for="cuentaAhorroElegir">Cuenta</label>
+            <select id="cuentaAhorroElegir" class="assetModalSelect">${opciones}</select>
+            <p class="cuentaAhorroHint">Una de tus cuentas de Finanzas › Cuentas. Para una cuenta nueva, créala antes allí.</p>`
+            : `<p class="cuentaAhorroHint">Todas tus cuentas son ya de ahorro. Crea otra en Finanzas › Cuentas.</p>`,
+        submitLabel: "Añadir",
+        onSubmit: async ({ getValue, setFeedback }) => {
+            const id = getValue("cuentaAhorroElegir")
+            if (!libres.some((c) => c.id === id)) {
+                setFeedback("Elige una cuenta.", true)
+                return false
+            }
+            try {
+                await Api.put(`/api/cuentas/${encodeURIComponent(id)}`, { ahorro: true })
+                await reloadCuentaAhorroMovs()
+            } catch (error) {
+                setFeedback(error?.message || "No se pudo añadir la cuenta.", true)
+                return false
+            }
+            cuentaAhorroCuenta = id
             await refreshCuentaAhorro()
+            return true
         }
     })
 }
@@ -965,27 +979,22 @@ function renameCuentaAhorro() {
     })
 }
 
+// Quitarla de aquí no borra la cuenta ni sus movimientos: sigue en «Cuentas».
+// Su configuración (objetivo, aportación) se guarda por si se vuelve a añadir;
+// la aportación automática deja de crearse mientras no sea de ahorro.
 function deleteCuentaAhorro() {
     const actual = getCuentaAhorroActual()
-    if (!actual || actual.protegida) return
-    const clave = getCuentaAhorroClave(actual)
+    if (!actual || actual.id === CUENTA_AHORRO_PRINCIPAL) return
     openConfirmModal({
-        title: "Eliminar cuenta",
-        message: `Vas a eliminar la cuenta «${actual.nombre}». Solo se puede si no tiene movimientos.`,
-        confirmLabel: "Eliminar",
+        title: "Quitar cuenta de ahorro",
+        message: `«${actual.nombre}» dejará de salir aquí. La cuenta y sus movimientos siguen en Cuentas.`,
+        confirmLabel: "Quitar",
         onConfirm: async () => {
             try {
-                await Api.del(`/api/cuentas/${encodeURIComponent(actual.id)}`)
+                await Api.put(`/api/cuentas/${encodeURIComponent(actual.id)}`, { ahorro: false })
             } catch (error) {
-                showError("No se pudo eliminar la cuenta", error)
+                showError("No se pudo quitar la cuenta", error)
                 return
-            }
-
-            cuentaAhorroConfig.cuentas = cuentaAhorroConfig.cuentas.filter((c) => !sameCuentaAhorro(c.nombre, clave))
-            try {
-                await saveCuentaAhorroConfig()
-            } catch (error) {
-                showError("La cuenta se eliminó, pero no se pudo limpiar su configuración", error)
             }
 
             cuentaAhorroCuenta = CUENTA_AHORRO_PRINCIPAL

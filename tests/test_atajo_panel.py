@@ -337,7 +337,8 @@ def test_con_https_el_atajo_apunta_a_https(cliente_autenticado, bp_atajo, monkey
     assert datos["urlBase"].startswith("https://")
 
 
-def test_la_descarga_es_un_atajo_con_nombre_de_fichero(cliente_autenticado, bp_atajo):
+def test_la_descarga_es_un_atajo_con_nombre_de_fichero(cliente_autenticado, bp_atajo, clave_aislada):
+    firma_hmac.escribirClaveNueva(clave_aislada)
     client, _cab, _app = cliente_autenticado(bp_atajo)
 
     res = client.get("/api/atajo/descargar")
@@ -345,3 +346,40 @@ def test_la_descarga_es_un_atajo_con_nombre_de_fichero(cliente_autenticado, bp_a
     assert res.status_code == 200
     assert "PorfolioManager.shortcut" in res.headers["Content-Disposition"]
     assert plistlib.loads(res.data)["WFWorkflowActions"]
+
+
+def test_la_descarga_lleva_el_token_en_todas_las_llamadas(cliente_autenticado, bp_atajo, clave_aislada):
+    """Sin él, el Atajo descargado fallaría en la primera llamada."""
+    firma_hmac.escribirClaveNueva(clave_aislada)
+    token = firma_hmac.tokenDispositivo()
+    client, _cab, _app = cliente_autenticado(bp_atajo)
+
+    acciones = plistlib.loads(client.get("/api/atajo/descargar").data)["WFWorkflowActions"]
+    llamadas = [a["WFWorkflowActionParameters"] for a in acciones if "WFURL" in a["WFWorkflowActionParameters"]]
+
+    assert len(llamadas) == 4
+    for llamada in llamadas:
+        cabeceras = {
+            c["WFKey"]["Value"]["string"]: c["WFValue"]["Value"]["string"]
+            for c in llamada["WFHTTPHeaders"]["Value"]["WFDictionaryFieldValueItems"]
+        }
+        assert cabeceras["X-Atajo-Token"] == token
+
+
+def test_sin_clave_no_se_descarga_un_atajo_inservible(cliente_autenticado, bp_atajo):
+    client, _cab, _app = cliente_autenticado(bp_atajo)
+
+    res = client.get("/api/atajo/descargar")
+
+    assert res.status_code == 400
+    assert "clave" in res.get_json()["error"]
+
+
+def test_el_token_se_muestra_solo_por_post(cliente_autenticado, bp_atajo, clave_aislada):
+    firma_hmac.escribirClaveNueva(clave_aislada)
+    client, cab, _app = cliente_autenticado(bp_atajo)
+
+    assert client.get("/api/atajo/token").status_code == 405
+    datos = client.post("/api/atajo/token", headers=cab).get_json()
+
+    assert datos["token"] == firma_hmac.tokenDispositivo()

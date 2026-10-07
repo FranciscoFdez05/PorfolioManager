@@ -17,6 +17,9 @@ let gastosYears = []
 let currentGastosYear = null
 let currentGastosMonth = "enero"
 let currentGastosData = null
+// Copia de lo último que se leyó o se guardó en el servidor. Ante un 409 (el
+// año cambió desde otro sitio) es la base de la fusión: ver core/fusion-anual.js.
+let gastosBaseSnapshot = null
 let currentGastosView = "year"
 let gastosAutosaveTimeout = null
 let gastosPersistenceBound = false
@@ -394,12 +397,10 @@ function normalizeComparableGastoText(value) {
 }
 
 function escapeGastosHtml(value) {
-    return String(value || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;")
+    // Alias del escapeHtml común (js/core/dom.js). Había una copia por
+    // módulo y no todas escapaban las comillas, que es lo que importa en
+    // un atributo value="…".
+    return escapeHtml(value)
 }
 
 function ensureGastosDataShape(data) {
@@ -481,11 +482,6 @@ function openGastosCreateModal({ title, bodyHtml, onSubmit, onReady, submitLabel
         feedback.classList.toggle("error", Boolean(message && isError))
     }
 
-    overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) {
-            // closeGastosCreateModal() // Deshabilitado para evitar cierre accidental
-        }
-    })
 
     modal.querySelector("#gastosCreateModalCancelBtn")?.addEventListener("click", closeGastosCreateModal)
     let guardando = false
@@ -895,11 +891,6 @@ function openGastoDetailModal(rowElement) {
         </div>
     `
 
-    overlay.addEventListener("click", (event) => {
-        if (event.target === overlay) {
-            closeGastoDetailModal()
-        }
-    })
     modal.querySelector("#gastosDetailCloseBtn")?.addEventListener("click", closeGastoDetailModal)
     modal.querySelector("#gastosDetailEditBtn")?.addEventListener("click", () => {
         closeGastoDetailModal()
@@ -1053,12 +1044,62 @@ async function saveGastosYear(year, payload, options = {}) {
             keepalive: true
         })
         if (!response.ok) {
-            throw new Error(`No se pudo guardar el año de gastos (HTTP ${response.status})`)
+            const error = new Error(`No se pudo guardar el año de gastos (HTTP ${response.status})`)
+            error.status = response.status
+            throw error
         }
-        return
+        return await response.json().catch(() => null)
     }
 
-    await Api.post(`/api/gastos/${encodeURIComponent(year)}`, payload)
+    return await Api.post(`/api/gastos/${encodeURIComponent(year)}`, payload)
+}
+
+// Tras un guardado correcto: la revisión nueva y la base para la próxima fusión
+// son las de lo que se acaba de mandar, no las de lo que haya ahora en pantalla
+// (el usuario puede haber seguido editando mientras volvía la respuesta).
+function anotarGuardadoGastos(enviado, respuesta) {
+    if (!Number.isInteger(respuesta?.revision)) {
+        return
+    }
+    enviado.revision = respuesta.revision
+    gastosBaseSnapshot = enviado
+    if (currentGastosData && currentGastosData.year === enviado.year) {
+        currentGastosData.revision = respuesta.revision
+    }
+}
+
+async function guardarGastosConRevision(options = {}) {
+    const year = currentGastosYear
+    const enviado = clonarDatosAnuales(currentGastosData)
+
+    try {
+        anotarGuardadoGastos(enviado, await saveGastosYear(year, enviado, options))
+    } catch (error) {
+        // Con keepalive la página puede estar cerrándose: no hay tiempo de
+        // fusionar. La revisión no avanza, así que el próximo guardado volverá a
+        // chocar y fusionará entonces; en el servidor no se ha borrado nada.
+        if (error?.status !== 409 || options.keepalive) {
+            throw error
+        }
+
+        const servidor = ensureGastosDataShape(await loadGastosYear(year))
+        // Lo que hay ahora en pantalla, no lo enviado: el usuario puede haber
+        // seguido editando mientras volvía el 409. Si cambió de año, se fusiona
+        // lo enviado y no se toca el año que tiene abierto ahora.
+        const sigueAbierto = currentGastosData?.year === year
+        if (sigueAbierto) syncGastosDataFromTables()
+        const local = sigueAbierto ? currentGastosData : enviado
+        const fusionado = fusionarAnioTresVias(gastosBaseSnapshot, local, servidor, "mensualidades", "gastosTipos")
+        gastosBaseSnapshot = clonarDatosAnuales(servidor)
+        if (sigueAbierto) currentGastosData = fusionado
+
+        const aEnviar = clonarDatosAnuales(fusionado)
+        anotarGuardadoGastos(aEnviar, await saveGastosYear(year, aEnviar))
+        if (sigueAbierto) renderCurrentGastosView()
+        showToast("Este año había cambiado desde otro sitio (el Atajo, otra pestaña…). Se han combinado los cambios.", {
+            type: "warning"
+        })
+    }
 }
 
 async function deleteGastosYearRequest(year) {
@@ -1221,6 +1262,7 @@ async function renderGastosYear(year) {
     _gastosDataLoaded = false
     _gastosHasPendingChanges = false
     currentGastosData = ensureGastosDataShape(await loadGastosYear(year))
+    gastosBaseSnapshot = clonarDatosAnuales(currentGastosData)
     currentGastosYear = currentGastosData.year
     _gastosDataLoaded = true
 
@@ -2613,7 +2655,7 @@ async function persistCurrentGastosData(options = {}) {
     gastosAutosaveTimeout = null
     _gastosHasPendingChanges = false
     await persistSharedGastosTypes()
-    await saveGastosYear(currentGastosYear, currentGastosData, options)
+    await guardarGastosConRevision(options)
 }
 
 async function flushGastosPendingChanges() {
@@ -2631,6 +2673,7 @@ function resetGastosStateForPortfolioSwitch() {
     _gastosDataLoaded = false
     _gastosHasPendingChanges = false
     currentGastosData = null
+    gastosBaseSnapshot = null
 }
 
 function bindGastosPersistenceGuards() {
@@ -2646,7 +2689,7 @@ function bindGastosPersistenceGuards() {
         }
 
         syncGastosDataFromTables()
-        saveGastosYear(currentGastosYear, currentGastosData, { keepalive: true }).catch((error) => {
+        guardarGastosConRevision({ keepalive: true }).catch((error) => {
             console.error("Error al guardar gastos al cerrar la ventana:", error)
         })
     })
@@ -2663,7 +2706,7 @@ function bindGastosPersistenceGuards() {
         }
 
         syncGastosDataFromTables()
-        saveGastosYear(currentGastosYear, currentGastosData, { keepalive: true }).catch((error) => {
+        guardarGastosConRevision({ keepalive: true }).catch((error) => {
             console.error("Error al guardar gastos al cambiar de ventana:", error)
         })
     })

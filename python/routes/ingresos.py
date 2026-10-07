@@ -1,5 +1,8 @@
+from datetime import date
+
 from flask import Blueprint, jsonify, request
 
+from stores import revisiones
 from stores.ingresos_store import (
     create_default_ingresos_year,
     delete_ingresos_year,
@@ -21,7 +24,7 @@ def getIngresosYears():
     years = list_ingresos_years()
 
     if not years:
-        default_year = "2026"
+        default_year = str(date.today().year)
         payload = create_default_ingresos_year(default_year)
         write_ingresos_year(default_year, payload)
         years = [default_year]
@@ -70,6 +73,7 @@ def getIngresosYear(year):
             return jsonify({"ok": False, "error": "Año no encontrado"}), 404
         data = create_default_ingresos_year(normalized)
         data["ingresosTipos"] = read_ingresos_types()
+        data["revision"] = revisiones.actual("ingresos", normalized)
 
     return jsonify(data)
 
@@ -82,8 +86,19 @@ def saveIngresosYear(year):
     if error:
         return jsonify({"ok": False, "error": error}), 400
 
-    write_ingresos_year(year, payload)
-    return jsonify({"ok": True})
+    try:
+        esperada = revisiones.revision_de_peticion(requestData)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    try:
+        nueva = write_ingresos_year(year, payload, revision_esperada=esperada)
+    except revisiones.ConflictoRevision as conflicto:
+        return jsonify({
+            "ok": False, "conflicto": True, "revision": conflicto.actual,
+            "error": "Este año ha cambiado desde otro sitio (otra pestaña, otro dispositivo o el Atajo)",
+        }), 409
+    return jsonify({"ok": True, "revision": nueva})
 
 
 @ingresos_bp.route("/api/ingresos/<year>", methods=["DELETE"])
@@ -99,8 +114,8 @@ def deleteIngresosYear(year):
     remaining_years = list_ingresos_years()
 
     if not remaining_years:
-        payload = create_default_ingresos_year("2026")
-        write_ingresos_year("2026", payload)
-        remaining_years = ["2026"]
+        actual = str(date.today().year)
+        write_ingresos_year(actual, create_default_ingresos_year(actual))
+        remaining_years = [actual]
 
     return jsonify({"ok": True, "years": remaining_years})

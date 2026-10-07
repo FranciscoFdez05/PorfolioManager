@@ -67,6 +67,34 @@ def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
     # mismo motivo que los dos de arriba: lo escribe cualquier test que cierre
     # sesión o cambie credenciales, no solo los que piden rutas aisladas, y sin
     # esto la suite dejaría revocaciones en el `data/sesion` real.
+    # El resolutor del portfolio activo (core/db.py) relee portfolios.json
+    # cuando cambia. Lo registra init_portfolios() y es estado de módulo: sin
+    # quitarlo, un test que lo registró con un portfolios.json temporal lo
+    # dejaría apuntando, tras deshacer los monkeypatch, al data/ real del
+    # usuario, y el siguiente test podría acabar abriendo su base de datos.
+    from core import db as _db
+
+    monkeypatch.setattr(_db, "_resolutor_activo", None, raising=False)
+
+    # Firmas del Atajo ya usadas y nombres de host aprendidos: un fichero por
+    # test. Compartidos, dos tests que firman el mismo cuerpo en el mismo
+    # segundo se verían como una repetición; y los hosts, sin redirigir,
+    # acabarían en el data/atajo real.
+    from core import firma_hmac, red_local
+
+    propios = tmp_path_factory.mktemp("atajo")
+    monkeypatch.setattr(firma_hmac, "_ficheroFirmasUsadas", lambda: propios / "atajo-firmas-usadas.json")
+    monkeypatch.setattr(red_local, "_ficheroHosts", lambda: propios / "hosts.json")
+    monkeypatch.setattr(red_local, "_hostsCache", {"firma": None, "hosts": frozenset()})
+
+    # Registro de intentos de login: vive en un fichero compartido entre
+    # procesos. Uno por test, para que el bloqueo de uno no pase al siguiente.
+    from routes import auth
+
+    intentos = tmp_path_factory.mktemp("login") / "login-intentos.json"
+    monkeypatch.setattr(auth, "_fichero_intentos", lambda: intentos)
+    auth._attempts.clear()
+
     sesiones = tmp_path_factory.getbasetemp() / "sesion"
     sesiones.mkdir(exist_ok=True)
     monkeypatch.setattr(sesion, "SESION_DIR", sesiones, raising=False)
@@ -110,7 +138,6 @@ def datos_aislados(tmp_path, monkeypatch):
         backup as rutas_backup,
         portfolios as rutas_portfolios,
     )
-    from stores import app_data
 
     data = tmp_path / "data"
     backups = data / "backups"
@@ -147,12 +174,8 @@ def datos_aislados(tmp_path, monkeypatch):
     claves.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(paths, "API_DIR", claves, raising=False)
     monkeypatch.setattr(rutas_ajustes, "_API_DIR", claves)
-    # `stores.app_data` resuelve su propio `apiDir` al importarse, y es quien
-    # lee las claves para los proveedores. Sin parchearlo también, la suite
-    # acaba leyendo el API/ real del equipo que la ejecuta: hasta ahora salía
-    # vacío de casualidad —porque sin SECRET_KEY no se puede descifrar— y con
-    # ella exportada los tests habrían empezado a ver claves de verdad.
-    monkeypatch.setattr(app_data, "apiDir", claves)
+    # `stores.app_data` lee las claves de `paths.API_DIR` en cada llamada, así
+    # que el parche de arriba ya lo cubre.
 
     # /api/restore llama a init_portfolios() al terminar, que reactiva el
     # portfolio guardado en el backup. Sin parchear también estos nombres, ese
@@ -268,3 +291,33 @@ def error_app():
     app.config["TESTING"] = True
     register_error_handlers(app)
     return app
+
+
+class ClienteAtajo:
+    """Fábrica de clientes de prueba que mandan el token del Atajo.
+
+    Desde que los endpoints del Atajo exigen `X-Atajo-Token`, cada petición de
+    estos tests tendría que llevarlo a mano. El cliente lo añade calculado con la
+    clave vigente en ese momento (la de MOVIMIENTOS_SECRET_KEY del fixture),
+    salvo que la petición traiga ya la cabecera: así los tests que comprueban el
+    rechazo pueden mandar uno falso o vacío.
+    """
+
+    @staticmethod
+    def instalar(app):
+        from flask.testing import FlaskClient
+
+        class _Cliente(FlaskClient):
+            def open(self, *args, **kwargs):
+                from core import firma_hmac
+
+                cabeceras = dict(kwargs.pop("headers", None) or {})
+                if not any(k.lower() == firma_hmac.CABECERA_TOKEN.lower() for k in cabeceras):
+                    try:
+                        cabeceras[firma_hmac.CABECERA_TOKEN] = firma_hmac.tokenDispositivo()
+                    except firma_hmac.ErrorFirma:
+                        pass  # sin clave: el test comprueba justo eso
+                return super().open(*args, headers=cabeceras, **kwargs)
+
+        app.test_client_class = _Cliente
+        return app

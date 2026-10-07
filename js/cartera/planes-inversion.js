@@ -1089,12 +1089,6 @@ function pinvAbrirEditor(planId = null) {
     overlay.querySelector("#pinvEditorCancelBtn").addEventListener("click", pinvCerrarEditor)
     overlay.querySelector("#pinvEditorSaveBtn").addEventListener("click", pinvEditorGuardar)
 
-    // Clic fuera de la ficha: cerrar. Dentro no, porque el desplegable de los
-    // <select> personalizados se pinta en el <body> y su clic burbujea hasta aquí.
-    overlay.addEventListener("click", (evento) => {
-        if (evento.target === overlay) pinvCerrarEditor()
-    })
-
     overlay.querySelector("#pinvEditorSelector").addEventListener("change", (evento) => {
         const assetId = evento.target.value
         if (!assetId || pinvEditorActivo(assetId)) return
@@ -1246,9 +1240,6 @@ function pinvAbrirArchivo() {
         </div>`
 
     overlay.querySelector("#pinvArchivoCerrarBtn").addEventListener("click", pinvCerrarArchivo)
-    overlay.addEventListener("click", (evento) => {
-        if (evento.target === overlay) pinvCerrarArchivo()
-    })
     overlay.querySelector("#pinvArchivoCuerpo").addEventListener("click", (evento) => {
         const boton = evento.target.closest("[data-archivo-accion]")
         if (!boton) return

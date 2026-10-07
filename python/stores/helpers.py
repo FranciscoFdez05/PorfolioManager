@@ -1,4 +1,5 @@
 from core import dinero
+from core.db import transaction
 from providers.finnhub_client import convert_amount
 from stores.app_data import (
     readAlphaVantageApiKey,
@@ -7,7 +8,6 @@ from stores.app_data import (
     readRotatedAlphaVantageApiKeys,
     readRotatedEodhdApiKeys,
 )
-from stores.asset_store import listAssets, readAssetFile, writeAssetFile
 from stores.asset_utils import sanitizeAssetOperationRows, slugify
 
 
@@ -229,15 +229,62 @@ def build_completed_operations_by_asset(rows):
     return {asset_id: sanitizeAssetOperationRows(asset_rows) for asset_id, asset_rows in operations_by_asset.items()}
 
 
+# Columnas de activo_operation_rows que salen de la operación, en el orden en que
+# se comparan y se insertan. El trío fx_* no está: se hereda de la fila previa.
+_CAMPOS_OPERACION = (
+    ("id", "id"), ("activo", "activo"), ("fecha_apertura", "fechaApertura"), ("par", "par"),
+    ("stablecoin_symbol", "stablecoinSymbol"), ("orden", "orden"), ("precio_orden", "precioOrden"),
+    ("precio_currency", "precioCurrency"), ("cantidad", "cantidad"),
+    ("comisiones_cripto", "comisionesCripto"), ("comisiones_fiat", "comisionesFiat"),
+    ("total", "total"), ("currency", "currency"), ("estado", "estado"), ("fecha_cierre", "fechaCierre"),
+)
+
+
 def sync_completed_operations_into_assets(rows):
+    """Copia las operaciones completadas a `activo_operation_rows` de cada activo.
+
+    Antes reescribía el activo entero (`writeAssetFile`) por cada activo y en
+    cada GET /api/operaciones: borraba y reinsertaba también sus compras, perdía
+    el tipo de cambio histórico de todas ellas y hacía un commit por activo.
+
+    Ahora toca solo la tabla derivada, en una única transacción, y solo los
+    activos cuyo contenido difiere: en el caso normal no escribe nada. El tipo
+    de cambio ya anotado se conserva por (fecha, divisa), que es de lo que
+    depende.
+    """
     operations_by_asset = build_completed_operations_by_asset(rows)
+    columnas = [c for c, _ in _CAMPOS_OPERACION]
+    lista = ", ".join(columnas)
 
-    for asset in listAssets():
-        asset_id = asset["id"]
-        asset_data = readAssetFile(asset_id)
+    with transaction() as conn:
+        existentes = {}
+        for fila in conn.execute(
+            f"SELECT asset_id, {lista}, fx_rate, fx_fecha, fx_origen "
+            "FROM activo_operation_rows ORDER BY rowid"
+        ):
+            existentes.setdefault(fila["asset_id"], []).append(fila)
 
-        if asset_data is None:
-            continue
+        ids_activos = {r[0] for r in conn.execute("SELECT id FROM activos")}
+        for asset_id in ids_activos:
+            deseadas = [
+                tuple(str(op.get(clave, "")) for _, clave in _CAMPOS_OPERACION)
+                for op in operations_by_asset.get(asset_id, [])
+            ]
+            previas = existentes.get(asset_id, [])
+            if [tuple(str(f[c]) for c in columnas) for f in previas] == deseadas:
+                continue
 
-        asset_data["operationRows"] = operations_by_asset.get(asset_id, [])
-        writeAssetFile(asset_id, asset_data)
+            fx = {(f["fecha_apertura"], f["currency"]): (f["fx_rate"], f["fx_fecha"], f["fx_origen"])
+                  for f in previas if f["fx_rate"]}
+            indice_fecha = columnas.index("fecha_apertura")
+            indice_divisa = columnas.index("currency")
+            conn.execute("DELETE FROM activo_operation_rows WHERE asset_id = ?", (asset_id,))
+            conn.executemany(
+                f"INSERT INTO activo_operation_rows (asset_id, {lista}, fx_rate, fx_fecha, fx_origen) "
+                f"VALUES ({', '.join('?' * (len(columnas) + 4))})",
+                [
+                    (asset_id, *valores,
+                     *fx.get((valores[indice_fecha], valores[indice_divisa]), ("", "", "")))
+                    for valores in deseadas
+                ],
+            )

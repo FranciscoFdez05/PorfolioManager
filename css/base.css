@@ -117,6 +117,10 @@
     background: #1e3a5f;
     color: var(--text-primary);
 }
+.csOption.csDisabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
 
 /* ── Global select style ── */
 select {
@@ -404,16 +408,101 @@ body {
    flotando en una esquina: `nav.tabs` ya desplaza en horizontal cuando no cabe,
    así que aquí no puede taparle nada al contenido. Pequeña y apagada a
    propósito: sirve para saber qué versión está desplegada de un vistazo, no
-   para competir con la navegación. */
+   para competir con la navegación.
+
+   Pegada al borde derecho (sticky): con la barra desbordada, la versión caía
+   en la parte que no se ve, debajo de la barra lateral, y no se podía pulsar.
+   Lleva el fondo de la barra para tapar lo que desplaza por debajo; por eso
+   lo apagado va en el color y no en `opacity`, que transparentaría el fondo. */
 .appVersion {
+    position: sticky;
+    right: 0;
+    z-index: 1;
     margin-left: auto;
     flex: 0 0 auto;
-    padding-left: 12px;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: inherit;
+    font: inherit;
     font-size: 11px;
     font-variant-numeric: tabular-nums;
-    color: var(--text-muted);
-    opacity: 0.65;
+    color: color-mix(in srgb, var(--text-muted) 65%, transparent);
     white-space: nowrap;
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background 0.15s ease;
+}
+
+.appVersion:hover,
+.appVersion[aria-expanded="true"] {
+    color: var(--text-muted);
+    background: var(--btn-bg);
+}
+
+/* Hay versión nueva: la versión deja de ir apagada y lleva un punto ámbar, el
+   mismo color que la etiqueta «Hay actualización» de Ajustes. */
+.appVersion.hayNueva {
+    color: #fbbf24;
+}
+
+.appVersion.hayNueva::after {
+    content: "";
+    position: absolute;
+    top: 1px;
+    right: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #fbbf24;
+    box-shadow: 0 0 0 2px var(--bg-surface);
+}
+
+/* Desplegable de la versión. Fijo y fuera de nav.tabs, que lo recortaría; lo
+   coloca js/ajustes/ajustes-actualizacion.js. Por debajo de los modales
+   (z-index 1000) para que la confirmación de actualizar quede encima. */
+.versionPopover {
+    position: fixed;
+    z-index: 900;
+    width: 300px;
+    max-width: calc(100vw - 16px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-mid);
+    border-radius: 10px;
+    background: var(--bg-surface);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.versionPopover.hidden {
+    display: none;
+}
+
+.versionPopoverTitulo {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.versionPopoverAcciones {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.versionPopoverAcciones > button {
+    width: 100%;
+    justify-content: center;
+}
+
+.versionPopover .ajustesStatusMsg:empty {
+    display: none;
 }
 
 .navDropdownBtn {
