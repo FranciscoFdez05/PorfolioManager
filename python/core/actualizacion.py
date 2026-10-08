@@ -73,7 +73,9 @@ def _ahora() -> str:
 
 def _leer_json(ruta: Path):
     try:
-        return json.loads(ruta.read_text("utf-8"))
+        # strict=False: un carácter de control suelto en un texto no debe hacer
+        # que la pantalla crea que el vigilante no existe.
+        return json.loads(ruta.read_text("utf-8", errors="replace"), strict=False)
     except FileNotFoundError:
         return None
     except (OSError, ValueError) as error:

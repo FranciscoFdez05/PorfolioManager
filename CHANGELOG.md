@@ -22,6 +22,43 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.0.3] — 2026-10-08
+
+**Esquema de base de datos:** no lo toca (sigue en la **17**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Corregido
+
+- Ajustes seguía diciendo que **el vigilante del servidor no daba señales de vida** con
+  el vigilante instalado y funcionando. La salida de `docker-update.sh` lleva colores
+  ANSI, el carácter ESC se colaba en el campo `detalle` de `actualizacion.estado` y
+  JSON no admite caracteres de control: la aplicación descartaba el fichero entero.
+  Ahora el script limpia colores y caracteres de control, y escribe el estado en un
+  temporal que renombra, para que la aplicación nunca lo lea a medias. Además, la
+  aplicación lo lee con tolerancia (`strict=False`, y bytes inválidos sustituidos) para
+  que un carácter suelto no vuelva a ocultar al vigilante.
+- «Última publicada» enseñaba una versión antigua tras actualizar: la comprobación de
+  GitHub se guarda 6 horas en `data/tmp`, que sobrevive a las actualizaciones. La caché
+  recuerda con qué versión instalada se hizo y se descarta si esa cambia.
+
+### Cambiado
+
+- `.gitattributes`: los `*.sh` se guardan siempre con LF, también en Windows. Con CRLF
+  el shebang hace que Linux no encuentre el intérprete.
+
+### Añadido
+
+- `tests/test_actualizador_script.py`: ejecuta el vigilante de verdad (en Linux) con
+  salida con colores y comillas, y comprueba que el estado resultante es JSON estricto y
+  lo lee la aplicación.
+
+> **Si ya tienes el vigilante instalado**, tras actualizar no hay que reinstalarlo: el
+> temporizador usa el script del repositorio. Si el aviso de Ajustes persiste con el
+> `actualizacion.estado` antiguo, basta con borrarlo
+> (`rm data/tmp/actualizacion.estado`): el vigilante lo recrea en menos de 30 s.
+
+---
+
 ## [4.0.2] — 2026-10-08
 
 **Esquema de base de datos:** no lo toca (sigue en la **17**). Para deshacer la

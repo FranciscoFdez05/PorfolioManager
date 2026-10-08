@@ -144,7 +144,7 @@ def _leer_cache() -> dict | None:
 
 
 def _guardar_cache(publicada, error) -> dict:
-    datos = {"publicada": publicada, "error": error, "momento": _ahora().isoformat()}
+    datos = {"publicada": publicada, "error": error, "momento": _ahora().isoformat(), "instalada": __version__}
     try:
         paths.TMP_DIR.mkdir(parents=True, exist_ok=True)
         escribirJsonAtomico(_archivo_cache(), datos)
@@ -156,6 +156,10 @@ def _guardar_cache(publicada, error) -> dict:
 
 def _vigente(cache, forzar: bool) -> bool:
     if not cache:
+        return False
+    # La caché vive en el volumen de datos y sobrevive a las actualizaciones: tras
+    # instalar una versión nueva seguiría diciendo lo que GitHub contestó antes.
+    if cache.get("instalada") != __version__:
         return False
     edad = _segundos_desde(cache.get("momento"))
     if edad is None:

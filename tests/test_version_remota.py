@@ -104,6 +104,20 @@ def test_la_segunda_consulta_no_vuelve_a_preguntar(datos_aislados, monkeypatch):
     assert len(llamadas) == 1
 
 
+def test_actualizar_la_aplicacion_invalida_la_cache(datos_aislados, monkeypatch):
+    """La caché sobrevive en el volumen: no puede enseñar lo leído con la versión anterior."""
+    llamadas = []
+    _responder(monkeypatch, "9.9.9", contador=llamadas)
+    version_remota.consultar()
+    datos = json.loads(_cache().read_text("utf-8"))
+    datos["instalada"] = "0.0.1"
+    _cache().write_text(json.dumps(datos), "utf-8")
+
+    version_remota.consultar()
+
+    assert len(llamadas) == 2
+
+
 def test_forzar_salta_la_cache(datos_aislados, monkeypatch):
     llamadas = []
     _responder(monkeypatch, "9.9.9", contador=llamadas)

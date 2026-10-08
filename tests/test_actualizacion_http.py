@@ -96,6 +96,24 @@ def test_un_fichero_de_estado_ilegible_no_tumba_la_pantalla(cliente):
     assert datos["ultimo"] is None
 
 
+def test_un_caracter_de_control_en_el_detalle_no_oculta_al_vigilante(cliente):
+    """La salida de docker-update.sh trae colores ANSI: el ESC se coló en el JSON y
+    la pantalla decía que el vigilante no daba señales aunque estuviera sano."""
+    from core import paths
+
+    client, _cabeceras = cliente
+    paths.TMP_DIR.mkdir(parents=True, exist_ok=True)
+    (paths.TMP_DIR / actualizacion.NOMBRE_ESTADO).write_text(
+        '{"estado": "ok", "momento": "2026-10-08T16:00:00+02:00", "codigo": 0, "detalle": "\x1b[1;36mbien"}',
+        encoding="utf-8",
+    )
+
+    datos = client.get("/api/actualizacion").get_json()
+
+    assert datos["vigilanteVisto"] is True
+    assert datos["ultimo"]["estado"] == "ok"
+
+
 def test_el_estado_sin_sesion_es_401(crear_app, datos_aislados, temp_db):
     from routes.actualizacion import actualizacion_bp
 
