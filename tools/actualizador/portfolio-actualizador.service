@@ -8,7 +8,7 @@ Type=oneshot
 # ── Ajusta estas tres líneas a tu instalación ────────────────────────────────
 User=francisco
 WorkingDirectory=/opt/PorfolioManager
-ExecStart=/opt/PorfolioManager/tools/actualizador/portfolio-actualizador.sh
+ExecStart=/bin/sh /opt/PorfolioManager/tools/actualizador/portfolio-actualizador.sh
 # ─────────────────────────────────────────────────────────────────────────────
 
 # El script reconstruye la imagen: puede tardar varios minutos en un servidor

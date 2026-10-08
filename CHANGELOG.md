@@ -22,6 +22,27 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.0.4] — 2026-10-08
+
+**Esquema de base de datos:** no lo toca (sigue en la **17**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Corregido
+
+- El vigilante de actualizaciones dejaba de arrancar tras un `git pull`: el servicio de
+  systemd ejecutaba `portfolio-actualizador.sh` directamente y necesitaba su bit de
+  ejecución, que Git no guarda cuando el commit se hace desde Windows. Ahora el servicio
+  lo lanza con `/bin/sh` y `instalar.sh` ya no cambia permisos de ficheros del
+  repositorio, así que el servidor deja de verlos como «modificados» y el `git pull` de
+  `docker-update.sh` no vuelve a abortar.
+
+> **En el servidor, una sola vez tras actualizar:** `sudo sh tools/actualizador/instalar.sh`
+> para que el servicio instalado use el `ExecStart` nuevo. Si el `git pull` se queja del
+> permiso de `portfolio-actualizador.sh`, `git checkout -- tools/actualizador/portfolio-actualizador.sh`
+> y repite.
+
+---
+
 ## [4.0.3] — 2026-10-08
 
 **Esquema de base de datos:** no lo toca (sigue en la **17**). Para deshacer la

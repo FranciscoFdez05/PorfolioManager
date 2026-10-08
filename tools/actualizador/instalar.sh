@@ -31,12 +31,14 @@ fi
 id "$USUARIO" >/dev/null 2>&1 || { echo "No existe el usuario $USUARIO." >&2; exit 1; }
 [ -f "$PROYECTO/docker-update.sh" ] || { echo "No encuentro docker-update.sh en $PROYECTO." >&2; exit 1; }
 
-chmod +x "$AQUI/portfolio-actualizador.sh" "$PROYECTO/docker-update.sh"
+# El vigilante se lanza con `sh`, sin depender de su bit de ejecución: cambiarlo
+# dejaría el repositorio «modificado» en el servidor y bloquearía el siguiente git pull.
+[ -x "$PROYECTO/docker-update.sh" ] || chmod +x "$PROYECTO/docker-update.sh"
 
 DESTINO=/etc/systemd/system
 sed -e "s|^User=.*|User=$USUARIO|" \
     -e "s|^WorkingDirectory=.*|WorkingDirectory=$PROYECTO|" \
-    -e "s|^ExecStart=.*|ExecStart=$AQUI/portfolio-actualizador.sh|" \
+    -e "s|^ExecStart=.*|ExecStart=/bin/sh $AQUI/portfolio-actualizador.sh|" \
     -e "s|^Documentation=.*|Documentation=file://$AQUI/README.md|" \
     "$AQUI/portfolio-actualizador.service" > "$DESTINO/portfolio-actualizador.service"
 cp "$AQUI/portfolio-actualizador.timer" "$DESTINO/portfolio-actualizador.timer"

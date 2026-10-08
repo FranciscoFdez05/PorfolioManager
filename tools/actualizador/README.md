@@ -43,7 +43,6 @@ Ajustes desaparece. Si prefieres hacerlo a mano, suponiendo el proyecto en
 
 ```bash
 cd /opt/PorfolioManager
-chmod +x tools/actualizador/portfolio-actualizador.sh
 
 # Ajusta User=, WorkingDirectory= y ExecStart= a tu ruta y tu usuario
 sudo cp tools/actualizador/portfolio-actualizador.service /etc/systemd/system/
@@ -70,13 +69,13 @@ El script no depende de systemd: es una pasada que mira si hay señal y termina.
 Vale cualquier cosa que lo llame cada poco. Con cron, cada minuto:
 
 ```cron
-* * * * * /opt/PorfolioManager/tools/actualizador/portfolio-actualizador.sh
+* * * * * /bin/sh /opt/PorfolioManager/tools/actualizador/portfolio-actualizador.sh
 ```
 
 O un bucle en un `tmux`, si el servidor no tiene ni cron:
 
 ```bash
-while true; do ./tools/actualizador/portfolio-actualizador.sh; sleep 30; done
+while true; do sh ./tools/actualizador/portfolio-actualizador.sh; sleep 30; done
 ```
 
 ## Lo que sí funciona sin vigilante
