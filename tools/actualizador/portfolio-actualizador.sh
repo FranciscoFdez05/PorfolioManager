@@ -29,6 +29,21 @@ ESTADO="$DATOS/tmp/actualizacion.estado"
 REGISTRO="./logs/actualizacion.log"
 CERROJO="$DATOS/tmp/actualizacion.lock"
 
+# Constancia de vida: la pantalla de Ajustes avisa de que el vigilante «no da
+# señales» mientras no exista el fichero de estado, y sin esto no aparecería hasta
+# la primera actualización. Solo se crea si falta, para no pisar un ok/fallo real.
+if [ ! -f "$ESTADO" ]; then
+    mkdir -p "$(dirname "$ESTADO")"
+    cat > "$ESTADO" <<FIN
+{
+  "estado": "inactivo",
+  "momento": "$(date -Is)",
+  "codigo": 0,
+  "detalle": "Vigilante instalado, sin actualizaciones pedidas"
+}
+FIN
+fi
+
 [ -f "$SENAL" ] || exit 0
 
 # `mkdir` es atómico en POSIX: si otra pasada del temporizador ya está dentro,

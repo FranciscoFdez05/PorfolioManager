@@ -28,7 +28,18 @@ un reinicio.** El endpoint exige sesión, como el resto.
 
 ## Instalación
 
-Suponiendo el proyecto en `/opt/PorfolioManager` y el usuario `francisco`:
+En el servidor, con un solo comando (rellena usuario y ruta, copia el servicio y
+el temporizador y los activa):
+
+```bash
+cd /ruta/al/PorfolioManager
+git pull
+sudo sh tools/actualizador/instalar.sh          # o: sudo sh tools/actualizador/instalar.sh <usuario>
+```
+
+El usuario tiene que poder usar `docker` sin contraseña. En un minuto el aviso de
+Ajustes desaparece. Si prefieres hacerlo a mano, suponiendo el proyecto en
+`/opt/PorfolioManager` y el usuario `francisco`:
 
 ```bash
 cd /opt/PorfolioManager
@@ -80,7 +91,8 @@ este servidor.
 ## Cómo saber si está funcionando
 
 La pantalla de Ajustes lo dice: mientras el vigilante no haya escrito nunca
-`data/tmp/actualizacion.estado`, el panel avisa de que **no da señales de vida** y
+`data/tmp/actualizacion.estado` (lo crea en su primera pasada, aunque no haya
+nada que actualizar), el panel avisa de que **no da señales de vida** y
 te recuerda que la actualización sigue siendo `./docker-update.sh` por SSH. Eso
 es a propósito: un botón que deja la señal y se queda girando para siempre es
 peor que no tener botón.
