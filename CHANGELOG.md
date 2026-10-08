@@ -22,6 +22,32 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.0.2] — 2026-10-08
+
+**Esquema de base de datos:** no lo toca (sigue en la **17**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Añadido
+
+- `tools/actualizador/instalar.sh`: instala el vigilante de actualizaciones con un solo
+  comando (`sudo sh tools/actualizador/instalar.sh`). Rellena usuario y ruta en el
+  servicio de systemd, lo copia junto al temporizador y lo activa.
+
+### Corregido
+
+- El aviso «El vigilante del servidor no da señales de vida» de Ajustes no desaparecía
+  aunque el vigilante estuviera instalado y sano: el script salía sin escribir nada si
+  no había una actualización pedida, y el aviso solo se quita cuando existe
+  `data/tmp/actualizacion.estado`. Ahora la primera pasada lo crea (estado `inactivo`)
+  sin pisar uno que ya exista.
+- `portfolio-actualizador.sh` e `instalar.sh` se guardan en el repositorio como
+  ejecutables. Antes, el `chmod +x` de la instalación contaba como cambio local en el
+  servidor y `./docker-update.sh` abortaba el `git pull` al actualizar. **Si ya lo
+  instalaste, en el servidor ejecuta una vez
+  `git checkout -- tools/actualizador/portfolio-actualizador.sh` antes de actualizar.**
+
+---
+
 ## [4.0.1] — 2026-10-08
 
 **Esquema de base de datos:** no lo toca (sigue en la **17**). Para deshacer la actualización basta con
