@@ -197,7 +197,11 @@ def cmd_backup(_args):
         peso = _tamano((_BACKUP_DIR / nombre).stat().st_size)
     except OSError:
         peso = "tamaño desconocido"
-    return f"💾 Copia creada\n{nombre} · {peso}"
+    texto = f"💾 Copia creada\n{nombre} · {peso}"
+    # El zip viaja con el texto de pie; si no sale, se contesta solo con el texto.
+    if telegram_notifier.responder_archivo(_BACKUP_DIR / nombre, texto):
+        return None
+    return texto + "\n⚠️ No he podido adjuntar el fichero."
 
 
 def cmd_backups(_args):

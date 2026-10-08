@@ -21,8 +21,8 @@ que una responde: el diagnóstico dice si el proveedor sirve, no si sirve la
 primera clave de la lista.
 
 **Las comprobaciones gastan cuota real**, así que se contabilizan en `api_stats`
-como cualquier otra llamada y el resultado se cachea: pulsar "Actualizar" en
-bucle no puede acabar siendo el motivo de que se agote la cuota. Por eso la
+como cualquier otra llamada y el resultado se cachea hasta que una llamada real
+falle: ver la pantalla no puede acabar siendo el motivo de que se agote la cuota. Por eso la
 respuesta lleva la antigüedad del dato en vez de fingir que se acaba de
 comprobar.
 """
@@ -34,14 +34,11 @@ from threading import Lock
 from urllib.error import HTTPError, URLError
 
 from core import proveedores_pausados
+from providers.api_stats import last_api_failure
 from providers.http import fetch_json
 from stores import app_data
 
 log = logging.getLogger(__name__)
-
-# Segundos que vale un diagnóstico. Un proveedor caído no vuelve en medio
-# minuto, y cada comprobación cuesta cuota.
-TTL_CACHE = 60
 
 # Los proveedores gratuitos tardan lo suyo cuando van justos, pero aquí hay
 # alguien esperando delante de la pantalla: es mejor decir "no responde" a los
@@ -231,6 +228,8 @@ def _fila(id_proveedor, nombre, estado, etiqueta, detalle="", ms=0):
         "etiqueta": etiqueta,
         "detalle": str(detalle)[:200],
         "ms": ms,
+        # Instante del diagnóstico: un fallo real posterior pide repetirlo.
+        "_momento": time.monotonic(),
     }
 
 
@@ -290,7 +289,7 @@ def _con_pausa(proveedores):
     pausados = proveedores_pausados.pausados()
     filas = []
     for fila in proveedores:
-        fila = dict(fila, pausable=fila["id"] in proveedores_pausados.PAUSABLES, pausada=fila["id"] in pausados)
+        fila = dict({k: v for k, v in fila.items() if k != "_momento"}, pausable=fila["id"] in proveedores_pausados.PAUSABLES, pausada=fila["id"] in pausados)
         if fila["pausada"] and fila["estado"] != "pausada":
             fila.update(estado="pausada", etiqueta="Pausada", detalle="Pausada desde Ajustes", ms=0)
         filas.append(fila)
@@ -307,20 +306,32 @@ def comprobar():
         return list(pool.map(lambda datos: _diagnosticar_o_pausa(*datos), _PROVEEDORES))
 
 
-def obtener(forzar: bool = False) -> dict:
-    """Estado de los proveedores; de la caché mientras siga fresco."""
-    ahora = time.monotonic()
-    with _lock:
-        fresco = _cache["proveedores"] and (ahora - _cache["momento"]) < TTL_CACHE
-        if fresco and not forzar:
-            return {
-                "proveedores": _con_pausa(_cache["proveedores"]),
-                "edadSegundos": round(ahora - _cache["momento"]),
-                "cacheado": True,
-                "ttlSegundos": TTL_CACHE,
-            }
+def _fallo_posterior(fila) -> bool:
+    """¿Falló una llamada real de este proveedor después de su último diagnóstico?"""
+    return last_api_failure(fila["nombre"]) > fila.get("_momento", 0.0)
 
-    proveedores = comprobar()
+
+def obtener(forzar: bool = False) -> dict:
+    """Estado de los proveedores, sin gastar cuota salvo que haga falta.
+
+    El diagnóstico dura hasta que una llamada real de un proveedor falla (clave,
+    cuota, caída): entonces se vuelve a comprobar solo ese. Abrir la pantalla o
+    dejarla abierta no sondea nada. La primera vez tras arrancar no hay nada
+    cacheado y se comprueba todo; `forzar` lo repite todo a petición del usuario.
+    """
+    with _lock:
+        previas = list(_cache["proveedores"])
+
+    if forzar or not previas:
+        proveedores = comprobar()
+    else:
+        pendientes = {fila["id"] for fila in previas if _fallo_posterior(fila)}
+        if not pendientes:
+            return _respuesta_cacheada(previas)
+        proveedores = [
+            _diagnosticar_o_pausa(*datos) if datos[0] in pendientes else fila
+            for datos, fila in zip(_PROVEEDORES, previas)
+        ]
 
     with _lock:
         _cache["momento"] = time.monotonic()
@@ -330,7 +341,16 @@ def obtener(forzar: bool = False) -> dict:
         "proveedores": _con_pausa(proveedores),
         "edadSegundos": 0,
         "cacheado": False,
-        "ttlSegundos": TTL_CACHE,
+    }
+
+
+def _respuesta_cacheada(proveedores) -> dict:
+    with _lock:
+        edad = round(time.monotonic() - _cache["momento"])
+    return {
+        "proveedores": _con_pausa(proveedores),
+        "edadSegundos": edad,
+        "cacheado": True,
     }
 
 

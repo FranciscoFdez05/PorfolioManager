@@ -479,6 +479,10 @@ def aplicar_configuracion_sesion(app):
     # renueva como mucho una vez por minuto, que es cuando cambia algo.
     app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=sesion.COOKIE_DIAS)
     app.config["SESSION_REFRESH_EACH_REQUEST"] = False
+    # Las cookies no distinguen puertos: otra instancia en este mismo host (una de
+    # pruebas, otra copia) con su propia SECRET_KEY pisaba la cookie `session` y
+    # cada una echaba a la otra sin motivo aparente. Un nombre por puerto las separa.
+    app.config["SESSION_COOKIE_NAME"] = f"pm_session_{settings.puerto()}"
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = settings.cookieSameSite()
     # SESSION_COOKIE_SECURE se activa solo cuando hay HTTPS (evita romper HTTP local).

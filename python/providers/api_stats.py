@@ -19,6 +19,7 @@ que es lo que el usuario ha pedido de verdad.
 
 import json
 import logging
+import time
 from datetime import date
 from threading import Lock
 
@@ -94,6 +95,21 @@ def record_api_call(provider: str) -> None:
             # Sin permiso o sin espacio: se sigue contando en memoria. El aviso
             # de por qué no se puede escribir ya lo da el arranque.
             log.debug("[api_stats] No se pudo guardar el contador: %s", error)
+
+
+_fallos: dict = {}
+
+
+def record_api_failure(provider: str) -> None:
+    """Anota (en memoria) cuándo falló por última vez una llamada real."""
+    with _lock:
+        _fallos[provider] = time.monotonic()
+
+
+def last_api_failure(provider: str) -> float:
+    """Instante monotónico del último fallo real del proveedor; 0 si no hubo."""
+    with _lock:
+        return _fallos.get(provider, 0.0)
 
 
 def get_today_stats() -> dict:

@@ -27,7 +27,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from core import settings
-from providers.api_stats import record_api_call
+from providers.api_stats import record_api_call, record_api_failure
 
 log = logging.getLogger(__name__)
 
@@ -196,6 +196,11 @@ def fetch_json(url, params=None, *, timeout=None, provider=None, headers=None,
             attempt + 1, attempts - 1, provider or url, last_error, delay,
         )
         time.sleep(delay)
+
+    # Solo los fallos que indican un problema del proveedor (clave, cuota, caída)
+    # disparan un nuevo diagnóstico en Ajustes; un 404 o 400 es culpa del símbolo.
+    if provider and not (isinstance(last_error, HTTPError) and last_error.code in (400, 404, 422)):
+        record_api_failure(provider)
 
     if isinstance(last_error, (HTTPError, URLError, TimeoutError)):
         raise last_error

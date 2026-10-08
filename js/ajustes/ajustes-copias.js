@@ -258,8 +258,16 @@ function _initAjustesDatos() {
             const a = document.createElement("a")
             a.href = URL.createObjectURL(blob)
             a.download = filename
+            // Enlazado al DOM y revocado más tarde: tras un fetch largo, el
+            // navegador puede ignorar el click de un <a> suelto, o cortar la
+            // descarga si se revoca la URL en el mismo instante.
+            a.style.display = "none"
+            document.body.appendChild(a)
             a.click()
-            URL.revokeObjectURL(a.href)
+            setTimeout(() => {
+                a.remove()
+                URL.revokeObjectURL(a.href)
+            }, 10000)
             showMsg(exportMsg, "Descargado", "ok")
         } catch {
             showMsg(exportMsg, "Error al exportar", "error")

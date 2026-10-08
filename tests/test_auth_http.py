@@ -151,7 +151,7 @@ def test_la_cookie_de_sesion_es_permanente(cliente):
     de verdad lo decide el servidor (core/sesion.py), no esta fecha."""
     respuesta = cliente.post("/login", data={"username": USUARIO, "password": CLAVE})
 
-    cookie = next(c for c in respuesta.headers.getlist("Set-Cookie") if c.startswith("session="))
+    cookie = next(c for c in respuesta.headers.getlist("Set-Cookie") if c.startswith("pm_session_"))
     assert "Expires=" in cookie or "Max-Age=" in cookie
     with cliente.session_transaction() as sesion:
         assert sesion.permanent is True

@@ -22,6 +22,39 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.0.1] — 2026-10-08
+
+**Esquema de base de datos:** no lo toca (sigue en la **17**). Para deshacer la actualización basta con
+volver a la imagen anterior.
+
+### Añadido
+
+- Telegram: `/backup` ahora **envía el ZIP al chat** además de crear la copia, con el
+  nombre y el peso de pie. Responde a una orden tuya, así que no depende del aviso
+  «Copias de seguridad» ni del silencio. Si el fichero no sale o pesa más de 50 MB,
+  contesta solo con el texto y el motivo.
+
+### Cambiado
+
+- Ajustes › Proveedores: el diagnóstico ya no caduca a los 60 s. Se conserva hasta que
+  una llamada real de un proveedor falla (clave, cuota, caída; un 400/404/422 no
+  cuenta) y entonces se repite solo ese. Abrir o dejar abierta la pantalla no gasta
+  cuota; «Actualizar» sigue repitiéndolo todo. La respuesta de la API deja de llevar
+  `ttlSegundos`.
+- Ajustes › Auto-backup: la nota aclara que el ZIP de las copias automáticas solo se
+  envía si activas «Enviar el fichero de cada copia automática» en Ajustes › Telegram.
+
+### Corregido
+
+- Dos instancias en el mismo host (una de pruebas, otra copia) con distinta
+  `SECRET_KEY` se echaban la sesión mutuamente porque las cookies no distinguen
+  puertos. La cookie de sesión pasa a llamarse `pm_session_<puerto>`; **se cerrará la
+  sesión una vez** al actualizar.
+- Exportar: la descarga podía no empezar tras una exportación larga; el enlace se
+  añade al DOM y la URL se revoca pasados 10 s.
+
+---
+
 ## [4.0.0] — 2026-10-07
 
 **Esquema de base de datos:** lo sube al **17** (desde la 12; tablas nuevas

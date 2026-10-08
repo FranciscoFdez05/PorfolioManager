@@ -390,6 +390,28 @@ def notificar_archivo(categoria: str, ruta, texto: str) -> bool:
         return False
 
 
+def responder_archivo(ruta, texto: str) -> bool:
+    """Manda un fichero al chat configurado sin pasar por categorías ni silencio.
+
+    Es la respuesta a algo que el usuario pidió (`/backup`). Si pesa más de lo
+    que admite Telegram manda solo `texto` con el aviso. Nunca lanza.
+    """
+    try:
+        token, chatId = leerConfig()
+        if not token or not chatId:
+            return False
+        tamano = Path(ruta).stat().st_size
+        if tamano > MAX_BYTES_DOCUMENTO:
+            _enviar(token, chatId, f"{texto}\n⚠️ No se ha podido adjuntar: pesa {tamano / 1024 / 1024:.0f} MB y "
+                                   "Telegram admite 50 MB como máximo.")
+        else:
+            _enviar_documento(token, chatId, ruta, texto)
+        return True
+    except Exception as error:
+        log.warning("[telegram] No se pudo responder con el fichero: %s", error)
+        return False
+
+
 def responder(texto: str) -> bool:
     """Manda `texto` al chat configurado sin pasar por categorías ni silencio."""
     try:
