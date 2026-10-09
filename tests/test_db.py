@@ -321,3 +321,20 @@ def test_el_paso_base_es_idempotente(temp_db):
     columnas = {fila[1] for fila in conexion.execute("PRAGMA table_info(activos)")}
     assert "color" in columnas and "tv_symbol" in columnas
     assert "precio_currency" not in columnas
+
+
+def test_una_bd_ya_en_la_18_recibe_las_columnas_de_cuenta_que_le_faltan(temp_db):
+    """Una base que arrancó con el paso 18 original no tenía `ingresos_recurrentes.cuenta`
+    ni `mensualidades.cuentas_cobro`: ampliar un paso ya aplicado no las habría creado."""
+    from core import db
+
+    conexion = db.get_db()
+    conexion.execute("ALTER TABLE ingresos_recurrentes DROP COLUMN cuenta")
+    conexion.execute("ALTER TABLE mensualidades DROP COLUMN cuentas_cobro")
+    conexion.execute("PRAGMA user_version = 18")
+
+    db._migrate(conexion)
+
+    assert conexion.execute("PRAGMA user_version").fetchone()[0] == db.ESQUEMA_VERSION
+    for tabla, columna in (("ingresos_recurrentes", "cuenta"), ("mensualidades", "cuentas_cobro")):
+        assert columna in {f[1] for f in conexion.execute(f"PRAGMA table_info({tabla})")}

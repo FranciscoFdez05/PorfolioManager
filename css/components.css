@@ -301,7 +301,7 @@
        scroll dentro de la propia ficha (overflow-y). Arrastrando el tirador
        (detailResizeHandle) se pisa este valor hasta DETAIL_MAX en
        initResizeHandles (app-core.js). */
-    flex: 0 0 340px;
+    flex: 0 0 355px;
     overflow-y: auto;
     min-height: 0;
 }
@@ -399,6 +399,17 @@ body.asset-rotation-halted .detailRotationBar span {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.detailPriceRow .detailChange {
+    align-self: center;
+}
+
+.detailPriceRow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
 }
 
 .detailPrice {
@@ -1510,7 +1521,62 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     flex-wrap: wrap;
     align-items: center;
     padding: 2px 0 6px 0;
-    flex: 1 1 auto;
+    flex: 0 1 auto;
+}
+
+/* Separador y tarjetas (mejor, peor, realizado). Miden 58px pero el margen
+   negativo las deja en 40px de layout, así la barra y la tabla no se mueven. */
+.overviewDivider {
+    width: 1px;
+    height: 36px;
+    background: var(--border-soft);
+    flex: none;
+}
+
+.overviewExtremes {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: -9px 0;
+}
+
+.overviewExtremeCard {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    height: 58px;
+    min-width: 220px;
+    padding: 0 20px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg-header);
+    white-space: nowrap;
+}
+
+.overviewExtremeLabel {
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.overviewExtremeValue {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.overviewExtremeRow {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.overviewExtremePct {
+    font-size: 0.74rem;
+    font-weight: 600;
 }
 
 .overviewFiltersBar {
@@ -3168,6 +3234,14 @@ html[data-theme="black"] .segHideBtn:hover {
     text-align: right;
 }
 
+.mensMonthAccountSelect {
+    width: 100%;
+    height: 28px;
+    margin: 4px 0 0;
+    padding: 0 6px;
+    font-size: 11.5px;
+}
+
 .mensMonthDayInput::placeholder {
     color: var(--text-dim);
 }
@@ -4076,4 +4150,33 @@ body.todosGridDebug .assetTodosTable thead th,
 body.todosGridDebug .assetTodosTable tbody td {
     outline: 1px solid #fff;
     outline-offset: -1px;
+}
+
+/* ── Huecos iguales entre columnas (js/core/tablas.js) ──
+   Mientras mide, la tabla se deja a su ancho natural y sin relleno lateral ni
+   anchos impuestos, para que cada columna mida lo que ocupa su celda más ancha.
+   Luego los anchos van en el <colgroup> y el reparto del hueco en el relleno de
+   cada celda (estilos en línea), así que solo hace falta forzar el modo fijo. */
+table.tablaMidiendo {
+    table-layout: auto !important;
+    width: max-content !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
+table.tablaMidiendo > colgroup > col {
+    width: auto !important;
+}
+
+table.tablaMidiendo > * > tr > th,
+table.tablaMidiendo > * > tr > td {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+}
+
+table.tablaHuecosIguales {
+    table-layout: fixed !important;
 }

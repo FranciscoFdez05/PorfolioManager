@@ -22,6 +22,37 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.1.0] — 2026-10-09
+
+**Esquema de base de datos:** sube a la **19**, desde la 17 (columna `cuenta` en
+`mensualidades` e `ingresos_recurrentes`, y `cuentas_cobro` en `mensualidades`, todas vacías
+por defecto). Al migrar se guarda
+`data/backups/auto/<portfolio>_pre-esquema-17-a-19_*.db`; para deshacer, levantar la
+imagen anterior y restaurar ese fichero.
+
+### Añadido
+
+- Cada mensualidad puede cobrarse de una cuenta concreta («Se cobra de» en el
+  formulario). Su importe resta del saldo de esa cuenta en vez de la bancaria, y la
+  tabla de mensualidades indica la cuenta cuando no es la bancaria. Las mensualidades
+  existentes siguen saliendo de la cuenta bancaria.
+- Una mensualidad puede cobrarse un mes concreto con otra cuenta (un selector bajo cada
+  mes, como el día de cobro), y la tabla de mensualidades tiene una columna «Cuenta» con
+  los anchos repartidos de forma más pareja.
+- En la pestaña Mensualidades ya no sale la barra de meses, solo la de años.
+- Los gastos de cada mes enseñan los cargos de las mensualidades en su día y con su cuenta,
+  como filas informativas: no se guardan como gasto y no suman al total del mes.
+- Igual con los ingresos recurrentes («Se cobra en»): suman al saldo de la cuenta
+  elegida y, por defecto, a la bancaria.
+
+### Cambiado
+
+- En todas las tablas el espacio entre columna y columna es el mismo: cada columna mide
+  lo que ocupa su contenido más ancho y lo que sobra se reparte a partes iguales entre
+  ellas, con independencia de que el texto vaya a la izquierda o a la derecha. Si el
+  contenido no cabe, la tabla se queda como estaba (los calendarios mantienen sus
+  columnas iguales).
+
 ## [4.0.4] — 2026-10-08
 
 **Esquema de base de datos:** no lo toca (sigue en la **17**). Para deshacer la

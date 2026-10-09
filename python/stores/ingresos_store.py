@@ -117,6 +117,7 @@ def sanitize_recurrentes_rows(rows):
             "mesInicio": normalize_mes(row.get("mesInicio")),
             "activa": bool(row.get("activa", True)),
             "nota": str(row.get("nota", ""))[:_MAX_NOTA].strip(),
+            "cuenta": str(row.get("cuenta", ""))[:_MAX_SHORT * 2].strip(),
             "meses": {
                 month: str(_dict(row.get("meses")).get(month, ""))[:_MAX_SHORT].strip()
                 for month in MONTH_KEYS
@@ -224,12 +225,13 @@ def read_ingresos_year(year):
             "mesInicio": normalize_mes(r["mes_inicio"]),
             "activa": bool(r["activa"]),
             "nota": r["nota"],
+            "cuenta": r["cuenta"],
             "meses": {month: r[month] for month in MONTH_KEYS},
         }
         for r in conn.execute(
             "SELECT nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
             "septiembre, octubre, noviembre, diciembre, "
-            "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota "
+            "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta "
             "FROM ingresos_recurrentes WHERE year = ? ORDER BY id",
             (normalized,)
         ).fetchall()
@@ -276,12 +278,13 @@ def write_ingresos_year(year, data, revision_esperada=None):
     conn.execute("DELETE FROM ingresos_rows WHERE year = ?", (normalized,))
     conn.execute("DELETE FROM ingresos_recurrentes WHERE year = ?", (normalized,))
 
+    validas = cuentas_validas_para_filas(conn)
     conn.executemany(
         "INSERT INTO ingresos_recurrentes "
         "(year, nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
         "septiembre, octubre, noviembre, diciembre, "
-        "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (normalized, m.get("nombre", ""),
              m.get("meses", {}).get("enero", ""), m.get("meses", {}).get("febrero", ""),
@@ -295,12 +298,12 @@ def write_ingresos_year(year, data, revision_esperada=None):
              normalize_dia_cobro(m.get("diaCobro")),
              normalize_mes(m.get("mesInicio")),
              1 if m.get("activa", True) else 0,
-             m.get("nota", ""))
+             m.get("nota", ""),
+             normalizar_cuenta_de_fila(m.get("cuenta"), validas))
             for m in data.get("recurrentes", [])
         ]
     )
 
-    validas = cuentas_validas_para_filas(conn)
     rows_to_insert = []
     for month in MONTH_KEYS:
         for row in data.get("months", {}).get(month, {}).get("rows", []):

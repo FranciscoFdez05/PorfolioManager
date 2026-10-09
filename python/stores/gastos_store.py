@@ -3,7 +3,7 @@ import json
 from core.db import get_db, transactional
 from core.validation import normalize_year
 from stores import revisiones
-from stores.cuentas_store import cuentas_validas_para_filas, normalizar_cuenta_de_fila
+from stores.cuentas_store import ID_BANCO, cuentas_validas_para_filas, normalizar_cuenta_de_fila
 
 _MAX_LABEL = 80
 _MAX_NAME = 120
@@ -69,6 +69,44 @@ def normalize_dias_cobro(value):
         if day:
             dias[month] = day
     return dias
+
+
+def normalize_cuentas_cobro(value):
+    """Cuenta con la que se cobra cada mes cuando no es la habitual de la mensualidad.
+
+    Como `normalize_dias_cobro`: entra un dict `{"marzo": "tarjeta"}` (o su JSON) y
+    salen solo los meses reconocibles con un identificador de cuenta. Un mes mal
+    escrito se descarta en vez de rechazar el guardado entero.
+    """
+    if isinstance(value, str):
+        try:
+            value = json.loads(value) if value.strip() else {}
+        except ValueError:
+            return {}
+
+    if not isinstance(value, dict):
+        return {}
+
+    cuentas = {}
+    for month in MONTH_KEYS:
+        cuenta = str(value.get(month) or "")[:_MAX_SHORT * 2].strip()
+        if cuenta:
+            cuentas[month] = cuenta
+    return cuentas
+
+
+def serialize_cuentas_cobro(value, validas=None):
+    """Las excepciones de cuenta, listas para la columna. Vacío se guarda como ''.
+
+    Con `validas`, se descartan las que apuntan a una cuenta que no existe: ese
+    mes vuelve a la cuenta habitual. Aquí la bancaria se guarda con su
+    identificador, porque el vacío significa «la cuenta habitual de la
+    mensualidad», que puede ser otra.
+    """
+    cuentas = normalize_cuentas_cobro(value)
+    if validas is not None:
+        cuentas = {mes: c for mes, c in cuentas.items() if c in validas}
+    return json.dumps(cuentas, ensure_ascii=False, sort_keys=True) if cuentas else ""
 
 
 def serialize_dias_cobro(value):
@@ -146,9 +184,11 @@ def sanitize_mensualidades_rows(rows):
             "frecuencia": normalize_frecuencia(row.get("frecuencia")),
             "diaCobro": normalize_dia_cobro(row.get("diaCobro")),
             "diasCobro": normalize_dias_cobro(row.get("diasCobro")),
+            "cuentasCobro": normalize_cuentas_cobro(row.get("cuentasCobro")),
             "mesInicio": normalize_mes(row.get("mesInicio")),
             "activa": bool(row.get("activa", True)),
             "nota": str(row.get("nota", ""))[:_MAX_NOTA].strip(),
+            "cuenta": str(row.get("cuenta", ""))[:_MAX_SHORT * 2].strip(),
             "meses": {
                 month: str(_dict(row.get("meses")).get(month, ""))[:_MAX_SHORT].strip()
                 for month in MONTH_KEYS
@@ -249,15 +289,17 @@ def read_gastos_year(year):
             "frecuencia": normalize_frecuencia(r["frecuencia"]),
             "diaCobro": normalize_dia_cobro(r["dia_cobro"]),
             "diasCobro": normalize_dias_cobro(r["dias_cobro"]),
+            "cuentasCobro": normalize_cuentas_cobro(r["cuentas_cobro"]),
             "mesInicio": normalize_mes(r["mes_inicio"]),
             "activa": bool(r["activa"]),
             "nota": r["nota"],
+            "cuenta": r["cuenta"],
             "meses": {month: r[month] for month in MONTH_KEYS},
         }
         for r in conn.execute(
             "SELECT nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
             "septiembre, octubre, noviembre, diciembre, "
-            "categoria, importe, frecuencia, dia_cobro, dias_cobro, mes_inicio, activa, nota "
+            "categoria, importe, frecuencia, dia_cobro, dias_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro "
             "FROM mensualidades WHERE year = ? ORDER BY id",
             (normalized,)
         ).fetchall()
@@ -305,12 +347,13 @@ def write_gastos_year(year, data, revision_esperada=None):
     conn.execute("DELETE FROM gastos_rows WHERE year = ?", (normalized,))
     conn.execute("DELETE FROM mensualidades WHERE year = ?", (normalized,))
 
+    validas = cuentas_validas_para_filas(conn)
     conn.executemany(
         "INSERT INTO mensualidades "
         "(year, nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
         "septiembre, octubre, noviembre, diciembre, "
-        "categoria, importe, frecuencia, dia_cobro, dias_cobro, mes_inicio, activa, nota) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "categoria, importe, frecuencia, dia_cobro, dias_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (normalized, m.get("nombre", ""),
              m.get("meses", {}).get("enero", ""), m.get("meses", {}).get("febrero", ""),
@@ -325,12 +368,13 @@ def write_gastos_year(year, data, revision_esperada=None):
              serialize_dias_cobro(m.get("diasCobro")),
              normalize_mes(m.get("mesInicio")),
              1 if m.get("activa", True) else 0,
-             m.get("nota", ""))
+             m.get("nota", ""),
+             normalizar_cuenta_de_fila(m.get("cuenta"), validas),
+             serialize_cuentas_cobro(m.get("cuentasCobro"), validas | {ID_BANCO}))
             for m in data.get("mensualidades", [])
         ]
     )
 
-    validas = cuentas_validas_para_filas(conn)
     rows_to_insert = []
     for month in MONTH_KEYS:
         for row in data.get("months", {}).get(month, {}).get("rows", []):

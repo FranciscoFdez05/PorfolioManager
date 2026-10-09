@@ -327,8 +327,8 @@ describe("pintado de la tabla", () => {
         renderMensualidadesTable()
 
         const filas = document.querySelectorAll("#mensTableBody tr")
-        expect(celdas(filas[0])[5]).toBe("22,00 €")
-        expect(celdas(filas[1])[5]).toBe("—")
+        expect(celdas(filas[0])[6]).toBe("22,00 €")
+        expect(celdas(filas[1])[6]).toBe("—")
         expect(filas[1].classList.contains("mensRowPaused")).toBe(true)
     })
 
@@ -344,9 +344,56 @@ describe("pintado de la tabla", () => {
         currentGastosData.mensualidades = [mensualidad({ nombre: "Proton", diasCobro: { marzo: "5", julio: "9" } })]
         renderMensualidadesTable()
 
-        const renovacion = document.querySelector("#mensTableBody tr td:nth-child(4)")
+        const renovacion = document.querySelector("#mensTableBody tr td:nth-child(5)")
         expect(renovacion.textContent).toContain("Día 2")
         expect(renovacion.textContent).toContain("2 meses aparte")
         expect(renovacion.querySelector("span").title).toBe("Marzo: día 5 · Julio: día 9")
+    })
+
+    it("enseña la cuenta base y avisa de los meses que se cobran con otra", () => {
+        window._cuentasDinero = [
+            { id: "banco", nombre: "Cuenta bancaria" },
+            { id: "santander", nombre: "Santander" },
+            { id: "tarjeta", nombre: "Tarjeta" }
+        ]
+        currentGastosData.mensualidades = [
+            mensualidad({ nombre: "Claude", cuenta: "santander", cuentasCobro: { marzo: "tarjeta" } })
+        ]
+        renderMensualidadesTable()
+
+        const cuenta = document.querySelector("#mensTableBody tr td:nth-child(2)")
+        expect(cuenta.textContent).toContain("Santander")
+        expect(cuenta.textContent).toContain("1 mes aparte")
+        expect(cuenta.title).toBe("Marzo: Tarjeta")
+    })
+})
+
+describe("mensualidades dentro del mes de gastos", () => {
+    it("saca el cargo del mes con su día y la cuenta de ese mes, sin tocar el resto", () => {
+        window._cuentasDinero = [
+            { id: "banco", nombre: "Cuenta bancaria" },
+            { id: "tarjeta", nombre: "Tarjeta" }
+        ]
+        currentGastosData.mensualidades = [
+            mensualidad({ nombre: "Claude", diaCobro: "9", cuenta: "tarjeta", cuentasCobro: { marzo: "banco" } }),
+            mensualidad({ nombre: "Sin día", diaCobro: "" })
+        ]
+
+        const marzo = getMensualidadesDelMes("marzo")
+        const claude = marzo.find((l) => l.cargo.nombre === "Claude").cargo
+        expect(claude.fecha).toBe("09-03-2026")
+        expect(claude.cuenta).toBe("banco")
+        expect(getMensualidadesDelMes("abril").find((l) => l.cargo.nombre === "Claude").cargo.cuenta).toBe("tarjeta")
+
+        // Sin día definido no se inventa una fecha: va al final y sin fecha.
+        const sinDia = marzo.find((l) => l.cargo.nombre === "Sin día")
+        expect(sinDia.cargo.fecha).toBe("")
+        expect(sinDia.dia).toBe(Infinity)
+    })
+
+    it("la fila de mensualidad no es un gasto del mes: se marca para que el guardado la ignore", () => {
+        const tr = buildMensualidadCargoRow({ fecha: "02-03-2026", nombre: "Claude", tipo: "Mensualidad", importe: "22,00 €", cuenta: "" })
+        expect(tr.dataset.mensualidad).toBe("true")
+        expect(tr.classList.contains("movDetailRow")).toBe(false)
     })
 })

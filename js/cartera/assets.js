@@ -865,9 +865,7 @@ async function updateAssetDetail(asset) {
     }
 
     if (detFees) {
-        detFees.textContent = isCryptoAssetType(asset.type)
-            ? formatAssetCommissionValue(summary.comisionesCripto)
-            : formatMoney(summary.comisiones, summary.currency)
+        detFees.textContent = formatMoney(summary.comisiones, summary.currency)
     }
 
     if (detStatus) {

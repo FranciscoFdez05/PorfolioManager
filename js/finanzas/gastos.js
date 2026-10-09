@@ -68,8 +68,40 @@ function normalizeMensualidad(row = {}) {
         mesInicio: GASTOS_MONTHS.some((month) => month.key === row.mesInicio) ? row.mesInicio : "enero",
         activa: row.activa === undefined ? true : Boolean(row.activa),
         nota: String(row.nota || ""),
+        // Vacía = cuenta bancaria, como en los gastos.
+        cuenta: String(row.cuenta || ""),
+        // Meses que se cobran con otra cuenta que la habitual: {marzo: "tarjeta"}.
+        cuentasCobro: normalizeMensualidadCuentas(row.cuentasCobro),
         meses
     }
+}
+
+function normalizeMensualidadCuentas(value) {
+    const result = {}
+    if (!value || typeof value !== "object") {
+        return result
+    }
+    GASTOS_MONTHS.forEach((month) => {
+        const cuenta = String(value[month.key] || "").trim()
+        if (cuenta) {
+            result[month.key] = cuenta
+        }
+    })
+    return result
+}
+
+// Selector de cuenta de un mes. El vacío es «la cuenta base»; la bancaria se
+// elige con su identificador, porque la base puede ser otra.
+function buildMensualidadMesCuentaSelect(month, actual, baseId) {
+    const baseName = nombreDeCuenta(baseId)
+    const opciones = window._cuentasDinero
+        .map(
+            (cuenta) =>
+                `<option value="${escapeGastosHtml(cuenta.id)}"${cuenta.id === actual ? " selected" : ""}>${escapeGastosHtml(cuenta.nombre)}</option>`
+        )
+        .join("")
+    return `<select class="assetModalSelect mensMonthAccountSelect" data-mens-account="${month.key}" aria-label="Cuenta de cobro de ${month.label}">
+        <option value="" data-mens-base-option${actual ? "" : " selected"}>Base · ${escapeGastosHtml(baseName)}</option>${opciones}</select>`
 }
 
 function normalizeMensualidadDia(value) {
@@ -569,6 +601,7 @@ function buildMensualidadFormHtml(row) {
             <input class="assetModalInput mensMonthDayInput" data-mens-day="${month.key}" type="text"
                    inputmode="numeric" maxlength="2" aria-label="Día de cobro de ${month.label}"
                    value="${escapeGastosHtml(row.diasCobro?.[month.key] || "")}" placeholder="${escapeGastosHtml(diaPlaceholder)}">
+            ${buildMensualidadMesCuentaSelect(month, row.cuentasCobro?.[month.key] || "", row.cuenta || "")}
         </div>
     `
     ).join("")
@@ -604,9 +637,13 @@ function buildMensualidadFormHtml(row) {
                 </select>
             </div>
             <div class="gastosCreateModalField mensFormFieldWide">
+                <label class="assetModalLabel" for="gastosMensualidadCuenta">Se cobra de</label>
+                ${construirSelectorCuenta("gastosMensualidadCuenta", row.cuenta || "")}
+            </div>
+            <div class="gastosCreateModalField mensFormFieldWide">
                 <label class="assetModalLabel" for="gastosMensualidadNota">Nota</label>
                 <input id="gastosMensualidadNota" class="assetModalInput" type="text"
-                       value="${escapeGastosHtml(row.nota || "")}" placeholder="Opcional: plan, cuenta, forma de pago…">
+                       value="${escapeGastosHtml(row.nota || "")}" placeholder="Opcional: plan, forma de pago…">
             </div>
         </div>
 
@@ -617,7 +654,7 @@ function buildMensualidadFormHtml(row) {
                 <span class="mensFormMonthsTitle">Importes por mes</span>
                 <button type="button" class="mensGhostBtn" id="gastosMensualidadRecalcBtn">Recalcular desde el importe</button>
             </div>
-            <p class="mensFormMonthsHint">Se rellenan solos con el importe y la frecuencia. Edita un mes para ajustarlo a mano. El recuadro pequeño es el día de cobro de ese mes: déjalo vacío y se usa el día de renovación.</p>
+            <p class="mensFormMonthsHint">Se rellenan solos con el importe y la frecuencia. Edita un mes para ajustarlo a mano. El primer recuadro pequeño es el día de cobro de ese mes (vacío = el día de renovación) y el segundo, la cuenta con la que se cobra (por defecto, la cuenta base).</p>
             <div class="mensMonthsGrid mensMonthsGridDays">${monthsHtml}</div>
         </div>
     `
@@ -737,6 +774,13 @@ function bindMensualidadFormModal(modal, { autoFill, startIndex }) {
         updateDayPlaceholders()
         updatePreview()
     })
+    // La etiqueta «Base · X» de cada mes sigue a la cuenta base del formulario.
+    modal.querySelector("#gastosMensualidadCuenta")?.addEventListener("change", (event) => {
+        const nombre = escapeGastosHtml(nombreDeCuenta(event.target.value))
+        modal.querySelectorAll("[data-mens-base-option]").forEach((option) => {
+            option.innerHTML = `Base · ${nombre}`
+        })
+    })
     estadoSelect.addEventListener("change", applyEstado)
     modal.querySelector("#gastosMensualidadRecalcBtn")?.addEventListener("click", () => refillMonths({ force: true }))
 
@@ -818,6 +862,22 @@ function openMensualidadFormModal(rowIndex = -1) {
                     )
                 ).filter(([, dia]) => dia !== diaCobro)
             )
+            // Como los días: solo los meses que se salen de la cuenta base. La
+            // bancaria es el vacío en la base y «banco» en un mes.
+            const cuentaBase = String(getValue("gastosMensualidadCuenta") || "").trim()
+            const cuentasCobro = normalizeMensualidadCuentas(
+                Object.fromEntries(
+                    [...modal.querySelectorAll("[data-mens-account]")].map((select) => [
+                        select.dataset.mensAccount,
+                        select.value
+                    ])
+                )
+            )
+            Object.keys(cuentasCobro).forEach((month) => {
+                if (cuentasCobro[month] === (cuentaBase || "banco")) {
+                    delete cuentasCobro[month]
+                }
+            })
             const nextRow = {
                 nombre,
                 importe: importeRaw ? formatCellEuroValue(importeRaw) : "",
@@ -826,6 +886,9 @@ function openMensualidadFormModal(rowIndex = -1) {
                 diasCobro,
                 activa: getValue("gastosMensualidadEstado") !== "pausada",
                 nota: String(getValue("gastosMensualidadNota")).trim(),
+                // La cuenta bancaria es el vacío; las demás, su identificador.
+                cuenta: cuentaBase,
+                cuentasCobro,
                 meses
             }
 
@@ -1803,7 +1866,11 @@ function renderCurrentGastosView() {
         return
     }
 
+    const monthBar = document.getElementById("gastosMonthBar")
+
     const showView = (view) => {
+        // En Mensualidades solo queda el selector de año: los meses no pintan nada ahí.
+        monthBar?.classList.toggle("hidden", view === "mensualidades")
         annualWrapper.classList.toggle("hidden", view !== "year")
         movementsWrapper.classList.toggle("hidden", view !== "month")
         mensualidadesWrapper?.classList.toggle("hidden", view !== "mensualidades")
@@ -1949,7 +2016,7 @@ function renderMensualidadesTable() {
         const message = totalRows
             ? "Ninguna mensualidad coincide con el filtro."
             : "Aún no hay mensualidades. Añade la primera para llevar el control de tus suscripciones."
-        body.innerHTML = `<tr class="mensEmptyRow"><td colspan="9">${message}</td></tr>`
+        body.innerHTML = `<tr class="mensEmptyRow"><td colspan="10">${message}</td></tr>`
         foot.innerHTML = ""
         return
     }
@@ -1978,12 +2045,19 @@ function renderMensualidadesTable() {
                 .map((month) => `${month.label}: día ${row.diasCobro[month.key]}`)
                 .join(" · ")
 
+            const mesesConOtraCuenta = GASTOS_MONTHS.filter((month) => row.cuentasCobro?.[month.key])
+            const cuentasAparte = mesesConOtraCuenta.length
+            const cuentasTitle = mesesConOtraCuenta
+                .map((month) => `${month.label}: ${nombreDeCuenta(row.cuentasCobro[month.key])}`)
+                .join(" · ")
+
             return `
             <tr class="${row.activa ? "" : "mensRowPaused"}">
                 <td class="mensColName">
                     <span class="mensNameMain">${escapeGastosHtml(row.nombre)}</span>
                     ${row.nota ? `<span class="mensNameNote" title="${escapeGastosHtml(row.nota)}">${escapeGastosHtml(row.nota)}</span>` : ""}
                 </td>
+                <td title="${escapeGastosHtml(cuentasTitle)}">${escapeGastosHtml(nombreDeCuenta(row.cuenta))}${cuentasAparte ? `<span class="mensNextHint">${cuentasAparte} mes${cuentasAparte === 1 ? "" : "es"} aparte</span>` : ""}</td>
                 <td>${cargo ? formatEuro(cargo) : "—"}</td>
                 <td><span class="mensBadge mensBadge-${frecuencia.key}">${frecuencia.short}</span></td>
                 <td>${renovacionText}${excepciones ? `<span class="mensNextHint" title="${escapeGastosHtml(excepcionesTitle)}">${excepciones}</span>` : ""}</td>
@@ -2017,7 +2091,7 @@ function renderMensualidadesTable() {
     const pausadas = items.filter(({ row }) => !row.activa).length
     foot.innerHTML = `
         <tr class="mensFootRow">
-            <td colspan="5">Total (${items.length} ${items.length === 1 ? "mensualidad" : "mensualidades"})${pausadas ? `<span class="mensFootHint">${pausadas} pausada${pausadas === 1 ? "" : "s"}, fuera del coste mensual</span>` : ""}</td>
+            <td colspan="6">Total (${items.length} ${items.length === 1 ? "mensualidad" : "mensualidades"})${pausadas ? `<span class="mensFootHint">${pausadas} pausada${pausadas === 1 ? "" : "s"}, fuera del coste mensual</span>` : ""}</td>
             <td class="numCell">${formatEuro(visibleMensual)}</td>
             <td class="numCell">${formatEuro(visibleAnual)}</td>
             <td colspan="2"></td>
@@ -2420,8 +2494,16 @@ function renderGastosMonthTable() {
         (a, b) => gastoParseDate(a.fecha) - gastoParseDate(b.fecha)
     )
 
-    rows.forEach((row, index) => {
-        body.appendChild(buildGastoMovementRow(row, index))
+    // Los cargos de las mensualidades se intercalan por fecha, solo para verlos:
+    // no son filas del mes (no se guardan) y no entran en el total ni en los
+    // resúmenes de al lado, porque esos importes ya cuentan como mensualidades.
+    const lineas = [
+        ...rows.map((row, index) => ({ dia: gastoParseDate(row.fecha), row, index })),
+        ...getMensualidadesDelMes(currentGastosMonth)
+    ].sort((a, b) => a.dia - b.dia)
+
+    lineas.forEach((linea) => {
+        body.appendChild(linea.cargo ? buildMensualidadCargoRow(linea.cargo) : buildGastoMovementRow(linea.row, linea.index))
     })
 
     const total = rows.reduce((sum, row) => sum + parseEuroNumber(row.cantidad || ""), 0)
@@ -2432,6 +2514,46 @@ function renderGastosMonthTable() {
     body.appendChild(totalTr)
 
     renderGastosMonthSide(rows)
+}
+
+// Cargos de las mensualidades que caen en un mes, con su día y su cuenta.
+// Sin día definido el cargo va al final y sin fecha, en vez de inventar una.
+function getMensualidadesDelMes(monthKey) {
+    return (currentGastosData?.mensualidades || [])
+        .map(normalizeMensualidad)
+        .flatMap((row) =>
+            getMensualidadCargos(row)
+                .filter((cargo) => cargo.key === monthKey)
+                .map((cargo) => ({
+                    dia: cargo.sinDia ? Infinity : cargo.date.getTime(),
+                    cargo: {
+                        fecha: cargo.sinDia ? "" : formatGastoCargoDate(cargo.date),
+                        nombre: row.nombre,
+                        tipo: row.categoria || "Mensualidad",
+                        importe: row.meses[monthKey],
+                        cuenta: row.cuentasCobro[monthKey] || row.cuenta,
+                        activa: row.activa,
+                        realizada: !cargo.sinDia && cargo.date.getTime() <= Date.now()
+                    }
+                }))
+        )
+}
+
+function buildMensualidadCargoRow(cargo) {
+    const tr = document.createElement("tr")
+    tr.className = cargo.realizada ? "gastosMensualidadRow isRealizada" : "gastosMensualidadRow"
+    // Que ni el guardado ni la ordenación la tomen por un gasto del mes.
+    tr.dataset.mensualidad = "true"
+    tr.title = "Mensualidad: se gestiona en la pestaña Mensualidades y no suma al total del mes"
+    tr.innerHTML = `
+        <td data-field="fecha">${escapeGastosHtml(cargo.fecha)}</td>
+        <td data-field="cuenta">${escapeGastosHtml(nombreDeCuenta(cargo.cuenta))}</td>
+        <td data-field="nombre">${escapeGastosHtml(cargo.nombre)}<span class="gastosMensualidadTag">Mensualidad</span></td>
+        <td data-field="tipo">${escapeGastosHtml(cargo.tipo)}</td>
+        <td data-field="cantidad">${formatCellEuroValue(cargo.importe)}</td>
+        <td class="rowActionsCell"></td>
+    `
+    return tr
 }
 
 // Al lado de la tabla del mes: en qué se ha gastado y con qué cuenta se ha pagado.
@@ -2583,7 +2705,7 @@ function syncGastosDataFromTables() {
             currentGastosData.months[currentGastosMonth] = { rows: [] }
         }
         currentGastosData.months[currentGastosMonth].rows = bodyRows
-            .filter((tr) => !tr.dataset.isTotal)
+            .filter((tr) => !tr.dataset.isTotal && !tr.dataset.mensualidad)
             .map((rowElement) => {
                 return {
                     fecha:

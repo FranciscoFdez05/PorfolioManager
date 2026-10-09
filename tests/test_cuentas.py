@@ -300,6 +300,86 @@ def test_el_saldo_cuenta_las_mensualidades_y_recurrentes_hasta_el_mes_actual(tem
     assert float(banco["saldo"]) == 940
 
 
+def test_una_mensualidad_con_cuenta_resta_de_esa_cuenta_y_no_de_la_bancaria(temp_db):
+    from core.db import get_db
+    from stores.cuentas_store import saldos
+
+    conn = get_db()
+    conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('tarjeta', 'Tarjeta', 'banco', 5)")
+    conn.execute("INSERT INTO mensualidades (year, nombre, enero, febrero, cuenta) VALUES ('2026', 'Gym', '30,00', '30,00', 'tarjeta')")
+    # Una cuenta que ya no existe vuelve a la bancaria en vez de perder el cargo.
+    conn.execute("INSERT INTO mensualidades (year, nombre, enero, cuenta) VALUES ('2026', 'Cine', '10,00', 'borrada')")
+    conn.commit()
+
+    resultado = saldos(conn, hoy=HOY)
+
+    assert float(resultado["tarjeta"]["salidas"]) == 60
+    assert float(resultado["banco"]["salidas"]) == 10
+
+
+def test_un_mes_de_la_mensualidad_puede_cobrarse_con_otra_cuenta(temp_db):
+    from core.db import get_db
+    from stores.cuentas_store import saldos
+    from stores.gastos_store import read_gastos_year, sanitize_gastos_payload, write_gastos_year
+
+    conn = get_db()
+    conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('tarjeta', 'Tarjeta', 'banco', 5)")
+    conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('santander', 'Santander', 'banco', 6)")
+    conn.commit()
+    payload, _ = sanitize_gastos_payload({"year": "2026", "mensualidades": [{
+        "nombre": "Claude", "cuenta": "santander",
+        "meses": {"enero": "20,00", "febrero": "20,00", "marzo": "20,00"},
+        # Febrero con la tarjeta, marzo con la bancaria (explícita) y abril con una cuenta que no existe.
+        "cuentasCobro": {"febrero": "tarjeta", "marzo": "banco", "abril": "borrada"},
+    }]})
+    write_gastos_year("2026", payload)
+
+    assert read_gastos_year("2026")["mensualidades"][0]["cuentasCobro"] == {"febrero": "tarjeta", "marzo": "banco"}
+    resultado = saldos(conn, hoy=HOY)
+    assert float(resultado["santander"]["salidas"]) == 20
+    assert float(resultado["tarjeta"]["salidas"]) == 20
+    assert float(resultado["banco"]["salidas"]) == 20
+
+
+def test_un_ingreso_recurrente_con_cuenta_suma_a_esa_cuenta_y_se_guarda(temp_db):
+    from core.db import get_db
+    from stores.cuentas_store import saldos
+    from stores.ingresos_store import read_ingresos_year, sanitize_ingresos_payload, write_ingresos_year
+
+    conn = get_db()
+    conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('tarjeta', 'Tarjeta', 'banco', 5)")
+    conn.commit()
+    payload, _ = sanitize_ingresos_payload({"year": "2026", "recurrentes": [
+        {"nombre": "Paga", "cuenta": "tarjeta", "meses": {"enero": "200,00", "febrero": "200,00"}},
+        {"nombre": "Otra", "cuenta": "no-existe", "meses": {"enero": "50,00"}},
+    ]})
+    write_ingresos_year("2026", payload)
+
+    assert {r["nombre"]: r["cuenta"] for r in read_ingresos_year("2026")["recurrentes"]} == {"Paga": "tarjeta", "Otra": ""}
+    resultado = saldos(conn, hoy=HOY)
+    assert float(resultado["tarjeta"]["entradas"]) == 400
+    assert float(resultado["banco"]["entradas"]) == 50
+
+
+def test_la_cuenta_de_la_mensualidad_se_guarda_y_una_desconocida_vuelve_a_la_bancaria(temp_db):
+    from core.db import get_db
+    from stores.gastos_store import read_gastos_year, sanitize_gastos_payload, write_gastos_year
+
+    conn = get_db()
+    conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('tarjeta', 'Tarjeta', 'banco', 5)")
+    conn.commit()
+    payload, _ = sanitize_gastos_payload({"year": "2026", "mensualidades": [
+        {"nombre": "Gym", "cuenta": "tarjeta"},
+        {"nombre": "Cine", "cuenta": "no-existe"},
+        {"nombre": "Luz"},
+    ]})
+    write_gastos_year("2026", payload)
+
+    cuentas = {m["nombre"]: m["cuenta"] for m in read_gastos_year("2026")["mensualidades"]}
+
+    assert cuentas == {"Gym": "tarjeta", "Cine": "", "Luz": ""}
+
+
 def test_las_filas_futuras_no_mueven_el_saldo_todavia(temp_db):
     from core.db import get_db
     from stores.cuentas_store import crear_transferencia, saldos

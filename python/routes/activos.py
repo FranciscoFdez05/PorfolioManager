@@ -297,6 +297,13 @@ def saveActivo(assetId):
         if campo not in requestData and campo in existing_asset:
             payload[campo] = existing_asset[campo]
 
+    # El proveedor ya elegido no se re-infiere del ticker: un ticker con ":" es
+    # lo normal en TradingView y la inferencia lo mandaba a finnhub. Solo se
+    # cambia si el cuerpo trae un proveedor válido de forma explícita.
+    proveedor_existente = existing_asset.get("marketProvider")
+    if proveedor_existente and normalizeMarketProvider(requestData.get("marketProvider", ""), fallback="") == "":
+        payload["marketProvider"] = proveedor_existente
+
     writeAssetFile(assetId, payload)
     return jsonify({"ok": True})
 

@@ -246,28 +246,9 @@
     width: 100%;
 }
 
-/* Anchos en porcentaje: el sobrante se reparte entre las columnas y los huecos
-   quedan parejos, en vez de acumularse en una sola. */
-.ingresosMovementsTable thead th:nth-child(1),
-.ingresosMovementsTable tbody td:nth-child(1) {
-    width: 14%;
-}
-.ingresosMovementsTable thead th:nth-child(2),
-.ingresosMovementsTable tbody td:nth-child(2) {
-    width: 19%;
-}
-.ingresosMovementsTable thead th:nth-child(3),
-.ingresosMovementsTable tbody td:nth-child(3) {
-    width: 29%;
-}
-.ingresosMovementsTable thead th:nth-child(4),
-.ingresosMovementsTable tbody td:nth-child(4) {
-    width: 19%;
-}
-.ingresosMovementsTable thead th:nth-child(5),
-.ingresosMovementsTable tbody td:nth-child(5) {
-    width: 15%;
-}
+/* Las cinco columnas de datos miden lo mismo (table-layout: fixed sin anchos las
+   reparte por igual) y solo la de acciones tiene ancho propio: los huecos son
+   iguales entre todas. */
 
 .ingresosMovementsTable thead th.rowActionHeader,
 .ingresosMovementsTable tbody td.rowActionsCell {

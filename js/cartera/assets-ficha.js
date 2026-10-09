@@ -315,10 +315,11 @@ function buildCurrentAssetPayload() {
     const marketSymbol = (assetPage?.dataset.assetMarketSymbol || assetPage?.dataset.assetFinnhubSymbol || "")
         .trim()
         .toUpperCase()
-    const marketProvider = inferMarketProviderFromSymbol(
-        marketSymbol,
-        (assetPage?.dataset.assetMarketProvider || "finnhub").trim().toLowerCase()
-    )
+    // El proveedor guardado manda: solo se infiere del ticker si el activo no
+    // tiene ninguno. Inferirlo siempre convertía en finnhub cualquier ticker
+    // con ":" (formato de TradingView) en cada autoguardado de la ficha.
+    const storedProvider = (assetPage?.dataset.assetMarketProvider || "").trim().toLowerCase()
+    const marketProvider = storedProvider || inferMarketProviderFromSymbol(marketSymbol, "finnhub")
 
     return {
         id: currentAssetId,

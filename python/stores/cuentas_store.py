@@ -14,8 +14,8 @@ Qué mueve el saldo de una cuenta:
     también del origen, sin mezclarse con las salidas;
   * los ingresos que se registran como cobrados en ella y los gastos pagados con
     ella (`gastos_rows.cuenta` / `ingresos_rows.cuenta`; vacío = bancaria);
-  * en la bancaria, además, las mensualidades y los ingresos recurrentes, que no
-    son filas sino importes por mes;
+  * las mensualidades y los ingresos recurrentes, que no son filas sino importes
+    por mes, en la cuenta que llevan apuntada (vacío = bancaria);
   * el saldo inicial que se le haya puesto, para no tener que registrar toda la
     historia.
 
@@ -35,6 +35,7 @@ de diciembre no es dinero que ya esté en la cuenta en octubre.
 """
 
 import datetime
+import json
 import re
 from decimal import Decimal
 
@@ -552,6 +553,15 @@ def _cuenta_de_fila(valor):
     return valor or ID_BANCO
 
 
+def _excepciones_de_cuenta(texto):
+    """`{mes: cuenta}` de la columna `cuentas_cobro` (JSON); vacío si no se entiende."""
+    try:
+        datos = json.loads(texto) if texto else {}
+    except ValueError:
+        return {}
+    return {m: str(c) for m, c in datos.items() if m in MONTH_KEYS} if isinstance(datos, dict) else {}
+
+
 def _ya_ocurrido(year, month, hoy):
     """¿El mes de esa fila ya ha empezado? Las filas futuras no mueven el saldo."""
     try:
@@ -664,13 +674,21 @@ def saldos(conn=None, hoy=None, a_euros=None):
             if cuenta_id in acumulado and _ya_ocurrido(fila["year"], fila["month"], hoy):
                 acumulado[cuenta_id][campo] += _decimal(fila["cantidad"])
 
-    # Mensualidades e ingresos recurrentes: importes por mes, y siempre de la bancaria.
+    # Mensualidades e ingresos recurrentes: importes por mes, de la cuenta con la
+    # que se pagan o en la que se cobran (vacía, o una que ya no existe, = bancaria).
     for tabla, campo in (("ingresos_recurrentes", "entradas"), ("mensualidades", "salidas")):
-        columnas = ", ".join(["year", *MONTH_KEYS])
+        extra = ", cuentas_cobro" if tabla == "mensualidades" else ""
+        columnas = ", ".join(["year", "cuenta", *MONTH_KEYS]) + extra
         for fila in conn.execute(f"SELECT {columnas} FROM {tabla}").fetchall():
+            habitual = _cuenta_de_fila(fila["cuenta"])
+            # Un mes puede cobrarse con otra cuenta que la habitual de la mensualidad.
+            excepciones = _excepciones_de_cuenta(fila["cuentas_cobro"]) if extra else {}
             for mes in MONTH_KEYS:
                 if _ya_ocurrido(fila["year"], mes, hoy):
-                    acumulado[ID_BANCO][campo] += _decimal(fila[mes])
+                    destino = _cuenta_de_fila(excepciones.get(mes)) if mes in excepciones else habitual
+                    if destino not in acumulado:
+                        destino = ID_BANCO
+                    acumulado[destino][campo] += _decimal(fila[mes])
 
     resultado = {}
     for cuenta in cuentas:

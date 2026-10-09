@@ -64,6 +64,8 @@ function normalizeRecurrente(row = {}) {
         mesInicio: INGRESOS_MONTHS.some((month) => month.key === row.mesInicio) ? row.mesInicio : "enero",
         activa: row.activa === undefined ? true : Boolean(row.activa),
         nota: String(row.nota || ""),
+        // Vacía = cuenta bancaria, como en los ingresos.
+        cuenta: String(row.cuenta || ""),
         meses
     }
 }
@@ -352,9 +354,13 @@ function buildRecurrenteFormHtml(row) {
                 </select>
             </div>
             <div class="ingresosCreateModalField recFormFieldWide">
+                <label class="assetModalLabel" for="ingresosRecurrenteCuenta">Se cobra en</label>
+                ${construirSelectorCuenta("ingresosRecurrenteCuenta", row.cuenta || "")}
+            </div>
+            <div class="ingresosCreateModalField recFormFieldWide">
                 <label class="assetModalLabel" for="ingresosRecurrenteNota">Nota</label>
                 <input id="ingresosRecurrenteNota" class="assetModalInput" type="text"
-                       value="${escapeIngresosHtml(row.nota || "")}" placeholder="Opcional: pagador, cuenta, contrato…">
+                       value="${escapeIngresosHtml(row.nota || "")}" placeholder="Opcional: pagador, contrato…">
             </div>
         </div>
 
@@ -490,6 +496,8 @@ function openRecurrenteFormModal(rowIndex = -1) {
                 diaCobro: normalizeRecurrenteDia(getValue("ingresosRecurrenteDia")),
                 activa: getValue("ingresosRecurrenteEstado") !== "pausada",
                 nota: String(getValue("ingresosRecurrenteNota")).trim(),
+                // La cuenta bancaria es el vacío; las demás, su identificador.
+                cuenta: String(getValue("ingresosRecurrenteCuenta") || "").trim(),
                 meses
             }
 
@@ -1447,7 +1455,7 @@ function renderRecurrentesTable() {
         const message = totalRows
             ? "Ninguna ganancia recurrente coincide con el filtro."
             : "Aún no hay ganancias recurrentes. Añade la primera para llevar el control de tus ingresos fijos."
-        body.innerHTML = `<tr class="recEmptyRow"><td colspan="9">${message}</td></tr>`
+        body.innerHTML = `<tr class="recEmptyRow"><td colspan="10">${message}</td></tr>`
         foot.innerHTML = ""
         return
     }
@@ -1468,6 +1476,7 @@ function renderRecurrentesTable() {
                     ${row.categoria ? `<span class="recNameMeta">${escapeIngresosHtml(row.categoria)}</span>` : ""}
                     ${row.nota ? `<span class="recNameNote" title="${escapeIngresosHtml(row.nota)}">${escapeIngresosHtml(row.nota)}</span>` : ""}
                 </td>
+                <td>${escapeIngresosHtml(nombreDeCuenta(row.cuenta))}</td>
                 <td>${cobro ? formatEuro(cobro) : "—"}</td>
                 <td><span class="recBadge recBadge-${frecuencia.key}">${frecuencia.short}</span></td>
                 <td>${row.diaCobro ? `Día ${escapeIngresosHtml(row.diaCobro)}` : "—"}</td>
@@ -1496,7 +1505,7 @@ function renderRecurrentesTable() {
     const visibleMensual = items.reduce((sum, { row }) => sum + getRecurrenteMonthlyAmount(row), 0)
     foot.innerHTML = `
         <tr class="recFootRow">
-            <td colspan="5">Total (${items.length} ${items.length === 1 ? "ganancia" : "ganancias"})</td>
+            <td colspan="6">Total (${items.length} ${items.length === 1 ? "ganancia" : "ganancias"})</td>
             <td class="numCell">${formatEuro(visibleMensual)}</td>
             <td class="numCell">${formatEuro(visibleAnual)}</td>
             <td colspan="2"></td>

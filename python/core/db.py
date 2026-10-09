@@ -342,6 +342,8 @@ CREATE TABLE IF NOT EXISTS mensualidades (
     mes_inicio  TEXT NOT NULL DEFAULT 'enero',
     activa      INTEGER NOT NULL DEFAULT 1,
     nota        TEXT NOT NULL DEFAULT '',
+    cuenta      TEXT NOT NULL DEFAULT '',
+    cuentas_cobro TEXT NOT NULL DEFAULT '',
     UNIQUE(year, nombre)
 );
 
@@ -384,6 +386,7 @@ CREATE TABLE IF NOT EXISTS ingresos_recurrentes (
     mes_inicio  TEXT NOT NULL DEFAULT 'enero',
     activa      INTEGER NOT NULL DEFAULT 1,
     nota        TEXT NOT NULL DEFAULT '',
+    cuenta      TEXT NOT NULL DEFAULT '',
     UNIQUE(year, nombre)
 );
 
@@ -661,7 +664,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id,
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 17
+ESQUEMA_VERSION = 19
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1556,6 +1559,39 @@ def _esquema_17(conn):
     columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(dividendos)")}
     if "cuenta" not in columnas:
         conn.execute("ALTER TABLE dividendos ADD COLUMN cuenta TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(18)
+def _esquema_18(conn):
+    """Cuenta con la que se paga cada mensualidad.
+
+    Hasta ahora todas salían de la cuenta bancaria. La columna guarda el
+    identificador de otra cuenta; vacío sigue siendo la bancaria, así que las
+    mensualidades que ya existen no cambian. Es una columna con DEFAULT: no
+    reescribe la tabla y la imagen anterior simplemente la ignora.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(mensualidades)")}
+    if "cuenta" not in columnas:
+        conn.execute("ALTER TABLE mensualidades ADD COLUMN cuenta TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(19)
+def _esquema_19(conn):
+    """Cuenta de los ingresos recurrentes y cuenta por mes de las mensualidades.
+
+    `ingresos_recurrentes.cuenta`: como en las mensualidades, vacío = bancaria.
+    `mensualidades.cuentas_cobro`: un JSON `{"marzo": "tarjeta"}` con solo los
+    meses que se cobran con otra cuenta que la habitual, como `dias_cobro`.
+
+    Es un paso aparte del 18 porque ese ya estaba aplicado en bases que habían
+    arrancado con él: un paso ya aplicado no se vuelve a ejecutar si se amplía.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(ingresos_recurrentes)")}
+    if "cuenta" not in columnas:
+        conn.execute("ALTER TABLE ingresos_recurrentes ADD COLUMN cuenta TEXT NOT NULL DEFAULT ''")
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(mensualidades)")}
+    if "cuentas_cobro" not in columnas:
+        conn.execute("ALTER TABLE mensualidades ADD COLUMN cuentas_cobro TEXT NOT NULL DEFAULT ''")
 
 
 class _CerrarAlTerminarElHilo:

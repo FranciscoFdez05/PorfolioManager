@@ -25,7 +25,7 @@ Al subir la versión hay que tocar, en el mismo commit: este fichero,
 test falla si falta alguno.
 """
 
-__version__ = "4.0.4"
+__version__ = "4.1.0"
 
 # La plantilla `index.html` lleva este marcador donde va la versión, y lo
 # sustituye el servidor al servirla. Se hace así, y no con una petición del

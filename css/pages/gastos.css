@@ -229,28 +229,9 @@
     min-width: 40px;
 }
 
-/* Anchos en porcentaje: el sobrante se reparte entre las columnas y los huecos
-   quedan parejos, en vez de acumularse en una sola. */
-.gastosMovementsTable thead th:nth-child(1),
-.gastosMovementsTable tbody td:nth-child(1) {
-    width: 14%;
-}
-.gastosMovementsTable thead th:nth-child(2),
-.gastosMovementsTable tbody td:nth-child(2) {
-    width: 19%;
-}
-.gastosMovementsTable thead th:nth-child(3),
-.gastosMovementsTable tbody td:nth-child(3) {
-    width: 29%;
-}
-.gastosMovementsTable thead th:nth-child(4),
-.gastosMovementsTable tbody td:nth-child(4) {
-    width: 19%;
-}
-.gastosMovementsTable thead th:nth-child(5),
-.gastosMovementsTable tbody td:nth-child(5) {
-    width: 15%;
-}
+/* Las cinco columnas de datos miden lo mismo (table-layout: fixed sin anchos las
+   reparte por igual) y solo la de acciones tiene ancho propio: los huecos son
+   iguales entre todas. */
 
 .gastosMovementsTable thead th.rowActionHeader,
 .gastosMovementsTable tbody td.rowActionsCell {
@@ -521,6 +502,27 @@
 
 .gastosMensualidadDetail td {
     color: #c9d6ea;
+}
+
+/* Cargo de una mensualidad dentro del mes: informativo, no es un gasto del mes. */
+.gastosMensualidadRow td {
+    opacity: 0.7;
+}
+
+/* Ya cobrada: a todo color; mientras no llegue su fecha se queda translúcida. */
+.gastosMensualidadRow.isRealizada td {
+    opacity: 1;
+}
+
+.gastosMensualidadTag {
+    margin-left: 8px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(96, 165, 250, 0.15);
+    color: #93c5fd;
+    font-size: 10.5px;
+    font-style: normal;
+    letter-spacing: 0.03em;
 }
 
 .gastosTotalRow td {
@@ -938,6 +940,32 @@
     white-space: normal;
 }
 
+/* Todas las columnas de datos miden lo mismo (table-layout: fixed sin anchos las
+   reparte por igual), así que los huecos entre ellas son iguales. */
+.mensTable .mensColName,
+.recTable .recColName {
+    width: auto;
+}
+
+/* Las columnas numéricas van a la derecha y las siguientes, a la izquierda: sin
+   este margen el número queda pegado al texto de la columna de al lado. Se aplica
+   a las numéricas que tienen una columna de texto justo detrás: el importe (que
+   precede a la frecuencia) y el coste anual (que precede al estado). */
+.mensTable thead th:nth-child(3),
+.mensTable tbody td:nth-child(3),
+.mensTable thead th:nth-child(8),
+.mensTable tbody td:nth-child(8),
+.recTable thead th:nth-child(3),
+.recTable tbody td:nth-child(3),
+.recTable thead th:nth-child(8),
+.recTable tbody td:nth-child(8),
+/* El pie de totales: su celda del importe anual es la tercera, y tiene que llevar el
+   mismo margen para que la cifra caiga bajo la columna. */
+.mensTable tfoot td:nth-child(3),
+.recTable tfoot td:nth-child(3) {
+    padding-right: 36px;
+}
+
 .mensTable .rowActionHeader,
 .recTable .rowActionHeader,
 .mensTable .rowActionsCell,
@@ -948,8 +976,10 @@
     padding-right: 4px;
 }
 
-.mensRowPaused td,
-.recRowPaused td {
+/* La pausada se atenúa, pero no la celda de acciones: con opacidad el botón «···» y su
+   menú desplegable se verían translúcidos. */
+.mensRowPaused td:not(.rowActionsCell),
+.recRowPaused td:not(.rowActionsCell) {
     opacity: 0.55;
 }
 

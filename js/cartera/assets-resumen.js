@@ -947,8 +947,79 @@ function _ovBindSort() {
     })
 }
 
+// Tarjetas de mejor y peor activo según el rendimiento % de las filas visibles.
+function renderOverviewExtremes(rows) {
+    const bestCard = document.getElementById("overviewBestCard")
+    const worstCard = document.getElementById("overviewWorstCard")
+    if (!bestCard || !worstCard) return
+
+    const ranked = rows
+        .filter((r) => !r._isOculto && r.invertidoBruto > 0)
+        .map((r) => ({ row: r, pct: ((r.overviewYieldValue ?? 0) / r.invertidoBruto) * 100 }))
+        .sort((a, b) => b.pct - a.pct)
+
+    const fill = (card, label, entry) => {
+        if (!entry) {
+            card.innerHTML = `<span class="overviewExtremeLabel">${label}</span><span class="overviewExtremeValue">—</span>`
+            return
+        }
+        const { row, pct } = entry
+        const yieldVal = row.overviewYieldValue ?? 0
+        const sign = yieldVal >= 0 ? "+" : ""
+        card.innerHTML = `
+            <span class="overviewExtremeLabel" title="${escapeHtml(row.nombre)}">${label} · ${escapeHtml(row.nombre)}</span>
+            <span class="overviewExtremeRow">
+                <span class="overviewExtremeValue ${yieldVal >= 0 ? "mCellPos" : "mCellNeg"}">${sign}${formatMoney(yieldVal, row.currency)}</span>
+                ${overviewPctLine(pct)}
+            </span>
+        `
+    }
+
+    fill(bestCard, "Mejor", ranked[0])
+    fill(worstCard, "Peor", ranked.length > 1 ? ranked[ranked.length - 1] : null)
+}
+
+function overviewPctLine(pct) {
+    const up = pct >= 0
+    return `<span class="overviewExtremePct ${up ? "mCellPos" : "mCellNeg"}">${up ? "▲" : "▼"} ${Math.abs(pct).toFixed(2)}%</span>`
+}
+
+// Beneficio realizado: ganancia o pérdida patrimonial de las ventas (FIFO del
+// servidor) de los activos que se ven con los filtros actuales. El % es sobre
+// el coste de adquisición de lo vendido.
+async function renderOverviewRealized(assetIds) {
+    const card = document.getElementById("overviewRealizedCard")
+    if (!card) return
+
+    let ventas = []
+    try {
+        ventas = await loadVentasRowsForAssets()
+    } catch (error) {
+        console.error("Error cargando ventas para beneficio realizado:", error)
+    }
+
+    const propias = ventas.filter((v) => assetIds.has(v.assetId) && !v.incidencia)
+    const num = (campo) => propias.reduce((total, v) => total + (parseLooseNumber(v[campo]) || 0), 0)
+    const ganancia = num("dineroDeclarar")
+    const coste = num("costeAdquisicion")
+
+    if (!propias.length) {
+        card.innerHTML = `<span class="overviewExtremeLabel">Beneficio realizado</span><span class="overviewExtremeValue">—</span>`
+        return
+    }
+
+    card.innerHTML = `
+        <span class="overviewExtremeLabel" title="Ganancia o pérdida de las ventas hechas (FIFO)">Beneficio realizado</span>
+        <span class="overviewExtremeRow">
+            <span class="overviewExtremeValue ${ganancia >= 0 ? "mCellPos" : "mCellNeg"}">${ganancia >= 0 ? "+" : ""}${formatMoney(ganancia, "EUR")}</span>
+            ${coste > 0 ? overviewPctLine((ganancia / coste) * 100) : ""}
+        </span>
+    `
+}
+
 function renderOverviewRows(rows) {
     _ovRows = rows
+    renderOverviewExtremes(rows)
     const tableBody = document.getElementById("overviewTableBody")
     const emptyState = document.getElementById("overviewEmptyState")
 
@@ -1038,9 +1109,10 @@ async function renderVistaGeneralTable() {
             .forEach((r) => console.error("Error cargando datos de activo:", r.reason))
         const fullAssets = loadResults.filter((r) => r.status === "fulfilled").map((r) => r.value)
 
-        const results = await Promise.allSettled(
-            fullAssets.filter((asset) => selectedTypes.has(asset.type)).map((asset) => buildOverviewDisplayRow(asset))
-        )
+        const visibleAssets = fullAssets.filter((asset) => selectedTypes.has(asset.type))
+        renderOverviewRealized(new Set(visibleAssets.map((asset) => asset.id)))
+
+        const results = await Promise.allSettled(visibleAssets.map((asset) => buildOverviewDisplayRow(asset)))
         results
             .filter((r) => r.status === "rejected")
             .forEach((r) => console.error("Error procesando activo en vista general:", r.reason))
