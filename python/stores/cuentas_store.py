@@ -677,12 +677,11 @@ def saldos(conn=None, hoy=None, a_euros=None):
     # Mensualidades e ingresos recurrentes: importes por mes, de la cuenta con la
     # que se pagan o en la que se cobran (vacía, o una que ya no existe, = bancaria).
     for tabla, campo in (("ingresos_recurrentes", "entradas"), ("mensualidades", "salidas")):
-        extra = ", cuentas_cobro" if tabla == "mensualidades" else ""
-        columnas = ", ".join(["year", "cuenta", *MONTH_KEYS]) + extra
+        columnas = ", ".join(["year", "cuenta", "cuentas_cobro", *MONTH_KEYS])
         for fila in conn.execute(f"SELECT {columnas} FROM {tabla}").fetchall():
             habitual = _cuenta_de_fila(fila["cuenta"])
-            # Un mes puede cobrarse con otra cuenta que la habitual de la mensualidad.
-            excepciones = _excepciones_de_cuenta(fila["cuentas_cobro"]) if extra else {}
+            # Un mes puede cobrarse con otra cuenta que la habitual de la fila.
+            excepciones = _excepciones_de_cuenta(fila["cuentas_cobro"])
             for mes in MONTH_KEYS:
                 if _ya_ocurrido(fila["year"], mes, hoy):
                     destino = _cuenta_de_fila(excepciones.get(mes)) if mes in excepciones else habitual
@@ -707,6 +706,31 @@ def saldos(conn=None, hoy=None, a_euros=None):
             "saldo": inicial + datos["entradas"] - datos["salidas"] - datos["comisiones"] + intereses + dividendos,
         }
     return resultado
+
+
+def saldos_del_mes(year, month, conn=None, a_euros=None):
+    """Punto de partida de cada cuenta para dibujar su mes:
+    `{id: {inicial, rendimientos}}`.
+
+    `inicial` es el saldo con el que la cuenta entra en el mes (todo lo ocurrido
+    hasta el mes anterior) y `rendimientos` lo que ese mes le suman los intereses
+    y dividendos, que no tienen día propio.
+    """
+    conn = conn or get_db()
+    indice = MONTH_KEYS.index(month)
+    primer_dia = datetime.date(int(year), indice + 1, 1)
+    fin_de_mes = (primer_dia + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
+    a_euros = a_euros or _cambio_a_euros()
+    antes = saldos(conn, primer_dia - datetime.timedelta(days=1), a_euros)
+    despues = saldos(conn, fin_de_mes, a_euros)
+    return {
+        cuenta_id: {
+            "inicial": datos["saldo"],
+            "rendimientos": (despues[cuenta_id]["intereses"] + despues[cuenta_id]["dividendos"])
+            - (datos["intereses"] + datos["dividendos"]),
+        }
+        for cuenta_id, datos in antes.items()
+    }
 
 
 def movimientos_de_cuenta(cuenta_id, conn=None):

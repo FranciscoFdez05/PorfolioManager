@@ -1095,6 +1095,20 @@ html[data-theme="black"] #mChartDivAxisWrap {
     background: var(--bg-header);
 }
 
+/* Los nombres de columna van completos, así que cabecera más pequeña y
+   compacta para que la tabla quepa sin scroll horizontal. */
+#overviewTable thead th {
+    font-size: 0.62rem;
+    letter-spacing: 0.03em;
+}
+
+#overviewTable th:nth-child(n + 4),
+#overviewTable td:nth-child(n + 4) {
+    min-width: 0;
+    padding-left: 10px;
+    padding-right: 12px;
+}
+
 /* ── Métricas tabla Posiciones: alineación estilo CMC ── */
 #metricasTopTable th,
 #metricasTopTable td {

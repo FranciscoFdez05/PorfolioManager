@@ -502,15 +502,53 @@ body.asset-rotation-halted .detailRotationBar span {
     padding-right: 18px;
 }
 
+/* Misma rejilla que .assetTodosLayout: las tarjetas ocupan la columna de la
+   tabla y terminan donde ella, y el menú ⋯ queda sobre la columna de gráficos. */
 .assetPageHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: stretch;
+    gap: 18px;
+}
+
+.assetPageHeader.assetPageHeaderFull {
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.assetHeaderMain {
     display: flex;
     align-items: stretch;
     gap: 16px;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .assetHeaderRight {
     align-self: flex-start;
+    justify-self: end;
+}
+
+.assetMainCol {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+/* Fija abajo a la izquierda: sticky dentro de la ficha, que mide como mínimo
+   lo que el área con scroll (ver fitAssetPageToViewport). */
+.assetAddRowBar {
+    position: sticky;
+    bottom: 12px;
+    z-index: 5;
+    margin-top: auto;
+    display: flex;
+    justify-content: flex-start;
+    pointer-events: none;
+}
+
+.assetAddRowBar > * {
+    pointer-events: auto;
 }
 
 .assetHeaderLeft {
@@ -4019,7 +4057,7 @@ html[data-theme="black"] .segHideBtn:hover {
     grid-template-columns: minmax(0, 1fr);
 }
 
-.assetTodosLayout > .assetTabsContainer {
+.assetTodosLayout > .assetMainCol {
     min-width: 0;
 }
 
@@ -4133,6 +4171,10 @@ html[data-theme="black"] .segHideBtn:hover {
 @media (max-width: 1180px) {
     .assetTodosLayout {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .assetPageHeader {
+        grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .todosChartsCol {

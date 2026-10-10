@@ -10,6 +10,7 @@ from routes.cuenta_ahorro import pasar_vinculos_antiguos
 from stores.cuenta_ahorro_store import clave_de_cuenta, renombrar_en_config
 from stores.cuentas_store import (
     ETIQUETAS_TIPO,
+    MONTH_KEYS,
     TIPOS,
     CuentaEnUso,
     CuentaInvalida,
@@ -25,6 +26,7 @@ from stores.cuentas_store import (
     obtener_cuenta,
     reordenar_cuentas,
     saldos,
+    saldos_del_mes,
 )
 
 log = logging.getLogger(__name__)
@@ -76,6 +78,25 @@ def getCuentas():
         "tipos": [{"id": t, "nombre": ETIQUETAS_TIPO[t]} for t in TIPOS],
         "cuentas": [_con_saldo(c, calculados) for c in listar_cuentas()],
         "remuneradas": listar_remuneradas(),
+    })
+
+
+@cuentas_bp.route("/api/cuentas/saldos-mes", methods=["GET"])
+def getSaldosMes():
+    """Saldo con el que cada cuenta entra en un mes, para la gráfica de Métricas."""
+    year = request.args.get("year", "")
+    month = request.args.get("month", "")
+    if not year.isdigit() or month not in MONTH_KEYS:
+        return _error("Falta el año o el mes")
+    calculados = saldos_del_mes(year, month)
+    return jsonify({
+        "cuentas": {
+            cuenta_id: {
+                "inicial": aTexto(datos["inicial"], decimales=2),
+                "rendimientos": aTexto(datos["rendimientos"], decimales=2),
+            }
+            for cuenta_id, datos in calculados.items()
+        }
     })
 
 

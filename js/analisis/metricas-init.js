@@ -522,6 +522,8 @@ async function initMetricasLogic() {
     _metricasGastosMonth = getChartPref("metricasGastosMonth", "all")
     _metricasIngresosMonth = getChartPref("metricasIngresosMonth", "all")
     _metricasSaldoMesMonth = getChartPref("metricasSaldoMesMonth", null)
+    _metricasSaldoMesCuenta = getChartPref("metricasSaldoMesCuenta", "all")
+    _mSaldoMesSaldos = {}
     _metricasInteresesYear = getChartPref("metricasInteresesYear", null)
     _metricasDivMensualYear = getChartPref("metricasDivMensualYear", null)
     _metricasDivYear = getChartPref("metricasDivYear", null)

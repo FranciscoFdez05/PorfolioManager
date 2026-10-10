@@ -22,6 +22,30 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.2.0] — 2026-10-10
+
+**Esquema de base de datos:** sube a la **20**, desde la 19 (columna `cuentas_cobro` en
+`ingresos_recurrentes`, vacía por defecto). Al migrar se guarda
+`data/backups/auto/<portfolio>_pre-esquema-19-a-20_*.db`; para deshacer, levantar la
+imagen anterior y restaurar ese fichero.
+
+### Añadido
+
+- Cada ingreso recurrente puede entrar un mes concreto en otra cuenta (selector bajo cada
+  importe, como en las mensualidades).
+- En Ingresos, las métricas de la derecha tienen scroll vertical propio y «Añadir fila»
+  queda fijo abajo a la izquierda. «Añadir compra» en la ficha de un activo también.
+
+### Cambiado
+
+- «Evolución del saldo durante el mes» arranca en el saldo real con el que la cuenta entra
+  en el mes (antes partía de los ingresos recurrentes) y se puede ver de todas las cuentas o de
+  una sola; cuenta recurrentes y mensualidades con su cuenta y día, transferencias, comisiones,
+  intereses y dividendos.
+- La vista general escribe los nombres de columna completos («Precio medio», «Inversión
+  bruta», «Rendimiento %»…) y los menús de navegación pasan a llamarse «Bolsa e Inversión»
+  y «Mi dinero».
+
 ## [4.1.0] — 2026-10-09
 
 **Esquema de base de datos:** sube a la **19**, desde la 17 (columna `cuenta` en

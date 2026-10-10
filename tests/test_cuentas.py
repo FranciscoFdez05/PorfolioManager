@@ -361,6 +361,29 @@ def test_un_ingreso_recurrente_con_cuenta_suma_a_esa_cuenta_y_se_guarda(temp_db)
     assert float(resultado["banco"]["entradas"]) == 50
 
 
+def test_un_mes_del_ingreso_recurrente_puede_entrar_en_otra_cuenta(temp_db):
+    from core.db import get_db
+    from stores.cuentas_store import saldos
+    from stores.ingresos_store import read_ingresos_year, sanitize_ingresos_payload, write_ingresos_year
+
+    conn = get_db()
+    conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('tarjeta', 'Tarjeta', 'banco', 5)")
+    conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('santander', 'Santander', 'banco', 6)")
+    conn.commit()
+    payload, _ = sanitize_ingresos_payload({"year": "2026", "recurrentes": [{
+        "nombre": "Paga", "cuenta": "santander",
+        "meses": {"enero": "100,00", "febrero": "100,00", "marzo": "100,00"},
+        "cuentasCobro": {"febrero": "tarjeta", "marzo": "banco", "abril": "borrada"},
+    }]})
+    write_ingresos_year("2026", payload)
+
+    assert read_ingresos_year("2026")["recurrentes"][0]["cuentasCobro"] == {"febrero": "tarjeta", "marzo": "banco"}
+    resultado = saldos(conn, hoy=HOY)
+    assert float(resultado["santander"]["entradas"]) == 100
+    assert float(resultado["tarjeta"]["entradas"]) == 100
+    assert float(resultado["banco"]["entradas"]) == 100
+
+
 def test_la_cuenta_de_la_mensualidad_se_guarda_y_una_desconocida_vuelve_a_la_bancaria(temp_db):
     from core.db import get_db
     from stores.gastos_store import read_gastos_year, sanitize_gastos_payload, write_gastos_year
@@ -470,3 +493,17 @@ def test_leer_las_cuentas_y_los_saldos_no_deja_una_transaccion_abierta(temp_db):
     movimientos_de_cuenta("ahorro", conn)
 
     assert conn.in_transaction is False
+
+
+def test_el_saldo_del_mes_arranca_con_lo_ocurrido_en_los_meses_anteriores(temp_db):
+    from core.db import get_db
+    from stores.cuentas_store import saldos_del_mes
+
+    conn = get_db()
+    conn.execute("UPDATE cuentas SET saldo_inicial = '100.00' WHERE id = 'banco'")
+    conn.execute("INSERT INTO mensualidades (year, nombre, enero, febrero, marzo) VALUES ('2026', 'Gym', '30,00', '30,00', '30,00')")
+    conn.execute("INSERT INTO ingresos_recurrentes (year, nombre, enero, febrero, marzo) VALUES ('2026', 'Nómina', '1.000,00', '1.000,00', '1.000,00')")
+    conn.commit()
+
+    assert float(saldos_del_mes("2026", "enero", conn)["banco"]["inicial"]) == 100
+    assert float(saldos_del_mes("2026", "marzo", conn)["banco"]["inicial"]) == 100 + 2 * 970

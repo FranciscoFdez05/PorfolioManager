@@ -507,7 +507,7 @@ body {
 
 .navDropdownBtn {
     height: 30px;
-    width: 128px;
+    width: 138px;
     padding: 0 10px;
     border: 1px solid var(--btn-border);
     border-radius: 6px;
@@ -569,7 +569,7 @@ body {
 
 .navBtn {
     height: 30px;
-    width: 128px;
+    width: 138px;
     padding: 0 10px;
     border: 1px solid var(--btn-border);
     border-radius: 6px;

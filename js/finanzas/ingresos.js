@@ -66,6 +66,8 @@ function normalizeRecurrente(row = {}) {
         nota: String(row.nota || ""),
         // Vacía = cuenta bancaria, como en los ingresos.
         cuenta: String(row.cuenta || ""),
+        // Meses que entran en otra cuenta que la habitual: {marzo: "tarjeta"}.
+        cuentasCobro: normalizeMensualidadCuentas(row.cuentasCobro),
         meses
     }
 }
@@ -313,6 +315,7 @@ function buildRecurrenteFormHtml(row) {
             <label class="recMonthLabel" for="ingresosRecurrente-${month.key}">${month.label}</label>
             <input id="ingresosRecurrente-${month.key}" class="assetModalInput recMonthInput" data-rec-month="${month.key}"
                    type="text" inputmode="decimal" value="${escapeIngresosHtml(row.meses?.[month.key] || "")}" placeholder="—">
+            ${buildMensualidadMesCuentaSelect(month, row.cuentasCobro?.[month.key] || "", row.cuenta || "")}
         </div>
     `
     ).join("")
@@ -371,8 +374,8 @@ function buildRecurrenteFormHtml(row) {
                 <span class="recFormMonthsTitle">Importes por mes</span>
                 <button type="button" class="recGhostBtn" id="ingresosRecurrenteRecalcBtn">Recalcular desde el importe</button>
             </div>
-            <p class="recFormMonthsHint">Se rellenan solos con el importe y la frecuencia. Edita un mes para ajustarlo a mano.</p>
-            <div class="recMonthsGrid">${monthsHtml}</div>
+            <p class="recFormMonthsHint">Se rellenan solos con el importe y la frecuencia. Edita un mes para ajustarlo a mano. El selector de debajo es la cuenta en la que entra ese mes (por defecto, la cuenta base).</p>
+            <div class="recMonthsGrid mensMonthsGridDays">${monthsHtml}</div>
         </div>
     `
 }
@@ -383,6 +386,14 @@ function bindRecurrenteFormModal(modal, { autoFill }) {
     const diaSelect = modal.querySelector("#ingresosRecurrenteDia")
     const preview = modal.querySelector("#ingresosRecurrentePreview")
     const monthInputs = [...modal.querySelectorAll("[data-rec-month]")]
+
+    // La etiqueta «Base · X» de cada mes sigue a la cuenta base del formulario.
+    modal.querySelector("#ingresosRecurrenteCuenta")?.addEventListener("change", (event) => {
+        const nombre = escapeIngresosHtml(nombreDeCuenta(event.target.value))
+        modal.querySelectorAll("[data-mens-base-option]").forEach((option) => {
+            option.innerHTML = `Base · ${nombre}`
+        })
+    })
 
     const readMeses = () => Object.fromEntries(monthInputs.map((input) => [input.dataset.recMonth, input.value]))
 
@@ -488,6 +499,22 @@ function openRecurrenteFormModal(rowIndex = -1) {
             }
 
             const importeRaw = String(getValue("ingresosRecurrenteImporte")).trim()
+            // Solo los meses que se salen de la cuenta base. La bancaria es el
+            // vacío en la base y «banco» en un mes.
+            const cuentaBase = String(getValue("ingresosRecurrenteCuenta") || "").trim()
+            const cuentasCobro = normalizeMensualidadCuentas(
+                Object.fromEntries(
+                    [...modal.querySelectorAll("[data-mens-account]")].map((select) => [
+                        select.dataset.mensAccount,
+                        select.value
+                    ])
+                )
+            )
+            Object.keys(cuentasCobro).forEach((month) => {
+                if (cuentasCobro[month] === (cuentaBase || "banco")) {
+                    delete cuentasCobro[month]
+                }
+            })
             const nextRow = {
                 nombre,
                 categoria: sanitizeIngresoTypeLabel(getValue("ingresosRecurrenteCategoria")),
@@ -497,7 +524,8 @@ function openRecurrenteFormModal(rowIndex = -1) {
                 activa: getValue("ingresosRecurrenteEstado") !== "pausada",
                 nota: String(getValue("ingresosRecurrenteNota")).trim(),
                 // La cuenta bancaria es el vacío; las demás, su identificador.
-                cuenta: String(getValue("ingresosRecurrenteCuenta") || "").trim(),
+                cuenta: cuentaBase,
+                cuentasCobro,
                 meses
             }
 
@@ -1465,6 +1493,11 @@ function renderRecurrentesTable() {
             const anual = getRecurrenteAnnualAmount(row)
             const frecuencia = getRecurrenteFrecuencia(row.frecuencia)
             const next = getRecurrenteNextCharge(row)
+            const mesesConOtraCuenta = INGRESOS_MONTHS.filter((month) => row.cuentasCobro?.[month.key])
+            const cuentasAparte = mesesConOtraCuenta.length
+            const cuentasTitle = mesesConOtraCuenta
+                .map((month) => `${month.label}: ${nombreDeCuenta(row.cuentasCobro[month.key])}`)
+                .join(" · ")
             const nextText = next && !next.isPast ? formatRecurrenteDate(next.date) : "—"
             const nextHint = next && !next.isPast ? (next.daysLeft === 0 ? "hoy" : `en ${next.daysLeft} d`) : ""
             const cobro = getRecurrenteCobro(row)
@@ -1476,7 +1509,7 @@ function renderRecurrentesTable() {
                     ${row.categoria ? `<span class="recNameMeta">${escapeIngresosHtml(row.categoria)}</span>` : ""}
                     ${row.nota ? `<span class="recNameNote" title="${escapeIngresosHtml(row.nota)}">${escapeIngresosHtml(row.nota)}</span>` : ""}
                 </td>
-                <td>${escapeIngresosHtml(nombreDeCuenta(row.cuenta))}</td>
+                <td title="${escapeIngresosHtml(cuentasTitle)}">${escapeIngresosHtml(nombreDeCuenta(row.cuenta))}${cuentasAparte ? `<span class="recNextHint">${cuentasAparte} mes${cuentasAparte === 1 ? "" : "es"} aparte</span>` : ""}</td>
                 <td>${cobro ? formatEuro(cobro) : "—"}</td>
                 <td><span class="recBadge recBadge-${frecuencia.key}">${frecuencia.short}</span></td>
                 <td>${row.diaCobro ? `Día ${escapeIngresosHtml(row.diaCobro)}` : "—"}</td>

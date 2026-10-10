@@ -1175,17 +1175,31 @@ function mDrawComparativaLineChart(ingMonthly, gastosMonthly) {
 
 // ── evolución del saldo durante el mes ─────────────────────────────────────
 
-// Día a día: arranca en los ingresos recurrentes del mes, suma cada ingreso en
-// su fecha y resta cada gasto en la suya; las mensualidades se restan en
-// su día de cobro (el día 1 si no tiene).
-function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey) {
+// eslint-disable-next-line prefer-const -- se reasigna desde metricas-init.js
+let _mSaldoMesSaldos = {}
+let _mSaldoMesPeticion = 0
+
+// Día a día, de la cuenta elegida o de todas juntas. Arranca en el saldo con el
+// que la cuenta entra en el mes (todo lo anterior, no solo este mes), suma cada
+// ingreso y resta cada gasto en su fecha; recurrentes y mensualidades van en su
+// día de cobro (el 1 si no tienen). Lo que se cobra o paga con otra cuenta solo
+// cuenta en esa cuenta. Entre todas, una transferencia no mueve nada (solo su
+// comisión): el dinero cambia de cuenta, no sale.
+const M_CUENTA_BANCO = "banco"
+
+function mCuentaDeMovimiento(cuenta) {
+    const existe = window._cuentasDinero.some((c) => c.id === cuenta)
+    return cuenta && existe ? cuenta : M_CUENTA_BANCO
+}
+
+function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey, cuentaSel, saldosMes) {
     const monthIdx = M_GASTOS_KEYS.indexOf(monthKey)
     const daysInMonth = new Date(Number(year), monthIdx + 1, 0).getDate()
+    const todas = cuentaSel === "all"
+    const esDeLaCuenta = (cuenta) => todas || mCuentaDeMovimiento(cuenta) === cuentaSel
 
-    let startBalance = 0
-    ;(ingresosYearData?.recurrentes || []).forEach((r) => {
-        startBalance += parseEuroNumber(r.meses?.[monthKey] || "")
-    })
+    const ids = todas ? Object.keys(saldosMes) : [cuentaSel]
+    const startBalance = ids.reduce((suma, id) => suma + parseEuroNumber(saldosMes[id]?.inicial || ""), 0)
 
     const deltaPorDia = Array(daysInMonth + 1).fill(0)
     const movs = Array.from({ length: daysInMonth + 1 }, () => [])
@@ -1193,55 +1207,56 @@ function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey
         const d = parseInt(String(fecha || "").split("-")[0], 10)
         return d >= 1 && d <= daysInMonth ? d : 1
     }
+    const diaCobro = (dia) => Math.min(Number(normalizeMensualidadDia(dia)) || 1, daysInMonth)
+    const anotar = (d, nombre, importe) => {
+        deltaPorDia[d] += importe
+        movs[d].push({ nombre, importe })
+    }
 
-    // Lo cobrado en otra cuenta (ahorro, exchange…) no entra en la cuenta bancaria.
+    ;(ingresosYearData?.recurrentes || []).forEach((r) => {
+        const val = parseEuroNumber(r.meses?.[monthKey] || "")
+        if (val <= 0 || !esDeLaCuenta(r.cuentasCobro?.[monthKey] || r.cuenta)) return
+        anotar(diaCobro(r.diaCobro), r.nombre || "Ingreso recurrente", val)
+    })
     ;(ingresosYearData?.months?.[monthKey]?.rows || []).forEach((row) => {
         const val = parseEuroNumber(row.cantidad || "")
-        if (val <= 0 || row.cuenta) return
-        const d = dayOf(row.fecha)
-        deltaPorDia[d] += val
-        movs[d].push({ nombre: row.nombre || row.tipo || "Ingreso", importe: val })
+        if (val <= 0 || !esDeLaCuenta(row.cuenta)) return
+        anotar(dayOf(row.fecha), row.nombre || row.tipo || "Ingreso", val)
     })
 
-    if (isMensualidadMonthActive(gastosYearData, monthKey)) {
-        ;(gastosYearData?.mensualidades || []).forEach((m) => {
-            const val = parseEuroNumber(m.meses?.[monthKey] || "")
-            if (val <= 0) return
-            const d = Math.min(Number(getMensualidadDiaMes(m, monthKey)) || 1, daysInMonth)
-            deltaPorDia[d] -= val
-            movs[d].push({ nombre: m.nombre || "Mensualidad", importe: -val })
-        })
-    }
+    ;(gastosYearData?.mensualidades || []).forEach((m) => {
+        const val = parseEuroNumber(m.meses?.[monthKey] || "")
+        if (val <= 0 || !esDeLaCuenta(m.cuentasCobro?.[monthKey] || m.cuenta)) return
+        anotar(diaCobro(getMensualidadDiaMes(m, monthKey)), m.nombre || "Mensualidad", -val)
+    })
     ;(gastosYearData?.months?.[monthKey]?.rows || []).forEach((row) => {
         const val = parseEuroNumber(row.cantidad || "")
-        if (val <= 0 || row.cuenta) return
-        const d = dayOf(row.fecha)
-        deltaPorDia[d] -= val
-        movs[d].push({ nombre: row.nombre || row.tipo || "Gasto", importe: -val })
+        if (val <= 0 || !esDeLaCuenta(row.cuenta)) return
+        anotar(dayOf(row.fecha), row.nombre || row.tipo || "Gasto", -val)
     })
 
-    // Dinero que sale hacia otras cuentas, o que vuelve de ellas.
     _metricasTransferencias.forEach((t) => {
         if (t.year !== String(year) || t.month !== monthKey) return
         const val = parseEuroNumber(t.cantidad || "")
         if (val <= 0) return
-        const signo = t.origen === "banco" ? -1 : t.destino === "banco" ? 1 : 0
-        if (!signo) return
         const d = dayOf(t.fecha)
-        deltaPorDia[d] += signo * val
-        const otra = signo < 0 ? t.destino_nombre : t.origen_nombre
-        movs[d].push({
-            nombre: t.concepto || (signo < 0 ? `Transferencia a ${otra}` : `Transferencia desde ${otra}`),
-            importe: signo * val
-        })
-
-        // La comisión sale de la cuenta de origen además de la cantidad.
         const comision = parseEuroNumber(t.comision || "")
-        if (comision > 0 && t.origen === "banco") {
-            deltaPorDia[d] -= comision
-            movs[d].push({ nombre: `Comisión${t.concepto ? " · " + t.concepto : ""}`, importe: -comision })
+
+        if (!todas && t.destino === cuentaSel) {
+            anotar(d, t.concepto || `Transferencia desde ${nombreDeCuenta(t.origen)}`, val)
+        }
+        if (!todas && t.origen === cuentaSel) {
+            anotar(d, t.concepto || `Transferencia a ${nombreDeCuenta(t.destino)}`, -val)
+        }
+        // La comisión sale de la cuenta de origen además de la cantidad.
+        if (comision > 0 && (todas || t.origen === cuentaSel)) {
+            anotar(d, `Comisión${t.concepto ? " · " + t.concepto : ""}`, -comision)
         }
     })
+
+    // Intereses y dividendos no tienen día en la cuenta: se anotan al cierre del mes.
+    const rendimientos = ids.reduce((suma, id) => suma + parseEuroNumber(saldosMes[id]?.rendimientos || ""), 0)
+    if (rendimientos) anotar(daysInMonth, "Intereses y dividendos", rendimientos)
 
     const dayLabels = ["Inicio"]
     const balances = [startBalance]
@@ -1257,12 +1272,31 @@ function mComputeSaldoMesSeries(ingresosYearData, gastosYearData, year, monthKey
     return { dayLabels, balances, startBalance, movimientos }
 }
 
-function mRenderSaldoMesChart(ingresosYearData, gastosYearData, year, monthKey) {
+// Saldos con los que cada cuenta entra en el mes; se piden una vez por mes.
+async function mCargarSaldosMes(year, monthKey) {
+    const clave = `${year}-${monthKey}`
+    if (!_mSaldoMesSaldos[clave]) {
+        const datos = await fetch(`/api/cuentas/saldos-mes?year=${year}&month=${monthKey}`)
+            .then((r) => r.json())
+            .catch(() => null)
+        _mSaldoMesSaldos[clave] = datos?.cuentas || {}
+    }
+    return _mSaldoMesSaldos[clave]
+}
+
+async function mRenderSaldoMesChart(ingresosYearData, gastosYearData, year, monthKey) {
+    const peticion = ++_mSaldoMesPeticion
+    const saldosMes = await mCargarSaldosMes(year, monthKey)
+    // Si mientras tanto se ha cambiado de mes o de cuenta, esta respuesta ya no vale.
+    if (peticion !== _mSaldoMesPeticion) return
+
     const { dayLabels, balances, startBalance, movimientos } = mComputeSaldoMesSeries(
         ingresosYearData,
         gastosYearData,
         year,
-        monthKey
+        monthKey,
+        _metricasSaldoMesCuenta,
+        saldosMes
     )
 
     const notaEl = document.getElementById("mSaldoMesNota")
@@ -1317,6 +1351,39 @@ function mRenderSaldoMesChart(ingresosYearData, gastosYearData, year, monthKey) 
             }
         }
     })
+}
+
+function mRenderSaldoMesCuentaToggle() {
+    const toggle = document.getElementById("mSaldoMesCuentaToggle")
+    if (!toggle) return
+    const cuentas = window._cuentasDinero
+    // Con una sola cuenta no hay nada que elegir.
+    toggle.classList.toggle("hidden", cuentas.length < 2)
+    if (_metricasSaldoMesCuenta !== "all" && !cuentas.some((c) => c.id === _metricasSaldoMesCuenta)) {
+        _metricasSaldoMesCuenta = "all"
+    }
+    if (!toggle.dataset.bound) {
+        toggle.dataset.bound = "true"
+        toggle.addEventListener("click", (e) => {
+            const btn = e.target.closest("[data-saldomescuenta]")
+            if (!btn) return
+            _metricasSaldoMesCuenta = btn.dataset.saldomescuenta
+            setChartPref("metricasSaldoMesCuenta", _metricasSaldoMesCuenta)
+            mRenderSaldoMesCuentaToggle()
+            mRenderSaldoMesChart(
+                _mSaldoMesCache?.ingresosYearData,
+                _mSaldoMesCache?.gastosYearData,
+                _mSaldoMesCache?.ingresosYearData?.year,
+                _metricasSaldoMesMonth
+            )
+        })
+    }
+    toggle.innerHTML = [{ id: "all", nombre: "Todas" }, ...cuentas]
+        .map(
+            (c) =>
+                `<button class="mToggleBtn${c.id === _metricasSaldoMesCuenta ? " active" : ""}" data-saldomescuenta="${escapeHtml(c.id)}">${escapeHtml(c.nombre)}</button>`
+        )
+        .join("")
 }
 
 function mSaldoMesDefaultMonth(year) {
@@ -1379,6 +1446,8 @@ function mRenderSaldoMes(ingresosYearsList, ingresosYearData, gastosYearData) {
             .querySelectorAll(".mToggleBtn")
             .forEach((b) => b.classList.toggle("active", b.dataset.saldomesyear === String(year)))
     }
+
+    mRenderSaldoMesCuentaToggle()
 
     const monthToggle = document.getElementById("mSaldoMesMonthToggle")
     if (monthToggle && !monthToggle.dataset.bound) {

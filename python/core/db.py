@@ -387,6 +387,7 @@ CREATE TABLE IF NOT EXISTS ingresos_recurrentes (
     activa      INTEGER NOT NULL DEFAULT 1,
     nota        TEXT NOT NULL DEFAULT '',
     cuenta      TEXT NOT NULL DEFAULT '',
+    cuentas_cobro TEXT NOT NULL DEFAULT '',
     UNIQUE(year, nombre)
 );
 
@@ -664,7 +665,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id,
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 19
+ESQUEMA_VERSION = 20
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1592,6 +1593,19 @@ def _esquema_19(conn):
     columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(mensualidades)")}
     if "cuentas_cobro" not in columnas:
         conn.execute("ALTER TABLE mensualidades ADD COLUMN cuentas_cobro TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(20)
+def _esquema_20(conn):
+    """Cuenta por mes de los ingresos recurrentes.
+
+    `ingresos_recurrentes.cuentas_cobro`: un JSON `{"marzo": "tarjeta"}` con solo
+    los meses que entran en otra cuenta que la habitual, igual que en las
+    mensualidades. Paso aparte del 19 porque ese ya puede estar aplicado.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(ingresos_recurrentes)")}
+    if "cuentas_cobro" not in columnas:
+        conn.execute("ALTER TABLE ingresos_recurrentes ADD COLUMN cuentas_cobro TEXT NOT NULL DEFAULT ''")
 
 
 class _CerrarAlTerminarElHilo:

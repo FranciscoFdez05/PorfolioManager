@@ -29,6 +29,8 @@ let _metricasSaldoMesMonth = getChartPref("metricasSaldoMesMonth", null)
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _mSaldoMesCache = null
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
+let _metricasSaldoMesCuenta = getChartPref("metricasSaldoMesCuenta", "all")
+// eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _metricasPayload = null
 // Transferencias entre cuentas: mueven el saldo de la cuenta bancaria sin ser gasto ni ingreso.
 let _metricasTransferencias = []

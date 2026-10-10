@@ -307,11 +307,26 @@
     width: 100%;
 }
 
+/* Fijo abajo a la izquierda: sticky lo mantiene visible al hacer scroll y
+   margin-top: auto lo baja al fondo cuando la página es corta. */
 .ingresosActions {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
     margin-top: auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    padding: 8px 0;
+    justify-content: flex-start;
+}
+
+/* Las métricas de la derecha hacen scroll vertical propio, a la altura de la tabla. */
+#ingresosResumenLado {
+    max-height: 525px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    padding-right: 4px;
 }
 
 .ingresosCreateModal {

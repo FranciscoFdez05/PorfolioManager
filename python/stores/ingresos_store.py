@@ -1,7 +1,8 @@
 from core.db import get_db, transactional
 from core.validation import normalize_year
 from stores import revisiones
-from stores.cuentas_store import cuentas_validas_para_filas, normalizar_cuenta_de_fila
+from stores.cuentas_store import ID_BANCO, cuentas_validas_para_filas, normalizar_cuenta_de_fila
+from stores.gastos_store import normalize_cuentas_cobro, serialize_cuentas_cobro
 
 _MAX_LABEL = 80
 _MAX_NAME = 120
@@ -118,6 +119,7 @@ def sanitize_recurrentes_rows(rows):
             "activa": bool(row.get("activa", True)),
             "nota": str(row.get("nota", ""))[:_MAX_NOTA].strip(),
             "cuenta": str(row.get("cuenta", ""))[:_MAX_SHORT * 2].strip(),
+            "cuentasCobro": normalize_cuentas_cobro(row.get("cuentasCobro")),
             "meses": {
                 month: str(_dict(row.get("meses")).get(month, ""))[:_MAX_SHORT].strip()
                 for month in MONTH_KEYS
@@ -226,12 +228,13 @@ def read_ingresos_year(year):
             "activa": bool(r["activa"]),
             "nota": r["nota"],
             "cuenta": r["cuenta"],
+            "cuentasCobro": normalize_cuentas_cobro(r["cuentas_cobro"]),
             "meses": {month: r[month] for month in MONTH_KEYS},
         }
         for r in conn.execute(
             "SELECT nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
             "septiembre, octubre, noviembre, diciembre, "
-            "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta "
+            "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro "
             "FROM ingresos_recurrentes WHERE year = ? ORDER BY id",
             (normalized,)
         ).fetchall()
@@ -283,8 +286,8 @@ def write_ingresos_year(year, data, revision_esperada=None):
         "INSERT INTO ingresos_recurrentes "
         "(year, nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
         "septiembre, octubre, noviembre, diciembre, "
-        "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "categoria, importe, frecuencia, dia_cobro, mes_inicio, activa, nota, cuenta, cuentas_cobro) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (normalized, m.get("nombre", ""),
              m.get("meses", {}).get("enero", ""), m.get("meses", {}).get("febrero", ""),
@@ -299,7 +302,8 @@ def write_ingresos_year(year, data, revision_esperada=None):
              normalize_mes(m.get("mesInicio")),
              1 if m.get("activa", True) else 0,
              m.get("nota", ""),
-             normalizar_cuenta_de_fila(m.get("cuenta"), validas))
+             normalizar_cuenta_de_fila(m.get("cuenta"), validas),
+             serialize_cuentas_cobro(m.get("cuentasCobro"), validas | {ID_BANCO}))
             for m in data.get("recurrentes", [])
         ]
     )

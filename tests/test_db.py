@@ -338,3 +338,16 @@ def test_una_bd_ya_en_la_18_recibe_las_columnas_de_cuenta_que_le_faltan(temp_db)
     assert conexion.execute("PRAGMA user_version").fetchone()[0] == db.ESQUEMA_VERSION
     for tabla, columna in (("ingresos_recurrentes", "cuenta"), ("mensualidades", "cuentas_cobro")):
         assert columna in {f[1] for f in conexion.execute(f"PRAGMA table_info({tabla})")}
+
+
+def test_una_bd_ya_en_la_19_recibe_la_cuenta_por_mes_de_los_ingresos_recurrentes(temp_db):
+    from core import db
+
+    conexion = db.get_db()
+    conexion.execute("ALTER TABLE ingresos_recurrentes DROP COLUMN cuentas_cobro")
+    conexion.execute("PRAGMA user_version = 19")
+
+    db._migrate(conexion)
+
+    assert conexion.execute("PRAGMA user_version").fetchone()[0] == db.ESQUEMA_VERSION
+    assert "cuentas_cobro" in {f[1] for f in conexion.execute("PRAGMA table_info(ingresos_recurrentes)")}

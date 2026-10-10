@@ -30,6 +30,7 @@ function renderAssetTablePage(asset) {
     contentArea.innerHTML = `
         <section class="assetTablePage" data-asset-id="${escapeHtml(asset.id)}" data-asset-type="${escapeHtml(asset.type)}" data-asset-name="${escapeHtml(asset.name)}" data-asset-symbol="${escapeHtml(asset.symbol)}" data-asset-price="${escapeHtml(asset.price || "0,00")}" data-asset-currency="${escapeHtml(asset.currency || "EUR")}" data-asset-change="${escapeHtml(asset.change || "+0,00%")}" data-asset-status="${escapeHtml(asset.status || "Mercado abierto")}" data-asset-last-updated="${escapeHtml(asset.lastUpdated || "")}" data-asset-market-provider="${escapeHtml(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || ""))}" data-asset-market-symbol="${escapeHtml(asset.marketSymbol || asset.finnhubSymbol || "")}" data-asset-finnhub-symbol="${escapeHtml(asset.finnhubSymbol || "")}" data-asset-color="${escapeHtml(asset.color || "")}" data-asset-tv-symbol="${escapeHtml(asset.tvSymbol || "")}" data-asset-convert-currency="${escapeHtml(asset.convertCurrency || "")}" data-asset-coste-anual="${escapeHtml(asset.costeAnual || "")}">
             <div class="assetPageHeader">
+                <div class="assetHeaderMain">
                 <div class="assetHeaderLeft">
                     <div class="assetTitleRow">
                         <h1 class="assetPageTitle">${escapeHtml(asset.name || asset.symbol)}</h1>
@@ -80,8 +81,8 @@ function renderAssetTablePage(asset) {
                         </div>
                     </div>
                 </div>
+                </div>
                 <div class="assetHeaderRight">
-                    <button id="addAssetRowBtn" class="primaryButton assetAddRowHeaderBtn"><span class="assetBtnIcon">+</span> Añadir compra</button>
                     <div class="assetHeaderMenu">
                         <button id="assetMenuBtn" class="assetMenuTrigger" type="button" aria-label="Más opciones">⋯</button>
                         <div class="assetMenuDropdown" id="assetMenuDropdown">
@@ -110,6 +111,7 @@ function renderAssetTablePage(asset) {
             </div>
 
             <div class="assetTodosLayout" id="assetTodosLayout">
+            <div class="assetMainCol">
             <div class="assetTabsContainer">
                 <div class="assetTabsNav">
                     <button class="assetTabBtn assetTabActive" id="todosTabBtn" data-tab="todos">Todos</button>
@@ -161,10 +163,16 @@ function renderAssetTablePage(asset) {
                     <div id="assetAlertasSection"></div>
                 </div>
             </div>
+            </div>
             <aside class="todosChartsCol" id="assetTodosChartsCol"></aside>
+            </div>
+            <div class="assetAddRowBar">
+                <button id="addAssetRowBtn" class="primaryButton assetAddRowHeaderBtn"><span class="assetBtnIcon">+</span> Añadir compra</button>
             </div>
         </section>
     `
+
+    fitAssetPageToViewport()
 
     currentAssetPersistedOperationRows = Array.isArray(asset.operationRows) ? asset.operationRows : []
     currentAssetPersistedConversionRows = conversionRows
@@ -194,6 +202,21 @@ function renderAssetTablePage(asset) {
     }
 }
 
+// "Añadir compra" queda fija abajo a la izquierda (sticky). Para que tenga
+// "abajo" aunque la tabla sea corta, la ficha mide como mínimo lo que el
+// contenedor con scroll: sin esto, el sticky se quedaría pegado a la tabla.
+function fitAssetPageToViewport() {
+    const page = document.querySelector(".assetTablePage")
+    const scroller = document.getElementById("mainContent")
+    if (!page || !scroller) {
+        return
+    }
+    const style = getComputedStyle(scroller)
+    const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
+    page.style.minHeight = `${scroller.clientHeight - padding}px`
+}
+window.addEventListener("resize", fitAssetPageToViewport)
+
 // Las acciones de cada pestaña viven en la propia barra de pestañas, no dentro
 // del panel: así no abren una franja vacía sobre la tabla y quedan a la altura
 // de "Añadir compra" de la cabecera.
@@ -211,6 +234,7 @@ function setActiveAssetTab(tab) {
     // reservado para una columna que no está.
     document.getElementById("assetTodosChartsCol")?.classList.toggle("hidden", tab !== "todos")
     document.getElementById("assetTodosLayout")?.classList.toggle("assetTodosLayoutFull", tab !== "todos")
+    document.querySelector(".assetPageHeader")?.classList.toggle("assetPageHeaderFull", tab !== "todos")
 }
 
 function setupAssetTabs(asset) {
