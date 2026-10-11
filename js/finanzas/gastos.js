@@ -1319,6 +1319,12 @@ function bindGastosEvents() {
         exportButton.dataset.bound = "true"
         exportButton.addEventListener("click", downloadGastosCsv)
     }
+
+    const informeButton = document.getElementById("gastosInformeBtn")
+    if (informeButton && !informeButton.dataset.bound) {
+        informeButton.dataset.bound = "true"
+        informeButton.addEventListener("click", () => descargarInformeFinanzas(currentGastosYear, informeButton))
+    }
 }
 
 async function renderGastosYear(year) {

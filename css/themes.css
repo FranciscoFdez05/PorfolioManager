@@ -2179,7 +2179,8 @@ html[data-theme="light"] .avChartBtn:hover {
     color: #00796b;
     border-color: #26a69a;
 }
-html[data-theme="light"] .avTooltip {
+html[data-theme="light"] .avTooltip,
+html[data-theme="light"] .appTooltip {
     background: #f0f6ff;
     color: #1e3a5f;
     border-color: #cbd5e1;

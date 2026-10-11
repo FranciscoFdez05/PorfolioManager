@@ -96,6 +96,13 @@ function updateTopMetricElement(elementId, value, colorize = false) {
     }
 }
 
+// Rendimiento en euros que se ve al pasar el ratón por encima de cada % de la barra superior.
+function setTopRendTooltip(suffix, rendimientoEur) {
+    const box = document.getElementById(`topPorcentaje${suffix}`)?.closest(".metricBox")
+    if (!box) return
+    box.dataset.rendEur = (rendimientoEur >= 0 ? "+" : "") + formatEuro(rendimientoEur)
+}
+
 function applyTopPortfolioMetrics(metrics) {
     updateTopMetricElement("topTotalCuenta", formatEuro(metrics.totalCuenta))
     updateTopMetricElement(
@@ -114,24 +121,28 @@ function applyTopPortfolioMetrics(metrics) {
         true
     )
     updateTopMetricElement("topEurosCripto", formatEuro(metrics.tipos.cripto.netoActual))
+    setTopRendTooltip("Cripto", metrics.tipos.cripto.rendimiento)
     updateTopMetricElement(
         "topPorcentajeAcciones",
         formatPercent(calculateYieldPercent(metrics.tipos.acciones.invertido, metrics.tipos.acciones.rendimiento)),
         true
     )
     updateTopMetricElement("topEurosAcciones", formatEuro(metrics.tipos.acciones.netoActual))
+    setTopRendTooltip("Acciones", metrics.tipos.acciones.rendimiento)
     updateTopMetricElement(
         "topPorcentajeEtf",
         formatPercent(calculateYieldPercent(metrics.tipos.etfs.invertido, metrics.tipos.etfs.rendimiento)),
         true
     )
     updateTopMetricElement("topEurosEtf", formatEuro(metrics.tipos.etfs.netoActual))
+    setTopRendTooltip("Etf", metrics.tipos.etfs.rendimiento)
     updateTopMetricElement(
         "topPorcentajeComoditis",
         formatPercent(calculateYieldPercent(metrics.tipos.comoditis.invertido, metrics.tipos.comoditis.rendimiento)),
         true
     )
     updateTopMetricElement("topEurosComoditis", formatEuro(metrics.tipos.comoditis.netoActual))
+    setTopRendTooltip("Comoditis", metrics.tipos.comoditis.rendimiento)
     if (typeof applyTopMetricsVisibility === "function") applyTopMetricsVisibility()
 }
 
@@ -189,15 +200,36 @@ async function initVistaGeneralLogic() {
     const refreshOverviewMarketButton = document.getElementById("refreshOverviewMarketBtn")
     const showHiddenBtn = document.getElementById("overviewShowHiddenBtn")
     const exportOverviewBtn = document.getElementById("downloadOverviewCsvBtn")
+    const informeBtn = document.getElementById("overviewInformeBtn")
+    const menuTrigger = document.querySelector("#overviewActionsMenu .pageActionsMenuTrigger")
+    const menuDropdown = document.getElementById("overviewActionsDropdown")
+
+    if (menuTrigger && menuDropdown && !menuTrigger.dataset.bound) {
+        menuTrigger.dataset.bound = "true"
+        menuTrigger.addEventListener("click", (e) => {
+            e.stopPropagation()
+            menuDropdown.classList.toggle("open")
+        })
+        document.addEventListener("click", () => menuDropdown.classList.remove("open"))
+        menuDropdown.addEventListener("click", () => menuDropdown.classList.remove("open"))
+    }
 
     if (showHiddenBtn && !showHiddenBtn.dataset.bound) {
         showHiddenBtn.dataset.bound = "true"
-        showHiddenBtn.classList.toggle("active", _ovShowHidden)
+        const syncShowHiddenLabel = () => {
+            showHiddenBtn.textContent = _ovShowHidden ? "Esconder ocultos" : "Mostrar ocultos"
+        }
+        syncShowHiddenLabel()
         showHiddenBtn.addEventListener("click", () => {
             _ovShowHidden = !_ovShowHidden
-            showHiddenBtn.classList.toggle("active", _ovShowHidden)
+            syncShowHiddenLabel()
             renderVistaGeneralTable()
         })
+    }
+
+    if (informeBtn && !informeBtn.dataset.bound) {
+        informeBtn.dataset.bound = "true"
+        informeBtn.addEventListener("click", () => descargarInformePortfolio(informeBtn))
     }
 
     if (filtersContainer && !filtersContainer.dataset.bound) {

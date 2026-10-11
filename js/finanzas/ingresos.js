@@ -934,6 +934,12 @@ function bindIngresosEvents() {
         exportButton.dataset.bound = "true"
         exportButton.addEventListener("click", downloadIngresosCsv)
     }
+
+    const informeButton = document.getElementById("ingresosInformeBtn")
+    if (informeButton && !informeButton.dataset.bound) {
+        informeButton.dataset.bound = "true"
+        informeButton.addEventListener("click", () => descargarInformeFinanzas(currentIngresosYear, informeButton))
+    }
 }
 
 async function renderIngresosYear(year) {

@@ -1035,6 +1035,8 @@ Cada respuesta lleva la cabecera `X-Request-Id`; ese mismo identificador aparece
 | `js/core/csrf.js` | Envuelve `fetch` para adjuntar la cabecera CSRF. Debe cargarse el primero. |
 | `js/core/api.js` | `Api.get/post/put/del`: timeout, reintento de las lecturas, mensaje de error real del servidor y redirección al login cuando caduca la sesión (esto último se aplica también a las llamadas a `fetch` sin migrar). |
 | `js/core/dom.js` | `escapeHtml`, constructores de nodos (`el`, `setText`, `clearNode`) y avisos no bloqueantes (`showToast`, `showError`). |
+| `js/core/tooltips.js` | Sustituye el `title` nativo del navegador por un tooltip con el estilo de la app (`.appTooltip`). |
+| `js/core/informes.js` | Informes en PDF del portfolio y de finanzas: se maquetan en HTML con gráficos SVG y se mandan a imprimir (*Guardar como PDF*), igual que el informe de la Renta. Las cifras salen de las mismas funciones que la Vista general y Métricas. |
 
 ---
 

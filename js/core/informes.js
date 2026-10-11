@@ -1,0 +1,1011 @@
+// Informes en PDF: el del portfolio (menú ··· de la Vista general) y el de
+// finanzas (menús ··· de Gastos, Ingresos, Cuentas y Cuenta remunerada, que
+// sacan todos el mismo informe).
+//
+// Mismo criterio que el informe de la Renta (python/core/informe_renta.py): se
+// maqueta en HTML y se manda a imprimir, y el diálogo del navegador lo guarda
+// como PDF. No hace falta ninguna librería de PDF y el texto sale vectorial y
+// seleccionable. Los gráficos son SVG dibujados aquí, no los canvas de
+// Chart.js: un canvas impreso sale borroso y con el fondo oscuro de la app.
+//
+// Las cifras salen de las mismas funciones que pintan la Vista general y
+// Métricas (buildOverviewRow, mComputeGastosData…), para que el informe cuadre
+// con lo que se ve en pantalla.
+
+const INF_MESES = [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre"
+]
+
+// Colores de las categorías de gastos e ingresos, que no tienen uno propio.
+const INF_PALETA = [
+    "#3a7bd5",
+    "#f7931a",
+    "#2ecc71",
+    "#e74c3c",
+    "#9b59b6",
+    "#1abc9c",
+    "#e67e22",
+    "#00bcd4",
+    "#8bc34a",
+    "#ff5722",
+    "#e91e63",
+    "#673ab7",
+    "#607d8b",
+    "#f39c12",
+    "#795548",
+    "#26c6da"
+]
+
+// ── utilidades ─────────────────────────────────────────────────────────────
+
+const infEsc = (valor) => escapeHtml(valor)
+
+async function infGet(url, fallback) {
+    try {
+        const res = await fetch(url)
+        return res.ok ? await res.json() : fallback
+    } catch {
+        return fallback
+    }
+}
+
+// Fechas de la app: "dd-mm-aaaa", "dd-mm-aa" o "aaaa-mm-dd".
+function infFecha(texto) {
+    const p = String(texto || "")
+        .trim()
+        .split(/[-/.]/)
+    if (p.length !== 3 || p.some((x) => !/^\d+$/.test(x))) return null
+    const [d, m, y] = p[0].length === 4 ? [p[2], p[1], p[0]] : p
+    const anio = y.length <= 2 ? 2000 + Number(y) : Number(y)
+    return { anio, mes: Number(m), dia: Number(d), orden: anio * 10000 + Number(m) * 100 + Number(d) }
+}
+
+const infAnio = (texto) => infFecha(texto)?.anio ?? null
+
+const infSigno = (v) => (v > 0 ? "+" : "")
+const infClase = (v) => (v > 0 ? "infPos" : v < 0 ? "infNeg" : "")
+const infEur = (v) => formatEuro(v || 0)
+const infEurSigno = (v) => `<span class="${infClase(v)}">${infSigno(v)}${infEur(v)}</span>`
+const infPct = (v) => (Number.isFinite(v) ? `${v.toFixed(2).replace(".", ",")} %` : "—")
+const infPctSigno = (v) => (Number.isFinite(v) ? `<span class="${infClase(v)}">${infSigno(v)}${infPct(v)}</span>` : "—")
+
+function infHoy() {
+    return new Date().toLocaleString("es-ES", { dateStyle: "long", timeStyle: "short" })
+}
+
+// ── piezas de maquetación ──────────────────────────────────────────────────
+
+function infCabecera(titulo, subtitulo) {
+    return `
+        <header class="infCabecera">
+            <div>
+                <h1>${infEsc(titulo)}</h1>
+                <p>${infEsc(subtitulo)}</p>
+            </div>
+            <div class="infCabeceraFecha">Generado el ${infEsc(infHoy())}</div>
+        </header>`
+}
+
+function infKpis(items) {
+    return `<div class="infKpis">${items
+        .map(
+            (k) => `
+            <div class="infKpi">
+                <span class="infKpiLabel">${infEsc(k.label)}</span>
+                <span class="infKpiValor">${k.valor}</span>
+                ${k.nota ? `<span class="infKpiNota">${k.nota}</span>` : ""}
+            </div>`
+        )
+        .join("")}</div>`
+}
+
+function infSeccion(titulo, contenido, nota = "") {
+    if (!contenido) return ""
+    return `
+        <section class="infSeccion">
+            <h2>${infEsc(titulo)}</h2>
+            ${nota ? `<p class="infNota">${nota}</p>` : ""}
+            ${contenido}
+        </section>`
+}
+
+// columnas: [{ label, num }] — `num` alinea a la derecha. filas: celdas ya en HTML.
+function infTabla(columnas, filas, totales = null) {
+    if (!filas.length) return ""
+    const th = columnas.map((c) => `<th${c.num ? ' class="num"' : ""}>${infEsc(c.label)}</th>`).join("")
+    const fila = (celdas, cls = "") =>
+        `<tr${cls ? ` class="${cls}"` : ""}>${celdas
+            .map((celda, i) => `<td${columnas[i]?.num ? ' class="num"' : ""}>${celda ?? ""}</td>`)
+            .join("")}</tr>`
+    return `
+        <table class="infTabla">
+            <thead><tr>${th}</tr></thead>
+            <tbody>${filas.map((f) => fila(f)).join("")}</tbody>
+            ${totales ? `<tfoot>${fila(totales, "infTotal")}</tfoot>` : ""}
+        </table>`
+}
+
+// Gráfico circular con su leyenda: cada nombre lleva al lado su % y su importe.
+// items: [{ label, valor, color }]. Los valores negativos no caben en un
+// circular: se dejan fuera del dibujo pero siguen en la leyenda.
+function infDonut(items, { titulo = "", columnasLeyenda = 1 } = {}) {
+    const datos = items.filter((i) => Number.isFinite(i.valor) && i.valor !== 0)
+    const total = datos.reduce((s, i) => s + Math.max(0, i.valor), 0)
+    if (!datos.length || total <= 0) return ""
+
+    const R = 80
+    const r = 50
+    const c = 90
+    let angulo = -Math.PI / 2
+    const punto = (radio, a) => `${(c + radio * Math.cos(a)).toFixed(3)} ${(c + radio * Math.sin(a)).toFixed(3)}`
+    const porciones = datos
+        .filter((i) => i.valor > 0)
+        .map((i) => {
+            const fraccion = i.valor / total
+            // Un único sector del 100 % no se puede dibujar como arco: es un anillo.
+            if (fraccion >= 0.9999) {
+                return `<circle cx="${c}" cy="${c}" r="${(R + r) / 2}" fill="none" stroke="${i.color}" stroke-width="${R - r}"/>`
+            }
+            const inicio = angulo
+            const fin = angulo + fraccion * Math.PI * 2
+            angulo = fin
+            const grande = fin - inicio > Math.PI ? 1 : 0
+            return `<path d="M ${punto(R, inicio)} A ${R} ${R} 0 ${grande} 1 ${punto(R, fin)} L ${punto(r, fin)} A ${r} ${r} 0 ${grande} 0 ${punto(r, inicio)} Z" fill="${i.color}" stroke="#fff" stroke-width="1"/>`
+        })
+        .join("")
+
+    const leyenda = datos
+        .map(
+            (i) => `
+            <div class="infLeyendaItem">
+                <span class="infMuestra" style="background:${i.color}"></span>
+                <span class="infLeyendaNombre">${infEsc(i.label)}</span>
+                <span class="infLeyendaPct">${i.valor > 0 ? infPct((i.valor / total) * 100) : "—"}</span>
+                <span class="infLeyendaValor">${infEur(i.valor)}</span>
+            </div>`
+        )
+        .join("")
+
+    return `
+        <div class="infGrafico">
+            ${titulo ? `<h3>${infEsc(titulo)}</h3>` : ""}
+            <div class="infDonut">
+                <svg viewBox="0 0 180 180" width="140" height="140" role="img" aria-label="${infEsc(titulo)}">
+                    ${porciones}
+                    <text x="${c}" y="${c - 4}" text-anchor="middle" class="infDonutTotalLabel">Total</text>
+                    <text x="${c}" y="${c + 12}" text-anchor="middle" class="infDonutTotal">${infEsc(infEur(total))}</text>
+                </svg>
+                <div class="infLeyenda" style="--inf-cols:${columnasLeyenda}">${leyenda}</div>
+            </div>
+        </div>`
+}
+
+// Barras agrupadas por mes (p. ej. ingresos frente a gastos).
+// series: [{ label, color, valores: [12] }]
+function infBarrasMensuales(series) {
+    const max = Math.max(0, ...series.flatMap((s) => s.valores))
+    if (max <= 0) return ""
+    const ancho = 720
+    const alto = 200
+    const base = alto - 22
+    const grupo = ancho / 12
+    const barra = Math.min(18, (grupo - 10) / series.length)
+    const rects = INF_MESES.map((mes, m) => {
+        const x0 = m * grupo + (grupo - barra * series.length) / 2
+        const barras = series
+            .map((s, i) => {
+                const v = Math.max(0, s.valores[m] || 0)
+                const h = (v / max) * (base - 10)
+                return `<rect x="${(x0 + i * barra).toFixed(1)}" y="${(base - h).toFixed(1)}" width="${(barra - 2).toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${s.color}"/>`
+            })
+            .join("")
+        return `${barras}<text x="${(m * grupo + grupo / 2).toFixed(1)}" y="${alto - 6}" text-anchor="middle" class="infEje">${mes.slice(0, 3)}</text>`
+    }).join("")
+    const leyenda = series
+        .map(
+            (s) =>
+                `<span class="infLeyendaItem"><span class="infMuestra" style="background:${s.color}"></span>${infEsc(s.label)}</span>`
+        )
+        .join("")
+    return `
+        <div class="infGrafico">
+            <svg viewBox="0 0 ${ancho} ${alto}" width="100%" role="img" aria-label="Evolución mensual">
+                <line x1="0" y1="${base}" x2="${ancho}" y2="${base}" stroke="#cbd5e1" stroke-width="1"/>
+                ${rects}
+            </svg>
+            <div class="infLeyendaLinea">${leyenda}</div>
+        </div>`
+}
+
+// ── impresión ──────────────────────────────────────────────────────────────
+
+// Pinta el informe en un contenedor que solo se ve al imprimir y abre el
+// diálogo de impresión. El título del documento es el nombre de archivo que
+// propone el navegador al guardar el PDF.
+function infImprimir(html, nombreArchivo) {
+    document.getElementById("informeImprimible")?.remove()
+    const contenedor = document.createElement("div")
+    contenedor.id = "informeImprimible"
+    contenedor.innerHTML = html
+    document.body.appendChild(contenedor)
+
+    const tituloAnterior = document.title
+    document.title = nombreArchivo
+    document.documentElement.classList.add("imprimiendoInforme")
+
+    window.addEventListener(
+        "afterprint",
+        () => {
+            document.documentElement.classList.remove("imprimiendoInforme")
+            document.title = tituloAnterior
+            contenedor.remove()
+        },
+        { once: true }
+    )
+    window.print()
+}
+
+// Envuelve la generación: el botón dice que está trabajando (cargar todos los
+// activos tarda) y un fallo se avisa en vez de quedarse en la consola.
+async function infGenerar(boton, generar) {
+    if (boton?.dataset.generando) return
+    const textoOriginal = boton?.textContent || ""
+    if (boton) {
+        boton.dataset.generando = "true"
+        boton.textContent = "Generando informe…"
+    }
+    document.documentElement.style.cursor = "progress"
+    try {
+        await generar()
+    } catch (error) {
+        console.error("No se pudo generar el informe:", error)
+        alert("No se pudo generar el informe. Revisa la consola para más detalles.")
+    } finally {
+        document.documentElement.style.cursor = ""
+        if (boton) {
+            delete boton.dataset.generando
+            boton.textContent = textoOriginal
+        }
+    }
+}
+
+// ── informe del portfolio ──────────────────────────────────────────────────
+
+const INF_TIPOS = ["cripto", "acciones", "etfs", "comoditis"]
+
+async function infDatosPortfolio() {
+    const assets = await loadAssetsList()
+    const cargados = await Promise.allSettled(assets.map((a) => loadAssetData(a.id)))
+    const completos = cargados.filter((r) => r.status === "fulfilled").map((r) => r.value)
+
+    const resultados = await Promise.allSettled(
+        completos.map(async (asset) => {
+            const fila = await buildOverviewDisplayRow(asset)
+            const eur = await buildSummaryMetricsInEuros(fila)
+            return { ...fila, color: asset.color || "", eur }
+        })
+    )
+    const filas = resultados.filter((r) => r.status === "fulfilled").map((r) => r.value)
+
+    const [divData, intData, bonosData, rfData, ventas] = await Promise.all([
+        infGet("/api/dividendos", { rows: [] }),
+        infGet("/api/intereses", { cuentas: [] }),
+        infGet("/api/bonos", { rows: [] }),
+        infGet("/api/rentafija", { rows: [] }),
+        loadVentasRowsForAssets().catch(() => [])
+    ])
+
+    return {
+        // Activos en cartera: los que tienen posición o, sin ella, valor.
+        activos: filas.filter((f) => f.participaciones > 0 || f.eur.netoActualEur > 0),
+        dividendos: Array.isArray(divData?.rows) ? divData.rows : [],
+        cuentasRemuneradas: Array.isArray(intData?.cuentas) ? intData.cuentas : [],
+        rentaFija: [
+            ...(Array.isArray(bonosData?.rows) ? bonosData.rows : []).map((r) => ({ ...r, _origen: "Bono" })),
+            ...(Array.isArray(rfData?.rows) ? rfData.rows : []).map((r) => ({ ...r, _origen: "Renta fija" }))
+        ],
+        ventas: (Array.isArray(ventas) ? ventas : []).filter((v) => !v.incidencia)
+    }
+}
+
+function infInteresNetoRF(r) {
+    return parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || "")
+}
+
+function infHtmlPortfolio(datos) {
+    const { activos, dividendos, cuentasRemuneradas, rentaFija, ventas } = datos
+    const anioActual = new Date().getFullYear()
+
+    const totalValor = activos.reduce((s, a) => s + a.eur.netoActualEur, 0)
+    const totalInvertido = activos.reduce((s, a) => s + a.eur.invertidoBrutoEur, 0)
+    const totalRend = totalValor - totalInvertido
+    const rentaFijaInvertido = rentaFija.reduce((s, r) => s + parseEuroNumber(r.invertido || ""), 0)
+    const rentaFijaInteres = rentaFija.reduce((s, r) => s + infInteresNetoRF(r), 0)
+
+    const filasIntereses = cuentasRemuneradas.flatMap((c) =>
+        (Array.isArray(c.rows) ? c.rows : []).map((r) => ({
+            cuenta: c.nombre || "Cuenta",
+            fecha: r.fecha,
+            bruto: parseEuroNumber(r.acumulado || ""),
+            impuestos: parseEuroNumber(r.impuestos || "")
+        }))
+    )
+    const interesesNetos = filasIntereses.reduce((s, r) => s + r.bruto - r.impuestos, 0)
+    const dividendosTotal = dividendos.reduce((s, r) => s + parseEuroNumber(r.total || ""), 0)
+    const dividendosAnio = dividendos
+        .filter((r) => infAnio(r.fecha) === anioActual)
+        .reduce((s, r) => s + parseEuroNumber(r.total || ""), 0)
+    const ganancia = (v) => parseLooseNumber(v.dineroDeclarar) || 0
+    const coste = (v) => parseLooseNumber(v.costeAdquisicion ?? v.valorCompra) || 0
+    const realizado = ventas.reduce((s, v) => s + ganancia(v), 0)
+
+    const kpis = infKpis([
+        { label: "Valor de la cartera", valor: infEur(totalValor) },
+        { label: "Invertido", valor: infEur(totalInvertido) },
+        {
+            label: "Rendimiento latente",
+            valor: infEurSigno(totalRend),
+            nota: infPctSigno(totalInvertido > 0 ? (totalRend / totalInvertido) * 100 : NaN)
+        },
+        { label: "Beneficio realizado", valor: infEurSigno(realizado), nota: "Ventas (FIFO)" },
+        {
+            label: "Dividendos cobrados",
+            valor: infEur(dividendosTotal),
+            nota: `${anioActual}: ${infEur(dividendosAnio)}`
+        },
+        { label: "Intereses netos", valor: infEur(interesesNetos), nota: "Cuentas remuneradas" },
+        {
+            label: "Renta fija",
+            valor: infEur(rentaFijaInvertido),
+            nota: rentaFija.length ? `Intereses netos ${infEur(rentaFijaInteres)}` : ""
+        },
+        { label: "Activos en cartera", valor: String(activos.length) }
+    ])
+
+    // Distribución: la misma que Métricas › Distribución del Portfolio (valor actual).
+    const porTipo = [
+        ...INF_TIPOS.map((t) => ({
+            label: M_TYPE_LABELS[t],
+            valor: activos.filter((a) => a.assetType === t).reduce((s, a) => s + a.eur.netoActualEur, 0),
+            color: M_TYPE_COLORS[t]
+        })),
+        { label: "Renta Fija", valor: rentaFijaInvertido, color: M_TYPE_COLORS.rentaFija }
+    ]
+    const porActivo = [
+        ...activos.map((a) => ({ label: a.nombre, valor: a.eur.netoActualEur, color: a.color })),
+        ...rentaFija.map((r) => ({ label: r.instrumento || r._origen, valor: parseEuroNumber(r.invertido || "") }))
+    ]
+        .sort((a, b) => b.valor - a.valor)
+        .map((item, i) => ({ ...item, color: item.color || M_PALETTE[i % M_PALETTE.length] }))
+
+    const graficos = `
+        <div class="infGraficosFila">
+            ${infDonut(porTipo, { titulo: "Por tipo de activo" })}
+            ${infDonut(porActivo, { titulo: "Por activo individual", columnasLeyenda: porActivo.length > 14 ? 2 : 1 })}
+        </div>`
+
+    // Resumen por tipo.
+    const filasTipo = INF_TIPOS.map((t) => {
+        const grupo = activos.filter((a) => a.assetType === t)
+        if (!grupo.length) return null
+        const valor = grupo.reduce((s, a) => s + a.eur.netoActualEur, 0)
+        const inv = grupo.reduce((s, a) => s + a.eur.invertidoBrutoEur, 0)
+        return [
+            infEsc(M_TYPE_LABELS[t]),
+            String(grupo.length),
+            infEur(inv),
+            infEur(valor),
+            infEurSigno(valor - inv),
+            infPctSigno(inv > 0 ? ((valor - inv) / inv) * 100 : NaN),
+            infPct(totalValor > 0 ? (valor / totalValor) * 100 : 0)
+        ]
+    }).filter(Boolean)
+    const tablaTipos = infTabla(
+        [
+            { label: "Tipo" },
+            { label: "Activos", num: true },
+            { label: "Invertido", num: true },
+            { label: "Valor actual", num: true },
+            { label: "Rendimiento", num: true },
+            { label: "Rend. %", num: true },
+            { label: "Peso", num: true }
+        ],
+        filasTipo,
+        [
+            "Total",
+            String(activos.length),
+            infEur(totalInvertido),
+            infEur(totalValor),
+            infEurSigno(totalRend),
+            infPctSigno(totalInvertido > 0 ? (totalRend / totalInvertido) * 100 : NaN),
+            "100,00 %"
+        ]
+    )
+
+    // Posiciones: importes en la moneda de cada activo, como en la Vista general.
+    const ordenados = [...activos].sort((a, b) => b.eur.netoActualEur - a.eur.netoActualEur)
+    const tablaPosiciones = infTabla(
+        [
+            { label: "Activo" },
+            { label: "Tipo" },
+            { label: "Posición", num: true },
+            { label: "Precio medio", num: true },
+            { label: "Precio actual", num: true },
+            { label: "Inv. bruta", num: true },
+            { label: "Comisiones", num: true },
+            { label: "Valor actual", num: true },
+            { label: "Rendimiento", num: true },
+            { label: "Rend. %", num: true },
+            { label: "Peso", num: true }
+        ],
+        ordenados.map((a) => {
+            const rend = a.overviewYieldValue ?? 0
+            return [
+                `<strong>${infEsc(a.nombre)}</strong>`,
+                infEsc(a.tipo),
+                formatAssetParticipationValue(a.participaciones, a.assetType),
+                formatMoney(a.promedioCompra, a.currency),
+                formatMoney(a.overviewCurrentPrice ?? a.valorActual, a.currency),
+                formatMoney(a.invertidoBruto, a.currency),
+                formatMoney(a.comisionesFiat ?? a.comisiones, a.currency),
+                formatMoney(a.overviewCurrentValue, a.currency),
+                `<span class="${infClase(rend)}">${infSigno(rend)}${formatMoney(rend, a.currency)}</span>`,
+                infPctSigno(a.invertidoBruto > 0 ? (rend / a.invertidoBruto) * 100 : NaN),
+                infPct(totalValor > 0 ? (a.eur.netoActualEur / totalValor) * 100 : 0)
+            ]
+        })
+    )
+
+    // Renta fija.
+    const tablaRentaFija = infTabla(
+        [
+            { label: "Instrumento" },
+            { label: "Clase" },
+            { label: "Fecha" },
+            { label: "Vencimiento" },
+            { label: "Rentabilidad", num: true },
+            { label: "Invertido", num: true },
+            { label: "Interés neto", num: true }
+        ],
+        rentaFija.map((r) => [
+            infEsc(r.instrumento || "—"),
+            infEsc(r._origen),
+            infEsc(r.fecha || ""),
+            infEsc(r.vencimiento || ""),
+            infEsc(r.rentabilidad || ""),
+            infEur(parseEuroNumber(r.invertido || "")),
+            infEurSigno(infInteresNetoRF(r))
+        ]),
+        ["Total", "", "", "", "", infEur(rentaFijaInvertido), infEurSigno(rentaFijaInteres)]
+    )
+
+    // Dividendos: resumen por año, por activo y detalle del año en curso.
+    const divAnios = {}
+    const divActivos = {}
+    dividendos.forEach((r) => {
+        const anio = infAnio(r.fecha) ?? "Sin fecha"
+        const total = parseEuroNumber(r.total || "")
+        const imp = parseEuroNumber(r.impuestos || "")
+        divAnios[anio] ||= { n: 0, total: 0, impuestos: 0 }
+        divAnios[anio].n += 1
+        divAnios[anio].total += total
+        divAnios[anio].impuestos += imp
+        const nombre = r.instrumento || "Sin nombre"
+        divActivos[nombre] ||= { n: 0, total: 0 }
+        divActivos[nombre].n += 1
+        divActivos[nombre].total += total
+    })
+    const tablaDivAnios = infTabla(
+        [
+            { label: "Año" },
+            { label: "Cobros", num: true },
+            { label: "Impuestos", num: true },
+            { label: "Total", num: true }
+        ],
+        Object.entries(divAnios)
+            .sort((a, b) => String(b[0]).localeCompare(String(a[0])))
+            .map(([anio, d]) => [infEsc(anio), String(d.n), infEur(d.impuestos), infEur(d.total)]),
+        [
+            "Total",
+            String(dividendos.length),
+            infEur(Object.values(divAnios).reduce((s, d) => s + d.impuestos, 0)),
+            infEur(dividendosTotal)
+        ]
+    )
+    const tablaDivActivos = infTabla(
+        [
+            { label: "Activo" },
+            { label: "Cobros", num: true },
+            { label: "Total", num: true },
+            { label: "% del total", num: true }
+        ],
+        Object.entries(divActivos)
+            .sort((a, b) => b[1].total - a[1].total)
+            .map(([nombre, d]) => [
+                infEsc(nombre),
+                String(d.n),
+                infEur(d.total),
+                infPct(dividendosTotal > 0 ? (d.total / dividendosTotal) * 100 : 0)
+            ])
+    )
+    const divDelAnio = dividendos
+        .filter((r) => infAnio(r.fecha) === anioActual)
+        .sort((a, b) => (infFecha(a.fecha)?.orden || 0) - (infFecha(b.fecha)?.orden || 0))
+    const tablaDivDetalle = infTabla(
+        [
+            { label: "Fecha" },
+            { label: "Activo" },
+            { label: "Acciones", num: true },
+            { label: "Dividendo/acción", num: true },
+            { label: "Impuestos", num: true },
+            { label: "Total", num: true }
+        ],
+        divDelAnio.map((r) => [
+            infEsc(r.fecha || ""),
+            infEsc(r.instrumento || ""),
+            infEsc(r.acciones || ""),
+            infEsc(r.dividendoAccion || ""),
+            infEsc(r.impuestos || ""),
+            infEsc(r.total || "")
+        ]),
+        ["Total", "", "", "", "", infEur(dividendosAnio)]
+    )
+    const dividendosHtml = dividendos.length
+        ? `<div class="infDosColumnas">${tablaDivAnios}${tablaDivActivos}</div>${
+              tablaDivDetalle ? `<h3>Cobros de ${anioActual}</h3>${tablaDivDetalle}` : ""
+          }`
+        : ""
+
+    // Intereses de las cuentas remuneradas.
+    const intCuentas = {}
+    filasIntereses.forEach((r) => {
+        intCuentas[r.cuenta] ||= { bruto: 0, impuestos: 0, n: 0 }
+        intCuentas[r.cuenta].bruto += r.bruto
+        intCuentas[r.cuenta].impuestos += r.impuestos
+        intCuentas[r.cuenta].n += 1
+    })
+    const intBruto = filasIntereses.reduce((s, r) => s + r.bruto, 0)
+    const intImp = filasIntereses.reduce((s, r) => s + r.impuestos, 0)
+    const tablaIntereses = infTabla(
+        [
+            { label: "Cuenta" },
+            { label: "Liquidaciones", num: true },
+            { label: "Bruto", num: true },
+            { label: "Impuestos", num: true },
+            { label: "Neto", num: true }
+        ],
+        Object.entries(intCuentas).map(([nombre, d]) => [
+            infEsc(nombre),
+            String(d.n),
+            infEur(d.bruto),
+            infEur(d.impuestos),
+            infEur(d.bruto - d.impuestos)
+        ]),
+        ["Total", String(filasIntereses.length), infEur(intBruto), infEur(intImp), infEur(interesesNetos)]
+    )
+
+    // Ventas realizadas.
+    const ventasAnios = {}
+    ventas.forEach((v) => {
+        const anio = infAnio(v.fecha) ?? "Sin fecha"
+        ventasAnios[anio] ||= { n: 0, valor: 0, coste: 0, ganancia: 0 }
+        ventasAnios[anio].n += 1
+        ventasAnios[anio].valor += parseLooseNumber(v.valorVenta) || 0
+        ventasAnios[anio].coste += coste(v)
+        ventasAnios[anio].ganancia += ganancia(v)
+    })
+    const tablaVentasAnios = infTabla(
+        [
+            { label: "Año" },
+            { label: "Ventas", num: true },
+            { label: "Valor de venta", num: true },
+            { label: "Coste de adquisición", num: true },
+            { label: "Ganancia / pérdida", num: true }
+        ],
+        Object.entries(ventasAnios)
+            .sort((a, b) => String(b[0]).localeCompare(String(a[0])))
+            .map(([anio, d]) => [infEsc(anio), String(d.n), infEur(d.valor), infEur(d.coste), infEurSigno(d.ganancia)])
+    )
+    const ventasDelAnio = ventas
+        .filter((v) => infAnio(v.fecha) === anioActual)
+        .sort((a, b) => (infFecha(a.fecha)?.orden || 0) - (infFecha(b.fecha)?.orden || 0))
+    const tablaVentasDetalle = infTabla(
+        [
+            { label: "Fecha" },
+            { label: "Activo" },
+            { label: "Cantidad", num: true },
+            { label: "Valor de venta", num: true },
+            { label: "Coste", num: true },
+            { label: "Ganancia / pérdida", num: true }
+        ],
+        ventasDelAnio.map((v) => [
+            infEsc(v.fecha || ""),
+            infEsc(v.activo || ""),
+            infEsc(v.cantidad || ""),
+            infEur(parseLooseNumber(v.valorVenta) || 0),
+            infEur(coste(v)),
+            infEurSigno(ganancia(v))
+        ])
+    )
+    const ventasHtml = ventas.length
+        ? `${tablaVentasAnios}${tablaVentasDetalle ? `<h3>Ventas de ${anioActual}</h3>${tablaVentasDetalle}` : ""}`
+        : ""
+
+    const nombrePortfolio = window._viewAllPortfolios
+        ? "Todos los portfolios"
+        : document.getElementById("portfolioCurrentName")?.textContent?.trim() || "Portfolio"
+
+    return `
+        ${infCabecera("Informe del portfolio", nombrePortfolio)}
+        ${kpis}
+        ${infSeccion("Distribución del portfolio", graficos, "Por valor actual en euros. La renta fija cuenta por lo invertido.")}
+        ${infSeccion("Resumen por tipo de activo", tablaTipos)}
+        ${infSeccion("Posiciones", tablaPosiciones, "Importes en la moneda de cada activo; el peso, sobre el valor en euros.")}
+        ${infSeccion("Renta fija", tablaRentaFija)}
+        ${infSeccion("Dividendos", dividendosHtml)}
+        ${infSeccion("Intereses de cuentas remuneradas", tablaIntereses)}
+        ${infSeccion("Beneficio realizado (ventas)", ventasHtml, "Ganancia o pérdida patrimonial calculada por FIFO.")}
+        <footer class="infPie">PortfolioManager · Las cotizaciones son las últimas guardadas al generar el informe.</footer>`
+}
+
+async function descargarInformePortfolio(boton = null) {
+    await infGenerar(boton, async () => {
+        const datos = await infDatosPortfolio()
+        if (!datos.activos.length && !datos.dividendos.length) {
+            alert("No hay activos para incluir en el informe.")
+            return
+        }
+        infImprimir(infHtmlPortfolio(datos), `informe-portfolio-${new Date().toISOString().slice(0, 10)}`)
+    })
+}
+
+// ── informe de finanzas ────────────────────────────────────────────────────
+
+async function infDatosFinanzas(anio) {
+    const [gastosAnios, ingresosAnios, cuentasData, transfData, intData, divData] = await Promise.all([
+        infGet("/api/gastos", { years: [] }),
+        infGet("/api/ingresos", { years: [] }),
+        infGet("/api/cuentas", { cuentas: [] }),
+        infGet("/api/transferencias", { transferencias: [] }),
+        infGet("/api/intereses", { cuentas: [] }),
+        infGet("/api/dividendos", { rows: [] })
+    ])
+    if (Array.isArray(cuentasData?.cuentas)) window._cuentasDinero = cuentasData.cuentas
+
+    const listaGastos = (gastosAnios?.years || []).map(String)
+    const listaIngresos = (ingresosAnios?.years || []).map(String)
+    const anios = [...new Set([...listaGastos, ...listaIngresos])].sort()
+
+    // mComputeGastosData necesita `year` para saber qué mensualidades ya se han cobrado.
+    const cargarAnio = async (y) => {
+        const [gastos, ingresos] = await Promise.all([
+            listaGastos.includes(y) ? infGet(`/api/gastos/${encodeURIComponent(y)}`, null) : null,
+            listaIngresos.includes(y) ? infGet(`/api/ingresos/${encodeURIComponent(y)}`, null) : null
+        ])
+        return {
+            year: y,
+            gastos: gastos ? { ...gastos, year: gastos.year ?? y } : null,
+            ingresos: ingresos ? { ...ingresos, year: ingresos.year ?? y } : null
+        }
+    }
+    const porAnio = await Promise.all(anios.map(cargarAnio))
+    const actual = porAnio.find((d) => d.year === String(anio)) || (await cargarAnio(String(anio)))
+
+    return {
+        anio: String(anio),
+        porAnio,
+        gastos: actual.gastos,
+        ingresos: actual.ingresos,
+        cuentas: Array.isArray(cuentasData?.cuentas) ? cuentasData.cuentas : [],
+        transferencias: Array.isArray(transfData?.transferencias) ? transfData.transferencias : [],
+        cuentasRemuneradas: Array.isArray(intData?.cuentas) ? intData.cuentas : [],
+        dividendos: Array.isArray(divData?.rows) ? divData.rows : []
+    }
+}
+
+function infTotalesAnio(gastos, ingresos) {
+    const g = mComputeGastosData(gastos)
+    const ingMes = mComputeIngresosMonthly(ingresos)
+    return {
+        gastosMes: M_GASTOS_KEYS.map((k) => g.totalMes[k] || 0),
+        ingresosMes: M_ING_KEYS.map((k) => ingMes[k] || 0),
+        gastosTipo: g.totalTipo,
+        totalMensualidades: g.totalMensualidades
+    }
+}
+
+function infHtmlFinanzas(datos) {
+    const { anio, porAnio, gastos, ingresos, cuentas, transferencias, cuentasRemuneradas, dividendos } = datos
+    const anioNum = Number(anio)
+    const t = infTotalesAnio(gastos, ingresos)
+    const totalGastos = t.gastosMes.reduce((s, v) => s + v, 0)
+    const totalIngresos = t.ingresosMes.reduce((s, v) => s + v, 0)
+    const ahorro = totalIngresos - totalGastos
+    const tasa = totalIngresos > 0 ? (ahorro / totalIngresos) * 100 : NaN
+
+    const saldoCuentas = cuentas.reduce((s, c) => s + parseEuroNumber(c.saldo), 0)
+    const filasIntereses = cuentasRemuneradas.flatMap((c) =>
+        (Array.isArray(c.rows) ? c.rows : [])
+            .filter((r) => infAnio(r.fecha) === anioNum)
+            .map((r) => ({
+                cuenta: c.nombre || "Cuenta",
+                fecha: r.fecha,
+                bruto: parseEuroNumber(r.acumulado || ""),
+                impuestos: parseEuroNumber(r.impuestos || "")
+            }))
+    )
+    const interesesNetos = filasIntereses.reduce((s, r) => s + r.bruto - r.impuestos, 0)
+    const dividendosAnio = dividendos
+        .filter((r) => infAnio(r.fecha) === anioNum)
+        .reduce((s, r) => s + parseEuroNumber(r.total || ""), 0)
+    const transfAnio = transferencias
+        .filter((tr) => String(tr.year || infAnio(tr.fecha) || "") === anio)
+        .sort((a, b) => (infFecha(a.fecha)?.orden || 0) - (infFecha(b.fecha)?.orden || 0))
+
+    const kpis = infKpis([
+        { label: "Ingresos", valor: `<span class="infPos">${infEur(totalIngresos)}</span>` },
+        { label: "Gastos", valor: `<span class="infNeg">${infEur(totalGastos)}</span>` },
+        { label: "Ahorro", valor: infEurSigno(ahorro), nota: `Tasa de ahorro ${infPct(tasa)}` },
+        { label: "Mensualidades", valor: infEur(t.totalMensualidades) },
+        { label: "Saldo en cuentas", valor: infEur(saldoCuentas), nota: "A día de hoy" },
+        { label: "Intereses netos", valor: infEur(interesesNetos), nota: "Cuentas remuneradas" },
+        { label: "Dividendos", valor: infEur(dividendosAnio) },
+        { label: "Transferencias", valor: String(transfAnio.length) }
+    ])
+
+    // Mes a mes.
+    const grafMeses = infBarrasMensuales([
+        { label: "Ingresos", color: "#2ecc71", valores: t.ingresosMes },
+        { label: "Gastos", color: "#e74c3c", valores: t.gastosMes }
+    ])
+    const tablaMeses = infTabla(
+        [
+            { label: "Mes" },
+            { label: "Ingresos", num: true },
+            { label: "Gastos", num: true },
+            { label: "Ahorro", num: true },
+            { label: "Tasa de ahorro", num: true }
+        ],
+        INF_MESES.map((mes, i) => {
+            const ing = t.ingresosMes[i]
+            const gas = t.gastosMes[i]
+            return [
+                mes,
+                infEur(ing),
+                infEur(gas),
+                infEurSigno(ing - gas),
+                ing > 0 ? infPct(((ing - gas) / ing) * 100) : "—"
+            ]
+        }),
+        ["Total", infEur(totalIngresos), infEur(totalGastos), infEurSigno(ahorro), infPct(tasa)]
+    )
+
+    // Categorías.
+    const aItems = (mapa) =>
+        Object.entries(mapa)
+            .filter(([, v]) => v > 0)
+            .sort((a, b) => b[1] - a[1])
+            .map(([label, valor], i) => ({ label, valor, color: INF_PALETA[i % INF_PALETA.length] }))
+    const graficosCategorias = `
+        <div class="infGraficosFila">
+            ${infDonut(aItems(t.gastosTipo), { titulo: "Gastos por categoría" })}
+            ${infDonut(aItems(mComputeIngresosTipo(ingresos, "all")), { titulo: "Ingresos por categoría" })}
+        </div>`
+
+    // Mensualidades y recurrentes.
+    const sumaMeses = (row) => M_GASTOS_KEYS.reduce((s, k) => s + parseEuroNumber(row.meses?.[k] || ""), 0)
+    const mensualidades = (gastos?.mensualidades || []).filter((m) => m.nombre || sumaMeses(m))
+    const tablaMensualidades = infTabla(
+        [
+            { label: "Servicio" },
+            { label: "Estado" },
+            { label: "Meses con cargo", num: true },
+            { label: `Total ${anio}`, num: true }
+        ],
+        mensualidades
+            .sort((a, b) => sumaMeses(b) - sumaMeses(a))
+            .map((m) => [
+                infEsc(m.nombre || "—"),
+                m.activa === false ? "Pausada" : "Activa",
+                String(M_GASTOS_KEYS.filter((k) => parseEuroNumber(m.meses?.[k] || "") > 0).length),
+                infEur(sumaMeses(m))
+            ]),
+        ["Total", "", "", infEur(mensualidades.reduce((s, m) => s + sumaMeses(m), 0))]
+    )
+    const recurrentes = (ingresos?.recurrentes || []).filter((r) => r.nombre || sumaMeses(r))
+    const tablaRecurrentes = infTabla(
+        [{ label: "Concepto" }, { label: "Categoría" }, { label: `Total ${anio}`, num: true }],
+        recurrentes
+            .sort((a, b) => sumaMeses(b) - sumaMeses(a))
+            .map((r) => [infEsc(r.nombre || "—"), infEsc(r.categoria || ""), infEur(sumaMeses(r))]),
+        ["Total", "", infEur(recurrentes.reduce((s, r) => s + sumaMeses(r), 0))]
+    )
+
+    // Cuentas.
+    const tablaCuentas = infTabla(
+        [
+            { label: "Cuenta" },
+            { label: "Tipo" },
+            { label: "Saldo inicial", num: true },
+            { label: "Entradas", num: true },
+            { label: "Salidas", num: true },
+            { label: "Comisiones", num: true },
+            { label: "Intereses", num: true },
+            { label: "Dividendos", num: true },
+            { label: "Saldo", num: true }
+        ],
+        cuentas.map((c) => [
+            `<strong>${infEsc(c.nombre)}</strong>`,
+            infEsc(c.tipo_etiqueta || c.tipo || ""),
+            infEur(parseEuroNumber(c.saldo_inicial)),
+            infEur(parseEuroNumber(c.entradas)),
+            infEur(-parseEuroNumber(c.salidas)),
+            infEur(-parseEuroNumber(c.comisiones)),
+            infEur(parseEuroNumber(c.intereses)),
+            infEur(parseEuroNumber(c.dividendos_cobrados)),
+            `<strong>${infEur(parseEuroNumber(c.saldo))}</strong>`
+        ]),
+        ["Total", "", "", "", "", "", "", "", `<strong>${infEur(saldoCuentas)}</strong>`]
+    )
+
+    // Cuenta remunerada.
+    const intCuentas = {}
+    filasIntereses.forEach((r) => {
+        intCuentas[r.cuenta] ||= { bruto: 0, impuestos: 0, n: 0 }
+        intCuentas[r.cuenta].bruto += r.bruto
+        intCuentas[r.cuenta].impuestos += r.impuestos
+        intCuentas[r.cuenta].n += 1
+    })
+    const tablaIntereses = infTabla(
+        [
+            { label: "Cuenta" },
+            { label: "Liquidaciones", num: true },
+            { label: "Bruto", num: true },
+            { label: "Impuestos", num: true },
+            { label: "Neto", num: true }
+        ],
+        Object.entries(intCuentas).map(([nombre, d]) => [
+            infEsc(nombre),
+            String(d.n),
+            infEur(d.bruto),
+            infEur(d.impuestos),
+            infEur(d.bruto - d.impuestos)
+        ]),
+        [
+            "Total",
+            String(filasIntereses.length),
+            infEur(filasIntereses.reduce((s, r) => s + r.bruto, 0)),
+            infEur(filasIntereses.reduce((s, r) => s + r.impuestos, 0)),
+            infEur(interesesNetos)
+        ]
+    )
+
+    // Transferencias entre cuentas.
+    const tablaTransferencias = infTabla(
+        [
+            { label: "Fecha" },
+            { label: "Origen" },
+            { label: "Destino" },
+            { label: "Concepto" },
+            { label: "Cantidad", num: true },
+            { label: "Comisión", num: true }
+        ],
+        transfAnio.map((tr) => [
+            infEsc(tr.fecha || ""),
+            infEsc(tr.origen_nombre || ""),
+            infEsc(tr.destino_nombre || ""),
+            infEsc(tr.concepto || ""),
+            infEur(parseEuroNumber(tr.cantidad)),
+            parseEuroNumber(tr.comision) ? infEur(parseEuroNumber(tr.comision)) : ""
+        ]),
+        [
+            "Total",
+            "",
+            "",
+            "",
+            infEur(transfAnio.reduce((s, tr) => s + parseEuroNumber(tr.cantidad), 0)),
+            infEur(transfAnio.reduce((s, tr) => s + parseEuroNumber(tr.comision), 0))
+        ]
+    )
+
+    // Detalle de movimientos.
+    const movimientos = (datosAnio, normalizar) =>
+        M_GASTOS_KEYS.flatMap((k) => datosAnio?.months?.[k]?.rows || [])
+            .filter((r) => r.fecha || r.nombre || parseEuroNumber(r.cantidad || ""))
+            .sort((a, b) => (infFecha(a.fecha)?.orden || 0) - (infFecha(b.fecha)?.orden || 0))
+            .map((r) => [
+                infEsc(r.fecha || ""),
+                infEsc(r.nombre || ""),
+                infEsc(normalizar(r.tipo || "")),
+                infEsc(nombreDeCuenta(r.cuenta || "")),
+                infEur(parseEuroNumber(r.cantidad || ""))
+            ])
+    const colsMov = [
+        { label: "Fecha" },
+        { label: "Concepto" },
+        { label: "Categoría" },
+        { label: "Cuenta" },
+        { label: "Importe", num: true }
+    ]
+    const movGastos = movimientos(gastos, normalizeGastoTipo)
+    const movIngresos = movimientos(ingresos, normalizeIngresoTipo)
+    const tablaMovGastos = infTabla(colsMov, movGastos, [
+        "Total",
+        "",
+        "",
+        "",
+        infEur(totalGastos - t.totalMensualidades)
+    ])
+    const totalRecurrentes = (ingresos?.recurrentes || []).reduce((s, r) => s + sumaMeses(r), 0)
+    const tablaMovIngresos = infTabla(colsMov, movIngresos, [
+        "Total",
+        "",
+        "",
+        "",
+        infEur(totalIngresos - totalRecurrentes)
+    ])
+
+    // Resumen de todos los años.
+    const resumenAnios = porAnio
+        .map((d) => {
+            const r = infTotalesAnio(d.gastos, d.ingresos)
+            const ing = r.ingresosMes.reduce((s, v) => s + v, 0)
+            const gas = r.gastosMes.reduce((s, v) => s + v, 0)
+            return { year: d.year, ing, gas }
+        })
+        .filter((r) => r.ing || r.gas)
+        .reverse()
+    const tablaAnios =
+        resumenAnios.length > 1
+            ? infTabla(
+                  [
+                      { label: "Año" },
+                      { label: "Ingresos", num: true },
+                      { label: "Gastos", num: true },
+                      { label: "Ahorro", num: true },
+                      { label: "Tasa de ahorro", num: true }
+                  ],
+                  resumenAnios.map((r) => [
+                      infEsc(r.year),
+                      infEur(r.ing),
+                      infEur(r.gas),
+                      infEurSigno(r.ing - r.gas),
+                      r.ing > 0 ? infPct(((r.ing - r.gas) / r.ing) * 100) : "—"
+                  ])
+              )
+            : ""
+
+    return `
+        ${infCabecera(`Informe de finanzas ${anio}`, "Ingresos, gastos, cuentas y movimientos")}
+        ${kpis}
+        ${infSeccion("Evolución mensual", grafMeses + tablaMeses)}
+        ${infSeccion("Reparto por categorías", graficosCategorias)}
+        ${infSeccion("Mensualidades", tablaMensualidades, "Solo cuentan los meses ya cobrados.")}
+        ${infSeccion("Ingresos recurrentes", tablaRecurrentes)}
+        ${infSeccion("Cuentas", tablaCuentas, "Saldos a día de hoy.")}
+        ${infSeccion("Cuenta remunerada", tablaIntereses)}
+        ${infSeccion("Transferencias entre cuentas", tablaTransferencias)}
+        ${infSeccion("Gastos del año", tablaMovGastos, "Movimientos sueltos; las mensualidades van en su apartado.")}
+        ${infSeccion("Ingresos del año", tablaMovIngresos, "Movimientos sueltos; los recurrentes van en su apartado.")}
+        ${infSeccion("Resumen por años", tablaAnios)}
+        <footer class="infPie">PortfolioManager · Informe de finanzas del año ${infEsc(anio)}.</footer>`
+}
+
+async function descargarInformeFinanzas(anio, boton = null) {
+    await infGenerar(boton, async () => {
+        const year = String(anio || new Date().getFullYear())
+        const datos = await infDatosFinanzas(year)
+        infImprimir(infHtmlFinanzas(datos), `informe-finanzas-${year}`)
+    })
+}

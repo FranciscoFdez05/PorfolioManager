@@ -1039,6 +1039,7 @@ function bindCuentaAhorroEvents() {
     on("cuentaAhorroAddRowBtn", () => openCuentaAhorroMovimientoModal())
     on("cuentaAhorroConfigBtn", openCuentaAhorroConfigModal)
     on("cuentaAhorroCsvBtn", downloadCuentaAhorroCsv)
+    on("cuentaAhorroInformeBtn", (e) => descargarInformeFinanzas(cuentaAhorroYear, e.currentTarget))
     on("cuentaAhorroNewAccountBtn", addCuentaAhorro)
     on("cuentaAhorroRenameBtn", renameCuentaAhorro)
     on("cuentaAhorroDeleteBtn", deleteCuentaAhorro)

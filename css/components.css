@@ -4222,3 +4222,37 @@ table.tablaMidiendo > * > tr > td {
 table.tablaHuecosIguales {
     table-layout: fixed !important;
 }
+
+/* ── Tooltip global: sustituye al title nativo (js/core/tooltips.js) ── */
+.appTooltip {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 100000;
+    pointer-events: none;
+    max-width: min(320px, calc(100vw - 12px));
+    background: var(--bg-elevated);
+    color: #c8d8ef;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-mid);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.02em;
+    opacity: 0;
+    transform: translateY(3px);
+    transition:
+        opacity 0.12s,
+        transform 0.12s;
+}
+.appTooltip.appTooltipBelow {
+    transform: translateY(-3px);
+}
+.appTooltip.appTooltipVisible {
+    opacity: 1;
+    transform: translateY(0);
+}

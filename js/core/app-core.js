@@ -946,6 +946,26 @@ function initNavigation(navButtons, contentArea) {
         },
         true
     )
+
+    // Rendimiento en € bajo cada % de la barra superior (debajo: arriba no hay sitio)
+    const rendTip = document.createElement("div")
+    rendTip.className = "avTooltip avTooltipBelow"
+    document.body.appendChild(rendTip)
+
+    document.addEventListener("mouseover", (e) => {
+        const box = e.target.closest?.(".metricBox[data-rend-eur]")
+        if (!box) return
+        rendTip.textContent = box.dataset.rendEur
+        const r = box.getBoundingClientRect()
+        rendTip.style.left = r.left + r.width / 2 + "px"
+        rendTip.style.top = r.bottom + 6 + "px"
+        rendTip.classList.add("avTooltipVisible")
+    })
+
+    document.addEventListener("mouseout", (e) => {
+        if (!e.target.closest?.(".metricBox[data-rend-eur]")) return
+        rendTip.classList.remove("avTooltipVisible")
+    })
 }
 
 async function loadPage(page, contentArea = document.getElementById("dynamicContent")) {

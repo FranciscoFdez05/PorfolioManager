@@ -415,6 +415,7 @@ function mSyncTopBar(summaries, rendimiento, invertido, totalCuenta) {
         const rend = group.reduce((s, a) => s + a.rendimientoEur, 0)
         topSet(`topEuros${suffix}`, formatEuro(neto))
         topSet(`topPorcentaje${suffix}`, formatPercent(inv > 0 ? (rend / inv) * 100 : 0))
+        if (typeof setTopRendTooltip === "function") setTopRendTooltip(suffix, rend)
     })
 }
 

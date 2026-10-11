@@ -37,6 +37,7 @@
     <link rel="stylesheet" href="css/pages/ventas.css">
     <link rel="stylesheet" href="css/pages/fundamentales.css">
     <link rel="stylesheet" href="css/pages/sentimiento.css">
+    <link rel="stylesheet" href="css/pages/informes.css">
     <link rel="stylesheet" href="css/themes.css">
     <!-- El marcador del atributo nonce lo sustituye serveIndex por el valor de
          esta petición (core/csp.py). Es el único script en línea de la
@@ -55,6 +56,8 @@
          dom.js expone escapeHtml y los helpers que usan todos los módulos. -->
     <script defer src="js/core/api.js"></script>
     <script defer src="js/core/dom.js"></script>
+    <!-- tooltips.js cambia el title nativo del navegador por un tooltip con estilo. -->
+    <script defer src="js/core/tooltips.js"></script>
     <!-- tablas.js reparte por igual el hueco entre columnas en todas las tablas. -->
     <script defer src="js/core/tablas.js"></script>
 </head>
@@ -2189,5 +2192,6 @@
 <script defer src="js/finanzas/cuentaAhorro.js"></script>
 <script defer src="js/finanzas/cuentas.js"></script>
 <script defer src="js/finanzas/calendario.js"></script>
+<script defer src="js/core/informes.js"></script>
 </body>
 </html>

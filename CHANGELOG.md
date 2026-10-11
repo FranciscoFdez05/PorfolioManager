@@ -22,6 +22,28 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.3.0] — 2026-10-11
+
+**Esquema de base de datos:** no lo toca (sigue en la **20**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Añadido
+
+- Informe en PDF del portfolio («Descargar informe (PDF)» en el menú ··· de la vista
+  general): resumen, distribución por tipo y por activo, posiciones, renta fija, dividendos,
+  intereses de cuentas remuneradas y beneficio realizado por FIFO.
+- Informe en PDF de finanzas del año seleccionado, desde los menús ··· de Gastos, Ingresos,
+  Cuentas y Cuenta remunerada: ingresos, gastos, ahorro, mensualidades, saldo en cuentas,
+  intereses, dividendos y transferencias, con su evolución mensual.
+- Al pasar el ratón por cada % de la barra superior se ve el rendimiento en euros.
+
+### Cambiado
+
+- La vista general agrupa sus acciones en un menú ···: «Mostrar/Esconder ocultos», «Descargar
+  CSV» y el informe en PDF.
+- Los tooltips de toda la app usan el estilo de la app (y su tema claro/oscuro) en vez de la
+  etiqueta nativa del navegador.
+
 ## [4.2.0] — 2026-10-10
 
 **Esquema de base de datos:** sube a la **20**, desde la 19 (columna `cuentas_cobro` en

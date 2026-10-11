@@ -563,6 +563,14 @@
     opacity: 1;
     transform: translateX(-50%) translateY(-100%) translateY(-8px);
 }
+.avTooltip.avTooltipBelow {
+    font-size: 12px;
+    font-weight: 700;
+    transform: translateX(-50%) translateY(4px);
+}
+.avTooltip.avTooltipBelow.avTooltipVisible {
+    transform: translateX(-50%) translateY(0);
+}
 
 .avColorDot {
     width: 14px;

@@ -1,0 +1,308 @@
+/* Informes en PDF (js/core/informes.js).
+ *
+ * El informe se pinta en #informeImprimible, que en pantalla no se ve: solo
+ * aparece al imprimir, y mientras tanto se esconde el resto de la app. Va en
+ * claro y con colores fijos, sin las variables del tema: es papel, y un PDF
+ * oscuro gasta tinta y se lee peor. */
+
+#informeImprimible {
+    display: none;
+}
+
+@media print {
+    @page {
+        margin: 12mm 10mm;
+    }
+
+    html.imprimiendoInforme,
+    html.imprimiendoInforme body {
+        display: block !important;
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+
+    html.imprimiendoInforme body > *:not(#informeImprimible) {
+        display: none !important;
+    }
+
+    html.imprimiendoInforme #informeImprimible {
+        display: block;
+    }
+}
+
+#informeImprimible {
+    color: #0f172a;
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 9pt;
+    line-height: 1.35;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+}
+
+#informeImprimible h1 {
+    margin: 0;
+    font-size: 18pt;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+#informeImprimible h2 {
+    margin: 0 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid #1d4ed8;
+    font-size: 12pt;
+    font-weight: 700;
+    color: #1e3a8a;
+    break-after: avoid;
+}
+
+#informeImprimible h3 {
+    margin: 10px 0 4px;
+    font-size: 10pt;
+    font-weight: 600;
+    color: #334155;
+    break-after: avoid;
+}
+
+.infCabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #cbd5e1;
+}
+
+.infCabecera p {
+    margin: 2px 0 0;
+    color: #475569;
+    font-size: 10pt;
+}
+
+.infCabeceraFecha {
+    color: #64748b;
+    font-size: 8.5pt;
+    white-space: nowrap;
+}
+
+.infKpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.infKpi {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #f8fafc;
+    break-inside: avoid;
+}
+
+.infKpiLabel {
+    color: #64748b;
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.infKpiValor {
+    font-size: 12pt;
+    font-weight: 700;
+}
+
+.infKpiNota {
+    color: #64748b;
+    font-size: 8pt;
+}
+
+/* Un apartado no se parte entre páginas si cabe entero en la siguiente: así el
+ * título no se queda solo al pie. Si no cabe en una página, se parte igual. */
+.infSeccion {
+    margin-bottom: 14px;
+    break-inside: avoid;
+}
+
+.infNota {
+    margin: 0 0 6px;
+    color: #64748b;
+    font-size: 8pt;
+}
+
+.infPos {
+    color: #15803d;
+}
+
+.infNeg {
+    color: #b91c1c;
+}
+
+/* ── tablas ─────────────────────────────────────────────────── */
+
+.infTabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8pt;
+}
+
+.infTabla th {
+    padding: 4px 5px;
+    border-bottom: 1px solid #94a3b8;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 7.5pt;
+    font-weight: 600;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.infTabla td {
+    padding: 3px 5px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+}
+
+.infTabla .num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.infTabla thead {
+    display: table-header-group;
+}
+
+.infTabla tr {
+    break-inside: avoid;
+}
+
+.infTabla tbody tr:nth-child(even) td {
+    background: #f8fafc;
+}
+
+.infTabla .infTotal td {
+    border-top: 1px solid #94a3b8;
+    border-bottom: none;
+    background: #eef2ff;
+    font-weight: 700;
+}
+
+.infDosColumnas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: start;
+}
+
+/* ── gráficos ───────────────────────────────────────────────── */
+
+.infGraficosFila {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 12px;
+    align-items: start;
+}
+
+.infGrafico {
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    break-inside: avoid;
+}
+
+.infGrafico h3 {
+    margin-top: 0;
+}
+
+.infDonut {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.infDonut svg {
+    flex: 0 0 auto;
+}
+
+.infDonutTotalLabel {
+    fill: #64748b;
+    font-size: 9px;
+}
+
+.infDonutTotal {
+    fill: #0f172a;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.infLeyenda {
+    flex: 1 1 170px;
+    display: grid;
+    grid-template-columns: repeat(var(--inf-cols, 1), minmax(0, 250px));
+    align-content: start;
+    gap: 1px 14px;
+    font-size: 7.5pt;
+}
+
+.infLeyendaItem {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+}
+
+.infMuestra {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+}
+
+.infLeyendaNombre {
+    flex: 1;
+    min-width: 45px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.infLeyendaPct {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.infLeyendaValor {
+    min-width: 54px;
+    color: #64748b;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.infLeyendaLinea {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    font-size: 8pt;
+}
+
+.infEje {
+    fill: #64748b;
+    font-size: 11px;
+}
+
+.infPie {
+    margin-top: 16px;
+    padding-top: 6px;
+    border-top: 1px solid #e2e8f0;
+    color: #94a3b8;
+    font-size: 7.5pt;
+}

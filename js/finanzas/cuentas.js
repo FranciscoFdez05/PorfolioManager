@@ -517,6 +517,8 @@ function cntBind() {
     on("cuentasAddRowBtn", () => cntAbrirModalTransferencia())
     on("cuentasNuevaCuentaBtn", () => cntAbrirModalCuenta())
     on("cuentasCsvBtn", cntDescargarCsv)
+    // Con «Todos» seleccionado (cntYear vacío) el informe es del año en curso.
+    on("cuentasInformeBtn", (e) => descargarInformeFinanzas(cntYear, e.currentTarget))
     on("cuentasFiltroQuitar", () => {
         cntFiltro = ""
         cntRender()
