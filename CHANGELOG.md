@@ -22,6 +22,20 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.3.1] — 2026-10-11
+
+**Esquema de base de datos:** no lo toca (sigue en la **20**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Corregido
+
+- «Descargar informe (PDF)» descarga el PDF directamente en vez de abrir el diálogo de
+  imprimir. Se genera en el navegador con `html2canvas-pro` y `jsPDF`, servidas desde
+  `js/vendor/`, en hojas A4 numeradas que no parten filas ni dejan un título solo al pie.
+- Los gráficos circulares de los informes ya no dejan huecos en blanco: van dos por fila solo
+  si sus leyendas son cortas (y entonces miden lo mismo); si una es larga, cada gráfico ocupa
+  su fila y la leyenda se reparte en columnas. Los porcentajes ya no se parten en dos líneas.
+
 ## [4.3.0] — 2026-10-11
 
 **Esquema de base de datos:** no lo toca (sigue en la **20**). Para deshacer la

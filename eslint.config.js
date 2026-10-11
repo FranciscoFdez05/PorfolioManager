@@ -179,6 +179,8 @@ export default [
                 ...globals.browser,
                 // Chart.js se carga desde el CDN en index.html.
                 Chart: "readonly",
+                // Librerías de los informes en PDF (js/vendor/).
+                html2canvas: "readonly",
                 ...globalesAjenos(ruta)
             }
         },

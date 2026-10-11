@@ -1,44 +1,19 @@
 /* Informes en PDF (js/core/informes.js).
  *
- * El informe se pinta en #informeImprimible, que en pantalla no se ve: solo
- * aparece al imprimir, y mientras tanto se esconde el resto de la app. Va en
- * claro y con colores fijos, sin las variables del tema: es papel, y un PDF
- * oscuro gasta tinta y se lee peor. */
+ * El informe se pinta en #informeImprimible fuera de la pantalla solo mientras
+ * se genera el PDF, al ancho útil de una hoja A4. Va en claro y con colores
+ * fijos, sin las variables del tema: es papel, y un PDF oscuro se lee peor. */
 
 #informeImprimible {
-    display: none;
-}
-
-@media print {
-    @page {
-        margin: 12mm 10mm;
-    }
-
-    html.imprimiendoInforme,
-    html.imprimiendoInforme body {
-        display: block !important;
-        height: auto !important;
-        min-height: 0 !important;
-        overflow: visible !important;
-        background: #fff !important;
-    }
-
-    html.imprimiendoInforme body > *:not(#informeImprimible) {
-        display: none !important;
-    }
-
-    html.imprimiendoInforme #informeImprimible {
-        display: block;
-    }
-}
-
-#informeImprimible {
+    position: absolute;
+    left: -10000px;
+    top: 0;
+    box-sizing: border-box;
+    background: #fff;
     color: #0f172a;
     font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-size: 9pt;
     line-height: 1.35;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
 }
 
 #informeImprimible h1 {
@@ -206,9 +181,14 @@
 
 .infGraficosFila {
     display: grid;
-    grid-template-columns: 1fr 1.4fr;
+    grid-template-columns: 1fr 1fr;
     gap: 12px;
-    align-items: start;
+    /* Las dos tarjetas de una fila miden lo mismo: sin escalón al pie. */
+    align-items: stretch;
+}
+
+.infGraficosApilados {
+    grid-template-columns: 1fr;
 }
 
 .infGrafico {
@@ -222,9 +202,10 @@
     margin-top: 0;
 }
 
+/* La leyenda siempre al lado del dibujo: debajo alargaba la tarjeta y la de al
+ * lado se quedaba con un hueco. */
 .infDonut {
     display: flex;
-    flex-wrap: wrap;
     align-items: flex-start;
     gap: 10px;
 }
@@ -245,7 +226,8 @@
 }
 
 .infLeyenda {
-    flex: 1 1 170px;
+    flex: 1 1 0;
+    min-width: 0;
     display: grid;
     grid-template-columns: repeat(var(--inf-cols, 1), minmax(0, 250px));
     align-content: start;
@@ -277,11 +259,13 @@
 
 .infLeyendaPct {
     font-weight: 700;
+    white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
 
 .infLeyendaValor {
     min-width: 54px;
+    white-space: nowrap;
     color: #64748b;
     text-align: right;
     font-variant-numeric: tabular-nums;

@@ -2,11 +2,10 @@
 // finanzas (menús ··· de Gastos, Ingresos, Cuentas y Cuenta remunerada, que
 // sacan todos el mismo informe).
 //
-// Mismo criterio que el informe de la Renta (python/core/informe_renta.py): se
-// maqueta en HTML y se manda a imprimir, y el diálogo del navegador lo guarda
-// como PDF. No hace falta ninguna librería de PDF y el texto sale vectorial y
-// seleccionable. Los gráficos son SVG dibujados aquí, no los canvas de
-// Chart.js: un canvas impreso sale borroso y con el fondo oscuro de la app.
+// Se maqueta en HTML, html2canvas lo fotografía y jsPDF lo parte en hojas A4 y
+// lo descarga directamente, sin pasar por el diálogo de imprimir (las dos
+// librerías están en js/vendor/). Los gráficos son SVG dibujados aquí, no los
+// canvas de Chart.js, que llevan el fondo oscuro de la app.
 //
 // Las cifras salen de las mismas funciones que pintan la Vista general y
 // Métricas (buildOverviewRow, mComputeGastosData…), para que el informe cuadre
@@ -181,14 +180,32 @@ function infDonut(items, { titulo = "", columnasLeyenda = 1 } = {}) {
         <div class="infGrafico">
             ${titulo ? `<h3>${infEsc(titulo)}</h3>` : ""}
             <div class="infDonut">
-                <svg viewBox="0 0 180 180" width="140" height="140" role="img" aria-label="${infEsc(titulo)}">
+                <svg viewBox="0 0 180 180" width="120" height="120" role="img" aria-label="${infEsc(titulo)}">
                     ${porciones}
-                    <text x="${c}" y="${c - 4}" text-anchor="middle" class="infDonutTotalLabel">Total</text>
-                    <text x="${c}" y="${c + 12}" text-anchor="middle" class="infDonutTotal">${infEsc(infEur(total))}</text>
+                    <text x="${c}" y="${c - 4}" text-anchor="middle" fill="#64748b" font-size="9" font-family="Segoe UI, Roboto, Arial, sans-serif">Total</text>
+                    <text x="${c}" y="${c + 12}" text-anchor="middle" fill="#0f172a" font-size="11" font-weight="700" font-family="Segoe UI, Roboto, Arial, sans-serif">${infEsc(infEur(total))}</text>
                 </svg>
                 <div class="infLeyenda" style="--inf-cols:${columnasLeyenda}">${leyenda}</div>
             </div>
         </div>`
+}
+
+// Dos circulares en la misma fila solo si sus leyendas caben a la altura del
+// dibujo; si una es más larga, el de al lado dejaría un hueco en blanco debajo,
+// así que cada uno va en su fila y la leyenda larga se reparte en columnas.
+const INF_LEYENDA_CORTA = 8
+
+function infFilaDonuts(graficos) {
+    const contar = (items) => items.filter((i) => Number.isFinite(i.valor) && i.valor !== 0).length
+    const apilados = graficos.some((g) => contar(g.items) > INF_LEYENDA_CORTA)
+    const html = graficos
+        .map((g) => {
+            const n = contar(g.items)
+            const columnasLeyenda = !apilados ? 1 : n > 40 ? 3 : n > INF_LEYENDA_CORTA ? 2 : 1
+            return infDonut(g.items, { titulo: g.titulo, columnasLeyenda })
+        })
+        .join("")
+    return `<div class="infGraficosFila${apilados ? " infGraficosApilados" : ""}">${html}</div>`
 }
 
 // Barras agrupadas por mes (p. ej. ingresos frente a gastos).
@@ -210,7 +227,7 @@ function infBarrasMensuales(series) {
                 return `<rect x="${(x0 + i * barra).toFixed(1)}" y="${(base - h).toFixed(1)}" width="${(barra - 2).toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${s.color}"/>`
             })
             .join("")
-        return `${barras}<text x="${(m * grupo + grupo / 2).toFixed(1)}" y="${alto - 6}" text-anchor="middle" class="infEje">${mes.slice(0, 3)}</text>`
+        return `${barras}<text x="${(m * grupo + grupo / 2).toFixed(1)}" y="${alto - 6}" text-anchor="middle" fill="#64748b" font-size="11" font-family="Segoe UI, Roboto, Arial, sans-serif">${mes.slice(0, 3)}</text>`
     }).join("")
     const leyenda = series
         .map(
@@ -228,32 +245,123 @@ function infBarrasMensuales(series) {
         </div>`
 }
 
-// ── impresión ──────────────────────────────────────────────────────────────
+// ── PDF ────────────────────────────────────────────────────────────────────
 
-// Pinta el informe en un contenedor que solo se ve al imprimir y abre el
-// diálogo de impresión. El título del documento es el nombre de archivo que
-// propone el navegador al guardar el PDF.
-function infImprimir(html, nombreArchivo) {
+// A4 en milímetros. El contenedor se maqueta al ancho útil de la hoja a 96 ppp
+// para que el texto salga al tamaño en puntos que dice informes.css.
+const INF_PAGINA = { ancho: 210, alto: 297, margenX: 10, margenY: 12, pie: 6 }
+const INF_PX_POR_MM = 96 / 25.4
+const INF_ESCALA = 2
+
+// Bloques que no se deben partir entre hojas. Un corte solo puede caer en un
+// hueco que no esté dentro de ninguno de ellos.
+const INF_BLOQUES = ".infCabecera, .infKpis, .infGrafico, .infTabla tr, .infNota, .infPie, h2, h3"
+// Bloques tras los que no se corta, para que un título no se quede solo al pie.
+const INF_TITULOS = "h2, h3, .infNota, .infTabla thead tr"
+
+// Alturas (en px del contenedor) donde se puede cortar la hoja.
+function infPuntosDeCorte(contenedor) {
+    const origen = contenedor.getBoundingClientRect().top
+    const bloques = [...contenedor.querySelectorAll(INF_BLOQUES)].map((el) => {
+        const r = el.getBoundingClientRect()
+        return { arriba: r.top - origen, abajo: r.bottom - origen, titulo: el.matches(INF_TITULOS) }
+    })
+    const dentro = (y) => bloques.some((b) => y > b.arriba + 0.5 && y < b.abajo - 0.5)
+    // Lo último que acaba por encima del corte es un título: el corte lo dejaría solo.
+    const trasTitulo = (y) => {
+        const previo = bloques
+            .filter((b) => b.abajo <= y + 0.5)
+            .reduce((a, b) => (!a || b.abajo > a.abajo ? b : a), null)
+        return Boolean(previo?.titulo)
+    }
+    const candidatos = bloques.flatMap((b) => [b.arriba, b.abajo])
+    return [...new Set(candidatos.map((y) => Math.round(y)))]
+        .filter((y) => !dentro(y) && !trasTitulo(y))
+        .sort((a, b) => a - b)
+}
+
+// Reparte el alto total en hojas: cada una acaba en el último corte que cabe.
+// Si un bloque no cabe en una hoja entera, se corta donde se acabe la hoja.
+function infRepartirHojas(altoTotal, altoHoja, cortes) {
+    const hojas = []
+    let y = 0
+    while (y < altoTotal - 1) {
+        const limite = y + altoHoja
+        if (limite >= altoTotal) {
+            hojas.push([y, altoTotal])
+            break
+        }
+        const corte = cortes.filter((c) => c > y + altoHoja * 0.3 && c <= limite).pop() ?? limite
+        hojas.push([y, corte])
+        y = corte
+    }
+    return hojas
+}
+
+// Pinta el informe fuera de la pantalla, lo pasa a imagen y descarga el PDF.
+async function infDescargarPdf(html, nombreArchivo) {
+    if (typeof html2canvas !== "function" || !window.jspdf?.jsPDF) {
+        throw new Error("No se han cargado las librerías del PDF (js/vendor/)")
+    }
+    const P = INF_PAGINA
+    const anchoUtil = P.ancho - 2 * P.margenX
+    const altoUtil = P.alto - 2 * P.margenY - P.pie
+
     document.getElementById("informeImprimible")?.remove()
     const contenedor = document.createElement("div")
     contenedor.id = "informeImprimible"
+    contenedor.style.width = `${Math.round(anchoUtil * INF_PX_POR_MM)}px`
     contenedor.innerHTML = html
     document.body.appendChild(contenedor)
 
-    const tituloAnterior = document.title
-    document.title = nombreArchivo
-    document.documentElement.classList.add("imprimiendoInforme")
+    try {
+        await document.fonts?.ready
+        const cortes = infPuntosDeCorte(contenedor)
+        const lienzo = await html2canvas(contenedor, {
+            scale: INF_ESCALA,
+            backgroundColor: "#ffffff",
+            logging: false
+        })
 
-    window.addEventListener(
-        "afterprint",
-        () => {
-            document.documentElement.classList.remove("imprimiendoInforme")
-            document.title = tituloAnterior
-            contenedor.remove()
-        },
-        { once: true }
-    )
-    window.print()
+        // px del contenedor → mm de la hoja
+        const mmPorPx = anchoUtil / contenedor.offsetWidth
+        const hojas = infRepartirHojas(contenedor.offsetHeight, altoUtil / mmPorPx, cortes)
+
+        const pdf = new window.jspdf.jsPDF({ unit: "mm", format: "a4", compress: true })
+        pdf.setProperties({ title: nombreArchivo, creator: "PortfolioManager" })
+        const trozo = document.createElement("canvas")
+        const ctx = trozo.getContext("2d")
+
+        hojas.forEach(([desde, hasta], i) => {
+            if (i > 0) pdf.addPage()
+            const y0 = Math.round(desde * INF_ESCALA)
+            const alto = Math.max(1, Math.round(hasta * INF_ESCALA) - y0)
+            trozo.width = lienzo.width
+            trozo.height = alto
+            ctx.fillStyle = "#ffffff"
+            ctx.fillRect(0, 0, trozo.width, trozo.height)
+            ctx.drawImage(lienzo, 0, y0, lienzo.width, alto, 0, 0, lienzo.width, alto)
+            pdf.addImage(
+                trozo,
+                "PNG",
+                P.margenX,
+                P.margenY,
+                anchoUtil,
+                (alto / INF_ESCALA) * mmPorPx,
+                undefined,
+                "FAST"
+            )
+
+            pdf.setFontSize(7)
+            pdf.setTextColor(148, 163, 184)
+            pdf.text(nombreArchivo, P.margenX, P.alto - P.margenY + 2)
+            pdf.text(`${i + 1} / ${hojas.length}`, P.ancho - P.margenX, P.alto - P.margenY + 2, { align: "right" })
+        })
+
+        pdf.save(`${nombreArchivo}.pdf`)
+    } finally {
+        contenedor.remove()
+    }
 }
 
 // Envuelve la generación: el botón dice que está trabajando (cargar todos los
@@ -389,11 +497,10 @@ function infHtmlPortfolio(datos) {
         .sort((a, b) => b.valor - a.valor)
         .map((item, i) => ({ ...item, color: item.color || M_PALETTE[i % M_PALETTE.length] }))
 
-    const graficos = `
-        <div class="infGraficosFila">
-            ${infDonut(porTipo, { titulo: "Por tipo de activo" })}
-            ${infDonut(porActivo, { titulo: "Por activo individual", columnasLeyenda: porActivo.length > 14 ? 2 : 1 })}
-        </div>`
+    const graficos = infFilaDonuts([
+        { items: porTipo, titulo: "Por tipo de activo" },
+        { items: porActivo, titulo: "Por activo individual" }
+    ])
 
     // Resumen por tipo.
     const filasTipo = INF_TIPOS.map((t) => {
@@ -666,7 +773,7 @@ async function descargarInformePortfolio(boton = null) {
             alert("No hay activos para incluir en el informe.")
             return
         }
-        infImprimir(infHtmlPortfolio(datos), `informe-portfolio-${new Date().toISOString().slice(0, 10)}`)
+        await infDescargarPdf(infHtmlPortfolio(datos), `informe-portfolio-${new Date().toISOString().slice(0, 10)}`)
     })
 }
 
@@ -797,11 +904,10 @@ function infHtmlFinanzas(datos) {
             .filter(([, v]) => v > 0)
             .sort((a, b) => b[1] - a[1])
             .map(([label, valor], i) => ({ label, valor, color: INF_PALETA[i % INF_PALETA.length] }))
-    const graficosCategorias = `
-        <div class="infGraficosFila">
-            ${infDonut(aItems(t.gastosTipo), { titulo: "Gastos por categoría" })}
-            ${infDonut(aItems(mComputeIngresosTipo(ingresos, "all")), { titulo: "Ingresos por categoría" })}
-        </div>`
+    const graficosCategorias = infFilaDonuts([
+        { items: aItems(t.gastosTipo), titulo: "Gastos por categoría" },
+        { items: aItems(mComputeIngresosTipo(ingresos, "all")), titulo: "Ingresos por categoría" }
+    ])
 
     // Mensualidades y recurrentes.
     const sumaMeses = (row) => M_GASTOS_KEYS.reduce((s, k) => s + parseEuroNumber(row.meses?.[k] || ""), 0)
@@ -1006,6 +1112,6 @@ async function descargarInformeFinanzas(anio, boton = null) {
     await infGenerar(boton, async () => {
         const year = String(anio || new Date().getFullYear())
         const datos = await infDatosFinanzas(year)
-        infImprimir(infHtmlFinanzas(datos), `informe-finanzas-${year}`)
+        await infDescargarPdf(infHtmlFinanzas(datos), `informe-finanzas-${year}`)
     })
 }
