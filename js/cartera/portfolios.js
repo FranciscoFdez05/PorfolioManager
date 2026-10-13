@@ -116,7 +116,6 @@ async function initPortfolioSwitcher() {
                 if (pDelNameInput.value.trim() === portfolioName) closeDelete(true)
             }
             document.getElementById("pDelCancel3").onclick = () => closeDelete(false)
-
         })
     }
 

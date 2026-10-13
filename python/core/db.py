@@ -233,6 +233,7 @@ CREATE TABLE IF NOT EXISTS transacciones (
     total            TEXT NOT NULL DEFAULT '',
     comision_red     TEXT NOT NULL DEFAULT '',
     wallet_tipo      TEXT NOT NULL DEFAULT 'entre_wallet',
+    wallet_desde     TEXT NOT NULL DEFAULT '',
     wallet_destino   TEXT NOT NULL DEFAULT '',
     hash_transaccion TEXT NOT NULL DEFAULT '',
     nota             TEXT NOT NULL DEFAULT ''
@@ -665,7 +666,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id,
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 20
+ESQUEMA_VERSION = 21
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1606,6 +1607,19 @@ def _esquema_20(conn):
     columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(ingresos_recurrentes)")}
     if "cuentas_cobro" not in columnas:
         conn.execute("ALTER TABLE ingresos_recurrentes ADD COLUMN cuentas_cobro TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(21)
+def _esquema_21(conn):
+    """Wallet de origen de las transacciones cripto.
+
+    Hasta ahora solo se apuntaba adónde iba la cripto; con el origen, el
+    gráfico de movimientos puede dibujar de qué wallet a qué wallet pasa. Vacío
+    = sin indicar, que es lo que quedan las transacciones que ya existen.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(transacciones)")}
+    if "wallet_desde" not in columnas:
+        conn.execute("ALTER TABLE transacciones ADD COLUMN wallet_desde TEXT NOT NULL DEFAULT ''")
 
 
 class _CerrarAlTerminarElHilo:

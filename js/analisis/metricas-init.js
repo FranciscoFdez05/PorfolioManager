@@ -22,7 +22,12 @@
 // pasada (si se ocultaran por "no tener gráfico todavía" desaparecerían aunque
 // sí hubiera histórico), y la de riesgo porque su gráfico de drawdown es todo
 // ceros mientras la cartera esté en máximos, que es un dato, no un hueco.
-const _M_SECCIONES_ASINCRONAS = new Set(["mSectionEvolucion", "mSectionEvolucionTipos", "mSectionRiesgo"])
+const _M_SECCIONES_DE_SNAPSHOTS = ["mSectionEvolucion", "mSectionEvolucionTipos", "mSectionRiesgo"]
+
+// Las que esta pasada no toca. Además de las de snapshots, la del saldo durante
+// el mes, que pinta su gráfico después de pedir los saldos de las cuentas y aún
+// no lo tiene cuando pasa esto; ella misma se esconde si no hay ingresos.
+const _M_SECCIONES_ASINCRONAS = new Set([..._M_SECCIONES_DE_SNAPSHOTS, "mSectionSaldoMes"])
 
 function _mChartConDatos(canvas) {
     const chart = _metricasCharts[canvas?.id]
@@ -74,14 +79,33 @@ function _mCategoriaConContenido(cat) {
     return [...elementos].some(_mElementoVisible)
 }
 
+// La pasada solo ve el año y el mes que están elegidos al cargar, y esa elección
+// se recuerda entre visitas. Si el elegido está vacío (un año recién creado, un
+// mes sin gastos todavía) y se escondiera lo que contiene su selector, el
+// selector se iría con ello y no habría forma de volver a otro año o mes. Así
+// que lo que tenga un selector con algo más que elegir se deja visible.
+function _mTieneOtroPeriodo(el, selector) {
+    return [...el.querySelectorAll(selector)].some((grupo) => grupo.querySelectorAll("button").length > 1)
+}
+
 function mOcultarApartadosSinDatos() {
+    // Categorías con un apartado que se puede cambiar de año: sus KPIs dependen
+    // del año elegido, así que tampoco se esconden.
+    const categoriasConAnios = new Set()
+
     document.querySelectorAll(".metricasSection").forEach((seccion) => {
         if (_M_SECCIONES_ASINCRONAS.has(seccion.id)) {
             return
         }
 
+        if (_mTieneOtroPeriodo(seccion, '[id$="YearToggle"]')) {
+            categoriasConAnios.add(seccion.dataset.mcat)
+            return
+        }
+
         const tarjetas = [...seccion.querySelectorAll(".metricasChartCard")]
         tarjetas.forEach((tarjeta) => {
+            if (_mTieneOtroPeriodo(tarjeta, '[id$="MonthToggle"]')) return
             if (!_mContenedorConDatos(tarjeta)) tarjeta.classList.add("hidden")
         })
 
@@ -118,6 +142,8 @@ function mOcultarApartadosSinDatos() {
     // que siguen visibles: los que la propia página ya ha escondido por no tener
     // datos no deben mantener viva la fila entera.
     document.querySelectorAll(".metricasKpiRow[data-mcat]").forEach((fila) => {
+        if (categoriasConAnios.has(fila.dataset.mcat)) return
+
         const grupos = [...fila.querySelectorAll(".metricasKpiGroup")]
         const visibles = grupos.length ? grupos.filter(_mElementoVisible) : [fila]
         const valores = visibles.flatMap((grupo) => [...grupo.querySelectorAll(".mkpiValue")])
@@ -202,7 +228,7 @@ function mRenderAll(payload) {
     // Sin ningún snapshot guardado no hay histórico que graficar en ningún
     // rango, así que las dos secciones de evolución sobran enteras.
     if (!snapshotHistory?.length) {
-        _M_SECCIONES_ASINCRONAS.forEach((id) => document.getElementById(id)?.classList.add("hidden"))
+        _M_SECCIONES_DE_SNAPSHOTS.forEach((id) => document.getElementById(id)?.classList.add("hidden"))
     }
 }
 

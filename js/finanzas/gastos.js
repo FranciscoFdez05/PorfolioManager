@@ -514,7 +514,6 @@ function openGastosCreateModal({ title, bodyHtml, onSubmit, onReady, submitLabel
         feedback.classList.toggle("error", Boolean(message && isError))
     }
 
-
     modal.querySelector("#gastosCreateModalCancelBtn")?.addEventListener("click", closeGastosCreateModal)
     let guardando = false
     modal.querySelector("#gastosCreateModalSaveBtn")?.addEventListener("click", async () => {
@@ -2509,7 +2508,9 @@ function renderGastosMonthTable() {
     ].sort((a, b) => a.dia - b.dia)
 
     lineas.forEach((linea) => {
-        body.appendChild(linea.cargo ? buildMensualidadCargoRow(linea.cargo) : buildGastoMovementRow(linea.row, linea.index))
+        body.appendChild(
+            linea.cargo ? buildMensualidadCargoRow(linea.cargo) : buildGastoMovementRow(linea.row, linea.index)
+        )
     })
 
     const total = rows.reduce((sum, row) => sum + parseEuroNumber(row.cantidad || ""), 0)
@@ -2525,24 +2526,22 @@ function renderGastosMonthTable() {
 // Cargos de las mensualidades que caen en un mes, con su día y su cuenta.
 // Sin día definido el cargo va al final y sin fecha, en vez de inventar una.
 function getMensualidadesDelMes(monthKey) {
-    return (currentGastosData?.mensualidades || [])
-        .map(normalizeMensualidad)
-        .flatMap((row) =>
-            getMensualidadCargos(row)
-                .filter((cargo) => cargo.key === monthKey)
-                .map((cargo) => ({
-                    dia: cargo.sinDia ? Infinity : cargo.date.getTime(),
-                    cargo: {
-                        fecha: cargo.sinDia ? "" : formatGastoCargoDate(cargo.date),
-                        nombre: row.nombre,
-                        tipo: row.categoria || "Mensualidad",
-                        importe: row.meses[monthKey],
-                        cuenta: row.cuentasCobro[monthKey] || row.cuenta,
-                        activa: row.activa,
-                        realizada: !cargo.sinDia && cargo.date.getTime() <= Date.now()
-                    }
-                }))
-        )
+    return (currentGastosData?.mensualidades || []).map(normalizeMensualidad).flatMap((row) =>
+        getMensualidadCargos(row)
+            .filter((cargo) => cargo.key === monthKey)
+            .map((cargo) => ({
+                dia: cargo.sinDia ? Infinity : cargo.date.getTime(),
+                cargo: {
+                    fecha: cargo.sinDia ? "" : formatGastoCargoDate(cargo.date),
+                    nombre: row.nombre,
+                    tipo: row.categoria || "Mensualidad",
+                    importe: row.meses[monthKey],
+                    cuenta: row.cuentasCobro[monthKey] || row.cuenta,
+                    activa: row.activa,
+                    realizada: !cargo.sinDia && cargo.date.getTime() <= Date.now()
+                }
+            }))
+    )
 }
 
 function buildMensualidadCargoRow(cargo) {

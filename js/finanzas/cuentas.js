@@ -100,10 +100,14 @@ function cntRenderCuentas() {
                         ${comisiones ? `<span class="cuentasNeg" title="Comisiones pagadas por esta cuenta">Comisiones ${formatEuro(-comisiones)}</span>` : ""}
                         ${inicial ? `<span>Saldo inicial ${formatEuro(inicial)}</span>` : ""}
                     </div>
-                    ${intereses || dividendos ? `<div class="cntCuentaDetalle">
+                    ${
+                        intereses || dividendos
+                            ? `<div class="cntCuentaDetalle">
                         ${intereses ? `<span class="cuentasPos" title="Intereses netos de la cuenta remunerada vinculada">Intereses ${cntSigned(intereses)}</span>` : ""}
                         ${dividendos ? `<span class="cuentasPos" title="Dividendos cobrados, en euros">Dividendos ${cntSigned(dividendos)}</span>` : ""}
-                    </div>` : ""}
+                    </div>`
+                            : ""
+                    }
                     ${cntVinculosTexto(c)}
                 </div>`
         })
@@ -491,6 +495,24 @@ function cntDescargarCsv() {
     downloadCsvFile(`transferencias${cntYear ? "-" + cntYear : ""}.csv`, filas)
 }
 
+// Respeta el año y la cuenta elegidos, como la tabla. La comisión no se dibuja:
+// no llega a ninguna cuenta.
+function cntAbrirGrafo() {
+    const partes = [cntYear || "Todos los años"]
+    if (cntFiltro) partes.push(`solo ${cntNombre(cntFiltro)}`)
+    abrirGrafoFlujos({
+        titulo: "Movimientos entre cuentas",
+        subtitulo: partes.join(" · "),
+        movimientos: cntTransferenciasVisibles().map((t) => ({
+            origen: t.origen_nombre || cntNombre(t.origen),
+            destino: t.destino_nombre || cntNombre(t.destino),
+            cantidad: parseEuroNumber(t.cantidad)
+        })),
+        formato: formatEuro,
+        vacio: "No hay transferencias en este periodo."
+    })
+}
+
 function cntBind() {
     const trigger = document.querySelector("#cuentasActionsMenu .pageActionsMenuTrigger")
     const menu = document.getElementById("cuentasActionsDropdown")
@@ -517,6 +539,7 @@ function cntBind() {
     on("cuentasAddRowBtn", () => cntAbrirModalTransferencia())
     on("cuentasNuevaCuentaBtn", () => cntAbrirModalCuenta())
     on("cuentasCsvBtn", cntDescargarCsv)
+    on("cuentasGrafoBtn", cntAbrirGrafo)
     // Con «Todos» seleccionado (cntYear vacío) el informe es del año en curso.
     on("cuentasInformeBtn", (e) => descargarInformeFinanzas(cntYear, e.currentTarget))
     on("cuentasFiltroQuitar", () => {

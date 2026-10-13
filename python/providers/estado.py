@@ -330,7 +330,7 @@ def obtener(forzar: bool = False) -> dict:
             return _respuesta_cacheada(previas)
         proveedores = [
             _diagnosticar_o_pausa(*datos) if datos[0] in pendientes else fila
-            for datos, fila in zip(_PROVEEDORES, previas)
+            for datos, fila in zip(_PROVEEDORES, previas, strict=False)
         ]
 
     with _lock:

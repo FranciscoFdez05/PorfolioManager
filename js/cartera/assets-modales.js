@@ -152,9 +152,6 @@ function initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirm
         })
     }
 
-    if (confirmModalOverlay) {
-    }
-
     window.addEventListener("resize", alignConfirmModalToContent)
 }
 

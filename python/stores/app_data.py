@@ -324,7 +324,7 @@ def readTransaccionesFile():
     conn = get_db()
     rows = conn.execute(
         "SELECT id, asset_id, asset_name, fecha_operacion, total, comision_red, "
-        "wallet_tipo, wallet_destino, hash_transaccion, nota FROM transacciones ORDER BY rowid"
+        "wallet_tipo, wallet_desde, wallet_destino, hash_transaccion, nota FROM transacciones ORDER BY rowid"
     ).fetchall()
     return {"rows": [
         {
@@ -335,6 +335,7 @@ def readTransaccionesFile():
             "total": r["total"],
             "comisionRed": r["comision_red"],
             "walletTipo": r["wallet_tipo"],
+            "walletDesde": r["wallet_desde"],
             "walletDestino": r["wallet_destino"],
             "hashTransaccion": r["hash_transaccion"],
             "nota": r["nota"],
@@ -350,12 +351,12 @@ def writeTransaccionesFile(data):
     conn.executemany(
         "INSERT INTO transacciones "
         "(id, asset_id, asset_name, fecha_operacion, total, comision_red, "
-        "wallet_tipo, wallet_destino, hash_transaccion, nota) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "wallet_tipo, wallet_desde, wallet_destino, hash_transaccion, nota) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), r.get("assetId", ""), r.get("assetName", ""),
              r.get("fechaOperacion", ""), r.get("total", ""), r.get("comisionRed", ""),
-             r.get("walletTipo", "entre_wallet"), r.get("walletDestino", ""),
+             r.get("walletTipo", "entre_wallet"), r.get("walletDesde", ""), r.get("walletDestino", ""),
              r.get("hashTransaccion", ""), r.get("nota", ""))
             for r in data.get("rows", [])
         ]

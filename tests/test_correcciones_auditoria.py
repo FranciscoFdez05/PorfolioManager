@@ -470,7 +470,7 @@ def test_la_lista_y_la_tabla_dan_las_mismas_cifras(temp_db, cliente_autenticado)
     for campo in ("rendimiento", "invertidoNeto", "rendimientoPct"):
         assert lista[campo] == tabla[campo], campo
     assert tabla["invertidoNeto"] == 0.27
-    assert tabla["netoActual"] == 85.09  # 8,5 participaciones × 10,01
+    assert tabla["netoActual"] == 85.09  # 8,5 participaciones por 10,01
 
 
 def test_el_importe_del_atajo_admite_separador_de_miles():

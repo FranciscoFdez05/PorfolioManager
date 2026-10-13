@@ -172,6 +172,7 @@ def saveTransacciones():
             "total": str(row.get("total", "")).strip(),
             "comisionRed": str(row.get("comisionRed", "")).strip(),
             "walletTipo": str(row.get("walletTipo", "entre_wallet")).strip().lower() or "entre_wallet",
+            "walletDesde": str(row.get("walletDesde", "")).strip(),
             "walletDestino": str(row.get("walletDestino", "")).strip(),
             "hashTransaccion": str(row.get("hashTransaccion", row.get("walletOrigen", ""))).strip(),
             "nota": str(row.get("nota", "")).strip()

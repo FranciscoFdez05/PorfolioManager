@@ -100,7 +100,13 @@ function _initAjustesGeneral(settings, _fiatCurrencies) {
                 texto: "Escribe tu contraseña de acceso a la web para ver la contraseña guardada.",
                 botones: [
                     { etiqueta: "Cancelar", clase: "cancelButton", valor: "cancelar" },
-                    { etiqueta: "Mostrar", clase: "primaryButton", valor: "con", principal: true, necesitaContrasena: true }
+                    {
+                        etiqueta: "Mostrar",
+                        clase: "primaryButton",
+                        valor: "con",
+                        principal: true,
+                        necesitaContrasena: true
+                    }
                 ],
                 onCerrar: async (valor, contrasenaWeb) => {
                     if (valor !== "con") return
@@ -118,7 +124,8 @@ function _initAjustesGeneral(settings, _fiatCurrencies) {
                         }
                         ocultarContrasenaCopias()
                         bkPwdInput.value = data.contrasena
-                        if (bkPwdInput.type === "password") document.querySelector('[data-target="ajustesBackupContrasena"]')?.click()
+                        if (bkPwdInput.type === "password")
+                            document.querySelector('[data-target="ajustesBackupContrasena"]')?.click()
                         bkPwdTemporizador = setTimeout(ocultarContrasenaCopias, 30000)
                         showMsg(bkPwdMsg, "Visible 30 s", "ok")
                     } catch {

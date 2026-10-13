@@ -129,6 +129,28 @@ function bindTransaccionesEvents() {
         })
     }
 
+    const menuTrigger = document.querySelector("#transaccionesActionsMenu .pageActionsMenuTrigger")
+    const menu = document.getElementById("transaccionesActionsDropdown")
+    if (menuTrigger && menu && !menu.dataset.bound) {
+        menu.dataset.bound = "true"
+        menuTrigger.addEventListener("click", (event) => {
+            event.stopPropagation()
+            menu.classList.toggle("open")
+        })
+        menu.addEventListener("click", () => menu.classList.remove("open"))
+        // Como en Cuentas: el listener del documento se retira solo cuando el
+        // menú ya no está en pantalla.
+        const cerrar = () => {
+            if (!menu.isConnected) {
+                document.removeEventListener("click", cerrar)
+                return
+            }
+            menu.classList.remove("open")
+        }
+        document.addEventListener("click", cerrar)
+        document.getElementById("transaccionesGrafoBtn")?.addEventListener("click", abrirGrafoTransacciones)
+    }
+
     if (saveButton && !saveButton.dataset.bound) {
         saveButton.dataset.bound = "true"
         saveButton.addEventListener("click", async () => {
@@ -154,6 +176,7 @@ function createEmptyTransaccionRow() {
         total: "0,00000000",
         comisionRed: "0,00000000",
         walletTipo: "entre_wallet",
+        walletDesde: "",
         walletDestino: "",
         hashTransaccion: "",
         nota: ""
@@ -293,6 +316,7 @@ function buildTransaccionRow(row) {
         <td>${formatTransaccionesNumber(row.total)}</td>
         <td>${formatTransaccionesNumber(row.comisionRed)}</td>
         <td>${walletLabel}</td>
+        <td>${escapeHtml(row.walletDesde || "")}</td>
         <td>${escapeHtml(row.walletDestino || "")}</td>
         <td class="transaccionHashCell" data-full-value="${escapeHtml(hashTransaccion)}" title="Haz clic para copiar el hash completo">${escapeHtml(formatHashTransaccionDisplay(hashTransaccion))}</td>
         <td>${escapeHtml(row.nota || "")}</td>
@@ -490,6 +514,10 @@ function openTransaccionRowModal(rowId) {
             </select>
         </div>
         <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Wallet origen</label>
+            <input id="txModalWalletDesde" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.walletDesde || "")}" placeholder="Ej: Binance">
+        </div>
+        <div class="assetRowModalField">
             <label class="assetRowModalLabel">Wallet destino</label>
             <input id="txModalWalletDestino" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.walletDestino)}">
         </div>
@@ -553,6 +581,35 @@ function openTransaccionRowModal(rowId) {
     document.body.appendChild(overlay)
 }
 
+// Gráfico de la moneda seleccionada: no se mezclan monedas porque las cantidades
+// van en unidades. Sin wallet indicada, lo recibido viene de «Externa» y lo
+// enviado va a «Externa»; el resto queda como «Sin indicar».
+function abrirGrafoTransacciones() {
+    const asset = getCurrentTransaccionesAsset()
+    if (!asset) return
+    const simbolo = String(asset.symbol || asset.name || "").trim()
+    const filas = getCurrentAssetRows()
+    const sinOrigen = filas.some(
+        (row) => !String(row.walletDesde || "").trim() && normalizeTransaccionWalletTipo(row.walletTipo) !== "recibida"
+    )
+    const movimientos = filas.map((row) => {
+        const tipo = normalizeTransaccionWalletTipo(row.walletTipo)
+        const origen = String(row.walletDesde || "").trim() || (tipo === "recibida" ? "Externa" : "Sin indicar")
+        const destino = String(row.walletDestino || "").trim() || (tipo === "enviada" ? "Externa" : "Sin indicar")
+        return { origen, destino, cantidad: parseLooseNumber(row.total) ?? 0 }
+    })
+    abrirGrafoFlujos({
+        titulo: `Movimientos de ${asset.name || simbolo}`,
+        subtitulo: sinOrigen
+            ? "Hay transacciones sin wallet de origen: salen de «Sin indicar». Edítalas para que salgan de su wallet."
+            : `${filas.length} transacción${filas.length === 1 ? "" : "es"}`,
+        movimientos,
+        formato: (n) =>
+            `${n.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 8 })} ${simbolo}`.trim(),
+        vacio: `No hay transacciones de ${asset.name || simbolo} entre dos wallets distintas.`
+    })
+}
+
 function closeTransaccionRowModal() {
     document.getElementById("transaccionRowModalOverlay")?.remove()
 }
@@ -571,6 +628,7 @@ function saveTransaccionRowFromModal() {
         total: g("txModalTotal"),
         comisionRed: g("txModalComision"),
         walletTipo: normalizeTransaccionWalletTipo(g("txModalWalletTipo")),
+        walletDesde: g("txModalWalletDesde").trim(),
         walletDestino: g("txModalWalletDestino"),
         hashTransaccion: normalizeHashTransaccionValue(g("txModalHash")),
         nota: g("txModalNota")

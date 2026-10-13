@@ -80,9 +80,7 @@ async function setDividendosCuentaCobra(id, cobra) {
 // las que no los cobran ya.
 function openDividendosCuentaPicker({ title, onConfirm }) {
     const libres = _dividendosCuentas.filter((c) => !c.dividendos)
-    const opciones = libres
-        .map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.nombre)}</option>`)
-        .join("")
+    const opciones = libres.map((c) => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.nombre)}</option>`).join("")
 
     openGastosCreateModal({
         title,
@@ -391,7 +389,6 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
         node.classList.toggle("hidden", !message)
         node.classList.toggle("error", Boolean(message && isError))
     }
-
 
     modal.querySelector("#dividendosModalCancelBtn")?.addEventListener("click", closeDividendosModal)
 

@@ -145,9 +145,7 @@ function _pintarMarcaVersion() {
     if (!marca) return
     marca.classList.toggle("hayNueva", _hayVersionNueva === true)
     marca.title =
-        _hayVersionNueva === true
-            ? `Hay una versión nueva: la ${_versionPublicada}`
-            : "Versión de PorfolioManager"
+        _hayVersionNueva === true ? `Hay una versión nueva: la ${_versionPublicada}` : "Versión de PorfolioManager"
 }
 
 function _pintarUpdate(datos) {

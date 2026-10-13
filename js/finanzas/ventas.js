@@ -279,7 +279,6 @@ function openVentasModal(rowIndex = -1) {
         node.classList.toggle("error", Boolean(message && isError))
     }
 
-
     modal.querySelector("#ventasModalCancelBtn")?.addEventListener("click", closeVentasModal)
     modal.querySelector("#ventasModalSaveBtn")?.addEventListener("click", async () => {
         const fecha = modal.querySelector("#ventaFechaInput")?.value.trim() || ""

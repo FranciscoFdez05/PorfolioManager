@@ -387,7 +387,6 @@ function openInteresesModal(globalIndex = -1, defaultFecha = "") {
         node.classList.toggle("error", Boolean(message && isError))
     }
 
-
     modal.querySelector("#interesesModalCancelBtn")?.addEventListener("click", closeInteresesModal)
     modal.querySelector("#interesesModalSaveBtn")?.addEventListener("click", async () => {
         const fecha = modal.querySelector("#interesFechaInput")?.value.trim() || ""

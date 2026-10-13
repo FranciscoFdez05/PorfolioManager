@@ -4256,3 +4256,189 @@ table.tablaHuecosIguales {
     opacity: 1;
     transform: translateY(0);
 }
+
+/* ── Grafo de flujos (Cuentas y Transacciones cripto) ─────────────────── */
+.grafoFlujosModal {
+    --grafo-nodo: #1e3a5f;
+    --grafo-nodo-borde: #3b82f6;
+    --grafo-enlace: #64748b;
+    --grafo-entra: #34d399;
+    --grafo-sale: #f87171;
+    --grafo-texto: var(--text-primary);
+    --grafo-texto-suave: var(--text-muted);
+    --grafo-fondo: var(--bg-surface);
+    width: min(820px, 100%);
+}
+
+html[data-theme="light"] .grafoFlujosModal {
+    --grafo-nodo: #dbeafe;
+    --grafo-nodo-borde: #2563eb;
+    --grafo-enlace: #94a3b8;
+    --grafo-entra: #059669;
+    --grafo-sale: #dc2626;
+    --grafo-texto: #0f172a;
+    --grafo-texto-suave: #475569;
+    --grafo-fondo: #ffffff;
+}
+
+.grafoFlujosCab {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.grafoFlujosSub {
+    margin: -6px 0 0;
+    color: var(--grafo-texto-suave);
+    font-size: 13px;
+}
+
+.grafoFlujosLeyenda {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
+    margin: 12px 0 4px;
+    color: var(--grafo-texto-suave);
+    font-size: 12px;
+}
+
+.grafoFlujosLeyenda span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.grafoFlujosPista {
+    flex-basis: 100%;
+}
+
+.grafoMuestra {
+    display: inline-block;
+    width: 18px;
+    height: 3px;
+    border-radius: 2px;
+}
+
+.grafoMuestraEntra {
+    background: var(--grafo-entra);
+}
+
+.grafoMuestraSale {
+    background: var(--grafo-sale);
+}
+
+.grafoFlujosSvg {
+    display: block;
+    width: 100%;
+    height: auto;
+    user-select: none;
+}
+
+.grafoEnlaceLinea {
+    fill: none;
+    stroke: var(--grafo-enlace);
+    stroke-linecap: round;
+    opacity: 0.7;
+    transition:
+        opacity 0.15s,
+        stroke 0.15s;
+}
+
+/* Zona invisible más ancha que la flecha para que el tooltip sea fácil de coger. */
+.grafoEnlaceZona {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 16;
+}
+
+.grafoFlecha path {
+    fill: var(--grafo-enlace);
+}
+
+.grafoEnlace:hover .grafoEnlaceLinea {
+    opacity: 1;
+}
+
+.grafoEnfocado .grafoEnlace .grafoEnlaceLinea {
+    opacity: 0.12;
+}
+
+.grafoEnfocado .grafoEnlace.entra .grafoEnlaceLinea {
+    stroke: var(--grafo-entra);
+    opacity: 1;
+}
+
+.grafoEnfocado .grafoEnlace.sale .grafoEnlaceLinea {
+    stroke: var(--grafo-sale);
+    opacity: 1;
+}
+
+.grafoEnlace.entra .grafoFlecha path {
+    fill: var(--grafo-entra);
+}
+
+.grafoEnlace.sale .grafoFlecha path {
+    fill: var(--grafo-sale);
+}
+
+.grafoNodo {
+    cursor: pointer;
+    outline: none;
+    transition: opacity 0.15s;
+}
+
+.grafoNodo circle {
+    fill: var(--grafo-nodo);
+    stroke: var(--grafo-nodo-borde);
+    stroke-width: 2;
+}
+
+.grafoNodo.activo circle,
+.grafoNodo:focus-visible circle {
+    stroke-width: 3.5;
+}
+
+.grafoEnfocado .grafoNodo:not(.vecino) {
+    opacity: 0.3;
+}
+
+.grafoNodo text {
+    text-anchor: middle;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    paint-order: stroke;
+    stroke: var(--grafo-fondo);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+
+.grafoNodo .grafoNodoNombre {
+    fill: var(--grafo-texto);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.grafoNodoEntra {
+    fill: var(--grafo-entra);
+}
+
+.grafoNodoSale {
+    fill: var(--grafo-sale);
+}
+
+.grafoFlujosTabla {
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+.grafoFlujosTabla summary {
+    cursor: pointer;
+    color: var(--grafo-texto-suave);
+}
+
+.grafoFlujosTabla table {
+    width: 100%;
+    margin-top: 8px;
+}

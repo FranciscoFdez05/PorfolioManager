@@ -454,7 +454,6 @@ function planAbrirModal({ titulo, campos, onGuardar, etiquetaGuardar = "Guardar"
     overlay.querySelector("#planModalSaveBtn").addEventListener("click", onGuardar)
     overlay.querySelector("#planModalDeleteBtn")?.addEventListener("click", onEliminar)
 
-
     document.body.appendChild(overlay)
 }
 

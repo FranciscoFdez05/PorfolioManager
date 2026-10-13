@@ -5,6 +5,12 @@
                 <p class="transaccionesAssetPanelLabel">Criptos</p>
                 <h3 class="transaccionesAssetPanelTitle">Selecciona la moneda para registrar sus transacciones</h3>
             </div>
+            <div class="pageActionsMenu" id="transaccionesActionsMenu">
+                <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
+                <div class="pageActionsDropdown" id="transaccionesActionsDropdown">
+                    <button id="transaccionesGrafoBtn" class="pageActionsItem" type="button">Ver movimientos en gráfico</button>
+                </div>
+            </div>
         </div>
         <div id="transaccionesAssetMenu" class="transaccionesAssetMenu"></div>
         <p id="transaccionesAssetHint" class="transaccionesAssetHint"></p>
@@ -18,9 +24,10 @@
                     <th class="mThSort" data-sortkey="1">Total cripto<span class="mSortArrow"></span></th>
                     <th class="mThSort" data-sortkey="2">Comisión red<span class="mSortArrow"></span></th>
                     <th class="mThSort" data-sortkey="3">Wallet<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="4">Wallet destino<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="5">Hash transacción<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="6">Nota<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="4">Wallet origen<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5">Wallet destino<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6">Hash transacción<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="7">Nota<span class="mSortArrow"></span></th>
                     <th class="rowActionsCell"></th>
                 </tr>
             </thead>

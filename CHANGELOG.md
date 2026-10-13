@@ -22,6 +22,30 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.4.0] — 2026-10-13
+
+**Esquema de base de datos:** sube a la **21**, desde la 20 (columna `wallet_desde` en
+`transacciones`, vacía por defecto). Al migrar se guarda
+`data/backups/auto/<portfolio>_pre-esquema-20-a-21_*.db`; para deshacer, levantar la
+imagen anterior y restaurar ese fichero.
+
+### Añadido
+
+- «Ver movimientos en gráfico» en el menú ··· de Cuentas: una bolita por cuenta con lo que
+  ha entrado y salido, y flechas entre ellas más gruesas cuanto más dinero ha pasado. Respeta
+  el año y la cuenta seleccionados. Al pasar el ratón o pulsar una bolita se ven solo sus
+  movimientos (entrantes en verde, salientes en rojo); también se puede ver como tabla.
+- El mismo gráfico en Transacciones cripto (nuevo menú ···), para la moneda seleccionada y en
+  sus unidades.
+- Las transacciones cripto tienen un campo «Wallet origen», para que el gráfico sepa de qué
+  wallet sale cada movimiento.
+
+### Corregido
+
+- Métricas ya no esconde un apartado que tiene selector de año o de mes solo porque el periodo
+  elegido esté vacío: con él se iba el selector y no había forma de volver a otro periodo. La
+  sección del saldo durante el mes tampoco desaparece antes de haber cargado sus datos.
+
 ## [4.3.1] — 2026-10-11
 
 **Esquema de base de datos:** no lo toca (sigue en la **20**). Para deshacer la
