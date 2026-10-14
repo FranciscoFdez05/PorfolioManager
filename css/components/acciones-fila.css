@@ -1,0 +1,35 @@
+/* Botones de editar/borrar de las filas de tabla y estado deshabilitado del botón de peligro.
+   Los colores de los temas claro y oscuro están en css/themes/. */
+
+/* ── Row Actions ── */
+.rowActionsCell {
+    width: 80px;
+    text-align: center;
+    padding: 4px;
+}
+
+.rowEditBtn,
+.rowDeleteBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 6px;
+    margin: 0 2px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.rowEditBtn:hover {
+    background-color: #3a7bd5;
+}
+
+.rowDeleteBtn:hover {
+    background-color: #d9534f;
+}
+
+/* Botón deshabilitado en paso 3 */
+.dangerButton:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}

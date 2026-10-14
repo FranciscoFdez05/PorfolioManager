@@ -998,8 +998,13 @@ js/
 
 html/                fragmentos de página, con las mismas carpetas que js/
                      (+ sesion/ para login, setup y el overlay de ajustes)
-css/                 variables, base, components, themes
-                     + pages/ con una hoja por pantalla
+css/                 variables (maquetación), base, components, responsive
+  components/        piezas compartidas: gráfico de TradingView, acciones de
+                     fila, modo privacidad, selector de portfolios
+  pages/             una hoja por pantalla
+  themes/            noche-clara.css: paleta del tema por defecto, en :root
+                     claro.css y oscuro.css: su paleta + reglas por zona,
+                     todas bajo html[data-theme="light"|"black"]
 ```
 
 `python/` es la raíz de importación (`gunicorn --chdir python server:app`), así que los paquetes se importan como `from core.db import …`, `from stores.gastos_store import …`.

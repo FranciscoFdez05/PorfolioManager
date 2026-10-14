@@ -1,0 +1,3308 @@
+/* ============================================================================
+   TEMA CLARO  ·  html[data-theme="light"]
+   ============================================================================
+   Fondo blanco y grises fríos (slate). Acento verde azulado (teal) #0d9488.
+
+   Noche clara es el tema por defecto (noche-clara.css, en :root); este
+   fichero redefine su paleta y solo se aplica cuando <html> lleva
+   data-theme="light" (lo pone js/ajustes/ajustes.js y el script de arranque de
+   index.html).
+
+   Cómo está organizado:
+     · La paleta (variables) va primero. Todo lo que en el resto de la app pinta
+       con var(--…) toma el color de aquí sin necesitar ninguna regla más.
+     · Después, por secciones, las piezas que llevan colores escritos a mano en
+       su CSS y hay que sobrescribir. Cada regla empieza por
+       html[data-theme="light"], que pesa más que la regla base: el orden de
+       carga no importa frente al CSS de las páginas.
+
+   Secciones:
+      1. Acento
+      2. Elementos base
+      3. Barra superior y navegación
+      4. Panel lateral
+      5. Botones y controles
+      6. Modales y popups
+      7. Tablas y tarjetas compartidas
+      8. Vista general
+      9. Activos y seguimiento
+     10. Cripto
+     11. Bolsa e inversión
+     12. Mi dinero
+     13. Planes
+     14. Métricas
+     15. Heatmap
+     16. Herramientas
+     17. Ajustes
+
+   Al añadir una regla, ponla en su sección y, si es posible, usa las
+   variables de la paleta en vez de un color nuevo.
+   ============================================================================ */
+
+/* ── 0. Paleta ───────────────────────────────────────────────────────────── */
+html[data-theme="light"] {
+    color-scheme: light;
+
+    /* Fondos, del más hundido al más elevado */
+    --bg-app: #f0f2f5;
+    --bg-inset: #f1f5f9;
+    --bg-header: #f1f5f9;
+    --bg-elevated: #f8f9fa;
+    --bg-panel: #ffffff;
+    --bg-surface: #ffffff;
+    --bg-hover: #e8edf5;
+
+    /* Bordes, del más suave al más marcado */
+    --border-inset: #e2e8f0;
+    --border-soft: #e2e8f0;
+    --border-mid: #cbd5e1;
+    --border-hard: #94a3b8;
+
+    /* Texto, del más contrastado al más discreto */
+    --text-bright: #0f172a;
+    --text-primary: #0f172a;
+    --text-subtle: #1e293b;
+    --text-muted: #475569;
+    --text-secondary: #475569;
+    --text-dim: #64748b;
+    --text-faint: #94a3b8;
+
+    /* Botones */
+    --btn-bg: #ffffff;
+    --btn-bg-hover: #f1f5f9;
+    --btn-border: #cbd5e1;
+    --btn-border-hover: #94a3b8;
+    --btn-active-bg: #0f766e;
+    --btn-active-border: #0d9488;
+    --btn-active-text: #ffffff;
+
+    /* Acento verde azulado (teal): el azul es la seña de Noche clara. Roles:
+       accent       bordes activos, foco, iconos
+       accent-dark  fondo de botones y selección (texto blanco encima)
+       accent-hover estado hover (más oscuro: va sobre blanco)
+       accent-soft  texto de acento sobre fondo claro
+       accent-deep  fondo teñido claro (pestañas/etiquetas activas)
+       accent-rgb   para transparencias: rgba(var(--accent-rgb), 0.2) */
+    --accent: #0d9488;
+    --accent-dark: #0f766e;
+    --accent-hover: #115e59;
+    --accent-soft: #0f766e;
+    --accent-deep: #ccfbf1;
+    --accent-glow: rgba(13, 148, 136, 0.16);
+    --accent-tint: #f0fdfa;
+    --accent-tint-strong: #ccfbf1;
+    --accent-rgb: 13, 148, 136;
+
+    /* Positivo / negativo (más oscuros que en los temas oscuros: van sobre blanco) */
+    --color-pos: #16a34a;
+    --color-neg: #dc2626;
+    --color-pos-bright: #15803d;
+    --color-neg-bright: #b91c1c;
+
+    /* Alias: nombres que usan algunas hojas (Trading journal, Ajustes,
+       Ventas…) y que nunca se habían definido. Aquí apuntan a la paleta. */
+    --border: var(--border-soft);
+    --border-color: var(--border-soft);
+    --surface: var(--bg-surface);
+    --surface-2: var(--bg-elevated);
+    --text: var(--text-primary);
+    --text-main: var(--text-primary);
+}
+
+/* ── 1. Acento ───────────────────────────────────────────────────────────── */
+/* Piezas de css/components y css/pages que llevan escrito a mano el azul de
+   Noche clara (botones, foco, pestañas y elementos activos). Aquí toman el
+   acento de este tema. Cada bloque indica su hoja de origen. El azul que es
+   color de una categoría (Acciones, Banco, Mensualidades…) no se toca. */
+
+/* base.css */
+html[data-theme="light"] .csTrigger.csOpen {
+    border-color: var(--accent);
+}
+
+/* base.css */
+html[data-theme="light"] .csOption.csActive {
+    background-color: var(--accent-deep);
+}
+
+/* base.css */
+html[data-theme="light"] select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18);
+}
+
+/* base.css */
+html[data-theme="light"] .sideResizeHandle:hover,
+html[data-theme="light"] .sideResizeHandle.dragging {
+    background-color: var(--accent);
+}
+
+/* base.css */
+html[data-theme="light"] .detailResizeHandle:hover,
+html[data-theme="light"] .detailResizeHandle.dragging {
+    background-color: var(--accent);
+}
+
+/* components.css */
+html[data-theme="light"] .assetSearchResultMeta {
+    color: var(--accent-soft);
+}
+
+/* components.css */
+html[data-theme="light"] .assetOperationsTable thead th.mThActive {
+    color: var(--accent-hover);
+}
+
+/* components.css */
+html[data-theme="light"] .assetAddRowHeaderBtn {
+    background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
+    border: 1px solid var(--accent) !important;
+    border-left: 3px solid var(--accent) !important;
+    color: var(--accent-soft) !important;
+    box-shadow:
+        0 0 0 1px rgba(var(--accent-rgb), 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+/* components.css */
+html[data-theme="light"] .assetAddRowHeaderBtn:hover {
+    background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
+    border-color: var(--accent-hover) !important;
+    border-left-color: var(--accent-soft) !important;
+    color: var(--accent-soft) !important;
+    box-shadow:
+        0 0 0 2px rgba(var(--accent-rgb), 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+/* components.css */
+html[data-theme="light"] .assetMenuTrigger {
+    border: 1px solid rgba(var(--accent-rgb), 0.2);
+}
+
+/* components.css */
+html[data-theme="light"] .assetRowEditBtn {
+    color: var(--accent-soft);
+}
+
+/* components.css */
+html[data-theme="light"] .assetRowEditBtn:hover {
+    background-color: rgba(var(--accent-rgb), 0.15);
+}
+
+/* components.css */
+html[data-theme="light"] .assetRowModalInput,
+html[data-theme="light"] .assetRowModalSelect {
+    background-color: var(--bg-panel);
+}
+
+/* components.css */
+html[data-theme="light"] .assetRowModalInput:focus,
+html[data-theme="light"] .assetRowModalSelect:focus {
+    border-color: var(--accent-hover);
+    background-color: var(--accent-deep);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.18);
+}
+
+/* components.css */
+html[data-theme="light"] .assetRowModalInput:-webkit-autofill,
+html[data-theme="light"] .assetRowModalInput:-webkit-autofill:hover,
+html[data-theme="light"] .assetRowModalInput:-webkit-autofill:focus,
+html[data-theme="light"] .assetRowModalInput:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px var(--bg-panel) inset !important;
+}
+
+/* components.css */
+html[data-theme="light"] .avShowHiddenBtn:hover {
+    border-color: var(--accent, var(--accent));
+    color: var(--accent, var(--accent));
+    box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.15);
+}
+
+/* components.css */
+html[data-theme="light"] .avShowHiddenBtn.active {
+    border-color: var(--accent, var(--accent));
+    background-color: var(--accent, var(--accent)) 22;
+    color: var(--accent, var(--accent));
+}
+
+/* components.css */
+html[data-theme="light"] .assetModalCsTrigger {
+    background-color: var(--bg-panel);
+}
+
+/* components.css */
+html[data-theme="light"] .assetModalCsTrigger.csOpen {
+    border-color: var(--accent-hover);
+    background-color: var(--accent-deep);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.18);
+}
+
+/* components.css */
+html[data-theme="light"] .assetModalInput,
+html[data-theme="light"] .assetModalSelect {
+    background-color: var(--bg-panel);
+}
+
+/* components.css */
+html[data-theme="light"] .assetModalInput:focus,
+html[data-theme="light"] .assetModalSelect:focus {
+    border-color: var(--accent-hover);
+    background-color: var(--accent-deep);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.18);
+}
+
+/* components.css */
+html[data-theme="light"] .dateTodayBtn {
+    background-color: var(--bg-panel);
+    color: var(--accent-soft);
+}
+
+/* components.css */
+html[data-theme="light"] .dateTodayBtn:hover {
+    border-color: var(--accent-hover);
+    background-color: var(--accent-deep);
+}
+
+/* components.css */
+html[data-theme="light"] .cpToggleBadge {
+    background-color: var(--accent);
+}
+
+/* components.css */
+html[data-theme="light"] .cpPreview {
+    background-color: var(--accent);
+}
+
+/* components.css */
+html[data-theme="light"] .gastosCreateModalFeedback {
+    color: var(--accent-soft);
+}
+
+/* components.css */
+html[data-theme="light"] .cuentaItemRenameBtn:hover {
+    color: var(--accent-soft);
+}
+
+/* components.css */
+html[data-theme="light"] .interesesMenuBtn {
+    border: 1px solid rgba(var(--accent-rgb), 0.2);
+}
+
+/* components.css */
+html[data-theme="light"] .primaryButton:hover,
+html[data-theme="light"] .secondaryButton:hover {
+    background-color: var(--accent);
+}
+
+/* components.css */
+html[data-theme="light"] .todosOrigenOperacion {
+    color: var(--accent-soft);
+}
+
+/* components.css */
+html[data-theme="light"] .todosChartToggle:hover .todosChartTitle,
+html[data-theme="light"] .todosChartToggle:hover .todosChartChevron {
+    color: var(--accent-hover);
+}
+
+/* components/acciones-fila.css */
+html[data-theme="light"] .rowEditBtn:hover {
+    background-color: var(--accent);
+}
+
+/* components/privacidad.css */
+html[data-theme="light"] .navMoneyToggleBtn.money-hidden-active {
+    background-color: var(--accent-dark);
+    border-color: var(--accent);
+}
+
+/* components/selector-portfolios.css */
+html[data-theme="light"] .portfolioSwitcherBtn {
+    background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%);
+    border: 1px solid var(--accent);
+    border-left: 3px solid var(--accent);
+    color: var(--accent-soft);
+    box-shadow:
+        0 0 0 1px rgba(var(--accent-rgb), 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* components/selector-portfolios.css */
+html[data-theme="light"] .portfolioSwitcherBtn:hover {
+    background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
+    border-color: var(--accent-hover) !important;
+    border-left-color: var(--accent-soft) !important;
+    color: var(--accent-soft) !important;
+    box-shadow:
+        0 0 0 2px rgba(var(--accent-rgb), 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* components/selector-portfolios.css */
+html[data-theme="light"] .portfolioMenuItemActive {
+    color: var(--accent);
+}
+
+/* components/selector-portfolios.css */
+html[data-theme="light"] .portfolioMenuItemTodos.portfolioMenuItemActive .portfolioMenuItemName {
+    color: var(--accent);
+}
+
+/* components/selector-portfolios.css */
+html[data-theme="light"] .assetPortfolioBadge {
+    background-color: rgba(var(--accent-rgb), 0.18);
+    color: var(--accent-soft);
+}
+
+/* components/selector-portfolios.css */
+html[data-theme="light"] .portfolioNewBtn {
+    color: var(--accent);
+}
+
+/* components/selector-portfolios.css */
+html[data-theme="light"] .portfolioNewBtn:hover {
+    background-color: rgba(var(--accent-rgb), 0.1);
+}
+
+/* components/selector-portfolios.css */
+html[data-theme="light"] .portfolioFileInput::-webkit-file-upload-button {
+    background-color: var(--accent-dark);
+}
+
+/* pages/activos.css */
+html[data-theme="light"] #activosAddBtn,
+html[data-theme="light"] #seguimientoAddBtn,
+html[data-theme="light"] #addAssetRowBtn,
+html[data-theme="light"] #addRowBtn,
+html[data-theme="light"] #addRowDividendoBtn,
+html[data-theme="light"] #bonosAddBtn,
+html[data-theme="light"] #addOperationRowBtn,
+html[data-theme="light"] #addStablecoinRowBtn,
+html[data-theme="light"] #addStakingRowBtn,
+html[data-theme="light"] #addEarnRowBtn,
+html[data-theme="light"] #addTradingRowBtn,
+html[data-theme="light"] #addVentaRowBtn,
+html[data-theme="light"] #addTransaccionRowBtn,
+html[data-theme="light"] #addConversionRowBtn,
+html[data-theme="light"] #addGastoRowBtn,
+html[data-theme="light"] #addIngresoRowBtn {
+    background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
+    border: 1px solid var(--accent) !important;
+    border-left: 3px solid var(--accent) !important;
+    color: var(--accent-soft) !important;
+    box-shadow:
+        0 0 0 1px rgba(var(--accent-rgb), 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+/* pages/activos.css */
+html[data-theme="light"] #activosAddBtn:hover,
+html[data-theme="light"] #seguimientoAddBtn:hover,
+html[data-theme="light"] #addAssetRowBtn:hover,
+html[data-theme="light"] #addRowBtn:hover,
+html[data-theme="light"] #addRowDividendoBtn:hover,
+html[data-theme="light"] #bonosAddBtn:hover,
+html[data-theme="light"] #addOperationRowBtn:hover,
+html[data-theme="light"] #addStablecoinRowBtn:hover,
+html[data-theme="light"] #addStakingRowBtn:hover,
+html[data-theme="light"] #addEarnRowBtn:hover,
+html[data-theme="light"] #addTradingRowBtn:hover,
+html[data-theme="light"] #addVentaRowBtn:hover,
+html[data-theme="light"] #addTransaccionRowBtn:hover,
+html[data-theme="light"] #addConversionRowBtn:hover,
+html[data-theme="light"] #addGastoRowBtn:hover,
+html[data-theme="light"] #addIngresoRowBtn:hover {
+    background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
+    border-color: var(--accent-hover) !important;
+    border-left-color: var(--accent-soft) !important;
+    color: var(--accent-soft) !important;
+    box-shadow:
+        0 0 0 2px rgba(var(--accent-rgb), 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+}
+
+/* pages/activos.css */
+html[data-theme="light"] .filterDropBtn.active {
+    border-color: var(--accent, var(--accent));
+    color: var(--accent, var(--accent));
+}
+
+/* pages/activos.css */
+html[data-theme="light"] .activosFilterBtn[data-type="all"].active,
+html[data-theme="light"] .activosFilterBtn[data-type="all"]:has(input:checked) {
+    border-color: rgba(var(--accent-rgb), 0.27);
+}
+
+/* pages/activos.css */
+html[data-theme="light"] .activosSearch:focus {
+    border-color: var(--accent);
+}
+
+/* pages/activos.css */
+html[data-theme="light"] .avCard:hover {
+    border-color: var(--av-color, var(--accent));
+}
+
+/* pages/activos.css */
+html[data-theme="light"] .avCard.avDragging {
+    border-color: var(--av-color, var(--accent));
+    box-shadow: inset 0 0 0 1px var(--av-color, var(--accent));
+}
+
+/* pages/ahorro.css */
+html[data-theme="light"] .ahorroObjetivoTarget {
+    box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.5);
+}
+
+/* pages/ajustes.css */
+html[data-theme="light"] .ajustesSection.ajustesUnlocked {
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.15);
+}
+
+/* pages/ajustes.css */
+html[data-theme="light"] .ajustesSectionIconWrap {
+    background-color: rgba(var(--accent-rgb), 0.1);
+    border: 1px solid rgba(var(--accent-rgb), 0.18);
+}
+
+/* pages/ajustes.css */
+html[data-theme="light"] .ajustesInput:focus {
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+}
+
+/* pages/ajustes.css */
+html[data-theme="light"] .ajustesBackupTag {
+    border: 1px solid rgba(var(--accent-rgb), 0.35);
+    background-color: rgba(var(--accent-rgb), 0.1);
+    color: var(--accent-soft);
+}
+
+/* pages/ajustes.css */
+html[data-theme="light"] .ajustesSelect:focus {
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+}
+
+/* pages/ajustes.css */
+html[data-theme="light"] .ajustesDropTrigger.open {
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+}
+
+/* pages/ajustes.css */
+html[data-theme="light"] .ajustesDropOption.active {
+    background-color: rgba(var(--accent-rgb), 0.08);
+}
+
+/* pages/ajustes.css */
+html[data-theme="light"] .ajustesApiStatsTotal {
+    border-color: rgba(var(--accent-rgb), 0.35);
+    background-color: rgba(var(--accent-rgb), 0.06);
+}
+
+/* pages/ajustes.css */
+html[data-theme="light"] .ajustesTemaBtn.active {
+    background-color: rgba(var(--accent-rgb), 0.06);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.1);
+}
+
+/* pages/ajustes.css */
+html[data-theme="light"] .ajustesRefreshBtn.active {
+    background-color: rgba(var(--accent-rgb), 0.1);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+}
+
+/* pages/bonos.css */
+html[data-theme="light"] .bonosTab.active {
+    background-color: rgba(var(--accent-rgb), 0.07);
+}
+
+/* pages/bonos.css */
+html[data-theme="light"] .bonosFilterBtn[data-tipo="all"].active,
+html[data-theme="light"] .bonosFilterBtn[data-tipo="all"]:has(input:checked) {
+    border-color: rgba(var(--accent-rgb), 0.27);
+}
+
+/* pages/bonos.css */
+html[data-theme="light"] .bonosSummaryGub {
+    border-color: rgba(var(--accent-rgb), 0.27);
+}
+
+/* pages/bonos.css */
+html[data-theme="light"] .bonosTable td[contenteditable="true"]:focus {
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* pages/calendario-dividendos.css */
+html[data-theme="light"] .calSelect:focus {
+    border-color: var(--accent);
+}
+
+/* pages/calendario-dividendos.css */
+html[data-theme="light"] .calAddBtn:hover {
+    background-color: var(--accent);
+}
+
+/* pages/gastos-popup.css */
+html[data-theme="light"] .gtPopupSearch:focus {
+    border-color: var(--accent);
+}
+
+/* pages/gastos-popup.css */
+html[data-theme="light"] .gtTotalRow td {
+    border-top: 2px solid var(--accent);
+}
+
+/* pages/gastos.css */
+html[data-theme="light"] .gastosYearBtn.yearViewActive {
+    box-shadow: inset 0 0 0 2px rgba(var(--accent-rgb), 0.85);
+}
+
+/* pages/gastos.css */
+html[data-theme="light"] .rowMenuTrigger {
+    border: 1px solid rgba(var(--accent-rgb), 0.2);
+}
+
+/* pages/gastos.css */
+html[data-theme="light"] .gastosTypeSelect:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.18);
+}
+
+/* pages/gastos.css */
+html[data-theme="light"] .gastosSectionRow td {
+    color: var(--accent-soft) !important;
+}
+
+/* pages/gastos.css */
+html[data-theme="light"] .gastosCategoryRow .gastosSectionToggle {
+    color: var(--accent-soft) !important;
+}
+
+/* pages/gastos.css */
+html[data-theme="light"] .gastosTypePanelEyebrow {
+    color: var(--accent-soft);
+}
+
+/* pages/gastos.css */
+html[data-theme="light"] .gastosTypeInput:focus {
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
+}
+
+/* pages/gastos.css */
+html[data-theme="light"] .gastosTypeChipTag {
+    color: var(--accent-soft);
+}
+
+/* pages/gastos.css */
+html[data-theme="light"] .pageActionsMenuTrigger {
+    border: 1px solid rgba(var(--accent-rgb), 0.2);
+}
+
+/* pages/heatmap.css */
+html[data-theme="light"] .hmGroupBtn.active {
+    background-color: var(--accent-dark);
+}
+
+/* pages/heatmap.css */
+html[data-theme="light"] .hmGroupMulti .hmGroupBtn.active {
+    background-color: var(--accent-deep);
+    color: var(--accent-soft);
+}
+
+/* pages/herramientas.css */
+html[data-theme="light"] .toolsAssetPicker,
+html[data-theme="light"] .toolsSelectedAsset {
+    border: 1px solid rgba(var(--accent-rgb), 0.22);
+}
+
+/* pages/herramientas.css */
+html[data-theme="light"] .toolsLabel,
+html[data-theme="light"] .toolsSelectedLabel {
+    color: var(--accent-soft);
+}
+
+/* pages/ingresos.css */
+html[data-theme="light"] .ingresosYearBtn.yearViewActive {
+    box-shadow: inset 0 0 0 2px rgba(var(--accent-rgb), 0.85);
+}
+
+/* pages/ingresos.css */
+html[data-theme="light"] .ingresosSectionRow td {
+    color: var(--accent-soft) !important;
+}
+
+/* pages/mercado-privado.css */
+html[data-theme="light"] .pmSummaryCard--neto {
+    border-color: rgba(var(--accent-rgb), 0.27);
+}
+
+/* pages/metricas.css */
+html[data-theme="light"] .mThSort.mThActive {
+    color: var(--accent);
+}
+
+/* pages/metricas.css */
+html[data-theme="light"] .mSortArrow {
+    color: var(--accent);
+}
+
+/* pages/operaciones.css */
+html[data-theme="light"] .operationsSelect {
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--accent-soft) 50%),
+        linear-gradient(135deg, var(--accent-soft) 50%, transparent 50%);
+}
+
+/* pages/operaciones.css */
+html[data-theme="light"] .operationsSelect:focus {
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.14);
+}
+
+/* pages/operaciones.css */
+html[data-theme="light"] .stablecoinToggle.active {
+    border-color: var(--accent);
+}
+
+/* pages/operaciones.css */
+html[data-theme="light"] .transaccionWalletSelect:focus {
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.2);
+}
+
+/* pages/operaciones.css */
+html[data-theme="light"] .transaccionHashCell:hover {
+    color: var(--text-bright);
+    background-color: rgba(var(--accent-rgb), 0.08);
+}
+
+/* pages/planes-inversion.css */
+html[data-theme="light"] .pinvOpCheck:has(input:checked) {
+    border-color: rgba(var(--accent-rgb), 0.45);
+    background-color: rgba(var(--accent-rgb), 0.07);
+}
+
+/* pages/planes-inversion.css */
+html[data-theme="light"] .pinvOpNuevaTag {
+    color: var(--accent-soft);
+    background-color: rgba(var(--accent-rgb), 0.16);
+}
+
+/* pages/settings-overlay.css */
+html[data-theme="light"] .sttNavBtn.active {
+    background-color: rgba(var(--accent-rgb), 0.12);
+}
+
+/* pages/ventas.css */
+html[data-theme="light"] .ventasInformeBtn:hover {
+    border-color: var(--accent, var(--accent));
+}
+
+/* Excepciones: piezas con dos clases en las que la regla de acento de arriba
+   pesaría más que el estilo base que de verdad les toca. */
+html[data-theme="light"] .rowMenuItem.assetRowEditBtn {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .rowMenuItem.assetRowEditBtn:hover {
+    background: rgba(15, 23, 42, 0.05);
+}
+
+/* ── 2. Elementos base ───────────────────────────────────────────────────── */
+/* Fondo de la app, títulos, tablas y campos genéricos. */
+
+html[data-theme="light"] body,
+html[data-theme="light"] .appContainer,
+html[data-theme="light"] .leftWrapper {
+    background: var(--bg-app);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .mainContent,
+html[data-theme="light"] .contentArea {
+    background: var(--bg-app);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] table {
+    background: var(--bg-surface);
+}
+
+html[data-theme="light"] th {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] td {
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] tr:hover td {
+    background: var(--bg-header) !important;
+}
+
+html[data-theme="light"] tbody tr:nth-child(even) td {
+    background: #fafbfc;
+}
+
+html[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]),
+html[data-theme="light"] textarea {
+    background: var(--bg-surface) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme="light"] select {
+    background-color: var(--bg-surface) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%230f172a' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 10px center !important;
+    background-size: 8px 5px !important;
+}
+
+html[data-theme="light"] select option {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .pageTitle,
+html[data-theme="light"] h1,
+html[data-theme="light"] h2,
+html[data-theme="light"] h3,
+html[data-theme="light"] h4 {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .transaccionesAssetPanel {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .transaccionesAssetPanelTitle {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .transaccionesAssetBtn {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .transaccionesAssetBtn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .transaccionesAssetHint {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .transaccionesAssetPanelLabel {
+    color: var(--accent);
+}
+
+/* ── 3. Barra superior y navegación ──────────────────────────────────────── */
+/* Métricas de cabecera, pestañas, menús, buscador y selector de portfolio. */
+
+html[data-theme="light"] .topBar {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .metricBox {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .metricTitle {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .metricValue {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .metricValue.metricPositive {
+    color: var(--color-pos);
+}
+
+html[data-theme="light"] .metricValue.metricNegative {
+    color: var(--color-neg);
+}
+
+html[data-theme="light"] .tabs {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .navBtn,
+html[data-theme="light"] .navDropdownBtn {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .navBtn:hover,
+html[data-theme="light"] .navDropdownBtn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .navBtn.active,
+html[data-theme="light"] .navDropdownBtn.active {
+    background: #1e293b;
+    border-color: #334155;
+    color: #ffffff;
+}
+
+html[data-theme="light"] .navDropdownMenu {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .navDropdownItem {
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .navDropdownItem:hover {
+    background: var(--bg-header);
+}
+
+html[data-theme="light"] .searchContainer input {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .navBackupBtn {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .navMoneyToggleBtn {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .navMoneyToggleBtn:hover {
+    background: var(--bg-header);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .portfolioSwitcherBtn {
+    background: linear-gradient(135deg, var(--accent-tint-strong) 0%, var(--accent-tint) 100%);
+    border-color: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    color: var(--accent-dark);
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.12);
+}
+
+html[data-theme="light"] .portfolioSwitcherBtn:hover {
+    background: linear-gradient(135deg, var(--accent-soft) 0%, var(--accent-tint-strong) 100%) !important;
+    border-color: var(--accent-soft) !important;
+    border-left-color: var(--accent) !important;
+    color: var(--accent-dark) !important;
+}
+
+html[data-theme="light"] .portfolioSwitcherMenu {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .portfolioMenuItem {
+    color: #374151;
+}
+
+html[data-theme="light"] .portfolioMenuItem:hover {
+    background: var(--bg-header);
+}
+
+html[data-theme="light"] .portfolioMenuItemActive {
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .portfolioMenuDivider {
+    background: #e2e8f0;
+}
+
+html[data-theme="light"] .portfolioActionBtn:hover {
+    background: rgba(0, 0, 0, 0.06);
+}
+
+html[data-theme="light"] .portfolioMenuItemTodos {
+    border-bottom-color: var(--border-soft);
+}
+
+html[data-theme="light"] .portfolioMenuItemTodos .portfolioMenuItemName {
+    color: #9ca3af;
+}
+
+html[data-theme="light"] .portfolioMenuItemTodos.portfolioMenuItemActive .portfolioMenuItemName {
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .portfolioNewBtn {
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .portfolioNewBtn:hover {
+    background: rgba(var(--accent-rgb), 0.08);
+}
+
+html[data-theme="light"] .portfolioImportBtn {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .portfolioFileInput {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+/* ── 4. Panel lateral ────────────────────────────────────────────────────── */
+/* Lista de activos, filtros y ficha de detalle del sidebar. */
+
+html[data-theme="light"] .sideWrapper,
+html[data-theme="light"] .sidePanel {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .assetToolbar {
+    /* Mismo blanco que .topBar: la barra de tabs del sidebar continúa la
+       cabecera superior en vez de leerse como un panel aparte. */
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .assetsList {
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .assetsListHeader {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .detailRotationBar {
+    background: #e2e8f0;
+}
+
+html[data-theme="light"] .sidebarFilterBar {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .sidebarFilterBtn {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .sidebarFilterBtn.active {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .assetBtn {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .assetBtn:hover {
+    background: var(--bg-header);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .assetBtn.selected {
+    background: var(--accent-dark);
+    border-color: var(--accent);
+}
+
+html[data-theme="light"] .assetBtn.selected .assetBtnName,
+html[data-theme="light"] .assetBtn.selected .assetBtnPrice {
+    color: #fff;
+}
+
+html[data-theme="light"] .assetBtnName {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .assetBtnPrice {
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .assetBtnChange {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .assetBtnChangePct {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .assetDetailView {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .detailStatCard {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .detailHeader {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .detailSub,
+html[data-theme="light"] .detailMeta {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .detailPrice {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .detailStatLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .detailStatValue {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .toggleButton {
+    background: linear-gradient(180deg, #ffffff, #f1f5f9);
+    color: var(--text-dim);
+    box-shadow:
+        -1px 0 0 #e2e8f0,
+        -6px 0 14px rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme="light"] .toggleButton:hover {
+    background: linear-gradient(180deg, #ffffff, #e8edf5);
+    color: var(--text-subtle);
+    box-shadow:
+        -1px 0 0 var(--accent),
+        -6px 0 18px rgba(var(--accent-rgb), 0.18);
+}
+
+html[data-theme="light"] .assetPortfolioBadge {
+    background: rgba(var(--accent-rgb), 0.1);
+    color: var(--accent);
+}
+
+html[data-theme="light"] .assetBtn.selected .assetBtnChange,
+html[data-theme="light"] .assetBtn.selected .assetBtnChangePct {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* ── 5. Botones y controles ──────────────────────────────────────────────── */
+/* Botones genéricos, desplegables, selectores, filtros y tooltips. */
+
+html[data-theme="light"] .csTrigger {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .csMenu {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .csOption {
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .csOption:hover {
+    background: var(--bg-header);
+}
+
+html[data-theme="light"] .csOption.csSelected {
+    background: var(--bg-hover);
+}
+
+html[data-theme="light"] .csOption.csActive {
+    background: #dbe6fb;
+}
+
+html[data-theme="light"] .csArrow {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .cpHexRow {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .cpHash {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .cpHexInput {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .cpRandomBtn {
+    background: rgba(0, 0, 0, 0.06);
+    border-color: var(--border-soft);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .cpRandomBtn:hover {
+    background: rgba(0, 0, 0, 0.12);
+    color: #334155;
+}
+
+html[data-theme="light"] .searchableSelectTrigger {
+    background-color: var(--bg-elevated);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath fill='%23334155' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+}
+
+html[data-theme="light"] .searchableSelectTrigger:hover,
+html[data-theme="light"] .searchableSelectWrap.ssOpen .searchableSelectTrigger {
+    border-color: var(--accent);
+    background-color: var(--accent-tint);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
+}
+
+html[data-theme="light"] .searchableSelectValue.empty {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .searchableSelectPanel {
+    background: var(--bg-surface);
+    border-color: var(--accent);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+html[data-theme="light"] .searchableSelectSearch {
+    background: var(--bg-header);
+    border-bottom-color: var(--border-soft);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .searchableSelectSearch::placeholder {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .searchableSelectItem {
+    color: #334155;
+}
+
+html[data-theme="light"] .searchableSelectItem:hover {
+    background: var(--accent-tint);
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .searchableSelectItem.active {
+    color: var(--accent);
+    background: var(--accent-tint);
+}
+
+html[data-theme="light"] .dateTodayBtn {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .dateTodayBtn:hover {
+    background: var(--accent-tint);
+    border-color: var(--accent);
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .secondaryButton {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .secondaryButton:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .dangerButton {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: var(--color-neg);
+}
+
+html[data-theme="light"] .cancelButton {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: var(--color-neg);
+}
+
+html[data-theme="light"] .cancelButton:hover {
+    background: #fecaca;
+    border-color: #f87171;
+}
+
+html[data-theme="light"] .mActivosFilterBtn[data-atype="todos"].active {
+    background: var(--bg-hover);
+    border-color: var(--border-hard);
+}
+
+html[data-theme="light"] .mActivosFilterBtn[data-atype="cripto"].active {
+    background: #fff3e0;
+    border-color: #f7931a;
+    color: #7a3500;
+}
+
+html[data-theme="light"] .mActivosFilterBtn[data-atype="acciones"].active {
+    background: var(--accent-tint-strong);
+    border-color: #3b82f6;
+    color: #1e40af;
+}
+
+html[data-theme="light"] .mActivosFilterBtn[data-atype="etfs"].active {
+    background: #dcfce7;
+    border-color: #22c55e;
+    color: #166534;
+}
+
+html[data-theme="light"] .mActivosFilterBtn[data-atype="comoditis"].active {
+    background: #fefce8;
+    border-color: #d4a906;
+    color: #713f12;
+}
+
+html[data-theme="light"] .mActivosFilterBtn[data-atype="bonos"].active {
+    background: #f3e8ff;
+    border-color: #9b59b6;
+    color: #5b21b6;
+}
+
+html[data-theme="light"] .mActivosFilterBtn[data-atype="rentaFija"].active {
+    background: #ccfbf1;
+    border-color: #14b8a6;
+    color: #0f5c50;
+}
+
+html[data-theme="light"] .filterDropBtn {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .filterDropBtn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .filterDropBtn.active {
+    border-color: var(--accent);
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .filterDropMenu {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .filterDropSep {
+    background: #e2e8f0;
+}
+
+html[data-theme="light"] .overviewFilterOption,
+html[data-theme="light"] .planFilterBtn,
+html[data-theme="light"] .calFinChip,
+html[data-theme="light"] .activosFilterBtn,
+html[data-theme="light"] .bonosFilterBtn,
+html[data-theme="light"] .mNavTab,
+html[data-theme="light"] .mActivosFilterBtn {
+    background: #f8fafc;
+    border-color: var(--border-soft);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .overviewFilterOption:has(input:checked),
+html[data-theme="light"] .planFilterBtn.active,
+html[data-theme="light"] .calFinChip.active,
+html[data-theme="light"] .activosFilterBtn.active,
+html[data-theme="light"] .activosFilterBtn:has(input:checked),
+html[data-theme="light"] .bonosFilterBtn.active,
+html[data-theme="light"] .bonosFilterBtn:has(input:checked),
+html[data-theme="light"] .mNavTab.active,
+html[data-theme="light"] .mNavTab:has(input:checked),
+html[data-theme="light"] .mActivosFilterBtn.active,
+html[data-theme="light"] .mActivosFilterBtn:has(input:checked) {
+    background: var(--bg-header);
+    color: var(--text-subtle);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .overviewFilterOption::before,
+html[data-theme="light"] .planFilterBtn::before,
+html[data-theme="light"] .calFinChip::before,
+html[data-theme="light"] .activosFilterBtn::before,
+html[data-theme="light"] .bonosFilterBtn::before,
+html[data-theme="light"] .mNavTab::before,
+html[data-theme="light"] .mActivosFilterBtn::before {
+    background: #cbd5e1;
+}
+
+html[data-theme="light"] .overviewFilterOption:hover,
+html[data-theme="light"] .planFilterBtn:hover,
+html[data-theme="light"] .calFinChip:hover,
+html[data-theme="light"] .activosFilterBtn:hover,
+html[data-theme="light"] .bonosFilterBtn:hover,
+html[data-theme="light"] .mNavTab:hover,
+html[data-theme="light"] .mActivosFilterBtn:hover {
+    background: var(--bg-header);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .avTooltip,
+html[data-theme="light"] .appTooltip {
+    background: #f0f6ff;
+    color: var(--accent-deep);
+    border-color: var(--border-mid);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* El color de estas etiquetas es el del tipo de activo y lo pone el JS; sobre
+   blanco los tonos claros (el naranja de cripto, el amarillo de materias
+   primas) no se leían. */
+html[data-theme="light"] .mTypeBadge,
+html[data-theme="light"] .avBadge {
+    filter: brightness(0.72) saturate(1.3);
+}
+
+html[data-theme="light"] .fnTypeBadge[data-type="acciones"] {
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .fnTypeBadge[data-type="etfs"] {
+    color: #15803d;
+}
+
+html[data-theme="light"] .fnTypeBadge[data-type="cripto"] {
+    color: #c2410c;
+}
+
+html[data-theme="light"] .fnTypeBadge[data-type="comoditis"] {
+    color: #a16207;
+}
+
+html[data-theme="light"] .fnTypeBadge[data-type="rentafija"],
+html[data-theme="light"] .fnTypeBadge[data-type="rentaFija"] {
+    color: #0f766e;
+}
+
+/* Botones "Añadir" (css/pages/activos.css): llevan el degradado azul marino
+   con !important, así que cada tema necesita el suyo. */
+html[data-theme="light"]
+    :is(
+        #activosAddBtn,
+        #seguimientoAddBtn,
+        #addAssetRowBtn,
+        #addRowBtn,
+        #addRowDividendoBtn,
+        #bonosAddBtn,
+        #addOperationRowBtn,
+        #addStablecoinRowBtn,
+        #addStakingRowBtn,
+        #addEarnRowBtn,
+        #addTradingRowBtn,
+        #addVentaRowBtn,
+        #addTransaccionRowBtn,
+        #addConversionRowBtn,
+        #addGastoRowBtn,
+        #addIngresoRowBtn
+    ) {
+    background: var(--accent-tint) !important;
+    border-color: var(--accent-soft) !important;
+    border-left-color: var(--accent) !important;
+    color: var(--accent-dark) !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06) !important;
+}
+
+html[data-theme="light"]
+    :is(
+        #activosAddBtn,
+        #seguimientoAddBtn,
+        #addAssetRowBtn,
+        #addRowBtn,
+        #addRowDividendoBtn,
+        #bonosAddBtn,
+        #addOperationRowBtn,
+        #addStablecoinRowBtn,
+        #addStakingRowBtn,
+        #addEarnRowBtn,
+        #addTradingRowBtn,
+        #addVentaRowBtn,
+        #addTransaccionRowBtn,
+        #addConversionRowBtn,
+        #addGastoRowBtn,
+        #addIngresoRowBtn
+    ):hover {
+    background: var(--accent-tint-strong) !important;
+    border-color: var(--accent-soft) !important;
+    border-left-color: var(--accent-dark) !important;
+    color: var(--accent-dark) !important;
+}
+
+/* ── 6. Modales y popups ─────────────────────────────────────────────────── */
+/* Diálogos de alta/edición, confirmaciones y el gráfico de TradingView. */
+
+/* Textos de ejemplo y flechas: en Noche clara llevan un gris azulado. */
+html[data-theme="light"] .assetModalInput::placeholder,
+html[data-theme="light"] .operationsCryptoCommissionInput::placeholder {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .cpToggleArrow {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .operationsCryptoCommissionInput {
+    caret-color: var(--text-primary);
+}
+
+html[data-theme="light"] .grafoFlujosModal {
+    --grafo-nodo: #dbeafe;
+    --grafo-nodo-borde: #2563eb;
+    --grafo-enlace: #94a3b8;
+    --grafo-entra: #059669;
+    --grafo-sale: #dc2626;
+    --grafo-texto: #0f172a;
+    --grafo-texto-suave: #475569;
+    --grafo-fondo: #ffffff;
+}
+
+html[data-theme="light"] .modalOverlay {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+html[data-theme="light"] .assetModal,
+html[data-theme="light"] .calendarioModal,
+html[data-theme="light"] .backupModal,
+html[data-theme="light"] .stablecoinModal {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .assetModalTitle {
+    color: var(--text-primary);
+}
+
+/* El mensaje se quedó sin color propio en el tema claro: el de base (#d7e3f6)
+   es casi blanco y sobre el diálogo blanco no se leía. Afecta a todos los
+   diálogos de confirmación, que es justo donde hay que leer qué se va a hacer. */
+html[data-theme="light"] .assetModalMessage {
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .confirmTypeLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .confirmTypeLabel b {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .assetModalLabel {
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .movDetailItem,
+html[data-theme="light"] .movDetailNote {
+    background: #f8fafc;
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .movDetailNote {
+    border-left-color: var(--accent);
+}
+
+html[data-theme="light"] .movDetailNoteEmpty {
+    border-left-color: var(--border-mid);
+}
+
+html[data-theme="light"] .movDetailItem dt,
+html[data-theme="light"] .movDetailNoteLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .movDetailItem dd,
+html[data-theme="light"] .movDetailNoteText {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .movDetailItem dd.movDetailAmount {
+    color: var(--color-neg);
+}
+
+html[data-theme="light"] .movDetailItem dd.movDetailAmountPos {
+    color: var(--color-pos);
+}
+
+html[data-theme="light"] .movDetailNoteEmpty .movDetailNoteText {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .assetModalInput,
+html[data-theme="light"] .assetModalSelect {
+    background: var(--bg-elevated) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme="light"] .assetRowModalTitle {
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .assetRowModalLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .assetRowModalInput,
+html[data-theme="light"] .assetRowModalSelect {
+    background: var(--bg-elevated) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+}
+
+html[data-theme="light"] .assetRowModalFooter {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .tvChartModal {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .tvChartModalHeader {
+    background: var(--bg-hover);
+    border-color: #d1d9e6;
+}
+
+html[data-theme="light"] .tvChartModalTitle {
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .tvChartModalSym {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .tvChartCloseBtn {
+    color: var(--text-faint);
+}
+
+/* ── 7. Tablas y tarjetas compartidas ────────────────────────────────────── */
+/* Envoltorios de tabla y tarjetas de resumen que usan varias páginas. */
+
+html[data-theme="light"] .overviewTableWrapper {
+    background: var(--bg-surface);
+}
+
+html[data-theme="light"] .overviewTable tbody td.overviewCurrentPriceCell,
+html[data-theme="light"] .overviewTable tbody td.overviewProfitPositive,
+html[data-theme="light"] .overviewTable tbody td.overviewProfitNegative {
+    background: var(--bg-surface);
+}
+
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td.overviewCurrentPriceCell,
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td.overviewProfitPositive,
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td.overviewProfitNegative {
+    background: #fafbfc;
+}
+
+html[data-theme="light"] .overviewTable tbody tr:hover td.overviewCurrentPriceCell,
+html[data-theme="light"] .overviewTable tbody tr:hover td.overviewProfitPositive,
+html[data-theme="light"] .overviewTable tbody tr:hover td.overviewProfitNegative {
+    background: var(--bg-header);
+}
+
+html[data-theme="light"] .overviewTableWrapper,
+html[data-theme="light"] .interesesTableWrapper,
+html[data-theme="light"] .dividendosTableWrapper,
+html[data-theme="light"] .operationsTableWrapper {
+    background: var(--bg-surface);
+}
+
+html[data-theme="light"] .overviewTable,
+html[data-theme="light"] .interesesTable,
+html[data-theme="light"] .dividendosTable,
+html[data-theme="light"] .operationsTable {
+    background: var(--bg-surface);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .overviewTable thead th,
+html[data-theme="light"] .interesesTable thead th,
+html[data-theme="light"] .dividendosTable thead th,
+html[data-theme="light"] .operationsTable thead th {
+    background: var(--bg-header);
+    color: var(--text-muted);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] #overviewTable thead th {
+    background: var(--bg-header);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .overviewTable tbody td,
+html[data-theme="light"] .interesesTable tbody td,
+html[data-theme="light"] .dividendosTable tbody td,
+html[data-theme="light"] .operationsTable tbody td {
+    background: var(--bg-surface);
+    color: var(--text-subtle);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .overviewTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .interesesTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .dividendosTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .operationsTable tbody tr:nth-child(odd) td {
+    background: #fafbfc;
+}
+
+html[data-theme="light"] .overviewTable tbody tr:hover td,
+html[data-theme="light"] .interesesTable tbody tr:hover td,
+html[data-theme="light"] .dividendosTable tbody tr:hover td,
+html[data-theme="light"] .operationsTable tbody tr:hover td {
+    background: var(--bg-header) !important;
+}
+
+html[data-theme="light"] .summaryCard {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .summaryCardTitle {
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .summaryCardValue {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .summaryCard.summaryCardTotal .summaryCardValue {
+    color: #059669;
+}
+
+html[data-theme="light"] .summaryCard.summaryCardTax .summaryCardValue {
+    color: #c2410c;
+}
+
+/* ── 8. Vista general ────────────────────────────────────────────────────── */
+
+html[data-theme="light"] .overviewEmpty {
+    background: #f8faff;
+    border-color: var(--border-mid);
+    color: var(--text-dim);
+}
+
+/* ── 9. Activos y seguimiento ────────────────────────────────────────────── */
+
+html[data-theme="light"] .segEditNoticeBox {
+    background: #fffbeb;
+    border-color: #f59e0b44;
+}
+
+html[data-theme="light"] .segEditNoticeBox p {
+    color: #92400e;
+}
+
+html[data-theme="light"] .segEditNoticeBox strong {
+    color: #b45309;
+}
+
+html[data-theme="light"] .segHideBtn:hover {
+    background: #fff3cd;
+    color: #d4790a;
+    border-color: #f39c12;
+}
+
+html[data-theme="light"] .segHiddenItem {
+    background: #f8fafc;
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .segHiddenItemName {
+    color: #334155;
+}
+
+html[data-theme="light"] .assetEditNameBtn {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .assetEditNameBtn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .assetSearchResultBtn {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .assetSearchResultBtn:hover {
+    background: #f8faff;
+}
+
+html[data-theme="light"] .assetSearchResultSubtitle {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .assetSearchResultPrice {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .assetOperationsTable {
+    background: var(--bg-surface);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .assetOperationsTable thead th {
+    background: var(--bg-header);
+    color: var(--text-muted);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .assetOperationsTable tbody td {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .assetOperationsTable tbody tr:nth-child(odd) td {
+    background: #fafbfc;
+}
+
+html[data-theme="light"] .assetOperationsTable tbody tr:hover td {
+    background: var(--bg-header) !important;
+}
+
+html[data-theme="light"] .avActionBtn {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .avEditBtn:hover {
+    background: var(--accent-tint-strong);
+    color: var(--accent-dark);
+    border-color: var(--accent);
+}
+
+html[data-theme="light"] .avDeleteBtn:hover {
+    background: #fee2e2;
+    color: var(--color-neg);
+    border-color: #fca5a5;
+}
+
+html[data-theme="light"] .avChartBtn:hover {
+    background: #e0f2f1;
+    color: #00796b;
+    border-color: #26a69a;
+}
+
+html[data-theme="light"] .avCard {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .avCard:hover {
+    border-color: var(--av-color, var(--accent));
+}
+
+html[data-theme="light"] .avCardName {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .avCardPrice {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .avCardTicker {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .avCardUpdated {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .avCardMetrics {
+    border-top-color: var(--border-soft);
+}
+
+html[data-theme="light"] .avMetricLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .avMetricValue {
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .avViewToggle {
+    background: #f8fafc;
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .avViewBtn {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .avViewBtn:hover {
+    background: var(--bg-header);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .avViewBtn.active {
+    background: #e2e8f0;
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .activosTableWrap {
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .activosTable thead tr {
+    background: #f8fafc;
+}
+
+html[data-theme="light"] .activosTable th {
+    color: var(--text-faint);
+    border-bottom-color: var(--border-soft);
+}
+
+html[data-theme="light"] .avTableRow {
+    border-bottom-color: #f1f5f9;
+}
+
+html[data-theme="light"] .avTableRow:hover {
+    background: #f8fafc;
+}
+
+html[data-theme="light"] .activosTable td {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .avTrName {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .avTrPrice {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .avTrProvider {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .avTrUpdated {
+    color: #b0bec5;
+}
+
+/* ── 10. Cripto ──────────────────────────────────────────────────────────── */
+/* Operaciones, transacciones, conversiones y stablecoins. */
+
+html[data-theme="light"] .stablecoinsHeaderPanel {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .stablecoinSummaryCard {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .stablecoinSummaryHeader h4 {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .stablecoinSummaryHeader span,
+html[data-theme="light"] .stablecoinSummaryMeta {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .stablecoinSummaryMain {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .operationsPairsSummary {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .operationsPairsSummaryLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .operationsPairsSummaryItem {
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .operationsEstadoSelect.is-activo {
+    color: var(--accent-dark);
+    background-color: rgba(59, 130, 246, 0.12);
+}
+
+html[data-theme="light"] .operationsEstadoSelect.is-completado {
+    color: #15803d;
+    background-color: rgba(22, 163, 74, 0.12);
+}
+
+html[data-theme="light"] .operationsEstadoSelect.is-cancelado {
+    color: #b91c1c;
+    background-color: rgba(220, 38, 38, 0.12);
+}
+
+html[data-theme="light"] .operationsEstadoSelect option {
+    background-color: var(--bg-surface);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .cvStatCard {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .cvStatLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .cvStatValue {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .cvTipoBadge {
+    background: rgba(100, 116, 139, 0.12);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .cvTipoBadgeIn {
+    background: rgba(22, 163, 74, 0.1);
+    color: var(--color-pos);
+}
+
+html[data-theme="light"] .cvTipoBadgeOut {
+    background: rgba(220, 38, 38, 0.1);
+    color: var(--color-neg);
+}
+
+html[data-theme="light"] .operationsFilterLabel {
+    color: var(--text-dim);
+}
+
+/* Selector de activo y cabecera de Conversiones/Herramientas */
+html[data-theme="light"] .toolsAssetPicker,
+html[data-theme="light"] .toolsSelectedAsset {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+html[data-theme="light"] .toolsLabel,
+html[data-theme="light"] .toolsSelectedLabel {
+    color: var(--accent);
+}
+
+html[data-theme="light"] .toolsSelectedValue {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .toolsSelectedMeta {
+    color: var(--text-dim);
+}
+
+/* ── 11. Bolsa e inversión ───────────────────────────────────────────────── */
+/* Bonos, dividendos, intereses y fundamentales. */
+
+html[data-theme="light"] .bonosSummaryCard {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .bonosSummaryLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .bonosSummaryValue {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .bonosTableWrapper {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .bonosTable {
+    background: var(--bg-surface);
+}
+
+html[data-theme="light"] .bonosTable thead th {
+    background: var(--bg-header);
+    color: var(--text-muted);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .bonosTable tbody td {
+    background: var(--bg-surface);
+    color: var(--text-subtle);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .bonosTable tbody tr:nth-child(odd) td {
+    background: #fafbfc;
+}
+
+html[data-theme="light"] .bonosPage {
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .bonosTabs {
+    border-bottom-color: var(--border-soft);
+}
+
+html[data-theme="light"] .bonosTab {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .bonosTab:hover {
+    color: #334155;
+    background: rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme="light"] .bonosTab.active {
+    color: #3b5bdb;
+    border-bottom-color: #3b5bdb;
+    background: rgba(59, 91, 219, 0.06);
+}
+
+/* ── 12. Mi dinero ───────────────────────────────────────────────────────── */
+/* Gastos, ingresos, cuentas, ahorro y calendario. */
+
+html[data-theme="light"] .calFinYearBtn {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .calFinYearBtn:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .calFinYearBtn.active {
+    background: #1e293b;
+    border-color: #334155;
+    color: #ffffff;
+}
+
+html[data-theme="light"] .calFinCard,
+html[data-theme="light"] .calFinMonth,
+html[data-theme="light"] .calFinSide,
+html[data-theme="light"] .calFinEmpty {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .calFinCard {
+    border-left-width: 3px;
+}
+
+html[data-theme="light"] .calFinCardLabel,
+html[data-theme="light"] .calFinCardHint,
+html[data-theme="light"] .calFinMonthTotals,
+html[data-theme="light"] .calFinNoDay,
+html[data-theme="light"] .calFinSideLabel,
+html[data-theme="light"] .calFinSideDate,
+html[data-theme="light"] .calFinSideHint,
+html[data-theme="light"] .calFinEmpty {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .calFinCardValue,
+html[data-theme="light"] .calFinMonthName,
+html[data-theme="light"] .calFinSideTitle,
+html[data-theme="light"] .calFinSideItem,
+html[data-theme="light"] .calFinSideTotal,
+html[data-theme="light"] .calFinDayFilled {
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .calFinDay {
+    color: var(--text-faint);
+}
+
+/* Las iniciales de la semana son rótulos: se leen, no se insinúan. */
+html[data-theme="light"] .calFinWeekdays span {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .calFinDayEmpty {
+    background: #f8fafc;
+}
+
+html[data-theme="light"] .calFinDayPast {
+    background: var(--bg-header);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .calFinDayNext {
+    background: var(--accent-tint);
+    border-color: #bfdbfe;
+}
+
+html[data-theme="light"] .calFinSideTotal,
+html[data-theme="light"] .calFinSideBalance {
+    border-color: var(--border-soft);
+}
+
+/* Los colores de tipo, un punto más oscuros para leerse sobre blanco. */
+html[data-theme="light"] .calFinTipo-gastos,
+html[data-theme="light"] .calFinNegativo,
+html[data-theme="light"] .calFinCard-negativo .calFinCardValue {
+    color: var(--color-neg);
+}
+
+html[data-theme="light"] .calFinTipo-ingresos,
+html[data-theme="light"] .calFinPositivo,
+html[data-theme="light"] .calFinCard-positivo .calFinCardValue {
+    color: var(--color-pos);
+}
+
+html[data-theme="light"] .calFinTipo-mensualidades {
+    color: var(--accent);
+}
+
+html[data-theme="light"] .gastosYearBtn,
+html[data-theme="light"] .gastosAddYearBtn,
+html[data-theme="light"] .gastosMonthTab {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .gastosYearBtn:hover,
+html[data-theme="light"] .gastosAddYearBtn:hover,
+html[data-theme="light"] .gastosMonthTab:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .gastosYearBtn.active,
+html[data-theme="light"] .gastosMonthTab.active {
+    background: #1e293b;
+    border-color: #334155;
+    color: #ffffff;
+}
+
+html[data-theme="light"] .gastosAnnualWrapper,
+html[data-theme="light"] .gastosMovementsWrapper {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .gastosAnnualTable,
+html[data-theme="light"] .gastosMovementsTable {
+    background: var(--bg-surface);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .gastosAnnualTable thead th,
+html[data-theme="light"] .gastosMovementsTable thead th {
+    background: var(--bg-header);
+    color: var(--text-muted);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .gastosAnnualTable tbody td,
+html[data-theme="light"] .gastosMovementsTable tbody td {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .gastosAnnualTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .gastosMovementsTable tbody tr:nth-child(odd) td {
+    background: #fafbfc;
+}
+
+html[data-theme="light"] .gastosMovementsTable tbody tr:hover td,
+html[data-theme="light"] .ingresosMovementsTable tbody tr:hover td {
+    background: var(--bg-header) !important;
+}
+
+html[data-theme="light"] .gastosAnnualTable .totalRow td,
+html[data-theme="light"] .gastosMovementsTable .totalRow td {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .gastosAnnualTable .headerRow td {
+    background: var(--accent-tint-strong);
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .gastosMonthActions .primaryButton {
+    background: var(--accent-dark);
+}
+
+html[data-theme="light"] .gastosEliminarAnoBtn,
+html[data-theme="light"] .gastosMonthActions .dangerButton {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: var(--color-neg);
+}
+
+html[data-theme="light"] .gtPopup {
+    background: var(--bg-surface);
+}
+
+html[data-theme="light"] .gtPopupHeader {
+    background: var(--bg-elevated);
+    border-bottom-color: var(--border-soft);
+}
+
+html[data-theme="light"] .gtPopupTitle {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .gtPopupTotal {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .gtPopupClose {
+    border-color: var(--border-soft);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .gtPopupSearch {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .gtPopupSearch::placeholder {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .gtTotalRow td {
+    background: var(--accent-tint-strong) !important;
+    color: var(--text-subtle);
+    border-top-color: var(--accent);
+}
+
+html[data-theme="light"] .ingresosYearBtn,
+html[data-theme="light"] .ingresosAddYearBtn,
+html[data-theme="light"] .ingresosMonthTab {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .ingresosYearBtn:hover,
+html[data-theme="light"] .ingresosAddYearBtn:hover,
+html[data-theme="light"] .ingresosMonthTab:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .ingresosYearBtn.active,
+html[data-theme="light"] .ingresosMonthTab.active {
+    background: #1e293b;
+    border-color: #334155;
+    color: #ffffff;
+}
+
+html[data-theme="light"] .ingresosAnnualWrapper,
+html[data-theme="light"] .ingresosMovementsWrapper {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .ingresosAnnualTable,
+html[data-theme="light"] .ingresosMovementsTable {
+    background: var(--bg-surface);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .ingresosAnnualTable thead th,
+html[data-theme="light"] .ingresosMovementsTable thead th {
+    background: var(--bg-header);
+    color: var(--text-muted);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .ingresosAnnualTable tbody td,
+html[data-theme="light"] .ingresosMovementsTable tbody td {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .ingresosAnnualTable tbody tr:nth-child(odd) td,
+html[data-theme="light"] .ingresosMovementsTable tbody tr:nth-child(odd) td {
+    background: #fafbfc;
+}
+
+html[data-theme="light"] .cuentaItem {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: #374151;
+}
+
+html[data-theme="light"] .cuentaItem:hover {
+    background: #e2e8f0;
+    border-color: var(--accent-soft);
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .cuentaItem.active {
+    background: var(--accent-tint-strong);
+    border-color: var(--accent);
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .gastosSectionRow td {
+    background: var(--accent-dark) !important;
+    border-color: var(--accent);
+    color: #ffffff !important;
+}
+
+html[data-theme="light"] .ingresosSectionRow td {
+    background: var(--accent-dark) !important;
+    border-color: var(--accent);
+    color: #ffffff !important;
+}
+
+html[data-theme="light"] .gastosTotalRow td {
+    background: var(--accent-tint-strong) !important;
+    border-color: var(--accent-soft);
+    color: var(--accent-dark) !important;
+}
+
+html[data-theme="light"] .ingresosTotalRow td {
+    background: #dcfce7 !important;
+    border-color: #86efac;
+    color: #14532d !important;
+}
+
+html[data-theme="light"] .gastosAnnualTable .rowActionHeader,
+html[data-theme="light"] .gastosMovementsTable .rowActionHeader {
+    background: var(--bg-header) !important;
+}
+
+html[data-theme="light"] .ingresosAnnualTable .rowActionHeader,
+html[data-theme="light"] .ingresosMovementsTable .rowActionHeader {
+    background: var(--bg-header) !important;
+}
+
+html[data-theme="light"] .cuentasPos,
+html[data-theme="light"] .ahorroKpiValue.ahorroKpiPos {
+    color: #059669;
+}
+
+html[data-theme="light"] .cuentasNeg,
+html[data-theme="light"] .cntCuentaSaldo.cuentasNeg,
+html[data-theme="light"] .ahorroKpiValue.ahorroKpiNeg {
+    color: var(--color-neg);
+}
+
+html[data-theme="light"] .cuentaAhorroPos {
+    color: #059669 !important;
+}
+
+html[data-theme="light"] .cuentaAhorroNeg {
+    color: var(--color-neg) !important;
+}
+
+html[data-theme="light"] .cntTipo-banco {
+    color: var(--accent);
+}
+
+html[data-theme="light"] .cntTipo-ahorro {
+    color: #059669;
+}
+
+html[data-theme="light"] .cntTipo-exchange {
+    color: #b45309;
+}
+
+html[data-theme="light"] .cntTipo-broker {
+    color: #9333ea;
+}
+
+html[data-theme="light"] .cntTipo-metalico {
+    color: #db2777;
+}
+
+html[data-theme="light"] .ingresosKpiIconTotal {
+    color: var(--color-pos);
+}
+
+html[data-theme="light"] .ingresosKpiIconPromedio {
+    color: var(--accent);
+}
+
+html[data-theme="light"] .ingresosKpiIconMejor {
+    color: #7c3aed;
+}
+
+html[data-theme="light"] .ingresosKpiIconActual {
+    color: #b45309;
+}
+
+/* Fila "Mensualidades" de la tabla anual de gastos: el texto casi blanco y el
+   azul pastel desaparecían sobre el fondo claro. */
+html[data-theme="light"] .gastosCategoryRow td {
+    color: var(--text-primary) !important;
+}
+
+html[data-theme="light"] .gastosCategoryRow .gastosSectionToggle {
+    color: var(--accent-dark) !important;
+}
+
+/* ── 13. Planes ──────────────────────────────────────────────────────────── */
+/* Planes de ahorro y planes de inversión. */
+
+html[data-theme="light"] .planKpi {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .planKpiLabel {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .planKpiValue {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .planDestacado {
+    border-top-color: var(--border-soft);
+}
+
+html[data-theme="light"] .planDestacadoValor {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .planTrack {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+}
+
+/* El ··· de la barra del plan va emparejado con «Editar plan», que aquí es
+   claro; su fondo de base (--bg-elevated) es oscuro en los tres temas. */
+html[data-theme="light"] .pinvPlanAcciones .rowMenuTrigger {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+    box-shadow: none;
+}
+
+html[data-theme="light"] .pinvPlanAcciones .rowMenuTrigger:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+    color: var(--text-subtle);
+    box-shadow: none;
+}
+
+html[data-theme="light"] .pinvPlanTab {
+    background: #f8fafc;
+    border-color: var(--border-soft);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .pinvPlanTab:hover {
+    background: var(--bg-header);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .pinvPlanTab.active {
+    background: #3b5bdb;
+    border-color: #3b5bdb;
+    color: #ffffff;
+}
+
+html[data-theme="light"] .pinvPlanNombre,
+html[data-theme="light"] .pinvKpiValue,
+html[data-theme="light"] .pinvActivoNombre,
+html[data-theme="light"] .pinvChartPct,
+html[data-theme="light"] .pinvLegendPct,
+html[data-theme="light"] .pinvEditorActivoNombre,
+html[data-theme="light"] .pinvArchivoNombre {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .pinvRepartoTotal {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .pinvKpi,
+html[data-theme="light"] .pinvTableWrap,
+html[data-theme="light"] .pinvChartCard {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .pinvTable thead th {
+    background: var(--bg-header);
+    color: var(--text-muted);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .pinvTable tbody td,
+html[data-theme="light"] .pinvOpFecha,
+html[data-theme="light"] .pinvLegendRow {
+    color: var(--text-subtle);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .pinvAssetRow:hover td,
+html[data-theme="light"] .pinvAssetRowOpen td {
+    background: var(--bg-header);
+}
+
+html[data-theme="light"] .pinvOpRow td {
+    background: #f8fafc;
+}
+
+html[data-theme="light"] .pinvCeldaOp {
+    border-left-color: var(--border-soft);
+}
+
+/* La casilla se pinta con --bg-inset, que es oscuro en los tres temas. Solo la
+   vacía: marcada lleva el azul y el check blanco que pone la hoja de la
+   página, y aclararle el fondo aquí dejaría el check invisible. */
+html[data-theme="light"] .pinvOpCheck input[type="checkbox"]:not(:checked) {
+    background-color: var(--bg-surface);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .pinvOrdenCompra,
+html[data-theme="light"] .pinvEstadoRealizada {
+    color: #15803d;
+}
+
+html[data-theme="light"] .pinvOrdenVenta,
+html[data-theme="light"] .pinvEstadoPendiente {
+    color: #b91c1c;
+}
+
+html[data-theme="light"] .pinvOpNuevaTag {
+    color: var(--accent-dark);
+}
+
+html[data-theme="light"] .pinvEditorActivo,
+html[data-theme="light"] .pinvArchivoFila {
+    background: #f8fafc;
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .pinvEditorActivoCab:hover {
+    background: var(--bg-header);
+}
+
+html[data-theme="light"] .pinvEditorOps {
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .pinvOpCheck {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .pinvNuevaForm {
+    background: var(--bg-surface);
+    border-color: var(--border-mid);
+}
+
+/* El desvanecido tiene que morir en el color del propio diálogo. */
+html[data-theme="light"] .pinvEditorListaConMas::after {
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #ffffff);
+}
+
+/* ── 14. Métricas ────────────────────────────────────────────────────────── */
+
+html[data-theme="light"] #mChartDivAxisWrap {
+    background: var(--bg-surface);
+}
+
+html[data-theme="light"] .metricasPage {
+    background: var(--bg-app);
+}
+
+html[data-theme="light"] .metricasTitle {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .metricasKpiGroupLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .metricasKpiCard {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .metricasKpiCard:hover {
+    background: #f0f6ff;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+html[data-theme="light"] .metricasKpiCard[data-mhelp]::before {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+html[data-theme="light"] .mkpiCardActivo[data-kpi]::after {
+    background: var(--accent-deep);
+    border-color: rgba(100, 160, 255, 0.3);
+    color: #e8f0ff;
+}
+
+html[data-theme="light"] .mkpiLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .mkpiValue {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .metricasChartCard {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .metricasChartTitle {
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .metricasSectionTitle {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .metricasSection {
+    color: var(--text-primary);
+}
+
+/* La columna de meses va fija con fondo propio para tapar lo que scrollea por
+   debajo: sin esto se quedaría con el azul oscuro del tema por defecto. */
+html[data-theme="light"] .mDivMensualTable th:first-child,
+html[data-theme="light"] .mDivMensualTable td:first-child {
+    background: var(--bg-app);
+}
+
+html[data-theme="light"] .mNavTab[data-mcat="todo"].active {
+    background: var(--bg-hover);
+    border-color: var(--border-hard);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .mNavTab[data-mcat="portfolio"].active {
+    background: var(--accent-tint-strong);
+    border-color: #3b82f6;
+    color: #1e40af;
+}
+
+html[data-theme="light"] .mNavTab[data-mcat="finanzas"].active {
+    background: #dcfce7;
+    border-color: #22c55e;
+    color: #166534;
+}
+
+html[data-theme="light"] .mNavTab[data-mcat="gastos"].active {
+    background: #fee2e2;
+    border-color: #ef4444;
+    color: #991b1b;
+}
+
+html[data-theme="light"] .mNavTab[data-mcat="ingresos"].active {
+    background: #fef3c7;
+    border-color: #f59e0b;
+    color: #92400e;
+}
+
+html[data-theme="light"] .mNavTab[data-mcat="gastos,ingresos"].active {
+    background: #fff0e0;
+    border-color: #e8720e;
+    color: #92350e;
+}
+
+html[data-theme="light"] .mNavSearch {
+    background: var(--bg-surface);
+    border-color: var(--border-mid);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .mNavSearch::placeholder {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .mToggleGroup {
+    background: var(--bg-hover);
+    border-color: #d1d9e6;
+}
+
+html[data-theme="light"] .mToggleBtn,
+html[data-theme="light"] .mDistMetricBtn {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .mToggleBtn.active,
+html[data-theme="light"] .mDistMetricBtn.active {
+    background: var(--bg-surface);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .mToggleBtn:hover:not(.active),
+html[data-theme="light"] .mDistMetricBtn:hover:not(.active) {
+    background: #dde4ef;
+    color: #334155;
+}
+
+/* ── 15. Heatmap ─────────────────────────────────────────────────────────── */
+
+html[data-theme="light"] .hmGroup {
+    background: var(--bg-hover);
+    border-color: #d1d9e6;
+}
+
+html[data-theme="light"] .hmGroupBtn {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .hmGroupBtn:hover {
+    background: #dde4ef;
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .hmGroupBtn.active {
+    background: var(--accent-dark);
+    color: #fff;
+}
+
+html[data-theme="light"] .hmGroupToggle .hmGroupBtn.active {
+    background: #065f46;
+    color: #fff;
+}
+
+html[data-theme="light"] .hmGroupMulti .hmGroupBtn.active {
+    background: var(--accent-dark);
+    color: #fff;
+}
+
+html[data-theme="light"] .hmGroupMulti .hmGroupBtn[data-type="all"].active {
+    background: #334155;
+    color: #fff;
+}
+
+html[data-theme="light"] .hmGroupSep {
+    background: #d1d9e6;
+}
+
+html[data-theme="light"] .hmSummary,
+html[data-theme="light"] .hmLegend {
+    background: var(--bg-hover);
+    border-color: #d1d9e6;
+}
+
+html[data-theme="light"] .hmSumLabel,
+html[data-theme="light"] .hmLegendTick {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .hmSumVal {
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .hmSumVal.hmPos {
+    color: #15803d;
+}
+
+html[data-theme="light"] .hmSumVal.hmNeg {
+    color: #b91c1c;
+}
+
+/* El centro de la escala es el mismo gris que usan las baldosas planas. */
+html[data-theme="light"] .hmLegendBar {
+    background: linear-gradient(
+        90deg,
+        #b71c1c 0%,
+        #e53935 30%,
+        #ef9a9a 47%,
+        #64748b 50%,
+        #a5d6a7 53%,
+        #43a047 70%,
+        #1b5e20 100%
+    );
+}
+
+/* ── 16. Herramientas ────────────────────────────────────────────────────── */
+
+html[data-theme="light"] .herramientasNav {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .herramientaCategorias {
+    border-bottom-color: var(--border-soft);
+}
+
+html[data-theme="light"] .herramientaCatBtn {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .herramientaCatBtn.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--accent);
+}
+
+html[data-theme="light"] .hPrecargaMsg {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .herramientaBtn {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .herramientaBtn:hover:not(.active) {
+    background: var(--bg-header);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .herramientaBtn.active {
+    background: var(--accent-tint);
+    border-color: var(--accent-soft);
+    color: var(--accent-dark);
+    box-shadow: none;
+}
+
+html[data-theme="light"] .hPanelHead {
+    border-bottom-color: var(--border-soft);
+}
+
+html[data-theme="light"] .herramientaPanelTitle {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .hPanelDesc,
+html[data-theme="light"] .hCardTitle,
+html[data-theme="light"] .hResultLabel,
+html[data-theme="light"] .herramientaField label,
+html[data-theme="light"] .hInputUnit,
+html[data-theme="light"] .hPrecioMedioTable th,
+html[data-theme="light"] .hPrecioMedioTable .hPmNum,
+html[data-theme="light"] .hRatioFuenteMsg {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .hCard,
+html[data-theme="light"] .herramientaResultCard {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .hResultCardAccent {
+    border-left-color: var(--accent);
+}
+
+html[data-theme="light"] .herramientaBlock .hCardTitle,
+html[data-theme="light"] .hResultValue,
+html[data-theme="light"] .hPrecioMedioTable td,
+html[data-theme="light"] .hPrecioMedioTable .hPmTotal {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .hResultPositive {
+    color: var(--color-pos);
+}
+
+html[data-theme="light"] .hResultNegative {
+    color: var(--color-neg);
+}
+
+html[data-theme="light"] .hRatioFuenteOk {
+    color: var(--color-pos);
+}
+
+html[data-theme="light"] .hRatioFuenteWarn {
+    color: #b45309;
+}
+
+html[data-theme="light"] .herramientaField input,
+html[data-theme="light"] .hPrecioInput {
+    background: #f8fafc;
+    border-color: var(--border-mid);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .herramientaField input:hover {
+    border-color: var(--border-hard);
+}
+
+html[data-theme="light"] .hPrecioMedioTable th {
+    border-bottom-color: var(--border-soft);
+}
+
+html[data-theme="light"] .hPrecioMedioTable td {
+    border-bottom-color: #eef2f7;
+}
+
+html[data-theme="light"] .herramientaSecBtn {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .herramientaSecBtn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .herramientaResetBtn {
+    border-color: var(--border-soft);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .hPlaceholder {
+    border-color: var(--border-mid);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .hPlaceholder strong {
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .hPrecioDeleteBtn {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .hRatioInfoPos {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+html[data-theme="light"] .hRatioInfoNeg {
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+/* ── 17. Ajustes ─────────────────────────────────────────────────────────── */
+
+html[data-theme="light"] .ajustesPassModalText {
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .ajustesPassModalError {
+    color: var(--color-neg);
+}
+
+html[data-theme="light"] .sttOverlay {
+    background: var(--bg-app);
+}
+
+html[data-theme="light"] .sttSidebar {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .sttSidebarHeader {
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .sttCloseBtn {
+    border-color: var(--border-soft);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .sttCloseBtn:hover {
+    background: var(--bg-header);
+    color: var(--text-primary);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .sttNavBtn {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .sttNavBtn:hover {
+    background: var(--bg-header);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .sttNavBtn.active {
+    background: rgba(var(--accent-rgb), 0.1);
+    color: var(--accent);
+}
+
+html[data-theme="light"] .sttSidebarTitle {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .sttPageTitle {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .ajustesLayout {
+    background: var(--bg-app);
+}
+
+html[data-theme="light"] .ajustesSection {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .ajustesSectionIconWrap {
+    background: rgba(var(--accent-rgb), 0.08);
+    border-color: rgba(var(--accent-rgb), 0.2);
+}
+
+html[data-theme="light"] .ajustesSectionDivider {
+    background: #e2e8f0;
+}
+
+html[data-theme="light"] .ajustesAddBtn,
+html[data-theme="light"] .ajustesSecondaryBtn {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .ajustesAddBtn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-tint);
+}
+
+html[data-theme="light"] .ajustesToggleBtn {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .ajustesTemaBtn {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .ajustesTemaBtn:hover {
+    background: var(--bg-app);
+    border-color: var(--border-mid);
+}
+
+html[data-theme="light"] .ajustesTemaLabel {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .ajustesTemaBtn.active .ajustesTemaLabel {
+    color: var(--accent);
+}
+
+html[data-theme="light"] .ajustesRefreshBtn {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .ajustesRefreshBtn:hover {
+    background: var(--bg-app);
+    border-color: var(--border-mid);
+    color: #334155;
+}
+
+html[data-theme="light"] .ajustesRefreshBtn.active {
+    border-color: var(--accent);
+    background: var(--accent-tint);
+    color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.1);
+}
+
+html[data-theme="light"] .ajustesRestoreBtn {
+    border-color: var(--border-mid);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .ajustesDeleteBackupBtn {
+    color: var(--text-faint);
+}
+
+html[data-theme="light"] .ajustesSectionHeader {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme="light"] .ajustesSectionTitle {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .ajustesSectionDesc {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .ajustesLabel {
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .ajustesInput,
+html[data-theme="light"] .ajustesSelect {
+    background: var(--bg-elevated) !important;
+    border-color: var(--border-soft) !important;
+    color: var(--text-primary) !important;
+    color-scheme: light;
+}
+
+html[data-theme="light"] .ajustesSelect option {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .ajustesBackupItem,
+html[data-theme="light"] .ajustesHiddenItem,
+html[data-theme="light"] .ajustesApiStatsRow {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .ajustesApiStatsTotal {
+    background: var(--accent-tint);
+    border-color: var(--accent);
+}
+
+html[data-theme="light"] .ajustesApiStatsProvider {
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .ajustesApiStatsCount {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .ajustesBackupName,
+html[data-theme="light"] .ajustesHiddenName {
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .ajustesSectionDesc code {
+    background: var(--bg-header);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .ajustesTlsAyuda,
+html[data-theme="light"] .ajustesTlsGuia,
+html[data-theme="light"] .ajustesTlsPruebaRes,
+html[data-theme="light"] .ajustesAtajoGuia,
+html[data-theme="light"] .ajustesAtajoPruebaRes,
+html[data-theme="light"] .ajustesAtajoAviso,
+html[data-theme="light"] .ajustesAtajoRechazadas {
+    background: var(--bg-elevated);
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .ajustesAtajoPaso,
+html[data-theme="light"] .ajustesAtajoRechazo,
+html[data-theme="light"] .ajustesTlsPruebaFila {
+    border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .ajustesAtajoPaso .ajustesAtajoRechazadas {
+    background: var(--bg-surface);
+}
+
+html[data-theme="light"] .ajustesAtajoPasoNum {
+    background: var(--bg-surface);
+    border-color: var(--border-mid);
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .ajustesAtajoPaso[data-estado="ok"] .ajustesAtajoPasoNum,
+html[data-theme="light"] .ajustesAtajoPaso[data-estado="aviso"] .ajustesAtajoPasoNum,
+html[data-theme="light"] .ajustesAtajoPaso[data-estado="mal"] .ajustesAtajoPasoNum {
+    color: #ffffff;
+}
+
+/* Blanco sobre ámbar no llega a 2,2:1; el número va en oscuro. */
+html[data-theme="light"] .ajustesAtajoPaso[data-estado="aviso"] .ajustesAtajoPasoNum {
+    color: #422006;
+}
+
+html[data-theme="light"] .ajustesTlsAvisoBtn {
+    background: var(--bg-surface);
+    border-color: var(--border-soft);
+    color: var(--text-muted);
+}
+
+html[data-theme="light"] .ajustesTlsAvisoBtn:hover {
+    background: var(--accent-tint);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+html[data-theme="light"] .ajustesTlsEstado,
+html[data-theme="light"] .ajustesAtajoEstado,
+html[data-theme="light"] .ajustesAtajoPasoDetalle,
+html[data-theme="light"] .ajustesAtajoRechazoDetalle,
+html[data-theme="light"] .ajustesAtajoAviso,
+html[data-theme="light"] .ajustesTlsAyudaCuerpo,
+html[data-theme="light"] .ajustesTlsGuia,
+html[data-theme="light"] .ajustesTlsPruebaDetalle,
+html[data-theme="light"] .ajustesAtajoDatos dt,
+html[data-theme="light"] .ajustesFieldHint {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .ajustesTlsEstadoTexto strong,
+html[data-theme="light"] .ajustesAtajoPasoTitulo,
+html[data-theme="light"] .ajustesAtajoPasoDetalle strong,
+html[data-theme="light"] .ajustesAtajoPasoDetalle em,
+html[data-theme="light"] .ajustesAtajoRechazadasCabecera,
+html[data-theme="light"] .ajustesAtajoAviso strong,
+html[data-theme="light"] .ajustesAtajoAviso em,
+html[data-theme="light"] .ajustesTlsGuia strong,
+html[data-theme="light"] .ajustesTlsGuia em,
+html[data-theme="light"] .ajustesTlsPruebaNombre,
+html[data-theme="light"] .ajustesTlsAyuda > summary,
+html[data-theme="light"] .ajustesAtajoUrlFila code,
+html[data-theme="light"] .ajustesAtajoDatos dd,
+html[data-theme="light"] .ajustesFieldHint strong,
+html[data-theme="light"] .ajustesSwitchLabel {
+    color: var(--text-primary);
+}
+
+html[data-theme="light"] .ajustesSwitchLabel small,
+html[data-theme="light"] .ajustesAtajoUrlEtiqueta,
+html[data-theme="light"] .ajustesAtajoExtra {
+    color: var(--text-dim);
+}
+
+html[data-theme="light"] .ajustesSectionDesc a {
+    color: var(--accent);
+}
+
+html[data-theme="light"] .ajustesUpdateEtiqueta {
+    color: #047857;
+}
+
+html[data-theme="light"] .ajustesUpdateEtiqueta.hayNueva,
+html[data-theme="light"] .ajustesAviso {
+    color: #b45309;
+}

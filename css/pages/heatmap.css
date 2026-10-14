@@ -1,0 +1,394 @@
+/* Heatmap: barra de filtros, resumen, leyenda, baldosas y tooltip.
+   Los colores de los temas claro y oscuro están en css/themes/. */
+
+/* ── Heatmap ─────────────────────────────────────────────── */
+.heatmapPage {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    gap: 8px;
+}
+
+.heatmapToolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Grupo genérico */
+.hmGroup {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    background: #111827;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 3px;
+}
+
+.hmGroupBtn {
+    padding: 4px 11px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+        background 0.13s,
+        color 0.13s;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.hmGroupBtn:hover {
+    background: #1e293b;
+    color: #e2e8f0;
+}
+
+.hmGroupBtn.active {
+    background: #1d4ed8;
+    color: #fff;
+    font-weight: 600;
+}
+
+/* Grupo toggle (Activos/Cuenta): activo en verde */
+.hmGroupToggle .hmGroupBtn.active {
+    background: #065f46;
+    color: #6ee7b7;
+}
+
+/* Grupo multi-selección: activo en gris azulado */
+.hmGroupMulti .hmGroupBtn.active {
+    background: #1e3a5f;
+    color: #93c5fd;
+    font-weight: 600;
+}
+
+/* "Todos" cuando está solo activo: más neutro */
+.hmGroupMulti .hmGroupBtn[data-type="all"].active {
+    background: #374151;
+    color: #f3f4f6;
+}
+
+/* Separador visual entre grupos */
+.hmGroupSep {
+    width: 1px;
+    height: 22px;
+    background: #1e293b;
+    flex-shrink: 0;
+}
+
+/* Resumen y leyenda: van juntos al extremo derecho de la barra */
+.hmToolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+
+.hmSummary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #111827;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 4px 12px;
+}
+
+.hmSumItem {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.hmSumLabel {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+}
+
+.hmSumVal {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+.hmSumVal.hmPos {
+    color: #4ade80;
+}
+
+.hmSumVal.hmNeg {
+    color: #f87171;
+}
+
+/* Leyenda del color. Los topes son los del degradado de hmColorForValue: a
+   partir de ±10 % el color ya no cambia. */
+.hmLegend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #111827;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 5px 10px;
+}
+
+.hmLegendTick {
+    font-size: 0.68rem;
+    color: #6b7280;
+    white-space: nowrap;
+}
+
+.hmLegendBar {
+    width: 132px;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(
+        90deg,
+        #b71c1c 0%,
+        #e53935 30%,
+        #ef9a9a 47%,
+        #252d3a 50%,
+        #a5d6a7 53%,
+        #43a047 70%,
+        #1b5e20 100%
+    );
+}
+
+.heatmapWrapper {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.heatmapContainer {
+    position: relative;
+    width: 100%;
+    /* El alto lo pone el hueco que deja la barra de filtros (el envoltorio es
+       flex:1), no un cálculo sobre la altura de la ventana: ese se quedaba
+       corto y dejaba una franja muerta bajo el mapa, y más aún cuando la barra
+       pasaba a dos líneas. */
+    height: 100%;
+    min-height: 360px;
+    overflow: hidden;
+}
+
+.heatmapLoading,
+.heatmapEmpty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    font-size: 1rem;
+}
+
+.heatmapCell {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 4px;
+    box-sizing: border-box;
+    padding: 4px;
+    cursor: default;
+    transition: filter 0.15s;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.heatmapCell:hover {
+    filter: brightness(1.13);
+    border-color: rgba(255, 255, 255, 0.45);
+}
+
+.heatmapCell {
+    cursor: pointer;
+}
+
+/* El nombre solo aparece en las baldosas con sitio; lo decide el JS. */
+.hmName {
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.25;
+    opacity: 0.82;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    margin-top: 1px;
+}
+
+.hmSymbol {
+    font-weight: 700;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.hmPrice {
+    font-size: 0.71em;
+    opacity: 0.85;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.hmValue {
+    font-size: 0.71em;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.hmValue.hmPos {
+    color: #bbf7d0;
+}
+
+.hmValue.hmNeg {
+    color: #fecaca;
+}
+
+.hmValue.hmNd {
+    opacity: 0.55;
+}
+
+/* El dinero movido en el periodo, bajo el porcentaje */
+.hmMoney {
+    font-size: 0.66em;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    opacity: 0.92;
+}
+
+.hmMoney.hmPos {
+    color: #bbf7d0;
+}
+
+.hmMoney.hmNeg {
+    color: #fecaca;
+}
+
+.hmMoney.hmNd {
+    opacity: 0.55;
+}
+
+/* ── Heatmap tooltip ── */
+.hmTooltip {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-width: 200px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+        opacity 0.12s ease,
+        transform 0.12s ease;
+}
+
+.hmTooltip.hmTooltipVisible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.hmTipName {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #cbd5e1;
+    margin-bottom: 6px;
+    white-space: nowrap;
+}
+
+.hmTipDivider {
+    height: 1px;
+    background: #1e293b;
+    margin: 6px 0;
+}
+
+.hmTipGrid {
+    display: grid;
+    grid-template-columns: auto auto;
+    row-gap: 3px;
+    column-gap: 14px;
+    align-items: center;
+}
+
+.hmTipLabel {
+    font-size: 0.75rem;
+    color: #64748b;
+    white-space: nowrap;
+}
+
+.hmTipVal {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.hmTipRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hmTipPct {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #94a3b8;
+}
+
+.hmTipMoney {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #94a3b8;
+    opacity: 0.85;
+}
+
+.hmTipPos {
+    color: #4ade80;
+}
+
+.hmTipMoney.hmTipPos {
+    color: #86efac;
+}
+
+.hmTipNeg {
+    color: #f87171;
+}
+
+.hmTipMoney.hmTipNeg {
+    color: #fca5a5;
+}
+
+.hmTipVal.hmTipPos {
+    color: #4ade80;
+}
+
+.hmTipVal.hmTipNeg {
+    color: #f87171;
+}

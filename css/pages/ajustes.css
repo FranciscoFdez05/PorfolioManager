@@ -1974,12 +1974,6 @@
 .ajustesPassModalActions .cancelButton:first-child {
     margin-right: auto;
 }
-html[data-theme="light"] .ajustesPassModalText {
-    color: #475569;
-}
-html[data-theme="light"] .ajustesPassModalError {
-    color: #dc2626;
-}
 
 /* ── Redes desde las que se acepta el Atajo ───────────────────────────────────
    Una red por línea, con lo que significa al lado, en vez de un campo de texto

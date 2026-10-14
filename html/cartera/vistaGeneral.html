@@ -1,6 +1,14 @@
 <section class="overviewPage">
     <div class="overviewFiltersBar">
+        <div class="overviewScroll">
         <div class="overviewFilters" id="overviewFilters">
+            <div class="overviewSearch" id="overviewSearch">
+                <button class="overviewSearchBtn" id="overviewSearchBtn" type="button" aria-label="Buscar activo" title="Buscar activo">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21"></line></svg>
+                </button>
+                <input class="overviewSearchInput" id="overviewSearchInput" type="text" placeholder="Buscar por nombre…" autocomplete="off" spellcheck="false" hidden>
+            </div>
+            <div class="overviewDivider"></div>
             <label class="overviewFilterOption overviewFilterTodos">
                 <input type="checkbox" value="todos" checked>
                 <span>Todos</span>
@@ -29,6 +37,7 @@
             <div class="overviewExtremeCard" id="overviewRealizedCard"></div>
             <div class="overviewExtremeCard" id="overviewBestCard"></div>
             <div class="overviewExtremeCard" id="overviewWorstCard"></div>
+        </div>
         </div>
 
         <!-- <button id="refreshOverviewMarketBtn" class="primaryButton" type="button">Actualizar cotizaciones</button> -->

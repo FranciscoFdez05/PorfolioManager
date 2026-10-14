@@ -22,6 +22,47 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.5.0] — 2026-10-14
+
+**Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Añadido
+
+- Vista general: una lupa junto a los filtros para buscar un activo por nombre (Esc la cierra).
+  Los filtros y las tarjetas de resumen van en una sola línea; si no caben, se desplazan de
+  lado arrastrando.
+- Las tarjetas «Mejor» y «Peor» muestran también el activo con más ganancia o pérdida en
+  euros cuando no es el mismo que el del porcentaje.
+- Logo y favicon propios en la aplicación, en el inicio de sesión y en la configuración inicial.
+
+### Cambiado
+
+- Los temas Claro y Oscuro tienen acento propio y ya no repiten el azul de Noche clara:
+  verde azulado en Claro y violeta en Oscuro (botones, foco, pestañas, filtros activos,
+  selección del panel lateral). El azul que identifica una categoría —Acciones, Banco,
+  Mensualidades, el grupo Portfolio de Métricas— se mantiene en los tres temas.
+- Oscuro: los grises del texto siguen una única escala, y los controles nativos (casillas,
+  selector de fecha, barras de desplazamiento) se dibujan en oscuro.
+- Las hojas de estilo están reorganizadas: cada tema en `css/themes/` (`noche-clara.css`,
+  `claro.css`, `oscuro.css`), con su paleta arriba y sus reglas por zona; las piezas que no
+  eran de ningún tema han salido a `css/components/`, `css/pages/` y `css/responsive.css`.
+  Noche clara se ve exactamente igual.
+
+### Corregido
+
+- Claro y Oscuro: muchas piezas seguían en azul noche porque esos temas no redefinían los
+  colores base: tarjetas Mejor/Peor/Beneficio realizado, lupa, menú ···, botones «Añadir»,
+  selector de activo de Conversiones y Herramientas, controles y baldosas del Heatmap.
+- Claro: verdes, rojos y naranjas que no se leían sobre blanco (tarjetas de Dividendos,
+  Intereses, Earn, Staking, Cuentas y Ahorro; iconos de Ingresos; etiquetas de tipo de
+  activo), la fila Mensualidades de Gastos casi invisible y la variación del activo
+  seleccionado en el panel lateral.
+- Oscuro: etiquetas en gris tan oscuro que apenas se veían (tarjetas de activos, Métricas,
+  Bonos, Heatmap, Ajustes) y enlaces de Ajustes › Telegram en el azul del navegador.
+- Trading journal, Ajustes y Ventas usaban variables de color que no existían; en Claro y
+  Oscuro ahora toman las de la paleta (aparecen bordes que antes no se pintaban).
+
 ## [4.4.0] — 2026-10-13
 
 **Esquema de base de datos:** sube a la **21**, desde la 20 (columna `wallet_desde` en

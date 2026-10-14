@@ -1,0 +1,65 @@
+/* ============================================================================
+   TEMA NOCHE CLARA  ·  :root (tema por defecto, sin data-theme)
+   ============================================================================
+   Azul noche: fondos #0b1120–#162235 y acento azul #3b82f6.
+
+   Es el tema base de la aplicación: se aplica cuando <html> no lleva
+   data-theme. Por eso su paleta va en :root y el resto de temas
+   (claro.css, oscuro.css) la redefinen bajo html[data-theme="…"].
+
+   Cómo está organizado:
+     · La paleta (variables) es todo el tema. Todo lo que en la app pinta con
+       var(--…) toma el color de aquí.
+     · No tiene secciones de reglas como los otros temas: las piezas con un
+       color escrito a mano en su CSS (css/components.css, css/pages/…) ya
+       están diseñadas para Noche clara, y son justo lo que claro.css y
+       oscuro.css sobrescriben en sus secciones.
+
+   Al añadir una variable aquí, añádela también a claro.css y oscuro.css; si
+   no, esos temas heredarán el valor azul noche.
+   ============================================================================ */
+
+/* ── 0. Paleta ───────────────────────────────────────────────────────────── */
+:root {
+    /* Fondos */
+    --bg-app: #0b1120;
+    --bg-panel: #0f1724;
+    --bg-surface: #111827;
+    --bg-elevated: #162235;
+    --bg-header: #0d1525;
+    --bg-inset: #0a0f1c;
+
+    /* Bordes */
+    --border-inset: #1f2937;
+    --border-soft: #1e2d45;
+    --border-mid: #273246;
+    --border-hard: #334155;
+
+    /* Texto */
+    --text-bright: #ffffff;
+    --text-primary: #e5edf9;
+    --text-subtle: #ccd6f6;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+
+    /* Botones */
+    --btn-bg: #0f1724;
+    --btn-bg-hover: #162033;
+    --btn-border: #334155;
+    --btn-border-hover: #475569;
+    --btn-active-bg: #1d4ed8;
+    --btn-active-border: #3b82f6;
+    --btn-active-text: #ffffff;
+
+    /* Acento */
+    --accent: #3b82f6;
+    --accent-dark: #1d4ed8;
+    --accent-hover: #4a9eff;
+    --accent-glow: rgba(59, 130, 246, 0.22);
+
+    /* Positivo / negativo */
+    --color-pos: #2ecc71;
+    --color-neg: #e74c3c;
+    --color-pos-bright: #4ade80;
+    --color-neg-bright: #f87171;
+}

@@ -2,11 +2,9 @@ let _herramientasChart = null
 let _hDivChart = null
 let _hPrecioMedioCount = 0
 
-// Colores del gráfico según el tema activo. Las variables de :root no sirven
-// aquí: los temas claro y negro no las redefinen, sobrescriben clases (ver el
-// bloque de Herramientas al final de css/themes.css), así que leerlas
-// devolvía siempre la paleta oscura y en el tema claro la rejilla salía azul
-// marino y la leyenda casi invisible.
+// Colores del gráfico según el tema activo: los mismos tonos que la paleta de
+// css/themes/claro.css y css/themes/oscuro.css. Chart.js pinta en un canvas y
+// necesita el valor ya resuelto, no un var(--…).
 function hChartTheme() {
     const tema = document.documentElement.getAttribute("data-theme")
     if (tema === "light") return { text: "#0f172a", muted: "#64748b", grid: "#e2e8f0" }

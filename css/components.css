@@ -1556,7 +1556,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 .overviewFilters {
     display: flex;
     gap: 12px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     padding: 2px 0 6px 0;
     flex: 0 1 auto;
@@ -1592,6 +1592,25 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     white-space: nowrap;
 }
 
+.overviewExtremeCardDual {
+    gap: 4px;
+    min-width: 290px;
+}
+
+.overviewExtremeLine {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.overviewExtremeLine .overviewExtremeLabel {
+    min-width: 128px;
+}
+
+.overviewExtremeLine .overviewExtremeValue {
+    font-size: 0.9rem;
+}
+
 .overviewExtremeLabel {
     color: var(--text-dim);
     font-size: 0.72rem;
@@ -1622,15 +1641,94 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+}
+
+/* Filtros y tarjetas en una sola línea: si no caben, scroll lateral. El menú
+   «···» queda fuera para que su desplegable no se recorte. */
+.overviewScroll {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 9px 0;
+    margin: -9px 0;
+    scrollbar-width: none;
+    cursor: grab;
+}
+
+.overviewScroll::-webkit-scrollbar {
+    display: none;
+}
+
+.overviewScroll.dragging {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.overviewScroll > * {
+    flex: none;
 }
 
 .overviewActionsGroup {
+    flex: none;
     display: flex;
     align-items: center;
     gap: 10px;
     margin-left: auto;
     flex-wrap: wrap;
+}
+
+.overviewSearch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.overviewSearchBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 50%;
+    background: var(--bg-header);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        color 0.15s;
+}
+
+.overviewSearchBtn:hover,
+.overviewSearch.open .overviewSearchBtn {
+    color: var(--text-main, inherit);
+    border-color: var(--btn-border);
+}
+
+.overviewSearchInput {
+    width: 200px;
+    height: 32px;
+    padding: 0 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 20px;
+    background: var(--bg-header);
+    color: inherit;
+    font-size: 0.81rem;
+    outline: none;
+}
+
+.overviewSearchInput[hidden] {
+    display: none;
+}
+
+.overviewSearchInput:focus {
+    border-color: var(--btn-border);
 }
 
 .overviewFilterOption,
@@ -2593,21 +2691,6 @@ table td.numCell [contenteditable="true"] {
     color: #f0c040;
 }
 
-html[data-theme="light"] .segEditNoticeBox {
-    background: #fffbeb;
-    border-color: #f59e0b44;
-}
-html[data-theme="light"] .segEditNoticeBox p {
-    color: #92400e;
-}
-html[data-theme="light"] .segEditNoticeBox strong {
-    color: #b45309;
-}
-html[data-theme="black"] .segEditNoticeBox {
-    background: #110e00;
-    border-color: #f39c1244;
-}
-
 .segHiddenToggleBtn {
     display: flex;
     align-items: center;
@@ -2657,28 +2740,6 @@ html[data-theme="black"] .segEditNoticeBox {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-html[data-theme="light"] .segHideBtn:hover {
-    background: #fff3cd;
-    color: #d4790a;
-    border-color: #f39c12;
-}
-html[data-theme="light"] .segHiddenItem {
-    background: #f8fafc;
-    border-color: #e2e8f0;
-}
-html[data-theme="light"] .segHiddenItemName {
-    color: #334155;
-}
-html[data-theme="black"] .segHiddenItem {
-    background: #080808;
-    border-color: #1a1a1a;
-}
-html[data-theme="black"] .segHideBtn:hover {
-    background: #111;
-    color: #f39c12;
-    border-color: #f39c12;
 }
 
 .assetColorPicker {
@@ -4268,17 +4329,6 @@ table.tablaHuecosIguales {
     --grafo-texto-suave: var(--text-muted);
     --grafo-fondo: var(--bg-surface);
     width: min(820px, 100%);
-}
-
-html[data-theme="light"] .grafoFlujosModal {
-    --grafo-nodo: #dbeafe;
-    --grafo-nodo-borde: #2563eb;
-    --grafo-enlace: #94a3b8;
-    --grafo-entra: #059669;
-    --grafo-sale: #dc2626;
-    --grafo-texto: #0f172a;
-    --grafo-texto-suave: #475569;
-    --grafo-fondo: #ffffff;
 }
 
 .grafoFlujosCab {

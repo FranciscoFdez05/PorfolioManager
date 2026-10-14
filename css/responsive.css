@@ -1,0 +1,83 @@
+/* Ajustes de maquetación para tablet (≤1024px) y móvil (≤768px).
+   Los colores de los temas claro y oscuro están en css/themes/. */
+
+/* ── Responsive: tablet (≤1024px) ── */
+@media (max-width: 1024px) {
+    :root {
+        --sidebar-width: 200px;
+    }
+
+    .sideWrapper {
+        width: 200px;
+        min-width: 160px;
+    }
+
+    .searchContainer input {
+        width: 120px;
+    }
+
+    .metricBox {
+        min-width: 80px;
+        padding: 6px 8px;
+    }
+
+    .metricValue {
+        font-size: 13px;
+    }
+
+    .metricTitle {
+        font-size: 9px;
+    }
+}
+
+/* ── Responsive: móvil / iPad mini portrait (≤768px) ── */
+@media (max-width: 768px) {
+    :root {
+        --sidebar-width: 0px;
+    }
+
+    .sideWrapper {
+        width: 0 !important;
+        min-width: 0 !important;
+        border-left: none;
+    }
+
+    .sideWrapper .sidePanel {
+        pointer-events: none;
+    }
+
+    .topBar {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .metrics {
+        order: 2;
+        width: 100%;
+
+        /* Aquí el panel superior se parte en varias filas: el margen negativo
+           que esconde la barra de desplazamiento metería la fila de métricas
+           debajo de la siguiente, así que se deja ocupar sus 6px. */
+        margin-bottom: 0;
+    }
+
+    .searchContainer input {
+        width: 100px;
+    }
+
+    .navBtn,
+    .navDropdownBtn {
+        font-size: 12px;
+        height: 28px;
+        padding: 0 8px;
+    }
+
+    .metricBox {
+        min-width: 72px;
+        padding: 4px 6px;
+    }
+
+    .metricValue {
+        font-size: 12px;
+    }
+}

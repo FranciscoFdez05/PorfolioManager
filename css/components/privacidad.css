@@ -1,0 +1,212 @@
+/* Botón del ojo y modo «ocultar valores» (body.money-hidden) en todas las páginas.
+   Los colores de los temas claro y oscuro están en css/themes/. */
+
+/* ── Toggle ocultar dinero ── */
+/* 30px de alto, los mismos que .navBtn y .navDropdownBtn: es un botón más de la
+   barra, y cuatro píxeles de más lo desalineaban de todo lo que tiene al lado. */
+.navMoneyToggleBtn {
+    height: 30px;
+    width: 34px;
+    padding: 0;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    background: #0f1724;
+    color: #e5edf9;
+    cursor: pointer;
+    font-size: 16px;
+    flex-shrink: 0;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        opacity 0.15s ease;
+}
+
+.navMoneyToggleBtn:hover {
+    background: #162033;
+    border-color: #475569;
+}
+
+.navMoneyToggleBtn.money-hidden-active {
+    background: #1d4ed8;
+    border-color: #3b82f6;
+}
+
+body.money-hidden .metricValue {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+body.money-hidden #overviewTableBody td:not(.mTdRank):not(.mTdName):not(:nth-child(3)):not(:nth-child(6)) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+body.money-hidden #detPosition,
+body.money-hidden #detInvested,
+body.money-hidden #detPnL,
+body.money-hidden #detAvgPrice,
+body.money-hidden #detFees,
+body.money-hidden #assetStatNetoActual,
+body.money-hidden #assetStatCantidad,
+body.money-hidden #assetStatPrecioMedio,
+body.money-hidden #assetStatInvertido,
+body.money-hidden #assetStatPnL,
+body.money-hidden #assetStatPnLPct {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* ── money-hidden: páginas adicionales ── */
+/* mapa: resumen de la barra y euros del tooltip (los precios de mercado no,
+   que son dato público y no dicen cuánto se tiene) */
+body.money-hidden .hmSumMoney,
+body.money-hidden .hmCellMoney,
+body.money-hidden .hmTipMoneyVal {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* activos grid cards */
+body.money-hidden .avMetricValue {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* activo individual - tabla de operaciones */
+body.money-hidden [data-field="exchange"],
+body.money-hidden [data-field="currency"],
+body.money-hidden [data-field="costeAnual"],
+body.money-hidden [data-field="participaciones"],
+body.money-hidden [data-field="precioParticipacion"],
+body.money-hidden [data-field="capitalInvertidoBruto"],
+body.money-hidden [data-field="comisiones"],
+body.money-hidden [data-field="comisionesFiat"],
+body.money-hidden [data-field="comisionesCripto"],
+body.money-hidden .rowTotal {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* intereses: cols acumulado, impuestos, total */
+body.money-hidden #interesesBody td:nth-child(n + 2):not(:last-child) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* dividendos: cols acciones, div/accion, impuestos, total */
+body.money-hidden #dividendosBody td:nth-child(n + 3):not(:last-child) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* cards resumen (intereses y dividendos) */
+body.money-hidden .summaryCardValue,
+body.money-hidden .cvStatValue {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* gastos - tabla anual (todos los meses) y movimientos (cantidad) */
+body.money-hidden #gastosAnnualBody td:not(:first-child):not(:last-child),
+body.money-hidden #gastosMovementsBody td:nth-child(4) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* ingresos - tabla anual y movimientos */
+body.money-hidden #ingresosAnnualBody td:not(:first-child):not(:last-child),
+body.money-hidden #ingresosMovementsBody td:nth-child(4) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* bonos - resumen y cols invertido, interés, impuestos, total neto */
+body.money-hidden .bonosSummaryValue {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+body.money-hidden #bonosBody td:nth-child(n + 7):not(:last-child) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* ventas - cols desde coste fifo en adelante */
+body.money-hidden #ventasBody td:nth-child(n + 4):not(:last-child) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* stablecoins - resumen y cols cantidad, precio, total, comisiones */
+body.money-hidden .stablecoinsSummary,
+body.money-hidden #stablecoinsBody td:nth-child(5),
+body.money-hidden #stablecoinsBody td:nth-child(6),
+body.money-hidden #stablecoinsBody td:nth-child(7),
+body.money-hidden #stablecoinsBody td:nth-child(8) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* operaciones (trading) - precio, cantidad, comisiones, total + saldo de pares */
+body.money-hidden #operationsBody td:nth-child(5),
+body.money-hidden #operationsBody td:nth-child(6),
+body.money-hidden #operationsBody td:nth-child(7),
+body.money-hidden #operationsBody td:nth-child(8),
+body.money-hidden .operationsPairsSummaryValues {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* transacciones - total cripto, comisión red */
+body.money-hidden #transaccionesBody td:nth-child(2),
+body.money-hidden #transaccionesBody td:nth-child(3) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* métricas - valores KPI */
+body.money-hidden .mkpiValue {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* métricas - gráficos (eje Y y valores dentro del canvas) */
+body.money-hidden .metricasChartWrap canvas {
+    filter: blur(7px);
+}
+
+/* métricas - tabla Posiciones */
+body.money-hidden #metricasTopBody td:nth-child(n + 4) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* asset detail - ops spot completadas */
+body.money-hidden .assetCompletedOpsTable td:nth-child(4),
+body.money-hidden .assetCompletedOpsTable td:nth-child(5),
+body.money-hidden .assetCompletedOpsTable td:nth-child(6),
+body.money-hidden .assetCompletedOpsTable td:nth-child(7),
+body.money-hidden .assetCompletedOpsTable td:nth-child(8) {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}

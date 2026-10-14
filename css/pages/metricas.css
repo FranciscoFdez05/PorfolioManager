@@ -983,12 +983,6 @@
 #mChartDivAxisWrap {
     background: var(--bg-elevated);
 }
-html[data-theme="light"] #mChartDivAxisWrap {
-    background: #ffffff;
-}
-html[data-theme="black"] #mChartDivAxisWrap {
-    background: #17171b;
-}
 
 /* ── Table ── */
 .metricasTable {

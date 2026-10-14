@@ -7,7 +7,13 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Portfolio Manager</title>
+    <link rel="icon" href="/img/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
     <link rel="stylesheet" href="css/variables.css">
+    <!-- Noche clara es el tema base (:root): va antes que todo lo que usa sus
+         variables. Claro y Oscuro se cargan al final, tras las páginas. -->
+    <link rel="stylesheet" href="css/themes/noche-clara.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
     <!-- css/pages.css llegó a 7.022 líneas con dieciséis pantallas dentro. Está
@@ -38,7 +44,19 @@
     <link rel="stylesheet" href="css/pages/fundamentales.css">
     <link rel="stylesheet" href="css/pages/sentimiento.css">
     <link rel="stylesheet" href="css/pages/informes.css">
-    <link rel="stylesheet" href="css/themes.css">
+    <!-- Piezas que vivían en el antiguo css/themes.css sin ser de ningún tema,
+         en el mismo orden que tenían allí. -->
+    <link rel="stylesheet" href="css/components/grafico-tradingview.css">
+    <link rel="stylesheet" href="css/components/acciones-fila.css">
+    <link rel="stylesheet" href="css/pages/gastos-popup.css">
+    <link rel="stylesheet" href="css/components/privacidad.css">
+    <link rel="stylesheet" href="css/pages/heatmap.css">
+    <link rel="stylesheet" href="css/components/selector-portfolios.css">
+    <!-- Temas Claro y Oscuro (Noche clara va arriba, es la base). Van
+         después de todo lo anterior: cada regla empieza por html[data-theme]. -->
+    <link rel="stylesheet" href="css/themes/claro.css">
+    <link rel="stylesheet" href="css/themes/oscuro.css">
+    <link rel="stylesheet" href="css/responsive.css">
     <!-- El marcador del atributo nonce lo sustituye serveIndex por el valor de
          esta petición (core/csp.py). Es el único script en línea de la
          aplicación, y va con nonce para que la Content-Security-Policy no tenga

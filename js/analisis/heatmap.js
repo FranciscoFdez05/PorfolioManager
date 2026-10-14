@@ -635,9 +635,13 @@ function hmFormatPrice(num, currency) {
 
 // Gris de "ni sube ni baja" (y de los que no tienen dato). En el tema claro el
 // azul oscuro de siempre cantaba como un agujero negro entre las baldosas de
-// color, así que ahí se usa un gris medio que aguanta el texto en blanco.
+// color, así que ahí se usa un gris medio que aguanta el texto en blanco; en el
+// negro, un gris sin el tinte azul de la paleta por defecto.
 function hmNeutralColor() {
-    return document.documentElement.getAttribute("data-theme") === "light" ? "#64748b" : "#252d3a"
+    const tema = document.documentElement.getAttribute("data-theme")
+    if (tema === "light") return "#64748b"
+    if (tema === "black") return "#2a2a30"
+    return "#252d3a"
 }
 
 function hmColorForValue(pct) {

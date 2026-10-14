@@ -232,6 +232,72 @@ async function initVistaGeneralLogic() {
         informeBtn.addEventListener("click", () => descargarInformePortfolio(informeBtn))
     }
 
+    const scroller = document.querySelector(".overviewScroll")
+    if (scroller && !scroller.dataset.bound) {
+        scroller.dataset.bound = "true"
+        let startX = 0
+        let startScroll = 0
+        let pressed = false
+        let moved = false
+        scroller.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0 || e.target.closest("input[type='text']")) return
+            pressed = true
+            moved = false
+            startX = e.clientX
+            startScroll = scroller.scrollLeft
+        })
+        window.addEventListener("pointermove", (e) => {
+            if (!pressed) return
+            const dx = e.clientX - startX
+            if (!moved && Math.abs(dx) < 5) return
+            moved = true
+            scroller.classList.add("dragging")
+            scroller.scrollLeft = startScroll - dx
+        })
+        window.addEventListener("pointerup", () => {
+            pressed = false
+            scroller.classList.remove("dragging")
+        })
+        // Tras arrastrar, el soltar no debe contar como clic en un filtro.
+        scroller.addEventListener(
+            "click",
+            (e) => {
+                if (!moved) return
+                moved = false
+                e.preventDefault()
+                e.stopPropagation()
+            },
+            true
+        )
+    }
+
+    _ovSearch = ""
+    const searchBox = document.getElementById("overviewSearch")
+    const searchBtn = document.getElementById("overviewSearchBtn")
+    const searchInput = document.getElementById("overviewSearchInput")
+    if (searchBox && searchBtn && searchInput && !searchBtn.dataset.bound) {
+        searchBtn.dataset.bound = "true"
+        searchBtn.addEventListener("click", () => {
+            const abrir = searchInput.hidden
+            searchInput.hidden = !abrir
+            searchBox.classList.toggle("open", abrir)
+            if (abrir) {
+                searchInput.focus()
+            } else {
+                searchInput.value = ""
+                _ovSearch = ""
+                renderOverviewRows(_ovRows)
+            }
+        })
+        searchInput.addEventListener("input", () => {
+            _ovSearch = searchInput.value
+            renderOverviewRows(_ovRows)
+        })
+        searchInput.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") searchBtn.click()
+        })
+    }
+
     if (filtersContainer && !filtersContainer.dataset.bound) {
         filtersContainer.dataset.bound = "true"
         filtersContainer.addEventListener("change", (e) => {
@@ -909,6 +975,7 @@ async function buildOverviewRow(asset) {
 let _ovSortKey = "sidebarOrder"
 let _ovSortDir = "asc"
 let _ovRows = []
+let _ovSearch = ""
 
 function downloadVistaGeneralCsv() {
     if (!Array.isArray(_ovRows) || !_ovRows.length) {
@@ -1007,8 +1074,36 @@ function renderOverviewExtremes(rows) {
         `
     }
 
-    fill(bestCard, "Mejor", ranked[0])
-    fill(worstCard, "Peor", ranked.length > 1 ? ranked[ranked.length - 1] : null)
+    const bestPct = ranked[0] || null
+    const worstPct = ranked.length > 1 ? ranked[ranked.length - 1] : null
+
+    // Mayor ganancia y mayor pérdida en dinero; solo se muestran si el activo
+    // es distinto al de mejor/peor porcentaje.
+    const byMoney = [...ranked].sort((a, b) => (b.row.overviewYieldValue ?? 0) - (a.row.overviewYieldValue ?? 0))
+    const bestMoney = byMoney[0] || null
+    const worstMoney = byMoney.length > 1 ? byMoney[byMoney.length - 1] : null
+
+    const showBestMoney = bestMoney && bestPct && bestMoney.row !== bestPct.row
+    const showWorstMoney = worstMoney && worstPct && worstMoney.row !== worstPct.row
+
+    // Mismo cuadro: si el activo difiere entre % y €, se apilan dos líneas.
+    const fillDual = (card, label, byPct, byMoneyEntry, differs) => {
+        card.classList.add("overviewExtremeCardDual")
+        if (!byPct) return fill(card, label, null)
+        const line = (tag, entry) => {
+            const { row, pct } = entry
+            const v = row.overviewYieldValue ?? 0
+            return `<span class="overviewExtremeLine" title="${escapeHtml(row.nombre)}">
+                <span class="overviewExtremeLabel">${tag ? `${label} ${tag}` : label} · ${escapeHtml(row.nombre)}</span>
+                <span class="overviewExtremeValue ${v >= 0 ? "mCellPos" : "mCellNeg"}">${v >= 0 ? "+" : ""}${formatMoney(v, row.currency)}</span>
+                ${overviewPctLine(pct)}
+            </span>`
+        }
+        card.innerHTML = differs ? line("%", byPct) + line("€", byMoneyEntry) : line("", byPct)
+    }
+
+    fillDual(bestCard, "Mejor", bestPct, bestMoney, showBestMoney)
+    fillDual(worstCard, "Peor", worstPct, worstMoney, showWorstMoney)
 }
 
 function overviewPctLine(pct) {
@@ -1073,7 +1168,19 @@ function renderOverviewRows(rows) {
     }
 
     const OV_TYPE_COLORS = { cripto: "#f7931a", acciones: "#3a7bd5", etfs: "#2ecc71", comoditis: "#e0c068" }
-    const sorted = _ovSortRows(rows)
+    const consulta = _ovSearch.trim().toLowerCase()
+    const visibles = consulta
+        ? rows.filter((r) =>
+              String(r.nombre || "")
+                  .toLowerCase()
+                  .includes(consulta)
+          )
+        : rows
+    if (!visibles.length) {
+        emptyState?.classList.remove("hidden")
+        return
+    }
+    const sorted = _ovSortRows(visibles)
 
     sorted.forEach((row, idx) => {
         const tr = document.createElement("tr")

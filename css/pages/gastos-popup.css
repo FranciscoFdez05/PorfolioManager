@@ -1,0 +1,88 @@
+/* Popup de detalle de un tipo de gasto (tabla anual de Gastos).
+   Los colores de los temas claro y oscuro están en css/themes/. */
+
+/* ── Gastos tipo popup ── */
+.gtPopup {
+    background: #0b1120;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.gtPopupHeader {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    border-bottom: 1px solid #273246;
+    background: #0f1724;
+    flex-shrink: 0;
+}
+
+.gtPopupTitle {
+    font-size: 17px;
+    font-weight: 700;
+    color: #e5edf9;
+}
+
+.gtPopupTotal {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-left: auto;
+}
+
+.gtPopupClose {
+    background: none;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 10px;
+    line-height: 1.4;
+    transition:
+        color 0.15s,
+        border-color 0.15s;
+}
+
+.gtPopupClose:hover {
+    color: #f87171;
+    border-color: #f87171;
+}
+
+.gtPopupSearch {
+    background: #1a2535;
+    border: 1px solid #334155;
+    border-radius: 7px;
+    color: #e5edf9;
+    font-size: 13px;
+    outline: none;
+    padding: 5px 12px;
+    width: 220px;
+    transition: border-color 0.15s;
+}
+
+.gtPopupSearch::placeholder {
+    color: #4a5a74;
+}
+
+.gtPopupSearch:focus {
+    border-color: #3b82f6;
+}
+
+.gtPopupBody {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+}
+
+.gtPopupTable {
+    width: 100%;
+}
+
+.gtTotalRow td {
+    background: #162235 !important;
+    border-top: 2px solid #3b82f6;
+    color: #e5edf9;
+    font-weight: 700;
+}
