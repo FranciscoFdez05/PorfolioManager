@@ -23,6 +23,7 @@ from providers.api_stats import get_today_stats
 from stores import app_data
 from stores.cuenta_ahorro_store import normalizar_config, vinculos_de_config
 from stores.cuentas_store import importar_vinculos
+from stores.paneles_config import normalizar_paneles
 
 log = logging.getLogger(__name__)
 
@@ -97,6 +98,9 @@ _PORTFOLIO_DEFAULTS = {
     # Último mes con aportación automática creada, por cuenta. Solo lo escribe el
     # servidor (no se lee ni se acepta desde la web): ver aplicar_recurrentes.
     "cuentaAhorroGenerado": {},
+    # Activos > Paneles: los paneles del usuario y sus widgets (ver
+    # stores.paneles_config).
+    "panelesConfig": {},
 }
 
 _GLOBAL_KEYS    = set(_GLOBAL_DEFAULTS)
@@ -324,6 +328,7 @@ def get_settings():
         "modulosConfig":            pcfg.get("modulosConfig") or {},
         "ahorroConfig":             pcfg.get("ahorroConfig") or {"objetivoAhorro": 30, "presupuesto": {}},
         "cuentaAhorroConfig":       normalizar_config(pcfg.get("cuentaAhorroConfig")),
+        "panelesConfig":            normalizar_paneles(pcfg.get("panelesConfig")),
     })
 
 
@@ -696,6 +701,12 @@ def _config_cuenta_ahorro(valor, _cfg):
     return normalizar_config(valor)
 
 
+def _config_paneles(valor, _cfg):
+    if not isinstance(valor, dict):
+        return _SIN_CAMBIO
+    return normalizar_paneles(valor)
+
+
 _NORMALIZADORES_GLOBALES = {
     "autoBackupDays": _acotado(0, 365, 0),
     "backupIncluirClaves": lambda valor, _cfg: valor is True,
@@ -733,6 +744,7 @@ _NORMALIZADORES_PORTFOLIO = {
     "modulosConfig": _mapa_booleanos(_MODULOS),
     "ahorroConfig": _config_ahorro,
     "cuentaAhorroConfig": _config_cuenta_ahorro,
+    "panelesConfig": _config_paneles,
 }
 
 

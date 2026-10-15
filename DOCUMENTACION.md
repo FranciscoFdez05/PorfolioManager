@@ -664,6 +664,218 @@ El esquema se actualiza solo. Lleva su número en `PRAGMA user_version`, y antes
 
 Dentro de la BD del portfolio hay dos tablas que son **caché y no datos del usuario** — `fx_rates` (tipos de cambio históricos) y `benchmark_prices` (cierres de los índices). Se pueden borrar sin perder nada: se vuelven a bajar, a costa de gastar cuota del proveedor. Los `portfolio_snapshots`, en cambio, no se reconstruyen, así que el purgado desde Ajustes vuelca antes una copia en JSON a `data/pre_restore/`.
 
+### Esquema de la base (versión 21)
+
+Cada portfolio es un fichero SQLite con **46 tablas**, en el esquema 21 (`ESQUEMA_VERSION` en `core/db.py`, aplicación 4.5.0). Los diagramas muestran solo las claves y las columnas que enlazan tablas; el resto de columnas está en `_SCHEMA` y en los pasos `@_migracion(N)` del mismo fichero.
+
+- **Línea continua** — clave foránea real con `ON DELETE CASCADE`: borrar el padre se lleva las filas hijas.
+- **Línea discontinua** — referencia por convención, sin clave foránea. Es a propósito: tablas como `operaciones` se reescriben enteras en cada guardado (DELETE + INSERT) y una cascada vaciaría lo que cuelga de ellas. Un identificador que ya no existe se ignora al leer.
+
+Los importes se guardan como `TEXT` (ver `core.dinero`); solo los snapshots y los cierres de índices usan `REAL`.
+
+#### Inversión: activos, planes y cripto
+
+```mermaid
+erDiagram
+    activos {
+        TEXT id PK
+        TEXT symbol
+        TEXT market_provider
+        TEXT currency
+    }
+    activo_rows {
+        INTEGER id PK
+        TEXT asset_id FK
+        TEXT fx_rate "tipo de cambio del día"
+    }
+    activo_operation_rows {
+        TEXT id PK
+        TEXT asset_id PK,FK
+    }
+    activo_conversion_rows {
+        TEXT id PK
+        TEXT asset_id PK,FK
+    }
+    alertas_precio {
+        INTEGER id PK
+        TEXT asset_id FK
+        TEXT condicion
+    }
+    planes_inversion {
+        TEXT id PK
+        TEXT asset_id FK
+    }
+    planes_cartera {
+        TEXT id PK
+        TEXT nombre
+    }
+    planes_cartera_activos {
+        TEXT plan_id PK,FK
+        TEXT asset_id PK,FK
+    }
+    planes_cartera_operaciones {
+        TEXT plan_id PK,FK
+        TEXT operacion_id PK
+    }
+    operaciones {
+        TEXT id PK
+        TEXT asset_id
+        TEXT estado
+    }
+    ventas {
+        TEXT id PK
+        TEXT year PK
+        TEXT asset_id
+    }
+    ventas_years {
+        TEXT year PK
+    }
+    asset_snapshots {
+        INTEGER id PK
+        INTEGER ts
+        TEXT asset_id
+    }
+    transacciones {
+        TEXT id PK
+        TEXT asset_id
+        TEXT wallet_desde
+        TEXT wallet_destino
+    }
+    staking_criptos {
+        TEXT id PK
+    }
+    staking_rows {
+        INTEGER id PK
+        TEXT cripto_id FK
+    }
+    earn_criptos {
+        TEXT id PK
+    }
+    earn_rows {
+        INTEGER id PK
+        TEXT cripto_id FK
+    }
+    stablecoins_catalog {
+        TEXT symbol PK
+    }
+    stablecoins_enabled {
+        TEXT symbol PK
+    }
+    stablecoins_rows {
+        TEXT id PK
+        TEXT stablecoin_symbol
+    }
+
+    activos ||--o{ activo_rows : "compras y ventas"
+    activos ||--o{ activo_operation_rows : "órdenes"
+    activos ||--o{ activo_conversion_rows : "conversiones"
+    activos ||--o{ alertas_precio : "alertas"
+    activos ||--o{ planes_inversion : "plan en la ficha"
+    activos ||--o{ planes_cartera_activos : "incluido en"
+    planes_cartera ||--o{ planes_cartera_activos : "agrupa"
+    planes_cartera ||--o{ planes_cartera_operaciones : "agrupa"
+    operaciones ||..o{ planes_cartera_operaciones : "operacion_id"
+    activos ||..o{ operaciones : "asset_id"
+    activos ||..o{ ventas : "asset_id"
+    ventas_years ||..o{ ventas : "year"
+    activos ||..o{ asset_snapshots : "asset_id"
+    activos ||..o{ transacciones : "asset_id"
+    staking_criptos ||--o{ staking_rows : "recompensas"
+    earn_criptos ||--o{ earn_rows : "rendimientos"
+    stablecoins_catalog ||..o| stablecoins_enabled : "activada"
+    stablecoins_catalog ||..o{ stablecoins_rows : "stablecoin_symbol"
+```
+
+#### Dinero: cuentas, gastos e ingresos
+
+```mermaid
+erDiagram
+    cuentas {
+        TEXT id PK
+        TEXT tipo "banco | ahorro | exchange | broker"
+        INTEGER dividendos "1 = cobra los dividendos"
+        INTEGER ahorro "1 = sale en Cuenta de ahorro"
+    }
+    cuentas_remuneradas {
+        TEXT id PK
+    }
+    cuenta_remunerada_vinculo {
+        TEXT remunerada_id PK,FK
+        TEXT cuenta_id FK,UK
+    }
+    intereses_v2 {
+        INTEGER id PK
+        TEXT cuenta_id FK
+    }
+    transferencias {
+        INTEGER id PK
+        TEXT origen
+        TEXT destino
+    }
+    gastos_years {
+        TEXT year PK
+    }
+    gastos_rows {
+        INTEGER id PK
+        TEXT year
+        TEXT month
+        TEXT cuenta
+    }
+    mensualidades {
+        INTEGER id PK
+        TEXT year UK
+        TEXT nombre UK
+        TEXT cuenta
+        TEXT cuentas_cobro "JSON por mes"
+    }
+    ingresos_rows {
+        INTEGER id PK
+        TEXT year
+        TEXT month
+        TEXT cuenta
+    }
+    ingresos_recurrentes {
+        INTEGER id PK
+        TEXT year UK
+        TEXT nombre UK
+        TEXT cuenta
+        TEXT cuentas_cobro "JSON por mes"
+    }
+    dividendos {
+        INTEGER id PK
+        TEXT instrumento
+        TEXT cuenta
+    }
+
+    cuentas ||--o| cuenta_remunerada_vinculo : "una por lado"
+    cuentas_remuneradas ||--o| cuenta_remunerada_vinculo : "una por lado"
+    cuentas_remuneradas ||--o{ intereses_v2 : "intereses"
+    cuentas ||..o{ transferencias : "origen / destino"
+    cuentas ||..o{ gastos_rows : "cuenta"
+    cuentas ||..o{ mensualidades : "cuenta"
+    cuentas ||..o{ ingresos_rows : "cuenta"
+    cuentas ||..o{ ingresos_recurrentes : "cuenta"
+    cuentas ||..o{ dividendos : "cuenta"
+    gastos_years ||..o{ gastos_rows : "year"
+```
+
+En las columnas `cuenta` de gastos, ingresos y mensualidades, vacío significa la cuenta bancaria: es lo que eran todas antes del esquema 11. En `dividendos`, vacío significa la cuenta marcada con `cuentas.dividendos`.
+
+#### Tablas sueltas
+
+No enlazan con ninguna otra.
+
+| Ámbito | Tablas |
+|---|---|
+| Otras inversiones | `renta_fija`, `bonos`, `private_market`, `trading` |
+| Intereses y dividendos | `intereses` (la de antes de las cuentas remuneradas), `dividendo_calendar` |
+| Catálogos | `gastos_tipos`, `ingresos_tipos` |
+| Histórico | `portfolio_snapshots`, `snapshot_jobs` (reserva del hueco horario entre workers) |
+| Caché, se puede borrar | `fx_rates`, `benchmark_prices` |
+| Control | `settings`, `revisiones_anuales` (contador por año que evita pisar un guardado más reciente) |
+
+Si un cambio sube `ESQUEMA_VERSION`, este apartado se actualiza en la misma versión.
+
 ### Qué lleva el ZIP de «Exportar como ZIP»
 
 | Fichero | Qué es |

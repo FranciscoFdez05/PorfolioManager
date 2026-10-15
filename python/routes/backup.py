@@ -194,6 +194,13 @@ def _safety_copy_before_restore() -> Path | None:
             shutil.copy2(str(_META_FILE), str(dest_dir / "portfolios.json"))
         if _AJUSTES_SRC.exists():
             shutil.copy2(str(_AJUSTES_SRC), str(dest_dir / "ajustes.json"))
+        # Las preferencias de cada portfolio también: llevan los paneles de
+        # Activos > Paneles, que el restore sobrescribe igual que los .db. Sin
+        # ellas, restaurar la copia equivocada se llevaba los paneles para
+        # siempre aunque las carteras se pudieran recuperar de aquí.
+        if _JSON_DIR.exists():
+            for prefs_file in sorted(_JSON_DIR.glob("prefs_*.json")):
+                shutil.copy2(str(prefs_file), str(dest_dir / prefs_file.name))
         log.info(f"[backup] Copia previa al restore guardada en {dest_dir}")
         return dest_dir
     except Exception as e:

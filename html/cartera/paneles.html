@@ -1,0 +1,23 @@
+<div class="pnPage" id="pnPage">
+
+    <!-- Pestañas de paneles: doble clic para renombrar, × para borrar, + para
+         crear uno nuevo desde la galería de plantillas. -->
+    <div class="pnBar">
+        <div class="pnTabs" id="pnTabs"></div>
+        <button class="pnIconBtn" id="pnNuevoBtn" type="button" title="Nuevo panel">+</button>
+
+        <div class="pnBarRight">
+            <button class="pnIconBtn" id="pnAjustesPanelBtn" type="button" title="Ajustes del panel">⚙</button>
+            <button class="pnBtn" id="pnAddWidgetBtn" type="button" title="Añadir un widget a este panel">+ Widget</button>
+            <button class="pnBtn" id="pnCompartirBtn" type="button" title="Exportar paneles a un fichero o importar los que te pasen">Importar / Exportar ▾</button>
+            <input type="file" id="pnImportarInput" accept=".json,application/json" hidden>
+            <button class="pnIconBtn" id="pnRefreshBtn" type="button" title="Volver a cargar los datos de la cartera">↻</button>
+            <button class="pnIconBtn pnSalirBtn" id="pnSalirBtn" type="button" title="Salir de los paneles (Esc)" aria-label="Salir de los paneles">✕</button>
+        </div>
+    </div>
+
+    <div class="pnBody" id="pnBody">
+        <div class="pnCargando">Cargando…</div>
+    </div>
+
+</div>

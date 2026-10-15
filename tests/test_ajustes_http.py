@@ -584,6 +584,64 @@ def test_las_divisas_fiat_exigen_codigo_y_nombre(cliente):
     assert client.get("/api/settings").get_json()["monedaBase"] == "GBP"
 
 
+def test_los_paneles_se_guardan_y_se_leen(cliente):
+    client, cabeceras, _rutas = cliente
+    paneles = {
+        "activo": "p2",
+        "paneles": [
+            {"id": "p1", "nombre": "Research", "cfg": {"fila": "44", "bordes": False}, "widgets": [
+                {"id": "w1", "tipo": "mapa", "w": 8, "h": 7, "cfg": {"periodo": "dia", "activos": ["a", "b"]}},
+            ]},
+            {"id": "p2", "nombre": "Vacío", "cfg": {}, "widgets": []},
+        ],
+    }
+    _guardar(client, cabeceras, panelesConfig=paneles)
+
+    assert client.get("/api/settings").get_json()["panelesConfig"] == paneles
+
+
+def test_los_widgets_de_mercado_y_los_tickers_sueltos_se_guardan(cliente):
+    """Los tipos nuevos pasan el filtro y un ticker suelto («tk|…») es una
+    cadena más de la lista: tiene que llegar entera."""
+    client, cabeceras, _rutas = cliente
+    tipos = [
+        "mapaMercado", "instrumento", "tecnico", "ficha", "perfil", "noticias", "calendario",
+        "miedoCodicia", "amplitud", "indices", "sectores", "escaner", "metrica",
+    ]
+    ticker = "tk|NASDAQ:AMD|Advanced Micro Devices Inc.|acciones"
+    _guardar(client, cabeceras, panelesConfig={"activo": "p1", "paneles": [
+        {"id": "p1", "nombre": "Mercado", "widgets": [
+            {"id": f"w{i}", "tipo": tipo, "w": 4, "h": 5, "cfg": {"activos": [ticker], "activo": ticker}}
+            for i, tipo in enumerate(tipos)
+        ]},
+    ]})
+
+    widgets = client.get("/api/settings").get_json()["panelesConfig"]["paneles"][0]["widgets"]
+    assert [w["tipo"] for w in widgets] == tipos
+    assert widgets[0]["cfg"] == {"activos": [ticker], "activo": ticker}
+
+
+def test_los_paneles_descartan_lo_que_la_pantalla_no_sabe_pintar(cliente):
+    client, cabeceras, _rutas = cliente
+    _guardar(client, cabeceras, panelesConfig={
+        "activo": "inexistente",
+        "paneles": [
+            {"id": "p1", "nombre": "  ", "widgets": [
+                {"id": "w1", "tipo": "widgetFantasma", "w": 4, "h": 4},
+                {"id": "w2", "tipo": "grafico", "w": 99, "h": -3, "cfg": {"anidado": {"x": 1}, "vincular": True}},
+                {"id": "w2", "tipo": "notas", "w": 3, "h": 3},   # id repetido
+            ]},
+            "esto no es un panel",
+        ],
+    })
+
+    guardado = client.get("/api/settings").get_json()["panelesConfig"]
+    assert guardado["activo"] == "p1"
+    [panel] = guardado["paneles"]
+    assert panel["nombre"] == "Panel"
+    assert panel["widgets"] == [{"id": "w2", "tipo": "grafico", "w": 12, "h": 2, "cfg": {"vincular": True}}]
+
+
 def test_las_preferencias_por_portfolio_van_a_su_propio_fichero(cliente):
     """Cada portfolio tiene su prefs_<id>.json: no deben mezclarse con los globales."""
     client, cabeceras, rutas = cliente

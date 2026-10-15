@@ -146,6 +146,7 @@ function _initAjustesCopias() {
     async function _doRestore(filename, btn, extra = {}) {
         btn.disabled = true
         showMsg(backupMsg, "Restaurando…", "")
+        await _copiasGuardarPendiente()
         try {
             const res = await fetch("/api/restore", {
                 method: "POST",
@@ -159,6 +160,7 @@ function _initAjustesCopias() {
                 return
             }
             if (data.ok) {
+                _copiasAvisarRestaurado()
                 // El servidor puede haber saltado entradas dañadas del zip y
                 // seguir adelante con el resto. Un "Restaurado" a secas después
                 // de perder un portfolio sería el peor mensaje posible: aquí no
@@ -388,6 +390,7 @@ function _initAjustesDatos() {
     async function _doImport(url, file, btn, extra = {}) {
         btn.disabled = true
         showMsg(importMsg, "Importando…", "")
+        await _copiasGuardarPendiente()
         try {
             const form = new FormData()
             form.append("file", file)
@@ -399,6 +402,7 @@ function _initAjustesDatos() {
                 return
             }
             if (data.ok) {
+                _copiasAvisarRestaurado()
                 // Una importación parcial no puede anunciarse como un éxito a
                 // secas: el usuario tiene que saber qué no ha entrado. Mismo
                 // criterio que al restaurar una copia de seguridad.
@@ -511,4 +515,21 @@ function _initAjustesDatos() {
             })
         })
     }
+}
+
+// Lo que la pantalla abierta tenga aún sin guardar (los paneles guardan con
+// medio segundo de retardo) se guarda antes de restaurar o importar: si
+// llegara después, pisaría lo que trae la copia.
+async function _copiasGuardarPendiente() {
+    try {
+        await window.flushPendingPageChanges?.()
+    } catch {
+        /* lo que no se pudo guardar tampoco va a pisar nada */
+    }
+}
+
+// Y después se avisa, para que nadie vuelva a guardar lo que tenía en memoria
+// antes de recargar (o si no se recarga, con una restauración parcial).
+function _copiasAvisarRestaurado() {
+    window.dispatchEvent(new CustomEvent("app:datos-restaurados"))
 }

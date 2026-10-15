@@ -477,6 +477,25 @@ def test_restore_guarda_una_copia_del_estado_previo(cliente):
     assert _snapshots(copia / "principal.db") == [("2026-06-01", 999.0, 888.0)]
 
 
+def test_la_copia_previa_al_restore_guarda_tambien_las_preferencias(cliente):
+    """Las preferencias llevan los paneles: el restore las pisa como a los .db,
+    así que la copia previa tiene que poder devolverlas también."""
+    client, cabeceras, rutas = cliente
+    _crear_db(rutas["portfolios"] / "principal.db")
+    actuales = {"panelesConfig": {"activo": "p1", "paneles": [{"id": "p1", "nombre": "Mío", "widgets": []}]}}
+    (rutas["json"] / "prefs_principal.json").write_text(json.dumps(actuales), encoding="utf-8")
+
+    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(ruta_zip, "w") as zf:
+        zf.writestr("portfolios/principal.db", _crear_db(rutas["data"] / "origen.db").read_bytes())
+        zf.writestr("prefs/prefs_principal.json", json.dumps({"panelesConfig": {}}))
+
+    datos = client.post("/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras).get_json()
+
+    copia = Path(datos["safetyCopy"])
+    assert json.loads((copia / "prefs_principal.json").read_text("utf-8")) == actuales
+
+
 def test_los_snapshots_se_recuperan_del_json_si_el_db_llega_sin_ellos(cliente):
     """El .db puede venir de una versión anterior sin esa tabla poblada."""
     client, cabeceras, rutas = cliente
@@ -655,6 +674,65 @@ def test_importar_un_backup_deja_copia_previa(cliente_completo):
 
     assert datos["safetyCopy"]
     assert (Path(datos["safetyCopy"]) / "principal.db").exists()
+
+
+_PANELES = {
+    "activo": "p1",
+    "paneles": [
+        {"id": "p1", "nombre": "Research", "cfg": {"fila": "44"}, "widgets": [
+            {"id": "w1", "tipo": "mapa", "w": 8, "h": 7, "cfg": {"periodo": "mes"}},
+            {"id": "w2", "tipo": "grafico", "w": 4, "h": 7, "cfg": {"activo": "tk|NASDAQ:AMD|AMD|acciones"}},
+        ]},
+    ],
+}
+
+
+def _preparar_portfolio(rutas):
+    _crear_db(rutas["portfolios"] / "principal.db")
+    rutas["meta"].write_text(
+        json.dumps({"active": "principal", "portfolios": [{"id": "principal", "name": "P"}]}),
+        encoding="utf-8",
+    )
+
+
+def test_los_paneles_vuelven_al_restaurar_una_copia(cliente_completo):
+    """Los paneles viven en prefs_<id>.json: la copia los lleva y el restore los
+    devuelve, aunque después de la copia se hayan cambiado o borrado."""
+    client, cabeceras, rutas = cliente_completo
+    _preparar_portfolio(rutas)
+    client.post("/api/settings", json={"panelesConfig": _PANELES}, headers=cabeceras)
+
+    nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
+    with zipfile.ZipFile(rutas["backups"] / nombre) as zf:
+        assert json.loads(zf.read("prefs/prefs_principal.json"))["panelesConfig"] == _PANELES
+
+    client.post("/api/settings", json={"panelesConfig": {"activo": "", "paneles": []}}, headers=cabeceras)
+    assert client.get("/api/settings").get_json()["panelesConfig"]["paneles"] == []
+
+    respuesta = client.post("/api/restore", json={"filename": nombre}, headers=cabeceras)
+
+    assert respuesta.status_code == 200, respuesta.get_json()
+    assert client.get("/api/settings").get_json()["panelesConfig"] == _PANELES
+
+
+def test_los_paneles_vuelven_al_importar_el_zip_de_una_copia(cliente_completo):
+    """Lo mismo por «Importar ZIP» de Ajustes, que es otra puerta de entrada."""
+    client, cabeceras, rutas = cliente_completo
+    _preparar_portfolio(rutas)
+    client.post("/api/settings", json={"panelesConfig": _PANELES}, headers=cabeceras)
+    nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
+    contenido = (rutas["backups"] / nombre).read_bytes()
+    client.post("/api/settings", json={"panelesConfig": {"activo": "", "paneles": []}}, headers=cabeceras)
+
+    respuesta = client.post(
+        "/api/import/zip",
+        data={"file": (io.BytesIO(contenido), nombre)},
+        headers=cabeceras,
+        content_type="multipart/form-data",
+    )
+
+    assert respuesta.status_code == 200, respuesta.get_json()
+    assert client.get("/api/settings").get_json()["panelesConfig"] == _PANELES
 
 
 def test_un_zip_sin_nada_reconocible_se_rechaza(cliente_completo):

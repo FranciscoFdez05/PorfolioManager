@@ -22,6 +22,55 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.6.0] — 2026-10-15
+
+**Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la
+actualización basta con volver a la imagen anterior. Los paneles se guardan en las
+preferencias de cada portfolio (`prefs_<id>.json`), que la versión anterior no
+conoce: al volver atrás dejan de verse y se pierden en cuanto se guarde cualquier
+ajuste. Si se piensa volver atrás, conviene exportarlos antes (Paneles › Importar /
+Exportar › Exportar todos los paneles).
+
+### Añadido
+
+- **Activos › Paneles**: tableros a pantalla completa que se montan con widgets, como
+  los paneles de Trade Republic. Se pueden tener varios, cada uno en su pestaña (doble
+  clic para renombrar); uno nuevo empieza en una galería de plantillas (Research,
+  Seguimiento, Cartera, Vacío) o con un solo widget. Salen con ✕ o Esc.
+  - La rejilla es de 12 columnas: los widgets se reordenan por el asa de su cabecera,
+    con la misma lógica que los bloques de Ajustes, y se estiran por la esquina.
+  - **Tu cartera:** mapa de la cuenta, tabla de posiciones, rendimiento, distribución y
+    resumen.
+  - **Mercado:** mapa de mercado (los activos en bruto, sin tu dinero), gráfico de velas
+    de TradingView con indicadores, favoritos, instrumento, análisis técnico, ficha y
+    perfil de la empresa.
+  - **Sentimiento:** miedo y codicia, amplitud, índices, mapa de sectores (S&P 500,
+    Nasdaq 100, cripto) y escáner (más suben, más bajan, RSI, volumen inusual), con los
+    mismos datos que la página de Sentimiento.
+  - **Métricas:** cualquiera de los 30 gráficos y tablas de la página de Métricas.
+  - **Información:** noticias (en inglés: TradingView no ofrece ese widget en español),
+    calendario económico y notas.
+  - Los widgets de un panel están enlazados: al pulsar un activo en uno, los gráficos y
+    widgets de TradingView enlazados lo muestran.
+  - Cada widget y cada panel tienen su ventana de ajustes (⚙): flotante, movible y con
+    varias abiertas a la vez. Permite elegir activos o tickers, filtrar por tipo, cambiar
+    columnas, periodos, intervalos, indicadores, agrupaciones y aspecto.
+  - **Tickers sueltos:** en cualquier selector de activos se puede buscar en TradingView y
+    añadir un símbolo que no esté en la cartera.
+  - **Importar y exportar** paneles como fichero: el fichero no lleva importes ni ids de
+    activos, sino símbolo y nombre, y quien lo importa los emparejas con los suyos.
+  - Los paneles se guardan en el servidor, por portfolio.
+- Las copias de seguridad y las importaciones de ZIP llevan los paneles y los devuelven al
+  restaurar.
+
+### Corregido
+
+- La copia que se guarda antes de restaurar no incluía las preferencias de cada portfolio:
+  restaurar una copia equivocada se llevaba por delante los paneles sin posibilidad de
+  recuperarlos.
+- Restaurar o importar justo después de cambiar algo en Paneles podía dejar los paneles
+  antiguos: el guardado pendiente llegaba después y pisaba lo restaurado.
+
 ## [4.5.0] — 2026-10-14
 
 **Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la

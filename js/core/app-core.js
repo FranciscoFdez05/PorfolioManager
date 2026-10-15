@@ -8,6 +8,7 @@ const _PAGE_DIRS = {
     vistaGeneral: "cartera",
     privateMarket: "cartera",
     planesInversion: "cartera",
+    paneles: "cartera",
 
     gastos: "finanzas",
     ingresos: "finanzas",
@@ -85,7 +86,7 @@ window.setChartPref = setChartPref
 const _MODULE_PAGES = {
     panelSuperior: [],
     vistaGeneral: ["vistaGeneral"],
-    activos: ["activos", "seguimiento", "heatmap", "fundamentales", "sentimiento"],
+    activos: ["activos", "seguimiento", "heatmap", "fundamentales", "sentimiento", "paneles"],
     gastos: ["gastos", "ingresos", "cuentas", "cuentaAhorro", "calendario"],
     finanzas: ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
     cripto: ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
@@ -272,6 +273,7 @@ async function loadGlobalSettings() {
             window._metricasSectionsCollapsed = data.metricasSectionsCollapsed ?? []
             window._topMetricsConfig = data.topMetricsConfig ?? {}
             window._modulosConfig = data.modulosConfig ?? {}
+            window._panelesConfig = data.panelesConfig ?? {}
             window._sidebarCollapsed = data.sidebarCollapsed ?? false
             window._monedaBase = data.monedaBase ?? "EUR"
             window._fiatCurrencies = (data.fiatCurrencies || []).map((c) => c.code).filter(Boolean)
@@ -973,6 +975,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
         return
     }
 
+    // Paneles se abre a pantalla completa y su botón de salir vuelve aquí.
+    if (window._paginaActual !== page) window._paginaAnterior = window._paginaActual
     window._paginaActual = page
 
     try {
@@ -984,6 +988,11 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
         if (typeof window._smResizeCleanup === "function") {
             window._smResizeCleanup()
             window._smResizeCleanup = null
+        }
+
+        if (typeof window._pnCleanup === "function") {
+            window._pnCleanup()
+            window._pnCleanup = null
         }
 
         if (typeof window.flushPendingPageChanges === "function") {
@@ -1062,6 +1071,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initFundamentalesLogic()
         } else if (page === "sentimiento") {
             await initSentimientoLogic()
+        } else if (page === "paneles") {
+            await initPanelesLogic()
         } else if (page === "seguimiento") {
             await initSeguimientoLogic()
         } else if (page === "privateMarket") {
