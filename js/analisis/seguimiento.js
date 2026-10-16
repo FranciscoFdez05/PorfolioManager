@@ -586,6 +586,7 @@ async function initSeguimientoLogic() {
     const filtersEl = document.getElementById("seguimientoFilters")
     const srcFiltersEl = document.getElementById("seguimientoSourceFilters")
     const viewToggle = document.getElementById("seguimientoViewToggle")
+    const segTradingViewBtn = document.getElementById("segSearchTradingViewBtn")
     const segFinnhubBtn = document.getElementById("segSearchFinnhubBtn")
     const segEodhdBtn = document.getElementById("segSearchEodhdBtn")
     const segYahooBtn = document.getElementById("segSearchYahooBtn")
@@ -958,6 +959,19 @@ async function initSeguimientoLogic() {
         if (typeof renderMarketSearchResults === "function") renderMarketSearchResults(segSearchResults, [], () => {})
     }
 
+    segTradingViewBtn?.addEventListener("click", async () => {
+        if (typeof handleTradingViewSearch !== "function") return
+        const query = nombreInput?.value.trim() || tickerInput?.value.trim() || ""
+        await handleTradingViewSearch({
+            query,
+            assetName: nombreInput?.value.trim() || "",
+            assetType: typeSelect?.value || "",
+            feedbackElement: segSearchFeedback,
+            resultsElement: segSearchResults,
+            onSelect: (r) => segTickerSelected(r, "TradingView")
+        })
+    })
+
     segFinnhubBtn?.addEventListener("click", async () => {
         if (typeof handleFinnhubSearch !== "function") return
         const query = nombreInput?.value.trim() || tickerInput?.value.trim() || ""
@@ -1160,6 +1174,18 @@ async function initSeguimientoLogic() {
             setAssetSearchFeedback(editFeedback, `Ticker seleccionado (${providerName}): ${result.symbol}`)
         if (typeof renderMarketSearchResults === "function") renderMarketSearchResults(editResults, [], () => {})
     }
+
+    document.getElementById("segEditSearchTradingViewBtn")?.addEventListener("click", async () => {
+        if (typeof handleTradingViewSearch !== "function") return
+        await handleTradingViewSearch({
+            query: editNombreInput?.value.trim() || editTickerInput?.value.trim() || "",
+            assetName: editNombreInput?.value.trim() || "",
+            assetType: editTypeSelect?.value || "",
+            feedbackElement: editFeedback,
+            resultsElement: editResults,
+            onSelect: (r) => editTickerSelected(r, "TradingView")
+        })
+    })
 
     document.getElementById("segEditSearchFinnhubBtn")?.addEventListener("click", async () => {
         if (typeof handleFinnhubSearch !== "function") return
