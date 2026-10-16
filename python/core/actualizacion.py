@@ -22,6 +22,9 @@ El canal son dos ficheros en `data/tmp/`:
 
 * ``actualizacion.solicitada`` — lo escribe la aplicación al pulsar el botón.
 * ``actualizacion.estado``     — lo escribe el vigilante: en marcha, bien o mal.
+* ``actualizacion.fase``       — lo escribe `docker-update.sh` al cambiar de paso
+  (descargando, construyendo…). Es la barra de progreso de la pantalla; un
+  vigilante antiguo no lo deja, y entonces la pantalla se las arregla sin él.
 
 Que el vigilante no haya escrito nunca ese segundo fichero es en sí un dato: o
 no está instalado, o no ha llegado a arrancar. La interfaz lo dice en vez de
@@ -50,6 +53,7 @@ log = logging.getLogger(__name__)
 
 NOMBRE_SOLICITUD = "actualizacion.solicitada"
 NOMBRE_ESTADO = "actualizacion.estado"
+NOMBRE_FASE = "actualizacion.fase"
 
 # Cuánto se sigue creyendo un «en marcha» sin noticias. `docker-update.sh`
 # reconstruye la imagen entera: en un servidor modesto son varios minutos, y
@@ -65,6 +69,10 @@ def _archivo_solicitud() -> Path:
 
 def _archivo_estado() -> Path:
     return paths.TMP_DIR / NOMBRE_ESTADO
+
+
+def _archivo_fase() -> Path:
+    return paths.TMP_DIR / NOMBRE_FASE
 
 
 def _ahora() -> str:
@@ -107,12 +115,16 @@ def estado() -> dict:
     """Qué versión corre, qué se ha pedido y cómo fue el último intento."""
     solicitud = _leer_json(_archivo_solicitud())
     ultimo = _leer_json(_archivo_estado())
+    fase = _leer_json(_archivo_fase())
 
     return {
         "version": __version__,
         "solicitada": solicitud,
         "haceSegundos": _segundos_desde((solicitud or {}).get("momento")),
         "ultimo": ultimo,
+        # Tal cual la dejó docker-update.sh. Puede ser de la actualización
+        # anterior: la pantalla la compara con el momento de su solicitud.
+        "fase": fase if isinstance(fase, dict) else None,
         "enMarcha": _en_marcha(ultimo),
         # Sin rastro del vigilante, el botón dejaría la señal ahí para siempre.
         # Mejor decirlo que fingir que se está actualizando algo.
@@ -148,6 +160,7 @@ def solicitar() -> tuple[dict, str | None]:
 __all__ = [
     "ESPERA_MAXIMA_SEGUNDOS",
     "NOMBRE_ESTADO",
+    "NOMBRE_FASE",
     "NOMBRE_SOLICITUD",
     "estado",
     "panel",

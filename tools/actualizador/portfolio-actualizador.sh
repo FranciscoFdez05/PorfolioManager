@@ -28,6 +28,8 @@ SENAL="$DATOS/tmp/actualizacion.solicitada"
 ESTADO="$DATOS/tmp/actualizacion.estado"
 REGISTRO="./logs/actualizacion.log"
 CERROJO="$DATOS/tmp/actualizacion.lock"
+# docker-update.sh deja aquí la fase en curso: es la barra de progreso de Ajustes.
+FASE="$DATOS/tmp/actualizacion.fase"
 
 escribir_json() {
     # $1 estado · $2 código · $3 detalle ya escapado. Se escribe en un temporal y se
@@ -86,8 +88,10 @@ escribir_estado "en_marcha" 0 "Actualización lanzada desde Ajustes"
     echo "$(date -Is)  Actualización solicitada desde Ajustes"
 } >> "$REGISTRO"
 
+# La fase de la actualización anterior no puede pasar por la de esta.
+rm -f "$FASE"
 codigo=0
-./docker-update.sh >> "$REGISTRO" 2>&1 || codigo=$?
+PM_FASE_ARCHIVO="$FASE" ./docker-update.sh >> "$REGISTRO" 2>&1 || codigo=$?
 
 # El contenedor de la aplicación ya se ha reiniciado a estas alturas, así que
 # este resultado es lo único que le va a llegar a la pantalla: la cola del

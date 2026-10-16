@@ -40,7 +40,7 @@ log = logging.getLogger(__name__)
 
 NOMBRE_CACHE = "actualizacion.remota"
 RUTA_VERSION = "python/core/version.py"
-PLANTILLA_URL = "https://raw.githubusercontent.com/{repositorio}/{rama}/" + RUTA_VERSION
+PLANTILLA_URL = "https://raw.githubusercontent.com/{repositorio}/{rama}/{ruta}"
 
 # Un fallo se recuerda mucho menos que un acierto: puede ser un corte de un
 # minuto, y dejar el panel diciendo «no se pudo comprobar» durante seis horas
@@ -57,6 +57,16 @@ ESPERA_MINIMA_FORZADO_SEGUNDOS = 20
 MAX_BYTES = 64 * 1024
 
 _PATRON_VERSION = re.compile(r'^__version__\s*=\s*"(\d+\.\d+\.\d+)"', re.M)
+
+# Novedades: las secciones del CHANGELOG.md de la misma rama que sean más nuevas
+# que la instalada, para que la pantalla diga qué trae la actualización y no solo
+# un número. Solo se descarga si hay versión nueva, y solo el principio: el
+# fichero entero pasa de 180 KB y lo reciente va arriba.
+RUTA_CHANGELOG = "CHANGELOG.md"
+MAX_BYTES_CHANGELOG = 128 * 1024
+MAX_NOVEDADES = 8
+MAX_CARACTERES_NOVEDAD = 8000
+_PATRON_SECCION = re.compile(r"^## \[(\d+\.\d+\.\d+)\][ \t]*(?:[—–-][ \t]*(\S+))?[ \t]*$", re.M)
 _PATRON_REPOSITORIO = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 _PATRON_RAMA = re.compile(r"^[A-Za-z0-9._/-]+$")
 
@@ -103,7 +113,7 @@ def hayNueva(instalada, publicada) -> bool | None:
     return b > a
 
 
-def _url() -> str | None:
+def _url(ruta: str = RUTA_VERSION) -> str | None:
     repositorio = settings.actualizacionRepositorio().strip().strip("/")
     rama = settings.actualizacionRama().strip().strip("/")
 
@@ -115,16 +125,65 @@ def _url() -> str | None:
     if ".." in repositorio or ".." in rama:
         return None
 
-    return PLANTILLA_URL.format(repositorio=repositorio, rama=rama)
+    return PLANTILLA_URL.format(repositorio=repositorio, rama=rama, ruta=ruta)
 
 
-def _descargar(url: str) -> str:
+def _leer_url(url: str, maximo: int) -> str:
     peticion = Request(url, headers={
         "User-Agent": f"PorfolioManager/{__version__}",
         "Accept": "text/plain",
     })
     with urlopen(peticion, timeout=settings.actualizacionTimeout()) as respuesta:
-        return respuesta.read(MAX_BYTES).decode("utf-8", errors="replace")
+        return respuesta.read(maximo).decode("utf-8", errors="replace")
+
+
+def _descargar(url: str) -> str:
+    return _leer_url(url, MAX_BYTES)
+
+
+def _descargar_changelog(url: str) -> str:
+    return _leer_url(url, MAX_BYTES_CHANGELOG)
+
+
+def extraerNovedades(texto, instalada) -> list[dict]:
+    """Las secciones del changelog posteriores a `instalada`, de la más nueva a
+    la más vieja: `[{"version", "fecha", "texto"}]`, el texto en Markdown.
+
+    El fichero llega cortado, así que la última sección del trozo puede estar a
+    medias: solo se da por buena una sección si después viene otra cabecera.
+    """
+    texto = (texto or "").replace("\r\n", "\n")
+    cabeceras = list(_PATRON_SECCION.finditer(texto))
+    base = _tupla(instalada)
+    novedades = []
+
+    for i, cabecera in enumerate(cabeceras):
+        if len(novedades) >= MAX_NOVEDADES or i + 1 >= len(cabeceras):
+            break
+        version = _tupla(cabecera.group(1))
+        if base is not None and version <= base:
+            break
+        cuerpo = texto[cabecera.end():cabeceras[i + 1].start()].strip()
+        # El separador `---` entre versiones no es contenido.
+        cuerpo = re.sub(r"\n-{3,}\s*$", "", cuerpo).strip()
+        if len(cuerpo) > MAX_CARACTERES_NOVEDAD:
+            cuerpo = cuerpo[:MAX_CARACTERES_NOVEDAD].rsplit("\n", 1)[0] + "\n\n…"
+        novedades.append({"version": cabecera.group(1), "fecha": cabecera.group(2), "texto": cuerpo})
+
+    return novedades
+
+
+def _consultar_novedades() -> list[dict]:
+    """Novedades desde la instalada. Un fallo deja la lista vacía y nada más:
+    no saber qué trae no cambia que haya versión nueva."""
+    url = _url(RUTA_CHANGELOG)
+    if url is None:
+        return []
+    try:
+        return extraerNovedades(_descargar_changelog(url), __version__)
+    except (TimeoutError, URLError, OSError, ValueError) as error:
+        log.info("No se pudieron leer las novedades: %s", error)
+        return []
 
 
 def _extraer(texto) -> str | None:
@@ -143,8 +202,14 @@ def _leer_cache() -> dict | None:
     return datos if isinstance(datos, dict) else None
 
 
-def _guardar_cache(publicada, error) -> dict:
-    datos = {"publicada": publicada, "error": error, "momento": _ahora().isoformat(), "instalada": __version__}
+def _guardar_cache(publicada, error, novedades=None) -> dict:
+    datos = {
+        "publicada": publicada,
+        "error": error,
+        "momento": _ahora().isoformat(),
+        "instalada": __version__,
+        "novedades": novedades or [],
+    }
     try:
         paths.TMP_DIR.mkdir(parents=True, exist_ok=True)
         escribirJsonAtomico(_archivo_cache(), datos)
@@ -200,6 +265,7 @@ def _respuesta(cache, activo=True) -> dict:
         "hayNueva": hayNueva(__version__, publicada) if publicada else None,
         "comprobado": (cache or {}).get("momento"),
         "error": (cache or {}).get("error"),
+        "novedades": (cache or {}).get("novedades") or [],
         "repositorio": settings.actualizacionRepositorio(),
         "rama": settings.actualizacionRama(),
     }
@@ -221,12 +287,17 @@ def consultar(forzar: bool = False) -> dict:
             return _respuesta(cache)
 
         publicada, error = _consultar_a_github()
+        novedades = []
         if error:
             log.info("No se pudo comprobar la versión publicada: %s", error)
             # Se conserva la última versión conocida: saber que hace seis horas
             # había una 1.8.0 es más útil que un hueco por un corte de red.
             publicada = publicada or (cache or {}).get("publicada")
-        cache = _guardar_cache(publicada, error)
+            if cache and cache.get("publicada") == publicada:
+                novedades = cache.get("novedades") or []
+        elif hayNueva(__version__, publicada):
+            novedades = _consultar_novedades()
+        cache = _guardar_cache(publicada, error, novedades)
 
     return _respuesta(cache)
 

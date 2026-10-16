@@ -55,6 +55,19 @@ que estaba medida.
   hacen scroll dentro y los botones («Añadir fila», el resumen lateral) quedan a
   la vista. Por debajo de un alto mínimo la página vuelve a desplazarse entera en
   vez de aplastar las tablas.
+- **Ventana de actualización con progreso.** «Comprobar versiones» y
+  «Actualizar» (en el desplegable de la versión y en Ajustes) abren una ventana
+  con la versión instalada y la publicada, cuándo se comprobó y **qué trae**: las
+  entradas de este changelog posteriores a la tuya, leídas de GitHub solo si hay
+  versión nueva. Al confirmar, muestra la instalación paso a paso (recoger la
+  petición, descargar, construir la imagen, reiniciar, comprobar que arranca) con
+  barra de progreso y tiempos. Los pasos son los que anuncia `docker-update.sh`
+  en `data/tmp/actualizacion.fase`; no es una animación de relleno. Se puede
+  cerrar mientras instala, y el botón de la versión («Ver cómo va») la vuelve a
+  abrir. Al acabar ofrece recargar la página; si falla, la barra se pone roja,
+  muestra el detalle y ofrece reintentar. Sustituye al diálogo de confirmación.
+  La primera actualización tras instalar esta versión todavía la hace el script
+  anterior, que no anuncia fases: la ventana funciona, pero con menos detalle.
 
 ### Cambiado
 

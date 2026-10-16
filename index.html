@@ -482,6 +482,60 @@
     </div>
 </div>
 
+<!-- Comprobar y actualizar la aplicación. Lo abren los botones del desplegable
+     de la versión y de Ajustes; lo maneja js/ajustes/ajustes-actualizacion.js.
+     Una sola ventana para las tres cosas —qué hay publicado, qué trae y cómo va
+     la instalación— para que lo que se ve antes de pulsar siga a la vista
+     mientras se instala. -->
+<div class="modalOverlay hidden" id="updateModalOverlay">
+    <div class="assetModal updateModal" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle">
+        <div class="updateModalCabecera">
+            <h3 class="assetModalTitle" id="updateModalTitle">Actualizar PorfolioManager</h3>
+            <button class="updateModalX" id="updModalX" type="button" aria-label="Cerrar">×</button>
+        </div>
+
+        <div class="updateVersiones">
+            <div class="updateVersionCaja">
+                <span>Instalada</span>
+                <strong id="updModalInstalada">—</strong>
+            </div>
+            <svg class="updateVersionFlecha" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10h11m-4-4 4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="updateVersionCaja">
+                <span>Publicada</span>
+                <strong id="updModalPublicada">—</strong>
+            </div>
+        </div>
+        <div class="updateResumen" id="updModalResumen"></div>
+
+        <div class="updateProgreso" id="updModalProgreso" hidden>
+            <div class="updateBarra" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="updModalBarra">
+                <div class="updateBarraRelleno" id="updModalBarraRelleno"></div>
+            </div>
+            <div class="updateProgresoFila">
+                <span id="updModalFaseTexto"></span>
+                <span class="updateProgresoTiempo" id="updModalTiempo"></span>
+            </div>
+            <ol class="updatePasos" id="updModalPasos"></ol>
+        </div>
+
+        <div class="ajustesAviso" id="updModalAviso" hidden></div>
+
+        <div class="updateNovedadesCaja" id="updModalNovedadesCaja" hidden>
+            <div class="updateNovedadesTitulo">Qué trae</div>
+            <div class="updateNovedades" id="updModalNovedades"></div>
+        </div>
+
+        <p class="updateNota" id="updModalNota"></p>
+
+        <div class="assetModalActions updateModalActions">
+            <button class="cancelButton" id="updModalCerrarBtn" type="button">Cerrar</button>
+            <button class="cancelButton" id="updModalComprobarBtn" type="button">Comprobar otra vez</button>
+            <button class="primaryButton" id="updModalActualizarBtn" type="button">Actualizar</button>
+            <button class="primaryButton" id="updModalRecargarBtn" type="button" hidden>Recargar la página</button>
+        </div>
+    </div>
+</div>
+
 <div class="modalOverlay hidden" id="editAssetModalOverlay">
     <div class="assetModal" role="dialog" aria-modal="true" aria-labelledby="editAssetModalTitle">
         <h3 class="assetModalTitle" id="editAssetModalTitle">Editar activo</h3>

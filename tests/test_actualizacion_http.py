@@ -216,6 +216,7 @@ def _responder_github(monkeypatch, version="9.9.9", contador=None):
         return f'__version__ = "{version}"'
 
     monkeypatch.setattr(version_remota, "_descargar", _falso)
+    monkeypatch.setattr(version_remota, "_descargar_changelog", lambda url: "")
 
 
 def test_el_estado_dice_si_hay_version_nueva(cliente, monkeypatch):
@@ -263,3 +264,29 @@ def test_un_github_inalcanzable_no_rompe_el_panel(cliente, monkeypatch):
     assert datos["remota"]["publicada"] is None
     assert datos["remota"]["error"]
     assert client.post("/api/actualizacion", headers=cabeceras).get_json()["ok"] is True
+
+
+# ── Fase en curso ────────────────────────────────────────────────────────────
+
+def test_la_fase_que_deja_docker_update_llega_al_estado(cliente):
+    """Es la barra de progreso: docker-update.sh la escribe en cada paso."""
+    from core import paths
+
+    client, _cabeceras = cliente
+    paths.TMP_DIR.mkdir(parents=True, exist_ok=True)
+    (paths.TMP_DIR / actualizacion.NOMBRE_FASE).write_text(
+        json.dumps({"fase": "construyendo", "momento": _ahora(), "detalle": "9.9.9"}),
+        encoding="utf-8",
+    )
+
+    datos = client.get("/api/actualizacion").get_json()
+
+    assert datos["fase"]["fase"] == "construyendo"
+    assert datos["fase"]["detalle"] == "9.9.9"
+
+
+def test_sin_fase_no_hay_fase(cliente):
+    """Un vigilante antiguo no la deja: la pantalla tiene que poder sin ella."""
+    client, _cabeceras = cliente
+
+    assert client.get("/api/actualizacion").get_json()["fase"] is None

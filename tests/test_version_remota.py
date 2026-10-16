@@ -25,6 +25,8 @@ def _sin_red(monkeypatch):
         raise AssertionError(f"se ha intentado descargar {url}")
 
     monkeypatch.setattr(version_remota, "_descargar", _prohibido)
+    # Con versión nueva se piden también las novedades: aquí, ninguna.
+    monkeypatch.setattr(version_remota, "_descargar_changelog", lambda url: "")
 
 
 def _responder(monkeypatch, version="9.9.9", contador=None):
@@ -253,3 +255,91 @@ def test_la_url_apunta_a_la_rama_configurada(monkeypatch):
     assert url == (
         "https://raw.githubusercontent.com/alguien/otro-repo/pruebas/python/core/version.py"
     )
+
+
+# ── Novedades ────────────────────────────────────────────────────────────────
+
+_CHANGELOG = """# Changelog
+
+Introducción.
+
+---
+
+## [9.9.9] — 2026-12-01
+
+### Añadido
+
+- Lo último.
+
+---
+
+## [9.9.8] — 2026-11-30
+
+- Lo penúltimo.
+
+---
+
+## [0.0.1] — 2020-01-01
+
+- Lo de siempre.
+
+---
+
+## [0.0.0] — 2019-01-01
+"""
+
+
+def test_las_novedades_son_las_posteriores_a_la_instalada():
+    novedades = version_remota.extraerNovedades(_CHANGELOG, "1.0.0")
+
+    assert [n["version"] for n in novedades] == ["9.9.9", "9.9.8"]
+    assert novedades[0]["fecha"] == "2026-12-01"
+    assert "Lo último" in novedades[0]["texto"]
+    # El separador entre versiones no es contenido.
+    assert not novedades[0]["texto"].rstrip().endswith("---")
+
+
+def test_una_seccion_cortada_al_final_no_se_da_por_buena():
+    """El changelog se descarga a medias: la última sección del trozo puede
+    estar incompleta, y es mejor no enseñarla que enseñarla mutilada."""
+    cortado = _CHANGELOG.split("## [9.9.8]")[0] + "## [9.9.8] — 2026-11-30\n\n- Lo pen"
+
+    novedades = version_remota.extraerNovedades(cortado, "1.0.0")
+
+    assert [n["version"] for n in novedades] == ["9.9.9"]
+
+
+def test_las_novedades_llegan_a_la_consulta(datos_aislados, monkeypatch):
+    _responder(monkeypatch, "9.9.9")
+    monkeypatch.setattr(version_remota, "_descargar_changelog", lambda url: _CHANGELOG)
+
+    resultado = version_remota.consultar()
+
+    assert [n["version"] for n in resultado["novedades"]] == ["9.9.9", "9.9.8"]
+
+
+def test_al_dia_no_se_piden_novedades(datos_aislados, monkeypatch):
+    _responder(monkeypatch, __version__)
+
+    def _prohibido(url):
+        raise AssertionError("sin versión nueva no hay novedades que leer")
+
+    monkeypatch.setattr(version_remota, "_descargar_changelog", _prohibido)
+
+    assert version_remota.consultar()["novedades"] == []
+
+
+def test_sin_novedades_legibles_sigue_habiendo_version_nueva(datos_aislados, monkeypatch):
+    from urllib.error import URLError
+
+    _responder(monkeypatch, "9.9.9")
+
+    def _falla(url):
+        raise URLError("sin ruta al host")
+
+    monkeypatch.setattr(version_remota, "_descargar_changelog", _falla)
+
+    resultado = version_remota.consultar()
+
+    assert resultado["hayNueva"] is True
+    assert resultado["novedades"] == []

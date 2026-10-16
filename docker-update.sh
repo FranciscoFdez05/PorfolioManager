@@ -97,8 +97,22 @@ aviso()  { printf '\n\033[33m%s\033[0m\n' "$*"; }
 error()  { printf '\n\033[31m%s\033[0m\n' "$*" >&2; }
 paso()   { printf '\n\033[36m── %s\033[0m\n' "$*"; }
 
+# Fase en curso, para la barra de progreso de Ajustes. Solo si la pide el
+# vigilante (PM_FASE_ARCHIVO): a mano por SSH no hace falta. $1 es una clave fija
+# que entiende la pantalla; $2, un texto opcional. Temporal y renombrado, como el
+# estado: la aplicación lo lee cada pocos segundos. Si falla, se sigue.
+fase() {
+    [ -n "$PM_FASE_ARCHIVO" ] || return 0
+    temporal="$PM_FASE_ARCHIVO.tmp.$$"
+    printf '{"fase": "%s", "momento": "%s", "detalle": "%s"}\n' "$1" "$(date -Is)" "${2:-}" \
+        > "$temporal" 2>/dev/null && mv -f "$temporal" "$PM_FASE_ARCHIVO" 2>/dev/null \
+        || rm -f "$temporal" 2>/dev/null
+    return 0
+}
+
 # ── 1. Comprobaciones previas ─────────────────────────────────────────────────
 paso "Comprobando el estado local"
+fase comprobando
 
 if [ ! -f .env ]; then
     error "No hay .env. Esto es una instalación nueva: usa ./docker-up.sh."
@@ -133,6 +147,7 @@ echo "Versión instalada: $VERSION_ANTERIOR"
 # ── 2. Traer los cambios ──────────────────────────────────────────────────────
 if [ "$SIN_PULL" -eq 0 ]; then
     paso "Descargando la versión nueva"
+    fase descargando
     git pull --ff-only
 fi
 
@@ -188,15 +203,18 @@ fi
 
 # ── 6. Construir y levantar ───────────────────────────────────────────────────
 paso "Construyendo la imagen $VERSION_NUEVA"
+fase construyendo "$VERSION_NUEVA"
 docker compose build
 
 paso "Levantando"
+fase levantando "$VERSION_NUEVA"
 docker compose up -d
 
 # ── 7. Comprobar que arranca de verdad ────────────────────────────────────────
 # /api/health consulta la base de datos activa y devuelve 503 si falla, así que
 # esperar aquí distingue «el contenedor está arriba» de «la aplicación funciona».
 paso "Esperando a que responda (hasta ${ESPERA_SALUD}s)"
+fase esperando "$VERSION_NUEVA"
 
 # Se prueban los dos esquemas porque el puerto es el mismo en ambos casos: el
 # HTTPS se activa desde Ajustes y este script no sabe —ni tiene por qué saber—
@@ -224,6 +242,7 @@ printf '\n'
 
 if [ "$sano" -eq 1 ]; then
     paso "Actualización correcta"
+    fase correcta "$VERSION_NUEVA"
     salud || true
     printf '\n\nVersión %s en marcha en el puerto %s.\n' "$VERSION_NUEVA" "$PORT"
     exit 0
@@ -231,6 +250,7 @@ fi
 
 # ── 8. Vuelta atrás ───────────────────────────────────────────────────────────
 error "La versión $VERSION_NUEVA no responde tras ${ESPERA_SALUD}s. Volviendo atrás."
+fase volviendo "$VERSION_ANTERIOR"
 
 echo
 echo "Últimas líneas del log:"
