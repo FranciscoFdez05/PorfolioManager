@@ -1079,7 +1079,22 @@
 
 .overviewPage .metricasTableCard {
     overflow: auto;
-    max-height: calc(100vh - 225px);
+    max-height: calc(100 * var(--vh) - 225px);
+}
+
+/* Ajustada al alto visible (fitPageActive, ver base.css): la tabla se queda con
+   el hueco bajo la barra de filtros, sin el cálculo fijo contra 100vh. */
+@media (min-width: 1201px) {
+    .fitPageActive .overviewPage {
+        flex: 1 1 auto;
+        min-height: 400px;
+    }
+
+    .fitPageActive .overviewPage .metricasTableCard {
+        flex: 0 1 auto;
+        min-height: 0;
+        max-height: none;
+    }
 }
 
 #overviewTable thead th {

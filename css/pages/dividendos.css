@@ -31,7 +31,7 @@
 }
 
 html .dividendosTableWrapper {
-    max-height: calc(100vh - 307px);
+    max-height: calc(100 * var(--vh) - 307px);
     position: relative;
     border: 1px solid var(--border-soft);
     border-radius: 10px;

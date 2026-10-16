@@ -184,7 +184,7 @@ body {
 
 .appContainer {
     display: flex;
-    height: 100vh;
+    height: calc(100 * var(--vh));
     width: 100%;
     background: var(--bg-app);
     overflow: hidden;
@@ -196,7 +196,7 @@ body {
     display: flex;
     flex-direction: column;
     background: var(--bg-panel);
-    height: 100vh;
+    height: calc(100 * var(--vh));
     overflow: clip;
 }
 
@@ -416,11 +416,17 @@ body {
    lo apagado va en el color y no en `opacity`, que transparentaría el fondo. */
 .appVersion {
     position: sticky;
-    right: 0;
+
+    /* El pegado se detiene en el borde del contenido, no en el de la barra: sin
+       llegar hasta el relleno derecho de nav.tabs (18px) los botones asomaban
+       a ambos lados del número al desplazar. El margen negativo descuenta el
+       relleno para que, sin desbordar, la versión siga donde estaba. */
+    right: -18px;
     z-index: 1;
     margin-left: auto;
+    margin-right: -18px;
     flex: 0 0 auto;
-    padding: 4px 6px;
+    padding: 4px 18px 4px 10px;
     border: 0;
     border-radius: 6px;
     background: inherit;
@@ -466,7 +472,7 @@ body {
     position: fixed;
     z-index: 900;
     width: 300px;
-    max-width: calc(100vw - 16px);
+    max-width: calc(100 * var(--vw) - 16px);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -643,6 +649,18 @@ body {
     min-height: 0;
 }
 
+/* Páginas ajustadas al alto visible (lista en app-core.js): la página no crece
+   con sus tablas, son ellas las que hacen scroll dentro. Cada hoja de página
+   decide qué bloque encoge y pone a la página un alto mínimo: por debajo de él
+   mainContent vuelve a hacer scroll (sigue con overflow: auto, a diferencia de
+   gridPageActive) en vez de aplastar las tablas. */
+@media (min-width: 1201px) {
+    .mainContent.fitPageActive .contentArea {
+        height: 100%;
+        min-height: 0;
+    }
+}
+
 .contentArea {
     width: 100%;
     min-width: 0;
@@ -658,7 +676,7 @@ body {
     position: relative;
     width: 300px;
     min-width: 220px;
-    height: 100vh;
+    height: calc(100 * var(--vh));
     background: var(--bg-app);
     border-left: 1px solid var(--border-inset);
     overflow: hidden;
@@ -702,7 +720,7 @@ body {
 
 .sidePanel {
     width: 100%;
-    height: 100vh;
+    height: calc(100 * var(--vh));
     display: flex;
     flex-direction: column;
     background: var(--bg-app);

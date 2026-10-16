@@ -428,7 +428,7 @@
 
 /* ── Modal de configuración ── */
 .cuentaAhorroConfigModal .gastosCreateModalBody {
-    max-height: 62vh;
+    max-height: calc(62 * var(--vh));
     overflow-y: auto;
     padding-right: 4px;
 }

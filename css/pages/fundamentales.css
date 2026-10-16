@@ -56,7 +56,7 @@
 
 /* ── Tabla ── */
 .fnTableWrap {
-    max-height: calc(100vh - 250px);
+    max-height: calc(100 * var(--vh) - 250px);
 }
 
 .fnTable {

@@ -30,6 +30,7 @@ Referencia completa de PorfolioManager: instalación, configuración, operación
 - **Telegram** — avisos de copias de seguridad, alertas de precio por activo, proveedores, seguridad y estado del servidor; comandos para consultarlo desde el móvil (`/estado`, `/cartera`, `/backup`…) y un vigilante que avisa si la aplicación deja de responder ([detalle](#telegram-avisos-alertas-de-precio-y-comandos))
 - **Ajustes** — claves API, caducidad de cotizaciones, backup/restauración, tipos de cambio históricos y tema
 - **Atajo de iOS** — alta rápida de gastos e ingresos desde el Centro de Control, restringida a la LAN y a WireGuard ([guía](docs/atajo-ios.md))
+- **Cualquier pantalla** — se amplía sola en monitores de 27" y 4K, el lateral pasa a ser un cajón en tablet y móvil, y las tablas parten sus cabeceras para caber en un iPad
 
 Las cotizaciones se obtienen opcionalmente vía **Finnhub**, **EODHD**, **Yahoo Finance** y **Alpha Vantage** (basta con dejar los archivos de clave vacíos para funcionar sin ellas).
 
@@ -1250,6 +1251,8 @@ Cada respuesta lleva la cabecera `X-Request-Id`; ese mismo identificador aparece
 | Fichero | Responsabilidad |
 |---|---|
 | `js/core/csrf.js` | Envuelve `fetch` para adjuntar la cabecera CSRF. Debe cargarse el primero. |
+| `js/core/zoom.js` | En pantallas grandes `css/responsive.css` amplía la interfaz con `zoom` en `<html>` (`--ui-zoom`). Con el zoom estándar, `getBoundingClientRect`, las coordenadas del ratón e `innerWidth` vienen en px de pantalla y el resto en px de la página; este fichero las devuelve todas en px de la página para que menús y popups no se descoloquen. Va justo después de `csrf.js`. Por lo mismo, **en CSS no se usan `vh`/`vw` a pelo** sino `calc(N * var(--vh))` / `var(--vw)` (`css/variables.css`), que descuentan el zoom. |
+| `js/core/tablas.js` | Reparte por igual el hueco entre columnas en todas las tablas (anchos en un `<colgroup>`). Si no caben, prueba con las cabeceras partidas en líneas; si tampoco, deja la tabla como la pinta su CSS. En las tablas que gestiona se ignoran los `width`/`min-width` de celda. |
 | `js/core/api.js` | `Api.get/post/put/del`: timeout, reintento de las lecturas, mensaje de error real del servidor y redirección al login cuando caduca la sesión (esto último se aplica también a las llamadas a `fetch` sin migrar). |
 | `js/core/dom.js` | `escapeHtml`, constructores de nodos (`el`, `setText`, `clearNode`) y avisos no bloqueantes (`showToast`, `showError`). |
 | `js/core/tooltips.js` | Sustituye el `title` nativo del navegador por un tooltip con el estilo de la app (`.appTooltip`). |

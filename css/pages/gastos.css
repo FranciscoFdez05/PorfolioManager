@@ -1624,3 +1624,67 @@
         grid-template-columns: minmax(0, 1fr);
     }
 }
+
+/* ── Gastos e Ingresos ajustados al alto visible (fitPageActive, ver base.css) ──
+   El bloque visible (mes, año o mensualidades/recurrentes) se queda con el hueco
+   que dejan las barras de arriba y su tabla hace scroll dentro, así «Añadir fila»
+   queda justo debajo sin bajar por la página. */
+@media (min-width: 1201px) {
+    .fitPageActive .gastosPage,
+    .fitPageActive .ingresosPage {
+        min-height: 480px;
+    }
+
+    .fitPageActive .movMonthLayout {
+        flex: 0 1 auto;
+        min-height: 0;
+        grid-template-rows: minmax(0, 1fr);
+    }
+
+    .fitPageActive .gastosMovementsWrapper,
+    .fitPageActive .ingresosMovementsWrapper {
+        max-height: 100%;
+    }
+
+    .fitPageActive .movResumenLado,
+    .fitPageActive #ingresosResumenLado {
+        max-height: 100%;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+
+    .fitPageActive .gastosAnnualWrapper,
+    .fitPageActive .ingresosAnnualWrapper {
+        flex: 0 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    .fitPageActive .mensPanel,
+    .fitPageActive .recPanel {
+        flex: 0 1 auto;
+        min-height: 0;
+    }
+
+    .fitPageActive .mensTableWrapper,
+    .fitPageActive .recTableWrapper,
+    .fitPageActive .mensCalendar {
+        flex: 0 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+
+    .fitPageActive .mensTable thead th,
+    .fitPageActive .recTable thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+
+    .fitPageActive .gastosActions,
+    .fitPageActive .ingresosActions {
+        flex-shrink: 0;
+        margin-top: 0;
+    }
+}

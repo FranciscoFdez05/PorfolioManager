@@ -680,7 +680,7 @@
 /* Con un activo desplegado la lista crece para que sus operaciones y el
    formulario de operación nueva quepan sin tener que desplazarse a ciegas. */
 .pinvEditorLista.pinvEditorListaAbierta {
-    max-height: min(62vh, calc(var(--pinv-visibles, 5) * 58px + 340px));
+    max-height: min(calc(62 * var(--vh)), calc(var(--pinv-visibles, 5) * 58px + 340px));
 }
 
 /* Desvanecido del borde inferior mientras quede lista por debajo (la clase la

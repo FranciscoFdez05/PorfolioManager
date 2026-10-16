@@ -1,17 +1,120 @@
-/* Ajustes de maquetación para tablet (≤1024px) y móvil (≤768px).
-   Los colores de los temas claro y oscuro están en css/themes/. */
+/* Ajustes de maquetación para pantallas grandes (zoom), tablet (≤1024px) y
+   móvil (≤768px). Los colores de los temas claro y oscuro están en css/themes/. */
+
+/* ── Pantallas grandes: se amplía todo ──
+   La maqueta está medida en px para un 24" (1920×1080). En un 27" a 2560 o en un
+   4K sin escalado de Windows/macOS sale diminuta y con la mitad de la pantalla
+   vacía. Se amplía con `zoom` para que el ancho útil vuelva a rondar los
+   2000px. Hace falta también alto: un ultrapanorámico (3440×1440) se queda en el
+   escalón que le permite su alto. La clase uiZoom la pone index.html solo si el
+   navegador tiene el zoom estándar; js/core/zoom.js corrige las medidas que lee
+   la app. */
+:root.uiZoom {
+    zoom: var(--ui-zoom);
+}
+
+@media (min-width: 2200px) and (min-height: 1200px) {
+    :root.uiZoom {
+        --ui-zoom: 1.15;
+    }
+}
+
+@media (min-width: 2400px) and (min-height: 1300px) {
+    :root.uiZoom {
+        --ui-zoom: 1.25;
+    }
+}
+
+@media (min-width: 2880px) and (min-height: 1600px) {
+    :root.uiZoom {
+        --ui-zoom: 1.5;
+    }
+}
+
+@media (min-width: 3600px) and (min-height: 1900px) {
+    :root.uiZoom {
+        --ui-zoom: 1.75;
+    }
+}
+
+/* En el iPad, deslizar en diagonal una tabla que desplaza en horizontal la
+   llevaba más allá de su borde con el rebote del sistema y dejaba un bloque
+   vacío a un lado. Solo afecta a lo que desplaza: el resto no tiene rebote. */
+.mainContent,
+.mainContent * {
+    overscroll-behavior-x: none;
+}
+
+/* ── Lateral como cajón (≤1180px, y en pantallas táctiles ≤1400px: cualquier
+   iPad, también el Pro de 12,9" en horizontal; un portátil de 1366 con ratón
+   conserva el lateral fijo) ──
+   Al lado del contenido se comía un tercio de la pantalla y dejaba las tablas a
+   medias. Aquí flota encima, entra desde la derecha y arranca cerrado
+   (SIDEBAR_FLOTANTE en app-core.js, con el mismo límite); tocar fuera lo
+   cierra. Se mueve con transform y no con el ancho: el contenido no se
+   recoloca al abrirlo y las gráficas del lateral no se redimensionan. */
+@media (max-width: 1180px), (pointer: coarse) and (max-width: 1400px) {
+    :root {
+        --sidebar-width: min(340px, calc(88 * var(--vw)));
+    }
+
+    .sideWrapper,
+    .sideWrapper.collapsed {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 900;
+        width: var(--sidebar-width) !important;
+        min-width: 0 !important;
+        height: auto;
+        border-left: 1px solid var(--border-inset);
+        box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
+        transition:
+            transform 0.22s ease,
+            box-shadow 0.22s ease;
+    }
+
+    .sideWrapper.collapsed {
+        transform: translateX(100%);
+        box-shadow: none;
+    }
+
+    .sidePanel {
+        height: 100%;
+    }
+
+    .sideResizeHandle {
+        display: none;
+    }
+
+    .toggleButton {
+        z-index: 901;
+    }
+
+    /* Con el lateral fuera, la pestaña flotante ya no necesita el hueco derecho
+       de Vista general, y los márgenes se ajustan un poco. */
+    .contentArea {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .overviewPage {
+        padding-right: 0;
+    }
+
+    /* Lo que ensancha las columnas de las tablas son las cabeceras en
+       mayúsculas y espaciadas («INVERSIÓN BRUTA»), no las cifras: sin el
+       espaciado y un punto más pequeñas, la tabla de Vista general cabe entera
+       en un iPad en horizontal. */
+    .metricasTable th {
+        font-size: 0.68rem;
+        letter-spacing: 0;
+    }
+}
 
 /* ── Responsive: tablet (≤1024px) ── */
 @media (max-width: 1024px) {
-    :root {
-        --sidebar-width: 200px;
-    }
-
-    .sideWrapper {
-        width: 200px;
-        min-width: 160px;
-    }
-
     .searchContainer input {
         width: 120px;
     }
@@ -32,20 +135,72 @@
 
 /* ── Responsive: móvil / iPad mini portrait (≤768px) ── */
 @media (max-width: 768px) {
-    :root {
-        --sidebar-width: 0px;
+    /* En un móvil cada px de ancho cuenta: márgenes más justos y sin el hueco
+       derecho de Vista general, que en escritorio deja sitio a la pestaña del
+       lateral. */
+    .contentArea {
+        padding: 12px 12px 18px;
     }
 
-    .sideWrapper {
-        width: 0 !important;
-        min-width: 0 !important;
-        border-left: none;
+    .overviewPage {
+        padding-right: 0;
     }
 
-    .sideWrapper .sidePanel {
-        pointer-events: none;
+    /* Las tablas anuales de Gastos e Ingresos (doce meses + total) se
+       encogían hasta montar unos importes sobre otros: aquí guardan un ancho
+       legible y el bloque desplaza en horizontal. */
+    .gastosAnnualWrapper,
+    .ingresosAnnualWrapper {
+        overflow-x: auto;
     }
 
+    .gastosAnnualTable,
+    .ingresosAnnualTable {
+        min-width: 980px;
+    }
+
+    /* Filas de pestañas de mes (Gastos, Ingresos, Ahorro, Dividendos): doce
+       botones en una línea ensanchaban la página entera. Aquí desplazan ellas
+       solas, como la barra de navegación. */
+    .gastosMonthTabs,
+    .ingresosMonthTabs,
+    .ahorroMonthTabs,
+    .dividendosMonthTabs {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .gastosMonthTabs > *,
+    .ingresosMonthTabs > *,
+    .ahorroMonthTabs > *,
+    .dividendosMonthTabs > * {
+        flex: 0 0 auto;
+    }
+
+    /* Métricas: los grupos de tarjetas no encogían y las tarjetas de un grupo
+       iban siempre en una línea; los selectores (€ / % / periodo) tampoco. */
+    .metricasKpiGroup,
+    .mGastosHeaderLeft {
+        flex-shrink: 1;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .metricasKpiCards {
+        flex-wrap: wrap;
+    }
+
+    .mToggleGroup {
+        max-width: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .metricasSectionTitle {
+        white-space: normal;
+        min-width: 0;
+        flex-shrink: 1;
+    }
     .topBar {
         flex-wrap: wrap;
         gap: 6px;

@@ -514,6 +514,27 @@ body.money-hidden .calFinSideTotal span:last-child {
     pointer-events: none;
 }
 
+/* Ajustado al alto visible (fitPageActive, ver base.css): los meses hacen
+   scroll dentro de su rejilla y el resumen de la derecha se queda a la vista. */
+@media (min-width: 1201px) {
+    .fitPageActive .calFinPage {
+        min-height: 480px;
+    }
+
+    .fitPageActive .calFinCalendar {
+        flex: 0 1 auto;
+        min-height: 0;
+        grid-template-rows: minmax(0, 1fr);
+    }
+
+    .fitPageActive .calFinGrid,
+    .fitPageActive .calFinSide {
+        max-height: 100%;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+}
+
 @media (max-width: 1400px) {
     .calFinGrid {
         grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -64,6 +64,7 @@
          que abrirse con 'unsafe-inline'. -->
     <script nonce="__CSP_NONCE__">
         (function(){var t=localStorage.getItem("portfolioTheme");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t)})()
+        if("currentCSSZoom" in Element.prototype)document.documentElement.classList.add("uiZoom")
     </script>
     <!-- Debe ir antes que cualquier script que llame a fetch(). Todos los
          <script> de la página llevan `defer`: el navegador los descarga en
@@ -71,6 +72,10 @@
          el orden del documento justo antes de DOMContentLoaded, así que este
          orden relativo (csrf → api → dom → el resto) se mantiene igual. -->
     <script defer src="js/core/csrf.js"></script>
+    <!-- zoom.js, antes que cualquier módulo que mida: en pantallas grandes se
+         amplía la interfaz con `zoom` (responsive.css) y corrige las medidas
+         que lee el resto. -->
+    <script defer src="js/core/zoom.js"></script>
     <!-- api.js envuelve fetch DESPUÉS de csrf.js (sesión caducada, timeouts);
          dom.js expone escapeHtml y los helpers que usan todos los módulos. -->
     <script defer src="js/core/api.js"></script>

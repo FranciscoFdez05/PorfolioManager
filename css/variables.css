@@ -2,4 +2,12 @@
    css/themes/: noche-clara.css (por defecto), claro.css y oscuro.css. */
 :root {
     --sidebar-width: 300px;
+
+    /* Escala de la interfaz en pantallas grandes: la fija responsive.css y la
+       aplica `zoom` en <html>. Con zoom, 1vh y 1vw se amplían con todo lo
+       demás y 100vh se saldría de la pantalla, así que las hojas usan
+       var(--vh)/var(--vw), que lo descuentan. */
+    --ui-zoom: 1;
+    --vh: calc(1vh / var(--ui-zoom));
+    --vw: calc(1vw / var(--ui-zoom));
 }

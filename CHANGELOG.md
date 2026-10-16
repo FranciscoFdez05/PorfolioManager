@@ -22,6 +22,63 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.7.0] — 2026-10-16
+
+**Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+La interfaz se adapta a la pantalla: se ve bien en un monitor de 27" o 4K, en
+cualquier iPad (también en horizontal) y en el móvil, no solo en el 24" para el
+que estaba medida.
+
+### Añadido
+
+- **Escala automática en pantallas grandes.** En un 27" a 2560 o en un 4K sin
+  escalado del sistema todo salía diminuto y con media pantalla vacía. Ahora la
+  interfaz se amplía sola (×1,15 a ×1,75 según el tamaño) para que el ancho útil
+  ronde el de un 24". Hace falta también alto: un ultrapanorámico (3440×1440) se
+  queda en el escalón que le permite el suyo. Menús, tooltips, ventanas y
+  gráficos siguen saliendo en su sitio y nítidos. En Safari se queda como antes.
+- **Lateral como cajón en tablet y móvil.** Hasta 1180px de ancho, y en pantallas
+  táctiles hasta 1400px (cualquier iPad, también el Pro en horizontal), el
+  lateral de activos flota sobre el contenido en vez de comerse un tercio de la
+  pantalla. Se abre con la pestaña de la derecha, se cierra tocando fuera y
+  arranca cerrado. Abrirlo o cerrarlo ahí no se guarda: el ajuste es compartido
+  y no debe abrir el lateral del ordenador. Antes, en el móvil, el lateral se
+  escondía sin manera de abrirlo.
+- **Tablas que caben en pantallas estrechas.** Cuando una tabla no cabe, sus
+  cabeceras se parten en dos líneas («INVERSIÓN / BRUTA») y cada columna mide lo
+  que ocupan sus cifras. La tabla de Vista general cabe entera en un iPad en
+  horizontal. En escritorio no cambia nada.
+- **Páginas ajustadas al alto visible.** En Vista general, Gastos, Ingresos y el
+  Calendario del dinero, la página ya no crece con sus tablas: son ellas las que
+  hacen scroll dentro y los botones («Añadir fila», el resumen lateral) quedan a
+  la vista. Por debajo de un alto mínimo la página vuelve a desplazarse entera en
+  vez de aplastar las tablas.
+
+### Cambiado
+
+- **Móvil:** márgenes más justos. Las pestañas de mes de Gastos, Ingresos, Ahorro
+  y Dividendos, y los selectores de Métricas, desplazan en horizontal en vez de
+  ensanchar la página. Las tarjetas de Métricas pasan a la línea siguiente cuando
+  no caben, y las tablas anuales de Gastos e Ingresos guardan un ancho legible y
+  desplazan.
+- **Paneles:** los widgets de TradingView ya no muestran su propia barra de
+  desplazamiento (la rueda sigue funcionando).
+
+### Corregido
+
+- La tabla de Vista general y la del top de Métricas eran más anchas que su caja
+  y desplazaban en horizontal, también en un 24": las columnas Nombre (180px) y #
+  (44px) tenían un ancho fijo en CSS que no contaba al repartir las columnas.
+- Las tablas que no cabían se repartían sobre su propio ancho desbordado en vez de
+  sobre el de su caja, y en un iPad se cortaban las últimas columnas
+  (Rendimiento € y %).
+- La versión al final de la barra de pestañas dejaba ver los botones a ambos
+  lados del número al desplazar la barra.
+- En el iPad, deslizar en diagonal una tabla la llevaba más allá de su borde con
+  el rebote del sistema y dejaba un bloque vacío a un lado.
+
 ## [4.6.0] — 2026-10-15
 
 **Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la

@@ -613,7 +613,7 @@ body.pnPantallaCompleta {
     position: fixed;
     z-index: 10000;
     min-width: 170px;
-    max-height: min(440px, 70vh);
+    max-height: min(440px, calc(70 * var(--vh)));
     overflow-y: auto;
     padding: 5px;
     border: 1px solid var(--border-mid);
@@ -699,7 +699,7 @@ body.pnPantallaCompleta {
 .pnPop.pnPopSel {
     display: flex;
     flex-direction: column;
-    max-height: min(500px, 78vh);
+    max-height: min(500px, calc(78 * var(--vh)));
     padding: 0;
     overflow: hidden;
 }
@@ -1176,6 +1176,14 @@ body.money-hidden .pnMoney {
     width: 100%;
     height: 100%;
     border: 0;
+}
+
+/* Los widgets de TradingView pintan su propia barra de scroll dentro del
+   iframe (otro dominio, no se puede estilar). Se ensancha el iframe y el
+   cuerpo, que recorta, deja la barra fuera de vista; la rueda sigue
+   funcionando. */
+.pnIframeWidget {
+    width: calc(100% + 16px);
 }
 
 /* Tabla de la cartera */
@@ -1772,8 +1780,8 @@ body.money-hidden .pnMoney {
     z-index: 960;
     display: flex;
     flex-direction: column;
-    width: min(360px, calc(100vw - 16px));
-    max-height: min(680px, calc(100vh - 16px));
+    width: min(360px, calc(100 * var(--vw) - 16px));
+    max-height: min(680px, calc(100 * var(--vh) - 16px));
     overflow: hidden;
     border: 1px solid var(--border-mid);
     border-radius: 12px;
@@ -2258,7 +2266,7 @@ body.money-hidden .pnMoney {
         bottom: 8px;
         left: 8px !important;
         width: auto;
-        max-height: 70vh;
+        max-height: calc(70 * var(--vh));
     }
 
     .pnAjCab {

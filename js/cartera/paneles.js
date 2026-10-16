@@ -3719,7 +3719,7 @@ function pnPintarEmbebido(w, cuerpo, ctrls) {
         if (cfgFinal.symbol) consulta.set("symbol", cfgFinal.symbol)
         const url = `https://s.tradingview.com/embed-widget/${PN_EMBEBIDOS[w.tipo]}/?${consulta}#${encodeURIComponent(JSON.stringify(cfgFinal))}`
         cuerpo.innerHTML = `
-        <iframe class="pnIframe" src="${escapeAttr(url)}" frameborder="0" allowtransparency="true" scrolling="no"
+        <iframe class="pnIframe pnIframeWidget" src="${escapeAttr(url)}" frameborder="0" allowtransparency="true" scrolling="no"
             sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
             referrerpolicy="no-referrer" title="${escapeAttr(PN_TIPOS[w.tipo].nombre)}"></iframe>`
     }

@@ -629,7 +629,7 @@
 .ahorroConfigModal {
     max-width: 480px;
     width: calc(100% - 40px);
-    max-height: 80vh;
+    max-height: calc(80 * var(--vh));
     overflow-y: auto;
     display: flex;
     flex-direction: column;

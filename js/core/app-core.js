@@ -575,12 +575,22 @@ function initSearchableSelect(selectEl) {
     )
 }
 
+// En tablet y móvil el lateral no cabe al lado del contenido: flota encima como
+// un cajón (responsive.css, mismo ancho) y arranca cerrado. Abrirlo o cerrarlo
+// ahí no se guarda: sidebarCollapsed es un ajuste del servidor, compartido con
+// el ordenador, y abrir el cajón en el iPad no debe abrir el lateral del 27".
+const SIDEBAR_FLOTANTE = window.matchMedia?.("(max-width: 1180px), (pointer: coarse) and (max-width: 1400px)") ?? {
+    matches: false
+}
+
+function setSidebarCollapsed(sideWrapper, toggleButton, collapsed) {
+    sideWrapper.classList.toggle("collapsed", collapsed)
+    toggleButton.innerHTML = collapsed ? "◀" : "▶"
+}
+
 function applySidebarState(sideWrapper, toggleButton) {
     if (!sideWrapper || !toggleButton) return
-    if (window._sidebarCollapsed) {
-        sideWrapper.classList.add("collapsed")
-        toggleButton.innerHTML = "◀"
-    }
+    setSidebarCollapsed(sideWrapper, toggleButton, Boolean(window._sidebarCollapsed) || SIDEBAR_FLOTANTE.matches)
 }
 
 const dividendosAutosaveTimeout = null
@@ -744,9 +754,9 @@ function initSidePanel(toggleButton, sideWrapper) {
     }
 
     toggleButton.addEventListener("click", () => {
-        sideWrapper.classList.toggle("collapsed")
-        const collapsed = sideWrapper.classList.contains("collapsed")
-        toggleButton.innerHTML = collapsed ? "◀" : "▶"
+        const collapsed = !sideWrapper.classList.contains("collapsed")
+        setSidebarCollapsed(sideWrapper, toggleButton, collapsed)
+        if (SIDEBAR_FLOTANTE.matches) return
         window._sidebarCollapsed = collapsed
         fetch("/api/settings", {
             method: "POST",
@@ -754,6 +764,24 @@ function initSidePanel(toggleButton, sideWrapper) {
             body: JSON.stringify({ sidebarCollapsed: collapsed })
         }).catch(() => {})
     })
+
+    // El cajón abierto tapa el contenido: tocar fuera lo cierra.
+    document.addEventListener(
+        "pointerdown",
+        (e) => {
+            if (!SIDEBAR_FLOTANTE.matches || sideWrapper.classList.contains("collapsed")) return
+            if (sideWrapper.contains(e.target) || toggleButton.contains(e.target)) return
+            // Los modales y desplegables que abre el propio lateral (editar un
+            // activo, un selector) no cuentan como «fuera».
+            if (e.target.closest?.(".modalOverlay, .csMenu")) return
+            setSidebarCollapsed(sideWrapper, toggleButton, true)
+        },
+        true
+    )
+
+    // Girar el iPad o estrechar la ventana cruza el límite: al entrar en modo
+    // cajón se cierra, y al salir vuelve a lo guardado.
+    SIDEBAR_FLOTANTE.addEventListener?.("change", () => applySidebarState(sideWrapper, toggleButton))
 
     sideWrapper.addEventListener("transitionend", (e) => {
         if (e.propertyName === "width" && typeof window._resizeChartsOnSidebarChange === "function") {
@@ -1027,6 +1055,10 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             // se dibuja en una franja de 360 px con el resto en negro.
             const gridPages = ["activos", "seguimiento", "heatmap"]
             mainContent.classList.toggle("gridPageActive", gridPages.includes(page))
+            // Páginas cuyo contenido cabe en la ventana si sus tablas hacen
+            // scroll dentro en vez de alargar mainContent (ver base.css).
+            const fitPages = ["vistaGeneral", "gastos", "ingresos", "calendario"]
+            mainContent.classList.toggle("fitPageActive", fitPages.includes(page))
         }
 
         if (page === "vistaGeneral") {

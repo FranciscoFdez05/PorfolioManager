@@ -827,7 +827,7 @@ body.asset-rotation-halted .detailRotationBar span {
 }
 
 .conversionesTableWrapper {
-    max-height: calc(100vh - 500px);
+    max-height: calc(100 * var(--vh) - 500px);
     overflow-y: auto;
     overflow-x: hidden;
     scrollbar-width: none;
@@ -1419,8 +1419,8 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 .assetRowModal {
     padding: 0;
     width: min(460px, 100%);
-    max-width: 96vw;
-    max-height: 88vh;
+    max-width: calc(96 * var(--vw));
+    max-height: calc(88 * var(--vh));
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -1998,7 +1998,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 .gastosMovementsWrapper {
     border: none;
     background: var(--bg-panel);
-    max-height: calc(100vh - 245px);
+    max-height: calc(100 * var(--vh) - 245px);
     overflow: auto;
     scrollbar-width: none;
 }
@@ -2119,7 +2119,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 }
 
 .overviewTableWrapper {
-    max-height: calc(100vh - 245px);
+    max-height: calc(100 * var(--vh) - 245px);
 }
 
 .overviewTable {
@@ -2346,7 +2346,7 @@ table td.numCell [contenteditable="true"] {
 
 .assetModal {
     width: min(420px, 100%);
-    max-height: calc(100vh - 60px);
+    max-height: calc(100 * var(--vh) - 60px);
     overflow-y: auto;
     padding: 22px 18px 16px 18px;
     border: 1px solid var(--border-mid);
@@ -3023,7 +3023,7 @@ table td.numCell [contenteditable="true"] {
 }
 
 .gastosCreateModalBody {
-    max-height: min(62vh, 620px);
+    max-height: min(calc(62 * var(--vh)), 620px);
     overflow-y: auto;
     padding-right: 4px;
 }
@@ -3913,7 +3913,7 @@ table td.numCell [contenteditable="true"] {
 }
 
 .catList {
-    max-height: 46vh;
+    max-height: calc(46 * var(--vh));
     margin: 0;
     padding: 0;
     overflow-y: auto;
@@ -4280,8 +4280,44 @@ table.tablaMidiendo > * > tr > td {
     max-width: none !important;
 }
 
+/* Segundo intento de tablas.js cuando la tabla no cabe: el cuerpo se mide sin
+   la cabecera, y la cabecera sola en una tabla de ancho cero, que la deja en
+   su palabra más larga. Si así cabe, las cabeceras van partidas en líneas. */
+table.tablaMidiendoCuerpo > thead {
+    display: none !important;
+}
+
+table.tablaMidiendoCabecera {
+    width: 0 !important;
+}
+
+table.tablaMidiendoCabecera > tbody,
+table.tablaMidiendoCabecera > tfoot {
+    display: none !important;
+}
+
+table.tablaMidiendoCabecera > thead > tr > th,
+table.tablaCabeceraPartida > thead > tr > th {
+    white-space: normal !important;
+}
+
+table.tablaCabeceraPartida > thead > tr > th {
+    vertical-align: bottom;
+}
+
 table.tablaHuecosIguales {
     table-layout: fixed !important;
+}
+
+/* Los anchos ya los decide tablas.js en el <colgroup>. Un min-width o width de
+   celda (la columna Nombre de Vista general y del top de Métricas pedía 180px,
+   la del número 44px) no cuenta al medir y luego ensancha la tabla por encima
+   de su caja: salía desplazamiento lateral hasta en un 24", y en un iPad se
+   cortaba la última columna. */
+table.tablaHuecosIguales > * > tr > th,
+table.tablaHuecosIguales > * > tr > td {
+    width: auto !important;
+    min-width: 0 !important;
 }
 
 /* ── Tooltip global: sustituye al title nativo (js/core/tooltips.js) ── */
@@ -4291,7 +4327,7 @@ table.tablaHuecosIguales {
     top: 0;
     z-index: 100000;
     pointer-events: none;
-    max-width: min(320px, calc(100vw - 12px));
+    max-width: min(320px, calc(100 * var(--vw) - 12px));
     background: var(--bg-elevated);
     color: #c8d8ef;
     font-size: 12px;

@@ -13,8 +13,9 @@
 // columna → borde) se quedan con el relleno que ya tenían en la hoja de estilos.
 //
 // Se recalcula sola cuando cambia el contenido de una tabla (MutationObserver) o
-// su ancho (ResizeObserver). Si el contenido no cabe con un hueco mínimo, la tabla
-// se queda como la deja su CSS (con sus recortes con «…»).
+// su ancho (ResizeObserver). Si el contenido no cabe con un hueco mínimo se prueba
+// con las cabeceras partidas en líneas, y si tampoco, la tabla se queda como la
+// deja su CSS (con sus recortes con «…» o su desplazamiento lateral).
 ;(function () {
     "use strict"
 
@@ -22,6 +23,8 @@
 
     const CLASE_MIDIENDO = "tablaMidiendo"
     const CLASE_ACTIVA = "tablaHuecosIguales"
+    // Segundo intento cuando no cabe: cabeceras en dos líneas (ver más abajo).
+    const CLASE_PARTIDA = "tablaCabeceraPartida"
     const HUECO_MINIMO = 16
     // Rejillas en las que interesa que las columnas midan lo mismo, no los huecos.
     const EXCLUIDAS = ".calendarioTable"
@@ -64,7 +67,7 @@
     // tomaría por contenido nuevo, en bucle.
     function limpiar(tabla) {
         if (!tabla.classList.contains(CLASE_ACTIVA)) return
-        tabla.classList.remove(CLASE_ACTIVA)
+        tabla.classList.remove(CLASE_ACTIVA, CLASE_PARTIDA)
         const grupo = tabla.querySelector(":scope > colgroup")
         if (grupo) for (const col of grupo.children) col.style.width = ""
         for (const fila of tabla.rows) {
@@ -111,6 +114,51 @@
         }
     }
 
+    // El ancho de la tabla tal como la deja su CSS no vale si ya se desborda: con
+    // contenido que no cabe mide más que su caja, y repartir ese ancho daba una
+    // tabla que «cabía» pero se salía (en un iPad se cortaban las últimas
+    // columnas). Manda el hueco del contenedor, salvo un min-width en px puesto a
+    // propósito para que desplace (las tablas anuales en el móvil) o una tabla
+    // que por CSS es más estrecha que su caja.
+    function anchoDisponible(tabla) {
+        const propio = tabla.getBoundingClientRect().width
+        const padre = tabla.parentElement
+        if (!padre) return propio
+        const estilo = getComputedStyle(padre)
+        // clientWidth ya descuenta bordes y barra de desplazamiento.
+        const caja = padre.clientWidth - (parseFloat(estilo.paddingLeft) || 0) - (parseFloat(estilo.paddingRight) || 0)
+        if (caja <= 0) return propio
+        const minimo = getComputedStyle(tabla).minWidth
+        const minimoPx = minimo.endsWith("px") ? parseFloat(minimo) : 0
+        return Math.min(propio, Math.max(caja, minimoPx))
+    }
+
+    // Lo que más ensancha una columna suele ser su cabecera («INVERSIÓN BRUTA» en
+    // mayúsculas), no sus cifras. En una pantalla estrecha (un iPad) la tabla no
+    // cabía y se quedaba desbordada; partiendo las cabeceras en líneas cada
+    // columna solo necesita lo que ocupan sus celdas o la palabra más larga de su
+    // cabecera. Se mide por separado: el cuerpo sin la cabecera a su ancho
+    // natural, y la cabecera sola en una tabla de ancho cero (lo mínimo que le
+    // cabe). Solo con una cabecera de una fila que tenga todas las columnas.
+    function anchosConCabeceraPartida(tabla, columnas) {
+        const cabecera = tabla.tHead
+        if (!cabecera || cabecera.rows.length !== 1 || cabecera.rows[0].cells.length !== columnas) return null
+        let fila = null
+        for (const cuerpo of tabla.tBodies) {
+            fila = Array.from(cuerpo.rows).find((f) => f.cells.length === columnas)
+            if (fila) break
+        }
+        if (!fila) return null
+        const medir = (celdas) => Array.from(celdas).map((celda) => Math.ceil(celda.getBoundingClientRect().width))
+
+        tabla.classList.add(CLASE_MIDIENDO, "tablaMidiendoCuerpo")
+        const delCuerpo = medir(fila.cells)
+        tabla.classList.replace("tablaMidiendoCuerpo", "tablaMidiendoCabecera")
+        const deCabecera = medir(cabecera.rows[0].cells)
+        tabla.classList.remove(CLASE_MIDIENDO, "tablaMidiendoCabecera")
+        return delCuerpo.map((ancho, i) => Math.max(ancho, deCabecera[i]))
+    }
+
     function ajustar(tabla) {
         if (!tabla.isConnected || tabla.matches(EXCLUIDAS)) return
         if (!tabla.getClientRects().length) return
@@ -125,20 +173,29 @@
 
         // 1. Ancho disponible y márgenes de los extremos, con la tabla como la deja su CSS.
         limpiar(tabla)
-        const disponible = tabla.getBoundingClientRect().width
+        const disponible = anchoDisponible(tabla)
         const { bordeIzq, bordeDer } = rellenoDeLosExtremos(tabla, columnas)
 
         // 2. Ancho del contenido más ancho de cada columna: sin relleno ni anchos
         //    impuestos, cada columna mide lo que ocupa su celda más ancha.
         tabla.classList.add(CLASE_MIDIENDO)
-        const anchos = celdas.map((celda) => Math.ceil(celda.getBoundingClientRect().width))
+        let anchos = celdas.map((celda) => Math.ceil(celda.getBoundingClientRect().width))
         tabla.classList.remove(CLASE_MIDIENDO)
 
-        const contenido = anchos.reduce((a, b) => a + b, 0)
-        const hueco = (disponible - contenido - bordeIzq - bordeDer) / (columnas - 1)
+        const huecoCon = (lista) =>
+            (disponible - lista.reduce((a, b) => a + b, 0) - bordeIzq - bordeDer) / (columnas - 1)
+        let hueco = huecoCon(anchos)
+        let partida = false
         if (hueco < HUECO_MINIMO) {
-            restaurarScroll()
-            return
+            const alternativa = anchosConCabeceraPartida(tabla, columnas)
+            if (alternativa && huecoCon(alternativa) >= HUECO_MINIMO) {
+                anchos = alternativa
+                hueco = huecoCon(alternativa)
+                partida = true
+            } else {
+                restaurarScroll()
+                return
+            }
         }
 
         // 3. El hueco se parte en dos: la mitad a la derecha de una columna y la otra
@@ -153,6 +210,7 @@
             return
         }
         tabla.classList.add(CLASE_ACTIVA)
+        tabla.classList.toggle(CLASE_PARTIDA, partida)
         Array.from(grupo.children).forEach((col, i) => {
             col.style.width = anchos[i] + izq[i] + der[i] + "px"
         })

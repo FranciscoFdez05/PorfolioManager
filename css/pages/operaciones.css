@@ -81,7 +81,7 @@
 
 .operationsTableWrapper {
     position: relative;
-    max-height: calc(100vh - 315px);
+    max-height: calc(100 * var(--vh) - 315px);
     overflow: auto;
     border: 1px solid var(--border-soft);
     border-radius: 10px;
@@ -174,12 +174,12 @@
 }
 
 .ventasPageExpanded .operationsTableWrapper {
-    max-height: calc(100vh - 293px);
+    max-height: calc(100 * var(--vh) - 293px);
     height: auto;
 }
 
 .operationsPageCompact .operationsTableWrapper {
-    max-height: calc(100vh - 313px);
+    max-height: calc(100 * var(--vh) - 313px);
     overflow-y: auto;
 }
 
@@ -706,7 +706,7 @@
 }
 
 .transaccionesPageCompact .operationsTableWrapper {
-    max-height: calc(100vh - 325px);
+    max-height: calc(100 * var(--vh) - 325px);
     overflow-y: auto;
 }
 

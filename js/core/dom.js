@@ -89,7 +89,7 @@
     // usuario seguía trabajando creyendo que se había guardado.
     const TOAST_STYLES = [
         ".appToastHost{position:fixed;right:16px;bottom:16px;z-index:9999;",
-        "display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:min(380px,90vw)}",
+        "display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:min(380px,calc(90 * var(--vw)))}",
         ".appToast{pointer-events:auto;padding:10px 14px;border-radius:8px;font-size:14px;",
         "line-height:1.35;box-shadow:0 4px 16px rgba(0,0,0,.28);opacity:0;transform:translateY(8px);",
         "transition:opacity .18s ease,transform .18s ease;word-break:break-word;",
