@@ -112,3 +112,76 @@ def testUnEstaticoJsSeSirveComprimido(clienteAutenticado):
 
     assert respuesta.headers.get("Content-Encoding") == "gzip"
     assert gzip.decompress(respuesta.get_data()) == original
+
+
+# ── Caché de la versión comprimida de los estáticos ──────────────────────────
+# Comprimir era ~1 ms de los ~2,3 ms que cuesta servir un JS: el mismo fichero
+# se comprimía en cada petición. Se guarda la versión comprimida por ETag
+# (Werkzeug lo calcula de la fecha y el tamaño del fichero), así que un fichero
+# que cambia nunca se sirve con la compresión del anterior.
+
+@pytest.fixture
+def clienteEstaticos(clienteAutenticado, tmp_path, monkeypatch):
+    from flask import send_from_directory
+
+    from core import seguridad_app
+
+    seguridad_app.vaciarCacheGzip()
+    llamadas = []
+    original = gzip.compress
+    monkeypatch.setattr(seguridad_app.gzip, "compress",
+                        lambda datos, **kw: llamadas.append(1) or original(datos, **kw))
+
+    fichero = tmp_path / "app.js"
+    fichero.write_text("console.log('uno');\n" * 100, "utf-8")
+    contador = {"n": 0}
+
+    bp = Blueprint("estaticos_cache", __name__)
+
+    @bp.route("/prueba/fichero")
+    def servirFichero():
+        return send_from_directory(tmp_path, "app.js")
+
+    @bp.route("/prueba/dinamico")
+    def dinamico():
+        contador["n"] += 1
+        return Response(json.dumps({"n": contador["n"], "relleno": TEXTO_GRANDE}), mimetype="application/json")
+
+    client, cabeceras, _app = clienteAutenticado(bp)
+    yield client, {**cabeceras, "Accept-Encoding": "gzip"}, fichero, llamadas
+    seguridad_app.vaciarCacheGzip()
+
+
+def testUnEstaticoNoSeVuelveAComprimir(clienteEstaticos):
+    client, cabeceras, fichero, llamadas = clienteEstaticos
+
+    primera = client.get("/prueba/fichero", headers=cabeceras)
+    segunda = client.get("/prueba/fichero", headers=cabeceras)
+
+    assert len(llamadas) == 1
+    assert segunda.headers["Content-Encoding"] == "gzip"
+    assert gzip.decompress(segunda.get_data()) == fichero.read_bytes()
+    assert segunda.headers["Content-Length"] == primera.headers["Content-Length"]
+
+
+def testUnEstaticoQueCambiaSeSirveNuevo(clienteEstaticos):
+    import os
+
+    client, cabeceras, fichero, _llamadas = clienteEstaticos
+    client.get("/prueba/fichero", headers=cabeceras)
+
+    fichero.write_text("console.log('dos, distinto');\n" * 100, "utf-8")
+    st = fichero.stat()
+    os.utime(fichero, ns=(st.st_atime_ns, st.st_mtime_ns + 2_000_000_000))
+
+    respuesta = client.get("/prueba/fichero", headers=cabeceras)
+    assert gzip.decompress(respuesta.get_data()) == fichero.read_bytes()
+
+
+def testLasRespuestasDinamicasNoSeCachean(clienteEstaticos):
+    client, cabeceras, _fichero, _llamadas = clienteEstaticos
+
+    primera = json.loads(gzip.decompress(client.get("/prueba/dinamico", headers=cabeceras).get_data()))
+    segunda = json.loads(gzip.decompress(client.get("/prueba/dinamico", headers=cabeceras).get_data()))
+
+    assert (primera["n"], segunda["n"]) == (1, 2)

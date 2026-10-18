@@ -29,6 +29,8 @@ import gzip
 import logging
 import os
 import secrets
+import threading
+from collections import OrderedDict
 from datetime import timedelta
 
 from flask import abort, g, make_response, redirect, request, session, url_for
@@ -97,6 +99,46 @@ _COMPRESION_MIN_BYTES = 500
 # compensa frente al coste de CPU y memoria. Los estáticos (JS/CSS, el grueso
 # del tráfico repetido) están muy por debajo de este tope.
 _COMPRESION_MAX_BYTES = 3 * 1024 * 1024
+
+# Versión comprimida de los estáticos, por ruta y ETag. Comprimir era ~1 ms de
+# los ~2,3 ms de servir un JS, y el mismo fichero se comprimía en cada
+# petición. El ETag de send_from_directory sale de la fecha y el tamaño del
+# fichero, así que un fichero que cambia trae otro ETag y se comprime de nuevo.
+# Solo entran respuestas de fichero (direct_passthrough): las dinámicas no
+# tienen un ETag que garantice que el contenido es el mismo. Todo el JS/CSS
+# propio comprimido ocupa ~1 MB; el tope es solo por si acaso.
+_CACHE_GZIP_MAX_BYTES = 32 * 1024 * 1024
+_cacheGzip = OrderedDict()
+_cacheGzipBytes = 0
+_cacheGzipLock = threading.Lock()
+
+
+def _gzipCacheado(clave):
+    with _cacheGzipLock:
+        comprimido = _cacheGzip.get(clave)
+        if comprimido is not None:
+            _cacheGzip.move_to_end(clave)
+        return comprimido
+
+
+def _guardarGzip(clave, comprimido):
+    global _cacheGzipBytes
+    with _cacheGzipLock:
+        if clave in _cacheGzip:
+            return
+        _cacheGzip[clave] = comprimido
+        _cacheGzipBytes += len(comprimido)
+        while _cacheGzipBytes > _CACHE_GZIP_MAX_BYTES and _cacheGzip:
+            _, viejo = _cacheGzip.popitem(last=False)
+            _cacheGzipBytes -= len(viejo)
+
+
+def vaciarCacheGzip():
+    """Vacía la caché de estáticos comprimidos (lo usan los tests)."""
+    global _cacheGzipBytes
+    with _cacheGzipLock:
+        _cacheGzip.clear()
+        _cacheGzipBytes = 0
 
 # ── CSRF (double-submit cookie) ───────────────────────────────────────────────
 # SESSION_COOKIE_SAMESITE=Lax ya bloquea los POST cross-site en navegadores
@@ -399,9 +441,19 @@ def instalar(app, *, limiteEscrituras=None, limitePesadas=None):
         # Los estáticos llegan en direct_passthrough (el fichero se sirve como
         # iterador, no como bytes ya cargados): hay que desactivarlo para poder
         # leer el cuerpo entero y sustituirlo por la versión comprimida.
+        etag = response.headers.get("ETag") if response.direct_passthrough else None
+        clave = (request.path, etag) if etag else None
+        comprimido = _gzipCacheado(clave) if clave else None
+
         response.direct_passthrough = False
-        cuerpo = response.get_data()
-        response.set_data(gzip.compress(cuerpo, compresslevel=6))
+        if comprimido is None:
+            comprimido = gzip.compress(response.get_data(), compresslevel=6)
+            if clave:
+                _guardarGzip(clave, comprimido)
+        else:
+            # El fichero ya está abierto como iterador; se cierra sin leerlo.
+            response.close()
+        response.set_data(comprimido)
         response.headers["Content-Encoding"] = "gzip"
         response.headers["Content-Length"] = str(len(response.get_data()))
         return response
