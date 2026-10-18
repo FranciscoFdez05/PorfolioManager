@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request
 from core import dinero, rentabilidad, settings
 from core.db import getDb, transaction
 from routes.ajustes import DEFAULT_SNAPSHOT_MINUTES, _readAjustes
+from stores import historico_tipos
 
 log = logging.getLogger(__name__)
 
@@ -208,31 +209,17 @@ def getHistoryByType():
     }
     seconds = rangeMap.get(rangeParam, 30 * 86400)
 
-    conn = getDb()
-    _SQL = """SELECT s.ts, a.type, SUM(s.price_eur) as v, SUM(s.cost_eur) as cost
-              FROM asset_snapshots s
-              JOIN activos a ON s.asset_id = a.id
-              WHERE {where} a.type IS NOT NULL AND a.type != ''
-              GROUP BY s.ts, a.type
-              ORDER BY s.ts ASC"""
-
+    # El agrupado de asset_snapshots se cachea por proceso y cada rango se
+    # recorta de él (ver stores/historico_tipos.py): agruparlo en cada
+    # petición eran 530 ms con el rango completo.
     if rangeParam == "YTD":
         jan1 = int(datetime.datetime(datetime.datetime.now().year, 1, 1).timestamp())
-        rows = conn.execute(_SQL.format(where="s.ts >= ? AND"), (jan1,)).fetchall()
+        data = historico_tipos.seriePorTipo(jan1)
     elif seconds is None:
-        rows = conn.execute(_SQL.format(where="")).fetchall()
+        data = historico_tipos.seriePorTipo()
     else:
-        rows = conn.execute(_SQL.format(where="s.ts >= ? AND"), (nowTs - seconds,)).fetchall()
+        data = historico_tipos.seriePorTipo(nowTs - seconds)
 
-    tsMap = {}
-    for r in rows:
-        ts = r["ts"]
-        if ts not in tsMap:
-            tsMap[ts] = {}
-        tsMap[ts][r["type"]]          = round(r["v"], 2)
-        tsMap[ts][f"c_{r['type']}"]   = round(r["cost"] or 0, 2)
-
-    data = [{"ts": ts, **types} for ts, types in sorted(tsMap.items())]
     return jsonify({"ok": True, "range": rangeParam, "data": data})
 
 
