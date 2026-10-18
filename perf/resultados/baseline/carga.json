@@ -1,0 +1,97 @@
+{
+  "servidor": "waitress",
+  "hilos": 8,
+  "segundosArranque": 3.25,
+  "rssArranqueMb": 66.6,
+  "rssTrasCargaMb": 199.5,
+  "resultados": [
+    {
+      "escenario": "carga-inicial",
+      "concurrencia": 1,
+      "peticiones": 7149,
+      "errores": 0,
+      "rps": 476.6,
+      "p50": 1.94,
+      "p95": 3.01,
+      "p99": 3.98,
+      "media": 2.08
+    },
+    {
+      "escenario": "carga-inicial",
+      "concurrencia": 8,
+      "peticiones": 10551,
+      "errores": 0,
+      "rps": 703.0,
+      "p50": 8.4,
+      "p95": 34.31,
+      "p99": 69.44,
+      "media": 11.36
+    },
+    {
+      "escenario": "historico",
+      "concurrencia": 1,
+      "peticiones": 97,
+      "errores": 0,
+      "rps": 6.4,
+      "p50": 46.87,
+      "p95": 536.56,
+      "p99": 558.22,
+      "media": 156.44
+    },
+    {
+      "escenario": "historico",
+      "concurrencia": 8,
+      "peticiones": 75,
+      "errores": 0,
+      "rps": 4.5,
+      "p50": 941.03,
+      "p95": 5828.85,
+      "p99": 6315.48,
+      "media": 1681.76
+    },
+    {
+      "escenario": "estaticos",
+      "concurrencia": 1,
+      "peticiones": 4215,
+      "errores": 0,
+      "rps": 281.0,
+      "p50": 3.33,
+      "p95": 5.31,
+      "p99": 6.53,
+      "media": 3.54
+    },
+    {
+      "escenario": "estaticos-304",
+      "concurrencia": 1,
+      "peticiones": 1863,
+      "errores": 0,
+      "rps": 124.2,
+      "p50": 3.53,
+      "p95": 26.32,
+      "p99": 28.36,
+      "media": 8.03
+    },
+    {
+      "escenario": "estaticos",
+      "concurrencia": 8,
+      "peticiones": 10502,
+      "errores": 0,
+      "rps": 699.8,
+      "p50": 10.96,
+      "p95": 16.06,
+      "p99": 21.4,
+      "media": 11.41
+    },
+    {
+      "escenario": "estaticos-304",
+      "concurrencia": 8,
+      "peticiones": 9298,
+      "errores": 0,
+      "rps": 619.0,
+      "p50": 10.24,
+      "p95": 30.57,
+      "p99": 34.45,
+      "media": 12.9
+    }
+  ]
+}

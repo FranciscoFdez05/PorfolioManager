@@ -1,0 +1,79 @@
+{
+  "bd": "portfolio-export-2026-09-26_zip.db",
+  "filasTablasGrandes": {
+    "portfolio_snapshots": 17671,
+    "asset_snapshots": 465904
+  },
+  "consultas": {
+    "history ALL": {
+      "plan": [
+        "SCAN portfolio_snapshots USING INDEX idx_portfolio_snapshots_ts"
+      ],
+      "filas": 17671,
+      "msMediana": 9.62,
+      "msMin": 9.0
+    },
+    "history 1M": {
+      "plan": [
+        "SEARCH portfolio_snapshots USING INDEX idx_portfolio_snapshots_ts (ts>?)"
+      ],
+      "filas": 2820,
+      "msMediana": 1.4,
+      "msMin": 1.37
+    },
+    "by-type ALL": {
+      "plan": [
+        "SCAN s USING INDEX idx_asset_snapshots_ts",
+        "SEARCH a USING INDEX sqlite_autoindex_activos_1 (id=?)",
+        "USE TEMP B-TREE FOR GROUP BY",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ],
+      "filas": 61918,
+      "msMediana": 372.78,
+      "msMin": 363.82
+    },
+    "by-type 1M": {
+      "plan": [
+        "SEARCH s USING INDEX idx_asset_snapshots_ts (ts>?)",
+        "SEARCH a USING INDEX sqlite_autoindex_activos_1 (id=?)",
+        "USE TEMP B-TREE FOR GROUP BY",
+        "USE TEMP B-TREE FOR ORDER BY"
+      ],
+      "filas": 11228,
+      "msMediana": 66.79,
+      "msMin": 63.44
+    },
+    "historical-changes latest": {
+      "plan": [
+        "SEARCH asset_snapshots USING INDEX idx_asset_snapshots_ts (ts=?)",
+        "SCALAR SUBQUERY 1",
+        "SEARCH asset_snapshots USING COVERING INDEX idx_asset_snapshots_ts"
+      ],
+      "filas": 30,
+      "msMediana": 0.03,
+      "msMin": 0.02
+    },
+    "historical-changes ventana": {
+      "plan": [
+        "SEARCH asset_snapshots USING INDEX idx_asset_snapshots_ts (ts>? AND ts<?)"
+      ],
+      "filas": 74910,
+      "msMediana": 45.95,
+      "msMin": 42.97
+    },
+    "resumen valor previo": {
+      "plan": [
+        "SEARCH portfolio_snapshots USING INDEX idx_portfolio_snapshots_ts (ts<?)"
+      ],
+      "filas": 1,
+      "msMediana": 0.01,
+      "msMin": 0.01
+    },
+    "health quick_check": {
+      "plan": [],
+      "filas": 1,
+      "msMediana": 109.04,
+      "msMin": 105.67
+    }
+  }
+}

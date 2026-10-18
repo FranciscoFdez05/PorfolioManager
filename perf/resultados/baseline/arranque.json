@@ -1,0 +1,16 @@
+{
+  "servidor": "waitress",
+  "segundosHastaHealth": {
+    "mediana": 3.22,
+    "min": 3.2,
+    "max": 3.75
+  },
+  "segundosImportServer": {
+    "mediana": 1.659,
+    "min": 1.622,
+    "max": 1.829
+  },
+  "rssAlArrancarMb": {
+    "mediana": 64.7
+  }
+}
