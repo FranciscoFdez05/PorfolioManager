@@ -33,24 +33,61 @@ def _base(base):
     return Path(base) if base is not None else paths.BASE_DIR
 
 
-def firmaEstatico(rutaRelativa, base=None):
-    """Versión del fichero (8 hex), o None si no existe o sale de la base."""
+def _version(st):
+    return format(zlib.crc32(f"{st.st_mtime_ns}:{st.st_size}".encode()), "08x")
+
+
+def _segmentosSeguros(rutaRelativa):
     # Sin Path.resolve(): en Windows costaba ~0,4 ms por fichero, 40 ms en cada
     # index.html. Basta con no aceptar segmentos "..": las rutas son relativas
     # (empiezan por js/ o css/) y nunca suben de la base.
     segmentos = rutaRelativa.replace("\\", "/").split("/")
     if ".." in segmentos or rutaRelativa.startswith(("/", "\\")) or ":" in rutaRelativa:
         return None
+    return segmentos
+
+
+def firmaEstatico(rutaRelativa, base=None):
+    """Versión del fichero (8 hex), o None si no existe o sale de la base."""
+    segmentos = _segmentosSeguros(rutaRelativa)
+    if segmentos is None:
+        return None
     try:
-        st = os.stat(os.path.join(_base(base), *segmentos))
+        return _version(os.stat(os.path.join(_base(base), *segmentos)))
     except OSError:
         return None
-    return format(zlib.crc32(f"{st.st_mtime_ns}:{st.st_size}".encode()), "08x")
+
+
+def _versionesPorCarpeta(rutas, base):
+    """Versión de cada ruta leyendo cada carpeta una sola vez.
+
+    Un os.stat() por fichero eran ~5 ms por index.html en Windows (99
+    ficheros). os.scandir trae fecha y tamaño en el mismo listado del
+    directorio, sin una llamada al sistema por fichero.
+    """
+    porCarpeta = {}
+    for ruta in rutas:
+        segmentos = _segmentosSeguros(ruta)
+        if segmentos is not None:
+            porCarpeta.setdefault(tuple(segmentos[:-1]), set()).add(segmentos[-1])
+
+    versiones = {}
+    for carpeta, nombres in porCarpeta.items():
+        try:
+            with os.scandir(os.path.join(_base(base), *carpeta)) as entradas:
+                for entrada in entradas:
+                    if entrada.name in nombres and entrada.is_file():
+                        versiones["/".join((*carpeta, entrada.name))] = _version(entrada.stat())
+        except OSError:
+            continue
+    return versiones
 
 
 def versionarReferencias(html, base=None):
+    versiones = _versionesPorCarpeta({m.group(2) for m in _REFERENCIA.finditer(html)}, base)
+
     def sustituir(m):
-        version = firmaEstatico(m.group(2), base)
+        version = versiones.get(m.group(2))
         if version is None:
             return m.group(0)
         return f"{m.group(1)}{m.group(2)}?v={version}{m.group(3)}"
