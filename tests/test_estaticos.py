@@ -77,3 +77,62 @@ def testNoSeSaleDeLaCarpetaDelProyecto(base):
     assert estaticos.firmaEstatico("C:/Windows/win.ini", base) is None
     html = estaticos.versionarReferencias('<script src="js/../../fuera.js"></script>', base)
     assert "?v=" not in html
+
+
+# ── index.html versionado en memoria ─────────────────────────────────────────
+# Versionar en cada petición duplicaba lo que costaba servir index.html (99
+# ficheros que mirar en cada carga). La plantilla versionada se guarda y una
+# comprobación periódica la rehace si cambia index.html o cualquiera de los
+# ficheros que referencia. Aquí se llama a comprobar() a mano en vez de esperar
+# al hilo.
+
+def _tocar(fichero, texto):
+    fichero.write_text(texto, "utf-8")
+    st = fichero.stat()
+    os.utime(fichero, ns=(st.st_atime_ns, st.st_mtime_ns + 2_000_000_000))
+
+
+@pytest.fixture
+def indice(base):
+    ruta = base / "index.html"
+    ruta.write_text('<script defer src="js/core/app.js"></script><p>__V__</p>', "utf-8")
+    return ruta, estaticos.IndiceVersionado(ruta, base, transformar=lambda h: h.replace("__V__", "1.0"))
+
+
+def testLaPlantillaSaleVersionadaYTransformada(base, indice):
+    _ruta, vigilante = indice
+
+    html = vigilante.html(arrancarHilo=False)
+
+    version = estaticos.firmaEstatico("js/core/app.js", base)
+    assert html == f'<script defer src="js/core/app.js?v={version}"></script><p>1.0</p>'
+
+
+def testSinCambiosNoSeRehace(indice):
+    _ruta, vigilante = indice
+    vigilante.html(arrancarHilo=False)
+
+    assert vigilante.comprobar() is False
+
+
+def testUnFicheroReferenciadoQueCambiaCambiaSuVersion(base, indice):
+    _ruta, vigilante = indice
+    antes = vigilante.html(arrancarHilo=False)
+
+    _tocar(base / "js" / "core" / "app.js", "console.log('otro contenido')")
+
+    assert vigilante.comprobar() is True
+    despues = vigilante.html(arrancarHilo=False)
+    assert despues != antes
+    assert f"app.js?v={estaticos.firmaEstatico('js/core/app.js', base)}" in despues
+
+
+def testUnIndexQueCambiaSeRelee(base, indice):
+    ruta, vigilante = indice
+    vigilante.html(arrancarHilo=False)
+
+    _tocar(ruta, '<link rel="stylesheet" href="css/base.css">')
+
+    assert vigilante.comprobar() is True
+    version = estaticos.firmaEstatico("css/base.css", base)
+    assert vigilante.html(arrancarHilo=False) == f'<link rel="stylesheet" href="css/base.css?v={version}">'

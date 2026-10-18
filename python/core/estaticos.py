@@ -15,12 +15,17 @@ Lo que no encaje (un fichero que no existe, una referencia que ya lleva `?`,
 como las de js/vendor/) se deja tal cual y se sigue sirviendo como antes.
 """
 
+import logging
 import os
 import re
+import threading
+import time
 import zlib
 from pathlib import Path
 
 from core import paths
+
+log = logging.getLogger(__name__)
 
 # Solo etiquetas que cargan recursos, solo rutas relativas a js/ o css/ y solo
 # las que aún no llevan query: las de js/vendor/ traen su propio ?v= a mano.
@@ -83,9 +88,7 @@ def _versionesPorCarpeta(rutas, base):
     return versiones
 
 
-def versionarReferencias(html, base=None):
-    versiones = _versionesPorCarpeta({m.group(2) for m in _REFERENCIA.finditer(html)}, base)
-
+def _sustituirVersiones(html, versiones):
     def sustituir(m):
         version = versiones.get(m.group(2))
         if version is None:
@@ -95,6 +98,89 @@ def versionarReferencias(html, base=None):
     return _REFERENCIA.sub(sustituir, html)
 
 
+def versionarReferencias(html, base=None):
+    versiones = _versionesPorCarpeta({m.group(2) for m in _REFERENCIA.finditer(html)}, base)
+    return _sustituirVersiones(html, versiones)
+
+
+class IndiceVersionado:
+    """index.html ya versionado, rehecho solo cuando algo cambia.
+
+    Versionar en cada petición duplicaba lo que costaba servir index.html:
+    leerlo y mirar los 99 ficheros que referencia eran ~3,5 ms por carga en
+    Windows. Aquí se guarda el resultado y un hilo lo comprueba cada
+    `intervalo` segundos (fecha y tamaño de index.html y de cada fichero
+    referenciado); si algo cambió, lo rehace. La petición solo pone el nonce.
+
+    Durante ese segundo como mucho, una carga puede llevar el `v` anterior de un
+    fichero recién cambiado. No sirve nada viejo: esa URL ya no es la vigente,
+    así que serveStatic la manda con `no-cache` y el contenido actual.
+
+    `transformar` se aplica a la plantilla al leerla (la versión de la
+    aplicación, que no cambia mientras el proceso vive).
+    """
+
+    def __init__(self, ruta, base=None, transformar=None, intervalo=1.0):
+        self.ruta = Path(ruta)
+        self.base = base
+        self.transformar = transformar or (lambda texto: texto)
+        self.intervalo = intervalo
+        self._lock = threading.Lock()
+        self._hilo = None
+        self._firmaIndice = None
+        self._plantilla = None
+        self._referencias = frozenset()
+        self._versiones = None
+        self._html = None
+
+    def _firmaFichero(self):
+        try:
+            st = os.stat(self.ruta)
+        except OSError:
+            return None
+        return (st.st_mtime_ns, st.st_size)
+
+    def comprobar(self):
+        """Rehace el HTML si cambió algo. Devuelve si lo ha rehecho."""
+        with self._lock:
+            firma = self._firmaFichero()
+            plantilla, referencias = self._plantilla, self._referencias
+            if plantilla is None or firma != self._firmaIndice:
+                plantilla = self.transformar(self.ruta.read_text("utf-8"))
+                referencias = frozenset(m.group(2) for m in _REFERENCIA.finditer(plantilla))
+            versiones = _versionesPorCarpeta(referencias, self.base)
+            if plantilla is self._plantilla and versiones == self._versiones:
+                return False
+            self._html = _sustituirVersiones(plantilla, versiones)
+            self._firmaIndice, self._plantilla = firma, plantilla
+            self._referencias, self._versiones = referencias, versiones
+            return True
+
+    def html(self, arrancarHilo=True):
+        if self._html is None:
+            self.comprobar()
+        if arrancarHilo and self._hilo is None:
+            self._arrancar()
+        return self._html
+
+    def _arrancar(self):
+        with self._lock:
+            if self._hilo is not None:
+                return
+            self._hilo = threading.Thread(target=self._vigilar, name="estaticos-index", daemon=True)
+            self._hilo.start()
+
+    def _vigilar(self):
+        while True:
+            time.sleep(self.intervalo)
+            try:
+                self.comprobar()
+            except Exception as error:
+                # Se sigue sirviendo la última versión buena; la siguiente
+                # vuelta lo vuelve a intentar.
+                log.warning("[estaticos] No se pudo comprobar index.html: %s", error)
+
+
 def esVersionVigente(rutaRelativa, version, base=None):
     """¿La URL pedida lleva la versión actual del fichero? Solo entonces es inmutable."""
     if not version:
@@ -102,4 +188,4 @@ def esVersionVigente(rutaRelativa, version, base=None):
     return firmaEstatico(rutaRelativa, base) == version
 
 
-__all__ = ["esVersionVigente", "firmaEstatico", "versionarReferencias"]
+__all__ = ["IndiceVersionado", "esVersionVigente", "firmaEstatico", "versionarReferencias"]

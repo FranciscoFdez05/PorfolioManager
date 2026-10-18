@@ -185,6 +185,9 @@ _BLOCKED_PREFIXES = ("python/", "data/", "api/", ".env", ".git/", "__pycache__/"
                      "logs/", ".venv/", "venv/", "node_modules/")
 _ALLOWED_EXTENSIONS = {".html", ".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".svg", ".woff", ".woff2", ".ttf"}
 
+# index.html versionado en memoria; lo comprueba un hilo cada segundo.
+_indice = estaticos.IndiceVersionado(INDEX_FILE)
+
 
 @app.route("/")
 def serveIndex():
@@ -193,13 +196,13 @@ def serveIndex():
     # fichero ya se enviaba con Cache-Control: no-store, así que releerlo no
     # cambia el número de lecturas de disco.
     g.csp_nonce = csp.generarNonce()
-    html = csp.insertarNonce(INDEX_FILE.read_text("utf-8"), g.csp_nonce)
+    # La plantilla sale de memoria ya con el ?v= de cada JS/CSS propio, y se
+    # rehace sola si cambia index.html o alguno de esos ficheros (ver
+    # core/estaticos.py): leerla y versionarla en cada carga costaba ~3,5 ms.
+    html = csp.insertarNonce(_indice.html(), g.csp_nonce)
     # La versión se inyecta aquí por lo mismo que el nonce: la plantilla es un
     # fichero estático y este es el único punto por el que pasa antes de salir.
     html = insertarVersion(html)
-    # Cada JS/CSS propio con un ?v= sacado del propio fichero: la URL vigente
-    # se cachea como inmutable en serveStatic (ver core/estaticos.py).
-    html = estaticos.versionarReferencias(html)
     response = make_response(html)
     response.headers["Content-Type"] = "text/html; charset=utf-8"
     response.headers["Cache-Control"] = "no-store"
