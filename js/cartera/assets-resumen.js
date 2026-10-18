@@ -371,18 +371,29 @@ async function refreshOverviewMarketData(buttonElement = null, { respetarPausa =
             ? assetsWithTicker.filter((asset) => !tipoEnPausa(asset.type))
             : assetsWithTicker
 
-        for (const asset of pendientes) {
-            try {
-                await refreshAssetMarketDataOnServer(asset.id)
-                _falloApiPorActivo.delete(asset.id)
-            } catch (error) {
-                // Se guarda para que el sidebar pueda marcarlo con ⚠ y decir de
-                // qué se queja el proveedor. Antes solo iba a la consola, donde
-                // no lo veía nadie sin abrir las herramientas del navegador.
-                _falloApiPorActivo.set(asset.id, _mensajeDeFalloApi(error))
-                console.error(`No se pudo actualizar ${asset.name || asset.symbol || asset.id}:`, error)
+        // Varias a la vez en vez de una tras otra: en serie, 33 activos eran
+        // ~7 s de espera al abrir la aplicación. Se piden las mismas
+        // cotizaciones; solo se solapan. El tope queda por debajo de las 6
+        // conexiones por servidor del navegador, para que el resto de la
+        // interfaz no se quede esperando turno.
+        const cotizacionesEnParalelo = 4
+        const cola = [...pendientes]
+        const trabajador = async () => {
+            while (cola.length) {
+                const asset = cola.shift()
+                try {
+                    await refreshAssetMarketDataOnServer(asset.id)
+                    _falloApiPorActivo.delete(asset.id)
+                } catch (error) {
+                    // Se guarda para que el sidebar pueda marcarlo con ⚠ y decir de
+                    // qué se queja el proveedor. Antes solo iba a la consola, donde
+                    // no lo veía nadie sin abrir las herramientas del navegador.
+                    _falloApiPorActivo.set(asset.id, _mensajeDeFalloApi(error))
+                    console.error(`No se pudo actualizar ${asset.name || asset.symbol || asset.id}:`, error)
+                }
             }
         }
+        await Promise.all(Array.from({ length: Math.min(cotizacionesEnParalelo, cola.length) }, trabajador))
 
         await refreshAssetsSidebar(currentAssetId, false)
         await renderVistaGeneralTable()
