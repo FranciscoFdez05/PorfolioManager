@@ -41,7 +41,8 @@ cada mejora por separado, en `perf/resultados/mejora1..4/`.
 | `/api/portfolio/history/by-type?range=1M` | 79,8 / 88,7 / 93,0 | 11,5 / 15,4 / 17,2 | **-86 %** |
 | `/css/components.css` (gzip) | 2,42 / 2,88 / 3,52 | 1,48 / 2,01 / 2,42 | -39 % |
 | `/js/core/app-core.js` (gzip) | 1,97 / 2,51 / 3,97 | 1,64 / 2,08 / 2,30 | -17 % |
-| `/` (index.html) | 3,27 / 3,87 / 4,55 | 6,45 / 7,57 / 8,08 | **+97 %** (ver abajo) |
+| `/` (index.html), con `5c37cdf` | 3,27 / 3,87 / 4,55 | 6,45 / 7,57 / 8,08 | +97 % (corregido después, ver abajo) |
+| `/` (index.html), tras la corrección | ~4,0 de media en A/B alterno | ~4,0 de media en A/B alterno | sin cambio |
 | Resto de endpoints de la carga inicial | | | dentro de ±15 %, sin cambios de código |
 
 En la mejora 5 aislada (A/B alterno contra el commit anterior),
@@ -57,7 +58,7 @@ porque la base ya era más rápida en esa tanda.
 | histórico (Métricas) | 1 | 4,9, 638 | **25,6, 72** |
 | histórico | 8 | 4,6, 5 265 | **15,8, 1 522** |
 | estáticos (incluye `/`) | 1 | 324,7, 4,63 | 355,7, 6,65 |
-| estáticos (incluye `/`) | 8 | 580,8, 18,1 | **501,2, 44,6** (peor) |
+| estáticos (incluye `/`) | 8 | 580,8, 18,1 | 501,2, 44,6 (peor; corregido después, ver abajo) |
 
 ### Arranque y memoria
 
@@ -91,20 +92,29 @@ Tests añadidos antes de tocar código sin cobertura: `tests/test_historico_tipo
 que su servidor simulado también conteste a `/api/activos-lote`; sus
 aserciones no han cambiado.
 
-## Lo que ha empeorado y por qué se ha mantenido
+## Lo que empeoró y cómo se corrigió
 
-- **`/` (index.html) pasa de 3,3 a 6,5 ms en proceso** y, por eso, el escenario
-  sintético de estáticos con 8 clientes (una de cada cinco peticiones es `/`)
-  baja de 581 a 501 req/s y su p95 sube de 18 a 45 ms. Es el coste de la mejora
-  3: en cada carga hay que leer la fecha y el tamaño de los 99 JS/CSS y
-  reescribir sus URLs. La primera versión costaba 40 ms (`Path.resolve()` por
-  fichero en Windows); con `os.scandir` por carpeta se quedó en 2 ms más el
-  gzip de un HTML algo mayor. Se mantiene porque pediste conservar la mejora y
-  porque el balance es claramente positivo: un navegador pide `/` una vez por
-  carga, y a cambio se ahorra ~100 revalidaciones (unos 200 ms de CPU del
-  servidor y más de 1 s de espera con latencia). Además, `stat` y `scandir`
-  cuestan mucho menos en Linux que en NTFS, así que en Docker el sobrecoste
-  debería ser menor; no lo he podido medir allí.
+- **`/` (index.html) pasó de 3,3 a 6,5 ms en proceso** con la mejora 3 y, por
+  eso, el escenario sintético de estáticos con 8 clientes (una de cada cinco
+  peticiones es `/`) bajó de 581 a 501 req/s y su p95 subió de 18 a 45 ms. La
+  causa: en cada carga se leía index.html (1,0 ms) y se miraban fecha y tamaño
+  de los 99 JS/CSS para versionar sus URLs (2,3 ms). La primera versión
+  costaba aún más, 40 ms, por `Path.resolve()` en cada fichero; `os.scandir`
+  por carpeta (`5c37cdf`) la dejó en esos 2,3 ms.
+- **Corrección** (`4ea02a4`): `core.estaticos.IndiceVersionado`
+  guarda index.html ya versionado y un hilo comprueba cada segundo si ha
+  cambiado index.html o alguno de los ficheros que referencia; si es así, lo
+  rehace. La petición solo pone el nonce y la versión. El HTML que sale es
+  idéntico carácter a carácter al de antes (comprobado con el mismo nonce). Un
+  fichero modificado tiene URL nueva en menos de un segundo (medido: 0,97 s), y
+  en ese segundo la URL anterior se sirve con `no-cache` y el contenido actual,
+  nunca uno viejo.
+- Resultado, en A/B alterno de 3 rondas en proceso: `/` cuesta lo mismo que en
+  la línea base (~4,0 ms de media en ambos; 6,2 ms antes de corregirlo). En
+  carga HTTP, 4 rondas alternas: estáticos con 1 cliente 330-347 → 396-470
+  req/s; con 8 clientes 520-720 → 519-736 req/s (iguales dentro del ruido);
+  304 con 8 clientes 516-711 → 457-596 (iguales dentro del ruido; por ese
+  camino no pasa nada de lo modificado).
 - `/api/health` sale con +22 % en la tabla (102 → 125 ms), pero ni ese endpoint
   ni `PRAGMA quick_check` han cambiado: es variación de la máquina.
 
