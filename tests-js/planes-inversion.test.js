@@ -133,7 +133,7 @@ function fetchFalso() {
 }
 
 function montarPagina() {
-    const html = readFileSync(resolve(RAIZ, "html/cartera/planesInversion.html"), "utf-8")
+    const html = readFileSync(resolve(RAIZ, "html/cartera/planes-inversion.html"), "utf-8")
     document.body.innerHTML = `
         <div class="modalOverlay hidden" id="confirmModalOverlay">
             <div><h3 id="confirmModalTitle"></h3><p id="confirmModalMessage"></p>

@@ -41,9 +41,13 @@ const _PAGE_DIRS = {
     ajustes: "sesion"
 }
 
+// El identificador de página (data-page, ajustes guardados, módulos) no cambia,
+// pero los ficheros van en kebab-case: "vistaGeneral" → vista-general.html,
+// "Earn" → earn.html.
 function pageHtmlPath(page) {
     const dir = _PAGE_DIRS[page]
-    return dir ? `./html/${dir}/${page}.html` : `./html/${page}.html`
+    const fichero = page.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase()
+    return dir ? `./html/${dir}/${fichero}.html` : `./html/${fichero}.html`
 }
 
 // ── Preferencias de visualización de los gráficos ─────────────────────────
