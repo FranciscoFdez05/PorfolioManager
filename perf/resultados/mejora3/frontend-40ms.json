@@ -1,0 +1,607 @@
+{
+  "latenciaEmuladaMs": 40,
+  "proveedor": "simulado 200 ms",
+  "repeticiones": 3,
+  "fria": {
+    "peticiones": 182,
+    "bytesTransferidos": 1077639,
+    "bytesDescomprimidos": 4256256,
+    "recursosDesdeCache": 0,
+    "domContentLoadedMs": 1296.6,
+    "loadMs": 1296.9,
+    "finEstaticosMs": 1278,
+    "finApiMs": 5075,
+    "redEnReposoMs": 5648.1,
+    "redEnReposoMinMax": [
+      5643,
+      5714
+    ],
+    "porTipo": {
+      "document": {
+        "n": 1,
+        "bytes": 25193
+      },
+      "stylesheet": {
+        "n": 38,
+        "bytes": 185231
+      },
+      "script": {
+        "n": 64,
+        "bytes": 873551
+      },
+      "fetch": {
+        "n": 79,
+        "bytes": 137469
+      }
+    },
+    "apiPorRuta": {
+      "/api/activos/<id>/refresh-market-data (simulado)": {
+        "n": 33,
+        "msMax": 68.3,
+        "bytes": 42738
+      },
+      "/api/activos-lote": {
+        "n": 7,
+        "msMax": 72.1,
+        "bytes": 27139
+      },
+      "/api/activos": {
+        "n": 6,
+        "msMax": 71.4,
+        "bytes": 22398
+      },
+      "/api/ventas": {
+        "n": 5,
+        "msMax": 63.4,
+        "bytes": 6955
+      },
+      "/api/transacciones": {
+        "n": 2,
+        "msMax": 63.0,
+        "bytes": 2432
+      },
+      "/api/operaciones": {
+        "n": 2,
+        "msMax": 62.6,
+        "bytes": 2560
+      },
+      "/api/intereses": {
+        "n": 2,
+        "msMax": 59.3,
+        "bytes": 2238
+      },
+      "/api/dividendos": {
+        "n": 2,
+        "msMax": 59.4,
+        "bytes": 3564
+      },
+      "/api/ingresos/<year>": {
+        "n": 2,
+        "msMax": 60.2,
+        "bytes": 3778
+      },
+      "/api/gastos/<year>": {
+        "n": 2,
+        "msMax": 62.4,
+        "bytes": 7960
+      },
+      "/api/rentafija": {
+        "n": 2,
+        "msMax": 59.4,
+        "bytes": 1622
+      },
+      "/api/bonos": {
+        "n": 2,
+        "msMax": 59.1,
+        "bytes": 1622
+      },
+      "/api/trading": {
+        "n": 2,
+        "msMax": 120.2,
+        "bytes": 1622
+      },
+      "/api/staking": {
+        "n": 2,
+        "msMax": 120.0,
+        "bytes": 1628
+      },
+      "/api/privatemarket": {
+        "n": 2,
+        "msMax": 120.0,
+        "bytes": 1622
+      },
+      "/api/portfolios": {
+        "n": 1,
+        "msMax": 59.7,
+        "bytes": 990
+      },
+      "/api/settings": {
+        "n": 1,
+        "msMax": 61.6,
+        "bytes": 1627
+      },
+      "/api/actualizacion": {
+        "n": 1,
+        "msMax": 60.7,
+        "bytes": 1101
+      },
+      "/api/exchange-rate": {
+        "n": 1,
+        "msMax": 180.3,
+        "bytes": 856
+      },
+      "/api/portfolio/snapshot": {
+        "n": 1,
+        "msMax": 51.1,
+        "bytes": 826
+      }
+    }
+  },
+  "caliente": {
+    "peticiones": 258,
+    "bytesTransferidos": 95135,
+    "bytesDescomprimidos": 4256256,
+    "recursosDesdeCache": 102,
+    "domContentLoadedMs": 218.3,
+    "loadMs": 218.5,
+    "finEstaticosMs": 146,
+    "finApiMs": 3972,
+    "redEnReposoMs": 4531.4,
+    "redEnReposoMinMax": [
+      4512,
+      7602
+    ],
+    "porTipo": {
+      "stylesheet": {
+        "n": 38,
+        "bytes": 0
+      },
+      "document": {
+        "n": 1,
+        "bytes": 25194
+      },
+      "script": {
+        "n": 64,
+        "bytes": 0
+      },
+      "fetch": {
+        "n": 155,
+        "bytes": 268860
+      }
+    },
+    "apiPorRuta": {
+      "/api/activos/<id>/refresh-market-data (simulado)": {
+        "n": 66,
+        "msMax": 68.4,
+        "bytes": 85476
+      },
+      "/api/activos-lote": {
+        "n": 14,
+        "msMax": 71.0,
+        "bytes": 54278
+      },
+      "/api/activos": {
+        "n": 12,
+        "msMax": 118.7,
+        "bytes": 44796
+      },
+      "/api/ventas": {
+        "n": 10,
+        "msMax": 81.4,
+        "bytes": 13910
+      },
+      "/api/transacciones": {
+        "n": 4,
+        "msMax": 77.5,
+        "bytes": 4864
+      },
+      "/api/operaciones": {
+        "n": 4,
+        "msMax": 77.4,
+        "bytes": 5120
+      },
+      "/api/dividendos": {
+        "n": 4,
+        "msMax": 116.1,
+        "bytes": 7128
+      },
+      "/api/ingresos/<year>": {
+        "n": 4,
+        "msMax": 115.7,
+        "bytes": 7556
+      },
+      "/api/gastos/<year>": {
+        "n": 4,
+        "msMax": 116.9,
+        "bytes": 15920
+      },
+      "/api/bonos": {
+        "n": 4,
+        "msMax": 116.4,
+        "bytes": 3244
+      },
+      "/api/rentafija": {
+        "n": 4,
+        "msMax": 115.9,
+        "bytes": 3244
+      },
+      "/api/intereses": {
+        "n": 4,
+        "msMax": 116.3,
+        "bytes": 4476
+      },
+      "/api/trading": {
+        "n": 4,
+        "msMax": 177.1,
+        "bytes": 3244
+      },
+      "/api/privatemarket": {
+        "n": 4,
+        "msMax": 176.9,
+        "bytes": 3244
+      },
+      "/api/staking": {
+        "n": 4,
+        "msMax": 177.2,
+        "bytes": 3256
+      },
+      "/api/portfolio/snapshot": {
+        "n": 2,
+        "msMax": 75.2,
+        "bytes": 1699
+      },
+      "/api/actualizacion": {
+        "n": 1,
+        "msMax": 66.4,
+        "bytes": 1101
+      },
+      "/api/portfolios": {
+        "n": 1,
+        "msMax": 65.5,
+        "bytes": 990
+      },
+      "/api/settings": {
+        "n": 1,
+        "msMax": 68.0,
+        "bytes": 1627
+      },
+      "/api/exchange-rate": {
+        "n": 1,
+        "msMax": 152.1,
+        "bytes": 856
+      },
+      "/api/portfolio/history/by-type": {
+        "n": 1,
+        "msMax": 58.3,
+        "bytes": 990
+      },
+      "/api/portfolio/history": {
+        "n": 1,
+        "msMax": 59.7,
+        "bytes": 917
+      }
+    }
+  },
+  "paginas": {
+    "vistaGeneral": {
+      "msHastaReposo": 313,
+      "api": {
+        "/api/activos": {
+          "n": 1,
+          "msMax": 60.3,
+          "bytes": 3733
+        },
+        "/api/activos-lote": {
+          "n": 1,
+          "msMax": 58.7,
+          "bytes": 4899
+        },
+        "/api/ventas": {
+          "n": 1,
+          "msMax": 61.1,
+          "bytes": 1391
+        }
+      }
+    },
+    "activos": {
+      "msHastaReposo": 311,
+      "api": {
+        "/api/activos": {
+          "n": 1,
+          "msMax": 59.6,
+          "bytes": 3733
+        },
+        "/api/activos-lote": {
+          "n": 1,
+          "msMax": 71.7,
+          "bytes": 4899
+        }
+      }
+    },
+    "metricas": {
+      "msHastaReposo": 311,
+      "api": {
+        "/api/activos": {
+          "n": 1,
+          "msMax": 70.2,
+          "bytes": 3733
+        },
+        "/api/activos-lote": {
+          "n": 1,
+          "msMax": 59.7,
+          "bytes": 4899
+        }
+      }
+    },
+    "dividendos": {
+      "msHastaReposo": 312,
+      "api": {
+        "/api/dividendos": {
+          "n": 2,
+          "msMax": 63.3,
+          "bytes": 3564
+        },
+        "/api/cuentas": {
+          "n": 2,
+          "msMax": 59.2,
+          "bytes": 2676
+        },
+        "/api/intereses": {
+          "n": 1,
+          "msMax": 62.7,
+          "bytes": 1119
+        },
+        "/api/bonos": {
+          "n": 1,
+          "msMax": 62.7,
+          "bytes": 811
+        },
+        "/api/ingresos": {
+          "n": 1,
+          "msMax": 62.6,
+          "bytes": 818
+        },
+        "/api/gastos": {
+          "n": 1,
+          "msMax": 63.0,
+          "bytes": 818
+        },
+        "/api/rentafija": {
+          "n": 1,
+          "msMax": 63.2,
+          "bytes": 811
+        },
+        "/api/metricas/inversiones": {
+          "n": 1,
+          "msMax": 110.6,
+          "bytes": 1072
+        },
+        "/api/settings": {
+          "n": 1,
+          "msMax": 110.9,
+          "bytes": 1627
+        },
+        "/api/trading": {
+          "n": 1,
+          "msMax": 110.8,
+          "bytes": 811
+        },
+        "/api/privatemarket": {
+          "n": 1,
+          "msMax": 110.6,
+          "bytes": 811
+        },
+        "/api/portfolio/rentabilidad": {
+          "n": 1,
+          "msMax": 174.3,
+          "bytes": 2336
+        },
+        "/api/activos": {
+          "n": 1,
+          "msMax": 59.9,
+          "bytes": 3733
+        },
+        "/api/transferencias": {
+          "n": 1,
+          "msMax": 50.4,
+          "bytes": 1132
+        },
+        "/api/portfolio/history": {
+          "n": 1,
+          "msMax": 266.9,
+          "bytes": 106023
+        },
+        "/api/gastos/<year>": {
+          "n": 1,
+          "msMax": 60.9,
+          "bytes": 3980
+        }
+      }
+    },
+    "gastos": {
+      "msHastaReposo": 310,
+      "api": {
+        "/api/ingresos/<year>": {
+          "n": 1,
+          "msMax": 59.3,
+          "bytes": 1889
+        },
+        "/api/cuentas/saldos-mes": {
+          "n": 1,
+          "msMax": 60.0,
+          "bytes": 1093
+        },
+        "/api/portfolio/history/by-type": {
+          "n": 1,
+          "msMax": 44.1,
+          "bytes": 990
+        },
+        "/api/portfolio/history": {
+          "n": 1,
+          "msMax": 59.1,
+          "bytes": 917
+        },
+        "/api/gastos": {
+          "n": 1,
+          "msMax": 55.2,
+          "bytes": 818
+        },
+        "/api/gastos-tipos": {
+          "n": 1,
+          "msMax": 59.2,
+          "bytes": 881
+        },
+        "/api/cuentas": {
+          "n": 1,
+          "msMax": 62.0,
+          "bytes": 1338
+        }
+      }
+    },
+    "ingresos": {
+      "msHastaReposo": 337,
+      "api": {
+        "/api/gastos/<year>": {
+          "n": 1,
+          "msMax": 59.9,
+          "bytes": 3980
+        },
+        "/api/ingresos": {
+          "n": 1,
+          "msMax": 59.9,
+          "bytes": 818
+        },
+        "/api/ingresos-tipos": {
+          "n": 1,
+          "msMax": 60.7,
+          "bytes": 856
+        },
+        "/api/cuentas": {
+          "n": 1,
+          "msMax": 60.4,
+          "bytes": 1338
+        }
+      }
+    },
+    "cuentas": {
+      "msHastaReposo": 341,
+      "api": {
+        "/api/ingresos/<year>": {
+          "n": 2,
+          "msMax": 75.4,
+          "bytes": 2714
+        },
+        "/api/ingresos-tipos": {
+          "n": 1,
+          "msMax": 67.8,
+          "bytes": 866
+        },
+        "/api/transferencias": {
+          "n": 1,
+          "msMax": 61.0,
+          "bytes": 1132
+        },
+        "/api/cuentas": {
+          "n": 1,
+          "msMax": 61.5,
+          "bytes": 1338
+        }
+      }
+    },
+    "ventas": {
+      "msHastaReposo": 309,
+      "api": {
+        "/api/ventas": {
+          "n": 1,
+          "msMax": 59.5,
+          "bytes": 1391
+        },
+        "/api/activos": {
+          "n": 1,
+          "msMax": 59.2,
+          "bytes": 3733
+        },
+        "/api/ventas/<year>": {
+          "n": 1,
+          "msMax": 60.2,
+          "bytes": 1379
+        }
+      }
+    },
+    "paneles": {
+      "msHastaReposo": 324,
+      "api": {
+        "/api/ventas/<year>": {
+          "n": 1,
+          "msMax": 75.0,
+          "bytes": 1386
+        },
+        "/api/settings": {
+          "n": 1,
+          "msMax": 59.1,
+          "bytes": 1627
+        },
+        "/api/activos": {
+          "n": 1,
+          "msMax": 58.9,
+          "bytes": 3733
+        }
+      }
+    },
+    "heatmap": {
+      "msHastaReposo": 340,
+      "api": {
+        "/api/activos-lote": {
+          "n": 2,
+          "msMax": 61.1,
+          "bytes": 9798
+        },
+        "/api/activos": {
+          "n": 1,
+          "msMax": 60.7,
+          "bytes": 3733
+        }
+      }
+    },
+    "calendario": {
+      "msHastaReposo": 1009,
+      "api": {
+        "/api/gastos": {
+          "n": 1,
+          "msMax": 59.9,
+          "bytes": 818
+        },
+        "/api/ingresos": {
+          "n": 1,
+          "msMax": 59.4,
+          "bytes": 818
+        },
+        "/api/ingresos/<year>": {
+          "n": 1,
+          "msMax": 59.6,
+          "bytes": 1889
+        },
+        "/api/gastos/<year>": {
+          "n": 1,
+          "msMax": 60.0,
+          "bytes": 3980
+        }
+      }
+    },
+    "seguimiento": {
+      "msHastaReposo": 310,
+      "api": {
+        "/api/activos": {
+          "n": 1,
+          "msMax": 72.0,
+          "bytes": 3733
+        },
+        "/api/operaciones": {
+          "n": 1,
+          "msMax": 61.1,
+          "bytes": 1280
+        }
+      }
+    }
+  }
+}

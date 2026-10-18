@@ -10,12 +10,12 @@ mimetypes.add_type("font/woff", ".woff")
 mimetypes.add_type("font/woff2", ".woff2")
 
 from dotenv import load_dotenv
-from flask import Flask, abort, g, make_response, send_from_directory
+from flask import Flask, abort, g, make_response, request, send_from_directory
 
 from admin import avisos_scheduler, snapshot_scheduler, telegram_listener
 from admin.backup_manager import startScheduler as startBackupScheduler
 from admin.portfolios_manager import initPortfolios
-from core import atajo_acceso, csp, paths, seguridad_app, settings, telegram_notifier, tls
+from core import atajo_acceso, csp, estaticos, paths, seguridad_app, settings, telegram_notifier, tls
 from core.errors import registerErrorHandlers
 from core.paths import API_DIR, BASE_DIR, INDEX_FILE
 from core.version import __version__, insertarVersion
@@ -197,6 +197,9 @@ def serveIndex():
     # La versión se inyecta aquí por lo mismo que el nonce: la plantilla es un
     # fichero estático y este es el único punto por el que pasa antes de salir.
     html = insertarVersion(html)
+    # Cada JS/CSS propio con un ?v= sacado del propio fichero: la URL vigente
+    # se cachea como inmutable en serveStatic (ver core/estaticos.py).
+    html = estaticos.versionarReferencias(html)
     response = make_response(html)
     response.headers["Content-Type"] = "text/html; charset=utf-8"
     response.headers["Cache-Control"] = "no-store"
@@ -232,6 +235,11 @@ def serveStatic(path):
         # la URL lleva la versión en el `?v=`. Cachearlas un año evita volver a
         # bajar los 200 KB de Chart.js en cada carga de la página, que es lo
         # que pasaba cuando todo js/ se servía con no-store.
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif ext in (".js", ".css") and estaticos.esVersionVigente(normalized, request.args.get("v")):
+        # Pedido con la versión que tiene ahora el fichero (la que pone
+        # serveIndex): ese contenido no cambia nunca bajo esa URL. Si el
+        # fichero cambia, el index.html siguiente pide otra.
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     elif ext in (".js", ".css"):
         # Código propio: no-cache (no "no-store"). send_from_directory ya manda
