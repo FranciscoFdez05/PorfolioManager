@@ -1140,6 +1140,8 @@ Dos pruebas merecen mención porque no comprueban comportamiento sino invariante
 - `tests/test_frontera_dinero.py` recorre el AST para exigir que los módulos de importes no llamen a `float()` fuera de la serialización. El dinero se calcula en `Decimal` de principio a fin y esta prueba es lo que impide que vuelva a colarse.
 - `tests-js/globales.test.js` comprueba que ningún nombre se declare en dos ficheros de `js/` —los 27 scripts comparten un solo ámbito y el último cargado machaca al anterior— y que `csrf.js` y `api.js` sigan cargándose antes que el resto.
 
+**Rendimiento:** `perf/` tiene scripts reproducibles para medir la carga de la interfaz (Playwright), la latencia de cada endpoint, una prueba de carga HTTP, los planes de consulta, el arranque y Docker, siempre sobre una copia aislada de `data/`. Cómo se usan, en `perf/README.md`; la última auditoría, en `perf/report.md`. Un cambio que se haga por rendimiento debería llevar su medición antes y después.
+
 ### Integración continua
 
 `.github/workflows/ci.yml` corre cuatro trabajos:
@@ -1239,6 +1241,8 @@ css/                 variables (maquetación), base, components, responsive
 | `core/red_local.py` + `core/firma_hmac.py` | Autenticación de los endpoints que no pueden usar la sesión de la web app (el Atajo de iOS): filtro de IP por CIDR y firma HMAC-SHA256 sobre timestamp + cuerpo crudo. Se configuran en `[atajo]` de `config.ini`. Ver [docs/atajo-ios.md](docs/atajo-ios.md). |
 | `core/seguridad_app.py` | CSRF, sesión, tope de cuerpo, límite de escrituras y cabeceras de respuesta, montados con `instalar(app)` sobre cualquier Flask — también sobre la app mínima que construyen los tests. Ver [Seguridad](#seguridad). |
 | `core/csp.py` + `core/rate_limit.py` | Content-Security-Policy con nonce y ventana deslizante de escrituras por IP. Aparte de `seguridad_app` para poder afirmar en un test qué contienen exactamente. |
+| `core/estaticos.py` | Versión automática en las URLs de los JS/CSS propios: `index.html` sale con un `?v=` sacado de la fecha y el tamaño de cada fichero, y la URL con la versión vigente se sirve `immutable` un año. La plantilla versionada se guarda en memoria y un hilo la rehace si en el último segundo ha cambiado `index.html` o alguno de esos ficheros. Una URL con un `v` que ya no es el actual se sirve con `no-cache`, así que nunca sale un fichero viejo. Las de `js/vendor/` llevan su `?v=` a mano y no se tocan. |
+| `stores/historico_tipos.py` | Agregado de `asset_snapshots` por fecha y tipo de activo para `/api/portfolio/history/by-type`, en caché por proceso. Se amplía con las filas nuevas y se recalcula entero si cambia otra cosa (purga, tipo o borrado de un activo, restauración o cambio de portfolio). |
 | `core/fifo.py` + `core/fiscal_es.py` + `core/informe_renta.py` | Aritmética de lotes, normativa española y salidas CSV/HTML del ejercicio. La aritmética no caduca y la normativa cambia con cada reforma: por eso están separadas. Ver [Ventas y fiscalidad](#ventas-y-fiscalidad-españa). |
 | `core/rentabilidad.py` + `core/pnl_divisa.py` | TWR, XIRR, drawdown y volatilidad sobre los snapshots; y el reparto del resultado entre efecto activo y efecto divisa. Módulos puros: reciben listas y devuelven números, sin Flask ni SQLite. |
 | `stores/market_data.py` | Punto único de despacho de cotizaciones por proveedor. El `if provider ==` vivía dentro de `/api/market/quote`, así que añadir un proveedor arreglaba la pantalla y dejaba el histórico valorando con precios viejos. |

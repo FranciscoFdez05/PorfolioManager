@@ -22,6 +22,57 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.8.0] — 2026-10-18
+
+**Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+La aplicación abre y responde más deprisa, sobre todo desde el móvil o una VPN.
+Cada cambio está medido antes y después (`perf/report.md`): abrir la interfaz
+pasa de ~8,5 s a ~3,1 s en la red local y de ~13,5 s a ~4,6 s con la latencia de
+un acceso remoto. No hay nada que cambiar en el Atajo de iOS: sus rutas y
+respuestas son las mismas.
+
+### Cambiado
+
+- **Cotizaciones al abrir, varias a la vez.** El refresco de precios de todos los
+  activos se hacía uno detrás de otro: con 33 activos eran ~7 s con la interfaz
+  cargando. Ahora van hasta 4 a la vez. Se piden las mismas cotizaciones al
+  proveedor, solo que se solapan, y un fallo se sigue marcando con ⚠ en el
+  lateral.
+- **Una petición en vez de una por activo.** Vista general, Activos, Métricas,
+  Paneles y Heatmap pedían la ficha de cada activo por separado (33 peticiones al
+  entrar en cada una, ~170 al abrir la aplicación). Ahora las que se piden a la
+  vez van juntas en una sola. Abrir la aplicación pasa de 342 peticiones a 182.
+  No hay caché: lo que se lee después de guardar es siempre lo guardado.
+- **El navegador guarda los JS y CSS propios.** Antes preguntaba por los 102
+  ficheros en cada carga aunque no hubieran cambiado: en local apenas se notaba,
+  pero desde el móvil eran más de 1 s antes de empezar a pintar. Ahora cada uno
+  lleva en su dirección una marca sacada del propio fichero y se reutiliza
+  mientras no cambie. Al actualizar, o al editar un fichero a mano, la marca
+  cambia en menos de un segundo y el navegador baja el nuevo; no hace falta
+  forzar la recarga. Con 40 ms de latencia, la página está lista en ~0,2 s en vez
+  de ~1,3 s.
+- **Evolución por tipo de activo en Métricas.** El gráfico con el rango completo
+  tardaba ~0,5 s en cada cambio de rango o de modo, porque se recalculaba sobre
+  todo el histórico. Ahora tarda ~0,06 s; el gráfico es exactamente el mismo.
+- Los JS y CSS ya no se vuelven a comprimir en cada petición si no han cambiado:
+  servirlos cuesta ~40 % menos.
+
+### Añadido
+
+- `GET /api/activos-lote?ids=a,b,c`: las fichas de varios activos de una vez,
+  iguales a las de `/api/activos/<id>`. Es lo que usa la interfaz para lo
+  anterior.
+- Carpeta `perf/` con los scripts que miden todo lo de arriba (carga de la
+  interfaz con Playwright, latencia por endpoint, prueba de carga HTTP, planes de
+  consulta de SQLite, arranque y memoria, y un script de Docker para el
+  servidor) sobre una copia aislada de los datos. La línea base, el diagnóstico y
+  el informe con los números están en `perf/baseline.md`, `perf/diagnostico.md` y
+  `perf/report.md`.
+
+---
+
 ## [4.7.0] — 2026-10-16
 
 **Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la
