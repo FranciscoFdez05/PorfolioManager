@@ -263,6 +263,33 @@ def getActivo(assetId):
     return jsonify(data)
 
 
+# Tope de ids por lote: el frontend los parte en trozos de 50, y sin tope una
+# URL manipulada podría pedir miles de fichas en una sola petición.
+_MAX_IDS_LOTE = 200
+
+
+@activosBp.route("/api/activos-lote", methods=["GET"])
+def getActivosLote():
+    """Varias fichas de una vez: `?ids=a,b,c` -> {"assets": {id: ficha}}.
+
+    Cada pantalla que necesita las filas de todos los activos hacía una
+    petición por activo (33 al entrar en Vista general, Activos, Métricas...).
+    La ficha es la misma que devuelve /api/activos/<id>; los que no existen se
+    omiten y el llamador los trata como ese 404. No cuelga de /api/activos/
+    para no quitarle a ningún activo el id "lote".
+    """
+    ids = list(dict.fromkeys(i.strip() for i in request.args.get("ids", "").split(",") if i.strip()))
+    if not ids or len(ids) > _MAX_IDS_LOTE:
+        return jsonify({"ok": False, "error": f"Indica entre 1 y {_MAX_IDS_LOTE} ids"}), 400
+
+    fichas = {}
+    for assetId in ids:
+        data = readAssetFile(assetId)
+        if data is not None:
+            fichas[assetId] = data
+    return jsonify({"assets": fichas})
+
+
 @activosBp.route("/api/activos/<assetId>", methods=["POST"])
 def saveActivo(assetId):
     requestData = request.get_json(silent=True) or {}

@@ -119,6 +119,39 @@ def testLeerUnActivoDevuelveSuFicha(cliente):
     assert isinstance(datos["rows"], list)
 
 
+def testLeerVariosActivosDeUnaVezDevuelveLasMismasFichas(cliente):
+    """/api/activos-lote sustituye a N peticiones a /api/activos/<id>.
+
+    Cada ficha tiene que ser exactamente la que daría la ruta individual: el
+    frontend la reparte a quien la pidió como si viniera de ella.
+    """
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Apple", marketSymbol="AAPL")
+    _crear(client, cabeceras, "Tesla", marketSymbol="TSLA")
+
+    datos = client.get("/api/activos-lote?ids=apple,tesla").get_json()
+
+    assert set(datos["assets"]) == {"apple", "tesla"}
+    for activoId in ("apple", "tesla"):
+        assert datos["assets"][activoId] == client.get(f"/api/activos/{activoId}").get_json()
+
+
+def testElLoteOmiteLosActivosQueNoExisten(cliente):
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Apple")
+
+    datos = client.get("/api/activos-lote?ids=apple,no-existe").get_json()
+
+    assert list(datos["assets"]) == ["apple"]
+
+
+def testUnLoteSinIdsODemasiadoGrandeSeRechaza(cliente):
+    client, _cabeceras = cliente
+    assert client.get("/api/activos-lote").status_code == 400
+    ids = ",".join(f"activo-{i}" for i in range(201))
+    assert client.get(f"/api/activos-lote?ids={ids}").status_code == 400
+
+
 # ── Guardar ──────────────────────────────────────────────────────────────────
 
 def testGuardarUnaFichaPersisteLasFilas(cliente):

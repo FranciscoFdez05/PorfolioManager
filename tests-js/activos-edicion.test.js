@@ -99,6 +99,11 @@ function servidor({ guardarFalla = null } = {}) {
             }
         }
 
+        // loadAssetData lee las fichas por lotes (/api/activos-lote).
+        if (String(url).startsWith("/api/activos-lote")) {
+            return { ok: true, status: 200, json: async () => ({ assets: { xrp: { ...ACTIVO } } }) }
+        }
+
         // El GET siempre devuelve el activo tal y como está guardado: es de donde
         // sale lo que la edición no toca.
         return {

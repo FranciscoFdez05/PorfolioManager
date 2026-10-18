@@ -169,8 +169,7 @@ async function hmLoadData() {
         await Promise.all(
             assets.map(async (asset) => {
                 try {
-                    const fullRes = await fetch(`/api/activos/${asset.id}`)
-                    const fullAsset = await fullRes.json()
+                    const fullAsset = await loadAssetData(asset.id)
                     const row = await buildOverviewRow(fullAsset)
                     const euros = await buildSummaryMetricsInEuros(row)
                     asset._hmMetrics = {

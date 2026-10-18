@@ -337,13 +337,53 @@ async function loadAssetData(assetId) {
         if (!response.ok) throw new Error("No se pudo cargar el activo")
         return await response.json()
     }
-    const response = await fetch(`/api/activos/${assetId}`)
+    return await _pedirActivoEnLote(String(assetId))
+}
 
-    if (!response.ok) {
-        throw new Error("No se pudo cargar el activo")
+// Las pantallas que necesitan las filas de todos los activos llamaban a
+// loadAssetData una vez por activo: 33 peticiones al entrar en Vista general,
+// Activos, Métricas, Paneles o Heatmap, y ~170 al abrir la aplicación. Las
+// llamadas hechas en el mismo ciclo se juntan ahora en una sola petición a
+// /api/activos-lote. Solo se agrupa lo pedido a la vez: no hay caché, así que
+// una lectura hecha después de guardar nunca recibe la ficha de antes.
+let _loteActivos = null
+const _activosPorLote = 50
+
+function _pedirActivoEnLote(assetId) {
+    return new Promise((resolve, reject) => {
+        if (!_loteActivos) {
+            _loteActivos = new Map()
+            queueMicrotask(_enviarLoteActivos)
+        }
+        if (!_loteActivos.has(assetId)) _loteActivos.set(assetId, [])
+        _loteActivos.get(assetId).push({ resolve, reject })
+    })
+}
+
+async function _enviarLoteActivos() {
+    const pendientes = _loteActivos
+    _loteActivos = null
+    const ids = [...pendientes.keys()]
+    for (let i = 0; i < ids.length; i += _activosPorLote) {
+        const trozo = ids.slice(i, i + _activosPorLote)
+        let fichas = null
+        try {
+            const response = await fetch(`/api/activos-lote?ids=${trozo.map(encodeURIComponent).join(",")}`)
+            if (response.ok) fichas = (await response.json()).assets || {}
+        } catch {
+            fichas = null
+        }
+        trozo.forEach((id) => {
+            const esperando = pendientes.get(id)
+            const ficha = fichas?.[id]
+            esperando.forEach(({ resolve, reject }, n) => {
+                if (!ficha) reject(new Error("No se pudo cargar el activo"))
+                // Cada llamador recibe su propia copia: algunos modifican la
+                // ficha que reciben y no deben tocar la de otro.
+                else resolve(n === 0 ? ficha : structuredClone(ficha))
+            })
+        })
     }
-
-    return await response.json()
 }
 
 async function saveAssetDataToServer(assetData) {
