@@ -19,20 +19,20 @@ from core.escritura import escribirAtomico, escribirJsonAtomico
 from core.paths import AUTH_FILE as _AUTH_FILE, LOGIN_HTML
 from core.secret_store import fernetDeSecretKey
 
-auth_bp = Blueprint("auth", __name__)
+authBp = Blueprint("auth", __name__)
 
 _DEFAULT_HASH = generate_password_hash(secrets.token_hex(32), method=settings.metodoHashPassword())
 
 _senuelos: dict[str, str] = {}
 
 
-def _senuelo(password_hash: str) -> str:
+def _senuelo(passwordHash: str) -> str:
     """Hash de una contraseña aleatoria con el mismo método que `password_hash`.
 
     Se comprueba contra él cuando el usuario no coincide, para que esa
     comprobación cueste lo mismo que la de verdad. Se calcula una vez por método.
     """
-    metodo = password_hash.split("$", 1)[0] if "$" in password_hash else ""
+    metodo = passwordHash.split("$", 1)[0] if "$" in passwordHash else ""
     if metodo not in _senuelos:
         try:
             _senuelos[metodo] = generate_password_hash(secrets.token_hex(16), method=metodo)
@@ -65,18 +65,18 @@ logger = logging.getLogger(__name__)
 # Si el cerrojo no se consigue a tiempo se usa la memoria del proceso, como
 # antes: un disco lento no puede dejar el login sin ningún límite.
 _attempts: dict[str, list] = {}   # respaldo en memoria: ip -> [nº fallos, instante del último]
-_attempts_lock = threading.Lock()
+_attemptsLock = threading.Lock()
 
 
-def _fichero_intentos():
+def _ficheroIntentos():
     return paths.TMP_DIR / "login-intentos.json"
 
 
 @contextmanager
 def _intentos():
     """El registro de intentos, compartido entre procesos; se guarda al salir."""
-    ruta = _fichero_intentos()
-    with _attempts_lock, exclusivo(ruta.with_suffix(".lock"), espera=5, obligatorio=False) as conseguido:
+    ruta = _ficheroIntentos()
+    with _attemptsLock, exclusivo(ruta.with_suffix(".lock"), espera=5, obligatorio=False) as conseguido:
         if not conseguido:
             yield _attempts
             return
@@ -95,11 +95,11 @@ def _intentos():
                 logger.warning("No se pudo guardar el registro de intentos de login: %s", error)
 
 
-def _client_ip() -> str:
+def _clientIp() -> str:
     return request.remote_addr or "desconocida"
 
 
-def _seconds_locked_out(ip: str) -> int:
+def _secondsLockedOut(ip: str) -> int:
     """Segundos que quedan de bloqueo para esta IP, 0 si puede intentarlo."""
     lockout = settings.bloqueoSegundos()
     with _intentos() as intentos:
@@ -113,7 +113,7 @@ def _seconds_locked_out(ip: str) -> int:
         return int(lockout - elapsed)
 
 
-def _record_failure(ip: str) -> None:
+def _recordFailure(ip: str) -> None:
     lockout = settings.bloqueoSegundos()
     with _intentos() as intentos:
         entry = intentos.get(ip)
@@ -128,12 +128,12 @@ def _record_failure(ip: str) -> None:
                 intentos.pop(stale, None)
 
 
-def _clear_failures(ip: str) -> None:
+def _clearFailures(ip: str) -> None:
     with _intentos() as intentos:
         intentos.pop(ip, None)
 
 
-def _avisar_si_se_bloquea(ip: str) -> None:
+def _avisarSiSeBloquea(ip: str) -> None:
     """Cuenta por Telegram que una IP acaba de agotar sus intentos de login.
 
     Se llama justo después de anotar un fallo: si con ese fallo la IP ha
@@ -142,7 +142,7 @@ def _avisar_si_se_bloquea(ip: str) -> None:
     probando contraseñas contra un servidor doméstico es exactamente lo que
     quien lo administra quiere enterarse, y no lo vería hasta mirar el log.
     """
-    locked = _seconds_locked_out(ip)
+    locked = _secondsLockedOut(ip)
     if locked:
         telegram_notifier.notificar(
             "seguridad",
@@ -160,33 +160,33 @@ def _avisar_si_se_bloquea(ip: str) -> None:
 _SAFE_NEXT_RE = re.compile(r"^/[A-Za-z0-9._~!$&'()*+,;=:@%/?-]*$")
 
 
-def _safe_next_url(next_url: str) -> str:
+def _safeNextUrl(nextUrl: str) -> str:
     """Devuelve next_url si es una ruta interna segura, o '/' en caso contrario."""
-    if not next_url or not _SAFE_NEXT_RE.match(next_url):
+    if not nextUrl or not _SAFE_NEXT_RE.match(nextUrl):
         return "/"
     # "//host" y "/\host" son referencias protocol-relative: destino externo.
-    if next_url.startswith("//"):
+    if nextUrl.startswith("//"):
         return "/"
-    return next_url
+    return nextUrl
 
 
 # ── Cifrado ───────────────────────────────────────────────────────────────────
 
-def _get_fernet() -> Fernet | None:
+def _getFernet() -> Fernet | None:
     """Devuelve una instancia Fernet derivada de SECRET_KEY, o None si no hay clave."""
     return fernetDeSecretKey(b"portfolio-auth-v1")
 
 
 # ── Persistencia ──────────────────────────────────────────────────────────────
 
-def _load_credentials() -> tuple[str, str]:
+def _loadCredentials() -> tuple[str, str]:
     """Devuelve (username, password_hash). Orden: auth.json (cifrado) > env vars > admin/admin."""
     ilegible = False
     if _AUTH_FILE.exists():
         ilegible = True  # hasta que se demuestre lo contrario
         try:
             raw = _AUTH_FILE.read_bytes()
-            fernet = _get_fernet()
+            fernet = _getFernet()
             if fernet:
                 try:
                     raw = fernet.decrypt(raw)
@@ -202,7 +202,7 @@ def _load_credentials() -> tuple[str, str]:
                     try:
                         fernet.decrypt(_AUTH_FILE.read_bytes())
                     except InvalidToken:
-                        _save_credentials(u, h)
+                        _saveCredentials(u, h)
                         logger.info("auth.json migrado a formato cifrado")
                 return u, h
         except Exception as error:
@@ -218,8 +218,8 @@ def _load_credentials() -> tuple[str, str]:
     h = os.environ.get("LOGIN_PASSWORD_HASH", "").strip()
     if u and h:
         if ilegible:
-            _apartar_auth_ilegible()
-        _save_credentials(u, h)
+            _apartarAuthIlegible()
+        _saveCredentials(u, h)
         return u, h
 
     logger.critical(
@@ -229,7 +229,7 @@ def _load_credentials() -> tuple[str, str]:
     return "__no_user__", _DEFAULT_HASH
 
 
-def _apartar_auth_ilegible() -> None:
+def _apartarAuthIlegible() -> None:
     """Renombra un auth.dat que no se puede leer en vez de sobrescribirlo.
 
     Lo normal es que la SECRET_KEY haya cambiado: el fichero está bien, solo que
@@ -250,9 +250,9 @@ def _apartar_auth_ilegible() -> None:
         logger.error("No se pudo apartar %s (%s); se sobrescribirá.", _AUTH_FILE.name, error)
 
 
-def _save_credentials(username: str, password_hash: str) -> None:
-    payload = json.dumps({"username": username, "password_hash": password_hash}).encode()
-    fernet = _get_fernet()
+def _saveCredentials(username: str, passwordHash: str) -> None:
+    payload = json.dumps({"username": username, "password_hash": passwordHash}).encode()
+    fernet = _getFernet()
     # Atómica: un corte a mitad de un write_bytes() dejaba auth.dat truncado, y
     # a partir de ahí se entraba con las credenciales del .env o con ninguna.
     escribirAtomico(_AUTH_FILE, fernet.encrypt(payload) if fernet else payload, permisos=0o600)
@@ -261,47 +261,47 @@ def _save_credentials(username: str, password_hash: str) -> None:
 # ── Rutas ─────────────────────────────────────────────────────────────────────
 
 
-@auth_bp.route("/login", methods=["GET", "POST"])
+@authBp.route("/login", methods=["GET", "POST"])
 def login():
     # Con la sesión ya iniciada no hay nada que pedir: al volver atrás desde la
     # aplicación el navegador vuelve a solicitar /login (la respuesta se marca
     # como no almacenable, ver más abajo) y aquí se devuelve a la app.
     if session.get("logged_in"):
-        return redirect(_safe_next_url(request.args.get("next") or "/"))
+        return redirect(_safeNextUrl(request.args.get("next") or "/"))
 
     error = None
-    if request.method == "POST" and not _mismo_origen():
+    if request.method == "POST" and not _mismoOrigen():
         # Login CSRF: otra web podía enviar este formulario y dejar al usuario
         # dentro de la aplicación con una cuenta elegida por ella.
         logger.warning("Login rechazado: el formulario llega desde otro origen (%s)",
                        request.headers.get("Origin") or request.headers.get("Referer"))
         return "Origen no permitido", 403
     if request.method == "POST":
-        ip = _client_ip()
-        locked = _seconds_locked_out(ip)
+        ip = _clientIp()
+        locked = _secondsLockedOut(ip)
         if locked:
             logger.warning("Login bloqueado por exceso de intentos desde %s", ip)
             error = f"Demasiados intentos fallidos. Vuelve a intentarlo en {locked // 60 + 1} min."
         else:
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
-            expected_user, password_hash = _load_credentials()
+            expectedUser, passwordHash = _loadCredentials()
 
             # compare_digest evita filtrar por tiempo la longitud del usuario.
             # Se comparan bytes: con str lanza TypeError si el usuario enviado
             # tiene caracteres no ASCII, lo que devolvía un 500 y además saltaba
             # el registro del intento fallido.
-            user_ok = hmac.compare_digest(
-                username.encode("utf-8"), expected_user.encode("utf-8")
+            userOk = hmac.compare_digest(
+                username.encode("utf-8"), expectedUser.encode("utf-8")
             )
             # El hash se comprueba siempre, también con un usuario equivocado:
             # cortocircuitar con `and` hacía que la respuesta tardase ~100 ms
             # menos cuando el usuario no existía, y eso lo delataba. El señuelo
             # usa el mismo método y coste que el hash guardado; con uno de coste
             # distinto, la diferencia de tiempo se invertía pero seguía ahí.
-            pass_ok = check_password_hash(password_hash if user_ok else _senuelo(password_hash), password)
-            if user_ok and pass_ok:
-                _clear_failures(ip)
+            passOk = check_password_hash(passwordHash if userOk else _senuelo(passwordHash), password)
+            if userOk and passOk:
+                _clearFailures(ip)
                 session.clear()
                 session["logged_in"] = True
                 # Permanente: sobrevive al cierre del navegador, que es lo que
@@ -314,11 +314,11 @@ def login():
                 # clear() para que no herede nada de la sesión anterior.
                 sesion.abrir(session)
                 telegram_notifier.notificar("sesion", f"🔑 Inicio de sesión desde {ip}")
-                return redirect(_safe_next_url(request.args.get("next") or "/"))
+                return redirect(_safeNextUrl(request.args.get("next") or "/"))
 
-            _record_failure(ip)
+            _recordFailure(ip)
             logger.warning("Intento de login fallido desde %s", ip)
-            _avisar_si_se_bloquea(ip)
+            _avisarSiSeBloquea(ip)
             error = "Usuario o contraseña incorrectos"
 
     html = LOGIN_HTML.read_text("utf-8")
@@ -329,8 +329,8 @@ def login():
     # El botón de mostrar/ocultar la contraseña va en un script en línea. Con
     # la CSP sin 'unsafe-inline' solo corre si lleva el nonce de la petición,
     # que el after_request de core/seguridad_app.py recoge de `g`.
-    g.csp_nonce = csp.generar_nonce()
-    html = csp.insertar_nonce(html, g.csp_nonce)
+    g.csp_nonce = csp.generarNonce()
+    html = csp.insertarNonce(html, g.csp_nonce)
     response = make_response(html)
     # Sin esto el navegador guarda la página en su caché de historial (bfcache) y
     # el botón "atrás" la muestra tal cual, sin preguntar al servidor, aunque la
@@ -341,7 +341,7 @@ def login():
     return response
 
 
-def _mismo_origen() -> bool:
+def _mismoOrigen() -> bool:
     """¿La petición sale de una página de este mismo host?
 
     Los navegadores mandan `Origin` en todo POST de formulario. Sin él (un
@@ -354,7 +354,7 @@ def _mismo_origen() -> bool:
     return urlsplit(procedencia).netloc.lower() == (request.host or "").lower()
 
 
-@auth_bp.route("/logout", methods=["GET", "POST"])
+@authBp.route("/logout", methods=["GET", "POST"])
 def logout():
     # Cerrar sesión solo por POST, que pasa por el CSRF de core/seguridad_app.
     # Por GET bastaba un <img src="/logout"> en cualquier web para echar al
@@ -369,7 +369,7 @@ def logout():
     return redirect(url_for("auth.login"))
 
 
-def _renovar_sesiones() -> None:
+def _renovarSesiones() -> None:
     """Cierra todas las sesiones abiertas y vuelve a sellar la de quien lo pide.
 
     Cambiar la contraseña tiene que echar a quien estuviera dentro con la
@@ -382,7 +382,7 @@ def _renovar_sesiones() -> None:
     sesion.abrir(session)
 
 
-def _cuerpo_dict() -> dict:
+def _cuerpoDict() -> dict:
     datos = request.get_json(silent=True)
     return datos if isinstance(datos, dict) else {}
 
@@ -393,7 +393,7 @@ def _texto(valor) -> str:
     return valor if isinstance(valor, str) else ""
 
 
-def _rechazar_si_bloqueado():
+def _rechazarSiBloqueado():
     """Respuesta 429 si esta IP ha agotado los intentos, o None si puede seguir.
 
     Comparte el contador con /login a propósito. Estos dos endpoints piden la
@@ -404,7 +404,7 @@ def _rechazar_si_bloqueado():
     cookie robada intentando averiguar la contraseña para cambiarla— entra por
     aquí, no por /login.
     """
-    locked = _seconds_locked_out(_client_ip())
+    locked = _secondsLockedOut(_clientIp())
     if not locked:
         return None
     respuesta = jsonify({
@@ -415,65 +415,65 @@ def _rechazar_si_bloqueado():
     return respuesta, 429
 
 
-@auth_bp.route("/api/settings/credentials/username", methods=["POST"])
-def change_username():
-    bloqueado = _rechazar_si_bloqueado()
+@authBp.route("/api/settings/credentials/username", methods=["POST"])
+def changeUsername():
+    bloqueado = _rechazarSiBloqueado()
     if bloqueado:
         return bloqueado
 
-    data = _cuerpo_dict()
-    current_password = _texto(data.get("currentPassword"))
-    new_username     = _texto(data.get("newUsername")).strip()
+    data = _cuerpoDict()
+    currentPassword = _texto(data.get("currentPassword"))
+    newUsername     = _texto(data.get("newUsername")).strip()
 
-    if not new_username:
+    if not newUsername:
         return jsonify({"ok": False, "error": "El nuevo usuario no puede estar vacío"}), 400
-    if len(new_username) > MAX_LARGO_USUARIO:
+    if len(newUsername) > MAX_LARGO_USUARIO:
         return jsonify({"ok": False, "error": f"El usuario no puede pasar de {MAX_LARGO_USUARIO} caracteres"}), 400
 
-    _current_user, password_hash = _load_credentials()
-    if not check_password_hash(password_hash, current_password):
-        _record_failure(_client_ip())
-        logger.warning("Contraseña actual incorrecta al cambiar el usuario desde %s", _client_ip())
-        _avisar_si_se_bloquea(_client_ip())
+    _currentUser, passwordHash = _loadCredentials()
+    if not check_password_hash(passwordHash, currentPassword):
+        _recordFailure(_clientIp())
+        logger.warning("Contraseña actual incorrecta al cambiar el usuario desde %s", _clientIp())
+        _avisarSiSeBloquea(_clientIp())
         return jsonify({"ok": False, "error": "Contraseña actual incorrecta"}), 400
 
-    _clear_failures(_client_ip())
-    _save_credentials(new_username, password_hash)
-    _renovar_sesiones()
-    telegram_notifier.notificar("seguridad", f"🔐 Se ha cambiado el usuario de acceso (desde {_client_ip()}).")
+    _clearFailures(_clientIp())
+    _saveCredentials(newUsername, passwordHash)
+    _renovarSesiones()
+    telegram_notifier.notificar("seguridad", f"🔐 Se ha cambiado el usuario de acceso (desde {_clientIp()}).")
     return jsonify({"ok": True})
 
 
-@auth_bp.route("/api/settings/credentials/password", methods=["POST"])
-def change_password():
-    bloqueado = _rechazar_si_bloqueado()
+@authBp.route("/api/settings/credentials/password", methods=["POST"])
+def changePassword():
+    bloqueado = _rechazarSiBloqueado()
     if bloqueado:
         return bloqueado
 
-    data = _cuerpo_dict()
-    current_password = _texto(data.get("currentPassword"))
-    new_password     = data.get("newPassword", "")
+    data = _cuerpoDict()
+    currentPassword = _texto(data.get("currentPassword"))
+    newPassword     = data.get("newPassword", "")
 
-    if not isinstance(new_password, str) or not new_password:
+    if not isinstance(newPassword, str) or not newPassword:
         return jsonify({"ok": False, "error": "La nueva contraseña no puede estar vacía"}), 400
-    if len(new_password) < MIN_LARGO_CONTRASENA:
+    if len(newPassword) < MIN_LARGO_CONTRASENA:
         return jsonify({
             "ok": False,
             "error": f"La nueva contraseña debe tener al menos {MIN_LARGO_CONTRASENA} caracteres",
         }), 400
-    if len(new_password) > MAX_LARGO_CONTRASENA:
+    if len(newPassword) > MAX_LARGO_CONTRASENA:
         return jsonify({"ok": False, "error": "La nueva contraseña es demasiado larga"}), 400
 
-    current_user, password_hash = _load_credentials()
-    if not check_password_hash(password_hash, current_password):
-        _record_failure(_client_ip())
-        logger.warning("Contraseña actual incorrecta al cambiar la contraseña desde %s", _client_ip())
-        _avisar_si_se_bloquea(_client_ip())
+    currentUser, passwordHash = _loadCredentials()
+    if not check_password_hash(passwordHash, currentPassword):
+        _recordFailure(_clientIp())
+        logger.warning("Contraseña actual incorrecta al cambiar la contraseña desde %s", _clientIp())
+        _avisarSiSeBloquea(_clientIp())
         return jsonify({"ok": False, "error": "Contraseña actual incorrecta"}), 400
 
-    _clear_failures(_client_ip())
-    new_hash = generate_password_hash(new_password, method=settings.metodoHashPassword())
-    _save_credentials(current_user, new_hash)
-    _renovar_sesiones()
-    telegram_notifier.notificar("seguridad", f"🔐 Se ha cambiado la contraseña de acceso (desde {_client_ip()}).")
+    _clearFailures(_clientIp())
+    newHash = generate_password_hash(newPassword, method=settings.metodoHashPassword())
+    _saveCredentials(currentUser, newHash)
+    _renovarSesiones()
+    telegram_notifier.notificar("seguridad", f"🔐 Se ha cambiado la contraseña de acceso (desde {_clientIp()}).")
     return jsonify({"ok": True})

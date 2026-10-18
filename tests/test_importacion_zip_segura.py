@@ -17,42 +17,42 @@ import pytest
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, datos_aislados, monkeypatch):
+def cliente(clienteAutenticado, datosAislados, monkeypatch):
     """Ajustes + copias + carteras, con la cartera activa dentro de portfolios/."""
     from core import db
-    from routes.ajustes import ajustes_bp
-    from routes.backup import backup_bp
-    from routes.portfolios import portfolios_bp
+    from routes.ajustes import ajustesBp
+    from routes.backup import backupBp
+    from routes.portfolios import portfoliosBp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
 
     # Sin índice, la primera consulta de carteras lo inicializaría y haría
     # una copia automática por el camino.
-    datos_aislados["meta"].write_text(
+    datosAislados["meta"].write_text(
         '{"active": "principal", "legacyMigrated": true,'
         ' "portfolios": [{"id": "principal", "name": "Principal"}]}',
         "utf-8",
     )
-    original = db.get_active_db_path()
-    activa = datos_aislados["portfolios"] / "principal.db"
-    db.set_active_db_path(activa)
-    conn = db.get_db()
+    original = db.getActiveDbPath()
+    activa = datosAislados["portfolios"] / "principal.db"
+    db.setActiveDbPath(activa)
+    conn = db.getDb()
     conn.execute("INSERT INTO activos (id, name, type) VALUES ('previo', 'Activo previo', 'acciones')")
     conn.commit()
 
-    client, cabeceras, _app = cliente_autenticado(ajustes_bp, backup_bp, portfolios_bp)
-    yield client, cabeceras, datos_aislados
+    client, cabeceras, _app = clienteAutenticado(ajustesBp, backupBp, portfoliosBp)
+    yield client, cabeceras, datosAislados
 
-    db.reset_db()
-    db.set_active_db_path(original)
-    db.invalidate_all_connections()
+    db.resetDb()
+    db.setActiveDbPath(original)
+    db.invalidateAllConnections()
 
 
 def _activos():
-    from core.db import get_db
+    from core.db import getDb
 
-    return [fila[0] for fila in get_db().execute("SELECT id FROM activos ORDER BY id")]
+    return [fila[0] for fila in getDb().execute("SELECT id FROM activos ORDER BY id")]
 
 
 def _zip(entradas):
@@ -63,9 +63,9 @@ def _zip(entradas):
     return buf.getvalue()
 
 
-def _sqlite(ruta, con_activos=True):
+def _sqlite(ruta, conActivos=True):
     conn = sqlite3.connect(str(ruta))
-    if con_activos:
+    if conActivos:
         conn.execute("CREATE TABLE activos (id TEXT PRIMARY KEY, name TEXT, type TEXT)")
         conn.execute("INSERT INTO activos VALUES ('importado', 'Importado', 'acciones')")
     else:
@@ -84,7 +84,7 @@ def _subir(client, cabeceras, ruta, contenido, **campos):
 
 # ── Importar ZIP con una base en la raíz ─────────────────────────────────────
 
-def test_una_sqlite_vacia_no_sustituye_la_cartera(cliente, tmp_path):
+def testUnaSqliteVaciaNoSustituyeLaCartera(cliente, tmp_path):
     client, cabeceras, _rutas = cliente
     vacia = tmp_path / "vacia.db"
     sqlite3.connect(str(vacia)).close()
@@ -95,9 +95,9 @@ def test_una_sqlite_vacia_no_sustituye_la_cartera(cliente, tmp_path):
     assert _activos() == ["previo"]
 
 
-def test_una_sqlite_que_no_es_un_portfolio_se_rechaza(cliente, tmp_path):
+def testUnaSqliteQueNoEsUnPortfolioSeRechaza(cliente, tmp_path):
     client, cabeceras, _rutas = cliente
-    contenido = _sqlite(tmp_path / "otra.db", con_activos=False)
+    contenido = _sqlite(tmp_path / "otra.db", conActivos=False)
 
     r = _subir(client, cabeceras, "/api/import/zip", _zip({"portfolio-2026.db": contenido}))
 
@@ -106,7 +106,7 @@ def test_una_sqlite_que_no_es_un_portfolio_se_rechaza(cliente, tmp_path):
     assert _activos() == ["previo"]
 
 
-def test_un_fichero_que_no_es_sqlite_se_rechaza(cliente):
+def testUnFicheroQueNoEsSqliteSeRechaza(cliente):
     client, cabeceras, _rutas = cliente
 
     r = _subir(client, cabeceras, "/api/import/zip", _zip({"portfolio-2026.db": b"no soy una base"}))
@@ -115,7 +115,7 @@ def test_un_fichero_que_no_es_sqlite_se_rechaza(cliente):
     assert _activos() == ["previo"]
 
 
-def test_una_importacion_valida_deja_copia_del_estado_anterior(cliente, tmp_path):
+def testUnaImportacionValidaDejaCopiaDelEstadoAnterior(cliente, tmp_path):
     client, cabeceras, rutas = cliente
     contenido = _sqlite(tmp_path / "buena.db")
 
@@ -128,11 +128,11 @@ def test_una_importacion_valida_deja_copia_del_estado_anterior(cliente, tmp_path
         assert [f[0] for f in conn.execute("SELECT id FROM activos")] == ["previo"]
 
 
-def test_sin_copia_previa_no_se_importa_nada(cliente, tmp_path, monkeypatch):
+def testSinCopiaPreviaNoSeImportaNada(cliente, tmp_path, monkeypatch):
     from routes import backup
 
     client, cabeceras, _rutas = cliente
-    monkeypatch.setattr(backup, "_safety_copy_before_restore", lambda: None)
+    monkeypatch.setattr(backup, "_safetyCopyBeforeRestore", lambda: None)
     contenido = _sqlite(tmp_path / "buena.db")
 
     r = _subir(client, cabeceras, "/api/import/zip", _zip({"portfolio-2026.db": contenido}))
@@ -141,7 +141,7 @@ def test_sin_copia_previa_no_se_importa_nada(cliente, tmp_path, monkeypatch):
     assert _activos() == ["previo"]
 
 
-def test_un_ajustes_json_que_no_es_json_no_se_escribe(cliente):
+def testUnAjustesJsonQueNoEsJsonNoSeEscribe(cliente):
     client, cabeceras, rutas = cliente
 
     r = _subir(client, cabeceras, "/api/import/zip", _zip({"ajustes.json": b"{roto"}))
@@ -150,7 +150,7 @@ def test_un_ajustes_json_que_no_es_json_no_se_escribe(cliente):
     assert not rutas["ajustes"].exists()
 
 
-def test_importar_json_tambien_deja_copia_previa(cliente):
+def testImportarJsonTambienDejaCopiaPrevia(cliente):
     client, cabeceras, rutas = cliente
 
     r = client.post(
@@ -166,7 +166,7 @@ def test_importar_json_tambien_deja_copia_previa(cliente):
 # ── Zip bombs ────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def limites_pequenos(monkeypatch):
+def limitesPequenos(monkeypatch):
     """Límites de unos pocos MB para no tener que fabricar gigas en un test."""
     from core import settings, zip_seguro
 
@@ -184,7 +184,7 @@ def _bomba(nombre, megas=8):
     ("/api/import/zip", "export-2026.json"),
     ("/api/portfolios/import", "portfolios/otra.db"),
 ])
-def test_una_bomba_se_rechaza_sin_descomprimirla(cliente, limites_pequenos, monkeypatch, ruta, nombre):
+def testUnaBombaSeRechazaSinDescomprimirla(cliente, limitesPequenos, monkeypatch, ruta, nombre):
     client, cabeceras, _rutas = cliente
     # Si llegara a descomprimirse, testzip() sería lo primero en hacerlo.
     monkeypatch.setattr(zipfile.ZipFile, "testzip", lambda self: pytest.fail("se descomprimió"))
@@ -195,7 +195,7 @@ def test_una_bomba_se_rechaza_sin_descomprimirla(cliente, limites_pequenos, monk
     assert _activos() == ["previo"]
 
 
-def test_la_restauracion_rechaza_una_bomba(cliente, limites_pequenos):
+def testLaRestauracionRechazaUnaBomba(cliente, limitesPequenos):
     client, cabeceras, rutas = cliente
     contenido = _zip({"portfolios/principal.db": b"\0" * (8 * 1024 * 1024), "portfolios.json": b"{}"})
     (rutas["backups"] / "backup_01-01-2026_00-00-00.zip").write_bytes(contenido)
@@ -206,7 +206,7 @@ def test_la_restauracion_rechaza_una_bomba(cliente, limites_pequenos):
     assert _activos() == ["previo"]
 
 
-def test_comprobar_admite_un_zip_normal_y_rechaza_la_proporcion_anomala(limites_pequenos):
+def testComprobarAdmiteUnZipNormalYRechazaLaProporcionAnomala(limitesPequenos):
     from core import zip_seguro
 
     with zipfile.ZipFile(io.BytesIO(_zip({"a.json": b'{"x": 1}' * 1000})), "r") as zf:

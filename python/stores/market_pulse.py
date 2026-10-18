@@ -19,8 +19,8 @@ import time
 
 from providers import tradingview_client
 from providers.feargreed_client import (
-    fetch_history as _fetch_fear_greed_history,
-    fetch_index as _fetch_fear_greed_index,
+    fetchHistory as _fetchFearGreedHistory,
+    fetchIndex as _fetchFearGreedIndex,
 )
 
 MAJOR_INDICES = [
@@ -103,7 +103,7 @@ def _cached(key, ttl, fetcher):
     return valor
 
 
-def _fila_stats(item, stats):
+def _filaStats(item, stats):
     datos = stats.get(item["ticker"])
     if not datos or not datos.get("close"):
         return {**item, "price": None, "change": None, "currency": None, "aum": None}
@@ -124,22 +124,22 @@ def _fila_stats(item, stats):
 def snapshot(timeout=None):
     """Cotización actual de índices y ETF de sector, en una sola petición.
 
-    Usa `fetch_stats` (no el `fetch_quotes` más ligero) porque los ETF de
+    Usa `fetchStats` (no el `fetchQuotes` más ligero) porque los ETF de
     sector necesitan además su AUM para el treemap; a los índices ese campo
     les llega `None`, que es justo lo que son.
     """
     def _fetch():
         tickers = [item["ticker"] for item in MAJOR_INDICES + SECTOR_ETFS]
-        stats = tradingview_client.fetch_stats(tickers, timeout)
+        stats = tradingview_client.fetchStats(tickers, timeout)
         return {
-            "indices": [_fila_stats(item, stats) for item in MAJOR_INDICES],
-            "sectores": [_fila_stats(item, stats) for item in SECTOR_ETFS],
+            "indices": [_filaStats(item, stats) for item in MAJOR_INDICES],
+            "sectores": [_filaStats(item, stats) for item in SECTOR_ETFS],
         }
 
     return _cached("snapshot", _SNAPSHOT_TTL, _fetch)
 
 
-def _screener_rows(payload, columns):
+def _screenerRows(payload, columns):
     """Filas del screener ya emparejadas símbolo → {columna: valor}, saltando
     las que vengan cortas (sin dato para alguna columna pedida)."""
     filas = []
@@ -152,12 +152,12 @@ def _screener_rows(payload, columns):
     return filas
 
 
-def top_movers(limit=10, timeout=None):
+def topMovers(limit=10, timeout=None):
     """Las `limit` acciones de EE. UU. que más suben y más bajan hoy."""
     def _lado(orden):
-        payload = tradingview_client.fetch_screener(
-            _LIQUID_US_FILTER, _MOVERS_COLUMNS, sort_by="change", sort_order=orden,
-            limit=limit, instrument_types=["stock"], timeout=timeout,
+        payload = tradingview_client.fetchScreener(
+            _LIQUID_US_FILTER, _MOVERS_COLUMNS, sortBy="change", sortOrder=orden,
+            limit=limit, instrumentTypes=["stock"], timeout=timeout,
         )
         return [
             {
@@ -170,7 +170,7 @@ def top_movers(limit=10, timeout=None):
                 "sector": datos.get("sector"),
                 "exchange": datos.get("exchange"),
             }
-            for symbol, datos in _screener_rows(payload, _MOVERS_COLUMNS)
+            for symbol, datos in _screenerRows(payload, _MOVERS_COLUMNS)
         ]
 
     def _fetch():
@@ -179,15 +179,15 @@ def top_movers(limit=10, timeout=None):
     return _cached(f"movers_{limit}", _MOVERS_TTL, _fetch)
 
 
-def rsi_extremes(limit=8, timeout=None):
+def rsiExtremes(limit=8, timeout=None):
     """Las `limit` acciones de EE. UU. con el RSI(14) más alto (más cerca de
     sobrecompra) y más bajo (más cerca de sobreventa) hoy, en el mismo
-    universo líquido que `top_movers`.
+    universo líquido que `topMovers`.
     """
     def _lado(orden):
-        payload = tradingview_client.fetch_screener(
-            _LIQUID_US_FILTER, _RSI_COLUMNS, sort_by="RSI", sort_order=orden,
-            limit=limit, instrument_types=["stock"], timeout=timeout,
+        payload = tradingview_client.fetchScreener(
+            _LIQUID_US_FILTER, _RSI_COLUMNS, sortBy="RSI", sortOrder=orden,
+            limit=limit, instrumentTypes=["stock"], timeout=timeout,
         )
         return [
             {
@@ -200,7 +200,7 @@ def rsi_extremes(limit=8, timeout=None):
                 "sector": datos.get("sector"),
                 "exchange": datos.get("exchange"),
             }
-            for symbol, datos in _screener_rows(payload, _RSI_COLUMNS)
+            for symbol, datos in _screenerRows(payload, _RSI_COLUMNS)
         ]
 
     def _fetch():
@@ -209,15 +209,15 @@ def rsi_extremes(limit=8, timeout=None):
     return _cached(f"rsi_{limit}", _MOVERS_TTL, _fetch)
 
 
-def unusual_volume(limit=8, timeout=None):
+def unusualVolume(limit=8, timeout=None):
     """Las `limit` acciones de EE. UU. cuyo volumen de hoy está más por
     encima de su propia media de 10 días: señal de que "algo está pasando"
     ahí, no una lista de qué acciones vigilar fijada de antemano.
     """
     def _fetch():
-        payload = tradingview_client.fetch_screener(
-            _LIQUID_US_FILTER, _VOLUME_COLUMNS, sort_by="relative_volume_10d_calc",
-            sort_order="desc", limit=limit, instrument_types=["stock"], timeout=timeout,
+        payload = tradingview_client.fetchScreener(
+            _LIQUID_US_FILTER, _VOLUME_COLUMNS, sortBy="relative_volume_10d_calc",
+            sortOrder="desc", limit=limit, instrumentTypes=["stock"], timeout=timeout,
         )
         return [
             {
@@ -230,7 +230,7 @@ def unusual_volume(limit=8, timeout=None):
                 "sector": datos.get("sector"),
                 "exchange": datos.get("exchange"),
             }
-            for symbol, datos in _screener_rows(payload, _VOLUME_COLUMNS)
+            for symbol, datos in _screenerRows(payload, _VOLUME_COLUMNS)
         ]
 
     return _cached(f"volume_{limit}", _MOVERS_TTL, _fetch)
@@ -238,10 +238,10 @@ def unusual_volume(limit=8, timeout=None):
 
 def breadth(timeout=None):
     """Cuántas acciones del mismo universo suben, bajan o están planas hoy."""
-    def _contar(extra_filter):
-        payload = tradingview_client.fetch_screener(
-            _LIQUID_US_FILTER + extra_filter, ["name"], limit=1,
-            instrument_types=["stock"], timeout=timeout,
+    def _contar(extraFilter):
+        payload = tradingview_client.fetchScreener(
+            _LIQUID_US_FILTER + extraFilter, ["name"], limit=1,
+            instrumentTypes=["stock"], timeout=timeout,
         )
         return int(payload.get("totalCount") or 0)
 
@@ -255,16 +255,16 @@ def breadth(timeout=None):
     return _cached("breadth", _BREADTH_TTL, _fetch)
 
 
-def top_cryptos(limit=30, timeout=None):
+def topCryptos(limit=30, timeout=None):
     """Las `limit` criptomonedas de mayor capitalización, una fila por moneda
     (no por par de cotización): el mismo par de cotización se repite en
     docenas de exchanges, así que se piden de golpe más filas de las que hacen
     falta (300) y se corta en la primera vez que aparece cada `base_currency`.
     """
     def _fetch():
-        payload = tradingview_client.fetch_screener(
-            [], _CRYPTO_COLUMNS, sort_by="market_cap_calc", sort_order="desc",
-            limit=300, instrument_types=["spot"], market="crypto", timeout=timeout,
+        payload = tradingview_client.fetchScreener(
+            [], _CRYPTO_COLUMNS, sortBy="market_cap_calc", sortOrder="desc",
+            limit=300, instrumentTypes=["spot"], market="crypto", timeout=timeout,
         )
         vistos = set()
         filas = []
@@ -293,16 +293,16 @@ def top_cryptos(limit=30, timeout=None):
     return _cached(f"cryptos_{limit}", _MOVERS_TTL, _fetch)
 
 
-def top_nasdaq100(limit=40, timeout=None):
+def topNasdaq100(limit=40, timeout=None):
     """Las `limit` acciones de mayor capitalización que estén hoy en el
     Nasdaq 100 de verdad (columna `indexes` de TradingView), no una lista de
     tickers copiada a mano que se desactualiza en cada rebalanceo del índice.
     """
     def _fetch():
-        payload = tradingview_client.fetch_screener(
+        payload = tradingview_client.fetchScreener(
             [{"left": "exchange", "operation": "in_range", "right": ["NASDAQ"]}],
-            _NASDAQ100_COLUMNS, sort_by="market_cap_basic", sort_order="desc",
-            limit=300, instrument_types=["stock"], timeout=timeout,
+            _NASDAQ100_COLUMNS, sortBy="market_cap_basic", sortOrder="desc",
+            limit=300, instrumentTypes=["stock"], timeout=timeout,
         )
         filas = []
         for row in payload.get("data") or []:
@@ -334,7 +334,7 @@ def top_nasdaq100(limit=40, timeout=None):
 # el mosaico: symbol para el gráfico, primary/secondary para el texto, change
 # para el color, size para el área y price/currency/sizeLabel para el tooltip
 # al pasar el cursor.
-def _universe_sp500():
+def _universeSp500():
     return [
         {
             "symbol": s["ticker"], "primary": s["label"], "secondary": "",
@@ -352,32 +352,32 @@ def _universe_sp500():
 _UNIVERSE_TREEMAP_LIMIT = 24
 
 
-def _universe_cripto():
+def _universeCripto():
     return [
         {
             "symbol": c["symbol"], "primary": c["ticker"], "secondary": c["name"],
             "change": c["change"], "size": c["marketCap"], "sizeLabel": "Capitalización de mercado",
             "price": c["price"], "currency": "USD",
         }
-        for c in top_cryptos(limit=_UNIVERSE_TREEMAP_LIMIT)
+        for c in topCryptos(limit=_UNIVERSE_TREEMAP_LIMIT)
     ]
 
 
-def _universe_nasdaq100():
+def _universeNasdaq100():
     return [
         {
             "symbol": n["symbol"], "primary": n["ticker"], "secondary": n["name"],
             "change": n["change"], "size": n["marketCap"], "sizeLabel": "Capitalización de mercado",
             "price": n["price"], "currency": "USD",
         }
-        for n in top_nasdaq100(limit=_UNIVERSE_TREEMAP_LIMIT)
+        for n in topNasdaq100(limit=_UNIVERSE_TREEMAP_LIMIT)
     ]
 
 
 _UNIVERSES = {
-    "sp500": _universe_sp500,
-    "cripto": _universe_cripto,
-    "nasdaq100": _universe_nasdaq100,
+    "sp500": _universeSp500,
+    "cripto": _universeCripto,
+    "nasdaq100": _universeNasdaq100,
 }
 
 
@@ -398,7 +398,7 @@ def universe(clave):
     return _cached(f"universe_{clave}", _UNIVERSE_TTL, _fetch)
 
 
-def fear_greed(timeout=None):
+def fearGreed(timeout=None):
     """`(datos, None)` o `(None, error)`. Cacheado una hora: la fuente lo
     actualiza como mucho una vez al día, no merece pedirlo en cada visita.
     """
@@ -407,7 +407,7 @@ def fear_greed(timeout=None):
     if cacheado and ahora - cacheado["ts"] < _FEAR_GREED_TTL:
         return cacheado["valor"], None
 
-    datos, error = _fetch_fear_greed_index(timeout)
+    datos, error = _fetchFearGreedIndex(timeout)
     if error:
         return None, error
 
@@ -415,7 +415,7 @@ def fear_greed(timeout=None):
     return datos, None
 
 
-def fear_greed_history(days=_FEAR_GREED_HISTORY_DAYS, timeout=None):
+def fearGreedHistory(days=_FEAR_GREED_HISTORY_DAYS, timeout=None):
     """El histórico del índice, el más reciente primero. `(lista, None)` o
     `([], error)`. Cacheado una hora, igual que `fear_greed`.
     """
@@ -425,7 +425,7 @@ def fear_greed_history(days=_FEAR_GREED_HISTORY_DAYS, timeout=None):
     if cacheado and ahora - cacheado["ts"] < _FEAR_GREED_HISTORY_TTL:
         return cacheado["valor"], None
 
-    serie, error = _fetch_fear_greed_history(days, timeout)
+    serie, error = _fetchFearGreedHistory(days, timeout)
     if error:
         return [], error
 

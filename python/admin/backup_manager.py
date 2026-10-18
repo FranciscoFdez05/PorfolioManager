@@ -23,7 +23,7 @@ from pathlib import Path
 
 from core import paths, settings, telegram_notifier
 from core.bloqueo import exclusivo
-from core.copia_sqlite import copiar as copiar_sqlite
+from core.copia_sqlite import copiar as copiarSqlite
 from core.escritura import temporalPara
 from core.paths import (
     AUTO_BACKUPS_DIR as _BACKUP_DIR,
@@ -35,11 +35,11 @@ log = logging.getLogger(__name__)
 # El scheduler puede coexistir con una creación durante el arranque. Serializar
 # ambos evita que dos copias SQLite escriban el mismo temporal a la vez.
 _AUTO_BACKUP_LOCK = threading.Lock()
-_scheduler_thread = None
-_scheduler_started = False
+_schedulerThread = None
+_schedulerStarted = False
 
 
-def _configured_backup_days() -> int:
+def _configuredBackupDays() -> int:
     """Frecuencia elegida en Ajustes, con 0 como desactivado."""
     try:
         raw = json.loads((_JSON_DIR / "ajustes.json").read_text("utf-8"))
@@ -48,7 +48,7 @@ def _configured_backup_days() -> int:
         return 0
 
 
-def _last_backup_date():
+def _lastBackupDate():
     """Fecha de la última copia automática, en cualquiera de sus dos formatos.
 
     Los zips `backup_<fecha>_auto.zip` de data/backups/ son los actuales; los
@@ -75,15 +75,15 @@ def _last_backup_date():
     return max(fechas) if fechas else None
 
 
-def _backup_is_due() -> bool:
-    days = _configured_backup_days()
+def _backupIsDue() -> bool:
+    days = _configuredBackupDays()
     if days <= 0:
         return False
-    last = _last_backup_date()
+    last = _lastBackupDate()
     return last is None or (datetime.now().date() - last).days >= days
 
 
-def _dated_backups(db_stem: str):
+def _datedBackups(dbStem: str):
     """Backups diarios de ESTE portfolio, ordenados de más antiguo a más reciente.
 
     No se puede usar glob(f"{stem}_*.db"): el patrón de 'principal' también casa
@@ -92,27 +92,27 @@ def _dated_backups(db_stem: str):
     backup recién creado del portfolio activo (ordenaba antes que los
     '_recovered_') y que la restauración eligiese la copia de otro portfolio.
     """
-    pattern = re.compile(rf"^{re.escape(db_stem)}_(\d{{4}}-\d{{2}}-\d{{2}})\.db$")
+    pattern = re.compile(rf"^{re.escape(dbStem)}_(\d{{4}}-\d{{2}}-\d{{2}})\.db$")
     matches = []
-    for path in _BACKUP_DIR.glob(f"{db_stem}_*.db"):
+    for path in _BACKUP_DIR.glob(f"{dbStem}_*.db"):
         m = pattern.match(path.name)
         if m:
             matches.append((m.group(1), path))
     return [path for _, path in sorted(matches)]
 
 
-def _remove_wal_sidecars(db_path: Path):
+def _removeWalSidecars(dbPath: Path):
     """Elimina ficheros -wal/-shm obsoletos. Imprescindible tras sustituir un .db:
     un WAL viejo se re-aplicaría sobre la BD restaurada y la corrompería."""
     for suffix in ("-wal", "-shm"):
-        sidecar = Path(str(db_path) + suffix)
+        sidecar = Path(str(dbPath) + suffix)
         try:
             sidecar.unlink(missing_ok=True)
         except Exception as e:
             log.warning(f"[backup] No se pudo eliminar {sidecar.name}: {e}")
 
 
-def _estado_integridad(db_path: Path) -> str:
+def _estadoIntegridad(dbPath: Path) -> str:
     """'ok', 'dañada' u 'ocupada'.
 
     Distinguir la última importa: «database is locked» no dice nada sobre el
@@ -121,25 +121,25 @@ def _estado_integridad(db_path: Path) -> str:
     una base perfectamente sana. Se reintenta unas veces y, si sigue ocupada, se
     devuelve 'ocupada' para que quien llama la deje en paz hasta la próxima pasada.
     """
-    ultimo_error = None
+    ultimoError = None
     for intento in range(3):
         conn = None
         try:
-            conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
+            conn = sqlite3.connect(str(dbPath), timeout=settings.backupSqliteTimeout())
             result = conn.execute("PRAGMA integrity_check").fetchone()
             if not (result and result[0] == "ok"):
                 return "dañada"
             return "ok" if not conn.execute("PRAGMA foreign_key_check").fetchall() else "dañada"
         except sqlite3.OperationalError as e:
-            ultimo_error = e
+            ultimoError = e
             texto = str(e).lower()
             if "locked" in texto or "busy" in texto:
                 time.sleep(1 + intento)
                 continue
-            log.error(f"[backup] Error comprobando integridad de {db_path.name}: {e}")
+            log.error(f"[backup] Error comprobando integridad de {dbPath.name}: {e}")
             return "dañada"
         except Exception as e:
-            log.error(f"[backup] Error comprobando integridad de {db_path.name}: {e}")
+            log.error(f"[backup] Error comprobando integridad de {dbPath.name}: {e}")
             return "dañada"
         finally:
             if conn is not None:
@@ -147,16 +147,16 @@ def _estado_integridad(db_path: Path) -> str:
                     conn.close()
                 except Exception:
                     pass
-    log.warning(f"[backup] {db_path.name} sigue ocupada, no se puede comprobar: {ultimo_error}")
+    log.warning(f"[backup] {dbPath.name} sigue ocupada, no se puede comprobar: {ultimoError}")
     return "ocupada"
 
 
-def check_integrity(db_path: Path) -> bool:
+def checkIntegrity(dbPath: Path) -> bool:
     """Devuelve True si la BD pasa integrity_check y foreign_key_check."""
-    return _estado_integridad(db_path) == "ok"
+    return _estadoIntegridad(dbPath) == "ok"
 
 
-def problema_de_portfolio(db_path: Path, exigir_activos: bool = True) -> str | None:
+def problemaDePortfolio(dbPath: Path, exigirActivos: bool = True) -> str | None:
     """Motivo por el que un .db subido no puede ocupar el lugar de un portfolio.
 
     None si es una base SQLite íntegra con la tabla `activos`. Lo comparten
@@ -168,7 +168,7 @@ def problema_de_portfolio(db_path: Path, exigir_activos: bool = True) -> str | N
     comprobar que fuese legible entera (antes solo se miraba la cabecera).
     """
     try:
-        with open(db_path, "rb") as f:
+        with open(dbPath, "rb") as f:
             if not f.read(16).startswith(b"SQLite format 3\x00"):
                 return "El fichero no es una base de datos SQLite"
     except OSError as e:
@@ -176,7 +176,7 @@ def problema_de_portfolio(db_path: Path, exigir_activos: bool = True) -> str | N
 
     conn = None
     try:
-        conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
+        conn = sqlite3.connect(str(dbPath), timeout=settings.backupSqliteTimeout())
         # El fichero viene de fuera (una copia, un ZIP de otra persona): que su
         # esquema no pueda ejecutar funciones desde vistas o disparadores
         # mientras se inspecciona.
@@ -184,7 +184,7 @@ def problema_de_portfolio(db_path: Path, exigir_activos: bool = True) -> str | N
         result = conn.execute("PRAGMA integrity_check").fetchone()
         if not result or result[0] != "ok":
             return "La base de datos está corrupta"
-        if exigir_activos and not conn.execute(
+        if exigirActivos and not conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='activos'"
         ).fetchone():
             return "El fichero no es un portfolio de esta aplicación"
@@ -196,7 +196,7 @@ def problema_de_portfolio(db_path: Path, exigir_activos: bool = True) -> str | N
     return None
 
 
-def _checkpoint_and_copy(db_path: Path, backup_path: Path):
+def _checkpointAndCopy(dbPath: Path, backupPath: Path):
     """Copia consistente vía API de backup de SQLite (incluye WAL pendiente)
     a un temporal y rename atómico al destino.
 
@@ -205,15 +205,15 @@ def _checkpoint_and_copy(db_path: Path, backup_path: Path):
     arrancar y en cada comprobación horaria. Escribían el mismo fichero desde
     dos procesos y renombraban encima la mezcla.
     """
-    with temporalPara(backup_path) as tmp:
-        copiar_sqlite(db_path, tmp)
-        tmp.replace(backup_path)
+    with temporalPara(backupPath) as tmp:
+        copiarSqlite(dbPath, tmp)
+        tmp.replace(backupPath)
 
 
-def backup_previo_a_migracion(db_path: Path, desde: int, hasta: int):
+def backupPrevioAMigracion(dbPath: Path, desde: int, hasta: int):
     """Copia de seguridad justo antes de subir el esquema. Devuelve la ruta o None.
 
-    Ya existe un backup diario que se hace al arrancar (`run_startup_backup`) y
+    Ya existe un backup diario que se hace al arrancar (`runStartupBackup`) y
     que, por el orden en que server.py llama a las cosas, siempre es anterior a
     las migraciones. Lo que no da es un punto de retorno **identificable**: se
     llama `<portfolio>_2026-08-25.db` igual que los otros, así que para volver
@@ -222,24 +222,24 @@ def backup_previo_a_migracion(db_path: Path, desde: int, hasta: int):
     aparecer.
 
     Esta copia se hace solo cuando de verdad va a migrar, lleva el salto en el
-    nombre y **queda fuera de la rotación**: `_dated_backups()` solo reconoce el
+    nombre y **queda fuera de la rotación**: `_datedBackups()` solo reconoce el
     patrón `<stem>_AAAA-MM-DD.db`, y este no encaja, así que nunca se elige para
     borrar. Son unos pocos ficheros en la vida del proyecto, uno por cada
     versión del esquema.
     """
-    db_path = Path(db_path)
-    if not db_path.exists():
+    dbPath = Path(dbPath)
+    if not dbPath.exists():
         return None
 
     _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     marca = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    destino = _BACKUP_DIR / f"{db_path.stem}_pre-esquema-{desde}-a-{hasta}_{marca}.db"
+    destino = _BACKUP_DIR / f"{dbPath.stem}_pre-esquema-{desde}-a-{hasta}_{marca}.db"
 
-    _checkpoint_and_copy(db_path, destino)
+    _checkpointAndCopy(dbPath, destino)
     return destino
 
 
-def run_startup_backup(db_path: Path):
+def runStartupBackup(dbPath: Path):
     """Comprueba el DB y crea una copia automática cuando toca.
 
     La frecuencia de Ajustes se respeta al arrancar y desde el scheduler. Antes
@@ -252,8 +252,8 @@ def run_startup_backup(db_path: Path):
        «Límite de backups».
     3. Inserta snapshot diario si no existe.
     """
-    db_path = Path(db_path)
-    if not db_path.exists():
+    dbPath = Path(dbPath)
+    if not dbPath.exists():
         return
 
     # Un intento sin espera. Los dos workers de gunicorn llegan aquí a la vez
@@ -261,59 +261,59 @@ def run_startup_backup(db_path: Path):
     # dos verificaban, reparaban, copiaban y rotaban los mismos ficheros en
     # paralelo. Basta con que lo haga uno: el que no consiga el bloqueo se lo
     # salta, porque el trabajo es el mismo y ya se está haciendo.
-    with exclusivo(_ruta_bloqueo(), obligatorio=False) as conseguido:
+    with exclusivo(_rutaBloqueo(), obligatorio=False) as conseguido:
         if not conseguido:
             log.info("[backup] Otro proceso está con la copia automática; se omite.")
             return False
-        return _run_startup_backup_locked(db_path)
+        return _runStartupBackupLocked(dbPath)
 
 
-def _portfolios_a_vigilar(db_path: Path):
-    rutas = [db_path]
+def _portfoliosAVigilar(dbPath: Path):
+    rutas = [dbPath]
     carpeta = getattr(paths, "PORTFOLIOS_DIR", None)
     if carpeta and Path(carpeta).exists():
-        rutas += [r for r in sorted(Path(carpeta).glob("*.db")) if r != db_path]
+        rutas += [r for r in sorted(Path(carpeta).glob("*.db")) if r != dbPath]
     return rutas
 
 
-def _vigilar_integridad(db_path: Path):
-    estado = _estado_integridad(db_path)
+def _vigilarIntegridad(dbPath: Path):
+    estado = _estadoIntegridad(dbPath)
     if estado == "ok":
-        log.info(f"[backup] Integridad OK: {db_path.name}")
+        log.info(f"[backup] Integridad OK: {dbPath.name}")
         return
     if estado == "ocupada":
         return
 
-    log.error(f"[backup] ¡INTEGRIDAD FALLIDA en {db_path.name}! Intentando reparación.")
-    if _emergency_repair(db_path):
+    log.error(f"[backup] ¡INTEGRIDAD FALLIDA en {dbPath.name}! Intentando reparación.")
+    if _emergencyRepair(dbPath):
         telegram_notifier.notificar(
             "sistema",
-            f"🚨 La base de datos {db_path.name} estaba dañada y se ha reparado sola.\n"
+            f"🚨 La base de datos {dbPath.name} estaba dañada y se ha reparado sola.\n"
             "La copia dañada se ha guardado por si hace falta. Revisa que los datos estén bien.",
         )
         return
 
     log.error("[backup] Reparación fallida. Intentando restaurar desde backup automático.")
-    restaurada = _restore_from_latest_auto_backup(db_path)
+    restaurada = _restoreFromLatestAutoBackup(dbPath)
     telegram_notifier.notificar(
         "sistema",
-        f"🚨 La base de datos {db_path.name} estaba dañada y no se pudo reparar.\n"
+        f"🚨 La base de datos {dbPath.name} estaba dañada y no se pudo reparar.\n"
         + ("Se ha restaurado desde la última copia válida: puede faltar lo último que guardaste."
            if restaurada else "No se ha encontrado ninguna copia válida. Hay que intervenir a mano."),
     )
 
 
-def _run_startup_backup_locked(db_path: Path):
+def _runStartupBackupLocked(dbPath: Path):
     _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
     # ── 1. Integridad de los portfolios ─────────────────────────────────────
     # Todos, no solo el activo: una copia con un portfolio dañado se rechaza
-    # (ver `_escribir_backup`), y si nadie lo arreglaba las copias dejaban de
+    # (ver `_escribirBackup`), y si nadie lo arreglaba las copias dejaban de
     # hacerse sin que nadie lo notase.
-    for ruta in _portfolios_a_vigilar(db_path):
-        _vigilar_integridad(ruta)
+    for ruta in _portfoliosAVigilar(dbPath):
+        _vigilarIntegridad(ruta)
 
-    if not _backup_is_due():
+    if not _backupIsDue():
         return False
 
     # ── 2. Copia completa, la misma que «Crear backup ahora» ────────────────
@@ -321,40 +321,40 @@ def _run_startup_backup_locked(db_path: Path):
     # ser al cargar. Es el mismo zip y la misma rotación que el botón; hasta la
     # 2.1.0 el automático dejaba un .db por portfolio en backups/auto/, que
     # la lista de Ajustes no enseñaba y desde la que no se podía restaurar.
-    from routes.backup import crear_backup_automatico
+    from routes.backup import crearBackupAutomatico
 
     try:
-        nombre = crear_backup_automatico()
+        nombre = crearBackupAutomatico()
         log.info(f"[backup] Copia automática creada: {nombre}")
     except Exception as e:
         # Se deja sin copia y se vuelve a intentar en la siguiente pasada del
-        # scheduler: _last_backup_date no verá ninguna de hoy.
+        # scheduler: _lastBackupDate no verá ninguna de hoy.
         log.error(f"[backup] Error al crear la copia automática: {e}")
         return False
 
     # ── 3. Snapshot diario ──────────────────────────────────────────────────
-    _ensure_daily_snapshot(db_path)
+    _ensureDailySnapshot(dbPath)
     return True
 
 
-def check_scheduled_backup():
+def checkScheduledBackup():
     """Comprueba la frecuencia sin depender de reiniciar el servidor.
 
     El `threading.Lock` serializa los hilos de este proceso; de los otros
-    workers se encarga el bloqueo de fichero de `run_startup_backup`.
+    workers se encarga el bloqueo de fichero de `runStartupBackup`.
     """
-    from core.db import get_active_db_path
+    from core.db import getActiveDbPath
 
     with _AUTO_BACKUP_LOCK:
         try:
-            return run_startup_backup(get_active_db_path())
+            return runStartupBackup(getActiveDbPath())
         except Exception as e:
             # Un fallo de I/O no debe matar el hilo; se reintentará después.
             log.error("[backup] Comprobación automática fallida: %s", e)
             return False
 
 
-def _ruta_bloqueo():
+def _rutaBloqueo():
     """Fichero de bloqueo de las copias automáticas, común a todos los workers.
 
     Se lee de `paths` en cada llamada para que los tests, que redirigen los
@@ -363,28 +363,28 @@ def _ruta_bloqueo():
     return paths.TMP_DIR / "backup-automatico.lock"
 
 
-def _scheduler_loop(interval_seconds: int):
+def _schedulerLoop(intervalSeconds: int):
     while True:
-        time.sleep(interval_seconds)
-        check_scheduled_backup()
+        time.sleep(intervalSeconds)
+        checkScheduledBackup()
 
 
-def start_scheduler(interval_seconds: int = 3600):
+def startScheduler(intervalSeconds: int = 3600):
     """Inicia una única comprobación horaria de las copias automáticas."""
-    global _scheduler_started, _scheduler_thread
-    if _scheduler_started:
+    global _schedulerStarted, _schedulerThread
+    if _schedulerStarted:
         return
-    _scheduler_started = True
-    _scheduler_thread = threading.Thread(
-        target=_scheduler_loop,
-        args=(max(60, int(interval_seconds)),),
+    _schedulerStarted = True
+    _schedulerThread = threading.Thread(
+        target=_schedulerLoop,
+        args=(max(60, int(intervalSeconds)),),
         name="backup-scheduler",
         daemon=True,
     )
-    _scheduler_thread.start()
+    _schedulerThread.start()
 
 
-def _candidatos_de_restauracion(db_stem: str):
+def _candidatosDeRestauracion(dbStem: str):
     """Copias de `db_stem` de las que se puede recuperar, de más nueva a más vieja.
 
     Genera pares (nombre, ruta a un .db ya extraído). Primero los zips de
@@ -392,23 +392,23 @@ def _candidatos_de_restauracion(db_stem: str):
     de cada uno la entrada `portfolios/<stem>.db` a un temporal; después los
     `.db` diarios de versiones anteriores que sigan en backups/auto/.
     """
-    zips = sorted(paths.BACKUPS_DIR.glob("backup_*.zip"), key=_fecha_del_zip, reverse=True)
-    for ruta_zip in zips:
+    zips = sorted(paths.BACKUPS_DIR.glob("backup_*.zip"), key=_fechaDelZip, reverse=True)
+    for rutaZip in zips:
         try:
-            with zipfile.ZipFile(str(ruta_zip)) as zf:
-                entrada = f"portfolios/{db_stem}.db"
+            with zipfile.ZipFile(str(rutaZip)) as zf:
+                entrada = f"portfolios/{dbStem}.db"
                 if entrada not in zf.namelist():
                     continue
-                with temporalPara(paths.BACKUPS_DIR / f"{db_stem}.db", directorio=paths.TMP_DIR) as tmp:
+                with temporalPara(paths.BACKUPS_DIR / f"{dbStem}.db", directorio=paths.TMP_DIR) as tmp:
                     tmp.write_bytes(zf.read(entrada))
-                    yield ruta_zip.name, tmp
+                    yield rutaZip.name, tmp
         except (OSError, zipfile.BadZipFile) as e:
-            log.warning(f"[backup] {ruta_zip.name} no se puede leer: {e}")
-    for candidato in reversed(_dated_backups(db_stem)):
+            log.warning(f"[backup] {rutaZip.name} no se puede leer: {e}")
+    for candidato in reversed(_datedBackups(dbStem)):
         yield candidato.name, candidato
 
 
-def _fecha_del_zip(ruta: Path):
+def _fechaDelZip(ruta: Path):
     match = re.search(r"(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})", ruta.name)
     try:
         return datetime.strptime(match.group(1), "%d-%m-%Y_%H-%M-%S") if match else datetime.min
@@ -416,14 +416,14 @@ def _fecha_del_zip(ruta: Path):
         return datetime.min
 
 
-def _avisar_sustitucion() -> None:
+def _avisarSustitucion() -> None:
     """El .db se acaba de sustituir por otro fichero: que todos los procesos
-    reabran sus conexiones (ver core.db.invalidate_all_connections)."""
-    from core.db import invalidate_all_connections
-    invalidate_all_connections()
+    reabran sus conexiones (ver core.db.invalidateAllConnections)."""
+    from core.db import invalidateAllConnections
+    invalidateAllConnections()
 
 
-def _restore_from_latest_auto_backup(db_path: Path):
+def _restoreFromLatestAutoBackup(dbPath: Path):
     """Restaura db_path desde la copia válida más reciente. True si lo consiguió.
 
     La sustitución es atómica —temporal junto al destino y rename—: un `copy2`
@@ -432,59 +432,59 @@ def _restore_from_latest_auto_backup(db_path: Path):
     (disco justo) no puede impedir la restauración. Lo copiado se vuelve a
     comprobar antes de sustituir; si no pasa, se prueba con la copia anterior.
     """
-    corrupted_copy = _BACKUP_DIR / f"{db_path.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    corruptedCopy = _BACKUP_DIR / f"{dbPath.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
     guardada = False
-    for nombre, candidate in _candidatos_de_restauracion(db_path.stem):
-        if not check_integrity(candidate):
+    for nombre, candidate in _candidatosDeRestauracion(dbPath.stem):
+        if not checkIntegrity(candidate):
             log.warning(f"[backup] La copia {nombre} tampoco pasa la integridad; se prueba la anterior.")
             continue
         try:
             if not guardada:
                 try:
-                    shutil.copy2(str(db_path), str(corrupted_copy))
+                    shutil.copy2(str(dbPath), str(corruptedCopy))
                     guardada = True
                 except Exception as e:
                     log.warning(f"[backup] No se pudo guardar la copia dañada: {e}")
-            with temporalPara(db_path) as tmp:
+            with temporalPara(dbPath) as tmp:
                 shutil.copy2(str(candidate), str(tmp))
-                if not check_integrity(tmp):
+                if not checkIntegrity(tmp):
                     log.error(f"[backup] La copia de {nombre} salió dañada al copiarla.")
                     continue
-                _remove_wal_sidecars(db_path)
-                tmp.replace(db_path)
-            _remove_wal_sidecars(db_path)
-            _avisar_sustitucion()
+                _removeWalSidecars(dbPath)
+                tmp.replace(dbPath)
+            _removeWalSidecars(dbPath)
+            _avisarSustitucion()
             log.info(f"[backup] Restaurado desde la copia: {nombre}")
             return True
         except Exception as e:
             log.error(f"[backup] Error restaurando desde {nombre}: {e}")
-    log.error(f"[backup] No se encontró ninguna copia válida para {db_path.name}")
+    log.error(f"[backup] No se encontró ninguna copia válida para {dbPath.name}")
     return False
 
 
-def _ensure_daily_snapshot(db_path: Path):
+def _ensureDailySnapshot(dbPath: Path):
     """Si no existe snapshot del día actual, duplica el último con timestamp de hoy."""
     import time
     conn = None
     try:
-        conn = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
+        conn = sqlite3.connect(str(dbPath), timeout=settings.backupSqliteTimeout())
         conn.row_factory = sqlite3.Row
-        now_ts = int(time.time())
-        today_start = now_ts - (now_ts % 86400)
-        has_today = conn.execute(
-            "SELECT 1 FROM portfolio_snapshots WHERE ts >= ? LIMIT 1", (today_start,)
+        nowTs = int(time.time())
+        todayStart = nowTs - (nowTs % 86400)
+        hasToday = conn.execute(
+            "SELECT 1 FROM portfolio_snapshots WHERE ts >= ? LIMIT 1", (todayStart,)
         ).fetchone()
-        if not has_today:
+        if not hasToday:
             last = conn.execute(
                 "SELECT total_value, total_invested FROM portfolio_snapshots ORDER BY ts DESC LIMIT 1"
             ).fetchone()
             if last:
                 conn.execute(
                     "INSERT INTO portfolio_snapshots (ts, total_value, total_invested) VALUES (?, ?, ?)",
-                    (now_ts, last["total_value"], last["total_invested"])
+                    (nowTs, last["total_value"], last["total_invested"])
                 )
                 conn.commit()
-                log.info(f"[backup] Snapshot diario insertado para {db_path.name}")
+                log.info(f"[backup] Snapshot diario insertado para {dbPath.name}")
     except Exception as e:
         log.warning(f"[backup] No se pudo insertar snapshot diario: {e}")
     finally:
@@ -495,7 +495,7 @@ def _ensure_daily_snapshot(db_path: Path):
                 pass
 
 
-def _emergency_repair(db_path: Path) -> bool:
+def _emergencyRepair(dbPath: Path) -> bool:
     """Dump + restore para recuperar una BD corrupta. Devuelve True si tuvo éxito.
 
     La base reconstruida se arma en `data/tmp` y no como `<portfolio>.repair.db`
@@ -503,36 +503,36 @@ def _emergency_repair(db_path: Path) -> bool:
     los `glob("*.db")` del proyecto, y el nombre era además el mismo para los dos
     workers de gunicorn, que llegan aquí a la vez cuando una base está dañada.
     """
-    corrupted_backup = _BACKUP_DIR / f"{db_path.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-    with temporalPara(db_path, directorio=paths.TMP_DIR) as repair_path:
-        return _reparar_en(db_path, repair_path, corrupted_backup)
+    corruptedBackup = _BACKUP_DIR / f"{dbPath.stem}_CORRUPTED_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    with temporalPara(dbPath, directorio=paths.TMP_DIR) as repairPath:
+        return _repararEn(dbPath, repairPath, corruptedBackup)
 
 
-def _reparar_en(db_path: Path, repair_path: Path, corrupted_backup: Path) -> bool:
-    """El trabajo de _emergency_repair, ya con el temporal reservado."""
+def _repararEn(dbPath: Path, repairPath: Path, corruptedBackup: Path) -> bool:
+    """El trabajo de _emergencyRepair, ya con el temporal reservado."""
     try:
-        src = sqlite3.connect(str(db_path), timeout=settings.backupSqliteTimeout())
+        src = sqlite3.connect(str(dbPath), timeout=settings.backupSqliteTimeout())
         dump = list(src.iterdump())
         src.close()
 
-        if repair_path.exists():
-            repair_path.unlink()
-        dst = sqlite3.connect(str(repair_path), timeout=settings.backupSqliteTimeout())
+        if repairPath.exists():
+            repairPath.unlink()
+        dst = sqlite3.connect(str(repairPath), timeout=settings.backupSqliteTimeout())
         dst.executescript("\n".join(dump))
         dst.close()
 
-        if check_integrity(repair_path):
-            shutil.copy2(str(db_path), str(corrupted_backup))
-            shutil.move(str(repair_path), str(db_path))
-            _remove_wal_sidecars(db_path)
-            _avisar_sustitucion()
-            log.info(f"[backup] Reparación automática OK. Corrupta guardada en {corrupted_backup.name}")
+        if checkIntegrity(repairPath):
+            shutil.copy2(str(dbPath), str(corruptedBackup))
+            shutil.move(str(repairPath), str(dbPath))
+            _removeWalSidecars(dbPath)
+            _avisarSustitucion()
+            log.info(f"[backup] Reparación automática OK. Corrupta guardada en {corruptedBackup.name}")
             return True
         else:
             log.error("[backup] La reparación automática no pudo resolver la corrupción.")
-            repair_path.unlink(missing_ok=True)
+            repairPath.unlink(missing_ok=True)
             return False
     except Exception as e:
         log.error(f"[backup] Error en reparación de emergencia: {e}")
-        repair_path.unlink(missing_ok=True)
+        repairPath.unlink(missing_ok=True)
         return False

@@ -4,95 +4,95 @@ from flask import Blueprint, jsonify, request
 
 from stores import revisiones
 from stores.ingresos_store import (
-    create_default_ingresos_year,
-    delete_ingresos_year,
-    list_ingresos_years,
-    normalize_year,
-    read_ingresos_types,
-    read_ingresos_year,
-    sanitize_ingresos_payload,
-    sanitize_ingresos_types,
-    write_ingresos_types,
-    write_ingresos_year,
+    createDefaultIngresosYear,
+    deleteIngresosYear as borrarAnioIngresos,
+    listIngresosYears,
+    normalizeYear,
+    readIngresosTypes,
+    readIngresosYear,
+    sanitizeIngresosPayload,
+    sanitizeIngresosTypes,
+    writeIngresosTypes,
+    writeIngresosYear,
 )
 
-ingresos_bp = Blueprint("ingresos", __name__)
+ingresosBp = Blueprint("ingresos", __name__)
 
 
-@ingresos_bp.route("/api/ingresos", methods=["GET"])
+@ingresosBp.route("/api/ingresos", methods=["GET"])
 def getIngresosYears():
-    years = list_ingresos_years()
+    years = listIngresosYears()
 
     if not years:
-        default_year = str(date.today().year)
-        payload = create_default_ingresos_year(default_year)
-        write_ingresos_year(default_year, payload)
-        years = [default_year]
+        defaultYear = str(date.today().year)
+        payload = createDefaultIngresosYear(defaultYear)
+        writeIngresosYear(defaultYear, payload)
+        years = [defaultYear]
 
     return jsonify({"years": years})
 
 
-@ingresos_bp.route("/api/ingresos-tipos", methods=["GET"])
+@ingresosBp.route("/api/ingresos-tipos", methods=["GET"])
 def getIngresosTipos():
-    return jsonify({"types": read_ingresos_types()})
+    return jsonify({"types": readIngresosTypes()})
 
 
-@ingresos_bp.route("/api/ingresos-tipos", methods=["POST"])
+@ingresosBp.route("/api/ingresos-tipos", methods=["POST"])
 def saveIngresosTipos():
     requestData = request.get_json(silent=True) or {}
-    types = sanitize_ingresos_types(requestData.get("types", []))
-    write_ingresos_types(types)
+    types = sanitizeIngresosTypes(requestData.get("types", []))
+    writeIngresosTypes(types)
     return jsonify({"ok": True, "types": types})
 
 
-@ingresos_bp.route("/api/ingresos", methods=["POST"])
+@ingresosBp.route("/api/ingresos", methods=["POST"])
 def createIngresosYear():
     requestData = request.get_json(silent=True) or {}
-    year = normalize_year(requestData.get("year"))
+    year = normalizeYear(requestData.get("year"))
 
     if not year:
         return jsonify({"ok": False, "error": "Año inválido"}), 400
 
-    if read_ingresos_year(year) is not None:
+    if readIngresosYear(year) is not None:
         return jsonify({"ok": False, "error": "Ese año ya existe"}), 409
 
-    payload = create_default_ingresos_year(year)
-    write_ingresos_year(year, payload)
+    payload = createDefaultIngresosYear(year)
+    writeIngresosYear(year, payload)
     return jsonify({"ok": True, "year": year, "data": payload}), 201
 
 
-@ingresos_bp.route("/api/ingresos/<year>", methods=["GET"])
+@ingresosBp.route("/api/ingresos/<year>", methods=["GET"])
 def getIngresosYear(year):
-    data = read_ingresos_year(year)
+    data = readIngresosYear(year)
 
     if data is None:
         # El año fue creado con cero recurrentes y cero filas, por lo que la BD
         # no tiene registros pero el año es válido — devolvemos la estructura vacía.
-        normalized = normalize_year(year)
+        normalized = normalizeYear(year)
         if not normalized:
             return jsonify({"ok": False, "error": "Año no encontrado"}), 404
-        data = create_default_ingresos_year(normalized)
-        data["ingresosTipos"] = read_ingresos_types()
+        data = createDefaultIngresosYear(normalized)
+        data["ingresosTipos"] = readIngresosTypes()
         data["revision"] = revisiones.actual("ingresos", normalized)
 
     return jsonify(data)
 
 
-@ingresos_bp.route("/api/ingresos/<year>", methods=["POST"])
+@ingresosBp.route("/api/ingresos/<year>", methods=["POST"])
 def saveIngresosYear(year):
     requestData = request.get_json(silent=True) or {}
-    payload, error = sanitize_ingresos_payload(requestData, year)
+    payload, error = sanitizeIngresosPayload(requestData, year)
 
     if error:
         return jsonify({"ok": False, "error": error}), 400
 
     try:
-        esperada = revisiones.revision_de_peticion(requestData)
+        esperada = revisiones.revisionDePeticion(requestData)
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
     try:
-        nueva = write_ingresos_year(year, payload, revision_esperada=esperada)
+        nueva = writeIngresosYear(year, payload, revisionEsperada=esperada)
     except revisiones.ConflictoRevision as conflicto:
         return jsonify({
             "ok": False, "conflicto": True, "revision": conflicto.actual,
@@ -101,21 +101,21 @@ def saveIngresosYear(year):
     return jsonify({"ok": True, "revision": nueva})
 
 
-@ingresos_bp.route("/api/ingresos/<year>", methods=["DELETE"])
+@ingresosBp.route("/api/ingresos/<year>", methods=["DELETE"])
 def deleteIngresosYear(year):
-    normalized_year = normalize_year(year)
+    normalizedYear = normalizeYear(year)
 
-    if not normalized_year:
+    if not normalizedYear:
         return jsonify({"ok": False, "error": "Año inválido"}), 400
 
-    if not delete_ingresos_year(normalized_year):
+    if not borrarAnioIngresos(normalizedYear):
         return jsonify({"ok": False, "error": "Año no encontrado"}), 404
 
-    remaining_years = list_ingresos_years()
+    remainingYears = listIngresosYears()
 
-    if not remaining_years:
+    if not remainingYears:
         actual = str(date.today().year)
-        write_ingresos_year(actual, create_default_ingresos_year(actual))
-        remaining_years = [actual]
+        writeIngresosYear(actual, createDefaultIngresosYear(actual))
+        remainingYears = [actual]
 
-    return jsonify({"ok": True, "years": remaining_years})
+    return jsonify({"ok": True, "years": remainingYears})

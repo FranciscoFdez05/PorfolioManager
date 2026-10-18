@@ -12,18 +12,18 @@ from core import telegram_notifier
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, datos_aislados, temp_db, monkeypatch):
-    from routes.ajustes import ajustes_bp
+def cliente(clienteAutenticado, datosAislados, tempDb, monkeypatch):
+    from routes.ajustes import ajustesBp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
-    telegram_notifier.reiniciar_para_pruebas()
+    telegram_notifier.reiniciarParaPruebas()
 
-    client, cabeceras, _app = cliente_autenticado(ajustes_bp)
-    return client, cabeceras, datos_aislados
+    client, cabeceras, _app = clienteAutenticado(ajustesBp)
+    return client, cabeceras, datosAislados
 
 
-def test_sin_configurar_devuelve_no_configurado(cliente):
+def testSinConfigurarDevuelveNoConfigurado(cliente):
     client, _cabeceras, _rutas = cliente
 
     datos = client.get("/api/settings/telegram").get_json()
@@ -35,7 +35,7 @@ def test_sin_configurar_devuelve_no_configurado(cliente):
     assert datos["chatId"] == ""
 
 
-def test_guardar_sin_token_o_chat_id_da_error(cliente):
+def testGuardarSinTokenOChatIdDaError(cliente):
     client, cabeceras, _rutas = cliente
 
     respuesta = client.post("/api/settings/telegram", json={"token": "", "chatId": "123"}, headers=cabeceras)
@@ -44,7 +44,7 @@ def test_guardar_sin_token_o_chat_id_da_error(cliente):
     assert respuesta.get_json()["ok"] is False
 
 
-def test_guardar_y_leer_config(cliente):
+def testGuardarYLeerConfig(cliente):
     client, cabeceras, _rutas = cliente
 
     guardado = client.post(
@@ -63,7 +63,7 @@ def test_guardar_y_leer_config(cliente):
     assert datos["chatId"] == "987654321"
 
 
-def test_el_token_no_se_guarda_en_claro_en_disco(cliente):
+def testElTokenNoSeGuardaEnClaroEnDisco(cliente):
     client, cabeceras, rutas = cliente
 
     client.post(
@@ -76,7 +76,7 @@ def test_el_token_no_se_guarda_en_claro_en_disco(cliente):
     assert b"123456:ABC-token" not in crudo
 
 
-def test_borrar_config(cliente):
+def testBorrarConfig(cliente):
     client, cabeceras, _rutas = cliente
     client.post(
         "/api/settings/telegram",
@@ -91,7 +91,7 @@ def test_borrar_config(cliente):
     assert datos["configurado"] is False
 
 
-def test_probar_sin_configurar_da_error(cliente):
+def testProbarSinConfigurarDaError(cliente):
     client, cabeceras, _rutas = cliente
 
     respuesta = client.post("/api/settings/telegram/prueba", headers=cabeceras)
@@ -100,7 +100,7 @@ def test_probar_sin_configurar_da_error(cliente):
     assert respuesta.get_json()["ok"] is False
 
 
-def test_probar_configurado_envia_el_mensaje(cliente, monkeypatch):
+def testProbarConfiguradoEnviaElMensaje(cliente, monkeypatch):
     client, cabeceras, _rutas = cliente
     client.post(
         "/api/settings/telegram",
@@ -119,22 +119,22 @@ def test_probar_configurado_envia_el_mensaje(cliente, monkeypatch):
 
 # ── Qué avisos se reciben ─────────────────────────────────────────────────────
 
-def test_get_lista_las_categorias_con_su_estado(cliente):
+def testGetListaLasCategoriasConSuEstado(cliente):
     client, _cabeceras, _rutas = cliente
 
     datos = client.get("/api/settings/telegram").get_json()
 
     claves = [a["clave"] for a in datos["avisos"]]
     assert claves == list(telegram_notifier.CATEGORIAS_AVISO)
-    por_clave = {a["clave"]: a for a in datos["avisos"]}
-    assert por_clave["backup"]["activo"] is True
-    assert por_clave["resumen"]["activo"] is False
-    assert por_clave["backup"]["titulo"]
+    porClave = {a["clave"]: a for a in datos["avisos"]}
+    assert porClave["backup"]["activo"] is True
+    assert porClave["resumen"]["activo"] is False
+    assert porClave["backup"]["titulo"]
     assert datos["resumenHora"] == telegram_notifier.RESUMEN_HORA_DEFECTO
     assert datos["silenciadoHasta"] == 0
 
 
-def test_guardar_avisos_y_hora_del_resumen(cliente):
+def testGuardarAvisosYHoraDelResumen(cliente):
     client, cabeceras, _rutas = cliente
 
     respuesta = client.post(
@@ -145,13 +145,13 @@ def test_guardar_avisos_y_hora_del_resumen(cliente):
     assert respuesta.get_json()["ok"] is True
 
     datos = client.get("/api/settings/telegram").get_json()
-    por_clave = {a["clave"]: a["activo"] for a in datos["avisos"]}
-    assert por_clave["backup"] is False and por_clave["resumen"] is True
-    assert por_clave["precios"] is True, "lo que no se manda conserva su valor"
+    porClave = {a["clave"]: a["activo"] for a in datos["avisos"]}
+    assert porClave["backup"] is False and porClave["resumen"] is True
+    assert porClave["precios"] is True, "lo que no se manda conserva su valor"
     assert datos["resumenHora"] == 8
 
 
-def test_guardar_avisos_descarta_categorias_desconocidas(cliente):
+def testGuardarAvisosDescartaCategoriasDesconocidas(cliente):
     client, cabeceras, rutas = cliente
 
     client.post("/api/settings/telegram/avisos", json={"avisos": {"inventada": True, "backup": False}},
@@ -161,7 +161,7 @@ def test_guardar_avisos_descarta_categorias_desconocidas(cliente):
     assert "inventada" not in guardado and guardado["backup"] is False
 
 
-def test_guardar_avisos_acota_la_hora(cliente):
+def testGuardarAvisosAcotaLaHora(cliente):
     client, cabeceras, _rutas = cliente
 
     client.post("/api/settings/telegram/avisos", json={"resumenHora": 99}, headers=cabeceras)
@@ -169,7 +169,7 @@ def test_guardar_avisos_acota_la_hora(cliente):
     assert client.get("/api/settings/telegram").get_json()["resumenHora"] == 23
 
 
-def test_avisos_con_formato_erroneo_es_400(cliente):
+def testAvisosConFormatoErroneoEs400(cliente):
     client, cabeceras, _rutas = cliente
 
     respuesta = client.post("/api/settings/telegram/avisos", json={"avisos": ["backup"]}, headers=cabeceras)
@@ -177,7 +177,7 @@ def test_avisos_con_formato_erroneo_es_400(cliente):
     assert respuesta.status_code == 400
 
 
-def test_guardar_otros_ajustes_no_borra_los_avisos_elegidos(cliente):
+def testGuardarOtrosAjustesNoBorraLosAvisosElegidos(cliente):
     """`ajustes.json` filtra por claves conocidas: si estas no lo fueran, se perderían."""
     client, cabeceras, _rutas = cliente
     client.post("/api/settings/telegram/avisos", json={"avisos": {"backup": False}, "resumenHora": 7},
@@ -190,7 +190,7 @@ def test_guardar_otros_ajustes_no_borra_los_avisos_elegidos(cliente):
     assert datos["resumenHora"] == 7
 
 
-def test_guardar_con_el_token_vacio_conserva_el_guardado(cliente):
+def testGuardarConElTokenVacioConservaElGuardado(cliente):
     """El formulario ya no recibe el token: vacío significa «el que hay»."""
     from core import telegram_notifier
 

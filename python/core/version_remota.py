@@ -75,7 +75,7 @@ _PATRON_RAMA = re.compile(r"^[A-Za-z0-9._/-]+$")
 _cerrojo = threading.Lock()
 
 
-def _archivo_cache() -> Path:
+def _archivoCache() -> Path:
     return paths.TMP_DIR / NOMBRE_CACHE
 
 
@@ -83,7 +83,7 @@ def _ahora() -> datetime:
     return datetime.now().astimezone()
 
 
-def _segundos_desde(marca) -> float | None:
+def _segundosDesde(marca) -> float | None:
     try:
         momento = datetime.fromisoformat(str(marca))
     except (TypeError, ValueError):
@@ -128,7 +128,7 @@ def _url(ruta: str = RUTA_VERSION) -> str | None:
     return PLANTILLA_URL.format(repositorio=repositorio, rama=rama, ruta=ruta)
 
 
-def _leer_url(url: str, maximo: int) -> str:
+def _leerUrl(url: str, maximo: int) -> str:
     peticion = Request(url, headers={
         "User-Agent": f"PorfolioManager/{__version__}",
         "Accept": "text/plain",
@@ -138,11 +138,11 @@ def _leer_url(url: str, maximo: int) -> str:
 
 
 def _descargar(url: str) -> str:
-    return _leer_url(url, MAX_BYTES)
+    return _leerUrl(url, MAX_BYTES)
 
 
-def _descargar_changelog(url: str) -> str:
-    return _leer_url(url, MAX_BYTES_CHANGELOG)
+def _descargarChangelog(url: str) -> str:
+    return _leerUrl(url, MAX_BYTES_CHANGELOG)
 
 
 def extraerNovedades(texto, instalada) -> list[dict]:
@@ -173,14 +173,14 @@ def extraerNovedades(texto, instalada) -> list[dict]:
     return novedades
 
 
-def _consultar_novedades() -> list[dict]:
+def _consultarNovedades() -> list[dict]:
     """Novedades desde la instalada. Un fallo deja la lista vacía y nada más:
     no saber qué trae no cambia que haya versión nueva."""
     url = _url(RUTA_CHANGELOG)
     if url is None:
         return []
     try:
-        return extraerNovedades(_descargar_changelog(url), __version__)
+        return extraerNovedades(_descargarChangelog(url), __version__)
     except (TimeoutError, URLError, OSError, ValueError) as error:
         log.info("No se pudieron leer las novedades: %s", error)
         return []
@@ -191,9 +191,9 @@ def _extraer(texto) -> str | None:
     return encontrado.group(1) if encontrado else None
 
 
-def _leer_cache() -> dict | None:
+def _leerCache() -> dict | None:
     try:
-        datos = json.loads(_archivo_cache().read_text("utf-8"))
+        datos = json.loads(_archivoCache().read_text("utf-8"))
     except FileNotFoundError:
         return None
     except (OSError, ValueError) as error:
@@ -202,7 +202,7 @@ def _leer_cache() -> dict | None:
     return datos if isinstance(datos, dict) else None
 
 
-def _guardar_cache(publicada, error, novedades=None) -> dict:
+def _guardarCache(publicada, error, novedades=None) -> dict:
     datos = {
         "publicada": publicada,
         "error": error,
@@ -212,7 +212,7 @@ def _guardar_cache(publicada, error, novedades=None) -> dict:
     }
     try:
         paths.TMP_DIR.mkdir(parents=True, exist_ok=True)
-        escribirJsonAtomico(_archivo_cache(), datos)
+        escribirJsonAtomico(_archivoCache(), datos)
     except OSError as fallo:
         # Sin caché se sigue funcionando: solo se pregunta más de la cuenta.
         log.warning("No se pudo guardar %s: %s", NOMBRE_CACHE, fallo)
@@ -226,7 +226,7 @@ def _vigente(cache, forzar: bool) -> bool:
     # instalar una versión nueva seguiría diciendo lo que GitHub contestó antes.
     if cache.get("instalada") != __version__:
         return False
-    edad = _segundos_desde(cache.get("momento"))
+    edad = _segundosDesde(cache.get("momento"))
     if edad is None:
         return False
     if forzar:
@@ -236,7 +236,7 @@ def _vigente(cache, forzar: bool) -> bool:
     return edad < settings.actualizacionCacheSegundos()
 
 
-def _consultar_a_github() -> tuple[str | None, str | None]:
+def _consultarAGithub() -> tuple[str | None, str | None]:
     """Devuelve `(version, error)`. De aquí no sale ninguna excepción."""
     url = _url()
     if url is None:
@@ -276,17 +276,17 @@ def consultar(forzar: bool = False) -> dict:
     if not settings.comprobarVersionRemota():
         return _respuesta(None, activo=False)
 
-    cache = _leer_cache()
+    cache = _leerCache()
     if _vigente(cache, forzar):
         return _respuesta(cache)
 
     with _cerrojo:
         # Otra petición pudo preguntar mientras esta esperaba el cerrojo.
-        cache = _leer_cache()
+        cache = _leerCache()
         if _vigente(cache, forzar):
             return _respuesta(cache)
 
-        publicada, error = _consultar_a_github()
+        publicada, error = _consultarAGithub()
         novedades = []
         if error:
             log.info("No se pudo comprobar la versión publicada: %s", error)
@@ -296,8 +296,8 @@ def consultar(forzar: bool = False) -> dict:
             if cache and cache.get("publicada") == publicada:
                 novedades = cache.get("novedades") or []
         elif hayNueva(__version__, publicada):
-            novedades = _consultar_novedades()
-        cache = _guardar_cache(publicada, error, novedades)
+            novedades = _consultarNovedades()
+        cache = _guardarCache(publicada, error, novedades)
 
     return _respuesta(cache)
 

@@ -20,7 +20,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 
 # ── [A-01] El tipo de cambio histórico no se pierde al reescribir un activo ──
 
-def _activo_con_compra(fecha="02-01-2024", divisa="USD"):
+def _activoConCompra(fecha="02-01-2024", divisa="USD"):
     from stores.asset_store import writeAssetFile
 
     writeAssetFile("fx-prueba", {
@@ -30,17 +30,17 @@ def _activo_con_compra(fecha="02-01-2024", divisa="USD"):
     })
 
 
-def _fx_de(conn, tabla="activo_rows"):
+def _fxDe(conn, tabla="activo_rows"):
     return conn.execute(f"SELECT fx_rate, fx_fecha, fx_origen FROM {tabla} WHERE asset_id='fx-prueba'").fetchall()
 
 
-def test_guardar_el_activo_conserva_el_tipo_de_cambio(temp_db):
+def testGuardarElActivoConservaElTipoDeCambio(tempDb):
     """[A-01] El formulario manda las filas sin fx_*: antes se borraban en cada guardado."""
-    from core.db import get_db
+    from core.db import getDb
     from stores.asset_store import readAssetFile, writeAssetFile
 
-    _activo_con_compra()
-    conn = get_db()
+    _activoConCompra()
+    conn = getDb()
     conn.execute("UPDATE activo_rows SET fx_rate='0.91', fx_fecha='2024-01-02', fx_origen='manual'")
     conn.commit()
 
@@ -50,16 +50,16 @@ def test_guardar_el_activo_conserva_el_tipo_de_cambio(temp_db):
             fila.pop(clave, None)
     writeAssetFile("fx-prueba", datos)
 
-    assert [tuple(f) for f in _fx_de(conn)] == [("0.91", "2024-01-02", "manual")]
+    assert [tuple(f) for f in _fxDe(conn)] == [("0.91", "2024-01-02", "manual")]
 
 
-def test_cambiar_la_fecha_de_la_compra_deja_el_tipo_pendiente(temp_db):
+def testCambiarLaFechaDeLaCompraDejaElTipoPendiente(tempDb):
     """El tipo depende de la fecha: con otra fecha ya no vale y debe volver a pedirse."""
-    from core.db import get_db
+    from core.db import getDb
     from stores.asset_store import readAssetFile, writeAssetFile
 
-    _activo_con_compra()
-    conn = get_db()
+    _activoConCompra()
+    conn = getDb()
     conn.execute("UPDATE activo_rows SET fx_rate='0.91', fx_fecha='2024-01-02', fx_origen='manual'")
     conn.commit()
 
@@ -67,45 +67,45 @@ def test_cambiar_la_fecha_de_la_compra_deja_el_tipo_pendiente(temp_db):
     datos["rows"][0] = {**datos["rows"][0], "fechaOperacion": "05-03-2024", "fxRate": ""}
     writeAssetFile("fx-prueba", datos)
 
-    assert [tuple(f) for f in _fx_de(conn)] == [("", "", "")]
+    assert [tuple(f) for f in _fxDe(conn)] == [("", "", "")]
 
 
-def test_get_operaciones_no_toca_las_compras_ni_escribe_si_no_hay_cambios(temp_db):
+def testGetOperacionesNoTocaLasComprasNiEscribeSiNoHayCambios(tempDb):
     """[A-01][M-07] El GET reescribía todos los activos y borraba su tipo de cambio."""
-    from core.db import get_db
-    from stores.helpers import sync_completed_operations_into_assets
+    from core.db import getDb
+    from stores.helpers import syncCompletedOperationsIntoAssets
 
-    _activo_con_compra()
-    conn = get_db()
+    _activoConCompra()
+    conn = getDb()
     conn.execute("UPDATE activo_rows SET fx_rate='0.91', fx_fecha='2024-01-02', fx_origen='manual'")
     conn.commit()
-    id_antes = conn.execute("SELECT id FROM activo_rows").fetchone()[0]
+    idAntes = conn.execute("SELECT id FROM activo_rows").fetchone()[0]
 
     operaciones = [{"id": "op-1", "assetId": "fx-prueba", "estado": "Completado", "orden": "Compra",
                     "fechaApertura": "03-01-2024", "cantidad": "1", "total": "100", "currency": "USD"}]
-    sync_completed_operations_into_assets(operaciones)
+    syncCompletedOperationsIntoAssets(operaciones)
     cambios = conn.total_changes
-    sync_completed_operations_into_assets(operaciones)  # lo que hace cada GET
+    syncCompletedOperationsIntoAssets(operaciones)  # lo que hace cada GET
 
     assert conn.total_changes == cambios, "un GET sin cambios no debe escribir"
-    assert conn.execute("SELECT id FROM activo_rows").fetchone()[0] == id_antes
-    assert [tuple(f) for f in _fx_de(conn)] == [("0.91", "2024-01-02", "manual")]
+    assert conn.execute("SELECT id FROM activo_rows").fetchone()[0] == idAntes
+    assert [tuple(f) for f in _fxDe(conn)] == [("0.91", "2024-01-02", "manual")]
     assert conn.execute("SELECT COUNT(*) FROM activo_operation_rows").fetchone()[0] == 1
 
 
-def test_guardar_el_ejercicio_de_ventas_conserva_su_tipo_de_cambio(temp_db):
+def testGuardarElEjercicioDeVentasConservaSuTipoDeCambio(tempDb):
     """[A-01] El mismo fallo, en las ventas fiscales."""
-    from core.db import get_db
-    from stores.ventas_store import write_ventas_year
+    from core.db import getDb
+    from stores.ventas_store import writeVentasYear
 
-    _activo_con_compra()
+    _activoConCompra()
     venta = {"id": "venta-1", "fecha": "10-01-2026", "assetId": "fx-prueba", "cantidad": "1", "valorVenta": "100"}
-    write_ventas_year("2026", {"rows": [venta]})
-    conn = get_db()
+    writeVentasYear("2026", {"rows": [venta]})
+    conn = getDb()
     conn.execute("UPDATE ventas SET fx_rate='0.95', fx_fecha='2026-01-10', fx_origen='yahoo'")
     conn.commit()
 
-    write_ventas_year("2026", {"rows": [venta]})
+    writeVentasYear("2026", {"rows": [venta]})
 
     assert conn.execute("SELECT fx_rate FROM ventas").fetchone()[0] == "0.95"
 
@@ -113,19 +113,19 @@ def test_guardar_el_ejercicio_de_ventas_conserva_su_tipo_de_cambio(temp_db):
 # ── [A-02] Guardar un año con una copia antigua ya no borra lo que entró ──────
 
 @pytest.fixture
-def cliente_gastos(temp_db, cliente_autenticado):
-    from routes.gastos import gastos_bp
-    from routes.ingresos import ingresos_bp
+def clienteGastos(tempDb, clienteAutenticado):
+    from routes.gastos import gastosBp
+    from routes.ingresos import ingresosBp
 
-    client, cabeceras, _app = cliente_autenticado(gastos_bp, ingresos_bp)
+    client, cabeceras, _app = clienteAutenticado(gastosBp, ingresosBp)
     client.post("/api/gastos", json={"year": "2026"}, headers=cabeceras)
     return client, cabeceras
 
 
-def test_un_guardado_con_una_copia_antigua_recibe_409(cliente_gastos):
+def testUnGuardadoConUnaCopiaAntiguaRecibe409(clienteGastos):
     from stores.movimientos_store import crearMovimiento, sanitizarMovimiento
 
-    client, cabeceras = cliente_gastos
+    client, cabeceras = clienteGastos
     copia = client.get("/api/gastos/2026").get_json()
 
     # Entra un gasto por otro camino (el Atajo) mientras la pestaña tiene su copia.
@@ -140,8 +140,8 @@ def test_un_guardado_con_una_copia_antigua_recibe_409(cliente_gastos):
     assert [f["nombre"] for f in filas] == ["Desde el iPhone"]
 
 
-def test_guardados_consecutivos_con_la_revision_devuelta_entran(cliente_gastos):
-    client, cabeceras = cliente_gastos
+def testGuardadosConsecutivosConLaRevisionDevueltaEntran(clienteGastos):
+    client, cabeceras = clienteGastos
     datos = client.get("/api/gastos/2026").get_json()
 
     primera = client.post("/api/gastos/2026", json=datos, headers=cabeceras).get_json()
@@ -152,19 +152,19 @@ def test_guardados_consecutivos_con_la_revision_devuelta_entran(cliente_gastos):
     assert segunda.get_json()["revision"] == primera["revision"] + 1
 
 
-def test_sin_revision_se_guarda_como_siempre(cliente_gastos):
+def testSinRevisionSeGuardaComoSiempre(clienteGastos):
     """Scripts e importaciones que no la mandan siguen funcionando."""
-    client, cabeceras = cliente_gastos
+    client, cabeceras = clienteGastos
     datos = client.get("/api/gastos/2026").get_json()
     datos.pop("revision")
 
     assert client.post("/api/gastos/2026", json=datos, headers=cabeceras).status_code == 200
 
 
-def test_ingresos_tambien_detecta_la_copia_antigua(cliente_gastos):
+def testIngresosTambienDetectaLaCopiaAntigua(clienteGastos):
     from stores.movimientos_store import crearMovimiento, sanitizarMovimiento
 
-    client, cabeceras = cliente_gastos
+    client, cabeceras = clienteGastos
     client.post("/api/ingresos", json={"year": "2026"}, headers=cabeceras)
     copia = client.get("/api/ingresos/2026").get_json()
     crearMovimiento(sanitizarMovimiento({"tipo": "ingreso", "nombre": "Bizum", "importe": 5, "fecha": "2026-10-02"}))
@@ -172,11 +172,11 @@ def test_ingresos_tambien_detecta_la_copia_antigua(cliente_gastos):
     assert client.post("/api/ingresos/2026", json=copia, headers=cabeceras).status_code == 409
 
 
-def test_renombrar_una_categoria_invalida_las_copias_abiertas(cliente_gastos):
+def testRenombrarUnaCategoriaInvalidaLasCopiasAbiertas(clienteGastos):
     """Si no, la pestaña abierta desharía el renombrado al guardar."""
     from stores import categorias_store, revisiones
 
-    client, cabeceras = cliente_gastos
+    client, cabeceras = clienteGastos
     datos = client.get("/api/gastos/2026").get_json()
     datos["months"]["enero"]["rows"] = [{"fecha": "01-01-2026", "nombre": "Pan", "tipo": "Comida", "cantidad": "1"}]
     client.post("/api/gastos/2026", json=datos, headers=cabeceras)
@@ -195,30 +195,30 @@ def test_renombrar_una_categoria_invalida_las_copias_abiertas(cliente_gastos):
     ("/api/ingresos/2026", {"recurrentes": [1, "x", None]}),
     ("/api/ingresos/2026", {"months": "no-es-un-objeto"}),
 ])
-def test_listas_con_basura_no_dan_500(cliente_gastos, ruta, cuerpo):
-    client, cabeceras = cliente_gastos
+def testListasConBasuraNoDan500(clienteGastos, ruta, cuerpo):
+    client, cabeceras = clienteGastos
     assert client.post(ruta, json=cuerpo, headers=cabeceras).status_code < 500
 
 
 @pytest.fixture
-def cliente_registros(temp_db, cliente_autenticado):
-    from routes.registros import registros_bp
-    from routes.trading import trading_bp
+def clienteRegistros(tempDb, clienteAutenticado):
+    from routes.registros import registrosBp
+    from routes.trading import tradingBp
 
-    client, cabeceras, _app = cliente_autenticado(registros_bp, trading_bp)
+    client, cabeceras, _app = clienteAutenticado(registrosBp, tradingBp)
     return client, cabeceras
 
 
-def test_intereses_con_una_cuenta_que_no_es_objeto_da_400(cliente_registros):
-    client, cabeceras = cliente_registros
+def testInteresesConUnaCuentaQueNoEsObjetoDa400(clienteRegistros):
+    client, cabeceras = clienteRegistros
     assert client.post("/api/intereses", json={"cuentas": [1]}, headers=cabeceras).status_code == 400
     assert client.post("/api/intereses", json={"cuentas": [{"rows": [1]}]}, headers=cabeceras).status_code == 400
 
 
 # ── [M-09] Rutas que no tenían ningún test ────────────────────────────────────
 
-def test_intereses_ida_y_vuelta(cliente_registros):
-    client, cabeceras = cliente_registros
+def testInteresesIdaYVuelta(clienteRegistros):
+    client, cabeceras = clienteRegistros
     cuentas = [{"id": "c1", "nombre": "Remunerada", "rows": [{"fecha": "01-2026", "acumulado": "10", "impuestos": "1"}]}]
 
     assert client.post("/api/intereses", json={"cuentas": cuentas}, headers=cabeceras).get_json()["ok"]
@@ -228,8 +228,8 @@ def test_intereses_ida_y_vuelta(cliente_registros):
     assert client.get("/api/intereses").get_json()["cuentas"] == []
 
 
-def test_trading_ida_y_vuelta_y_normaliza_valores(cliente_registros):
-    client, cabeceras = cliente_registros
+def testTradingIdaYVueltaYNormalizaValores(clienteRegistros):
+    client, cabeceras = clienteRegistros
     filas = [{"id": "t1", "fecha": "01-10-2026", "tipo": "swing", "moneda": "btc",
               "direccion": "inventada", "resultado": "perdida", "capital": "100"}]
 
@@ -244,17 +244,17 @@ def test_trading_ida_y_vuelta_y_normaliza_valores(cliente_registros):
     "/api/intereses", "/api/dividendos", "/api/dividendos/calendar", "/api/transacciones", "/api/bonos",
     "/api/rentafija", "/api/privatemarket", "/api/staking", "/api/earn", "/api/trading",
 ])
-def test_las_rutas_de_registros_no_dan_500_con_tipos_cambiados(cliente_registros, ruta):
-    client, cabeceras = cliente_registros
+def testLasRutasDeRegistrosNoDan500ConTiposCambiados(clienteRegistros, ruta):
+    client, cabeceras = clienteRegistros
     assert client.get(ruta).status_code == 200
     for cuerpo in ({"rows": [1, "x", None]}, {"rows": "x"}, {"cuentas": "x"}, {"items": [None]}, {}):
         assert client.post(ruta, json=cuerpo, headers=cabeceras).status_code < 500, (ruta, cuerpo)
 
 
-def test_get_operaciones_responde(temp_db, cliente_autenticado):
-    from routes.operaciones import operaciones_bp
+def testGetOperacionesResponde(tempDb, clienteAutenticado):
+    from routes.operaciones import operacionesBp
 
-    client, cabeceras, _app = cliente_autenticado(operaciones_bp)
+    client, cabeceras, _app = clienteAutenticado(operacionesBp)
     filas = [{"id": "op-1", "activo": "BTC", "orden": "Compra", "estado": "Activo", "cantidad": "1"}]
     assert client.post("/api/operaciones", json={"rows": filas}, headers=cabeceras).get_json()["ok"]
     assert client.get("/api/operaciones").get_json()["rows"][0]["id"] == "op-1"
@@ -263,42 +263,42 @@ def test_get_operaciones_responde(temp_db, cliente_autenticado):
 # ── [M-02] SECRET_KEY de ejemplo ──────────────────────────────────────────────
 
 @pytest.mark.parametrize("clave", ["cambia_esto_por_una_clave_aleatoria_larga", "CAMBIA_ESTO_tambien", "corta"])
-def test_una_secret_key_insegura_no_arranca(clave):
+def testUnaSecretKeyInseguraNoArranca(clave):
     from core import seguridad_app
 
     with pytest.raises(SystemExit):
-        seguridad_app.rechazar_secret_key_insegura(clave)
+        seguridad_app.rechazarSecretKeyInsegura(clave)
 
 
 @pytest.mark.parametrize("clave", ["", "a" * 64])
-def test_una_secret_key_aceptable_arranca(clave):
+def testUnaSecretKeyAceptableArranca(clave):
     from core import seguridad_app
 
-    seguridad_app.rechazar_secret_key_insegura(clave)
+    seguridad_app.rechazarSecretKeyInsegura(clave)
 
 
-def test_el_ejemplo_publicado_esta_en_la_lista_negra():
+def testElEjemploPublicadoEstaEnLaListaNegra():
     texto = (RAIZ / ".env.example").read_text("utf-8")
     ejemplo = re.search(r"^SECRET_KEY=(.*)$", texto, re.M).group(1).strip()
     from core import seguridad_app
 
     with pytest.raises(SystemExit):
-        seguridad_app.rechazar_secret_key_insegura(ejemplo)
+        seguridad_app.rechazarSecretKeyInsegura(ejemplo)
 
 
 # ── [M-06] La copia previa a una migración es de la base que se migra ─────────
 
-def test_la_copia_previa_es_de_la_base_migrada(temp_db, tmp_path, monkeypatch):
+def testLaCopiaPreviaEsDeLaBaseMigrada(tempDb, tmp_path, monkeypatch):
     from admin import backup_manager
     from core import db
 
     copiadas = []
-    monkeypatch.setattr(backup_manager, "backup_previo_a_migracion",
+    monkeypatch.setattr(backup_manager, "backupPrevioAMigracion",
                         lambda ruta, desde, hasta: copiadas.append(Path(ruta).name))
     otra = tmp_path / "otra.db"
     sqlite3.connect(otra).close()
 
-    with db.open_db_at(otra):
+    with db.openDbAt(otra):
         pass
 
     assert copiadas == ["otra.db"]
@@ -306,7 +306,7 @@ def test_la_copia_previa_es_de_la_base_migrada(temp_db, tmp_path, monkeypatch):
 
 # ── [B-11] Cada paso de migración es atómico ──────────────────────────────────
 
-def test_un_paso_que_falla_no_deja_nada_a_medias(tmp_path, monkeypatch):
+def testUnPasoQueFallaNoDejaNadaAMedias(tmp_path, monkeypatch):
     from core import db
 
     ruta = tmp_path / "migrar.db"
@@ -315,14 +315,14 @@ def test_un_paso_que_falla_no_deja_nada_a_medias(tmp_path, monkeypatch):
     conn.execute(f"PRAGMA user_version = {db.ESQUEMA_VERSION}")
     conn.commit()
 
-    def paso_que_falla(c):
+    def pasoQueFalla(c):
         c.executescript("CREATE TABLE a_medias (x); INSERT INTO a_medias VALUES (1);")
         raise RuntimeError("corte a mitad del paso")
 
     siguiente = db.ESQUEMA_VERSION + 1
-    monkeypatch.setattr(db, "_MIGRACIONES", [*db._MIGRACIONES, (siguiente, paso_que_falla)])
+    monkeypatch.setattr(db, "_MIGRACIONES", [*db._MIGRACIONES, (siguiente, pasoQueFalla)])
     monkeypatch.setattr(db, "ESQUEMA_VERSION", siguiente)
-    monkeypatch.setattr(db, "_copia_antes_de_migrar", lambda *a: None)
+    monkeypatch.setattr(db, "_copiaAntesDeMigrar", lambda *a: None)
 
     with pytest.raises(RuntimeError):
         db._migrate(conn, ruta)
@@ -334,7 +334,7 @@ def test_un_paso_que_falla_no_deja_nada_a_medias(tmp_path, monkeypatch):
 
 # ── [M-08] Sin manejadores en línea que la CSP bloquea ────────────────────────
 
-def test_ningun_html_lleva_manejadores_en_linea():
+def testNingunHtmlLlevaManejadoresEnLinea():
     """La CSP no lleva 'unsafe-inline' en script-src: un onclick="…" no se ejecuta."""
     ficheros = [RAIZ / "index.html", *sorted((RAIZ / "html").rglob("*.html"))]
     culpables = [
@@ -347,7 +347,7 @@ def test_ningun_html_lleva_manejadores_en_linea():
 
 # ── [B-06] Nombres del certificado ────────────────────────────────────────────
 
-def test_los_nombres_del_certificado_no_admiten_nada_que_no_sea_un_host():
+def testLosNombresDelCertificadoNoAdmitenNadaQueNoSeaUnHost():
     from core import tls
 
     assert tls.normalizarNombres([
@@ -358,7 +358,7 @@ def test_los_nombres_del_certificado_no_admiten_nada_que_no_sea_un_host():
 
 # ── [B-08] Ficheros de ajustes enormes dentro de un ZIP ───────────────────────
 
-def test_un_json_de_ajustes_enorme_se_rechaza():
+def testUnJsonDeAjustesEnormeSeRechaza():
     from core import zip_seguro
 
     buf = BytesIO()
@@ -370,7 +370,7 @@ def test_un_json_de_ajustes_enorme_se_rechaza():
 
 # ── [B-09] Temporales huérfanos ───────────────────────────────────────────────
 
-def test_la_limpieza_barre_los_temporales_de_hoy(datos_aislados):
+def testLaLimpiezaBarreLosTemporalesDeHoy(datosAislados):
     import os
 
     from core import paths
@@ -380,43 +380,43 @@ def test_la_limpieza_barre_los_temporales_de_hoy(datos_aislados):
     tmp.mkdir(parents=True, exist_ok=True)
     viejo = tmp / ".principal.db.123-abc-ff00ff.tmp"
     reciente = tmp / ".principal.db.456-def-00ff00.tmp"
-    zip_viejo = datos_aislados["backups"] / "_tmp_backup_01-01-2026_00-00-00.zip"
-    for f in (viejo, reciente, zip_viejo):
+    zipViejo = datosAislados["backups"] / "_tmp_backup_01-01-2026_00-00-00.zip"
+    for f in (viejo, reciente, zipViejo):
         f.write_bytes(b"x")
-    hace_dos_horas = time.time() - 7200
-    for f in (viejo, zip_viejo):
-        os.utime(f, (hace_dos_horas, hace_dos_horas))
+    haceDosHoras = time.time() - 7200
+    for f in (viejo, zipViejo):
+        os.utime(f, (haceDosHoras, haceDosHoras))
 
-    backup._limpiar_temporales_huerfanos()
+    backup._limpiarTemporalesHuerfanos()
 
-    assert not viejo.exists() and not zip_viejo.exists()
+    assert not viejo.exists() and not zipViejo.exists()
     assert reciente.exists()  # puede ser una copia en curso
 
 
 # ── [B-12] auth.dat ilegible ──────────────────────────────────────────────────
 
-def test_un_auth_dat_ilegible_se_aparta_en_vez_de_sobrescribirse(datos_aislados, monkeypatch):
+def testUnAuthDatIlegibleSeApartaEnVezDeSobrescribirse(datosAislados, monkeypatch):
     from routes import auth
 
-    monkeypatch.setattr(auth, "_AUTH_FILE", datos_aislados["auth"])
-    datos_aislados["auth"].write_bytes(b"cifrado con otra SECRET_KEY")
+    monkeypatch.setattr(auth, "_AUTH_FILE", datosAislados["auth"])
+    datosAislados["auth"].write_bytes(b"cifrado con otra SECRET_KEY")
     monkeypatch.setenv("LOGIN_USERNAME", "admin")
     monkeypatch.setenv("LOGIN_PASSWORD_HASH", "pbkdf2:sha256:600000$x$y")
 
-    auth._load_credentials()
+    auth._loadCredentials()
 
-    apartados = list(datos_aislados["data"].glob("auth.dat.ilegible-*"))
+    apartados = list(datosAislados["data"].glob("auth.dat.ilegible-*"))
     assert len(apartados) == 1 and apartados[0].read_bytes() == b"cifrado con otra SECRET_KEY"
 
 
 # ── [B-02] Las peticiones anónimas no gastan el cupo de escrituras ────────────
 
-def test_las_peticiones_anonimas_no_agotan_el_cupo_del_usuario(temp_db, crear_app, monkeypatch):
+def testLasPeticionesAnonimasNoAgotanElCupoDelUsuario(tempDb, crearApp, monkeypatch):
     from core import sesion
-    from routes.trading import trading_bp
+    from routes.trading import tradingBp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "3")
-    app = crear_app(trading_bp)
+    app = crearApp(tradingBp)
     anonimo = app.test_client()
     for _ in range(10):
         assert anonimo.post("/api/trading", json={"rows": []}).status_code == 401
@@ -433,25 +433,25 @@ def test_las_peticiones_anonimas_no_agotan_el_cupo_del_usuario(temp_db, crear_ap
 
 # ── [B-15] Nombres de cartera ─────────────────────────────────────────────────
 
-def test_no_se_puede_crear_ni_renombrar_a_un_nombre_que_ya_existe(datos_aislados):
+def testNoSePuedeCrearNiRenombrarAUnNombreQueYaExiste(datosAislados):
     from admin import portfolios_manager as pm
 
-    datos_aislados["meta"].write_text(json.dumps({"active": None, "portfolios": []}), "utf-8")
-    pid = pm.create_portfolio("Ahorro")
-    otro = pm.create_portfolio("Otro")
+    datosAislados["meta"].write_text(json.dumps({"active": None, "portfolios": []}), "utf-8")
+    pid = pm.createPortfolio("Ahorro")
+    otro = pm.createPortfolio("Otro")
 
     with pytest.raises(pm.NombreDuplicado):
-        pm.create_portfolio("ahorro")
+        pm.createPortfolio("ahorro")
     with pytest.raises(pm.NombreDuplicado):
-        pm.rename_portfolio(otro, "AHORRO")
-    pm.rename_portfolio(pid, "Ahorro")  # renombrarse a sí mismo no choca
+        pm.renamePortfolio(otro, "AHORRO")
+    pm.renamePortfolio(pid, "Ahorro")  # renombrarse a sí mismo no choca
 
 
 # ── [I-04] Un único cálculo de rendimiento ────────────────────────────────────
 
-def test_la_lista_y_la_tabla_dan_las_mismas_cifras(temp_db, cliente_autenticado):
+def testLaListaYLaTablaDanLasMismasCifras(tempDb, clienteAutenticado):
     """Antes eran dos copias del cálculo (float y Decimal) y podían diferir."""
-    from routes.activos import activos_bp
+    from routes.activos import activosBp
     from stores.asset_store import listAssets, writeAssetFile
 
     writeAssetFile("cent", {
@@ -462,7 +462,7 @@ def test_la_lista_y_la_tabla_dan_las_mismas_cifras(temp_db, cliente_autenticado)
             {"tipoOperacion": "Venta", "participaciones": "1,5"},
         ],
     })
-    client, _cab, _app = cliente_autenticado(activos_bp)
+    client, _cab, _app = clienteAutenticado(activosBp)
 
     tabla = client.get("/api/activos/rendimiento-batch").get_json()["cent"]
     lista = next(a for a in listAssets() if a["id"] == "cent")
@@ -473,7 +473,7 @@ def test_la_lista_y_la_tabla_dan_las_mismas_cifras(temp_db, cliente_autenticado)
     assert tabla["netoActual"] == 85.09  # 8,5 participaciones por 10,01
 
 
-def test_el_importe_del_atajo_admite_separador_de_miles():
+def testElImporteDelAtajoAdmiteSeparadorDeMiles():
     from decimal import Decimal
 
     from stores.movimientos_store import formatearImporteEuro, normalizarImporte

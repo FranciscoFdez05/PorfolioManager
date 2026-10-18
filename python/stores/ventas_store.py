@@ -9,21 +9,21 @@ nunca la fuente de verdad. Antes el POST aceptaba esos importes tal cual venían
 del navegador y los escribía sin mirarlos.
 """
 
-from core.db import get_db, transactional
+from core.db import getDb, transactional
 from core.errors import ValidationError
 from stores import ventas_fifo
-from stores.gastos_store import normalize_year
+from stores.gastos_store import normalizeYear
 
 _MAX_SHORT = 30
 _MAX_NAME = 120
 _MAX_FILAS = 500
 
 
-def create_default_ventas_year(year):
-    return {"year": normalize_year(year), "rows": []}
+def createDefaultVentasYear(year):
+    return {"year": normalizeYear(year), "rows": []}
 
 
-def sanitize_ventas_rows(rows):
+def sanitizeVentasRows(rows):
     if not isinstance(rows, list):
         return []
     if len(rows) > _MAX_FILAS:
@@ -44,12 +44,12 @@ def sanitize_ventas_rows(rows):
     return sanitized
 
 
-def sanitize_ventas_payload(payload, fallback_year=None):
-    year = normalize_year(payload.get("year") or fallback_year)
+def sanitizeVentasPayload(payload, fallbackYear=None):
+    year = normalizeYear(payload.get("year") or fallbackYear)
     if not year:
         return None, "Año inválido"
 
-    rows = sanitize_ventas_rows(payload.get("rows", []))
+    rows = sanitizeVentasRows(payload.get("rows", []))
 
     vistos = set()
     for row in rows:
@@ -62,12 +62,12 @@ def sanitize_ventas_payload(payload, fallback_year=None):
     return {"year": year, "rows": rows}, None
 
 
-def list_ventas_years():
-    conn = get_db()
+def listVentasYears():
+    conn = getDb()
     return [r["year"] for r in conn.execute("SELECT year FROM ventas_years ORDER BY year").fetchall()]
 
 
-def _fila_base(r):
+def _filaBase(r):
     return {
         "id": r["id"],
         "fecha": r["fecha"],
@@ -85,13 +85,13 @@ _SELECT_BASE = (
 )
 
 
-def read_ventas_year(year, calculo=None):
+def readVentasYear(year, calculo=None):
     """Ventas de un ejercicio con su liquidación fiscal ya aplicada."""
-    normalized = normalize_year(year)
+    normalized = normalizeYear(year)
     if not normalized:
         return None
 
-    conn = get_db()
+    conn = getDb()
     if not conn.execute("SELECT 1 FROM ventas_years WHERE year = ?", (normalized,)).fetchone():
         return None
 
@@ -99,14 +99,14 @@ def read_ventas_year(year, calculo=None):
         f"{_SELECT_BASE} WHERE year = ? ORDER BY rowid", (normalized,)
     ).fetchall()
 
-    calculo = calculo or ventas_fifo.calcular_todo()
+    calculo = calculo or ventas_fifo.calcularTodo()
     liquidacion = calculo["liquidaciones"].get(normalized)
 
     return {
         "year": normalized,
         "rows": [_combinar(r, calculo) for r in filas],
         "resumen": (
-            ventas_fifo.serializar_liquidacion(liquidacion) if liquidacion else None
+            ventas_fifo.serializarLiquidacion(liquidacion) if liquidacion else None
         ),
         "incidencias": [
             i for i in calculo["incidencias"] if str(i["year"]) == normalized
@@ -115,14 +115,14 @@ def read_ventas_year(year, calculo=None):
 
 
 def _combinar(fila, calculo):
-    base = _fila_base(fila)
+    base = _filaBase(fila)
     calculado = calculo["filas"].get((fila["year"], fila["id"]))
-    base.update(calculado or ventas_fifo.fila_vacia())
+    base.update(calculado or ventas_fifo.filaVacia())
     return base
 
 
 @transactional
-def write_ventas_year(year, data):
+def writeVentasYear(year, data):
     """Guarda las filas del ejercicio y recalcula la fiscalidad de todos.
 
     El recálculo abarca todos los ejercicios, no solo el que se guarda: añadir
@@ -130,11 +130,11 @@ def write_ventas_year(year, data):
     los números viejos era exactamente el descuadre que arrastraba la versión
     anterior.
     """
-    normalized = normalize_year(year)
+    normalized = normalizeYear(year)
     if not normalized:
         return
 
-    conn = get_db()
+    conn = getDb()
     # El nombre del activo se guarda resuelto desde `activos`: es solo una
     # etiqueta para que un backup o una exportación se lean sin la otra tabla,
     # y depender de lo que mande el cliente la dejaba vacía o desfasada.
@@ -143,7 +143,7 @@ def write_ventas_year(year, data):
     # El tipo de cambio de cada venta lo rellena fx_historico y el formulario no
     # lo manda: reescribir el ejercicio sin heredarlo lo borraba en cada guardado.
     # Depende de la fecha y de la divisa, que en una venta es la de su activo.
-    fx_previos = {
+    fxPrevios = {
         (r["fecha"], r["asset_id"]): (r["fx_rate"], r["fx_fecha"], r["fx_origen"])
         for r in conn.execute(
             "SELECT fecha, asset_id, fx_rate, fx_fecha, fx_origen FROM ventas "
@@ -163,25 +163,25 @@ def write_ventas_year(year, data):
              nombres.get(r.get("assetId", ""), r.get("activo", "")),
              r.get("cantidad", ""), r.get("valorVenta", ""),
              r.get("comisionVenta", ""),
-             *fx_previos.get((r.get("fecha", ""), r.get("assetId", "")), ("", "", "")))
+             *fxPrevios.get((r.get("fecha", ""), r.get("assetId", "")), ("", "", "")))
             for r in data.get("rows", [])
         ]
     )
     conn.commit()
 
-    return refrescar_calculo()
+    return refrescarCalculo()
 
 
 @transactional
-def refrescar_calculo():
+def refrescarCalculo():
     """Recalcula el FIFO completo y vuelca los importes derivados a la tabla.
 
     La copia en base de datos existe para que un backup o una exportación
     lleven los importes ya calculados; la fuente de verdad sigue siendo el
     cálculo, que se rehace en cada lectura.
     """
-    calculo = ventas_fifo.calcular_todo()
-    conn = get_db()
+    calculo = ventas_fifo.calcularTodo()
+    conn = getDb()
 
     conn.executemany(
         "UPDATE ventas SET valor_compra = ?, dinero_declarar = ?, "
@@ -193,16 +193,16 @@ def refrescar_calculo():
                 fila.get("tramo1", ""), fila.get("tramo2", ""), fila.get("tramo3", ""),
                 fila.get("tramo4", ""), fila.get("tramo5", ""),
                 fila.get("totalPagar", ""), fila.get("bruto", ""), fila.get("neto", ""),
-                anio, venta_id,
+                anio, ventaId,
             )
-            for (anio, venta_id), fila in calculo["filas"].items()
+            for (anio, ventaId), fila in calculo["filas"].items()
         ]
     )
     conn.commit()
     return calculo
 
 
-def validar_para_guardar(data):
+def validarParaGuardar(data):
     """Rechaza lo que no puede entrar en la línea temporal.
 
     Distingue dos niveles a propósito. Un dato formalmente imposible (fecha
@@ -212,7 +212,7 @@ def validar_para_guardar(data):
     registrando la compra que faltaba, y bloquear el guardado dejaría al
     usuario sin poder avanzar.
     """
-    conn = get_db()
+    conn = getDb()
     activos = {r["id"] for r in conn.execute("SELECT id FROM activos")}
     errores = []
 
@@ -230,7 +230,7 @@ def validar_para_guardar(data):
             "fecha": row.get("fecha", ""),
             "year": data.get("year", ""),
         }
-        _, incidencia = ventas_fifo.validar_venta(
+        _, incidencia = ventas_fifo.validarVenta(
             fila, {a: {} for a in activos}
         )
         if incidencia in ventas_fifo.BLOQUEANTES:
@@ -238,7 +238,7 @@ def validar_para_guardar(data):
                 "fila": indice,
                 "id": row.get("id", ""),
                 "codigo": incidencia,
-                "mensaje": ventas_fifo.mensaje_incidencia(incidencia),
+                "mensaje": ventas_fifo.mensajeIncidencia(incidencia),
             })
 
     if errores:
@@ -249,12 +249,12 @@ def validar_para_guardar(data):
 
 
 @transactional
-def delete_ventas_year(year):
-    normalized = normalize_year(year)
+def deleteVentasYear(year):
+    normalized = normalizeYear(year)
     if not normalized:
         return False
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("DELETE FROM ventas WHERE year = ?", (normalized,))
     result = conn.execute("DELETE FROM ventas_years WHERE year = ?", (normalized,))
     conn.commit()
@@ -263,28 +263,28 @@ def delete_ventas_year(year):
         # Borrar un ejercicio devuelve lotes a la cartera: los años siguientes
         # tienen que recalcularse o quedarían con un coste FIFO que ya no
         # corresponde a ninguna compra.
-        refrescar_calculo()
+        refrescarCalculo()
 
     return result.rowcount > 0
 
 
 @transactional
-def migrate_legacy_ventas_if_needed(default_year):
+def migrateLegacyVentasIfNeeded(defaultYear):
     """En la versión SQLite no hay ficheros legacy que migrar.
     Si no hay ningún año crea uno vacío con el año por defecto.
     También migra años existentes en la tabla ventas que no estén en ventas_years."""
-    conn = get_db()
+    conn = getDb()
     conn.execute("INSERT OR IGNORE INTO ventas_years (year) SELECT DISTINCT year FROM ventas")
     conn.commit()
-    years = list_ventas_years()
+    years = listVentasYears()
     if years:
         return years
-    write_ventas_year(default_year, create_default_ventas_year(default_year))
-    return [default_year]
+    writeVentasYear(defaultYear, createDefaultVentasYear(defaultYear))
+    return [defaultYear]
 
 
-def read_all_ventas_rows(calculo=None):
-    conn = get_db()
+def readAllVentasRows(calculo=None):
+    conn = getDb()
     filas = conn.execute(f"{_SELECT_BASE} ORDER BY year, rowid").fetchall()
-    calculo = calculo or ventas_fifo.calcular_todo()
+    calculo = calculo or ventas_fifo.calcularTodo()
     return [_combinar(r, calculo) for r in filas]

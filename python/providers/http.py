@@ -27,7 +27,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from core import settings
-from providers.api_stats import record_api_call, record_api_failure
+from providers.api_stats import recordApiCall, recordApiFailure
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ log = logging.getLogger(__name__)
 _RETRYABLE_STATUS = {408, 425, 429, 500, 502, 503, 504}
 
 
-def motivo_conexion(error, proveedor="") -> str:
+def motivoConexion(error, proveedor="") -> str:
     """El motivo de un fallo de conexión, dicho en corto y sin datos internos.
 
     `error.reason` es el texto del sistema operativo («[WinError 10061] No se
@@ -63,7 +63,7 @@ def motivo_conexion(error, proveedor="") -> str:
     return "error de red"
 
 
-def _headers_base():
+def _headersBase():
     return {
         "User-Agent": settings.proveedorUserAgent(),
         "Accept": "application/json",
@@ -90,18 +90,18 @@ class ProviderResponseError(ProviderError):
     """El proveedor respondió algo que no es JSON válido o es demasiado grande."""
 
 
-def _sleep_for(attempt: int, retry_after: float | None) -> float:
-    if retry_after is not None:
+def _sleepFor(attempt: int, retryAfter: float | None) -> float:
+    if retryAfter is not None:
         # Tope al Retry-After: los proveedores gratuitos llegan a pedir 60 s y
         # el usuario está esperando delante de la pantalla.
-        return min(retry_after, settings.proveedorMaxRetryAfter())
+        return min(retryAfter, settings.proveedorMaxRetryAfter())
     # Backoff exponencial con jitter: evita que los refrescos de varios activos
     # reintenten todos en el mismo instante y vuelvan a saturar al proveedor.
     base = min(settings.proveedorBackoffInicial() * (2 ** attempt), settings.proveedorBackoffMaximo())
     return base * (0.5 + random.random() / 2)
 
 
-def _parse_retry_after(error: HTTPError):
+def _parseRetryAfter(error: HTTPError):
     raw = error.headers.get("Retry-After") if error.headers else None
     if not raw:
         return None
@@ -112,7 +112,7 @@ def _parse_retry_after(error: HTTPError):
         return None
 
 
-def _read_json(response, url: str):
+def _readJson(response, url: str):
     # El mayor payload legítimo son los catálogos de símbolos de Finnhub (unos
     # 2 MB); el resto son cotizaciones de pocos KB. El tope protege la memoria
     # del proceso cuando varios activos se refrescan a la vez.
@@ -132,14 +132,14 @@ def _read_json(response, url: str):
         raise ProviderResponseError("El proveedor devolvió una respuesta no válida") from exc
 
 
-def build_url(url: str, params=None) -> str:
+def buildUrl(url: str, params=None) -> str:
     query = urlencode(params or {})
     return f"{url}?{query}" if query else url
 
 
-def fetch_json(url, params=None, *, timeout=None, provider=None, headers=None,
-               retries=None, json_body=None):
-    """GET (o POST con `json_body`) + parseo JSON con reintentos.
+def fetchJson(url, params=None, *, timeout=None, provider=None, headers=None,
+               retries=None, jsonBody=None):
+    """GET (o POST con `jsonBody`) + parseo JSON con reintentos.
 
     `provider` es la etiqueta con la que se contabiliza la llamada en las
     estadísticas de uso de API (pantalla de Ajustes). Se registra una vez por
@@ -149,19 +149,19 @@ def fetch_json(url, params=None, *, timeout=None, provider=None, headers=None,
     [proveedores] en config.ini; pasarlos explícitamente es para el caso puntual
     de una llamada que sabe que necesita otra cosa.
 
-    `json_body`, si se da, convierte la petición en POST con ese cuerpo
+    `jsonBody`, si se da, convierte la petición en POST con ese cuerpo
     serializado a JSON (lo pide el scanner de TradingView; el resto de
     proveedores solo usan `params` en la query string).
     """
-    request_url = build_url(url, params)
-    request_headers = _headers_base()
+    requestUrl = buildUrl(url, params)
+    requestHeaders = _headersBase()
     if headers:
-        request_headers.update(headers)
+        requestHeaders.update(headers)
 
-    request_data = None
-    if json_body is not None:
-        request_data = json.dumps(json_body).encode("utf-8")
-        request_headers["Content-Type"] = "application/json"
+    requestData = None
+    if jsonBody is not None:
+        requestData = json.dumps(jsonBody).encode("utf-8")
+        requestHeaders["Content-Type"] = "application/json"
 
     if timeout is None:
         timeout = settings.proveedorTimeout()
@@ -169,39 +169,39 @@ def fetch_json(url, params=None, *, timeout=None, provider=None, headers=None,
         retries = settings.proveedorReintentos()
 
     attempts = max(1, int(retries) + 1)
-    last_error = None
+    lastError = None
 
     for attempt in range(attempts):
         if provider:
-            record_api_call(provider)
+            recordApiCall(provider)
         try:
-            request = Request(request_url, data=request_data, headers=request_headers)
+            request = Request(requestUrl, data=requestData, headers=requestHeaders)
             with urlopen(request, timeout=timeout) as response:
-                return _read_json(response, url)
+                return _readJson(response, url)
         except HTTPError as error:
-            last_error = error
+            lastError = error
             retryable = error.code in _RETRYABLE_STATUS
-            delay = _sleep_for(attempt, _parse_retry_after(error)) if retryable else 0
+            delay = _sleepFor(attempt, _parseRetryAfter(error)) if retryable else 0
         except (TimeoutError, ProviderResponseError, URLError, OSError) as error:
             # OSError cubre ConnectionResetError y similares, que urllib deja
             # pasar sin envolver en URLError.
-            last_error = error
+            lastError = error
             retryable = True
-            delay = _sleep_for(attempt, None)
+            delay = _sleepFor(attempt, None)
 
         if not retryable or attempt == attempts - 1:
             break
         log.info(
             "Reintento %s/%s de %s tras %s (espera %.2fs)",
-            attempt + 1, attempts - 1, provider or url, last_error, delay,
+            attempt + 1, attempts - 1, provider or url, lastError, delay,
         )
         time.sleep(delay)
 
     # Solo los fallos que indican un problema del proveedor (clave, cuota, caída)
     # disparan un nuevo diagnóstico en Ajustes; un 404 o 400 es culpa del símbolo.
-    if provider and not (isinstance(last_error, HTTPError) and last_error.code in (400, 404, 422)):
-        record_api_failure(provider)
+    if provider and not (isinstance(lastError, HTTPError) and lastError.code in (400, 404, 422)):
+        recordApiFailure(provider)
 
-    if isinstance(last_error, (HTTPError, URLError, TimeoutError)):
-        raise last_error
-    raise ProviderError(str(last_error) if last_error else "Fallo desconocido")
+    if isinstance(lastError, (HTTPError, URLError, TimeoutError)):
+        raise lastError
+    raise ProviderError(str(lastError) if lastError else "Fallo desconocido")

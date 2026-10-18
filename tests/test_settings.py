@@ -29,29 +29,29 @@ def config(tmp_path, monkeypatch):
 
 # ── Catálogo ──────────────────────────────────────────────────────────────────
 
-def test_todos_los_ajustes_se_pueden_leer():
+def testTodosLosAjustesSePuedenLeer():
     """Ningún ajuste declarado revienta al resolverse con los valores actuales."""
     for ajuste in settings.CATALOGO:
         ajuste.leer()
 
 
-def test_los_nombres_no_se_repiten():
+def testLosNombresNoSeRepiten():
     nombres = [ajuste.nombre for ajuste in settings.CATALOGO]
     assert len(nombres) == len(set(nombres))
 
 
-def test_las_variables_de_entorno_no_se_repiten():
+def testLasVariablesDeEntornoNoSeRepiten():
     """Dos ajustes con la misma env se pisarían entre ellos sin avisar."""
     envs = [ajuste.env for ajuste in settings.CATALOGO if ajuste.env]
     assert len(envs) == len(set(envs))
 
 
-def test_todos_los_ajustes_estan_documentados():
+def testTodosLosAjustesEstanDocumentados():
     for ajuste in settings.CATALOGO:
         assert ajuste.descripcion.strip(), f"{ajuste.nombre} sin descripción"
 
 
-def test_los_defectos_respetan_su_propio_rango():
+def testLosDefectosRespetanSuPropioRango():
     for ajuste in settings.CATALOGO:
         if ajuste.minimo is not None:
             assert ajuste.defecto >= ajuste.minimo, ajuste.nombre
@@ -61,12 +61,12 @@ def test_los_defectos_respetan_su_propio_rango():
             assert ajuste.defecto in ajuste.permitidos, ajuste.nombre
 
 
-def test_obtener_falla_con_un_nombre_no_declarado():
+def testObtenerFallaConUnNombreNoDeclarado():
     with pytest.raises(KeyError):
         settings.obtener("seccion.inventada")
 
 
-def test_el_entorno_gana_al_fichero(config, monkeypatch):
+def testElEntornoGanaAlFichero(config, monkeypatch):
     config("[seguridad]\nmax_intentos_login = 3\n")
     assert settings.maxIntentosLogin() == 3
 
@@ -74,29 +74,29 @@ def test_el_entorno_gana_al_fichero(config, monkeypatch):
     assert settings.maxIntentosLogin() == 9
 
 
-def test_un_valor_fuera_de_rango_se_recorta(config):
+def testUnValorFueraDeRangoSeRecorta(config):
     """Recortar y avisar, en vez de dejar pasar un valor peligroso."""
     config("[seguridad]\nbloqueo_segundos = 0\n")
     assert settings.bloqueoSegundos() == 1  # el mínimo declarado
 
 
-def test_un_valor_ilegible_cae_al_defecto(config):
+def testUnValorIlegibleCaeAlDefecto(config):
     config("[proveedores]\ntimeout_segundos = pronto\n")
     assert settings.proveedorTimeout() == 10.0
 
 
-def test_las_unidades_se_convierten(config):
+def testLasUnidadesSeConvierten(config):
     config("[server]\nmax_cuerpo_mb = 3\n\n[proveedores]\nmax_respuesta_mb = 2\n")
     assert settings.maxCuerpoBytes() == 3 * 1024 * 1024
     assert settings.proveedorMaxRespuestaBytes() == 2 * 1024 * 1024
 
 
-def test_el_decimal_acepta_coma(config):
+def testElDecimalAceptaComa(config):
     config("[proveedores]\nbackoff_inicial_segundos = 1,5\n")
     assert settings.proveedorBackoffInicial() == 1.5
 
 
-def test_samesite_none_sin_https_se_degrada_a_lax(config):
+def testSamesiteNoneSinHttpsSeDegradaALax(config):
     """SameSite=None sin Secure haría que el navegador tirase la cookie."""
     config("[server]\ncookie_samesite = None\nhttps_activado = false\n")
     assert settings.cookieSameSite() == "Lax"
@@ -105,59 +105,59 @@ def test_samesite_none_sin_https_se_degrada_a_lax(config):
     assert settings.cookieSameSite() == "None"
 
 
-def test_el_metodo_de_hash_usa_las_iteraciones_configuradas(config):
+def testElMetodoDeHashUsaLasIteracionesConfiguradas(config):
     config("[seguridad]\nhash_iteraciones = 250000\n")
     assert settings.metodoHashPassword() == "pbkdf2:sha256:250000"
 
 
 # ── Validación ────────────────────────────────────────────────────────────────
 
-def test_una_configuracion_correcta_no_genera_avisos(config):
+def testUnaConfiguracionCorrectaNoGeneraAvisos(config):
     config("[server]\nport = 8080\n")
     assert settings.validar() == []
 
 
-def test_avisa_de_un_valor_fuera_de_rango(config):
+def testAvisaDeUnValorFueraDeRango(config):
     config("[server]\nport = 99999\n")
     avisos = settings.validar()
     assert any("port" in aviso for aviso in avisos)
 
 
-def test_avisa_de_un_valor_ilegible(config):
+def testAvisaDeUnValorIlegible(config):
     config("[backups]\nmax_copias = muchas\n")
     assert any("max_copias" in aviso for aviso in settings.validar())
 
 
-def test_avisa_de_una_opcion_no_permitida(config):
+def testAvisaDeUnaOpcionNoPermitida(config):
     config("[registros]\nnivel = CHARLATAN\n")
     assert any("nivel" in aviso for aviso in settings.validar())
 
 
-def test_avisa_de_un_booleano_ilegible(config):
+def testAvisaDeUnBooleanoIlegible(config):
     config("[server]\ndebug = quizas\n")
     assert any("debug" in aviso for aviso in settings.validar())
 
 
-def test_avisa_si_la_subida_es_menor_que_el_cuerpo(config):
+def testAvisaSiLaSubidaEsMenorQueElCuerpo(config):
     """Cada valor es válido por separado; la combinación no tiene sentido."""
     config("[server]\nmax_cuerpo_mb = 100\nmax_subida_mb = 10\n")
     assert any("max_subida_mb" in aviso for aviso in settings.validar())
 
 
-def test_avisa_del_atajo_activado_sin_redes(config):
+def testAvisaDelAtajoActivadoSinRedes(config):
     """Fail-closed: sin redes no entra nadie, mejor decirlo que dejarlo pasar."""
     config("[atajo]\nactivado = true\nredes_permitidas =\n")
     assert any("redes_permitidas" in aviso for aviso in settings.validar())
 
 
-def test_avisa_del_modo_debug(config):
+def testAvisaDelModoDebug(config):
     config("[server]\ndebug = true\n")
     assert any("debug" in aviso for aviso in settings.validar())
 
 
 # ── TLS y proxy inverso ───────────────────────────────────────────────────────
 
-def test_avisa_de_https_sin_proxy(config):
+def testAvisaDeHttpsSinProxy(config):
     """La app no termina TLS: con https_activado hay un proxy, y hay que decirlo.
 
     Sin proxy_saltos, la IP de todas las peticiones sería la del proxy, y con
@@ -167,18 +167,18 @@ def test_avisa_de_https_sin_proxy(config):
     assert any("proxy_saltos" in aviso for aviso in settings.validar())
 
 
-def test_avisa_de_proxy_sin_https(config):
+def testAvisaDeProxySinHttps(config):
     """Al revés: hay proxy declarado, pero la cookie sale sin Secure."""
     config("[server]\nhttps_activado = false\nproxy_saltos = 1\n")
     assert any("Secure" in aviso for aviso in settings.validar())
 
 
-def test_https_con_proxy_no_genera_avisos(config):
+def testHttpsConProxyNoGeneraAvisos(config):
     config("[server]\nhttps_activado = true\nproxy_saltos = 1\n")
     assert settings.validar() == []
 
 
-def test_el_aviso_de_http_plano_esta_fuera_de_validar(config):
+def testElAvisoDeHttpPlanoEstaFueraDeValidar(config):
     """Servir por HTTP es el defecto, no un error de configuración.
 
     Si estuviera en validar(), el config.ini que se distribuye no pasaría su
@@ -189,7 +189,7 @@ def test_el_aviso_de_http_plano_esta_fuera_de_validar(config):
     assert settings.validar() == []
 
 
-def test_proxy_saltos_se_acota_por_abajo(config):
+def testProxySaltosSeAcotaPorAbajo(config):
     """Un valor raro aquí decide de quién se fía la app: se recorta al mínimo."""
     config("[server]\nproxy_saltos = -1\n")
     assert settings.proxySaltos() == 0
@@ -201,7 +201,7 @@ def test_proxy_saltos_se_acota_por_abajo(config):
 # dos sitios donde poner lo mismo, uno con prioridad, y nada que lo diga. Estas
 # pruebas fijan que el choque se avise y que avisar no se convierta en ruido.
 
-def test_avisa_cuando_el_entorno_tapa_un_valor_escrito(config, monkeypatch):
+def testAvisaCuandoElEntornoTapaUnValorEscrito(config, monkeypatch):
     config("[backups]\nmax_copias = 7\n")
     monkeypatch.setenv("BACKUPS_MAX_COPIAS", "30")
 
@@ -214,7 +214,7 @@ def test_avisa_cuando_el_entorno_tapa_un_valor_escrito(config, monkeypatch):
     assert avisos == [aviso for aviso in settings.validar() if aviso in avisos]
 
 
-def test_no_avisa_si_los_dos_sitios_dicen_lo_mismo(config, monkeypatch):
+def testNoAvisaSiLosDosSitiosDicenLoMismo(config, monkeypatch):
     """Redundante, pero no engaña a nadie: avisar aquí sería ruido."""
     config("[backups]\nmax_copias = 30\n")
     monkeypatch.setenv("BACKUPS_MAX_COPIAS", "30")
@@ -222,7 +222,7 @@ def test_no_avisa_si_los_dos_sitios_dicen_lo_mismo(config, monkeypatch):
     assert settings.sombras() == []
 
 
-def test_no_avisa_si_el_fichero_esta_como_se_distribuye(config, monkeypatch):
+def testNoAvisaSiElFicheroEstaComoSeDistribuye(config, monkeypatch):
     """El README recomienda dejar config.ini quieto y cambiar las cosas en .env.
 
     Como el fichero se distribuye con todas las opciones escritas en su valor
@@ -235,7 +235,7 @@ def test_no_avisa_si_el_fichero_esta_como_se_distribuye(config, monkeypatch):
     assert settings.sombras() == []
 
 
-def test_el_config_ini_del_repositorio_no_genera_sombras(monkeypatch):
+def testElConfigIniDelRepositorioNoGeneraSombras(monkeypatch):
     """La comprobación de arriba, contra el fichero de verdad y todo el catálogo."""
     for ajuste in settings.CATALOGO:
         if ajuste.env and ajuste.env not in settings.FIJADAS_POR_EL_DESPLIEGUE:
@@ -244,7 +244,7 @@ def test_el_config_ini_del_repositorio_no_genera_sombras(monkeypatch):
     assert settings.sombras() == []
 
 
-def test_no_avisa_de_un_ajuste_que_no_esta_escrito(config, monkeypatch):
+def testNoAvisaDeUnAjusteQueNoEstaEscrito(config, monkeypatch):
     """Sin la opción en el fichero no hay dos valores: el entorno es el único."""
     config("[server]\nport = 8080\n")
     monkeypatch.setenv("BACKUPS_MAX_COPIAS", "30")
@@ -252,14 +252,14 @@ def test_no_avisa_de_un_ajuste_que_no_esta_escrito(config, monkeypatch):
     assert settings.sombras() == []
 
 
-def test_una_variable_vacia_no_tapa_nada(config, monkeypatch):
+def testUnaVariableVaciaNoTapaNada(config, monkeypatch):
     config("[backups]\nmax_copias = 7\n")
     monkeypatch.setenv("BACKUPS_MAX_COPIAS", "")
 
     assert settings.sombras() == []
 
 
-def test_no_avisa_de_lo_que_fija_el_despliegue(config, monkeypatch):
+def testNoAvisaDeLoQueFijaElDespliegue(config, monkeypatch):
     """PROXY_FIX_HOPS lo pone docker-compose.yml en todos los arranques."""
     config("[server]\nproxy_saltos = 2\n")
     monkeypatch.setenv("PROXY_FIX_HOPS", "1")
@@ -267,12 +267,12 @@ def test_no_avisa_de_lo_que_fija_el_despliegue(config, monkeypatch):
     assert settings.sombras() == []
 
 
-def test_las_variables_fijadas_existen_en_el_catalogo():
+def testLasVariablesFijadasExistenEnElCatalogo():
     envs = {ajuste.env for ajuste in settings.CATALOGO if ajuste.env}
     assert envs >= settings.FIJADAS_POR_EL_DESPLIEGUE
 
 
-def test_las_fijadas_cubren_lo_que_escribe_docker_compose():
+def testLasFijadasCubrenLoQueEscribeDockerCompose():
     """Un override nuevo en docker-compose.yml sin añadir aquí = aviso en cada arranque.
 
     docker-compose.yml escribe algunas variables en el contenedor a propósito
@@ -298,7 +298,7 @@ def test_las_fijadas_cubren_lo_que_escribe_docker_compose():
     )
 
 
-def test_el_config_ini_se_monta_en_el_contenedor():
+def testElConfigIniSeMontaEnElContenedor():
     """Sin el montaje, editar config.ini no hace nada hasta reconstruir la imagen."""
     compose = (config_ini._RAIZ / "docker-compose.yml").read_text(encoding="utf-8")
     assert "./config.ini:/app/config.ini:ro" in compose
@@ -306,38 +306,38 @@ def test_el_config_ini_se_monta_en_el_contenedor():
 
 # ── Diagnóstico ───────────────────────────────────────────────────────────────
 
-def test_el_diagnostico_indica_el_origen_de_cada_valor(config, monkeypatch):
+def testElDiagnosticoIndicaElOrigenDeCadaValor(config, monkeypatch):
     config("[server]\nport = 8080\n")
     monkeypatch.setenv("BACKUPS_MAX_COPIAS", "30")
 
-    por_nombre = {fila["nombre"]: fila for fila in settings.diagnostico()}
+    porNombre = {fila["nombre"]: fila for fila in settings.diagnostico()}
 
-    assert por_nombre["server.port"]["origen"] == "config.ini"
-    assert por_nombre["backups.max_copias"]["origen"] == "entorno"
-    assert por_nombre["server.host"]["origen"] == "defecto"
+    assert porNombre["server.port"]["origen"] == "config.ini"
+    assert porNombre["backups.max_copias"]["origen"] == "entorno"
+    assert porNombre["server.host"]["origen"] == "defecto"
 
 
-def test_el_diagnostico_cubre_el_catalogo_entero(config):
+def testElDiagnosticoCubreElCatalogoEntero(config):
     config("")
     assert len(settings.diagnostico()) == len(settings.CATALOGO)
 
 
 # ── Coherencia entre config.ini y el catálogo ─────────────────────────────────
 
-def _config_del_repositorio():
+def _configDelRepositorio():
     parser = configparser.ConfigParser(inline_comment_prefixes=(";", "#"), interpolation=None)
     parser.read(config_ini._RAIZ / "config.ini", encoding="utf-8")
     return parser
 
 
-def test_config_ini_del_repositorio_es_legible():
-    parser = _config_del_repositorio()
+def testConfigIniDelRepositorioEsLegible():
+    parser = _configDelRepositorio()
     assert parser.sections(), "config.ini vacío o ilegible"
 
 
-def test_config_ini_no_tiene_opciones_sin_declarar():
+def testConfigIniNoTieneOpcionesSinDeclarar():
     """Una opción que el código no lee es una trampa: se edita y no hace nada."""
-    parser = _config_del_repositorio()
+    parser = _configDelRepositorio()
     declarados = {ajuste.nombre for ajuste in settings.CATALOGO}
 
     huerfanos = [
@@ -350,9 +350,9 @@ def test_config_ini_no_tiene_opciones_sin_declarar():
     assert not huerfanos, f"Opciones en config.ini que settings.py no declara: {huerfanos}"
 
 
-def test_config_ini_declara_todos_los_ajustes():
+def testConfigIniDeclaraTodosLosAjustes():
     """Al revés: un ajuste sin línea en config.ini es un ajuste que nadie descubre."""
-    parser = _config_del_repositorio()
+    parser = _configDelRepositorio()
 
     ausentes = [
         ajuste.nombre for ajuste in settings.CATALOGO
@@ -362,7 +362,7 @@ def test_config_ini_declara_todos_los_ajustes():
     assert not ausentes, f"Ajustes declarados que config.ini no documenta: {ausentes}"
 
 
-def test_config_ini_del_repositorio_no_genera_avisos():
+def testConfigIniDelRepositorioNoGeneraAvisos():
     """El fichero que se distribuye tiene que pasar su propia validación."""
     config_ini.invalidarCache()
     try:
@@ -371,7 +371,7 @@ def test_config_ini_del_repositorio_no_genera_avisos():
         config_ini.invalidarCache()
 
 
-def test_config_ini_coincide_con_los_defectos_del_catalogo():
+def testConfigIniCoincideConLosDefectosDelCatalogo():
     """Los valores distribuidos son los valores por defecto.
 
     Si divergen, el usuario que borre una línea de config.ini obtiene un
@@ -393,7 +393,7 @@ def test_config_ini_coincide_con_los_defectos_del_catalogo():
 
 # ── Rutas ─────────────────────────────────────────────────────────────────────
 
-def test_las_rutas_derivan_del_directorio_de_datos():
+def testLasRutasDerivanDelDirectorioDeDatos():
     from core import paths
 
     assert paths.AUTH_FILE.parent == paths.DATA_DIR
@@ -402,13 +402,13 @@ def test_las_rutas_derivan_del_directorio_de_datos():
     assert paths.AJUSTES_JSON.parent == paths.JSON_DIR
 
 
-def test_una_ruta_relativa_del_config_cuelga_de_la_raiz():
+def testUnaRutaRelativaDelConfigCuelgaDeLaRaiz():
     from core import paths
 
     assert paths.rutaDesdeBase("API/movimientos.key") == paths.BASE_DIR / "API" / "movimientos.key"
 
 
-def test_una_ruta_absoluta_del_config_se_respeta(tmp_path):
+def testUnaRutaAbsolutaDelConfigSeRespeta(tmp_path):
     from core import paths
 
     assert paths.rutaDesdeBase(tmp_path / "claves.key") == tmp_path / "claves.key"

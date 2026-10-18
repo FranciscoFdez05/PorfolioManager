@@ -19,7 +19,7 @@ def config(tmp_path, monkeypatch):
     config_ini.invalidarCache()
 
 
-def test_lee_texto_y_aplica_el_defecto(config):
+def testLeeTextoYAplicaElDefecto(config):
     from core.config_ini import obtenerTexto
 
     config("[demo]\nvalor = hola\nvacio =\n")
@@ -30,7 +30,7 @@ def test_lee_texto_y_aplica_el_defecto(config):
     assert obtenerTexto("seccion-ausente", "valor", "defecto") == "defecto"
 
 
-def test_el_entorno_gana_al_fichero(config, monkeypatch):
+def testElEntornoGanaAlFichero(config, monkeypatch):
     from core.config_ini import obtenerTexto
 
     config("[demo]\nvalor = del-fichero\n")
@@ -39,7 +39,7 @@ def test_el_entorno_gana_al_fichero(config, monkeypatch):
     assert obtenerTexto("demo", "valor", "", env="DEMO_VALOR") == "del-entorno"
 
 
-def test_entorno_vacio_no_pisa_el_fichero(config, monkeypatch):
+def testEntornoVacioNoPisaElFichero(config, monkeypatch):
     """Una variable declarada pero vacía no debe borrar el valor configurado."""
     from core.config_ini import obtenerTexto
 
@@ -49,7 +49,7 @@ def test_entorno_vacio_no_pisa_el_fichero(config, monkeypatch):
     assert obtenerTexto("demo", "valor", "", env="DEMO_VALOR") == "del-fichero"
 
 
-def test_entero_con_limites(config):
+def testEnteroConLimites(config):
     from core.config_ini import obtenerEntero
 
     config("[demo]\nbajo = 0\nalto = 999\nok = 42\nbasura = abc\n")
@@ -65,7 +65,7 @@ def test_entero_con_limites(config):
     ("true", True), ("1", True), ("yes", True), ("on", True), ("si", True), ("Sí", True),
     ("false", False), ("0", False), ("no", False), ("off", False),
 ])
-def test_booleanos(config, texto, esperado):
+def testBooleanos(config, texto, esperado):
     from core.config_ini import obtenerBooleano
 
     config(f"[demo]\nvalor = {texto}\n")
@@ -73,7 +73,7 @@ def test_booleanos(config, texto, esperado):
     assert obtenerBooleano("demo", "valor", not esperado) is esperado
 
 
-def test_booleano_ilegible_usa_el_defecto(config):
+def testBooleanoIlegibleUsaElDefecto(config):
     from core.config_ini import obtenerBooleano
 
     config("[demo]\nvalor = quizas\n")
@@ -82,7 +82,7 @@ def test_booleano_ilegible_usa_el_defecto(config):
     assert obtenerBooleano("demo", "valor", False) is False
 
 
-def test_lista_ignora_huecos(config):
+def testListaIgnoraHuecos(config):
     from core.config_ini import obtenerLista
 
     config("[demo]\nvalores = uno,  dos ,,tres,\n")
@@ -91,7 +91,7 @@ def test_lista_ignora_huecos(config):
     assert obtenerLista("demo", "ausente", ("a", "b")) == ["a", "b"]
 
 
-def test_comentario_en_linea(config):
+def testComentarioEnLinea(config):
     """inline_comment_prefixes evita que el ';' acabe dentro del valor."""
     from core.config_ini import obtenerLista
 
@@ -100,7 +100,7 @@ def test_comentario_en_linea(config):
     assert obtenerLista("demo", "valores") == ["uno", "dos"]
 
 
-def test_relee_al_cambiar_el_fichero(config):
+def testReleeAlCambiarElFichero(config):
     """Editar config.ini con el servidor arrancado surte efecto sin reiniciar."""
     import os
 
@@ -118,7 +118,7 @@ def test_relee_al_cambiar_el_fichero(config):
     assert obtenerTexto("demo", "valor") == "despues"
 
 
-def test_fichero_ausente_no_revienta(tmp_path, monkeypatch):
+def testFicheroAusenteNoRevienta(tmp_path, monkeypatch):
     from core import config_ini
 
     monkeypatch.setattr(config_ini, "RUTA_CONFIG", tmp_path / "no-existe.ini")

@@ -23,7 +23,7 @@ BASE = "http://192.168.1.163:5000"
 
 
 @pytest.fixture(autouse=True)
-def clave_aislada(tmp_path, monkeypatch):
+def claveAislada(tmp_path, monkeypatch):
     """Saca API/movimientos.key del repositorio en todos los tests del fichero."""
     destino = tmp_path / "movimientos.key"
     monkeypatch.setattr(firma_hmac, "rutaFicheroClave", lambda: destino)
@@ -46,7 +46,7 @@ def _urls(acciones):
 
 # ── El fichero .shortcut ──────────────────────────────────────────────────────
 
-def test_el_atajo_es_un_plist_con_las_cuatro_llamadas():
+def testElAtajoEsUnPlistConLasCuatroLlamadas():
     """Portfolios, categorías, preparar y enviar, en ese orden."""
     urls = _urls(_acciones())
 
@@ -56,7 +56,7 @@ def test_el_atajo_es_un_plist_con_las_cuatro_llamadas():
     assert urls[3] == f"{BASE}/api/movimiento"
 
 
-def test_cada_llamada_al_servidor_para_el_atajo_si_falla():
+def testCadaLlamadaAlServidorParaElAtajoSiFalla():
     """Atajos no trata un 403 o un 404 como error: el JSON del fallo sigue su
     curso, «Elegir de la lista» con una lista vacía no pregunta nada y el atajo
     acababa en «Apuntado» sin haber apuntado. Después de cada llamada tiene que
@@ -97,7 +97,7 @@ def test_cada_llamada_al_servidor_para_el_atajo_si_falla():
     assert ids.count("is.workflow.actions.conditional") == 10
 
 
-def test_elegir_de_la_lista_lee_de_la_variable_y_no_de_la_accion_anterior():
+def testElegirDeLaListaLeeDeLaVariableYNoDeLaAccionAnterior():
     """Con el «Si» en medio, la acción anterior a «Elegir» ya no es la lista."""
     for a in _acciones():
         if a["WFWorkflowActionIdentifier"] == "is.workflow.actions.choosefromlist":
@@ -106,7 +106,7 @@ def test_elegir_de_la_lista_lee_de_la_variable_y_no_de_la_accion_anterior():
             assert a["WFWorkflowActionParameters"]["WFInput"]["Value"]["VariableName"] == "opciones"
 
 
-def test_el_envio_va_como_archivo_y_no_como_json():
+def testElEnvioVaComoArchivoYNoComoJson():
     """Es el detalle que rompe el atajo sin dejar rastro: con `Json`, Atajos
     vuelve a serializar el cuerpo, cambian los bytes y la firma deja de valer.
     El 401 resultante parece un problema de clave y no lo es."""
@@ -123,7 +123,7 @@ def test_el_envio_va_como_archivo_y_no_como_json():
     assert cabeceras == ["Content-Type", "X-Signature", "X-Timestamp"]
 
 
-def test_las_variables_caen_donde_dice_el_mapa_de_posiciones():
+def testLasVariablesCaenDondeDiceElMapaDePosiciones():
     """Atajos localiza cada variable por su posición dentro del texto. Si el mapa
     y la cadena se calcularan por separado, tocar una letra de la URL metería la
     variable en otro sitio y el atajo se importaría roto."""
@@ -138,7 +138,7 @@ def test_las_variables_caen_donde_dice_el_mapa_de_posiciones():
         assert url["string"][posicion] == atajo_shortcut.HUECO, adjunto
 
 
-def test_el_movimiento_no_lleva_fecha():
+def testElMovimientoNoLlevaFecha():
     """La pone el servidor con el día en que llega la petición: preguntarla sería
     un paso más en algo que tiene que caber en una pulsación."""
     preparar = next(
@@ -152,22 +152,22 @@ def test_el_movimiento_no_lleva_fecha():
     assert "fecha" not in campos
 
 
-def test_el_fichero_no_lleva_ninguna_clave(clave_aislada):
+def testElFicheroNoLlevaNingunaClave(claveAislada):
     """Puede guardarse en Archivos o mandarse por AirDrop: lo único sensible que
     contiene es la dirección del servidor. El atajo pide la firma en cada uso."""
-    firma_hmac.escribirClaveNueva(clave_aislada)
+    firma_hmac.escribirClaveNueva(claveAislada)
     secreto = firma_hmac.obtenerClaveSecreta().decode()
 
     assert secreto.encode() not in atajo_shortcut.construir(BASE)
 
 
-def test_la_barra_final_no_duplica_la_del_endpoint():
+def testLaBarraFinalNoDuplicaLaDelEndpoint():
     assert _urls(_acciones(BASE + "/"))[0] == f"{BASE}/api/portfolios-lista"
 
 
 # ── Diagnóstico ───────────────────────────────────────────────────────────────
 
-def test_sin_fichero_el_estado_dice_que_no_hay_clave():
+def testSinFicheroElEstadoDiceQueNoHayClave():
     assert atajo.estado(BASE)["clave"] == {
         "hay": False,
         "origen": "ninguna",
@@ -175,8 +175,8 @@ def test_sin_fichero_el_estado_dice_que_no_hay_clave():
     }
 
 
-def test_con_clave_el_estado_dice_de_dónde_sale(clave_aislada):
-    firma_hmac.escribirClaveNueva(clave_aislada)
+def testConClaveElEstadoDiceDeDóndeSale(claveAislada):
+    firma_hmac.escribirClaveNueva(claveAislada)
 
     clave = atajo.estado(BASE)["clave"]
 
@@ -184,11 +184,11 @@ def test_con_clave_el_estado_dice_de_dónde_sale(clave_aislada):
     assert clave["origen"] == "fichero"
 
 
-def test_una_clave_ilegible_no_se_confunde_con_una_que_falta(clave_aislada, monkeypatch):
+def testUnaClaveIlegibleNoSeConfundeConUnaQueFalta(claveAislada, monkeypatch):
     """Son dos averías con soluciones opuestas —generar otra, o recuperar la
     SECRET_KEY— y antes se veían idénticas: las dos acaban en una lista vacía.
     Confundirlas lleva a generar una clave nueva y perder la que había."""
-    firma_hmac.escribirClaveNueva(clave_aislada)
+    firma_hmac.escribirClaveNueva(claveAislada)
     monkeypatch.setenv("SECRET_KEY", "otra-clave-distinta-0123456789abcdef0123456789")
 
     clave = atajo.estado(BASE)["clave"]
@@ -198,8 +198,8 @@ def test_una_clave_ilegible_no_se_confunde_con_una_que_falta(clave_aislada, monk
     assert "SECRET_KEY" in clave["detalle"]
 
 
-def test_la_variable_de_entorno_manda_sobre_el_fichero(clave_aislada, monkeypatch):
-    firma_hmac.escribirClaveNueva(clave_aislada)
+def testLaVariableDeEntornoMandaSobreElFichero(claveAislada, monkeypatch):
+    firma_hmac.escribirClaveNueva(claveAislada)
     monkeypatch.setenv(firma_hmac.ENV_CLAVE, "clave-por-entorno")
 
     assert atajo.estado(BASE)["clave"]["origen"] == "entorno"
@@ -207,7 +207,7 @@ def test_la_variable_de_entorno_manda_sobre_el_fichero(clave_aislada, monkeypatc
 
 # ── Prueba en seco ────────────────────────────────────────────────────────────
 
-def test_la_prueba_para_en_el_primer_paso_que_falla():
+def testLaPruebaParaEnElPrimerPasoQueFalla():
     """Señalar la avería, no listar síntomas: sin clave, lo que viene después
     tampoco puede funcionar y decirlo solo añade ruido."""
     salida = atajo.probar()
@@ -217,11 +217,11 @@ def test_la_prueba_para_en_el_primer_paso_que_falla():
     assert salida["pasos"][-1]["paso"] == "Hay clave de firma"
 
 
-def test_con_todo_puesto_la_prueba_firma_y_verifica(clave_aislada):
+def testConTodoPuestoLaPruebaFirmaYVerifica(claveAislada):
     """El último paso hace el mismo camino que una petición real del Atajo: si
     la clave estuviera ilegible o el reloj imposible, saldría aquí y no en el
     iPhone."""
-    firma_hmac.escribirClaveNueva(clave_aislada)
+    firma_hmac.escribirClaveNueva(claveAislada)
 
     salida = atajo.probar()
 
@@ -230,7 +230,7 @@ def test_con_todo_puesto_la_prueba_firma_y_verifica(clave_aislada):
     assert all(p["ok"] for p in salida["pasos"])
 
 
-def test_la_prueba_no_escribe_ningún_movimiento(clave_aislada, monkeypatch):
+def testLaPruebaNoEscribeNingúnMovimiento(claveAislada, monkeypatch):
     """Una comprobación que deja un gasto de mentira en el portfolio no se puede
     repetir sin ensuciar los datos.
 
@@ -240,7 +240,7 @@ def test_la_prueba_no_escribe_ningún_movimiento(clave_aislada, monkeypatch):
     """
     import stores.movimientos_store as store
 
-    firma_hmac.escribirClaveNueva(clave_aislada)
+    firma_hmac.escribirClaveNueva(claveAislada)
     monkeypatch.setattr(
         store, "crearMovimiento",
         lambda *a, **k: pytest.fail("la prueba en seco no debe crear movimientos"),
@@ -252,22 +252,22 @@ def test_la_prueba_no_escribe_ningún_movimiento(clave_aislada, monkeypatch):
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def bp_atajo():
-    from routes.atajo import atajo_bp
-    return atajo_bp
+def bpAtajo():
+    from routes.atajo import atajoBp
+    return atajoBp
 
 
-def test_los_endpoints_del_panel_exigen_sesión(crear_app, bp_atajo):
+def testLosEndpointsDelPanelExigenSesión(crearApp, bpAtajo):
     """Son los de la web app, no los del Atajo: el Atajo se autentica por IP y
     firma, pero esto se abre desde el navegador y va detrás del login."""
-    client = crear_app(bp_atajo).test_client()
+    client = crearApp(bpAtajo).test_client()
 
     assert client.get("/api/atajo").status_code == 401
     assert client.get("/api/atajo/descargar").status_code == 401
 
 
-def test_el_panel_devuelve_el_estado(cliente_autenticado, bp_atajo):
-    client, _cab, _app = cliente_autenticado(bp_atajo)
+def testElPanelDevuelveElEstado(clienteAutenticado, bpAtajo):
+    client, _cab, _app = clienteAutenticado(bpAtajo)
 
     datos = client.get("/api/atajo").get_json()
 
@@ -278,11 +278,11 @@ def test_el_panel_devuelve_el_estado(cliente_autenticado, bp_atajo):
     assert datos["urlBase"].endswith("localhost")
 
 
-def test_el_panel_lista_las_ips_rechazadas(cliente_autenticado, bp_atajo):
+def testElPanelListaLasIpsRechazadas(clienteAutenticado, bpAtajo):
     """Lo que hace falta para permitir al móvil sin ir al log."""
     from core import red_local
 
-    client, _cab, _app = cliente_autenticado(bp_atajo)
+    client, _cab, _app = clienteAutenticado(bpAtajo)
     red_local.olvidarRechazos()
     red_local.registrarRechazo("172.16.1.10", "GET", "/api/portfolios-lista")
 
@@ -293,18 +293,18 @@ def test_el_panel_lista_las_ips_rechazadas(cliente_autenticado, bp_atajo):
     assert "permitida" in datos["rechazadas"][0]
 
 
-def test_generar_la_clave_desde_el_panel_la_deja_utilizable(cliente_autenticado, bp_atajo, clave_aislada):
-    client, cab, _app = cliente_autenticado(bp_atajo)
+def testGenerarLaClaveDesdeElPanelLaDejaUtilizable(clienteAutenticado, bpAtajo, claveAislada):
+    client, cab, _app = clienteAutenticado(bpAtajo)
 
     datos = client.post("/api/atajo/clave", headers=cab).get_json()
 
     assert datos["ok"] is True
     assert datos["clave"]["hay"] is True
-    assert clave_aislada.exists()
+    assert claveAislada.exists()
     assert firma_hmac.obtenerClaveSecreta()
 
 
-def test_sin_https_el_atajo_apunta_a_http(cliente_autenticado, bp_atajo, tmp_path, monkeypatch):
+def testSinHttpsElAtajoApuntaAHttp(clienteAutenticado, bpAtajo, tmp_path, monkeypatch):
     """El Atajo no exige cifrado: con el HTTPS apagado entra en claro, como
     siempre. Y la dirección que se le mete dentro tiene que decir eso mismo.
 
@@ -316,30 +316,30 @@ def test_sin_https_el_atajo_apunta_a_http(cliente_autenticado, bp_atajo, tmp_pat
 
     monkeypatch.setattr(tls, "ESTADO_FILE", tmp_path / "estado.json", raising=False)
     monkeypatch.delenv("HTTPS_ENABLED", raising=False)
-    client, _cab, _app = cliente_autenticado(bp_atajo)
+    client, _cab, _app = clienteAutenticado(bpAtajo)
 
     datos = client.get("/api/atajo").get_json()
 
     assert datos["urlBase"].startswith("http://")
 
 
-def test_con_https_el_atajo_apunta_a_https(cliente_autenticado, bp_atajo, monkeypatch):
+def testConHttpsElAtajoApuntaAHttps(clienteAutenticado, bpAtajo, monkeypatch):
     """Y al revés: encendido, el atajo que se descargue tiene que llamar por TLS.
 
     Por eso el panel avisa de que hay que volver a descargarlo al cambiar el
     HTTPS: el que ya esté en el iPhone se queda con el esquema de antes.
     """
     monkeypatch.setenv("HTTPS_ENABLED", "true")
-    client, _cab, _app = cliente_autenticado(bp_atajo)
+    client, _cab, _app = clienteAutenticado(bpAtajo)
 
     datos = client.get("/api/atajo").get_json()
 
     assert datos["urlBase"].startswith("https://")
 
 
-def test_la_descarga_es_un_atajo_con_nombre_de_fichero(cliente_autenticado, bp_atajo, clave_aislada):
-    firma_hmac.escribirClaveNueva(clave_aislada)
-    client, _cab, _app = cliente_autenticado(bp_atajo)
+def testLaDescargaEsUnAtajoConNombreDeFichero(clienteAutenticado, bpAtajo, claveAislada):
+    firma_hmac.escribirClaveNueva(claveAislada)
+    client, _cab, _app = clienteAutenticado(bpAtajo)
 
     res = client.get("/api/atajo/descargar")
 
@@ -348,11 +348,11 @@ def test_la_descarga_es_un_atajo_con_nombre_de_fichero(cliente_autenticado, bp_a
     assert plistlib.loads(res.data)["WFWorkflowActions"]
 
 
-def test_la_descarga_lleva_el_token_en_todas_las_llamadas(cliente_autenticado, bp_atajo, clave_aislada):
+def testLaDescargaLlevaElTokenEnTodasLasLlamadas(clienteAutenticado, bpAtajo, claveAislada):
     """Sin él, el Atajo descargado fallaría en la primera llamada."""
-    firma_hmac.escribirClaveNueva(clave_aislada)
+    firma_hmac.escribirClaveNueva(claveAislada)
     token = firma_hmac.tokenDispositivo()
-    client, _cab, _app = cliente_autenticado(bp_atajo)
+    client, _cab, _app = clienteAutenticado(bpAtajo)
 
     acciones = plistlib.loads(client.get("/api/atajo/descargar").data)["WFWorkflowActions"]
     llamadas = [a["WFWorkflowActionParameters"] for a in acciones if "WFURL" in a["WFWorkflowActionParameters"]]
@@ -366,8 +366,8 @@ def test_la_descarga_lleva_el_token_en_todas_las_llamadas(cliente_autenticado, b
         assert cabeceras["X-Atajo-Token"] == token
 
 
-def test_sin_clave_no_se_descarga_un_atajo_inservible(cliente_autenticado, bp_atajo):
-    client, _cab, _app = cliente_autenticado(bp_atajo)
+def testSinClaveNoSeDescargaUnAtajoInservible(clienteAutenticado, bpAtajo):
+    client, _cab, _app = clienteAutenticado(bpAtajo)
 
     res = client.get("/api/atajo/descargar")
 
@@ -375,9 +375,9 @@ def test_sin_clave_no_se_descarga_un_atajo_inservible(cliente_autenticado, bp_at
     assert "clave" in res.get_json()["error"]
 
 
-def test_el_token_se_muestra_solo_por_post(cliente_autenticado, bp_atajo, clave_aislada):
-    firma_hmac.escribirClaveNueva(clave_aislada)
-    client, cab, _app = cliente_autenticado(bp_atajo)
+def testElTokenSeMuestraSoloPorPost(clienteAutenticado, bpAtajo, claveAislada):
+    firma_hmac.escribirClaveNueva(claveAislada)
+    client, cab, _app = clienteAutenticado(bpAtajo)
 
     assert client.get("/api/atajo/token").status_code == 405
     datos = client.post("/api/atajo/token", headers=cab).get_json()

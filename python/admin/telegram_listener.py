@@ -67,10 +67,10 @@ _MENSAJE_CONFIRMACION = (
 )
 
 # Token para el que ya se registró el menú de comandos de Telegram.
-_menu_registrado: str | None = None
+_menuRegistrado: str | None = None
 
 
-def _get_updates(token: str, offset):
+def _getUpdates(token: str, offset):
     parametros = {"timeout": _TIMEOUT_TELEGRAM}
     if offset is not None:
         parametros["offset"] = offset
@@ -82,14 +82,14 @@ def _get_updates(token: str, offset):
     return cuerpo.get("result") or []
 
 
-def _responder(token: str, chat_id: str, texto: str) -> None:
+def _responder(token: str, chatId: str, texto: str) -> None:
     try:
-        telegram_notifier._enviar(token, chat_id, texto)
+        telegram_notifier._enviar(token, chatId, texto)
     except Exception as error:
         log.warning("[telegram] No se pudo responder: %s", error)
 
 
-def _procesar(update: dict, token: str, chat_id_configurado: str) -> None:
+def _procesar(update: dict, token: str, chatIdConfigurado: str) -> None:
     mensaje = update.get("message") or {}
     texto = str(mensaje.get("text") or "").strip()
     remitente = str((mensaje.get("chat") or {}).get("id") or "")
@@ -98,7 +98,7 @@ def _procesar(update: dict, token: str, chat_id_configurado: str) -> None:
     if comando is None or not remitente:
         return
 
-    if remitente != chat_id_configurado:
+    if remitente != chatIdConfigurado:
         log.info("[telegram] /%s de un chat no autorizado, ignorado", comando)
         return
 
@@ -116,10 +116,10 @@ def _procesar(update: dict, token: str, chat_id_configurado: str) -> None:
         _responder(token, remitente, respuesta)
 
 
-def _registrar_menu(token: str) -> None:
+def _registrarMenu(token: str) -> None:
     """Publica la lista de comandos para que Telegram la ofrezca al escribir «/»."""
-    global _menu_registrado
-    if _menu_registrado == token:
+    global _menuRegistrado
+    if _menuRegistrado == token:
         return
     try:
         cuerpo = json.dumps({"commands": [
@@ -131,7 +131,7 @@ def _registrar_menu(token: str) -> None:
         )
         with urllib.request.urlopen(peticion, timeout=_TIMEOUT_PETICION):
             pass
-        _menu_registrado = token
+        _menuRegistrado = token
     except Exception as error:
         # Es un adorno: sin menú los comandos funcionan igual escritos a mano.
         log.debug("[telegram] No se pudo registrar el menú de comandos: %s", error)
@@ -142,17 +142,17 @@ def _escuchar() -> bool:
     offset = None
 
     while not _parada.is_set():
-        token, chat_id = telegram_notifier.leerConfig()
-        if not token or not chat_id:
+        token, chatId = telegram_notifier.leerConfig()
+        if not token or not chatId:
             offset = None
             if _parada.wait(_ESPERA_SIN_CONFIGURAR):
                 return True
             continue
 
-        _registrar_menu(token)
+        _registrarMenu(token)
 
         try:
-            updates = _get_updates(token, offset)
+            updates = _getUpdates(token, offset)
         except (HTTPError, URLError, ValueError, TimeoutError) as error:
             log.debug("[telegram] getUpdates falló, se reintenta: %s", error)
             if _parada.wait(_ESPERA_TRAS_FALLO):
@@ -167,13 +167,13 @@ def _escuchar() -> bool:
         for update in updates:
             offset = update["update_id"] + 1
             try:
-                _procesar(update, token, chat_id)
+                _procesar(update, token, chatId)
             except Exception as error:
                 log.warning("[telegram] No se pudo procesar una actualización: %s", error)
     return True
 
 
-def _ruta_bloqueo():
+def _rutaBloqueo():
     return paths.TMP_DIR / "telegram-listener.lock"
 
 
@@ -182,7 +182,7 @@ def _bucle():
         # El bloqueo se mantiene mientras dura la escucha. Si otro worker ya es
         # el oyente, este espera y vuelve a intentarlo: si el otro muere, el
         # sistema suelta su bloqueo y este lo releva.
-        with exclusivo(_ruta_bloqueo(), obligatorio=False) as conseguido:
+        with exclusivo(_rutaBloqueo(), obligatorio=False) as conseguido:
             if conseguido:
                 if _escuchar():
                     return

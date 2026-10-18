@@ -103,7 +103,7 @@ INACTIVIDAD_OPCIONES = (0, 15, 30, 60, 240, 480, 1440)
 # cerrada o el aparato apagado.
 CLAVE_INACTIVIDAD = "bloqueoInactividad"
 
-_cache_inactividad = {"firma": None, "segundos": 0}
+_cacheInactividad = {"firma": None, "segundos": 0}
 
 
 def inactividadSegundos() -> int:
@@ -120,8 +120,8 @@ def inactividadSegundos() -> int:
     # distinto en cada caso, y dos ficheros recién escritos pueden compartir
     # mtime en un sistema de ficheros de resolución gruesa.
     firma = (str(paths.AJUSTES_JSON), st.st_mtime_ns, st.st_size)
-    if _cache_inactividad["firma"] == firma:
-        return _cache_inactividad["segundos"]
+    if _cacheInactividad["firma"] == firma:
+        return _cacheInactividad["segundos"]
 
     segundos = 0
     try:
@@ -132,8 +132,8 @@ def inactividadSegundos() -> int:
     except (OSError, ValueError, TypeError):
         segundos = 0
 
-    _cache_inactividad["firma"] = firma
-    _cache_inactividad["segundos"] = segundos
+    _cacheInactividad["firma"] = firma
+    _cacheInactividad["segundos"] = segundos
     return segundos
 
 

@@ -14,7 +14,7 @@ from flask import Blueprint, jsonify
 
 
 @pytest.fixture
-def bp_prueba():
+def bpPrueba():
     """Blueprint de juguete con un GET y un POST bajo /api/."""
     bp = Blueprint("prueba", __name__)
 
@@ -27,7 +27,7 @@ def bp_prueba():
         return jsonify({"ok": True, "escrito": True})
 
     @bp.route("/api/backup", methods=["POST"])
-    def backup_falso():
+    def backupFalso():
         return jsonify({"ok": True})
 
     @bp.route("/pagina", methods=["GET"])
@@ -39,16 +39,16 @@ def bp_prueba():
 
 # ── Sesión ───────────────────────────────────────────────────────────────────
 
-def test_api_sin_sesion_responde_401(crear_app, bp_prueba):
-    client = crear_app(bp_prueba).test_client()
+def testApiSinSesionResponde401(crearApp, bpPrueba):
+    client = crearApp(bpPrueba).test_client()
     assert client.get("/api/prueba").status_code == 401
 
 
-def test_pagina_sin_sesion_redirige_al_login(crear_app, bp_prueba):
+def testPaginaSinSesionRedirigeAlLogin(crearApp, bpPrueba):
     """Y conserva el destino en ?next, para volver donde estaba tras entrar."""
-    from routes.auth import auth_bp
+    from routes.auth import authBp
 
-    client = crear_app(bp_prueba, auth_bp).test_client()
+    client = crearApp(bpPrueba, authBp).test_client()
     respuesta = client.get("/pagina")
 
     assert respuesta.status_code == 302
@@ -56,19 +56,19 @@ def test_pagina_sin_sesion_redirige_al_login(crear_app, bp_prueba):
     assert "next=/pagina" in respuesta.headers["Location"]
 
 
-def test_con_sesion_la_api_responde(cliente_autenticado, bp_prueba):
-    client, cabeceras, _ = cliente_autenticado(bp_prueba)
+def testConSesionLaApiResponde(clienteAutenticado, bpPrueba):
+    client, cabeceras, _ = clienteAutenticado(bpPrueba)
     assert client.get("/api/prueba").status_code == 200
     assert client.post("/api/prueba", headers=cabeceras).status_code == 200
 
 
-def test_assets_del_login_se_sirven_sin_sesion(crear_app, bp_prueba):
+def testAssetsDelLoginSeSirvenSinSesion(crearApp, bpPrueba):
     """La página de login necesita su CSS antes de que exista sesión."""
-    from core.seguridad_app import _es_asset_publico
+    from core.seguridad_app import _esAssetPublico
 
-    assert _es_asset_publico("/css/base.css")
-    assert _es_asset_publico("/js/core/csrf.js")
-    assert _es_asset_publico("/favicon.ico")
+    assert _esAssetPublico("/css/base.css")
+    assert _esAssetPublico("/js/core/csrf.js")
+    assert _esAssetPublico("/favicon.ico")
 
 
 @pytest.mark.parametrize("ruta", [
@@ -77,41 +77,41 @@ def test_assets_del_login_se_sirven_sin_sesion(crear_app, bp_prueba):
     "/css/../.env",            # ni nada que trepe fuera de css/
     "/notas.css",              # ni un .css que no esté bajo css/
 ])
-def test_rutas_sensibles_no_cuentan_como_asset_publico(ruta):
-    from core.seguridad_app import _es_asset_publico
+def testRutasSensiblesNoCuentanComoAssetPublico(ruta):
+    from core.seguridad_app import _esAssetPublico
 
-    assert not _es_asset_publico(ruta)
+    assert not _esAssetPublico(ruta)
 
 
 # ── CSRF ─────────────────────────────────────────────────────────────────────
 
-def test_post_con_sesion_pero_sin_token_csrf_es_403(cliente_autenticado, bp_prueba):
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+def testPostConSesionPeroSinTokenCsrfEs403(clienteAutenticado, bpPrueba):
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
     assert client.post("/api/prueba").status_code == 403
 
 
-def test_post_con_token_csrf_ajeno_es_403(cliente_autenticado, bp_prueba):
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+def testPostConTokenCsrfAjenoEs403(clienteAutenticado, bpPrueba):
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
     respuesta = client.post("/api/prueba", headers={"X-CSRF-Token": "token-de-otra-sesion"})
     assert respuesta.status_code == 403
 
 
-def test_sesion_sin_token_no_se_deja_pasar(cliente_autenticado, bp_prueba):
+def testSesionSinTokenNoSeDejaPasar(clienteAutenticado, bpPrueba):
     """Fail-closed: una sesión emitida antes de existir el CSRF se rechaza.
 
     Lo contrario —dejar pasar si no hay token guardado— convertiría en un
     bypass trivial el simple hecho de borrar la clave de la sesión.
     """
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
     with client.session_transaction() as sesion:
         del sesion["csrf_token"]
 
     assert client.post("/api/prueba", headers={"X-CSRF-Token": "loquesea"}).status_code == 403
 
 
-def test_el_get_reemite_la_cookie_csrf(cliente_autenticado, bp_prueba):
+def testElGetReemiteLaCookieCsrf(clienteAutenticado, bpPrueba):
     """Así una sesión que perdió el token se recupera sola al navegar."""
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
     respuesta = client.get("/api/prueba")
 
     cookies = respuesta.headers.getlist("Set-Cookie")
@@ -120,24 +120,24 @@ def test_el_get_reemite_la_cookie_csrf(cliente_autenticado, bp_prueba):
     assert not any("csrf_token=" in c and "HttpOnly" in c for c in cookies)
 
 
-def test_los_get_no_pasan_por_csrf(cliente_autenticado, bp_prueba):
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+def testLosGetNoPasanPorCsrf(clienteAutenticado, bpPrueba):
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
     assert client.get("/api/prueba").status_code == 200
 
 
 # ── Límite de escrituras ─────────────────────────────────────────────────────
 
-def test_las_lecturas_no_consumen_cupo(cliente_autenticado, bp_prueba, monkeypatch):
+def testLasLecturasNoConsumenCupo(clienteAutenticado, bpPrueba, monkeypatch):
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "2")
-    client, _cabeceras, _app = cliente_autenticado(bp_prueba)
+    client, _cabeceras, _app = clienteAutenticado(bpPrueba)
 
     for _ in range(10):
         assert client.get("/api/prueba").status_code == 200
 
 
-def test_al_pasarse_del_limite_responde_429_con_retry_after(cliente_autenticado, bp_prueba, monkeypatch):
+def testAlPasarseDelLimiteResponde429ConRetryAfter(clienteAutenticado, bpPrueba, monkeypatch):
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "3")
-    client, cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, cabeceras, _ = clienteAutenticado(bpPrueba)
 
     codigos = [client.post("/api/prueba", headers=cabeceras).status_code for _ in range(5)]
 
@@ -148,10 +148,10 @@ def test_al_pasarse_del_limite_responde_429_con_retry_after(cliente_autenticado,
     assert ultima.get_json()["ok"] is False
 
 
-def test_el_limite_es_por_ip(cliente_autenticado, bp_prueba, monkeypatch):
+def testElLimiteEsPorIp(clienteAutenticado, bpPrueba, monkeypatch):
     """Agotar el cupo desde una IP no debe dejar fuera al resto de la casa."""
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "2")
-    client, cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, cabeceras, _ = clienteAutenticado(bpPrueba)
 
     for _ in range(3):
         client.post("/api/prueba", headers=cabeceras, environ_base={"REMOTE_ADDR": "192.168.1.10"})
@@ -160,11 +160,11 @@ def test_el_limite_es_por_ip(cliente_autenticado, bp_prueba, monkeypatch):
     assert otra.status_code == 200
 
 
-def test_backup_tiene_un_cupo_propio_mas_estrecho(cliente_autenticado, bp_prueba, monkeypatch):
+def testBackupTieneUnCupoPropioMasEstrecho(clienteAutenticado, bpPrueba, monkeypatch):
     """Copiar bases enteras es caro: el límite general se le queda largo."""
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "1000")
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "2")
-    client, cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, cabeceras, _ = clienteAutenticado(bpPrueba)
 
     codigos = [client.post("/api/backup", headers=cabeceras).status_code for _ in range(4)]
     assert codigos == [200, 200, 429, 429]
@@ -173,21 +173,21 @@ def test_backup_tiene_un_cupo_propio_mas_estrecho(cliente_autenticado, bp_prueba
     assert client.post("/api/prueba", headers=cabeceras).status_code == 200
 
 
-def test_con_el_limite_a_cero_no_hay_freno(cliente_autenticado, bp_prueba, monkeypatch):
+def testConElLimiteACeroNoHayFreno(clienteAutenticado, bpPrueba, monkeypatch):
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
-    client, cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, cabeceras, _ = clienteAutenticado(bpPrueba)
 
     for _ in range(50):
         assert client.post("/api/prueba", headers=cabeceras).status_code == 200
 
 
-def test_el_login_no_pasa_por_el_limitador(crear_app, monkeypatch):
+def testElLoginNoPasaPorElLimitador(crearApp, monkeypatch):
     """Tiene su propio bloqueo por intentos fallidos, con mensaje al usuario."""
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "1")
-    from routes.auth import auth_bp
+    from routes.auth import authBp
 
-    client = crear_app(auth_bp).test_client()
+    client = crearApp(authBp).test_client()
     for _ in range(4):
         respuesta = client.post("/login", data={"username": "x", "password": "y"})
         assert respuesta.status_code != 429
@@ -195,9 +195,9 @@ def test_el_login_no_pasa_por_el_limitador(crear_app, monkeypatch):
 
 # ── Tope de cuerpo ───────────────────────────────────────────────────────────
 
-def test_cuerpo_por_encima_del_tope_es_413(cliente_autenticado, bp_prueba, monkeypatch):
+def testCuerpoPorEncimaDelTopeEs413(clienteAutenticado, bpPrueba, monkeypatch):
     monkeypatch.setenv("MAX_CUERPO_MB", "1")
-    client, cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, cabeceras, _ = clienteAutenticado(bpPrueba)
 
     respuesta = client.post(
         "/api/prueba", headers=cabeceras,
@@ -206,7 +206,7 @@ def test_cuerpo_por_encima_del_tope_es_413(cliente_autenticado, bp_prueba, monke
     assert respuesta.status_code == 413
 
 
-def test_las_rutas_de_importacion_admiten_cuerpos_grandes(crear_app, monkeypatch):
+def testLasRutasDeImportacionAdmitenCuerposGrandes(crearApp, monkeypatch):
     """Un export JSON completo ronda los 25 MB: con el tope general no entraba."""
     monkeypatch.setenv("MAX_CUERPO_MB", "1")
     from core.seguridad_app import UPLOAD_PATHS
@@ -222,31 +222,31 @@ def test_las_rutas_de_importacion_admiten_cuerpos_grandes(crear_app, monkeypatch
     ("X-Frame-Options", "SAMEORIGIN"),
     ("Referrer-Policy", "strict-origin-when-cross-origin"),
 ])
-def test_cabeceras_de_seguridad_en_toda_respuesta(cliente_autenticado, bp_prueba, cabecera, valor):
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+def testCabecerasDeSeguridadEnTodaRespuesta(clienteAutenticado, bpPrueba, cabecera, valor):
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
     assert client.get("/api/prueba").headers[cabecera] == valor
 
 
-def test_permissions_policy_cierra_los_permisos_del_navegador(cliente_autenticado, bp_prueba):
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+def testPermissionsPolicyCierraLosPermisosDelNavegador(clienteAutenticado, bpPrueba):
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
     politica = client.get("/api/prueba").headers["Permissions-Policy"]
 
     for permiso in ("geolocation", "microphone", "camera"):
         assert f"{permiso}=()" in politica
 
 
-def test_hay_csp_incluso_en_las_respuestas_de_error(crear_app, bp_prueba):
+def testHayCspInclusoEnLasRespuestasDeError(crearApp, bpPrueba):
     """El 401 también se pinta en el navegador; no debe quedarse sin política."""
-    client = crear_app(bp_prueba).test_client()
+    client = crearApp(bpPrueba).test_client()
     respuesta = client.get("/api/prueba")
 
     assert respuesta.status_code == 401
     assert "default-src 'self'" in respuesta.headers["Content-Security-Policy"]
 
 
-def test_la_csp_se_puede_desactivar_para_depurar(cliente_autenticado, bp_prueba, monkeypatch):
+def testLaCspSePuedeDesactivarParaDepurar(clienteAutenticado, bpPrueba, monkeypatch):
     monkeypatch.setenv("CSP_ACTIVADA", "false")
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
 
     assert "Content-Security-Policy" not in client.get("/api/prueba").headers
 
@@ -262,17 +262,17 @@ def test_la_csp_se_puede_desactivar_para_depurar(cliente_autenticado, bp_prueba,
 # ── Varias sesiones y caducidad ──────────────────────────────────────────────
 # El login real vive en routes/auth.py; aquí se sella la sesión igual que él
 # (`sesion.abrir`) y se comprueba contra un endpoint protegido, que es donde
-# `require_login` decide si sigue valiendo.
+# `requireLogin` decide si sigue valiendo.
 
 def _entrar(app):
     from core import sesion
 
     client = app.test_client()
-    with client.session_transaction() as sesion_prueba:
-        sesion_prueba["logged_in"] = True
-        sesion_prueba["csrf_token"] = "token-de-prueba"
-        sesion_prueba.permanent = True
-        sesion.abrir(sesion_prueba)
+    with client.session_transaction() as sesionPrueba:
+        sesionPrueba["logged_in"] = True
+        sesionPrueba["csrf_token"] = "token-de-prueba"
+        sesionPrueba.permanent = True
+        sesion.abrir(sesionPrueba)
     return client
 
 
@@ -280,11 +280,11 @@ def _salir(client):
     return client.post("/logout", headers={"X-CSRF-Token": "token-de-prueba"})
 
 
-def test_dos_dispositivos_tienen_sesiones_independientes(crear_app, bp_prueba):
+def testDosDispositivosTienenSesionesIndependientes(crearApp, bpPrueba):
     """Entrar desde el móvil no echa al portátil, y cerrar en uno no cierra el otro."""
-    from routes.auth import auth_bp
+    from routes.auth import authBp
 
-    app = crear_app(bp_prueba, auth_bp)
+    app = crearApp(bpPrueba, authBp)
     portatil = _entrar(app)
     movil = _entrar(app)
     assert portatil.get("/api/prueba").status_code == 200
@@ -296,59 +296,59 @@ def test_dos_dispositivos_tienen_sesiones_independientes(crear_app, bp_prueba):
     assert movil.get("/api/prueba").status_code == 401
 
 
-def test_por_defecto_la_sesion_no_caduca_por_inactividad(crear_app, bp_prueba, datos_aislados):
+def testPorDefectoLaSesionNoCaducaPorInactividad(crearApp, bpPrueba, datosAislados):
     """«No cerrar» es el valor de fábrica: sin tocar Ajustes, una sesión de hace
     un mes sigue valiendo mientras no se cierre ni cambien las credenciales."""
     from core import sesion
 
-    client = _entrar(crear_app(bp_prueba))
-    with client.session_transaction() as sesion_prueba:
-        sesion_prueba[sesion.VISTA] = time.time() - 30 * 24 * 3600
-        sesion_prueba[sesion.CREADA] = time.time() - 30 * 24 * 3600
+    client = _entrar(crearApp(bpPrueba))
+    with client.session_transaction() as sesionPrueba:
+        sesionPrueba[sesion.VISTA] = time.time() - 30 * 24 * 3600
+        sesionPrueba[sesion.CREADA] = time.time() - 30 * 24 * 3600
 
     assert client.get("/api/prueba").status_code == 200
 
 
-def test_la_inactividad_se_lee_de_ajustes(crear_app, bp_prueba, datos_aislados):
+def testLaInactividadSeLeeDeAjustes(crearApp, bpPrueba, datosAislados):
     """El plazo lo fija Ajustes > Seguridad y lo aplica el servidor, no solo la pestaña."""
     from core import sesion
 
-    datos_aislados["ajustes"].write_text(json.dumps({"bloqueoInactividad": 15}), "utf-8")
+    datosAislados["ajustes"].write_text(json.dumps({"bloqueoInactividad": 15}), "utf-8")
 
-    client = _entrar(crear_app(bp_prueba))
-    with client.session_transaction() as sesion_prueba:
-        sesion_prueba[sesion.VISTA] = time.time() - 14 * 60
+    client = _entrar(crearApp(bpPrueba))
+    with client.session_transaction() as sesionPrueba:
+        sesionPrueba[sesion.VISTA] = time.time() - 14 * 60
     assert client.get("/api/prueba").status_code == 200
 
-    with client.session_transaction() as sesion_prueba:
-        sesion_prueba[sesion.VISTA] = time.time() - 16 * 60
+    with client.session_transaction() as sesionPrueba:
+        sesionPrueba[sesion.VISTA] = time.time() - 16 * 60
     assert client.get("/api/prueba").status_code == 401
 
 
-def test_un_valor_de_inactividad_fuera_de_la_lista_no_cierra_nada(crear_app, bp_prueba, datos_aislados):
+def testUnValorDeInactividadFueraDeLaListaNoCierraNada(crearApp, bpPrueba, datosAislados):
     """Un ajustes.json editado a mano con un número raro no puede dejar fuera al usuario."""
     from core import sesion
 
-    datos_aislados["ajustes"].write_text(json.dumps({"bloqueoInactividad": 7}), "utf-8")
+    datosAislados["ajustes"].write_text(json.dumps({"bloqueoInactividad": 7}), "utf-8")
 
-    client = _entrar(crear_app(bp_prueba))
-    with client.session_transaction() as sesion_prueba:
-        sesion_prueba[sesion.VISTA] = time.time() - 3600
+    client = _entrar(crearApp(bpPrueba))
+    with client.session_transaction() as sesionPrueba:
+        sesionPrueba[sesion.VISTA] = time.time() - 3600
 
     assert client.get("/api/prueba").status_code == 200
 
 
-def test_sin_https_la_cookie_de_sesion_no_lleva_secure(crear_app, bp_prueba):
+def testSinHttpsLaCookieDeSesionNoLlevaSecure(crearApp, bpPrueba):
     """Marcarla Secure sobre HTTP haría que el navegador la tirase: sin login."""
-    app = crear_app(bp_prueba)
+    app = crearApp(bpPrueba)
 
     assert app.config["SESSION_COOKIE_SECURE"] is False
     assert app.config["REMEMBER_COOKIE_SECURE"] is False
 
 
-def test_con_https_las_cookies_llevan_secure(crear_app, bp_prueba, monkeypatch):
+def testConHttpsLasCookiesLlevanSecure(crearApp, bpPrueba, monkeypatch):
     monkeypatch.setenv("HTTPS_ENABLED", "true")
-    app = crear_app(bp_prueba)
+    app = crearApp(bpPrueba)
 
     assert app.config["SESSION_COOKIE_SECURE"] is True
     # No la usa nada hoy (no hay "recordarme"), pero los valores de fábrica de
@@ -359,10 +359,10 @@ def test_con_https_las_cookies_llevan_secure(crear_app, bp_prueba, monkeypatch):
     assert app.config["REMEMBER_COOKIE_SAMESITE"] == app.config["SESSION_COOKIE_SAMESITE"]
 
 
-def test_la_cookie_csrf_hereda_el_secure_de_la_sesion(cliente_autenticado, bp_prueba, monkeypatch):
+def testLaCookieCsrfHeredaElSecureDeLaSesion(clienteAutenticado, bpPrueba, monkeypatch):
     """Va replicada fuera de la sesión firmada, así que necesita la misma protección."""
     monkeypatch.setenv("HTTPS_ENABLED", "true")
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
 
     galletas = client.get("/api/prueba").headers.getlist("Set-Cookie")
     csrf = [c for c in galletas if c.startswith("csrf_token=")]
@@ -370,15 +370,15 @@ def test_la_cookie_csrf_hereda_el_secure_de_la_sesion(cliente_autenticado, bp_pr
     assert csrf and "Secure" in csrf[0]
 
 
-def test_sin_https_no_se_emite_hsts(cliente_autenticado, bp_prueba):
+def testSinHttpsNoSeEmiteHsts(clienteAutenticado, bpPrueba):
     """Emitirla en HTTP dejaría el host inaccesible un año, sin poder retirarlo."""
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
     assert "Strict-Transport-Security" not in client.get("/api/prueba").headers
 
 
-def test_con_https_se_emite_hsts(cliente_autenticado, bp_prueba, monkeypatch):
+def testConHttpsSeEmiteHsts(clienteAutenticado, bpPrueba, monkeypatch):
     monkeypatch.setenv("HTTPS_ENABLED", "true")
-    client, _cabeceras, _ = cliente_autenticado(bp_prueba)
+    client, _cabeceras, _ = clienteAutenticado(bpPrueba)
     politica = client.get("/api/prueba").headers["Strict-Transport-Security"]
 
     assert "max-age=31536000" in politica
@@ -387,11 +387,11 @@ def test_con_https_se_emite_hsts(cliente_autenticado, bp_prueba, monkeypatch):
     assert "includeSubDomains" not in politica
 
 
-def _origen_visto(app, **peticion):
+def _origenVisto(app, **peticion):
     """(remote_addr, scheme) tal y como los ve una vista de la aplicación.
 
     El registro se hace en la propia vista y no en un `before_request` añadido a
-    posteriori: ese se registraría después de `require_login`, que corta la
+    posteriori: ese se registraría después de `requireLogin`, que corta la
     petición con 401 antes de llegar. Y es justo lo que ve una vista lo que
     importa, porque de ahí salen la IP del log, la del límite de escrituras y la
     del filtro de red del Atajo.
@@ -411,25 +411,25 @@ def _origen_visto(app, **peticion):
     client = app.test_client()
     # Solo la sesión: es un GET, así que no pasa por la comprobación de CSRF.
     # Se sella con `sesion.abrir` igual que en el login real; sin identificador
-    # ni marcas de tiempo, `require_login` la rechaza antes de llegar a la vista
+    # ni marcas de tiempo, `requireLogin` la rechaza antes de llegar a la vista
     # y el helper devolvería None en vez de la IP que se quiere comprobar.
-    with client.session_transaction() as sesion_prueba:
-        sesion_prueba["logged_in"] = True
-        sesion.abrir(sesion_prueba)
+    with client.session_transaction() as sesionPrueba:
+        sesionPrueba["logged_in"] = True
+        sesion.abrir(sesionPrueba)
 
     client.get("/api/origen", **peticion)
     return visto.get("addr"), visto.get("scheme")
 
 
-def test_sin_proxy_declarado_se_ignora_x_forwarded_for(crear_app, bp_prueba):
+def testSinProxyDeclaradoSeIgnoraXForwardedFor(crearApp, bpPrueba):
     """La cabecera la pone el cliente: hacerle caso sería regalar la suplantación.
 
     Es el caso por defecto —sin proxy delante— y el que hace que el bloqueo por
     intentos de login signifique algo: si bastara con mandar la cabecera, cada
     intento fallido se contaría contra una IP inventada distinta.
     """
-    addr, _scheme = _origen_visto(
-        crear_app(bp_prueba),
+    addr, _scheme = _origenVisto(
+        crearApp(bpPrueba),
         headers={"X-Forwarded-For": "203.0.113.9"},
         environ_base={"REMOTE_ADDR": "10.0.0.2"},
     )
@@ -437,11 +437,11 @@ def test_sin_proxy_declarado_se_ignora_x_forwarded_for(crear_app, bp_prueba):
     assert addr == "10.0.0.2"
 
 
-def test_con_un_proxy_declarado_se_recupera_la_ip_del_cliente(crear_app, bp_prueba, monkeypatch):
+def testConUnProxyDeclaradoSeRecuperaLaIpDelCliente(crearApp, bpPrueba, monkeypatch):
     monkeypatch.setenv("PROXY_FIX_HOPS", "1")
 
-    addr, scheme = _origen_visto(
-        crear_app(bp_prueba),
+    addr, scheme = _origenVisto(
+        crearApp(bpPrueba),
         headers={"X-Forwarded-For": "203.0.113.9", "X-Forwarded-Proto": "https"},
         environ_base={"REMOTE_ADDR": "172.18.0.5"},
     )
@@ -455,7 +455,7 @@ def test_con_un_proxy_declarado_se_recupera_la_ip_del_cliente(crear_app, bp_prue
     assert scheme == "https"
 
 
-def test_un_salto_de_confianza_no_deja_elegir_la_ip_al_cliente(crear_app, bp_prueba, monkeypatch):
+def testUnSaltoDeConfianzaNoDejaElegirLaIpAlCliente(crearApp, bpPrueba, monkeypatch):
     """Con un proxy, solo vale la última entrada: la que escribió ese proxy.
 
     Si el cliente prefija la cabecera, sus valores quedan a la izquierda y se
@@ -463,8 +463,8 @@ def test_un_salto_de_confianza_no_deja_elegir_la_ip_al_cliente(crear_app, bp_pru
     """
     monkeypatch.setenv("PROXY_FIX_HOPS", "1")
 
-    addr, _scheme = _origen_visto(
-        crear_app(bp_prueba),
+    addr, _scheme = _origenVisto(
+        crearApp(bpPrueba),
         headers={"X-Forwarded-For": "1.2.3.4, 203.0.113.9"},
         environ_base={"REMOTE_ADDR": "172.18.0.5"},
     )

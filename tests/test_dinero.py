@@ -50,17 +50,17 @@ from core.dinero import (
     (7, "7"),
     (Decimal("3.14"), "3.14"),
 ])
-def test_formatos_aceptados(entrada, esperado):
+def testFormatosAceptados(entrada, esperado):
     assert aDecimal(entrada) == Decimal(esperado)
 
 
-def test_un_float_no_arrastra_su_cola_binaria():
+def testUnFloatNoArrastraSuColaBinaria():
     """`Decimal(0.1)` da 0.1000000000000000055511151231257827; `repr` da 0.1."""
     assert aDecimal(0.1) == Decimal("0.1")
     assert aDecimal(2.675) == Decimal("2.675")
 
 
-def test_el_punto_solo_es_separador_decimal():
+def testElPuntoSoloEsSeparadorDecimal():
     """Decisión heredada: cambiarla reinterpretaría datos ya guardados."""
     assert aDecimal("1.234") == Decimal("1.234")
 
@@ -89,31 +89,31 @@ def test_el_punto_solo_es_separador_decimal():
     True,
     False,
 ])
-def test_entradas_rechazadas(entrada):
+def testEntradasRechazadas(entrada):
     with pytest.raises(ImporteInvalido):
         aDecimal(entrada)
 
 
 @pytest.mark.parametrize("entrada", ["", "   ", None])
-def test_el_vacio_tambien_falla_sin_defecto_explicito(entrada):
+def testElVacioTambienFallaSinDefectoExplicito(entrada):
     """Una columna vacía puede ser legítima, pero decidirlo es de quien llama."""
     with pytest.raises(ImporteInvalido):
         aDecimal(entrada)
 
 
-def test_el_defecto_convierte_el_fallo_en_un_valor():
+def testElDefectoConvierteElFalloEnUnValor():
     assert aDecimal("", defecto=Decimal("0")) == Decimal("0")
     assert aDecimal("basura", defecto=Decimal("0")) == Decimal("0")
     assert aDecimal(None, defecto=Decimal("1")) == Decimal("1")
 
 
-def test_el_mensaje_de_error_nombra_el_campo():
+def testElMensajeDeErrorNombraElCampo():
     """Para que un 400 diga cuál de los quince campos del formulario falla."""
     with pytest.raises(ImporteInvalido, match="comisiones"):
         aDecimal("basura", "comisiones")
 
 
-def test_a_decimal_o_nulo_no_levanta():
+def testADecimalONuloNoLevanta():
     assert aDecimalONulo("basura") is None
     assert aDecimalONulo("") is None
     assert aDecimalONulo("1,5") == Decimal("1.5")
@@ -131,17 +131,17 @@ def test_a_decimal_o_nulo_no_levanta():
     (Decimal("0E-8"), "0"),
     ("-0,50", "-0.5"),
 ])
-def test_a_texto_es_canonico(entrada, esperado):
+def testATextoEsCanonico(entrada, esperado):
     assert aTexto(entrada) == esperado
 
 
-def test_a_texto_con_escala_fija():
+def testATextoConEscalaFija():
     assert aTexto("7", decimales=2) == "7.00"
     assert aTexto("1,005", decimales=2) == "1.01"
 
 
 @pytest.mark.parametrize("entrada", ["1.234,56", "83,58 €", "0,001", "-99,99", "1234.56"])
-def test_ida_y_vuelta(entrada):
+def testIdaYVuelta(entrada):
     """Lo que escribe `aTexto` lo tiene que volver a leer `aDecimal` igual.
 
     Es la propiedad que hace utilizable el formato canónico: sin ella, guardar
@@ -150,7 +150,7 @@ def test_ida_y_vuelta(entrada):
     assert aDecimal(aTexto(entrada)) == aDecimal(entrada)
 
 
-def test_a_texto_no_emite_separador_de_miles():
+def testATextoNoEmiteSeparadorDeMiles():
     """Emitirlo haría el valor ambiguo al releerlo (ver el docstring del módulo)."""
     assert aTexto("1234567,89") == "1234567.89"
 
@@ -164,12 +164,12 @@ def test_a_texto_no_emite_separador_de_miles():
     ("999", "999,00"),
     ("1000", "1.000,00"),
 ])
-def test_a_texto_es_espaniol(entrada, esperado):
+def testATextoEsEspaniol(entrada, esperado):
     assert aTextoEs(entrada) == esperado
 
 
-def test_a_texto_es_sin_miles():
-    """La forma que usa `helpers.format_decimal`, que acaba en columnas TEXT."""
+def testATextoEsSinMiles():
+    """La forma que usa `helpers.formatDecimal`, que acaba en columnas TEXT."""
     assert aTextoEs("1234567.891", miles=False) == "1234567,89"
 
 
@@ -184,18 +184,18 @@ def test_a_texto_es_sin_miles():
     ("-2,675", "-2.68"),
     ("1,004", "1.00"),
 ])
-def test_redondeo_half_up(entrada, esperado):
+def testRedondeoHalfUp(entrada, esperado):
     assert redondear(entrada) == Decimal(esperado)
 
 
-def test_redondear_a_otra_escala():
+def testRedondearAOtraEscala():
     assert redondear("1,123456789", 8) == Decimal("1.12345679")
     assert redondear("1,5", 0) == Decimal("2")
 
 
 # ── Sumas ─────────────────────────────────────────────────────────────────────
 
-def test_sumar_es_exacto_donde_float_no_lo_es():
+def testSumarEsExactoDondeFloatNoLoEs():
     """El motivo de todo el módulo, en una línea.
 
     En coma flotante, 0,1 + 0,2 no es 0,3. Sobre las cientos de filas que
@@ -205,11 +205,11 @@ def test_sumar_es_exacto_donde_float_no_lo_es():
     assert sumar(["0,1"] * 10) == Decimal("1.0")
 
 
-def test_sumar_lista_vacia():
+def testSumarListaVacia():
     assert sumar([]) == Decimal("0")
 
 
-def test_sumar_propaga_el_dato_corrupto():
+def testSumarPropagaElDatoCorrupto():
     """Un total no puede salir bien si una de sus filas es ilegible."""
     with pytest.raises(ImporteInvalido):
         sumar(["1,00", "basura"])
@@ -218,10 +218,10 @@ def test_sumar_propaga_el_dato_corrupto():
 # ── Utilidades ────────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("entrada", ["0", "0,00", "0.000", "", None, 0, Decimal("0E-10")])
-def test_es_cero(entrada):
+def testEsCero(entrada):
     assert esCero(entrada)
 
 
 @pytest.mark.parametrize("entrada", ["0,01", "-0,01", "1"])
-def test_no_es_cero(entrada):
+def testNoEsCero(entrada):
     assert not esCero(entrada)

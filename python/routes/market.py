@@ -8,49 +8,49 @@ from urllib.error import HTTPError, URLError
 from flask import Blueprint, jsonify, request
 
 from core import dinero, paths, settings
-from core.db import get_active_db_path, get_db
-from providers.alpha_vantage_client import search_symbol as search_av_symbol
-from providers.eodhd_client import search_symbol as search_eodhd_symbol
+from core.db import getActiveDbPath, getDb
+from providers.alpha_vantage_client import searchSymbol as searchAvSymbol
+from providers.eodhd_client import searchSymbol as buscarSimboloEodhd
 from providers.finnhub_client import (
-    fetch_candle_close,
-    fetch_currencies,
-    fetch_exchange_rate,
-    fetch_exchange_rates,
-    search_symbol,
+    fetchCandleClose,
+    fetchCurrencies,
+    fetchExchangeRate,
+    fetchExchangeRates,
+    searchSymbol,
 )
-from providers.http import motivo_conexion
+from providers.http import motivoConexion
 from providers.tradingview_client import (
-    fetch_stats as fetch_tradingview_stats,
-    search_symbol as search_tradingview_symbol,
+    fetchStats as fetchTradingviewStats,
+    searchSymbol as searchTradingviewSymbol,
 )
-from providers.yahoo_finance_client import search_symbol as search_yahoo_symbol
+from providers.yahoo_finance_client import searchSymbol as buscarSimboloYahoo
 from stores import benchmark
 from stores.asset_store import listAssets
 from stores.asset_utils import SUPPORTED_ASSET_CURRENCIES
-from stores.divisas_historico import HistoricoInvalido, historico_par
+from stores.divisas_historico import HistoricoInvalido, historicoPar
 from stores.helpers import (
-    call_alpha_vantage_with_fallbacks,
-    call_eodhd_with_fallbacks,
-    call_finnhub_with_fallbacks,
-    is_temporary_service_error,
-    normalize_currency_code,
-    parse_loose_number,
+    callAlphaVantageWithFallbacks,
+    callEodhdWithFallbacks,
+    callFinnhubWithFallbacks,
+    isTemporaryServiceError,
+    normalizeCurrencyCode,
+    parseLooseNumber,
 )
-from stores.market_data import fetch_asset_quote
+from stores.market_data import fetchAssetQuote
 
 log = logging.getLogger(__name__)
 
 # {(ruta de la cartera, periodo): {"data": {...}, "ts": float, "marca": float}}
 # La cartera va en la clave: con solo el periodo, tras cambiar de cartera se
 # servían durante horas las variaciones de los activos de la anterior.
-_hist_cache = {}
+_histCache = {}
 
 
-def _fichero_invalidacion():
+def _ficheroInvalidacion():
     return paths.TMP_DIR / "historico-invalidado"
 
 
-def _marca_invalidacion() -> float:
+def _marcaInvalidacion() -> float:
     """Cuándo se invalidó la caché por última vez, en cualquier worker.
 
     La caché vive en la memoria de cada proceso, y /invalidate solo vaciaba la
@@ -58,35 +58,35 @@ def _marca_invalidacion() -> float:
     una marca en disco (un stat por petición) todos se enteran.
     """
     try:
-        return _fichero_invalidacion().stat().st_mtime
+        return _ficheroInvalidacion().stat().st_mtime
     except OSError:
         return 0.0
 
-market_bp = Blueprint("market", __name__)
+marketBp = Blueprint("market", __name__)
 
 
-@market_bp.route("/api/exchange-rate", methods=["GET"])
+@marketBp.route("/api/exchange-rate", methods=["GET"])
 def getExchangeRate():
-    source_currency = normalize_currency_code(
+    sourceCurrency = normalizeCurrencyCode(
         request.args.get("source") or request.args.get("from", ""), fallback="EUR"
     )
-    target_currency = normalize_currency_code(
-        request.args.get("target") or request.args.get("to", ""), fallback=source_currency
+    targetCurrency = normalizeCurrencyCode(
+        request.args.get("target") or request.args.get("to", ""), fallback=sourceCurrency
     )
 
-    if source_currency == target_currency:
-        return jsonify({"ok": True, "source": source_currency, "target": target_currency, "rate": 1.0})
+    if sourceCurrency == targetCurrency:
+        return jsonify({"ok": True, "source": sourceCurrency, "target": targetCurrency, "rate": 1.0})
 
-    rate, error = fetch_exchange_rate(source_currency, target_currency)
+    rate, error = fetchExchangeRate(sourceCurrency, targetCurrency)
 
     if error:
-        statusCode = 503 if is_temporary_service_error(error) else 400
+        statusCode = 503 if isTemporaryServiceError(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
-    return jsonify({"ok": True, "source": source_currency, "target": target_currency, "rate": rate})
+    return jsonify({"ok": True, "source": sourceCurrency, "target": targetCurrency, "rate": rate})
 
 
-@market_bp.route("/api/divisas", methods=["GET"])
+@marketBp.route("/api/divisas", methods=["GET"])
 def listDivisas():
     """Divisas a las que se puede pasar un activo ahora mismo, con su nombre.
 
@@ -95,7 +95,7 @@ def listDivisas():
     fallar al guardar. Sin respuesta del servicio se ofrecen todas las del
     activo, y la conversión dirá en su momento si alguna no se puede hacer.
     """
-    publicadas, error = fetch_currencies()
+    publicadas, error = fetchCurrencies()
     codigos = sorted(SUPPORTED_ASSET_CURRENCIES)
 
     if error:
@@ -111,11 +111,11 @@ def listDivisas():
     })
 
 
-@market_bp.route("/api/divisas/historico", methods=["GET"])
+@marketBp.route("/api/divisas/historico", methods=["GET"])
 def getHistoricoDivisas():
     """Serie de un par de divisas para el comparador de Herramientas."""
     try:
-        datos, error = historico_par(
+        datos, error = historicoPar(
             request.args.get("base"), request.args.get("quote"), request.args.get("rango", "1M")
         )
     except HistoricoInvalido as invalido:
@@ -127,24 +127,24 @@ def getHistoricoDivisas():
     return jsonify({"ok": True, **datos})
 
 
-@market_bp.route("/api/divisas/cambio", methods=["GET"])
+@marketBp.route("/api/divisas/cambio", methods=["GET"])
 def getCambiosDivisa():
     """Comprobación del servicio de cambio para Ajustes: los tipos de `base` a
     las demás divisas del activo, de dónde salen, de qué fecha son y cuánto
     tardó en contestar. Es la misma fuente que usa la conversión de cotizaciones.
     """
-    base = normalize_currency_code(request.args.get("base", ""), fallback="EUR")
+    base = normalizeCurrencyCode(request.args.get("base", ""), fallback="EUR")
     if base not in SUPPORTED_ASSET_CURRENCIES:
         return jsonify({"ok": False, "error": f"Divisa no admitida: {base}"}), 400
 
     inicio = time.monotonic()
-    datos, error = fetch_exchange_rates(base, sorted(SUPPORTED_ASSET_CURRENCIES - {base}))
+    datos, error = fetchExchangeRates(base, sorted(SUPPORTED_ASSET_CURRENCIES - {base}))
     ms = round((time.monotonic() - inicio) * 1000)
 
     if error:
         return jsonify({"ok": False, "error": error, "ms": ms}), 503
 
-    nombres, _ = fetch_currencies()
+    nombres, _ = fetchCurrencies()
     nombres = nombres or {}
     return jsonify({
         "ok": True,
@@ -160,24 +160,24 @@ def getCambiosDivisa():
     })
 
 
-@market_bp.route("/api/finnhub/search", methods=["GET"])
-@market_bp.route("/api/market/search", methods=["GET"])
+@marketBp.route("/api/finnhub/search", methods=["GET"])
+@marketBp.route("/api/market/search", methods=["GET"])
 def searchFinnhubSymbol():
     query = str(request.args.get("q", "")).strip()
     assetName = str(request.args.get("assetName", "")).strip()
     assetType = str(request.args.get("assetType", "")).strip()
-    results, error = call_finnhub_with_fallbacks(
-        lambda apiKey: search_symbol(query, apiKey, asset_name=assetName, preferred_asset_type=assetType)
+    results, error = callFinnhubWithFallbacks(
+        lambda apiKey: searchSymbol(query, apiKey, assetName=assetName, preferredAssetType=assetType)
     )
 
     if error:
-        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
+        statusCode = 503 if "API key" in error or isTemporaryServiceError(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})
 
 
-@market_bp.route("/api/historical-changes", methods=["GET"])
+@marketBp.route("/api/historical-changes", methods=["GET"])
 def getHistoricalChanges():
     period = str(request.args.get("period", "semana")).strip().lower()
     if period not in ("semana", "mes", "ytd", "anyo"):
@@ -186,9 +186,9 @@ def getHistoricalChanges():
     # TTL 0 en [mercado] historico_ttl_segundos desactiva la caché: útil para
     # depurar sin tener que esperar a que caduque.
     ttl = settings.historicoTtlSegundos()
-    clave = (str(get_active_db_path()), period)
-    marca = _marca_invalidacion()
-    cached = _hist_cache.get(clave)
+    clave = (str(getActiveDbPath()), period)
+    marca = _marcaInvalidacion()
+    cached = _histCache.get(clave)
     if ttl > 0 and cached and cached.get("marca") == marca and time.time() - cached["ts"] < ttl:
         return jsonify({"ok": True, "data": cached["data"], "cached": True})
 
@@ -202,11 +202,11 @@ def getHistoricalChanges():
     else:
         target = now - timedelta(days=365)
 
-    from_ts    = int(target.timestamp())
-    safe_limit = int((now - timedelta(days=2)).timestamp())
-    to_ts      = min(from_ts + 10 * 86400, safe_limit)
+    fromTs    = int(target.timestamp())
+    safeLimit = int((now - timedelta(days=2)).timestamp())
+    toTs      = min(fromTs + 10 * 86400, safeLimit)
 
-    conn   = get_db()
+    conn   = getDb()
     result = {}
 
     # Snapshot más reciente por activo (valor actual)
@@ -222,12 +222,12 @@ def getHistoricalChanges():
     for row in conn.execute(
         "SELECT asset_id, price_eur FROM asset_snapshots "
         "WHERE ts BETWEEN ? AND ? ORDER BY ts ASC",
-        (from_ts, to_ts)
+        (fromTs, toTs)
     ).fetchall():
         if row["asset_id"] not in past:
             past[row["asset_id"]] = row["price_eur"]
 
-    assets_needing_api = []
+    assetsNeedingApi = []
     for asset in listAssets():
         aid  = asset["id"]
         cur  = latest.get(aid)
@@ -235,46 +235,46 @@ def getHistoricalChanges():
         if cur and prev and prev > 0:
             result[aid] = round((cur - prev) / prev * 100, 2)
         elif asset.get("marketSymbol") or asset.get("finnhubSymbol"):
-            assets_needing_api.append(asset)
+            assetsNeedingApi.append(asset)
 
     # Fallback a Finnhub para activos sin snapshots almacenados
-    if assets_needing_api:
-        def fetch_one(asset):
+    if assetsNeedingApi:
+        def fetchOne(asset):
             symbol    = str(asset.get("marketSymbol") or asset.get("finnhubSymbol") or "").strip()
-            cur_price = parse_loose_number(asset.get("price"))
-            if not symbol or not cur_price or cur_price <= 0:
+            curPrice = parseLooseNumber(asset.get("price"))
+            if not symbol or not curPrice or curPrice <= 0:
                 return asset["id"], None
-            hist_price, _ = call_finnhub_with_fallbacks(
-                lambda apiKey: fetch_candle_close(symbol, from_ts, to_ts, apiKey)
+            histPrice, _ = callFinnhubWithFallbacks(
+                lambda apiKey: fetchCandleClose(symbol, fromTs, toTs, apiKey)
             )
-            if not hist_price or hist_price <= 0:
+            if not histPrice or histPrice <= 0:
                 return asset["id"], None
             # El precio actual sale de una columna TEXT (Decimal) y el histórico
             # de la API de Finnhub (float). Restarlos directamente es un
             # TypeError, así que el float del proveedor entra por `dinero`, que
             # lo convierte por su representación más corta en vez de arrastrar
             # la cola binaria.
-            hist = dinero.aDecimal(hist_price, "precio histórico")
-            variacion = (cur_price - hist) / hist * 100
+            hist = dinero.aDecimal(histPrice, "precio histórico")
+            variacion = (curPrice - hist) / hist * 100
             return asset["id"], float(dinero.redondear(variacion))
 
         with ThreadPoolExecutor(max_workers=settings.maxPeticionesParalelas()) as pool:
-            futures = {pool.submit(fetch_one, a): a for a in assets_needing_api}
+            futures = {pool.submit(fetchOne, a): a for a in assetsNeedingApi}
             for f in as_completed(futures):
-                asset_id, pct = f.result()
+                assetId, pct = f.result()
                 if pct is not None:
-                    result[asset_id] = pct
+                    result[assetId] = pct
 
-    _hist_cache[clave] = {"data": result, "ts": time.time(), "marca": marca}
+    _histCache[clave] = {"data": result, "ts": time.time(), "marca": marca}
     return jsonify({"ok": True, "data": result, "cached": False})
 
 
-@market_bp.route("/api/market/benchmarks", methods=["GET"])
+@marketBp.route("/api/market/benchmarks", methods=["GET"])
 def listBenchmarks():
     return jsonify({"ok": True, "indices": benchmark.catalogo()})
 
 
-@market_bp.route("/api/market/benchmark", methods=["GET"])
+@marketBp.route("/api/market/benchmark", methods=["GET"])
 def getBenchmark():
     """Cierres diarios del índice pedido, para superponerlo a la evolución."""
     clave = request.args.get("indice", "")
@@ -289,18 +289,18 @@ def getBenchmark():
 
     datos, error = benchmark.serie(clave, desde, hasta)
     if error:
-        statusCode = 503 if is_temporary_service_error(error) else 400
+        statusCode = 503 if isTemporaryServiceError(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, **datos})
 
 
-@market_bp.route("/api/historical-changes/invalidate", methods=["POST"])
+@marketBp.route("/api/historical-changes/invalidate", methods=["POST"])
 def invalidateHistoricalCache():
-    _hist_cache.clear()
+    _histCache.clear()
     # Para los demás workers: su caché se descarta al ver la marca nueva.
     try:
-        ruta = _fichero_invalidacion()
+        ruta = _ficheroInvalidacion()
         ruta.parent.mkdir(parents=True, exist_ok=True)
         ruta.touch()
         ahora = time.time()
@@ -310,66 +310,66 @@ def invalidateHistoricalCache():
     return jsonify({"ok": True})
 
 
-@market_bp.route("/api/eodhd/search", methods=["GET"])
+@marketBp.route("/api/eodhd/search", methods=["GET"])
 def searchEodhdSymbol():
     query = str(request.args.get("q", "")).strip()
     assetName = str(request.args.get("assetName", "")).strip()
     assetType = str(request.args.get("assetType", "")).strip()
-    results, error = call_eodhd_with_fallbacks(
-        lambda apiKey: search_eodhd_symbol(query, apiKey, asset_name=assetName, preferred_asset_type=assetType)
+    results, error = callEodhdWithFallbacks(
+        lambda apiKey: buscarSimboloEodhd(query, apiKey, assetName=assetName, preferredAssetType=assetType)
     )
 
     if error:
-        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
+        statusCode = 503 if "API key" in error or isTemporaryServiceError(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})
 
 
-@market_bp.route("/api/yahoo/search", methods=["GET"])
+@marketBp.route("/api/yahoo/search", methods=["GET"])
 def searchYahooSymbol():
     query = str(request.args.get("q", "")).strip()
     assetName = str(request.args.get("assetName", "")).strip()
     assetType = str(request.args.get("assetType", "")).strip()
-    results, error = search_yahoo_symbol(query, asset_name=assetName, preferred_asset_type=assetType)
+    results, error = buscarSimboloYahoo(query, assetName=assetName, preferredAssetType=assetType)
 
     if error:
-        statusCode = 503 if is_temporary_service_error(error) else 400
+        statusCode = 503 if isTemporaryServiceError(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})
 
 
-@market_bp.route("/api/alphavantage/search", methods=["GET"])
+@marketBp.route("/api/alphavantage/search", methods=["GET"])
 def searchAlphaVantageSymbol():
     query = str(request.args.get("q", "")).strip()
     assetName = str(request.args.get("assetName", "")).strip()
     assetType = str(request.args.get("assetType", "")).strip()
-    results, error = call_alpha_vantage_with_fallbacks(
-        lambda apiKey: search_av_symbol(query, apiKey, asset_name=assetName, preferred_asset_type=assetType)
+    results, error = callAlphaVantageWithFallbacks(
+        lambda apiKey: searchAvSymbol(query, apiKey, assetName=assetName, preferredAssetType=assetType)
     )
 
     if error:
-        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
+        statusCode = 503 if "API key" in error or isTemporaryServiceError(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})
 
-@market_bp.route("/api/tradingview/search", methods=["GET"])
+@marketBp.route("/api/tradingview/search", methods=["GET"])
 def searchTradingViewSymbol():
     query = str(request.args.get("q", "")).strip()
     assetName = str(request.args.get("assetName", "")).strip()
     assetType = str(request.args.get("assetType", "")).strip()
-    results, error = search_tradingview_symbol(query, asset_name=assetName, preferred_asset_type=assetType)
+    results, error = searchTradingviewSymbol(query, assetName=assetName, preferredAssetType=assetType)
 
     if error:
-        statusCode = 503 if is_temporary_service_error(error) else 400
+        statusCode = 503 if isTemporaryServiceError(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({"ok": True, "results": results})
 
 
-@market_bp.route("/api/tradingview/stats", methods=["GET"])
+@marketBp.route("/api/tradingview/stats", methods=["GET"])
 def getTradingViewStats():
     """Fundamentales y técnico del scanner de TradingView, para la página de
     Estadísticas de mercado.
@@ -378,34 +378,34 @@ def getTradingViewStats():
     que abre el gráfico de cada activo): aquí no se adivina ni se completa
     ningún ticker, solo se pide al scanner lo que llega en la petición.
     """
-    raw_symbols = str(request.args.get("symbols", "")).strip()
-    symbols = sorted({s.strip().upper() for s in raw_symbols.split(",") if s.strip()})
+    rawSymbols = str(request.args.get("symbols", "")).strip()
+    symbols = sorted({s.strip().upper() for s in rawSymbols.split(",") if s.strip()})
 
     if not symbols:
         return jsonify({"ok": False, "error": "symbols requerido"}), 400
 
     try:
-        stats = fetch_tradingview_stats(symbols)
+        stats = fetchTradingviewStats(symbols)
     except HTTPError as error:
         return jsonify({"ok": False, "error": f"TradingView devolvió HTTP {error.code}"}), 503
     except URLError as error:
-        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {motivo_conexion(error, 'TradingView')}"}), 503
+        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {motivoConexion(error, 'TradingView')}"}), 503
 
     return jsonify({"ok": True, "data": stats})
 
 
-@market_bp.route("/api/market/quote", methods=["GET"])
+@marketBp.route("/api/market/quote", methods=["GET"])
 def getMarketQuote():
     symbol = str(request.args.get("symbol", "")).strip().upper()
-    provider_raw = str(request.args.get("provider", "")).strip()
+    providerRaw = str(request.args.get("provider", "")).strip()
 
     if not symbol:
         return jsonify({"ok": False, "error": "symbol requerido"}), 400
 
-    quote, error = fetch_asset_quote(symbol, provider_raw)
+    quote, error = fetchAssetQuote(symbol, providerRaw)
 
     if error:
-        statusCode = 503 if "API key" in error or is_temporary_service_error(error) else 400
+        statusCode = 503 if "API key" in error or isTemporaryServiceError(error) else 400
         return jsonify({"ok": False, "error": error}), statusCode
 
     return jsonify({

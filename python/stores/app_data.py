@@ -3,8 +3,8 @@ import os
 import re
 
 from core import paths
-from core.db import get_db, init_db, transactional
-from core.secret_store import read_secret_lines
+from core.db import getDb, initDb, transactional
+from core.secret_store import readSecretLines
 
 log = logging.getLogger(__name__)
 
@@ -27,19 +27,19 @@ _EJEMPLO = re.compile(
 )
 
 
-def _read_api_keys(file_path):
+def _readApiKeys(filePath):
     """Claves del fichero, sin duplicados. Descifra si está en formato cifrado."""
     seen = set()
     apiKeys = []
-    for apiKey in read_secret_lines(file_path):
+    for apiKey in readSecretLines(filePath):
         if apiKey not in seen:
             apiKeys.append(apiKey)
             seen.add(apiKey)
     return apiKeys
 
 
-def _read_first_api_key(file_path):
-    apiKeys = _read_api_keys(file_path)
+def _readFirstApiKey(filePath):
+    apiKeys = _readApiKeys(filePath)
     return apiKeys[0] if apiKeys else None
 
 
@@ -53,32 +53,32 @@ API_KEY_SOURCES = {
 
 
 def ensureDataFile():
-    init_db()
+    initDb()
 
 
 # --- Cuentas Remuneradas (ex Intereses) ---
 
 @transactional
 def readInteresesFile():
-    conn = get_db()
+    conn = getDb()
     cuentas = conn.execute(
         "SELECT id, nombre FROM cuentas_remuneradas ORDER BY sort_order, rowid"
     ).fetchall()
 
     # Migración: si no hay cuentas_remuneradas pero sí filas antiguas, migrarlas
     if not cuentas:
-        old_rows = conn.execute(
+        oldRows = conn.execute(
             "SELECT fecha, acumulado, impuestos FROM intereses ORDER BY id"
         ).fetchall()
-        if old_rows:
-            default_id = "cuenta-default"
+        if oldRows:
+            defaultId = "cuenta-default"
             conn.execute(
                 "INSERT OR IGNORE INTO cuentas_remuneradas (id, nombre, sort_order) VALUES (?, ?, ?)",
-                (default_id, "Cuenta principal", 0)
+                (defaultId, "Cuenta principal", 0)
             )
             conn.executemany(
                 "INSERT INTO intereses_v2 (cuenta_id, fecha, acumulado, impuestos) VALUES (?, ?, ?, ?)",
-                [(default_id, r["fecha"], r["acumulado"], r["impuestos"]) for r in old_rows]
+                [(defaultId, r["fecha"], r["acumulado"], r["impuestos"]) for r in oldRows]
             )
             conn.execute("DELETE FROM intereses")
             conn.commit()
@@ -102,18 +102,18 @@ def readInteresesFile():
             "SELECT fecha, acumulado, impuestos FROM intereses_v2 WHERE cuenta_id = ? ORDER BY id",
             (c["id"],)
         ).fetchall()
-        cuenta_id, cuenta_nombre = vinculos.get(c["id"], ("", ""))
+        cuentaId, cuentaNombre = vinculos.get(c["id"], ("", ""))
         result.append({
             "id": c["id"],
-            "nombre": cuenta_nombre or c["nombre"],
-            "cuenta": cuenta_id,
+            "nombre": cuentaNombre or c["nombre"],
+            "cuenta": cuentaId,
             "rows": [{"fecha": r["fecha"], "acumulado": r["acumulado"], "impuestos": r["impuestos"]} for r in filas]
         })
 
     return {"cuentas": result}
 
 
-def _vincular_remunerada(conn, remunerada_id, cuenta_id):
+def _vincularRemunerada(conn, remuneradaId, cuentaId):
     """Hace de `cuenta_id` (una cuenta de «Cuentas») la cuenta de la remunerada.
 
     La remunerada puede cambiar de cuenta; la cuenta de destino, en cambio, no
@@ -121,18 +121,18 @@ def _vincular_remunerada(conn, remunerada_id, cuenta_id):
     """
     from stores.cuentas_store import CuentaInvalida
 
-    fila = conn.execute("SELECT nombre FROM cuentas WHERE id = ?", (cuenta_id,)).fetchone()
+    fila = conn.execute("SELECT nombre FROM cuentas WHERE id = ?", (cuentaId,)).fetchone()
     if fila is None:
         raise CuentaInvalida("La cuenta elegida no existe")
     otra = conn.execute(
         "SELECT 1 FROM cuenta_remunerada_vinculo WHERE cuenta_id = ? AND remunerada_id <> ?",
-        (cuenta_id, remunerada_id),
+        (cuentaId, remuneradaId),
     ).fetchone()
     if otra is not None:
         raise CuentaInvalida(f"«{fila['nombre']}» ya es una cuenta remunerada")
-    conn.execute("DELETE FROM cuenta_remunerada_vinculo WHERE remunerada_id = ?", (remunerada_id,))
+    conn.execute("DELETE FROM cuenta_remunerada_vinculo WHERE remunerada_id = ?", (remuneradaId,))
     conn.execute(
-        "INSERT INTO cuenta_remunerada_vinculo (remunerada_id, cuenta_id) VALUES (?, ?)", (remunerada_id, cuenta_id)
+        "INSERT INTO cuenta_remunerada_vinculo (remunerada_id, cuenta_id) VALUES (?, ?)", (remuneradaId, cuentaId)
     )
     return fila["nombre"]
 
@@ -144,14 +144,14 @@ def writeInteresesFile(data):
     Una entrada con `cuenta` la vincula a esa cuenta de «Cuentas» (y toma su
     nombre); sin la clave, el vínculo que tuviera se queda como está.
     """
-    conn = get_db()
+    conn = getDb()
     cuentas = data.get("cuentas", [])
 
-    existing_ids = {r["id"] for r in conn.execute("SELECT id FROM cuentas_remuneradas").fetchall()}
-    new_ids = {str(c.get("id", "")).strip() for c in cuentas}
+    existingIds = {r["id"] for r in conn.execute("SELECT id FROM cuentas_remuneradas").fetchall()}
+    newIds = {str(c.get("id", "")).strip() for c in cuentas}
 
-    for old_id in existing_ids - new_ids:
-        conn.execute("DELETE FROM cuentas_remuneradas WHERE id = ?", (old_id,))
+    for oldId in existingIds - newIds:
+        conn.execute("DELETE FROM cuentas_remuneradas WHERE id = ?", (oldId,))
 
     for i, cuenta in enumerate(cuentas):
         cid = str(cuenta.get("id", "")).strip()
@@ -165,10 +165,10 @@ def writeInteresesFile(data):
             "ON CONFLICT(id) DO UPDATE SET nombre = excluded.nombre, sort_order = excluded.sort_order",
             (cid, nombre, i)
         )
-        cuenta_id = str(cuenta.get("cuenta") or "").strip()
-        if cuenta_id:
-            nombre_cuenta = _vincular_remunerada(conn, cid, cuenta_id)
-            conn.execute("UPDATE cuentas_remuneradas SET nombre = ? WHERE id = ?", (nombre_cuenta, cid))
+        cuentaId = str(cuenta.get("cuenta") or "").strip()
+        if cuentaId:
+            nombreCuenta = _vincularRemunerada(conn, cid, cuentaId)
+            conn.execute("UPDATE cuentas_remuneradas SET nombre = ? WHERE id = ?", (nombreCuenta, cid))
         conn.execute("DELETE FROM intereses_v2 WHERE cuenta_id = ?", (cid,))
         rows = cuenta.get("rows", [])
         if rows:
@@ -183,7 +183,7 @@ def writeInteresesFile(data):
 # --- Dividendos ---
 
 def readDividendosFile():
-    conn = get_db()
+    conn = getDb()
     rows = conn.execute(
         "SELECT fecha, instrumento, acciones, dividendo_accion, impuestos, total, moneda_dividendo, moneda_total, cuenta FROM dividendos ORDER BY id"
     ).fetchall()
@@ -208,7 +208,7 @@ def readDividendosFile():
 
 @transactional
 def writeDividendosFile(data):
-    conn = get_db()
+    conn = getDb()
     conn.execute("DELETE FROM dividendos")
     conn.executemany(
         "INSERT INTO dividendos (fecha, instrumento, acciones, dividendo_accion, impuestos, total, moneda_dividendo, moneda_total, cuenta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -225,7 +225,7 @@ def writeDividendosFile(data):
 # --- Operaciones ---
 
 def readOperacionesFile():
-    conn = get_db()
+    conn = getDb()
     rows = conn.execute(
         "SELECT id, asset_id, activo, fecha_apertura, par, stablecoin_symbol, orden, "
         "precio_orden, precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre "
@@ -256,7 +256,7 @@ def readOperacionesFile():
 
 @transactional
 def writeOperacionesFile(data):
-    conn = get_db()
+    conn = getDb()
     conn.execute("DELETE FROM operaciones")
     conn.executemany(
         "INSERT INTO operaciones "
@@ -279,7 +279,7 @@ def writeOperacionesFile(data):
 # --- Trading Journal ---
 
 def readTradingFile():
-    conn = get_db()
+    conn = getDb()
     rows = conn.execute(
         "SELECT id, fecha, tipo, moneda, direccion, resultado, capital, capital_currency, roi, ganancia, ganancia_neta FROM trading ORDER BY rowid"
     ).fetchall()
@@ -303,7 +303,7 @@ def readTradingFile():
 
 @transactional
 def writeTradingFile(data):
-    conn = get_db()
+    conn = getDb()
     conn.execute("DELETE FROM trading")
     conn.executemany(
         "INSERT INTO trading (id, fecha, tipo, moneda, direccion, resultado, capital, capital_currency, roi, ganancia, ganancia_neta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -321,7 +321,7 @@ def writeTradingFile(data):
 # --- Transacciones ---
 
 def readTransaccionesFile():
-    conn = get_db()
+    conn = getDb()
     rows = conn.execute(
         "SELECT id, asset_id, asset_name, fecha_operacion, total, comision_red, "
         "wallet_tipo, wallet_desde, wallet_destino, hash_transaccion, nota FROM transacciones ORDER BY rowid"
@@ -346,7 +346,7 @@ def readTransaccionesFile():
 
 @transactional
 def writeTransaccionesFile(data):
-    conn = get_db()
+    conn = getDb()
     conn.execute("DELETE FROM transacciones")
     conn.executemany(
         "INSERT INTO transacciones "
@@ -373,7 +373,7 @@ CALENDAR_MONTHS = [
 
 
 def readDividendoCalendar():
-    conn = get_db()
+    conn = getDb()
     rows = conn.execute(
         "SELECT month, asset_name FROM dividendo_calendar ORDER BY month, sort_order, asset_name"
     ).fetchall()
@@ -387,18 +387,18 @@ def readDividendoCalendar():
 
 @transactional
 def writeDividendoCalendar(data):
-    conn = get_db()
+    conn = getDb()
     calendar = data.get("calendar", {})
     conn.execute("DELETE FROM dividendo_calendar")
-    rows_to_insert = []
+    rowsToInsert = []
     for month in CALENDAR_MONTHS:
-        for order, asset_name in enumerate(calendar.get(month, [])):
-            name = str(asset_name).strip()[:120]
+        for order, assetName in enumerate(calendar.get(month, [])):
+            name = str(assetName).strip()[:120]
             if name:
-                rows_to_insert.append((month, name, order))
+                rowsToInsert.append((month, name, order))
     conn.executemany(
         "INSERT OR IGNORE INTO dividendo_calendar (month, asset_name, sort_order) VALUES (?, ?, ?)",
-        rows_to_insert
+        rowsToInsert
     )
     conn.commit()
 
@@ -406,7 +406,7 @@ def writeDividendoCalendar(data):
 # --- Stablecoins ---
 
 def readStablecoinsFile():
-    conn = get_db()
+    conn = getDb()
     catalog = [
         {
             "symbol": r["symbol"],
@@ -447,7 +447,7 @@ def readStablecoinsFile():
 
 @transactional
 def writeStablecoinsFile(data):
-    conn = get_db()
+    conn = getDb()
     conn.execute("DELETE FROM stablecoins_catalog")
     conn.execute("DELETE FROM stablecoins_enabled")
     conn.execute("DELETE FROM stablecoins_rows")
@@ -481,7 +481,7 @@ def writeStablecoinsFile(data):
 # --- Renta Fija ---
 
 def readRentaFijaFile():
-    conn = get_db()
+    conn = getDb()
     rows = conn.execute(
         "SELECT fecha, tipo, currency, instrumento, rentabilidad, vencimiento, invertido, interes_acumulado, impuestos "
         "FROM renta_fija ORDER BY id"
@@ -504,7 +504,7 @@ def readRentaFijaFile():
 
 @transactional
 def writeRentaFijaFile(data):
-    conn = get_db()
+    conn = getDb()
     conn.execute("DELETE FROM renta_fija")
     conn.executemany(
         "INSERT INTO renta_fija (fecha, tipo, currency, instrumento, rentabilidad, vencimiento, invertido, interes_acumulado, impuestos) "
@@ -522,7 +522,7 @@ def writeRentaFijaFile(data):
 # --- Bonos ---
 
 def readBonosFile():
-    conn = get_db()
+    conn = getDb()
     rows = conn.execute(
         "SELECT fecha, tipo, currency, instrumento, cupon, vencimiento, invertido, interes_acumulado, impuestos, nota "
         "FROM bonos ORDER BY id"
@@ -546,7 +546,7 @@ def readBonosFile():
 
 @transactional
 def writeBonosFile(data):
-    conn = get_db()
+    conn = getDb()
     conn.execute("DELETE FROM bonos")
     conn.executemany(
         "INSERT INTO bonos (fecha, tipo, currency, instrumento, cupon, vencimiento, invertido, interes_acumulado, impuestos, nota) "
@@ -564,7 +564,7 @@ def writeBonosFile(data):
 # --- Staking ---
 
 def readStakingFile():
-    conn = get_db()
+    conn = getDb()
     criptos = conn.execute(
         "SELECT id, nombre FROM staking_criptos ORDER BY sort_order, rowid"
     ).fetchall()
@@ -584,12 +584,12 @@ def readStakingFile():
 
 @transactional
 def writeStakingFile(data):
-    conn = get_db()
+    conn = getDb()
     criptos = data.get("criptos", [])
-    existing_ids = {r["id"] for r in conn.execute("SELECT id FROM staking_criptos").fetchall()}
-    new_ids = {str(c.get("id", "")).strip() for c in criptos}
-    for old_id in existing_ids - new_ids:
-        conn.execute("DELETE FROM staking_criptos WHERE id = ?", (old_id,))
+    existingIds = {r["id"] for r in conn.execute("SELECT id FROM staking_criptos").fetchall()}
+    newIds = {str(c.get("id", "")).strip() for c in criptos}
+    for oldId in existingIds - newIds:
+        conn.execute("DELETE FROM staking_criptos WHERE id = ?", (oldId,))
     for i, cripto in enumerate(criptos):
         cid = str(cripto.get("id", "")).strip()
         nombre = str(cripto.get("nombre", "")).strip()
@@ -612,7 +612,7 @@ def writeStakingFile(data):
 # --- Earn ---
 
 def readEarnFile():
-    conn = get_db()
+    conn = getDb()
     criptos = conn.execute(
         "SELECT id, nombre FROM earn_criptos ORDER BY sort_order, rowid"
     ).fetchall()
@@ -632,12 +632,12 @@ def readEarnFile():
 
 @transactional
 def writeEarnFile(data):
-    conn = get_db()
+    conn = getDb()
     criptos = data.get("criptos", [])
-    existing_ids = {r["id"] for r in conn.execute("SELECT id FROM earn_criptos").fetchall()}
-    new_ids = {str(c.get("id", "")).strip() for c in criptos}
-    for old_id in existing_ids - new_ids:
-        conn.execute("DELETE FROM earn_criptos WHERE id = ?", (old_id,))
+    existingIds = {r["id"] for r in conn.execute("SELECT id FROM earn_criptos").fetchall()}
+    newIds = {str(c.get("id", "")).strip() for c in criptos}
+    for oldId in existingIds - newIds:
+        conn.execute("DELETE FROM earn_criptos WHERE id = ?", (oldId,))
     for i, cripto in enumerate(criptos):
         cid = str(cripto.get("id", "")).strip()
         nombre = str(cripto.get("nombre", "")).strip()
@@ -660,7 +660,7 @@ def writeEarnFile(data):
 # --- Private Market ---
 
 def readPrivateMarketFile():
-    conn = get_db()
+    conn = getDb()
     rows = conn.execute(
         "SELECT fecha, tipo, nombre, gestor, vintage, currency, comprometido, llamado, distribuido, valor_actual, nota "
         "FROM private_market ORDER BY id"
@@ -685,7 +685,7 @@ def readPrivateMarketFile():
 
 @transactional
 def writePrivateMarketFile(data):
-    conn = get_db()
+    conn = getDb()
     conn.execute("DELETE FROM private_market")
     conn.executemany(
         "INSERT INTO private_market (fecha, tipo, nombre, gestor, vintage, currency, comprometido, llamado, distribuido, valor_actual, nota) "
@@ -722,7 +722,7 @@ def writePrivateMarketFile(data):
 # No son claves: su único efecto posible es romper el proveedor.
 
 
-def _es_valor_de_ejemplo(clave):
+def _esValorDeEjemplo(clave):
     """¿Es un hueco de la documentación en vez de una clave?
 
     La lista es deliberadamente estrecha —los valores que aparecen en
@@ -736,7 +736,7 @@ def _es_valor_de_ejemplo(clave):
 # Procedencias por las que ya se ha avisado en este proceso.
 #
 # El descarte hay que contarlo —es la explicación de por qué un proveedor no
-# responde—, pero decirlo una vez basta: `_sin_ejemplos()` corre en cada lectura
+# responde—, pero decirlo una vez basta: `_sinEjemplos()` corre en cada lectura
 # de claves, o sea en cada ciclo de precios, así que un `.env` con el valor de
 # ejemplo puesto escribía miles de líneas idénticas al día y enterraba todo lo
 # demás del log, que es donde se mira cuando algo va mal.
@@ -747,10 +747,10 @@ def _es_valor_de_ejemplo(clave):
 _EJEMPLOS_AVISADOS = set()
 
 
-def _sin_ejemplos(claves, procedencia):
+def _sinEjemplos(claves, procedencia):
     utiles = []
     for clave in claves:
-        if _es_valor_de_ejemplo(clave):
+        if _esValorDeEjemplo(clave):
             if procedencia not in _EJEMPLOS_AVISADOS:
                 _EJEMPLOS_AVISADOS.add(procedencia)
                 log.warning(
@@ -768,7 +768,7 @@ def _clavesDeEntorno(variable, admiteVarias):
     if not crudo:
         return []
     partes = [c.strip() for c in crudo.split(",") if c.strip()] if admiteVarias else [crudo]
-    return _sin_ejemplos(partes, f"el valor de {variable}")
+    return _sinEjemplos(partes, f"el valor de {variable}")
 
 
 def readApiKeysConOrigen(proveedor):
@@ -783,12 +783,12 @@ def readApiKeysConOrigen(proveedor):
     # `paths.API_DIR` y no `<raíz>/API`: Ajustes guarda las claves en el
     # directorio de [rutas] claves, y leerlas de otro sitio hacía que, con esa
     # ruta cambiada, las guardadas no se usaran nunca.
-    delFichero = _sin_ejemplos(_read_api_keys(paths.API_DIR / fichero), f"una clave de {fichero}")
+    delFichero = _sinEjemplos(_readApiKeys(paths.API_DIR / fichero), f"una clave de {fichero}")
 
     # Compatibilidad: la clave de Finnhub se aceptaba en twelvedata.key, y ese
     # fichero sigue leyéndose cuando finnhub.key está vacío.
     if proveedor == "finnhub" and not delFichero:
-        delFichero = _sin_ejemplos(_read_api_keys(paths.API_DIR / "twelvedata.key"), "una clave de twelvedata.key")
+        delFichero = _sinEjemplos(_readApiKeys(paths.API_DIR / "twelvedata.key"), "una clave de twelvedata.key")
 
     delEntorno = _clavesDeEntorno(variable, admiteVarias)
 
@@ -810,12 +810,12 @@ def readApiKeysConOrigen(proveedor):
     }
 
 
-def _claves_efectivas(proveedor):
+def _clavesEfectivas(proveedor):
     return readApiKeysConOrigen(proveedor)["claves"]
 
 
 def readFinnhubApiKeys():
-    return _claves_efectivas("finnhub")
+    return _clavesEfectivas("finnhub")
 
 
 def readFinnhubApiKey():
@@ -824,21 +824,21 @@ def readFinnhubApiKey():
 
 
 def readEodhdApiKey():
-    claves = _claves_efectivas("eodhd")
+    claves = _clavesEfectivas("eodhd")
     return claves[0] if claves else None
 
 
 def readEodhdApiKeys():
-    return _claves_efectivas("eodhd")
+    return _clavesEfectivas("eodhd")
 
 
 def readAlphaVantageApiKey():
-    claves = _claves_efectivas("alphavantage")
+    claves = _clavesEfectivas("alphavantage")
     return claves[0] if claves else None
 
 
 def readAlphaVantageApiKeys():
-    return _claves_efectivas("alphavantage")
+    return _clavesEfectivas("alphavantage")
 
 
 def _rotar(apiKeys, indice):

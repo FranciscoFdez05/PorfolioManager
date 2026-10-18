@@ -26,7 +26,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from core import paths
-from core.secret_store import fernetDeSecretKey, read_secret_lines, write_secret_lines
+from core.secret_store import fernetDeSecretKey, readSecretLines, writeSecretLines
 
 log = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def _derivar(contrasena: str, sal: bytes, iteraciones: int = ITERACIONES) -> byt
 
 def _leer() -> dict | None:
     """{"sal": bytes, "clave": bytes} o None si no hay o no se puede leer."""
-    lineas = read_secret_lines(_ruta())
+    lineas = readSecretLines(_ruta())
     if not lineas:
         return None
     try:
@@ -72,7 +72,7 @@ def configurada() -> bool:
     return _leer() is not None
 
 
-def contrasena_guardada() -> str | None:
+def contrasenaGuardada() -> str | None:
     """La contraseña fijada, o None si no hay (o se fijó antes de poder guardarla)."""
     guardada = _leer()
     texto = guardada["contrasena"] if guardada else None
@@ -98,7 +98,7 @@ def fijar(contrasena: str) -> None:
         "clave": _derivar(contrasena, sal).decode("ascii"),
         "contrasena": contrasena,
     })
-    write_secret_lines(_ruta(), [linea])
+    writeSecretLines(_ruta(), [linea])
 
 
 def quitar() -> None:
@@ -123,7 +123,7 @@ def cifrar(claves: dict) -> dict | None:
     }
 
 
-def abrir_sin_contrasena(paquete) -> dict | None:
+def abrirSinContrasena(paquete) -> dict | None:
     """Las claves del paquete si son de la contraseña fijada en este servidor, o None."""
     guardada = _leer()
     if guardada is None or not isinstance(paquete, dict):

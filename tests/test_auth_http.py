@@ -5,7 +5,7 @@ el bloqueo por IP, el cifrado de auth.dat y la validación del parámetro `next`
 son código con historia (cada uno arregla un fallo concreto) que hasta ahora
 solo se podía comprobar a mano.
 
-`datos_aislados` mueve AUTH_FILE a tmp_path, así que ningún caso escribe sobre
+`datosAislados` mueve AUTH_FILE a tmp_path, así que ningún caso escribe sobre
 las credenciales reales de quien lance la suite.
 """
 
@@ -19,11 +19,11 @@ CLAVE = "una-contraseña-larga-de-prueba"
 
 
 @pytest.fixture
-def credenciales(datos_aislados, monkeypatch):
+def credenciales(datosAislados, monkeypatch):
     """Escribe unas credenciales conocidas en el AUTH_FILE aislado."""
     from routes import auth
 
-    monkeypatch.setattr(auth, "_AUTH_FILE", datos_aislados["auth"])
+    monkeypatch.setattr(auth, "_AUTH_FILE", datosAislados["auth"])
     # De SECRET_KEY sale el Fernet con el que se cifra auth.dat. Sin ella el
     # fichero se guarda en claro (comportamiento deliberado, para no dejar fuera
     # a quien aún no la tenga configurada), así que aquí hay que fijarla o los
@@ -34,13 +34,13 @@ def credenciales(datos_aislados, monkeypatch):
     # a cambio: lo que se prueba es el flujo, no la dureza del hash.
     monkeypatch.setenv("HASH_ITERACIONES", "100000")
 
-    auth._save_credentials(USUARIO, generate_password_hash(CLAVE, method="pbkdf2:sha256:100000"))
-    return datos_aislados["auth"]
+    auth._saveCredentials(USUARIO, generate_password_hash(CLAVE, method="pbkdf2:sha256:100000"))
+    return datosAislados["auth"]
 
 
 @pytest.fixture
-def cliente(crear_app, credenciales, monkeypatch):
-    from routes.auth import auth_bp
+def cliente(crearApp, credenciales, monkeypatch):
+    from routes.auth import authBp
 
     # El limitador de escrituras no cubre /login (tiene su propio bloqueo), pero
     # sí los endpoints de cambio de credenciales.
@@ -50,13 +50,13 @@ def cliente(crear_app, credenciales, monkeypatch):
     from routes import auth
     auth._attempts.clear()
 
-    app = crear_app(auth_bp)
+    app = crearApp(authBp)
     return app.test_client()
 
 
 # ── Login ────────────────────────────────────────────────────────────────────
 
-def test_login_correcto_abre_sesion(cliente):
+def testLoginCorrectoAbreSesion(cliente):
     respuesta = cliente.post("/login", data={"username": USUARIO, "password": CLAVE})
 
     assert respuesta.status_code == 302
@@ -65,7 +65,7 @@ def test_login_correcto_abre_sesion(cliente):
         assert sesion["logged_in"] is True
 
 
-def test_credenciales_incorrectas_no_abren_sesion(cliente):
+def testCredencialesIncorrectasNoAbrenSesion(cliente):
     respuesta = cliente.post("/login", data={"username": USUARIO, "password": "otra"})
 
     assert respuesta.status_code == 200          # vuelve a pintar el formulario
@@ -74,16 +74,16 @@ def test_credenciales_incorrectas_no_abren_sesion(cliente):
         assert not sesion.get("logged_in")
 
 
-def test_el_error_no_distingue_usuario_de_contrasenia(cliente):
+def testElErrorNoDistingueUsuarioDeContrasenia(cliente):
     """Decir cuál de los dos falla confirma qué usuarios existen."""
-    con_usuario_malo = cliente.post("/login", data={"username": "nadie", "password": CLAVE})
-    con_clave_mala = cliente.post("/login", data={"username": USUARIO, "password": "no"})
+    conUsuarioMalo = cliente.post("/login", data={"username": "nadie", "password": CLAVE})
+    conClaveMala = cliente.post("/login", data={"username": USUARIO, "password": "no"})
 
-    assert "incorrectos" in con_usuario_malo.get_data(as_text=True)
-    assert "incorrectos" in con_clave_mala.get_data(as_text=True)
+    assert "incorrectos" in conUsuarioMalo.get_data(as_text=True)
+    assert "incorrectos" in conClaveMala.get_data(as_text=True)
 
 
-def test_un_usuario_con_acentos_no_provoca_un_500(cliente):
+def testUnUsuarioConAcentosNoProvocaUn500(cliente):
     """`compare_digest` sobre str lanza TypeError con caracteres no ASCII.
 
     Además de devolver 500, ese camino se saltaba el registro del intento
@@ -95,14 +95,14 @@ def test_un_usuario_con_acentos_no_provoca_un_500(cliente):
     assert _registro()  # el intento sí quedó registrado
 
 
-def test_la_pagina_de_login_no_se_guarda_en_cache(cliente):
+def testLaPaginaDeLoginNoSeGuardaEnCache(cliente):
     """Sin esto, el botón "atrás" la mostraba desde la bfcache ya con sesión."""
     cabeceras = cliente.get("/login").headers
 
     assert "no-store" in cabeceras["Cache-Control"]
 
 
-def test_el_script_del_login_lleva_el_nonce_de_la_csp(cliente):
+def testElScriptDelLoginLlevaElNonceDeLaCsp(cliente):
     """El botón de mostrar la contraseña iba en un onclick= y la CSP lo bloqueaba.
 
     Ahora va en un <script nonce>: el nonce del HTML tiene que ser el mismo que
@@ -120,7 +120,7 @@ def test_el_script_del_login_lleva_el_nonce_de_la_csp(cliente):
     assert f"'nonce-{nonce}'" in respuesta.headers["Content-Security-Policy"]
 
 
-def test_con_sesion_abierta_login_devuelve_a_la_aplicacion(cliente):
+def testConSesionAbiertaLoginDevuelveALaAplicacion(cliente):
     with cliente.session_transaction() as sesion:
         sesion["logged_in"] = True
 
@@ -130,13 +130,13 @@ def test_con_sesion_abierta_login_devuelve_a_la_aplicacion(cliente):
     assert respuesta.headers["Location"] == "/"
 
 
-def test_logout_cierra_la_sesion(cliente):
-    from core import sesion as sesion_app
+def testLogoutCierraLaSesion(cliente):
+    from core import sesion as sesionApp
 
     with cliente.session_transaction() as sesion:
         sesion["logged_in"] = True
         sesion["csrf_token"] = "token-de-prueba"
-        sesion_app.abrir(sesion)
+        sesionApp.abrir(sesion)
 
     respuesta = cliente.post("/logout", headers={"X-CSRF-Token": "token-de-prueba"})
 
@@ -145,7 +145,7 @@ def test_logout_cierra_la_sesion(cliente):
         assert not sesion.get("logged_in")
 
 
-def test_la_cookie_de_sesion_es_permanente(cliente):
+def testLaCookieDeSesionEsPermanente(cliente):
     """Sin fecha de caducidad, el navegador la tira al cerrarse —en el móvil,
     solo— y el usuario tenía que volver a entrar cada dos por tres. Cuánto vale
     de verdad lo decide el servidor (core/sesion.py), no esta fecha."""
@@ -166,7 +166,7 @@ def test_la_cookie_de_sesion_es_permanente(cliente):
     "http://evil.com/x",
     "javascript:alert(1)",
 ])
-def test_next_externo_se_descarta(cliente, destino):
+def testNextExternoSeDescarta(cliente, destino):
     """Un redirect abierto convierte el login en una página de phishing."""
     respuesta = cliente.post(
         f"/login?next={destino}", data={"username": USUARIO, "password": CLAVE},
@@ -175,7 +175,7 @@ def test_next_externo_se_descarta(cliente, destino):
 
 
 @pytest.mark.parametrize("destino", ["/metricas", "/html/analisis/metricas.html", "/?tab=activos"])
-def test_next_interno_se_respeta(cliente, destino):
+def testNextInternoSeRespeta(cliente, destino):
     respuesta = cliente.post(
         f"/login?next={destino}", data={"username": USUARIO, "password": CLAVE},
     )
@@ -184,7 +184,7 @@ def test_next_interno_se_respeta(cliente, destino):
 
 # ── Bloqueo por IP ───────────────────────────────────────────────────────────
 
-def test_tras_agotar_los_intentos_la_ip_queda_bloqueada(cliente, monkeypatch):
+def testTrasAgotarLosIntentosLaIpQuedaBloqueada(cliente, monkeypatch):
     monkeypatch.setenv("MAX_INTENTOS_LOGIN", "3")
     ip = {"REMOTE_ADDR": "192.168.1.99"}
 
@@ -199,7 +199,7 @@ def test_tras_agotar_los_intentos_la_ip_queda_bloqueada(cliente, monkeypatch):
         assert not sesion.get("logged_in")
 
 
-def test_el_bloqueo_es_por_ip(cliente, monkeypatch):
+def testElBloqueoEsPorIp(cliente, monkeypatch):
     monkeypatch.setenv("MAX_INTENTOS_LOGIN", "2")
 
     for _ in range(3):
@@ -213,7 +213,7 @@ def test_el_bloqueo_es_por_ip(cliente, monkeypatch):
     assert otra.headers["Location"] == "/"
 
 
-def test_un_login_correcto_limpia_los_fallos_previos(cliente, monkeypatch):
+def testUnLoginCorrectoLimpiaLosFallosPrevios(cliente, monkeypatch):
     monkeypatch.setenv("MAX_INTENTOS_LOGIN", "3")
     ip = {"REMOTE_ADDR": "192.168.1.101"}
 
@@ -223,7 +223,7 @@ def test_un_login_correcto_limpia_los_fallos_previos(cliente, monkeypatch):
     assert "192.168.1.101" not in _registro()
 
 
-def test_el_registro_de_intentos_no_crece_sin_limite(monkeypatch):
+def testElRegistroDeIntentosNoCreceSinLimite(monkeypatch):
     """Con IPs falsificadas el diccionario sería un consumo de memoria abierto."""
     import time
 
@@ -232,14 +232,14 @@ def test_el_registro_de_intentos_no_crece_sin_limite(monkeypatch):
     monkeypatch.setenv("MAX_IPS_VIGILADAS", "20")
     monkeypatch.setenv("BLOQUEO_SEGUNDOS", "1")
     viejos = {f"10.0.0.{i}": [1, time.time() - 100] for i in range(30)}  # ya caducados
-    auth._fichero_intentos().write_text(json.dumps(viejos), encoding="utf-8")
+    auth._ficheroIntentos().write_text(json.dumps(viejos), encoding="utf-8")
 
-    auth._record_failure("10.9.9.9")
+    auth._recordFailure("10.9.9.9")
 
     assert len(_registro()) < 30
 
 
-def test_el_bloqueo_no_depende_de_la_memoria_del_proceso(cliente, monkeypatch):
+def testElBloqueoNoDependeDeLaMemoriaDelProceso(cliente, monkeypatch):
     """Con varios workers cada uno llevaba su cuenta: 8 intentos por worker.
 
     El registro vive ahora en un fichero compartido. Vaciar la memoria del
@@ -260,7 +260,7 @@ def test_el_bloqueo_no_depende_de_la_memoria_del_proceso(cliente, monkeypatch):
 
 # ── Almacenamiento de credenciales ───────────────────────────────────────────
 
-def test_auth_dat_se_guarda_cifrado(credenciales):
+def testAuthDatSeGuardaCifrado(credenciales):
     """El fichero está dentro de data/, que acaba en los backups y en los zips."""
     crudo = credenciales.read_bytes()
 
@@ -270,14 +270,14 @@ def test_auth_dat_se_guarda_cifrado(credenciales):
         json.loads(crudo)
 
 
-def test_un_auth_dat_en_texto_plano_se_migra_al_leerlo(credenciales, monkeypatch):
+def testUnAuthDatEnTextoPlanoSeMigraAlLeerlo(credenciales, monkeypatch):
     """Instalaciones anteriores a que existiera el cifrado deben seguir entrando."""
     from routes import auth
 
     plano = json.dumps({"username": "antiguo", "password_hash": "hash-cualquiera"}).encode()
     credenciales.write_bytes(plano)
 
-    usuario, _hash = auth._load_credentials()
+    usuario, _hash = auth._loadCredentials()
 
     assert usuario == "antiguo"
     # Y al leerlo se ha reescrito ya cifrado, sin pedirle nada al usuario.
@@ -285,35 +285,35 @@ def test_un_auth_dat_en_texto_plano_se_migra_al_leerlo(credenciales, monkeypatch
     assert b"antiguo" not in credenciales.read_bytes()
 
 
-def test_sin_credenciales_no_se_permite_el_acceso(datos_aislados, monkeypatch):
+def testSinCredencialesNoSePermiteElAcceso(datosAislados, monkeypatch):
     """El fallback nunca puede ser admin/admin ni "deja pasar a todos"."""
     from routes import auth
 
-    monkeypatch.setattr(auth, "_AUTH_FILE", datos_aislados["auth"])
+    monkeypatch.setattr(auth, "_AUTH_FILE", datosAislados["auth"])
     monkeypatch.delenv("LOGIN_USERNAME", raising=False)
     monkeypatch.delenv("LOGIN_PASSWORD_HASH", raising=False)
 
-    usuario, password_hash = auth._load_credentials()
+    usuario, passwordHash = auth._loadCredentials()
 
     assert usuario == "__no_user__"
     from werkzeug.security import check_password_hash
     for intento in ("", "admin", "password", "__no_user__"):
-        assert not check_password_hash(password_hash, intento)
+        assert not check_password_hash(passwordHash, intento)
 
 
 # ── Cambio de credenciales ───────────────────────────────────────────────────
 
 @pytest.fixture
-def cliente_dentro(cliente_autenticado, credenciales, monkeypatch):
-    from routes.auth import auth_bp
+def clienteDentro(clienteAutenticado, credenciales, monkeypatch):
+    from routes.auth import authBp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
-    client, cabeceras, _app = cliente_autenticado(auth_bp)
+    client, cabeceras, _app = clienteAutenticado(authBp)
     return client, cabeceras
 
 
-def test_cambiar_contrasenia_exige_la_actual(cliente_dentro):
-    client, cabeceras = cliente_dentro
+def testCambiarContraseniaExigeLaActual(clienteDentro):
+    client, cabeceras = clienteDentro
     respuesta = client.post(
         "/api/settings/credentials/password",
         json={"currentPassword": "la que no es", "newPassword": "nueva-clave-larga"},
@@ -324,10 +324,10 @@ def test_cambiar_contrasenia_exige_la_actual(cliente_dentro):
     assert respuesta.get_json()["ok"] is False
 
 
-def test_cambiar_contrasenia_con_la_actual_correcta(cliente_dentro, credenciales):
+def testCambiarContraseniaConLaActualCorrecta(clienteDentro, credenciales):
     from routes import auth
 
-    client, cabeceras = cliente_dentro
+    client, cabeceras = clienteDentro
     respuesta = client.post(
         "/api/settings/credentials/password",
         json={"currentPassword": CLAVE, "newPassword": "nueva-clave-larga"},
@@ -336,12 +336,12 @@ def test_cambiar_contrasenia_con_la_actual_correcta(cliente_dentro, credenciales
 
     assert respuesta.status_code == 200
     from werkzeug.security import check_password_hash
-    _usuario, nuevo_hash = auth._load_credentials()
-    assert check_password_hash(nuevo_hash, "nueva-clave-larga")
+    _usuario, nuevoHash = auth._loadCredentials()
+    assert check_password_hash(nuevoHash, "nueva-clave-larga")
 
 
-def test_no_se_admite_una_contrasenia_vacia(cliente_dentro):
-    client, cabeceras = cliente_dentro
+def testNoSeAdmiteUnaContraseniaVacia(clienteDentro):
+    client, cabeceras = clienteDentro
     respuesta = client.post(
         "/api/settings/credentials/password",
         json={"currentPassword": CLAVE, "newPassword": ""},
@@ -351,11 +351,11 @@ def test_no_se_admite_una_contrasenia_vacia(cliente_dentro):
     assert respuesta.status_code == 400
 
 
-def test_cambiar_usuario_conserva_el_hash_de_la_contrasenia(cliente_dentro):
+def testCambiarUsuarioConservaElHashDeLaContrasenia(clienteDentro):
     from routes import auth
 
-    client, cabeceras = cliente_dentro
-    _usuario, hash_previo = auth._load_credentials()
+    client, cabeceras = clienteDentro
+    _usuario, hashPrevio = auth._loadCredentials()
 
     respuesta = client.post(
         "/api/settings/credentials/username",
@@ -364,15 +364,15 @@ def test_cambiar_usuario_conserva_el_hash_de_la_contrasenia(cliente_dentro):
     )
 
     assert respuesta.status_code == 200
-    usuario, hash_nuevo = auth._load_credentials()
+    usuario, hashNuevo = auth._loadCredentials()
     assert usuario == "nuevo"
-    assert hash_nuevo == hash_previo
+    assert hashNuevo == hashPrevio
 
 
-def test_cambiar_credenciales_sin_sesion_es_401(crear_app, credenciales):
-    from routes.auth import auth_bp
+def testCambiarCredencialesSinSesionEs401(crearApp, credenciales):
+    from routes.auth import authBp
 
-    client = crear_app(auth_bp).test_client()
+    client = crearApp(authBp).test_client()
     respuesta = client.post(
         "/api/settings/credentials/password",
         json={"currentPassword": CLAVE, "newPassword": "otra-clave-larga"},
@@ -381,10 +381,10 @@ def test_cambiar_credenciales_sin_sesion_es_401(crear_app, credenciales):
     assert respuesta.status_code == 401
 
 
-def test_cambiar_credenciales_sin_csrf_es_403(cliente_autenticado, credenciales):
-    from routes.auth import auth_bp
+def testCambiarCredencialesSinCsrfEs403(clienteAutenticado, credenciales):
+    from routes.auth import authBp
 
-    client, _cabeceras, _app = cliente_autenticado(auth_bp)
+    client, _cabeceras, _app = clienteAutenticado(authBp)
     respuesta = client.post(
         "/api/settings/credentials/password",
         json={"currentPassword": CLAVE, "newPassword": "otra-clave-larga"},
@@ -400,15 +400,15 @@ def telegram(credenciales, monkeypatch):
     """Telegram configurado sobre las rutas aisladas; devuelve lo que se enviaría."""
     from core import telegram_notifier
 
-    telegram_notifier.reiniciar_para_pruebas()
+    telegram_notifier.reiniciarParaPruebas()
     telegram_notifier.escribirConfig("123456:ABC-token", "987654321")
     mensajes = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chat, texto: mensajes.append(texto))
     yield mensajes
-    telegram_notifier.reiniciar_para_pruebas()
+    telegram_notifier.reiniciarParaPruebas()
 
 
-def test_el_bloqueo_de_una_ip_se_cuenta_una_sola_vez(cliente, telegram, monkeypatch):
+def testElBloqueoDeUnaIpSeCuentaUnaSolaVez(cliente, telegram, monkeypatch):
     monkeypatch.setenv("MAX_INTENTOS_LOGIN", "3")
     ip = {"REMOTE_ADDR": "192.168.1.99"}
 
@@ -419,7 +419,7 @@ def test_el_bloqueo_de_una_ip_se_cuenta_una_sola_vez(cliente, telegram, monkeypa
     assert "192.168.1.99" in telegram[0] and "bloqueado" in telegram[0].lower()
 
 
-def test_los_fallos_sueltos_no_avisan(cliente, telegram, monkeypatch):
+def testLosFallosSueltosNoAvisan(cliente, telegram, monkeypatch):
     monkeypatch.setenv("MAX_INTENTOS_LOGIN", "5")
 
     for _ in range(4):
@@ -428,11 +428,11 @@ def test_los_fallos_sueltos_no_avisan(cliente, telegram, monkeypatch):
     assert telegram == []
 
 
-def test_el_login_correcto_solo_avisa_si_se_ha_pedido(cliente, telegram, datos_aislados):
+def testElLoginCorrectoSoloAvisaSiSeHaPedido(cliente, telegram, datosAislados):
     cliente.post("/login", data={"username": USUARIO, "password": CLAVE})
     assert telegram == [], "por defecto avisar de cada login sería ruido"
 
-    datos_aislados["ajustes"].write_text(json.dumps({"telegramAvisos": {"sesion": True}}), "utf-8")
+    datosAislados["ajustes"].write_text(json.dumps({"telegramAvisos": {"sesion": True}}), "utf-8")
     with cliente.session_transaction() as sesion:
         sesion.clear()
     cliente.post("/login", data={"username": USUARIO, "password": CLAVE})
@@ -440,8 +440,8 @@ def test_el_login_correcto_solo_avisa_si_se_ha_pedido(cliente, telegram, datos_a
     assert len(telegram) == 1 and "Inicio de sesión" in telegram[0]
 
 
-def test_cambiar_la_contrasenia_se_cuenta(cliente_dentro, telegram):
-    client, cabeceras = cliente_dentro
+def testCambiarLaContraseniaSeCuenta(clienteDentro, telegram):
+    client, cabeceras = clienteDentro
     client.post(
         "/api/settings/credentials/password",
         json={"currentPassword": CLAVE, "newPassword": "nueva-clave-larga"},
@@ -451,8 +451,8 @@ def test_cambiar_la_contrasenia_se_cuenta(cliente_dentro, telegram):
     assert len(telegram) == 1 and "contraseña" in telegram[0]
 
 
-def test_una_contrasenia_actual_incorrecta_no_avisa_del_cambio(cliente_dentro, telegram):
-    client, cabeceras = cliente_dentro
+def testUnaContraseniaActualIncorrectaNoAvisaDelCambio(clienteDentro, telegram):
+    client, cabeceras = clienteDentro
     client.post(
         "/api/settings/credentials/password",
         json={"currentPassword": "mal", "newPassword": "nueva-clave-larga"},
@@ -466,5 +466,5 @@ def _registro():
     """El registro de intentos de login tal como lo ven todos los workers."""
     from routes import auth
 
-    ruta = auth._fichero_intentos()
+    ruta = auth._ficheroIntentos()
     return json.loads(ruta.read_text("utf-8")) if ruta.exists() else {}

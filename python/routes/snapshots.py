@@ -6,15 +6,15 @@ import time
 from flask import Blueprint, jsonify, request
 
 from core import dinero, rentabilidad, settings
-from core.db import get_db, transaction
-from routes.ajustes import DEFAULT_SNAPSHOT_MINUTES, _read_ajustes
+from core.db import getDb, transaction
+from routes.ajustes import DEFAULT_SNAPSHOT_MINUTES, _readAjustes
 
 log = logging.getLogger(__name__)
 
-snapshots_bp = Blueprint("snapshots", __name__)
+snapshotsBp = Blueprint("snapshots", __name__)
 
 
-def _interval_seconds() -> int:
+def _intervalSeconds() -> int:
     """Intervalo entre snapshots: lo que pida Ajustes, con un suelo del config.
 
     El intervalo es una preferencia del usuario (Ajustes), pero el suelo es un
@@ -22,16 +22,16 @@ def _interval_seconds() -> int:
     tabla de snapshots.
     """
     try:
-        minutes = int(_read_ajustes().get("snapshotMinutes") or DEFAULT_SNAPSHOT_MINUTES)
+        minutes = int(_readAjustes().get("snapshotMinutes") or DEFAULT_SNAPSHOT_MINUTES)
     except (TypeError, ValueError):
         minutes = DEFAULT_SNAPSHOT_MINUTES
     return max(settings.snapshotIntervaloMinimo(), minutes * 60)
 
-def _same_bucket(ts_a: int, ts_b: int, interval: int) -> bool:
-    return ts_a // interval == ts_b // interval
+def _sameBucket(tsA: int, tsB: int, interval: int) -> bool:
+    return tsA // interval == tsB // interval
 
 
-def reservar_bucket(now_ts=None) -> bool:
+def reservarBucket(nowTs=None) -> bool:
     """Reclama el hueco horario actual para el hilo del servidor.
 
     True si lo consigue este proceso, False si ya lo tenía otro. Sin esto, los
@@ -39,17 +39,17 @@ def reservar_bucket(now_ts=None) -> bool:
     la vez para el mismo punto y una de las dos tandas de llamadas se tiraría a
     la basura al perder el INSERT.
 
-    No sustituye a la comprobación de `guardar_snapshot`: esto solo evita el
+    No sustituye a la comprobación de `guardarSnapshot`: esto solo evita el
     trabajo duplicado *antes* de gastar la cuota de API.
     """
-    now_ts = int(now_ts if now_ts is not None else time.time())
-    bucket = now_ts // _interval_seconds()
-    conn   = get_db()
+    nowTs = int(nowTs if nowTs is not None else time.time())
+    bucket = nowTs // _intervalSeconds()
+    conn   = getDb()
 
     conn.execute("BEGIN IMMEDIATE")
     try:
         cur = conn.execute(
-            "INSERT OR IGNORE INTO snapshot_jobs (bucket, ts) VALUES (?, ?)", (bucket, now_ts)
+            "INSERT OR IGNORE INTO snapshot_jobs (bucket, ts) VALUES (?, ?)", (bucket, nowTs)
         )
         # La tabla es un cerrojo, no un histórico: solo interesa el pasado
         # inmediato para que un reloj que retrocede unos segundos no vuelva a
@@ -62,7 +62,7 @@ def reservar_bucket(now_ts=None) -> bool:
         raise
 
 
-def _a_real(value):
+def _aReal(value):
     """Importe listo para una columna REAL, o `None` si no se entiende.
 
     Las columnas del histórico son REAL, así que el punto acaba en coma
@@ -85,7 +85,7 @@ def _a_real(value):
     return float(dinero.redondear(numero))
 
 
-def guardar_snapshot(total_value, total_invested, assets=(), now_ts=None) -> bool:
+def guardarSnapshot(totalValue, totalInvested, assets=(), nowTs=None) -> bool:
     """Escribe un punto del histórico si el hueco horario sigue libre.
 
     Devuelve True si se guardó y False si ya había un snapshot en el mismo
@@ -95,22 +95,22 @@ def guardar_snapshot(total_value, total_invested, assets=(), now_ts=None) -> boo
     en la que ambos veían el bucket vacío y se guardaban dos puntos casi
     simultáneos.
     """
-    now_ts   = int(now_ts if now_ts is not None else time.time())
-    interval = _interval_seconds()
-    conn     = get_db()
+    nowTs   = int(nowTs if nowTs is not None else time.time())
+    interval = _intervalSeconds()
+    conn     = getDb()
 
     conn.execute("BEGIN IMMEDIATE")
     try:
         last = conn.execute(
             "SELECT ts FROM portfolio_snapshots ORDER BY ts DESC LIMIT 1"
         ).fetchone()
-        if last and _same_bucket(now_ts, last["ts"], interval):
+        if last and _sameBucket(nowTs, last["ts"], interval):
             conn.rollback()
             return False
 
         conn.execute(
             "INSERT INTO portfolio_snapshots (ts, total_value, total_invested) VALUES (?, ?, ?)",
-            (now_ts, _a_real(total_value) or 0.0, _a_real(total_invested) or 0.0)
+            (nowTs, _aReal(totalValue) or 0.0, _aReal(totalInvested) or 0.0)
         )
 
         # Guardar valor en EUR por activo para histórico del heatmap
@@ -118,12 +118,12 @@ def guardar_snapshot(total_value, total_invested, assets=(), now_ts=None) -> boo
             if not isinstance(a, dict):
                 continue
             aid = str(a.get("id") or "").strip()
-            v   = _a_real(a.get("v") or 0)
-            c   = _a_real(a.get("c") or 0)
+            v   = _aReal(a.get("v") or 0)
+            c   = _aReal(a.get("c") or 0)
             if aid and v is not None and v > 0:
                 conn.execute(
                     "INSERT INTO asset_snapshots (ts, asset_id, price_eur, cost_eur) VALUES (?, ?, ?, ?)",
-                    (now_ts, aid, v, c or 0.0)
+                    (nowTs, aid, v, c or 0.0)
                 )
 
         conn.commit()
@@ -133,18 +133,18 @@ def guardar_snapshot(total_value, total_invested, assets=(), now_ts=None) -> boo
         raise
 
 
-@snapshots_bp.route("/api/portfolio/snapshot", methods=["POST"])
-def save_snapshot():
+@snapshotsBp.route("/api/portfolio/snapshot", methods=["POST"])
+def saveSnapshot():
     body           = request.get_json(silent=True) or {}
-    frontend_value = body.get("total_value")
-    frontend_inv   = body.get("total_invested")
+    frontendValue = body.get("total_value")
+    frontendInv   = body.get("total_invested")
 
-    if frontend_value is None or frontend_inv is None:
+    if frontendValue is None or frontendInv is None:
         return jsonify({"ok": True, "skipped": True})
 
-    total_value    = _a_real(frontend_value)
-    total_invested = _a_real(frontend_inv)
-    if total_value is None or total_invested is None:
+    totalValue    = _aReal(frontendValue)
+    totalInvested = _aReal(frontendInv)
+    if totalValue is None or totalInvested is None:
         return jsonify({"ok": False, "error": "Valores numéricos inválidos"}), 400
 
     assets = body.get("assets")
@@ -154,27 +154,27 @@ def save_snapshot():
     # El frontend envía netoEur recién calculado con precios de mercado frescos,
     # así que su punto vale igual que el del hilo del servidor: gana el primero
     # que llegue al bucket.
-    guardado = guardar_snapshot(total_value, total_invested, assets)
+    guardado = guardarSnapshot(totalValue, totalInvested, assets)
     if not guardado:
         return jsonify({"ok": True, "skipped": True})
 
-    return jsonify({"ok": True, "skipped": False, "total_value": total_value, "total_invested": total_invested})
+    return jsonify({"ok": True, "skipped": False, "total_value": totalValue, "total_invested": totalInvested})
 
 
-@snapshots_bp.route("/api/portfolio/history", methods=["GET"])
-def get_history():
-    range_param = request.args.get("range", "1M")
-    now_ts      = int(time.time())
+@snapshotsBp.route("/api/portfolio/history", methods=["GET"])
+def getHistory():
+    rangeParam = request.args.get("range", "1M")
+    nowTs      = int(time.time())
 
-    range_map = {
+    rangeMap = {
         "1D": 86400, "1W": 7*86400, "1M": 30*86400,
         "3M": 90*86400, "6M": 180*86400, "1Y": 365*86400,
         "ALL": None, "YTD": None,
     }
-    seconds = range_map.get(range_param, 30 * 86400)
+    seconds = rangeMap.get(rangeParam, 30 * 86400)
 
-    conn = get_db()
-    if range_param == "YTD":
+    conn = getDb()
+    if rangeParam == "YTD":
         jan1 = int(datetime.datetime(datetime.datetime.now().year, 1, 1).timestamp())
         rows = conn.execute(
             "SELECT ts, total_value, total_invested FROM portfolio_snapshots "
@@ -187,28 +187,28 @@ def get_history():
     else:
         rows = conn.execute(
             "SELECT ts, total_value, total_invested FROM portfolio_snapshots "
-            "WHERE ts >= ? ORDER BY ts ASC", (now_ts - seconds,)
+            "WHERE ts >= ? ORDER BY ts ASC", (nowTs - seconds,)
         ).fetchall()
 
     return jsonify({
-        "ok": True, "range": range_param,
+        "ok": True, "range": rangeParam,
         "data": [{"ts": r["ts"], "v": r["total_value"], "i": r["total_invested"]} for r in rows]
     })
 
 
-@snapshots_bp.route("/api/portfolio/history/by-type", methods=["GET"])
-def get_history_by_type():
-    range_param = request.args.get("range", "1M")
-    now_ts      = int(time.time())
+@snapshotsBp.route("/api/portfolio/history/by-type", methods=["GET"])
+def getHistoryByType():
+    rangeParam = request.args.get("range", "1M")
+    nowTs      = int(time.time())
 
-    range_map = {
+    rangeMap = {
         "1D": 86400, "1W": 7*86400, "1M": 30*86400,
         "3M": 90*86400, "6M": 180*86400, "1Y": 365*86400,
         "ALL": None, "YTD": None,
     }
-    seconds = range_map.get(range_param, 30 * 86400)
+    seconds = rangeMap.get(rangeParam, 30 * 86400)
 
-    conn = get_db()
+    conn = getDb()
     _SQL = """SELECT s.ts, a.type, SUM(s.price_eur) as v, SUM(s.cost_eur) as cost
               FROM asset_snapshots s
               JOIN activos a ON s.asset_id = a.id
@@ -216,69 +216,69 @@ def get_history_by_type():
               GROUP BY s.ts, a.type
               ORDER BY s.ts ASC"""
 
-    if range_param == "YTD":
+    if rangeParam == "YTD":
         jan1 = int(datetime.datetime(datetime.datetime.now().year, 1, 1).timestamp())
         rows = conn.execute(_SQL.format(where="s.ts >= ? AND"), (jan1,)).fetchall()
     elif seconds is None:
         rows = conn.execute(_SQL.format(where="")).fetchall()
     else:
-        rows = conn.execute(_SQL.format(where="s.ts >= ? AND"), (now_ts - seconds,)).fetchall()
+        rows = conn.execute(_SQL.format(where="s.ts >= ? AND"), (nowTs - seconds,)).fetchall()
 
-    ts_map = {}
+    tsMap = {}
     for r in rows:
         ts = r["ts"]
-        if ts not in ts_map:
-            ts_map[ts] = {}
-        ts_map[ts][r["type"]]          = round(r["v"], 2)
-        ts_map[ts][f"c_{r['type']}"]   = round(r["cost"] or 0, 2)
+        if ts not in tsMap:
+            tsMap[ts] = {}
+        tsMap[ts][r["type"]]          = round(r["v"], 2)
+        tsMap[ts][f"c_{r['type']}"]   = round(r["cost"] or 0, 2)
 
-    data = [{"ts": ts, **types} for ts, types in sorted(ts_map.items())]
-    return jsonify({"ok": True, "range": range_param, "data": data})
+    data = [{"ts": ts, **types} for ts, types in sorted(tsMap.items())]
+    return jsonify({"ok": True, "range": rangeParam, "data": data})
 
 
-@snapshots_bp.route("/api/portfolio/rentabilidad", methods=["GET"])
-def get_rentabilidad():
+@snapshotsBp.route("/api/portfolio/rentabilidad", methods=["GET"])
+def getRentabilidad():
     """TWR, XIRR, drawdown y volatilidad sobre todo el histórico.
 
     Acepta `value`/`invested` para clavar el último punto con lo que el
     frontend tiene en pantalla: los snapshots se guardan cada pocos minutos y
     sin esto las KPIs de rentabilidad no cuadrarían con las de arriba.
     """
-    conn = get_db()
+    conn = getDb()
     rows = conn.execute(
         "SELECT ts, total_value, total_invested FROM portfolio_snapshots ORDER BY ts ASC"
     ).fetchall()
     snaps = [{"ts": r["ts"], "v": r["total_value"], "i": r["total_invested"]} for r in rows]
 
-    valor_vivo     = _a_real(request.args.get("value"))
-    invertido_vivo = _a_real(request.args.get("invested"))
-    if valor_vivo is not None and invertido_vivo is not None:
+    valorVivo     = _aReal(request.args.get("value"))
+    invertidoVivo = _aReal(request.args.get("invested"))
+    if valorVivo is not None and invertidoVivo is not None:
         ahora = int(time.time())
         # Mismo criterio que el gráfico de evolución: si el último snapshot es
         # de hace nada, se sustituye en vez de añadir un punto pegado a él.
         if snaps and ahora - snaps[-1]["ts"] < 120:
-            snaps[-1] = {"ts": ahora, "v": valor_vivo, "i": invertido_vivo}
+            snaps[-1] = {"ts": ahora, "v": valorVivo, "i": invertidoVivo}
         else:
-            snaps.append({"ts": ahora, "v": valor_vivo, "i": invertido_vivo})
+            snaps.append({"ts": ahora, "v": valorVivo, "i": invertidoVivo})
 
     datos = rentabilidad.resumen(snaps)
     return jsonify({"ok": True, **datos})
 
 
-def _safety_copy_snapshots():
+def _safetyCopySnapshots():
     """Vuelca los snapshots a JSON antes de un borrado destructivo."""
-    from core.db import get_active_db_path
+    from core.db import getActiveDbPath
     try:
-        conn = get_db()
+        conn = getDb()
         rows = conn.execute(
             "SELECT ts, total_value, total_invested FROM portfolio_snapshots ORDER BY ts"
         ).fetchall()
         if not rows:
             return None
-        base = get_active_db_path().parent.parent / "pre_restore"
+        base = getActiveDbPath().parent.parent / "pre_restore"
         base.mkdir(parents=True, exist_ok=True)
         stamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        dest = base / f"snapshots_{get_active_db_path().stem}_{stamp}.json"
+        dest = base / f"snapshots_{getActiveDbPath().stem}_{stamp}.json"
         dest.write_text(
             json.dumps([{"ts": r["ts"], "v": r["total_value"], "i": r["total_invested"]} for r in rows],
                        ensure_ascii=False),
@@ -291,8 +291,8 @@ def _safety_copy_snapshots():
         return None
 
 
-@snapshots_bp.route("/api/snapshots/purge", methods=["POST"])
-def purge_snapshots():
+@snapshotsBp.route("/api/snapshots/purge", methods=["POST"])
+def purgeSnapshots():
     body = request.get_json(silent=True) or {}
     try:
         days = int(body.get("days", 0))
@@ -308,7 +308,7 @@ def purge_snapshots():
                 "ok": False,
                 "error": "Para borrar todo el histórico envía confirm='BORRAR TODO'",
             }), 400
-        safety = _safety_copy_snapshots()
+        safety = _safetyCopySnapshots()
         with transaction() as conn:
             cur = conn.execute("DELETE FROM portfolio_snapshots")
             conn.execute("DELETE FROM asset_snapshots")

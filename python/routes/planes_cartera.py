@@ -15,10 +15,10 @@ Las operaciones se guardan por referencia: crear una desde el plan es crearla en
 from flask import Blueprint, jsonify
 
 from core.errors import ValidationError
-from core.validation import as_bool, as_rows, as_text, json_body
-from stores.planes_cartera_store import read_planes_cartera, write_planes_cartera
+from core.validation import asBool, asRows, asText, jsonBody
+from stores.planes_cartera_store import readPlanesCartera, writePlanesCartera
 
-planes_cartera_bp = Blueprint("planes_cartera", __name__)
+planesCarteraBp = Blueprint("planes_cartera", __name__)
 
 _MAX_NOMBRE = 120
 _MAX_ACTIVOS = 200
@@ -35,39 +35,39 @@ def _lista(valor, campo, maximo):
     return valor
 
 
-def _sanear_activo(fila, campo):
+def _sanearActivo(fila, campo):
     if not isinstance(fila, dict):
         raise ValidationError(f"«{campo}» debe ser un objeto", field=campo)
     return {
-        "assetId": as_text(fila.get("assetId"), "assetId", max_length=120, required=True),
+        "assetId": asText(fila.get("assetId"), "assetId", maxLength=120, required=True),
         "operaciones": [
-            as_text(operacion_id, "operaciones", max_length=120, required=True)
-            for operacion_id in _lista(fila.get("operaciones"), f"{campo}.operaciones", _MAX_OPERACIONES)
+            asText(operacionId, "operaciones", maxLength=120, required=True)
+            for operacionId in _lista(fila.get("operaciones"), f"{campo}.operaciones", _MAX_OPERACIONES)
         ],
     }
 
 
-def _sanear_plan(fila, indice):
+def _sanearPlan(fila, indice):
     campo = f"rows[{indice}].activos"
     return {
-        "id":        as_text(fila.get("id"), "id", max_length=64) or f"plan-cartera-{indice + 1}",
-        "nombre":    as_text(fila.get("nombre"), "nombre", max_length=_MAX_NOMBRE) or f"Plan {indice + 1}",
-        "archivado": as_bool(fila.get("archivado")),
+        "id":        asText(fila.get("id"), "id", maxLength=64) or f"plan-cartera-{indice + 1}",
+        "nombre":    asText(fila.get("nombre"), "nombre", maxLength=_MAX_NOMBRE) or f"Plan {indice + 1}",
+        "archivado": asBool(fila.get("archivado")),
         "activos": [
-            _sanear_activo(activo, campo)
+            _sanearActivo(activo, campo)
             for activo in _lista(fila.get("activos"), campo, _MAX_ACTIVOS)
         ],
     }
 
 
-@planes_cartera_bp.route("/api/planes-cartera", methods=["GET"])
+@planesCarteraBp.route("/api/planes-cartera", methods=["GET"])
 def getPlanesCartera():
-    return jsonify(read_planes_cartera())
+    return jsonify(readPlanesCartera())
 
 
-@planes_cartera_bp.route("/api/planes-cartera", methods=["POST"])
+@planesCarteraBp.route("/api/planes-cartera", methods=["POST"])
 def savePlanesCartera():
-    filas = as_rows(json_body().get("rows"), "rows", max_rows=200)
-    saneados = [_sanear_plan(fila, indice) for indice, fila in enumerate(filas)]
-    write_planes_cartera(saneados)
-    return jsonify({"ok": True, "rows": read_planes_cartera()["rows"]})
+    filas = asRows(jsonBody().get("rows"), "rows", maxRows=200)
+    saneados = [_sanearPlan(fila, indice) for indice, fila in enumerate(filas)]
+    writePlanesCartera(saneados)
+    return jsonify({"ok": True, "rows": readPlanesCartera()["rows"]})

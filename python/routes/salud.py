@@ -27,7 +27,7 @@ from core.version import __version__
 
 log = logging.getLogger(__name__)
 
-salud_bp = Blueprint("salud", __name__)
+saludBp = Blueprint("salud", __name__)
 
 # Momento de importación del módulo, que en la práctica es el arranque del
 # worker. Sirve para distinguir "lleva días en pie" de "se acaba de reiniciar
@@ -35,7 +35,7 @@ salud_bp = Blueprint("salud", __name__)
 _ARRANQUE = time.monotonic()
 
 
-def _comprobar_bd():
+def _comprobarBd():
     """(sano, detalle) de la base de datos activa.
 
     Se usa `PRAGMA quick_check` y no `integrity_check`: el rápido recorre la
@@ -46,13 +46,13 @@ def _comprobar_bd():
     """
     detalle = {}
     try:
-        conexion = db.get_db()
+        conexion = db.getDb()
         conexion.execute("SELECT 1").fetchone()
 
         resultado = conexion.execute("PRAGMA quick_check(1)").fetchone()
-        estado_bd = (resultado[0] if resultado else "sin respuesta").lower()
-        if estado_bd != "ok":
-            return False, {"bd": "corrupta", "detalle": estado_bd}
+        estadoBd = (resultado[0] if resultado else "sin respuesta").lower()
+        if estadoBd != "ok":
+            return False, {"bd": "corrupta", "detalle": estadoBd}
 
         detalle["esquema"] = conexion.execute("PRAGMA user_version").fetchone()[0]
         detalle["journal_mode"] = conexion.execute("PRAGMA journal_mode").fetchone()[0]
@@ -64,9 +64,9 @@ def _comprobar_bd():
         return False, {"bd": "no disponible", "detalle": str(error)[:200]}
 
 
-@salud_bp.route("/api/health", methods=["GET"])
+@saludBp.route("/api/health", methods=["GET"])
 def getHealth():
-    sano, detalle = _comprobar_bd()
+    sano, detalle = _comprobarBd()
 
     respuesta = {
         "ok": sano,
@@ -79,16 +79,16 @@ def getHealth():
         respuesta["uptime_segundos"] = round(time.monotonic() - _ARRANQUE)
         respuesta["bd"] = detalle
         try:
-            ruta = db.get_active_db_path()
+            ruta = db.getActiveDbPath()
             respuesta["bd"]["ruta"] = str(ruta)
             respuesta["bd"]["tamano_bytes"] = ruta.stat().st_size if ruta.exists() else 0
         except Exception as error:
             respuesta["bd"]["ruta"] = f"no disponible: {error}"
 
         try:
-            from admin.portfolios_manager import get_active_portfolio_id
+            from admin.portfolios_manager import getActivePortfolioId
 
-            respuesta["portfolio_activo"] = get_active_portfolio_id()
+            respuesta["portfolio_activo"] = getActivePortfolioId()
         except Exception as error:
             respuesta["portfolio_activo"] = f"no disponible: {error}"
 

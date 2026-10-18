@@ -140,7 +140,7 @@ def construir(anio, filas, resumen):
 _INICIO_FORMULA = ("=", "+", "-", "@", "\t", "\r")
 
 
-def _texto_csv(valor):
+def _textoCsv(valor):
     """Texto escrito por el usuario, a salvo de ejecutarse como fórmula.
 
     Un activo llamado `=HYPERLINK("http://…";"ver")` salía tal cual en el CSV y
@@ -153,7 +153,7 @@ def _texto_csv(valor):
     return "'" + texto if texto.startswith(_INICIO_FORMULA) else texto
 
 
-def a_csv(informe):
+def aCsv(informe):
     """CSV con separador ';' y coma decimal: lo que espera Excel en español.
 
     Con separador ',' y punto decimal, Excel con configuración regional
@@ -171,9 +171,9 @@ def a_csv(informe):
     escritor.writerow([etiqueta for _clave, etiqueta in COLUMNAS_DETALLE])
     for fila in informe["detalle"]:
         escritor.writerow([
-            _texto_csv(fila.get("fecha", "")) if clave == "fecha" else
-            _texto_csv(fila.get("activo", "")) if clave == "activo" else
-            _texto_csv(fila.get("cantidad", "")) if clave == "cantidad" else
+            _textoCsv(fila.get("fecha", "")) if clave == "fecha" else
+            _textoCsv(fila.get("activo", "")) if clave == "activo" else
+            _textoCsv(fila.get("cantidad", "")) if clave == "cantidad" else
             _es(fila.get(clave))
             for clave, _etiqueta in COLUMNAS_DETALLE
         ])
@@ -214,7 +214,7 @@ def a_csv(informe):
         escritor.writerow(["FILAS EXCLUIDAS DEL CÁLCULO"])
         escritor.writerow(["Fecha", "Elemento patrimonial", "Motivo"])
         for fila in informe["incidencias"]:
-            escritor.writerow([_texto_csv(fila.get("fecha", "")), _texto_csv(fila.get("activo", "")),
+            escritor.writerow([_textoCsv(fila.get("fecha", "")), _textoCsv(fila.get("activo", "")),
                                fila.get("mensaje", "")])
 
     escritor.writerow([])
@@ -267,17 +267,17 @@ button { font: inherit; padding: 8px 16px; border-radius: 8px;
 """
 
 
-def _fila_html(celdas):
+def _filaHtml(celdas):
     return "<tr>" + "".join(celdas) + "</tr>"
 
 
-def _num_html(valor):
+def _numHtml(valor):
     texto = _es(valor)
     clase = "num neg" if texto.startswith("-") else "num"
     return f'<td class="{clase}">{html.escape(texto)}</td>'
 
 
-def a_html(informe, nonce=""):
+def aHtml(informe, nonce=""):
     """Documento completo. `nonce` es el de la CSP de esta petición.
 
     El botón de imprimir se enlaza desde un `<script>` con nonce y no con un
@@ -285,14 +285,14 @@ def a_html(informe, nonce=""):
     'unsafe-inline' en script-src, así que un manejador en el atributo lo
     bloquearía el navegador y el botón no haría nada.
     """
-    atributo_nonce = f' nonce="{html.escape(nonce)}"' if nonce else ""
+    atributoNonce = f' nonce="{html.escape(nonce)}"' if nonce else ""
     partes = [
         f"<title>{html.escape(TITULO)} — {informe['anio']}</title>",
         f"<style>{_ESTILOS}</style>",
         '<div class="acciones">'
         '<button type="button" id="botonImprimir">Imprimir o guardar como PDF</button>'
         "</div>"
-        f"<script{atributo_nonce}>"
+        f"<script{atributoNonce}>"
         'document.getElementById("botonImprimir").addEventListener("click", function () {'
         " window.print() });"
         "</script>",
@@ -316,9 +316,9 @@ def a_html(informe, nonce=""):
                 f'<td>{html.escape(str(fila.get("activo", "")))}</td>',
                 f'<td class="num">{html.escape(str(fila.get("cantidad", "")))}</td>',
             ]
-            celdas += [_num_html(fila.get(clave))
+            celdas += [_numHtml(fila.get(clave))
                        for clave, _e in COLUMNAS_DETALLE[3:]]
-            cuerpo.append(_fila_html(celdas))
+            cuerpo.append(_filaHtml(celdas))
         partes.append(
             f"<table><thead><tr>{cabeceras}</tr></thead>"
             f"<tbody>{''.join(cuerpo)}</tbody></table>"
@@ -328,15 +328,15 @@ def a_html(informe, nonce=""):
 
     # ── Resumen ──
     partes.append("<h2>Resumen del ejercicio</h2>")
-    filas_resumen = []
+    filasResumen = []
     for indice, (concepto, importe) in enumerate(informe["totales"]):
         clase = ' class="total"' if indice >= len(informe["totales"]) - 2 else ""
         signo = "num neg" if importe.startswith("-") else "num"
-        filas_resumen.append(
+        filasResumen.append(
             f"<tr{clase}><td>{html.escape(concepto)}</td>"
             f'<td class="{signo}">{html.escape(importe)}</td></tr>'
         )
-    partes.append(f"<table><tbody>{''.join(filas_resumen)}</tbody></table>")
+    partes.append(f"<table><tbody>{''.join(filasResumen)}</tbody></table>")
 
     # ── Regla de los dos meses ──
     partes.append("<h2>Regla de los dos meses (art. 33.5 LIRPF)</h2>")
@@ -352,7 +352,7 @@ def a_html(informe, nonce=""):
     # ── Arrastres ──
     partes.append("<h2>Saldos negativos pendientes de compensar (art. 49.1.b LIRPF)</h2>")
     if informe["arrastres"]:
-        filas_arrastre = "".join(
+        filasArrastre = "".join(
             f'<tr><td>{html.escape(a["anioOrigen"])}</td>'
             f'<td class="num">{html.escape(_es(a["importe"]))}</td>'
             f'<td>{html.escape(a["ultimoEjercicio"])}</td></tr>'
@@ -362,24 +362,24 @@ def a_html(informe, nonce=""):
             "<table><thead><tr><th>Ejercicio de origen</th>"
             '<th class="num">Importe pendiente</th>'
             "<th>Último ejercicio para aplicarlo</th></tr></thead>"
-            f"<tbody>{filas_arrastre}</tbody></table>"
+            f"<tbody>{filasArrastre}</tbody></table>"
         )
     else:
         partes.append('<p class="vacio">No queda ningún saldo negativo pendiente.</p>')
 
     if informe["compensaciones"]:
         partes.append("<h2>Compensaciones aplicadas en este ejercicio</h2>")
-        filas_comp = "".join(
+        filasComp = "".join(
             f'<tr><td>Saldo negativo de {html.escape(c["anioOrigen"])}</td>'
             f'<td class="num">{html.escape(_es(c["importe"]))}</td></tr>'
             for c in informe["compensaciones"]
         )
-        partes.append(f"<table><tbody>{filas_comp}</tbody></table>")
+        partes.append(f"<table><tbody>{filasComp}</tbody></table>")
 
     # ── Incidencias ──
     if informe["incidencias"]:
         partes.append("<h2>Filas excluidas del cálculo</h2>")
-        filas_inc = "".join(
+        filasInc = "".join(
             f'<tr><td>{html.escape(str(f.get("fecha", "")))}</td>'
             f'<td>{html.escape(str(f.get("activo", "")))}</td>'
             f'<td>{html.escape(str(f.get("mensaje", "")))}</td></tr>'
@@ -387,7 +387,7 @@ def a_html(informe, nonce=""):
         )
         partes.append(
             "<table><thead><tr><th>Fecha</th><th>Elemento patrimonial</th>"
-            f"<th>Motivo</th></tr></thead><tbody>{filas_inc}</tbody></table>"
+            f"<th>Motivo</th></tr></thead><tbody>{filasInc}</tbody></table>"
         )
 
     partes.append(

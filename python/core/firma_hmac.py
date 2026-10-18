@@ -32,7 +32,7 @@ from pathlib import Path
 from core import paths, settings
 from core.bloqueo import BloqueoOcupado, exclusivo
 from core.escritura import escribirJsonAtomico
-from core.secret_store import read_secret_lines, write_secret_lines
+from core.secret_store import readSecretLines, writeSecretLines
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +94,7 @@ def obtenerClaveSecreta():
         return desdeEntorno.encode("utf-8")
 
     ruta = rutaFicheroClave()
-    lineas = read_secret_lines(ruta)
+    lineas = readSecretLines(ruta)
 
     if lineas and lineas[0]:
         return lineas[0].encode("utf-8")
@@ -139,7 +139,7 @@ def escribirClaveNueva(ruta=None):
     """
     destino = ruta or rutaFicheroClave()
     destino.parent.mkdir(parents=True, exist_ok=True)
-    write_secret_lines(destino, [generarClave()])
+    writeSecretLines(destino, [generarClave()])
     return destino
 
 def calcularFirma(mensaje, clave=None):

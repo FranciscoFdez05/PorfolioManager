@@ -1,7 +1,7 @@
 """Endpoints para el Atajo de iOS: alta de movimientos y catálogo de categorías.
 
 Estas rutas no pasan por la sesión de la web app (un Atajo no puede mantener la
-cookie ni el token CSRF), así que están exentas de require_login en server.py y
+cookie ni el token CSRF), así que están exentas de requireLogin en server.py y
 se protegen con dos barreras propias:
 
   1. Filtro de IP (core/red_local.py): solo LAN y WireGuard.
@@ -18,13 +18,13 @@ import time
 from flask import Blueprint, jsonify, request
 
 from admin.portfolios_manager import (
-    find_portfolio_id,
-    get_active_portfolio_id,
-    get_portfolio_db_path,
-    get_portfolios,
+    findPortfolioId,
+    getActivePortfolioId,
+    getPortfolioDbPath,
+    getPortfolios,
 )
 from core import atajo_acceso
-from core.db import open_db_at
+from core.db import openDbAt
 from core.firma_hmac import (
     ErrorFirma,
     calcularFirma,
@@ -34,7 +34,7 @@ from core.firma_hmac import (
     verificarTokenDispositivo,
 )
 from core.red_local import soloRedLocal
-from stores.cuentas_store import ETIQUETAS_TIPO, ID_BANCO, etiquetas_de_cuentas, listar_cuentas
+from stores.cuentas_store import ETIQUETAS_TIPO, ID_BANCO, etiquetasDeCuentas, listarCuentas
 from stores.movimientos_store import (
     TIPOS_VALIDOS,
     DatosMovimientoInvalidos,
@@ -45,20 +45,20 @@ from stores.movimientos_store import (
 
 log = logging.getLogger(__name__)
 
-movimientos_bp = Blueprint("movimientos", __name__)
+movimientosBp = Blueprint("movimientos", __name__)
 
 # Se avisa una vez por proceso y no en cada alta: con el Atajo en uso diario
 # serían cientos de líneas idénticas al mes y el log dejaría de servir para lo
 # que está. Una vez basta para que quede constancia de con qué política arrancó
 # esto; el estado permanente lo dice el aviso de arranque y el panel.
-_avisado_sin_firma = False
+_avisadoSinFirma = False
 
 
 def _avisarSinFirma() -> None:
-    global _avisado_sin_firma
-    if _avisado_sin_firma:
+    global _avisadoSinFirma
+    if _avisadoSinFirma:
         return
-    _avisado_sin_firma = True
+    _avisadoSinFirma = True
     log.warning(
         "[movimientos] Peticiones aceptadas SIN firma (Ajustes > API): la unica "
         "barrera es la red de origen. No se repetira este aviso."
@@ -106,19 +106,19 @@ def _resolverPortfolio(pid):
     if not texto:
         return None, None
 
-    identificador = find_portfolio_id(texto)
+    identificador = findPortfolioId(texto)
 
     if identificador is None:
         log.warning("[movimientos] Portfolio inexistente solicitado: %r", texto)
         return None, (jsonify({"ok": False, "error": f"Portfolio '{texto}' no encontrado"}), 404)
 
     try:
-        return get_portfolio_db_path(identificador), None
+        return getPortfolioDbPath(identificador), None
     except ValueError:
         return None, (jsonify({"ok": False, "error": f"Portfolio '{texto}' no encontrado"}), 404)
 
 
-@movimientos_bp.route("/api/movimiento", methods=["POST"])
+@movimientosBp.route("/api/movimiento", methods=["POST"])
 @soloRedLocal
 @conTokenDeDispositivo
 def createMovimiento():
@@ -152,13 +152,13 @@ def createMovimiento():
             movimiento = sanitizarMovimiento(payload)
             creado = crearMovimiento(movimiento)
         else:
-            with open_db_at(rutaPortfolio) as conn:
+            with openDbAt(rutaPortfolio) as conn:
                 movimiento = sanitizarMovimiento(payload, conn=conn)
                 creado = crearMovimiento(movimiento, conn=conn)
     except DatosMovimientoInvalidos as error:
         return jsonify({"ok": False, "error": str(error)}), 400
 
-    creado["portfolio"] = str(payload.get("portfolio") or "").strip() or (get_active_portfolio_id() or "")
+    creado["portfolio"] = str(payload.get("portfolio") or "").strip() or (getActivePortfolioId() or "")
     log.info(
         "[movimientos] %s registrado en '%s': %s (%s)",
         creado["tipo"], creado["portfolio"], creado["nombre"], creado["cantidad"],
@@ -167,7 +167,7 @@ def createMovimiento():
     return jsonify({"ok": True, "movimiento": creado}), 201
 
 
-@movimientos_bp.route("/api/portfolios-lista", methods=["GET"])
+@movimientosBp.route("/api/portfolios-lista", methods=["GET"])
 @soloRedLocal
 @conTokenDeDispositivo
 def getPortfoliosLista():
@@ -176,7 +176,7 @@ def getPortfoliosLista():
     Cada usuario tiene los suyos y puede crear más desde la web, así que la
     lista se pide en tiempo de ejecución igual que las categorías.
     """
-    meta = get_portfolios() or {}
+    meta = getPortfolios() or {}
     activo = meta.get("active")
 
     portfolios = [
@@ -210,7 +210,7 @@ def getPortfoliosLista():
     })
 
 
-@movimientos_bp.route("/api/cuentas-lista", methods=["GET"])
+@movimientosBp.route("/api/cuentas-lista", methods=["GET"])
 @soloRedLocal
 @conTokenDeDispositivo
 def getCuentasLista():
@@ -229,10 +229,10 @@ def getCuentasLista():
         return errorPortfolio
 
     if rutaPortfolio is None:
-        cuentas = listar_cuentas()
+        cuentas = listarCuentas()
     else:
-        with open_db_at(rutaPortfolio) as conn:
-            cuentas = listar_cuentas(conn)
+        with openDbAt(rutaPortfolio) as conn:
+            cuentas = listarCuentas(conn)
 
     return jsonify({
         "cuentas": [
@@ -247,7 +247,7 @@ def getCuentasLista():
     })
 
 
-@movimientos_bp.route("/api/categorias", methods=["GET"])
+@movimientosBp.route("/api/categorias", methods=["GET"])
 @soloRedLocal
 @conTokenDeDispositivo
 def getCategorias():
@@ -286,11 +286,11 @@ def getCategorias():
 
     if rutaPortfolio is None:
         categorias = leerCategorias()
-        cuentas = etiquetas_de_cuentas()
+        cuentas = etiquetasDeCuentas()
     else:
-        with open_db_at(rutaPortfolio) as conn:
+        with openDbAt(rutaPortfolio) as conn:
             categorias = leerCategorias(conn=conn)
-            cuentas = etiquetas_de_cuentas(conn)
+            cuentas = etiquetasDeCuentas(conn)
 
     todas = sorted(
         {etiqueta for lista in categorias.values() for etiqueta in lista},
@@ -306,7 +306,7 @@ def getCategorias():
     return jsonify(respuesta)
 
 
-@movimientos_bp.route("/api/preparar", methods=["POST"])
+@movimientosBp.route("/api/preparar", methods=["POST"])
 @soloRedLocal
 @conTokenDeDispositivo
 def prepararMovimiento():
@@ -349,7 +349,7 @@ def prepararMovimiento():
         if rutaPortfolio is None:
             sanitizarMovimiento(datos)
         else:
-            with open_db_at(rutaPortfolio) as conn:
+            with openDbAt(rutaPortfolio) as conn:
                 sanitizarMovimiento(datos, conn=conn)
     except DatosMovimientoInvalidos as error:
         return jsonify({"ok": False, "error": str(error)}), 400
@@ -369,7 +369,7 @@ def prepararMovimiento():
     return jsonify({"ok": True, "cuerpo": cuerpo, "firma": firma, "timestamp": str(timestamp)})
 
 
-@movimientos_bp.route("/api/firmar", methods=["POST"])
+@movimientosBp.route("/api/firmar", methods=["POST"])
 @soloRedLocal
 @conTokenDeDispositivo
 def firmarTexto():

@@ -26,13 +26,13 @@ npm run format             # prettier sobre js/ y css/
 
 Los cuatro tienen que pasar; es lo mismo que corre CI.
 
-**Las pruebas no tocan `data/` jamás.** Usan una base temporal vía `set_active_db_path()` y no importan `server`, porque ese módulo inicializa los portfolios reales al importarse: una prueba mal montada te borraría tu propia cartera. Si necesitas la capa HTTP, `tests/conftest.py` da `crear_app` y `cliente_autenticado`.
+**Las pruebas no tocan `data/` jamás.** Usan una base temporal vía `setActiveDbPath()` y no importan `server`, porque ese módulo inicializa los portfolios reales al importarse: una prueba mal montada te borraría tu propia cartera. Si necesitas la capa HTTP, `tests/conftest.py` da `crearApp` y `clienteAutenticado`.
 
 ## Convenciones
 
 **Los comentarios explican el _porqué_, no el _qué_.** Es la convención más visible del repositorio: si abres cualquier módulo verás que los comentarios largos cuentan qué se intentó antes, qué falló y por qué la solución es la que es. Un comentario que repite lo que dice el código sobra; uno que explica por qué el redondeo es `ROUND_HALF_UP` y no el de fábrica, no.
 
-**El código y los comentarios, en español.** Los nombres de funciones de rutas y stores usan `camelCase` por coherencia con el frontend, y `ruff` tiene desactivadas las reglas de nomenclatura por eso.
+**El código y los comentarios, en español.** En Python, funciones, parámetros y variables van en `camelCase`, igual que en el frontend; las constantes, en `MAYÚSCULAS`, y las clases, en `PascalCase`. Los nombres de los ficheros siguen en `snake_case` (en Python) y en `kebab-case` (HTML, JS y CSS). Las excepciones son los nombres que fija una librería (`status_code`, `row_factory`, los fixtures de pytest como `tmp_path`…), las claves de `config.ini` y las del JSON que se guarda o se envía al navegador, que no cambian. `ruff` tiene desactivadas las reglas de nomenclatura por eso.
 
 **El dinero se calcula en `Decimal`.** Toda conversión entre el texto que guarda SQLite y un número pasa por `core/dinero.py`, que es la única que hay. `float()` solo vale al serializar y sobre un valor ya redondeado; `tests/test_frontera_dinero.py` lo comprueba sobre el AST y fallará si se cuela otra.
 

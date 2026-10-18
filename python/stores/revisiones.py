@@ -16,7 +16,7 @@ escritura y con el bloqueo de escritura ya tomado (BEGIN IMMEDIATE): leer la
 revisión fuera dejaría colarse a otra escritura entre la lectura y el guardado.
 """
 
-from core.db import get_db
+from core.db import getDb
 
 AMBITOS = ("gastos", "ingresos")
 
@@ -45,7 +45,7 @@ def leer(conn, ambito, year):
 
 def actual(ambito, year):
     """La revisión del año en la base activa."""
-    return leer(get_db(), ambito, year)
+    return leer(getDb(), ambito, year)
 
 
 def avanzar(conn, ambito, year):
@@ -72,13 +72,13 @@ def comprobar(conn, ambito, year, esperada):
         raise ConflictoRevision(actual)
 
 
-def tomar_bloqueo(conn):
+def tomarBloqueo(conn):
     """Abre la transacción con el bloqueo de escritura ya tomado."""
     if not conn.in_transaction:
         conn.execute("BEGIN IMMEDIATE")
 
 
-def revision_de_peticion(datos):
+def revisionDePeticion(datos):
     """La revisión que manda el cliente: None si no la manda; ValueError si no es un entero."""
     valor = datos.get("revision") if isinstance(datos, dict) else None
     if valor is None:

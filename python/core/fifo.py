@@ -77,12 +77,12 @@ def _dec(value, campo="importe") -> Decimal:
         raise FifoError(str(error)) from error
 
 
-def parse_decimal(value, campo="importe") -> Decimal:
+def parseDecimal(value, campo="importe") -> Decimal:
     """Igual que `_dec`, expuesto para quien construye las operaciones."""
     return _dec(value, campo)
 
 
-def parse_fecha(value, campo="fecha") -> date:
+def parseFecha(value, campo="fecha") -> date:
     """Acepta dd-mm-aaaa, dd/mm/aaaa y aaaa-mm-dd. Estricta a propósito.
 
     Una fecha ilegible rompe el orden FIFO entero, así que no hay valor por
@@ -123,7 +123,7 @@ class Operacion:
     """
 
     ref: str
-    activo_id: str
+    activoId: str
     fecha: date
     tipo: str
     cantidad: Decimal
@@ -133,7 +133,7 @@ class Operacion:
     origen: str = ""                      # "ficha" | "ventas": de dónde salió la fila
     fiscal: bool = True                   # si genera resultado declarable
 
-    def clave_orden(self):
+    def claveOrden(self):
         # Una adquisición del mismo día se coloca antes que la transmisión: no
         # se puede vender por la mañana lo que se compra por la tarde, pero sí
         # al revés, y esta es la lectura que no genera falsos negativos.
@@ -148,22 +148,22 @@ class Lote:
     ref: str
     fecha: date
     cantidad: Decimal
-    coste_total: Decimal
+    costeTotal: Decimal
     restante: Decimal
     origen: str = ""
     # Pérdida cuya imputación quedó aplazada por la regla de antiaplicación
     # (art. 33.5 LIRPF) al ser este lote la recompra que la bloqueó. Se libera
     # cuando el lote se transmite. Lo rellena `core.fiscal_es`.
-    perdida_diferida: Decimal = Decimal("0")
+    perdidaDiferida: Decimal = Decimal("0")
     # Cantidad de este lote ya usada como "recompra" para bloquear una pérdida,
     # para que una sola recompra no bloquee dos minusvalías distintas.
-    bloqueo_usado: Decimal = Decimal("0")
+    bloqueoUsado: Decimal = Decimal("0")
 
     @property
-    def coste_unitario(self) -> Decimal:
+    def costeUnitario(self) -> Decimal:
         if self.cantidad <= 0:
             return Decimal("0")
-        return self.coste_total / self.cantidad
+        return self.costeTotal / self.cantidad
 
 
 @dataclass
@@ -174,10 +174,10 @@ class ConsumoLote:
     qué compras salió, en qué proporción y a qué coste.
     """
 
-    lote_ref: str
-    fecha_adquisicion: date
+    loteRef: str
+    fechaAdquisicion: date
     cantidad: Decimal
-    coste_unitario: Decimal
+    costeUnitario: Decimal
     coste: Decimal
     origen: str = ""
 
@@ -187,30 +187,30 @@ class Resultado:
     """Ganancia o pérdida patrimonial de una transmisión."""
 
     ref: str
-    activo_id: str
+    activoId: str
     fecha: date
     cantidad: Decimal
-    valor_transmision: Decimal
-    coste_adquisicion: Decimal
+    valorTransmision: Decimal
+    costeAdquisicion: Decimal
     ganancia: Decimal
     lotes: list = field(default_factory=list)
-    disponible_antes: Decimal = Decimal("0")
+    disponibleAntes: Decimal = Decimal("0")
     fiscal: bool = True
     origen: str = ""
     incidencia: str = ""
     # Rellenados por `core.fiscal_es` al aplicar la regla de los dos meses.
-    perdida_no_computable: Decimal = Decimal("0")
-    perdida_diferida_liberada: Decimal = Decimal("0")
-    nota_antiaplicacion: str = ""
+    perdidaNoComputable: Decimal = Decimal("0")
+    perdidaDiferidaLiberada: Decimal = Decimal("0")
+    notaAntiaplicacion: str = ""
 
     @property
-    def coste_unitario(self) -> Decimal:
+    def costeUnitario(self) -> Decimal:
         if self.cantidad <= 0:
             return Decimal("0")
-        return self.coste_adquisicion / self.cantidad
+        return self.costeAdquisicion / self.cantidad
 
     @property
-    def ganancia_computable(self) -> Decimal:
+    def gananciaComputable(self) -> Decimal:
         """Ganancia que entra en la declaración del ejercicio.
 
         Se le suma la pérdida que en su día quedó aplazada y que esta
@@ -219,17 +219,17 @@ class Resultado:
         """
         return (
             self.ganancia
-            + self.perdida_no_computable
-            - self.perdida_diferida_liberada
+            + self.perdidaNoComputable
+            - self.perdidaDiferidaLiberada
         )
 
 
 def ordenar(operaciones):
     """Operaciones en orden cronológico estable."""
-    return sorted(operaciones, key=lambda op: op.clave_orden())
+    return sorted(operaciones, key=lambda op: op.claveOrden())
 
 
-def aplicar_fifo(operaciones, perdidas_diferidas=None):
+def aplicarFifo(operaciones, perdidasDiferidas=None):
     """Recorre el histórico de un activo y resuelve cada transmisión por FIFO.
 
     Devuelve `(resultados, lotes_vivos)`. Los resultados salen en el mismo
@@ -248,7 +248,7 @@ def aplicar_fifo(operaciones, perdidas_diferidas=None):
     la cartera en un estado que ya no cuadra con ninguna realidad, y arrastraría
     el error a todas las ventas posteriores.
     """
-    diferidas = perdidas_diferidas or {}
+    diferidas = perdidasDiferidas or {}
     lotes: list[Lote] = []
     resultados: list[Resultado] = []
 
@@ -262,10 +262,10 @@ def aplicar_fifo(operaciones, perdidas_diferidas=None):
                 ref=op.ref,
                 fecha=op.fecha,
                 cantidad=op.cantidad,
-                coste_total=coste,
+                costeTotal=coste,
                 restante=op.cantidad,
                 origen=op.origen,
-                perdida_diferida=diferidas.get(op.ref, Decimal("0")),
+                perdidaDiferida=diferidas.get(op.ref, Decimal("0")),
             ))
             continue
 
@@ -274,33 +274,33 @@ def aplicar_fifo(operaciones, perdidas_diferidas=None):
 
         resultados.append(_transmitir(lotes, op))
 
-    lotes_vivos = [lote for lote in lotes if lote.restante > 0]
-    return resultados, lotes_vivos
+    lotesVivos = [lote for lote in lotes if lote.restante > 0]
+    return resultados, lotesVivos
 
 
 def _transmitir(lotes, op):
     disponible = sum((lote.restante for lote in lotes), Decimal("0"))
     # Valor de transmisión = importe - gastos del transmitente (art. 35.2).
-    valor_transmision = op.importe - op.comision
+    valorTransmision = op.importe - op.comision
 
     if op.cantidad <= 0 or disponible < op.cantidad:
         return Resultado(
             ref=op.ref,
-            activo_id=op.activo_id,
+            activoId=op.activoId,
             fecha=op.fecha,
             cantidad=op.cantidad,
-            valor_transmision=valor_transmision,
-            coste_adquisicion=Decimal("0"),
+            valorTransmision=valorTransmision,
+            costeAdquisicion=Decimal("0"),
             ganancia=Decimal("0"),
-            disponible_antes=disponible,
+            disponibleAntes=disponible,
             fiscal=op.fiscal,
             origen=op.origen,
             incidencia=INCIDENCIA_SIN_LOTES if disponible <= 0 else INCIDENCIA_STOCK,
         )
 
     pendiente = op.cantidad
-    coste_total = Decimal("0")
-    liberada_total = Decimal("0")
+    costeTotal = Decimal("0")
+    liberadaTotal = Decimal("0")
     consumos = []
 
     for lote in lotes:
@@ -310,44 +310,44 @@ def _transmitir(lotes, op):
             continue
 
         tomado = min(lote.restante, pendiente)
-        coste_unitario = lote.coste_unitario
+        costeUnitario = lote.costeUnitario
 
         # La pérdida aplazada del lote viaja con las participaciones: si se
         # transmite la mitad de la recompra, se libera la mitad de la pérdida.
         # Se calcula antes de descontar `restante`, que es sobre lo que queda
         # pendiente de liberar.
-        if lote.perdida_diferida > 0:
-            liberada = lote.perdida_diferida * tomado / lote.restante
-            lote.perdida_diferida -= liberada
-            liberada_total += liberada
+        if lote.perdidaDiferida > 0:
+            liberada = lote.perdidaDiferida * tomado / lote.restante
+            lote.perdidaDiferida -= liberada
+            liberadaTotal += liberada
 
-        coste = coste_unitario * tomado
+        coste = costeUnitario * tomado
         consumos.append(ConsumoLote(
-            lote_ref=lote.ref,
-            fecha_adquisicion=lote.fecha,
+            loteRef=lote.ref,
+            fechaAdquisicion=lote.fecha,
             cantidad=tomado,
-            coste_unitario=coste_unitario,
+            costeUnitario=costeUnitario,
             coste=coste,
             origen=lote.origen,
         ))
 
-        coste_total += coste
+        costeTotal += coste
         lote.restante -= tomado
         pendiente -= tomado
 
     return Resultado(
         ref=op.ref,
-        activo_id=op.activo_id,
+        activoId=op.activoId,
         fecha=op.fecha,
         cantidad=op.cantidad,
-        valor_transmision=valor_transmision,
-        coste_adquisicion=coste_total,
-        ganancia=valor_transmision - coste_total,
+        valorTransmision=valorTransmision,
+        costeAdquisicion=costeTotal,
+        ganancia=valorTransmision - costeTotal,
         lotes=consumos,
-        disponible_antes=disponible,
+        disponibleAntes=disponible,
         fiscal=op.fiscal,
         origen=op.origen,
-        perdida_diferida_liberada=liberada_total,
+        perdidaDiferidaLiberada=liberadaTotal,
     )
 
 
@@ -358,5 +358,5 @@ def cuantizar(value, escala=Decimal("0.01")) -> Decimal:
     return Decimal(value).quantize(escala)
 
 
-def cuantizar_cantidad(value) -> Decimal:
+def cuantizarCantidad(value) -> Decimal:
     return Decimal(value or 0).quantize(_ESCALA).normalize()

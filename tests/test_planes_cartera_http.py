@@ -12,11 +12,11 @@ import pytest
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, temp_db, monkeypatch):
-    from core.db import get_db
-    from routes.planes_cartera import planes_cartera_bp
+def cliente(clienteAutenticado, tempDb, monkeypatch):
+    from core.db import getDb
+    from routes.planes_cartera import planesCarteraBp
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("INSERT INTO activos (id, name) VALUES ('bitcoin', 'Bitcoin')")
     conn.execute("INSERT INTO activos (id, name) VALUES ('sp500', 'S&P 500')")
     conn.executemany(
@@ -31,7 +31,7 @@ def cliente(cliente_autenticado, temp_db, monkeypatch):
     conn.commit()
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
-    client, cabeceras, _app = cliente_autenticado(planes_cartera_bp)
+    client, cabeceras, _app = clienteAutenticado(planesCarteraBp)
     return client, cabeceras
 
 
@@ -53,12 +53,12 @@ def _plan(**cambios):
     return plan
 
 
-def test_sin_planes_la_lista_esta_vacia(cliente):
+def testSinPlanesLaListaEstaVacia(cliente):
     client, _ = cliente
     assert client.get("/api/planes-cartera").get_json() == {"rows": []}
 
 
-def test_un_plan_se_guarda_y_se_recupera_con_sus_activos_y_operaciones(cliente):
+def testUnPlanSeGuardaYSeRecuperaConSusActivosYOperaciones(cliente):
     client, cabeceras = cliente
     respuesta = _guardar(client, cabeceras, _plan())
     assert respuesta.status_code == 200
@@ -67,7 +67,7 @@ def test_un_plan_se_guarda_y_se_recupera_con_sus_activos_y_operaciones(cliente):
     assert guardado == [_plan()]
 
 
-def test_el_orden_de_activos_y_operaciones_es_el_que_llego(cliente):
+def testElOrdenDeActivosYOperacionesEsElQueLlego(cliente):
     client, cabeceras = cliente
     _guardar(client, cabeceras, _plan(activos=[
         {"assetId": "sp500", "operaciones": ["op-sp-1"]},
@@ -79,7 +79,7 @@ def test_el_orden_de_activos_y_operaciones_es_el_que_llego(cliente):
     assert activos[1]["operaciones"] == ["op-btc-2", "op-btc-1"]
 
 
-def test_guardar_reemplaza_la_lista_entera(cliente):
+def testGuardarReemplazaLaListaEntera(cliente):
     client, cabeceras = cliente
     _guardar(client, cabeceras, _plan(id="plan-1"), _plan(id="plan-2", nombre="Otro"))
     _guardar(client, cabeceras, _plan(id="plan-2", nombre="Otro"))
@@ -88,13 +88,13 @@ def test_guardar_reemplaza_la_lista_entera(cliente):
     assert ids == ["plan-2"]
 
 
-def test_archivado_se_conserva_como_booleano(cliente):
+def testArchivadoSeConservaComoBooleano(cliente):
     client, cabeceras = cliente
     _guardar(client, cabeceras, _plan(archivado="1"))
     assert client.get("/api/planes-cartera").get_json()["rows"][0]["archivado"] is True
 
 
-def test_un_activo_que_no_existe_es_un_400(cliente):
+def testUnActivoQueNoExisteEsUn400(cliente):
     client, cabeceras = cliente
     respuesta = _guardar(client, cabeceras, _plan(activos=[{"assetId": "oro", "operaciones": []}]))
 
@@ -104,7 +104,7 @@ def test_un_activo_que_no_existe_es_un_400(cliente):
     assert client.get("/api/planes-cartera").get_json() == {"rows": []}
 
 
-def test_una_operacion_que_ya_no_existe_se_descarta_al_guardar(cliente):
+def testUnaOperacionQueYaNoExisteSeDescartaAlGuardar(cliente):
     client, cabeceras = cliente
     _guardar(client, cabeceras, _plan(activos=[
         {"assetId": "bitcoin", "operaciones": ["op-btc-1", "op-borrada", "op-btc-2"]},
@@ -114,7 +114,7 @@ def test_una_operacion_que_ya_no_existe_se_descarta_al_guardar(cliente):
     assert activos[0]["operaciones"] == ["op-btc-1", "op-btc-2"]
 
 
-def test_activos_y_operaciones_repetidos_se_quedan_con_la_primera_aparicion(cliente):
+def testActivosYOperacionesRepetidosSeQuedanConLaPrimeraAparicion(cliente):
     client, cabeceras = cliente
     _guardar(client, cabeceras, _plan(activos=[
         {"assetId": "bitcoin", "operaciones": ["op-btc-1", "op-btc-1"]},
@@ -125,30 +125,30 @@ def test_activos_y_operaciones_repetidos_se_quedan_con_la_primera_aparicion(clie
     assert activos == [{"assetId": "bitcoin", "operaciones": ["op-btc-1"]}]
 
 
-def test_un_activo_sin_identificador_es_un_400(cliente):
+def testUnActivoSinIdentificadorEsUn400(cliente):
     client, cabeceras = cliente
     respuesta = _guardar(client, cabeceras, _plan(activos=[{"operaciones": []}]))
     assert respuesta.status_code == 400
 
 
-def test_activos_debe_ser_una_lista(cliente):
+def testActivosDebeSerUnaLista(cliente):
     client, cabeceras = cliente
     respuesta = _guardar(client, cabeceras, _plan(activos={"assetId": "bitcoin"}))
     assert respuesta.status_code == 400
 
 
-def test_sin_nombre_el_plan_recibe_uno(cliente):
+def testSinNombreElPlanRecibeUno(cliente):
     client, cabeceras = cliente
     _guardar(client, cabeceras, _plan(nombre="   "))
     assert client.get("/api/planes-cartera").get_json()["rows"][0]["nombre"] == "Plan 1"
 
 
-def test_borrar_el_activo_se_lleva_su_linea_del_plan(cliente):
+def testBorrarElActivoSeLlevaSuLineaDelPlan(cliente):
     client, cabeceras = cliente
     _guardar(client, cabeceras, _plan())
 
-    from core.db import get_db
-    conn = get_db()
+    from core.db import getDb
+    conn = getDb()
     conn.execute("DELETE FROM activos WHERE id = 'sp500'")
     conn.commit()
 
@@ -158,10 +158,10 @@ def test_borrar_el_activo_se_lleva_su_linea_del_plan(cliente):
     assert plan["nombre"] == "Acumular en 2026"
 
 
-def test_una_base_en_la_version_6_recibe_las_tablas(temp_db, tmp_path):
+def testUnaBaseEnLaVersion6RecibeLasTablas(tempDb, tmp_path):
     """La migración 7 crea las tres tablas en una base que venga de la 6.
 
-    `temp_db` no se usa en el cuerpo: está para que la base activa que se
+    `tempDb` no se usa en el cuerpo: está para que la base activa que se
     restaura al final sea la temporal del test y no la real del repositorio.
     """
     import sqlite3
@@ -173,13 +173,13 @@ def test_una_base_en_la_version_6_recibe_las_tablas(temp_db, tmp_path):
         conn.execute("CREATE TABLE activos (id TEXT PRIMARY KEY, name TEXT)")
         conn.execute("PRAGMA user_version = 6")
 
-    original = db.get_active_db_path()
+    original = db.getActiveDbPath()
     try:
-        db.set_active_db_path(ruta)
-        db.init_db()
-        conn = db.get_db()
+        db.setActiveDbPath(ruta)
+        db.initDb()
+        conn = db.getDb()
         tablas = {fila[0] for fila in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert {"planes_cartera", "planes_cartera_activos", "planes_cartera_operaciones"} <= tablas
         assert conn.execute("PRAGMA user_version").fetchone()[0] == db.ESQUEMA_VERSION
     finally:
-        db.set_active_db_path(original)
+        db.setActiveDbPath(original)

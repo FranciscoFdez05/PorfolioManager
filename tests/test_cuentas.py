@@ -8,17 +8,17 @@ HOY = datetime.date(2026, 10, 5)
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, datos_aislados, temp_db, monkeypatch):
-    from routes.ajustes import ajustes_bp
-    from routes.cuenta_ahorro import cuenta_ahorro_bp
-    from routes.cuentas import cuentas_bp
-    from routes.gastos import gastos_bp
-    from routes.ingresos import ingresos_bp
+def cliente(clienteAutenticado, datosAislados, tempDb, monkeypatch):
+    from routes.ajustes import ajustesBp
+    from routes.cuenta_ahorro import cuentaAhorroBp
+    from routes.cuentas import cuentasBp
+    from routes.gastos import gastosBp
+    from routes.ingresos import ingresosBp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
 
-    client, cabeceras, _app = cliente_autenticado(cuentas_bp, cuenta_ahorro_bp, gastos_bp, ingresos_bp, ajustes_bp)
+    client, cabeceras, _app = clienteAutenticado(cuentasBp, cuentaAhorroBp, gastosBp, ingresosBp, ajustesBp)
     return client, cabeceras
 
 
@@ -36,12 +36,12 @@ def _transferir(client, cabeceras, origen, destino, cantidad, fecha="10-03-2026"
     )
 
 
-def _saldo(client, cuenta_id):
+def _saldo(client, cuentaId):
     cuentas = client.get("/api/cuentas").get_json()["cuentas"]
-    return float(next(c for c in cuentas if c["id"] == cuenta_id)["saldo"])
+    return float(next(c for c in cuentas if c["id"] == cuentaId)["saldo"])
 
 
-def _guardar_gastos(client, cabeceras, filas, year="2026", mes="marzo"):
+def _guardarGastos(client, cabeceras, filas, year="2026", mes="marzo"):
     client.post(
         f"/api/gastos/{year}",
         json={"year": year, "months": {mes: {"rows": filas}}},
@@ -51,7 +51,7 @@ def _guardar_gastos(client, cabeceras, filas, year="2026", mes="marzo"):
 
 # ── Cuentas ──────────────────────────────────────────────────────────────────
 
-def test_siempre_existen_la_cuenta_bancaria_y_la_de_ahorro(cliente):
+def testSiempreExistenLaCuentaBancariaYLaDeAhorro(cliente):
     client, _cabeceras = cliente
 
     cuentas = client.get("/api/cuentas").get_json()["cuentas"]
@@ -60,7 +60,7 @@ def test_siempre_existen_la_cuenta_bancaria_y_la_de_ahorro(cliente):
     assert all(c["protegida"] for c in cuentas[:2])
 
 
-def test_se_pueden_crear_cuentas_de_cada_tipo(cliente):
+def testSePuedenCrearCuentasDeCadaTipo(cliente):
     client, cabeceras = cliente
 
     for nombre, tipo in (
@@ -88,21 +88,21 @@ def test_se_pueden_crear_cuentas_de_cada_tipo(cliente):
         {"nombre": "Binance", "tipo": "exchange", "saldoInicial": "abc"},
     ],
 )
-def test_las_cuentas_invalidas_se_rechazan(cliente, cuerpo):
+def testLasCuentasInvalidasSeRechazan(cliente, cuerpo):
     client, cabeceras = cliente
     _cuenta(client, cabeceras, "Binance")
 
     assert client.post("/api/cuentas", json=cuerpo, headers=cabeceras).status_code == 400
 
 
-def test_el_nombre_no_se_repite_aunque_cambien_las_mayusculas(cliente):
+def testElNombreNoSeRepiteAunqueCambienLasMayusculas(cliente):
     client, cabeceras = cliente
     _cuenta(client, cabeceras, "Binance")
 
     assert client.post("/api/cuentas", json={"nombre": "BINANCE", "tipo": "broker"}, headers=cabeceras).status_code == 400
 
 
-def test_renombrar_y_poner_saldo_inicial(cliente):
+def testRenombrarYPonerSaldoInicial(cliente):
     client, cabeceras = cliente
     cuenta = _cuenta(client, cabeceras, "Binance")
 
@@ -115,7 +115,7 @@ def test_renombrar_y_poner_saldo_inicial(cliente):
     assert _saldo(client, cuenta["id"]) == 1500.50
 
 
-def test_la_cuenta_bancaria_se_puede_renombrar_pero_no_eliminar(cliente):
+def testLaCuentaBancariaSePuedeRenombrarPeroNoEliminar(cliente):
     client, cabeceras = cliente
 
     res = client.put("/api/cuentas/banco", json={"nombre": "BBVA nómina"}, headers=cabeceras)
@@ -126,7 +126,7 @@ def test_la_cuenta_bancaria_se_puede_renombrar_pero_no_eliminar(cliente):
     assert client.delete("/api/cuentas/ahorro", headers=cabeceras).status_code == 400
 
 
-def test_la_cuenta_bancaria_puede_volver_a_llamarse_como_al_principio(cliente):
+def testLaCuentaBancariaPuedeVolverALlamarseComoAlPrincipio(cliente):
     client, cabeceras = cliente
     client.put("/api/cuentas/banco", json={"nombre": "BBVA"}, headers=cabeceras)
 
@@ -135,17 +135,17 @@ def test_la_cuenta_bancaria_puede_volver_a_llamarse_como_al_principio(cliente):
     assert res.status_code == 200
 
 
-def test_la_cuenta_bancaria_renombrada_sigue_siendo_la_de_las_filas_sin_cuenta(cliente):
+def testLaCuentaBancariaRenombradaSigueSiendoLaDeLasFilasSinCuenta(cliente):
     client, cabeceras = cliente
     client.put("/api/cuentas/banco", json={"nombre": "BBVA"}, headers=cabeceras)
-    _guardar_gastos(client, cabeceras, [
+    _guardarGastos(client, cabeceras, [
         {"fecha": "12-03-2026", "nombre": "Cena", "tipo": "Comida", "cantidad": "30,00 €"},
     ])
 
     assert _saldo(client, "banco") == -30
 
 
-def test_ninguna_otra_cuenta_puede_llamarse_como_los_alias_de_la_bancaria(cliente):
+def testNingunaOtraCuentaPuedeLlamarseComoLosAliasDeLaBancaria(cliente):
     client, cabeceras = cliente
     client.put("/api/cuentas/banco", json={"nombre": "BBVA"}, headers=cabeceras)
 
@@ -153,7 +153,7 @@ def test_ninguna_otra_cuenta_puede_llamarse_como_los_alias_de_la_bancaria(client
     assert client.post("/api/cuentas", json={"nombre": "BBVA", "tipo": "exchange"}, headers=cabeceras).status_code == 400
 
 
-def test_una_cuenta_con_movimientos_no_se_elimina(cliente):
+def testUnaCuentaConMovimientosNoSeElimina(cliente):
     client, cabeceras = cliente
     usada = _cuenta(client, cabeceras, "Binance")
     vacia = _cuenta(client, cabeceras, "Vacía", "broker")
@@ -165,7 +165,7 @@ def test_una_cuenta_con_movimientos_no_se_elimina(cliente):
 
 # ── Transferencias ───────────────────────────────────────────────────────────
 
-def test_una_transferencia_mueve_el_saldo_de_las_dos_cuentas(cliente):
+def testUnaTransferenciaMueveElSaldoDeLasDosCuentas(cliente):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
 
@@ -176,7 +176,7 @@ def test_una_transferencia_mueve_el_saldo_de_las_dos_cuentas(cliente):
     assert _saldo(client, "banco") == -250.50
 
 
-def test_una_transferencia_no_es_un_gasto_ni_un_ingreso(cliente):
+def testUnaTransferenciaNoEsUnGastoNiUnIngreso(cliente):
     client, cabeceras = cliente
     _transferir(client, cabeceras, "banco", "ahorro", "1000")
 
@@ -197,14 +197,14 @@ def test_una_transferencia_no_es_un_gasto_ni_un_ingreso(cliente):
         {"origen": "banco", "destino": "ahorro", "cantidad": "5", "fecha": "ayer"},
     ],
 )
-def test_las_transferencias_invalidas_se_rechazan(cliente, cuerpo):
+def testLasTransferenciasInvalidasSeRechazan(cliente, cuerpo):
     client, cabeceras = cliente
 
     assert client.post("/api/transferencias", json=cuerpo, headers=cabeceras).status_code == 400
     assert client.get("/api/transferencias").get_json()["transferencias"] == []
 
 
-def test_editar_y_eliminar_una_transferencia(cliente):
+def testEditarYEliminarUnaTransferencia(cliente):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
     t = _transferir(client, cabeceras, "banco", exchange["id"], "100").get_json()["transferencia"]
@@ -225,10 +225,10 @@ def test_editar_y_eliminar_una_transferencia(cliente):
 
 # ── Gastos e ingresos con cuenta ─────────────────────────────────────────────
 
-def test_un_gasto_pagado_con_ahorro_baja_ese_saldo_y_no_el_del_banco(cliente):
+def testUnGastoPagadoConAhorroBajaEseSaldoYNoElDelBanco(cliente):
     client, cabeceras = cliente
     _transferir(client, cabeceras, "banco", "ahorro", "500")
-    _guardar_gastos(client, cabeceras, [
+    _guardarGastos(client, cabeceras, [
         {"fecha": "12-03-2026", "nombre": "Nevera", "tipo": "Casa", "cantidad": "120,00 €", "cuenta": "ahorro"},
         {"fecha": "13-03-2026", "nombre": "Cena", "tipo": "Comida", "cantidad": "30,00 €"},
     ])
@@ -237,9 +237,9 @@ def test_un_gasto_pagado_con_ahorro_baja_ese_saldo_y_no_el_del_banco(cliente):
     assert _saldo(client, "banco") == -500 - 30
 
 
-def test_el_gasto_pagado_con_ahorro_sigue_siendo_un_gasto_de_su_categoria(cliente):
+def testElGastoPagadoConAhorroSigueSiendoUnGastoDeSuCategoria(cliente):
     client, cabeceras = cliente
-    _guardar_gastos(client, cabeceras, [
+    _guardarGastos(client, cabeceras, [
         {"fecha": "12-03-2026", "nombre": "Nevera", "tipo": "Casa", "cantidad": "120,00 €", "cuenta": "ahorro"},
     ])
 
@@ -248,7 +248,7 @@ def test_el_gasto_pagado_con_ahorro_sigue_siendo_un_gasto_de_su_categoria(client
     assert (fila["tipo"], fila["cuenta"]) == ("Casa", "ahorro")
 
 
-def test_un_ingreso_cobrado_en_ahorro_sube_ese_saldo(cliente):
+def testUnIngresoCobradoEnAhorroSubeEseSaldo(cliente):
     client, cabeceras = cliente
     client.post(
         "/api/ingresos/2026",
@@ -262,19 +262,19 @@ def test_un_ingreso_cobrado_en_ahorro_sube_ese_saldo(cliente):
     assert _saldo(client, "banco") == 0
 
 
-def test_una_cuenta_desconocida_en_una_fila_vuelve_a_la_bancaria(cliente):
+def testUnaCuentaDesconocidaEnUnaFilaVuelveALaBancaria(cliente):
     client, cabeceras = cliente
-    _guardar_gastos(client, cabeceras, [
+    _guardarGastos(client, cabeceras, [
         {"fecha": "12-03-2026", "nombre": "x", "tipo": "Casa", "cantidad": "10,00 €", "cuenta": "fantasma"},
     ])
 
     assert client.get("/api/gastos/2026").get_json()["months"]["marzo"]["rows"][0]["cuenta"] == ""
 
 
-def test_una_cuenta_con_gastos_pagados_no_se_elimina(cliente):
+def testUnaCuentaConGastosPagadosNoSeElimina(cliente):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
-    _guardar_gastos(client, cabeceras, [
+    _guardarGastos(client, cabeceras, [
         {"fecha": "12-03-2026", "nombre": "x", "tipo": "Casa", "cantidad": "10,00 €", "cuenta": exchange["id"]},
     ])
 
@@ -283,11 +283,11 @@ def test_una_cuenta_con_gastos_pagados_no_se_elimina(cliente):
 
 # ── Saldos ───────────────────────────────────────────────────────────────────
 
-def test_el_saldo_cuenta_las_mensualidades_y_recurrentes_hasta_el_mes_actual(temp_db):
-    from core.db import get_db
+def testElSaldoCuentaLasMensualidadesYRecurrentesHastaElMesActual(tempDb):
+    from core.db import getDb
     from stores.cuentas_store import saldos
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("INSERT INTO mensualidades (year, nombre, enero, febrero, diciembre) VALUES ('2026', 'Gym', '30,00', '30,00', '30,00')")
     conn.execute("INSERT INTO ingresos_recurrentes (year, nombre, enero, diciembre) VALUES ('2026', 'Nómina', '1.000,00', '1.000,00')")
     conn.commit()
@@ -300,11 +300,11 @@ def test_el_saldo_cuenta_las_mensualidades_y_recurrentes_hasta_el_mes_actual(tem
     assert float(banco["saldo"]) == 940
 
 
-def test_una_mensualidad_con_cuenta_resta_de_esa_cuenta_y_no_de_la_bancaria(temp_db):
-    from core.db import get_db
+def testUnaMensualidadConCuentaRestaDeEsaCuentaYNoDeLaBancaria(tempDb):
+    from core.db import getDb
     from stores.cuentas_store import saldos
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('tarjeta', 'Tarjeta', 'banco', 5)")
     conn.execute("INSERT INTO mensualidades (year, nombre, enero, febrero, cuenta) VALUES ('2026', 'Gym', '30,00', '30,00', 'tarjeta')")
     # Una cuenta que ya no existe vuelve a la bancaria en vez de perder el cargo.
@@ -317,110 +317,110 @@ def test_una_mensualidad_con_cuenta_resta_de_esa_cuenta_y_no_de_la_bancaria(temp
     assert float(resultado["banco"]["salidas"]) == 10
 
 
-def test_un_mes_de_la_mensualidad_puede_cobrarse_con_otra_cuenta(temp_db):
-    from core.db import get_db
+def testUnMesDeLaMensualidadPuedeCobrarseConOtraCuenta(tempDb):
+    from core.db import getDb
     from stores.cuentas_store import saldos
-    from stores.gastos_store import read_gastos_year, sanitize_gastos_payload, write_gastos_year
+    from stores.gastos_store import readGastosYear, sanitizeGastosPayload, writeGastosYear
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('tarjeta', 'Tarjeta', 'banco', 5)")
     conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('santander', 'Santander', 'banco', 6)")
     conn.commit()
-    payload, _ = sanitize_gastos_payload({"year": "2026", "mensualidades": [{
+    payload, _ = sanitizeGastosPayload({"year": "2026", "mensualidades": [{
         "nombre": "Claude", "cuenta": "santander",
         "meses": {"enero": "20,00", "febrero": "20,00", "marzo": "20,00"},
         # Febrero con la tarjeta, marzo con la bancaria (explícita) y abril con una cuenta que no existe.
         "cuentasCobro": {"febrero": "tarjeta", "marzo": "banco", "abril": "borrada"},
     }]})
-    write_gastos_year("2026", payload)
+    writeGastosYear("2026", payload)
 
-    assert read_gastos_year("2026")["mensualidades"][0]["cuentasCobro"] == {"febrero": "tarjeta", "marzo": "banco"}
+    assert readGastosYear("2026")["mensualidades"][0]["cuentasCobro"] == {"febrero": "tarjeta", "marzo": "banco"}
     resultado = saldos(conn, hoy=HOY)
     assert float(resultado["santander"]["salidas"]) == 20
     assert float(resultado["tarjeta"]["salidas"]) == 20
     assert float(resultado["banco"]["salidas"]) == 20
 
 
-def test_un_ingreso_recurrente_con_cuenta_suma_a_esa_cuenta_y_se_guarda(temp_db):
-    from core.db import get_db
+def testUnIngresoRecurrenteConCuentaSumaAEsaCuentaYSeGuarda(tempDb):
+    from core.db import getDb
     from stores.cuentas_store import saldos
-    from stores.ingresos_store import read_ingresos_year, sanitize_ingresos_payload, write_ingresos_year
+    from stores.ingresos_store import readIngresosYear, sanitizeIngresosPayload, writeIngresosYear
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('tarjeta', 'Tarjeta', 'banco', 5)")
     conn.commit()
-    payload, _ = sanitize_ingresos_payload({"year": "2026", "recurrentes": [
+    payload, _ = sanitizeIngresosPayload({"year": "2026", "recurrentes": [
         {"nombre": "Paga", "cuenta": "tarjeta", "meses": {"enero": "200,00", "febrero": "200,00"}},
         {"nombre": "Otra", "cuenta": "no-existe", "meses": {"enero": "50,00"}},
     ]})
-    write_ingresos_year("2026", payload)
+    writeIngresosYear("2026", payload)
 
-    assert {r["nombre"]: r["cuenta"] for r in read_ingresos_year("2026")["recurrentes"]} == {"Paga": "tarjeta", "Otra": ""}
+    assert {r["nombre"]: r["cuenta"] for r in readIngresosYear("2026")["recurrentes"]} == {"Paga": "tarjeta", "Otra": ""}
     resultado = saldos(conn, hoy=HOY)
     assert float(resultado["tarjeta"]["entradas"]) == 400
     assert float(resultado["banco"]["entradas"]) == 50
 
 
-def test_un_mes_del_ingreso_recurrente_puede_entrar_en_otra_cuenta(temp_db):
-    from core.db import get_db
+def testUnMesDelIngresoRecurrentePuedeEntrarEnOtraCuenta(tempDb):
+    from core.db import getDb
     from stores.cuentas_store import saldos
-    from stores.ingresos_store import read_ingresos_year, sanitize_ingresos_payload, write_ingresos_year
+    from stores.ingresos_store import readIngresosYear, sanitizeIngresosPayload, writeIngresosYear
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('tarjeta', 'Tarjeta', 'banco', 5)")
     conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('santander', 'Santander', 'banco', 6)")
     conn.commit()
-    payload, _ = sanitize_ingresos_payload({"year": "2026", "recurrentes": [{
+    payload, _ = sanitizeIngresosPayload({"year": "2026", "recurrentes": [{
         "nombre": "Paga", "cuenta": "santander",
         "meses": {"enero": "100,00", "febrero": "100,00", "marzo": "100,00"},
         "cuentasCobro": {"febrero": "tarjeta", "marzo": "banco", "abril": "borrada"},
     }]})
-    write_ingresos_year("2026", payload)
+    writeIngresosYear("2026", payload)
 
-    assert read_ingresos_year("2026")["recurrentes"][0]["cuentasCobro"] == {"febrero": "tarjeta", "marzo": "banco"}
+    assert readIngresosYear("2026")["recurrentes"][0]["cuentasCobro"] == {"febrero": "tarjeta", "marzo": "banco"}
     resultado = saldos(conn, hoy=HOY)
     assert float(resultado["santander"]["entradas"]) == 100
     assert float(resultado["tarjeta"]["entradas"]) == 100
     assert float(resultado["banco"]["entradas"]) == 100
 
 
-def test_la_cuenta_de_la_mensualidad_se_guarda_y_una_desconocida_vuelve_a_la_bancaria(temp_db):
-    from core.db import get_db
-    from stores.gastos_store import read_gastos_year, sanitize_gastos_payload, write_gastos_year
+def testLaCuentaDeLaMensualidadSeGuardaYUnaDesconocidaVuelveALaBancaria(tempDb):
+    from core.db import getDb
+    from stores.gastos_store import readGastosYear, sanitizeGastosPayload, writeGastosYear
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("INSERT INTO cuentas (id, nombre, tipo, sort_order) VALUES ('tarjeta', 'Tarjeta', 'banco', 5)")
     conn.commit()
-    payload, _ = sanitize_gastos_payload({"year": "2026", "mensualidades": [
+    payload, _ = sanitizeGastosPayload({"year": "2026", "mensualidades": [
         {"nombre": "Gym", "cuenta": "tarjeta"},
         {"nombre": "Cine", "cuenta": "no-existe"},
         {"nombre": "Luz"},
     ]})
-    write_gastos_year("2026", payload)
+    writeGastosYear("2026", payload)
 
-    cuentas = {m["nombre"]: m["cuenta"] for m in read_gastos_year("2026")["mensualidades"]}
+    cuentas = {m["nombre"]: m["cuenta"] for m in readGastosYear("2026")["mensualidades"]}
 
     assert cuentas == {"Gym": "tarjeta", "Cine": "", "Luz": ""}
 
 
-def test_las_filas_futuras_no_mueven_el_saldo_todavia(temp_db):
-    from core.db import get_db
-    from stores.cuentas_store import crear_transferencia, saldos
+def testLasFilasFuturasNoMuevenElSaldoTodavia(tempDb):
+    from core.db import getDb
+    from stores.cuentas_store import crearTransferencia, saldos
 
-    crear_transferencia("banco", "ahorro", "10-12-2026", "100")
-    crear_transferencia("banco", "ahorro", "10-03-2026", "40")
+    crearTransferencia("banco", "ahorro", "10-12-2026", "100")
+    crearTransferencia("banco", "ahorro", "10-03-2026", "40")
 
-    assert float(saldos(get_db(), hoy=HOY)["ahorro"]["saldo"]) == 40
-    assert float(saldos(get_db(), hoy=datetime.date(2026, 12, 20))["ahorro"]["saldo"]) == 140
+    assert float(saldos(getDb(), hoy=HOY)["ahorro"]["saldo"]) == 40
+    assert float(saldos(getDb(), hoy=datetime.date(2026, 12, 20))["ahorro"]["saldo"]) == 140
 
 
 # ── Ventana de ahorro ────────────────────────────────────────────────────────
 
-def test_los_movimientos_de_ahorro_son_transferencias_ingresos_y_gastos_de_esa_cuenta(cliente):
+def testLosMovimientosDeAhorroSonTransferenciasIngresosYGastosDeEsaCuenta(cliente):
     client, cabeceras = cliente
     _transferir(client, cabeceras, "banco", "ahorro", "500", concepto="Aportación")
     _transferir(client, cabeceras, "ahorro", "banco", "50", fecha="11-03-2026")
-    _guardar_gastos(client, cabeceras, [
+    _guardarGastos(client, cabeceras, [
         {"fecha": "12-03-2026", "nombre": "Nevera", "tipo": "Casa", "cantidad": "120,00 €", "cuenta": "ahorro"},
     ])
 
@@ -435,7 +435,7 @@ def test_los_movimientos_de_ahorro_son_transferencias_ingresos_y_gastos_de_esa_c
     assert datos["movimientos"][0]["contraparte"] == "Cuenta bancaria"
 
 
-def test_cada_cuenta_de_ahorro_solo_ve_lo_suyo(cliente):
+def testCadaCuentaDeAhorroSoloVeLoSuyo(cliente):
     client, cabeceras = cliente
     viaje = _cuenta(client, cabeceras, "Viaje", "ahorro")
     _transferir(client, cabeceras, "banco", viaje["id"], "70")
@@ -446,7 +446,7 @@ def test_cada_cuenta_de_ahorro_solo_ve_lo_suyo(cliente):
     assert sorted((m["cuenta"], m["cantidad"]) for m in movs) == [("ahorro", "20,00 €"), (viaje["id"], "70,00 €")]
 
 
-def test_las_cuentas_que_no_son_de_ahorro_no_salen_en_su_ventana(cliente):
+def testLasCuentasQueNoSonDeAhorroNoSalenEnSuVentana(cliente):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
     _transferir(client, cabeceras, "banco", exchange["id"], "70")
@@ -457,7 +457,7 @@ def test_las_cuentas_que_no_son_de_ahorro_no_salen_en_su_ventana(cliente):
     assert datos["movimientos"] == []
 
 
-def test_renombrar_una_cuenta_de_ahorro_mueve_su_configuracion(cliente):
+def testRenombrarUnaCuentaDeAhorroMueveSuConfiguracion(cliente):
     client, cabeceras = cliente
     viaje = _cuenta(client, cabeceras, "Viaje", "ahorro")
     client.post(
@@ -474,36 +474,36 @@ def test_renombrar_una_cuenta_de_ahorro_mueve_su_configuracion(cliente):
 
 # ── Categorías ───────────────────────────────────────────────────────────────
 
-def test_ya_no_hay_categorias_reservadas(cliente):
+def testYaNoHayCategoriasReservadas(cliente):
     client, _cabeceras = cliente
 
     assert client.get("/api/gastos-tipos").get_json()["types"] == []
     assert client.get("/api/ingresos-tipos").get_json()["types"] == []
 
 
-def test_leer_las_cuentas_y_los_saldos_no_deja_una_transaccion_abierta(temp_db):
+def testLeerLasCuentasYLosSaldosNoDejaUnaTransaccionAbierta(tempDb):
     """Una lectura que escribiera dejaría la base bloqueada para los demás hilos."""
-    from core.db import get_db
-    from stores.cuentas_store import listar_cuentas, listar_transferencias, movimientos_de_cuenta, saldos
+    from core.db import getDb
+    from stores.cuentas_store import listarCuentas, listarTransferencias, movimientosDeCuenta, saldos
 
-    conn = get_db()
-    listar_cuentas(conn)
-    listar_transferencias(conn)
+    conn = getDb()
+    listarCuentas(conn)
+    listarTransferencias(conn)
     saldos(conn)
-    movimientos_de_cuenta("ahorro", conn)
+    movimientosDeCuenta("ahorro", conn)
 
     assert conn.in_transaction is False
 
 
-def test_el_saldo_del_mes_arranca_con_lo_ocurrido_en_los_meses_anteriores(temp_db):
-    from core.db import get_db
-    from stores.cuentas_store import saldos_del_mes
+def testElSaldoDelMesArrancaConLoOcurridoEnLosMesesAnteriores(tempDb):
+    from core.db import getDb
+    from stores.cuentas_store import saldosDelMes
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("UPDATE cuentas SET saldo_inicial = '100.00' WHERE id = 'banco'")
     conn.execute("INSERT INTO mensualidades (year, nombre, enero, febrero, marzo) VALUES ('2026', 'Gym', '30,00', '30,00', '30,00')")
     conn.execute("INSERT INTO ingresos_recurrentes (year, nombre, enero, febrero, marzo) VALUES ('2026', 'Nómina', '1.000,00', '1.000,00', '1.000,00')")
     conn.commit()
 
-    assert float(saldos_del_mes("2026", "enero", conn)["banco"]["inicial"]) == 100
-    assert float(saldos_del_mes("2026", "marzo", conn)["banco"]["inicial"]) == 100 + 2 * 970
+    assert float(saldosDelMes("2026", "enero", conn)["banco"]["inicial"]) == 100
+    assert float(saldosDelMes("2026", "marzo", conn)["banco"]["inicial"]) == 100 + 2 * 970

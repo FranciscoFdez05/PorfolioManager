@@ -25,11 +25,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _proyecto(tmp_path, salida_update=""):
+def _proyecto(tmp_path, salidaUpdate=""):
     """Un proyecto de mentira con un docker-update.sh que imprime `salida_update`."""
     (tmp_path / "logs").mkdir()
     actualizar = tmp_path / "docker-update.sh"
-    actualizar.write_text(f"#!/bin/sh\nprintf '%b' '{salida_update}'\n", encoding="utf-8")
+    actualizar.write_text(f"#!/bin/sh\nprintf '%b' '{salidaUpdate}'\n", encoding="utf-8")
     actualizar.chmod(0o755)
     return tmp_path
 
@@ -48,7 +48,7 @@ def _pedir(proyecto):
     (proyecto / "data" / "tmp" / actualizacion.NOMBRE_SOLICITUD).write_text("{}", encoding="utf-8")
 
 
-def test_sin_peticion_deja_constancia_de_que_esta_vivo(tmp_path):
+def testSinPeticionDejaConstanciaDeQueEstaVivo(tmp_path):
     proyecto = _proyecto(tmp_path)
 
     resultado = _ejecutar(proyecto)
@@ -57,7 +57,7 @@ def test_sin_peticion_deja_constancia_de_que_esta_vivo(tmp_path):
     assert _estado(proyecto)["estado"] == "inactivo"
 
 
-def test_no_pisa_un_resultado_real_con_el_de_estar_vivo(tmp_path):
+def testNoPisaUnResultadoRealConElDeEstarVivo(tmp_path):
     proyecto = _proyecto(tmp_path)
     _pedir(proyecto)
     _ejecutar(proyecto)
@@ -68,7 +68,7 @@ def test_no_pisa_un_resultado_real_con_el_de_estar_vivo(tmp_path):
     assert _estado(proyecto)["estado"] == "ok"
 
 
-def test_la_salida_con_colores_y_comillas_sigue_siendo_json_valido(tmp_path):
+def testLaSalidaConColoresYComillasSigueSiendoJsonValido(tmp_path):
     proyecto = _proyecto(tmp_path, r'\033[1;36m── Actualización\033[0m correcta "x" \\ fin\n')
     _pedir(proyecto)
 
@@ -81,7 +81,7 @@ def test_la_salida_con_colores_y_comillas_sigue_siendo_json_valido(tmp_path):
     assert '"x"' in estado["detalle"]
 
 
-def test_un_fallo_se_cuenta_con_su_codigo(tmp_path):
+def testUnFalloSeCuentaConSuCodigo(tmp_path):
     proyecto = _proyecto(tmp_path)
     (proyecto / "docker-update.sh").write_text("#!/bin/sh\necho roto\nexit 3\n", encoding="utf-8")
     _pedir(proyecto)
@@ -94,13 +94,13 @@ def test_un_fallo_se_cuenta_con_su_codigo(tmp_path):
     assert "roto" in estado["detalle"]
 
 
-def test_lo_que_escribe_la_aplicacion_lo_lee_la_aplicacion(tmp_path, datos_aislados):
+def testLoQueEscribeLaAplicacionLoLeeLaAplicacion(tmp_path, datosAislados):
     """El contrato entero: el JSON del script pasa por el lector de `core.actualizacion`."""
     proyecto = _proyecto(tmp_path, r'\033[31mrojo\033[0m\n')
     _pedir(proyecto)
     _ejecutar(proyecto)
 
-    leido = actualizacion._leer_json(proyecto / "data" / "tmp" / actualizacion.NOMBRE_ESTADO)
+    leido = actualizacion._leerJson(proyecto / "data" / "tmp" / actualizacion.NOMBRE_ESTADO)
 
     assert leido is not None
     assert leido["estado"] == "ok"

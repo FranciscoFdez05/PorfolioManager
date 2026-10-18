@@ -13,38 +13,38 @@ from dotenv import load_dotenv
 from flask import Flask, abort, g, make_response, send_from_directory
 
 from admin import avisos_scheduler, snapshot_scheduler, telegram_listener
-from admin.backup_manager import start_scheduler as start_backup_scheduler
-from admin.portfolios_manager import init_portfolios
+from admin.backup_manager import startScheduler as startBackupScheduler
+from admin.portfolios_manager import initPortfolios
 from core import atajo_acceso, csp, paths, seguridad_app, settings, telegram_notifier, tls
-from core.errors import register_error_handlers
+from core.errors import registerErrorHandlers
 from core.paths import API_DIR, BASE_DIR, INDEX_FILE
-from core.version import __version__, insertar_version
-from routes.activos import activos_bp
-from routes.actualizacion import actualizacion_bp
-from routes.ajustes import ajustes_bp
-from routes.alertas import alertas_bp
-from routes.atajo import atajo_bp
-from routes.auth import auth_bp
-from routes.backup import backup_bp
-from routes.categorias import categorias_bp
-from routes.cuenta_ahorro import cuenta_ahorro_bp
-from routes.cuentas import cuentas_bp
-from routes.gastos import gastos_bp
-from routes.herramientas import herramientas_bp
-from routes.ingresos import ingresos_bp
-from routes.market import market_bp
-from routes.market_pulse import market_pulse_bp
-from routes.movimientos import movimientos_bp
-from routes.operaciones import operaciones_bp
-from routes.planes import planes_bp
-from routes.planes_cartera import planes_cartera_bp
-from routes.portfolios import portfolios_bp
-from routes.registros import registros_bp
-from routes.salud import salud_bp
-from routes.snapshots import snapshots_bp
-from routes.tls import tls_bp
-from routes.trading import trading_bp
-from routes.ventas import ventas_bp
+from core.version import __version__, insertarVersion
+from routes.activos import activosBp
+from routes.actualizacion import actualizacionBp
+from routes.ajustes import ajustesBp
+from routes.alertas import alertasBp
+from routes.atajo import atajoBp
+from routes.auth import authBp
+from routes.backup import backupBp
+from routes.categorias import categoriasBp
+from routes.cuenta_ahorro import cuentaAhorroBp
+from routes.cuentas import cuentasBp
+from routes.gastos import gastosBp
+from routes.herramientas import herramientasBp
+from routes.ingresos import ingresosBp
+from routes.market import marketBp
+from routes.market_pulse import marketPulseBp
+from routes.movimientos import movimientosBp
+from routes.operaciones import operacionesBp
+from routes.planes import planesBp
+from routes.planes_cartera import planesCarteraBp
+from routes.portfolios import portfoliosBp
+from routes.registros import registrosBp
+from routes.salud import saludBp
+from routes.snapshots import snapshotsBp
+from routes.tls import tlsBp
+from routes.trading import tradingBp
+from routes.ventas import ventasBp
 from stores.app_data import ensureDataFile
 
 # .env antes que nada: los ajustes admiten override por variable de entorno, y
@@ -52,7 +52,7 @@ from stores.app_data import ensureDataFile
 # .env no se vieran.
 load_dotenv()
 
-# Configurar logging ANTES de init_portfolios(): esa llamada verifica la
+# Configurar logging ANTES de initPortfolios(): esa llamada verifica la
 # integridad de la BD, puede repararla o restaurarla desde un backup, y todos
 # esos mensajes se perdían porque el logging aún no estaba inicializado.
 logging.basicConfig(level=settings.nivelLog(), format=settings.formatoLog())
@@ -103,7 +103,7 @@ def _comprobarAlmacenamiento():
 
 _comprobarAlmacenamiento()
 
-init_portfolios()
+initPortfolios()
 
 # static_folder=None desactiva la ruta estática integrada de Flask. Con
 # static_folder="../" + static_url_path="" esa ruta capturaba /<path:...> antes
@@ -112,26 +112,26 @@ init_portfolios()
 # Todo el contenido estático pasa ahora obligatoriamente por serveStatic.
 app = Flask(__name__, static_folder=None)
 
-_secret_key = os.environ.get("SECRET_KEY", "").strip()
+_secretKey = os.environ.get("SECRET_KEY", "").strip()
 # La de .env.example es pública: con ella cualquiera firma una cookie de sesión
 # válida sin contraseña y descifra auth.dat y API/*.key. docker-setup la
 # sustituye, pero copiar el ejemplo a mano arrancaba sin decir nada. Una clave
 # corta tampoco: es la que firma la sesión y deriva el cifrado de los secretos.
-seguridad_app.rechazar_secret_key_insegura(_secret_key)
-if not _secret_key:
+seguridad_app.rechazarSecretKeyInsegura(_secretKey)
+if not _secretKey:
     logging.critical(
         "SECRET_KEY no configurada. Se usará una clave temporal: las sesiones serán "
         "inválidas entre reinicios y entre workers de Gunicorn (cada worker genera su "
         "propia clave, lo que también impide descifrar auth.dat y puede degradar las "
         "credenciales al estado sin acceso). Define SECRET_KEY en .env para producción."
     )
-    _secret_key = secrets.token_hex(32)
-app.secret_key = _secret_key
+    _secretKey = secrets.token_hex(32)
+app.secret_key = _secretKey
 
 # Con un proxy inverso delante (el Caddy del perfil `https`), la conexión que ve
 # gunicorn sale siempre del proxy. El detalle está en core/seguridad_app.py,
 # junto al resto de la capa de seguridad y al alcance de los tests.
-seguridad_app.aplicar_proxy_inverso(app)
+seguridad_app.aplicarProxyInverso(app)
 
 # Límite general (por defecto 5 MB) para no agotar memoria. Los endpoints de
 # importación y restauración necesitan más: un export JSON completo del
@@ -139,44 +139,44 @@ seguridad_app.aplicar_proxy_inverso(app)
 # imposible reimportar un backup propio (413 Request Entity Too Large). Ambos
 # topes salen de [server] en config.ini; los aplica seguridad_app junto al resto
 # de la configuración de sesión.
-seguridad_app.aplicar_configuracion_sesion(app)
+seguridad_app.aplicarConfiguracionSesion(app)
 
 # Antes que los blueprints, para que el request id ya esté disponible en los
 # before_request de CSRF y de login (así sus warnings se pueden correlacionar
 # con la respuesta que recibió el navegador).
-register_error_handlers(app)
+registerErrorHandlers(app)
 
-app.register_blueprint(auth_bp)
-app.register_blueprint(activos_bp)
-app.register_blueprint(atajo_bp)
-app.register_blueprint(actualizacion_bp)
-app.register_blueprint(ajustes_bp)
-app.register_blueprint(alertas_bp)
-app.register_blueprint(backup_bp)
-app.register_blueprint(categorias_bp)
-app.register_blueprint(cuenta_ahorro_bp)
-app.register_blueprint(cuentas_bp)
-app.register_blueprint(gastos_bp)
-app.register_blueprint(herramientas_bp)
-app.register_blueprint(ingresos_bp)
-app.register_blueprint(market_bp)
-app.register_blueprint(market_pulse_bp)
-app.register_blueprint(movimientos_bp)
-app.register_blueprint(operaciones_bp)
-app.register_blueprint(planes_bp)
-app.register_blueprint(planes_cartera_bp)
-app.register_blueprint(portfolios_bp)
-app.register_blueprint(trading_bp)
-app.register_blueprint(registros_bp)
-app.register_blueprint(salud_bp)
-app.register_blueprint(snapshots_bp)
-app.register_blueprint(tls_bp)
-app.register_blueprint(ventas_bp)
+app.register_blueprint(authBp)
+app.register_blueprint(activosBp)
+app.register_blueprint(atajoBp)
+app.register_blueprint(actualizacionBp)
+app.register_blueprint(ajustesBp)
+app.register_blueprint(alertasBp)
+app.register_blueprint(backupBp)
+app.register_blueprint(categoriasBp)
+app.register_blueprint(cuentaAhorroBp)
+app.register_blueprint(cuentasBp)
+app.register_blueprint(gastosBp)
+app.register_blueprint(herramientasBp)
+app.register_blueprint(ingresosBp)
+app.register_blueprint(marketBp)
+app.register_blueprint(marketPulseBp)
+app.register_blueprint(movimientosBp)
+app.register_blueprint(operacionesBp)
+app.register_blueprint(planesBp)
+app.register_blueprint(planesCarteraBp)
+app.register_blueprint(portfoliosBp)
+app.register_blueprint(tradingBp)
+app.register_blueprint(registrosBp)
+app.register_blueprint(saludBp)
+app.register_blueprint(snapshotsBp)
+app.register_blueprint(tlsBp)
+app.register_blueprint(ventasBp)
 
 # CSRF, tope de cuerpo, límite de escrituras, sesión y cabeceras de respuesta.
 # El detalle vive en core/seguridad_app.py: aquí ocupaba 130 líneas que ningún
 # test podía alcanzar, porque importar este módulo escribe sobre los datos
-# reales (init_portfolios/ensureDataFile) y la suite tiene prohibido hacerlo.
+# reales (initPortfolios/ensureDataFile) y la suite tiene prohibido hacerlo.
 seguridad_app.instalar(app)
 
 
@@ -192,11 +192,11 @@ def serveIndex():
     # sustituir el marcador del nonce de CSP por el de esta petición. El
     # fichero ya se enviaba con Cache-Control: no-store, así que releerlo no
     # cambia el número de lecturas de disco.
-    g.csp_nonce = csp.generar_nonce()
-    html = csp.insertar_nonce(INDEX_FILE.read_text("utf-8"), g.csp_nonce)
+    g.csp_nonce = csp.generarNonce()
+    html = csp.insertarNonce(INDEX_FILE.read_text("utf-8"), g.csp_nonce)
     # La versión se inyecta aquí por lo mismo que el nonce: la plantilla es un
     # fichero estático y este es el único punto por el que pasa antes de salir.
-    html = insertar_version(html)
+    html = insertarVersion(html)
     response = make_response(html)
     response.headers["Content-Type"] = "text/html; charset=utf-8"
     response.headers["Cache-Control"] = "no-store"
@@ -246,31 +246,31 @@ def serveStatic(path):
     return response
 
 
-def _encrypt_api_keys_at_rest():
+def _encryptApiKeysAtRest():
     """Cifra los API/*.key que sigan en texto plano de instalaciones previas.
 
     Se recorre el directorio en vez de una lista fija de nombres: así un
     proveedor nuevo queda cubierto sin tener que acordarse de añadirlo aquí, que
     es justo el descuido que dejaría una clave sin cifrar.
     """
-    from core.secret_store import migrate_plaintext_if_needed
+    from core.secret_store import migratePlaintextIfNeeded
 
     if not API_DIR.is_dir():
         return
 
     for path in sorted(API_DIR.glob("*.key")):
         try:
-            migrate_plaintext_if_needed(path)
+            migratePlaintextIfNeeded(path)
         except Exception as e:
             logging.warning("No se pudo cifrar %s: %s", path.name, e)
 
 
 # Inicialización al arrancar, tanto con Gunicorn como con el servidor de desarrollo
 ensureDataFile()
-_encrypt_api_keys_at_rest()
+_encryptApiKeysAtRest()
 # Las copias automáticas se comprueban ya al iniciar portfolios y luego cada
 # hora. Así cambiar la frecuencia en Ajustes no exige reiniciar el servidor.
-start_backup_scheduler()
+startBackupScheduler()
 # El histórico de evolución lo programaba un setInterval del navegador, así que
 # solo existía mientras hubiera una pestaña abierta. Este hilo lo guarda desde
 # el servidor; con varios workers, el primero que reclama el hueco lo escribe.
@@ -283,7 +283,7 @@ telegram_listener.iniciar()
 # vigila por su cuenta y cuenta por Telegram (ver admin/avisos_scheduler.py).
 avisos_scheduler.iniciar()
 # Los dos workers llegan aquí; el aviso de arranque lo manda solo el primero.
-telegram_notifier.notificar_arranque(__version__)
+telegram_notifier.notificarArranque(__version__)
 
 # Reaplica en el proxy el estado de HTTPS guardado desde Ajustes. Va al final
 # porque no condiciona nada de lo anterior, y no aborta si el proxy no responde:
@@ -291,16 +291,16 @@ telegram_notifier.notificar_arranque(__version__)
 # arreglarlo. El detalle, en core/tls.py.
 tls.converger()
 
-_aviso_tls = tls.avisoSinHttps()
-if _aviso_tls:
-    logging.warning("[tls] %s", _aviso_tls)
+_avisoTls = tls.avisoSinHttps()
+if _avisoTls:
+    logging.warning("[tls] %s", _avisoTls)
 
 # Igual que el de arriba: no es una configuración mal puesta, es una decisión
 # tomada desde la interfaz. Pero desde fuera no se distingue de un servidor que
 # sí comprueba quién escribe, así que tiene que quedar escrito al arrancar.
-_aviso_firma = atajo_acceso.avisoSinFirma()
-if _aviso_firma:
-    logging.warning("[atajo] %s", _aviso_firma)
+_avisoFirma = atajo_acceso.avisoSinFirma()
+if _avisoFirma:
+    logging.warning("[atajo] %s", _avisoFirma)
 
 if __name__ == "__main__":
     # Servidor de desarrollo. En Docker manda gunicorn (ver entrypoint.sh), que

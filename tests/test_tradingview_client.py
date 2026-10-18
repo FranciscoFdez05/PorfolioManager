@@ -1,21 +1,21 @@
 """Cliente de TradingView: decodificado del ticker y filtro por mercado en la búsqueda.
 
-Nada sale a la red: se sustituye `providers.tradingview_client._fetch_json`.
+Nada sale a la red: se sustituye `providers.tradingview_client._fetchJson`.
 """
 
 
 from providers import tradingview_client
 
 
-def _quote_payload(symbol="BINANCE:BTCUSD", price=100.0, change=1.5, currency="USD"):
+def _quotePayload(symbol="BINANCE:BTCUSD", price=100.0, change=1.5, currency="USD"):
     return {"data": [{"s": symbol, "d": [price, change, currency]}]}
 
 
-def _batch_quote_payload(*rows):
+def _batchQuotePayload(*rows):
     return {"data": [{"s": symbol, "d": [price, change, currency]} for symbol, price, change, currency in rows]}
 
 
-def _search_payload(*symbols):
+def _searchPayload(*symbols):
     return {
         "symbols": [
             {
@@ -30,34 +30,34 @@ def _search_payload(*symbols):
     }
 
 
-def test_fetch_quote_decodifica_el_ticker_pegado_de_una_url(monkeypatch):
-    monkeypatch.setattr(tradingview_client, "_fetch_json", lambda *a, **kw: _quote_payload())
+def testFetchQuoteDecodificaElTickerPegadoDeUnaUrl(monkeypatch):
+    monkeypatch.setattr(tradingview_client, "_fetchJson", lambda *a, **kw: _quotePayload())
 
-    quote, error = tradingview_client.fetch_quote("BINANCE%3ABTCUSD")
+    quote, error = tradingview_client.fetchQuote("BINANCE%3ABTCUSD")
 
     assert error is None
     assert quote["symbol"] == "BINANCE:BTCUSD"
 
 
-def test_fetch_quote_sin_dos_puntos_da_error_claro():
-    quote, error = tradingview_client.fetch_quote("AAPL")
+def testFetchQuoteSinDosPuntosDaErrorClaro():
+    quote, error = tradingview_client.fetchQuote("AAPL")
 
     assert quote is None
     assert "mercado delante" in error
 
 
-def test_search_symbol_separa_mercado_y_texto(monkeypatch):
+def testSearchSymbolSeparaMercadoYTexto(monkeypatch):
     llamadas = []
 
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        if json_body is not None:
-            return _quote_payload()  # cotización con la que se enriquece el resultado
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        if jsonBody is not None:
+            return _quotePayload()  # cotización con la que se enriquece el resultado
         llamadas.append(dict(params))
-        return _search_payload(("BTCEUR", "BITVAVO", "Bitcoin / Euro"))
+        return _searchPayload(("BTCEUR", "BITVAVO", "Bitcoin / Euro"))
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    results, error = tradingview_client.search_symbol("BITVAVO:BTCEUR")
+    results, error = tradingview_client.searchSymbol("BITVAVO:BTCEUR")
 
     assert error is None
     assert len(llamadas) == 1
@@ -66,20 +66,20 @@ def test_search_symbol_separa_mercado_y_texto(monkeypatch):
     assert results[0]["symbol"] == "BITVAVO:BTCEUR"
 
 
-def test_search_symbol_repite_como_texto_libre_si_el_mercado_no_existe(monkeypatch):
+def testSearchSymbolRepiteComoTextoLibreSiElMercadoNoExiste(monkeypatch):
     llamadas = []
 
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        if json_body is not None:
-            return _quote_payload()  # cotización con la que se enriquece el resultado
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        if jsonBody is not None:
+            return _quotePayload()  # cotización con la que se enriquece el resultado
         llamadas.append(dict(params))
         if params["exchange"]:
-            return _search_payload()  # el "mercado" inventado no encuentra nada
-        return _search_payload(("AAPL", "NASDAQ", "Apple Inc."))
+            return _searchPayload()  # el "mercado" inventado no encuentra nada
+        return _searchPayload(("AAPL", "NASDAQ", "Apple Inc."))
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    results, error = tradingview_client.search_symbol("FAKEEXCH:AAPL")
+    results, error = tradingview_client.searchSymbol("FAKEEXCH:AAPL")
 
     assert error is None
     assert len(llamadas) == 2
@@ -89,45 +89,45 @@ def test_search_symbol_repite_como_texto_libre_si_el_mercado_no_existe(monkeypat
     assert results[0]["symbol"] == "NASDAQ:AAPL"
 
 
-def test_search_symbol_sin_dos_puntos_no_filtra_por_mercado(monkeypatch):
+def testSearchSymbolSinDosPuntosNoFiltraPorMercado(monkeypatch):
     llamadas = []
 
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        if json_body is not None:
-            return _quote_payload()  # cotización con la que se enriquece el resultado
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        if jsonBody is not None:
+            return _quotePayload()  # cotización con la que se enriquece el resultado
         llamadas.append(dict(params))
-        return _search_payload(("AAPL", "NASDAQ", "Apple Inc."))
+        return _searchPayload(("AAPL", "NASDAQ", "Apple Inc."))
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    tradingview_client.search_symbol("Apple")
+    tradingview_client.searchSymbol("Apple")
 
     assert len(llamadas) == 1
     assert llamadas[0]["text"] == "Apple"
     assert llamadas[0]["exchange"] == ""
 
 
-def test_search_symbol_prioriza_resultados_con_cotizacion_real(monkeypatch):
+def testSearchSymbolPriorizaResultadosConCotizacionReal(monkeypatch):
     """GETTEX (algunos fondos) u OANDA (según la divisa) no están en el scanner
     gratuito de TradingView aunque el instrumento cotice de verdad en su web:
     entre dos listados del mismo activo, el que sí tiene precio va primero,
     aunque el buscador lo devolviera en peor posición por relevancia."""
-    llamadas_cotizacion = []
+    llamadasCotizacion = []
 
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        if json_body is not None:
-            llamadas_cotizacion.append(json_body)
-            return _batch_quote_payload(("LSIN:0E5R", 104.1, 0.5, "EUR"))
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        if jsonBody is not None:
+            llamadasCotizacion.append(jsonBody)
+            return _batchQuotePayload(("LSIN:0E5R", 104.1, 0.5, "EUR"))
         # GETTEX sale primero en la respuesta del buscador (mejor relevancia),
         # LSIN segundo.
-        return _search_payload(
+        return _searchPayload(
             ("10AF", "GETTEX", "Amundi Core MSCI Emerging Markets"),
             ("0E5R", "LSIN", "Amundi Core MSCI Emerging Markets"),
         )
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    results, error = tradingview_client.search_symbol("MSCI Emerging Markets")
+    results, error = tradingview_client.searchSymbol("MSCI Emerging Markets")
 
     assert error is None
     assert results[0]["symbol"] == "LSIN:0E5R"
@@ -135,38 +135,38 @@ def test_search_symbol_prioriza_resultados_con_cotizacion_real(monkeypatch):
     assert results[1]["symbol"] == "GETTEX:10AF"
     assert results[1]["price"] == ""
     # Una sola llamada al scanner para las dos, no una por resultado.
-    assert len(llamadas_cotizacion) == 1
-    assert set(llamadas_cotizacion[0]["symbols"]["tickers"]) == {"GETTEX:10AF", "LSIN:0E5R"}
+    assert len(llamadasCotizacion) == 1
+    assert set(llamadasCotizacion[0]["symbols"]["tickers"]) == {"GETTEX:10AF", "LSIN:0E5R"}
 
 
 # ── Cruces que el scanner no tiene ───────────────────────────────────────────
 
-def _scanner_que_cotiza(precios):
+def _scannerQueCotiza(precios):
     """Doble del scanner: cotiza solo los tickers de `precios` y registra qué
     se le pide. `precios` es `{ticker: (precio, variación %, divisa)}`."""
     peticiones = []
 
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        tickers = json_body["symbols"]["tickers"]
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        tickers = jsonBody["symbols"]["tickers"]
         peticiones.append(tickers)
         return {"data": [
             {"s": t, "d": [precios[t][0], precios[t][1], precios[t][2]]}
             for t in tickers if t in precios
         ]}
 
-    return fake_fetch, peticiones
+    return fakeFetch, peticiones
 
 
-def test_un_cruce_en_eur_que_no_esta_se_calcula_con_el_par_en_usd(monkeypatch):
+def testUnCruceEnEurQueNoEstaSeCalculaConElParEnUsd(monkeypatch):
     # Las cifras son las reales de OANDA: 4284,97 / 1,13911 = 3761,68, lo mismo
     # que marca el gráfico de OANDA:XAUEUR en tradingview.com.
-    fake, peticiones = _scanner_que_cotiza({
+    fake, peticiones = _scannerQueCotiza({
         "OANDA:XAUUSD": (4284.97, 0.26135991389396024, "USD"),
         "OANDA:EURUSD": (1.13911, 0.09578039050280622, "USD"),
     })
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fake)
 
-    quote, error = tradingview_client.fetch_quote("OANDA:XAUEUR")
+    quote, error = tradingview_client.fetchQuote("OANDA:XAUEUR")
 
     assert error is None
     assert quote["price"] == "3761,68"
@@ -176,90 +176,90 @@ def test_un_cruce_en_eur_que_no_esta_se_calcula_con_el_par_en_usd(monkeypatch):
     assert len(peticiones) == 2  # el ticker pedido, y luego las dos piezas juntas
 
 
-def test_sin_el_par_en_usd_del_mismo_mercado_se_queda_sin_cotizacion(monkeypatch):
+def testSinElParEnUsdDelMismoMercadoSeQuedaSinCotizacion(monkeypatch):
     # OANDA:XAGUSD no está en el scanner. No se busca la plata en otro sitio
     # (un spot compuesto, otro bróker): eso sería decidir a mano de dónde sale
     # el precio de un activo concreto.
-    fake, _ = _scanner_que_cotiza({
+    fake, _ = _scannerQueCotiza({
         "TVC:SILVER": (64.2904, 0.72, "USD"),
         "OANDA:EURUSD": (1.13911, 0.09, "USD"),
     })
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fake)
 
-    quote, error = tradingview_client.fetch_quote("OANDA:XAGEUR")
+    quote, error = tradingview_client.fetchQuote("OANDA:XAGEUR")
 
     assert quote is None
     assert "no devolvió cotización" in error
 
 
-def test_el_sentido_del_cambio_se_toma_del_par_que_exista(monkeypatch):
+def testElSentidoDelCambioSeTomaDelParQueExista(monkeypatch):
     # El mercado tiene USDJPY (yenes por dólar), no JPYUSD: se multiplica. No
     # hay ninguna lista que diga qué divisas cotizan al revés.
-    fake, peticiones = _scanner_que_cotiza({
+    fake, peticiones = _scannerQueCotiza({
         "OANDA:XAUUSD": (4000.0, 0.0, "USD"),
         "OANDA:USDJPY": (150.0, 0.0, "JPY"),
     })
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fake)
 
-    quote, _ = tradingview_client.fetch_quote("OANDA:XAUJPY")
+    quote, _ = tradingview_client.fetchQuote("OANDA:XAUJPY")
 
     assert quote["price"] == "600000,00"
     assert quote["currency"] == "JPY"
     assert set(peticiones[1]) == {"OANDA:XAUUSD", "OANDA:JPYUSD", "OANDA:USDJPY"}
 
 
-def test_el_cambio_se_busca_solo_en_el_mismo_mercado(monkeypatch):
-    fake, peticiones = _scanner_que_cotiza({
+def testElCambioSeBuscaSoloEnElMismoMercado(monkeypatch):
+    fake, peticiones = _scannerQueCotiza({
         "SAXO:XAUUSD": (4000.0, 0.0, "USD"),
         "OANDA:EURUSD": (1.1, 0.0, "USD"),  # otro mercado: no se usa
     })
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fake)
 
-    quote, _ = tradingview_client.fetch_quote("SAXO:XAUEUR")
+    quote, _ = tradingview_client.fetchQuote("SAXO:XAUEUR")
 
     assert quote is None
     assert all(t.startswith("SAXO:") for t in peticiones[1])
 
 
-def test_una_cotizacion_real_no_se_sustituye_por_la_calculada(monkeypatch):
-    fake, peticiones = _scanner_que_cotiza({"OANDA:XAUEUR": (3700.0, 0.0, "EUR")})
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+def testUnaCotizacionRealNoSeSustituyePorLaCalculada(monkeypatch):
+    fake, peticiones = _scannerQueCotiza({"OANDA:XAUEUR": (3700.0, 0.0, "EUR")})
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fake)
 
-    quote, _ = tradingview_client.fetch_quote("OANDA:XAUEUR")
+    quote, _ = tradingview_client.fetchQuote("OANDA:XAUEUR")
 
     assert quote["price"] == "3700,00"
     assert quote["status"] == "Cotización actualizada"
     assert len(peticiones) == 1
 
 
-def test_sin_piezas_para_calcularlo_sigue_sin_cotizacion(monkeypatch):
-    fake, _ = _scanner_que_cotiza({})
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake)
+def testSinPiezasParaCalcularloSigueSinCotizacion(monkeypatch):
+    fake, _ = _scannerQueCotiza({})
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fake)
 
-    quote, error = tradingview_client.fetch_quote("OANDA:XAUEUR")
+    quote, error = tradingview_client.fetchQuote("OANDA:XAUEUR")
 
     assert quote is None
     assert "no devolvió cotización" in error
 
 
-def test_la_busqueda_calcula_el_cruce_que_falta(monkeypatch):
+def testLaBusquedaCalculaElCruceQueFalta(monkeypatch):
     precios = {
         "OANDA:XAUUSD": (4284.97, 0.26, "USD"),
         "OANDA:EURUSD": (1.13911, 0.09, "USD"),
     }
 
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        if json_body is None:
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        if jsonBody is None:
             return {"symbols": [
                 {"symbol": "XAUEUR", "exchange": "OANDA", "description": "Gold/EUR",
                  "type": "commodity", "currency_code": "EUR"},
             ]}
-        tickers = json_body["symbols"]["tickers"]
+        tickers = jsonBody["symbols"]["tickers"]
         return {"data": [{"s": t, "d": list(precios[t])} for t in tickers if t in precios]}
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    results, error = tradingview_client.search_symbol("OANDA:XAUEUR")
+    results, error = tradingview_client.searchSymbol("OANDA:XAUEUR")
 
     assert error is None
     assert results[0]["symbol"] == "OANDA:XAUEUR"
@@ -267,40 +267,40 @@ def test_la_busqueda_calcula_el_cruce_que_falta(monkeypatch):
     assert results[0]["currency"] == "EUR"
 
 
-def test_los_perpetuos_quedan_detras_del_activo(monkeypatch):
+def testLosPerpetuosQuedanDetrasDelActivo(monkeypatch):
     """Buscar "XAG" devolvía primero BINANCE:XAGUSDT.P y compañía."""
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        if json_body is None:
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        if jsonBody is None:
             return {"symbols": [
                 {"symbol": "XAGUSDT.P", "exchange": "BINANCE", "description": "XAG / TetherUS PERPETUAL",
                  "type": "swap", "currency_code": "USDT"},
                 {"symbol": "XAGUSD", "exchange": "OANDA", "description": "Silver",
                  "type": "commodity", "currency_code": "USD"},
             ]}
-        return {"data": [{"s": t, "d": [64.2, 0.1, "USD"]} for t in json_body["symbols"]["tickers"]]}
+        return {"data": [{"s": t, "d": [64.2, 0.1, "USD"]} for t in jsonBody["symbols"]["tickers"]]}
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    results, _ = tradingview_client.search_symbol("XAG", preferred_asset_type="comoditis")
+    results, _ = tradingview_client.searchSymbol("XAG", preferredAssetType="comoditis")
 
     assert [r["symbol"] for r in results] == ["OANDA:XAGUSD", "BINANCE:XAGUSDT.P"]
 
 
 # ── Screener real (subidas/bajadas, amplitud de mercado) ────────────────────
 
-def test_fetch_screener_manda_filtro_orden_y_rango(monkeypatch):
+def testFetchScreenerMandaFiltroOrdenYRango(monkeypatch):
     peticiones = []
 
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        peticiones.append((url, json_body))
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        peticiones.append((url, jsonBody))
         return {"totalCount": 2, "data": [{"s": "NASDAQ:AAA", "d": ["AAA", 10.0, 5.0]}]}
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
     filtro = [{"left": "market_cap_basic", "operation": "greater", "right": 1_000_000}]
-    payload = tradingview_client.fetch_screener(
-        filtro, ["name", "close", "change"], sort_by="change", sort_order="desc", limit=5,
-        instrument_types=["stock"],
+    payload = tradingview_client.fetchScreener(
+        filtro, ["name", "close", "change"], sortBy="change", sortOrder="desc", limit=5,
+        instrumentTypes=["stock"],
     )
 
     assert len(peticiones) == 1
@@ -313,28 +313,28 @@ def test_fetch_screener_manda_filtro_orden_y_rango(monkeypatch):
     assert payload["totalCount"] == 2
 
 
-def test_fetch_screener_sin_sort_no_lo_manda(monkeypatch):
+def testFetchScreenerSinSortNoLoManda(monkeypatch):
     peticiones = []
     monkeypatch.setattr(
-        tradingview_client, "_fetch_json",
-        lambda url, params=None, timeout=None, json_body=None, headers=None: (peticiones.append(json_body) or {}),
+        tradingview_client, "_fetchJson",
+        lambda url, params=None, timeout=None, jsonBody=None, headers=None: (peticiones.append(jsonBody) or {}),
     )
 
-    tradingview_client.fetch_screener([], ["name"], limit=1)
+    tradingview_client.fetchScreener([], ["name"], limit=1)
 
     assert "sort" not in peticiones[0]
 
 
-def test_fetch_quotes_es_un_envoltorio_de_scan(monkeypatch):
+def testFetchQuotesEsUnEnvoltorioDeScan(monkeypatch):
     peticiones = []
 
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        peticiones.append(json_body["symbols"]["tickers"])
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        peticiones.append(jsonBody["symbols"]["tickers"])
         return {"data": [{"s": "SP:SPX", "d": [6700.0, 0.5, "USD"]}]}
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    cotizados = tradingview_client.fetch_quotes(["SP:SPX"])
+    cotizados = tradingview_client.fetchQuotes(["SP:SPX"])
 
     assert cotizados == {"SP:SPX": (6700.0, 0.5, "USD")}
     assert peticiones[0] == ["SP:SPX"]
@@ -342,18 +342,18 @@ def test_fetch_quotes_es_un_envoltorio_de_scan(monkeypatch):
 
 # ── Fundamentales y técnico (página de Estadísticas de mercado) ─────────────
 
-def test_fetch_stats_junta_cada_columna_con_su_valor(monkeypatch):
+def testFetchStatsJuntaCadaColumnaConSuValor(monkeypatch):
     peticiones = []
 
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        peticiones.append(json_body)
-        columnas = json_body["columns"]
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        peticiones.append(jsonBody)
+        columnas = jsonBody["columns"]
         valores = [42.0 if c == "market_cap_basic" else None for c in columnas]
         return {"data": [{"s": "NASDAQ:AAPL", "d": valores}]}
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    stats = tradingview_client.fetch_stats(["NASDAQ:AAPL"])
+    stats = tradingview_client.fetchStats(["NASDAQ:AAPL"])
 
     assert len(peticiones) == 1
     assert stats["NASDAQ:AAPL"]["market_cap_basic"] == 42.0
@@ -362,44 +362,44 @@ def test_fetch_stats_junta_cada_columna_con_su_valor(monkeypatch):
     assert stats["NASDAQ:AAPL"]["sector"] is None
 
 
-def test_fetch_stats_una_sola_peticion_para_varios_tickers(monkeypatch):
+def testFetchStatsUnaSolaPeticionParaVariosTickers(monkeypatch):
     peticiones = []
 
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        peticiones.append(json_body["symbols"]["tickers"])
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        peticiones.append(jsonBody["symbols"]["tickers"])
         return {"data": []}
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    tradingview_client.fetch_stats(["NASDAQ:AAPL", "NASDAQ:MSFT"])
+    tradingview_client.fetchStats(["NASDAQ:AAPL", "NASDAQ:MSFT"])
 
     assert len(peticiones) == 1
     assert set(peticiones[0]) == {"NASDAQ:AAPL", "NASDAQ:MSFT"}
 
 
-def test_fetch_stats_sin_tickers_no_llama_a_la_red(monkeypatch):
-    def fake_fetch(*a, **kw):
+def testFetchStatsSinTickersNoLlamaALaRed(monkeypatch):
+    def fakeFetch(*a, **kw):
         raise AssertionError("no debería llamar a la red sin tickers")
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    assert tradingview_client.fetch_stats([]) == {}
+    assert tradingview_client.fetchStats([]) == {}
 
 
-def test_sin_tipo_de_activo_manda_el_orden_de_tradingview(monkeypatch):
+def testSinTipoDeActivoMandaElOrdenDeTradingview(monkeypatch):
     """Sin tipo elegido no hay preferencia por ninguna clase de instrumento."""
-    def fake_fetch(url, params=None, timeout=None, json_body=None, headers=None):
-        if json_body is None:
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        if jsonBody is None:
             return {"symbols": [
                 {"symbol": "XAGUSDT.P", "exchange": "BINANCE", "description": "XAG / TetherUS PERPETUAL",
                  "type": "swap", "currency_code": "USDT"},
                 {"symbol": "XAGUSD", "exchange": "OANDA", "description": "Silver",
                  "type": "commodity", "currency_code": "USD"},
             ]}
-        return {"data": [{"s": t, "d": [64.2, 0.1, "USD"]} for t in json_body["symbols"]["tickers"]]}
+        return {"data": [{"s": t, "d": [64.2, 0.1, "USD"]} for t in jsonBody["symbols"]["tickers"]]}
 
-    monkeypatch.setattr(tradingview_client, "_fetch_json", fake_fetch)
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
 
-    results, _ = tradingview_client.search_symbol("XAG")
+    results, _ = tradingview_client.searchSymbol("XAG")
 
     assert [r["symbol"] for r in results] == ["BINANCE:XAGUSDT.P", "OANDA:XAGUSD"]

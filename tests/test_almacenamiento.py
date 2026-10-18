@@ -22,27 +22,27 @@ from core.errors import mensajeAlmacenamiento
 
 # ── Detección ─────────────────────────────────────────────────────────────────
 
-def test_un_directorio_normal_es_escribible(tmp_path):
+def testUnDirectorioNormalEsEscribible(tmp_path):
     escribible, motivo = paths.comprobarEscritura(tmp_path)
 
     assert escribible is True
     assert motivo == ""
 
 
-def test_no_deja_el_fichero_de_prueba_detras(tmp_path):
+def testNoDejaElFicheroDePruebaDetras(tmp_path):
     paths.comprobarEscritura(tmp_path)
 
     assert list(tmp_path.iterdir()) == []
 
 
-def test_crea_el_directorio_si_no_existe(tmp_path):
+def testCreaElDirectorioSiNoExiste(tmp_path):
     destino = tmp_path / "data" / "tmp"
 
     assert paths.comprobarEscritura(destino)[0] is True
     assert destino.is_dir()
 
 
-def test_con_crear_desactivado_un_directorio_ausente_no_se_crea(tmp_path):
+def testConCrearDesactivadoUnDirectorioAusenteNoSeCrea(tmp_path):
     destino = tmp_path / "no_montado"
 
     escribible, motivo = paths.comprobarEscritura(destino, crear=False)
@@ -52,7 +52,7 @@ def test_con_crear_desactivado_un_directorio_ausente_no_se_crea(tmp_path):
     assert not destino.exists()
 
 
-def test_una_ruta_ocupada_por_un_fichero_no_es_escribible(tmp_path):
+def testUnaRutaOcupadaPorUnFicheroNoEsEscribible(tmp_path):
     """Pasa cuando el volumen se monta sobre algo que no es un directorio."""
     ocupada = tmp_path / "data"
     ocupada.write_text("no soy un directorio", encoding="utf-8")
@@ -63,7 +63,7 @@ def test_una_ruta_ocupada_por_un_fichero_no_es_escribible(tmp_path):
     assert motivo
 
 
-def test_el_diagnostico_lista_todos_los_directorios_de_datos(tmp_path, monkeypatch):
+def testElDiagnosticoListaTodosLosDirectoriosDeDatos(tmp_path, monkeypatch):
     for nombre in ("DATA_DIR", "PORTFOLIOS_DIR", "JSON_DIR", "BACKUPS_DIR", "LOGS_DIR", "API_DIR"):
         monkeypatch.setattr(paths, nombre, tmp_path / nombre.lower(), raising=False)
 
@@ -86,14 +86,14 @@ def test_el_diagnostico_lista_todos_los_directorios_de_datos(tmp_path, monkeypat
     (errno.ENOENT, "no existe"),
     (errno.EIO, "entrada/salida"),
 ])
-def test_cada_fallo_del_sistema_de_ficheros_dice_su_causa(codigo, fragmento):
+def testCadaFalloDelSistemaDeFicherosDiceSuCausa(codigo, fragmento):
     mensaje = mensajeAlmacenamiento(OSError(codigo, "…"), "/app/data/backups")
 
     assert fragmento in mensaje
     assert "/app/data/backups" in mensaje
 
 
-def test_el_fallo_de_permisos_dice_cómo_arreglarlo():
+def testElFalloDePermisosDiceCómoArreglarlo():
     """En Docker el usuario no puede tocar el código, pero sí los permisos."""
     mensaje = mensajeAlmacenamiento(PermissionError(errno.EACCES, "denied"), "/app/data")
 
@@ -101,7 +101,7 @@ def test_el_fallo_de_permisos_dice_cómo_arreglarlo():
     assert "PUID" in mensaje
 
 
-def test_un_errno_desconocido_no_se_queda_sin_mensaje():
+def testUnErrnoDesconocidoNoSeQuedaSinMensaje():
     mensaje = mensajeAlmacenamiento(OSError(4095, "Algo raro"), "/app/data")
 
     assert "/app/data" in mensaje
@@ -115,7 +115,7 @@ def test_un_errno_desconocido_no_se_queda_sin_mensaje():
     ("database is locked", "bloqueada"),
     ("database disk image is malformed", "dañada"),
 ])
-def test_los_errores_de_sqlite_se_traducen_a_la_causa_real(texto, fragmento):
+def testLosErroresDeSqliteSeTraducenALaCausaReal(texto, fragmento):
     """SQLite envuelve los fallos del sistema de ficheros en mensajes propios."""
     mensaje = mensajeAlmacenamiento(sqlite3.OperationalError(texto), "/app/data/portfolios")
 

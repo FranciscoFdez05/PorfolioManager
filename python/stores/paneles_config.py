@@ -125,7 +125,7 @@ def _panel(crudo):
     }
 
 
-def normalizar_paneles(valor) -> dict:
+def normalizarPaneles(valor) -> dict:
     """La configuración de paneles con la forma esperada; vacía si no la tiene."""
     if not isinstance(valor, dict):
         return {}

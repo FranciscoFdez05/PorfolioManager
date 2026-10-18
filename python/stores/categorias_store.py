@@ -4,7 +4,7 @@ El panel de categorías de la web permite renombrar y eliminar cualquiera de las
 dos listas sin importar en qué pestaña estés, y eso obliga a hacer el trabajo
 aquí en vez de en el navegador: el frontend solo tiene en memoria el año que
 está mirando, y renombrar tocando únicamente ese año dejaría el resto de años
-con la etiqueta vieja. Como `sanitize_gastos_payload` reconstruye el catálogo a
+con la etiqueta vieja. Como `sanitizeGastosPayload` reconstruye el catálogo a
 partir de las filas guardadas, la categoría renombrada reaparecería sola en
 cuanto se guardase cualquiera de esos años.
 
@@ -12,7 +12,7 @@ Cada tipo toca tres tablas: el catálogo, las filas de movimientos y los cargos
 recurrentes (que guardan su categoría en una columna aparte).
 """
 
-from core.db import get_db, transaction
+from core.db import getDb, transaction
 from stores import revisiones
 
 TIPOS_VALIDOS = ("gasto", "ingreso")
@@ -66,7 +66,7 @@ def normalizarEtiqueta(valor, campo):
 def contarUsos(tipo, etiqueta, conn=None):
     """Movimientos y recurrentes que usan esa categoría, en todos los años."""
     tablas = _TABLAS[tipo]
-    conn = conn or get_db()
+    conn = conn or getDb()
 
     tablaFilas, columnaFilas = tablas["filas"]
     tablaRec, columnaRec = tablas["recurrentes"]
@@ -90,7 +90,7 @@ def leerResumen():
     salieran aquí no habría forma de renombrarlas ni de entender por qué
     reaparecen.
     """
-    conn = get_db()
+    conn = getDb()
     resumen = {}
 
     for tipo, tablas in _TABLAS.items():

@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 
 
-def _read_meta():
+def _readMeta():
     if not _META_FILE.exists():
         return None
     try:
@@ -31,7 +31,7 @@ def _read_meta():
         return None
 
 
-def _write_meta(data):
+def _writeMeta(data):
     """Guarda portfolios.json sin poder dejarlo a medias.
 
     El temporal se llamaba `portfolios.tmp`, el mismo nombre en todos los
@@ -49,35 +49,35 @@ def _write_meta(data):
 # elegían el mismo id, la segunda borraba el .db que la primera acababa de
 # crear y el índice podía perder una de las dos. El Lock cubre los hilos de
 # este proceso; el fichero de bloqueo, el otro worker de gunicorn.
-_indice_lock = threading.Lock()
+_indiceLock = threading.Lock()
 
 
 @contextmanager
-def bloqueo_indice():
-    with _indice_lock, exclusivo(_META_FILE.with_name("portfolios.lock"), espera=10):
+def bloqueoIndice():
+    with _indiceLock, exclusivo(_META_FILE.with_name("portfolios.lock"), espera=10):
         yield
 
 
-def _con_indice_bloqueado(funcion):
+def _conIndiceBloqueado(funcion):
     @functools.wraps(funcion)
     def envoltura(*args, **kwargs):
-        with bloqueo_indice():
+        with bloqueoIndice():
             return funcion(*args, **kwargs)
     return envoltura
 
 
-def _id_libre(meta, name: str) -> str:
+def _idLibre(meta, name: str) -> str:
     """Id derivado del nombre que no use ningún portfolio ni ningún fichero.
 
     Se mira también el disco: un .db huérfano (de un alta que se cortó a medias)
     no aparece en el índice, y antes se borraba sin más para reutilizar su id.
     """
-    base_id = _safe_id(name)
-    pid = base_id
+    baseId = _safeId(name)
+    pid = baseId
     existentes = {p["id"] for p in meta["portfolios"]}
     contador = 2
     while pid in existentes or (_PORTFOLIOS_DIR / f"{pid}.db").exists():
-        pid = f"{base_id}_{contador}"
+        pid = f"{baseId}_{contador}"
         contador += 1
     return pid
 
@@ -86,25 +86,25 @@ class NombreDuplicado(ValueError):
     """Ya hay un portfolio con ese nombre visible. Las rutas responden 409."""
 
 
-def _nombre_en_uso(meta, name: str, salvo_id=None) -> bool:
+def _nombreEnUso(meta, name: str, salvoId=None) -> bool:
     buscado = name.strip().casefold()
     return any(
-        str(p.get("name", "")).strip().casefold() == buscado and p.get("id") != salvo_id
+        str(p.get("name", "")).strip().casefold() == buscado and p.get("id") != salvoId
         for p in meta["portfolios"]
     )
 
 
-def _nombre_libre(meta, name: str) -> str:
+def _nombreLibre(meta, name: str) -> str:
     """`name`, o `name (2)`, `name (3)`… el primero que no use ningún portfolio."""
     candidato, contador = name, 2
-    while _nombre_en_uso(meta, candidato):
+    while _nombreEnUso(meta, candidato):
         sufijo = f" ({contador})"
         candidato = f"{name[:50 - len(sufijo)]}{sufijo}"
         contador += 1
     return candidato
 
 
-def registrar_portfolio(name: str, colocar, renombrar_si_existe=False) -> str:
+def registrarPortfolio(name: str, colocar, renombrarSiExiste=False) -> str:
     """Da de alta un portfolio de forma atómica respecto a las demás altas.
 
     `colocar(destino)` deja el .db en su sitio (crearlo vacío, mover uno
@@ -117,42 +117,42 @@ def registrar_portfolio(name: str, colocar, renombrar_si_existe=False) -> str:
     NombreDuplicado; una importación (`renombrar_si_existe`) se queda con
     «nombre (2)», porque restaurar una copia no debería fallar por eso.
     """
-    with bloqueo_indice():
-        meta = get_portfolios()
-        if _nombre_en_uso(meta, name):
-            if not renombrar_si_existe:
+    with bloqueoIndice():
+        meta = getPortfolios()
+        if _nombreEnUso(meta, name):
+            if not renombrarSiExiste:
                 raise NombreDuplicado(f"Ya existe un portfolio llamado «{name}»")
-            name = _nombre_libre(meta, name)
-        pid = _id_libre(meta, name)
+            name = _nombreLibre(meta, name)
+        pid = _idLibre(meta, name)
         _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
         colocar(_PORTFOLIOS_DIR / f"{pid}.db")
         meta["portfolios"].append({"id": pid, "name": name})
-        _write_meta(meta)
+        _writeMeta(meta)
     return pid
 
 
-def _safe_id(name: str) -> str:
+def _safeId(name: str) -> str:
     return re.sub(r"[^a-z0-9_-]", "_", name.lower().strip())[:40] or "portfolio"
 
 
-def _set_active(db_path: Path):
-    global _firma_vista
-    from core.db import registrar_resolutor_activo, set_active_db_path
-    set_active_db_path(db_path)
+def _setActive(dbPath: Path):
+    global _firmaVista
+    from core.db import registrarResolutorActivo, setActiveDbPath
+    setActiveDbPath(dbPath)
     # Lo que hay ahora en portfolios.json es justo lo que se acaba de fijar:
     # solo un cambio posterior (de otro proceso) obliga a releerlo.
-    _firma_vista = _firma_meta()
-    registrar_resolutor_activo(_activo_segun_meta)
+    _firmaVista = _firmaMeta()
+    registrarResolutorActivo(_activoSegunMeta)
 
 
 # Firma de portfolios.json la última vez que este proceso lo leyó para saber
 # cuál es el activo. Mientras no cambie, no hay nada que releer: el coste por
 # llamada es un stat().
-_firma_vista = None
-_firma_lock = threading.Lock()
+_firmaVista = None
+_firmaLock = threading.Lock()
 
 
-def _firma_meta():
+def _firmaMeta():
     try:
         st = _META_FILE.stat()
     except OSError:
@@ -160,27 +160,27 @@ def _firma_meta():
     return (st.st_mtime_ns, st.st_size, st.st_ino)
 
 
-def _activo_segun_meta(actual: Path):
+def _activoSegunMeta(actual: Path):
     """Ruta del portfolio activo si otro proceso la ha cambiado, o None.
 
     Cada worker de gunicorn guarda su propia copia de la BD activa
     (core/db.py). El cambio de portfolio se escribe en portfolios.json, que sí
     es común, así que basta con releerlo cuando su firma cambia.
     """
-    global _firma_vista
-    firma = _firma_meta()
-    if firma is None or firma == _firma_vista:
+    global _firmaVista
+    firma = _firmaMeta()
+    if firma is None or firma == _firmaVista:
         return None
 
-    with _firma_lock:
-        if firma == _firma_vista:
+    with _firmaLock:
+        if firma == _firmaVista:
             return None
-        meta = _read_meta()
+        meta = _readMeta()
         if meta is None:
             return None
-        _firma_vista = firma
+        _firmaVista = firma
         try:
-            destino = _portfolio_db_path(str(meta.get("active") or ""))
+            destino = _portfolioDbPath(str(meta.get("active") or ""))
         except ValueError:
             return None
         if destino == Path(actual) or not destino.exists():
@@ -188,7 +188,7 @@ def _activo_segun_meta(actual: Path):
         return destino
 
 
-def _migrate_legacy_gastos(active_db_path: Path):
+def _migrateLegacyGastos(activeDbPath: Path):
     """Copia datos de gastos de portfolio.db (legacy) al DB activo si el activo está vacío."""
     if not _LEGACY_DB.exists():
         return
@@ -199,26 +199,26 @@ def _migrate_legacy_gastos(active_db_path: Path):
 
         # Comprobar si el legacy tiene mensualidades con valores o gastos
         try:
-            has_mens = src.execute(
+            hasMens = src.execute(
                 "SELECT 1 FROM mensualidades WHERE enero != '' OR febrero != '' LIMIT 1"
             ).fetchone()
-            has_rows = src.execute("SELECT 1 FROM gastos_rows LIMIT 1").fetchone()
+            hasRows = src.execute("SELECT 1 FROM gastos_rows LIMIT 1").fetchone()
         except Exception:
             src.close()
             return
 
-        if not has_mens and not has_rows:
+        if not hasMens and not hasRows:
             src.close()
             return
 
-        dst = sqlite3.connect(str(active_db_path), timeout=settings.backupSqliteTimeout())
+        dst = sqlite3.connect(str(activeDbPath), timeout=settings.backupSqliteTimeout())
         try:
             # Solo migrar si el activo NO tiene datos de gastos
-            empty_mens = dst.execute(
+            emptyMens = dst.execute(
                 "SELECT 1 FROM mensualidades WHERE enero != '' OR febrero != '' LIMIT 1"
             ).fetchone()
-            has_dst_rows = dst.execute("SELECT 1 FROM gastos_rows LIMIT 1").fetchone()
-            if empty_mens or has_dst_rows:
+            hasDstRows = dst.execute("SELECT 1 FROM gastos_rows LIMIT 1").fetchone()
+            if emptyMens or hasDstRows:
                 dst.close()
                 src.close()
                 return
@@ -229,7 +229,7 @@ def _migrate_legacy_gastos(active_db_path: Path):
 
         # Migrar mensualidades
         dst.execute("DELETE FROM mensualidades")
-        src_mens = src.execute(
+        srcMens = src.execute(
             "SELECT year, nombre, enero, febrero, marzo, abril, mayo, junio, "
             "julio, agosto, septiembre, octubre, noviembre, diciembre FROM mensualidades"
         ).fetchall()
@@ -239,23 +239,23 @@ def _migrate_legacy_gastos(active_db_path: Path):
             "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [(r["year"], r["nombre"], r["enero"], r["febrero"], r["marzo"], r["abril"],
               r["mayo"], r["junio"], r["julio"], r["agosto"], r["septiembre"],
-              r["octubre"], r["noviembre"], r["diciembre"]) for r in src_mens]
+              r["octubre"], r["noviembre"], r["diciembre"]) for r in srcMens]
         )
 
         # Migrar gastos_rows
         dst.execute("DELETE FROM gastos_rows")
-        src_rows = src.execute(
+        srcRows = src.execute(
             "SELECT year, month, fecha, nombre, tipo, cantidad FROM gastos_rows"
         ).fetchall()
         dst.executemany(
             "INSERT INTO gastos_rows (year, month, fecha, nombre, tipo, cantidad) VALUES (?, ?, ?, ?, ?, ?)",
-            [(r["year"], r["month"], r["fecha"], r["nombre"], r["tipo"], r["cantidad"]) for r in src_rows]
+            [(r["year"], r["month"], r["fecha"], r["nombre"], r["tipo"], r["cantidad"]) for r in srcRows]
         )
 
         # Migrar gastos_tipos
         dst.execute("DELETE FROM gastos_tipos")
-        src_tipos = src.execute("SELECT label FROM gastos_tipos").fetchall()
-        dst.executemany("INSERT OR IGNORE INTO gastos_tipos (label) VALUES (?)", [(r["label"],) for r in src_tipos])
+        srcTipos = src.execute("SELECT label FROM gastos_tipos").fetchall()
+        dst.executemany("INSERT OR IGNORE INTO gastos_tipos (label) VALUES (?)", [(r["label"],) for r in srcTipos])
 
         # Asegurar que gastos_years tiene los años correctos
         years = {r["year"] for r in src.execute("SELECT DISTINCT year FROM mensualidades").fetchall()}
@@ -269,16 +269,16 @@ def _migrate_legacy_gastos(active_db_path: Path):
 
         # Migrar ingresos si el activo no tiene ninguno
         try:
-            has_ing = dst.execute("SELECT 1 FROM ingresos_rows LIMIT 1").fetchone()
-            if not has_ing:
-                src_ing = src.execute(
+            hasIng = dst.execute("SELECT 1 FROM ingresos_rows LIMIT 1").fetchone()
+            if not hasIng:
+                srcIng = src.execute(
                     "SELECT year, month, fecha, nombre, tipo, cantidad FROM ingresos_rows ORDER BY id"
                 ).fetchall()
                 dst.executemany(
                     "INSERT INTO ingresos_rows (year, month, fecha, nombre, tipo, cantidad) VALUES (?,?,?,?,?,?)",
-                    [(r["year"], r["month"], r["fecha"], r["nombre"], r["tipo"], r["cantidad"]) for r in src_ing]
+                    [(r["year"], r["month"], r["fecha"], r["nombre"], r["tipo"], r["cantidad"]) for r in srcIng]
                 )
-                src_rec = src.execute(
+                srcRec = src.execute(
                     "SELECT year, nombre, enero, febrero, marzo, abril, mayo, junio, "
                     "julio, agosto, septiembre, octubre, noviembre, diciembre FROM ingresos_recurrentes ORDER BY id"
                 ).fetchall()
@@ -286,11 +286,11 @@ def _migrate_legacy_gastos(active_db_path: Path):
                     "INSERT OR IGNORE INTO ingresos_recurrentes "
                     "(year,nombre,enero,febrero,marzo,abril,mayo,junio,julio,agosto,septiembre,octubre,noviembre,diciembre) "
                     "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    [tuple(r) for r in src_rec]
+                    [tuple(r) for r in srcRec]
                 )
-                src_tipos_ing = src.execute("SELECT label FROM ingresos_tipos").fetchall()
-                dst.executemany("INSERT OR IGNORE INTO ingresos_tipos (label) VALUES (?)", [(r["label"],) for r in src_tipos_ing])
-                log.info(f"[gastos migration] Ingresos migrados desde legacy: {len(src_ing)} filas")
+                srcTiposIng = src.execute("SELECT label FROM ingresos_tipos").fetchall()
+                dst.executemany("INSERT OR IGNORE INTO ingresos_tipos (label) VALUES (?)", [(r["label"],) for r in srcTiposIng])
+                log.info(f"[gastos migration] Ingresos migrados desde legacy: {len(srcIng)} filas")
         except Exception as e:
             log.warning(f"[gastos migration] No se pudieron migrar ingresos: {e}")
 
@@ -303,29 +303,29 @@ def _migrate_legacy_gastos(active_db_path: Path):
         log.warning(f"[gastos migration] Aviso: {e}")
 
 
-def init_portfolios():
+def initPortfolios():
     """Llamado al arrancar el servidor. Migra el DB legacy si es necesario y activa el portfolio."""
-    meta = _read_meta()
+    meta = _readMeta()
 
     if meta is None:
         _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
-        default_id = "principal"
-        default_db = _PORTFOLIOS_DIR / f"{default_id}.db"
+        defaultId = "principal"
+        defaultDb = _PORTFOLIOS_DIR / f"{defaultId}.db"
 
-        if _LEGACY_DB.exists() and not default_db.exists():
+        if _LEGACY_DB.exists() and not defaultDb.exists():
             # API de backup de SQLite: incluye el WAL pendiente, cosa que una
             # copia de fichero simple podría perder.
-            from admin.backup_manager import _checkpoint_and_copy
-            _checkpoint_and_copy(_LEGACY_DB, default_db)
+            from admin.backup_manager import _checkpointAndCopy
+            _checkpointAndCopy(_LEGACY_DB, defaultDb)
 
         meta = {
-            "active": default_id,
-            "portfolios": [{"id": default_id, "name": "Principal"}],
+            "active": defaultId,
+            "portfolios": [{"id": defaultId, "name": "Principal"}],
         }
-        _write_meta(meta)
+        _writeMeta(meta)
 
     _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
-    active_id = meta.get("active", "principal")
+    activeId = meta.get("active", "principal")
 
     # El id sale de portfolios.json, y ese fichero ya no es necesariamente uno
     # que haya escrito la aplicación: desde que «Importar ZIP» acepta un archivo
@@ -334,24 +334,24 @@ def init_portfolios():
     # se escriba después— acabara fuera del volumen de datos, y el valor se
     # persistía, así que el desvío sobrevivía a cada arranque.
     #
-    # `_portfolio_db_path` es la comprobación que ya existía para esto mismo en
+    # `_portfolioDbPath` es la comprobación que ya existía para esto mismo en
     # borrar y cambiar de portfolio; lo que faltaba era usarla también aquí.
     try:
-        active_db = _portfolio_db_path(active_id)
+        activeDb = _portfolioDbPath(activeId)
     except ValueError:
         log.error(
             "[portfolios] El portfolio activo declarado en portfolios.json no es un id "
-            "admisible (%r). Se vuelve a 'principal'.", active_id,
+            "admisible (%r). Se vuelve a 'principal'.", activeId,
         )
-        active_id = "principal"
-        active_db = _portfolio_db_path(active_id)
-        meta["active"] = active_id
-        _write_meta(meta)
+        activeId = "principal"
+        activeDb = _portfolioDbPath(activeId)
+        meta["active"] = activeId
+        _writeMeta(meta)
 
     # Si el DB activo no existe, intentar recuperarlo desde el backup más reciente
-    if not active_db.exists():
-        log.warning(f"[portfolios] DB activo no encontrado: {active_db.name}. Intentando recuperar.")
-        _recover_missing_db(active_db)
+    if not activeDb.exists():
+        log.warning(f"[portfolios] DB activo no encontrado: {activeDb.name}. Intentando recuperar.")
+        _recoverMissingDb(activeDb)
 
     # La migración del legacy solo tiene sentido una vez, y solo hacia el
     # portfolio que se creó a partir de data/portfolio.db.
@@ -362,72 +362,72 @@ def init_portfolios():
     # que se le volcaran dentro los gastos, mensualidades, categorías e ingresos
     # del legacy. El usuario veía "mezclados" dos portfolios que nunca había
     # relacionado.
-    legacy_id = (meta.get("portfolios") or [{}])[0].get("id")
+    legacyId = (meta.get("portfolios") or [{}])[0].get("id")
 
     if not meta.get("legacyMigrated"):
-        if active_id == legacy_id:
-            _migrate_legacy_gastos(active_db)
+        if activeId == legacyId:
+            _migrateLegacyGastos(activeDb)
         # Se marca hecha en cualquier caso: es un paso de actualización de una
         # sola vez, no algo que deba reevaluarse en cada arranque.
         meta["legacyMigrated"] = True
-        _write_meta(meta)
+        _writeMeta(meta)
 
-    from admin.backup_manager import run_startup_backup
-    run_startup_backup(active_db)
+    from admin.backup_manager import runStartupBackup
+    runStartupBackup(activeDb)
 
-    _set_active(active_db)
+    _setActive(activeDb)
     return meta
 
 
-def _recover_missing_db(db_path: Path):
+def _recoverMissingDb(dbPath: Path):
     """Intenta recuperar un DB que no existe copiando desde el backup automático más reciente."""
-    from admin.backup_manager import _BACKUP_DIR, _dated_backups, _remove_wal_sidecars, check_integrity
-    candidates = list(reversed(_dated_backups(db_path.stem))) if _BACKUP_DIR.exists() else []
+    from admin.backup_manager import _BACKUP_DIR, _datedBackups, _removeWalSidecars, checkIntegrity
+    candidates = list(reversed(_datedBackups(dbPath.stem))) if _BACKUP_DIR.exists() else []
     for candidate in candidates:
-        if check_integrity(candidate):
+        if checkIntegrity(candidate):
             try:
-                shutil.copy2(str(candidate), str(db_path))
-                _remove_wal_sidecars(db_path)
+                shutil.copy2(str(candidate), str(dbPath))
+                _removeWalSidecars(dbPath)
                 log.info(f"[portfolios] DB recuperado desde: {candidate.name}")
                 return
             except Exception as e:
                 log.error(f"[portfolios] Error copiando {candidate.name}: {e}")
-    log.warning(f"[portfolios] No se pudo recuperar {db_path.name}. Se creará vacío.")
+    log.warning(f"[portfolios] No se pudo recuperar {dbPath.name}. Se creará vacío.")
 
 
-def get_portfolios():
-    meta = _read_meta()
+def getPortfolios():
+    meta = _readMeta()
     if meta is None:
-        return init_portfolios()
+        return initPortfolios()
     return meta
 
 
-def create_portfolio(name: str) -> str:
+def createPortfolio(name: str) -> str:
     name = name.strip()[:50]
     if not name:
         raise ValueError("El nombre no puede estar vacío")
 
-    from core.db import init_db_at_path
-    return registrar_portfolio(name, init_db_at_path)
+    from core.db import initDbAtPath
+    return registrarPortfolio(name, initDbAtPath)
 
 
-@_con_indice_bloqueado
-def switch_portfolio(pid: str):
-    meta = get_portfolios()
+@_conIndiceBloqueado
+def switchPortfolio(pid: str):
+    meta = getPortfolios()
     ids = {p["id"] for p in meta["portfolios"]}
     if pid not in ids:
         raise ValueError(f"Portfolio '{pid}' no encontrado")
 
-    db_path = _portfolio_db_path(pid)
+    dbPath = _portfolioDbPath(pid)
     meta["active"] = pid
-    _write_meta(meta)
-    _set_active(db_path)
+    _writeMeta(meta)
+    _setActive(dbPath)
 
 
-def _portfolio_db_path(pid: str) -> Path:
+def _portfolioDbPath(pid: str) -> Path:
     """Ruta del .db de un portfolio, verificando que no se escape del directorio.
 
-    delete_portfolio construía _PORTFOLIOS_DIR / f"{pid}.db" con un pid sin
+    deletePortfolio construía _PORTFOLIOS_DIR / f"{pid}.db" con un pid sin
     validar; un pid como '../portfolio' apuntaba a data/portfolio.db y lo movía
     a data/deleted/.
     """
@@ -439,13 +439,13 @@ def _portfolio_db_path(pid: str) -> Path:
     return path
 
 
-def get_active_portfolio_id():
+def getActivePortfolioId():
     """Id del portfolio activo, o None si el fichero de metadatos aún no existe."""
-    meta = get_portfolios()
+    meta = getPortfolios()
     return (meta or {}).get("active")
 
 
-def find_portfolio_id(valor: str):
+def findPortfolioId(valor: str):
     """Id de un portfolio a partir de su id o de su nombre visible.
 
     Aceptar el nombre le ahorra al Atajo de iOS dos acciones y una traducción
@@ -459,7 +459,7 @@ def find_portfolio_id(valor: str):
     if not texto:
         return None
 
-    portfolios = (get_portfolios() or {}).get("portfolios", [])
+    portfolios = (getPortfolios() or {}).get("portfolios", [])
 
     # El id manda: si alguien llamara "test2" a un portfolio cuyo id es otro, la
     # coincidencia exacta de id sigue ganando.
@@ -475,7 +475,7 @@ def find_portfolio_id(valor: str):
     return None
 
 
-def get_portfolio_db_path(pid: str) -> Path:
+def getPortfolioDbPath(pid: str) -> Path:
     """Ruta del .db de un portfolio existente.
 
     Lo usan los endpoints del Atajo para escribir en el portfolio que elija el
@@ -483,17 +483,17 @@ def get_portfolio_db_path(pid: str) -> Path:
     metadatos, no solo contra el sistema de ficheros, para que un pid válido de
     formato pero inexistente no acabe creando una base de datos vacía.
     """
-    meta = get_portfolios()
+    meta = getPortfolios()
 
     if pid not in {p["id"] for p in (meta or {}).get("portfolios", [])}:
         raise ValueError(f"Portfolio '{pid}' no encontrado")
 
-    return _portfolio_db_path(pid)
+    return _portfolioDbPath(pid)
 
 
-@_con_indice_bloqueado
-def delete_portfolio(pid: str):
-    meta = get_portfolios()
+@_conIndiceBloqueado
+def deletePortfolio(pid: str):
+    meta = getPortfolios()
     if pid not in {p["id"] for p in meta["portfolios"]}:
         raise ValueError(f"Portfolio '{pid}' no encontrado")
     if meta["active"] == pid:
@@ -501,40 +501,40 @@ def delete_portfolio(pid: str):
     if len(meta["portfolios"]) <= 1:
         raise ValueError("Debe existir al menos un portfolio")
 
-    db_file = _portfolio_db_path(pid)
+    dbFile = _portfolioDbPath(pid)
 
     meta["portfolios"] = [p for p in meta["portfolios"] if p["id"] != pid]
-    _write_meta(meta)
+    _writeMeta(meta)
 
-    if db_file.exists():
+    if dbFile.exists():
         _DELETED_DIR.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         # Mover en lugar de borrar: el .db queda recuperable en data/deleted/
-        shutil.move(str(db_file), str(_DELETED_DIR / f"{pid}_{ts}.db"))
+        shutil.move(str(dbFile), str(_DELETED_DIR / f"{pid}_{ts}.db"))
         for suffix in ("-wal", "-shm"):
-            sidecar = Path(str(db_file) + suffix)
+            sidecar = Path(str(dbFile) + suffix)
             if sidecar.exists():
                 shutil.move(str(sidecar), str(_DELETED_DIR / f"{pid}_{ts}.db{suffix}"))
 
 
-@_con_indice_bloqueado
-def rename_portfolio(pid: str, new_name: str):
+@_conIndiceBloqueado
+def renamePortfolio(pid: str, newName: str):
     """Cambia el nombre visible, bajo el cerrojo del índice como las altas.
 
     El cerrojo no es reentrante: no se puede llamar desde otra función que ya lo
     tenga tomado.
     """
-    new_name = new_name.strip()[:50]
-    if not new_name:
+    newName = newName.strip()[:50]
+    if not newName:
         raise ValueError("El nombre no puede estar vacío")
 
-    meta = get_portfolios()
-    if _nombre_en_uso(meta, new_name, salvo_id=pid):
-        raise NombreDuplicado(f"Ya existe un portfolio llamado «{new_name}»")
+    meta = getPortfolios()
+    if _nombreEnUso(meta, newName, salvoId=pid):
+        raise NombreDuplicado(f"Ya existe un portfolio llamado «{newName}»")
     for p in meta["portfolios"]:
         if p["id"] == pid:
-            p["name"] = new_name
-            _write_meta(meta)
+            p["name"] = newName
+            _writeMeta(meta)
             return
 
     raise ValueError(f"Portfolio '{pid}' no encontrado")

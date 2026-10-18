@@ -12,21 +12,21 @@ from core import telegram_notifier
 
 
 @pytest.fixture(autouse=True)
-def _sin_estado_previo():
-    telegram_notifier.reiniciar_para_pruebas()
+def _sinEstadoPrevio():
+    telegram_notifier.reiniciarParaPruebas()
     yield
     telegram_listener.detener()
-    telegram_notifier.reiniciar_para_pruebas()
+    telegram_notifier.reiniciarParaPruebas()
 
 
-def _update(texto, chat_id, update_id=1):
+def _update(texto, chatId, updateId=1):
     return {
-        "update_id": update_id,
-        "message": {"text": texto, "chat": {"id": chat_id}},
+        "update_id": updateId,
+        "message": {"text": texto, "chat": {"id": chatId}},
     }
 
 
-def test_start_del_chat_configurado_responde(monkeypatch):
+def testStartDelChatConfiguradoResponde(monkeypatch):
     llamadas = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chatId, texto: llamadas.append((chatId, texto)))
 
@@ -37,7 +37,7 @@ def test_start_del_chat_configurado_responde(monkeypatch):
     assert "Conectado" in llamadas[0][1]
 
 
-def test_start_de_otro_chat_se_ignora(monkeypatch):
+def testStartDeOtroChatSeIgnora(monkeypatch):
     llamadas = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda *a: llamadas.append(a))
 
@@ -46,7 +46,7 @@ def test_start_de_otro_chat_se_ignora(monkeypatch):
     assert llamadas == []
 
 
-def test_mensaje_que_no_es_start_se_ignora(monkeypatch):
+def testMensajeQueNoEsStartSeIgnora(monkeypatch):
     llamadas = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda *a: llamadas.append(a))
 
@@ -55,7 +55,7 @@ def test_mensaje_que_no_es_start_se_ignora(monkeypatch):
     assert llamadas == []
 
 
-def test_update_sin_mensaje_no_lanza(monkeypatch):
+def testUpdateSinMensajeNoLanza(monkeypatch):
     llamadas = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda *a: llamadas.append(a))
 
@@ -64,7 +64,7 @@ def test_update_sin_mensaje_no_lanza(monkeypatch):
     assert llamadas == []
 
 
-def test_fallo_al_confirmar_no_lanza(monkeypatch):
+def testFalloAlConfirmarNoLanza(monkeypatch):
     def _falla(*a):
         raise ValueError("Telegram caído")
 
@@ -73,7 +73,7 @@ def test_fallo_al_confirmar_no_lanza(monkeypatch):
     telegram_listener._procesar(_update("/start", 123456789), "token-123", "123456789")
 
 
-def test_iniciar_y_detener_es_idempotente(datos_aislados):
+def testIniciarYDetenerEsIdempotente(datosAislados):
     hilo1 = telegram_listener.iniciar()
     hilo2 = telegram_listener.iniciar()
 
@@ -87,16 +87,16 @@ def test_iniciar_y_detener_es_idempotente(datos_aislados):
 
 # ── Comandos ─────────────────────────────────────────────────────────────────
 
-def _comando(texto, chat_id=123456789, hace=0, update_id=1):
+def _comando(texto, chatId=123456789, hace=0, updateId=1):
     import time
 
     return {
-        "update_id": update_id,
-        "message": {"text": texto, "chat": {"id": chat_id}, "date": int(time.time()) - hace},
+        "update_id": updateId,
+        "message": {"text": texto, "chat": {"id": chatId}, "date": int(time.time()) - hace},
     }
 
 
-def test_un_comando_del_chat_configurado_se_contesta(monkeypatch):
+def testUnComandoDelChatConfiguradoSeContesta(monkeypatch):
     llamadas = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chatId, texto: llamadas.append((chatId, texto)))
 
@@ -106,7 +106,7 @@ def test_un_comando_del_chat_configurado_se_contesta(monkeypatch):
     assert llamadas[0][0] == "123456789" and "pong" in llamadas[0][1]
 
 
-def test_un_comando_de_otro_chat_no_se_contesta_ni_se_ejecuta(monkeypatch):
+def testUnComandoDeOtroChatNoSeContestaNiSeEjecuta(monkeypatch):
     """Ni siquiera con un comando desconocido: no se confirma que hay un bot detrás."""
     llamadas = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda *a: llamadas.append(a))
@@ -115,12 +115,12 @@ def test_un_comando_de_otro_chat_no_se_contesta_ni_se_ejecuta(monkeypatch):
     monkeypatch.setattr(telegram_comandos, "responder", lambda texto: ejecutados.append(texto) or "x")
 
     for texto in ("/backup", "/estado", "/inventado", "/ayuda"):
-        telegram_listener._procesar(_comando(texto, chat_id=999999999), "token-123", "123456789")
+        telegram_listener._procesar(_comando(texto, chatId=999999999), "token-123", "123456789")
 
     assert llamadas == [] and ejecutados == []
 
 
-def test_un_comando_viejo_no_se_ejecuta(monkeypatch):
+def testUnComandoViejoNoSeEjecuta(monkeypatch):
     """Tras un apagado, Telegram entrega lo escrito hace horas: un /backup de ayer no."""
     llamadas = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda *a: llamadas.append(a))
@@ -130,7 +130,7 @@ def test_un_comando_viejo_no_se_ejecuta(monkeypatch):
     assert llamadas == []
 
 
-def test_start_viejo_si_se_contesta(monkeypatch):
+def testStartViejoSiSeContesta(monkeypatch):
     """/start es el que desbloquea al bot: no caduca."""
     llamadas = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chatId, texto: llamadas.append(texto))
@@ -140,7 +140,7 @@ def test_start_viejo_si_se_contesta(monkeypatch):
     assert len(llamadas) == 1 and "/ayuda" in llamadas[0]
 
 
-def test_un_comando_desconocido_del_chat_autorizado_se_contesta(monkeypatch):
+def testUnComandoDesconocidoDelChatAutorizadoSeContesta(monkeypatch):
     llamadas = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chatId, texto: llamadas.append(texto))
 
@@ -149,10 +149,10 @@ def test_un_comando_desconocido_del_chat_autorizado_se_contesta(monkeypatch):
     assert len(llamadas) == 1 and "/ayuda" in llamadas[0]
 
 
-def test_el_bucle_sigue_con_la_siguiente_actualizacion_tras_un_fallo(monkeypatch, datos_aislados):
+def testElBucleSigueConLaSiguienteActualizacionTrasUnFallo(monkeypatch, datosAislados):
     monkeypatch.setenv("SECRET_KEY", "clave-de-pruebas-0123456789abcdef0123456789abcdef")
     telegram_notifier.escribirConfig("123456:ABC-token", "123456789")
-    monkeypatch.setattr(telegram_listener, "_registrar_menu", lambda token: None)
+    monkeypatch.setattr(telegram_listener, "_registrarMenu", lambda token: None)
 
     vistos = []
 
@@ -163,7 +163,7 @@ def test_el_bucle_sigue_con_la_siguiente_actualizacion_tras_un_fallo(monkeypatch
         telegram_listener._parada.set()
 
     monkeypatch.setattr(telegram_listener, "_procesar", _procesar)
-    monkeypatch.setattr(telegram_listener, "_get_updates", lambda token, offset: [{"update_id": 1}, {"update_id": 2}])
+    monkeypatch.setattr(telegram_listener, "_getUpdates", lambda token, offset: [{"update_id": 1}, {"update_id": 2}])
     telegram_listener._parada.clear()
 
     assert telegram_listener._escuchar() is True
@@ -171,7 +171,7 @@ def test_el_bucle_sigue_con_la_siguiente_actualizacion_tras_un_fallo(monkeypatch
     telegram_listener._parada.clear()
 
 
-def test_dos_workers_no_escuchan_a_la_vez(monkeypatch, datos_aislados):
+def testDosWorkersNoEscuchanALaVez(monkeypatch, datosAislados):
     """Telegram devuelve 409 a la segunda sesión de getUpdates, y contestaría doble."""
     from core.bloqueo import exclusivo
 
@@ -179,8 +179,8 @@ def test_dos_workers_no_escuchan_a_la_vez(monkeypatch, datos_aislados):
     monkeypatch.setattr(telegram_listener, "_escuchar", lambda: escuchas.append(1) or True)
     monkeypatch.setattr(telegram_listener, "_ESPERA_SIN_CONFIGURAR", 0.05)
 
-    with exclusivo(telegram_listener._ruta_bloqueo(), obligatorio=False) as otro_worker:
-        assert otro_worker is True
+    with exclusivo(telegram_listener._rutaBloqueo(), obligatorio=False) as otroWorker:
+        assert otroWorker is True
         # Este "worker" lo intenta en un hilo aparte (el bloqueo es por
         # descriptor abierto) mientras el otro sigue teniéndolo.
         import threading
@@ -196,7 +196,7 @@ def test_dos_workers_no_escuchan_a_la_vez(monkeypatch, datos_aislados):
     telegram_listener._parada.clear()
 
 
-def test_el_menu_de_comandos_se_registra_una_vez_por_token(monkeypatch):
+def testElMenuDeComandosSeRegistraUnaVezPorToken(monkeypatch):
     peticiones = []
 
     class _Respuesta:
@@ -211,22 +211,22 @@ def test_el_menu_de_comandos_se_registra_una_vez_por_token(monkeypatch):
         return _Respuesta()
 
     monkeypatch.setattr(telegram_listener.urllib.request, "urlopen", _urlopen)
-    monkeypatch.setattr(telegram_listener, "_menu_registrado", None)
+    monkeypatch.setattr(telegram_listener, "_menuRegistrado", None)
 
-    telegram_listener._registrar_menu("token-A")
-    telegram_listener._registrar_menu("token-A")
-    telegram_listener._registrar_menu("token-B")
+    telegram_listener._registrarMenu("token-A")
+    telegram_listener._registrarMenu("token-A")
+    telegram_listener._registrarMenu("token-B")
 
     assert len(peticiones) == 2 and all(p.endswith("/setMyCommands") for p in peticiones)
 
 
-def test_un_fallo_registrando_el_menu_se_ignora(monkeypatch):
+def testUnFalloRegistrandoElMenuSeIgnora(monkeypatch):
     def _cae(*a, **k):
         raise OSError("sin red")
 
     monkeypatch.setattr(telegram_listener.urllib.request, "urlopen", _cae)
-    monkeypatch.setattr(telegram_listener, "_menu_registrado", None)
+    monkeypatch.setattr(telegram_listener, "_menuRegistrado", None)
 
-    telegram_listener._registrar_menu("token-A")
+    telegram_listener._registrarMenu("token-A")
 
-    assert telegram_listener._menu_registrado is None, "hay que reintentarlo en la siguiente vuelta"
+    assert telegram_listener._menuRegistrado is None, "hay que reintentarlo en la siguiente vuelta"

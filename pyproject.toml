@@ -44,7 +44,7 @@ source = ["python"]
 branch = true
 omit = [
     # server.py se excluye porque la suite tiene prohibido importarlo: al
-    # importarse ejecuta init_portfolios() y ensureDataFile(), que escriben
+    # importarse ejecuta initPortfolios() y ensureDataFile(), que escriben
     # sobre los datos reales de quien lance los tests. Lo que sí importaba de
     # ese módulo —CSRF, sesión, límite de escrituras, cabeceras— vive ahora en
     # core/seguridad_app.py, y eso sí está cubierto.
@@ -96,8 +96,9 @@ select = [
     "RUF",  # reglas propias de ruff
 ]
 ignore = [
-    # El proyecto usa camelCase en las funciones de rutas y stores por
-    # coherencia con el frontend; renombrarlo sería un cambio masivo sin valor.
+    # Todo el código Python usa camelCase en funciones, parámetros y variables,
+    # igual que el frontend. Las constantes siguen en MAYÚSCULAS y los nombres
+    # que fija una librería (status_code, row_factory…) se quedan como están.
     "N802", "N803", "N806",
     # `except Exception` es deliberado en los puntos donde un fallo de un
     # proveedor externo no debe tumbar la petición completa.
@@ -123,8 +124,8 @@ ignore = [
 "tests/*" = ["RUF012"]
 
 [tool.ruff.lint.isort]
-# Sin esto, los imports con alias (`from market import fetch_json,
-# format_decimal as _format_decimal`) se parten en un bloque `from market
+# Sin esto, los imports con alias (`from market import fetchJson,
+# formatDecimal as _formatDecimal`) se parten en un bloque `from market
 # import (...)` por cada alias.
 combine-as-imports = true
 known-first-party = ["admin", "core", "providers", "routes", "server", "stores"]

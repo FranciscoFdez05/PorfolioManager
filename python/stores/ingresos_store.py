@@ -1,8 +1,8 @@
-from core.db import get_db, transactional
-from core.validation import normalize_year
+from core.db import getDb, transactional
+from core.validation import normalizeYear
 from stores import revisiones
-from stores.cuentas_store import ID_BANCO, cuentas_validas_para_filas, normalizar_cuenta_de_fila
-from stores.gastos_store import normalize_cuentas_cobro, serialize_cuentas_cobro
+from stores.cuentas_store import ID_BANCO, cuentasValidasParaFilas, normalizarCuentaDeFila
+from stores.gastos_store import normalizeCuentasCobro, serializeCuentasCobro
 
 _MAX_LABEL = 80
 _MAX_NAME = 120
@@ -27,17 +27,17 @@ FRECUENCIAS = {
 DEFAULT_FRECUENCIA = "mensual"
 
 
-def normalize_frecuencia(value):
+def normalizeFrecuencia(value):
     text = str(value or "").strip().lower()
     return text if text in FRECUENCIAS else DEFAULT_FRECUENCIA
 
 
-def normalize_mes(value):
+def normalizeMes(value):
     text = str(value or "").strip().lower()
     return text if text in MONTH_KEYS else MONTH_KEYS[0]
 
 
-def normalize_dia_cobro(value):
+def normalizeDiaCobro(value):
     text = str(value or "").strip()
     if not text.isdigit():
         return ""
@@ -45,18 +45,18 @@ def normalize_dia_cobro(value):
     return str(day) if 1 <= day <= 31 else ""
 
 
-def build_empty_month_summary():
+def buildEmptyMonthSummary():
     return dict.fromkeys(MONTH_KEYS, "")
 
 
-def create_default_ingresos_year(year):
-    normalized_year = normalize_year(year)
-    empty_months = build_empty_month_summary()
+def createDefaultIngresosYear(year):
+    normalizedYear = normalizeYear(year)
+    emptyMonths = buildEmptyMonthSummary()
     return {
-        "year": normalized_year,
+        "year": normalizedYear,
         "ingresosTipos": [],
         "recurrentes": [
-            {"nombre": name, "meses": dict(empty_months)}
+            {"nombre": name, "meses": dict(emptyMonths)}
             for name in DEFAULT_RECURRENTES
         ],
         "months": {month: {"rows": []} for month in MONTH_KEYS},
@@ -67,7 +67,7 @@ def _dict(valor):
     return valor if isinstance(valor, dict) else {}
 
 
-def sanitize_month_rows(rows):
+def sanitizeMonthRows(rows):
     if not isinstance(rows, list):
         return []
     # Un elemento que no es un objeto (`[1, "x"]`) llegaba a `row.get` y daba 500.
@@ -87,7 +87,7 @@ def sanitize_month_rows(rows):
     ]
 
 
-def sanitize_recurrentes_rows(rows):
+def sanitizeRecurrentesRows(rows):
     if not isinstance(rows, list):
         return []
     rows = [row for row in rows if isinstance(row, dict)]
@@ -98,7 +98,7 @@ def sanitize_recurrentes_rows(rows):
     # en vez de dejar que el INSERT falle y se pierda todo el guardado.
     seen = set()
 
-    def unique_name(value):
+    def uniqueName(value):
         base = str(value or "")[:_MAX_NAME].strip() or "Recurrente"
         name = base
         suffix = 2
@@ -110,16 +110,16 @@ def sanitize_recurrentes_rows(rows):
 
     return [
         {
-            "nombre": unique_name(row.get("nombre", "")),
+            "nombre": uniqueName(row.get("nombre", "")),
             "categoria": str(row.get("categoria", ""))[:_MAX_LABEL].strip(),
             "importe": str(row.get("importe", ""))[:_MAX_SHORT].strip(),
-            "frecuencia": normalize_frecuencia(row.get("frecuencia")),
-            "diaCobro": normalize_dia_cobro(row.get("diaCobro")),
-            "mesInicio": normalize_mes(row.get("mesInicio")),
+            "frecuencia": normalizeFrecuencia(row.get("frecuencia")),
+            "diaCobro": normalizeDiaCobro(row.get("diaCobro")),
+            "mesInicio": normalizeMes(row.get("mesInicio")),
             "activa": bool(row.get("activa", True)),
             "nota": str(row.get("nota", ""))[:_MAX_NOTA].strip(),
             "cuenta": str(row.get("cuenta", ""))[:_MAX_SHORT * 2].strip(),
-            "cuentasCobro": normalize_cuentas_cobro(row.get("cuentasCobro")),
+            "cuentasCobro": normalizeCuentasCobro(row.get("cuentasCobro")),
             "meses": {
                 month: str(_dict(row.get("meses")).get(month, ""))[:_MAX_SHORT].strip()
                 for month in MONTH_KEYS
@@ -129,7 +129,7 @@ def sanitize_recurrentes_rows(rows):
     ]
 
 
-def sanitize_ingresos_types(payload):
+def sanitizeIngresosTypes(payload):
     values = payload.get("types", payload) if isinstance(payload, dict) else payload
     if not isinstance(values, list):
         return []
@@ -145,54 +145,54 @@ def sanitize_ingresos_types(payload):
     return sanitized
 
 
-def sanitize_ingresos_payload(payload, fallback_year=None):
-    year = normalize_year(payload.get("year") or fallback_year)
+def sanitizeIngresosPayload(payload, fallbackYear=None):
+    year = normalizeYear(payload.get("year") or fallbackYear)
     if not year:
         return None, "Año inválido"
 
-    recurrentes = sanitize_recurrentes_rows(payload.get("recurrentes", []))
+    recurrentes = sanitizeRecurrentesRows(payload.get("recurrentes", []))
 
-    ingresos_tipos = sanitize_ingresos_types(payload.get("ingresosTipos", []))
-    seen_tipos = {label.lower() for label in ingresos_tipos}
+    ingresosTipos = sanitizeIngresosTypes(payload.get("ingresosTipos", []))
+    seenTipos = {label.lower() for label in ingresosTipos}
 
-    sanitized_months = {}
+    sanitizedMonths = {}
     for month in MONTH_KEYS:
-        month_data = _dict(_dict(payload.get("months")).get(month))
-        sanitized_rows = sanitize_month_rows(month_data.get("rows", []))
-        sanitized_months[month] = {"rows": sanitized_rows}
+        monthData = _dict(_dict(payload.get("months")).get(month))
+        sanitizedRows = sanitizeMonthRows(monthData.get("rows", []))
+        sanitizedMonths[month] = {"rows": sanitizedRows}
 
-        for row in sanitized_rows:
+        for row in sanitizedRows:
             label = str(row.get("tipo", "")).strip()
             normalized = label.lower()
-            if not label or normalized in seen_tipos:
+            if not label or normalized in seenTipos:
                 continue
-            ingresos_tipos.append(label)
-            seen_tipos.add(normalized)
+            ingresosTipos.append(label)
+            seenTipos.add(normalized)
 
     return {
         "year": year,
-        "ingresosTipos": ingresos_tipos,
+        "ingresosTipos": ingresosTipos,
         "recurrentes": recurrentes,
-        "months": sanitized_months,
+        "months": sanitizedMonths,
     }, None
 
 
-def read_ingresos_types():
-    conn = get_db()
+def readIngresosTypes():
+    conn = getDb()
     return [r["label"] for r in conn.execute("SELECT label FROM ingresos_tipos ORDER BY rowid").fetchall()]
 
 
 @transactional
-def write_ingresos_types(types):
-    conn = get_db()
-    sanitized = sanitize_ingresos_types(types)
+def writeIngresosTypes(types):
+    conn = getDb()
+    sanitized = sanitizeIngresosTypes(types)
     conn.execute("DELETE FROM ingresos_tipos")
     conn.executemany("INSERT INTO ingresos_tipos (label) VALUES (?)", [(t,) for t in sanitized])
     conn.commit()
 
 
-def list_ingresos_years():
-    conn = get_db()
+def listIngresosYears():
+    conn = getDb()
     rows = conn.execute(
         "SELECT DISTINCT year FROM ingresos_rows "
         "UNION SELECT DISTINCT year FROM ingresos_recurrentes "
@@ -201,20 +201,20 @@ def list_ingresos_years():
     return [r["year"] for r in rows]
 
 
-def read_ingresos_year(year):
-    normalized = normalize_year(year)
+def readIngresosYear(year):
+    normalized = normalizeYear(year)
     if not normalized:
         return None
 
-    conn = get_db()
-    has_rows = conn.execute(
+    conn = getDb()
+    hasRows = conn.execute(
         "SELECT 1 FROM ingresos_rows WHERE year = ? LIMIT 1", (normalized,)
     ).fetchone()
-    has_rec = conn.execute(
+    hasRec = conn.execute(
         "SELECT 1 FROM ingresos_recurrentes WHERE year = ? LIMIT 1", (normalized,)
     ).fetchone()
 
-    if not has_rows and not has_rec:
+    if not hasRows and not hasRec:
         return None
 
     recurrentes = [
@@ -222,13 +222,13 @@ def read_ingresos_year(year):
             "nombre": r["nombre"],
             "categoria": r["categoria"],
             "importe": r["importe"],
-            "frecuencia": normalize_frecuencia(r["frecuencia"]),
-            "diaCobro": normalize_dia_cobro(r["dia_cobro"]),
-            "mesInicio": normalize_mes(r["mes_inicio"]),
+            "frecuencia": normalizeFrecuencia(r["frecuencia"]),
+            "diaCobro": normalizeDiaCobro(r["dia_cobro"]),
+            "mesInicio": normalizeMes(r["mes_inicio"]),
             "activa": bool(r["activa"]),
             "nota": r["nota"],
             "cuenta": r["cuenta"],
-            "cuentasCobro": normalize_cuentas_cobro(r["cuentas_cobro"]),
+            "cuentasCobro": normalizeCuentasCobro(r["cuentas_cobro"]),
             "meses": {month: r[month] for month in MONTH_KEYS},
         }
         for r in conn.execute(
@@ -242,7 +242,7 @@ def read_ingresos_year(year):
 
     months = {}
     for month in MONTH_KEYS:
-        month_rows = conn.execute(
+        monthRows = conn.execute(
             "SELECT fecha, nombre, tipo, cantidad, nota, cuenta FROM ingresos_rows "
             "WHERE year = ? AND month = ? ORDER BY id",
             (normalized, month)
@@ -252,12 +252,12 @@ def read_ingresos_year(year):
                 "fecha": r["fecha"], "nombre": r["nombre"], "tipo": r["tipo"],
                 "cantidad": r["cantidad"], "nota": r["nota"], "cuenta": r["cuenta"],
             }
-            for r in month_rows
+            for r in monthRows
         ]}
 
     return {
         "year": normalized,
-        "ingresosTipos": read_ingresos_types(),
+        "ingresosTipos": readIngresosTypes(),
         "recurrentes": recurrentes,
         "months": months,
         "revision": revisiones.leer(conn, "ingresos", normalized),
@@ -265,23 +265,23 @@ def read_ingresos_year(year):
 
 
 @transactional
-def write_ingresos_year(year, data, revision_esperada=None):
+def writeIngresosYear(year, data, revisionEsperada=None):
     """Sustituye el año entero. Devuelve la revisión nueva.
 
     Con `revision_esperada` lanza ConflictoRevision si el año cambió desde que
     el cliente lo leyó (ver stores/revisiones.py).
     """
-    normalized = normalize_year(year)
+    normalized = normalizeYear(year)
     if not normalized:
         return None
 
-    conn = get_db()
-    revisiones.tomar_bloqueo(conn)
-    revisiones.comprobar(conn, "ingresos", normalized, revision_esperada)
+    conn = getDb()
+    revisiones.tomarBloqueo(conn)
+    revisiones.comprobar(conn, "ingresos", normalized, revisionEsperada)
     conn.execute("DELETE FROM ingresos_rows WHERE year = ?", (normalized,))
     conn.execute("DELETE FROM ingresos_recurrentes WHERE year = ?", (normalized,))
 
-    validas = cuentas_validas_para_filas(conn)
+    validas = cuentasValidasParaFilas(conn)
     conn.executemany(
         "INSERT INTO ingresos_recurrentes "
         "(year, nombre, enero, febrero, marzo, abril, mayo, junio, julio, agosto, "
@@ -297,31 +297,31 @@ def write_ingresos_year(year, data, revision_esperada=None):
              m.get("meses", {}).get("septiembre", ""), m.get("meses", {}).get("octubre", ""),
              m.get("meses", {}).get("noviembre", ""), m.get("meses", {}).get("diciembre", ""),
              m.get("categoria", ""), m.get("importe", ""),
-             normalize_frecuencia(m.get("frecuencia")),
-             normalize_dia_cobro(m.get("diaCobro")),
-             normalize_mes(m.get("mesInicio")),
+             normalizeFrecuencia(m.get("frecuencia")),
+             normalizeDiaCobro(m.get("diaCobro")),
+             normalizeMes(m.get("mesInicio")),
              1 if m.get("activa", True) else 0,
              m.get("nota", ""),
-             normalizar_cuenta_de_fila(m.get("cuenta"), validas),
-             serialize_cuentas_cobro(m.get("cuentasCobro"), validas | {ID_BANCO}))
+             normalizarCuentaDeFila(m.get("cuenta"), validas),
+             serializeCuentasCobro(m.get("cuentasCobro"), validas | {ID_BANCO}))
             for m in data.get("recurrentes", [])
         ]
     )
 
-    rows_to_insert = []
+    rowsToInsert = []
     for month in MONTH_KEYS:
         for row in data.get("months", {}).get(month, {}).get("rows", []):
-            rows_to_insert.append((
+            rowsToInsert.append((
                 normalized, month,
                 row.get("fecha", ""), row.get("nombre", ""),
                 row.get("tipo", ""), row.get("cantidad", ""),
                 row.get("nota", ""),
-                normalizar_cuenta_de_fila(row.get("cuenta"), validas),
+                normalizarCuentaDeFila(row.get("cuenta"), validas),
             ))
     conn.executemany(
         "INSERT INTO ingresos_rows (year, month, fecha, nombre, tipo, cantidad, nota, cuenta) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        rows_to_insert
+        rowsToInsert
     )
 
     if data.get("ingresosTipos"):
@@ -337,12 +337,12 @@ def write_ingresos_year(year, data, revision_esperada=None):
 
 
 @transactional
-def delete_ingresos_year(year):
-    normalized = normalize_year(year)
+def deleteIngresosYear(year):
+    normalized = normalizeYear(year)
     if not normalized:
         return False
 
-    conn = get_db()
+    conn = getDb()
     r1 = conn.execute("DELETE FROM ingresos_rows WHERE year = ?", (normalized,))
     r2 = conn.execute("DELETE FROM ingresos_recurrentes WHERE year = ?", (normalized,))
     # Una pestaña que aún tenga el año abierto no debe poder resucitarlo al guardar.

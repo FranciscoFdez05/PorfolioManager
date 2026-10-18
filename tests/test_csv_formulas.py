@@ -6,19 +6,19 @@ el CSV y la hoja de cálculo lo interpretaba como fórmula.
 
 import pytest
 
-from core.informe_renta import _texto_csv
+from core.informe_renta import _textoCsv
 
 
 @pytest.mark.parametrize("texto", ["=1+1", "+34 600", "-cmd", "@SUM(A1)", "\tx", "\rx",
                                    '=HYPERLINK("http://x","v")'])
-def test_lo_que_empieza_como_formula_queda_como_texto(texto):
-    assert _texto_csv(texto) == "'" + texto
+def testLoQueEmpiezaComoFormulaQuedaComoTexto(texto):
+    assert _textoCsv(texto) == "'" + texto
 
 
 @pytest.mark.parametrize("texto", ["Apple", "10-01-2026", "1,5", "", "Vanguard FTSE All-World"])
-def test_el_texto_normal_no_cambia(texto):
-    assert _texto_csv(texto) == texto
+def testElTextoNormalNoCambia(texto):
+    assert _textoCsv(texto) == texto
 
 
-def test_none_es_cadena_vacia():
-    assert _texto_csv(None) == ""
+def testNoneEsCadenaVacia():
+    assert _textoCsv(None) == ""

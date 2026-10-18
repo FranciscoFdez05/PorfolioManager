@@ -17,8 +17,8 @@ import logging
 import time
 
 from core import settings
-from core.db import get_db, transaction
-from providers.yahoo_finance_client import fetch_price_series
+from core.db import getDb, transaction
+from providers.yahoo_finance_client import fetchPriceSeries
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ _MARGEN_DIAS = 1
 # el gráfico. Hace falta además de la caché en BD porque un fin de semana el
 # último cierre es el del viernes y, sin esto, cada refresco volvería a
 # preguntar por un dato que todavía no existe.
-_ultimo_intento: dict[str, float] = {}
+_ultimoIntento: dict[str, float] = {}
 
 
 def catalogo():
@@ -50,10 +50,10 @@ def catalogo():
     return [{"clave": clave, **datos} for clave, datos in INDICES.items()]
 
 
-def _cache(symbol, desde_ts, hasta_ts):
-    filas = get_db().execute(
+def _cache(symbol, desdeTs, hastaTs):
+    filas = getDb().execute(
         "SELECT ts, close FROM benchmark_prices WHERE symbol = ? AND ts BETWEEN ? AND ? ORDER BY ts ASC",
-        (symbol, int(desde_ts), int(hasta_ts)),
+        (symbol, int(desdeTs), int(hastaTs)),
     ).fetchall()
     return [{"ts": f["ts"], "close": f["close"]} for f in filas]
 
@@ -73,14 +73,14 @@ def _guardar(symbol, serie):
         )
 
 
-def _hace_falta_bajar(symbol, cacheada, desde_ts, hasta_ts):
+def _haceFaltaBajar(symbol, cacheada, desdeTs, hastaTs):
     """¿La caché cubre el tramo pedido, o hay que volver a preguntar?
 
     TTL 0 en `[mercado] historico_ttl_segundos` desactiva la caché en memoria
     (no la de la BD), igual que en `/api/historical-changes`.
     """
     ttl = settings.historicoTtlSegundos()
-    if ttl > 0 and time.time() - _ultimo_intento.get(symbol, 0) < ttl:
+    if ttl > 0 and time.time() - _ultimoIntento.get(symbol, 0) < ttl:
         return False
     if not cacheada:
         return True
@@ -88,10 +88,10 @@ def _hace_falta_bajar(symbol, cacheada, desde_ts, hasta_ts):
     margen = _MARGEN_DIAS * 86400
     # Falta cola (el índice se ha movido desde la última visita) o falta cabeza
     # (el usuario ha estirado el rango hacia atrás).
-    return cacheada[-1]["ts"] < hasta_ts - margen or cacheada[0]["ts"] > desde_ts + margen
+    return cacheada[-1]["ts"] < hastaTs - margen or cacheada[0]["ts"] > desdeTs + margen
 
 
-def serie(clave, desde_ts, hasta_ts):
+def serie(clave, desdeTs, hastaTs):
     """Cierres diarios del índice `clave` en el tramo pedido.
 
     Devuelve `({"clave", "symbol", "nombre", "data"}, error)`. Si la descarga
@@ -104,22 +104,22 @@ def serie(clave, desde_ts, hasta_ts):
         return None, "Índice desconocido"
 
     symbol   = indice["symbol"]
-    desde_ts = int(desde_ts)
-    hasta_ts = int(hasta_ts)
-    cacheada = _cache(symbol, desde_ts, hasta_ts)
+    desdeTs = int(desdeTs)
+    hastaTs = int(hastaTs)
+    cacheada = _cache(symbol, desdeTs, hastaTs)
 
-    if _hace_falta_bajar(symbol, cacheada, desde_ts, hasta_ts):
-        _ultimo_intento[symbol] = time.time()
+    if _haceFaltaBajar(symbol, cacheada, desdeTs, hastaTs):
+        _ultimoIntento[symbol] = time.time()
         # Se baja un margen extra por delante para que un rango que empieza en
         # fin de semana o festivo tenga un cierre con el que arrancar la base 100.
-        bajada, error = fetch_price_series(symbol, desde_ts - 7 * 86400, hasta_ts)
+        bajada, error = fetchPriceSeries(symbol, desdeTs - 7 * 86400, hastaTs)
         if error:
             log.info("[benchmark] %s: %s", symbol, error)
             if not cacheada:
                 return None, error
         else:
             _guardar(symbol, bajada)
-            cacheada = _cache(symbol, desde_ts, hasta_ts)
+            cacheada = _cache(symbol, desdeTs, hastaTs)
 
     return {
         "clave":  str(clave).strip().lower(),

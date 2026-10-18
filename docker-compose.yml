@@ -217,7 +217,7 @@ services:
       - ${PORTFOLIO_HOST_API_DIR:-./API}:/app/API:ro
       - ${PORTFOLIO_HOST_DATA_DIR:-./data}:/app/data:ro
       # La CA interna de Caddy, para verificar el certificado del proxy al
-      # sondearlo (python/vigilante.py · contexto_tls). Solo lectura.
+      # sondearlo (python/vigilante.py · contextoTls). Solo lectura.
       - caddy_data:/caddy-data:ro
     restart: unless-stopped
     read_only: true

@@ -54,7 +54,7 @@ MODULOS_FRONTERA = [
 ]
 
 
-def _llamadas_a_float(ruta):
+def _llamadasAFloat(ruta):
     """[(línea, código_fuente_de_la_llamada)] de cada `float(...)` del módulo."""
     fuente = ruta.read_text("utf-8")
     arbol = ast.parse(fuente, filename=str(ruta))
@@ -66,7 +66,7 @@ def _llamadas_a_float(ruta):
     return fuente, encontradas
 
 
-def _envuelve_a_dinero(nodo):
+def _envuelveADinero(nodo):
     """True si es `float(dinero.algo(...))`, la única forma permitida."""
     if len(nodo.args) != 1:
         return False
@@ -82,9 +82,9 @@ def _envuelve_a_dinero(nodo):
 
 
 @pytest.mark.parametrize("modulo", MODULOS_PUROS)
-def test_los_modulos_de_calculo_no_llaman_a_float(modulo):
+def testLosModulosDeCalculoNoLlamanAFloat(modulo):
     ruta = PYTHON_DIR / modulo
-    _fuente, llamadas = _llamadas_a_float(ruta)
+    _fuente, llamadas = _llamadasAFloat(ruta)
 
     assert not llamadas, (
         f"{modulo} llama a float() en la(s) línea(s) "
@@ -94,15 +94,15 @@ def test_los_modulos_de_calculo_no_llaman_a_float(modulo):
 
 
 @pytest.mark.parametrize("modulo", MODULOS_FRONTERA)
-def test_en_la_frontera_float_solo_envuelve_a_dinero(modulo):
+def testEnLaFronteraFloatSoloEnvuelveADinero(modulo):
     ruta = PYTHON_DIR / modulo
-    fuente, llamadas = _llamadas_a_float(ruta)
+    fuente, llamadas = _llamadasAFloat(ruta)
     lineas = fuente.splitlines()
 
     infractoras = [
         (linea, lineas[linea - 1].strip())
         for linea, nodo in llamadas
-        if not _envuelve_a_dinero(nodo)
+        if not _envuelveADinero(nodo)
     ]
 
     assert not infractoras, (
@@ -113,13 +113,13 @@ def test_en_la_frontera_float_solo_envuelve_a_dinero(modulo):
     )
 
 
-def test_las_listas_apuntan_a_ficheros_que_existen():
+def testLasListasApuntanAFicherosQueExisten():
     """Renombrar un módulo y dejarlo fuera de la lista desactivaría la regla."""
     for modulo in MODULOS_PUROS + MODULOS_FRONTERA:
         assert (PYTHON_DIR / modulo).is_file(), f"{modulo} ya no existe; actualiza la lista"
 
 
-def _construye_decimal_desde_str(ruta):
+def _construyeDecimalDesdeStr(ruta):
     """Líneas con un `Decimal(str(...))` **de código**, no de comentario.
 
     La comprobación va sobre el AST justamente porque los docstrings de estos
@@ -144,7 +144,7 @@ def _construye_decimal_desde_str(ruta):
 
 
 @pytest.mark.parametrize("modulo", ["core/fifo.py", "core/informe_renta.py", "core/pnl_divisa.py"])
-def test_no_quedan_conversiones_de_importes_propias(modulo):
+def testNoQuedanConversionesDeImportesPropias(modulo):
     """Cada `_dec` privado que reaparezca es la sexta implementación en camino.
 
     Los tres módulos que tenían la suya delegan ahora en `core.dinero`; lo que
@@ -154,7 +154,7 @@ def test_no_quedan_conversiones_de_importes_propias(modulo):
     """
     ruta = PYTHON_DIR / modulo
 
-    lineas = _construye_decimal_desde_str(ruta)
+    lineas = _construyeDecimalDesdeStr(ruta)
     assert not lineas, (
         f"{modulo} vuelve a construir Decimal desde str en la(s) línea(s) {lineas}. "
         f"Usa dinero.aDecimal, que entiende también el formato español en el que "

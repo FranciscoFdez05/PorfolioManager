@@ -12,22 +12,22 @@ from pathlib import Path
 from flask import Blueprint, Response, jsonify, request
 
 from core import clave_copias, exportables, paths, proveedores_pausados, sesion, settings, telegram_notifier, zip_seguro
-from core.copia_sqlite import copiar as copiar_sqlite
-from core.db import get_active_db_path, get_db
+from core.copia_sqlite import copiar as copiarSqlite
+from core.db import getActiveDbPath, getDb
 from core.errors import registrarFalloEscritura
 from core.escritura import escribirJsonAtomico, temporalPara
 from core.paths import AJUSTES_JSON as _AJUSTES_JSON, API_DIR as _API_DIR, JSON_DIR
-from core.secret_store import read_secret_lines, write_secret_lines
-from providers import estado as estado_proveedores
-from providers.api_stats import get_today_stats
+from core.secret_store import readSecretLines, writeSecretLines
+from providers import estado as estadoProveedores
+from providers.api_stats import getTodayStats
 from stores import app_data
-from stores.cuenta_ahorro_store import normalizar_config, vinculos_de_config
-from stores.cuentas_store import importar_vinculos
-from stores.paneles_config import normalizar_paneles
+from stores.cuenta_ahorro_store import normalizarConfig, vinculosDeConfig
+from stores.cuentas_store import importarVinculos
+from stores.paneles_config import normalizarPaneles
 
 log = logging.getLogger(__name__)
 
-ajustes_bp = Blueprint("ajustes", __name__)
+ajustesBp = Blueprint("ajustes", __name__)
 
 # Claves globales (compartidas entre todos los portfolios)
 _FIAT_DEFAULTS = [
@@ -96,7 +96,7 @@ _PORTFOLIO_DEFAULTS = {
     # cuentan, el objetivo y la aportación mensual (ver stores.cuenta_ahorro_store).
     "cuentaAhorroConfig": {},
     # Último mes con aportación automática creada, por cuenta. Solo lo escribe el
-    # servidor (no se lee ni se acepta desde la web): ver aplicar_recurrentes.
+    # servidor (no se lee ni se acepta desde la web): ver aplicarRecurrentes.
     "cuentaAhorroGenerado": {},
     # Activos > Paneles: los paneles del usuario y sus widgets (ver
     # stores.paneles_config).
@@ -107,15 +107,15 @@ _GLOBAL_KEYS    = set(_GLOBAL_DEFAULTS)
 _PORTFOLIO_KEYS = set(_PORTFOLIO_DEFAULTS)
 
 
-def _active_portfolio_id() -> str:
-    return get_active_db_path().stem
+def _activePortfolioId() -> str:
+    return getActiveDbPath().stem
 
 
-def _prefs_path(portfolio_id: str) -> Path:
-    return JSON_DIR / f"prefs_{portfolio_id}.json"
+def _prefsPath(portfolioId: str) -> Path:
+    return JSON_DIR / f"prefs_{portfolioId}.json"
 
 
-def _tipo_compatible(valor, defecto) -> bool:
+def _tipoCompatible(valor, defecto) -> bool:
     if isinstance(defecto, bool):
         return isinstance(valor, bool)
     if isinstance(defecto, (int, float)):
@@ -136,7 +136,7 @@ def _sanear(guardado, defaults: dict) -> dict:
         return dict(defaults)
     limpio = dict(defaults)
     for clave, valor in guardado.items():
-        if clave not in defaults or not _tipo_compatible(valor, defaults[clave]):
+        if clave not in defaults or not _tipoCompatible(valor, defaults[clave]):
             continue
         if clave == "fiatCurrencies":
             if not valor or not all(
@@ -152,7 +152,7 @@ def _sanear(guardado, defaults: dict) -> dict:
     return limpio
 
 
-def _read_ajustes():
+def _readAjustes():
     if not _AJUSTES_JSON.exists():
         return dict(_GLOBAL_DEFAULTS)
     try:
@@ -161,11 +161,11 @@ def _read_ajustes():
         return dict(_GLOBAL_DEFAULTS)
 
 
-def _atomic_write_json(path: Path, data) -> None:
+def _atomicWriteJson(path: Path, data) -> None:
     """Escribe JSON de forma atómica y durable: tmp → fsync → rename.
 
     write_text() directo truncaba el fichero antes de escribirlo: un fallo a
-    mitad dejaba un JSON inválido y _read_ajustes/_read_prefs caen al valor por
+    mitad dejaba un JSON inválido y _readAjustes/_readPrefs caen al valor por
     defecto en silencio, es decir, todos los ajustes perdidos sin aviso.
 
     La mecánica vive ahora en core/escritura.py, que es de donde la toman
@@ -175,12 +175,12 @@ def _atomic_write_json(path: Path, data) -> None:
     escribirJsonAtomico(path, data)
 
 
-def _write_ajustes(data):
-    _atomic_write_json(_AJUSTES_JSON, data)
+def _writeAjustes(data):
+    _atomicWriteJson(_AJUSTES_JSON, data)
 
 
-def _read_prefs(portfolio_id: str) -> dict:
-    path = _prefs_path(portfolio_id)
+def _readPrefs(portfolioId: str) -> dict:
+    path = _prefsPath(portfolioId)
     if not path.exists():
         # Migración: extraer claves por-portfolio desde ajustes.json si existen
         try:
@@ -191,15 +191,15 @@ def _read_prefs(portfolio_id: str) -> dict:
         return dict(_PORTFOLIO_DEFAULTS)
     try:
         # Filtrar a las claves conocidas y con la forma esperada, igual que
-        # _read_ajustes: un prefs importado podía inyectar claves arbitrarias
+        # _readAjustes: un prefs importado podía inyectar claves arbitrarias
         # que luego se reescriben, o valores que tumbaban el guardado.
         return _sanear(json.loads(path.read_text("utf-8")), _PORTFOLIO_DEFAULTS)
     except Exception:
         return dict(_PORTFOLIO_DEFAULTS)
 
 
-def _write_prefs(portfolio_id: str, data: dict):
-    _atomic_write_json(_prefs_path(portfolio_id), data)
+def _writePrefs(portfolioId: str, data: dict):
+    _atomicWriteJson(_prefsPath(portfolioId), data)
 
 
 def _opcion(valor, permitidos, defecto):
@@ -211,7 +211,7 @@ def _opcion(valor, permitidos, defecto):
     return valor if isinstance(valor, str) and valor in permitidos else defecto
 
 
-def _as_int(value, default, allowed=None):
+def _asInt(value, default, allowed=None):
     """int() tolerante. Un valor no numérico en ajustes.json (o en el JSON de un
     import) reventaba GET /api/settings con un 500 permanente que dejaba la app
     inutilizable, porque no había forma de corregir el ajuste desde la UI."""
@@ -232,7 +232,7 @@ _FICHEROS_CLAVES = {
 }
 
 
-def _fichero_de_claves(proveedor):
+def _ficheroDeClaves(proveedor):
     """Ruta del fichero del proveedor, o None si el nombre no es de los tres.
 
     El nombre llega en el cuerpo de la petición: sin contrastarlo contra los
@@ -242,12 +242,12 @@ def _fichero_de_claves(proveedor):
     return (_API_DIR / nombre) if nombre else None
 
 
-def _huella_clave(clave: str) -> str:
+def _huellaClave(clave: str) -> str:
     """Identificador estable de una clave que no permite reconstruirla."""
     return hashlib.sha256(clave.encode("utf-8")).hexdigest()[:16]
 
 
-def _enmascarar_clave(clave):
+def _enmascararClave(clave):
     """Lo justo para reconocer una clave sin enseñarla.
 
     Con las puntas se distingue una clave de otra —que es lo que hace falta para
@@ -262,58 +262,58 @@ def _enmascarar_clave(clave):
     return f"{clave[:4]}{'-' * 6}{clave[-4:]}"
 
 
-def _read_key_file(path):
+def _readKeyFile(path):
     """Claves del fichero, descifrando si está en formato cifrado."""
-    return "\n".join(read_secret_lines(path))
+    return "\n".join(readSecretLines(path))
 
 
-def _write_key_file(path, value):
-    write_secret_lines(path, str(value).splitlines())
+def _writeKeyFile(path, value):
+    writeSecretLines(path, str(value).splitlines())
 
 
-def _append_key_file(path, value):
-    existing = read_secret_lines(path)
-    new_key = str(value).strip()
-    if new_key and new_key not in existing:
-        existing.append(new_key)
-    write_secret_lines(path, existing)
+def _appendKeyFile(path, value):
+    existing = readSecretLines(path)
+    newKey = str(value).strip()
+    if newKey and newKey not in existing:
+        existing.append(newKey)
+    writeSecretLines(path, existing)
 
 
-@ajustes_bp.route("/api/settings", methods=["GET"])
-def get_settings():
-    pid  = _active_portfolio_id()
-    gcfg = _read_ajustes()
-    pcfg = _read_prefs(pid)
-    finnhub_raw      = _read_key_file(_API_DIR / "finnhub.key")
-    eodhd_raw        = _read_key_file(_API_DIR / "eodhd.key")
-    alphavantage_raw = _read_key_file(_API_DIR / "alphavantage.key")
+@ajustesBp.route("/api/settings", methods=["GET"])
+def getSettings():
+    pid  = _activePortfolioId()
+    gcfg = _readAjustes()
+    pcfg = _readPrefs(pid)
+    finnhubRaw      = _readKeyFile(_API_DIR / "finnhub.key")
+    eodhdRaw        = _readKeyFile(_API_DIR / "eodhd.key")
+    alphavantageRaw = _readKeyFile(_API_DIR / "alphavantage.key")
     return jsonify({
         "ok":                    True,
-        "finnhubKeyCount":       len([k for k in finnhub_raw.splitlines() if k.strip()]),
-        "eodhdKeyCount":         len([k for k in eodhd_raw.splitlines() if k.strip()]),
-        "alphaVantageKeyCount":  len([k for k in alphavantage_raw.splitlines() if k.strip()]),
+        "finnhubKeyCount":       len([k for k in finnhubRaw.splitlines() if k.strip()]),
+        "eodhdKeyCount":         len([k for k in eodhdRaw.splitlines() if k.strip()]),
+        "alphaVantageKeyCount":  len([k for k in alphavantageRaw.splitlines() if k.strip()]),
         # Globales
-        "autoBackupDays":        _as_int(gcfg.get("autoBackupDays"), 0),
+        "autoBackupDays":        _asInt(gcfg.get("autoBackupDays"), 0),
         "backupIncluirClaves":   bool(gcfg.get("backupIncluirClaves", False)),
         "backupContrasena":      clave_copias.configurada(),
-        "staleHours":            _as_int(gcfg.get("staleHours"), 24),
-        "autoRefreshMinutes":    _as_int(gcfg.get("autoRefreshMinutes"), 0),
-        "snapshotMinutes":       _as_int(gcfg.get("snapshotMinutes"), 60),
+        "staleHours":            _asInt(gcfg.get("staleHours"), 24),
+        "autoRefreshMinutes":    _asInt(gcfg.get("autoRefreshMinutes"), 0),
+        "snapshotMinutes":       _asInt(gcfg.get("snapshotMinutes"), 60),
         "snapshotAlcance":       gcfg.get("snapshotAlcance") or "activo",
         "snapshotServidor":      settings.snapshotServidorActivo(),
         "theme":                 gcfg.get("theme") or "default",
         "sidebarCollapsed":      bool(gcfg.get("sidebarCollapsed", False)),
         "monedaBase":            gcfg.get("monedaBase") or "EUR",
-        "precioDecimalesAcciones":  _as_int(gcfg.get("precioDecimalesAcciones"), 2),
-        "precioDecimalesEtf":       _as_int(gcfg.get("precioDecimalesEtf"), 2),
-        "precioDecimalesComoditis": _as_int(gcfg.get("precioDecimalesComoditis"), 2),
-        "precioDecimalesCripto":    _as_int(gcfg.get("precioDecimalesCripto"), 4),
+        "precioDecimalesAcciones":  _asInt(gcfg.get("precioDecimalesAcciones"), 2),
+        "precioDecimalesEtf":       _asInt(gcfg.get("precioDecimalesEtf"), 2),
+        "precioDecimalesComoditis": _asInt(gcfg.get("precioDecimalesComoditis"), 2),
+        "precioDecimalesCripto":    _asInt(gcfg.get("precioDecimalesCripto"), 4),
         "soloHorarioMercado":       bool(gcfg.get("soloHorarioMercado", False)),
         "soloMercadoTipos":         gcfg.get("soloMercadoTipos") or ["acciones", "etfs", "comoditis"],
-        "bloqueoInactividad":       _as_int(gcfg.get("bloqueoInactividad"), 0),
+        "bloqueoInactividad":       _asInt(gcfg.get("bloqueoInactividad"), 0),
         "numLocale":                gcfg.get("numLocale") or "es-ES",
         "dateFormat":               gcfg.get("dateFormat") or "DD/MM/YYYY",
-        "maxBackups":               _as_int(gcfg.get("maxBackups"), 0),
+        "maxBackups":               _asInt(gcfg.get("maxBackups"), 0),
         # Por-portfolio
         "hiddenAssets":             pcfg.get("hiddenAssets") or [],
         "comparativaExcluded":      pcfg.get("comparativaExcluded") or [],
@@ -327,13 +327,13 @@ def get_settings():
         "topMetricsConfig":         pcfg.get("topMetricsConfig") or {},
         "modulosConfig":            pcfg.get("modulosConfig") or {},
         "ahorroConfig":             pcfg.get("ahorroConfig") or {"objetivoAhorro": 30, "presupuesto": {}},
-        "cuentaAhorroConfig":       normalizar_config(pcfg.get("cuentaAhorroConfig")),
-        "panelesConfig":            normalizar_paneles(pcfg.get("panelesConfig")),
+        "cuentaAhorroConfig":       normalizarConfig(pcfg.get("cuentaAhorroConfig")),
+        "panelesConfig":            normalizarPaneles(pcfg.get("panelesConfig")),
     })
 
 
-@ajustes_bp.route("/api/settings/apikeys", methods=["GET"])
-def list_api_keys():
+@ajustesBp.route("/api/settings/apikeys", methods=["GET"])
+def listApiKeys():
     """Las claves de cada proveedor, y —lo importante— de dónde salen.
 
     Hasta aquí la interfaz solo sabía **cuántas** claves había. Con varias
@@ -366,8 +366,8 @@ def list_api_keys():
             "claves": [
                 {
                     "indice": indice,
-                    "vista": _enmascarar_clave(clave),
-                    "huella": _huella_clave(clave),
+                    "vista": _enmascararClave(clave),
+                    "huella": _huellaClave(clave),
                     "longitud": len(clave),
                 }
                 for indice, clave in enumerate(origen["claves"])
@@ -380,8 +380,8 @@ def list_api_keys():
     return respuesta
 
 
-@ajustes_bp.route("/api/settings/apikey/ver", methods=["POST"])
-def ver_api_key():
+@ajustesBp.route("/api/settings/apikey/ver", methods=["POST"])
+def verApiKey():
     """El valor completo de UNA clave, identificada por su huella.
 
     POST y no GET para que pase por el CSRF y no quede en ningún historial ni
@@ -396,7 +396,7 @@ def ver_api_key():
         return jsonify({"ok": False, "error": "Petición incorrecta"}), 400
 
     for clave in app_data.readApiKeysConOrigen(proveedor)["claves"]:
-        if hmac.compare_digest(_huella_clave(clave), huella):
+        if hmac.compare_digest(_huellaClave(clave), huella):
             respuesta = jsonify({"ok": True, "clave": clave})
             respuesta.headers["Cache-Control"] = "no-store"
             return respuesta
@@ -404,25 +404,25 @@ def ver_api_key():
     return jsonify({"ok": False, "error": "Esa clave ya no está guardada"}), 404
 
 
-@ajustes_bp.route("/api/settings/apikey", methods=["POST"])
-def append_api_key():
+@ajustesBp.route("/api/settings/apikey", methods=["POST"])
+def appendApiKey():
     data = request.get_json(silent=True) or {}
     if data.get("finnhubKey"):
-        _append_key_file(_API_DIR / "finnhub.key", str(data["finnhubKey"]).strip())
+        _appendKeyFile(_API_DIR / "finnhub.key", str(data["finnhubKey"]).strip())
     if data.get("eodhdKeys"):
-        _append_key_file(_API_DIR / "eodhd.key", str(data["eodhdKeys"]).strip())
+        _appendKeyFile(_API_DIR / "eodhd.key", str(data["eodhdKeys"]).strip())
     if data.get("alphaVantageKeys"):
-        _append_key_file(_API_DIR / "alphavantage.key", str(data["alphaVantageKeys"]).strip())
+        _appendKeyFile(_API_DIR / "alphavantage.key", str(data["alphaVantageKeys"]).strip())
     return jsonify({
         "ok":               True,
-        "finnhubKeys":      len([k for k in _read_key_file(_API_DIR / "finnhub.key").splitlines() if k.strip()]),
-        "eodhdKeys":        len([k for k in _read_key_file(_API_DIR / "eodhd.key").splitlines() if k.strip()]),
-        "alphaVantageKeys": len([k for k in _read_key_file(_API_DIR / "alphavantage.key").splitlines() if k.strip()]),
+        "finnhubKeys":      len([k for k in _readKeyFile(_API_DIR / "finnhub.key").splitlines() if k.strip()]),
+        "eodhdKeys":        len([k for k in _readKeyFile(_API_DIR / "eodhd.key").splitlines() if k.strip()]),
+        "alphaVantageKeys": len([k for k in _readKeyFile(_API_DIR / "alphavantage.key").splitlines() if k.strip()]),
     })
 
 
-@ajustes_bp.route("/api/settings/apikey", methods=["DELETE"])
-def delete_api_key():
+@ajustesBp.route("/api/settings/apikey", methods=["DELETE"])
+def deleteApiKey():
     """Quita una clave del fichero de su proveedor.
 
     Se borra **por valor, no por posición**. La lista que el usuario tiene
@@ -434,17 +434,17 @@ def delete_api_key():
     del proxy ni en el historial del navegador, que es donde acaban las rutas.
     """
     datos = request.get_json(silent=True) or {}
-    fichero = _fichero_de_claves(datos.get("proveedor"))
+    fichero = _ficheroDeClaves(datos.get("proveedor"))
 
     if fichero is None:
         return jsonify({"ok": False, "error": "Proveedor desconocido"}), 400
 
-    claves = read_secret_lines(fichero)
+    claves = readSecretLines(fichero)
     # Se identifica por la huella que da el listado (el listado ya no lleva el
     # valor). Se sigue aceptando el valor tal cual para quien lo tenga.
     huella = datos.get("huella")
     if isinstance(huella, str) and huella:
-        clave = next((c for c in claves if hmac.compare_digest(_huella_clave(c), huella)), "")
+        clave = next((c for c in claves if hmac.compare_digest(_huellaClave(c), huella)), "")
     else:
         clave = str(datos.get("clave") or "").strip()
 
@@ -454,19 +454,19 @@ def delete_api_key():
         return jsonify({"ok": False, "error": "Esa clave ya no está guardada"}), 404
 
     restantes = [existente for existente in claves if existente != clave]
-    write_secret_lines(fichero, restantes)
+    writeSecretLines(fichero, restantes)
     log.info("Clave de API eliminada de %s; quedan %s", fichero.name, len(restantes))
 
     return jsonify({"ok": True, "restantes": len(restantes)})
 
 
-@ajustes_bp.route("/api/stats/api-calls", methods=["GET"])
-def get_api_call_stats():
-    return jsonify({"ok": True, **get_today_stats()})
+@ajustesBp.route("/api/stats/api-calls", methods=["GET"])
+def getApiCallStats():
+    return jsonify({"ok": True, **getTodayStats()})
 
 
-@ajustes_bp.route("/api/stats/api-estado", methods=["GET"])
-def get_api_estado():
+@ajustesBp.route("/api/stats/api-estado", methods=["GET"])
+def getApiEstado():
     """Estado de cada proveedor: operativo, sin clave, sin cuota o caído.
 
     `?forzar=1` salta la caché. Se deja fuera de la comprobación automática
@@ -475,14 +475,14 @@ def get_api_estado():
     """
     forzar = str(request.args.get("forzar", "")).strip().lower() in ("1", "true", "si", "sí")
     try:
-        return jsonify({"ok": True, **estado_proveedores.obtener(forzar=forzar)})
+        return jsonify({"ok": True, **estadoProveedores.obtener(forzar=forzar)})
     except Exception as error:
         log.warning("No se pudo comprobar el estado de los proveedores: %s", error)
         return jsonify({"ok": False, "error": str(error)[:200]}), 500
 
 
-@ajustes_bp.route("/api/settings/apis-pausadas", methods=["POST"])
-def save_api_pausada():
+@ajustesBp.route("/api/settings/apis-pausadas", methods=["POST"])
+def saveApiPausada():
     """Pausa o reanuda un proveedor de cotizaciones: {proveedor, pausada}."""
     data = request.get_json(silent=True) or {}
     proveedor = str(data.get("proveedor") or "").strip().lower()
@@ -495,31 +495,31 @@ def save_api_pausada():
     else:
         pausados.discard(proveedor)
 
-    gcfg = _read_ajustes()
+    gcfg = _readAjustes()
     gcfg["apisPausadas"] = [p for p in proveedores_pausados.PAUSABLES if p in pausados]
     try:
-        _write_ajustes(gcfg)
+        _writeAjustes(gcfg)
     except OSError as error:
         mensaje = registrarFalloEscritura(log, "No se pudo guardar la pausa del proveedor", error, _AJUSTES_JSON)
         return jsonify({"ok": False, "error": mensaje}), 500
     return jsonify({"ok": True, "pausados": gcfg["apisPausadas"]})
 
 
-@ajustes_bp.route("/api/settings/telegram", methods=["GET"])
-def get_telegram_settings():
-    token, chat_id = telegram_notifier.leerConfig()
+@ajustesBp.route("/api/settings/telegram", methods=["GET"])
+def getTelegramSettings():
+    token, chatId = telegram_notifier.leerConfig()
     activos = telegram_notifier.preferencias()
     return jsonify({
         "ok": True,
-        "configurado": bool(token) and bool(chat_id),
+        "configurado": bool(token) and bool(chatId),
         # Igual que /api/settings/apikeys: solo la máscara. Con el token del bot
         # se lee y se escribe en el chat del usuario; mandarlo entero lo dejaba
         # en la memoria de la pestaña cada vez que se abría Ajustes. Para
         # cambiarlo se escribe uno nuevo; guardar con el campo vacío conserva
         # el que hay.
         "hayToken": bool(token),
-        "tokenVista": _enmascarar_clave(token) if token else "",
-        "chatId": chat_id,
+        "tokenVista": _enmascararClave(token) if token else "",
+        "chatId": chatId,
         "avisos": [
             {"clave": clave, "titulo": titulo, "activo": activos[clave]}
             for clave, (titulo, _defecto) in telegram_notifier.CATEGORIAS_AVISO.items()
@@ -529,11 +529,11 @@ def get_telegram_settings():
     })
 
 
-@ajustes_bp.route("/api/settings/telegram/avisos", methods=["POST"])
-def save_telegram_avisos():
+@ajustesBp.route("/api/settings/telegram/avisos", methods=["POST"])
+def saveTelegramAvisos():
     """Qué tipos de aviso se mandan y a qué hora sale el resumen diario."""
     data = request.get_json(silent=True) or {}
-    gcfg = _read_ajustes()
+    gcfg = _readAjustes()
 
     if "avisos" in data:
         raw = data["avisos"]
@@ -548,39 +548,39 @@ def save_telegram_avisos():
         gcfg["telegramAvisos"] = actuales
 
     if "resumenHora" in data:
-        gcfg["telegramResumenHora"] = max(0, min(23, _as_int(data["resumenHora"], telegram_notifier.RESUMEN_HORA_DEFECTO)))
+        gcfg["telegramResumenHora"] = max(0, min(23, _asInt(data["resumenHora"], telegram_notifier.RESUMEN_HORA_DEFECTO)))
 
     try:
-        _write_ajustes(gcfg)
+        _writeAjustes(gcfg)
     except OSError as error:
         mensaje = registrarFalloEscritura(log, "No se pudieron guardar los avisos de Telegram", error, _AJUSTES_JSON)
         return jsonify({"ok": False, "error": mensaje}), 500
     return jsonify({"ok": True})
 
 
-@ajustes_bp.route("/api/settings/telegram", methods=["POST"])
-def save_telegram_settings():
+@ajustesBp.route("/api/settings/telegram", methods=["POST"])
+def saveTelegramSettings():
     data = request.get_json(silent=True) or {}
     token = str(data.get("token") or "").strip()
-    chat_id = str(data.get("chatId") or "").strip()
+    chatId = str(data.get("chatId") or "").strip()
     if not token:
         # El formulario ya no recibe el token guardado (solo su máscara): vacío
         # significa «el que hay».
-        token, _chat_guardado = telegram_notifier.leerConfig()
-    if not token or not chat_id:
+        token, _chatGuardado = telegram_notifier.leerConfig()
+    if not token or not chatId:
         return jsonify({"ok": False, "error": "Rellena el token del bot y el ID de chat"}), 400
-    telegram_notifier.escribirConfig(token, chat_id)
+    telegram_notifier.escribirConfig(token, chatId)
     return jsonify({"ok": True})
 
 
-@ajustes_bp.route("/api/settings/telegram", methods=["DELETE"])
-def delete_telegram_settings():
+@ajustesBp.route("/api/settings/telegram", methods=["DELETE"])
+def deleteTelegramSettings():
     telegram_notifier.borrarConfig()
     return jsonify({"ok": True})
 
 
-@ajustes_bp.route("/api/settings/telegram/prueba", methods=["POST"])
-def test_telegram_settings():
+@ajustesBp.route("/api/settings/telegram/prueba", methods=["POST"])
+def testTelegramSettings():
     ok, error = telegram_notifier.enviarPrueba()
     if not ok:
         return jsonify({"ok": False, "error": error}), 400
@@ -602,14 +602,14 @@ _MODULOS = {
 
 
 def _acotado(minimo, maximo, defecto):
-    return lambda valor, _cfg: max(minimo, min(maximo, _as_int(valor, defecto)))
+    return lambda valor, _cfg: max(minimo, min(maximo, _asInt(valor, defecto)))
 
 
-def _entero_de(permitidos, defecto):
-    return lambda valor, _cfg: _as_int(valor, defecto, permitidos)
+def _enteroDe(permitidos, defecto):
+    return lambda valor, _cfg: _asInt(valor, defecto, permitidos)
 
 
-def _una_de(permitidas, defecto):
+def _unaDe(permitidas, defecto):
     return lambda valor, _cfg: _opcion(valor, permitidas, defecto)
 
 
@@ -617,11 +617,11 @@ def _booleano(valor, _cfg):
     return bool(valor)
 
 
-def _lista_de_textos(valor, _cfg):
+def _listaDeTextos(valor, _cfg):
     return [str(t) for t in valor if isinstance(t, str) and t.strip()] if isinstance(valor, list) else []
 
 
-def _alcance_snapshot(valor, _cfg):
+def _alcanceSnapshot(valor, _cfg):
     alcance = str(valor).strip().lower()
     return alcance if alcance in {"activo", "todos"} else "activo"
 
@@ -641,27 +641,27 @@ def _divisas(valor, _cfg):
     return validas or _SIN_CAMBIO
 
 
-def _moneda_base(valor, cfg):
+def _monedaBase(valor, cfg):
     # Depende de las divisas ya aplicadas: va detrás de fiatCurrencies en la tabla.
     codigos = {c["code"] for c in cfg.get("fiatCurrencies", _FIAT_DEFAULTS)}
     return str(valor) if str(valor) in codigos else "EUR"
 
 
-def _tipos_solo_mercado(valor, _cfg):
+def _tiposSoloMercado(valor, _cfg):
     return [t for t in valor if _opcion(t, _TIPOS_SOLO_MERCADO, None)] if isinstance(valor, list) else []
 
 
 def _inactividad(valor, _cfg):
     # La lista de valores vive en core/sesion.py: es quien la aplica en el
     # servidor, y el navegador solo la imita para cerrar la pestaña abierta.
-    return _as_int(valor, 0, set(sesion.INACTIVIDAD_OPCIONES))
+    return _asInt(valor, 0, set(sesion.INACTIVIDAD_OPCIONES))
 
 
-def _activos_ocultos(valor, _cfg):
+def _activosOcultos(valor, _cfg):
     return [str(i) for i in valor if i and isinstance(i, (str, int))] if isinstance(valor, list) else []
 
 
-def _mapa_booleanos(permitidas=None):
+def _mapaBooleanos(permitidas=None):
     def normalizar(valor, _cfg):
         if not isinstance(valor, dict):
             return _SIN_CAMBIO
@@ -677,7 +677,7 @@ def _porcentaje(valor, defecto):
         return defecto
 
 
-def _config_ahorro(valor, _cfg):
+def _configAhorro(valor, _cfg):
     if not isinstance(valor, dict):
         return _SIN_CAMBIO
     crudo = valor.get("presupuesto", {})
@@ -690,61 +690,61 @@ def _config_ahorro(valor, _cfg):
     return {"objetivoAhorro": _porcentaje(valor.get("objetivoAhorro", 30), 30.0), "presupuesto": presupuesto}
 
 
-def _config_cuenta_ahorro(valor, _cfg):
+def _configCuentaAhorro(valor, _cfg):
     if not isinstance(valor, dict):
         return _SIN_CAMBIO
     # Una configuración antigua (importada, o de una pestaña sin recargar) aún
     # puede traer remuneradas: pasan a la base antes de que la normalización las quite.
-    pares = vinculos_de_config(valor)
+    pares = vinculosDeConfig(valor)
     if pares:
-        importar_vinculos(pares)
-    return normalizar_config(valor)
+        importarVinculos(pares)
+    return normalizarConfig(valor)
 
 
-def _config_paneles(valor, _cfg):
+def _configPaneles(valor, _cfg):
     if not isinstance(valor, dict):
         return _SIN_CAMBIO
-    return normalizar_paneles(valor)
+    return normalizarPaneles(valor)
 
 
 _NORMALIZADORES_GLOBALES = {
     "autoBackupDays": _acotado(0, 365, 0),
     "backupIncluirClaves": lambda valor, _cfg: valor is True,
     "staleHours": _acotado(1, 8760, 24),
-    "autoRefreshMinutes": _entero_de({0, 1, 5, 15, 30, 60}, 0),
-    "snapshotMinutes": _entero_de({0, 1, 5, 15, 30, 60, 240, 1440}, 60),
-    "snapshotAlcance": _alcance_snapshot,
-    "theme": _una_de({"default", "black", "light"}, "default"),
+    "autoRefreshMinutes": _enteroDe({0, 1, 5, 15, 30, 60}, 0),
+    "snapshotMinutes": _enteroDe({0, 1, 5, 15, 30, 60, 240, 1440}, 60),
+    "snapshotAlcance": _alcanceSnapshot,
+    "theme": _unaDe({"default", "black", "light"}, "default"),
     "sidebarCollapsed": _booleano,
     "fiatCurrencies": _divisas,
-    "monedaBase": _moneda_base,
-    "precioDecimalesAcciones": _entero_de(_DECIMALES_PRECIO, 2),
-    "precioDecimalesEtf": _entero_de(_DECIMALES_PRECIO, 2),
-    "precioDecimalesComoditis": _entero_de(_DECIMALES_PRECIO, 2),
-    "precioDecimalesCripto": _entero_de(_DECIMALES_PRECIO, 2),
+    "monedaBase": _monedaBase,
+    "precioDecimalesAcciones": _enteroDe(_DECIMALES_PRECIO, 2),
+    "precioDecimalesEtf": _enteroDe(_DECIMALES_PRECIO, 2),
+    "precioDecimalesComoditis": _enteroDe(_DECIMALES_PRECIO, 2),
+    "precioDecimalesCripto": _enteroDe(_DECIMALES_PRECIO, 2),
     "soloHorarioMercado": _booleano,
-    "soloMercadoTipos": _tipos_solo_mercado,
+    "soloMercadoTipos": _tiposSoloMercado,
     "bloqueoInactividad": _inactividad,
-    "numLocale": _una_de({"es-ES", "en-US", "fr-FR"}, "es-ES"),
-    "dateFormat": _una_de({"DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"}, "DD/MM/YYYY"),
-    "maxBackups": _entero_de({0, 5, 10, 20, 50}, 0),
+    "numLocale": _unaDe({"es-ES", "en-US", "fr-FR"}, "es-ES"),
+    "dateFormat": _unaDe({"DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD"}, "DD/MM/YYYY"),
+    "maxBackups": _enteroDe({0, 5, 10, 20, 50}, 0),
 }
 
 _NORMALIZADORES_PORTFOLIO = {
-    "hiddenAssets": _activos_ocultos,
-    "metricasDisplayType": _una_de({"doughnut", "bar"}, "doughnut"),
-    "metricasDistMetric": _una_de({"netoActualEur", "invertidoEur", "rendimientoEur"}, "netoActualEur"),
-    "comparativaExcluded": _lista_de_textos,
-    "gastosHiddenTipos": _lista_de_textos,
-    "gastosHiddenMensualidades": _lista_de_textos,
-    "metricasActivosHidden": _lista_de_textos,
-    "metricasSectionsCollapsed": _lista_de_textos,
+    "hiddenAssets": _activosOcultos,
+    "metricasDisplayType": _unaDe({"doughnut", "bar"}, "doughnut"),
+    "metricasDistMetric": _unaDe({"netoActualEur", "invertidoEur", "rendimientoEur"}, "netoActualEur"),
+    "comparativaExcluded": _listaDeTextos,
+    "gastosHiddenTipos": _listaDeTextos,
+    "gastosHiddenMensualidades": _listaDeTextos,
+    "metricasActivosHidden": _listaDeTextos,
+    "metricasSectionsCollapsed": _listaDeTextos,
     "gastosMostrarPausadas": _booleano,
-    "topMetricsConfig": _mapa_booleanos(),
-    "modulosConfig": _mapa_booleanos(_MODULOS),
-    "ahorroConfig": _config_ahorro,
-    "cuentaAhorroConfig": _config_cuenta_ahorro,
-    "panelesConfig": _config_paneles,
+    "topMetricsConfig": _mapaBooleanos(),
+    "modulosConfig": _mapaBooleanos(_MODULOS),
+    "ahorroConfig": _configAhorro,
+    "cuentaAhorroConfig": _configCuentaAhorro,
+    "panelesConfig": _configPaneles,
 }
 
 
@@ -757,29 +757,29 @@ def _aplicar(cfg: dict, data: dict, normalizadores: dict) -> None:
                 cfg[clave] = valor
 
 
-@ajustes_bp.route("/api/settings", methods=["POST"])
-def save_settings():
+@ajustesBp.route("/api/settings", methods=["POST"])
+def saveSettings():
     data = request.get_json(silent=True) or {}
-    pid  = _active_portfolio_id()
+    pid  = _activePortfolioId()
 
     if data.get("finnhubKey"):
-        _write_key_file(_API_DIR / "finnhub.key", str(data["finnhubKey"]).strip())
+        _writeKeyFile(_API_DIR / "finnhub.key", str(data["finnhubKey"]).strip())
     if data.get("eodhdKeys"):
-        _write_key_file(_API_DIR / "eodhd.key", str(data["eodhdKeys"]).strip())
+        _writeKeyFile(_API_DIR / "eodhd.key", str(data["eodhdKeys"]).strip())
     # Faltaba: /api/settings/apikey sí permitía añadir claves de Alpha Vantage,
     # pero guardarlas desde la pantalla de ajustes las descartaba en silencio.
     if data.get("alphaVantageKeys"):
-        _write_key_file(_API_DIR / "alphavantage.key", str(data["alphaVantageKeys"]).strip())
+        _writeKeyFile(_API_DIR / "alphavantage.key", str(data["alphaVantageKeys"]).strip())
 
-    gcfg = _read_ajustes()
-    pcfg = _read_prefs(pid)
+    gcfg = _readAjustes()
+    pcfg = _readPrefs(pid)
 
     _aplicar(gcfg, data, _NORMALIZADORES_GLOBALES)
     _aplicar(pcfg, data, _NORMALIZADORES_PORTFOLIO)
 
     try:
-        _write_ajustes(gcfg)
-        _write_prefs(pid, pcfg)
+        _writeAjustes(gcfg)
+        _writePrefs(pid, pcfg)
     except OSError as e:
         # Igual que en /api/backup: si el fallo es del disco (permisos del
         # volumen en Docker, montaje de solo lectura, disco lleno), el manejador
@@ -803,7 +803,7 @@ _SAFE_TABLE_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _RE_SAFE_PREFS_NAME = re.compile(r"^prefs_[A-Za-z0-9_-]{1,64}\.json$")
 
 
-def _real_tables(conn) -> list:
+def _realTables(conn) -> list:
     """Tablas de datos que existen realmente en la BD activa, en orden estable."""
     nombres = [
         r[0] for r in conn.execute(
@@ -817,7 +817,7 @@ def _real_tables(conn) -> list:
     return seguras
 
 
-def _build_export(conn, pid: str) -> dict:
+def _buildExport(conn, pid: str) -> dict:
     """Volcado completo de la BD activa.
 
     Antes se exportaba una lista fija de 11 nombres de los que 4 ni existían
@@ -830,21 +830,21 @@ def _build_export(conn, pid: str) -> dict:
     export = {
         "exported_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "version": 3,
-        "ajustes": _read_ajustes(),
-        "portfolio_prefs": _read_prefs(pid),
+        "ajustes": _readAjustes(),
+        "portfolio_prefs": _readPrefs(pid),
         "tables": {},
     }
-    for table in _real_tables(conn):
+    for table in _realTables(conn):
         rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
         export["tables"][table] = [dict(r) for r in rows]
     return export
 
 
-@ajustes_bp.route("/api/export/json", methods=["GET"])
-def export_json():
-    pid  = _active_portfolio_id()
-    conn = get_db()
-    export = _build_export(conn, pid)
+@ajustesBp.route("/api/export/json", methods=["GET"])
+def exportJson():
+    pid  = _activePortfolioId()
+    conn = getDb()
+    export = _buildExport(conn, pid)
 
     payload = json.dumps(export, ensure_ascii=False, indent=2)
     return Response(
@@ -854,8 +854,8 @@ def export_json():
     )
 
 
-@ajustes_bp.route("/api/export/zip", methods=["GET", "POST"])
-def export_zip():
+@ajustesBp.route("/api/export/zip", methods=["GET", "POST"])
+def exportZip():
     """El ZIP completo. En POST admite lo que un GET no puede llevar.
 
     Sigue aceptando GET —un enlace directo o un `curl` siguen valiendo—, pero
@@ -863,9 +863,9 @@ def export_zip():
     `localStorage`, que solo tiene el navegador, y las claves de API, que no se
     incluyen si nadie las pide expresamente.
     """
-    pid  = _active_portfolio_id()
-    conn = get_db()
-    export = _build_export(conn, pid)
+    pid  = _activePortfolioId()
+    conn = getDb()
+    export = _buildExport(conn, pid)
 
     peticion = request.get_json(silent=True) if request.method == "POST" else None
     peticion = peticion if isinstance(peticion, dict) else {}
@@ -876,23 +876,23 @@ def export_zip():
     if len(contrasena) > exportables.MAX_LARGO_CONTRASENA:
         return jsonify({"ok": False, "error": "La contraseña es demasiado larga"}), 400
 
-    json_bytes = json.dumps(export, ensure_ascii=False, indent=2).encode("utf-8")
+    jsonBytes = json.dumps(export, ensure_ascii=False, indent=2).encode("utf-8")
 
     buf = io.BytesIO()
-    date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+    dateStr = datetime.datetime.now().strftime("%Y-%m-%d")
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"portfolio-export-{date_str}.json", json_bytes)
-        db_path = get_active_db_path()
-        if db_path.exists():
+        zf.writestr(f"portfolio-export-{dateStr}.json", jsonBytes)
+        dbPath = getActiveDbPath()
+        if dbPath.exists():
             # Copia vía API de backup: zf.write() del .db en caliente puede
             # capturar páginas a medias y dejar en el zip una BD corrupta,
             # porque los cambios recientes viven aún en el fichero -wal.
-            zf.writestr(f"portfolio-{date_str}.db", _consistent_db_bytes(db_path))
+            zf.writestr(f"portfolio-{dateStr}.db", _consistentDbBytes(dbPath))
         if _AJUSTES_JSON.exists():
             zf.write(str(_AJUSTES_JSON), "ajustes.json")
-        prefs_file = _prefs_path(pid)
-        if prefs_file.exists():
-            zf.write(str(prefs_file), f"prefs_{pid}.json")
+        prefsFile = _prefsPath(pid)
+        if prefsFile.exists():
+            zf.write(str(prefsFile), f"prefs_{pid}.json")
 
         # Preferencias de la interfaz: orden de las tarjetas de Ajustes, orden
         # de cada tabla y modos de visualización. Viven en el navegador, así que
@@ -919,11 +919,11 @@ def export_zip():
     return Response(
         buf.read(),
         mimetype="application/zip",
-        headers={"Content-Disposition": f"attachment; filename=portfolio-export-{date_str}.zip"}
+        headers={"Content-Disposition": f"attachment; filename=portfolio-export-{dateStr}.zip"}
     )
 
 
-def _consistent_db_bytes(db_path) -> bytes:
+def _consistentDbBytes(dbPath) -> bytes:
     """Bytes de una copia consistente del .db (incluye el WAL pendiente).
 
     El temporal va a data/tmp. Antes se llamaba `_tmp_export_<portfolio>.db` y
@@ -932,11 +932,11 @@ def _consistent_db_bytes(db_path) -> bytes:
     una copia de seguridad metía la exportación a medias en el backup como si
     fuera un portfolio más.
     """
-    with temporalPara(db_path, directorio=paths.TMP_DIR) as tmp:
-        return copiar_sqlite(db_path, tmp, timeout=settings.dbTimeout()).read_bytes()
+    with temporalPara(dbPath, directorio=paths.TMP_DIR) as tmp:
+        return copiarSqlite(dbPath, tmp, timeout=settings.dbTimeout()).read_bytes()
 
 
-def _restore_tables_from_dict(conn, data: dict):
+def _restoreTablesFromDict(conn, data: dict):
     """Restaura tablas de la BD activa desde un dict de exportación.
 
     Todo ocurre en UNA transacción: si algo falla se revierte por completo. La
@@ -945,19 +945,19 @@ def _restore_tables_from_dict(conn, data: dict):
     OperationalError con las tablas ya vaciadas dentro de una transacción
     abierta que nadie revertía.
     """
-    tables_payload = data.get("tables")
-    if not isinstance(tables_payload, dict):
+    tablesPayload = data.get("tables")
+    if not isinstance(tablesPayload, dict):
         # Formato legacy: las tablas eran claves de primer nivel
-        tables_payload = {k: v for k, v in data.items() if isinstance(v, list)}
+        tablesPayload = {k: v for k, v in data.items() if isinstance(v, list)}
 
-    existing = set(_real_tables(conn))
-    skipped = [name for name in tables_payload if name not in existing]
+    existing = set(_realTables(conn))
+    skipped = [name for name in tablesPayload if name not in existing]
     if skipped:
         log.warning("[import] Tablas del fichero que no existen en el esquema, ignoradas: %s",
                     ", ".join(sorted(skipped)))
 
-    targets = [t for t in sorted(tables_payload)
-               if t in existing and isinstance(tables_payload[t], list)]
+    targets = [t for t in sorted(tablesPayload)
+               if t in existing and isinstance(tablesPayload[t], list)]
 
     try:
         # Aplaza la verificación de FK al commit, para poder insertar hijos antes
@@ -975,18 +975,18 @@ def _restore_tables_from_dict(conn, data: dict):
 
         # Pasada 2: insertar
         for table in targets:
-            rows = tables_payload[table]
+            rows = tablesPayload[table]
             if not rows or not isinstance(rows[0], dict):
                 continue
-            actual_cols = {r[1] for r in conn.execute(f'PRAGMA table_info("{table}")').fetchall()}
-            valid_cols = [c for c in rows[0] if c in actual_cols]
-            if not valid_cols:
+            actualCols = {r[1] for r in conn.execute(f'PRAGMA table_info("{table}")').fetchall()}
+            validCols = [c for c in rows[0] if c in actualCols]
+            if not validCols:
                 continue
-            col_str      = ", ".join(f'"{c}"' for c in valid_cols)
-            placeholders = ", ".join("?" for _ in valid_cols)
+            colStr      = ", ".join(f'"{c}"' for c in validCols)
+            placeholders = ", ".join("?" for _ in validCols)
             conn.executemany(
-                f'INSERT OR IGNORE INTO "{table}" ({col_str}) VALUES ({placeholders})',
-                [[row.get(c) for c in valid_cols] for row in rows if isinstance(row, dict)],
+                f'INSERT OR IGNORE INTO "{table}" ({colStr}) VALUES ({placeholders})',
+                [[row.get(c) for c in validCols] for row in rows if isinstance(row, dict)],
             )
         conn.commit()
     except Exception as e:
@@ -997,8 +997,8 @@ def _restore_tables_from_dict(conn, data: dict):
         raise RuntimeError(f"Error restaurando datos: {e}") from e
 
 
-@ajustes_bp.route("/api/import/json", methods=["POST"])
-def import_json():
+@ajustesBp.route("/api/import/json", methods=["POST"])
+def importJson():
     f = request.files.get("file")
     if not f:
         return jsonify({"ok": False, "error": "No se recibió ningún archivo"}), 400
@@ -1014,37 +1014,37 @@ def import_json():
     # va con las mismas garantías (cerrojo y copia previa) que /api/restore.
     from core.bloqueo import BloqueoOcupado
     from routes.backup import (
-        _respuesta_bloqueo_ocupado,
-        bloqueo_restauracion,
-        copia_previa_obligatoria,
-        respuesta_sin_copia_previa,
+        _respuestaBloqueoOcupado,
+        bloqueoRestauracion,
+        copiaPreviaObligatoria,
+        respuestaSinCopiaPrevia,
     )
 
     try:
-        with bloqueo_restauracion():
-            copia, copia_ok = copia_previa_obligatoria()
-            if not copia_ok:
-                return respuesta_sin_copia_previa()
+        with bloqueoRestauracion():
+            copia, copiaOk = copiaPreviaObligatoria()
+            if not copiaOk:
+                return respuestaSinCopiaPrevia()
 
-            pid  = _active_portfolio_id()
-            conn = get_db()
+            pid  = _activePortfolioId()
+            conn = getDb()
 
             if "ajustes" in data and isinstance(data["ajustes"], dict):
-                _write_ajustes(data["ajustes"])
+                _writeAjustes(data["ajustes"])
             if "portfolio_prefs" in data and isinstance(data["portfolio_prefs"], dict):
-                _write_prefs(pid, data["portfolio_prefs"])
+                _writePrefs(pid, data["portfolio_prefs"])
 
             try:
-                _restore_tables_from_dict(conn, data)
+                _restoreTablesFromDict(conn, data)
             except RuntimeError as e:
                 return jsonify({"ok": False, "error": str(e)}), 500
     except BloqueoOcupado:
-        return _respuesta_bloqueo_ocupado()
+        return _respuestaBloqueoOcupado()
 
     return jsonify({"ok": True, "copiaPrevia": copia.name if copia else None})
 
 
-def _json_de_zip(zf, nombre):
+def _jsonDeZip(zf, nombre):
     """Contenido JSON de una entrada, o ValueError si no es JSON válido."""
     try:
         return json.loads(zf.read(nombre).decode("utf-8"))
@@ -1052,15 +1052,15 @@ def _json_de_zip(zf, nombre):
         raise ValueError(f"{nombre} no es un JSON válido") from error
 
 
-@ajustes_bp.route("/api/import/zip", methods=["POST"])
-def import_zip():
+@ajustesBp.route("/api/import/zip", methods=["POST"])
+def importZip():
     f = request.files.get("file")
     if not f:
         return jsonify({"ok": False, "error": "No se recibió ningún archivo"}), 400
 
-    raw_bytes = f.read()
+    rawBytes = f.read()
     try:
-        buf = io.BytesIO(raw_bytes)
+        buf = io.BytesIO(rawBytes)
         with zipfile.ZipFile(buf, "r") as zf:
             # Antes que testzip(), que descomprime todo para validar el CRC: un
             # ZIP de 1 MB con 1 GB de ceros llevaba el proceso a 2 GB de memoria.
@@ -1079,22 +1079,22 @@ def import_zip():
     # mismo código que /api/restore. Antes se buscaba el `.db` en la raíz, no se
     # encontraba, se restauraban solo los ajustes y se respondía «ok»: la
     # pantalla decía que había ido bien y las carteras seguían como estaban.
-    from routes.backup import es_backup_completo, restaurar_backup_subido
+    from routes.backup import esBackupCompleto, restaurarBackupSubido
 
-    if es_backup_completo(names):
+    if esBackupCompleto(names):
         with temporalPara(paths.BACKUPS_DIR / "importado.zip", directorio=paths.TMP_DIR) as tmp:
-            tmp.write_bytes(raw_bytes)
-            return restaurar_backup_subido(tmp)
+            tmp.write_bytes(rawBytes)
+            return restaurarBackupSubido(tmp)
 
     # Claves protegidas con contraseña: se descifran ANTES de tocar nada. Si la
     # contraseña falta o falla, la respuesta lo dice y la cartera sigue como
     # estaba; el navegador la pide y vuelve a mandar el mismo ZIP. Quien no la
     # tenga puede importar el resto sin las claves (`sinClaves`).
     contrasena = request.form.get("contrasena", "")
-    sin_claves = request.form.get("sinClaves", "") == "1"
-    claves_descifradas = None
-    entrada_cifrada = next((n for n in names if Path(n).name == exportables.FICHERO_CLAVES_CIFRADAS), None)
-    if entrada_cifrada and not sin_claves:
+    sinClaves = request.form.get("sinClaves", "") == "1"
+    clavesDescifradas = None
+    entradaCifrada = next((n for n in names if Path(n).name == exportables.FICHERO_CLAVES_CIFRADAS), None)
+    if entradaCifrada and not sinClaves:
         if not contrasena:
             return jsonify({
                 "ok": False, "necesitaContrasena": True,
@@ -1103,21 +1103,21 @@ def import_zip():
         if len(contrasena) > exportables.MAX_LARGO_CONTRASENA:
             return jsonify({"ok": False, "error": "La contraseña es demasiado larga"}), 400
         try:
-            with zipfile.ZipFile(io.BytesIO(raw_bytes), "r") as zf:
-                paquete = json.loads(zf.read(entrada_cifrada).decode("utf-8"))
-            claves_descifradas = exportables.descifrarClaves(paquete, contrasena)
+            with zipfile.ZipFile(io.BytesIO(rawBytes), "r") as zf:
+                paquete = json.loads(zf.read(entradaCifrada).decode("utf-8"))
+            clavesDescifradas = exportables.descifrarClaves(paquete, contrasena)
         except (exportables.ContrasenaIncorrecta, ValueError, UnicodeDecodeError):
             log.warning("[import] Contraseña incorrecta para las claves del ZIP")
             return jsonify({"ok": False, "necesitaContrasena": True, "error": "Contraseña incorrecta"}), 400
 
     from core.bloqueo import BloqueoOcupado
-    from routes.backup import _respuesta_bloqueo_ocupado, bloqueo_restauracion
+    from routes.backup import _respuestaBloqueoOcupado, bloqueoRestauracion
 
     try:
-        with bloqueo_restauracion():
-            return _importar_zip(raw_bytes, claves_descifradas, sin_claves)
+        with bloqueoRestauracion():
+            return _importarZip(rawBytes, clavesDescifradas, sinClaves)
     except BloqueoOcupado:
-        return _respuesta_bloqueo_ocupado()
+        return _respuestaBloqueoOcupado()
 
 
 class _ImportacionRechazada(Exception):
@@ -1130,7 +1130,7 @@ class _ContenidoImportado:
 
     nombres: list
     base: str | None = None          # entrada .db de la raíz, ya extraída al temporal
-    export_json: dict | None = None  # o, en su lugar, el export JSON
+    exportJson: dict | None = None  # o, en su lugar, el export JSON
     ajustes: dict | None = None
     prefs: dict = field(default_factory=dict)
 
@@ -1141,21 +1141,21 @@ _SIN_NADA_QUE_IMPORTAR = (
 )
 
 
-def _leer_contenido_zip(zf, tmp_db) -> _ContenidoImportado:
+def _leerContenidoZip(zf, tmpDb) -> _ContenidoImportado:
     """Valida todo lo que se va a usar, sin escribir nada fuera de `tmp_db`."""
-    from admin.backup_manager import problema_de_portfolio
+    from admin.backup_manager import problemaDePortfolio
 
     nombres = zf.namelist()
     contenido = _ContenidoImportado(nombres=nombres)
     # Base de datos en la raíz (formato de exportación: portfolio-{fecha}.db)
     contenido.base = next((n for n in nombres if n.endswith(".db") and "/" not in n), None)
-    nombre_json = next((n for n in nombres if n.endswith(".json") and "export" in n and "/" not in n), None)
+    nombreJson = next((n for n in nombres if n.endswith(".json") and "export" in n and "/" not in n), None)
     # `ajustes.json` y las preferencias también cuentan: un zip que solo traiga
     # eso sí tiene algo que importar.
-    trae_configuracion = any(
+    traeConfiguracion = any(
         Path(n).name == "ajustes.json" or Path(n).name.startswith("prefs_") for n in nombres
     )
-    if not contenido.base and not nombre_json and not trae_configuracion:
+    if not contenido.base and not nombreJson and not traeConfiguracion:
         # Decirlo es la diferencia entre «este zip no vale» y creer que se ha
         # importado algo que en realidad sigue sin estar.
         raise _ImportacionRechazada(_SIN_NADA_QUE_IMPORTAR)
@@ -1163,17 +1163,17 @@ def _leer_contenido_zip(zf, tmp_db) -> _ContenidoImportado:
     if contenido.base:
         # A disco y no a memoria; el temporal va a data/tmp para que ningún
         # `glob("*.db")` de data/portfolios lo tome por una cartera.
-        zip_seguro.extraer(zf, contenido.base, tmp_db)
-        problema = problema_de_portfolio(tmp_db)
+        zip_seguro.extraer(zf, contenido.base, tmpDb)
+        problema = problemaDePortfolio(tmpDb)
         if problema:
             raise _ImportacionRechazada(f"{contenido.base}: {problema}")
-    elif nombre_json:
-        contenido.export_json = _json_de_zip(zf, nombre_json)
-        if not isinstance(contenido.export_json, dict):
-            raise _ImportacionRechazada(f"{nombre_json} no tiene el formato de un export")
+    elif nombreJson:
+        contenido.exportJson = _jsonDeZip(zf, nombreJson)
+        if not isinstance(contenido.exportJson, dict):
+            raise _ImportacionRechazada(f"{nombreJson} no tiene el formato de un export")
 
     if "ajustes.json" in nombres:
-        contenido.ajustes = _json_de_zip(zf, "ajustes.json")
+        contenido.ajustes = _jsonDeZip(zf, "ajustes.json")
         if not isinstance(contenido.ajustes, dict):
             raise _ImportacionRechazada("ajustes.json no tiene el formato esperado")
 
@@ -1181,45 +1181,45 @@ def _leer_contenido_zip(zf, tmp_db) -> _ContenidoImportado:
     # patrón: comprobar solo que no hubiera "/" dejaba pasar entradas como
     # "prefs_..\..\algo.json", que en Windows escriben fuera de data/JSON.
     for nombre in nombres:
-        prefs_name = Path(nombre).name
-        if _RE_SAFE_PREFS_NAME.match(prefs_name):
-            contenido.prefs[prefs_name] = _json_de_zip(zf, nombre)
-        elif prefs_name.startswith("prefs_"):
+        prefsName = Path(nombre).name
+        if _RE_SAFE_PREFS_NAME.match(prefsName):
+            contenido.prefs[prefsName] = _jsonDeZip(zf, nombre)
+        elif prefsName.startswith("prefs_"):
             log.warning("[import] Entrada de prefs ignorada por nombre inseguro: %r", nombre)
     return contenido
 
 
-def _restaurar_claves_del_zip(zf, nombres, claves_descifradas, sin_claves) -> list:
+def _restaurarClavesDelZip(zf, nombres, clavesDescifradas, sinClaves) -> list:
     """Claves de API del ZIP, guardadas cifradas con la SECRET_KEY de ESTA
     instalación: ese cambio de cifrado es lo que hace que una copia sirva en un
     servidor recién montado."""
-    if claves_descifradas is not None:
-        return exportables.restaurarClaves(claves_descifradas)
+    if clavesDescifradas is not None:
+        return exportables.restaurarClaves(clavesDescifradas)
     entrada = next((n for n in nombres if Path(n).name == exportables.FICHERO_CLAVES), None)
-    if entrada and not sin_claves:
-        return exportables.restaurarClaves(_json_de_zip(zf, entrada))
+    if entrada and not sinClaves:
+        return exportables.restaurarClaves(_jsonDeZip(zf, entrada))
     return []
 
 
-def _aplicar_contenido(contenido: _ContenidoImportado, tmp_db, db_path) -> None:
+def _aplicarContenido(contenido: _ContenidoImportado, tmpDb, dbPath) -> None:
     """Sustituye la cartera activa y la configuración por lo importado."""
-    from core.db import invalidate_all_connections
+    from core.db import invalidateAllConnections
 
     if contenido.base:
-        invalidate_all_connections()
+        invalidateAllConnections()
         # Por la API de backup sobre el mismo fichero, no con un rename: así
         # no cambia el inodo bajo las conexiones de los demás procesos.
-        copiar_sqlite(tmp_db, db_path)
-    elif contenido.export_json is not None:
-        _restore_tables_from_dict(get_db(), contenido.export_json)
+        copiarSqlite(tmpDb, dbPath)
+    elif contenido.exportJson is not None:
+        _restoreTablesFromDict(getDb(), contenido.exportJson)
 
     if contenido.ajustes is not None:
         escribirJsonAtomico(_AJUSTES_JSON, contenido.ajustes)
-    for prefs_name, prefs in contenido.prefs.items():
-        escribirJsonAtomico(_AJUSTES_JSON.parent / prefs_name, prefs)
+    for prefsName, prefs in contenido.prefs.items():
+        escribirJsonAtomico(_AJUSTES_JSON.parent / prefsName, prefs)
 
 
-def _importar_zip(raw_bytes, claves_descifradas, sin_claves):
+def _importarZip(rawBytes, clavesDescifradas, sinClaves):
     """La importación propiamente dicha, ya con el cerrojo de restauración.
 
     Hasta aquí no se ha escrito nada. El orden es: validar todo lo que se va a
@@ -1227,26 +1227,26 @@ def _importar_zip(raw_bytes, claves_descifradas, sin_claves):
     cualquier SQLite —una vacía incluida— reemplazaba la cartera activa sin
     copia previa, y los ajustes se escribían sin comprobar que fueran JSON.
     """
-    from routes.backup import copia_previa_obligatoria, respuesta_sin_copia_previa
+    from routes.backup import copiaPreviaObligatoria, respuestaSinCopiaPrevia
 
-    db_path = get_active_db_path()
+    dbPath = getActiveDbPath()
     try:
-        with zipfile.ZipFile(io.BytesIO(raw_bytes), "r") as zf, \
-                temporalPara(db_path, directorio=paths.TMP_DIR) as tmp_db:
-            contenido = _leer_contenido_zip(zf, tmp_db)
+        with zipfile.ZipFile(io.BytesIO(rawBytes), "r") as zf, \
+                temporalPara(dbPath, directorio=paths.TMP_DIR) as tmpDb:
+            contenido = _leerContenidoZip(zf, tmpDb)
 
-            copia, copia_ok = copia_previa_obligatoria()
-            if not copia_ok:
-                return respuesta_sin_copia_previa()
+            copia, copiaOk = copiaPreviaObligatoria()
+            if not copiaOk:
+                return respuestaSinCopiaPrevia()
 
-            _aplicar_contenido(contenido, tmp_db, db_path)
-            claves = _restaurar_claves_del_zip(zf, contenido.nombres, claves_descifradas, sin_claves)
+            _aplicarContenido(contenido, tmpDb, dbPath)
+            claves = _restaurarClavesDelZip(zf, contenido.nombres, clavesDescifradas, sinClaves)
             if claves:
                 log.info("[import] Claves de API restauradas: %s", ", ".join(claves))
             # Preferencias de interfaz: no se guardan aquí, se devuelven para
             # que las escriba el navegador, que es donde viven.
-            entrada_ui = next((n for n in contenido.nombres if Path(n).name == exportables.FICHERO_UI), None)
-            ui = exportables.sanearUi(_json_de_zip(zf, entrada_ui)) if entrada_ui else {}
+            entradaUi = next((n for n in contenido.nombres if Path(n).name == exportables.FICHERO_UI), None)
+            ui = exportables.sanearUi(_jsonDeZip(zf, entradaUi)) if entradaUi else {}
     except (_ImportacionRechazada, ValueError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     except Exception as e:

@@ -124,8 +124,8 @@ escribe:
 Si se omite el campo se usa el portfolio activo, así que un Atajo hecho antes de
 esto sigue funcionando igual.
 
-Internamente cada petición abre su portfolio con `core.db.open_db_at()`, que es
-una conexión de usar y tirar. No se usa `set_active_db_path()` porque esa
+Internamente cada petición abre su portfolio con `core.db.openDbAt()`, que es
+una conexión de usar y tirar. No se usa `setActiveDbPath()` porque esa
 función cambia una variable global del proceso: le cambiaría la base de datos
 por debajo a la sesión web que estuviera abierta en ese momento.
 

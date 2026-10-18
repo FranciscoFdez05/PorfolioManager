@@ -9,46 +9,46 @@ from flask import Blueprint, jsonify, request, send_file
 from admin.portfolios_manager import (
     _PORTFOLIOS_DIR,
     NombreDuplicado,
-    _safe_id,
-    create_portfolio,
-    delete_portfolio,
-    get_portfolios,
-    registrar_portfolio,
-    rename_portfolio,
-    switch_portfolio,
+    _safeId,
+    createPortfolio,
+    deletePortfolio,
+    getPortfolios,
+    registrarPortfolio,
+    renamePortfolio,
+    switchPortfolio,
 )
 from core import paths, settings, zip_seguro
-from core.copia_sqlite import copiar as copiar_sqlite
+from core.copia_sqlite import copiar as copiarSqlite
 from core.escritura import limpiarTemporal, rutaTemporal, temporalPara
 from stores.asset_utils import slugify
 
-portfolios_bp = Blueprint("portfolios", __name__)
+portfoliosBp = Blueprint("portfolios", __name__)
 
 
-def _open_portfolio_db(db_file):
-    conn = sqlite3.connect(str(db_file), check_same_thread=False, timeout=settings.backupSqliteTimeout())
+def _openPortfolioDb(dbFile):
+    conn = sqlite3.connect(str(dbFile), check_same_thread=False, timeout=settings.backupSqliteTimeout())
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
+def _readAssetFromPortfolioDb(conn, assetId, pid, portfolioName):
     """Read a single asset from a given DB connection, returning camelCase data with prefixed IDs."""
-    safe_id = slugify(asset_id)
+    safeId = slugify(assetId)
     row = conn.execute(
         "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
         "sort_order, price, currency, change, status, last_updated, color, tv_symbol, coste_anual "
         "FROM activos WHERE id = ?",
-        (safe_id,)
+        (safeId,)
     ).fetchone()
     if row is None:
         return None
 
-    prefixed_id = f"{pid}__{row['id']}"
+    prefixedId = f"{pid}__{row['id']}"
     result = {
-        "id": prefixed_id,
+        "id": prefixedId,
         "originalId": row["id"],
         "portfolioId": pid,
-        "portfolioName": portfolio_name,
+        "portfolioName": portfolioName,
         "name": row["name"],
         "symbol": row["symbol"],
         "marketProvider": row["market_provider"],
@@ -86,14 +86,14 @@ def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
             "precio_participacion, capital_invertido_bruto, coste_anual, comisiones, "
             "comisiones_fiat, comisiones_cripto, comisiones_satoshis "
             "FROM activo_rows WHERE asset_id = ? ORDER BY id",
-            (safe_id,)
+            (safeId,)
         ).fetchall()
     ]
 
     result["operationRows"] = [
         {
             "id": r["id"],
-            "assetId": prefixed_id,
+            "assetId": prefixedId,
             "activo": r["activo"],
             "fechaApertura": r["fecha_apertura"],
             "par": r["par"],
@@ -113,7 +113,7 @@ def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
             "SELECT id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
             "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, fecha_cierre "
             "FROM activo_operation_rows WHERE asset_id = ? ORDER BY rowid",
-            (safe_id,)
+            (safeId,)
         ).fetchall()
     ]
 
@@ -128,27 +128,27 @@ def _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio_name):
         for r in conn.execute(
             "SELECT id, fecha, par, tipo, cantidad FROM activo_conversion_rows "
             "WHERE asset_id = ? ORDER BY rowid",
-            (safe_id,)
+            (safeId,)
         ).fetchall()
     ]
 
     return result
 
 
-@portfolios_bp.route("/api/portfolios", methods=["GET"])
-def list_portfolios():
-    meta = get_portfolios()
+@portfoliosBp.route("/api/portfolios", methods=["GET"])
+def listPortfolios():
+    meta = getPortfolios()
     return jsonify({"ok": True, "active": meta["active"], "portfolios": meta["portfolios"]})
 
 
-@portfolios_bp.route("/api/portfolios", methods=["POST"])
-def new_portfolio():
+@portfoliosBp.route("/api/portfolios", methods=["POST"])
+def newPortfolio():
     data = request.get_json(silent=True) or {}
     name = str(data.get("name", "")).strip()
     if not name:
         return jsonify({"ok": False, "error": "Nombre requerido"}), 400
     try:
-        pid = create_portfolio(name)
+        pid = createPortfolio(name)
         return jsonify({"ok": True, "id": pid})
     except NombreDuplicado as e:
         return jsonify({"ok": False, "error": str(e)}), 409
@@ -156,36 +156,36 @@ def new_portfolio():
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
-@portfolios_bp.route("/api/portfolios/switch", methods=["POST"])
-def do_switch():
+@portfoliosBp.route("/api/portfolios/switch", methods=["POST"])
+def doSwitch():
     data = request.get_json(silent=True) or {}
     pid = str(data.get("id", "")).strip()
     if not pid:
         return jsonify({"ok": False, "error": "ID requerido"}), 400
     try:
-        switch_portfolio(pid)
+        switchPortfolio(pid)
         return jsonify({"ok": True})
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
-@portfolios_bp.route("/api/portfolios/<pid>", methods=["DELETE"])
-def remove_portfolio(pid):
+@portfoliosBp.route("/api/portfolios/<pid>", methods=["DELETE"])
+def removePortfolio(pid):
     try:
-        delete_portfolio(pid)
+        deletePortfolio(pid)
         return jsonify({"ok": True})
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
-@portfolios_bp.route("/api/portfolios/<pid>/rename", methods=["POST"])
+@portfoliosBp.route("/api/portfolios/<pid>/rename", methods=["POST"])
 def rename(pid):
     data = request.get_json(silent=True) or {}
     name = str(data.get("name", "")).strip()
     if not name:
         return jsonify({"ok": False, "error": "Nombre requerido"}), 400
     try:
-        rename_portfolio(pid, name)
+        renamePortfolio(pid, name)
         return jsonify({"ok": True})
     except NombreDuplicado as e:
         return jsonify({"ok": False, "error": str(e)}), 409
@@ -193,19 +193,19 @@ def rename(pid):
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
-@portfolios_bp.route("/api/portfolios/<pid>/export", methods=["GET"])
-def export_portfolio(pid):
-    meta = get_portfolios()
+@portfoliosBp.route("/api/portfolios/<pid>/export", methods=["GET"])
+def exportPortfolio(pid):
+    meta = getPortfolios()
     portfolio = next((p for p in meta["portfolios"] if p["id"] == pid), None)
     if not portfolio:
         return jsonify({"ok": False, "error": "Portfolio no encontrado"}), 404
 
-    db_file = _PORTFOLIOS_DIR / f"{pid}.db"
-    if not db_file.exists():
+    dbFile = _PORTFOLIOS_DIR / f"{pid}.db"
+    if not dbFile.exists():
         return jsonify({"ok": False, "error": "Fichero de base de datos no encontrado"}), 404
 
-    safe_name = _safe_id(portfolio["name"]) or pid
-    download_name = f"portfolio_{safe_name}.db"
+    safeName = _safeId(portfolio["name"]) or pid
+    downloadName = f"portfolio_{safeName}.db"
 
     # Copia consistente en memoria: shutil.copy2 del .db en caliente puede dejar
     # fuera lo que aún está en el -wal, y el NamedTemporaryFile(delete=False)
@@ -214,10 +214,10 @@ def export_portfolio(pid):
     # El nombre llevaba el pid, que distingue a los dos workers de gunicorn pero
     # no a sus cuatro hilos: dos exportaciones del mismo portfolio a la vez
     # escribían el mismo fichero. rutaTemporal añade el hilo y un aleatorio.
-    with temporalPara(db_file, directorio=Path(tempfile.gettempdir())) as tmp_path:
+    with temporalPara(dbFile, directorio=Path(tempfile.gettempdir())) as tmpPath:
         try:
-            copiar_sqlite(db_file, tmp_path)
-            payload = tmp_path.read_bytes()
+            copiarSqlite(dbFile, tmpPath)
+            payload = tmpPath.read_bytes()
         except Exception as e:
             return jsonify({"ok": False, "error": f"No se pudo exportar: {e}"}), 500
 
@@ -225,11 +225,11 @@ def export_portfolio(pid):
         io.BytesIO(payload),
         mimetype="application/octet-stream",
         as_attachment=True,
-        download_name=download_name,
+        download_name=downloadName,
     )
 
 
-def _db_de_un_zip(origen, destino: Path):
+def _dbDeUnZip(origen, destino: Path):
     """Extrae a `destino` la base de datos de un ZIP de la aplicación. Devuelve el error o None.
 
     Vale tanto el ZIP de «Exportar ZIP» —que lleva el `.db` en la raíz— como una
@@ -266,8 +266,8 @@ def _db_de_un_zip(origen, destino: Path):
     return None
 
 
-@portfolios_bp.route("/api/portfolios/import", methods=["POST"])
-def import_portfolio():
+@portfoliosBp.route("/api/portfolios/import", methods=["POST"])
+def importPortfolio():
     name = request.form.get("name", "").strip()
     file = request.files.get("file")
 
@@ -283,8 +283,8 @@ def import_portfolio():
     header = file.read(4)
     file.seek(0)
 
-    es_zip = header.startswith(b"PK")
-    if not es_zip and not file.read(16).startswith(b"SQLite format 3"):
+    esZip = header.startswith(b"PK")
+    if not esZip and not file.read(16).startswith(b"SQLite format 3"):
         return jsonify({"ok": False, "error": "El fichero no es una base de datos SQLite válida"}), 400
     file.seek(0)
 
@@ -296,23 +296,23 @@ def import_portfolio():
     # copia automática, el backup manual, la rotación—, y con ficheros de
     # decenas de MB esa ventana dura segundos, no un instante.
     # El id se elige después, ya validado y bajo el cerrojo del índice
-    # (admin.portfolios_manager.registrar_portfolio): elegirlo aquí, sin
+    # (admin.portfolios_manager.registrarPortfolio): elegirlo aquí, sin
     # cerrojo, dejaba que dos importaciones simultáneas se quedaran con el mismo.
-    tmp_dest = rutaTemporal(_PORTFOLIOS_DIR / "importacion.db", directorio=paths.TMP_DIR)
+    tmpDest = rutaTemporal(_PORTFOLIOS_DIR / "importacion.db", directorio=paths.TMP_DIR)
     try:
-        if es_zip:
-            error = _db_de_un_zip(file.stream, tmp_dest)
+        if esZip:
+            error = _dbDeUnZip(file.stream, tmpDest)
             if error:
                 return jsonify({"ok": False, "error": error}), 400
         else:
-            file.save(str(tmp_dest))
+            file.save(str(tmpDest))
 
         # Verificar integridad de verdad: antes se ejecutaba el PRAGMA pero
         # nunca se miraba el resultado, así que cualquier BD que se pudiera
         # abrir se aceptaba aunque integrity_check devolviese errores.
         conn = None
         try:
-            conn = sqlite3.connect(str(tmp_dest), timeout=settings.backupSqliteTimeout())
+            conn = sqlite3.connect(str(tmpDest), timeout=settings.backupSqliteTimeout())
             result = conn.execute("PRAGMA integrity_check").fetchone()
             if not result or result[0] != "ok":
                 return jsonify({"ok": False, "error": "La base de datos importada está corrupta"}), 400
@@ -327,24 +327,24 @@ def import_portfolio():
                 except Exception:
                     pass
 
-        pid = registrar_portfolio(name[:50], lambda destino: tmp_dest.replace(destino), renombrar_si_existe=True)
+        pid = registrarPortfolio(name[:50], lambda destino: tmpDest.replace(destino), renombrarSiExiste=True)
     except Exception as e:
         return jsonify({"ok": False, "error": f"No se pudo importar: {e}"}), 400
     finally:
-        limpiarTemporal(tmp_dest)
+        limpiarTemporal(tmpDest)
 
     return jsonify({"ok": True, "id": pid})
 
 
-@portfolios_bp.route("/api/portfolios/all-assets", methods=["GET"])
-def all_portfolios_assets():
-    meta = get_portfolios()
+@portfoliosBp.route("/api/portfolios/all-assets", methods=["GET"])
+def allPortfoliosAssets():
+    meta = getPortfolios()
     result = []
     for p in meta["portfolios"]:
-        db_file = _PORTFOLIOS_DIR / f"{p['id']}.db"
-        if not db_file.exists():
+        dbFile = _PORTFOLIOS_DIR / f"{p['id']}.db"
+        if not dbFile.exists():
             continue
-        conn = _open_portfolio_db(db_file)
+        conn = _openPortfolioDb(dbFile)
         try:
             assets = conn.execute(
                 "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
@@ -381,18 +381,18 @@ def all_portfolios_assets():
     return jsonify({"ok": True, "assets": result})
 
 
-@portfolios_bp.route("/api/portfolios/<pid>/activo/<asset_id>", methods=["GET"])
-def portfolio_activo(pid, asset_id):
-    meta = get_portfolios()
+@portfoliosBp.route("/api/portfolios/<pid>/activo/<assetId>", methods=["GET"])
+def portfolioActivo(pid, assetId):
+    meta = getPortfolios()
     portfolio = next((p for p in meta["portfolios"] if p["id"] == pid), None)
     if not portfolio:
         return jsonify({"ok": False, "error": "Portfolio no encontrado"}), 404
-    db_file = _PORTFOLIOS_DIR / f"{pid}.db"
-    if not db_file.exists():
+    dbFile = _PORTFOLIOS_DIR / f"{pid}.db"
+    if not dbFile.exists():
         return jsonify({"ok": False, "error": "DB no encontrada"}), 404
-    conn = _open_portfolio_db(db_file)
+    conn = _openPortfolioDb(dbFile)
     try:
-        result = _read_asset_from_portfolio_db(conn, asset_id, pid, portfolio["name"])
+        result = _readAssetFromPortfolioDb(conn, assetId, pid, portfolio["name"])
         if result is None:
             return jsonify({"ok": False, "error": "Activo no encontrado"}), 404
         return jsonify(result)

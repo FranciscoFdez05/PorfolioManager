@@ -20,17 +20,17 @@ from stores.app_data import (
     writeStakingFile,
     writeTransaccionesFile,
 )
-from stores.cuentas_store import CuentaInvalida, listar_cuentas
+from stores.cuentas_store import CuentaInvalida, listarCuentas
 
-registros_bp = Blueprint("registros", __name__)
+registrosBp = Blueprint("registros", __name__)
 
 
-@registros_bp.route("/api/intereses", methods=["GET"])
+@registrosBp.route("/api/intereses", methods=["GET"])
 def getIntereses():
     return jsonify(readInteresesFile())
 
 
-@registros_bp.route("/api/intereses", methods=["POST"])
+@registrosBp.route("/api/intereses", methods=["POST"])
 def saveIntereses():
     requestData = request.get_json(silent=True)
 
@@ -72,18 +72,18 @@ def saveIntereses():
     return jsonify({"ok": True})
 
 
-@registros_bp.route("/api/intereses/reset", methods=["POST"])
+@registrosBp.route("/api/intereses/reset", methods=["POST"])
 def resetIntereses():
     writeInteresesFile({"cuentas": []})
     return jsonify({"ok": True})
 
 
-@registros_bp.route("/api/dividendos", methods=["GET"])
+@registrosBp.route("/api/dividendos", methods=["GET"])
 def getDividendos():
     return jsonify(readDividendosFile())
 
 
-@registros_bp.route("/api/dividendos", methods=["POST"])
+@registrosBp.route("/api/dividendos", methods=["POST"])
 def saveDividendos():
     requestData = request.get_json(silent=True)
 
@@ -100,11 +100,11 @@ def saveDividendos():
 
     sanitizedRows = []
 
-    _valid_currencies = {"EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK",
+    _validCurrencies = {"EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK",
                           "HKD", "SGD", "MXN", "BRL", "INR", "CNY", "KRW", "TRY", "PLN", "CZK"}
     # Una cuenta que ya no existe se queda en blanco: el dividendo vuelve a ir a
     # la que cobra los dividendos, en vez de quedar apuntando a ninguna parte.
-    cuentas_validas = {c["id"] for c in listar_cuentas()}
+    cuentasValidas = {c["id"] for c in listarCuentas()}
     for row in rows:
         md = str(row.get("monedaDividendo", "USD")).strip().upper()
         mt = str(row.get("monedaTotal",     "EUR")).strip().upper()
@@ -118,25 +118,25 @@ def saveDividendos():
             "total": str(row.get("total", "")).strip(),
             "monedaDividendo": md if md.isalpha() and 2 <= len(md) <= 5 else "USD",
             "monedaTotal":     mt if mt.isalpha() and 2 <= len(mt) <= 5 else "EUR",
-            "cuenta": cuenta if cuenta in cuentas_validas else "",
+            "cuenta": cuenta if cuenta in cuentasValidas else "",
         })
 
     writeDividendosFile({"rows": sanitizedRows})
     return jsonify({"ok": True})
 
 
-@registros_bp.route("/api/dividendos/reset", methods=["POST"])
+@registrosBp.route("/api/dividendos/reset", methods=["POST"])
 def resetDividendos():
     writeDividendosFile({"rows": []})
     return jsonify({"ok": True})
 
 
-@registros_bp.route("/api/dividendos/calendar", methods=["GET"])
+@registrosBp.route("/api/dividendos/calendar", methods=["GET"])
 def getDividendoCalendar():
     return jsonify(readDividendoCalendar())
 
 
-@registros_bp.route("/api/dividendos/calendar", methods=["POST"])
+@registrosBp.route("/api/dividendos/calendar", methods=["POST"])
 def saveDividendoCalendar():
     requestData = request.get_json(silent=True) or {}
     if "calendar" not in requestData or not isinstance(requestData["calendar"], dict):
@@ -145,12 +145,12 @@ def saveDividendoCalendar():
     return jsonify({"ok": True})
 
 
-@registros_bp.route("/api/transacciones", methods=["GET"])
+@registrosBp.route("/api/transacciones", methods=["GET"])
 def getTransacciones():
     return jsonify(readTransaccionesFile())
 
 
-@registros_bp.route("/api/transacciones", methods=["POST"])
+@registrosBp.route("/api/transacciones", methods=["POST"])
 def saveTransacciones():
     requestData = request.get_json(silent=True) or {}
     rows = requestData.get("rows", [])
@@ -182,12 +182,12 @@ def saveTransacciones():
     return jsonify({"ok": True})
 
 
-@registros_bp.route("/api/bonos", methods=["GET"])
+@registrosBp.route("/api/bonos", methods=["GET"])
 def getBonos():
     return jsonify(readBonosFile())
 
 
-@registros_bp.route("/api/bonos", methods=["POST"])
+@registrosBp.route("/api/bonos", methods=["POST"])
 def saveBonos():
     requestData = request.get_json(silent=True)
 
@@ -228,12 +228,12 @@ def saveBonos():
     return jsonify({"ok": True})
 
 
-@registros_bp.route("/api/rentafija", methods=["GET"])
+@registrosBp.route("/api/rentafija", methods=["GET"])
 def getRentaFija():
     return jsonify(readRentaFijaFile())
 
 
-@registros_bp.route("/api/rentafija", methods=["POST"])
+@registrosBp.route("/api/rentafija", methods=["POST"])
 def saveRentaFija():
     requestData = request.get_json(silent=True)
 
@@ -271,12 +271,12 @@ def saveRentaFija():
     return jsonify({"ok": True})
 
 
-@registros_bp.route("/api/privatemarket", methods=["GET"])
+@registrosBp.route("/api/privatemarket", methods=["GET"])
 def getPrivateMarket():
     return jsonify(readPrivateMarketFile())
 
 
-@registros_bp.route("/api/privatemarket", methods=["POST"])
+@registrosBp.route("/api/privatemarket", methods=["POST"])
 def savePrivateMarket():
     requestData = request.get_json(silent=True)
 
@@ -319,12 +319,12 @@ def savePrivateMarket():
     return jsonify({"ok": True})
 
 
-@registros_bp.route("/api/staking", methods=["GET"])
+@registrosBp.route("/api/staking", methods=["GET"])
 def getStaking():
     return jsonify(readStakingFile())
 
 
-@registros_bp.route("/api/staking", methods=["POST"])
+@registrosBp.route("/api/staking", methods=["POST"])
 def saveStaking():
     requestData = request.get_json(silent=True)
     if not requestData or "criptos" not in requestData:
@@ -351,12 +351,12 @@ def saveStaking():
     return jsonify({"ok": True})
 
 
-@registros_bp.route("/api/earn", methods=["GET"])
+@registrosBp.route("/api/earn", methods=["GET"])
 def getEarn():
     return jsonify(readEarnFile())
 
 
-@registros_bp.route("/api/earn", methods=["POST"])
+@registrosBp.route("/api/earn", methods=["POST"])
 def saveEarn():
     requestData = request.get_json(silent=True)
     if not requestData or "criptos" not in requestData:

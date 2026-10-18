@@ -8,11 +8,11 @@ import pytest
 
 
 @pytest.fixture
-def datos(temp_db):
+def datos(tempDb):
     """Dos años de gastos y uno de ingresos usando las mismas categorías."""
-    from core.db import get_db
+    from core.db import getDb
 
-    conn = get_db()
+    conn = getDb()
     conn.executemany(
         "INSERT INTO gastos_tipos (label) VALUES (?)",
         [("Café",), ("Coche",), ("Compras",)],
@@ -43,7 +43,7 @@ def datos(temp_db):
 
 # ── Resumen ──────────────────────────────────────────────────────────────────
 
-def test_resumen_cuenta_usos_de_todos_los_anios(datos):
+def testResumenCuentaUsosDeTodosLosAnios(datos):
     from stores.categorias_store import leerResumen
 
     resumen = leerResumen()
@@ -57,12 +57,12 @@ def test_resumen_cuenta_usos_de_todos_los_anios(datos):
     assert {item["label"]: item["usos"] for item in resumen["ingreso"]}["Nómina"] == 1
 
 
-def test_resumen_incluye_categorias_que_solo_estan_en_filas(datos):
+def testResumenIncluyeCategoriasQueSoloEstanEnFilas(datos):
     """Una etiqueta que nunca llegó al catálogo también hay que poder editarla."""
-    from core.db import get_db
+    from core.db import getDb
     from stores.categorias_store import leerResumen
 
-    conn = get_db()
+    conn = getDb()
     conn.execute(
         "INSERT INTO gastos_rows (year, month, fecha, nombre, tipo, cantidad) VALUES (?, ?, ?, ?, ?, ?)",
         ("2026", "mayo", "02-05-2026", "Farmacia", "Salud", "12,00 €"),
@@ -75,7 +75,7 @@ def test_resumen_incluye_categorias_que_solo_estan_en_filas(datos):
 
 # ── Renombrar ────────────────────────────────────────────────────────────────
 
-def test_renombrar_alcanza_todos_los_anios(datos):
+def testRenombrarAlcanzaTodosLosAnios(datos):
     from stores.categorias_store import renombrarCategoria
 
     filas = renombrarCategoria("gasto", "Café", "Cafetería")
@@ -87,7 +87,7 @@ def test_renombrar_alcanza_todos_los_anios(datos):
     assert [r["year"] for r in nuevas] == ["2025", "2026"]
 
 
-def test_renombrar_actualiza_el_catalogo(datos):
+def testRenombrarActualizaElCatalogo(datos):
     from stores.categorias_store import renombrarCategoria
 
     renombrarCategoria("gasto", "Café", "Cafetería")
@@ -97,7 +97,7 @@ def test_renombrar_actualiza_el_catalogo(datos):
     assert "Café" not in etiquetas
 
 
-def test_renombrar_actualiza_los_recurrentes(datos):
+def testRenombrarActualizaLosRecurrentes(datos):
     from stores.categorias_store import renombrarCategoria
 
     renombrarCategoria("gasto", "Coche", "Vehículo")
@@ -106,7 +106,7 @@ def test_renombrar_actualiza_los_recurrentes(datos):
     assert categoria == "Vehículo"
 
 
-def test_renombrar_una_categoria_sin_catalogo_la_da_de_alta(datos):
+def testRenombrarUnaCategoriaSinCatalogoLaDaDeAlta(datos):
     from stores.categorias_store import leerResumen, renombrarCategoria
 
     datos.execute(
@@ -122,7 +122,7 @@ def test_renombrar_una_categoria_sin_catalogo_la_da_de_alta(datos):
     assert "Salud" not in etiquetas
 
 
-def test_renombrar_a_un_nombre_existente_falla(datos):
+def testRenombrarAUnNombreExistenteFalla(datos):
     from stores.categorias_store import CategoriaInvalida, renombrarCategoria
 
     with pytest.raises(CategoriaInvalida):
@@ -132,7 +132,7 @@ def test_renombrar_a_un_nombre_existente_falla(datos):
     assert datos.execute("SELECT COUNT(*) AS n FROM gastos_rows WHERE tipo = 'Café'").fetchone()["n"] == 2
 
 
-def test_renombrar_al_mismo_nombre_no_hace_nada(datos):
+def testRenombrarAlMismoNombreNoHaceNada(datos):
     from stores.categorias_store import renombrarCategoria
 
     assert renombrarCategoria("gasto", "Café", "Café") == 0
@@ -143,14 +143,14 @@ def test_renombrar_al_mismo_nombre_no_hace_nada(datos):
     ("gasto", "", "Bar"),
     ("gasto", "Café", "   "),
 ])
-def test_renombrar_valida_la_entrada(datos, tipo, de, a):
+def testRenombrarValidaLaEntrada(datos, tipo, de, a):
     from stores.categorias_store import CategoriaInvalida, renombrarCategoria
 
     with pytest.raises(CategoriaInvalida):
         renombrarCategoria(tipo, de, a)
 
 
-def test_renombrar_ingresos_es_independiente_de_gastos(datos):
+def testRenombrarIngresosEsIndependienteDeGastos(datos):
     from stores.categorias_store import renombrarCategoria
 
     renombrarCategoria("ingreso", "Nómina", "Salario")
@@ -162,14 +162,14 @@ def test_renombrar_ingresos_es_independiente_de_gastos(datos):
 
 # ── Eliminar ─────────────────────────────────────────────────────────────────
 
-def test_eliminar_categoria_sin_uso(datos):
+def testEliminarCategoriaSinUso(datos):
     from stores.categorias_store import eliminarCategoria
 
     assert eliminarCategoria("gasto", "Compras") is True
     assert datos.execute("SELECT COUNT(*) AS n FROM gastos_tipos WHERE label = 'Compras'").fetchone()["n"] == 0
 
 
-def test_eliminar_categoria_en_uso_en_otro_anio_falla(datos):
+def testEliminarCategoriaEnUsoEnOtroAnioFalla(datos):
     """El caso que el frontend no podía detectar: uso en un año no cargado."""
     from stores.categorias_store import CategoriaEnUso, eliminarCategoria
 
@@ -180,7 +180,7 @@ def test_eliminar_categoria_en_uso_en_otro_anio_falla(datos):
     assert datos.execute("SELECT COUNT(*) AS n FROM gastos_tipos WHERE label = 'Café'").fetchone()["n"] == 1
 
 
-def test_eliminar_categoria_usada_solo_por_un_recurrente_falla(datos):
+def testEliminarCategoriaUsadaSoloPorUnRecurrenteFalla(datos):
     from stores.categorias_store import CategoriaEnUso, eliminarCategoria
 
     datos.execute("DELETE FROM gastos_rows WHERE tipo = 'Coche'")
@@ -193,53 +193,53 @@ def test_eliminar_categoria_usada_solo_por_un_recurrente_falla(datos):
 # ── Rutas HTTP ───────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def categorias_app(datos):
+def categoriasApp(datos):
     from flask import Flask
 
-    from core.errors import register_error_handlers
-    from routes.categorias import categorias_bp
+    from core.errors import registerErrorHandlers
+    from routes.categorias import categoriasBp
 
     app = Flask(__name__)
     app.config["TESTING"] = True
-    register_error_handlers(app)
-    app.register_blueprint(categorias_bp)
+    registerErrorHandlers(app)
+    app.register_blueprint(categoriasBp)
     return app
 
 
-def test_endpoint_resumen(categorias_app):
-    client = categorias_app.test_client()
+def testEndpointResumen(categoriasApp):
+    client = categoriasApp.test_client()
     datos = client.get("/api/categorias/resumen").get_json()
 
     assert datos["ok"] is True
     assert {item["label"] for item in datos["categorias"]["gasto"]} == {"Café", "Coche", "Compras"}
 
 
-def test_endpoint_renombrar(categorias_app):
-    client = categorias_app.test_client()
+def testEndpointRenombrar(categoriasApp):
+    client = categoriasApp.test_client()
     respuesta = client.post("/api/categorias/renombrar", json={"tipo": "gasto", "de": "Café", "a": "Cafetería"})
 
     assert respuesta.status_code == 200
     assert respuesta.get_json()["filas"] == 2
 
 
-def test_endpoint_renombrar_invalido_da_400(categorias_app):
-    client = categorias_app.test_client()
+def testEndpointRenombrarInvalidoDa400(categoriasApp):
+    client = categoriasApp.test_client()
     respuesta = client.post("/api/categorias/renombrar", json={"tipo": "gasto", "de": "Café", "a": "Coche"})
 
     assert respuesta.status_code == 400
     assert "Coche" in respuesta.get_json()["error"]
 
 
-def test_endpoint_eliminar_en_uso_da_409(categorias_app):
-    client = categorias_app.test_client()
+def testEndpointEliminarEnUsoDa409(categoriasApp):
+    client = categoriasApp.test_client()
     respuesta = client.post("/api/categorias/eliminar", json={"tipo": "gasto", "label": "Café"})
 
     assert respuesta.status_code == 409
     assert respuesta.get_json()["usos"] == 2
 
 
-def test_endpoint_eliminar_sin_uso(categorias_app):
-    client = categorias_app.test_client()
+def testEndpointEliminarSinUso(categoriasApp):
+    client = categoriasApp.test_client()
     respuesta = client.post("/api/categorias/eliminar", json={"tipo": "gasto", "label": "Compras"})
 
     assert respuesta.status_code == 200

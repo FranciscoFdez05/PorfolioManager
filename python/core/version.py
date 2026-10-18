@@ -35,9 +35,9 @@ __version__ = "4.7.0"
 MARCADOR_VERSION = "__APP_VERSION__"
 
 
-def insertar_version(html: str) -> str:
+def insertarVersion(html: str) -> str:
     """Sustituye el marcador de la plantilla por la versión en curso."""
     return html.replace(MARCADOR_VERSION, __version__)
 
 
-__all__ = ["MARCADOR_VERSION", "__version__", "insertar_version"]
+__all__ = ["MARCADOR_VERSION", "__version__", "insertarVersion"]

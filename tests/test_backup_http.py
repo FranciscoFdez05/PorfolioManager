@@ -7,7 +7,7 @@ histórico completo del usuario. Estos tests cubren sobre todo lo que tiene que
 pasar **cuando algo va mal**: nombre manipulado, zip corrupto, entradas con
 rutas de escape, y la copia de seguridad previa que permite dar marcha atrás.
 
-Ningún caso toca `data/`: el fixture `datos_aislados` redirige a tmp_path todos
+Ningún caso toca `data/`: el fixture `datosAislados` redirige a tmp_path todos
 los directorios que usan estas rutas.
 """
 
@@ -21,20 +21,20 @@ import pytest
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, datos_aislados, monkeypatch):
+def cliente(clienteAutenticado, datosAislados, monkeypatch):
     """Cliente con sesión + directorios de datos aislados + límites amplios."""
-    from routes.backup import backup_bp
+    from routes.backup import backupBp
 
     # El cupo de rutas pesadas es 30/hora en producción; varios tests hacen más
     # de una copia seguida y el 429 no es lo que quieren comprobar.
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
 
-    client, cabeceras, _app = cliente_autenticado(backup_bp)
-    return client, cabeceras, datos_aislados
+    client, cabeceras, _app = clienteAutenticado(backupBp)
+    return client, cabeceras, datosAislados
 
 
-def _crear_db(ruta, filas=()):
+def _crearDb(ruta, filas=()):
     """Base SQLite mínima con la tabla que lee y restaura el módulo de backup."""
     conn = sqlite3.connect(str(ruta))
     conn.execute(
@@ -62,10 +62,10 @@ def _snapshots(ruta):
 
 # ── Crear ────────────────────────────────────────────────────────────────────
 
-def test_crear_backup_empaqueta_portfolios_ajustes_y_manifest(cliente):
+def testCrearBackupEmpaquetaPortfoliosAjustesYManifest(cliente):
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
-    _crear_db(rutas["portfolios"] / "cripto.db", [("2026-01-02", 50.0, 40.0)])
+    _crearDb(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
+    _crearDb(rutas["portfolios"] / "cripto.db", [("2026-01-02", 50.0, 40.0)])
     rutas["meta"].write_text(json.dumps({"active": "principal"}), encoding="utf-8")
     rutas["ajustes"].write_text(json.dumps({"maxBackups": 0}), encoding="utf-8")
     (rutas["json"] / "prefs_principal.json").write_text("{}", encoding="utf-8")
@@ -86,9 +86,9 @@ def test_crear_backup_empaqueta_portfolios_ajustes_y_manifest(cliente):
     assert sorted(manifest["portfolios"]) == ["cripto", "principal"]
 
 
-def test_el_backup_recien_creado_aparece_el_primero_en_la_lista(cliente):
+def testElBackupRecienCreadoApareceElPrimeroEnLaLista(cliente):
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
     nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
     listado = client.get("/api/backups").get_json()["backups"]
@@ -96,10 +96,10 @@ def test_el_backup_recien_creado_aparece_el_primero_en_la_lista(cliente):
     assert listado[0] == nombre
 
 
-def test_maxBackups_borra_los_viejos_pero_nunca_el_recien_creado(cliente):
+def testMaxBackupsBorraLosViejosPeroNuncaElRecienCreado(cliente):
     """El caso que hay que evitar: crear una copia y que la poda se la lleve."""
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
     rutas["ajustes"].write_text(json.dumps({"maxBackups": 2}), encoding="utf-8")
 
     for viejo in ("backup_01-01-2020_00-00-00.zip", "backup_02-01-2020_00-00-00.zip",
@@ -113,7 +113,7 @@ def test_maxBackups_borra_los_viejos_pero_nunca_el_recien_creado(cliente):
     assert nombre in restantes
 
 
-def test_un_zip_a_medio_escribir_no_queda_en_el_listado(cliente):
+def testUnZipAMedioEscribirNoQuedaEnElListado(cliente):
     """El temporal `_tmp_backup_*.zip` no encaja con el patrón de nombres."""
     client, _cabeceras, rutas = cliente
     (rutas["backups"] / "_tmp_backup_01-01-2026_00-00-00.zip").write_bytes(b"a medias")
@@ -121,7 +121,7 @@ def test_un_zip_a_medio_escribir_no_queda_en_el_listado(cliente):
     assert client.get("/api/backups").get_json()["backups"] == []
 
 
-def test_las_copias_temporales_no_se_dejan_caer_en_portfolios(cliente):
+def testLasCopiasTemporalesNoSeDejanCaerEnPortfolios(cliente):
     """El .db temporal de cada copia va a data/tmp, no junto a los portfolios.
 
     En data/portfolios lo veía como un portfolio más cualquier `glob("*.db")`:
@@ -130,7 +130,7 @@ def test_las_copias_temporales_no_se_dejan_caer_en_portfolios(cliente):
     y cuatro hilos de gunicorn del contenedor, no.
     """
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
+    _crearDb(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
 
     assert client.post("/api/backup", headers=cabeceras).get_json()["ok"] is True
 
@@ -143,7 +143,7 @@ def test_las_copias_temporales_no_se_dejan_caer_en_portfolios(cliente):
     assert restantes == ["backup-automatico.lock"]
 
 
-def test_un_fallo_de_permisos_se_devuelve_con_su_causa(cliente, monkeypatch):
+def testUnFalloDePermisosSeDevuelveConSuCausa(cliente, monkeypatch):
     """El caso de Docker: el volumen montado no deja escribir.
 
     Antes salía un 500 con `str(e)` a secas —o el "Error interno del servidor"
@@ -152,15 +152,15 @@ def test_un_fallo_de_permisos_se_devuelve_con_su_causa(cliente, monkeypatch):
     """
     import errno
 
-    from routes import backup as rutas_backup
+    from routes import backup as rutasBackup
 
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
     def _denegado(*_args, **_kwargs):
         raise PermissionError(errno.EACCES, "Permission denied")
 
-    monkeypatch.setattr(rutas_backup.zipfile, "ZipFile", _denegado)
+    monkeypatch.setattr(rutasBackup.zipfile, "ZipFile", _denegado)
 
     respuesta = client.post("/api/backup", headers=cabeceras)
     datos = respuesta.get_json()
@@ -172,19 +172,19 @@ def test_un_fallo_de_permisos_se_devuelve_con_su_causa(cliente, monkeypatch):
     assert str(rutas["backups"]) in datos["error"]
 
 
-def test_no_se_empieza_el_zip_si_el_destino_no_es_escribible(cliente, monkeypatch):
+def testNoSeEmpiezaElZipSiElDestinoNoEsEscribible(cliente, monkeypatch):
     """La comprobación va antes de tocar nada, para no dejar un zip a medias."""
     from core import paths
-    from routes import backup as rutas_backup
+    from routes import backup as rutasBackup
 
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
     monkeypatch.setattr(
         paths, "comprobarEscritura",
         lambda directorio, crear=True: (False, "Read-only file system"),
     )
-    monkeypatch.setattr(rutas_backup, "paths", paths)
+    monkeypatch.setattr(rutasBackup, "paths", paths)
 
     respuesta = client.post("/api/backup", headers=cabeceras)
     datos = respuesta.get_json()
@@ -205,7 +205,7 @@ def test_no_se_empieza_el_zip_si_el_destino_no_es_escribible(cliente, monkeypatc
     "backup_01-01-2026_00-00-00.zip.bak",
     "",
 ])
-def test_restore_rechaza_nombres_que_no_son_de_un_backup(cliente, nombre):
+def testRestoreRechazaNombresQueNoSonDeUnBackup(cliente, nombre):
     """El nombre viene del cuerpo JSON: es entrada de usuario, no una ruta."""
     client, cabeceras, _rutas = cliente
     respuesta = client.post("/api/restore", json={"filename": nombre}, headers=cabeceras)
@@ -214,7 +214,7 @@ def test_restore_rechaza_nombres_que_no_son_de_un_backup(cliente, nombre):
     assert respuesta.get_json()["ok"] is False
 
 
-def test_restore_de_un_backup_inexistente_es_404(cliente):
+def testRestoreDeUnBackupInexistenteEs404(cliente):
     client, cabeceras, _rutas = cliente
     respuesta = client.post(
         "/api/restore", json={"filename": "backup_01-01-2026_00-00-00.zip"}, headers=cabeceras,
@@ -222,10 +222,10 @@ def test_restore_de_un_backup_inexistente_es_404(cliente):
     assert respuesta.status_code == 404
 
 
-def test_un_zip_corrupto_se_rechaza_antes_de_tocar_nada(cliente):
+def testUnZipCorruptoSeRechazaAntesDeTocarNada(cliente):
     """Abortar a mitad dejaría parte de los portfolios ya sobrescritos."""
     client, cabeceras, rutas = cliente
-    original = _crear_db(rutas["portfolios"] / "principal.db", [("2026-06-01", 999.0, 888.0)])
+    original = _crearDb(rutas["portfolios"] / "principal.db", [("2026-06-01", 999.0, 888.0)])
     (rutas["backups"] / "backup_01-01-2026_00-00-00.zip").write_bytes(b"esto no es un zip")
 
     respuesta = client.post(
@@ -237,37 +237,37 @@ def test_un_zip_corrupto_se_rechaza_antes_de_tocar_nada(cliente):
     assert _snapshots(original) == [("2026-06-01", 999.0, 888.0)]
 
 
-def test_restore_sin_sesion_es_401(crear_app, datos_aislados):
+def testRestoreSinSesionEs401(crearApp, datosAislados):
     """La ruta más destructiva no puede quedar detrás de una comprobación floja."""
-    from routes.backup import backup_bp
+    from routes.backup import backupBp
 
-    client = crear_app(backup_bp).test_client()
+    client = crearApp(backupBp).test_client()
     respuesta = client.post("/api/restore", json={"filename": "backup_01-01-2026_00-00-00.zip"})
     assert respuesta.status_code == 401
 
 
-def test_restore_con_sesion_pero_sin_csrf_es_403(cliente_autenticado, datos_aislados):
-    from routes.backup import backup_bp
+def testRestoreConSesionPeroSinCsrfEs403(clienteAutenticado, datosAislados):
+    from routes.backup import backupBp
 
-    client, _cabeceras, _app = cliente_autenticado(backup_bp)
+    client, _cabeceras, _app = clienteAutenticado(backupBp)
     respuesta = client.post("/api/restore", json={"filename": "backup_01-01-2026_00-00-00.zip"})
     assert respuesta.status_code == 403
 
 
 # ── Restaurar: entradas maliciosas dentro del zip ────────────────────────────
 
-def test_una_entrada_con_ruta_de_escape_no_sale_del_directorio(cliente, tmp_path):
+def testUnaEntradaConRutaDeEscapeNoSaleDelDirectorio(cliente, tmp_path):
     """`portfolios/../../../../evil.db` no debe escribir fuera de data/portfolios."""
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
     fuera = tmp_path / "evil.db"
 
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("portfolios/../../../../evil.db", b"SQLite format 3\x00" + b"\x00" * 100)
 
     respuesta = client.post(
-        "/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras,
+        "/api/restore", json={"filename": rutaZip.name}, headers=cabeceras,
     )
 
     assert respuesta.status_code == 200
@@ -279,7 +279,7 @@ def test_una_entrada_con_ruta_de_escape_no_sale_del_directorio(cliente, tmp_path
                    if p.parent != rutas["portfolios"])
 
 
-def test_una_entrada_danada_no_tumba_el_resto_de_la_restauracion(cliente):
+def testUnaEntradaDanadaNoTumbaElRestoDeLaRestauracion(cliente):
     """Los 16 bytes de cabecera SQLite se pueden acertar con basura detrás.
 
     Antes, esa entrada lanzaba desde `_sqlite_copy` y abortaba el restore
@@ -287,17 +287,17 @@ def test_una_entrada_danada_no_tumba_el_resto_de_la_restauracion(cliente):
     se habían tocado, y la respuesta era un 500 sin decir cuál falló.
     """
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
-    _crear_db(rutas["portfolios"] / "cripto.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "cripto.db")
 
-    bueno = _crear_db(rutas["data"] / "bueno.db", [("2026-01-01", 5.0, 4.0)])
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+    bueno = _crearDb(rutas["data"] / "bueno.db", [("2026-01-01", 5.0, 4.0)])
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("portfolios/cripto.db", b"SQLite format 3\x00" + b"basura" * 50)
         zf.writestr("portfolios/principal.db", bueno.read_bytes())
 
     datos = client.post(
-        "/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras,
+        "/api/restore", json={"filename": rutaZip.name}, headers=cabeceras,
     ).get_json()
 
     assert datos["ok"] is True
@@ -307,31 +307,31 @@ def test_una_entrada_danada_no_tumba_el_resto_de_la_restauracion(cliente):
     assert any("cripto.db" in aviso for aviso in datos["ignorados"])
 
 
-def test_una_entrada_que_no_es_sqlite_se_ignora(cliente):
+def testUnaEntradaQueNoEsSqliteSeIgnora(cliente):
     """Escribir esos bytes como .db dejaría el portfolio ilegible."""
     client, cabeceras, rutas = cliente
-    original = _crear_db(rutas["portfolios"] / "principal.db", [("2026-06-01", 10.0, 5.0)])
+    original = _crearDb(rutas["portfolios"] / "principal.db", [("2026-06-01", 10.0, 5.0)])
 
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("portfolios/principal.db", b"<html>no soy una base de datos</html>")
 
-    respuesta = client.post("/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras)
+    respuesta = client.post("/api/restore", json={"filename": rutaZip.name}, headers=cabeceras)
 
     assert respuesta.status_code == 200
     assert _snapshots(original) == [("2026-06-01", 10.0, 5.0)]
 
 
-def test_un_nombre_de_prefs_manipulado_se_ignora(cliente):
+def testUnNombreDePrefsManipuladoSeIgnora(cliente):
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("prefs/ajustes.json", b'{"robado": true}')
         zf.writestr("prefs/prefs_principal.json", b'{"tema": "oscuro"}')
 
-    client.post("/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras)
+    client.post("/api/restore", json={"filename": rutaZip.name}, headers=cabeceras)
 
     # `ajustes.json` no encaja con prefs_<id>.json: se ignora, y el ajustes.json
     # global no se toca desde una entrada de prefs.
@@ -347,13 +347,13 @@ def test_un_nombre_de_prefs_manipulado_se_ignora(cliente):
 # hacía, y desde que «Importar ZIP» acepta un archivo subido su contenido puede
 # venir de fuera de esta instalación.
 
-def _zip_con_indice(rutas, indice):
-    origen = _crear_db(rutas["data"] / "origen.db", [("2026-01-01", 1.0, 1.0)])
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+def _zipConIndice(rutas, indice):
+    origen = _crearDb(rutas["data"] / "origen.db", [("2026-01-01", 1.0, 1.0)])
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("portfolios/principal.db", origen.read_bytes())
         zf.writestr("portfolios.json", indice)
-    return ruta_zip
+    return rutaZip
 
 
 @pytest.mark.parametrize("active", [
@@ -363,7 +363,7 @@ def _zip_con_indice(rutas, indice):
     "Principal",                     # el alfabeto de un id es en minúsculas
     "con espacio",
 ])
-def test_un_portfolio_activo_manipulado_no_se_restaura(cliente, active):
+def testUnPortfolioActivoManipuladoNoSeRestaura(cliente, active):
     """El id del activo decide qué fichero se abre: si no es un id, no entra.
 
     Un `active` como '../../../tmp/principal' dejaba la base activa fuera del
@@ -373,12 +373,12 @@ def test_un_portfolio_activo_manipulado_no_se_restaura(cliente, active):
     client, cabeceras, rutas = cliente
     rutas["meta"].write_text(json.dumps({"active": "principal",
                                          "portfolios": [{"id": "principal", "name": "P"}]}))
-    ruta_zip = _zip_con_indice(rutas, json.dumps({
+    rutaZip = _zipConIndice(rutas, json.dumps({
         "active": active,
         "portfolios": [{"id": "principal", "name": "P"}],
     }))
 
-    datos = client.post("/api/restore", json={"filename": ruta_zip.name},
+    datos = client.post("/api/restore", json={"filename": rutaZip.name},
                         headers=cabeceras).get_json()
 
     assert json.loads(rutas["meta"].read_text())["active"] == "principal"
@@ -387,46 +387,46 @@ def test_un_portfolio_activo_manipulado_no_se_restaura(cliente, active):
     )
 
 
-def test_un_id_manipulado_en_la_lista_tampoco_pasa(cliente):
+def testUnIdManipuladoEnLaListaTampocoPasa(cliente):
     """No solo `active`: de cada id de la lista sale también un nombre de fichero."""
     client, cabeceras, rutas = cliente
     rutas["meta"].write_text(json.dumps({"active": "principal", "portfolios": []}))
-    ruta_zip = _zip_con_indice(rutas, json.dumps({
+    rutaZip = _zipConIndice(rutas, json.dumps({
         "active": "principal",
         "portfolios": [{"id": "../../otro", "name": "P"}],
     }))
 
-    client.post("/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras)
+    client.post("/api/restore", json={"filename": rutaZip.name}, headers=cabeceras)
 
     assert json.loads(rutas["meta"].read_text())["portfolios"] == []
 
 
 @pytest.mark.parametrize("crudo", [b"no soy json", b"[]", b'"principal"', b"\xff\xfe"])
-def test_un_indice_ilegible_se_ignora_y_se_dice(cliente, crudo):
+def testUnIndiceIlegibleSeIgnoraYSeDice(cliente, crudo):
     client, cabeceras, rutas = cliente
     rutas["meta"].write_text(json.dumps({"active": "principal", "portfolios": []}))
-    origen = _crear_db(rutas["data"] / "origen.db", [("2026-01-01", 1.0, 1.0)])
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+    origen = _crearDb(rutas["data"] / "origen.db", [("2026-01-01", 1.0, 1.0)])
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("portfolios/principal.db", origen.read_bytes())
         zf.writestr("portfolios.json", crudo)
 
-    datos = client.post("/api/restore", json={"filename": ruta_zip.name},
+    datos = client.post("/api/restore", json={"filename": rutaZip.name},
                         headers=cabeceras).get_json()
 
     assert json.loads(rutas["meta"].read_text())["active"] == "principal"
     assert any("portfolios.json" in entrada for entrada in datos["ignorados"])
 
 
-def test_un_indice_correcto_se_restaura_entero(cliente):
+def testUnIndiceCorrectoSeRestauraEntero(cliente):
     """La validación no puede volverse una excusa para no restaurar lo bueno."""
     client, cabeceras, rutas = cliente
-    ruta_zip = _zip_con_indice(rutas, json.dumps({
+    rutaZip = _zipConIndice(rutas, json.dumps({
         "active": "otro-2",
         "portfolios": [{"id": "principal", "name": "P"}, {"id": "otro-2", "name": "Otro"}],
     }))
 
-    datos = client.post("/api/restore", json={"filename": ruta_zip.name},
+    datos = client.post("/api/restore", json={"filename": rutaZip.name},
                         headers=cabeceras).get_json()
 
     assert json.loads(rutas["meta"].read_text())["active"] == "otro-2"
@@ -435,20 +435,20 @@ def test_un_indice_correcto_se_restaura_entero(cliente):
 
 # ── Restaurar: camino feliz ──────────────────────────────────────────────────
 
-def test_restore_devuelve_los_datos_del_backup(cliente):
+def testRestoreDevuelveLosDatosDelBackup(cliente):
     client, cabeceras, rutas = cliente
     # Estado actual, que el restore debe sustituir.
-    _crear_db(rutas["portfolios"] / "principal.db", [("2026-06-01", 999.0, 888.0)])
+    _crearDb(rutas["portfolios"] / "principal.db", [("2026-06-01", 999.0, 888.0)])
 
-    origen = _crear_db(rutas["data"] / "origen.db", [("2026-01-01", 100.0, 90.0)])
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+    origen = _crearDb(rutas["data"] / "origen.db", [("2026-01-01", 100.0, 90.0)])
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("portfolios/principal.db", origen.read_bytes())
         zf.writestr("portfolios.json", json.dumps({"active": "principal",
                                                    "portfolios": [{"id": "principal", "name": "P"}]}))
         zf.writestr("ajustes.json", json.dumps({"maxBackups": 7}))
 
-    respuesta = client.post("/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras)
+    respuesta = client.post("/api/restore", json={"filename": rutaZip.name}, headers=cabeceras)
 
     assert respuesta.status_code == 200
     assert _snapshots(rutas["portfolios"] / "principal.db") == [("2026-01-01", 100.0, 90.0)]
@@ -456,18 +456,18 @@ def test_restore_devuelve_los_datos_del_backup(cliente):
     assert json.loads(rutas["meta"].read_text())["active"] == "principal"
 
 
-def test_restore_guarda_una_copia_del_estado_previo(cliente):
+def testRestoreGuardaUnaCopiaDelEstadoPrevio(cliente):
     """Sin esto, restaurar el backup equivocado es irreversible."""
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db", [("2026-06-01", 999.0, 888.0)])
+    _crearDb(rutas["portfolios"] / "principal.db", [("2026-06-01", 999.0, 888.0)])
 
-    origen = _crear_db(rutas["data"] / "origen.db", [("2026-01-01", 1.0, 1.0)])
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+    origen = _crearDb(rutas["data"] / "origen.db", [("2026-01-01", 1.0, 1.0)])
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("portfolios/principal.db", origen.read_bytes())
 
     datos = client.post(
-        "/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras,
+        "/api/restore", json={"filename": rutaZip.name}, headers=cabeceras,
     ).get_json()
 
     from pathlib import Path
@@ -477,74 +477,74 @@ def test_restore_guarda_una_copia_del_estado_previo(cliente):
     assert _snapshots(copia / "principal.db") == [("2026-06-01", 999.0, 888.0)]
 
 
-def test_la_copia_previa_al_restore_guarda_tambien_las_preferencias(cliente):
+def testLaCopiaPreviaAlRestoreGuardaTambienLasPreferencias(cliente):
     """Las preferencias llevan los paneles: el restore las pisa como a los .db,
     así que la copia previa tiene que poder devolverlas también."""
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
     actuales = {"panelesConfig": {"activo": "p1", "paneles": [{"id": "p1", "nombre": "Mío", "widgets": []}]}}
     (rutas["json"] / "prefs_principal.json").write_text(json.dumps(actuales), encoding="utf-8")
 
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
-        zf.writestr("portfolios/principal.db", _crear_db(rutas["data"] / "origen.db").read_bytes())
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
+        zf.writestr("portfolios/principal.db", _crearDb(rutas["data"] / "origen.db").read_bytes())
         zf.writestr("prefs/prefs_principal.json", json.dumps({"panelesConfig": {}}))
 
-    datos = client.post("/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras).get_json()
+    datos = client.post("/api/restore", json={"filename": rutaZip.name}, headers=cabeceras).get_json()
 
     copia = Path(datos["safetyCopy"])
     assert json.loads((copia / "prefs_principal.json").read_text("utf-8")) == actuales
 
 
-def test_los_snapshots_se_recuperan_del_json_si_el_db_llega_sin_ellos(cliente):
+def testLosSnapshotsSeRecuperanDelJsonSiElDbLlegaSinEllos(cliente):
     """El .db puede venir de una versión anterior sin esa tabla poblada."""
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
-    vacio = _crear_db(rutas["data"] / "vacio.db")
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+    vacio = _crearDb(rutas["data"] / "vacio.db")
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("portfolios/principal.db", vacio.read_bytes())
         zf.writestr("snapshots/principal.json", json.dumps(
             [{"ts": "2026-03-01", "v": 42.0, "i": 40.0}]
         ))
 
-    client.post("/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras)
+    client.post("/api/restore", json={"filename": rutaZip.name}, headers=cabeceras)
 
     assert _snapshots(rutas["portfolios"] / "principal.db") == [("2026-03-01", 42.0, 40.0)]
 
 
-def test_los_snapshots_del_json_no_pisan_los_que_ya_trae_el_db(cliente):
+def testLosSnapshotsDelJsonNoPisanLosQueYaTraeElDb(cliente):
     """El JSON es un plan B, no la fuente principal."""
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
-    origen = _crear_db(rutas["data"] / "origen.db", [("2026-05-05", 7.0, 6.0)])
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+    origen = _crearDb(rutas["data"] / "origen.db", [("2026-05-05", 7.0, 6.0)])
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("portfolios/principal.db", origen.read_bytes())
         zf.writestr("snapshots/principal.json", json.dumps(
             [{"ts": "1999-01-01", "v": 0.0, "i": 0.0}]
         ))
 
-    client.post("/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras)
+    client.post("/api/restore", json={"filename": rutaZip.name}, headers=cabeceras)
 
     assert _snapshots(rutas["portfolios"] / "principal.db") == [("2026-05-05", 7.0, 6.0)]
 
 
-def test_restaurar_deja_la_base_sin_ficheros_wal_huerfanos(cliente):
+def testRestaurarDejaLaBaseSinFicherosWalHuerfanos(cliente):
     """Un -wal viejo se re-aplicaría sobre la base restaurada y la corrompería."""
     client, cabeceras, rutas = cliente
-    destino = _crear_db(rutas["portfolios"] / "principal.db")
+    destino = _crearDb(rutas["portfolios"] / "principal.db")
     from pathlib import Path
     Path(str(destino) + "-wal").write_bytes(b"wal de la base anterior")
 
-    origen = _crear_db(rutas["data"] / "origen.db", [("2026-01-01", 1.0, 1.0)])
-    ruta_zip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
-    with zipfile.ZipFile(ruta_zip, "w") as zf:
+    origen = _crearDb(rutas["data"] / "origen.db", [("2026-01-01", 1.0, 1.0)])
+    rutaZip = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
+    with zipfile.ZipFile(rutaZip, "w") as zf:
         zf.writestr("portfolios/principal.db", origen.read_bytes())
 
-    client.post("/api/restore", json={"filename": ruta_zip.name}, headers=cabeceras)
+    client.post("/api/restore", json={"filename": rutaZip.name}, headers=cabeceras)
 
     assert not Path(str(destino) + "-wal").exists()
     # Y ningún temporal del proceso de restauración se queda por el medio.
@@ -553,7 +553,7 @@ def test_restaurar_deja_la_base_sin_ficheros_wal_huerfanos(cliente):
 
 # ── Borrar ───────────────────────────────────────────────────────────────────
 
-def test_no_se_puede_borrar_el_unico_backup(cliente):
+def testNoSePuedeBorrarElUnicoBackup(cliente):
     """Es la única red de seguridad frente a una corrupción o un borrado."""
     client, cabeceras, rutas = cliente
     unico = rutas["backups"] / "backup_01-01-2026_00-00-00.zip"
@@ -565,7 +565,7 @@ def test_no_se_puede_borrar_el_unico_backup(cliente):
     assert unico.exists()
 
 
-def test_borrar_con_mas_de_uno_funciona(cliente):
+def testBorrarConMasDeUnoFunciona(cliente):
     client, cabeceras, rutas = cliente
     for nombre in ("backup_01-01-2026_00-00-00.zip", "backup_02-01-2026_00-00-00.zip"):
         (rutas["backups"] / nombre).write_bytes(b"PK\x05\x06" + b"\x00" * 18)
@@ -578,19 +578,19 @@ def test_borrar_con_mas_de_uno_funciona(cliente):
 
 
 @pytest.mark.parametrize("nombre", ["..%2F..%2F.env", "cualquiera.zip", "backup_.zip"])
-def test_borrar_rechaza_nombres_que_no_son_de_un_backup(cliente, nombre):
+def testBorrarRechazaNombresQueNoSonDeUnBackup(cliente, nombre):
     client, cabeceras, _rutas = cliente
     respuesta = client.delete(f"/api/backups/{nombre}", headers=cabeceras)
     assert respuesta.status_code in (400, 404)
 
 
-def test_una_copia_temporal_abandonada_se_barre_en_la_siguiente(cliente):
+def testUnaCopiaTemporalAbandonadaSeBarreEnLaSiguiente(cliente):
     """Si el contenedor muere a media copia, el temporal no se queda para siempre."""
     import os
     import time
 
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
     tmp = rutas["data"] / "tmp"
     tmp.mkdir(parents=True, exist_ok=True)
@@ -611,19 +611,19 @@ def test_una_copia_temporal_abandonada_se_barre_en_la_siguiente(cliente):
 # ── Importar un backup desde Ajustes ─────────────────────────────────────────
 
 @pytest.fixture
-def cliente_completo(cliente_autenticado, datos_aislados, monkeypatch):
+def clienteCompleto(clienteAutenticado, datosAislados, monkeypatch):
     """Cliente con los dos blueprints: el mismo zip entra por Ajustes y por copias."""
-    from routes.ajustes import ajustes_bp
-    from routes.backup import backup_bp
+    from routes.ajustes import ajustesBp
+    from routes.backup import backupBp
 
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
 
-    client, cabeceras, _app = cliente_autenticado(backup_bp, ajustes_bp)
-    return client, cabeceras, datos_aislados
+    client, cabeceras, _app = clienteAutenticado(backupBp, ajustesBp)
+    return client, cabeceras, datosAislados
 
 
-def test_importar_un_zip_de_backup_restaura_las_bases_de_datos(cliente_completo):
+def testImportarUnZipDeBackupRestauraLasBasesDeDatos(clienteCompleto):
     """El fallo que se veía en producción.
 
     «Importar ZIP» buscaba el `.db` en la raíz del zip. Una copia de seguridad lo
@@ -631,16 +631,16 @@ def test_importar_un_zip_de_backup_restaura_las_bases_de_datos(cliente_completo)
     ajustes y respondía que todo había ido bien: la pantalla decía «importado» y
     las carteras seguían exactamente como estaban.
     """
-    client, cabeceras, rutas = cliente_completo
-    _crear_db(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
-    _crear_db(rutas["portfolios"] / "cripto.db", [("2026-01-02", 50.0, 40.0)])
+    client, cabeceras, rutas = clienteCompleto
+    _crearDb(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
+    _crearDb(rutas["portfolios"] / "cripto.db", [("2026-01-02", 50.0, 40.0)])
     rutas["meta"].write_text(json.dumps({"active": "principal"}), encoding="utf-8")
 
     nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
     contenido = (rutas["backups"] / nombre).read_bytes()
 
     # Los datos cambian después de la copia: si la importación funciona, vuelven.
-    _crear_db(rutas["portfolios"] / "principal.db", [("2030-12-31", 1.0, 1.0)])
+    _crearDb(rutas["portfolios"] / "principal.db", [("2030-12-31", 1.0, 1.0)])
     (rutas["portfolios"] / "cripto.db").unlink()
 
     respuesta = client.post(
@@ -657,10 +657,10 @@ def test_importar_un_zip_de_backup_restaura_las_bases_de_datos(cliente_completo)
     assert _snapshots(rutas["portfolios"] / "cripto.db") == [("2026-01-02", 50.0, 40.0)]
 
 
-def test_importar_un_backup_deja_copia_previa(cliente_completo):
+def testImportarUnBackupDejaCopiaPrevia(clienteCompleto):
     """Sobrescribe todas las carteras, así que vale la misma red que /api/restore."""
-    client, cabeceras, rutas = cliente_completo
-    _crear_db(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
+    client, cabeceras, rutas = clienteCompleto
+    _crearDb(rutas["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
 
     nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
     contenido = (rutas["backups"] / nombre).read_bytes()
@@ -687,19 +687,19 @@ _PANELES = {
 }
 
 
-def _preparar_portfolio(rutas):
-    _crear_db(rutas["portfolios"] / "principal.db")
+def _prepararPortfolio(rutas):
+    _crearDb(rutas["portfolios"] / "principal.db")
     rutas["meta"].write_text(
         json.dumps({"active": "principal", "portfolios": [{"id": "principal", "name": "P"}]}),
         encoding="utf-8",
     )
 
 
-def test_los_paneles_vuelven_al_restaurar_una_copia(cliente_completo):
+def testLosPanelesVuelvenAlRestaurarUnaCopia(clienteCompleto):
     """Los paneles viven en prefs_<id>.json: la copia los lleva y el restore los
     devuelve, aunque después de la copia se hayan cambiado o borrado."""
-    client, cabeceras, rutas = cliente_completo
-    _preparar_portfolio(rutas)
+    client, cabeceras, rutas = clienteCompleto
+    _prepararPortfolio(rutas)
     client.post("/api/settings", json={"panelesConfig": _PANELES}, headers=cabeceras)
 
     nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
@@ -715,10 +715,10 @@ def test_los_paneles_vuelven_al_restaurar_una_copia(cliente_completo):
     assert client.get("/api/settings").get_json()["panelesConfig"] == _PANELES
 
 
-def test_los_paneles_vuelven_al_importar_el_zip_de_una_copia(cliente_completo):
+def testLosPanelesVuelvenAlImportarElZipDeUnaCopia(clienteCompleto):
     """Lo mismo por «Importar ZIP» de Ajustes, que es otra puerta de entrada."""
-    client, cabeceras, rutas = cliente_completo
-    _preparar_portfolio(rutas)
+    client, cabeceras, rutas = clienteCompleto
+    _prepararPortfolio(rutas)
     client.post("/api/settings", json={"panelesConfig": _PANELES}, headers=cabeceras)
     nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
     contenido = (rutas["backups"] / nombre).read_bytes()
@@ -735,9 +735,9 @@ def test_los_paneles_vuelven_al_importar_el_zip_de_una_copia(cliente_completo):
     assert client.get("/api/settings").get_json()["panelesConfig"] == _PANELES
 
 
-def test_un_zip_sin_nada_reconocible_se_rechaza(cliente_completo):
+def testUnZipSinNadaReconocibleSeRechaza(clienteCompleto):
     """Antes respondía «ok» sin haber importado nada."""
-    client, cabeceras, _rutas = cliente_completo
+    client, cabeceras, _rutas = clienteCompleto
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr("cualquier-cosa.txt", b"nada que ver")
@@ -757,22 +757,22 @@ def test_un_zip_sin_nada_reconocible_se_rechaza(cliente_completo):
 # ── Avisos por Telegram ──────────────────────────────────────────────────────
 
 @pytest.fixture
-def telegram(datos_aislados, monkeypatch):
+def telegram(datosAislados, monkeypatch):
     """Telegram configurado sobre las rutas aisladas; devuelve lo que se enviaría."""
     from core import telegram_notifier
 
     monkeypatch.setenv("SECRET_KEY", "clave-de-pruebas-0123456789abcdef0123456789abcdef")
-    telegram_notifier.reiniciar_para_pruebas()
+    telegram_notifier.reiniciarParaPruebas()
     telegram_notifier.escribirConfig("123456:ABC-token", "987654321")
     mensajes = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chat, texto: mensajes.append(texto))
     yield mensajes
-    telegram_notifier.reiniciar_para_pruebas()
+    telegram_notifier.reiniciarParaPruebas()
 
 
-def test_crear_una_copia_manual_se_cuenta_por_telegram(cliente, telegram):
+def testCrearUnaCopiaManualSeCuentaPorTelegram(cliente, telegram):
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
     nombre = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
 
@@ -781,49 +781,49 @@ def test_crear_una_copia_manual_se_cuenta_por_telegram(cliente, telegram):
     assert "1 portfolio" in telegram[0] and "MB" in telegram[0]
 
 
-def test_una_copia_fallida_se_cuenta_por_telegram(cliente, telegram, monkeypatch):
-    from routes import backup as rutas_backup
+def testUnaCopiaFallidaSeCuentaPorTelegram(cliente, telegram, monkeypatch):
+    from routes import backup as rutasBackup
 
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
     def _falla(*_a, **_k):
         raise OSError("disco lleno")
 
-    monkeypatch.setattr(rutas_backup.zipfile, "ZipFile", _falla)
+    monkeypatch.setattr(rutasBackup.zipfile, "ZipFile", _falla)
 
     assert client.post("/api/backup", headers=cabeceras).status_code == 500
     assert len(telegram) == 1 and "Ha fallado" in telegram[0]
 
 
-def test_la_copia_automatica_se_cuenta_por_telegram(cliente, telegram):
-    from routes.backup import crear_backup_automatico
+def testLaCopiaAutomaticaSeCuentaPorTelegram(cliente, telegram):
+    from routes.backup import crearBackupAutomatico
 
     _client, _cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
-    nombre = crear_backup_automatico()
+    nombre = crearBackupAutomatico()
 
     assert len(telegram) == 1
     assert "automática" in telegram[0] and nombre in telegram[0]
 
 
-def test_la_copia_automatica_fallida_se_cuenta_y_se_propaga(cliente, telegram, monkeypatch):
-    from routes import backup as rutas_backup
+def testLaCopiaAutomaticaFallidaSeCuentaYSePropaga(cliente, telegram, monkeypatch):
+    from routes import backup as rutasBackup
 
     _client, _cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
-    monkeypatch.setattr(rutas_backup, "_escribir_backup", lambda automatico: (_ for _ in ()).throw(OSError("sin espacio")))
+    _crearDb(rutas["portfolios"] / "principal.db")
+    monkeypatch.setattr(rutasBackup, "_escribirBackup", lambda automatico: (_ for _ in ()).throw(OSError("sin espacio")))
 
     with pytest.raises(OSError):
-        rutas_backup.crear_backup_automatico()
+        rutasBackup.crearBackupAutomatico()
 
     assert len(telegram) == 1 and "sin espacio" in telegram[0]
 
 
-def test_restaurar_y_borrar_se_cuentan_por_telegram(cliente, telegram):
+def testRestaurarYBorrarSeCuentanPorTelegram(cliente, telegram):
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
     primera = client.post("/api/backup", headers=cabeceras).get_json()["filename"]
     telegram.clear()
 
@@ -838,7 +838,7 @@ def test_restaurar_y_borrar_se_cuentan_por_telegram(cliente, telegram):
     assert len(telegram) == 1 and "eliminada" in telegram[0]
 
 
-def test_un_restore_de_un_zip_corrupto_no_dice_que_ha_restaurado(cliente, telegram):
+def testUnRestoreDeUnZipCorruptoNoDiceQueHaRestaurado(cliente, telegram):
     client, cabeceras, rutas = cliente
     (rutas["backups"] / "backup_01-01-2026_00-00-00.zip").write_bytes(b"esto no es un zip")
 
@@ -847,8 +847,8 @@ def test_un_restore_de_un_zip_corrupto_no_dice_que_ha_restaurado(cliente, telegr
     assert telegram == []
 
 
-def test_sin_telegram_configurado_las_copias_siguen_funcionando(cliente):
+def testSinTelegramConfiguradoLasCopiasSiguenFuncionando(cliente):
     client, cabeceras, rutas = cliente
-    _crear_db(rutas["portfolios"] / "principal.db")
+    _crearDb(rutas["portfolios"] / "principal.db")
 
     assert client.post("/api/backup", headers=cabeceras).get_json()["ok"] is True

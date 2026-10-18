@@ -9,12 +9,12 @@ sin abrir la web degradaba la métrica.
 Las piezas se reutilizan, no se reimplementan:
 
   * la posición viva y su coste salen del FIFO del servidor
-    (`ventas_fifo.cartera_viva`), el mismo motor que liquida las ventas;
+    (`ventas_fifo.carteraViva`), el mismo motor que liquida las ventas;
   * las cotizaciones, de `stores.market_data`, el mismo despacho por proveedor
     que usa `/api/market/quote`;
-  * el cambio a euros, de `fetch_exchange_rate`, que no gasta clave de API.
+  * el cambio a euros, de `fetchExchangeRate`, que no gasta clave de API.
 
-Lo que devuelve tiene la forma que espera `routes.snapshots.guardar_snapshot`,
+Lo que devuelve tiene la forma que espera `routes.snapshots.guardarSnapshot`,
 que es la misma que manda el frontend.
 """
 
@@ -23,11 +23,11 @@ from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 
 from core import dinero, settings
-from core.db import get_db
-from providers.finnhub_client import fetch_exchange_rate
+from core.db import getDb
+from providers.finnhub_client import fetchExchangeRate
 from stores import ventas_fifo
-from stores.helpers import normalize_currency_code
-from stores.market_data import fetch_asset_quote
+from stores.helpers import normalizeCurrencyCode
+from stores.market_data import fetchAssetQuote
 
 log = logging.getLogger(__name__)
 
@@ -44,10 +44,10 @@ class _Cambios:
     def __init__(self):
         self._cache = {"EUR": Decimal("1")}
 
-    def a_euros(self, importe, moneda):
-        divisa = normalize_currency_code(moneda, fallback="EUR")
+    def aEuros(self, importe, moneda):
+        divisa = normalizeCurrencyCode(moneda, fallback="EUR")
         if divisa not in self._cache:
-            rate, error = fetch_exchange_rate(divisa, "EUR")
+            rate, error = fetchExchangeRate(divisa, "EUR")
             if error or not rate or rate <= 0:
                 log.warning("[valoracion] Sin cambio %s→EUR (%s); se valora 1:1", divisa, error)
                 rate = 1
@@ -55,13 +55,13 @@ class _Cambios:
         return dinero.aDecimal(importe) * self._cache[divisa]
 
 
-def _activos_en_cartera():
+def _activosEnCartera():
     """Datos de mercado de los activos que tienen posición viva."""
-    cartera = ventas_fifo.cartera_viva()
+    cartera = ventas_fifo.carteraViva()
     if not cartera:
         return []
 
-    conn = get_db()
+    conn = getDb()
     filas = conn.execute(
         "SELECT id, market_provider, market_symbol, finnhub_symbol, price, currency FROM activos"
     ).fetchall()
@@ -71,7 +71,7 @@ def _activos_en_cartera():
         posicion = cartera.get(fila["id"])
         if posicion is None:
             continue
-        moneda = normalize_currency_code(fila["currency"], fallback="EUR")
+        moneda = normalizeCurrencyCode(fila["currency"], fallback="EUR")
         activos.append({
             "id":        fila["id"],
             "proveedor": fila["market_provider"],
@@ -93,26 +93,26 @@ def _activos_en_cartera():
     return activos
 
 
-def _refrescar_precios(activos):
+def _refrescarPrecios(activos):
     """Pide cotización fresca de cada activo. Devuelve cuántas se obtuvieron.
 
     Un fallo no invalida el snapshot: ese activo se valora con el último precio
     conocido. Un hueco en el histórico hace más daño que un punto con un precio
     de hace unas horas, y el aviso queda en el log.
     """
-    con_simbolo = [a for a in activos if a["simbolo"]]
-    if not con_simbolo:
+    conSimbolo = [a for a in activos if a["simbolo"]]
+    if not conSimbolo:
         return 0
 
     def _pedir(activo):
         try:
-            return activo, fetch_asset_quote(activo["simbolo"], activo["proveedor"])
+            return activo, fetchAssetQuote(activo["simbolo"], activo["proveedor"])
         except Exception as e:  # el hilo del scheduler no puede morir por esto
             return activo, (None, str(e))
 
     frescos = 0
     with ThreadPoolExecutor(max_workers=settings.maxPeticionesParalelas()) as pool:
-        for activo, (quote, error) in pool.map(_pedir, con_simbolo):
+        for activo, (quote, error) in pool.map(_pedir, conSimbolo):
             # `price` viene formateado a la española ("345,90"): float() directo
             # reventaba aquí, fuera del try de `_pedir`, y se llevaba por delante
             # el snapshot entero de la cartera por un solo activo. `dinero` lo
@@ -123,46 +123,46 @@ def _refrescar_precios(activos):
                 log.info("[valoracion] %s conserva su último precio (%s)", activo["id"], error or "sin cotización")
                 continue
             activo["precio"] = precio
-            activo["moneda"] = normalize_currency_code((quote or {}).get("currency"), fallback=activo["moneda"])
+            activo["moneda"] = normalizeCurrencyCode((quote or {}).get("currency"), fallback=activo["moneda"])
             frescos += 1
 
     return frescos
 
 
-def valorar_portfolio(refrescar_precios=True):
+def valorarPortfolio(refrescarPrecios=True):
     """Valor y coste de la cartera en euros, más el desglose por activo.
 
     Devuelve `{"total_value", "total_invested", "assets": [{"id", "v", "c"}],
     "precios_frescos", "activos": n}`.
     """
-    activos = _activos_en_cartera()
-    frescos = _refrescar_precios(activos) if refrescar_precios else 0
+    activos = _activosEnCartera()
+    frescos = _refrescarPrecios(activos) if refrescarPrecios else 0
 
     cambios = _Cambios()
-    total_value = Decimal("0")
-    total_invested = Decimal("0")
+    totalValue = Decimal("0")
+    totalInvested = Decimal("0")
     desglose = []
 
     for activo in activos:
-        valor_eur = cambios.a_euros(activo["cantidad"] * activo["precio"], activo["moneda"])
-        coste_eur = cambios.a_euros(activo["coste"], activo["monedaCoste"])
+        valorEur = cambios.aEuros(activo["cantidad"] * activo["precio"], activo["moneda"])
+        costeEur = cambios.aEuros(activo["coste"], activo["monedaCoste"])
 
-        total_value += valor_eur
-        total_invested += coste_eur
-        if valor_eur > 0:
+        totalValue += valorEur
+        totalInvested += costeEur
+        if valorEur > 0:
             # `float` aquí y no antes: las columnas del histórico son REAL, así
             # que el punto acaba en coma flotante igualmente. La diferencia es
             # que ahora se convierte **el total ya sumado en Decimal** en vez de
             # ir acumulando el error activo a activo.
             desglose.append({
                 "id": activo["id"],
-                "v": float(dinero.redondear(valor_eur)),
-                "c": float(dinero.redondear(coste_eur)),
+                "v": float(dinero.redondear(valorEur)),
+                "c": float(dinero.redondear(costeEur)),
             })
 
     return {
-        "total_value":     float(dinero.redondear(total_value)),
-        "total_invested":  float(dinero.redondear(total_invested)),
+        "total_value":     float(dinero.redondear(totalValue)),
+        "total_invested":  float(dinero.redondear(totalInvested)),
         "assets":          desglose,
         "precios_frescos": frescos,
         "activos":         len(activos),

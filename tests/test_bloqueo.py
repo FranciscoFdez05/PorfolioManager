@@ -18,7 +18,7 @@ import pytest
 from core.bloqueo import BloqueoOcupado, exclusivo
 
 
-def test_solo_uno_lo_consigue_a_la_vez(tmp_path):
+def testSoloUnoLoConsigueALaVez(tmp_path):
     lock = tmp_path / "esquema.lock"
 
     with exclusivo(lock) as primero:
@@ -27,7 +27,7 @@ def test_solo_uno_lo_consigue_a_la_vez(tmp_path):
         assert primero is True
 
 
-def test_se_suelta_al_salir(tmp_path):
+def testSeSueltaAlSalir(tmp_path):
     lock = tmp_path / "esquema.lock"
 
     with exclusivo(lock):
@@ -37,7 +37,7 @@ def test_se_suelta_al_salir(tmp_path):
         assert conseguido is True
 
 
-def test_se_suelta_aunque_lo_de_dentro_falle(tmp_path):
+def testSeSueltaAunqueLoDeDentroFalle(tmp_path):
     """Si una migración revienta, el bloqueo no puede quedarse puesto."""
     lock = tmp_path / "esquema.lock"
 
@@ -48,7 +48,7 @@ def test_se_suelta_aunque_lo_de_dentro_falle(tmp_path):
         assert conseguido is True
 
 
-def test_obligatorio_avisa_en_vez_de_seguir(tmp_path):
+def testObligatorioAvisaEnVezDeSeguir(tmp_path):
     """La migración prefiere morir a aplicarse dos veces sobre los datos."""
     lock = tmp_path / "esquema.lock"
 
@@ -56,7 +56,7 @@ def test_obligatorio_avisa_en_vez_de_seguir(tmp_path):
         pass
 
 
-def test_espera_a_que_el_otro_termine(tmp_path):
+def testEsperaAQueElOtroTermine(tmp_path):
     lock = tmp_path / "esquema.lock"
     soltado = threading.Event()
 
@@ -76,7 +76,7 @@ def test_espera_a_que_el_otro_termine(tmp_path):
     hilo.join()
 
 
-def test_sin_sitio_donde_crearlo_se_continua_sin_bloqueo(tmp_path):
+def testSinSitioDondeCrearloSeContinuaSinBloqueo(tmp_path):
     """Un bloqueo que no se puede crear no debe impedir arrancar.
 
     Es el peor momento posible para negarse a funcionar: el volumen de datos no
@@ -89,7 +89,7 @@ def test_sin_sitio_donde_crearlo_se_continua_sin_bloqueo(tmp_path):
         assert conseguido is False
 
 
-def test_crea_el_directorio_del_bloqueo_si_falta(tmp_path):
+def testCreaElDirectorioDelBloqueoSiFalta(tmp_path):
     lock = tmp_path / "tmp" / "backup-automatico.lock"
 
     with exclusivo(lock) as conseguido:

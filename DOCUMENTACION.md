@@ -526,7 +526,7 @@ El FIFO recorre **toda** la historia del activo, no solo las ventas del año abi
 
 ### Simular una venta antes de hacerla
 
-**Herramientas › Fiscalidad › Simular venta** contesta qué pagarías si vendieras hoy: coste FIFO, lotes que se consumen, regla de los dos meses y cuota. No guarda nada y no repite la aritmética — `GET /api/herramientas/simular-venta` llama a `stores/ventas_fifo.simular_venta()`, el mismo motor que liquida la tabla de ventas.
+**Herramientas › Fiscalidad › Simular venta** contesta qué pagarías si vendieras hoy: coste FIFO, lotes que se consumen, regla de los dos meses y cuota. No guarda nada y no repite la aritmética — `GET /api/herramientas/simular-venta` llama a `stores/ventas_fifo.simularVenta()`, el mismo motor que liquida la tabla de ventas.
 
 La cuota que devuelve es **incremental**: liquida el ejercicio con la venta y sin ella, y resta. Aplicar un tipo fijo a la ganancia daría otro número, porque la escala es progresiva y el saldo puede compensarse con pérdidas de ejercicios anteriores.
 
@@ -1131,7 +1131,7 @@ Las pruebas del frontend viven en `tests-js/` y corren sobre jsdom. Los módulos
 
 El linter no es cosmético aquí: `js/cartera/assets.js` pasa de 4.800 líneas y `js/analisis/metricas.js` de 4.400, y sin él un nombre mal escrito o una variable que ya no existe solo se ve cuando el usuario abre esa pantalla. La configuración (`eslint.config.js`) tiene en cuenta que los módulos comparten el ámbito global de la página, que es lo que hace útil a `no-undef`.
 
-La configuración de pytest, ruff y coverage está en `pyproject.toml`. Los tests **nunca tocan `data/`**: usan una BD temporal vía `set_active_db_path()` y no importan `server`, porque ese módulo inicializa los portfolios reales al importarse. Para probar la capa HTTP, `tests/conftest.py` ofrece `crear_app` y `cliente_autenticado`, que montan una app mínima con los blueprints que interesen y la capa de `core/seguridad_app.py` encima — así se puede comprobar de verdad que un `POST` sin token CSRF recibe `403` o que `/api/restore` exige sesión.
+La configuración de pytest, ruff y coverage está en `pyproject.toml`. Los tests **nunca tocan `data/`**: usan una BD temporal vía `setActiveDbPath()` y no importan `server`, porque ese módulo inicializa los portfolios reales al importarse. Para probar la capa HTTP, `tests/conftest.py` ofrece `crearApp` y `clienteAutenticado`, que montan una app mínima con los blueprints que interesen y la capa de `core/seguridad_app.py` encima — así se puede comprobar de verdad que un `POST` sin token CSRF recibe `403` o que `/api/restore` exige sesión.
 
 El umbral de cobertura (`fail_under = 60`) **no es una meta, es un trinquete**: sirve para que un PR no baje la cobertura sin que nadie se dé cuenta, y sube cuando sube ella. Ese número es del proyecto entero y mezcla un cliente HTTP con el cálculo de la declaración de la renta, así que hay un segundo umbral, del 90 %, solo para los módulos donde un error no da un fallo sino una cifra equivocada: `fifo`, `fiscal_es`, `informe_renta`, `pnl_divisa`, `rentabilidad` y `dinero`.
 
@@ -1231,7 +1231,7 @@ css/                 variables (maquetación), base, components, responsive
 | Módulo | Responsabilidad |
 |---|---|
 | `core/errors.py` | Excepciones de negocio (`ValidationError`, `NotFoundError`, `ConflictError`, `UpstreamError`) y manejadores globales. Todo lo que cuelga de `/api/` responde JSON `{ok:false, error, requestId}`, incluso ante un fallo no previsto, y el detalle interno solo va al log. |
-| `core/validation.py` | Normalización de la entrada de las rutas (`as_text`, `as_number`, `as_year`, `as_rows`, `one_of`…) con límites de longitud y de número de filas. |
+| `core/validation.py` | Normalización de la entrada de las rutas (`asText`, `asNumber`, `asYear`, `asRows`, `oneOf`…) con límites de longitud y de número de filas. |
 | `core/paths.py` | Única fuente de verdad de las rutas del proyecto, y comprobación de que se puede escribir en cada directorio de datos (lo que publica `/api/health` y se registra al arrancar). |
 | `core/escritura.py` | Temporales con nombre único y escritura atómica (tmp → fsync → rename). Cada módulo se lo montaba por su cuenta con un nombre fijo, que con los dos workers de gunicorn dejaba de ser único; y varios de esos temporales eran `.db` dentro de `data/portfolios/`, donde el proyecto busca los portfolios con `glob("*.db")`. |
 | `core/bloqueo.py` | Exclusión mutua **entre procesos** (`fcntl` en Linux, `msvcrt` en Windows) para lo que no puede hacerse dos veces a la vez: migrar el esquema y la copia automática diaria. Un `threading.Lock` solo protege de los hilos del mismo worker. |

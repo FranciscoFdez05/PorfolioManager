@@ -2,8 +2,8 @@
 
 Regla importante: **ningún test toca `data/` del repositorio**. Los tests que
 necesitan base de datos apuntan `db` a un fichero temporal con
-`set_active_db_path()`, y ninguno importa `server`, porque ese módulo ejecuta
-`init_portfolios()` / `ensureDataFile()` al importarse y escribiría sobre los
+`setActiveDbPath()`, y ninguno importa `server`, porque ese módulo ejecuta
+`initPortfolios()` / `ensureDataFile()` al importarse y escribiría sobre los
 datos reales del usuario que ejecuta la suite en su máquina.
 """
 
@@ -21,18 +21,18 @@ if str(_PYTHON_DIR) not in sys.path:
 
 
 @pytest.fixture(autouse=True)
-def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
+def _tmpDeDatosAislado(tmp_path_factory, monkeypatch):
     """Saca `data/tmp` y `data/backups/auto` del repositorio en TODOS los tests.
 
     Ahí van los ficheros de bloqueo entre procesos (migración del esquema,
     copia automática) y los temporales de las copias de bases de datos. A
     diferencia del resto de rutas, los usa cualquier test que abra una base de
-    datos, no solo los que piden `datos_aislados`, así que el aislamiento tiene
+    datos, no solo los que piden `datosAislados`, así que el aislamiento tiene
     que ser automático: si no, la suite deja ficheros sueltos en el `data/` real
     de quien la ejecuta.
 
     El directorio de copias automáticas se quedó fuera de esa regla y el efecto
-    era acumulativo: cada base que crea `temp_db` nace en la versión 0 del
+    era acumulativo: cada base que crea `tempDb` nace en la versión 0 del
     esquema, así que migra, y cada migración deja su copia previa
     `<base>_pre-esquema-N-a-M_*.db`. Esas copias están **exentas de la
     rotación** a propósito —son el punto de retorno de una actualización—, así
@@ -40,7 +40,7 @@ def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
     cuatrocientas en el `data/backups/auto` de verdad.
 
     Se parchea el nombre dentro de `admin.backup_manager`, no en `core.paths`,
-    por lo mismo que explica `datos_aislados`: el módulo se lo lleva con
+    por lo mismo que explica `datosAislados`: el módulo se lo lleva con
     `from core.paths import AUTO_BACKUPS_DIR as _BACKUP_DIR` al importarse, y
     reasignar el original ya no alcanza a nadie.
     """
@@ -56,25 +56,25 @@ def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
     monkeypatch.setattr(backup_manager, "_BACKUP_DIR", copias, raising=False)
 
     # Telegram lee su token de API/telegram.key. Sin esto, un test que provoque
-    # un aviso (una copia, un login bloqueado) sin pedir `datos_aislados` leería
+    # un aviso (una copia, un login bloqueado) sin pedir `datosAislados` leería
     # el API/ real de quien ejecuta la suite y, con SECRET_KEY exportada, mandaría
     # mensajes de verdad a su chat.
-    claves_vacias = tmp_path_factory.getbasetemp() / "API_vacio"
-    claves_vacias.mkdir(exist_ok=True)
-    monkeypatch.setattr(paths, "API_DIR", claves_vacias, raising=False)
+    clavesVacias = tmp_path_factory.getbasetemp() / "API_vacio"
+    clavesVacias.mkdir(exist_ok=True)
+    monkeypatch.setattr(paths, "API_DIR", clavesVacias, raising=False)
 
-    # Estado de revocación de sesiones. Va aquí y no en `datos_aislados` por el
+    # Estado de revocación de sesiones. Va aquí y no en `datosAislados` por el
     # mismo motivo que los dos de arriba: lo escribe cualquier test que cierre
     # sesión o cambie credenciales, no solo los que piden rutas aisladas, y sin
     # esto la suite dejaría revocaciones en el `data/sesion` real.
     # El resolutor del portfolio activo (core/db.py) relee portfolios.json
-    # cuando cambia. Lo registra init_portfolios() y es estado de módulo: sin
+    # cuando cambia. Lo registra initPortfolios() y es estado de módulo: sin
     # quitarlo, un test que lo registró con un portfolios.json temporal lo
     # dejaría apuntando, tras deshacer los monkeypatch, al data/ real del
     # usuario, y el siguiente test podría acabar abriendo su base de datos.
     from core import db as _db
 
-    monkeypatch.setattr(_db, "_resolutor_activo", None, raising=False)
+    monkeypatch.setattr(_db, "_resolutorActivo", None, raising=False)
 
     # Firmas del Atajo ya usadas y nombres de host aprendidos: un fichero por
     # test. Compartidos, dos tests que firman el mismo cuerpo en el mismo
@@ -92,7 +92,7 @@ def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
     from routes import auth
 
     intentos = tmp_path_factory.mktemp("login") / "login-intentos.json"
-    monkeypatch.setattr(auth, "_fichero_intentos", lambda: intentos)
+    monkeypatch.setattr(auth, "_ficheroIntentos", lambda: intentos)
     auth._attempts.clear()
 
     sesiones = tmp_path_factory.getbasetemp() / "sesion"
@@ -103,25 +103,25 @@ def _tmp_de_datos_aislado(tmp_path_factory, monkeypatch):
 
 
 @pytest.fixture
-def temp_db(tmp_path, monkeypatch):
+def tempDb(tmp_path, monkeypatch):
     """Base de datos SQLite vacía y aislada para el test."""
     from core import db
 
-    original_path = db.get_active_db_path()
-    db_path = tmp_path / "test_portfolio.db"
-    db.set_active_db_path(db_path)
+    originalPath = db.getActiveDbPath()
+    dbPath = tmp_path / "test_portfolio.db"
+    db.setActiveDbPath(dbPath)
     # Crea el esquema y deja la conexión del hilo lista.
-    db.init_db()
+    db.initDb()
 
-    yield db_path
+    yield dbPath
 
-    db.reset_db()
-    db.set_active_db_path(original_path)
-    db.invalidate_all_connections()
+    db.resetDb()
+    db.setActiveDbPath(originalPath)
+    db.invalidateAllConnections()
 
 
 @pytest.fixture
-def datos_aislados(tmp_path, monkeypatch):
+def datosAislados(tmp_path, monkeypatch):
     """Redirige a tmp_path todos los directorios de datos que tocan las rutas.
 
     `core.paths` resuelve sus constantes al importarse y los módulos las copian
@@ -134,57 +134,57 @@ def datos_aislados(tmp_path, monkeypatch):
     from admin import portfolios_manager
     from core import paths
     from routes import (
-        ajustes as rutas_ajustes,
-        backup as rutas_backup,
-        portfolios as rutas_portfolios,
+        ajustes as rutasAjustes,
+        backup as rutasBackup,
+        portfolios as rutasPortfolios,
     )
 
     data = tmp_path / "data"
     backups = data / "backups"
     portfolios = data / "portfolios"
-    json_dir = data / "JSON"
+    jsonDir = data / "JSON"
     # logs/ también: el diagnóstico de almacenamiento comprueba la escritura
     # creando un fichero de verdad en cada directorio, y sin aislarlo tocaría el
     # logs/ del repositorio.
     logs = tmp_path / "logs"
-    for carpeta in (data, backups, portfolios, json_dir, logs):
+    for carpeta in (data, backups, portfolios, jsonDir, logs):
         carpeta.mkdir(parents=True, exist_ok=True)
 
     monkeypatch.setattr(paths, "DATA_DIR", data, raising=False)
     monkeypatch.setattr(paths, "BACKUPS_DIR", backups, raising=False)
     monkeypatch.setattr(paths, "PORTFOLIOS_DIR", portfolios, raising=False)
-    monkeypatch.setattr(paths, "JSON_DIR", json_dir, raising=False)
-    monkeypatch.setattr(paths, "AJUSTES_JSON", json_dir / "ajustes.json", raising=False)
+    monkeypatch.setattr(paths, "JSON_DIR", jsonDir, raising=False)
+    monkeypatch.setattr(paths, "AJUSTES_JSON", jsonDir / "ajustes.json", raising=False)
     monkeypatch.setattr(paths, "PORTFOLIOS_META_FILE", data / "portfolios.json", raising=False)
     monkeypatch.setattr(paths, "AUTH_FILE", data / "auth.dat", raising=False)
     monkeypatch.setattr(paths, "LOGS_DIR", logs, raising=False)
     monkeypatch.setattr(paths, "TMP_DIR", data / "tmp", raising=False)
 
-    monkeypatch.setattr(rutas_backup, "DATA_DIR", data)
-    monkeypatch.setattr(rutas_backup, "_BACKUP_DIR", backups)
-    monkeypatch.setattr(rutas_backup, "_PORTFOLIOS_DIR", portfolios)
-    monkeypatch.setattr(rutas_backup, "_JSON_DIR", json_dir)
-    monkeypatch.setattr(rutas_backup, "_AJUSTES_SRC", json_dir / "ajustes.json")
-    monkeypatch.setattr(rutas_backup, "_META_FILE", data / "portfolios.json")
-    monkeypatch.setattr(rutas_ajustes, "_AJUSTES_JSON", json_dir / "ajustes.json")
-    monkeypatch.setattr(rutas_ajustes, "JSON_DIR", json_dir)
+    monkeypatch.setattr(rutasBackup, "DATA_DIR", data)
+    monkeypatch.setattr(rutasBackup, "_BACKUP_DIR", backups)
+    monkeypatch.setattr(rutasBackup, "_PORTFOLIOS_DIR", portfolios)
+    monkeypatch.setattr(rutasBackup, "_JSON_DIR", jsonDir)
+    monkeypatch.setattr(rutasBackup, "_AJUSTES_SRC", jsonDir / "ajustes.json")
+    monkeypatch.setattr(rutasBackup, "_META_FILE", data / "portfolios.json")
+    monkeypatch.setattr(rutasAjustes, "_AJUSTES_JSON", jsonDir / "ajustes.json")
+    monkeypatch.setattr(rutasAjustes, "JSON_DIR", jsonDir)
     # Las claves de API se guardan cifradas en API/*.key; sin aislarlas, un test
     # de /api/settings sobrescribiría las del usuario.
     claves = tmp_path / "API"
     claves.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(paths, "API_DIR", claves, raising=False)
-    monkeypatch.setattr(rutas_ajustes, "_API_DIR", claves)
+    monkeypatch.setattr(rutasAjustes, "_API_DIR", claves)
     # `stores.app_data` lee las claves de `paths.API_DIR` en cada llamada, así
     # que el parche de arriba ya lo cubre.
 
-    # /api/restore llama a init_portfolios() al terminar, que reactiva el
+    # /api/restore llama a initPortfolios() al terminar, que reactiva el
     # portfolio guardado en el backup. Sin parchear también estos nombres, ese
     # paso final leería y escribiría el portfolios.json real.
     monkeypatch.setattr(portfolios_manager, "_PORTFOLIOS_DIR", portfolios)
     # routes/portfolios.py se lleva el nombre con `from … import`, así que
     # parchear solo el de admin dejaría la importación de carteras escribiendo
     # en el data/ real.
-    monkeypatch.setattr(rutas_portfolios, "_PORTFOLIOS_DIR", portfolios)
+    monkeypatch.setattr(rutasPortfolios, "_PORTFOLIOS_DIR", portfolios)
     monkeypatch.setattr(portfolios_manager, "_META_FILE", data / "portfolios.json")
     monkeypatch.setattr(portfolios_manager, "_DELETED_DIR", data / "deleted")
     monkeypatch.setattr(portfolios_manager, "_LEGACY_DB", data / "portfolio.db")
@@ -194,8 +194,8 @@ def datos_aislados(tmp_path, monkeypatch):
         "logs": logs,
         "backups": backups,
         "portfolios": portfolios,
-        "json": json_dir,
-        "ajustes": json_dir / "ajustes.json",
+        "json": jsonDir,
+        "ajustes": jsonDir / "ajustes.json",
         "meta": data / "portfolios.json",
         "auth": data / "auth.dat",
         "claves": claves,
@@ -203,7 +203,7 @@ def datos_aislados(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def crear_app(monkeypatch):
+def crearApp(monkeypatch):
     """Fábrica de apps Flask con la capa de seguridad real instalada.
 
     Monta los mismos `before_request`/`after_request` que `server.py` —CSRF,
@@ -220,18 +220,18 @@ def crear_app(monkeypatch):
         from flask import Flask
 
         from core import seguridad_app
-        from core.errors import register_error_handlers
+        from core.errors import registerErrorHandlers
 
         app = Flask(__name__, static_folder=None)
         app.secret_key = "clave-de-pruebas-0123456789abcdef0123456789abcdef"
         app.config["TESTING"] = True
         # Mismo orden que server.py: el proxy envuelve la wsgi_app antes de que
         # nada mire request.remote_addr.
-        seguridad_app.aplicar_proxy_inverso(app)
-        seguridad_app.aplicar_configuracion_sesion(app)
+        seguridad_app.aplicarProxyInverso(app)
+        seguridad_app.aplicarConfiguracionSesion(app)
         app.config.update(config)
 
-        register_error_handlers(app)
+        registerErrorHandlers(app)
         for blueprint in blueprints:
             app.register_blueprint(blueprint)
 
@@ -248,7 +248,7 @@ CSRF_PRUEBA = "token-csrf-de-pruebas"
 
 
 @pytest.fixture
-def cliente_autenticado(crear_app):
+def clienteAutenticado(crearApp):
     """Devuelve `(client, cabeceras, app)` con sesión abierta y token CSRF válido.
 
     La sesión se escribe directamente con `session_transaction()` en vez de
@@ -264,32 +264,32 @@ def cliente_autenticado(crear_app):
     from core import sesion
 
     def _abrir(*blueprints, **config):
-        app = crear_app(*blueprints, **config)
+        app = crearApp(*blueprints, **config)
         client = app.test_client()
-        with client.session_transaction() as sesion_prueba:
-            sesion_prueba["logged_in"] = True
-            sesion_prueba["csrf_token"] = CSRF_PRUEBA
-            sesion.abrir(sesion_prueba)
+        with client.session_transaction() as sesionPrueba:
+            sesionPrueba["logged_in"] = True
+            sesionPrueba["csrf_token"] = CSRF_PRUEBA
+            sesion.abrir(sesionPrueba)
         return client, {"X-CSRF-Token": CSRF_PRUEBA}, app
 
     return _abrir
 
 
 @pytest.fixture
-def error_app():
+def errorApp():
     """App Flask mínima con la capa de errores instalada.
 
     Se construye a mano en vez de importar `server` para que estos tests
-    verifiquen exclusivamente `errors.register_error_handlers` sin arrastrar la
+    verifiquen exclusivamente `errors.registerErrorHandlers` sin arrastrar la
     inicialización completa de la aplicación.
     """
     from flask import Flask
 
-    from core.errors import register_error_handlers
+    from core.errors import registerErrorHandlers
 
     app = Flask(__name__)
     app.config["TESTING"] = True
-    register_error_handlers(app)
+    registerErrorHandlers(app)
     return app
 
 

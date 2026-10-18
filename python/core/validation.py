@@ -6,7 +6,7 @@ longitudes, normalizar opciones de un desplegable…). Centralizarlo evita que u
 módulo se olvide de un caso: aquí cualquier entrada inesperada acaba en un
 `ValidationError`, que la capa de errores traduce a un 400 con mensaje útil.
 
-Todas las funciones son puras y no dependen de Flask salvo `json_body`, para
+Todas las funciones son puras y no dependen de Flask salvo `jsonBody`, para
 poder testearlas sin contexto de petición.
 """
 
@@ -20,19 +20,19 @@ DEFAULT_MAX_LENGTH = 512
 MAX_ROWS = 10_000
 
 
-def normalize_year(year_value):
+def normalizeYear(yearValue):
     """Año de cuatro dígitos como texto, o None si no lo es.
 
     Vivía duplicada, idéntica, en stores/gastos_store.py y
     stores/ingresos_store.py; las dos lo siguen exportando desde aquí.
     """
-    text = str(year_value or "").strip()
+    text = str(yearValue or "").strip()
     if not text.isdigit() or len(text) != 4:
         return None
     return text
 
 
-def json_body(required=True) -> dict:
+def jsonBody(required=True) -> dict:
     """Cuerpo JSON de la petición actual como dict.
 
     `silent=True` porque un JSON malformado debe dar un 400 con mensaje propio,
@@ -50,7 +50,7 @@ def json_body(required=True) -> dict:
     return data
 
 
-def as_text(value, field="valor", *, default="", max_length=DEFAULT_MAX_LENGTH,
+def asText(value, field="valor", *, default="", maxLength=DEFAULT_MAX_LENGTH,
             required=False, strip=True) -> str:
     """Convierte a cadena acotada. None/ausente pasa a `default`."""
     if value is None:
@@ -67,14 +67,14 @@ def as_text(value, field="valor", *, default="", max_length=DEFAULT_MAX_LENGTH,
         text = text.strip()
     if required and not text:
         raise ValidationError(f"«{field}» es obligatorio", field=field)
-    if max_length is not None and len(text) > max_length:
+    if maxLength is not None and len(text) > maxLength:
         raise ValidationError(
-            f"«{field}» supera el máximo de {max_length} caracteres", field=field
+            f"«{field}» supera el máximo de {maxLength} caracteres", field=field
         )
     return text
 
 
-def as_decimal(value, field="valor", *, default=None, minimum=None, maximum=None,
+def asDecimal(value, field="valor", *, default=None, minimum=None, maximum=None,
                required=False):
     """Número validado, en `Decimal`. Es la forma correcta para un importe.
 
@@ -100,28 +100,28 @@ def as_decimal(value, field="valor", *, default=None, minimum=None, maximum=None
     return number
 
 
-def as_number(value, field="valor", *, default=None, minimum=None, maximum=None,
+def asNumber(value, field="valor", *, default=None, minimum=None, maximum=None,
               required=False):
-    """Igual que `as_decimal` pero devuelve `float`.
+    """Igual que `asDecimal` pero devuelve `float`.
 
     Para lo que no es dinero: porcentajes de una gráfica, límites, contadores.
-    Para importes usa `as_decimal`, porque lo que sale de aquí se suma.
+    Para importes usa `asDecimal`, porque lo que sale de aquí se suma.
     """
-    number = as_decimal(value, field, default=default, minimum=minimum,
+    number = asDecimal(value, field, default=default, minimum=minimum,
                         maximum=maximum, required=required)
     return number if number is None or isinstance(number, (int, float)) else float(number)
 
 
-def as_int(value, field="valor", *, default=None, minimum=None, maximum=None,
+def asInt(value, field="valor", *, default=None, minimum=None, maximum=None,
            required=False):
-    number = as_number(value, field, default=None, minimum=minimum,
+    number = asNumber(value, field, default=None, minimum=minimum,
                        maximum=maximum, required=required)
     if number is None:
         return default
     return int(number)
 
 
-def as_bool(value, *, default=False) -> bool:
+def asBool(value, *, default=False) -> bool:
     if isinstance(value, bool):
         return value
     if value is None:
@@ -131,7 +131,7 @@ def as_bool(value, *, default=False) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on", "si", "sí"}
 
 
-def one_of(value, options, field="valor", *, default=None, upper=False,
+def oneOf(value, options, field="valor", *, default=None, upper=False,
            capitalize=False):
     """Normaliza contra un conjunto cerrado de opciones.
 
@@ -140,7 +140,7 @@ def one_of(value, options, field="valor", *, default=None, upper=False,
     tolerantes (que es como funcionaba la app) sin dejar de validar cuando el
     campo es realmente obligatorio.
     """
-    text = as_text(value, field)
+    text = asText(value, field)
     if upper:
         text = text.upper()
     elif capitalize:
@@ -155,15 +155,15 @@ def one_of(value, options, field="valor", *, default=None, upper=False,
     )
 
 
-def as_rows(value, field="rows", *, max_rows=MAX_ROWS) -> list:
+def asRows(value, field="rows", *, maxRows=MAX_ROWS) -> list:
     """Lista de objetos tal como la envían las tablas del frontend."""
     if value is None:
         return []
     if not isinstance(value, list):
         raise ValidationError(f"«{field}» debe ser una lista", field=field)
-    if len(value) > max_rows:
+    if len(value) > maxRows:
         raise ValidationError(
-            f"«{field}» supera el máximo de {max_rows} filas", field=field
+            f"«{field}» supera el máximo de {maxRows} filas", field=field
         )
     for index, row in enumerate(value):
         if not isinstance(row, dict):
@@ -173,14 +173,14 @@ def as_rows(value, field="rows", *, max_rows=MAX_ROWS) -> list:
     return value
 
 
-def as_year(value, field="year") -> str:
+def asYear(value, field="year") -> str:
     """Año de 4 dígitos en un rango razonable.
 
     Las tablas de gastos/ingresos/ventas usan el año como parte de la clave
     primaria y como nombre de fichero histórico, así que un valor libre aquí
     creaba entradas basura imposibles de borrar desde la interfaz.
     """
-    text = as_text(value, field, max_length=8)
+    text = asText(value, field, maxLength=8)
     if not text.isdigit() or len(text) != 4:
         raise ValidationError(f"«{field}» debe ser un año de 4 dígitos", field=field)
     year = int(text)

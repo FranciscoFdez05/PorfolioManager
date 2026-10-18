@@ -24,16 +24,16 @@ from core.version import __version__
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, datos_aislados, temp_db, monkeypatch):
-    from routes.actualizacion import actualizacion_bp
+def cliente(clienteAutenticado, datosAislados, tempDb, monkeypatch):
+    from routes.actualizacion import actualizacionBp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
 
-    client, cabeceras, _app = cliente_autenticado(actualizacion_bp)
+    client, cabeceras, _app = clienteAutenticado(actualizacionBp)
     return client, cabeceras
 
 
-def _escribir_estado(estado, momento=None, **extra):
+def _escribirEstado(estado, momento=None, **extra):
     """Escribe lo que dejaría el vigilante del host."""
     from core import paths
 
@@ -58,7 +58,7 @@ def _senal():
 
 # ── Estado ───────────────────────────────────────────────────────────────────
 
-def test_sin_nada_hecho_no_hay_ni_solicitud_ni_vigilante(cliente):
+def testSinNadaHechoNoHayNiSolicitudNiVigilante(cliente):
     client, _cabeceras = cliente
 
     datos = client.get("/api/actualizacion").get_json()
@@ -72,9 +72,9 @@ def test_sin_nada_hecho_no_hay_ni_solicitud_ni_vigilante(cliente):
     assert datos["vigilanteVisto"] is False
 
 
-def test_el_rastro_del_vigilante_es_lo_que_dice_que_esta_instalado(cliente):
+def testElRastroDelVigilanteEsLoQueDiceQueEstaInstalado(cliente):
     client, _cabeceras = cliente
-    _escribir_estado("ok", codigo=0, detalle="todo bien")
+    _escribirEstado("ok", codigo=0, detalle="todo bien")
 
     datos = client.get("/api/actualizacion").get_json()
 
@@ -82,7 +82,7 @@ def test_el_rastro_del_vigilante_es_lo_que_dice_que_esta_instalado(cliente):
     assert datos["ultimo"]["estado"] == "ok"
 
 
-def test_un_fichero_de_estado_ilegible_no_tumba_la_pantalla(cliente):
+def testUnFicheroDeEstadoIlegibleNoTumbaLaPantalla(cliente):
     """Lo escribe un proceso de fuera: puede pillarse a medias."""
     from core import paths
 
@@ -96,7 +96,7 @@ def test_un_fichero_de_estado_ilegible_no_tumba_la_pantalla(cliente):
     assert datos["ultimo"] is None
 
 
-def test_un_caracter_de_control_en_el_detalle_no_oculta_al_vigilante(cliente):
+def testUnCaracterDeControlEnElDetalleNoOcultaAlVigilante(cliente):
     """La salida de docker-update.sh trae colores ANSI: el ESC se coló en el JSON y
     la pantalla decía que el vigilante no daba señales aunque estuviera sano."""
     from core import paths
@@ -114,16 +114,16 @@ def test_un_caracter_de_control_en_el_detalle_no_oculta_al_vigilante(cliente):
     assert datos["ultimo"]["estado"] == "ok"
 
 
-def test_el_estado_sin_sesion_es_401(crear_app, datos_aislados, temp_db):
-    from routes.actualizacion import actualizacion_bp
+def testElEstadoSinSesionEs401(crearApp, datosAislados, tempDb):
+    from routes.actualizacion import actualizacionBp
 
-    client = crear_app(actualizacion_bp).test_client()
+    client = crearApp(actualizacionBp).test_client()
     assert client.get("/api/actualizacion").status_code == 401
 
 
 # ── Solicitud ────────────────────────────────────────────────────────────────
 
-def test_pedir_una_actualizacion_deja_la_senal(cliente):
+def testPedirUnaActualizacionDejaLaSenal(cliente):
     client, cabeceras = cliente
 
     respuesta = client.post("/api/actualizacion", headers=cabeceras)
@@ -134,7 +134,7 @@ def test_pedir_una_actualizacion_deja_la_senal(cliente):
     assert dejado["momento"]
 
 
-def test_la_solicitud_se_ve_en_el_estado(cliente):
+def testLaSolicitudSeVeEnElEstado(cliente):
     client, cabeceras = cliente
     client.post("/api/actualizacion", headers=cabeceras)
 
@@ -144,10 +144,10 @@ def test_la_solicitud_se_ve_en_el_estado(cliente):
     assert datos["haceSegundos"] is not None
 
 
-def test_no_se_pisan_dos_actualizaciones_a_la_vez(cliente):
+def testNoSePisanDosActualizacionesALaVez(cliente):
     """El vigilante ya está construyendo la imagen: pedir otra no ayuda."""
     client, cabeceras = cliente
-    _escribir_estado("en_marcha")
+    _escribirEstado("en_marcha")
 
     respuesta = client.post("/api/actualizacion", headers=cabeceras)
 
@@ -155,13 +155,13 @@ def test_no_se_pisan_dos_actualizaciones_a_la_vez(cliente):
     assert not _senal().exists()
 
 
-def test_un_en_marcha_viejo_no_deja_el_boton_muerto(cliente):
+def testUnEnMarchaViejoNoDejaElBotonMuerto(cliente):
     """Si el host se reinició a mitad, nadie va a escribir el resultado.
 
     Sin plazo, ese «en marcha» eterno dejaría el botón inservible para siempre.
     """
     client, cabeceras = cliente
-    _escribir_estado("en_marcha", momento=_ahora(actualizacion.ESPERA_MAXIMA_SEGUNDOS + 60))
+    _escribirEstado("en_marcha", momento=_ahora(actualizacion.ESPERA_MAXIMA_SEGUNDOS + 60))
 
     respuesta = client.post("/api/actualizacion", headers=cabeceras)
 
@@ -169,9 +169,9 @@ def test_un_en_marcha_viejo_no_deja_el_boton_muerto(cliente):
     assert _senal().exists()
 
 
-def test_una_actualizacion_fallida_no_impide_reintentar(cliente):
+def testUnaActualizacionFallidaNoImpideReintentar(cliente):
     client, cabeceras = cliente
-    _escribir_estado("fallo", codigo=1, detalle="el build reventó")
+    _escribirEstado("fallo", codigo=1, detalle="el build reventó")
 
     respuesta = client.post("/api/actualizacion", headers=cabeceras)
 
@@ -179,7 +179,7 @@ def test_una_actualizacion_fallida_no_impide_reintentar(cliente):
     assert _senal().exists()
 
 
-def test_pedirla_dos_veces_deja_una_sola_senal(cliente):
+def testPedirlaDosVecesDejaUnaSolaSenal(cliente):
     """Un doble clic no puede convertirse en dos reconstrucciones seguidas."""
     client, cabeceras = cliente
 
@@ -190,24 +190,24 @@ def test_pedirla_dos_veces_deja_una_sola_senal(cliente):
     assert json.loads(_senal().read_text(encoding="utf-8"))["version"] == __version__
 
 
-def test_pedir_la_actualizacion_sin_sesion_es_401(crear_app, datos_aislados, temp_db):
+def testPedirLaActualizacionSinSesionEs401(crearApp, datosAislados, tempDb):
     """Reconstruye y reinicia el servidor: no es un endpoint para desconocidos."""
-    from routes.actualizacion import actualizacion_bp
+    from routes.actualizacion import actualizacionBp
 
-    client = crear_app(actualizacion_bp).test_client()
+    client = crearApp(actualizacionBp).test_client()
     assert client.post("/api/actualizacion").status_code == 401
 
 
-def test_pedir_la_actualizacion_sin_csrf_es_403(cliente_autenticado, datos_aislados, temp_db):
-    from routes.actualizacion import actualizacion_bp
+def testPedirLaActualizacionSinCsrfEs403(clienteAutenticado, datosAislados, tempDb):
+    from routes.actualizacion import actualizacionBp
 
-    client, _cabeceras, _app = cliente_autenticado(actualizacion_bp)
+    client, _cabeceras, _app = clienteAutenticado(actualizacionBp)
     assert client.post("/api/actualizacion").status_code == 403
 
 
 # ── Versión publicada ────────────────────────────────────────────────────────
 
-def _responder_github(monkeypatch, version="9.9.9", contador=None):
+def _responderGithub(monkeypatch, version="9.9.9", contador=None):
     from core import version_remota
 
     def _falso(url):
@@ -216,12 +216,12 @@ def _responder_github(monkeypatch, version="9.9.9", contador=None):
         return f'__version__ = "{version}"'
 
     monkeypatch.setattr(version_remota, "_descargar", _falso)
-    monkeypatch.setattr(version_remota, "_descargar_changelog", lambda url: "")
+    monkeypatch.setattr(version_remota, "_descargarChangelog", lambda url: "")
 
 
-def test_el_estado_dice_si_hay_version_nueva(cliente, monkeypatch):
+def testElEstadoDiceSiHayVersionNueva(cliente, monkeypatch):
     client, _cabeceras = cliente
-    _responder_github(monkeypatch, "9.9.9")
+    _responderGithub(monkeypatch, "9.9.9")
 
     remota = client.get("/api/actualizacion").get_json()["remota"]
 
@@ -229,11 +229,11 @@ def test_el_estado_dice_si_hay_version_nueva(cliente, monkeypatch):
     assert remota["hayNueva"] is True
 
 
-def test_refrescar_vuelve_a_preguntar(cliente, monkeypatch):
+def testRefrescarVuelveAPreguntar(cliente, monkeypatch):
     """El botón «Comprobar»: sin él habría que esperar a que caducara la caché."""
     client, _cabeceras = cliente
     llamadas = []
-    _responder_github(monkeypatch, "9.9.9", contador=llamadas)
+    _responderGithub(monkeypatch, "9.9.9", contador=llamadas)
 
     client.get("/api/actualizacion")
     from core import version_remota
@@ -244,7 +244,7 @@ def test_refrescar_vuelve_a_preguntar(cliente, monkeypatch):
     assert len(llamadas) == 2
 
 
-def test_un_github_inalcanzable_no_rompe_el_panel(cliente, monkeypatch):
+def testUnGithubInalcanzableNoRompeElPanel(cliente, monkeypatch):
     """La actualización sigue pudiéndose pedir aunque no se sepa qué hay fuera."""
     from urllib.error import URLError
 
@@ -268,7 +268,7 @@ def test_un_github_inalcanzable_no_rompe_el_panel(cliente, monkeypatch):
 
 # ── Fase en curso ────────────────────────────────────────────────────────────
 
-def test_la_fase_que_deja_docker_update_llega_al_estado(cliente):
+def testLaFaseQueDejaDockerUpdateLlegaAlEstado(cliente):
     """Es la barra de progreso: docker-update.sh la escribe en cada paso."""
     from core import paths
 
@@ -285,7 +285,7 @@ def test_la_fase_que_deja_docker_update_llega_al_estado(cliente):
     assert datos["fase"]["detalle"] == "9.9.9"
 
 
-def test_sin_fase_no_hay_fase(cliente):
+def testSinFaseNoHayFase(cliente):
     """Un vigilante antiguo no la deja: la pantalla tiene que poder sin ella."""
     client, _cabeceras = cliente
 

@@ -51,11 +51,11 @@ class ApiError(Exception):
 
     status_code = 400
 
-    def __init__(self, message, status_code=None, *, field=None, details=None):
+    def __init__(self, message, statusCode=None, *, field=None, details=None):
         super().__init__(message)
         self.message = str(message)
-        if status_code is not None:
-            self.status_code = int(status_code)
+        if statusCode is not None:
+            self.status_code = int(statusCode)
         self.field = field
         self.details = details
 
@@ -163,14 +163,14 @@ def mensajeAlmacenamiento(error, ruta=None) -> str:
     return str(error)
 
 
-def registrarFalloEscritura(log_destino, contexto, error, ruta=None) -> str:
+def registrarFalloEscritura(logDestino, contexto, error, ruta=None) -> str:
     """Deja la traza completa en el log y devuelve el mensaje para el usuario."""
     mensaje = mensajeAlmacenamiento(error, ruta)
-    log_destino.exception("%s: %s", contexto, mensaje)
+    logDestino.exception("%s: %s", contexto, mensaje)
     return mensaje
 
 
-def wants_json() -> bool:
+def wantsJson() -> bool:
     """True si la respuesta de error debe ser JSON en vez de HTML."""
     if request.path.startswith("/api/"):
         return True
@@ -180,75 +180,75 @@ def wants_json() -> bool:
     return accept.accept_json and not accept.accept_html
 
 
-def current_request_id() -> str:
-    request_id = getattr(g, "request_id", None)
-    if not request_id:
-        request_id = uuid.uuid4().hex[:12]
-        g.request_id = request_id
-    return request_id
+def currentRequestId() -> str:
+    requestId = getattr(g, "request_id", None)
+    if not requestId:
+        requestId = uuid.uuid4().hex[:12]
+        g.request_id = requestId
+    return requestId
 
 
-def register_error_handlers(app) -> None:
+def registerErrorHandlers(app) -> None:
     """Instala el request id y los manejadores globales de error."""
 
     @app.before_request
-    def _assign_request_id():
+    def _assignRequestId():
         # Se respeta el id que venga de un proxy inverso para poder seguir una
         # petición a través de varias capas.
         incoming = request.headers.get(_REQUEST_ID_HEADER, "").strip()
         g.request_id = incoming[:64] if incoming else uuid.uuid4().hex[:12]
 
     @app.after_request
-    def _expose_request_id(response):
-        request_id = getattr(g, "request_id", None)
-        if request_id:
-            response.headers[_REQUEST_ID_HEADER] = request_id
+    def _exposeRequestId(response):
+        requestId = getattr(g, "request_id", None)
+        if requestId:
+            response.headers[_REQUEST_ID_HEADER] = requestId
         return response
 
     @app.errorhandler(ApiError)
-    def _handle_api_error(error: ApiError):
+    def _handleApiError(error: ApiError):
         # Errores de negocio esperados: nivel info/warning, sin traza.
         log.warning(
             "[%s] %s %s -> %s: %s",
-            current_request_id(), request.method, request.path,
+            currentRequestId(), request.method, request.path,
             error.status_code, error.message,
         )
         payload = error.to_dict()
-        payload["requestId"] = current_request_id()
+        payload["requestId"] = currentRequestId()
         return jsonify(payload), error.status_code
 
     @app.errorhandler(HTTPException)
-    def _handle_http_exception(error: HTTPException):
-        if not wants_json():
+    def _handleHttpException(error: HTTPException):
+        if not wantsJson():
             return error
         status = error.code or 500
         message = _GENERIC_MESSAGES.get(status) or error.name or "Error"
         if status >= 500:
             log.error(
                 "[%s] %s %s -> %s: %s",
-                current_request_id(), request.method, request.path, status, error,
+                currentRequestId(), request.method, request.path, status, error,
             )
         return jsonify({
             "ok": False,
             "error": message,
-            "requestId": current_request_id(),
+            "requestId": currentRequestId(),
         }), status
 
     @app.errorhandler(Exception)
-    def _handle_unexpected(error: Exception):
+    def _handleUnexpected(error: Exception):
         # exc_info=True: la traza completa va al log, nunca a la respuesta.
         log.exception(
             "[%s] Error no controlado en %s %s",
-            current_request_id(), request.method, request.path,
+            currentRequestId(), request.method, request.path,
         )
         # Con debug activo interesa la traza del depurador de Werkzeug en el
         # navegador, así que se deja propagar.
         if current_app.debug:
             raise error
-        if not wants_json():
+        if not wantsJson():
             return "Error interno del servidor", 500
         return jsonify({
             "ok": False,
             "error": _GENERIC_MESSAGES[500],
-            "requestId": current_request_id(),
+            "requestId": currentRequestId(),
         }), 500

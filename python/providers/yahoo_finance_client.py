@@ -6,13 +6,13 @@ from urllib.parse import quote
 
 from core import settings
 from providers import (
-    fetch_json,
-    format_decimal as _format_decimal,
-    format_percent as _format_percent,
-    normalize_text as _normalize_text,
+    fetchJson,
+    formatDecimal as _formatDecimal,
+    formatPercent as _formatPercent,
+    normalizeText as _normalizeText,
 )
-from providers.api_stats import record_api_call
-from providers.http import motivo_conexion
+from providers.api_stats import recordApiCall
+from providers.http import motivoConexion
 
 YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart"
@@ -36,64 +36,64 @@ _TYPE_MAP = {
 }
 
 
-def _fetch_json(url, params=None, timeout=None):
+def _fetchJson(url, params=None, timeout=None):
     # Yahoo no tiene API key ni cuota documentada: las llamadas se contabilizan
     # en las funciones públicas para no inflar el contador con los reintentos.
-    return fetch_json(url, params, timeout=timeout, headers=_HEADERS)
+    return fetchJson(url, params, timeout=timeout, headers=_HEADERS)
 
 
-def _map_quote_type(quote_type):
-    return _TYPE_MAP.get(str(quote_type or "").upper(), "market")
+def _mapQuoteType(quoteType):
+    return _TYPE_MAP.get(str(quoteType or "").upper(), "market")
 
 
-def _score_result(item, normalized_query, normalized_asset_name="", preferred_asset_type=""):
+def _scoreResult(item, normalizedQuery, normalizedAssetName="", preferredAssetType=""):
     symbol = str(item.get("symbol", "")).strip().upper()
     name = str(item.get("shortname") or item.get("longname", "")).strip()
-    quote_type = str(item.get("quoteType", "")).upper()
-    normalized_name = _normalize_text(name)
-    compact_symbol = re.sub(r"[^A-Za-z0-9]+", "", symbol)
-    compact_query = re.sub(r"[^A-Za-z0-9]+", "", normalized_query.upper())
+    quoteType = str(item.get("quoteType", "")).upper()
+    normalizedName = _normalizeText(name)
+    compactSymbol = re.sub(r"[^A-Za-z0-9]+", "", symbol)
+    compactQuery = re.sub(r"[^A-Za-z0-9]+", "", normalizedQuery.upper())
     score = 0
 
-    if compact_query:
-        if compact_symbol == compact_query:
+    if compactQuery:
+        if compactSymbol == compactQuery:
             score += 500
-        elif compact_symbol.startswith(compact_query):
+        elif compactSymbol.startswith(compactQuery):
             score += 220
-        if compact_query.lower() in normalized_name:
+        if compactQuery.lower() in normalizedName:
             score += 180
 
-    if normalized_asset_name:
-        if normalized_asset_name == normalized_name:
+    if normalizedAssetName:
+        if normalizedAssetName == normalizedName:
             score += 260
-        elif normalized_asset_name in normalized_name:
+        elif normalizedAssetName in normalizedName:
             score += 160
 
-    if preferred_asset_type == "etfs":
-        if quote_type == "ETF":
+    if preferredAssetType == "etfs":
+        if quoteType == "ETF":
             score += 320
-        elif any(t in normalized_name for t in ("etf", "etp", "ucits", "ishares", "xtrackers", "amundi", "vanguard")):
+        elif any(t in normalizedName for t in ("etf", "etp", "ucits", "ishares", "xtrackers", "amundi", "vanguard")):
             score += 200
-        elif quote_type == "MUTUALFUND":
+        elif quoteType == "MUTUALFUND":
             score += 80
-    elif preferred_asset_type == "acciones":
-        if quote_type == "EQUITY":
+    elif preferredAssetType == "acciones":
+        if quoteType == "EQUITY":
             score += 250
-        elif quote_type == "ETF":
+        elif quoteType == "ETF":
             score += 40
-    elif preferred_asset_type == "cripto":
-        if quote_type == "CRYPTOCURRENCY":
+    elif preferredAssetType == "cripto":
+        if quoteType == "CRYPTOCURRENCY":
             score += 280
-    elif preferred_asset_type == "comoditis":
-        if any(t in normalized_name for t in ("gold", "silver", "oil", "brent", "crude", "commodity")):
+    elif preferredAssetType == "comoditis":
+        if any(t in normalizedName for t in ("gold", "silver", "oil", "brent", "crude", "commodity")):
             score += 280
 
     return score
 
 
-def _fetch_one_price(symbol, timeout=None):
+def _fetchOnePrice(symbol, timeout=None):
     try:
-        payload = _fetch_json(
+        payload = _fetchJson(
             f"{YAHOO_CHART_URL}/{quote(symbol, safe='=')}",
             {"range": "1d", "interval": "1d"},
             timeout=timeout,
@@ -110,7 +110,7 @@ def _fetch_one_price(symbol, timeout=None):
         return symbol.upper(), {}
 
 
-def _fetch_prices(symbols, timeout=None):
+def _fetchPrices(symbols, timeout=None):
     if not symbols:
         return {}
     result = {}
@@ -118,7 +118,7 @@ def _fetch_prices(symbols, timeout=None):
     # acelera el refresco pero agota antes la cuota del proveedor.
     workers = min(len(symbols), settings.maxPeticionesParalelas())
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_fetch_one_price, s, timeout): s for s in symbols}
+        futures = {pool.submit(_fetchOnePrice, s, timeout): s for s in symbols}
         for f in as_completed(futures):
             sym, data = f.result()
             if data:
@@ -132,12 +132,12 @@ _PRECIOUS_METALS = {"XAU", "XAG", "XPT", "XPD"}
 _METAL_NAMES     = {"XAU": "Gold", "XAG": "Silver", "XPT": "Platinum", "XPD": "Palladium"}
 
 
-def _synthetic_yahoo_result(symbol, description, asset_type="forex", currency=""):
+def _syntheticYahooResult(symbol, description, assetType="forex", currency=""):
     return {
         "symbol":        symbol.upper(),
         "displaySymbol": symbol.upper(),
         "description":   description,
-        "type":          asset_type,
+        "type":          assetType,
         "exchange":      "Yahoo Finance",
         "provider":      "yahoo",
         "price":         "",
@@ -146,39 +146,39 @@ def _synthetic_yahoo_result(symbol, description, asset_type="forex", currency=""
     }
 
 
-def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_asset_type=""):
-    normalized_query = str(query_text or "").strip().upper()
+def searchSymbol(queryText, timeout=None, limit=8, assetName="", preferredAssetType=""):
+    normalizedQuery = str(queryText or "").strip().upper()
 
-    if not normalized_query:
+    if not normalizedQuery:
         return None, "Escribe un nombre o ticker para buscar"
 
     # Forex pairs like XAUEUR=X, EURUSD=X — Yahoo search doesn't index these,
     # but the chart API can fetch them directly.
-    m = _FOREX_SUFFIX_RE.match(normalized_query)
+    m = _FOREX_SUFFIX_RE.match(normalizedQuery)
     if m:
-        from_cur, to_cur = m.group(1).upper(), m.group(2).upper()
-        from_name = _METAL_NAMES.get(from_cur, from_cur)
-        to_name   = _METAL_NAMES.get(to_cur,   to_cur)
-        result = _synthetic_yahoo_result(
-            normalized_query,
-            f"{from_name} / {to_name}",
-            asset_type="forex",
-            currency=to_cur,
+        fromCur, toCur = m.group(1).upper(), m.group(2).upper()
+        fromName = _METAL_NAMES.get(fromCur, fromCur)
+        toName   = _METAL_NAMES.get(toCur,   toCur)
+        result = _syntheticYahooResult(
+            normalizedQuery,
+            f"{fromName} / {toName}",
+            assetType="forex",
+            currency=toCur,
         )
-        quote_data, _ = fetch_quote(normalized_query, timeout=timeout)
-        if quote_data:
-            result["price"]    = quote_data["price"]
-            result["change"]   = quote_data.get("change", "")
-            result["currency"] = quote_data.get("currency") or to_cur
+        quoteData, _ = fetchQuote(normalizedQuery, timeout=timeout)
+        if quoteData:
+            result["price"]    = quoteData["price"]
+            result["change"]   = quoteData.get("change", "")
+            result["currency"] = quoteData.get("currency") or toCur
         return [result], None
 
-    record_api_call("Yahoo Finance")
+    recordApiCall("Yahoo Finance")
 
     try:
-        payload = _fetch_json(
+        payload = _fetchJson(
             YAHOO_SEARCH_URL,
             {
-                "q": normalized_query,
+                "q": normalizedQuery,
                 "quotesCount": max(1, min(int(limit or 8), 20)),
                 "newsCount": 0,
                 "enableFuzzyQuery": "false",
@@ -191,28 +191,28 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
     except URLError:
         return None, "No se pudo conectar con Yahoo Finance"
 
-    raw_results = payload.get("quotes") or []
-    normalized_asset_name = _normalize_text(asset_name)
-    ranked_results = []
-    seen_symbols = set()
+    rawResults = payload.get("quotes") or []
+    normalizedAssetName = _normalizeText(assetName)
+    rankedResults = []
+    seenSymbols = set()
 
-    for item in raw_results:
+    for item in rawResults:
         symbol = str(item.get("symbol", "")).strip().upper()
         name = str(item.get("shortname") or item.get("longname", "")).strip()
         exchange = str(item.get("exchDisp") or item.get("exchange", "")).strip().upper()
-        quote_type = str(item.get("quoteType", "")).strip()
+        quoteType = str(item.get("quoteType", "")).strip()
         currency = str(item.get("currency", "")).strip().upper()
 
-        if not symbol or not name or symbol in seen_symbols:
+        if not symbol or not name or symbol in seenSymbols:
             continue
 
-        seen_symbols.add(symbol)
-        score = _score_result(item, normalized_query, normalized_asset_name, preferred_asset_type)
-        ranked_results.append((score, {
+        seenSymbols.add(symbol)
+        score = _scoreResult(item, normalizedQuery, normalizedAssetName, preferredAssetType)
+        rankedResults.append((score, {
             "symbol": symbol,
             "displaySymbol": symbol,
             "description": name,
-            "type": _map_quote_type(quote_type),
+            "type": _mapQuoteType(quoteType),
             "exchange": exchange,
             "provider": "yahoo",
             "price": "",
@@ -220,28 +220,28 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
             "change": ""
         }))
 
-    ranked_results.sort(key=lambda row: (-row[0], row[1]["symbol"]))
-    top_results = [item for _, item in ranked_results[:limit]]
+    rankedResults.sort(key=lambda row: (-row[0], row[1]["symbol"]))
+    topResults = [item for _, item in rankedResults[:limit]]
 
-    prices = _fetch_prices([r["symbol"] for r in top_results], timeout=timeout)
-    for result in top_results:
-        quote_data = prices.get(result["symbol"])
-        if not quote_data:
+    prices = _fetchPrices([r["symbol"] for r in topResults], timeout=timeout)
+    for result in topResults:
+        quoteData = prices.get(result["symbol"])
+        if not quoteData:
             continue
-        current = quote_data.get("price") or 0
-        prev = quote_data.get("previousClose") or 0
-        currency = quote_data.get("currency") or result["currency"]
+        current = quoteData.get("price") or 0
+        prev = quoteData.get("previousClose") or 0
+        currency = quoteData.get("currency") or result["currency"]
         if current > 0:
-            result["price"] = _format_decimal(current)
+            result["price"] = _formatDecimal(current)
             if prev > 0:
-                result["change"] = _format_percent((current - prev) / prev * 100)
+                result["change"] = _formatPercent((current - prev) / prev * 100)
         if currency:
             result["currency"] = currency
 
-    return top_results, None
+    return topResults, None
 
 
-def fetch_price_series(symbol, from_ts, to_ts, timeout=None, interval="1d"):
+def fetchPriceSeries(symbol, fromTs, toTs, timeout=None, interval="1d"):
     """Cierres de un ticker entre dos fechas, diarios salvo que se pida otro intervalo.
 
     `interval` es el de Yahoo (`5m`, `30m`, `1h`, `1d`, `1wk`, `1mo`). Los
@@ -255,22 +255,22 @@ def fetch_price_series(symbol, from_ts, to_ts, timeout=None, interval="1d"):
     sin cierre (festivos, sesiones a medias) se descartan en vez de
     interpolarse: un hueco es más honesto que un precio inventado.
     """
-    normalized_symbol = str(symbol or "").strip().upper()
-    if not normalized_symbol:
+    normalizedSymbol = str(symbol or "").strip().upper()
+    if not normalizedSymbol:
         return [], "El ticker de Yahoo Finance es obligatorio"
 
-    record_api_call("Yahoo Finance")
+    recordApiCall("Yahoo Finance")
 
     try:
-        payload = _fetch_json(
-            f"{YAHOO_CHART_URL}/{quote(normalized_symbol, safe='=^')}",
-            {"period1": int(from_ts), "period2": int(to_ts), "interval": interval},
+        payload = _fetchJson(
+            f"{YAHOO_CHART_URL}/{quote(normalizedSymbol, safe='=^')}",
+            {"period1": int(fromTs), "period2": int(toTs), "interval": interval},
             timeout=timeout,
         )
     except HTTPError as error:
         return [], f"Yahoo Finance devolvió HTTP {error.code}"
     except URLError as error:
-        return [], f"No se pudo conectar con Yahoo Finance: {motivo_conexion(error, 'Yahoo Finance')}"
+        return [], f"No se pudo conectar con Yahoo Finance: {motivoConexion(error, 'Yahoo Finance')}"
     except Exception as error:
         return [], f"Error al obtener el histórico de Yahoo Finance: {error}"
 
@@ -299,24 +299,24 @@ def fetch_price_series(symbol, from_ts, to_ts, timeout=None, interval="1d"):
     return serie, None
 
 
-def fetch_quote(symbol, timeout=None):
-    normalized_symbol = str(symbol or "").strip().upper()
+def fetchQuote(symbol, timeout=None):
+    normalizedSymbol = str(symbol or "").strip().upper()
 
-    if not normalized_symbol:
+    if not normalizedSymbol:
         return None, "El ticker de Yahoo Finance es obligatorio"
 
-    record_api_call("Yahoo Finance")
+    recordApiCall("Yahoo Finance")
 
     try:
-        payload = _fetch_json(
-            f"{YAHOO_CHART_URL}/{quote(normalized_symbol, safe='=')}",
+        payload = _fetchJson(
+            f"{YAHOO_CHART_URL}/{quote(normalizedSymbol, safe='=')}",
             {"range": "2d", "interval": "1d"},
             timeout=timeout,
         )
     except HTTPError as error:
         return None, f"Yahoo Finance devolvió HTTP {error.code}"
     except URLError as error:
-        return None, f"No se pudo conectar con Yahoo Finance: {motivo_conexion(error, 'Yahoo Finance')}"
+        return None, f"No se pudo conectar con Yahoo Finance: {motivoConexion(error, 'Yahoo Finance')}"
     except Exception as error:
         return None, f"Error al obtener cotización de Yahoo Finance: {error}"
 
@@ -325,25 +325,25 @@ def fetch_quote(symbol, timeout=None):
     except (KeyError, IndexError, TypeError):
         return None, "Yahoo Finance no devolvió cotización para ese ticker"
 
-    current_price = float(meta.get("regularMarketPrice") or 0)
-    previous_close = float(meta.get("chartPreviousClose") or meta.get("previousClose") or 0)
+    currentPrice = float(meta.get("regularMarketPrice") or 0)
+    previousClose = float(meta.get("chartPreviousClose") or meta.get("previousClose") or 0)
     currency = str(meta.get("currency") or "USD").strip().upper()
 
-    if current_price <= 0 and previous_close <= 0:
+    if currentPrice <= 0 and previousClose <= 0:
         return None, "Yahoo Finance no devolvió cotización para ese ticker"
 
-    percent_change = (current_price - previous_close) / previous_close * 100 if previous_close > 0 else 0.0
+    percentChange = (currentPrice - previousClose) / previousClose * 100 if previousClose > 0 else 0.0
 
     return {
-        "symbol": normalized_symbol,
-        "price": _format_decimal(current_price),
+        "symbol": normalizedSymbol,
+        "price": _formatDecimal(currentPrice),
         "currency": currency,
-        "change": _format_percent(percent_change),
+        "change": _formatPercent(percentChange),
         "status": "Cotización actualizada",
         "lastUpdated": datetime.now().astimezone().isoformat(),
         "marketData": {
-            "currentPrice": current_price,
-            "percentChange": percent_change,
-            "previousClose": previous_close
+            "currentPrice": currentPrice,
+            "percentChange": percentChange,
+            "previousClose": previousClose
         }
     }, None

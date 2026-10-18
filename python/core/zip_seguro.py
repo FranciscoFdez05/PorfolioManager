@@ -38,7 +38,7 @@ _MAX_JSON_CONFIGURACION = 4 * 1024 * 1024
 _MAX_ENTRADAS = 2000
 
 
-def _es_json_de_configuracion(nombre: str) -> bool:
+def _esJsonDeConfiguracion(nombre: str) -> bool:
     base = Path(nombre).name
     return base == "ajustes.json" or (base.startswith("prefs_") and base.endswith(".json"))
 
@@ -61,7 +61,7 @@ def comprobar(zf) -> None:
         raise ZipNoAdmitido(f"El ZIP tiene {len(entradas)} entradas; no parece una copia de esta aplicación")
     for info in entradas:
         tamano = info.file_size
-        if _es_json_de_configuracion(info.filename) and tamano > _MAX_JSON_CONFIGURACION:
+        if _esJsonDeConfiguracion(info.filename) and tamano > _MAX_JSON_CONFIGURACION:
             raise ZipNoAdmitido(f"La entrada {info.filename!r} es demasiado grande para ser un fichero de ajustes")
         if tamano > _UMBRAL_PROPORCION and tamano > _PROPORCION_MAXIMA * max(info.compress_size, 1):
             raise ZipNoAdmitido(f"La entrada {info.filename!r} tiene una compresión anómala")

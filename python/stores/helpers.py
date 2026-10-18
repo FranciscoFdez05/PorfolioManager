@@ -1,6 +1,6 @@
 from core import dinero
 from core.db import transaction
-from providers.finnhub_client import convert_amount
+from providers.finnhub_client import convertAmount
 from stores.app_data import (
     readAlphaVantageApiKey,
     readEodhdApiKey,
@@ -11,7 +11,7 @@ from stores.app_data import (
 from stores.asset_utils import sanitizeAssetOperationRows, slugify
 
 
-def normalize_currency_code(currency, fallback="EUR"):
+def normalizeCurrencyCode(currency, fallback="EUR"):
     normalized = str(currency or "").strip().upper()
 
     if normalized in {"USDT", "USDC", "BUSD", "DAI", "FDUSD", "PYUSD", "TUSD", "USDE"} or normalized.endswith("USD"):
@@ -23,7 +23,7 @@ def normalize_currency_code(currency, fallback="EUR"):
     return normalized or fallback
 
 
-def call_finnhub_with_fallbacks(callback):
+def callFinnhubWithFallbacks(callback):
     """Prueba las claves de Finnhub en orden y se queda con la primera que sirve.
 
     Finnhub era el único proveedor sin respaldo: usaba siempre la primera clave
@@ -59,7 +59,7 @@ def call_finnhub_with_fallbacks(callback):
     return None, lastError or "Todas las API keys de Finnhub han fallado"
 
 
-def call_eodhd_with_fallbacks(callback):
+def callEodhdWithFallbacks(callback):
     apiKeys = readRotatedEodhdApiKeys()
 
     if not apiKeys:
@@ -88,7 +88,7 @@ def call_eodhd_with_fallbacks(callback):
     return None, lastError or "Todas las API keys de EODHD han fallado"
 
 
-def call_alpha_vantage_with_fallbacks(callback):
+def callAlphaVantageWithFallbacks(callback):
     apiKeys = readRotatedAlphaVantageApiKeys()
 
     if not apiKeys:
@@ -117,7 +117,7 @@ def call_alpha_vantage_with_fallbacks(callback):
     return None, lastError or "Todas las API keys de Alpha Vantage han fallado"
 
 
-def parse_loose_number(value):
+def parseLooseNumber(value):
     """Importe de una columna TEXT a `Decimal`, o `None` si no se entiende.
 
     Devuelve `Decimal` y no `float` porque lo que sale de aquí se acumula: los
@@ -134,7 +134,7 @@ def parse_loose_number(value):
     return dinero.aDecimalONulo(value)
 
 
-def format_decimal(value, digits=2):
+def formatDecimal(value, digits=2):
     """Importe en formato español sin separador de miles ("1234,56").
 
     Es formato de **presentación**. Que además acabe guardado en algunas
@@ -144,72 +144,72 @@ def format_decimal(value, digits=2):
     return dinero.aTextoEs(value, decimales=digits, miles=False)
 
 
-def is_temporary_service_error(error):
-    normalized_error = str(error or "").lower()
-    return any(fragment in normalized_error for fragment in ("conectar", "divisa", "tard", "timeout"))
+def isTemporaryServiceError(error):
+    normalizedError = str(error or "").lower()
+    return any(fragment in normalizedError for fragment in ("conectar", "divisa", "tard", "timeout"))
 
 
-def is_rate_limited_error(error):
+def isRateLimitedError(error):
     """Si el error es un 429/cuota agotada, y no otra cosa.
 
     Los mensajes no llevan un código de error propio, así que se distingue por
-    los fragmentos que ya escriben `_mensaje_http` de cada cliente: "límite" y
+    los fragmentos que ya escriben `_mensajeHttp` de cada cliente: "límite" y
     "cuota" (EODHD, Finnhub) o el "429" que queda tal cual en los proveedores
     sin traducción específica (Yahoo, Alpha Vantage). Sirve para marcar el
     proveedor como de reposo un rato y no insistir con él en la próxima
     cotización (ver `stores.market_data`).
     """
-    normalized_error = str(error or "").lower()
-    return any(fragment in normalized_error for fragment in ("límite", "cuota", "429"))
+    normalizedError = str(error or "").lower()
+    return any(fragment in normalizedError for fragment in ("límite", "cuota", "429"))
 
 
-def convert_asset_rows_currency(rows, source_currency, target_currency, asset_type="", fields=None):
-    converted_rows = []
-    normalized_asset_type = str(asset_type or "").strip().lower()
+def convertAssetRowsCurrency(rows, sourceCurrency, targetCurrency, assetType="", fields=None):
+    convertedRows = []
+    normalizedAssetType = str(assetType or "").strip().lower()
 
     for row in rows or []:
-        converted_row = dict(row)
+        convertedRow = dict(row)
 
-        if normalized_asset_type != "cripto":
-            money_fields = ("precioParticipacion", "capitalInvertidoBruto", "comisiones")
+        if normalizedAssetType != "cripto":
+            moneyFields = ("precioParticipacion", "capitalInvertidoBruto", "comisiones")
         else:
-            money_fields = ("precioParticipacion", "capitalInvertidoBruto", "comisiones", "comisionesFiat")
+            moneyFields = ("precioParticipacion", "capitalInvertidoBruto", "comisiones", "comisionesFiat")
 
         if fields:
-            allowed_fields = set(fields)
-            money_fields = tuple(field_name for field_name in money_fields if field_name in allowed_fields)
+            allowedFields = set(fields)
+            moneyFields = tuple(fieldName for fieldName in moneyFields if fieldName in allowedFields)
 
-        for field_name in money_fields:
-            parsed_value = parse_loose_number(converted_row.get(field_name, ""))
+        for fieldName in moneyFields:
+            parsedValue = parseLooseNumber(convertedRow.get(fieldName, ""))
 
-            if parsed_value is None:
+            if parsedValue is None:
                 continue
 
-            converted_value, error = convert_amount(parsed_value, source_currency, target_currency)
+            convertedValue, error = convertAmount(parsedValue, sourceCurrency, targetCurrency)
 
             if error:
                 return None, error
 
-            converted_row[field_name] = format_decimal(converted_value)
+            convertedRow[fieldName] = formatDecimal(convertedValue)
 
-        converted_rows.append(converted_row)
+        convertedRows.append(convertedRow)
 
-    return converted_rows, None
+    return convertedRows, None
 
 
-def build_completed_operations_by_asset(rows):
-    operations_by_asset = {}
+def buildCompletedOperationsByAsset(rows):
+    operationsByAsset = {}
 
     for row in rows or []:
-        asset_id = slugify(row.get("assetId", ""))
+        assetId = slugify(row.get("assetId", ""))
         estado = str(row.get("estado", "")).strip().capitalize()
 
-        if not asset_id or estado != "Completado":
+        if not assetId or estado != "Completado":
             continue
 
-        operations_by_asset.setdefault(asset_id, []).append({
+        operationsByAsset.setdefault(assetId, []).append({
             "id": str(row.get("id", "")).strip(),
-            "assetId": asset_id,
+            "assetId": assetId,
             "activo": str(row.get("activo", "")).strip(),
             "fechaApertura": str(row.get("fechaApertura", row.get("fecha", ""))).strip(),
             "par": str(row.get("par", "")).strip(),
@@ -226,7 +226,7 @@ def build_completed_operations_by_asset(rows):
             "fechaCierre": str(row.get("fechaCierre", "")).strip()
         })
 
-    return {asset_id: sanitizeAssetOperationRows(asset_rows) for asset_id, asset_rows in operations_by_asset.items()}
+    return {assetId: sanitizeAssetOperationRows(assetRows) for assetId, assetRows in operationsByAsset.items()}
 
 
 # Columnas de activo_operation_rows que salen de la operación, en el orden en que
@@ -240,7 +240,7 @@ _CAMPOS_OPERACION = (
 )
 
 
-def sync_completed_operations_into_assets(rows):
+def syncCompletedOperationsIntoAssets(rows):
     """Copia las operaciones completadas a `activo_operation_rows` de cada activo.
 
     Antes reescribía el activo entero (`writeAssetFile`) por cada activo y en
@@ -252,7 +252,7 @@ def sync_completed_operations_into_assets(rows):
     de cambio ya anotado se conserva por (fecha, divisa), que es de lo que
     depende.
     """
-    operations_by_asset = build_completed_operations_by_asset(rows)
+    operationsByAsset = buildCompletedOperationsByAsset(rows)
     columnas = [c for c, _ in _CAMPOS_OPERACION]
     lista = ", ".join(columnas)
 
@@ -264,27 +264,27 @@ def sync_completed_operations_into_assets(rows):
         ):
             existentes.setdefault(fila["asset_id"], []).append(fila)
 
-        ids_activos = {r[0] for r in conn.execute("SELECT id FROM activos")}
-        for asset_id in ids_activos:
+        idsActivos = {r[0] for r in conn.execute("SELECT id FROM activos")}
+        for assetId in idsActivos:
             deseadas = [
                 tuple(str(op.get(clave, "")) for _, clave in _CAMPOS_OPERACION)
-                for op in operations_by_asset.get(asset_id, [])
+                for op in operationsByAsset.get(assetId, [])
             ]
-            previas = existentes.get(asset_id, [])
+            previas = existentes.get(assetId, [])
             if [tuple(str(f[c]) for c in columnas) for f in previas] == deseadas:
                 continue
 
             fx = {(f["fecha_apertura"], f["currency"]): (f["fx_rate"], f["fx_fecha"], f["fx_origen"])
                   for f in previas if f["fx_rate"]}
-            indice_fecha = columnas.index("fecha_apertura")
-            indice_divisa = columnas.index("currency")
-            conn.execute("DELETE FROM activo_operation_rows WHERE asset_id = ?", (asset_id,))
+            indiceFecha = columnas.index("fecha_apertura")
+            indiceDivisa = columnas.index("currency")
+            conn.execute("DELETE FROM activo_operation_rows WHERE asset_id = ?", (assetId,))
             conn.executemany(
                 f"INSERT INTO activo_operation_rows (asset_id, {lista}, fx_rate, fx_fecha, fx_origen) "
                 f"VALUES ({', '.join('?' * (len(columnas) + 4))})",
                 [
-                    (asset_id, *valores,
-                     *fx.get((valores[indice_fecha], valores[indice_divisa]), ("", "", "")))
+                    (assetId, *valores,
+                     *fx.get((valores[indiceFecha], valores[indiceDivisa]), ("", "", "")))
                     for valores in deseadas
                 ],
             )

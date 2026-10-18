@@ -31,7 +31,7 @@ def _directivas(politica):
 
 # ── La política ───────────────────────────────────────────────────────────────
 
-def test_script_src_esta_cerrado_a_self():
+def testScriptSrcEstaCerradoASelf():
     """El motivo de vendorizar Chart.js: ningún dominio externo en script-src.
 
     Si alguien vuelve a añadir un CDN a `csp_origenes_scripts`, este test lo
@@ -41,30 +41,30 @@ def test_script_src_esta_cerrado_a_self():
     assert _directivas(csp.construir())["script-src"] == ["'self'"]
 
 
-def test_script_src_no_admite_unsafe_inline():
+def testScriptSrcNoAdmiteUnsafeInline():
     """Con 'unsafe-inline' la directiva no protegería de nada, que es el fallo a cubrir."""
     assert "'unsafe-inline'" not in _directivas(csp.construir())["script-src"]
     assert "'unsafe-inline'" not in _directivas(csp.construir("abc123"))["script-src"]
 
 
-def test_el_nonce_entra_en_script_src():
+def testElNonceEntraEnScriptSrc():
     directiva = _directivas(csp.construir("abc123"))["script-src"]
     assert "'nonce-abc123'" in directiva
     assert "'self'" in directiva
 
 
-def test_sin_nonce_no_aparece_la_palabra_nonce():
+def testSinNonceNoApareceLaPalabraNonce():
     """Un `nonce-` vacío invalidaría la directiva entera en algunos navegadores."""
     assert "nonce" not in csp.construir()
 
 
-def test_origenes_extra_configurados_se_respetan(monkeypatch):
+def testOrigenesExtraConfiguradosSeRespetan(monkeypatch):
     """El ajuste sigue siendo útil para quien añada una librería externa a conciencia."""
     monkeypatch.setattr(settings, "cspOrigenesScripts", lambda: ["https://ejemplo.test"])
     assert _directivas(csp.construir())["script-src"] == ["'self'", "https://ejemplo.test"]
 
 
-def test_directivas_de_cierre():
+def testDirectivasDeCierre():
     """Las que impiden inyección de base, formularios y plugins."""
     directivas = _directivas(csp.construir())
     assert directivas["object-src"] == ["'none'"]
@@ -74,7 +74,7 @@ def test_directivas_de_cierre():
     assert directivas["default-src"] == ["'self'"]
 
 
-def test_frame_src_permite_tradingview():
+def testFrameSrcPermiteTradingview():
     """El modal de gráfico incrusta widgetembed; sin esto el iframe sale en blanco.
 
     El síntoma es engañoso —el navegador pinta su propia página de "contenido
@@ -86,19 +86,19 @@ def test_frame_src_permite_tradingview():
     assert directiva[0] == "'self'"
 
 
-def test_frame_src_no_se_abre_a_cualquiera():
+def testFrameSrcNoSeAbreACualquiera():
     """Una lista cerrada: el comodín dejaría incrustar cualquier página."""
     directiva = _directivas(csp.construir())["frame-src"]
     assert "*" not in directiva
     assert all(o == "'self'" or o.startswith("https://") for o in directiva)
 
 
-def test_connect_src_solo_self():
+def testConnectSrcSoloSelf():
     """El navegador solo habla con /api/; a los proveedores sale el servidor."""
     assert _directivas(csp.construir())["connect-src"] == ["'self'"]
 
 
-def test_connect_src_admite_el_puerto_de_comprobacion_del_certificado():
+def testConnectSrcAdmiteElPuertoDeComprobacionDelCertificado():
     """La única excepción, y se calcula por petición.
 
     El panel de HTTPS pide esa página para averiguar si **este** navegador se
@@ -111,7 +111,7 @@ def test_connect_src_admite_el_puerto_de_comprobacion_del_certificado():
     assert directiva == ["'self'", "https://192.168.1.163:9443"]
 
 
-def test_connect_src_no_se_abre_a_cualquiera():
+def testConnectSrcNoSeAbreACualquiera():
     """Lo que se añade es un host concreto, nunca un comodín: la excepción es
     para el propio servidor, no para la red."""
     directiva = _directivas(csp.construir("", ("https://192.168.1.163:9443",)))["connect-src"]
@@ -120,33 +120,33 @@ def test_connect_src_no_se_abre_a_cualquiera():
     assert all(o == "'self'" or o.startswith("https://") for o in directiva)
 
 
-def test_los_nonces_no_se_repiten():
-    assert len({csp.generar_nonce() for _ in range(50)}) == 50
+def testLosNoncesNoSeRepiten():
+    assert len({csp.generarNonce() for _ in range(50)}) == 50
 
 
-def test_insertar_nonce_sustituye_el_marcador():
-    assert csp.insertar_nonce("<script nonce='__CSP_NONCE__'>", "xyz") == "<script nonce='xyz'>"
+def testInsertarNonceSustituyeElMarcador():
+    assert csp.insertarNonce("<script nonce='__CSP_NONCE__'>", "xyz") == "<script nonce='xyz'>"
 
 
-def test_insertar_nonce_sin_marcador_devuelve_el_html_intacto():
+def testInsertarNonceSinMarcadorDevuelveElHtmlIntacto():
     """Preferible a reventar la petición entera: la página funciona salvo el script de tema."""
-    assert csp.insertar_nonce("<html></html>", "xyz") == "<html></html>"
+    assert csp.insertarNonce("<html></html>", "xyz") == "<html></html>"
 
 
 # ── Procedencia de los scripts ────────────────────────────────────────────────
 
-def test_index_no_carga_scripts_de_ningun_dominio_externo():
+def testIndexNoCargaScriptsDeNingunDominioExterno():
     html = (RAIZ / "index.html").read_text("utf-8")
     externos = re.findall(r'<script[^>]+src="(https?://[^"]+)"', html)
     assert externos == [], f"index.html carga scripts externos: {externos}"
 
 
-def test_index_carga_chartjs_desde_vendor():
+def testIndexCargaChartjsDesdeVendor():
     html = (RAIZ / "index.html").read_text("utf-8")
     assert "js/vendor/chart.umd.min.js" in html
 
 
-def test_chartjs_vendorizado_existe_y_es_la_version_documentada():
+def testChartjsVendorizadoExisteYEsLaVersionDocumentada():
     """Que el fichero, el README y el `?v=` de index.html no se separen.
 
     Al actualizar la librería es fácil cambiar el fichero y olvidar el resto:
@@ -169,7 +169,7 @@ def test_chartjs_vendorizado_existe_y_es_la_version_documentada():
     )
 
 
-def test_solo_las_librerias_de_terceros_llevan_cache_busting():
+def testSoloLasLibreriasDeTercerosLlevanCacheBusting():
     """El `?v=` a mano se quedó únicamente donde sirve para algo.
 
     El servidor manda el código propio con `Cache-Control: no-store`, así que
@@ -180,9 +180,9 @@ def test_solo_las_librerias_de_terceros_llevan_cache_busting():
     """
     html = (RAIZ / "index.html").read_text("utf-8")
 
-    con_version = re.findall(r'(?:href|src)="([^"]+?)\?v=[^"]*"', html)
+    conVersion = re.findall(r'(?:href|src)="([^"]+?)\?v=[^"]*"', html)
 
-    ajenos = [ruta for ruta in con_version if not ruta.startswith("js/vendor/")]
+    ajenos = [ruta for ruta in conVersion if not ruta.startswith("js/vendor/")]
     assert not ajenos, (
         f"estas rutas llevan ?v= y se sirven con no-store, así que no hace nada: {ajenos}"
     )

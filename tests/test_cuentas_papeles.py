@@ -4,16 +4,16 @@ import pytest
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, datos_aislados, temp_db, monkeypatch):
-    from routes.ajustes import ajustes_bp
-    from routes.cuenta_ahorro import cuenta_ahorro_bp
-    from routes.cuentas import cuentas_bp
-    from routes.registros import registros_bp
+def cliente(clienteAutenticado, datosAislados, tempDb, monkeypatch):
+    from routes.ajustes import ajustesBp
+    from routes.cuenta_ahorro import cuentaAhorroBp
+    from routes.cuentas import cuentasBp
+    from routes.registros import registrosBp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
 
-    client, cabeceras, _app = cliente_autenticado(cuentas_bp, cuenta_ahorro_bp, ajustes_bp, registros_bp)
+    client, cabeceras, _app = clienteAutenticado(cuentasBp, cuentaAhorroBp, ajustesBp, registrosBp)
     return client, cabeceras
 
 
@@ -29,7 +29,7 @@ def _cuentas(client):
 
 # ── Cuenta de ahorro ─────────────────────────────────────────────────────────
 
-def test_una_cuenta_de_tipo_ahorro_sale_en_la_ventana_de_ahorro(cliente):
+def testUnaCuentaDeTipoAhorroSaleEnLaVentanaDeAhorro(cliente):
     client, cabeceras = cliente
     cuenta = _cuenta(client, cabeceras, "Viaje", "ahorro")
     otra = _cuenta(client, cabeceras, "Broker", "broker")
@@ -40,7 +40,7 @@ def test_una_cuenta_de_tipo_ahorro_sale_en_la_ventana_de_ahorro(cliente):
     assert "ahorro" in ids
 
 
-def test_cualquier_cuenta_existente_se_elige_como_de_ahorro_y_se_quita_sin_borrarla(cliente):
+def testCualquierCuentaExistenteSeEligeComoDeAhorroYSeQuitaSinBorrarla(cliente):
     client, cabeceras = cliente
     cuenta = _cuenta(client, cabeceras, "Trade Republic", "broker")
 
@@ -55,22 +55,22 @@ def test_cualquier_cuenta_existente_se_elige_como_de_ahorro_y_se_quita_sin_borra
     assert cuenta["id"] in _cuentas(client)
 
 
-def test_la_cuenta_de_ahorro_principal_no_se_quita(cliente):
+def testLaCuentaDeAhorroPrincipalNoSeQuita(cliente):
     client, cabeceras = cliente
     res = client.put("/api/cuentas/ahorro", json={"ahorro": False}, headers=cabeceras)
     assert res.status_code == 400
     assert _cuentas(client)["ahorro"]["ahorro"] is True
 
 
-def test_la_migracion_marca_las_cuentas_que_ya_eran_de_ahorro(temp_db):
+def testLaMigracionMarcaLasCuentasQueYaEranDeAhorro(tempDb):
     from core import db
 
-    conn = db.get_db()
+    conn = db.getDb()
     conn.execute("INSERT INTO cuentas (id, nombre, tipo, ahorro) VALUES ('ahorro-x', 'X', 'ahorro', 0)")
     conn.execute("INSERT INTO cuentas (id, nombre, tipo, ahorro) VALUES ('exchange-y', 'Y', 'exchange', 0)")
     conn.commit()
 
-    db._esquema_16(conn)
+    db._esquema16(conn)
 
     marcadas = {f["id"] for f in conn.execute("SELECT id FROM cuentas WHERE ahorro = 1")}
     assert "ahorro-x" in marcadas
@@ -79,7 +79,7 @@ def test_la_migracion_marca_las_cuentas_que_ya_eran_de_ahorro(temp_db):
 
 # ── Cuenta remunerada ────────────────────────────────────────────────────────
 
-def test_una_remunerada_se_crea_eligiendo_una_cuenta_y_toma_su_nombre(cliente):
+def testUnaRemuneradaSeCreaEligiendoUnaCuentaYTomaSuNombre(cliente):
     client, cabeceras = cliente
     cuenta = _cuenta(client, cabeceras, "Trade Republic")
 
@@ -100,7 +100,7 @@ def test_una_remunerada_se_crea_eligiendo_una_cuenta_y_toma_su_nombre(cliente):
     assert client.get("/api/intereses").get_json()["cuentas"][0]["nombre"] == "TR"
 
 
-def test_una_remunerada_cambia_de_cuenta_pero_no_a_una_que_ya_lo_es(cliente):
+def testUnaRemuneradaCambiaDeCuentaPeroNoAUnaQueYaLoEs(cliente):
     client, cabeceras = cliente
     a = _cuenta(client, cabeceras, "A")
     b = _cuenta(client, cabeceras, "B")
@@ -126,7 +126,7 @@ def test_una_remunerada_cambia_de_cuenta_pero_no_a_una_que_ya_lo_es(cliente):
     assert _cuentas(client)[c["id"]]["remunerada"] == "r1"
 
 
-def test_quitar_una_remunerada_no_borra_su_cuenta(cliente):
+def testQuitarUnaRemuneradaNoBorraSuCuenta(cliente):
     client, cabeceras = cliente
     cuenta = _cuenta(client, cabeceras, "Trade Republic")
     client.post(

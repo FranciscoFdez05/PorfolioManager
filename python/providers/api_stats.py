@@ -44,12 +44,12 @@ _memoria: dict = {"date": None, "counts": {}}
 _ESPERA_BLOQUEO = 1.0
 
 
-def _ruta_fichero():
+def _rutaFichero():
     """Se resuelve en cada llamada: los tests redirigen los directorios."""
     return paths.JSON_DIR / "api_stats.json"
 
 
-def _ruta_bloqueo():
+def _rutaBloqueo():
     return paths.TMP_DIR / "api-stats.lock"
 
 
@@ -57,10 +57,10 @@ def _vacio(hoy: str) -> dict:
     return {"date": hoy, "counts": {}}
 
 
-def _leer_fichero(hoy: str) -> dict:
+def _leerFichero(hoy: str) -> dict:
     """Lo guardado, o un recuento vacío si no hay nada legible o es de ayer."""
     try:
-        datos = json.loads(_ruta_fichero().read_text("utf-8"))
+        datos = json.loads(_rutaFichero().read_text("utf-8"))
     except (OSError, ValueError):
         return _vacio(hoy)
 
@@ -82,15 +82,15 @@ def _sumar(datos: dict, hoy: str, provider: str) -> None:
     datos["counts"][provider] = datos["counts"].get(provider, 0) + 1
 
 
-def record_api_call(provider: str) -> None:
+def recordApiCall(provider: str) -> None:
     hoy = date.today().isoformat()
     with _lock:
         _sumar(_memoria, hoy, provider)
         try:
-            with exclusivo(_ruta_bloqueo(), espera=_ESPERA_BLOQUEO, obligatorio=False):
-                datos = _leer_fichero(hoy)
+            with exclusivo(_rutaBloqueo(), espera=_ESPERA_BLOQUEO, obligatorio=False):
+                datos = _leerFichero(hoy)
                 _sumar(datos, hoy, provider)
-                escribirJsonAtomico(_ruta_fichero(), datos)
+                escribirJsonAtomico(_rutaFichero(), datos)
         except OSError as error:
             # Sin permiso o sin espacio: se sigue contando en memoria. El aviso
             # de por qué no se puede escribir ya lo da el arranque.
@@ -100,22 +100,22 @@ def record_api_call(provider: str) -> None:
 _fallos: dict = {}
 
 
-def record_api_failure(provider: str) -> None:
+def recordApiFailure(provider: str) -> None:
     """Anota (en memoria) cuándo falló por última vez una llamada real."""
     with _lock:
         _fallos[provider] = time.monotonic()
 
 
-def last_api_failure(provider: str) -> float:
+def lastApiFailure(provider: str) -> float:
     """Instante monotónico del último fallo real del proveedor; 0 si no hubo."""
     with _lock:
         return _fallos.get(provider, 0.0)
 
 
-def get_today_stats() -> dict:
+def getTodayStats() -> dict:
     hoy = date.today().isoformat()
     with _lock:
-        datos = _leer_fichero(hoy)
+        datos = _leerFichero(hoy)
         # El respaldo solo se usa si el fichero no ha llegado a escribirse: ya
         # incluye lo que ha contado este proceso, así que sumarlos duplicaría.
         if not datos["counts"] and _memoria.get("date") == hoy:
@@ -125,7 +125,7 @@ def get_today_stats() -> dict:
     return {"date": hoy, "counts": counts, "total": sum(counts.values())}
 
 
-def reiniciar_para_pruebas() -> None:
+def reiniciarParaPruebas() -> None:
     """Vacía el respaldo en memoria. Simula un worker recién arrancado."""
     with _lock:
         _memoria["date"] = None

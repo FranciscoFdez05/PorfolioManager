@@ -721,7 +721,7 @@ def converger() -> None:
     hay ningún proxy) no hay Caddy con el que converger: intentarlo de todas
     formas eran hasta 8 s de reintentos contra `http://caddy:2019` en cada
     arranque, un host que en ese despliegue no va a responder nunca. Es la
-    misma señal que ya usa `aplicar_proxy_inverso` para decidir si hay proxy
+    misma señal que ya usa `aplicarProxyInverso` para decidir si hay proxy
     delante.
     """
     if not settings.proxySaltos():

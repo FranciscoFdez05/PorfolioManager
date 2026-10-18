@@ -1,6 +1,6 @@
 """Serie de índices para comparar contra la cartera.
 
-Ningún test toca la red: `fetch_price_series` se sustituye por un doble que
+Ningún test toca la red: `fetchPriceSeries` se sustituye por un doble que
 además cuenta las llamadas, porque la mitad del valor de este módulo está en
 no bajar años de cotizaciones en cada visita a Métricas.
 """
@@ -9,7 +9,7 @@ import datetime
 
 import pytest
 
-from core.db import get_db
+from core.db import getDb
 from stores import benchmark
 
 DIA = 86400
@@ -17,11 +17,11 @@ AHORA = int(datetime.datetime(2024, 6, 1, 12).timestamp())
 
 
 @pytest.fixture(autouse=True)
-def sin_memoria_entre_tests():
+def sinMemoriaEntreTests():
     """El registro de últimos intentos es de proceso, no de base de datos."""
-    benchmark._ultimo_intento.clear()
+    benchmark._ultimoIntento.clear()
     yield
-    benchmark._ultimo_intento.clear()
+    benchmark._ultimoIntento.clear()
 
 
 @pytest.fixture
@@ -34,12 +34,12 @@ def yahoo(monkeypatch):
         dias = range(0, max(int((hasta - desde) // DIA), 1))
         return [{"ts": int(desde) + d * DIA, "close": 100.0 + d} for d in dias], None
 
-    monkeypatch.setattr(benchmark, "fetch_price_series", _serie)
+    monkeypatch.setattr(benchmark, "fetchPriceSeries", _serie)
     return llamadas
 
 
 class TestCatalogo:
-    def test_las_claves_no_exponen_el_simbolo_del_proveedor(self):
+    def testLasClavesNoExponenElSimboloDelProveedor(self):
         # La clave viaja por la URL y se guarda en las preferencias del
         # navegador; el símbolo puede cambiar sin romperlas.
         claves = {i["clave"] for i in benchmark.catalogo()}
@@ -47,12 +47,12 @@ class TestCatalogo:
         assert "sp500" in claves
         assert benchmark.INDICES["sp500"]["symbol"] == "^GSPC"
 
-    def test_todos_los_indices_llevan_nombre_legible(self):
+    def testTodosLosIndicesLlevanNombreLegible(self):
         assert all(i["nombre"] for i in benchmark.catalogo())
 
 
 class TestSerie:
-    def test_baja_y_cachea_los_cierres(self, temp_db, yahoo):
+    def testBajaYCacheaLosCierres(self, tempDb, yahoo):
         datos, error = benchmark.serie("sp500", AHORA - 30 * DIA, AHORA)
 
         assert error is None
@@ -60,10 +60,10 @@ class TestSerie:
         assert len(datos["data"]) > 0
         assert len(yahoo) == 1
 
-        guardados = get_db().execute("SELECT COUNT(*) FROM benchmark_prices").fetchone()[0]
+        guardados = getDb().execute("SELECT COUNT(*) FROM benchmark_prices").fetchone()[0]
         assert guardados > 0
 
-    def test_la_segunda_visita_no_vuelve_a_llamar(self, temp_db, yahoo, monkeypatch):
+    def testLaSegundaVisitaNoVuelveALlamar(self, tempDb, yahoo, monkeypatch):
         monkeypatch.setattr(benchmark.settings, "historicoTtlSegundos", lambda: 3600)
 
         benchmark.serie("sp500", AHORA - 30 * DIA, AHORA)
@@ -71,7 +71,7 @@ class TestSerie:
 
         assert len(yahoo) == 1
 
-    def test_el_tramo_nuevo_del_final_se_baja(self, temp_db, yahoo, monkeypatch):
+    def testElTramoNuevoDelFinalSeBaja(self, tempDb, yahoo, monkeypatch):
         monkeypatch.setattr(benchmark.settings, "historicoTtlSegundos", lambda: 0)
 
         benchmark.serie("sp500", AHORA - 30 * DIA, AHORA)
@@ -79,7 +79,7 @@ class TestSerie:
 
         assert len(yahoo) == 2
 
-    def test_el_ttl_protege_al_proveedor_aunque_falte_cola(self, temp_db, yahoo, monkeypatch):
+    def testElTtlProtegeAlProveedorAunqueFalteCola(self, tempDb, yahoo, monkeypatch):
         # Un fin de semana el último cierre es el del viernes: sin este freno,
         # cada refresco del gráfico volvería a preguntar por un dato que
         # todavía no existe.
@@ -90,7 +90,7 @@ class TestSerie:
 
         assert len(yahoo) == 1
 
-    def test_estirar_el_rango_hacia_atras_vuelve_a_bajar(self, temp_db, yahoo, monkeypatch):
+    def testEstirarElRangoHaciaAtrasVuelveABajar(self, tempDb, yahoo, monkeypatch):
         monkeypatch.setattr(benchmark.settings, "historicoTtlSegundos", lambda: 0)
 
         benchmark.serie("sp500", AHORA - 30 * DIA, AHORA)
@@ -99,27 +99,27 @@ class TestSerie:
         assert len(yahoo) == 2
         assert yahoo[1][1] < yahoo[0][1]
 
-    def test_un_dia_repetido_se_actualiza_en_vez_de_duplicarse(self, temp_db, yahoo, monkeypatch):
+    def testUnDiaRepetidoSeActualizaEnVezDeDuplicarse(self, tempDb, yahoo, monkeypatch):
         monkeypatch.setattr(benchmark.settings, "historicoTtlSegundos", lambda: 0)
 
         benchmark.serie("sp500", AHORA - 10 * DIA, AHORA)
-        antes = get_db().execute("SELECT COUNT(*) FROM benchmark_prices").fetchone()[0]
+        antes = getDb().execute("SELECT COUNT(*) FROM benchmark_prices").fetchone()[0]
         benchmark.serie("sp500", AHORA - 10 * DIA, AHORA)
 
-        assert get_db().execute("SELECT COUNT(*) FROM benchmark_prices").fetchone()[0] == antes
+        assert getDb().execute("SELECT COUNT(*) FROM benchmark_prices").fetchone()[0] == antes
 
-    def test_un_indice_desconocido_no_llama_al_proveedor(self, temp_db, yahoo):
+    def testUnIndiceDesconocidoNoLlamaAlProveedor(self, tempDb, yahoo):
         datos, error = benchmark.serie("no_existe", AHORA - 30 * DIA, AHORA)
 
         assert datos is None
         assert error == "Índice desconocido"
         assert yahoo == []
 
-    def test_si_falla_la_descarga_se_sirve_lo_cacheado(self, temp_db, yahoo, monkeypatch):
+    def testSiFallaLaDescargaSeSirveLoCacheado(self, tempDb, yahoo, monkeypatch):
         benchmark.serie("sp500", AHORA - 30 * DIA, AHORA)
-        benchmark._ultimo_intento.clear()
+        benchmark._ultimoIntento.clear()
         monkeypatch.setattr(
-            benchmark, "fetch_price_series",
+            benchmark, "fetchPriceSeries",
             lambda symbol, desde, hasta, timeout=None: ([], "Yahoo Finance devolvió HTTP 429"),
         )
 
@@ -130,9 +130,9 @@ class TestSerie:
         assert error is None
         assert len(datos["data"]) > 0
 
-    def test_si_falla_y_no_hay_nada_cacheado_devuelve_el_error(self, temp_db, monkeypatch):
+    def testSiFallaYNoHayNadaCacheadoDevuelveElError(self, tempDb, monkeypatch):
         monkeypatch.setattr(
-            benchmark, "fetch_price_series",
+            benchmark, "fetchPriceSeries",
             lambda symbol, desde, hasta, timeout=None: ([], "Yahoo Finance devolvió HTTP 429"),
         )
 
@@ -141,7 +141,7 @@ class TestSerie:
         assert datos is None
         assert error == "Yahoo Finance devolvió HTTP 429"
 
-    def test_solo_devuelve_los_puntos_del_rango_pedido(self, temp_db, yahoo):
+    def testSoloDevuelveLosPuntosDelRangoPedido(self, tempDb, yahoo):
         # La descarga se pide con una semana de margen por delante para que un
         # rango que arranca en festivo tenga cierre con el que empezar, pero
         # ese margen no debe colarse en el gráfico.

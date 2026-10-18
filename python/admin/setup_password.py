@@ -16,16 +16,16 @@ from core import settings
 from core.paths import AUTH_FILE, ENV_FILE
 
 
-def _update_env(key: str, value: str):
+def _updateEnv(key: str, value: str):
     if not ENV_FILE.exists():
         return
     content = ENV_FILE.read_text("utf-8")
     pattern = re.compile(rf"^{re.escape(key)}\s*=.*$", re.MULTILINE)
-    new_line = f"{key}={value}"
+    newLine = f"{key}={value}"
     if pattern.search(content):
-        content = pattern.sub(new_line, content)
+        content = pattern.sub(newLine, content)
     else:
-        content = content.rstrip("\n") + f"\n{new_line}\n"
+        content = content.rstrip("\n") + f"\n{newLine}\n"
     ENV_FILE.write_text(content, "utf-8")
 
 
@@ -41,20 +41,20 @@ def main():
             break
         print("Las contraseñas no coinciden, intenta de nuevo.\n")
 
-    password_hash = generate_password_hash(pwd, method=settings.metodoHashPassword())
-    secret_key    = secrets.token_hex(32)
+    passwordHash = generate_password_hash(pwd, method=settings.metodoHashPassword())
+    secretKey    = secrets.token_hex(32)
 
     AUTH_FILE.parent.mkdir(parents=True, exist_ok=True)
     AUTH_FILE.write_text(
-        json.dumps({"username": username, "password_hash": password_hash}, indent=2),
+        json.dumps({"username": username, "password_hash": passwordHash}, indent=2),
         encoding="utf-8",
     )
 
-    _update_env("SECRET_KEY", secret_key)
+    _updateEnv("SECRET_KEY", secretKey)
 
     print(f"\nListo. Credenciales guardadas en {AUTH_FILE}")
     print(f"  Usuario : {username}")
-    print(f"  Hash    : {password_hash[:40]}…")
+    print(f"  Hash    : {passwordHash[:40]}…")
     print("\nReinicia el servidor para aplicar los cambios.")
 
 

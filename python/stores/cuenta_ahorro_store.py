@@ -13,7 +13,7 @@ los ajustes del portfolio, no en la base de datos.
 La cuenta remunerada de cada cuenta y la cuenta que cobra los dividendos ya no
 están aquí: son de la cuenta, en la base (`cuentas_store`), valen para cualquier
 tipo de cuenta y entran en su saldo. Antes se guardaban en esta configuración,
-por nombre de cuenta; `vinculos_de_config` y `dividendos_de_config` sacan lo
+por nombre de cuenta; `vinculosDeConfig` y `dividendosDeConfig` sacan lo
 antiguo para pasarlo a la base.
 """
 
@@ -26,17 +26,17 @@ from stores.cuentas_store import (
     ID_AHORRO,
     ID_BANCO,
     CuentaInvalida,
-    crear_transferencia,
-    listar_cuentas,
-    movimientos_de_cuenta,
-    normalizar_nombre,
+    crearTransferencia,
+    listarCuentas,
+    movimientosDeCuenta,
+    normalizarNombre,
 )
 
 _MES = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 _MAX_CUENTAS = 61
 
 
-def clave_de_cuenta(cuenta):
+def claveDeCuenta(cuenta):
     """Con qué nombre se guarda la configuración de una cuenta de ahorro.
 
     La principal se guarda con el nombre vacío (así estaba antes de que las
@@ -46,31 +46,31 @@ def clave_de_cuenta(cuenta):
     return "" if cuenta["id"] == ID_AHORRO else cuenta["nombre"]
 
 
-def cuentas_de_ahorro(conn=None):
+def cuentasDeAhorro(conn=None):
     """Las cuentas elegidas como de ahorro, sean del tipo que sean."""
-    return [c for c in listar_cuentas(conn) if c["ahorro"]]
+    return [c for c in listarCuentas(conn) if c["ahorro"]]
 
 
-def buscar_por_clave(clave, conn=None):
+def buscarPorClave(clave, conn=None):
     """La cuenta de ahorro a la que corresponde una clave de configuración."""
-    for cuenta in cuentas_de_ahorro(conn):
-        if clave_de_cuenta(cuenta).lower() == str(clave or "").lower():
+    for cuenta in cuentasDeAhorro(conn):
+        if claveDeCuenta(cuenta).lower() == str(clave or "").lower():
             return cuenta
     return None
 
 
-def listar_movimientos(conn=None):
+def listarMovimientos(conn=None):
     """Los movimientos de todas las cuentas de ahorro, cada uno con su cuenta."""
     movimientos = []
-    for cuenta in cuentas_de_ahorro(conn):
-        for movimiento in movimientos_de_cuenta(cuenta["id"], conn):
+    for cuenta in cuentasDeAhorro(conn):
+        for movimiento in movimientosDeCuenta(cuenta["id"], conn):
             movimientos.append({**movimiento, "cuenta": cuenta["id"], "cuenta_nombre": cuenta["nombre"]})
     return movimientos
 
 
 # ── Configuración por cuenta (vive en los ajustes del portfolio) ────────────
 
-def _importe_canonico(valor):
+def _importeCanonico(valor):
     try:
         numero = aDecimal(valor, "importe")
     except ImporteInvalido:
@@ -78,7 +78,7 @@ def _importe_canonico(valor):
     return aTexto(numero, decimales=2) if numero > 0 else ""
 
 
-def _cuenta_vacia(nombre):
+def _cuentaVacia(nombre):
     return {
         "nombre": nombre,
         "objetivo": "",
@@ -99,7 +99,7 @@ def _entradas(raw):
     }]
 
 
-def vinculos_de_config(raw, conn=None):
+def vinculosDeConfig(raw, conn=None):
     """Los vínculos cuenta ↔ remunerada que guardaba la configuración antigua.
 
     Lista de `(id de cuenta, id de remunerada)`, en el orden en que estaban: si
@@ -112,30 +112,30 @@ def vinculos_de_config(raw, conn=None):
         ids = entrada.get("remuneradas")
         if not isinstance(ids, list) or not ids:
             continue
-        cuenta = buscar_por_clave(normalizar_nombre(entrada.get("nombre")), conn)
+        cuenta = buscarPorClave(normalizarNombre(entrada.get("nombre")), conn)
         if cuenta is None:
             continue
         pares.extend((cuenta["id"], str(rid).strip()) for rid in ids[:100] if str(rid).strip())
     return pares
 
 
-def dividendos_de_config(raw, conn=None):
+def dividendosDeConfig(raw, conn=None):
     """Identificador de la cuenta que tenía marcados los dividendos en la
     configuración antigua, o `None`."""
     for entrada in _entradas(raw)[:_MAX_CUENTAS]:
         if isinstance(entrada, dict) and entrada.get("incluirDividendos"):
-            cuenta = buscar_por_clave(normalizar_nombre(entrada.get("nombre")), conn)
+            cuenta = buscarPorClave(normalizarNombre(entrada.get("nombre")), conn)
             if cuenta is not None:
                 return cuenta["id"]
     return None
 
 
-def normalizar_config(raw):
+def normalizarConfig(raw):
     """Configuración de las cuentas de ahorro, con la forma que guarda y lee todo.
 
     Acepta también la forma antigua, que pasa a ser la cuenta principal. Las
     remuneradas y los dividendos se quitan: viven en la base (ver
-    `vinculos_de_config` y `dividendos_de_config`).
+    `vinculosDeConfig` y `dividendosDeConfig`).
     """
     entradas = _entradas(raw)
 
@@ -144,7 +144,7 @@ def normalizar_config(raw):
     for entrada in entradas[:_MAX_CUENTAS]:
         if not isinstance(entrada, dict):
             continue
-        nombre = normalizar_nombre(entrada.get("nombre"))
+        nombre = normalizarNombre(entrada.get("nombre"))
         if nombre.lower() in vistos:
             continue
         vistos.add(nombre.lower())
@@ -158,23 +158,23 @@ def normalizar_config(raw):
 
         cuentas.append({
             "nombre": nombre,
-            "objetivo": _importe_canonico(entrada.get("objetivo")),
+            "objetivo": _importeCanonico(entrada.get("objetivo")),
             "recurrente": {
                 "activa": bool(rec.get("activa", False)),
-                "importe": _importe_canonico(rec.get("importe")),
+                "importe": _importeCanonico(rec.get("importe")),
                 "dia": dia,
                 "desde": desde if _MES.match(desde) else "",
             },
         })
 
     if "" not in vistos:
-        cuentas.insert(0, _cuenta_vacia(""))
+        cuentas.insert(0, _cuentaVacia(""))
     return {"cuentas": cuentas}
 
 
-def renombrar_en_config(config, de, a):
+def renombrarEnConfig(config, de, a):
     """La configuración con la entrada `de` pasada a llamarse `a`."""
-    normal = normalizar_config(config)
+    normal = normalizarConfig(config)
     for cuenta in normal["cuentas"]:
         if cuenta["nombre"].lower() == str(de or "").lower():
             cuenta["nombre"] = a
@@ -183,12 +183,12 @@ def renombrar_en_config(config, de, a):
 
 # ── Aportación mensual automática ───────────────────────────────────────────
 
-def _mes_siguiente(texto):
+def _mesSiguiente(texto):
     anio, mes = int(texto[:4]), int(texto[5:7])
     return f"{anio + (mes == 12):04d}-{mes % 12 + 1:02d}"
 
 
-def aplicar_recurrentes(config, generado, hoy=None):
+def aplicarRecurrentes(config, generado, hoy=None):
     """Crea las aportaciones mensuales que ya tocan y no se han creado.
 
     Cada aportación es una transferencia desde la cuenta bancaria. `generado`
@@ -200,36 +200,36 @@ def aplicar_recurrentes(config, generado, hoy=None):
     Devuelve (nuevo `generado`, transferencias creadas).
     """
     hoy = hoy or datetime.date.today()
-    mes_actual = f"{hoy.year:04d}-{hoy.month:02d}"
+    mesActual = f"{hoy.year:04d}-{hoy.month:02d}"
     generado = dict(generado or {})
     creados = []
 
-    for entrada in normalizar_config(config)["cuentas"]:
+    for entrada in normalizarConfig(config)["cuentas"]:
         rec = entrada["recurrente"]
         if not (rec["activa"] and rec["importe"] and rec["desde"]):
             continue
-        cuenta = buscar_por_clave(entrada["nombre"])
+        cuenta = buscarPorClave(entrada["nombre"])
         if cuenta is None:
             continue
 
         clave = entrada["nombre"].lower() or "_"
         ultimo = generado.get(clave, "")
-        mes = rec["desde"] if not ultimo else max(rec["desde"], _mes_siguiente(ultimo))
+        mes = rec["desde"] if not ultimo else max(rec["desde"], _mesSiguiente(ultimo))
 
-        while mes <= mes_actual:
+        while mes <= mesActual:
             anio, num = int(mes[:4]), int(mes[5:7])
             dia = min(rec["dia"], calendar.monthrange(anio, num)[1])
             fecha = datetime.date(anio, num, dia)
             if fecha > hoy:
                 break
             try:
-                creados.append(crear_transferencia(
+                creados.append(crearTransferencia(
                     ID_BANCO, cuenta["id"], fecha.strftime("%d-%m-%Y"), rec["importe"],
                     "Ahorro mensual", "Aportación automática",
                 ))
             except CuentaInvalida:
                 break
             generado[clave] = mes
-            mes = _mes_siguiente(mes)
+            mes = _mesSiguiente(mes)
 
     return generado, creados

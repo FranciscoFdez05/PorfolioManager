@@ -25,17 +25,17 @@ from core import actualizacion
 
 log = logging.getLogger(__name__)
 
-actualizacion_bp = Blueprint("actualizacion", __name__)
+actualizacionBp = Blueprint("actualizacion", __name__)
 
 
-@actualizacion_bp.route("/api/actualizacion", methods=["GET"])
-def get_actualizacion():
+@actualizacionBp.route("/api/actualizacion", methods=["GET"])
+def getActualizacion():
     refrescar = request.args.get("refrescar") in ("1", "true", "si")
     return jsonify({"ok": True, **actualizacion.panel(forzarComprobacion=refrescar)})
 
 
-@actualizacion_bp.route("/api/actualizacion", methods=["POST"])
-def post_actualizacion():
+@actualizacionBp.route("/api/actualizacion", methods=["POST"])
+def postActualizacion():
     estado, error = actualizacion.solicitar()
 
     if error:

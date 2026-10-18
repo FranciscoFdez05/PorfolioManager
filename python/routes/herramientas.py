@@ -34,12 +34,12 @@ from flask import Blueprint, jsonify, request
 
 from core.paths import BASE_DIR
 from providers import tradingview_client
-from providers.http import motivo_conexion
+from providers.http import motivoConexion
 from stores import ventas_fifo
 
 log = logging.getLogger(__name__)
 
-herramientas_bp = Blueprint("herramientas", __name__)
+herramientasBp = Blueprint("herramientas", __name__)
 
 # Carpeta que mira este endpoint. Va dentro de html/ y no en data/ porque el
 # navegador tiene que poder descargar los ficheros, y data/ está bloqueado.
@@ -132,7 +132,7 @@ def listar(directorio=None):
     return herramientas
 
 
-@herramientas_bp.route("/api/herramientas-extra", methods=["GET"])
+@herramientasBp.route("/api/herramientas-extra", methods=["GET"])
 def getHerramientasExtra():
     return jsonify({"ok": True, "herramientas": listar()})
 
@@ -145,7 +145,7 @@ def getHerramientasExtra():
 # las ventas de verdad. Esta ruta solo traduce parámetros y errores.
 
 
-@herramientas_bp.route("/api/herramientas/simular-venta", methods=["GET"])
+@herramientasBp.route("/api/herramientas/simular-venta", methods=["GET"])
 def getSimulacionVenta():
     activo = (request.args.get("activo") or "").strip()
     if not activo:
@@ -153,7 +153,7 @@ def getSimulacionVenta():
 
     fecha = (request.args.get("fecha") or "").strip() or date.today().strftime("%d-%m-%Y")
 
-    dato, incidencia = ventas_fifo.simular_venta(
+    dato, incidencia = ventas_fifo.simularVenta(
         activo,
         fecha,
         request.args.get("cantidad", ""),
@@ -165,7 +165,7 @@ def getSimulacionVenta():
         return jsonify({
             "ok": False,
             "codigo": incidencia,
-            "error": ventas_fifo.mensaje_incidencia(incidencia),
+            "error": ventas_fifo.mensajeIncidencia(incidencia),
         }), 400
 
     return jsonify({"ok": True, "simulacion": dato})
@@ -177,18 +177,18 @@ def getSimulacionVenta():
 # que el scanner no publica llega como null y la herramienta pide el valor a mano.
 
 
-@herramientas_bp.route("/api/herramientas/capitalizacion", methods=["GET"])
+@herramientasBp.route("/api/herramientas/capitalizacion", methods=["GET"])
 def getCapitalizacion():
     ticker = (request.args.get("ticker") or "").strip().upper()
     if not ticker:
         return jsonify({"ok": False, "error": "Falta el ticker"}), 400
 
     try:
-        datos = tradingview_client.fetch_capitalizacion([ticker])
+        datos = tradingview_client.fetchCapitalizacion([ticker])
     except HTTPError as error:
         return jsonify({"ok": False, "error": f"TradingView devolvió HTTP {error.code}"}), 503
     except URLError as error:
-        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {motivo_conexion(error, 'TradingView')}"}), 503
+        return jsonify({"ok": False, "error": f"No se pudo conectar con TradingView: {motivoConexion(error, 'TradingView')}"}), 503
 
     dato = datos.get(ticker)
     if not dato or not dato["precio"]:

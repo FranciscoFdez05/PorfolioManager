@@ -15,11 +15,11 @@ import pytest
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, temp_db, monkeypatch):
-    from routes.activos import activos_bp
+def cliente(clienteAutenticado, tempDb, monkeypatch):
+    from routes.activos import activosBp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
-    client, cabeceras, _app = cliente_autenticado(activos_bp)
+    client, cabeceras, _app = clienteAutenticado(activosBp)
     return client, cabeceras
 
 
@@ -30,7 +30,7 @@ def _crear(client, cabeceras, nombre, tipo="acciones", **extra):
 
 # ── Crear ────────────────────────────────────────────────────────────────────
 
-def test_crear_activo_devuelve_201_y_el_payload(cliente):
+def testCrearActivoDevuelve201YElPayload(cliente):
     client, cabeceras = cliente
     respuesta = _crear(client, cabeceras, "Apple", "acciones", marketSymbol="aapl")
 
@@ -42,7 +42,7 @@ def test_crear_activo_devuelve_201_y_el_payload(cliente):
     assert activo["marketSymbol"] == "AAPL"
 
 
-def test_el_nombre_es_obligatorio(cliente):
+def testElNombreEsObligatorio(cliente):
     client, cabeceras = cliente
     respuesta = _crear(client, cabeceras, "   ")
 
@@ -50,14 +50,14 @@ def test_el_nombre_es_obligatorio(cliente):
     assert respuesta.get_json()["ok"] is False
 
 
-def test_un_tipo_de_activo_invalido_se_rechaza(cliente):
+def testUnTipoDeActivoInvalidoSeRechaza(cliente):
     client, cabeceras = cliente
     respuesta = _crear(client, cabeceras, "Algo", tipo="inventado")
 
     assert respuesta.status_code == 400
 
 
-def test_no_se_puede_crear_dos_veces_el_mismo_activo(cliente):
+def testNoSePuedeCrearDosVecesElMismoActivo(cliente):
     client, cabeceras = cliente
     _crear(client, cabeceras, "Apple")
     respuesta = _crear(client, cabeceras, "Apple")
@@ -65,7 +65,7 @@ def test_no_se_puede_crear_dos_veces_el_mismo_activo(cliente):
     assert respuesta.status_code == 409
 
 
-def test_dos_nombres_que_producen_el_mismo_id_colisionan(cliente):
+def testDosNombresQueProducenElMismoIdColisionan(cliente):
     """El id sale de slugify(nombre): "Apple Inc." y "apple-inc" son el mismo.
 
     Se prueba porque es sorprendente y determina el 409: si algún día slugify
@@ -79,7 +79,7 @@ def test_dos_nombres_que_producen_el_mismo_id_colisionan(cliente):
     assert segundo.status_code == 409
 
 
-def test_los_activos_se_crean_al_final_del_orden(cliente):
+def testLosActivosSeCreanAlFinalDelOrden(cliente):
     client, cabeceras = cliente
     for nombre in ("Uno", "Dos", "Tres"):
         _crear(client, cabeceras, nombre)
@@ -88,7 +88,7 @@ def test_los_activos_se_crean_al_final_del_orden(cliente):
     assert ordenes == sorted(ordenes)
 
 
-def test_un_color_manipulado_no_llega_al_html(cliente):
+def testUnColorManipuladoNoLlegaAlHtml(cliente):
     """El color se inyecta en un atributo style del frontend."""
     client, cabeceras = cliente
     respuesta = _crear(client, cabeceras, "Apple", color="red; background: url(javascript:alert(1))")
@@ -98,17 +98,17 @@ def test_un_color_manipulado_no_llega_al_html(cliente):
 
 # ── Leer ─────────────────────────────────────────────────────────────────────
 
-def test_listar_sin_activos_devuelve_una_lista_vacia(cliente):
+def testListarSinActivosDevuelveUnaListaVacia(cliente):
     client, _cabeceras = cliente
     assert client.get("/api/activos").get_json()["assets"] == []
 
 
-def test_leer_un_activo_inexistente_es_404(cliente):
+def testLeerUnActivoInexistenteEs404(cliente):
     client, _cabeceras = cliente
     assert client.get("/api/activos/no-existe").status_code == 404
 
 
-def test_leer_un_activo_devuelve_su_ficha(cliente):
+def testLeerUnActivoDevuelveSuFicha(cliente):
     client, cabeceras = cliente
     _crear(client, cabeceras, "Apple", marketSymbol="AAPL")
 
@@ -121,7 +121,7 @@ def test_leer_un_activo_devuelve_su_ficha(cliente):
 
 # ── Guardar ──────────────────────────────────────────────────────────────────
 
-def test_guardar_una_ficha_persiste_las_filas(cliente):
+def testGuardarUnaFichaPersisteLasFilas(cliente):
     client, cabeceras = cliente
     _crear(client, cabeceras, "Apple")
     ficha = client.get("/api/activos/apple").get_json()
@@ -140,7 +140,7 @@ def test_guardar_una_ficha_persiste_las_filas(cliente):
     assert guardado["rows"][0]["participaciones"] == "10"
 
 
-def test_guardar_sin_operationRows_no_borra_las_que_ya_habia(cliente):
+def testGuardarSinOperationRowsNoBorraLasQueYaHabia(cliente):
     """El formulario de la ficha no envía las operaciones de cripto.
 
     Sin esta salvaguarda, guardar cualquier cambio en la ficha se llevaba por
@@ -155,13 +155,13 @@ def test_guardar_sin_operationRows_no_borra_las_que_ya_habia(cliente):
     }]
     client.post("/api/activos/bitcoin", json=ficha, headers=cabeceras)
 
-    sin_operaciones = {k: v for k, v in ficha.items() if k != "operationRows"}
-    client.post("/api/activos/bitcoin", json=sin_operaciones, headers=cabeceras)
+    sinOperaciones = {k: v for k, v in ficha.items() if k != "operationRows"}
+    client.post("/api/activos/bitcoin", json=sinOperaciones, headers=cabeceras)
 
     assert len(client.get("/api/activos/bitcoin").get_json()["operationRows"]) == 1
 
 
-def test_editar_la_cabecera_sin_mandar_las_filas_no_borra_el_historico(cliente):
+def testEditarLaCabeceraSinMandarLasFilasNoBorraElHistorico(cliente):
     """Renombrar o cambiar el color no puede llevarse las compras por delante.
 
     Guardar reescribe el activo entero, así que un cuerpo sin `rows` las
@@ -174,9 +174,9 @@ def test_editar_la_cabecera_sin_mandar_las_filas_no_borra_el_historico(cliente):
     ficha["rows"] = [{"fechaOperacion": "10-01-2026", "participaciones": "10"}]
     client.post("/api/activos/apple", json=ficha, headers=cabeceras)
 
-    solo_cabecera = {k: v for k, v in ficha.items() if k not in ("rows", "conversionRows")}
-    solo_cabecera["color"] = "#242222"
-    respuesta = client.post("/api/activos/apple", json=solo_cabecera, headers=cabeceras)
+    soloCabecera = {k: v for k, v in ficha.items() if k not in ("rows", "conversionRows")}
+    soloCabecera["color"] = "#242222"
+    respuesta = client.post("/api/activos/apple", json=soloCabecera, headers=cabeceras)
 
     assert respuesta.status_code == 200
     guardado = client.get("/api/activos/apple").get_json()
@@ -184,7 +184,7 @@ def test_editar_la_cabecera_sin_mandar_las_filas_no_borra_el_historico(cliente):
     assert len(guardado["rows"]) == 1, "las compras no se mandaron, así que no se tocan"
 
 
-def test_mandar_las_filas_vacias_sigue_vaciandolas(cliente):
+def testMandarLasFilasVaciasSigueVaciandolas(cliente):
     """Borrar la última fila desde la tabla tiene que seguir funcionando.
 
     Es la diferencia entre "no mando las filas" y "mando que no hay ninguna":
@@ -204,7 +204,7 @@ def test_mandar_las_filas_vacias_sigue_vaciandolas(cliente):
 
 # ── Reordenar ────────────────────────────────────────────────────────────────
 
-def test_reordenar_con_la_lista_completa(cliente):
+def testReordenarConLaListaCompleta(cliente):
     client, cabeceras = cliente
     for nombre in ("Uno", "Dos", "Tres"):
         _crear(client, cabeceras, nombre)
@@ -217,7 +217,7 @@ def test_reordenar_con_la_lista_completa(cliente):
     assert ids == ["tres", "uno", "dos"]
 
 
-def test_una_lista_de_orden_incompleta_se_rechaza(cliente):
+def testUnaListaDeOrdenIncompletaSeRechaza(cliente):
     """Aceptarla dejaría fuera del orden a los activos que faltasen."""
     client, cabeceras = cliente
     for nombre in ("Uno", "Dos"):
@@ -229,7 +229,7 @@ def test_una_lista_de_orden_incompleta_se_rechaza(cliente):
     assert respuesta.status_code == 400
 
 
-def test_mover_un_activo_hacia_arriba(cliente):
+def testMoverUnActivoHaciaArriba(cliente):
     client, cabeceras = cliente
     for nombre in ("Uno", "Dos"):
         _crear(client, cabeceras, nombre)
@@ -241,7 +241,7 @@ def test_mover_un_activo_hacia_arriba(cliente):
     assert ids == ["dos", "uno"]
 
 
-def test_mover_el_primero_hacia_arriba_no_hace_nada(cliente):
+def testMoverElPrimeroHaciaArribaNoHaceNada(cliente):
     client, cabeceras = cliente
     for nombre in ("Uno", "Dos"):
         _crear(client, cabeceras, nombre)
@@ -258,7 +258,7 @@ def test_mover_el_primero_hacia_arriba_no_hace_nada(cliente):
     ({"assetId": "uno", "direction": "lateral"}, 400),  # dirección inventada
     ({"assetId": "no-existe", "direction": "up"}, 404),
 ])
-def test_reordenar_con_datos_incoherentes(cliente, cuerpo, codigo):
+def testReordenarConDatosIncoherentes(cliente, cuerpo, codigo):
     client, cabeceras = cliente
     _crear(client, cabeceras, "Uno")
 
@@ -267,7 +267,7 @@ def test_reordenar_con_datos_incoherentes(cliente, cuerpo, codigo):
 
 # ── Borrar ───────────────────────────────────────────────────────────────────
 
-def test_borrar_un_activo(cliente):
+def testBorrarUnActivo(cliente):
     client, cabeceras = cliente
     _crear(client, cabeceras, "Apple")
 
@@ -275,14 +275,14 @@ def test_borrar_un_activo(cliente):
     assert client.get("/api/activos/apple").status_code == 404
 
 
-def test_borrar_un_activo_inexistente_es_404(cliente):
+def testBorrarUnActivoInexistenteEs404(cliente):
     client, cabeceras = cliente
     assert client.delete("/api/activos/no-existe", headers=cabeceras).status_code == 404
 
 
 # ── Moneda ───────────────────────────────────────────────────────────────────
 
-def test_cambiar_a_la_misma_moneda_no_convierte_nada(cliente):
+def testCambiarALaMismaMonedaNoConvierteNada(cliente):
     """Y, sobre todo, no llama al proveedor de tipos de cambio."""
     client, cabeceras = cliente
     _crear(client, cabeceras, "Apple")
@@ -294,7 +294,7 @@ def test_cambiar_a_la_misma_moneda_no_convierte_nada(cliente):
     assert respuesta.get_json()["converted"] is False
 
 
-def test_una_moneda_no_soportada_se_rechaza_sin_salir_a_la_red(cliente):
+def testUnaMonedaNoSoportadaSeRechazaSinSalirALaRed(cliente):
     client, cabeceras = cliente
     _crear(client, cabeceras, "Apple")
 
@@ -305,14 +305,14 @@ def test_una_moneda_no_soportada_se_rechaza_sin_salir_a_la_red(cliente):
     assert "Moneda no soportada" in respuesta.get_json()["error"]
 
 
-def test_cambiar_la_moneda_de_un_activo_inexistente_es_404(cliente):
+def testCambiarLaMonedaDeUnActivoInexistenteEs404(cliente):
     client, cabeceras = cliente
     respuesta = client.post("/api/activos/no-existe/currency", json={"currency": "USD"},
                             headers=cabeceras)
     assert respuesta.status_code == 404
 
 
-def test_refrescar_un_activo_inexistente_es_404(cliente):
+def testRefrescarUnActivoInexistenteEs404(cliente):
     client, cabeceras = cliente
     respuesta = client.post("/api/activos/no-existe/refresh-market-data", headers=cabeceras)
     assert respuesta.status_code == 404
@@ -326,7 +326,7 @@ def _cotizacion(symbol, price, currency):
     }
 
 
-def test_refrescar_convierte_a_la_divisa_del_activo(cliente, monkeypatch):
+def testRefrescarConvierteALaDivisaDelActivo(cliente, monkeypatch):
     """Un ticker en USD sobre un activo en EUR se guarda en EUR.
 
     La divisa del activo es también la de lo invertido y el rendimiento resta
@@ -341,11 +341,11 @@ def test_refrescar_convierte_a_la_divisa_del_activo(cliente, monkeypatch):
 
     llamadas = []
 
-    def fake_fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=None):
-        llamadas.append((symbol, provider, target_currency))
-        return _cotizacion(symbol, "3789,52", target_currency), None
+    def fakeFetchAssetQuote(symbol, provider=None, useCache=True, targetCurrency=None):
+        llamadas.append((symbol, provider, targetCurrency))
+        return _cotizacion(symbol, "3789,52", targetCurrency), None
 
-    monkeypatch.setattr(activos_route, "fetch_asset_quote", fake_fetch_asset_quote)
+    monkeypatch.setattr(activos_route, "fetchAssetQuote", fakeFetchAssetQuote)
 
     respuesta = client.post("/api/activos/oro/refresh-market-data", headers=cabeceras)
 
@@ -356,8 +356,8 @@ def test_refrescar_convierte_a_la_divisa_del_activo(cliente, monkeypatch):
     assert activo["price"] == "3789,52"
 
 
-def test_refrescar_sin_tipo_de_cambio_no_guarda_un_precio_en_otra_divisa(cliente, monkeypatch):
-    """Si la conversión falla, `fetch_asset_quote` devuelve la cotización en su
+def testRefrescarSinTipoDeCambioNoGuardaUnPrecioEnOtraDivisa(cliente, monkeypatch):
+    """Si la conversión falla, `fetchAssetQuote` devuelve la cotización en su
     divisa original. Guardarla sería poner 4321 dólares con la etiqueta de
     euros; se rechaza y el precio anterior se queda como estaba."""
     import routes.activos as activos_route
@@ -367,8 +367,8 @@ def test_refrescar_sin_tipo_de_cambio_no_guarda_un_precio_en_otra_divisa(cliente
     antes = client.get("/api/activos/oro", headers=cabeceras).get_json()
 
     monkeypatch.setattr(
-        activos_route, "fetch_asset_quote",
-        lambda symbol, provider=None, use_cache=True, target_currency=None: (
+        activos_route, "fetchAssetQuote",
+        lambda symbol, provider=None, useCache=True, targetCurrency=None: (
             _cotizacion(symbol, "4321,20", "USD"), None
         ),
     )
@@ -381,7 +381,7 @@ def test_refrescar_sin_tipo_de_cambio_no_guarda_un_precio_en_otra_divisa(cliente
     assert despues["currency"] == "EUR"
 
 
-def test_el_autoguardado_no_borra_convert_currency_ni_hidden(cliente):
+def testElAutoguardadoNoBorraConvertCurrencyNiHidden(cliente):
     """El autoguardado de la ficha reenvía el activo sin estas dos claves."""
     client, cabeceras = cliente
     _crear(client, cabeceras, "Oro", tipo="comoditis")
@@ -397,7 +397,7 @@ def test_el_autoguardado_no_borra_convert_currency_ni_hidden(cliente):
     assert activo["hidden"] is True
 
 
-def test_cambiar_la_moneda_del_activo_arrastra_convert_currency(cliente, monkeypatch):
+def testCambiarLaMonedaDelActivoArrastraConvertCurrency(cliente, monkeypatch):
     """Si la divisa fijada y la del activo se separaran, el siguiente refresco
     guardaría el precio en una y las compras seguirían en la otra."""
     from decimal import Decimal
@@ -409,9 +409,9 @@ def test_cambiar_la_moneda_del_activo_arrastra_convert_currency(cliente, monkeyp
     client.post("/api/activos/oro", json={
         "name": "Oro", "type": "comoditis", "convertCurrency": "EUR", "rows": []
     }, headers=cabeceras)
-    monkeypatch.setattr(activos_route, "convert_amount",
+    monkeypatch.setattr(activos_route, "convertAmount",
                         lambda valor, origen, destino: (Decimal(valor) * Decimal("1.14"), None))
-    monkeypatch.setattr(activos_route, "convert_asset_rows_currency",
+    monkeypatch.setattr(activos_route, "convertAssetRowsCurrency",
                         lambda filas, *args, **kwargs: (filas, None))
 
     respuesta = client.post("/api/activos/oro/currency", json={"currency": "USD"}, headers=cabeceras)
@@ -424,19 +424,19 @@ def test_cambiar_la_moneda_del_activo_arrastra_convert_currency(cliente, monkeyp
 
 # ── Rendimiento agregado ─────────────────────────────────────────────────────
 
-def _ficha_con_filas(client, cabeceras, nombre, precio, filas, tipo="acciones"):
+def _fichaConFilas(client, cabeceras, nombre, precio, filas, tipo="acciones"):
     _crear(client, cabeceras, nombre, tipo=tipo)
-    asset_id = nombre.lower()
-    ficha = client.get(f"/api/activos/{asset_id}").get_json()
+    assetId = nombre.lower()
+    ficha = client.get(f"/api/activos/{assetId}").get_json()
     ficha["price"] = precio
     ficha["rows"] = filas
-    client.post(f"/api/activos/{asset_id}", json=ficha, headers=cabeceras)
-    return asset_id
+    client.post(f"/api/activos/{assetId}", json=ficha, headers=cabeceras)
+    return assetId
 
 
-def test_el_rendimiento_descuenta_las_comisiones_del_invertido(cliente):
+def testElRendimientoDescuentaLasComisionesDelInvertido(cliente):
     client, cabeceras = cliente
-    asset_id = _ficha_con_filas(client, cabeceras, "Apple", "120", [{
+    assetId = _fichaConFilas(client, cabeceras, "Apple", "120", [{
         "fechaOperacion": "10-01-2026",
         "tipoOperacion": "Compra",
         "participaciones": "10",
@@ -444,7 +444,7 @@ def test_el_rendimiento_descuenta_las_comisiones_del_invertido(cliente):
         "comisiones": "50",
     }])
 
-    datos = client.get("/api/activos/rendimiento-batch").get_json()[asset_id]
+    datos = client.get("/api/activos/rendimiento-batch").get_json()[assetId]
 
     # Invertido neto = 1000 bruto - 50 de comisiones.
     assert datos["invertidoNeto"] == 950.0
@@ -453,55 +453,55 @@ def test_el_rendimiento_descuenta_las_comisiones_del_invertido(cliente):
     assert datos["rendimientoPct"] == pytest.approx(26.32, abs=0.01)
 
 
-def test_una_venta_reduce_las_participaciones_pero_no_lo_invertido(cliente):
+def testUnaVentaReduceLasParticipacionesPeroNoLoInvertido(cliente):
     client, cabeceras = cliente
-    asset_id = _ficha_con_filas(client, cabeceras, "Apple", "100", [
+    assetId = _fichaConFilas(client, cabeceras, "Apple", "100", [
         {"fechaOperacion": "10-01-2026", "tipoOperacion": "Compra",
          "participaciones": "10", "capitalInvertidoBruto": "1000"},
         {"fechaOperacion": "11-01-2026", "tipoOperacion": "Venta",
          "participaciones": "4", "capitalInvertidoBruto": "500"},
     ])
 
-    datos = client.get("/api/activos/rendimiento-batch").get_json()[asset_id]
+    datos = client.get("/api/activos/rendimiento-batch").get_json()[assetId]
 
     assert datos["netoActual"] == 600.0     # quedan 6 participaciones a 100
     assert datos["invertidoNeto"] == 1000.0
 
 
-def test_vender_mas_de_lo_que_hay_no_produce_un_valor_negativo(cliente):
+def testVenderMasDeLoQueHayNoProduceUnValorNegativo(cliente):
     """Un descuadre en los datos no debe pintar una cartera en negativo."""
     client, cabeceras = cliente
-    asset_id = _ficha_con_filas(client, cabeceras, "Apple", "100", [
+    assetId = _fichaConFilas(client, cabeceras, "Apple", "100", [
         {"fechaOperacion": "10-01-2026", "tipoOperacion": "Compra",
          "participaciones": "5", "capitalInvertidoBruto": "500"},
         {"fechaOperacion": "11-01-2026", "tipoOperacion": "Venta",
          "participaciones": "50", "capitalInvertidoBruto": "5000"},
     ])
 
-    datos = client.get("/api/activos/rendimiento-batch").get_json()[asset_id]
+    datos = client.get("/api/activos/rendimiento-batch").get_json()[assetId]
 
     assert datos["netoActual"] == 0.0
 
 
-def test_sin_invertido_el_porcentaje_es_cero_y_no_divide_por_cero(cliente):
+def testSinInvertidoElPorcentajeEsCeroYNoDividePorCero(cliente):
     client, cabeceras = cliente
-    asset_id = _ficha_con_filas(client, cabeceras, "Apple", "100", [])
+    assetId = _fichaConFilas(client, cabeceras, "Apple", "100", [])
 
-    datos = client.get("/api/activos/rendimiento-batch").get_json()[asset_id]
+    datos = client.get("/api/activos/rendimiento-batch").get_json()[assetId]
 
     assert datos["rendimientoPct"] == 0
     assert datos["invertidoNeto"] == 0
 
 
-def test_los_importes_se_leen_en_formato_espaniol(cliente):
+def testLosImportesSeLeenEnFormatoEspaniol(cliente):
     """El frontend guarda "1.234,56": leerlo como float daría 1,234."""
     client, cabeceras = cliente
-    asset_id = _ficha_con_filas(client, cabeceras, "Apple", "1.500,00", [{
+    assetId = _fichaConFilas(client, cabeceras, "Apple", "1.500,00", [{
         "fechaOperacion": "10-01-2026", "tipoOperacion": "Compra",
         "participaciones": "1", "capitalInvertidoBruto": "1.234,56",
     }])
 
-    datos = client.get("/api/activos/rendimiento-batch").get_json()[asset_id]
+    datos = client.get("/api/activos/rendimiento-batch").get_json()[assetId]
 
     assert datos["invertidoNeto"] == 1234.56
     assert datos["netoActual"] == 1500.0
@@ -509,36 +509,36 @@ def test_los_importes_se_leen_en_formato_espaniol(cliente):
 
 # ── Sesión ───────────────────────────────────────────────────────────────────
 
-def test_los_activos_no_se_leen_sin_sesion(crear_app, temp_db):
-    from routes.activos import activos_bp
+def testLosActivosNoSeLeenSinSesion(crearApp, tempDb):
+    from routes.activos import activosBp
 
-    client = crear_app(activos_bp).test_client()
+    client = crearApp(activosBp).test_client()
     assert client.get("/api/activos").status_code == 401
 
 
-def test_borrar_un_activo_sin_csrf_es_403(cliente_autenticado, temp_db):
-    from routes.activos import activos_bp
+def testBorrarUnActivoSinCsrfEs403(clienteAutenticado, tempDb):
+    from routes.activos import activosBp
 
-    client, _cabeceras, _app = cliente_autenticado(activos_bp)
+    client, _cabeceras, _app = clienteAutenticado(activosBp)
     assert client.delete("/api/activos/apple").status_code == 403
 
 
 # ── Divisas del selector ─────────────────────────────────────────────────────
 
 @pytest.fixture
-def cliente_mercado(cliente_autenticado, monkeypatch):
-    from routes.market import market_bp
+def clienteMercado(clienteAutenticado, monkeypatch):
+    from routes.market import marketBp
 
-    client, cabeceras, _app = cliente_autenticado(market_bp)
+    client, cabeceras, _app = clienteAutenticado(marketBp)
     return client, cabeceras
 
 
-def test_las_divisas_salen_del_servicio_de_cambio(cliente_mercado, monkeypatch):
+def testLasDivisasSalenDelServicioDeCambio(clienteMercado, monkeypatch):
     """Se ofrecen las del activo que el servicio publica, con su nombre."""
     import routes.market as market_route
 
-    client, cabeceras = cliente_mercado
-    monkeypatch.setattr(market_route, "fetch_currencies", lambda: (
+    client, cabeceras = clienteMercado
+    monkeypatch.setattr(market_route, "fetchCurrencies", lambda: (
         {"EUR": "Euro", "USD": "United States Dollar", "SEK": "Swedish Krona"}, None
     ))
 
@@ -552,11 +552,11 @@ def test_las_divisas_salen_del_servicio_de_cambio(cliente_mercado, monkeypatch):
     ]
 
 
-def test_sin_servicio_de_cambio_se_ofrecen_las_del_activo(cliente_mercado, monkeypatch):
+def testSinServicioDeCambioSeOfrecenLasDelActivo(clienteMercado, monkeypatch):
     import routes.market as market_route
 
-    client, cabeceras = cliente_mercado
-    monkeypatch.setattr(market_route, "fetch_currencies",
+    client, cabeceras = clienteMercado
+    monkeypatch.setattr(market_route, "fetchCurrencies",
                         lambda: (None, "No se pudo conectar al servicio de cambio de divisa"))
 
     respuesta = client.get("/api/divisas", headers=cabeceras).get_json()
@@ -565,19 +565,19 @@ def test_sin_servicio_de_cambio_se_ofrecen_las_del_activo(cliente_mercado, monke
     assert "aviso" in respuesta
 
 
-def test_tipos_de_cambio_para_ajustes(cliente_mercado, monkeypatch):
+def testTiposDeCambioParaAjustes(clienteMercado, monkeypatch):
     import routes.market as market_route
 
-    client, cabeceras = cliente_mercado
+    client, cabeceras = clienteMercado
     pedidos = []
 
-    def fake_rates(base, targets, timeout=None):
+    def fakeRates(base, targets, timeout=None):
         pedidos.append((base, list(targets)))
         return {"rates": {"USD": 1.14, "GBP": 0.86}, "fuente": "Frankfurter (referencia diaria del BCE)",
                 "fecha": "2026-09-25"}, None
 
-    monkeypatch.setattr(market_route, "fetch_exchange_rates", fake_rates)
-    monkeypatch.setattr(market_route, "fetch_currencies", lambda: ({"USD": "United States Dollar"}, None))
+    monkeypatch.setattr(market_route, "fetchExchangeRates", fakeRates)
+    monkeypatch.setattr(market_route, "fetchCurrencies", lambda: ({"USD": "United States Dollar"}, None))
 
     datos = client.get("/api/divisas/cambio?base=eur", headers=cabeceras).get_json()
 
@@ -589,11 +589,11 @@ def test_tipos_de_cambio_para_ajustes(cliente_mercado, monkeypatch):
     assert {"code": "USD", "name": "United States Dollar", "rate": 1.14} in datos["cambios"]
 
 
-def test_tipos_de_cambio_sin_servicio_responde_503(cliente_mercado, monkeypatch):
+def testTiposDeCambioSinServicioResponde503(clienteMercado, monkeypatch):
     import routes.market as market_route
 
-    client, cabeceras = cliente_mercado
-    monkeypatch.setattr(market_route, "fetch_exchange_rates",
+    client, cabeceras = clienteMercado
+    monkeypatch.setattr(market_route, "fetchExchangeRates",
                         lambda base, targets, timeout=None: (None, "No se pudo conectar al servicio de cambio de divisa"))
 
     respuesta = client.get("/api/divisas/cambio?base=EUR", headers=cabeceras)

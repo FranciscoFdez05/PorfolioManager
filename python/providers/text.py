@@ -9,36 +9,36 @@ _NON_ALNUM_UPPER = re.compile(r"[^A-Za-z0-9]+")
 _NULL_TOKENS = {"NA", "N/A", "NONE", "NULL", "-", "--"}
 
 
-def normalize_text(value) -> str:
+def normalizeText(value) -> str:
     """Texto en minúsculas sin nada que no sea alfanumérico (para comparar)."""
     return _NON_ALNUM_LOWER.sub("", str(value or "").lower())
 
 
-def compact_symbol(value) -> str:
+def compactSymbol(value) -> str:
     """Símbolo en mayúsculas sin separadores: BTC-USD y BTC/USD → BTCUSD."""
     return _NON_ALNUM_UPPER.sub("", str(value or "").upper())
 
 
-def format_decimal(value, digits=2) -> str:
+def formatDecimal(value, digits=2) -> str:
     """Número con coma decimal (formato español).
 
     Acepta cadenas además de números: las versiones duplicadas hacían
     `f"{value:.2f}"` directamente y reventaban con TypeError si el proveedor
     devolvía el precio como texto, que es justo lo que hace EODHD a veces.
     """
-    number = safe_float(value, fallback=None)
+    number = safeFloat(value, fallback=None)
     if number is None:
         number = 0.0
     return f"{number:.{digits}f}".replace(".", ",")
 
 
-def format_percent(value, digits=2) -> str:
-    number = safe_float(value, fallback=0.0)
+def formatPercent(value, digits=2) -> str:
+    number = safeFloat(value, fallback=0.0)
     sign = "+" if number >= 0 else ""
-    return f"{sign}{format_decimal(number, digits)}%"
+    return f"{sign}{formatDecimal(number, digits)}%"
 
 
-def safe_float(value, fallback=0.0):
+def safeFloat(value, fallback=0.0):
     """float() tolerante: acepta '1.234,56', '3,5%', 'N/A' y None."""
     if isinstance(value, bool):
         return fallback

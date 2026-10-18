@@ -14,10 +14,10 @@ lo refuerza con una clave foránea.
 
 from flask import Blueprint, jsonify
 
-from core.validation import as_rows, as_text, json_body, one_of
-from stores.planes_store import read_planes, write_planes
+from core.validation import asRows, asText, jsonBody, oneOf
+from stores.planes_store import readPlanes, writePlanes
 
-planes_bp = Blueprint("planes", __name__)
+planesBp = Blueprint("planes", __name__)
 
 _HORIZONTES = {"Corto", "Medio", "Largo"}
 _ESTADOS_PLAN = {"Pendiente", "En curso", "Cumplido", "Cancelado"}
@@ -31,7 +31,7 @@ _MAX_IMPORTE = 32
 
 
 def _identificador(fila, indice, prefijo):
-    return as_text(fila.get("id"), "id", max_length=64) or f"{prefijo}-{indice + 1}"
+    return asText(fila.get("id"), "id", maxLength=64) or f"{prefijo}-{indice + 1}"
 
 
 def _mercado(fila):
@@ -44,38 +44,38 @@ def _mercado(fila):
     gráfico.
     """
     return {
-        "assetId":        as_text(fila.get("assetId"), "assetId", max_length=120, required=True),
-        "symbol":         as_text(fila.get("symbol"), "symbol", max_length=40).upper(),
-        "ticker":         as_text(fila.get("ticker"), "ticker", max_length=80).upper(),
-        "marketProvider": as_text(fila.get("marketProvider"), "marketProvider", max_length=40).lower(),
-        "tvSymbol":       as_text(fila.get("tvSymbol"), "tvSymbol", max_length=120),
-        "currency":       as_text(fila.get("currency"), "currency", max_length=10).upper() or "EUR",
+        "assetId":        asText(fila.get("assetId"), "assetId", maxLength=120, required=True),
+        "symbol":         asText(fila.get("symbol"), "symbol", maxLength=40).upper(),
+        "ticker":         asText(fila.get("ticker"), "ticker", maxLength=80).upper(),
+        "marketProvider": asText(fila.get("marketProvider"), "marketProvider", maxLength=40).lower(),
+        "tvSymbol":       asText(fila.get("tvSymbol"), "tvSymbol", maxLength=120),
+        "currency":       asText(fila.get("currency"), "currency", maxLength=10).upper() or "EUR",
     }
 
 
-def _sanear_plan(fila, indice):
+def _sanearPlan(fila, indice):
     return {
         **_mercado(fila),
         "id":            _identificador(fila, indice, "plan"),
-        "nombre":        as_text(fila.get("nombre"), "nombre", max_length=_MAX_NOMBRE),
-        "precioEntrada": as_text(fila.get("precioEntrada"), "precioEntrada", max_length=_MAX_IMPORTE),
-        "precioSalida":  as_text(fila.get("precioSalida"), "precioSalida", max_length=_MAX_IMPORTE),
-        "capital":       as_text(fila.get("capital"), "capital", max_length=_MAX_IMPORTE),
-        "horizonte":     one_of(fila.get("horizonte"), _HORIZONTES, "horizonte", default="Medio"),
-        "estado":        one_of(fila.get("estado"), _ESTADOS_PLAN, "estado", default="Pendiente"),
-        "fechaObjetivo": as_text(fila.get("fechaObjetivo"), "fechaObjetivo", max_length=20),
-        "notas":         as_text(fila.get("notas"), "notas", max_length=_MAX_NOTAS),
+        "nombre":        asText(fila.get("nombre"), "nombre", maxLength=_MAX_NOMBRE),
+        "precioEntrada": asText(fila.get("precioEntrada"), "precioEntrada", maxLength=_MAX_IMPORTE),
+        "precioSalida":  asText(fila.get("precioSalida"), "precioSalida", maxLength=_MAX_IMPORTE),
+        "capital":       asText(fila.get("capital"), "capital", maxLength=_MAX_IMPORTE),
+        "horizonte":     oneOf(fila.get("horizonte"), _HORIZONTES, "horizonte", default="Medio"),
+        "estado":        oneOf(fila.get("estado"), _ESTADOS_PLAN, "estado", default="Pendiente"),
+        "fechaObjetivo": asText(fila.get("fechaObjetivo"), "fechaObjetivo", maxLength=20),
+        "notas":         asText(fila.get("notas"), "notas", maxLength=_MAX_NOTAS),
     }
 
 
-@planes_bp.route("/api/planes", methods=["GET"])
+@planesBp.route("/api/planes", methods=["GET"])
 def getPlanes():
-    return jsonify(read_planes())
+    return jsonify(readPlanes())
 
 
-@planes_bp.route("/api/planes", methods=["POST"])
+@planesBp.route("/api/planes", methods=["POST"])
 def savePlanes():
-    filas = as_rows(json_body().get("rows"), "rows", max_rows=500)
-    saneadas = [_sanear_plan(fila, indice) for indice, fila in enumerate(filas)]
-    write_planes(saneadas)
+    filas = asRows(jsonBody().get("rows"), "rows", maxRows=500)
+    saneadas = [_sanearPlan(fila, indice) for indice, fila in enumerate(filas)]
+    writePlanes(saneadas)
     return jsonify({"ok": True, "rows": saneadas})

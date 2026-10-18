@@ -43,7 +43,7 @@ def _dia(ts):
     return datetime.date.fromtimestamp(ts)
 
 
-def serie_diaria(snaps):
+def serieDiaria(snaps):
     """Un punto por día: el último snapshot de cada jornada.
 
     El histórico guarda un punto cada pocos minutos. Sin colapsarlo, la
@@ -51,7 +51,7 @@ def serie_diaria(snaps):
     usuario tenga puesto en Ajustes, que es lo último que debería influir en
     una métrica de riesgo).
     """
-    por_dia = {}
+    porDia = {}
     for punto in snaps:
         try:
             ts = int(punto["ts"])
@@ -62,11 +62,11 @@ def serie_diaria(snaps):
         if not (math.isfinite(valor) and math.isfinite(invertido)):
             continue
         dia = _dia(ts)
-        anterior = por_dia.get(dia)
+        anterior = porDia.get(dia)
         if anterior is None or ts >= anterior["ts"]:
-            por_dia[dia] = {"ts": ts, "dia": dia, "v": valor, "i": invertido}
+            porDia[dia] = {"ts": ts, "dia": dia, "v": valor, "i": invertido}
 
-    return [por_dia[d] for d in sorted(por_dia)]
+    return [porDia[d] for d in sorted(porDia)]
 
 
 def _subperiodos(serie):
@@ -98,7 +98,7 @@ def _subperiodos(serie):
     return tramos
 
 
-def indice_twr(serie):
+def indiceTwr(serie):
     """Índice encadenado base 100: cuánto valdrían 100 € invertidos al inicio.
 
     Es la serie que se compara con un índice de bolsa y sobre la que se miden
@@ -116,7 +116,7 @@ def indice_twr(serie):
 
 def twr(serie):
     """Rentabilidad time-weighted total y anualizada, en tanto por uno."""
-    puntos = indice_twr(serie)
+    puntos = indiceTwr(serie)
     if len(puntos) < 2:
         return {"total": None, "anual": None, "dias": 0}
 
@@ -130,7 +130,7 @@ def twr(serie):
 
 # ── XIRR ───────────────────────────────────────────────────────────────────
 
-def flujos_de_caja(serie):
+def flujosDeCaja(serie):
     """Flujos con fecha, vistos desde el bolsillo del inversor.
 
     Negativo lo que sale (la cartera inicial y cada aportación), positivo lo
@@ -151,10 +151,10 @@ def flujos_de_caja(serie):
     return flujos
 
 
-def _van(flujos, tasa, ts_base):
+def _van(flujos, tasa, tsBase):
     total = 0.0
     for flujo in flujos:
-        anios = (flujo["ts"] - ts_base) / (DIAS_ANIO * 86400)
+        anios = (flujo["ts"] - tsBase) / (DIAS_ANIO * 86400)
         total += flujo["importe"] / (1 + tasa) ** anios
     return total
 
@@ -174,15 +174,15 @@ def xirr(flujos):
     if not (any(f["importe"] > 0 for f in flujos) and any(f["importe"] < 0 for f in flujos)):
         return None
 
-    ts_base = flujos[0]["ts"]
+    tsBase = flujos[0]["ts"]
     # -99,99 %: por debajo, el descuento se dispara y no aporta información.
     baja, alta = -0.9999, 1.0
-    van_baja = _van(flujos, baja, ts_base)
+    vanBaja = _van(flujos, baja, tsBase)
 
     # La tasa alta se estira hasta encontrar cambio de signo. Una cartera que
     # multiplica por diez en tres meses tiene una TIR anual de miles por cien.
     for _ in range(60):
-        if van_baja * _van(flujos, alta, ts_base) <= 0:
+        if vanBaja * _van(flujos, alta, tsBase) <= 0:
             break
         alta *= 2
         if alta > 1e6:
@@ -192,44 +192,44 @@ def xirr(flujos):
 
     for _ in range(200):
         media = (baja + alta) / 2
-        van_media = _van(flujos, media, ts_base)
-        if van_baja * van_media <= 0:
+        vanMedia = _van(flujos, media, tsBase)
+        if vanBaja * vanMedia <= 0:
             alta = media
         else:
-            baja, van_baja = media, van_media
+            baja, vanBaja = media, vanMedia
     tasa = (baja + alta) / 2
     return tasa if math.isfinite(tasa) else None
 
 
 # ── riesgo ─────────────────────────────────────────────────────────────────
 
-def drawdown(puntos_indice):
+def drawdown(puntosIndice):
     """Peor caída desde un máximo del índice TWR, y la caída actual.
 
     Se mide sobre el índice y no sobre el valor en euros: retirar dinero baja
     el valor sin que la cartera haya perdido nada.
     """
     vacio = {"maximo": None, "ts_pico": None, "ts_valle": None, "actual": None}
-    if len(puntos_indice) < 2:
+    if len(puntosIndice) < 2:
         return vacio
 
-    pico = puntos_indice[0]["idx"]
-    ts_pico_actual = puntos_indice[0]["ts"]
-    peor, ts_pico, ts_valle = 0.0, None, None
+    pico = puntosIndice[0]["idx"]
+    tsPicoActual = puntosIndice[0]["ts"]
+    peor, tsPico, tsValle = 0.0, None, None
 
-    for punto in puntos_indice:
+    for punto in puntosIndice:
         if punto["idx"] > pico:
             pico = punto["idx"]
-            ts_pico_actual = punto["ts"]
+            tsPicoActual = punto["ts"]
         caida = punto["idx"] / pico - 1
         if caida < peor:
-            peor, ts_pico, ts_valle = caida, ts_pico_actual, punto["ts"]
+            peor, tsPico, tsValle = caida, tsPicoActual, punto["ts"]
 
     return {
         "maximo": peor,
-        "ts_pico": ts_pico,
-        "ts_valle": ts_valle,
-        "actual": puntos_indice[-1]["idx"] / pico - 1,
+        "ts_pico": tsPico,
+        "ts_valle": tsValle,
+        "actual": puntosIndice[-1]["idx"] / pico - 1,
     }
 
 
@@ -258,7 +258,7 @@ def volatilidad(serie):
 
 # ── cobertura del histórico ────────────────────────────────────────────────
 
-def cobertura_anual(snaps, hoy=None):
+def coberturaAnual(snaps, hoy=None):
     """Cuántos días de cada año tienen snapshot, y cuántos debería haber.
 
     La rentabilidad anual se dibuja como una barra por año, y una barra
@@ -266,19 +266,19 @@ def cobertura_anual(snaps, hoy=None):
     trescientos. Esto es lo que deja marcarlas.
     """
     hoy = hoy or datetime.date.today()
-    dias_por_anio = {}
-    total_por_anio = {}
+    diasPorAnio = {}
+    totalPorAnio = {}
     for punto in snaps:
         try:
             ts = int(punto["ts"])
         except (KeyError, TypeError, ValueError):
             continue
         dia = _dia(ts)
-        dias_por_anio.setdefault(dia.year, set()).add(dia)
-        total_por_anio[dia.year] = total_por_anio.get(dia.year, 0) + 1
+        diasPorAnio.setdefault(dia.year, set()).add(dia)
+        totalPorAnio[dia.year] = totalPorAnio.get(dia.year, 0) + 1
 
     resultado = {}
-    for anio, dias in dias_por_anio.items():
+    for anio, dias in diasPorAnio.items():
         if anio == hoy.year:
             esperados = (hoy - datetime.date(anio, 1, 1)).days + 1
         else:
@@ -286,7 +286,7 @@ def cobertura_anual(snaps, hoy=None):
         resultado[anio] = {
             "dias": len(dias),
             "esperados": esperados,
-            "snapshots": total_por_anio[anio],
+            "snapshots": totalPorAnio[anio],
             "pct": round(len(dias) / esperados * 100, 1) if esperados else 0.0,
         }
     return resultado
@@ -296,15 +296,15 @@ def cobertura_anual(snaps, hoy=None):
 
 def resumen(snaps, hoy=None):
     """Todas las métricas de una pasada, con la serie del índice TWR."""
-    serie = serie_diaria(snaps)
-    puntos_indice = indice_twr(serie)
+    serie = serieDiaria(snaps)
+    puntosIndice = indiceTwr(serie)
 
     return {
         "twr":          twr(serie),
-        "xirr":         xirr(flujos_de_caja(serie)),
-        "drawdown":     drawdown(puntos_indice),
+        "xirr":         xirr(flujosDeCaja(serie)),
+        "drawdown":     drawdown(puntosIndice),
         "volatilidad":  volatilidad(serie),
-        "cobertura":    cobertura_anual(snaps, hoy=hoy),
-        "indice":       [{"ts": p["ts"], "idx": round(p["idx"], 4)} for p in puntos_indice],
+        "cobertura":    coberturaAnual(snaps, hoy=hoy),
+        "indice":       [{"ts": p["ts"], "idx": round(p["idx"], 4)} for p in puntosIndice],
         "dias":         len(serie),
     }

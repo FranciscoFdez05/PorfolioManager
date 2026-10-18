@@ -6,17 +6,17 @@ from urllib.error import HTTPError, URLError
 
 from core import dinero
 from providers import (
-    compact_symbol as _compact_symbol,
-    fetch_json,
-    format_decimal as _format_decimal,
-    format_percent as _format_percent,
-    normalize_text as _normalize_text,
+    compactSymbol as _compactSymbol,
+    fetchJson,
+    formatDecimal as _formatDecimal,
+    formatPercent as _formatPercent,
+    normalizeText as _normalizeText,
 )
 
 log = logging.getLogger(__name__)
 
 
-def _mensaje_http(error):
+def _mensajeHttp(error):
     """Traduce el código de Finnhub a algo que diga qué hacer.
 
     Finnhub contesta 403 «You don't have access to this resource» cuando la
@@ -35,7 +35,7 @@ def _mensaje_http(error):
     return f"Finnhub devolvió HTTP {error.code}"
 
 
-def _provider_from_url(url: str) -> str:
+def _providerFromUrl(url: str) -> str:
     if "finnhub.io" in url:
         return "Finnhub"
     if "frankfurter.app" in url or "er-api.com" in url:
@@ -81,7 +81,7 @@ FRANKFURTER_CURRENCIES_URL = "https://api.frankfurter.app/currencies"
 # La lista de divisas del servicio de cambio casi no cambia: se pide una vez al
 # día como mucho, en vez de en cada apertura del modal que la enseña.
 _CURRENCIES_TTL_SECONDS = 24 * 3600
-_currencies_cache = {"divisas": None, "ts": 0.0}
+_currenciesCache = {"divisas": None, "ts": 0.0}
 SEARCH_QUERY_ALIASES = {}
 PREFERRED_EXCHANGES_BY_TYPE = {
     "acciones": {"XNYS", "XNAS", "NYSE", "NASDAQ", "ARCX", "BATS", "XNCM"},
@@ -89,15 +89,15 @@ PREFERRED_EXCHANGES_BY_TYPE = {
 }
 
 
-def _fetch_json(url, params, timeout=None):
-    return fetch_json(url, params, timeout=timeout, provider=_provider_from_url(url))
+def _fetchJson(url, params, timeout=None):
+    return fetchJson(url, params, timeout=timeout, provider=_providerFromUrl(url))
 
 
-def _fetch_json_absolute(url, timeout=None):
-    return fetch_json(url, timeout=timeout, provider=_provider_from_url(url))
+def _fetchJsonAbsolute(url, timeout=None):
+    return fetchJson(url, timeout=timeout, provider=_providerFromUrl(url))
 
 
-def _normalize_currency_code(currency, fallback="EUR"):
+def _normalizeCurrencyCode(currency, fallback="EUR"):
     normalized = QUOTE_CURRENCY_ALIASES.get(
         str(currency or "").strip().upper(),
         str(currency or "").strip().upper()
@@ -117,141 +117,141 @@ _PALABRAS_COMODITIS = ("gold", "silver", "oil", "brent", "crude")
 _PALABRAS_FONDO = ("etf", "fund", "ucits", "ishares", "vanguard", "invesco", "spdr", "xtrackers", "amundi")
 
 
-def _puntos_por_busqueda(normalized_query, compact_symbol, compact_display, symbol, normalized_description):
-    if not normalized_query:
+def _puntosPorBusqueda(normalizedQuery, compactSymbol, compactDisplay, symbol, normalizedDescription):
+    if not normalizedQuery:
         return 0
     puntos = 0
-    if normalized_query in (compact_symbol, compact_display):
+    if normalizedQuery in (compactSymbol, compactDisplay):
         puntos += 500
-    if compact_symbol.startswith(normalized_query) or compact_display.startswith(normalized_query):
+    if compactSymbol.startswith(normalizedQuery) or compactDisplay.startswith(normalizedQuery):
         puntos += 200
-    if normalized_query in normalized_description:
+    if normalizedQuery in normalizedDescription:
         puntos += 180
-    if normalized_query in _normalize_text(symbol):
+    if normalizedQuery in _normalizeText(symbol):
         puntos += 140
     return puntos
 
 
-def _puntos_por_nombre(normalized_asset_name, normalized_description):
-    if not normalized_asset_name:
+def _puntosPorNombre(normalizedAssetName, normalizedDescription):
+    if not normalizedAssetName:
         return 0
-    if normalized_asset_name == normalized_description:
+    if normalizedAssetName == normalizedDescription:
         return 260
-    return 180 if normalized_asset_name in normalized_description else 0
+    return 180 if normalizedAssetName in normalizedDescription else 0
 
 
-def _puntos_por_tipo(preferred_asset_type, result_type, normalized_description):
+def _puntosPorTipo(preferredAssetType, resultType, normalizedDescription):
     puntos = next(
-        (valor for tipos, valor in _PUNTOS_POR_TIPO.get(preferred_asset_type, ()) if result_type in tipos), 0
+        (valor for tipos, valor in _PUNTOS_POR_TIPO.get(preferredAssetType, ()) if resultType in tipos), 0
     )
-    if preferred_asset_type == "comoditis" and any(p in normalized_description for p in _PALABRAS_COMODITIS):
+    if preferredAssetType == "comoditis" and any(p in normalizedDescription for p in _PALABRAS_COMODITIS):
         puntos += 220
     return puntos
 
 
-def _puntos_por_mercado(preferred_asset_type, exchange, normalized_description):
+def _puntosPorMercado(preferredAssetType, exchange, normalizedDescription):
     puntos = 0
-    if exchange in PREFERRED_EXCHANGES_BY_TYPE.get(preferred_asset_type, ()):
+    if exchange in PREFERRED_EXCHANGES_BY_TYPE.get(preferredAssetType, ()):
         puntos += 80
-    if preferred_asset_type in {"acciones", "etfs"} and any(p in normalized_description for p in _PALABRAS_FONDO):
-        puntos += 70 if preferred_asset_type == "etfs" else 20
+    if preferredAssetType in {"acciones", "etfs"} and any(p in normalizedDescription for p in _PALABRAS_FONDO):
+        puntos += 70 if preferredAssetType == "etfs" else 20
     return puntos
 
 
-def _score_remote_symbol(item, normalized_query, normalized_asset_name="", preferred_asset_type=""):
+def _scoreRemoteSymbol(item, normalizedQuery, normalizedAssetName="", preferredAssetType=""):
     symbol = str(item.get("symbol", "")).strip().upper()
-    display_symbol = str(item.get("displaySymbol", symbol)).strip().upper()
-    normalized_description = _normalize_text(str(item.get("description", "")).strip())
-    result_type = str(item.get("type", "")).strip().lower()
+    displaySymbol = str(item.get("displaySymbol", symbol)).strip().upper()
+    normalizedDescription = _normalizeText(str(item.get("description", "")).strip())
+    resultType = str(item.get("type", "")).strip().lower()
     exchange = str(item.get("exchange", "")).strip().upper()
 
     return (
-        _puntos_por_busqueda(normalized_query, _compact_symbol(symbol), _compact_symbol(display_symbol),
-                             symbol, normalized_description)
-        + _puntos_por_nombre(normalized_asset_name, normalized_description)
-        + _puntos_por_tipo(preferred_asset_type, result_type, normalized_description)
-        + _puntos_por_mercado(preferred_asset_type, exchange, normalized_description)
+        _puntosPorBusqueda(normalizedQuery, _compactSymbol(symbol), _compactSymbol(displaySymbol),
+                             symbol, normalizedDescription)
+        + _puntosPorNombre(normalizedAssetName, normalizedDescription)
+        + _puntosPorTipo(preferredAssetType, resultType, normalizedDescription)
+        + _puntosPorMercado(preferredAssetType, exchange, normalizedDescription)
     )
 
 
-def _extract_code_candidates(query_text, remote_results):
-    normalized_query = str(query_text or "").strip()
-    compact_query = _compact_symbol(normalized_query)
+def _extractCodeCandidates(queryText, remoteResults):
+    normalizedQuery = str(queryText or "").strip()
+    compactQuery = _compactSymbol(normalizedQuery)
     candidates = []
 
-    if 2 <= len(compact_query) <= 10:
-        candidates.append(compact_query)
+    if 2 <= len(compactQuery) <= 10:
+        candidates.append(compactQuery)
 
-    for result in remote_results:
-        searchable_text = " ".join([
+    for result in remoteResults:
+        searchableText = " ".join([
             str(result.get("symbol", "")),
             str(result.get("displaySymbol", "")),
             str(result.get("description", "")),
         ]).upper()
 
-        for token in re.findall(r"\b[A-Z0-9]{2,10}\b", searchable_text):
+        for token in re.findall(r"\b[A-Z0-9]{2,10}\b", searchableText):
             if token not in candidates:
                 candidates.append(token)
 
     return candidates
 
 
-def _get_cached_symbols(symbol_type, exchange, url, api_key, timeout=None):
-    cache_key = (symbol_type, exchange)
+def _getCachedSymbols(symbolType, exchange, url, apiKey, timeout=None):
+    cacheKey = (symbolType, exchange)
 
-    if cache_key in SYMBOL_CACHE:
-        return SYMBOL_CACHE[cache_key]
+    if cacheKey in SYMBOL_CACHE:
+        return SYMBOL_CACHE[cacheKey]
 
-    data = _fetch_json(url, {
+    data = _fetchJson(url, {
         "exchange": exchange,
-        "token": api_key
+        "token": apiKey
     }, timeout=timeout)
 
-    normalized_data = []
+    normalizedData = []
 
     for item in data:
         symbol = str(item.get("symbol", "")).strip().upper()
         description = str(item.get("description", "")).strip()
-        display_symbol = str(item.get("displaySymbol", symbol)).strip().upper() or symbol
+        displaySymbol = str(item.get("displaySymbol", symbol)).strip().upper() or symbol
 
         if not symbol or not description:
             continue
 
-        normalized_data.append({
+        normalizedData.append({
             "symbol": symbol,
             "description": description,
-            "displaySymbol": display_symbol,
-            "type": symbol_type
+            "displaySymbol": displaySymbol,
+            "type": symbolType
         })
 
-    SYMBOL_CACHE[cache_key] = normalized_data
-    return normalized_data
+    SYMBOL_CACHE[cacheKey] = normalizedData
+    return normalizedData
 
 
-def _score_local_symbol(item, normalized_query, candidate_codes, normalized_asset_name="", preferred_asset_type=""):
+def _scoreLocalSymbol(item, normalizedQuery, candidateCodes, normalizedAssetName="", preferredAssetType=""):
     symbol = item["symbol"]
-    display_symbol = item["displaySymbol"]
+    displaySymbol = item["displaySymbol"]
     description = item["description"]
-    compact_display = display_symbol.replace("/", "").replace("_", "")
-    normalized_description = _normalize_text(description)
+    compactDisplay = displaySymbol.replace("/", "").replace("_", "")
+    normalizedDescription = _normalizeText(description)
     score = 0
 
-    if normalized_query and normalized_query in _normalize_text(symbol):
+    if normalizedQuery and normalizedQuery in _normalizeText(symbol):
         score += 120
 
-    if normalized_query and normalized_query in _normalize_text(display_symbol):
+    if normalizedQuery and normalizedQuery in _normalizeText(displaySymbol):
         score += 160
 
-    if normalized_query and normalized_query in normalized_description:
+    if normalizedQuery and normalizedQuery in normalizedDescription:
         score += 80
 
-    if normalized_asset_name:
-        if normalized_asset_name == normalized_description:
+    if normalizedAssetName:
+        if normalizedAssetName == normalizedDescription:
             score += 220
-        elif normalized_asset_name in normalized_description:
+        elif normalizedAssetName in normalizedDescription:
             score += 160
 
-    for index, code in enumerate(candidate_codes):
+    for index, code in enumerate(candidateCodes):
         if not code:
             continue
 
@@ -262,142 +262,142 @@ def _score_local_symbol(item, normalized_query, candidate_codes, normalized_asse
         if symbol.split(":", 1)[-1].replace("_", "").startswith(code):
             score += weight + 90
 
-        if compact_display.startswith(code):
+        if compactDisplay.startswith(code):
             score += weight + 70
 
-        for quote_index, quote in enumerate(PREFERRED_QUOTES):
-            quote_weight = max(5, 40 - (quote_index * 5))
+        for quoteIndex, quote in enumerate(PREFERRED_QUOTES):
+            quoteWeight = max(5, 40 - (quoteIndex * 5))
 
-            if compact_display == f"{code}{quote}":
-                score += weight + quote_weight + 90
-            elif compact_display.startswith(f"{code}{quote}"):
-                score += weight + quote_weight + 50
+            if compactDisplay == f"{code}{quote}":
+                score += weight + quoteWeight + 90
+            elif compactDisplay.startswith(f"{code}{quote}"):
+                score += weight + quoteWeight + 50
 
-    if preferred_asset_type == "acciones" and item.get("type") in {"crypto", "forex"}:
+    if preferredAssetType == "acciones" and item.get("type") in {"crypto", "forex"}:
         score -= 220
 
-    if preferred_asset_type == "etfs":
+    if preferredAssetType == "etfs":
         if item.get("type") == "crypto":
             score -= 320
         elif item.get("type") == "forex":
             score -= 260
 
-    if preferred_asset_type == "cripto":
+    if preferredAssetType == "cripto":
         if item.get("type") == "crypto":
             score += 220
         elif item.get("type") == "forex":
             score -= 120
 
-    if preferred_asset_type == "comoditis":
+    if preferredAssetType == "comoditis":
         if item.get("type") == "forex":
             score += 280
         elif item.get("type") == "crypto":
             score -= 220
 
-        if any(token in normalized_description for token in ("gold", "silver", "oil", "brent", "crude")):
+        if any(token in normalizedDescription for token in ("gold", "silver", "oil", "brent", "crude")):
             score += 240
 
     return score
 
 
-def _search_local_symbols(query_text, remote_results, api_key, timeout=None, limit=8, asset_name="", preferred_asset_type=""):
-    normalized_query = _normalize_text(query_text)
-    normalized_asset_name = _normalize_text(asset_name)
-    candidate_codes = _extract_code_candidates(query_text, remote_results)
-    ranked_results = []
-    seen_symbols = set()
+def _searchLocalSymbols(queryText, remoteResults, apiKey, timeout=None, limit=8, assetName="", preferredAssetType=""):
+    normalizedQuery = _normalizeText(queryText)
+    normalizedAssetName = _normalizeText(assetName)
+    candidateCodes = _extractCodeCandidates(queryText, remoteResults)
+    rankedResults = []
+    seenSymbols = set()
 
-    for symbol_type, exchange, url in LOCAL_SYMBOL_SOURCES:
-        symbols = _get_cached_symbols(symbol_type, exchange, url, api_key, timeout=timeout)
+    for symbolType, exchange, url in LOCAL_SYMBOL_SOURCES:
+        symbols = _getCachedSymbols(symbolType, exchange, url, apiKey, timeout=timeout)
 
         for item in symbols:
-            score = _score_local_symbol(item, normalized_query, candidate_codes, normalized_asset_name, preferred_asset_type)
+            score = _scoreLocalSymbol(item, normalizedQuery, candidateCodes, normalizedAssetName, preferredAssetType)
 
             if score <= 0:
                 continue
 
             symbol = item["symbol"]
 
-            if symbol in seen_symbols:
+            if symbol in seenSymbols:
                 continue
 
-            seen_symbols.add(symbol)
-            ranked_results.append((score, item))
+            seenSymbols.add(symbol)
+            rankedResults.append((score, item))
 
-    ranked_results.sort(key=lambda row: (-row[0], row[1]["symbol"]))
-    return [item for _, item in ranked_results[:limit]]
+    rankedResults.sort(key=lambda row: (-row[0], row[1]["symbol"]))
+    return [item for _, item in rankedResults[:limit]]
 
 
-def infer_currency_from_symbol(symbol, fallback="USD"):
-    normalized_symbol = str(symbol or "").strip().upper()
+def inferCurrencyFromSymbol(symbol, fallback="USD"):
+    normalizedSymbol = str(symbol or "").strip().upper()
 
-    if not normalized_symbol:
+    if not normalizedSymbol:
         return fallback
 
-    if ":" in normalized_symbol:
-        market_symbol = normalized_symbol.split(":", 1)[1]
+    if ":" in normalizedSymbol:
+        marketSymbol = normalizedSymbol.split(":", 1)[1]
 
-        if "_" in market_symbol:
-            quote_currency = market_symbol.split("_")[-1]
-            return QUOTE_CURRENCY_ALIASES.get(quote_currency, quote_currency or fallback)
+        if "_" in marketSymbol:
+            quoteCurrency = marketSymbol.split("_")[-1]
+            return QUOTE_CURRENCY_ALIASES.get(quoteCurrency, quoteCurrency or fallback)
 
-        compact_symbol = market_symbol.replace("/", "")
+        compactSymbol = marketSymbol.replace("/", "")
 
-        for quote_currency in sorted(QUOTE_CURRENCY_ALIASES.keys(), key=len, reverse=True):
-            if compact_symbol.endswith(quote_currency):
-                return QUOTE_CURRENCY_ALIASES[quote_currency]
+        for quoteCurrency in sorted(QUOTE_CURRENCY_ALIASES.keys(), key=len, reverse=True):
+            if compactSymbol.endswith(quoteCurrency):
+                return QUOTE_CURRENCY_ALIASES[quoteCurrency]
 
     for suffix, currency in MARKET_SUFFIX_CURRENCIES.items():
-        if normalized_symbol.endswith(suffix):
+        if normalizedSymbol.endswith(suffix):
             return currency
 
     return fallback
 
 
-def fetch_quote(symbol, api_key, timeout=None):
-    normalized_symbol = str(symbol or "").strip().upper()
+def fetchQuote(symbol, apiKey, timeout=None):
+    normalizedSymbol = str(symbol or "").strip().upper()
 
-    if not normalized_symbol:
+    if not normalizedSymbol:
         return None, "El ticker de Finnhub es obligatorio"
 
-    if not api_key:
+    if not apiKey:
         return None, "No se ha encontrado la API key de Finnhub"
 
     try:
-        payload = _fetch_json(FINNHUB_QUOTE_URL, {
-            "symbol": normalized_symbol,
-            "token": api_key
+        payload = _fetchJson(FINNHUB_QUOTE_URL, {
+            "symbol": normalizedSymbol,
+            "token": apiKey
         }, timeout=timeout)
     except HTTPError as error:
-        return None, _mensaje_http(error)
+        return None, _mensajeHttp(error)
     except URLError:
         return None, "No se pudo conectar con Finnhub"
 
-    current_price = float(payload.get("c") or 0)
-    percent_change = float(payload.get("dp") or 0)
-    previous_close = float(payload.get("pc") or 0)
+    currentPrice = float(payload.get("c") or 0)
+    percentChange = float(payload.get("dp") or 0)
+    previousClose = float(payload.get("pc") or 0)
 
-    if current_price <= 0 and previous_close <= 0:
-        return None, f"Finnhub no devolvió cotización para {normalized_symbol} (precio 0: ticker desconocido, fuera del plan gratuito o mercado sin datos)"
+    if currentPrice <= 0 and previousClose <= 0:
+        return None, f"Finnhub no devolvió cotización para {normalizedSymbol} (precio 0: ticker desconocido, fuera del plan gratuito o mercado sin datos)"
 
     return {
-        "symbol": normalized_symbol,
-        "price": _format_decimal(current_price),
-        "currency": infer_currency_from_symbol(normalized_symbol),
-        "change": _format_percent(percent_change),
+        "symbol": normalizedSymbol,
+        "price": _formatDecimal(currentPrice),
+        "currency": inferCurrencyFromSymbol(normalizedSymbol),
+        "change": _formatPercent(percentChange),
         "status": "Cotización actualizada",
         "lastUpdated": datetime.now().astimezone().isoformat(),
         "marketData": {
-            "currentPrice": current_price,
-            "percentChange": percent_change,
-            "previousClose": previous_close
+            "currentPrice": currentPrice,
+            "percentChange": percentChange,
+            "previousClose": previousClose
         }
     }, None
 
 
-def fetch_exchange_rate(source_currency, target_currency, timeout=None):
-    source = _normalize_currency_code(source_currency)
-    target = _normalize_currency_code(target_currency)
+def fetchExchangeRate(sourceCurrency, targetCurrency, timeout=None):
+    source = _normalizeCurrencyCode(sourceCurrency)
+    target = _normalizeCurrencyCode(targetCurrency)
 
     if source == target:
         return 1.0, None
@@ -406,7 +406,7 @@ def fetch_exchange_rate(source_currency, target_currency, timeout=None):
     # dice el servicio de cambio, y si no conoce una divisa contesta con error
     # (que llega abajo como "No se pudo obtener el cambio").
     try:
-        payload = _fetch_json(FRANKFURTER_LATEST_URL, {
+        payload = _fetchJson(FRANKFURTER_LATEST_URL, {
             "from": source,
             "to": target
         }, timeout=timeout)
@@ -422,7 +422,7 @@ def fetch_exchange_rate(source_currency, target_currency, timeout=None):
         pass
 
     try:
-        payload = _fetch_json_absolute(f"{EXCHANGE_RATE_API_URL}/{source}", timeout=timeout)
+        payload = _fetchJsonAbsolute(f"{EXCHANGE_RATE_API_URL}/{source}", timeout=timeout)
     except HTTPError as error:
         return None, f"Cambio de divisa devolvió HTTP {error.code}"
     except URLError:
@@ -443,21 +443,21 @@ def fetch_exchange_rate(source_currency, target_currency, timeout=None):
     return rate, None
 
 
-def fetch_exchange_rates(base_currency, target_currencies, timeout=None):
+def fetchExchangeRates(baseCurrency, targetCurrencies, timeout=None):
     """Tipos de cambio de `base_currency` a varias divisas, en una petición.
 
-    Mismas fuentes y en el mismo orden que `fetch_exchange_rate` (Frankfurter y,
+    Mismas fuentes y en el mismo orden que `fetchExchangeRate` (Frankfurter y,
     si falla, open.er-api.com), para que lo que se enseña en Ajustes sea lo que
     de verdad se usa al convertir. Devuelve `(datos, error)` con
     `datos = {"rates": {divisa: tipo}, "fuente": str, "fecha": str}`.
     """
-    base = _normalize_currency_code(base_currency)
-    targets = [t for t in dict.fromkeys(_normalize_currency_code(t) for t in target_currencies) if t != base]
+    base = _normalizeCurrencyCode(baseCurrency)
+    targets = [t for t in dict.fromkeys(_normalizeCurrencyCode(t) for t in targetCurrencies) if t != base]
     if not targets:
         return {"rates": {}, "fuente": "", "fecha": ""}, None
 
     try:
-        payload = _fetch_json(FRANKFURTER_LATEST_URL, {"from": base, "to": ",".join(targets)}, timeout=timeout)
+        payload = _fetchJson(FRANKFURTER_LATEST_URL, {"from": base, "to": ",".join(targets)}, timeout=timeout)
         rates = {t: float(r) for t, r in (payload.get("rates") or {}).items() if float(r or 0) > 0}
         if rates:
             return {"rates": rates, "fuente": "Frankfurter (referencia diaria del BCE)",
@@ -466,7 +466,7 @@ def fetch_exchange_rates(base_currency, target_currencies, timeout=None):
         pass
 
     try:
-        payload = _fetch_json_absolute(f"{EXCHANGE_RATE_API_URL}/{base}", timeout=timeout)
+        payload = _fetchJsonAbsolute(f"{EXCHANGE_RATE_API_URL}/{base}", timeout=timeout)
     except HTTPError as error:
         return None, f"Cambio de divisa devolvió HTTP {error.code}"
     except URLError:
@@ -482,14 +482,14 @@ def fetch_exchange_rates(base_currency, target_currencies, timeout=None):
             "fecha": str(payload.get("time_last_update_utc") or "")}, None
 
 
-def fetch_currencies(timeout=None):
+def fetchCurrencies(timeout=None):
     """Divisas que publica el servicio de cambio: `({código: nombre}, error)`."""
     ahora = time.monotonic()
-    if _currencies_cache["divisas"] and ahora - _currencies_cache["ts"] < _CURRENCIES_TTL_SECONDS:
-        return dict(_currencies_cache["divisas"]), None
+    if _currenciesCache["divisas"] and ahora - _currenciesCache["ts"] < _CURRENCIES_TTL_SECONDS:
+        return dict(_currenciesCache["divisas"]), None
 
     try:
-        payload = _fetch_json_absolute(FRANKFURTER_CURRENCIES_URL, timeout=timeout)
+        payload = _fetchJsonAbsolute(FRANKFURTER_CURRENCIES_URL, timeout=timeout)
     except HTTPError as error:
         return None, f"El servicio de cambio de divisa devolvió HTTP {error.code}"
     except (URLError, TimeoutError):
@@ -499,12 +499,12 @@ def fetch_currencies(timeout=None):
         return None, "El servicio de cambio de divisa no devolvió una respuesta válida"
 
     divisas = {str(codigo).strip().upper(): str(nombre).strip() for codigo, nombre in payload.items()}
-    _currencies_cache["divisas"] = divisas
-    _currencies_cache["ts"] = ahora
+    _currenciesCache["divisas"] = divisas
+    _currenciesCache["ts"] = ahora
     return dict(divisas), None
 
 
-def convert_amount(value, source_currency, target_currency, timeout=None):
+def convertAmount(value, sourceCurrency, targetCurrency, timeout=None):
     """Convierte un importe de divisa. Devuelve `Decimal`, no `float`.
 
     El tipo de cambio llega de la API como float —ahí no hay elección— pero la
@@ -512,7 +512,7 @@ def convert_amount(value, source_currency, target_currency, timeout=None):
     columna de importes, y `float(value) * rate` metía la cola binaria del
     producto en el dato almacenado.
     """
-    rate, error = fetch_exchange_rate(source_currency, target_currency, timeout=timeout)
+    rate, error = fetchExchangeRate(sourceCurrency, targetCurrency, timeout=timeout)
 
     if error:
         return None, error
@@ -520,95 +520,95 @@ def convert_amount(value, source_currency, target_currency, timeout=None):
     return dinero.aDecimal(value, "importe a convertir") * dinero.aDecimal(rate, "tipo de cambio"), None
 
 
-def convert_quote_currency(quote, target_currency, timeout=None):
+def convertQuoteCurrency(quote, targetCurrency, timeout=None):
     if not quote:
         return None, "No hay cotización para convertir"
 
-    source_currency = _normalize_currency_code(quote.get("currency", ""), "USD")
-    target_currency = _normalize_currency_code(target_currency, source_currency)
+    sourceCurrency = _normalizeCurrencyCode(quote.get("currency", ""), "USD")
+    targetCurrency = _normalizeCurrencyCode(targetCurrency, sourceCurrency)
 
-    if source_currency == target_currency:
-        converted_quote = dict(quote)
-        converted_quote["currency"] = target_currency
-        converted_quote["marketData"] = {
+    if sourceCurrency == targetCurrency:
+        convertedQuote = dict(quote)
+        convertedQuote["currency"] = targetCurrency
+        convertedQuote["marketData"] = {
             **quote.get("marketData", {}),
-            "sourceCurrency": source_currency,
+            "sourceCurrency": sourceCurrency,
             "sourcePrice": float(quote.get("marketData", {}).get("currentPrice") or 0),
             "exchangeRate": 1.0
         }
-        return converted_quote, None
+        return convertedQuote, None
 
-    current_price = float(quote.get("marketData", {}).get("currentPrice") or 0)
-    previous_close = float(quote.get("marketData", {}).get("previousClose") or 0)
-    exchange_rate, error = fetch_exchange_rate(source_currency, target_currency, timeout=timeout)
+    currentPrice = float(quote.get("marketData", {}).get("currentPrice") or 0)
+    previousClose = float(quote.get("marketData", {}).get("previousClose") or 0)
+    exchangeRate, error = fetchExchangeRate(sourceCurrency, targetCurrency, timeout=timeout)
 
     if error:
         return None, error
 
-    converted_current_price = current_price * exchange_rate
-    converted_previous_close = previous_close * exchange_rate if previous_close > 0 else 0
+    convertedCurrentPrice = currentPrice * exchangeRate
+    convertedPreviousClose = previousClose * exchangeRate if previousClose > 0 else 0
 
-    converted_quote = dict(quote)
-    converted_quote["price"] = _format_decimal(converted_current_price)
-    converted_quote["currency"] = target_currency
-    converted_quote["status"] = f"Cotización actualizada ({source_currency}->{target_currency})"
-    converted_quote["marketData"] = {
+    convertedQuote = dict(quote)
+    convertedQuote["price"] = _formatDecimal(convertedCurrentPrice)
+    convertedQuote["currency"] = targetCurrency
+    convertedQuote["status"] = f"Cotización actualizada ({sourceCurrency}->{targetCurrency})"
+    convertedQuote["marketData"] = {
         **quote.get("marketData", {}),
-        "currentPrice": converted_current_price,
-        "previousClose": converted_previous_close,
-        "sourceCurrency": source_currency,
-        "sourcePrice": current_price,
-        "exchangeRate": exchange_rate
+        "currentPrice": convertedCurrentPrice,
+        "previousClose": convertedPreviousClose,
+        "sourceCurrency": sourceCurrency,
+        "sourcePrice": currentPrice,
+        "exchangeRate": exchangeRate
     }
 
-    return converted_quote, None
+    return convertedQuote, None
 
 
-def enrich_search_results_with_quote(results, api_key, timeout=None):
-    enriched_results = []
+def enrichSearchResultsWithQuote(results, apiKey, timeout=None):
+    enrichedResults = []
 
     for item in results:
-        enriched_item = dict(item)
-        quote, error = fetch_quote(item.get("symbol", ""), api_key, timeout=timeout)
+        enrichedItem = dict(item)
+        quote, error = fetchQuote(item.get("symbol", ""), apiKey, timeout=timeout)
 
         if not error and quote:
-            enriched_item["price"] = quote.get("price", "")
-            enriched_item["currency"] = quote.get("currency", "")
-            enriched_item["change"] = quote.get("change", "")
+            enrichedItem["price"] = quote.get("price", "")
+            enrichedItem["currency"] = quote.get("currency", "")
+            enrichedItem["change"] = quote.get("change", "")
 
-        enriched_results.append(enriched_item)
+        enrichedResults.append(enrichedItem)
 
-    return enriched_results
+    return enrichedResults
 
 
-def search_symbol(query_text, api_key, timeout=None, limit=8, asset_name="", preferred_asset_type=""):
-    normalized_query = str(query_text or "").strip()
+def searchSymbol(queryText, apiKey, timeout=None, limit=8, assetName="", preferredAssetType=""):
+    normalizedQuery = str(queryText or "").strip()
 
-    if not normalized_query:
+    if not normalizedQuery:
         return None, "Escribe un nombre o ticker para buscar"
 
-    if not api_key:
+    if not apiKey:
         return None, "No se ha encontrado la API key de Finnhub"
 
-    alias_queries = SEARCH_QUERY_ALIASES.get(_normalize_text(normalized_query), [])
-    search_queries = []
+    aliasQueries = SEARCH_QUERY_ALIASES.get(_normalizeText(normalizedQuery), [])
+    searchQueries = []
 
-    for query in [normalized_query, *alias_queries]:
-        clean_query = str(query or "").strip()
-        if clean_query and clean_query not in search_queries:
-            search_queries.append(clean_query)
+    for query in [normalizedQuery, *aliasQueries]:
+        cleanQuery = str(query or "").strip()
+        if cleanQuery and cleanQuery not in searchQueries:
+            searchQueries.append(cleanQuery)
 
-    remote_results = []
-    seen_remote_symbols = set()
+    remoteResults = []
+    seenRemoteSymbols = set()
 
-    for search_query in search_queries:
+    for searchQuery in searchQueries:
         try:
-            payload = _fetch_json(FINNHUB_SEARCH_URL, {
-                "q": search_query,
-                "token": api_key
+            payload = _fetchJson(FINNHUB_SEARCH_URL, {
+                "q": searchQuery,
+                "token": apiKey
             }, timeout=timeout)
         except HTTPError as error:
-            return None, _mensaje_http(error)
+            return None, _mensajeHttp(error)
         except URLError:
             return None, "No se pudo conectar con Finnhub"
 
@@ -616,11 +616,11 @@ def search_symbol(query_text, api_key, timeout=None, limit=8, asset_name="", pre
             symbol = str(item.get("symbol", "")).strip().upper()
             description = str(item.get("description", "")).strip()
 
-            if not symbol or not description or symbol in seen_remote_symbols:
+            if not symbol or not description or symbol in seenRemoteSymbols:
                 continue
 
-            seen_remote_symbols.add(symbol)
-            remote_results.append({
+            seenRemoteSymbols.add(symbol)
+            remoteResults.append({
                 "symbol": symbol,
                 "description": description,
                 "displaySymbol": str(item.get("displaySymbol", symbol)).strip().upper() or symbol,
@@ -628,51 +628,51 @@ def search_symbol(query_text, api_key, timeout=None, limit=8, asset_name="", pre
                 "exchange": str(item.get("mic", "")).strip().upper()
             })
 
-    local_results = _search_local_symbols(
-        normalized_query,
-        remote_results,
-        api_key,
+    localResults = _searchLocalSymbols(
+        normalizedQuery,
+        remoteResults,
+        apiKey,
         timeout=timeout,
         limit=limit * 2,
-        asset_name=asset_name,
-        preferred_asset_type=preferred_asset_type
+        assetName=assetName,
+        preferredAssetType=preferredAssetType
     )
 
-    normalized_rank_query = _compact_symbol(normalized_query)
-    normalized_asset_name = _normalize_text(asset_name)
-    ranked_results = []
-    seen_symbols = set()
+    normalizedRankQuery = _compactSymbol(normalizedQuery)
+    normalizedAssetName = _normalizeText(assetName)
+    rankedResults = []
+    seenSymbols = set()
 
-    for item in remote_results:
+    for item in remoteResults:
         symbol = item["symbol"]
 
-        if symbol in seen_symbols:
+        if symbol in seenSymbols:
             continue
 
-        seen_symbols.add(symbol)
-        ranked_results.append((
-            _score_remote_symbol(item, normalized_rank_query, normalized_asset_name, preferred_asset_type),
+        seenSymbols.add(symbol)
+        rankedResults.append((
+            _scoreRemoteSymbol(item, normalizedRankQuery, normalizedAssetName, preferredAssetType),
             item
         ))
 
-    candidate_codes = _extract_code_candidates(normalized_query, remote_results)
+    candidateCodes = _extractCodeCandidates(normalizedQuery, remoteResults)
 
-    for item in local_results:
+    for item in localResults:
         symbol = item["symbol"]
 
-        if symbol in seen_symbols:
+        if symbol in seenSymbols:
             continue
 
-        seen_symbols.add(symbol)
-        ranked_results.append((
-            _score_local_symbol(item, _normalize_text(normalized_query), candidate_codes, normalized_asset_name, preferred_asset_type),
+        seenSymbols.add(symbol)
+        rankedResults.append((
+            _scoreLocalSymbol(item, _normalizeText(normalizedQuery), candidateCodes, normalizedAssetName, preferredAssetType),
             item
         ))
 
-    ranked_results.sort(key=lambda row: (-row[0], row[1]["symbol"]))
-    merged_results = [item for _, item in ranked_results[:limit]]
+    rankedResults.sort(key=lambda row: (-row[0], row[1]["symbol"]))
+    mergedResults = [item for _, item in rankedResults[:limit]]
 
-    return enrich_search_results_with_quote(merged_results, api_key, timeout=timeout), None
+    return enrichSearchResultsWithQuote(mergedResults, apiKey, timeout=timeout), None
 
 
 FINNHUB_STOCK_CANDLE_URL  = "https://finnhub.io/api/v1/stock/candle"
@@ -688,40 +688,40 @@ SIN_HISTORICO = "El plan de Finnhub no incluye históricos (HTTP 403)"
 #
 # Se recuerda solo mientras viva el proceso: al mejorar el plan, un reinicio
 # vuelve a intentarlo.
-_sin_historicos = False
+_sinHistoricos = False
 
 
-def fetch_candle_close(symbol, from_ts, to_ts, api_key, timeout=None):
+def fetchCandleClose(symbol, fromTs, toTs, apiKey, timeout=None):
     """Return the first available daily closing price in [from_ts, to_ts]."""
-    global _sin_historicos
+    global _sinHistoricos
 
-    if not symbol or not api_key:
+    if not symbol or not apiKey:
         return None, "Parámetros insuficientes"
 
-    if _sin_historicos:
+    if _sinHistoricos:
         return None, SIN_HISTORICO
 
     normalized = str(symbol).strip().upper()
-    is_crypto = ":" in normalized
-    url = FINNHUB_CRYPTO_CANDLE_URL if is_crypto else FINNHUB_STOCK_CANDLE_URL
+    isCrypto = ":" in normalized
+    url = FINNHUB_CRYPTO_CANDLE_URL if isCrypto else FINNHUB_STOCK_CANDLE_URL
 
     try:
-        data = _fetch_json(url, {
+        data = _fetchJson(url, {
             "symbol": normalized,
             "resolution": "D",
-            "from": int(from_ts),
-            "to": int(to_ts),
-            "token": api_key,
+            "from": int(fromTs),
+            "to": int(toTs),
+            "token": apiKey,
         }, timeout=timeout)
     except HTTPError as error:
         if error.code == 403:
-            _sin_historicos = True
+            _sinHistoricos = True
             log.warning(
                 "Finnhub no da históricos con este plan: la variación por "
                 "periodo se calculará solo con los snapshots guardados."
             )
             return None, SIN_HISTORICO
-        return None, _mensaje_http(error)
+        return None, _mensajeHttp(error)
     except (TimeoutError, URLError) as error:
         return None, str(error)
 
@@ -731,7 +731,7 @@ def fetch_candle_close(symbol, from_ts, to_ts, api_key, timeout=None):
     return None, f"Sin datos ({data.get('s', 'unknown')})"
 
 
-def reiniciar_historicos_para_pruebas():
+def reiniciarHistoricosParaPruebas():
     """Olvida el 403 recordado. Simula un proceso recién arrancado."""
-    global _sin_historicos
-    _sin_historicos = False
+    global _sinHistoricos
+    _sinHistoricos = False

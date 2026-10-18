@@ -19,7 +19,7 @@ import threading
 import time
 
 from core import settings
-from core.db import get_active_db_path, use_db_path
+from core.db import getActiveDbPath, useDbPath
 
 log = logging.getLogger(__name__)
 
@@ -32,11 +32,11 @@ _ESPERA_DESACTIVADO = 300
 
 
 def _ajustes():
-    from routes.ajustes import _read_ajustes
-    return _read_ajustes()
+    from routes.ajustes import _readAjustes
+    return _readAjustes()
 
 
-def _rutas_objetivo():
+def _rutasObjetivo():
     """Bases de datos a las que hay que guardarles un punto.
 
     El alcance lo elige el usuario en Ajustes: 'activo' reproduce lo que hacía
@@ -45,14 +45,14 @@ def _rutas_objetivo():
     los proveedores por el número de portfolios.
     """
     if str(_ajustes().get("snapshotAlcance") or "activo").strip().lower() != "todos":
-        return [get_active_db_path()]
+        return [getActiveDbPath()]
 
-    from admin.portfolios_manager import _portfolio_db_path, get_portfolios
+    from admin.portfolios_manager import _portfolioDbPath, getPortfolios
 
     rutas = []
-    for portfolio in (get_portfolios() or {}).get("portfolios", []):
+    for portfolio in (getPortfolios() or {}).get("portfolios", []):
         try:
-            ruta = _portfolio_db_path(portfolio.get("id", ""))
+            ruta = _portfolioDbPath(portfolio.get("id", ""))
         except ValueError:
             continue
         # Un portfolio cuyo .db no existe todavía no se toca: crearlo aquí
@@ -60,15 +60,15 @@ def _rutas_objetivo():
         if ruta.exists():
             rutas.append(ruta)
 
-    return rutas or [get_active_db_path()]
+    return rutas or [getActiveDbPath()]
 
 
 def _intervalo() -> int:
-    from routes.snapshots import _interval_seconds
-    return _interval_seconds()
+    from routes.snapshots import _intervalSeconds
+    return _intervalSeconds()
 
 
-def _snapshots_activos() -> bool:
+def _snapshotsActivos() -> bool:
     """False si el usuario ha puesto los snapshots en 'Off' en Ajustes."""
     from routes.ajustes import DEFAULT_SNAPSHOT_MINUTES
     try:
@@ -78,7 +78,7 @@ def _snapshots_activos() -> bool:
     return minutos > 0
 
 
-def _espera_hasta_siguiente(ahora=None) -> float:
+def _esperaHastaSiguiente(ahora=None) -> float:
     """Segundos hasta el próximo hueco horario, más la gracia.
 
     Los buckets están alineados al reloj (igual que en el navegador), y la
@@ -93,25 +93,25 @@ def _espera_hasta_siguiente(ahora=None) -> float:
     return max(1.0, siguiente - ahora)
 
 
-def ejecutar_una_vez(refrescar_precios=True) -> int:
+def ejecutarUnaVez(refrescarPrecios=True) -> int:
     """Guarda el punto pendiente en cada portfolio objetivo. Devuelve cuántos."""
-    from routes.snapshots import guardar_snapshot, reservar_bucket
-    from stores.valoracion import valorar_portfolio
+    from routes.snapshots import guardarSnapshot, reservarBucket
+    from stores.valoracion import valorarPortfolio
 
     guardados = 0
-    for ruta in _rutas_objetivo():
+    for ruta in _rutasObjetivo():
         try:
-            with use_db_path(ruta):
-                if not reservar_bucket():
+            with useDbPath(ruta):
+                if not reservarBucket():
                     log.debug("[snapshots] %s: el hueco actual ya está reclamado", ruta.stem)
                     continue
 
-                valoracion = valorar_portfolio(refrescar_precios=refrescar_precios)
+                valoracion = valorarPortfolio(refrescarPrecios=refrescarPrecios)
                 if valoracion["activos"] == 0:
                     log.debug("[snapshots] %s: sin posiciones que valorar", ruta.stem)
                     continue
 
-                if guardar_snapshot(
+                if guardarSnapshot(
                     valoracion["total_value"], valoracion["total_invested"], valoracion["assets"]
                 ):
                     guardados += 1
@@ -131,8 +131,8 @@ def ejecutar_una_vez(refrescar_precios=True) -> int:
 def _bucle():
     while not _parada.is_set():
         try:
-            activo = _snapshots_activos()
-            espera = _espera_hasta_siguiente() if activo else _ESPERA_DESACTIVADO
+            activo = _snapshotsActivos()
+            espera = _esperaHastaSiguiente() if activo else _ESPERA_DESACTIVADO
         except Exception as e:
             log.warning("[snapshots] No se pudo calcular la próxima ejecución: %s", e)
             activo, espera = False, _ESPERA_DESACTIVADO
@@ -140,7 +140,7 @@ def _bucle():
         if _parada.wait(espera):
             return
         if activo:
-            ejecutar_una_vez()
+            ejecutarUnaVez()
 
 
 def iniciar():

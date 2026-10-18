@@ -17,7 +17,7 @@ import threading
 import time
 from datetime import UTC, datetime
 
-from providers.yahoo_finance_client import fetch_price_series
+from providers.yahoo_finance_client import fetchPriceSeries
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ def _ahora():
     return time.time()
 
 
-def normalizar_codigo(valor):
+def normalizarCodigo(valor):
     codigo = str(valor or "").strip().upper()
     if not _CODIGO.match(codigo):
         raise HistoricoInvalido(f"«{valor}» no es un código de divisa de tres letras")
@@ -74,7 +74,7 @@ def _serie(simbolo, clave, intervalo, dias, ttl, ahora):
         if guardada and ahora - guardada[0] < ttl:
             return guardada[1], None
 
-    serie, error = fetch_price_series(
+    serie, error = fetchPriceSeries(
         simbolo, ahora - dias * _DIA, ahora, interval=intervalo
     )
     if error:
@@ -91,8 +91,8 @@ def _referencia(serie, dias):
     if dias == 1:
         # «Ayer» es el cierre de la sesión anterior, no hace 24 horas exactas:
         # el lunes por la mañana, hace 24 horas es domingo.
-        dia_ultimo = datetime.fromtimestamp(ultimo["ts"], UTC).date()
-        previos = [p for p in serie if datetime.fromtimestamp(p["ts"], UTC).date() < dia_ultimo]
+        diaUltimo = datetime.fromtimestamp(ultimo["ts"], UTC).date()
+        previos = [p for p in serie if datetime.fromtimestamp(p["ts"], UTC).date() < diaUltimo]
         return previos[-1] if previos else None
 
     objetivo = ultimo["ts"] - dias * _DIA
@@ -104,24 +104,24 @@ def _referencia(serie, dias):
     return primero if primero["ts"] - objetivo <= _TOLERANCIA_DIAS * _DIA else None
 
 
-def _referencias(serie_anual):
+def _referencias(serieAnual):
     referencias = []
     for etiqueta, dias in PERIODOS:
-        punto = _referencia(serie_anual, dias)
-        if punto and punto["ts"] < serie_anual[-1]["ts"]:
+        punto = _referencia(serieAnual, dias)
+        if punto and punto["ts"] < serieAnual[-1]["ts"]:
             referencias.append({"rango": etiqueta, "ts": punto["ts"], "close": punto["close"]})
     return referencias
 
 
-def historico_par(base, quote, rango, ahora=None):
+def historicoPar(base, quote, rango, ahora=None):
     """Serie del par `base`/`quote` y los cambios por periodo.
 
     Devuelve `(datos, error)`. `datos` lleva los puntos del rango pedido, el
     último cierre y las referencias de cada periodo (el cambio se calcula en el
     navegador, para poder invertirlo sin volver a pedir nada).
     """
-    base = normalizar_codigo(base)
-    quote = normalizar_codigo(quote)
+    base = normalizarCodigo(base)
+    quote = normalizarCodigo(quote)
     if base == quote:
         raise HistoricoInvalido("Elige dos divisas distintas")
     rango = str(rango or "").strip().upper()
@@ -162,6 +162,6 @@ def historico_par(base, quote, rango, ahora=None):
     }, None
 
 
-def vaciar_cache():
+def vaciarCache():
     with _candado:
         _cache.clear()

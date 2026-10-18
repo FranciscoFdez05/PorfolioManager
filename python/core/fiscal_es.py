@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 
-from core.fifo import ADQUISICION, aplicar_fifo
+from core.fifo import ADQUISICION, aplicarFifo
 
 # Escala del ahorro por ejercicio. Cada entrada es (límite superior del tramo,
 # tipo). El último tramo es abierto.
@@ -77,7 +77,7 @@ _TIPOS_NO_COTIZADOS = {"cripto", "criptomoneda", "crypto", "no cotizado", "priva
 EJERCICIOS_ARRASTRE = 4
 
 
-def escala_del_ejercicio(anio):
+def escalaDelEjercicio(anio):
     """Escala de la base del ahorro aplicable a un ejercicio."""
     try:
         anio = int(anio)
@@ -89,9 +89,9 @@ def escala_del_ejercicio(anio):
     return _ESCALA_2016
 
 
-def ventana_antiaplicacion(tipo_activo):
+def ventanaAntiaplicacion(tipoActivo):
     """Plazo de recompra que bloquea la pérdida, según el tipo de activo."""
-    normalizado = str(tipo_activo or "").strip().lower()
+    normalizado = str(tipoActivo or "").strip().lower()
     if normalizado in _TIPOS_NO_COTIZADOS:
         return VENTANA_NO_COTIZADOS
     return VENTANA_COTIZADOS
@@ -105,14 +105,14 @@ class Liquidacion:
     ganancias: Decimal = Decimal("0")
     perdidas: Decimal = Decimal("0")
     saldo: Decimal = Decimal("0")
-    compensado_anteriores: Decimal = Decimal("0")
+    compensadoAnteriores: Decimal = Decimal("0")
     base: Decimal = Decimal("0")
     cuota: Decimal = Decimal("0")
     tramos: dict = field(default_factory=dict)
-    saldo_negativo_generado: Decimal = Decimal("0")
-    pendiente_compensar: Decimal = Decimal("0")
-    perdidas_no_computables: Decimal = Decimal("0")
-    perdidas_diferidas_liberadas: Decimal = Decimal("0")
+    saldoNegativoGenerado: Decimal = Decimal("0")
+    pendienteCompensar: Decimal = Decimal("0")
+    perdidasNoComputables: Decimal = Decimal("0")
+    perdidasDiferidasLiberadas: Decimal = Decimal("0")
     # Desglose de `pendiente_compensar`, que como total no sirve para
     # declarar: Renta Web pide los saldos negativos separados por el ejercicio
     # en que se generaron, porque cada uno caduca por su cuenta a los cuatro
@@ -121,10 +121,10 @@ class Liquidacion:
     arrastres: list = field(default_factory=list)
     # Detalle de lo que compensó este ejercicio, con el mismo formato. Sin
     # esto no se puede justificar de dónde sale `compensado_anteriores`.
-    compensaciones_aplicadas: list = field(default_factory=list)
+    compensacionesAplicadas: list = field(default_factory=list)
 
 
-def calcular_con_normativa(operaciones, tipo_activo=""):
+def calcularConNormativa(operaciones, tipoActivo=""):
     """FIFO + regla de los dos meses sobre el histórico de **un** activo.
 
     Va en dos pasadas porque la regla mira hacia adelante: para saber si una
@@ -133,24 +133,24 @@ def calcular_con_normativa(operaciones, tipo_activo=""):
     con el importe ya adherido al lote de la recompra. Una sola pasada no puede
     hacer las dos cosas.
     """
-    resultados, lotes = aplicar_fifo(operaciones)
-    bloqueos, diferidas_por_lote = _detectar_antiaplicacion(
-        resultados, operaciones, ventana_antiaplicacion(tipo_activo)
+    resultados, lotes = aplicarFifo(operaciones)
+    bloqueos, diferidasPorLote = _detectarAntiaplicacion(
+        resultados, operaciones, ventanaAntiaplicacion(tipoActivo)
     )
 
-    if not diferidas_por_lote:
+    if not diferidasPorLote:
         return resultados, lotes
 
-    resultados, lotes = aplicar_fifo(operaciones, diferidas_por_lote)
+    resultados, lotes = aplicarFifo(operaciones, diferidasPorLote)
     for resultado in resultados:
         bloqueo = bloqueos.get(resultado.ref)
         if bloqueo:
-            resultado.perdida_no_computable = bloqueo["importe"]
-            resultado.nota_antiaplicacion = bloqueo["nota"]
+            resultado.perdidaNoComputable = bloqueo["importe"]
+            resultado.notaAntiaplicacion = bloqueo["nota"]
     return resultados, lotes
 
 
-def _detectar_antiaplicacion(resultados, operaciones, ventana):
+def _detectarAntiaplicacion(resultados, operaciones, ventana):
     """Marca las pérdidas bloqueadas por recompra y a qué lote se aplazan.
 
     Devuelve `(bloqueos_por_transmision, importe_diferido_por_lote)`.
@@ -175,8 +175,8 @@ def _detectar_antiaplicacion(resultados, operaciones, ventana):
         # Las participaciones que esta venta se llevó dejan de estar en cartera
         # y dejan de poder bloquear nada de aquí en adelante.
         for consumo in resultado.lotes:
-            if consumo.lote_ref in consumido:
-                consumido[consumo.lote_ref] += consumo.cantidad
+            if consumo.loteRef in consumido:
+                consumido[consumo.loteRef] += consumo.cantidad
 
         if resultado.incidencia or not resultado.fiscal:
             continue
@@ -202,9 +202,9 @@ def _detectar_antiaplicacion(resultados, operaciones, ventana):
         if bloqueable <= 0:
             continue
 
-        importe_bloqueado = perdida * bloqueable / resultado.cantidad
+        importeBloqueado = perdida * bloqueable / resultado.cantidad
         bloqueos[resultado.ref] = {
-            "importe": importe_bloqueado,
+            "importe": importeBloqueado,
             "nota": (
                 f"Pérdida no computable por recompra de {_num(bloqueable)} "
                 f"participaciones dentro de los {ventana.days} días anteriores "
@@ -224,13 +224,13 @@ def _detectar_antiaplicacion(resultados, operaciones, ventana):
             consumido[op.ref] += usado
             pendiente -= usado
             diferidas[op.ref] = diferidas.get(op.ref, Decimal("0")) + (
-                importe_bloqueado * usado / bloqueable
+                importeBloqueado * usado / bloqueable
             )
 
     return bloqueos, diferidas
 
 
-def liquidar_ejercicios(resultados_por_anio):
+def liquidarEjercicios(resultadosPorAnio):
     """Cierra cada ejercicio en orden y arrastra los saldos negativos.
 
     `resultados_por_anio` es un dict `{anio: [Resultado, …]}`. Se procesan de
@@ -241,37 +241,37 @@ def liquidar_ejercicios(resultados_por_anio):
     # Cola de saldos negativos vivos: (ejercicio de origen, importe pendiente).
     pendientes = []
 
-    for anio in sorted(resultados_por_anio, key=_anio_int):
-        resultados = resultados_por_anio[anio]
+    for anio in sorted(resultadosPorAnio, key=_anioInt):
+        resultados = resultadosPorAnio[anio]
         liquidacion = Liquidacion(anio=str(anio))
 
         computables = [
             r for r in resultados if r.fiscal and not r.incidencia
         ]
         for resultado in computables:
-            valor = resultado.ganancia_computable
+            valor = resultado.gananciaComputable
             if valor >= 0:
                 liquidacion.ganancias += valor
             else:
                 liquidacion.perdidas += -valor
-            liquidacion.perdidas_no_computables += resultado.perdida_no_computable
-            liquidacion.perdidas_diferidas_liberadas += resultado.perdida_diferida_liberada
+            liquidacion.perdidasNoComputables += resultado.perdidaNoComputable
+            liquidacion.perdidasDiferidasLiberadas += resultado.perdidaDiferidaLiberada
 
         liquidacion.saldo = liquidacion.ganancias - liquidacion.perdidas
 
         if liquidacion.saldo > 0:
             disponible = liquidacion.saldo
-            anio_actual = _anio_int(anio)
+            anioActual = _anioInt(anio)
             for pendiente in pendientes:
                 if disponible <= 0:
                     break
-                if anio_actual - pendiente["anio"] > EJERCICIOS_ARRASTRE:
+                if anioActual - pendiente["anio"] > EJERCICIOS_ARRASTRE:
                     continue  # caducado
                 aplicado = min(pendiente["importe"], disponible)
                 pendiente["importe"] -= aplicado
                 disponible -= aplicado
-                liquidacion.compensado_anteriores += aplicado
-                liquidacion.compensaciones_aplicadas.append({
+                liquidacion.compensadoAnteriores += aplicado
+                liquidacion.compensacionesAplicadas.append({
                     "anio_origen": pendiente["anio"],
                     "importe": aplicado,
                     "ultimo_ejercicio": pendiente["anio"] + EJERCICIOS_ARRASTRE,
@@ -279,19 +279,19 @@ def liquidar_ejercicios(resultados_por_anio):
             liquidacion.base = disponible
         else:
             liquidacion.base = Decimal("0")
-            liquidacion.saldo_negativo_generado = -liquidacion.saldo
-            if liquidacion.saldo_negativo_generado > 0:
+            liquidacion.saldoNegativoGenerado = -liquidacion.saldo
+            if liquidacion.saldoNegativoGenerado > 0:
                 pendientes.append({
-                    "anio": _anio_int(anio),
-                    "importe": liquidacion.saldo_negativo_generado,
+                    "anio": _anioInt(anio),
+                    "importe": liquidacion.saldoNegativoGenerado,
                 })
 
         pendientes = [p for p in pendientes if p["importe"] > 0]
         vivos = [
             p for p in pendientes
-            if _anio_int(anio) - p["anio"] <= EJERCICIOS_ARRASTRE
+            if _anioInt(anio) - p["anio"] <= EJERCICIOS_ARRASTRE
         ]
-        liquidacion.pendiente_compensar = sum(
+        liquidacion.pendienteCompensar = sum(
             (p["importe"] for p in vivos), Decimal("0"),
         )
         liquidacion.arrastres = [
@@ -305,18 +305,18 @@ def liquidar_ejercicios(resultados_por_anio):
             for p in sorted(vivos, key=lambda p: p["anio"])
         ]
 
-        liquidacion.tramos = repartir_en_tramos(liquidacion.base, escala_del_ejercicio(anio))
+        liquidacion.tramos = repartirEnTramos(liquidacion.base, escalaDelEjercicio(anio))
         liquidacion.cuota = sum(liquidacion.tramos.values(), Decimal("0"))
         liquidaciones[str(anio)] = liquidacion
 
     return liquidaciones
 
 
-def repartir_en_tramos(base, escala):
+def repartirEnTramos(base, escala):
     """Cuota de cada tramo para una base dada."""
     tramos = {clave: Decimal("0") for clave in CLAVES_TRAMOS}
     restante = max(base, Decimal("0"))
-    limite_anterior = Decimal("0")
+    limiteAnterior = Decimal("0")
 
     for indice, (limite, tipo) in enumerate(escala):
         if restante <= 0:
@@ -324,15 +324,15 @@ def repartir_en_tramos(base, escala):
         if limite is None:
             porcion = restante
         else:
-            porcion = min(restante, limite - limite_anterior)
-            limite_anterior = limite
+            porcion = min(restante, limite - limiteAnterior)
+            limiteAnterior = limite
         tramos[CLAVES_TRAMOS[indice]] = porcion * tipo
         restante -= porcion
 
     return tramos
 
 
-def repartir_cuota_por_venta(resultados, liquidacion, escala):
+def repartirCuotaPorVenta(resultados, liquidacion, escala):
     """Imputa a cada venta su parte de la cuota anual.
 
     La escala del ahorro es anual y progresiva: no existe "el impuesto de esta
@@ -348,25 +348,25 @@ def repartir_cuota_por_venta(resultados, liquidacion, escala):
     reparto = {}
     positivas = [
         r for r in resultados
-        if r.fiscal and not r.incidencia and r.ganancia_computable > 0
+        if r.fiscal and not r.incidencia and r.gananciaComputable > 0
     ]
-    total_positivo = sum((r.ganancia_computable for r in positivas), Decimal("0"))
+    totalPositivo = sum((r.gananciaComputable for r in positivas), Decimal("0"))
 
-    if total_positivo <= 0 or liquidacion.base <= 0:
+    if totalPositivo <= 0 or liquidacion.base <= 0:
         return {r.ref: {clave: Decimal("0") for clave in CLAVES_TRAMOS} for r in resultados}
 
     # La base gravada puede ser menor que la suma de ganancias si se
     # compensaron pérdidas del propio año o de ejercicios anteriores: cada
     # venta cede parte de su ganancia en la misma proporción.
-    factor = liquidacion.base / total_positivo
+    factor = liquidacion.base / totalPositivo
 
     acumulado = Decimal("0")
     for resultado in sorted(positivas, key=lambda r: (r.fecha, r.ref)):
-        porcion = resultado.ganancia_computable * factor
-        tramos_hasta = repartir_en_tramos(acumulado + porcion, escala)
-        tramos_previos = repartir_en_tramos(acumulado, escala)
+        porcion = resultado.gananciaComputable * factor
+        tramosHasta = repartirEnTramos(acumulado + porcion, escala)
+        tramosPrevios = repartirEnTramos(acumulado, escala)
         reparto[resultado.ref] = {
-            clave: tramos_hasta[clave] - tramos_previos[clave]
+            clave: tramosHasta[clave] - tramosPrevios[clave]
             for clave in CLAVES_TRAMOS
         }
         acumulado += porcion
@@ -379,7 +379,7 @@ def repartir_cuota_por_venta(resultados, liquidacion, escala):
     return reparto
 
 
-def _anio_int(value):
+def _anioInt(value):
     try:
         return int(str(value)[:4])
     except (TypeError, ValueError):

@@ -5,40 +5,40 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from core.dinero import aTexto
-from routes.ajustes import _active_portfolio_id, _read_prefs, _write_prefs
-from routes.cuenta_ahorro import pasar_vinculos_antiguos
-from stores.cuenta_ahorro_store import clave_de_cuenta, renombrar_en_config
+from routes.ajustes import _activePortfolioId, _readPrefs, _writePrefs
+from routes.cuenta_ahorro import pasarVinculosAntiguos
+from stores.cuenta_ahorro_store import claveDeCuenta, renombrarEnConfig
 from stores.cuentas_store import (
     ETIQUETAS_TIPO,
     MONTH_KEYS,
     TIPOS,
     CuentaEnUso,
     CuentaInvalida,
-    crear_cuenta,
-    crear_transferencia,
-    eliminar_cuenta,
-    eliminar_transferencia,
-    listar_cuentas,
-    listar_remuneradas,
-    listar_transferencias,
-    modificar_cuenta,
-    modificar_transferencia,
-    obtener_cuenta,
-    reordenar_cuentas,
+    crearCuenta,
+    crearTransferencia,
+    eliminarCuenta,
+    eliminarTransferencia,
+    listarCuentas,
+    listarRemuneradas,
+    listarTransferencias,
+    modificarCuenta,
+    modificarTransferencia,
+    obtenerCuenta,
+    reordenarCuentas,
     saldos,
-    saldos_del_mes,
+    saldosDelMes,
 )
 
 log = logging.getLogger(__name__)
 
-cuentas_bp = Blueprint("cuentas", __name__)
+cuentasBp = Blueprint("cuentas", __name__)
 
 
 def _error(error, codigo=400):
     return jsonify({"ok": False, "error": str(error)}), codigo
 
 
-def _con_saldo(cuenta, calculados):
+def _conSaldo(cuenta, calculados):
     datos = calculados.get(cuenta["id"], {})
     return {
         **cuenta,
@@ -52,59 +52,59 @@ def _con_saldo(cuenta, calculados):
     }
 
 
-def _mover_configuracion_ahorro(clave_vieja, clave_nueva):
+def _moverConfiguracionAhorro(claveVieja, claveNueva):
     """Una cuenta de ahorro cambia de nombre: su configuración y el estado de sus
     aportaciones automáticas (que se guardan por nombre) la siguen."""
-    pid = _active_portfolio_id()
-    prefs = _read_prefs(pid)
-    prefs["cuentaAhorroConfig"] = renombrar_en_config(prefs.get("cuentaAhorroConfig"), clave_vieja, clave_nueva)
+    pid = _activePortfolioId()
+    prefs = _readPrefs(pid)
+    prefs["cuentaAhorroConfig"] = renombrarEnConfig(prefs.get("cuentaAhorroConfig"), claveVieja, claveNueva)
 
     generado = dict(prefs.get("cuentaAhorroGenerado") or {})
-    origen = clave_vieja.lower() or "_"
+    origen = claveVieja.lower() or "_"
     if origen in generado:
-        generado[clave_nueva.lower() or "_"] = generado.pop(origen)
+        generado[claveNueva.lower() or "_"] = generado.pop(origen)
         prefs["cuentaAhorroGenerado"] = generado
     try:
-        _write_prefs(pid, prefs)
+        _writePrefs(pid, prefs)
     except OSError:
         log.exception("[cuentas] No se pudo mover la configuración de la cuenta de ahorro renombrada")
 
 
-@cuentas_bp.route("/api/cuentas", methods=["GET"])
+@cuentasBp.route("/api/cuentas", methods=["GET"])
 def getCuentas():
-    pasar_vinculos_antiguos()
+    pasarVinculosAntiguos()
     calculados = saldos()
     return jsonify({
         "tipos": [{"id": t, "nombre": ETIQUETAS_TIPO[t]} for t in TIPOS],
-        "cuentas": [_con_saldo(c, calculados) for c in listar_cuentas()],
-        "remuneradas": listar_remuneradas(),
+        "cuentas": [_conSaldo(c, calculados) for c in listarCuentas()],
+        "remuneradas": listarRemuneradas(),
     })
 
 
-@cuentas_bp.route("/api/cuentas/saldos-mes", methods=["GET"])
+@cuentasBp.route("/api/cuentas/saldos-mes", methods=["GET"])
 def getSaldosMes():
     """Saldo con el que cada cuenta entra en un mes, para la gráfica de Métricas."""
     year = request.args.get("year", "")
     month = request.args.get("month", "")
     if not year.isdigit() or month not in MONTH_KEYS:
         return _error("Falta el año o el mes")
-    calculados = saldos_del_mes(year, month)
+    calculados = saldosDelMes(year, month)
     return jsonify({
         "cuentas": {
-            cuenta_id: {
+            cuentaId: {
                 "inicial": aTexto(datos["inicial"], decimales=2),
                 "rendimientos": aTexto(datos["rendimientos"], decimales=2),
             }
-            for cuenta_id, datos in calculados.items()
+            for cuentaId, datos in calculados.items()
         }
     })
 
 
-@cuentas_bp.route("/api/cuentas", methods=["POST"])
+@cuentasBp.route("/api/cuentas", methods=["POST"])
 def addCuenta():
     datos = request.get_json(silent=True) or {}
     try:
-        cuenta = crear_cuenta(
+        cuenta = crearCuenta(
             datos.get("nombre"), datos.get("tipo"), datos.get("saldoInicial", ""), datos.get("remunerada", ""),
             bool(datos.get("dividendos", False)),
             None if datos.get("ahorro") is None else bool(datos.get("ahorro")),
@@ -114,23 +114,23 @@ def addCuenta():
     return jsonify({"ok": True, "cuenta": cuenta}), 201
 
 
-@cuentas_bp.route("/api/cuentas/orden", methods=["PUT"])
+@cuentasBp.route("/api/cuentas/orden", methods=["PUT"])
 def ordenCuentas():
     datos = request.get_json(silent=True) or {}
     ids = datos.get("ids")
     if not isinstance(ids, list):
         return _error("Falta la lista de cuentas")
-    reordenar_cuentas([str(i) for i in ids])
+    reordenarCuentas([str(i) for i in ids])
     return jsonify({"ok": True})
 
 
-@cuentas_bp.route("/api/cuentas/<cuenta_id>", methods=["PUT"])
-def editCuenta(cuenta_id):
+@cuentasBp.route("/api/cuentas/<cuentaId>", methods=["PUT"])
+def editCuenta(cuentaId):
     datos = request.get_json(silent=True) or {}
-    antes = obtener_cuenta(cuenta_id)
+    antes = obtenerCuenta(cuentaId)
     try:
-        cuenta = modificar_cuenta(
-            cuenta_id, datos.get("nombre"), datos.get("saldoInicial"), datos.get("remunerada"),
+        cuenta = modificarCuenta(
+            cuentaId, datos.get("nombre"), datos.get("saldoInicial"), datos.get("remunerada"),
             None if datos.get("dividendos") is None else bool(datos.get("dividendos")),
             None if datos.get("ahorro") is None else bool(datos.get("ahorro")),
         )
@@ -138,14 +138,14 @@ def editCuenta(cuenta_id):
         return _error(error)
 
     if antes and antes["ahorro"] and antes["nombre"] != cuenta["nombre"]:
-        _mover_configuracion_ahorro(clave_de_cuenta(antes), clave_de_cuenta(cuenta))
+        _moverConfiguracionAhorro(claveDeCuenta(antes), claveDeCuenta(cuenta))
     return jsonify({"ok": True, "cuenta": cuenta})
 
 
-@cuentas_bp.route("/api/cuentas/<cuenta_id>", methods=["DELETE"])
-def deleteCuenta(cuenta_id):
+@cuentasBp.route("/api/cuentas/<cuentaId>", methods=["DELETE"])
+def deleteCuenta(cuentaId):
     try:
-        eliminar_cuenta(cuenta_id)
+        eliminarCuenta(cuentaId)
     except CuentaInvalida as error:
         return _error(error)
     except CuentaEnUso:
@@ -153,16 +153,16 @@ def deleteCuenta(cuenta_id):
     return jsonify({"ok": True})
 
 
-@cuentas_bp.route("/api/transferencias", methods=["GET"])
+@cuentasBp.route("/api/transferencias", methods=["GET"])
 def getTransferencias():
-    return jsonify({"transferencias": listar_transferencias()})
+    return jsonify({"transferencias": listarTransferencias()})
 
 
-@cuentas_bp.route("/api/transferencias", methods=["POST"])
+@cuentasBp.route("/api/transferencias", methods=["POST"])
 def addTransferencia():
     datos = request.get_json(silent=True) or {}
     try:
-        transferencia = crear_transferencia(
+        transferencia = crearTransferencia(
             datos.get("origen"), datos.get("destino"), datos.get("fecha"),
             datos.get("cantidad"), datos.get("concepto"), datos.get("nota"), datos.get("comision"),
         )
@@ -171,12 +171,12 @@ def addTransferencia():
     return jsonify({"ok": True, "transferencia": transferencia}), 201
 
 
-@cuentas_bp.route("/api/transferencias/<int:transferencia_id>", methods=["PUT"])
-def editTransferencia(transferencia_id):
+@cuentasBp.route("/api/transferencias/<int:transferenciaId>", methods=["PUT"])
+def editTransferencia(transferenciaId):
     datos = request.get_json(silent=True) or {}
     try:
-        transferencia = modificar_transferencia(
-            transferencia_id, datos.get("origen"), datos.get("destino"), datos.get("fecha"),
+        transferencia = modificarTransferencia(
+            transferenciaId, datos.get("origen"), datos.get("destino"), datos.get("fecha"),
             datos.get("cantidad"), datos.get("concepto"), datos.get("nota"), datos.get("comision"),
         )
     except CuentaInvalida as error:
@@ -186,8 +186,8 @@ def editTransferencia(transferencia_id):
     return jsonify({"ok": True, "transferencia": transferencia})
 
 
-@cuentas_bp.route("/api/transferencias/<int:transferencia_id>", methods=["DELETE"])
-def deleteTransferencia(transferencia_id):
-    if not eliminar_transferencia(transferencia_id):
+@cuentasBp.route("/api/transferencias/<int:transferenciaId>", methods=["DELETE"])
+def deleteTransferencia(transferenciaId):
+    if not eliminarTransferencia(transferenciaId):
         return _error("La transferencia ya no existe", 404)
     return jsonify({"ok": True})

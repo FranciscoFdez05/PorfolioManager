@@ -15,17 +15,17 @@ import pytest
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, temp_db, monkeypatch):
-    from core.db import get_db
-    from routes.planes import planes_bp
+def cliente(clienteAutenticado, tempDb, monkeypatch):
+    from core.db import getDb
+    from routes.planes import planesBp
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("INSERT INTO activos (id, name) VALUES ('bitcoin', 'Bitcoin')")
     conn.execute("INSERT INTO activos (id, name) VALUES ('oro', 'Oro')")
     conn.commit()
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
-    client, cabeceras, _app = cliente_autenticado(planes_bp)
+    client, cabeceras, _app = clienteAutenticado(planesBp)
     return client, cabeceras
 
 
@@ -35,12 +35,12 @@ def _guardar(client, cabeceras, ruta, *filas):
 
 # ── Planes de inversión ──────────────────────────────────────────────────────
 
-def test_sin_planes_la_lista_esta_vacia(cliente):
+def testSinPlanesLaListaEstaVacia(cliente):
     client, _ = cliente
     assert client.get("/api/planes").get_json() == {"rows": []}
 
 
-def test_un_plan_se_guarda_y_se_recupera_igual(cliente):
+def testUnPlanSeGuardaYSeRecuperaIgual(cliente):
     client, cabeceras = cliente
     plan = {
         "id": "plan-btc", "assetId": "bitcoin", "nombre": "Bitcoin a 120k",
@@ -64,7 +64,7 @@ def test_un_plan_se_guarda_y_se_recupera_igual(cliente):
     assert guardado["currency"] == "USD"
 
 
-def test_un_plan_ya_no_guarda_direccion_ni_stop(cliente):
+def testUnPlanYaNoGuardaDireccionNiStop(cliente):
     """Un plan de inversión no es una operativa de trading."""
     client, cabeceras = cliente
     respuesta = _guardar(
@@ -77,7 +77,7 @@ def test_un_plan_ya_no_guarda_direccion_ni_stop(cliente):
     assert "stopLoss" not in fila
 
 
-def test_guardar_reemplaza_la_lista_entera_y_conserva_el_orden(cliente):
+def testGuardarReemplazaLaListaEnteraYConservaElOrden(cliente):
     client, cabeceras = cliente
     _guardar(
         client, cabeceras, "/api/planes",
@@ -93,7 +93,7 @@ def test_guardar_reemplaza_la_lista_entera_y_conserva_el_orden(cliente):
     assert [f["id"] for f in client.get("/api/planes").get_json()["rows"]] == ["b", "c"]
 
 
-def test_un_estado_inventado_cae_al_valor_por_defecto(cliente):
+def testUnEstadoInventadoCaeAlValorPorDefecto(cliente):
     client, cabeceras = cliente
     respuesta = _guardar(
         client, cabeceras, "/api/planes",
@@ -104,7 +104,7 @@ def test_un_estado_inventado_cae_al_valor_por_defecto(cliente):
     assert (fila["estado"], fila["horizonte"]) == ("Pendiente", "Medio")
 
 
-def test_un_plan_sin_activo_se_rechaza(cliente):
+def testUnPlanSinActivoSeRechaza(cliente):
     client, cabeceras = cliente
     respuesta = _guardar(client, cabeceras, "/api/planes", {"id": "x", "nombre": "Suelto"})
 
@@ -112,7 +112,7 @@ def test_un_plan_sin_activo_se_rechaza(cliente):
     assert respuesta.get_json()["ok"] is False
 
 
-def test_un_plan_con_un_activo_que_no_existe_se_rechaza(cliente):
+def testUnPlanConUnActivoQueNoExisteSeRechaza(cliente):
     """Pasa al borrar un activo desde otra pestaña y guardar desde esta."""
     client, cabeceras = cliente
     respuesta = _guardar(
@@ -123,20 +123,20 @@ def test_un_plan_con_un_activo_que_no_existe_se_rechaza(cliente):
     assert "fantasma" in respuesta.get_json()["error"]
 
 
-def test_borrar_el_activo_se_lleva_sus_planes(cliente):
-    from core.db import get_db
+def testBorrarElActivoSeLlevaSusPlanes(cliente):
+    from core.db import getDb
 
     client, cabeceras = cliente
     _guardar(client, cabeceras, "/api/planes", {"id": "x", "assetId": "oro", "nombre": "Oro"})
 
-    conn = get_db()
+    conn = getDb()
     conn.execute("DELETE FROM activos WHERE id = 'oro'")
     conn.commit()
 
     assert client.get("/api/planes").get_json()["rows"] == []
 
 
-def test_un_plan_sin_id_recibe_uno(cliente):
+def testUnPlanSinIdRecibeUno(cliente):
     client, cabeceras = cliente
     fila = _guardar(
         client, cabeceras, "/api/planes", {"assetId": "bitcoin", "nombre": "Sin id"},
@@ -144,7 +144,7 @@ def test_un_plan_sin_id_recibe_uno(cliente):
     assert fila["id"] == "plan-1"
 
 
-def test_una_nota_kilometrica_se_rechaza(cliente):
+def testUnaNotaKilometricaSeRechaza(cliente):
     client, cabeceras = cliente
     respuesta = _guardar(
         client, cabeceras, "/api/planes", {"id": "x", "assetId": "bitcoin", "notas": "n" * 501},
@@ -154,6 +154,6 @@ def test_una_nota_kilometrica_se_rechaza(cliente):
     assert respuesta.get_json()["ok"] is False
 
 
-def test_rows_tiene_que_ser_una_lista(cliente):
+def testRowsTieneQueSerUnaLista(cliente):
     client, cabeceras = cliente
     assert client.post("/api/planes", json={"rows": "no"}, headers=cabeceras).status_code == 400

@@ -21,18 +21,18 @@ def entorno(tmp_path, monkeypatch):
     monkeypatch.setattr(pm, "_PORTFOLIOS_DIR", directorio)
     monkeypatch.setattr(pm, "_LEGACY_DB", tmp_path / "portfolio.db")
     monkeypatch.setattr(pm, "_META_FILE", meta)
-    monkeypatch.setattr("admin.backup_manager.run_startup_backup", lambda *a, **k: None)
-    pm.init_portfolios()
+    monkeypatch.setattr("admin.backup_manager.runStartupBackup", lambda *a, **k: None)
+    pm.initPortfolios()
     return {"pm": pm, "dir": directorio, "meta": meta}
 
 
-def test_altas_simultaneas_con_el_mismo_nombre_solo_crean_una(entorno):
+def testAltasSimultaneasConElMismoNombreSoloCreanUna(entorno):
     """El nombre visible no se repite: el Atajo elige la cartera por él."""
     pm = entorno["pm"]
 
     def alta(_):
         try:
-            return pm.create_portfolio("Carrera")
+            return pm.createPortfolio("Carrera")
         except pm.NombreDuplicado:
             return None
 
@@ -46,12 +46,12 @@ def test_altas_simultaneas_con_el_mismo_nombre_solo_crean_una(entorno):
     assert sorted(f.stem for f in entorno["dir"].glob("carrera*.db")) == ids
 
 
-def test_importaciones_simultaneas_con_el_mismo_nombre_dan_ids_y_nombres_distintos(entorno):
+def testImportacionesSimultaneasConElMismoNombreDanIdsYNombresDistintos(entorno):
     """Importar no falla por el nombre: se queda con «Carrera (2)», «Carrera (3)»…"""
     pm = entorno["pm"]
 
     def importar(_):
-        return pm.registrar_portfolio("Carrera", lambda destino: destino.write_bytes(b""), renombrar_si_existe=True)
+        return pm.registrarPortfolio("Carrera", lambda destino: destino.write_bytes(b""), renombrarSiExiste=True)
 
     with ThreadPoolExecutor(10) as hilos:
         ids = list(hilos.map(importar, range(10)))
@@ -64,11 +64,11 @@ def test_importaciones_simultaneas_con_el_mismo_nombre_dan_ids_y_nombres_distint
         assert (entorno["dir"] / f"{pid}.db").exists()
 
 
-def test_un_db_huerfano_no_se_borra_para_reutilizar_su_id(entorno):
+def testUnDbHuerfanoNoSeBorraParaReutilizarSuId(entorno):
     huerfano = entorno["dir"] / "ahorro.db"
     huerfano.write_bytes(b"datos que nadie ha apuntado en el indice")
 
-    pid = entorno["pm"].create_portfolio("Ahorro")
+    pid = entorno["pm"].createPortfolio("Ahorro")
 
     assert pid != "ahorro"
     assert huerfano.read_bytes() == b"datos que nadie ha apuntado en el indice"

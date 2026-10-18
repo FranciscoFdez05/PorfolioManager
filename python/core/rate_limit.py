@@ -31,13 +31,13 @@ class LimitadorVentana:
     propósito: separarlos abriría una carrera entre comprobar y anotar.
     """
 
-    def __init__(self, maximo, ventana_segundos, max_clientes=1000):
+    def __init__(self, maximo, ventanaSegundos, maxClientes=1000):
         # `maximo` admite un invocable para poder leer el ajuste en cada
         # petición: config_ini recarga config.ini cuando cambia en disco, y
         # congelar el valor aquí obligaría a reiniciar para subir el límite.
         self._maximo = maximo
-        self._ventana = float(ventana_segundos)
-        self._max_clientes = max_clientes
+        self._ventana = float(ventanaSegundos)
+        self._maxClientes = maxClientes
         self._eventos: dict[str, deque] = {}
         self._lock = threading.Lock()
 
@@ -88,7 +88,7 @@ class LimitadorVentana:
         diccionario puede crecer— y únicamente cuando ya se pasó del tope, así
         que en operación normal no cuesta nada.
         """
-        if len(self._eventos) <= self._valor(self._max_clientes, 1000):
+        if len(self._eventos) <= self._valor(self._maxClientes, 1000):
             return
         corte = ahora - self._ventana
         for clave in [k for k, marcas in self._eventos.items() if not marcas or marcas[-1] <= corte]:

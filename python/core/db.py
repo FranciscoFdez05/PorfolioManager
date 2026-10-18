@@ -16,9 +16,9 @@ log = logging.getLogger(__name__)
 # Punto de partida antes de que portfolios_manager fije la BD activa al arrancar.
 _DB_PATH = LEGACY_DB
 _local = threading.local()
-_reset_generation = 0
-_initialized_paths: set = set()  # DB paths that have already had schema + migration applied
-_init_lock = threading.Lock()
+_resetGeneration = 0
+_initializedPaths: set = set()  # DB paths that have already had schema + migration applied
+_initLock = threading.Lock()
 
 
 # Quién sabe cuál es el portfolio activo de verdad. La global de arriba es solo
@@ -27,54 +27,54 @@ _init_lock = threading.Lock()
 # escribiendo en el anterior. portfolios_manager registra aquí una función que
 # compara la firma de portfolios.json y, si otro proceso la ha cambiado, devuelve
 # la ruta nueva. Sin resolutor (los tests que fijan su propia BD) no cambia nada.
-_resolutor_activo = None
+_resolutorActivo = None
 
 
-def registrar_resolutor_activo(funcion) -> None:
-    global _resolutor_activo
-    _resolutor_activo = funcion
+def registrarResolutorActivo(funcion) -> None:
+    global _resolutorActivo
+    _resolutorActivo = funcion
 
 
-def set_active_db_path(path) -> None:
+def setActiveDbPath(path) -> None:
     global _DB_PATH
     _DB_PATH = Path(path)
-    invalidate_all_connections()
+    invalidateAllConnections()
 
 
-def get_active_db_path() -> Path:
+def getActiveDbPath() -> Path:
     """BD activa para el hilo actual: la global, salvo que haya un override."""
-    override = getattr(_local, "override_path", None)
+    override = getattr(_local, "overridePath", None)
     if override is not None:
         return override
 
-    if _resolutor_activo is not None:
-        nueva = _resolutor_activo(_DB_PATH)
+    if _resolutorActivo is not None:
+        nueva = _resolutorActivo(_DB_PATH)
         if nueva is not None and Path(nueva) != _DB_PATH:
             log.info("[db] Otro proceso cambió el portfolio activo: %s -> %s", _DB_PATH.stem, Path(nueva).stem)
-            set_active_db_path(nueva)
+            setActiveDbPath(nueva)
 
     return _DB_PATH
 
 
 @contextmanager
-def use_db_path(path):
-    """Apunta las llamadas a get_db() de ESTE hilo a otra BD.
+def useDbPath(path):
+    """Apunta las llamadas a getDb() de ESTE hilo a otra BD.
 
-    set_active_db_path() cambia la global del proceso, así que un hilo de fondo
+    setActiveDbPath() cambia la global del proceso, así que un hilo de fondo
     que recorra varios portfolios le cambiaría la base de datos por debajo a la
-    sesión web abierta. open_db_at() tampoco sirve aquí: devuelve una conexión
-    suelta, y los módulos de dominio (stores, ventas_fifo…) llaman a get_db()
+    sesión web abierta. openDbAt() tampoco sirve aquí: devuelve una conexión
+    suelta, y los módulos de dominio (stores, ventas_fifo…) llaman a getDb()
     por su cuenta. Este override es thread-local, así que solo afecta al hilo
     que lo abre, y al salir se restaura lo que hubiera.
     """
-    previo = getattr(_local, "override_path", None)
-    _local.override_path = Path(path)
-    reset_db()
+    previo = getattr(_local, "overridePath", None)
+    _local.overridePath = Path(path)
+    resetDb()
     try:
-        yield get_db()
+        yield getDb()
     finally:
-        reset_db()
-        _local.override_path = previo
+        resetDb()
+        _local.overridePath = previo
 
 _SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -686,15 +686,15 @@ def _migracion(version: int):
 _ESPERA_BLOQUEO_ESQUEMA = 120
 
 
-def _bloqueo_esquema(ruta) -> Path:
+def _bloqueoEsquema(ruta) -> Path:
     """Fichero de bloqueo de la migración de `ruta`, común a todos los procesos."""
     return paths.TMP_DIR / f"esquema-{Path(ruta).stem}.lock"
 
 
-def _aplicar_esquema(conn, ruta) -> None:
+def _aplicarEsquema(conn, ruta) -> None:
     """Crea el esquema y aplica las migraciones pendientes, una sola vez.
 
-    `_init_lock` protege de los otros hilos del proceso. Esto protege de los
+    `_initLock` protege de los otros hilos del proceso. Esto protege de los
     otros **procesos**: gunicorn levanta dos workers que importan server.py a la
     vez y abren la misma base, así que los dos llegaban aquí a la vez. Los pasos
     de migración son idempotentes uno a uno, pero no reentrantes: el paso 3
@@ -706,7 +706,7 @@ def _aplicar_esquema(conn, ruta) -> None:
     otro ya habrá terminado. Un arranque ruidoso es mejor que dos ALTER TABLE
     simultáneos sobre los datos del usuario.
     """
-    with exclusivo(_bloqueo_esquema(ruta), espera=_ESPERA_BLOQUEO_ESQUEMA):
+    with exclusivo(_bloqueoEsquema(ruta), espera=_ESPERA_BLOQUEO_ESQUEMA):
         conn.executescript(_SCHEMA)
         _migrate(conn, ruta)
         conn.commit()
@@ -764,14 +764,14 @@ def _migrate(conn, ruta=None):
         log.warning(
             "La base de datos %s declara el esquema %s y este código conoce hasta el %s. "
             "Se abre tal cual: actualiza la aplicación si algo falla.",
-            Path(ruta).name if ruta else get_active_db_path().name, version, ESQUEMA_VERSION,
+            Path(ruta).name if ruta else getActiveDbPath().name, version, ESQUEMA_VERSION,
         )
         return
 
     # La copia es de la base que se migra, no de la activa: el Atajo y el
     # listado de todas las carteras abren y migran bases que no son la activa,
     # y antes se quedaban sin punto de retorno (y la activa acumulaba copias).
-    _copia_antes_de_migrar(ruta or get_active_db_path(), version, ESQUEMA_VERSION)
+    _copiaAntesDeMigrar(ruta or getActiveDbPath(), version, ESQUEMA_VERSION)
 
     if conn.in_transaction:
         conn.commit()
@@ -798,7 +798,7 @@ def _migrate(conn, ruta=None):
     conn.execute(f"PRAGMA user_version = {int(ESQUEMA_VERSION)}")
 
 
-def _copia_antes_de_migrar(ruta, desde: int, hasta: int) -> None:
+def _copiaAntesDeMigrar(ruta, desde: int, hasta: int) -> None:
     """Punto de retorno identificable antes de tocar el esquema.
 
     Una migración aplica ALTER TABLE y DROP COLUMN, y no hay paso inverso: si
@@ -816,9 +816,9 @@ def _copia_antes_de_migrar(ruta, desde: int, hasta: int) -> None:
     actualización y no poder.
     """
     try:
-        from admin.backup_manager import backup_previo_a_migracion
+        from admin.backup_manager import backupPrevioAMigracion
 
-        destino = backup_previo_a_migracion(Path(ruta), desde, hasta)
+        destino = backupPrevioAMigracion(Path(ruta), desde, hasta)
         if destino is not None:
             log.info("Copia previa a la migración: %s", destino.name)
     except Exception as error:
@@ -831,7 +831,7 @@ def _copia_antes_de_migrar(ruta, desde: int, hasta: int) -> None:
 
 
 @_migracion(1)
-def _esquema_1(conn):
+def _esquema1(conn):
     """Estado del esquema anterior al contador de versión.
 
     Es el cuerpo que se ejecutaba en cada arranque. Se conserva entero y en
@@ -852,37 +852,37 @@ def _esquema_1(conn):
             ganancia         TEXT NOT NULL DEFAULT ''
         );
     """)
-    trading_cols = {row[1] for row in conn.execute("PRAGMA table_info(trading)")}
-    if "capital" not in trading_cols:
+    tradingCols = {row[1] for row in conn.execute("PRAGMA table_info(trading)")}
+    if "capital" not in tradingCols:
         conn.execute("ALTER TABLE trading ADD COLUMN capital TEXT NOT NULL DEFAULT ''")
-    if "capital_currency" not in trading_cols:
+    if "capital_currency" not in tradingCols:
         conn.execute("ALTER TABLE trading ADD COLUMN capital_currency TEXT NOT NULL DEFAULT 'EUR'")
-    if "ganancia_neta" not in trading_cols:
+    if "ganancia_neta" not in tradingCols:
         conn.execute("ALTER TABLE trading ADD COLUMN ganancia_neta TEXT NOT NULL DEFAULT ''")
 
-    activos_cols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
-    if "color" not in activos_cols:
+    activosCols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
+    if "color" not in activosCols:
         conn.execute("ALTER TABLE activos ADD COLUMN color TEXT NOT NULL DEFAULT ''")
-    if "tv_symbol" not in activos_cols:
+    if "tv_symbol" not in activosCols:
         conn.execute("ALTER TABLE activos ADD COLUMN tv_symbol TEXT NOT NULL DEFAULT ''")
-    if "hidden" not in activos_cols:
+    if "hidden" not in activosCols:
         conn.execute("ALTER TABLE activos ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0")
 
-    asset_snap_cols = {row[1] for row in conn.execute("PRAGMA table_info(asset_snapshots)")}
-    if "cost_eur" not in asset_snap_cols:
+    assetSnapCols = {row[1] for row in conn.execute("PRAGMA table_info(asset_snapshots)")}
+    if "cost_eur" not in assetSnapCols:
         conn.execute("ALTER TABLE asset_snapshots ADD COLUMN cost_eur REAL NOT NULL DEFAULT 0")
 
-    bonos_cols = {row[1] for row in conn.execute("PRAGMA table_info(bonos)")}
-    if "currency" not in bonos_cols:
+    bonosCols = {row[1] for row in conn.execute("PRAGMA table_info(bonos)")}
+    if "currency" not in bonosCols:
         conn.execute("ALTER TABLE bonos ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'")
 
-    rf_cols = {row[1] for row in conn.execute("PRAGMA table_info(renta_fija)")}
-    if "currency" not in rf_cols:
+    rfCols = {row[1] for row in conn.execute("PRAGMA table_info(renta_fija)")}
+    if "currency" not in rfCols:
         conn.execute("ALTER TABLE renta_fija ADD COLUMN currency TEXT NOT NULL DEFAULT 'EUR'")
 
     for table in ("operaciones", "activo_operation_rows"):
-        operation_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
-        if "comisiones_fiat" not in operation_cols:
+        operationCols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        if "comisiones_fiat" not in operationCols:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN comisiones_fiat TEXT NOT NULL DEFAULT ''")
 
     # Tipo de cambio por operación. Va en las tres tablas que registran un
@@ -909,8 +909,8 @@ def _esquema_1(conn):
         );
     """)
 
-    sc_rows_cols = {row[1] for row in conn.execute("PRAGMA table_info(stablecoins_rows)")}
-    if "comisiones" not in sc_rows_cols:
+    scRowsCols = {row[1] for row in conn.execute("PRAGMA table_info(stablecoins_rows)")}
+    if "comisiones" not in scRowsCols:
         conn.execute("ALTER TABLE stablecoins_rows ADD COLUMN comisiones TEXT NOT NULL DEFAULT ''")
 
     # Mensualidades (gastos) e ingresos recurrentes comparten los mismos campos.
@@ -924,25 +924,25 @@ def _esquema_1(conn):
         ("nota",       "TEXT NOT NULL DEFAULT ''"),
     )
     for table in ("mensualidades", "ingresos_recurrentes"):
-        existing_cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        existingCols = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
         for column, definition in _RECURRENTE_COLS:
-            if column not in existing_cols:
+            if column not in existingCols:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     # Los gastos de la venta minoran el valor de transmisión (art. 35.2 LIRPF);
     # sin esta columna la ganancia declarada salía inflada.
-    ventas_cols = {row[1] for row in conn.execute("PRAGMA table_info(ventas)")}
-    if "comision_venta" not in ventas_cols:
+    ventasCols = {row[1] for row in conn.execute("PRAGMA table_info(ventas)")}
+    if "comision_venta" not in ventasCols:
         conn.execute("ALTER TABLE ventas ADD COLUMN comision_venta TEXT NOT NULL DEFAULT ''")
 
-    div_cols = {row[1] for row in conn.execute("PRAGMA table_info(dividendos)")}
-    if "moneda_dividendo" not in div_cols:
+    divCols = {row[1] for row in conn.execute("PRAGMA table_info(dividendos)")}
+    if "moneda_dividendo" not in divCols:
         conn.execute("ALTER TABLE dividendos ADD COLUMN moneda_dividendo TEXT NOT NULL DEFAULT 'USD'")
-    if "moneda_total" not in div_cols:
+    if "moneda_total" not in divCols:
         conn.execute("ALTER TABLE dividendos ADD COLUMN moneda_total TEXT NOT NULL DEFAULT 'EUR'")
     # Cuenta (de «Cuentas») donde se cobró cada dividendo. Vacía = la que tenga
     # marcados los dividendos, que es como funcionaba antes.
-    if "cuenta" not in div_cols:
+    if "cuenta" not in divCols:
         conn.execute("ALTER TABLE dividendos ADD COLUMN cuenta TEXT NOT NULL DEFAULT ''")
 
     conn.executescript("""
@@ -989,7 +989,7 @@ def _esquema_1(conn):
     # Un activo tiene UNA moneda. Mientras hubo dos columnas (`currency` para lo
     # invertido y `precio_currency` para la cotización) podían divergir y la
     # misma fila salía con el precio en euros y el invertido en dólares.
-    if "precio_currency" in activos_cols:
+    if "precio_currency" in activosCols:
         # Sin compras anotadas manda la de cotización (es lo que se ve); con
         # compras manda la del capital invertido, porque las filas están en esa
         # moneda y el precio se reconvierte solo en el siguiente refresco.
@@ -1011,7 +1011,7 @@ def _esquema_1(conn):
 
 
 @_migracion(2)
-def _esquema_2(conn):
+def _esquema2(conn):
     """Planes de inversión y planes de aportación periódica (DCA).
 
     Solo crea tablas nuevas: no toca ni una fila de las que ya había, así que
@@ -1066,7 +1066,7 @@ def _esquema_2(conn):
 
 
 @_migracion(3)
-def _esquema_3(conn):
+def _esquema3(conn):
     """Los planes pasan a colgar de un activo, y dejan de ser trading.
 
     Tres cambios sobre las tablas que creó el paso anterior:
@@ -1081,7 +1081,7 @@ def _esquema_3(conn):
       * Por eso mismo se descartan las filas que no apuntan a ningún activo
         existente: la clave foránea no las admitiría. Es la única migración del
         proyecto que borra filas, y por eso conviene la copia previa que hace
-        `_copia_antes_de_migrar` antes de llegar aquí.
+        `_copiaAntesDeMigrar` antes de llegar aquí.
 
     Se reconstruyen las tablas enteras porque SQLite no sabe añadir una clave
     foránea con ALTER TABLE. `legacy_alter_table` mantiene el sentido clásico de
@@ -1171,7 +1171,7 @@ def _esquema_3(conn):
 
 
 @_migracion(4)
-def _esquema_4(conn):
+def _esquema4(conn):
     """El día de cobro de una mensualidad puede cambiar de un mes a otro.
 
     `dia_cobro` guarda un único día para todo el año, y eso no describe lo que
@@ -1200,7 +1200,7 @@ def _esquema_4(conn):
 
 
 @_migracion(5)
-def _esquema_5(conn):
+def _esquema5(conn):
     """Se retiran los planes de aportación periódica (DCA).
 
     La función se quita entera de la aplicación, así que su tabla deja de tener
@@ -1223,7 +1223,7 @@ def _esquema_5(conn):
 
 
 @_migracion(6)
-def _esquema_6(conn):
+def _esquema6(conn):
     """Nota libre en cada gasto e ingreso del mes.
 
     Una columna de texto más en `gastos_rows` e `ingresos_rows`, vacía por
@@ -1241,7 +1241,7 @@ def _esquema_6(conn):
 
 
 @_migracion(7)
-def _esquema_7(conn):
+def _esquema7(conn):
     """Planes de inversión de la cartera.
 
     Tres tablas nuevas y ninguna fila tocada: el plan, los activos que agrupa y
@@ -1275,7 +1275,7 @@ def _esquema_7(conn):
 
 
 @_migracion(8)
-def _esquema_8(conn):
+def _esquema8(conn):
     """Divisa fijada a mano para la cotización, por activo.
 
     La cotización se guarda siempre convertida a la divisa del activo (que es
@@ -1283,13 +1283,13 @@ def _esquema_8(conn):
     desde el interruptor de «Editar activo» y cuál: vacía, el activo conserva
     la divisa que tenga; con un código, esa pasa a ser la del activo.
     """
-    activos_cols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
-    if "convert_currency" not in activos_cols:
+    activosCols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
+    if "convert_currency" not in activosCols:
         conn.execute("ALTER TABLE activos ADD COLUMN convert_currency TEXT NOT NULL DEFAULT ''")
 
 
 @_migracion(9)
-def _esquema_9(conn):
+def _esquema9(conn):
     """Alertas de precio por activo.
 
     Una tabla nueva y ninguna fila tocada. Se crea con IF NOT EXISTS porque una
@@ -1314,7 +1314,7 @@ def _esquema_9(conn):
 
 
 @_migracion(10)
-def _esquema_10(conn):
+def _esquema10(conn):
     """Coste anual (TER) a nivel de activo.
 
     Antes se tecleaba en cada compra, pero es una propiedad del fondo. Se
@@ -1322,8 +1322,8 @@ def _esquema_10(conn):
     activo. La columna vieja de `activo_rows` se queda sin leerse: borrarla no
     aporta nada y cierra la vuelta atrás.
     """
-    activos_cols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
-    if "coste_anual" not in activos_cols:
+    activosCols = {row[1] for row in conn.execute("PRAGMA table_info(activos)")}
+    if "coste_anual" not in activosCols:
         conn.execute("ALTER TABLE activos ADD COLUMN coste_anual TEXT NOT NULL DEFAULT ''")
     conn.execute(
         "UPDATE activos SET coste_anual = COALESCE(("
@@ -1335,7 +1335,7 @@ def _esquema_10(conn):
 
 
 @_migracion(11)
-def _esquema_11(conn):
+def _esquema11(conn):
     """Cuentas de dinero y transferencias entre ellas.
 
     Hasta aquí, meter dinero en una cuenta de ahorro era un **gasto** con la
@@ -1400,7 +1400,7 @@ def _esquema_11(conn):
         "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
     ]
 
-    def nombre_de_cuenta(tipo):
+    def nombreDeCuenta(tipo):
         texto = str(tipo or "").strip()
         if texto.lower() == base:
             return ""
@@ -1408,7 +1408,7 @@ def _esquema_11(conn):
             return texto[len(base) + len(separador):].strip()
         return None
 
-    def id_de_cuenta(nombre):
+    def idDeCuenta(nombre):
         if not nombre:
             return "ahorro"
         existente = conn.execute(
@@ -1428,7 +1428,7 @@ def _esquema_11(conn):
         )
         return candidato
 
-    def fecha_de(fila):
+    def fechaDe(fila):
         if fila["fecha"]:
             return fila["fecha"]
         try:
@@ -1439,21 +1439,21 @@ def _esquema_11(conn):
     anterior = conn.row_factory
     conn.row_factory = sqlite3.Row
     try:
-        for tabla, hacia_ahorro in (("gastos_rows", True), ("ingresos_rows", False)):
+        for tabla, haciaAhorro in (("gastos_rows", True), ("ingresos_rows", False)):
             filas = conn.execute(
                 f"SELECT id, year, month, fecha, nombre, tipo, cantidad, nota FROM {tabla} "
                 "WHERE lower(tipo) LIKE 'cuenta de ahorro%' ORDER BY id"
             ).fetchall()
             for fila in filas:
-                nombre = nombre_de_cuenta(fila["tipo"])
+                nombre = nombreDeCuenta(fila["tipo"])
                 if nombre is None:
                     continue
-                cuenta = id_de_cuenta(nombre)
-                origen, destino = ("banco", cuenta) if hacia_ahorro else (cuenta, "banco")
+                cuenta = idDeCuenta(nombre)
+                origen, destino = ("banco", cuenta) if haciaAhorro else (cuenta, "banco")
                 conn.execute(
                     "INSERT INTO transferencias (fecha, origen, destino, cantidad, concepto, nota) "
                     "VALUES (?, ?, ?, ?, ?, ?)",
-                    (fecha_de(fila), origen, destino, fila["cantidad"], fila["nombre"], fila["nota"]),
+                    (fechaDe(fila), origen, destino, fila["cantidad"], fila["nombre"], fila["nota"]),
                 )
                 conn.execute(f"DELETE FROM {tabla} WHERE id = ?", (fila["id"],))
     finally:
@@ -1464,7 +1464,7 @@ def _esquema_11(conn):
 
 
 @_migracion(12)
-def _esquema_12(conn):
+def _esquema12(conn):
     """Comisión de las transferencias entre cuentas.
 
     Una columna de texto vacía por defecto (= sin comisión), así que ninguna
@@ -1478,7 +1478,7 @@ def _esquema_12(conn):
 
 
 @_migracion(13)
-def _esquema_13(conn):
+def _esquema13(conn):
     """Vínculo entre cada cuenta de dinero y su cuenta remunerada.
 
     Solo crea una tabla nueva y vacía. Los vínculos que ya hubiera en la
@@ -1497,7 +1497,7 @@ def _esquema_13(conn):
 
 
 @_migracion(14)
-def _esquema_14(conn):
+def _esquema14(conn):
     """Revisión de cada año de gastos e ingresos.
 
     El guardado de un año sustituye todas sus filas por las que manda la
@@ -1521,7 +1521,7 @@ def _esquema_14(conn):
 
 
 @_migracion(15)
-def _esquema_15(conn):
+def _esquema15(conn):
     """Qué cuenta cobra los dividendos.
 
     Antes era una casilla de la ventana de ahorro guardada en las preferencias,
@@ -1536,7 +1536,7 @@ def _esquema_15(conn):
 
 
 @_migracion(16)
-def _esquema_16(conn):
+def _esquema16(conn):
     """Qué cuentas salen en la ventana Cuenta de ahorro.
 
     Hasta ahora eran las de tipo `ahorro`, y la ventana creaba cuentas nuevas de
@@ -1551,7 +1551,7 @@ def _esquema_16(conn):
 
 
 @_migracion(17)
-def _esquema_17(conn):
+def _esquema17(conn):
     """Cuenta de cada dividendo, para las bases que ya estaban en la versión 16.
 
     La columna solo se añadía en el paso 1, así que una base creada o importada
@@ -1564,7 +1564,7 @@ def _esquema_17(conn):
 
 
 @_migracion(18)
-def _esquema_18(conn):
+def _esquema18(conn):
     """Cuenta con la que se paga cada mensualidad.
 
     Hasta ahora todas salían de la cuenta bancaria. La columna guarda el
@@ -1578,7 +1578,7 @@ def _esquema_18(conn):
 
 
 @_migracion(19)
-def _esquema_19(conn):
+def _esquema19(conn):
     """Cuenta de los ingresos recurrentes y cuenta por mes de las mensualidades.
 
     `ingresos_recurrentes.cuenta`: como en las mensualidades, vacío = bancaria.
@@ -1597,7 +1597,7 @@ def _esquema_19(conn):
 
 
 @_migracion(20)
-def _esquema_20(conn):
+def _esquema20(conn):
     """Cuenta por mes de los ingresos recurrentes.
 
     `ingresos_recurrentes.cuentas_cobro`: un JSON `{"marzo": "tarjeta"}` con solo
@@ -1610,7 +1610,7 @@ def _esquema_20(conn):
 
 
 @_migracion(21)
-def _esquema_21(conn):
+def _esquema21(conn):
     """Wallet de origen de las transacciones cripto.
 
     Hasta ahora solo se apuntaba adónde iba la cripto; con el origen, el
@@ -1625,7 +1625,7 @@ def _esquema_21(conn):
 class _CerrarAlTerminarElHilo:
     """Cierra la conexión del hilo cuando el hilo desaparece.
 
-    `get_db()` guarda una conexión por hilo y la reutiliza. Mientras el hilo
+    `getDb()` guarda una conexión por hilo y la reutiliza. Mientras el hilo
     vive es lo que se quiere; pero cuando termina (el servidor de desarrollo
     crea uno por petición, y los pools de hilos los recogen) su almacenamiento
     local se libera sin que nadie cierre la conexión: queda abierta hasta que la
@@ -1646,17 +1646,17 @@ class _CerrarAlTerminarElHilo:
             pass
 
 
-def get_db() -> sqlite3.Connection:
-    _comprobar_generacion_compartida()
-    objetivo = get_active_db_path()
+def getDb() -> sqlite3.Connection:
+    _comprobarGeneracionCompartida()
+    objetivo = getActiveDbPath()
     stale = (
         not hasattr(_local, "conn")
         or _local.conn is None
-        or getattr(_local, "_conn_gen", -1) < _reset_generation
-        # Con use_db_path() el hilo puede haber cambiado de BD sin que la
+        or getattr(_local, "_connGen", -1) < _resetGeneration
+        # Con useDbPath() el hilo puede haber cambiado de BD sin que la
         # generación global se mueva: reutilizar la conexión anterior escribiría
         # en el portfolio equivocado.
-        or getattr(_local, "conn_path", None) != str(objetivo)
+        or getattr(_local, "connPath", None) != str(objetivo)
     )
     if stale:
         old = getattr(_local, "conn", None)
@@ -1673,14 +1673,14 @@ def get_db() -> sqlite3.Connection:
             conn.execute(f"PRAGMA busy_timeout={settings.dbBusyTimeoutMs()}")
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA cache_size=-8000")
-            db_key = str(objetivo)
+            dbKey = str(objetivo)
             # Schema + migración solo una vez por BD y proceso. El lock evita
             # que dos hilos ejecuten ALTER TABLE a la vez sobre el mismo
-            # fichero; de los otros workers se encarga _aplicar_esquema.
-            with _init_lock:
-                if db_key not in _initialized_paths:
-                    _aplicar_esquema(conn, objetivo)
-                    _initialized_paths.add(db_key)
+            # fichero; de los otros workers se encarga _aplicarEsquema.
+            with _initLock:
+                if dbKey not in _initializedPaths:
+                    _aplicarEsquema(conn, objetivo)
+                    _initializedPaths.add(dbKey)
                 else:
                     conn.execute("PRAGMA foreign_keys=ON")
         except Exception:
@@ -1688,8 +1688,8 @@ def get_db() -> sqlite3.Connection:
             raise
         _local.conn = conn
         _local._cierre = _CerrarAlTerminarElHilo(conn)
-        _local.conn_path = str(objetivo)
-        _local._conn_gen = _reset_generation
+        _local.connPath = str(objetivo)
+        _local._connGen = _resetGeneration
 
     conn = _local.conn
     # Red de seguridad: si una escritura anterior falló a medio camino, su
@@ -1706,11 +1706,11 @@ def get_db() -> sqlite3.Connection:
 
 
 @contextmanager
-def open_db_at(path):
+def openDbAt(path):
     """Conexión de un solo uso a un .db concreto, sin tocar la BD activa.
 
     Los endpoints del Atajo pueden apuntar a cualquier portfolio, y no pueden
-    hacerlo con set_active_db_path(): esa función cambia la variable global del
+    hacerlo con setActiveDbPath(): esa función cambia la variable global del
     proceso, así que le cambiaría la base de datos por debajo a la sesión web
     que hubiera abierta en ese momento. Aquí se abre, se usa y se cierra.
 
@@ -1728,11 +1728,11 @@ def open_db_at(path):
         conn.execute(f"PRAGMA busy_timeout={settings.dbBusyTimeoutMs()}")
         conn.execute("PRAGMA foreign_keys=ON")
 
-        db_key = str(p)
-        with _init_lock:
-            if db_key not in _initialized_paths:
-                _aplicar_esquema(conn, p)
-                _initialized_paths.add(db_key)
+        dbKey = str(p)
+        with _initLock:
+            if dbKey not in _initializedPaths:
+                _aplicarEsquema(conn, p)
+                _initializedPaths.add(dbKey)
 
         yield conn
         conn.commit()
@@ -1749,7 +1749,7 @@ def open_db_at(path):
 @contextmanager
 def transaction():
     """Contexto transaccional: commit al salir con éxito, rollback si hay excepción."""
-    conn = get_db()
+    conn = getDb()
     try:
         yield conn
         conn.commit()
@@ -1778,7 +1778,7 @@ def transactional(func):
     return wrapper
 
 
-def reset_db():
+def resetDb():
     conn = getattr(_local, "conn", None)
     if conn is not None:
         try:
@@ -1786,58 +1786,58 @@ def reset_db():
         except Exception:
             pass
         _local.conn = None
-        _local.conn_path = None
+        _local.connPath = None
     _local._cierre = None
 
 
-def _invalidar_este_proceso():
-    global _reset_generation
-    _reset_generation += 1
+def _invalidarEsteProceso():
+    global _resetGeneration
+    _resetGeneration += 1
     # El contenido del fichero puede haber cambiado (restore/switch), así que
     # la próxima conexión debe volver a aplicar schema + migraciones.
-    with _init_lock:
-        _initialized_paths.clear()
-    reset_db()
+    with _initLock:
+        _initializedPaths.clear()
+    resetDb()
 
 
-def invalidate_all_connections():
-    """Force every thread to re-open a fresh connection on their next get_db() call.
+def invalidateAllConnections():
+    """Force every thread to re-open a fresh connection on their next getDb() call.
 
     En TODOS los procesos, no solo en este. Restaurar o reparar sustituye el
     .db por otro fichero; el otro worker de gunicorn seguía con sus conexiones
     abiertas sobre el fichero anterior —ya desvinculado— y lo que escribía se
     perdía al reiniciar. Además no migraba un backup de esquema antiguo, porque
     la ruta seguía en `_initialized_paths`. Por eso, además de invalidar aquí,
-    se deja constancia en un fichero común que `get_db()` consulta.
+    se deja constancia en un fichero común que `getDb()` consulta.
     """
-    _invalidar_este_proceso()
-    _publicar_generacion()
+    _invalidarEsteProceso()
+    _publicarGeneracion()
 
 
 # ── Generación compartida entre procesos ─────────────────────────────────────
 # Un fichero en data/tmp cuyo contenido cambia cada vez que algún proceso
 # invalida las conexiones. Cada proceso recuerda la firma que vio por última
-# vez; si cambia, cierra y reabre. Comprobarlo cuesta un stat() por get_db().
+# vez; si cambia, cierra y reabre. Comprobarlo cuesta un stat() por getDb().
 _SIN_LEER = object()
-_generacion_vista = _SIN_LEER
+_generacionVista = _SIN_LEER
 
 
-def _fichero_generacion() -> Path:
+def _ficheroGeneracion() -> Path:
     # Se lee `paths.TMP_DIR` en cada llamada: los tests lo redirigen.
     return paths.TMP_DIR / "db-generacion"
 
 
-def _firma_generacion():
+def _firmaGeneracion():
     try:
-        st = _fichero_generacion().stat()
+        st = _ficheroGeneracion().stat()
     except OSError:
         return None
     return (st.st_mtime_ns, st.st_size, st.st_ino)
 
 
-def _publicar_generacion() -> None:
-    global _generacion_vista
-    ruta = _fichero_generacion()
+def _publicarGeneracion() -> None:
+    global _generacionVista
+    ruta = _ficheroGeneracion()
     try:
         ruta.parent.mkdir(parents=True, exist_ok=True)
         tmp = ruta.with_name(f"{ruta.name}.{os.getpid()}.{threading.get_ident()}.tmp")
@@ -1846,33 +1846,33 @@ def _publicar_generacion() -> None:
     except OSError as error:
         log.warning("[db] No se pudo avisar a los demás procesos del cambio de base de datos: %s", error)
         return
-    _generacion_vista = _firma_generacion()
+    _generacionVista = _firmaGeneracion()
 
 
-def _comprobar_generacion_compartida() -> None:
-    global _generacion_vista
-    firma = _firma_generacion()
-    if firma == _generacion_vista:
+def _comprobarGeneracionCompartida() -> None:
+    global _generacionVista
+    firma = _firmaGeneracion()
+    if firma == _generacionVista:
         return
-    primera_vez = _generacion_vista is _SIN_LEER
-    _generacion_vista = firma
+    primeraVez = _generacionVista is _SIN_LEER
+    _generacionVista = firma
     # La primera lectura de un proceso solo toma nota: lo que hubiera antes de
     # arrancar ya está reflejado en las conexiones que va a abrir.
-    if not primera_vez:
+    if not primeraVez:
         log.info("[db] Otro proceso ha sustituido una base de datos; se reabren las conexiones")
-        _invalidar_este_proceso()
+        _invalidarEsteProceso()
 
 
-def init_db():
-    get_db()
+def initDb():
+    getDb()
 
 
-def init_db_at_path(path) -> None:
+def initDbAtPath(path) -> None:
     """Create and initialize an empty DB at the given path without changing the active DB."""
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(p), check_same_thread=False, timeout=settings.backupSqliteTimeout())
     try:
-        _aplicar_esquema(conn, p)
+        _aplicarEsquema(conn, p)
     finally:
         conn.close()

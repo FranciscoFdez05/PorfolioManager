@@ -46,7 +46,7 @@ _TIMEOUT_SONDA = 10.0
 
 # ── Qué vigilar ───────────────────────────────────────────────────────────────
 
-def leer_objetivos(texto: str, puerto: int) -> list:
+def leerObjetivos(texto: str, puerto: int) -> list:
     """[(nombre, [urls])] a partir de «nombre=url|url2, otro=url».
 
     Varias URL separadas por «|» son alternativas para el mismo objetivo: sirve
@@ -76,10 +76,10 @@ def leer_objetivos(texto: str, puerto: int) -> list:
 # volumen de datos de Caddy en solo lectura en /caddy-data para que el vigilante
 # pueda comprobar que quien contesta es de verdad ese Caddy.
 _CA_POR_DEFECTO = "/caddy-data/caddy/pki/authorities/local/root.crt"
-_avisado_sin_ca = False
+_avisadoSinCa = False
 
 
-def contexto_tls(ruta_ca=None):
+def contextoTls(rutaCa=None):
     """Contexto TLS para sondear el proxy.
 
     Con la CA de Caddy a mano se verifica la cadena: un equipo de la red interna
@@ -93,10 +93,10 @@ def contexto_tls(ruta_ca=None):
     antes, sin verificar: un vigilante que diese por caída una aplicación sana
     solo porque no encuentra la CA sería peor. Se avisa una vez en el log.
     """
-    global _avisado_sin_ca
+    global _avisadoSinCa
     import os
 
-    ruta = ruta_ca or os.environ.get("VIGILANTE_CA", _CA_POR_DEFECTO)
+    ruta = rutaCa or os.environ.get("VIGILANTE_CA", _CA_POR_DEFECTO)
     if ruta and os.path.isfile(ruta):
         contexto = ssl.create_default_context()
         contexto.load_verify_locations(cafile=ruta)
@@ -104,15 +104,15 @@ def contexto_tls(ruta_ca=None):
         contexto.verify_mode = ssl.CERT_REQUIRED
         return contexto
 
-    if not _avisado_sin_ca:
-        _avisado_sin_ca = True
+    if not _avisadoSinCa:
+        _avisadoSinCa = True
         log.warning("Sin la CA de Caddy (%s): el certificado del proxy no se verifica.", ruta)
     return ssl._create_unverified_context()
 
 
 def sondear(urls, timeout=_TIMEOUT_SONDA, contexto=None):
     """(estado, detalle) tras preguntar a las URL en orden. Nunca lanza."""
-    contexto = contexto or contexto_tls()
+    contexto = contexto or contextoTls()
     resultado = (CAIDO, "sin respuesta")
 
     for url in urls:
@@ -122,7 +122,7 @@ def sondear(urls, timeout=_TIMEOUT_SONDA, contexto=None):
                 return OK, ""
         except HTTPError as error:
             if error.code == 503:
-                return DEGRADADO, _fallo_del_health(error)
+                return DEGRADADO, _falloDelHealth(error)
             resultado = (CAIDO, f"HTTP {error.code}")
         except (URLError, OSError, ValueError) as error:
             motivo = getattr(error, "reason", error)
@@ -130,7 +130,7 @@ def sondear(urls, timeout=_TIMEOUT_SONDA, contexto=None):
     return resultado
 
 
-def _fallo_del_health(error: HTTPError) -> str:
+def _falloDelHealth(error: HTTPError) -> str:
     try:
         cuerpo = json.loads(error.read().decode("utf-8", errors="replace"))
         return str(cuerpo.get("fallo") or cuerpo.get("estado") or "degradado")[:120]
@@ -161,8 +161,8 @@ class Vigia:
     problema: str | None = None      # OK, DEGRADADO o CAIDO mientras dura una racha
     desde: float | None = None       # instante (epoch) del primer fallo de la racha
     avisado: str | None = None       # qué problema se ha llegado a contar
-    ultimo_aviso: float = 0.0
-    recuperacion_pendiente: bool = field(default=False)
+    ultimoAviso: float = 0.0
+    recuperacionPendiente: bool = field(default=False)
 
     def procesar(self, estado: str, detalle: str, ahora: float) -> None:
         if estado == OK:
@@ -177,16 +177,16 @@ class Vigia:
             self.fallos = 0
             self.desde = self.desde or ahora
         self.fallos += 1
-        self.recuperacion_pendiente = False
+        self.recuperacionPendiente = False
 
         if self.fallos < self.umbral:
             return
 
-        toca_recordar = (
+        tocaRecordar = (
             self.recordatorio > 0 and self.avisado == estado
-            and ahora - self.ultimo_aviso >= self.recordatorio
+            and ahora - self.ultimoAviso >= self.recordatorio
         )
-        if self.avisado != estado or toca_recordar:
+        if self.avisado != estado or tocaRecordar:
             self._avisar(estado, detalle, ahora, recordatorio=self.avisado == estado)
 
     def _avisar(self, estado, detalle, ahora, recordatorio) -> None:
@@ -202,31 +202,31 @@ class Vigia:
 
         if self.enviar(texto):
             self.avisado = estado
-            self.ultimo_aviso = ahora
+            self.ultimoAviso = ahora
         else:
             log.warning("No se pudo enviar el aviso de %s; se reintenta en la siguiente comprobación", self.nombre)
 
     def _recuperado(self, ahora) -> None:
-        if self.avisado is not None or self.recuperacion_pendiente:
+        if self.avisado is not None or self.recuperacionPendiente:
             duracion = _duracion(ahora - (self.desde or ahora))
             if self.enviar(f"🟢 {self.nombre} vuelve a responder (estuvo mal {duracion})"):
-                self.recuperacion_pendiente = False
+                self.recuperacionPendiente = False
             else:
                 # Sin poder contarlo: se conserva la hora de la caída y se
                 # reintenta en la siguiente comprobación.
-                self.recuperacion_pendiente = True
+                self.recuperacionPendiente = True
                 self.avisado = None
                 return
         self.fallos = 0
         self.problema = None
         self.desde = None
         self.avisado = None
-        self.ultimo_aviso = 0.0
+        self.ultimoAviso = 0.0
 
 
 # ── Bucle ─────────────────────────────────────────────────────────────────────
 
-def _enviar_por_telegram(texto: str) -> bool:
+def _enviarPorTelegram(texto: str) -> bool:
     from core import telegram_notifier
 
     # `responder` y no `notificar`: que la aplicación esté caída es lo que el
@@ -234,7 +234,7 @@ def _enviar_por_telegram(texto: str) -> bool:
     return telegram_notifier.responder(texto)
 
 
-def ejecutar(objetivos, intervalo, umbral, recordatorio, enviar=_enviar_por_telegram,
+def ejecutar(objetivos, intervalo, umbral, recordatorio, enviar=_enviarPorTelegram,
              sonda=sondear, dormir=time.sleep, vueltas=None) -> None:
     """Bucle principal. `vueltas` limita las rondas (para las pruebas)."""
     vigias = [(Vigia(nombre, umbral, recordatorio, enviar), urls) for nombre, urls in objetivos]
@@ -265,7 +265,7 @@ def main() -> int:
 
     logging.basicConfig(level=settings.nivelLog(), format=settings.formatoLog())
 
-    objetivos = leer_objetivos(settings.vigilanteUrl(), settings.puerto())
+    objetivos = leerObjetivos(settings.vigilanteUrl(), settings.puerto())
     log.info(
         "Vigilando %s cada %s s (avisa tras %s fallos seguidos)",
         ", ".join(f"{n} → {u[0]}" for n, u in objetivos),

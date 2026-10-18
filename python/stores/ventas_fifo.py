@@ -25,7 +25,7 @@ from dataclasses import replace
 from decimal import Decimal
 
 from core import fifo, fiscal_es
-from core.db import get_db
+from core.db import getDb
 from core.fifo import ADQUISICION, TRANSMISION, Operacion
 
 # Motivos de incidencia propios de esta capa (los de reparto viven en core.fifo).
@@ -60,26 +60,26 @@ BLOQUEANTES = {
 }
 
 
-def mensaje_incidencia(codigo):
+def mensajeIncidencia(codigo):
     return _MENSAJES.get(codigo, "")
 
 
-def _es_cripto(tipo):
+def _esCripto(tipo):
     return str(tipo or "").strip().lower() == "cripto"
 
 
-def _cargar_activos():
-    conn = get_db()
+def _cargarActivos():
+    conn = getDb()
     return {
         row["id"]: {"id": row["id"], "name": row["name"], "type": row["type"]}
         for row in conn.execute("SELECT id, name, type FROM activos")
     }
 
 
-def _operaciones_de_fichas():
+def _operacionesDeFichas():
     """Movimientos apuntados en la ficha de cada activo y en sus operaciones."""
-    conn = get_db()
-    por_activo = {}
+    conn = getDb()
+    porActivo = {}
 
     filas = conn.execute(
         "SELECT id, asset_id, fecha_operacion, tipo_operacion, participaciones, "
@@ -87,18 +87,18 @@ def _operaciones_de_fichas():
         "FROM activo_rows ORDER BY asset_id, id"
     ).fetchall()
 
-    activos = _cargar_activos()
+    activos = _cargarActivos()
 
     for fila in filas:
         activo = activos.get(fila["asset_id"])
         if activo is None:
             continue
-        cripto = _es_cripto(activo["type"])
+        cripto = _esCripto(activo["type"])
         cantidad = _num(fila["participaciones"])
         if cantidad <= 0:
             continue
 
-        tipo_operacion = str(fila["tipo_operacion"] or "").strip().lower()
+        tipoOperacion = str(fila["tipo_operacion"] or "").strip().lower()
         precio = _num(fila["precio_participacion"])
         bruto = _num(fila["capital_invertido_bruto"])
         # En cripto el usuario apunta el importe total invertido; en el resto,
@@ -114,18 +114,18 @@ def _operaciones_de_fichas():
             comision = _num(fila["comisiones"])
 
         try:
-            fecha = fifo.parse_fecha(fila["fecha_operacion"])
+            fecha = fifo.parseFecha(fila["fecha_operacion"])
         except fifo.FifoError:
             # Una fila de la ficha sin fecha legible no puede ordenarse. Se
             # ignora en vez de tumbar el cálculo de todo el activo; la ficha
             # tiene su propia pantalla para corregirla.
             continue
 
-        por_activo.setdefault(fila["asset_id"], []).append(Operacion(
+        porActivo.setdefault(fila["asset_id"], []).append(Operacion(
             ref=f"{fila['asset_id']}:ficha:{fila['id']}",
-            activo_id=fila["asset_id"],
+            activoId=fila["asset_id"],
             fecha=fecha,
-            tipo=TRANSMISION if tipo_operacion == "venta" else ADQUISICION,
+            tipo=TRANSMISION if tipoOperacion == "venta" else ADQUISICION,
             cantidad=cantidad,
             importe=importe,
             comision=comision,
@@ -147,16 +147,16 @@ def _operaciones_de_fichas():
         if cantidad <= 0:
             continue
         try:
-            fecha = fifo.parse_fecha(fila["fecha_apertura"])
+            fecha = fifo.parseFecha(fila["fecha_apertura"])
         except fifo.FifoError:
             continue
 
-        es_venta = str(fila["orden"] or "").strip().lower() == "venta"
-        por_activo.setdefault(fila["asset_id"], []).append(Operacion(
+        esVenta = str(fila["orden"] or "").strip().lower() == "venta"
+        porActivo.setdefault(fila["asset_id"], []).append(Operacion(
             ref=f"{fila['asset_id']}:op:{fila['id']}",
-            activo_id=fila["asset_id"],
+            activoId=fila["asset_id"],
             fecha=fecha,
-            tipo=TRANSMISION if es_venta else ADQUISICION,
+            tipo=TRANSMISION if esVenta else ADQUISICION,
             cantidad=cantidad,
             importe=_num(fila["total"]),
             comision=_num(fila["comisiones_fiat"]),
@@ -167,18 +167,18 @@ def _operaciones_de_fichas():
             fiscal=False,
         ))
 
-    return por_activo, activos
+    return porActivo, activos
 
 
-def _leer_ventas_crudas():
-    conn = get_db()
+def _leerVentasCrudas():
+    conn = getDb()
     return conn.execute(
         "SELECT rowid AS seq, id, year, fecha, asset_id, cantidad, valor_venta, comision_venta "
         "FROM ventas ORDER BY year, rowid"
     ).fetchall()
 
 
-def validar_venta(fila, activos):
+def validarVenta(fila, activos):
     """Comprueba una fila de venta antes de meterla en la línea temporal."""
     if fila["asset_id"] not in activos:
         return None, INCIDENCIA_ACTIVO
@@ -192,7 +192,7 @@ def validar_venta(fila, activos):
         return None, INCIDENCIA_PRECIO
 
     try:
-        fecha = fifo.parse_fecha(fila["fecha"])
+        fecha = fifo.parseFecha(fila["fecha"])
     except fifo.FifoError:
         return None, INCIDENCIA_FECHA
 
@@ -202,23 +202,23 @@ def validar_venta(fila, activos):
     return {"fecha": fecha, "cantidad": cantidad, "precio": precio}, ""
 
 
-def _añadir_ventas(por_activo, ventas, activos):
+def _añadirVentas(porActivo, ventas, activos):
     """Mete las ventas fiscales válidas en la línea temporal de cada activo.
 
     Devuelve `{(anio, id): incidencia}` con las que no se pudieron colocar.
     """
     invalidas = {}
     for fila in ventas:
-        datos, incidencia = validar_venta(fila, activos)
+        datos, incidencia = validarVenta(fila, activos)
         clave = (fila["year"], fila["id"])
         if incidencia:
             invalidas[clave] = incidencia
             continue
 
         ref = f"venta:{fila['year']}:{fila['id']}"
-        por_activo.setdefault(fila["asset_id"], []).append(Operacion(
+        porActivo.setdefault(fila["asset_id"], []).append(Operacion(
             ref=ref,
-            activo_id=fila["asset_id"],
+            activoId=fila["asset_id"],
             fecha=datos["fecha"],
             tipo=TRANSMISION,
             cantidad=datos["cantidad"],
@@ -234,7 +234,7 @@ def _añadir_ventas(por_activo, ventas, activos):
     return invalidas
 
 
-def cartera_viva():
+def carteraViva():
     """Posición que sigue en cartera por activo, según el FIFO.
 
     Devuelve `{asset_id: {"cantidad": Decimal, "coste": Decimal}}`, en la moneda
@@ -242,7 +242,7 @@ def cartera_viva():
     lo necesita el snapshot del servidor para valorar la cartera sin depender de
     que haya una pestaña abierta.
 
-    Dos diferencias deliberadas con `calcular_todo()`:
+    Dos diferencias deliberadas con `calcularTodo()`:
 
     * Las comisiones se descuentan de las operaciones antes de repartir. El
       coste que devuelve esta función es el **invertido bruto**, que es la cifra
@@ -252,26 +252,26 @@ def cartera_viva():
     * No pasa por `fiscal_es`: la regla de antiaplicación mueve el resultado
       declarable de una venta, no las participaciones que quedan ni su coste.
     """
-    por_activo, activos = _operaciones_de_fichas()
-    _añadir_ventas(por_activo, _leer_ventas_crudas(), activos)
+    porActivo, activos = _operacionesDeFichas()
+    _añadirVentas(porActivo, _leerVentasCrudas(), activos)
 
     cartera = {}
-    for activo_id, operaciones in por_activo.items():
-        sin_comision = [replace(op, comision=Decimal("0")) for op in operaciones]
-        _, lotes = fifo.aplicar_fifo(sin_comision)
+    for activoId, operaciones in porActivo.items():
+        sinComision = [replace(op, comision=Decimal("0")) for op in operaciones]
+        _, lotes = fifo.aplicarFifo(sinComision)
 
         cantidad = sum((lote.restante for lote in lotes), Decimal("0"))
-        coste = sum((lote.restante * lote.coste_unitario for lote in lotes), Decimal("0"))
+        coste = sum((lote.restante * lote.costeUnitario for lote in lotes), Decimal("0"))
         if cantidad > 0:
-            cartera[activo_id] = {"cantidad": cantidad, "coste": coste}
+            cartera[activoId] = {"cantidad": cantidad, "coste": coste}
 
     return cartera
 
 
-_cache_hilo = threading.local()
+_cacheHilo = threading.local()
 
 
-def calcular_todo():
+def calcularTodo():
     """Liquida todas las ventas de todos los ejercicios. Memoizado por hilo.
 
     El cálculo depende de tres tablas (`activos`, las fichas de operaciones y
@@ -294,18 +294,18 @@ def calcular_todo():
     Nadie fuera de este módulo debe mutar el diccionario devuelto: con caché,
     ese mismo objeto se reparte entre peticiones.
     """
-    conn = get_db()
+    conn = getDb()
     clave = (id(conn), conn.execute("PRAGMA data_version").fetchone()[0], conn.total_changes)
-    if getattr(_cache_hilo, "clave", None) == clave:
-        return _cache_hilo.resultado
+    if getattr(_cacheHilo, "clave", None) == clave:
+        return _cacheHilo.resultado
 
-    resultado = _calcular_todo_sin_cache()
-    _cache_hilo.clave = clave
-    _cache_hilo.resultado = resultado
+    resultado = _calcularTodoSinCache()
+    _cacheHilo.clave = clave
+    _cacheHilo.resultado = resultado
     return resultado
 
 
-def _calcular_todo_sin_cache():
+def _calcularTodoSinCache():
     """Liquida todas las ventas de todos los ejercicios.
 
     Se calcula siempre sobre el histórico completo, nunca sobre un año suelto:
@@ -316,72 +316,72 @@ def _calcular_todo_sin_cache():
     Devuelve `{"filas": {(anio, id): dato}, "liquidaciones": {...},
     "incidencias": [...]}`.
     """
-    por_activo, activos = _operaciones_de_fichas()
-    ventas = _leer_ventas_crudas()
-    invalidas = _añadir_ventas(por_activo, ventas, activos)
+    porActivo, activos = _operacionesDeFichas()
+    ventas = _leerVentasCrudas()
+    invalidas = _añadirVentas(porActivo, ventas, activos)
 
-    resultados_por_ref = {}
-    lotes_vivos = {}
-    for activo_id, operaciones in por_activo.items():
-        tipo = activos.get(activo_id, {}).get("type", "")
-        resultados, lotes = fiscal_es.calcular_con_normativa(operaciones, tipo)
-        lotes_vivos[activo_id] = lotes
+    resultadosPorRef = {}
+    lotesVivos = {}
+    for activoId, operaciones in porActivo.items():
+        tipo = activos.get(activoId, {}).get("type", "")
+        resultados, lotes = fiscal_es.calcularConNormativa(operaciones, tipo)
+        lotesVivos[activoId] = lotes
         for resultado in resultados:
-            resultados_por_ref[resultado.ref] = resultado
+            resultadosPorRef[resultado.ref] = resultado
 
     # Agrupa por ejercicio solo los resultados fiscales (los de la ficha mueven
     # la posición pero no declaran).
-    resultados_por_anio = {}
+    resultadosPorAnio = {}
     for fila in ventas:
         clave = (fila["year"], fila["id"])
         if clave in invalidas:
             continue
-        resultado = resultados_por_ref.get(f"venta:{fila['year']}:{fila['id']}")
+        resultado = resultadosPorRef.get(f"venta:{fila['year']}:{fila['id']}")
         if resultado is not None:
-            resultados_por_anio.setdefault(fila["year"], []).append(resultado)
+            resultadosPorAnio.setdefault(fila["year"], []).append(resultado)
 
     # Un ejercicio existente sin ventas válidas también necesita liquidación
     # (a cero) para que la pantalla tenga algo que enseñar.
-    conn = get_db()
+    conn = getDb()
     for row in conn.execute("SELECT year FROM ventas_years"):
-        resultados_por_anio.setdefault(row["year"], [])
+        resultadosPorAnio.setdefault(row["year"], [])
 
-    liquidaciones = fiscal_es.liquidar_ejercicios(resultados_por_anio)
+    liquidaciones = fiscal_es.liquidarEjercicios(resultadosPorAnio)
 
     filas = {}
     incidencias = []
-    for anio, resultados in resultados_por_anio.items():
+    for anio, resultados in resultadosPorAnio.items():
         liquidacion = liquidaciones[str(anio)]
-        reparto = fiscal_es.repartir_cuota_por_venta(
-            resultados, liquidacion, fiscal_es.escala_del_ejercicio(anio)
+        reparto = fiscal_es.repartirCuotaPorVenta(
+            resultados, liquidacion, fiscal_es.escalaDelEjercicio(anio)
         )
         for resultado in resultados:
-            _, venta_id = resultado.ref.rsplit(":", 1)
-            filas[(anio, venta_id)] = _serializar_fila(
+            _, ventaId = resultado.ref.rsplit(":", 1)
+            filas[(anio, ventaId)] = _serializarFila(
                 resultado, reparto.get(resultado.ref, {})
             )
             if resultado.incidencia:
                 incidencias.append({
                     "year": anio,
-                    "id": venta_id,
+                    "id": ventaId,
                     "codigo": resultado.incidencia,
-                    "mensaje": mensaje_incidencia(resultado.incidencia),
+                    "mensaje": mensajeIncidencia(resultado.incidencia),
                 })
 
-    for (anio, venta_id), codigo in invalidas.items():
-        filas[(anio, venta_id)] = fila_vacia(codigo)
+    for (anio, ventaId), codigo in invalidas.items():
+        filas[(anio, ventaId)] = filaVacia(codigo)
         incidencias.append({
             "year": anio,
-            "id": venta_id,
+            "id": ventaId,
             "codigo": codigo,
-            "mensaje": mensaje_incidencia(codigo),
+            "mensaje": mensajeIncidencia(codigo),
         })
 
     return {
         "filas": filas,
         "liquidaciones": liquidaciones,
         "incidencias": incidencias,
-        "lotes_vivos": lotes_vivos,
+        "lotes_vivos": lotesVivos,
     }
 
 
@@ -399,44 +399,44 @@ def _calcular_todo_sin_cache():
 REF_SIMULACION = "simulacion"
 
 
-def _liquidar_con(por_activo, activos, ventas, invalidas, extra=None):
+def _liquidarCon(porActivo, activos, ventas, invalidas, extra=None):
     """Liquida todos los ejercicios, opcionalmente con una venta más.
 
     `extra` es una `Operacion` que no está guardada en ninguna parte. No se
     mezcla con `por_activo` para que la misma línea temporal pueda liquidarse
     dos veces, con ella y sin ella.
     """
-    por_ref = {}
-    activos_a_recorrer = set(por_activo)
+    porRef = {}
+    activosARecorrer = set(porActivo)
     if extra is not None:
-        activos_a_recorrer.add(extra.activo_id)
+        activosARecorrer.add(extra.activoId)
 
-    for activo_id in activos_a_recorrer:
-        operaciones = list(por_activo.get(activo_id, []))
-        if extra is not None and extra.activo_id == activo_id:
+    for activoId in activosARecorrer:
+        operaciones = list(porActivo.get(activoId, []))
+        if extra is not None and extra.activoId == activoId:
             operaciones.append(extra)
-        tipo = activos.get(activo_id, {}).get("type", "")
-        resultados, _lotes = fiscal_es.calcular_con_normativa(operaciones, tipo)
+        tipo = activos.get(activoId, {}).get("type", "")
+        resultados, _lotes = fiscal_es.calcularConNormativa(operaciones, tipo)
         for resultado in resultados:
-            por_ref[resultado.ref] = resultado
+            porRef[resultado.ref] = resultado
 
-    resultados_por_anio = {}
+    resultadosPorAnio = {}
     for fila in ventas:
         if (fila["year"], fila["id"]) in invalidas:
             continue
-        resultado = por_ref.get(f"venta:{fila['year']}:{fila['id']}")
+        resultado = porRef.get(f"venta:{fila['year']}:{fila['id']}")
         if resultado is not None:
-            resultados_por_anio.setdefault(str(fila["year"]), []).append(resultado)
+            resultadosPorAnio.setdefault(str(fila["year"]), []).append(resultado)
 
     if extra is not None:
-        simulada = por_ref.get(REF_SIMULACION)
+        simulada = porRef.get(REF_SIMULACION)
         if simulada is not None:
-            resultados_por_anio.setdefault(str(extra.fecha.year), []).append(simulada)
+            resultadosPorAnio.setdefault(str(extra.fecha.year), []).append(simulada)
 
-    return por_ref, fiscal_es.liquidar_ejercicios(resultados_por_anio)
+    return porRef, fiscal_es.liquidarEjercicios(resultadosPorAnio)
 
 
-def simular_venta(asset_id, fecha_texto, cantidad, precio, comision=0):
+def simularVenta(assetId, fechaTexto, cantidad, precio, comision=0):
     """Qué saldría de vender ahora mismo. No guarda nada.
 
     Devuelve `(dato, incidencia)`. La incidencia bloqueante (fecha ilegible,
@@ -444,8 +444,8 @@ def simular_venta(asset_id, fecha_texto, cantidad, precio, comision=0):
     lo que hay, sin compras previas— llegan dentro del dato, porque el resto de
     las cifras siguen siendo informativas.
     """
-    activos = _cargar_activos()
-    activo = activos.get(asset_id)
+    activos = _cargarActivos()
+    activo = activos.get(assetId)
     if activo is None:
         return None, INCIDENCIA_ACTIVO
 
@@ -458,17 +458,17 @@ def simular_venta(asset_id, fecha_texto, cantidad, precio, comision=0):
         return None, INCIDENCIA_PRECIO
 
     try:
-        fecha = fifo.parse_fecha(fecha_texto)
+        fecha = fifo.parseFecha(fechaTexto)
     except fifo.FifoError:
         return None, INCIDENCIA_FECHA
 
-    por_activo, activos = _operaciones_de_fichas()
-    ventas = _leer_ventas_crudas()
-    invalidas = _añadir_ventas(por_activo, ventas, activos)
+    porActivo, activos = _operacionesDeFichas()
+    ventas = _leerVentasCrudas()
+    invalidas = _añadirVentas(porActivo, ventas, activos)
 
     operacion = Operacion(
         ref=REF_SIMULACION,
-        activo_id=asset_id,
+        activoId=assetId,
         fecha=fecha,
         tipo=TRANSMISION,
         cantidad=cantidad,
@@ -481,51 +481,51 @@ def simular_venta(asset_id, fecha_texto, cantidad, precio, comision=0):
     )
 
     anio = str(fecha.year)
-    _, liquidaciones_sin = _liquidar_con(por_activo, activos, ventas, invalidas)
-    por_ref, liquidaciones_con = _liquidar_con(por_activo, activos, ventas, invalidas, operacion)
+    _, liquidacionesSin = _liquidarCon(porActivo, activos, ventas, invalidas)
+    porRef, liquidacionesCon = _liquidarCon(porActivo, activos, ventas, invalidas, operacion)
 
-    resultado = por_ref.get(REF_SIMULACION)
+    resultado = porRef.get(REF_SIMULACION)
     if resultado is None:
         return None, INCIDENCIA_CANTIDAD
 
-    sin = liquidaciones_sin.get(anio)
-    con = liquidaciones_con.get(anio)
-    cuota_sin = sin.cuota if sin is not None else Decimal("0")
-    cuota_con = con.cuota if con is not None else Decimal("0")
-    cuota_venta = cuota_con - cuota_sin
+    sin = liquidacionesSin.get(anio)
+    con = liquidacionesCon.get(anio)
+    cuotaSin = sin.cuota if sin is not None else Decimal("0")
+    cuotaCon = con.cuota if con is not None else Decimal("0")
+    cuotaVenta = cuotaCon - cuotaSin
 
-    compensado_sin = sin.compensado_anteriores if sin is not None else Decimal("0")
-    compensado_con = con.compensado_anteriores if con is not None else Decimal("0")
+    compensadoSin = sin.compensadoAnteriores if sin is not None else Decimal("0")
+    compensadoCon = con.compensadoAnteriores if con is not None else Decimal("0")
 
-    ganancia = resultado.ganancia_computable
-    valor_transmision = resultado.valor_transmision
+    ganancia = resultado.gananciaComputable
+    valorTransmision = resultado.valorTransmision
 
     dato = {
         "activo": activo["name"],
         "tipo": activo["type"],
         "anio": anio,
         "cantidad": _money(cantidad, escala="0.00000001"),
-        "disponible": _money(resultado.disponible_antes, escala="0.00000001"),
-        "valorTransmision": _money(valor_transmision),
-        "costeAdquisicion": _money(resultado.coste_adquisicion),
+        "disponible": _money(resultado.disponibleAntes, escala="0.00000001"),
+        "valorTransmision": _money(valorTransmision),
+        "costeAdquisicion": _money(resultado.costeAdquisicion),
         "ganancia": _money(ganancia),
-        "cuota": _money(cuota_venta),
-        "neto": _money(valor_transmision - cuota_venta),
+        "cuota": _money(cuotaVenta),
+        "neto": _money(valorTransmision - cuotaVenta),
         # Tipo efectivo de ESTA venta, no el del tramo: con compensaciones de
         # ejercicios anteriores puede salir muy por debajo de la escala.
-        "tipoEfectivo": _money((cuota_venta / ganancia * 100) if ganancia > 0 else Decimal("0")),
-        "perdidaNoComputable": _money(resultado.perdida_no_computable),
-        "notaAntiaplicacion": resultado.nota_antiaplicacion,
-        "compensadoAnteriores": _money(compensado_con - compensado_sin),
-        "cuotaEjercicioAntes": _money(cuota_sin),
-        "cuotaEjercicioDespues": _money(cuota_con),
+        "tipoEfectivo": _money((cuotaVenta / ganancia * 100) if ganancia > 0 else Decimal("0")),
+        "perdidaNoComputable": _money(resultado.perdidaNoComputable),
+        "notaAntiaplicacion": resultado.notaAntiaplicacion,
+        "compensadoAnteriores": _money(compensadoCon - compensadoSin),
+        "cuotaEjercicioAntes": _money(cuotaSin),
+        "cuotaEjercicioDespues": _money(cuotaCon),
         "incidencia": resultado.incidencia,
-        "mensaje": mensaje_incidencia(resultado.incidencia),
+        "mensaje": mensajeIncidencia(resultado.incidencia),
         "lotes": [
             {
-                "fecha": consumo.fecha_adquisicion.strftime("%d-%m-%Y"),
+                "fecha": consumo.fechaAdquisicion.strftime("%d-%m-%Y"),
                 "cantidad": _money(consumo.cantidad, escala="0.00000001"),
-                "costeUnitario": _money(consumo.coste_unitario, escala="0.0001"),
+                "costeUnitario": _money(consumo.costeUnitario, escala="0.0001"),
                 "coste": _money(consumo.coste),
             }
             for consumo in resultado.lotes
@@ -535,20 +535,20 @@ def simular_venta(asset_id, fecha_texto, cantidad, precio, comision=0):
     return dato, ""
 
 
-def _serializar_fila(resultado, tramos):
+def _serializarFila(resultado, tramos):
     if resultado.incidencia:
-        fila = fila_vacia(resultado.incidencia)
-        fila["stockDisponible"] = _money(resultado.disponible_antes, escala="0.00000001")
-        fila["bruto"] = _money(resultado.valor_transmision)
+        fila = filaVacia(resultado.incidencia)
+        fila["stockDisponible"] = _money(resultado.disponibleAntes, escala="0.00000001")
+        fila["bruto"] = _money(resultado.valorTransmision)
         return fila
 
     cuota = sum(tramos.values(), Decimal("0"))
-    ganancia = resultado.ganancia_computable
+    ganancia = resultado.gananciaComputable
 
     return {
-        "valorCompra": _money(resultado.coste_unitario),
-        "costeAdquisicion": _money(resultado.coste_adquisicion),
-        "valorTransmision": _money(resultado.valor_transmision),
+        "valorCompra": _money(resultado.costeUnitario),
+        "costeAdquisicion": _money(resultado.costeAdquisicion),
+        "valorTransmision": _money(resultado.valorTransmision),
         "dineroDeclarar": _money(ganancia),
         "tramo1": _money(tramos.get("tramo1", 0)),
         "tramo2": _money(tramos.get("tramo2", 0)),
@@ -556,20 +556,20 @@ def _serializar_fila(resultado, tramos):
         "tramo4": _money(tramos.get("tramo4", 0)),
         "tramo5": _money(tramos.get("tramo5", 0)),
         "totalPagar": _money(cuota),
-        "bruto": _money(resultado.valor_transmision),
-        "neto": _money(resultado.valor_transmision - cuota),
-        "stockDisponible": _money(resultado.disponible_antes, escala="0.00000001"),
-        "perdidaNoComputable": _money(resultado.perdida_no_computable),
-        "perdidaDiferidaLiberada": _money(resultado.perdida_diferida_liberada),
-        "notaAntiaplicacion": resultado.nota_antiaplicacion,
+        "bruto": _money(resultado.valorTransmision),
+        "neto": _money(resultado.valorTransmision - cuota),
+        "stockDisponible": _money(resultado.disponibleAntes, escala="0.00000001"),
+        "perdidaNoComputable": _money(resultado.perdidaNoComputable),
+        "perdidaDiferidaLiberada": _money(resultado.perdidaDiferidaLiberada),
+        "notaAntiaplicacion": resultado.notaAntiaplicacion,
         "incidencia": "",
         "mensaje": "",
         "lotes": [
             {
-                "ref": consumo.lote_ref,
-                "fecha": consumo.fecha_adquisicion.strftime("%d-%m-%Y"),
+                "ref": consumo.loteRef,
+                "fecha": consumo.fechaAdquisicion.strftime("%d-%m-%Y"),
                 "cantidad": _money(consumo.cantidad, escala="0.00000001"),
-                "costeUnitario": _money(consumo.coste_unitario, escala="0.0001"),
+                "costeUnitario": _money(consumo.costeUnitario, escala="0.0001"),
                 "coste": _money(consumo.coste),
                 "origen": consumo.origen,
             }
@@ -578,7 +578,7 @@ def _serializar_fila(resultado, tramos):
     }
 
 
-def fila_vacia(incidencia=""):
+def filaVacia(incidencia=""):
     return {
         "valorCompra": "",
         "costeAdquisicion": "",
@@ -597,26 +597,26 @@ def fila_vacia(incidencia=""):
         "perdidaDiferidaLiberada": "",
         "notaAntiaplicacion": "",
         "incidencia": incidencia,
-        "mensaje": mensaje_incidencia(incidencia),
+        "mensaje": mensajeIncidencia(incidencia),
         "lotes": [],
     }
 
 
-def serializar_liquidacion(liquidacion):
+def serializarLiquidacion(liquidacion):
     """Resumen anual listo para JSON."""
     return {
         "year": liquidacion.anio,
         "ganancias": _money(liquidacion.ganancias),
         "perdidas": _money(liquidacion.perdidas),
         "saldo": _money(liquidacion.saldo),
-        "compensadoAnteriores": _money(liquidacion.compensado_anteriores),
+        "compensadoAnteriores": _money(liquidacion.compensadoAnteriores),
         "base": _money(liquidacion.base),
         "cuota": _money(liquidacion.cuota),
         "tramos": {k: _money(v) for k, v in liquidacion.tramos.items()},
-        "saldoNegativoGenerado": _money(liquidacion.saldo_negativo_generado),
-        "pendienteCompensar": _money(liquidacion.pendiente_compensar),
-        "perdidasNoComputables": _money(liquidacion.perdidas_no_computables),
-        "perdidasDiferidasLiberadas": _money(liquidacion.perdidas_diferidas_liberadas),
+        "saldoNegativoGenerado": _money(liquidacion.saldoNegativoGenerado),
+        "pendienteCompensar": _money(liquidacion.pendienteCompensar),
+        "perdidasNoComputables": _money(liquidacion.perdidasNoComputables),
+        "perdidasDiferidasLiberadas": _money(liquidacion.perdidasDiferidasLiberadas),
         # El total de `pendienteCompensar` no basta para declarar: cada saldo
         # negativo caduca a los cuatro ejercicios de su origen, así que hay que
         # saber de qué año viene cada trozo.
@@ -634,14 +634,14 @@ def serializar_liquidacion(liquidacion):
                 "importe": _money(c["importe"]),
                 "ultimoEjercicio": str(c["ultimo_ejercicio"]),
             }
-            for c in liquidacion.compensaciones_aplicadas
+            for c in liquidacion.compensacionesAplicadas
         ],
     }
 
 
 def _num(value):
     try:
-        return fifo.parse_decimal(value)
+        return fifo.parseDecimal(value)
     except fifo.FifoError:
         return Decimal("0")
 

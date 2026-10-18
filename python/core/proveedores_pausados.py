@@ -39,5 +39,5 @@ def pausados() -> frozenset:
     return ids
 
 
-def esta_pausado(proveedor: str) -> bool:
+def estaPausado(proveedor: str) -> bool:
     return proveedor in pausados()

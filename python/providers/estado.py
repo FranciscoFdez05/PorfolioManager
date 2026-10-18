@@ -34,8 +34,8 @@ from threading import Lock
 from urllib.error import HTTPError, URLError
 
 from core import proveedores_pausados
-from providers.api_stats import last_api_failure
-from providers.http import fetch_json
+from providers.api_stats import lastApiFailure
+from providers.http import fetchJson
 from stores import app_data
 
 log = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ def _clave(lector):
     return valor
 
 
-def _lista_claves(lector_lista, lector_legado):
+def _listaClaves(lectorLista, lectorLegado):
     """Todas las claves configuradas del proveedor, en orden.
 
     El lector "legado" es el de una sola clave y sigue haciendo falta: cubre las
@@ -88,14 +88,14 @@ def _lista_claves(lector_lista, lector_legado):
     corta la comprobación igual que `_clave`.
     """
     try:
-        claves = [clave for clave in (lector_lista() or []) if clave]
+        claves = [clave for clave in (lectorLista() or []) if clave]
     except Exception as error:
         log.debug("[estado] No se pudieron leer las claves: %s", error)
         claves = []
-    return claves or [_clave(lector_legado)]
+    return claves or [_clave(lectorLegado)]
 
 
-def _sondear_claves(claves, llamada):
+def _sondearClaves(claves, llamada):
     """Prueba las claves en orden y para en la primera que responde.
 
     Antes se sondeaba solo la primera. Con varias configuradas —EODHD da 20
@@ -109,13 +109,13 @@ def _sondear_claves(claves, llamada):
     claves de más que se prueban son precisamente las que no tienen cuota que
     gastar.
     """
-    ultimo_error = None
+    ultimoError = None
 
     for numero, clave in enumerate(claves, start=1):
         try:
             llamada(clave)
         except Exception as error:
-            ultimo_error = error
+            ultimoError = error
             continue
 
         if numero == 1:
@@ -125,13 +125,13 @@ def _sondear_claves(claves, llamada):
         # proveedor sirve, pero quedan menos claves de las que parece.
         return f"Responde la clave {numero} de {len(claves)}; las anteriores, no"
 
-    raise ultimo_error
+    raise ultimoError
 
 
-def _probar_finnhub():
-    return _sondear_claves(
-        _lista_claves(app_data.readFinnhubApiKeys, app_data.readFinnhubApiKey),
-        lambda clave: fetch_json(
+def _probarFinnhub():
+    return _sondearClaves(
+        _listaClaves(app_data.readFinnhubApiKeys, app_data.readFinnhubApiKey),
+        lambda clave: fetchJson(
             "https://finnhub.io/api/v1/quote",
             {"symbol": "AAPL", "token": clave},
             timeout=_TIMEOUT, provider="Finnhub", retries=0,
@@ -139,10 +139,10 @@ def _probar_finnhub():
     )
 
 
-def _probar_eodhd():
-    return _sondear_claves(
-        _lista_claves(app_data.readEodhdApiKeys, app_data.readEodhdApiKey),
-        lambda clave: fetch_json(
+def _probarEodhd():
+    return _sondearClaves(
+        _listaClaves(app_data.readEodhdApiKeys, app_data.readEodhdApiKey),
+        lambda clave: fetchJson(
             "https://eodhd.com/api/real-time/AAPL.US",
             {"api_token": clave, "fmt": "json"},
             timeout=_TIMEOUT, provider="EODHD", retries=0,
@@ -150,8 +150,8 @@ def _probar_eodhd():
     )
 
 
-def _consultar_alpha_vantage(clave):
-    payload = fetch_json(
+def _consultarAlphaVantage(clave):
+    payload = fetchJson(
         "https://www.alphavantage.co/query",
         {
             "function": "GLOBAL_QUOTE",
@@ -174,15 +174,15 @@ def _consultar_alpha_vantage(clave):
         raise _Clave(payload["Error Message"])
 
 
-def _probar_alpha_vantage():
-    return _sondear_claves(
-        _lista_claves(app_data.readAlphaVantageApiKeys, app_data.readAlphaVantageApiKey),
-        _consultar_alpha_vantage,
+def _probarAlphaVantage():
+    return _sondearClaves(
+        _listaClaves(app_data.readAlphaVantageApiKeys, app_data.readAlphaVantageApiKey),
+        _consultarAlphaVantage,
     )
 
 
-def _probar_yahoo():
-    fetch_json(
+def _probarYahoo():
+    fetchJson(
         "https://query1.finance.yahoo.com/v8/finance/chart/AAPL",
         {"range": "1d", "interval": "1d"},
         timeout=_TIMEOUT, provider="Yahoo Finance", retries=0,
@@ -190,19 +190,19 @@ def _probar_yahoo():
     )
 
 
-def _probar_tradingview():
-    fetch_json(
+def _probarTradingview():
+    fetchJson(
         "https://scanner.tradingview.com/global/scan",
         timeout=_TIMEOUT, provider="TradingView", retries=0,
-        json_body={
+        jsonBody={
             "symbols": {"tickers": ["NASDAQ:AAPL"], "query": {"types": []}},
             "columns": ["close"],
         },
     )
 
 
-def _probar_divisas():
-    fetch_json(
+def _probarDivisas():
+    fetchJson(
         "https://api.frankfurter.app/latest",
         {"from": "EUR", "to": "USD"},
         timeout=_TIMEOUT, provider="Tipo de cambio", retries=0,
@@ -211,18 +211,18 @@ def _probar_divisas():
 
 # (id, nombre visible, comprobación)
 _PROVEEDORES = (
-    ("finnhub",      "Finnhub",        _probar_finnhub),
-    ("eodhd",        "EODHD",          _probar_eodhd),
-    ("alphavantage", "Alpha Vantage",  _probar_alpha_vantage),
-    ("yahoo",        "Yahoo Finance",  _probar_yahoo),
-    ("tradingview",  "TradingView",    _probar_tradingview),
-    ("divisas",      "Tipo de cambio", _probar_divisas),
+    ("finnhub",      "Finnhub",        _probarFinnhub),
+    ("eodhd",        "EODHD",          _probarEodhd),
+    ("alphavantage", "Alpha Vantage",  _probarAlphaVantage),
+    ("yahoo",        "Yahoo Finance",  _probarYahoo),
+    ("tradingview",  "TradingView",    _probarTradingview),
+    ("divisas",      "Tipo de cambio", _probarDivisas),
 )
 
 
-def _fila(id_proveedor, nombre, estado, etiqueta, detalle="", ms=0):
+def _fila(idProveedor, nombre, estado, etiqueta, detalle="", ms=0):
     return {
-        "id": id_proveedor,
+        "id": idProveedor,
         "nombre": nombre,
         "estado": estado,
         "etiqueta": etiqueta,
@@ -233,7 +233,7 @@ def _fila(id_proveedor, nombre, estado, etiqueta, detalle="", ms=0):
     }
 
 
-def _por_codigo(codigo):
+def _porCodigo(codigo):
     if codigo == 401:
         return "clave", "Clave rechazada"
     if codigo == 403:
@@ -250,15 +250,15 @@ def _por_codigo(codigo):
     return "error", f"HTTP {codigo}"
 
 
-def _diagnosticar(id_proveedor, nombre, probar):
+def _diagnosticar(idProveedor, nombre, probar):
     inicio = time.monotonic()
 
     def fin(estado, etiqueta, detalle=""):
         ms = round((time.monotonic() - inicio) * 1000)
-        return _fila(id_proveedor, nombre, estado, etiqueta, detalle, ms)
+        return _fila(idProveedor, nombre, estado, etiqueta, detalle, ms)
 
     try:
-        detalle_ok = probar()
+        detalleOk = probar()
     except _SinClave:
         return fin("sin_clave", "Sin clave", "No hay ninguna clave configurada")
     except _Limite as error:
@@ -266,25 +266,25 @@ def _diagnosticar(id_proveedor, nombre, probar):
     except _Clave as error:
         return fin("clave", "Clave rechazada", error)
     except HTTPError as error:
-        estado, etiqueta = _por_codigo(error.code)
+        estado, etiqueta = _porCodigo(error.code)
         return fin(estado, etiqueta, f"HTTP {error.code}")
     except (TimeoutError, URLError) as error:
         return fin("caido", "No responde", getattr(error, "reason", error))
     except Exception as error:
         log.debug("[estado] %s falló de forma inesperada: %s", nombre, error)
         return fin("error", "Error", error)
-    return fin("ok", "Operativa", detalle_ok or "")
+    return fin("ok", "Operativa", detalleOk or "")
 
 
-def _diagnosticar_o_pausa(id_proveedor, nombre, probar):
+def _diagnosticarOPausa(idProveedor, nombre, probar):
     # Un proveedor pausado no se sondea: sería gastar cuota en algo que el
     # usuario ha apagado a propósito.
-    if proveedores_pausados.esta_pausado(id_proveedor):
-        return _fila(id_proveedor, nombre, "pausada", "Pausada", "Pausada desde Ajustes")
-    return _diagnosticar(id_proveedor, nombre, probar)
+    if proveedores_pausados.estaPausado(idProveedor):
+        return _fila(idProveedor, nombre, "pausada", "Pausada", "Pausada desde Ajustes")
+    return _diagnosticar(idProveedor, nombre, probar)
 
 
-def _con_pausa(proveedores):
+def _conPausa(proveedores):
     """Marca `pausable` y `pausada` con el ajuste de ahora, no el de cuando se cacheó."""
     pausados = proveedores_pausados.pausados()
     filas = []
@@ -303,12 +303,12 @@ def comprobar():
     with ThreadPoolExecutor(max_workers=len(_PROVEEDORES)) as pool:
         # `map` conserva el orden de entrada, que es el declarado arriba: una
         # lista que se reordena sola según quién conteste antes sería ilegible.
-        return list(pool.map(lambda datos: _diagnosticar_o_pausa(*datos), _PROVEEDORES))
+        return list(pool.map(lambda datos: _diagnosticarOPausa(*datos), _PROVEEDORES))
 
 
-def _fallo_posterior(fila) -> bool:
+def _falloPosterior(fila) -> bool:
     """¿Falló una llamada real de este proveedor después de su último diagnóstico?"""
-    return last_api_failure(fila["nombre"]) > fila.get("_momento", 0.0)
+    return lastApiFailure(fila["nombre"]) > fila.get("_momento", 0.0)
 
 
 def obtener(forzar: bool = False) -> dict:
@@ -325,11 +325,11 @@ def obtener(forzar: bool = False) -> dict:
     if forzar or not previas:
         proveedores = comprobar()
     else:
-        pendientes = {fila["id"] for fila in previas if _fallo_posterior(fila)}
+        pendientes = {fila["id"] for fila in previas if _falloPosterior(fila)}
         if not pendientes:
-            return _respuesta_cacheada(previas)
+            return _respuestaCacheada(previas)
         proveedores = [
-            _diagnosticar_o_pausa(*datos) if datos[0] in pendientes else fila
+            _diagnosticarOPausa(*datos) if datos[0] in pendientes else fila
             for datos, fila in zip(_PROVEEDORES, previas, strict=False)
         ]
 
@@ -338,23 +338,23 @@ def obtener(forzar: bool = False) -> dict:
         _cache["proveedores"] = proveedores
 
     return {
-        "proveedores": _con_pausa(proveedores),
+        "proveedores": _conPausa(proveedores),
         "edadSegundos": 0,
         "cacheado": False,
     }
 
 
-def _respuesta_cacheada(proveedores) -> dict:
+def _respuestaCacheada(proveedores) -> dict:
     with _lock:
         edad = round(time.monotonic() - _cache["momento"])
     return {
-        "proveedores": _con_pausa(proveedores),
+        "proveedores": _conPausa(proveedores),
         "edadSegundos": edad,
         "cacheado": True,
     }
 
 
-def reiniciar_para_pruebas() -> None:
+def reiniciarParaPruebas() -> None:
     """Vacía la caché. Simula un worker recién arrancado."""
     with _lock:
         _cache["momento"] = 0.0

@@ -17,7 +17,7 @@ cada activo, y sin este margen cada refresco sería un aviso de Telegram por
 activo.
 
 Cuando un proveedor que estaba avisado como caído vuelve a dar una cotización
-válida, `notificar_recuperado` manda un aviso de vuelta y libera su cooldown:
+válida, `notificarRecuperado` manda un aviso de vuelta y libera su cooldown:
 así, si vuelve a fallar justo después, se avisa sin esperar el margen entero.
 Sin esto, la única forma de saber que un proveedor se había arreglado era
 comprobarlo a mano en Ajustes.
@@ -45,7 +45,7 @@ from threading import Lock
 from urllib.error import HTTPError, URLError
 
 from core import paths, reclamo
-from core.secret_store import read_secret_lines, write_secret_lines
+from core.secret_store import readSecretLines, writeSecretLines
 
 log = logging.getLogger(__name__)
 
@@ -97,18 +97,18 @@ def _archivoConfig():
 
 def leerConfig():
     """(token, chatId) guardados, o ("", "") si no hay nada configurado."""
-    lineas = read_secret_lines(_archivoConfig())
+    lineas = readSecretLines(_archivoConfig())
     token = lineas[0] if len(lineas) > 0 else ""
     chatId = lineas[1] if len(lineas) > 1 else ""
     return token, chatId
 
 
 def escribirConfig(token: str, chatId: str) -> None:
-    write_secret_lines(_archivoConfig(), [str(token).strip(), str(chatId).strip()])
+    writeSecretLines(_archivoConfig(), [str(token).strip(), str(chatId).strip()])
 
 
 def borrarConfig() -> None:
-    write_secret_lines(_archivoConfig(), [])
+    writeSecretLines(_archivoConfig(), [])
 
 
 def configurado() -> bool:
@@ -162,13 +162,13 @@ def enviarPrueba():
             return False, _AVISO_SIN_START
         return False, f"Telegram devolvió HTTP {error.code}: {descripcion or str(error)}"[:300]
     except URLError as error:
-        from providers.http import motivo_conexion
-        return False, f"No se pudo conectar con Telegram: {motivo_conexion(error, 'Telegram')}"
+        from providers.http import motivoConexion
+        return False, f"No se pudo conectar con Telegram: {motivoConexion(error, 'Telegram')}"
     except Exception as error:
         return False, str(error)[:200]
 
 
-def notificar_problema(categoria: str, sujeto: str, detalle: str = "") -> None:
+def notificarProblema(categoria: str, sujeto: str, detalle: str = "") -> None:
     """Manda un aviso si hay Telegram configurado y no se ha mandado ya hace poco.
 
     Nunca lanza: un fallo mandando el aviso no debe tumbar el refresco de
@@ -204,7 +204,7 @@ def notificar_problema(categoria: str, sujeto: str, detalle: str = "") -> None:
         log.warning("[telegram] No se pudo enviar el aviso (%s/%s): %s", categoria, sujeto, error)
 
 
-def notificar_recuperado(sujeto: str) -> None:
+def notificarRecuperado(sujeto: str) -> None:
     """Avisa de que `sujeto` vuelve a responder, si antes se había avisado de un fallo suyo.
 
     Silencioso si nunca se avisó de que estuviera caído: no todo activo que se
@@ -232,7 +232,7 @@ def notificar_recuperado(sujeto: str) -> None:
 def _ajustesGuardados() -> dict:
     """`ajustes.json` tal cual, o {} si no existe o no se puede leer.
 
-    Se lee el fichero y no `routes.ajustes._read_ajustes`: este módulo es de
+    Se lee el fichero y no `routes.ajustes._readAjustes`: este módulo es de
     `core`, que no importa de `routes`, y el vigilante lo carga solo, sin Flask.
     """
     try:
@@ -343,7 +343,7 @@ MAX_BYTES_DOCUMENTO = 50 * 1024 * 1024
 _TIMEOUT_DOCUMENTO = 120.0
 
 
-def _enviar_documento(token: str, chatId: str, ruta, texto: str) -> None:
+def _enviarDocumento(token: str, chatId: str, ruta, texto: str) -> None:
     ruta = Path(ruta)
     limite = uuid.uuid4().hex
     cabecera = b"".join(
@@ -365,7 +365,7 @@ def _enviar_documento(token: str, chatId: str, ruta, texto: str) -> None:
         raise ValueError(respuesta.get("description") or "Telegram rechazó el fichero")
 
 
-def notificar_archivo(categoria: str, ruta, texto: str) -> bool:
+def notificarArchivo(categoria: str, ruta, texto: str) -> bool:
     """Manda un fichero (con `texto` de pie) con las mismas reglas que `notificar`.
 
     Si pesa más de lo que admite Telegram no se intenta: se avisa con un mensaje
@@ -383,14 +383,14 @@ def notificar_archivo(categoria: str, ruta, texto: str) -> bool:
             _enviar(token, chatId, f"{texto}\n⚠️ No se ha podido adjuntar: pesa {tamano / 1024 / 1024:.0f} MB y "
                                    "Telegram admite 50 MB como máximo.")
             return True
-        _enviar_documento(token, chatId, ruta, texto)
+        _enviarDocumento(token, chatId, ruta, texto)
         return True
     except Exception as error:
         log.warning("[telegram] No se pudo enviar el fichero (%s): %s", categoria, error)
         return False
 
 
-def responder_archivo(ruta, texto: str) -> bool:
+def responderArchivo(ruta, texto: str) -> bool:
     """Manda un fichero al chat configurado sin pasar por categorías ni silencio.
 
     Es la respuesta a algo que el usuario pidió (`/backup`). Si pesa más de lo
@@ -405,7 +405,7 @@ def responder_archivo(ruta, texto: str) -> bool:
             _enviar(token, chatId, f"{texto}\n⚠️ No se ha podido adjuntar: pesa {tamano / 1024 / 1024:.0f} MB y "
                                    "Telegram admite 50 MB como máximo.")
         else:
-            _enviar_documento(token, chatId, ruta, texto)
+            _enviarDocumento(token, chatId, ruta, texto)
         return True
     except Exception as error:
         log.warning("[telegram] No se pudo responder con el fichero: %s", error)
@@ -425,13 +425,13 @@ def responder(texto: str) -> bool:
         return False
 
 
-def notificar_arranque(version: str) -> None:
+def notificarArranque(version: str) -> None:
     """Aviso de servidor iniciado. Los dos workers llegan aquí; solo habla el primero."""
     notificar("sistema", f"🟢 PortfolioManager {version} iniciado",
               clave="arranque", cooldown=90, compartido=True)
 
 
-def reiniciar_para_pruebas() -> None:
+def reiniciarParaPruebas() -> None:
     """Vacía el cooldown y el estado de caídos en memoria. Simula un proceso recién arrancado."""
     with _lock:
         _ultimoAviso.clear()

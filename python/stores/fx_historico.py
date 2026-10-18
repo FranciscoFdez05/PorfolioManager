@@ -28,8 +28,8 @@ import time
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
-from core.db import get_db, transaction
-from providers.yahoo_finance_client import fetch_price_series
+from core.db import getDb, transaction
+from providers.yahoo_finance_client import fetchPriceSeries
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ _MARGEN_DIAS = 10
 _FORMATOS_ENTRADA = ("%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y")
 
 
-def normalizar_fecha(valor):
+def normalizarFecha(valor):
     """Convierte a `date` cualquiera de los formatos que guarda la aplicación."""
     if isinstance(valor, datetime):
         return valor.date()
@@ -64,9 +64,9 @@ def _par(moneda):
     return f"{str(moneda or '').strip().upper()}/{MONEDA_BASE}"
 
 
-def _leer_cache(par, fecha):
+def _leerCache(par, fecha):
     """Tipo cacheado para esa fecha exacta, o el más reciente anterior."""
-    fila = get_db().execute(
+    fila = getDb().execute(
         "SELECT fecha, rate, origen FROM fx_rates "
         "WHERE par = ? AND fecha <= ? AND rate <> '' "
         "ORDER BY fecha DESC LIMIT 1",
@@ -76,7 +76,7 @@ def _leer_cache(par, fecha):
         return None
     # Un cierre de hace más de dos semanas no es "el de esa fecha": es que la
     # caché no llega hasta ahí y hay que pedirlo.
-    cacheada = normalizar_fecha(fila["fecha"])
+    cacheada = normalizarFecha(fila["fecha"])
     if cacheada is None or (fecha - cacheada).days > _MARGEN_DIAS:
         return None
     try:
@@ -86,7 +86,7 @@ def _leer_cache(par, fecha):
 
 
 def _guardar(par, puntos, origen):
-    conn = get_db()
+    conn = getDb()
     ahora = datetime.now(UTC).isoformat(timespec="seconds")
     conn.executemany(
         "INSERT OR REPLACE INTO fx_rates (par, fecha, rate, origen, obtenido_en) "
@@ -102,7 +102,7 @@ def _descargar(moneda, desde, hasta):
     inicio = int(datetime.combine(desde, datetime.min.time(), UTC).timestamp())
     fin = int(datetime.combine(hasta, datetime.max.time(), UTC).timestamp())
 
-    serie, error = fetch_price_series(simbolo, inicio, fin)
+    serie, error = fetchPriceSeries(simbolo, inicio, fin)
     if error:
         return [], error
 
@@ -113,7 +113,7 @@ def _descargar(moneda, desde, hasta):
     return puntos, None
 
 
-def tasa(moneda, fecha, permitir_descarga=True):
+def tasa(moneda, fecha, permitirDescarga=True):
     """Tipo de cambio de `moneda` a EUR en `fecha`.
 
     Devuelve `(rate, origen, fecha_usada)`, o `(None, motivo, "")` si no se
@@ -123,16 +123,16 @@ def tasa(moneda, fecha, permitir_descarga=True):
     if not codigo or codigo == MONEDA_BASE:
         return Decimal("1"), "base", ""
 
-    dia = normalizar_fecha(fecha)
+    dia = normalizarFecha(fecha)
     if dia is None:
         return None, "fecha inválida", ""
 
     par = _par(codigo)
-    cacheado = _leer_cache(par, dia)
+    cacheado = _leerCache(par, dia)
     if cacheado:
         return cacheado[0], cacheado[1], cacheado[2]
 
-    if not permitir_descarga:
+    if not permitirDescarga:
         return None, "sin dato en caché", ""
 
     puntos, error = _descargar(codigo, dia - timedelta(days=_MARGEN_DIAS), dia)
@@ -143,15 +143,15 @@ def tasa(moneda, fecha, permitir_descarga=True):
         return None, "el proveedor no devolvió cierres", ""
 
     _guardar(par, puntos, "yahoo")
-    cacheado = _leer_cache(par, dia)
+    cacheado = _leerCache(par, dia)
     if not cacheado:
         return None, "el proveedor no cubre esa fecha", ""
     return cacheado[0], cacheado[1], cacheado[2]
 
 
-def tasa_actual(moneda, permitir_descarga=True):
+def tasaActual(moneda, permitirDescarga=True):
     """Tipo de cambio de hoy. Es el que se aplica al valorar la posición."""
-    return tasa(moneda, date.today(), permitir_descarga=permitir_descarga)
+    return tasa(moneda, date.today(), permitirDescarga=permitirDescarga)
 
 
 # ── Relleno del histórico ─────────────────────────────────────────────────────
@@ -165,10 +165,10 @@ _TABLAS = (
 )
 
 
-def _divisa_de_activos():
+def _divisaDeActivos():
     return {
         fila["id"]: str(fila["currency"] or MONEDA_BASE).upper()
-        for fila in get_db().execute("SELECT id, currency FROM activos")
+        for fila in getDb().execute("SELECT id, currency FROM activos")
     }
 
 
@@ -179,7 +179,7 @@ def _divisa_de_activos():
 SEGUNDOS_MAX_POR_PASADA = 60
 
 
-def rellenar_pendientes(limite=500, permitir_descarga=True, segundos_max=SEGUNDOS_MAX_POR_PASADA):
+def rellenarPendientes(limite=500, permitirDescarga=True, segundosMax=SEGUNDOS_MAX_POR_PASADA):
     """Completa `fx_rate` en las operaciones que no lo tienen.
 
     Se hace por lotes y no de golpe: el histórico completo de una cartera con
@@ -196,8 +196,8 @@ def rellenar_pendientes(limite=500, permitir_descarga=True, segundos_max=SEGUNDO
     mientras se descargaban los siguientes: el resto de escrituras de la
     aplicación esperaban `busy_timeout` y fallaban con «database is locked».
     """
-    conn = get_db()
-    divisas = _divisa_de_activos()
+    conn = getDb()
+    divisas = _divisaDeActivos()
     resueltas = 0
     fallidas = 0
     # Caché por (moneda, fecha) dentro de la propia pasada: una cartera real
@@ -205,9 +205,9 @@ def rellenar_pendientes(limite=500, permitir_descarga=True, segundos_max=SEGUNDO
     memoria = {}
     # (tabla, rowid, rate, fecha_usada, origen) que se escriben al final.
     actualizaciones = []
-    fin = time.monotonic() + max(1, segundos_max)
+    fin = time.monotonic() + max(1, segundosMax)
 
-    for tabla, columna_fecha, columna_divisa in _TABLAS:
+    for tabla, columnaFecha, columnaDivisa in _TABLAS:
         cols = {row[1] for row in conn.execute(f"PRAGMA table_info({tabla})")}
         if "fx_rate" not in cols:
             continue
@@ -215,8 +215,8 @@ def rellenar_pendientes(limite=500, permitir_descarga=True, segundos_max=SEGUNDO
         filas = conn.execute(
             # `rowid` se alía: en una tabla con `id INTEGER PRIMARY KEY` es un
             # alias de esa columna y sqlite3.Row no expone la clave "rowid".
-            f"SELECT rowid AS fila_id, asset_id, {columna_fecha} AS fecha"
-            + (f", {columna_divisa} AS divisa" if columna_divisa else "")
+            f"SELECT rowid AS fila_id, asset_id, {columnaFecha} AS fecha"
+            + (f", {columnaDivisa} AS divisa" if columnaDivisa else "")
             + f" FROM {tabla} WHERE fx_rate = '' LIMIT ?",
             (limite - resueltas - fallidas,),
         ).fetchall()
@@ -224,10 +224,10 @@ def rellenar_pendientes(limite=500, permitir_descarga=True, segundos_max=SEGUNDO
         for fila in filas:
             moneda = (
                 str(fila["divisa"] or MONEDA_BASE).upper()
-                if columna_divisa
+                if columnaDivisa
                 else divisas.get(fila["asset_id"], MONEDA_BASE)
             )
-            dia = normalizar_fecha(fila["fecha"])
+            dia = normalizarFecha(fila["fecha"])
             if dia is None:
                 fallidas += 1
                 continue
@@ -236,15 +236,15 @@ def rellenar_pendientes(limite=500, permitir_descarga=True, segundos_max=SEGUNDO
             if clave not in memoria:
                 if time.monotonic() > fin:
                     break  # sin tiempo para más descargas: el resto, en la siguiente pasada
-                memoria[clave] = tasa(moneda, dia, permitir_descarga=permitir_descarga)
-            rate, origen, fecha_usada = memoria[clave]
+                memoria[clave] = tasa(moneda, dia, permitirDescarga=permitirDescarga)
+            rate, origen, fechaUsada = memoria[clave]
 
             if rate is None:
                 fallidas += 1
                 continue
 
             actualizaciones.append(
-                (tabla, fila["fila_id"], f"{rate:.8f}", fecha_usada or dia.isoformat(), origen)
+                (tabla, fila["fila_id"], f"{rate:.8f}", fechaUsada or dia.isoformat(), origen)
             )
             resueltas += 1
 
@@ -255,20 +255,20 @@ def rellenar_pendientes(limite=500, permitir_descarga=True, segundos_max=SEGUNDO
 
     if actualizaciones:
         with transaction() as escritura:
-            for tabla, fila_id, rate, fecha_usada, origen in actualizaciones:
+            for tabla, filaId, rate, fechaUsada, origen in actualizaciones:
                 # `tabla` sale de _TABLAS (constantes del módulo), no de fuera.
                 escritura.execute(
                     f"UPDATE {tabla} SET fx_rate = ?, fx_fecha = ?, fx_origen = ? WHERE rowid = ?",
-                    (rate, fecha_usada, origen, fila_id),
+                    (rate, fechaUsada, origen, filaId),
                 )
     elif conn.in_transaction:
         conn.commit()
-    return {"resueltas": resueltas, "fallidas": fallidas, "pendientes": contar_pendientes()}
+    return {"resueltas": resueltas, "fallidas": fallidas, "pendientes": contarPendientes()}
 
 
-def contar_pendientes():
+def contarPendientes():
     """Operaciones sin tipo de cambio anotado, por tabla."""
-    conn = get_db()
+    conn = getDb()
     total = 0
     for tabla, _fecha, _divisa in _TABLAS:
         cols = {row[1] for row in conn.execute(f"PRAGMA table_info({tabla})")}

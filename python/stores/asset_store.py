@@ -1,18 +1,18 @@
-from core.db import get_db, transactional
+from core.db import getDb, transactional
 from stores import rendimiento_activo
 from stores.asset_utils import slugify
 
 
 def readAssetFile(assetId):
-    conn = get_db()
-    safe_id = slugify(assetId)
+    conn = getDb()
+    safeId = slugify(assetId)
 
     row = conn.execute(
         "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
         "sort_order, price, currency, change, status, last_updated, color, tv_symbol, hidden, "
         "convert_currency, coste_anual "
         "FROM activos WHERE id = ?",
-        (safe_id,)
+        (safeId,)
     ).fetchone()
 
     if row is None:
@@ -62,14 +62,14 @@ def readAssetFile(assetId):
             "precio_participacion, capital_invertido_bruto, coste_anual, comisiones, "
             "comisiones_fiat, comisiones_cripto, comisiones_satoshis, fx_rate, fx_fecha, fx_origen "
             "FROM activo_rows WHERE asset_id = ? ORDER BY id",
-            (safe_id,)
+            (safeId,)
         ).fetchall()
     ]
 
     result["operationRows"] = [
         {
             "id": r["id"],
-            "assetId": safe_id,
+            "assetId": safeId,
             "activo": r["activo"],
             "fechaApertura": r["fecha_apertura"],
             "par": r["par"],
@@ -93,7 +93,7 @@ def readAssetFile(assetId):
             "precio_currency, cantidad, comisiones_cripto, comisiones_fiat, total, currency, estado, "
             "fecha_cierre, fx_rate, fx_fecha, fx_origen "
             "FROM activo_operation_rows WHERE asset_id = ? ORDER BY rowid",
-            (safe_id,)
+            (safeId,)
         ).fetchall()
     ]
 
@@ -108,7 +108,7 @@ def readAssetFile(assetId):
         for r in conn.execute(
             "SELECT id, fecha, par, tipo, cantidad FROM activo_conversion_rows "
             "WHERE asset_id = ? ORDER BY rowid",
-            (safe_id,)
+            (safeId,)
         ).fetchall()
     ]
 
@@ -118,8 +118,8 @@ def readAssetFile(assetId):
 @transactional
 def updateAssetMarketData(assetId, data):
     """Actualiza solo los campos de mercado de un activo existente. No crea el activo si no existe."""
-    conn = get_db()
-    safe_id = slugify(assetId)
+    conn = getDb()
+    safeId = slugify(assetId)
     conn.execute(
         "UPDATE activos SET "
         "market_provider=?, market_symbol=?, finnhub_symbol=?, "
@@ -134,13 +134,13 @@ def updateAssetMarketData(assetId, data):
             data.get("change", "+0,00%"),
             data.get("status", "Mercado abierto"),
             data.get("lastUpdated", ""),
-            safe_id,
+            safeId,
         )
     )
     conn.commit()
 
 
-def _fx_previos(conn, tabla, columna_fecha, safe_id):
+def _fxPrevios(conn, tabla, columnaFecha, safeId):
     """Tipos de cambio ya anotados en las filas de un activo, por (fecha, divisa).
 
     El tipo depende solo de la fecha y de la divisa de la operación, así que es
@@ -150,14 +150,14 @@ def _fx_previos(conn, tabla, columna_fecha, safe_id):
     return {
         (r["fecha"], r["currency"]): (r["fx_rate"], r["fx_fecha"], r["fx_origen"])
         for r in conn.execute(
-            f"SELECT {columna_fecha} AS fecha, currency, fx_rate, fx_fecha, fx_origen "
+            f"SELECT {columnaFecha} AS fecha, currency, fx_rate, fx_fecha, fx_origen "
             f"FROM {tabla} WHERE asset_id = ? AND fx_rate != ''",
-            (safe_id,),
+            (safeId,),
         )
     }
 
 
-def _fx_de_fila(fila, previos, fecha, divisa):
+def _fxDeFila(fila, previos, fecha, divisa):
     """El trío fx de la fila: el que trae, o el anotado antes para su fecha y divisa.
 
     Las filas llegan del navegador sin estas columnas (el formulario no las
@@ -171,10 +171,10 @@ def _fx_de_fila(fila, previos, fecha, divisa):
 
 @transactional
 def writeAssetFile(assetId, data):
-    conn = get_db()
-    safe_id = slugify(assetId)
-    fx_filas = _fx_previos(conn, "activo_rows", "fecha_operacion", safe_id)
-    fx_operaciones = _fx_previos(conn, "activo_operation_rows", "fecha_apertura", safe_id)
+    conn = getDb()
+    safeId = slugify(assetId)
+    fxFilas = _fxPrevios(conn, "activo_rows", "fecha_operacion", safeId)
+    fxOperaciones = _fxPrevios(conn, "activo_operation_rows", "fecha_apertura", safeId)
 
     conn.execute(
         "INSERT INTO activos "
@@ -190,7 +190,7 @@ def writeAssetFile(assetId, data):
         "color=excluded.color, tv_symbol=excluded.tv_symbol, hidden=excluded.hidden, "
         "convert_currency=excluded.convert_currency, coste_anual=excluded.coste_anual",
         (
-            safe_id,
+            safeId,
             data.get("name", ""),
             data.get("symbol", ""),
             data.get("marketProvider", "finnhub"),
@@ -211,7 +211,7 @@ def writeAssetFile(assetId, data):
         )
     )
 
-    conn.execute("DELETE FROM activo_rows WHERE asset_id = ?", (safe_id,))
+    conn.execute("DELETE FROM activo_rows WHERE asset_id = ?", (safeId,))
     conn.executemany(
         "INSERT INTO activo_rows "
         "(asset_id, fecha_operacion, tipo_operacion, exchange, currency, participaciones, "
@@ -219,17 +219,17 @@ def writeAssetFile(assetId, data):
         "comisiones_fiat, comisiones_cripto, comisiones_satoshis, fx_rate, fx_fecha, fx_origen) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
-            (safe_id, r.get("fechaOperacion", ""), r.get("tipoOperacion", ""),
+            (safeId, r.get("fechaOperacion", ""), r.get("tipoOperacion", ""),
              r.get("exchange", ""), r.get("currency", "EUR"), r.get("participaciones", ""),
              r.get("precioParticipacion", ""), r.get("capitalInvertidoBruto", ""),
              r.get("costeAnual", ""), r.get("comisiones", ""), r.get("comisionesFiat", ""),
              r.get("comisionesCripto", ""), r.get("comisionesSatoshis", ""),
-             *_fx_de_fila(r, fx_filas, r.get("fechaOperacion", ""), r.get("currency", "EUR")))
+             *_fxDeFila(r, fxFilas, r.get("fechaOperacion", ""), r.get("currency", "EUR")))
             for r in data.get("rows", [])
         ]
     )
 
-    conn.execute("DELETE FROM activo_operation_rows WHERE asset_id = ?", (safe_id,))
+    conn.execute("DELETE FROM activo_operation_rows WHERE asset_id = ?", (safeId,))
     conn.executemany(
         "INSERT INTO activo_operation_rows "
         "(id, asset_id, activo, fecha_apertura, par, stablecoin_symbol, orden, precio_orden, "
@@ -237,23 +237,23 @@ def writeAssetFile(assetId, data):
         "fx_rate, fx_fecha, fx_origen) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
-            (r.get("id", ""), safe_id, r.get("activo", ""), r.get("fechaApertura", ""),
+            (r.get("id", ""), safeId, r.get("activo", ""), r.get("fechaApertura", ""),
              r.get("par", ""), r.get("stablecoinSymbol", ""), r.get("orden", "Compra"),
              r.get("precioOrden", ""), r.get("precioCurrency", "EUR"), r.get("cantidad", ""),
              r.get("comisionesCripto", ""), r.get("comisionesFiat", ""),
              r.get("total", ""), r.get("currency", "EUR"),
              r.get("estado", "Activo"), r.get("fechaCierre", ""),
-             *_fx_de_fila(r, fx_operaciones, r.get("fechaApertura", ""), r.get("currency", "EUR")))
+             *_fxDeFila(r, fxOperaciones, r.get("fechaApertura", ""), r.get("currency", "EUR")))
             for r in data.get("operationRows", [])
         ]
     )
 
-    conn.execute("DELETE FROM activo_conversion_rows WHERE asset_id = ?", (safe_id,))
+    conn.execute("DELETE FROM activo_conversion_rows WHERE asset_id = ?", (safeId,))
     conn.executemany(
         "INSERT INTO activo_conversion_rows (id, asset_id, fecha, par, tipo, cantidad) "
         "VALUES (?, ?, ?, ?, ?, ?)",
         [
-            (r.get("id", ""), safe_id, r.get("fecha", ""), r.get("par", ""),
+            (r.get("id", ""), safeId, r.get("fecha", ""), r.get("par", ""),
              r.get("tipo", ""), r.get("cantidad", ""))
             for r in data.get("conversionRows", [])
         ]
@@ -263,7 +263,7 @@ def writeAssetFile(assetId, data):
 
 
 def listAssets():
-    conn = get_db()
+    conn = getDb()
     rows = conn.execute(
         "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, type, "
         "sort_order, price, currency, change, status, last_updated, color, tv_symbol, hidden, "
@@ -271,46 +271,46 @@ def listAssets():
         "FROM activos ORDER BY sort_order, symbol"
     ).fetchall()
 
-    asset_rows = conn.execute(
+    assetRows = conn.execute(
         "SELECT asset_id, tipo_operacion, participaciones, capital_invertido_bruto, "
         "comisiones, comisiones_fiat FROM activo_rows"
     ).fetchall()
 
-    op_rows = conn.execute(
+    opRows = conn.execute(
         "SELECT asset_id, orden, cantidad, comisiones_cripto, total "
         "FROM activo_operation_rows WHERE estado = 'Completado'"
     ).fetchall()
 
-    rows_by_asset = {}
-    for row in asset_rows:
-        rows_by_asset.setdefault(row["asset_id"], []).append(row)
+    rowsByAsset = {}
+    for row in assetRows:
+        rowsByAsset.setdefault(row["asset_id"], []).append(row)
 
-    op_rows_by_asset = {}
-    for row in op_rows:
-        op_rows_by_asset.setdefault(row["asset_id"], []).append(row)
+    opRowsByAsset = {}
+    for row in opRows:
+        opRowsByAsset.setdefault(row["asset_id"], []).append(row)
 
-    assets_with_rows = set()
-    for asset_id, asset_r in rows_by_asset.items():
-        if any(r["participaciones"] or r["capital_invertido_bruto"] for r in asset_r):
-            assets_with_rows.add(asset_id)
-    for asset_id, op_r in op_rows_by_asset.items():
-        if any(r["cantidad"] or r["total"] for r in op_r):
-            assets_with_rows.add(asset_id)
+    assetsWithRows = set()
+    for assetId, assetR in rowsByAsset.items():
+        if any(r["participaciones"] or r["capital_invertido_bruto"] for r in assetR):
+            assetsWithRows.add(assetId)
+    for assetId, opR in opRowsByAsset.items():
+        if any(r["cantidad"] or r["total"] for r in opR):
+            assetsWithRows.add(assetId)
 
     result = []
     for r in rows:
-        asset_id = r["id"]
+        assetId = r["id"]
         # El mismo cálculo que la tabla principal (rendimiento-batch): en Decimal
         # y con el mismo lector de importes. Antes eran dos copias, esta en float.
         totales = rendimiento_activo.calcular(
-            rows_by_asset.get(asset_id, []),
-            op_rows_by_asset.get(asset_id, []),
+            rowsByAsset.get(assetId, []),
+            opRowsByAsset.get(assetId, []),
             str(r["type"] or "").strip().lower() == "cripto",
             r["price"],
-        ).para_json()
+        ).paraJson()
 
         result.append({
-            "id": asset_id,
+            "id": assetId,
             "name": r["name"],
             "symbol": r["symbol"],
             "marketProvider": r["market_provider"],
@@ -331,28 +331,28 @@ def listAssets():
             "rendimiento": totales["rendimiento"],
             "invertidoNeto": totales["invertidoNeto"],
             "rendimientoPct": totales["rendimientoPct"],
-            "hasRows": asset_id in assets_with_rows,
+            "hasRows": assetId in assetsWithRows,
         })
 
     return result
 
 
 @transactional
-def updateAssetsOrder(ordered_ids):
+def updateAssetsOrder(orderedIds):
     """Recibe una lista de asset IDs en el orden deseado y actualiza sort_order en bloque."""
-    conn = get_db()
+    conn = getDb()
     conn.executemany(
         "UPDATE activos SET sort_order = ? WHERE id = ?",
-        [(index, slugify(asset_id)) for index, asset_id in enumerate(ordered_ids)]
+        [(index, slugify(assetId)) for index, assetId in enumerate(orderedIds)]
     )
     conn.commit()
 
 
 @transactional
 def deleteAssetFile(assetId):
-    conn = get_db()
-    safe_id = slugify(assetId)
-    result = conn.execute("DELETE FROM activos WHERE id = ?", (safe_id,))
+    conn = getDb()
+    safeId = slugify(assetId)
+    result = conn.execute("DELETE FROM activos WHERE id = ?", (safeId,))
     conn.commit()
     return result.rowcount > 0
 
@@ -360,8 +360,8 @@ def deleteAssetFile(assetId):
 def getAssetFile(assetId):
     """Shim de compatibilidad: devuelve un objeto con .exists() para el código de rutas."""
     class _ExistenceCheck:
-        def __init__(self, asset_id):
-            self._id = asset_id
+        def __init__(self, assetId):
+            self._id = assetId
 
         def exists(self):
             return readAssetFile(self._id) is not None

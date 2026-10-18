@@ -2,19 +2,19 @@ from flask import Blueprint, jsonify, request
 
 from stores.app_data import readTradingFile, writeTradingFile
 
-trading_bp = Blueprint("trading", __name__)
+tradingBp = Blueprint("trading", __name__)
 
 _TIPO_OPTIONS = {"SCALP", "SWING"}
 _DIRECCION_OPTIONS = {"LONG", "SHORT"}
 _RESULTADO_OPTIONS = {"PROFIT", "PÉRDIDA"}
 
 
-@trading_bp.route("/api/trading", methods=["GET"])
+@tradingBp.route("/api/trading", methods=["GET"])
 def getTrading():
     return jsonify(readTradingFile())
 
 
-@trading_bp.route("/api/trading", methods=["POST"])
+@tradingBp.route("/api/trading", methods=["POST"])
 def saveTrading():
     requestData = request.get_json(silent=True) or {}
     rows = requestData.get("rows", [])

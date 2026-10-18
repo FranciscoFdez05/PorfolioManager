@@ -91,7 +91,7 @@ def olvidarRechazos():
 #
 #   - IPs literales y `localhost`: con ellas no hay dominio que reapuntar.
 #   - Los nombres por los que ya se ha entrado CON SESIÓN iniciada. Se aprenden
-#     solos (lo anota require_login en core/seguridad_app.py): el dominio de un
+#     solos (lo anota requireLogin en core/seguridad_app.py): el dominio de un
 #     atacante nunca llega con la cookie de sesión de esta aplicación, y así no
 #     hay que mantener ninguna lista a mano.
 MAX_HOSTS = 20

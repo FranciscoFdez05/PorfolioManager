@@ -6,7 +6,7 @@ import sqlite3
 import pytest
 
 from tests import test_cuentas
-from tests.test_cuentas import _cuenta, _guardar_gastos, _saldo, _transferir  # noqa: F401
+from tests.test_cuentas import _cuenta, _guardarGastos, _saldo, _transferir  # noqa: F401
 
 # La fixture se reutiliza asignándola, no importándola por nombre: un import
 # que luego reaparece como parámetro de los tests es un F811 para ruff.
@@ -19,7 +19,7 @@ def _cuentas(client):
     return {c["id"]: c for c in client.get("/api/cuentas").get_json()["cuentas"]}
 
 
-def test_la_comision_sale_del_origen_y_el_destino_recibe_solo_la_cantidad(cliente):
+def testLaComisionSaleDelOrigenYElDestinoRecibeSoloLaCantidad(cliente):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
 
@@ -35,7 +35,7 @@ def test_la_comision_sale_del_origen_y_el_destino_recibe_solo_la_cantidad(client
     assert float(_cuentas(client)["banco"]["entradas"]) == 0
 
 
-def test_sin_comision_todo_sigue_igual(cliente):
+def testSinComisionTodoSigueIgual(cliente):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
 
@@ -46,7 +46,7 @@ def test_sin_comision_todo_sigue_igual(cliente):
 
 
 @pytest.mark.parametrize("valor", ["0", "0,00", "", None])
-def test_una_comision_cero_o_vacia_no_se_guarda(cliente, valor):
+def testUnaComisionCeroOVaciaNoSeGuarda(cliente, valor):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
 
@@ -56,7 +56,7 @@ def test_una_comision_cero_o_vacia_no_se_guarda(cliente, valor):
 
 
 @pytest.mark.parametrize("valor", ["-1", "abc"])
-def test_una_comision_invalida_se_rechaza(cliente, valor):
+def testUnaComisionInvalidaSeRechaza(cliente, valor):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
 
@@ -66,7 +66,7 @@ def test_una_comision_invalida_se_rechaza(cliente, valor):
     assert client.get("/api/transferencias").get_json()["transferencias"] == []
 
 
-def test_editar_y_quitar_la_comision(cliente):
+def testEditarYQuitarLaComision(cliente):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
     t = _transferir(client, cabeceras, "banco", exchange["id"], "100", comision="3").get_json()["transferencia"]
@@ -79,7 +79,7 @@ def test_editar_y_quitar_la_comision(cliente):
     assert _saldo(client, "banco") == -100
 
 
-def test_borrar_la_transferencia_devuelve_tambien_la_comision(cliente):
+def testBorrarLaTransferenciaDevuelveTambienLaComision(cliente):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
     t = _transferir(client, cabeceras, "banco", exchange["id"], "100", comision="3").get_json()["transferencia"]
@@ -89,19 +89,19 @@ def test_borrar_la_transferencia_devuelve_tambien_la_comision(cliente):
     assert _saldo(client, "banco") == 0
 
 
-def test_la_comision_de_una_transferencia_futura_no_mueve_el_saldo_aun(cliente):
-    from core.db import get_db
+def testLaComisionDeUnaTransferenciaFuturaNoMueveElSaldoAun(cliente):
+    from core.db import getDb
     from stores.cuentas_store import saldos
 
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
     _transferir(client, cabeceras, "banco", exchange["id"], "100", fecha="10-12-2026", comision="4")
 
-    assert float(saldos(get_db(), hoy=HOY)["banco"]["saldo"]) == 0
-    assert float(saldos(get_db(), hoy=datetime.date(2026, 12, 20))["banco"]["saldo"]) == -104
+    assert float(saldos(getDb(), hoy=HOY)["banco"]["saldo"]) == 0
+    assert float(saldos(getDb(), hoy=datetime.date(2026, 12, 20))["banco"]["saldo"]) == -104
 
 
-def test_la_comision_aparece_como_movimiento_solo_en_la_cuenta_de_origen(cliente):
+def testLaComisionApareceComoMovimientoSoloEnLaCuentaDeOrigen(cliente):
     client, cabeceras = cliente
     _transferir(client, cabeceras, "ahorro", "banco", "50", concepto="Retirada", comision="1,5")
 
@@ -117,17 +117,17 @@ def test_la_comision_aparece_como_movimiento_solo_en_la_cuenta_de_origen(cliente
     assert _saldo(client, "ahorro") == -51.5
 
 
-def test_la_comision_no_cuenta_como_gasto(cliente):
+def testLaComisionNoCuentaComoGasto(cliente):
     client, cabeceras = cliente
     exchange = _cuenta(client, cabeceras, "Binance")
     _transferir(client, cabeceras, "banco", exchange["id"], "100", comision="5")
 
-    from core.db import get_db
+    from core.db import getDb
 
-    assert get_db().execute("SELECT COUNT(*) FROM gastos_rows").fetchone()[0] == 0
+    assert getDb().execute("SELECT COUNT(*) FROM gastos_rows").fetchone()[0] == 0
 
 
-def test_el_esquema_12_anade_la_columna_sin_tocar_las_filas(tmp_path):
+def testElEsquema12AnadeLaColumnaSinTocarLasFilas(tmp_path):
     from core import db
 
     ruta = tmp_path / "viejo.db"
@@ -139,8 +139,8 @@ def test_el_esquema_12_anade_la_columna_sin_tocar_las_filas(tmp_path):
     )
     conn.execute("INSERT INTO transferencias (fecha, origen, destino, cantidad) VALUES ('01-01-2026', 'banco', 'ahorro', '10,00 €')")
 
-    db._esquema_12(conn)
-    db._esquema_12(conn)  # idempotente
+    db._esquema12(conn)
+    db._esquema12(conn)  # idempotente
 
     fila = conn.execute("SELECT cantidad, comision FROM transferencias").fetchone()
     assert fila == ("10,00 €", "")

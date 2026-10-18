@@ -23,7 +23,7 @@ import os
 import time
 
 from core import atajo_acceso, firma_hmac, red_local, settings
-from core.secret_store import read_secret_lines
+from core.secret_store import readSecretLines
 from stores.movimientos_store import DatosMovimientoInvalidos, sanitizarMovimiento
 
 log = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def _estadoDeLaClave() -> dict:
 
     ruta = firma_hmac.rutaFicheroClave()
 
-    if read_secret_lines(ruta):
+    if readSecretLines(ruta):
         return {"hay": True, "origen": "fichero", "detalle": ruta.name}
 
     if ruta.exists():

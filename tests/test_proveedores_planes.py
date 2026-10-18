@@ -11,7 +11,7 @@ Aparte, `real-time` de EODHD no devuelve la divisa de la cotización, y el valor
 por defecto era "EUR": todo precio de EODHD acababa etiquetado en euros, así que
 un valor en dólares ni se convertía ni se marcaba.
 
-Nada sale a la red: se sustituye `fetch_json` en cada cliente, que es la
+Nada sale a la red: se sustituye `fetchJson` en cada cliente, que es la
 frontera con el proveedor.
 """
 
@@ -27,7 +27,7 @@ def _http(codigo):
 
 
 def _responde(monkeypatch, modulo, funcion):
-    monkeypatch.setattr(modulo, "fetch_json", funcion)
+    monkeypatch.setattr(modulo, "fetchJson", funcion)
 
 
 # ── EODHD · divisa de la cotización ──────────────────────────────────────────
@@ -47,14 +47,14 @@ class TestDivisaEodhd:
         ("EURUSD.FOREX", "USD"),
         ("BTC-USD.CC", "USD"),
     ])
-    def test_se_deduce_del_sufijo_de_mercado(self, simbolo, esperado):
-        assert eodhd_client.infer_currency_from_symbol(simbolo) == esperado
+    def testSeDeduceDelSufijoDeMercado(self, simbolo, esperado):
+        assert eodhd_client.inferCurrencyFromSymbol(simbolo) == esperado
 
     @pytest.mark.parametrize("simbolo", ["", "AAPL", "COSA.MERCADORARO"])
-    def test_lo_que_no_se_reconoce_cae_al_valor_por_defecto(self, simbolo):
-        assert eodhd_client.infer_currency_from_symbol(simbolo) == "EUR"
+    def testLoQueNoSeReconoceCaeAlValorPorDefecto(self, simbolo):
+        assert eodhd_client.inferCurrencyFromSymbol(simbolo) == "EUR"
 
-    def test_una_cotizacion_estadounidense_no_se_etiqueta_en_euros(self, monkeypatch):
+    def testUnaCotizacionEstadounidenseNoSeEtiquetaEnEuros(self, monkeypatch):
         """El fallo de fondo: `real-time` no trae `currency` nunca.
 
         Con "EUR" por defecto, un AAPL a 320 USD se guardaba como 320 €, y la
@@ -64,23 +64,23 @@ class TestDivisaEodhd:
         _responde(monkeypatch, eodhd_client,
                   lambda *a, **k: {"close": 320.65, "previousClose": 328.21, "change_p": -2.3})
 
-        cotizacion, error = eodhd_client.fetch_quote("AAPL.US", "clave")
+        cotizacion, error = eodhd_client.fetchQuote("AAPL.US", "clave")
 
         assert error is None
         assert cotizacion["currency"] == "USD"
 
-    def test_si_el_proveedor_dice_la_divisa_manda_la_suya(self, monkeypatch):
+    def testSiElProveedorDiceLaDivisaMandaLaSuya(self, monkeypatch):
         _responde(monkeypatch, eodhd_client,
                   lambda *a, **k: {"close": 10, "previousClose": 10, "currency": "gbp"})
 
-        cotizacion, _error = eodhd_client.fetch_quote("RARO.XX", "clave")
+        cotizacion, _error = eodhd_client.fetchQuote("RARO.XX", "clave")
 
         assert cotizacion["currency"] == "GBP"
 
 
 # ── EODHD · cuota ────────────────────────────────────────────────────────────
 
-def test_el_402_de_eodhd_se_explica_como_cuota_diaria(monkeypatch):
+def testEl402DeEodhdSeExplicaComoCuotaDiaria(monkeypatch):
     """20 peticiones al día por clave es el límite del plan gratuito.
 
     Es con diferencia el corte más habitual, y «EODHD devolvió HTTP 402» lo
@@ -91,33 +91,33 @@ def test_el_402_de_eodhd_se_explica_como_cuota_diaria(monkeypatch):
 
     _responde(monkeypatch, eodhd_client, falla)
 
-    _cotizacion, error = eodhd_client.fetch_quote("AAPL.US", "clave")
+    _cotizacion, error = eodhd_client.fetchQuote("AAPL.US", "clave")
 
     assert "cuota" in error.lower()
 
 
 # ── Finnhub · lo que el plan no cubre ────────────────────────────────────────
 
-def test_el_403_de_finnhub_habla_del_plan_y_no_de_la_clave(monkeypatch):
+def testEl403DeFinnhubHablaDelPlanYNoDeLaClave(monkeypatch):
     """Cualquier bolsa fuera de EE. UU. contesta 403 en el plan gratuito."""
     def falla(*a, **k):
         raise _http(403)
 
     _responde(monkeypatch, finnhub_client, falla)
 
-    _cotizacion, error = finnhub_client.fetch_quote("SAN.MC", "clave")
+    _cotizacion, error = finnhub_client.fetchQuote("SAN.MC", "clave")
 
     assert "plan" in error.lower()
     assert "403" in error
 
 
-def test_la_busqueda_tambien_explica_el_403(monkeypatch):
+def testLaBusquedaTambienExplicaEl403(monkeypatch):
     def falla(*a, **k):
         raise _http(403)
 
     _responde(monkeypatch, finnhub_client, falla)
 
-    _resultados, error = finnhub_client.search_symbol("santander", "clave")
+    _resultados, error = finnhub_client.searchSymbol("santander", "clave")
 
     assert "plan" in error.lower()
 
@@ -125,13 +125,13 @@ def test_la_busqueda_tambien_explica_el_403(monkeypatch):
 # ── Finnhub · históricos ─────────────────────────────────────────────────────
 
 @pytest.fixture(autouse=True)
-def sin_memoria_de_historicos():
-    finnhub_client.reiniciar_historicos_para_pruebas()
+def sinMemoriaDeHistoricos():
+    finnhub_client.reiniciarHistoricosParaPruebas()
     yield
-    finnhub_client.reiniciar_historicos_para_pruebas()
+    finnhub_client.reiniciarHistoricosParaPruebas()
 
 
-def test_el_403_de_los_historicos_no_se_pregunta_una_vez_por_activo(monkeypatch):
+def testEl403DeLosHistoricosNoSePreguntaUnaVezPorActivo(monkeypatch):
     """Las velas salieron del plan gratuito: contestan 403 pase lo que pase.
 
     Quien las pide es la variación por periodo, que las lanza en paralelo para
@@ -146,15 +146,15 @@ def test_el_403_de_los_historicos_no_se_pregunta_una_vez_por_activo(monkeypatch)
 
     _responde(monkeypatch, finnhub_client, falla)
 
-    primero = finnhub_client.fetch_candle_close("AAPL", 0, 1, "clave")
-    segundo = finnhub_client.fetch_candle_close("MSFT", 0, 1, "clave")
+    primero = finnhub_client.fetchCandleClose("AAPL", 0, 1, "clave")
+    segundo = finnhub_client.fetchCandleClose("MSFT", 0, 1, "clave")
 
     assert len(llamadas) == 1
     assert primero[0] is None and segundo[0] is None
     assert segundo[1] == finnhub_client.SIN_HISTORICO
 
 
-def test_al_reiniciar_el_proceso_se_vuelve_a_intentar(monkeypatch):
+def testAlReiniciarElProcesoSeVuelveAIntentar(monkeypatch):
     """Si se mejora el plan, un reinicio basta: no queda nada guardado."""
     llamadas = []
 
@@ -163,18 +163,18 @@ def test_al_reiniciar_el_proceso_se_vuelve_a_intentar(monkeypatch):
         raise _http(403)
 
     _responde(monkeypatch, finnhub_client, falla)
-    finnhub_client.fetch_candle_close("AAPL", 0, 1, "clave")
-    finnhub_client.reiniciar_historicos_para_pruebas()
-    finnhub_client.fetch_candle_close("AAPL", 0, 1, "clave")
+    finnhub_client.fetchCandleClose("AAPL", 0, 1, "clave")
+    finnhub_client.reiniciarHistoricosParaPruebas()
+    finnhub_client.fetchCandleClose("AAPL", 0, 1, "clave")
 
     assert len(llamadas) == 2
 
 
-def test_un_historico_que_llega_se_devuelve(monkeypatch):
+def testUnHistoricoQueLlegaSeDevuelve(monkeypatch):
     _responde(monkeypatch, finnhub_client,
               lambda *a, **k: {"s": "ok", "c": [123.45, 130.0]})
 
-    precio, error = finnhub_client.fetch_candle_close("AAPL", 0, 1, "clave")
+    precio, error = finnhub_client.fetchCandleClose("AAPL", 0, 1, "clave")
 
     assert error is None
     assert precio == pytest.approx(123.45)

@@ -15,7 +15,7 @@ y como se teclean —"1.234,56", "0,00021"— y el que los interpreta es
 capa de almacenamiento y perdería lo que el usuario escribió.
 """
 
-from core.db import get_db, transactional
+from core.db import getDb, transactional
 from core.errors import ValidationError
 
 _PLAN_COLUMNS = (
@@ -42,7 +42,7 @@ _PLAN_COLUMNS = (
 # literales de este módulo, y los valores —lo único que viene del cliente— van
 # parametrizados.
 def _leer(tabla, columnas):
-    conn = get_db()
+    conn = getDb()
     seleccion = ", ".join(columna for columna, _ in columnas)
     filas = conn.execute(
         f"SELECT {seleccion} FROM {tabla} ORDER BY sort_order, rowid"
@@ -53,7 +53,7 @@ def _leer(tabla, columnas):
     ]}
 
 
-def _comprobar_activos(conn, filas):
+def _comprobarActivos(conn, filas):
     """Rechaza los planes que apunten a un activo que ya no existe.
 
     Sin esto el aviso lo daría la clave foránea, con un error del motor y un 500
@@ -80,8 +80,8 @@ def _escribir(tabla, columnas, filas):
     se ve en pantalla. La transacción la abre `@transactional`: si algo falla a
     medias, la tabla se queda como estaba en vez de vaciarse.
     """
-    conn = get_db()
-    _comprobar_activos(conn, filas)
+    conn = getDb()
+    _comprobarActivos(conn, filas)
     conn.execute(f"DELETE FROM {tabla}")
 
     nombres = [columna for columna, _ in columnas] + ["sort_order"]
@@ -96,10 +96,10 @@ def _escribir(tabla, columnas, filas):
     conn.commit()
 
 
-def read_planes():
+def readPlanes():
     return _leer("planes_inversion", _PLAN_COLUMNS)
 
 
 @transactional
-def write_planes(rows):
+def writePlanes(rows):
     _escribir("planes_inversion", _PLAN_COLUMNS, rows)

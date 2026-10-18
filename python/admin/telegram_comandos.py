@@ -17,7 +17,7 @@ import time
 from datetime import datetime
 
 from core import dinero, paths, telegram_notifier
-from core.db import get_active_db_path, get_db
+from core.db import getActiveDbPath, getDb
 from core.version import __version__
 
 log = logging.getLogger(__name__)
@@ -68,13 +68,13 @@ def _numero(valor, decimales=2) -> str:
 # ── Activos ───────────────────────────────────────────────────────────────────
 
 def _activos():
-    return get_db().execute(
+    return getDb().execute(
         "SELECT id, name, symbol, market_provider, market_symbol, finnhub_symbol, price, currency, "
         "change, last_updated FROM activos ORDER BY sort_order, symbol"
     ).fetchall()
 
 
-def buscar_activo(texto: str):
+def buscarActivo(texto: str):
     """(activo, error): el activo que mejor encaja con `texto`, o por qué no hay uno.
 
     Coincidencia exacta con id, ticker o nombre primero; si no la hay, por
@@ -102,30 +102,30 @@ def buscar_activo(texto: str):
     return candidatos[0], None
 
 
-def _linea_activo(a) -> str:
+def _lineaActivo(a) -> str:
     cambio = str(a["change"] or "").strip()
     return f"{a['name'] or a['id']} · {a['price']} {a['currency']}" + (f" ({cambio})" if cambio else "")
 
 
-def cmd_activos(_args):
+def cmdActivos(_args):
     filas = _activos()
     if not filas:
         return "No hay activos en esta cartera."
-    return "📈 Activos\n" + "\n".join(_linea_activo(a) for a in filas[:40])
+    return "📈 Activos\n" + "\n".join(_lineaActivo(a) for a in filas[:40])
 
 
-def cmd_precio(args):
-    activo, error = buscar_activo(" ".join(args))
+def cmdPrecio(args):
+    activo, error = buscarActivo(" ".join(args))
     if error:
         return error
 
     simbolo = str(activo["market_symbol"] or activo["finnhub_symbol"] or "").strip()
     if simbolo:
-        from stores.helpers import normalize_currency_code
-        from stores.market_data import fetch_asset_quote
+        from stores.helpers import normalizeCurrencyCode
+        from stores.market_data import fetchAssetQuote
 
-        moneda = normalize_currency_code(activo["currency"], fallback="EUR")
-        quote, fallo = fetch_asset_quote(simbolo, activo["market_provider"], target_currency=moneda)
+        moneda = normalizeCurrencyCode(activo["currency"], fallback="EUR")
+        quote, fallo = fetchAssetQuote(simbolo, activo["market_provider"], targetCurrency=moneda)
         if not fallo and quote:
             cambio = str(quote.get("change") or "").strip()
             return (f"💹 {activo['name'] or activo['id']}\n"
@@ -133,25 +133,25 @@ def cmd_precio(args):
         log.info("[telegram] /precio %s sin cotización en vivo: %s", activo["id"], fallo)
 
     guardado = f" (último guardado: {activo['last_updated']})" if activo["last_updated"] else ""
-    return f"💹 {_linea_activo(activo)}{guardado}\nNo he podido pedir la cotización en vivo."
+    return f"💹 {_lineaActivo(activo)}{guardado}\nNo he podido pedir la cotización en vivo."
 
 
 # ── Cartera ───────────────────────────────────────────────────────────────────
 
-def cmd_cartera(_args):
-    from admin.portfolios_manager import get_portfolios
+def cmdCartera(_args):
+    from admin.portfolios_manager import getPortfolios
     from stores import resumen_cartera
 
-    pid = get_active_db_path().stem
+    pid = getActiveDbPath().stem
     nombre = next(
-        (p.get("name") for p in (get_portfolios() or {}).get("portfolios", []) if p.get("id") == pid), pid
+        (p.get("name") for p in (getPortfolios() or {}).get("portfolios", []) if p.get("id") == pid), pid
     )
     return resumen_cartera.formatear(nombre or pid, resumen_cartera.calcular())
 
 
 # ── Alertas ───────────────────────────────────────────────────────────────────
 
-def _describir_alerta(a, nombres) -> str:
+def _describirAlerta(a, nombres) -> str:
     nombre = nombres.get(a["assetId"], a["assetId"])
     if a["condicion"] == "var_dia":
         regla = f"variación del día ≥ {_numero(a['valor'])} %"
@@ -162,7 +162,7 @@ def _describir_alerta(a, nombres) -> str:
     return f"#{a['id']} {nombre}: {regla}{nota}"
 
 
-def cmd_alertas(_args):
+def cmdAlertas(_args):
     from stores import alertas_store
 
     todas = alertas_store.listar()
@@ -173,7 +173,7 @@ def cmd_alertas(_args):
     if not activas:
         texto = "🔔 No hay alertas de precio activas.\nSe crean desde la pestaña Alertas de la ficha de cada activo."
     else:
-        texto = "🔔 Alertas activas\n" + "\n".join(_describir_alerta(a, nombres) for a in activas)
+        texto = "🔔 Alertas activas\n" + "\n".join(_describirAlerta(a, nombres) for a in activas)
     if saltadas:
         texto += f"\n\n{len(saltadas)} alerta(s) ya saltaron y esperan que las reactives desde la web."
     return texto
@@ -181,12 +181,12 @@ def cmd_alertas(_args):
 
 # ── Copias ────────────────────────────────────────────────────────────────────
 
-def cmd_backup(_args):
+def cmdBackup(_args):
     from core.bloqueo import BloqueoOcupado
-    from routes.backup import _BACKUP_DIR, crear_backup_manual
+    from routes.backup import _BACKUP_DIR, crearBackupManual
 
     try:
-        nombre = crear_backup_manual(avisar=False)
+        nombre = crearBackupManual(avisar=False)
     except BloqueoOcupado:
         return "Ya hay otra copia en curso en el servidor. Inténtalo en unos segundos."
     except Exception as error:
@@ -199,15 +199,15 @@ def cmd_backup(_args):
         peso = "tamaño desconocido"
     texto = f"💾 Copia creada\n{nombre} · {peso}"
     # El zip viaja con el texto de pie; si no sale, se contesta solo con el texto.
-    if telegram_notifier.responder_archivo(_BACKUP_DIR / nombre, texto):
+    if telegram_notifier.responderArchivo(_BACKUP_DIR / nombre, texto):
         return None
     return texto + "\n⚠️ No he podido adjuntar el fichero."
 
 
-def cmd_backups(_args):
-    from routes.backup import _BACKUP_DIR, _list_backups
+def cmdBackups(_args):
+    from routes.backup import _BACKUP_DIR, _listBackups
 
-    copias = _list_backups()
+    copias = _listBackups()
     if not copias:
         return "No hay copias de seguridad."
     lineas = []
@@ -222,22 +222,22 @@ def cmd_backups(_args):
 
 # ── Servidor ──────────────────────────────────────────────────────────────────
 
-def _hilos_de_fondo() -> str:
+def _hilosDeFondo() -> str:
     vivos = {hilo.name for hilo in threading.enumerate()}
     nombres = (("snapshot-scheduler", "snapshots"), ("backup-scheduler", "copias"),
                ("avisos-scheduler", "avisos"), ("telegram-listener", "bot"))
     return "  ".join(f"{etiqueta} {'✓' if hilo in vivos else '✗'}" for hilo, etiqueta in nombres)
 
 
-def cmd_estado(_args):
-    from routes.backup import _list_backups, _parse_dt
-    from routes.salud import _comprobar_bd
+def cmdEstado(_args):
+    from routes.backup import _listBackups, _parseDt
+    from routes.salud import _comprobarBd
     from stores import alertas_store
 
     lineas = [f"🖥 PortfolioManager {__version__}", f"⏱ Activo desde hace {_duracion(time.time() - _ARRANQUE)}"]
 
-    sano, detalle = _comprobar_bd()
-    ruta = get_active_db_path()
+    sano, detalle = _comprobarBd()
+    ruta = getActiveDbPath()
     if sano:
         try:
             peso = _tamano(ruta.stat().st_size)
@@ -253,15 +253,15 @@ def cmd_estado(_args):
     except OSError:
         lineas.append("💽 Disco: no se pudo medir")
 
-    copias = _list_backups()
+    copias = _listBackups()
     if copias:
-        cuando = _parse_dt(copias[0]).strftime("%d/%m/%Y %H:%M")
+        cuando = _parseDt(copias[0]).strftime("%d/%m/%Y %H:%M")
         lineas.append(f"💾 Última copia: {cuando} ({len(copias)} guardadas)")
     else:
         lineas.append("💾 Aún no hay copias de seguridad")
 
-    lineas.append(f"🔔 Alertas de precio activas: {alertas_store.contar_activas()}")
-    lineas.append(f"🧵 Hilos: {_hilos_de_fondo()}")
+    lineas.append(f"🔔 Alertas de precio activas: {alertas_store.contarActivas()}")
+    lineas.append(f"🧵 Hilos: {_hilosDeFondo()}")
 
     hasta = telegram_notifier.silenciadoHasta()
     if hasta:
@@ -269,30 +269,30 @@ def cmd_estado(_args):
     return "\n".join(lineas)
 
 
-def cmd_proveedores(_args):
-    from providers.api_stats import get_today_stats
+def cmdProveedores(_args):
+    from providers.api_stats import getTodayStats
 
-    datos = get_today_stats()
+    datos = getTodayStats()
     if not datos["counts"]:
         return "📡 Hoy no se ha llamado a ningún proveedor de cotizaciones."
     desglose = "\n".join(f"• {nombre}: {n}" for nombre, n in sorted(datos["counts"].items(), key=lambda x: -x[1]))
     return f"📡 Llamadas de hoy: {datos['total']}\n{desglose}"
 
 
-def cmd_ping(_args):
+def cmdPing(_args):
     return "pong 🏓"
 
 
-def cmd_ayuda(_args):
+def cmdAyuda(_args):
     return "Comandos:\n" + "\n".join(f"/{c} — {ayuda}" for c, ayuda in COMANDOS)
 
 
 _MANEJADORES = {
-    "status": cmd_estado, "estado": cmd_estado, "cartera": cmd_cartera, "activos": cmd_activos, "precio": cmd_precio,
-    "alertas": cmd_alertas,
-    "backup": cmd_backup, "backups": cmd_backups, "proveedores": cmd_proveedores,
-    "ping": cmd_ping,
-    "ayuda": cmd_ayuda, "comandos": cmd_ayuda, "help": cmd_ayuda,
+    "status": cmdEstado, "estado": cmdEstado, "cartera": cmdCartera, "activos": cmdActivos, "precio": cmdPrecio,
+    "alertas": cmdAlertas,
+    "backup": cmdBackup, "backups": cmdBackups, "proveedores": cmdProveedores,
+    "ping": cmdPing,
+    "ayuda": cmdAyuda, "comandos": cmdAyuda, "help": cmdAyuda,
 }
 
 

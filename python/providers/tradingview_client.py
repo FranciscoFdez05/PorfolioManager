@@ -2,7 +2,7 @@
 
 Mathieu2301/TradingView-API habla con el feed en tiempo real de TradingView
 por WebSocket (protocolo propio de sockets, streaming). Los otros cuatro
-proveedores conectados aquí son síncronos por HTTP con `providers.fetch_json`
+proveedores conectados aquí son síncronos por HTTP con `providers.fetchJson`
 y no llevan ninguna dependencia nueva; mantener ese mismo patrón importaba más
 que el streaming, así que este cliente usa el `scanner.tradingview.com` que
 alimenta las tablas de la web —los mismos datos, en una foto en vez de un
@@ -11,7 +11,7 @@ proveedores) sin tocar esa lógica.
 
 El símbolo va con la sintaxis de TradingView, `MERCADO:TICKER`
 (`NASDAQ:AAPL`, `BINANCE:BTCUSDT`, `XETR:SAP`): por eso no es "portable" para
-`stores.market_data._is_portable_symbol` y solo se usa cuando el activo lo
+`stores.market_data._isPortableSymbol` y solo se usa cuando el activo lo
 pide explícitamente, igual que ya pasa con la sintaxis de Finnhub para
 cripto/forex.
 """
@@ -22,13 +22,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import unquote
 
 from providers import (
-    compact_symbol as _compact_symbol,
-    fetch_json,
-    format_decimal as _format_decimal,
-    format_percent as _format_percent,
-    normalize_text as _normalize_text,
+    compactSymbol as _compactSymbol,
+    fetchJson,
+    formatDecimal as _formatDecimal,
+    formatPercent as _formatPercent,
+    normalizeText as _normalizeText,
 )
-from providers.http import motivo_conexion
+from providers.http import motivoConexion
 
 TRADINGVIEW_SCAN_URL = "https://scanner.tradingview.com/global/scan"
 TRADINGVIEW_SEARCH_URL = "https://symbol-search.tradingview.com/symbol_search/v3/"
@@ -38,7 +38,7 @@ TRADINGVIEW_SEARCH_URL = "https://symbol-search.tradingview.com/symbol_search/v3
 # mercado pide su propio endpoint regional (`.../america/scan`, `.../spain/scan`...).
 _CAP_COLUMNS = ["close", "currency", "market_cap_calc", "total_shares_outstanding", "description"]
 
-def screener_url(market="america"):
+def screenerUrl(market="america"):
     return f"https://scanner.tradingview.com/{market}/scan"
 
 _SCAN_COLUMNS = ["close", "change", "currency", "description", "exchange", "type"]
@@ -136,17 +136,17 @@ _TAG_RE = re.compile(r"</?em>")
 _CROSS_RE = re.compile(r"^([A-Z]{3})([A-Z]{3})$")
 
 
-def _strip_markup(text):
+def _stripMarkup(text):
     """TradingView resalta la coincidencia con `<em>` dentro de symbol/description."""
     return _TAG_RE.sub("", str(text or ""))
 
 
-def _map_type(raw_type):
-    return _TYPE_MAP.get(str(raw_type or "").strip().lower(), "market")
+def _mapType(rawType):
+    return _TYPE_MAP.get(str(rawType or "").strip().lower(), "market")
 
 
-def _fetch_json(url, params=None, timeout=None, json_body=None, headers=None):
-    return fetch_json(url, params, timeout=timeout, provider="TradingView", json_body=json_body, headers=headers)
+def _fetchJson(url, params=None, timeout=None, jsonBody=None, headers=None):
+    return fetchJson(url, params, timeout=timeout, provider="TradingView", jsonBody=jsonBody, headers=headers)
 
 
 def _scan(tickers, timeout=None):
@@ -158,9 +158,9 @@ def _scan(tickers, timeout=None):
     if not tickers:
         return {}
 
-    payload = _fetch_json(
+    payload = _fetchJson(
         TRADINGVIEW_SCAN_URL,
-        json_body={"symbols": {"tickers": list(tickers), "query": {"types": []}}, "columns": _SCAN_COLUMNS},
+        jsonBody={"symbols": {"tickers": list(tickers), "query": {"types": []}}, "columns": _SCAN_COLUMNS},
         timeout=timeout,
     )
 
@@ -176,39 +176,39 @@ def _scan(tickers, timeout=None):
     return cotizados
 
 
-def fetch_quotes(tickers, timeout=None):
+def fetchQuotes(tickers, timeout=None):
     """Envoltorio público de `_scan`, para catálogos curados (índices, ETF de
     sector) que no son un activo del usuario y no necesitan los cruces
-    sintéticos de `fetch_quote` (esos solo tienen sentido para el ticker
+    sintéticos de `fetchQuote` (esos solo tienen sentido para el ticker
     exacto que pide un activo en concreto).
     """
     return _scan(tickers, timeout)
 
 
-def fetch_screener(filter_clauses, columns, sort_by=None, sort_order="desc", limit=50,
-                    instrument_types=None, market="america", timeout=None):
+def fetchScreener(filterClauses, columns, sortBy=None, sortOrder="desc", limit=50,
+                    instrumentTypes=None, market="america", timeout=None):
     """Consulta real al screener de TradingView: filtro + orden sobre todo un
     mercado, no una lista de tickers fijada de antemano. La usa
     `stores.market_pulse` para "qué sube y qué baja hoy" y la amplitud de
     mercado. Deja pasar HTTPError/URLError, igual que `_scan`.
     """
     payload = {
-        "filter": filter_clauses,
+        "filter": filterClauses,
         "options": {"lang": "en"},
-        "symbols": {"query": {"types": instrument_types or []}, "tickers": []},
+        "symbols": {"query": {"types": instrumentTypes or []}, "tickers": []},
         "columns": columns,
         "range": [0, max(1, limit)],
     }
-    if sort_by:
-        payload["sort"] = {"sortBy": sort_by, "sortOrder": sort_order}
+    if sortBy:
+        payload["sort"] = {"sortBy": sortBy, "sortOrder": sortOrder}
 
-    return _fetch_json(screener_url(market), json_body=payload, timeout=timeout, headers=_SEARCH_HEADERS)
+    return _fetchJson(screenerUrl(market), jsonBody=payload, timeout=timeout, headers=_SEARCH_HEADERS)
 
 
-def fetch_stats(tickers, timeout=None):
+def fetchStats(tickers, timeout=None):
     """Fundamentales y técnico del scanner para varios tickers a la vez.
 
-    Una sola petición para todos, como `_batch_fetch_quotes`. Cada campo sale
+    Una sola petición para todos, como `_batchFetchQuotes`. Cada campo sale
     tal cual lo devuelve el scanner: `None` cuando ese dato no existe para el
     tipo de instrumento (una cripto no tiene sector, un índice no tiene PER),
     nunca un valor inventado para rellenar el hueco. Deja pasar
@@ -218,9 +218,9 @@ def fetch_stats(tickers, timeout=None):
     if not tickers:
         return {}
 
-    payload = _fetch_json(
+    payload = _fetchJson(
         TRADINGVIEW_SCAN_URL,
-        json_body={"symbols": {"tickers": list(tickers), "query": {"types": []}}, "columns": _STATS_COLUMNS},
+        jsonBody={"symbols": {"tickers": list(tickers), "query": {"types": []}}, "columns": _STATS_COLUMNS},
         timeout=timeout,
     )
 
@@ -234,7 +234,7 @@ def fetch_stats(tickers, timeout=None):
     return stats
 
 
-def fetch_capitalizacion(tickers, timeout=None):
+def fetchCapitalizacion(tickers, timeout=None):
     """Precio, divisa, capitalización y acciones/monedas en circulación.
 
     Cada campo sale tal cual lo devuelve el scanner y es `None` cuando ese
@@ -244,9 +244,9 @@ def fetch_capitalizacion(tickers, timeout=None):
     if not tickers:
         return {}
 
-    payload = _fetch_json(
+    payload = _fetchJson(
         TRADINGVIEW_SCAN_URL,
-        json_body={"symbols": {"tickers": list(tickers), "query": {"types": []}}, "columns": _CAP_COLUMNS},
+        jsonBody={"symbols": {"tickers": list(tickers), "query": {"types": []}}, "columns": _CAP_COLUMNS},
         timeout=timeout,
     )
 
@@ -265,7 +265,7 @@ def fetch_capitalizacion(tickers, timeout=None):
     return datos
 
 
-def _cross_plan(ticker):
+def _crossPlan(ticker):
     """Con qué tickers se calcula el cruce `MERCADO:BBBQQQ` si el scanner no lo
     tiene, o None: `(par en USD, cambio QQQUSD, cambio USDQQQ, divisa QQQ)`.
 
@@ -284,10 +284,10 @@ def _cross_plan(ticker):
     return f"{exchange}:{base}USD", f"{exchange}:{target}USD", f"{exchange}:USD{target}", target
 
 
-def _synthetic_quotes(tickers, timeout=None):
+def _syntheticQuotes(tickers, timeout=None):
     """Calcula los cruces que el scanner no tiene: `{ticker: (precio, variación %,
     divisa, origen)}`. Una sola petición para todas las piezas que hagan falta."""
-    plans = {ticker: plan for ticker in tickers if (plan := _cross_plan(ticker))}
+    plans = {ticker: plan for ticker in tickers if (plan := _crossPlan(ticker))}
     if not plans:
         return {}
 
@@ -301,19 +301,19 @@ def _synthetic_quotes(tickers, timeout=None):
     for ticker, (base, directo, inverso, target) in plans.items():
         if cotizados.get(base, (0, 0, ""))[2] != "USD":
             continue
-        base_price, base_change, _ = cotizados[base]
+        basePrice, baseChange, _ = cotizados[base]
 
         # La variación del cruce no es la resta de las dos: se compone.
         if directo in cotizados:  # QQQUSD: dólares por unidad, se divide
             fx = directo
-            fx_price, fx_change, _ = cotizados[fx]
-            price = base_price / fx_price
-            change = ((1 + base_change / 100) / (1 + fx_change / 100) - 1) * 100
+            fxPrice, fxChange, _ = cotizados[fx]
+            price = basePrice / fxPrice
+            change = ((1 + baseChange / 100) / (1 + fxChange / 100) - 1) * 100
         elif inverso in cotizados:  # USDQQQ: unidades por dólar, se multiplica
             fx = inverso
-            fx_price, fx_change, _ = cotizados[fx]
-            price = base_price * fx_price
-            change = ((1 + base_change / 100) * (1 + fx_change / 100) - 1) * 100
+            fxPrice, fxChange, _ = cotizados[fx]
+            price = basePrice * fxPrice
+            change = ((1 + baseChange / 100) * (1 + fxChange / 100) - 1) * 100
         else:
             continue
 
@@ -322,53 +322,53 @@ def _synthetic_quotes(tickers, timeout=None):
     return calculados
 
 
-def fetch_quote(symbol, timeout=None):
+def fetchQuote(symbol, timeout=None):
     # Quien copia el símbolo desde la URL de tradingview.com (?symbol=BINANCE%3ABTCUSD)
     # se lleva los dos puntos codificados: la barra de direcciones no los decodifica
     # siempre. Sin este `unquote` ese pegado no tiene ":" y cae directo en el error
     # de abajo aunque el ticker sea correcto.
-    normalized_symbol = unquote(str(symbol or "").strip()).upper()
+    normalizedSymbol = unquote(str(symbol or "").strip()).upper()
 
-    if not normalized_symbol:
+    if not normalizedSymbol:
         return None, "El ticker de TradingView es obligatorio"
 
-    if ":" not in normalized_symbol:
+    if ":" not in normalizedSymbol:
         return None, "El ticker de TradingView necesita el mercado delante (p.ej. NASDAQ:AAPL)"
 
     try:
-        cotizados = _scan([normalized_symbol], timeout)
+        cotizados = _scan([normalizedSymbol], timeout)
     except HTTPError as error:
         return None, f"TradingView devolvió HTTP {error.code}"
     except URLError as error:
-        return None, f"No se pudo conectar con TradingView: {motivo_conexion(error, 'TradingView')}"
+        return None, f"No se pudo conectar con TradingView: {motivoConexion(error, 'TradingView')}"
 
     status = "Cotización actualizada"
-    if normalized_symbol in cotizados:
-        current_price, percent_change, currency = cotizados[normalized_symbol]
+    if normalizedSymbol in cotizados:
+        currentPrice, percentChange, currency = cotizados[normalizedSymbol]
         currency = currency or "USD"
     else:
-        calculado = _synthetic_quotes([normalized_symbol], timeout).get(normalized_symbol)
+        calculado = _syntheticQuotes([normalizedSymbol], timeout).get(normalizedSymbol)
         if not calculado:
             return None, "TradingView no devolvió cotización para ese ticker"
-        current_price, percent_change, currency, origen = calculado
+        currentPrice, percentChange, currency, origen = calculado
         # Se dice de dónde sale: no es la cotización de ese ticker en concreto
         # sino la del par en dólares pasada por el cambio, y puede diferir en
         # el diferencial del bróker.
         status = f"Cotización calculada ({origen})"
 
-    previous_close = current_price / (1 + percent_change / 100) if percent_change != -100 else current_price
+    previousClose = currentPrice / (1 + percentChange / 100) if percentChange != -100 else currentPrice
 
     return {
-        "symbol": normalized_symbol,
-        "price": _format_decimal(current_price),
+        "symbol": normalizedSymbol,
+        "price": _formatDecimal(currentPrice),
         "currency": currency,
-        "change": _format_percent(percent_change),
+        "change": _formatPercent(percentChange),
         "status": status,
         "lastUpdated": datetime.now().astimezone().isoformat(),
         "marketData": {
-            "currentPrice": current_price,
-            "percentChange": percent_change,
-            "previousClose": previous_close
+            "currentPrice": currentPrice,
+            "percentChange": percentChange,
+            "previousClose": previousClose
         }
     }, None
 
@@ -385,37 +385,37 @@ _TIPOS_API_POR_CATEGORIA = {
 }
 
 
-def _score_result(symbol, description, query_text, normalized_asset_name="", rank_index=0):
+def _scoreResult(symbol, description, queryText, normalizedAssetName="", rankIndex=0):
     """Relevancia de un resultado, solo con lo que escribió el usuario y lo que
     dice la API: sin listas de palabras, marcas ni mercados preferidos."""
-    normalized_query = _normalize_text(query_text)
-    compact_query = _compact_symbol(query_text)
-    compact_symbol = _compact_symbol(symbol)
-    normalized_description = _normalize_text(description)
+    normalizedQuery = _normalizeText(queryText)
+    compactQuery = _compactSymbol(queryText)
+    compactSymbol = _compactSymbol(symbol)
+    normalizedDescription = _normalizeText(description)
 
     # TradingView ya devuelve sus propios resultados ordenados por relevancia.
     # Este suelo, que baja con la posición original, hace que esa ordenación
     # mande salvo que el símbolo o el nombre coincidan mejor con lo buscado.
-    score = max(0, 200 - rank_index * 6)
+    score = max(0, 200 - rankIndex * 6)
 
-    if compact_query:
-        if compact_symbol == compact_query:
+    if compactQuery:
+        if compactSymbol == compactQuery:
             score += 500
-        elif compact_symbol.startswith(compact_query):
+        elif compactSymbol.startswith(compactQuery):
             score += 220
-        if normalized_query and normalized_query in normalized_description:
+        if normalizedQuery and normalizedQuery in normalizedDescription:
             score += 180
 
-    if normalized_asset_name:
-        if normalized_asset_name == normalized_description:
+    if normalizedAssetName:
+        if normalizedAssetName == normalizedDescription:
             score += 260
-        elif normalized_asset_name in normalized_description:
+        elif normalizedAssetName in normalizedDescription:
             score += 160
 
     return score
 
 
-def _batch_fetch_quotes(symbols, timeout=None):
+def _batchFetchQuotes(symbols, timeout=None):
     """Cotiza varios símbolos de una vez: una sola llamada al scanner, no una
     por resultado. El scanner ya acepta una lista de `tickers`; usarla aquí es
     lo que permite mirar más candidatos de golpe sin multiplicar peticiones.
@@ -431,21 +431,21 @@ def _batch_fetch_quotes(symbols, timeout=None):
     # Los que el scanner no tiene y son un cruce calculable con piezas del mismo
     # mercado (OANDA:XAUEUR) salen con precio en vez de "sin cotización".
     faltan = [symbol for symbol in symbols if symbol not in cotizados]
-    for symbol, (price, change, currency, _origen) in _synthetic_quotes(faltan, timeout).items():
+    for symbol, (price, change, currency, _origen) in _syntheticQuotes(faltan, timeout).items():
         cotizados[symbol] = (price, change, currency)
 
     return {
         symbol: {
-            "price": _format_decimal(price),
+            "price": _formatDecimal(price),
             "currency": currency,
-            "change": _format_percent(change),
+            "change": _formatPercent(change),
         }
         for symbol, (price, change, currency) in cotizados.items()
     }
 
 
-def _search_symbol_request(text, exchange, timeout):
-    return _fetch_json(
+def _searchSymbolRequest(text, exchange, timeout):
+    return _fetchJson(
         TRADINGVIEW_SEARCH_URL,
         {
             "text": text,
@@ -460,10 +460,10 @@ def _search_symbol_request(text, exchange, timeout):
     )
 
 
-def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_asset_type=""):
-    normalized_query = unquote(str(query_text or "").strip())
+def searchSymbol(queryText, timeout=None, limit=8, assetName="", preferredAssetType=""):
+    normalizedQuery = unquote(str(queryText or "").strip())
 
-    if not normalized_query:
+    if not normalizedQuery:
         return None, "Escribe un nombre o ticker para buscar"
 
     # Si pegan un ticker ya con mercado (p.ej. "BITVAVO:BTCEUR", copiado del
@@ -473,57 +473,57 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
     # resultado que sale primero suele ser el de un mercado distinto (comprobado
     # contra la API real: "BITVAVO:BTCEUR" como texto devuelve Bybit/Bitfinex,
     # nunca Bitvavo). Separarlo en `text` + `exchange` sí filtra de verdad.
-    exchange_filter = ""
-    search_text = normalized_query
-    if ":" in normalized_query:
-        possible_exchange, possible_symbol = normalized_query.split(":", 1)
-        if possible_exchange.strip() and possible_symbol.strip():
-            exchange_filter = possible_exchange.strip().upper()
-            search_text = possible_symbol.strip()
+    exchangeFilter = ""
+    searchText = normalizedQuery
+    if ":" in normalizedQuery:
+        possibleExchange, possibleSymbol = normalizedQuery.split(":", 1)
+        if possibleExchange.strip() and possibleSymbol.strip():
+            exchangeFilter = possibleExchange.strip().upper()
+            searchText = possibleSymbol.strip()
 
     try:
-        payload = _search_symbol_request(search_text, exchange_filter, timeout)
+        payload = _searchSymbolRequest(searchText, exchangeFilter, timeout)
         # Un prefijo que no es un código de mercado real de TradingView filtra a
         # cero en vez de dar error (comprobado: "exchange" inválido -> lista
         # vacía). Repetir como texto libre evita dejar al usuario sin nada por
         # una suposición nuestra que no encaja.
-        if exchange_filter and not (payload.get("symbols") or []):
-            payload = _search_symbol_request(normalized_query, "", timeout)
+        if exchangeFilter and not (payload.get("symbols") or []):
+            payload = _searchSymbolRequest(normalizedQuery, "", timeout)
     except HTTPError as error:
         return None, f"TradingView devolvió HTTP {error.code}"
     except URLError as error:
-        return None, f"No se pudo conectar con TradingView: {motivo_conexion(error, 'TradingView')}"
+        return None, f"No se pudo conectar con TradingView: {motivoConexion(error, 'TradingView')}"
 
-    raw_results = payload.get("symbols") or []
-    normalized_asset_name = _normalize_text(asset_name)
-    tipos_categoria = _TIPOS_API_POR_CATEGORIA.get(str(preferred_asset_type or "").strip().lower())
-    ranked_results = []
-    seen_symbols = set()
+    rawResults = payload.get("symbols") or []
+    normalizedAssetName = _normalizeText(assetName)
+    tiposCategoria = _TIPOS_API_POR_CATEGORIA.get(str(preferredAssetType or "").strip().lower())
+    rankedResults = []
+    seenSymbols = set()
 
-    for rank_index, item in enumerate(raw_results):
+    for rankIndex, item in enumerate(rawResults):
         exchange = str(item.get("exchange", "")).strip().upper()
-        raw_symbol = _strip_markup(item.get("symbol", "")).strip().upper()
-        description = _strip_markup(item.get("description", "")).strip()
-        raw_type = str(item.get("type", "")).strip().lower()
+        rawSymbol = _stripMarkup(item.get("symbol", "")).strip().upper()
+        description = _stripMarkup(item.get("description", "")).strip()
+        rawType = str(item.get("type", "")).strip().lower()
         currency = str(item.get("currency_code", "")).strip().upper()
 
-        if not raw_symbol or not exchange or not description:
+        if not rawSymbol or not exchange or not description:
             continue
 
-        full_symbol = f"{exchange}:{raw_symbol}"
+        fullSymbol = f"{exchange}:{rawSymbol}"
 
-        if full_symbol in seen_symbols:
+        if fullSymbol in seenSymbols:
             continue
 
-        seen_symbols.add(full_symbol)
-        score = _score_result(raw_symbol, description, normalized_query, normalized_asset_name, rank_index)
+        seenSymbols.add(fullSymbol)
+        score = _scoreResult(rawSymbol, description, normalizedQuery, normalizedAssetName, rankIndex)
         # Sin tipo de activo elegido, todos cuentan igual.
-        en_categoria = raw_type in tipos_categoria if tipos_categoria else True
-        ranked_results.append((score, en_categoria, {
-            "symbol": full_symbol,
-            "displaySymbol": full_symbol,
+        enCategoria = rawType in tiposCategoria if tiposCategoria else True
+        rankedResults.append((score, enCategoria, {
+            "symbol": fullSymbol,
+            "displaySymbol": fullSymbol,
             "description": description,
-            "type": _map_type(raw_type),
+            "type": _mapType(rawType),
             "exchange": exchange,
             "provider": "tradingview",
             "price": "",
@@ -535,7 +535,7 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
     # relevancia. Así, buscando "XAG" en un activo de materias primas, la plata
     # de los brókers (tipo "commodity") va antes que los contratos perpetuos de
     # los exchanges de cripto (tipo "swap"), sin nombrar a ninguno de los dos.
-    ranked_results.sort(key=lambda row: (not row[1], -row[0], row[2]["symbol"]))
+    rankedResults.sort(key=lambda row: (not row[1], -row[0], row[2]["symbol"]))
 
     # Se cotiza un grupo más amplio que lo que se va a enseñar (`_ENRICH_POOL`,
     # no `limit`): mirar la cotización solo cambia si un resultado sale al
@@ -544,8 +544,8 @@ def search_symbol(query_text, timeout=None, limit=8, asset_name="", preferred_as
     # sin precio se quedaba en el hueco de otro mercado del mismo instrumento
     # que sí lo tiene y rankeaba justo un poco peor.
     _ENRICH_POOL = max(limit, 20)
-    candidates = [(en_categoria, item) for _, en_categoria, item in ranked_results[:_ENRICH_POOL]]
-    quotes = _batch_fetch_quotes([item["symbol"] for _, item in candidates], timeout=timeout)
+    candidates = [(enCategoria, item) for _, enCategoria, item in rankedResults[:_ENRICH_POOL]]
+    quotes = _batchFetchQuotes([item["symbol"] for _, item in candidates], timeout=timeout)
 
     for _, candidate in candidates:
         quote = quotes.get(candidate["symbol"])

@@ -2,7 +2,7 @@
 
 Son 660 líneas que no cubría ningún test y que deciden dos cosas delicadas:
 
-  * **Qué se guarda como ajuste.** `save_settings` no confía en el cuerpo: cada
+  * **Qué se guarda como ajuste.** `saveSettings` no confía en el cuerpo: cada
     clave pasa por su lista de valores admitidos. Sin tests, cambiar una de esas
     listas y dejar entrar basura no lo nota nadie hasta que la aplicación pinta
     un tema inexistente o un número de decimales imposible.
@@ -19,14 +19,14 @@ import pytest
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, datos_aislados, temp_db, monkeypatch):
-    from routes.ajustes import ajustes_bp
+def cliente(clienteAutenticado, datosAislados, tempDb, monkeypatch):
+    from routes.ajustes import ajustesBp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
 
-    client, cabeceras, _app = cliente_autenticado(ajustes_bp)
-    return client, cabeceras, datos_aislados
+    client, cabeceras, _app = clienteAutenticado(ajustesBp)
+    return client, cabeceras, datosAislados
 
 
 def _guardar(client, cabeceras, **campos):
@@ -35,7 +35,7 @@ def _guardar(client, cabeceras, **campos):
 
 # ── Lectura ──────────────────────────────────────────────────────────────────
 
-def test_sin_fichero_de_ajustes_se_devuelven_los_valores_por_defecto(cliente):
+def testSinFicheroDeAjustesSeDevuelvenLosValoresPorDefecto(cliente):
     client, _cabeceras, _rutas = cliente
     datos = client.get("/api/settings").get_json()
 
@@ -45,7 +45,7 @@ def test_sin_fichero_de_ajustes_se_devuelven_los_valores_por_defecto(cliente):
     assert datos["dateFormat"] == "DD/MM/YYYY"
 
 
-def test_un_ajustes_json_ilegible_no_tumba_la_pantalla(cliente):
+def testUnAjustesJsonIlegibleNoTumbaLaPantalla(cliente):
     """Caer a los valores por defecto es preferible a un 500 sin ajustes."""
     client, _cabeceras, rutas = cliente
     rutas["ajustes"].write_text("{esto no es json", encoding="utf-8")
@@ -56,7 +56,7 @@ def test_un_ajustes_json_ilegible_no_tumba_la_pantalla(cliente):
     assert respuesta.get_json()["monedaBase"] == "EUR"
 
 
-def test_las_claves_de_api_se_devuelven_contadas_nunca_en_claro(cliente):
+def testLasClavesDeApiSeDevuelvenContadasNuncaEnClaro(cliente):
     """La pantalla solo necesita saber cuántas hay; el valor no debe salir."""
     client, cabeceras, _rutas = cliente
     client.post("/api/settings/apikey", json={"finnhubKey": "clave-secreta-1"}, headers=cabeceras)
@@ -68,7 +68,7 @@ def test_las_claves_de_api_se_devuelven_contadas_nunca_en_claro(cliente):
     assert "clave-secreta" not in respuesta.get_data(as_text=True)
 
 
-def test_las_claves_de_api_no_se_guardan_en_claro_en_disco(cliente):
+def testLasClavesDeApiNoSeGuardanEnClaroEnDisco(cliente):
     """API/ está dentro del proyecto y acaba en cualquier copia del directorio."""
     client, cabeceras, rutas = cliente
     client.post("/api/settings/apikey", json={"finnhubKey": "clave-secreta-1"}, headers=cabeceras)
@@ -83,13 +83,13 @@ _VARIABLES = ("FINNHUB_API_KEY", "EODHD_API_KEYS", "ALPHA_VANTAGE_API_KEYS")
 
 
 @pytest.fixture(autouse=True)
-def sin_claves_en_el_entorno(monkeypatch):
+def sinClavesEnElEntorno(monkeypatch):
     """El entorno gana al fichero, así que un `.env` cargado torcería la suite."""
     for variable in _VARIABLES:
         monkeypatch.delenv(variable, raising=False)
 
 
-def _anadir_claves(client, cabeceras, *claves, campo="finnhubKey"):
+def _anadirClaves(client, cabeceras, *claves, campo="finnhubKey"):
     for clave in claves:
         client.post("/api/settings/apikey", json={campo: clave}, headers=cabeceras)
 
@@ -113,14 +113,14 @@ def _listar(client, proveedor="finnhub"):
     return info
 
 
-def test_la_lista_trae_cada_clave_enmascarada_y_sin_su_valor(cliente):
+def testLaListaTraeCadaClaveEnmascaradaYSinSuValor(cliente):
     """Enmascarada para pintarla; el valor se pide aparte, clave a clave.
 
     Antes iba entero en el listado y quedaban todas las claves en la memoria de
     la pestaña cada vez que se abría Ajustes.
     """
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "abcdefghijklmnop", "1234567890123456")
+    _anadirClaves(client, cabeceras, "abcdefghijklmnop", "1234567890123456")
 
     respuesta = client.get("/api/settings/apikeys")
     claves = respuesta.get_json()["proveedores"]["finnhub"]["claves"]
@@ -137,9 +137,9 @@ def test_la_lista_trae_cada_clave_enmascarada_y_sin_su_valor(cliente):
     assert ver.headers.get("Cache-Control") == "no-store"
 
 
-def test_ver_una_clave_exige_csrf_y_una_huella_existente(cliente):
+def testVerUnaClaveExigeCsrfYUnaHuellaExistente(cliente):
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "abcdefghijklmnop")
+    _anadirClaves(client, cabeceras, "abcdefghijklmnop")
 
     assert client.post("/api/settings/apikey/ver",
                        json={"proveedor": "finnhub", "huella": "0" * 16}).status_code == 403
@@ -149,9 +149,9 @@ def test_ver_una_clave_exige_csrf_y_una_huella_existente(cliente):
                        json={"proveedor": "otro", "huella": "x"}, headers=cabeceras).status_code == 400
 
 
-def test_borrar_por_huella(cliente):
+def testBorrarPorHuella(cliente):
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb")
+    _anadirClaves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb")
     huella = client.get("/api/settings/apikeys").get_json()["proveedores"]["finnhub"]["claves"][1]["huella"]
 
     respuesta = client.delete("/api/settings/apikey", json={"proveedor": "finnhub", "huella": huella},
@@ -161,25 +161,25 @@ def test_borrar_por_huella(cliente):
     assert [c["clave"] for c in _listar(client)["claves"]] == ["primera-clave-aa"]
 
 
-def test_la_lista_de_claves_no_se_queda_en_ninguna_cache(cliente):
+def testLaListaDeClavesNoSeQuedaEnNingunaCache(cliente):
     """Lleva secretos dentro, así que no puede guardarla nadie por el camino."""
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "clave-secreta-1")
+    _anadirClaves(client, cabeceras, "clave-secreta-1")
 
     respuesta = client.get("/api/settings/apikeys")
 
     assert respuesta.headers.get("Cache-Control") == "no-store"
 
 
-def test_una_clave_corta_no_deja_ver_ni_las_puntas(cliente):
+def testUnaClaveCortaNoDejaVerNiLasPuntas(cliente):
     """Con ocho caracteres, enseñar cuatro y cuatro sería enseñarla entera."""
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "12345678")
+    _anadirClaves(client, cabeceras, "12345678")
 
     assert _listar(client)["claves"][0]["vista"] == "-" * 8
 
 
-def test_los_tres_proveedores_salen_aunque_no_tengan_claves(cliente):
+def testLosTresProveedoresSalenAunqueNoTenganClaves(cliente):
     """La interfaz pinta las tres filas; un proveedor ausente sería un hueco."""
     client, _cabeceras, _rutas = cliente
 
@@ -189,28 +189,28 @@ def test_los_tres_proveedores_salen_aunque_no_tengan_claves(cliente):
     assert proveedores["eodhd"]["claves"] == []
 
 
-def test_cada_proveedor_lista_solo_sus_claves(cliente):
+def testCadaProveedorListaSoloSusClaves(cliente):
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "clave-de-finnhub", campo="finnhubKey")
-    _anadir_claves(client, cabeceras, "clave-de-eodhd-1", campo="eodhdKeys")
+    _anadirClaves(client, cabeceras, "clave-de-finnhub", campo="finnhubKey")
+    _anadirClaves(client, cabeceras, "clave-de-eodhd-1", campo="eodhdKeys")
 
     assert [c["clave"] for c in _listar(client, "finnhub")["claves"]] == ["clave-de-finnhub"]
     assert [c["clave"] for c in _listar(client, "eodhd")["claves"]] == ["clave-de-eodhd-1"]
 
 
-def test_el_orden_de_la_lista_es_el_de_la_rotacion(cliente):
+def testElOrdenDeLaListaEsElDeLaRotacion(cliente):
     """El número de cada fila es con el que el panel de estado las nombra."""
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb", "tercera-clave-cc")
+    _anadirClaves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb", "tercera-clave-cc")
 
     claves = _listar(client)["claves"]
 
     assert [c["clave"] for c in claves] == ["primera-clave-aa", "segunda-clave-bb", "tercera-clave-cc"]
 
 
-def test_sin_variable_de_entorno_las_claves_salen_del_fichero(cliente):
+def testSinVariableDeEntornoLasClavesSalenDelFichero(cliente):
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "clave-del-fichero")
+    _anadirClaves(client, cabeceras, "clave-del-fichero")
 
     info = _listar(client)
 
@@ -219,7 +219,7 @@ def test_sin_variable_de_entorno_las_claves_salen_del_fichero(cliente):
     assert info["variable"] == "FINNHUB_API_KEY"
 
 
-def test_manda_el_fichero_y_la_variable_queda_de_respaldo(cliente, monkeypatch):
+def testMandaElFicheroYLaVariableQuedaDeRespaldo(cliente, monkeypatch):
     """La trampa que se comía instalaciones enteras, ahora del revés.
 
     Cuando mandaba el entorno, se podían añadir claves en Ajustes, verlas
@@ -229,7 +229,7 @@ def test_manda_el_fichero_y_la_variable_queda_de_respaldo(cliente, monkeypatch):
     en pantalla, que es lo único que se puede arreglar desde ella.
     """
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "d41d8cd98f00b204e980", "9e800998ecf8427e1234")
+    _anadirClaves(client, cabeceras, "d41d8cd98f00b204e980", "9e800998ecf8427e1234")
     monkeypatch.setenv("FINNHUB_API_KEY", "3c59dc048e8850243be8")
 
     info = _listar(client)
@@ -240,7 +240,7 @@ def test_manda_el_fichero_y_la_variable_queda_de_respaldo(cliente, monkeypatch):
     assert info["ignoradas"] == 1
 
 
-def test_sin_claves_en_el_fichero_se_usa_la_del_entorno(cliente, monkeypatch):
+def testSinClavesEnElFicheroSeUsaLaDelEntorno(cliente, monkeypatch):
     """Un despliegue sin volumen para API/ no tiene dónde guardarlas."""
     client, _cabeceras, _rutas = cliente
     monkeypatch.setenv("FINNHUB_API_KEY", "3c59dc048e8850243be8")
@@ -252,7 +252,7 @@ def test_sin_claves_en_el_fichero_se_usa_la_del_entorno(cliente, monkeypatch):
     assert info["ignoradas"] == 0
 
 
-def test_sin_claves_en_ningun_sitio_el_origen_lo_dice(cliente):
+def testSinClavesEnNingunSitioElOrigenLoDice(cliente):
     client, _cabeceras, _rutas = cliente
 
     info = _listar(client)
@@ -269,7 +269,7 @@ def test_sin_claves_en_ningun_sitio_el_origen_lo_dice(cliente):
     "changeme",
     "your_api_key",
 ])
-def test_los_valores_de_ejemplo_de_la_documentacion_se_descartan(cliente, monkeypatch, ejemplo):
+def testLosValoresDeEjemploDeLaDocumentacionSeDescartan(cliente, monkeypatch, ejemplo):
     """No son claves: su único efecto posible es romper el proveedor.
 
     Es el fallo que destapó todo esto: un `.env` copiado de `.env.example` y sin
@@ -285,9 +285,9 @@ def test_los_valores_de_ejemplo_de_la_documentacion_se_descartan(cliente, monkey
     assert info["origen"] == "ninguno"
 
 
-def test_un_ejemplo_en_el_entorno_no_tapa_a_la_clave_del_fichero(cliente, monkeypatch):
+def testUnEjemploEnElEntornoNoTapaALaClaveDelFichero(cliente, monkeypatch):
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "d41d8cd98f00b204e980")
+    _anadirClaves(client, cabeceras, "d41d8cd98f00b204e980")
     monkeypatch.setenv("FINNHUB_API_KEY", "tu_clave_finnhub")
 
     info = _listar(client)
@@ -297,7 +297,7 @@ def test_un_ejemplo_en_el_entorno_no_tapa_a_la_clave_del_fichero(cliente, monkey
     assert info["ignoradas"] == 0
 
 
-def test_una_clave_de_verdad_no_se_confunde_con_un_ejemplo(cliente, monkeypatch):
+def testUnaClaveDeVerdadNoSeConfundeConUnEjemplo(cliente, monkeypatch):
     """El reconocimiento es estrecho a propósito: tirar una clave buena sería peor."""
     client, _cabeceras, _rutas = cliente
     monkeypatch.setenv("FINNHUB_API_KEY", "d6s0abcdefghijklmnopsfe0")
@@ -305,7 +305,7 @@ def test_una_clave_de_verdad_no_se_confunde_con_un_ejemplo(cliente, monkeypatch)
     assert [c["clave"] for c in _listar(client)["claves"]] == ["d6s0abcdefghijklmnopsfe0"]
 
 
-def test_la_variable_de_eodhd_admite_varias_separadas_por_coma(cliente, monkeypatch):
+def testLaVariableDeEodhdAdmiteVariasSeparadasPorComa(cliente, monkeypatch):
     client, _cabeceras, _rutas = cliente
     monkeypatch.setenv("EODHD_API_KEYS", "69c2aaaa1875, 69c2bbbb6133 ,69c2cccc7788")
 
@@ -314,7 +314,7 @@ def test_la_variable_de_eodhd_admite_varias_separadas_por_coma(cliente, monkeypa
     assert [c["clave"] for c in info["claves"]] == ["69c2aaaa1875", "69c2bbbb6133", "69c2cccc7788"]
 
 
-def test_la_variable_de_finnhub_es_una_sola_clave(cliente, monkeypatch):
+def testLaVariableDeFinnhubEsUnaSolaClave(cliente, monkeypatch):
     """`FINNHUB_API_KEY` no se parte por comas: el lector real la usa entera."""
     client, _cabeceras, _rutas = cliente
     monkeypatch.setenv("FINNHUB_API_KEY", "d41d,8cd9,8f00")
@@ -322,10 +322,10 @@ def test_la_variable_de_finnhub_es_una_sola_clave(cliente, monkeypatch):
     assert [c["clave"] for c in _listar(client)["claves"]] == ["d41d,8cd9,8f00"]
 
 
-def test_una_variable_vacia_no_cuenta(cliente, monkeypatch):
+def testUnaVariableVaciaNoCuenta(cliente, monkeypatch):
     """`.env.example` deja las líneas puestas; en blanco no deben contar."""
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "d41d8cd98f00b204e980")
+    _anadirClaves(client, cabeceras, "d41d8cd98f00b204e980")
     monkeypatch.setenv("FINNHUB_API_KEY", "   ")
 
     info = _listar(client)
@@ -334,11 +334,11 @@ def test_una_variable_vacia_no_cuenta(cliente, monkeypatch):
     assert info["ignoradas"] == 0
 
 
-def test_listar_las_claves_sin_sesion_es_401(crear_app, datos_aislados, temp_db):
+def testListarLasClavesSinSesionEs401(crearApp, datosAislados, tempDb):
     """Es el único sitio del que salen las claves en claro."""
-    from routes.ajustes import ajustes_bp
+    from routes.ajustes import ajustesBp
 
-    client = crear_app(ajustes_bp).test_client()
+    client = crearApp(ajustesBp).test_client()
     assert client.get("/api/settings/apikeys").status_code == 401
 
 
@@ -352,9 +352,9 @@ def _borrar(client, cabeceras, proveedor, clave):
     )
 
 
-def test_borrar_una_clave_deja_las_demas(cliente):
+def testBorrarUnaClaveDejaLasDemas(cliente):
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb", "tercera-clave-cc")
+    _anadirClaves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb", "tercera-clave-cc")
 
     respuesta = _borrar(client, cabeceras, "finnhub", "segunda-clave-bb")
 
@@ -362,14 +362,14 @@ def test_borrar_una_clave_deja_las_demas(cliente):
     assert [c["clave"] for c in _listar(client)["claves"]] == ["primera-clave-aa", "tercera-clave-cc"]
 
 
-def test_se_borra_por_valor_y_no_por_posicion(cliente):
+def testSeBorraPorValorYNoPorPosicion(cliente):
     """La lista que ve el usuario puede haberse quedado atrás.
 
     Con un índice viejo —otra pestaña, una clave añadida entretanto— se borraría
     la clave equivocada sin que nada lo advirtiera.
     """
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb")
+    _anadirClaves(client, cabeceras, "primera-clave-aa", "segunda-clave-bb")
 
     _borrar(client, cabeceras, "finnhub", "primera-clave-aa")
     _borrar(client, cabeceras, "finnhub", "segunda-clave-bb")
@@ -377,9 +377,9 @@ def test_se_borra_por_valor_y_no_por_posicion(cliente):
     assert _listar(client)["claves"] == []
 
 
-def test_borrar_la_ultima_clave_deja_el_proveedor_sin_ninguna(cliente):
+def testBorrarLaUltimaClaveDejaElProveedorSinNinguna(cliente):
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "clave-unica-aaa")
+    _anadirClaves(client, cabeceras, "clave-unica-aaa")
 
     respuesta = _borrar(client, cabeceras, "finnhub", "clave-unica-aaa")
 
@@ -387,10 +387,10 @@ def test_borrar_la_ultima_clave_deja_el_proveedor_sin_ninguna(cliente):
     assert client.get("/api/settings").get_json()["finnhubKeyCount"] == 0
 
 
-def test_borrar_no_toca_las_claves_de_los_otros_proveedores(cliente):
+def testBorrarNoTocaLasClavesDeLosOtrosProveedores(cliente):
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "clave-de-finnhub", campo="finnhubKey")
-    _anadir_claves(client, cabeceras, "clave-de-eodhd-1", campo="eodhdKeys")
+    _anadirClaves(client, cabeceras, "clave-de-finnhub", campo="finnhubKey")
+    _anadirClaves(client, cabeceras, "clave-de-eodhd-1", campo="eodhdKeys")
 
     _borrar(client, cabeceras, "finnhub", "clave-de-finnhub")
 
@@ -398,10 +398,10 @@ def test_borrar_no_toca_las_claves_de_los_otros_proveedores(cliente):
     assert [c["clave"] for c in _listar(client, "eodhd")["claves"]] == ["clave-de-eodhd-1"]
 
 
-def test_el_fichero_sigue_cifrado_despues_de_borrar(cliente):
+def testElFicheroSigueCifradoDespuesDeBorrar(cliente):
     """Se reescribe entero: si la reescritura lo dejara en claro, nadie lo vería."""
     client, cabeceras, rutas = cliente
-    _anadir_claves(client, cabeceras, "clave-secreta-1", "clave-secreta-2")
+    _anadirClaves(client, cabeceras, "clave-secreta-1", "clave-secreta-2")
 
     _borrar(client, cabeceras, "finnhub", "clave-secreta-1")
 
@@ -409,14 +409,14 @@ def test_el_fichero_sigue_cifrado_despues_de_borrar(cliente):
     assert b"clave-secreta-2" not in crudo
 
 
-def test_borrar_una_clave_que_no_esta_es_404(cliente):
+def testBorrarUnaClaveQueNoEstaEs404(cliente):
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "clave-secreta-1")
+    _anadirClaves(client, cabeceras, "clave-secreta-1")
 
     assert _borrar(client, cabeceras, "finnhub", "clave-que-no-existe").status_code == 404
 
 
-def test_una_clave_del_entorno_no_se_puede_borrar_desde_aqui(cliente, monkeypatch):
+def testUnaClaveDelEntornoNoSePuedeBorrarDesdeAqui(cliente, monkeypatch):
     """No está en el fichero: se quita del `.env` del servidor, no de esta pantalla."""
     client, cabeceras, _rutas = cliente
     monkeypatch.setenv("FINNHUB_API_KEY", "clave-del-entorno")
@@ -425,10 +425,10 @@ def test_una_clave_del_entorno_no_se_puede_borrar_desde_aqui(cliente, monkeypatc
 
 
 @pytest.mark.parametrize("clave", ["", None])
-def test_borrar_sin_decir_que_clave_no_borra_nada(cliente, clave):
+def testBorrarSinDecirQueClaveNoBorraNada(cliente, clave):
     """Un cuerpo a medias no puede acabar vaciando el fichero."""
     client, cabeceras, _rutas = cliente
-    _anadir_claves(client, cabeceras, "clave-secreta-1")
+    _anadirClaves(client, cabeceras, "clave-secreta-1")
 
     respuesta = _borrar(client, cabeceras, "finnhub", clave)
 
@@ -436,25 +436,25 @@ def test_borrar_sin_decir_que_clave_no_borra_nada(cliente, clave):
     assert client.get("/api/settings").get_json()["finnhubKeyCount"] == 1
 
 
-def test_borrar_en_un_proveedor_que_no_existe_es_400(cliente):
+def testBorrarEnUnProveedorQueNoExisteEs400(cliente):
     client, cabeceras, _rutas = cliente
 
     assert _borrar(client, cabeceras, "../../.env", "lo-que-sea").status_code == 400
 
 
-def test_borrar_una_clave_sin_sesion_es_401(crear_app, datos_aislados, temp_db):
-    from routes.ajustes import ajustes_bp
+def testBorrarUnaClaveSinSesionEs401(crearApp, datosAislados, tempDb):
+    from routes.ajustes import ajustesBp
 
-    client = crear_app(ajustes_bp).test_client()
+    client = crearApp(ajustesBp).test_client()
     respuesta = client.delete("/api/settings/apikey", json={"proveedor": "finnhub", "clave": "x"})
 
     assert respuesta.status_code == 401
 
 
-def test_borrar_una_clave_sin_csrf_es_403(cliente_autenticado, datos_aislados, temp_db):
-    from routes.ajustes import ajustes_bp
+def testBorrarUnaClaveSinCsrfEs403(clienteAutenticado, datosAislados, tempDb):
+    from routes.ajustes import ajustesBp
 
-    client, _cabeceras, _app = cliente_autenticado(ajustes_bp)
+    client, _cabeceras, _app = clienteAutenticado(ajustesBp)
     respuesta = client.delete("/api/settings/apikey", json={"proveedor": "finnhub", "clave": "x"})
 
     assert respuesta.status_code == 403
@@ -462,7 +462,7 @@ def test_borrar_una_clave_sin_csrf_es_403(cliente_autenticado, datos_aislados, t
 
 # ── Escritura: validación de cada ajuste ─────────────────────────────────────
 
-def test_los_ajustes_validos_se_persisten(cliente):
+def testLosAjustesValidosSePersisten(cliente):
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, theme="black", monedaBase="USD", dateFormat="YYYY-MM-DD",
              maxBackups=10, precioDecimalesCripto=8)
@@ -488,7 +488,7 @@ def test_los_ajustes_validos_se_persisten(cliente):
     ("snapshotAlcance", "otro", "activo"),
     ("autoRefreshMinutes", 3, 0),
 ])
-def test_un_valor_no_admitido_cae_al_por_defecto(cliente, campo, valor, esperado):
+def testUnValorNoAdmitidoCaeAlPorDefecto(cliente, campo, valor, esperado):
     """Nada de lo que llega en el cuerpo se guarda tal cual."""
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, **{campo: valor})
@@ -502,7 +502,7 @@ def test_un_valor_no_admitido_cae_al_por_defecto(cliente, campo, valor, esperado
     ("staleHours", 0, 1, 8760),
     ("staleHours", 99_999, 1, 8760),
 ])
-def test_los_valores_numericos_se_acotan_al_rango(cliente, campo, valor, minimo, maximo):
+def testLosValoresNumericosSeAcotanAlRango(cliente, campo, valor, minimo, maximo):
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, **{campo: valor})
 
@@ -510,7 +510,7 @@ def test_los_valores_numericos_se_acotan_al_rango(cliente, campo, valor, minimo,
     assert minimo <= guardado <= maximo
 
 
-def test_guardar_un_ajuste_no_pisa_los_demas(cliente):
+def testGuardarUnAjusteNoPisaLosDemas(cliente):
     """El POST es parcial: solo toca las claves que trae."""
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, theme="black", maxBackups=20)
@@ -522,14 +522,14 @@ def test_guardar_un_ajuste_no_pisa_los_demas(cliente):
     assert datos["dateFormat"] == "MM/DD/YYYY"
 
 
-def test_los_tipos_de_mercado_desconocidos_se_filtran(cliente):
+def testLosTiposDeMercadoDesconocidosSeFiltran(cliente):
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, soloMercadoTipos=["acciones", "inventado", "cripto"])
 
     assert client.get("/api/settings").get_json()["soloMercadoTipos"] == ["acciones", "cripto"]
 
 
-def test_una_cadena_donde_se_espera_una_lista_no_provoca_un_500(cliente, tmp_path):
+def testUnaCadenaDondeSeEsperaUnaListaNoProvocaUn500(cliente, tmp_path):
     """Un cuerpo con el tipo equivocado se descarta, no revienta la petición."""
     client, cabeceras, rutas = cliente
     respuesta = _guardar(client, cabeceras, soloMercadoTipos="acciones", hiddenAssets=[])
@@ -537,7 +537,7 @@ def test_una_cadena_donde_se_espera_una_lista_no_provoca_un_500(cliente, tmp_pat
     assert respuesta.status_code == 200
     # Se guarda la lista vacía…
     assert json.loads(rutas["ajustes"].read_text("utf-8"))["soloMercadoTipos"] == []
-    # …aunque get_settings la lea con `or [defectos]`, así que al releer salen
+    # …aunque getSettings la lea con `or [defectos]`, así que al releer salen
     # los tres tipos por defecto. Es el comportamiento actual, no un descuido
     # del test: con soloHorarioMercado desactivado la lista no se usa, y quien
     # la deje vacía a propósito verá que vuelven los valores iniciales.
@@ -546,7 +546,7 @@ def test_una_cadena_donde_se_espera_una_lista_no_provoca_un_500(cliente, tmp_pat
     ]
 
 
-def test_los_modulos_desconocidos_no_entran_en_la_configuracion(cliente):
+def testLosModulosDesconocidosNoEntranEnLaConfiguracion(cliente):
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, modulosConfig={"metricas": False, "moduloFantasma": True})
 
@@ -554,7 +554,7 @@ def test_los_modulos_desconocidos_no_entran_en_la_configuracion(cliente):
     assert guardado == {"metricas": False}
 
 
-def test_el_objetivo_de_ahorro_se_acota_entre_0_y_100(cliente):
+def testElObjetivoDeAhorroSeAcotaEntre0Y100(cliente):
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, ahorroConfig={"objetivoAhorro": 500, "presupuesto": {"Casa": -20}})
 
@@ -563,14 +563,14 @@ def test_el_objetivo_de_ahorro_se_acota_entre_0_y_100(cliente):
     assert guardado["presupuesto"]["Casa"] == 0.0
 
 
-def test_un_objetivo_de_ahorro_que_no_es_numero_cae_al_defecto(cliente):
+def testUnObjetivoDeAhorroQueNoEsNumeroCaeAlDefecto(cliente):
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, ahorroConfig={"objetivoAhorro": "mucho"})
 
     assert client.get("/api/settings").get_json()["ahorroConfig"]["objetivoAhorro"] == 30.0
 
 
-def test_las_divisas_fiat_exigen_codigo_y_nombre(cliente):
+def testLasDivisasFiatExigenCodigoYNombre(cliente):
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, fiatCurrencies=[
         {"code": "eur", "name": "Euro"},
@@ -584,7 +584,7 @@ def test_las_divisas_fiat_exigen_codigo_y_nombre(cliente):
     assert client.get("/api/settings").get_json()["monedaBase"] == "GBP"
 
 
-def test_los_paneles_se_guardan_y_se_leen(cliente):
+def testLosPanelesSeGuardanYSeLeen(cliente):
     client, cabeceras, _rutas = cliente
     paneles = {
         "activo": "p2",
@@ -600,7 +600,7 @@ def test_los_paneles_se_guardan_y_se_leen(cliente):
     assert client.get("/api/settings").get_json()["panelesConfig"] == paneles
 
 
-def test_los_widgets_de_mercado_y_los_tickers_sueltos_se_guardan(cliente):
+def testLosWidgetsDeMercadoYLosTickersSueltosSeGuardan(cliente):
     """Los tipos nuevos pasan el filtro y un ticker suelto («tk|…») es una
     cadena más de la lista: tiene que llegar entera."""
     client, cabeceras, _rutas = cliente
@@ -621,7 +621,7 @@ def test_los_widgets_de_mercado_y_los_tickers_sueltos_se_guardan(cliente):
     assert widgets[0]["cfg"] == {"activos": [ticker], "activo": ticker}
 
 
-def test_los_paneles_descartan_lo_que_la_pantalla_no_sabe_pintar(cliente):
+def testLosPanelesDescartanLoQueLaPantallaNoSabePintar(cliente):
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, panelesConfig={
         "activo": "inexistente",
@@ -642,7 +642,7 @@ def test_los_paneles_descartan_lo_que_la_pantalla_no_sabe_pintar(cliente):
     assert panel["widgets"] == [{"id": "w2", "tipo": "grafico", "w": 12, "h": 2, "cfg": {"vincular": True}}]
 
 
-def test_las_preferencias_por_portfolio_van_a_su_propio_fichero(cliente):
+def testLasPreferenciasPorPortfolioVanASuPropioFichero(cliente):
     """Cada portfolio tiene su prefs_<id>.json: no deben mezclarse con los globales."""
     client, cabeceras, rutas = cliente
     _guardar(client, cabeceras, hiddenAssets=["1", "2"], theme="light")
@@ -658,25 +658,25 @@ def test_las_preferencias_por_portfolio_van_a_su_propio_fichero(cliente):
 
 # ── Sesión y CSRF ────────────────────────────────────────────────────────────
 
-def test_guardar_ajustes_sin_sesion_es_401(crear_app, datos_aislados, temp_db):
-    from routes.ajustes import ajustes_bp
+def testGuardarAjustesSinSesionEs401(crearApp, datosAislados, tempDb):
+    from routes.ajustes import ajustesBp
 
-    client = crear_app(ajustes_bp).test_client()
+    client = crearApp(ajustesBp).test_client()
     assert client.post("/api/settings", json={"theme": "black"}).status_code == 401
 
 
-def test_exportar_sin_sesion_es_401(crear_app, datos_aislados, temp_db):
+def testExportarSinSesionEs401(crearApp, datosAislados, tempDb):
     """El export lleva dentro toda la base de datos."""
-    from routes.ajustes import ajustes_bp
+    from routes.ajustes import ajustesBp
 
-    client = crear_app(ajustes_bp).test_client()
+    client = crearApp(ajustesBp).test_client()
     assert client.get("/api/export/json").status_code == 401
 
 
-def test_importar_sin_csrf_es_403(cliente_autenticado, datos_aislados, temp_db):
-    from routes.ajustes import ajustes_bp
+def testImportarSinCsrfEs403(clienteAutenticado, datosAislados, tempDb):
+    from routes.ajustes import ajustesBp
 
-    client, _cabeceras, _app = cliente_autenticado(ajustes_bp)
+    client, _cabeceras, _app = clienteAutenticado(ajustesBp)
     respuesta = client.post(
         "/api/import/json",
         data={"file": (io.BytesIO(b"{}"), "x.json")},
@@ -687,13 +687,13 @@ def test_importar_sin_csrf_es_403(cliente_autenticado, datos_aislados, temp_db):
 
 # ── Exportar ─────────────────────────────────────────────────────────────────
 
-def test_el_export_json_incluye_las_tablas_reales_y_los_ajustes(cliente):
+def testElExportJsonIncluyeLasTablasRealesYLosAjustes(cliente):
     """El export enumeraba una lista fija de nombres, 4 de ellos inexistentes."""
     client, cabeceras, _rutas = cliente
-    from core.db import get_db
+    from core.db import getDb
 
     _guardar(client, cabeceras, theme="black")
-    conn = get_db()
+    conn = getDb()
     conn.execute("INSERT INTO gastos_tipos (label) VALUES (?)", ("Café",))
     conn.commit()
 
@@ -708,7 +708,7 @@ def test_el_export_json_incluye_las_tablas_reales_y_los_ajustes(cliente):
     assert [f["label"] for f in datos["tables"]["gastos_tipos"]] == ["Café"]
 
 
-def test_el_export_se_descarga_como_fichero(cliente):
+def testElExportSeDescargaComoFichero(cliente):
     client, _cabeceras, _rutas = cliente
     cabeceras = client.get("/api/export/json").headers
 
@@ -716,7 +716,7 @@ def test_el_export_se_descarga_como_fichero(cliente):
     assert cabeceras["Content-Type"].startswith("application/json")
 
 
-def test_el_export_zip_lleva_el_json_el_db_y_los_ajustes(cliente):
+def testElExportZipLlevaElJsonElDbYLosAjustes(cliente):
     client, cabeceras, _rutas = cliente
     _guardar(client, cabeceras, theme="light")
 
@@ -731,14 +731,14 @@ def test_el_export_zip_lleva_el_json_el_db_y_los_ajustes(cliente):
 
 # ── Importar ─────────────────────────────────────────────────────────────────
 
-def test_importar_sin_fichero_es_400(cliente):
+def testImportarSinFicheroEs400(cliente):
     client, cabeceras, _rutas = cliente
     respuesta = client.post("/api/import/json", data={}, headers=cabeceras,
                             content_type="multipart/form-data")
     assert respuesta.status_code == 400
 
 
-def test_importar_un_json_invalido_es_400(cliente):
+def testImportarUnJsonInvalidoEs400(cliente):
     client, cabeceras, _rutas = cliente
     respuesta = client.post(
         "/api/import/json",
@@ -748,7 +748,7 @@ def test_importar_un_json_invalido_es_400(cliente):
     assert respuesta.status_code == 400
 
 
-def test_importar_una_lista_en_vez_de_un_objeto_es_400(cliente):
+def testImportarUnaListaEnVezDeUnObjetoEs400(cliente):
     client, cabeceras, _rutas = cliente
     respuesta = client.post(
         "/api/import/json",
@@ -758,12 +758,12 @@ def test_importar_una_lista_en_vez_de_un_objeto_es_400(cliente):
     assert respuesta.status_code == 400
 
 
-def test_exportar_e_importar_devuelve_los_mismos_datos(cliente):
+def testExportarEImportarDevuelveLosMismosDatos(cliente):
     """La ida y vuelta completa: es lo que hace un usuario que migra de máquina."""
     client, cabeceras, _rutas = cliente
-    from core.db import get_db
+    from core.db import getDb
 
-    conn = get_db()
+    conn = getDb()
     conn.executemany("INSERT INTO gastos_tipos (label) VALUES (?)", [("Café",), ("Coche",)])
     conn.execute(
         "INSERT INTO gastos_rows (year, month, fecha, nombre, tipo, cantidad) VALUES (?,?,?,?,?,?)",
@@ -784,15 +784,15 @@ def test_exportar_e_importar_devuelve_los_mismos_datos(cliente):
     )
 
     assert respuesta.status_code == 200
-    conn = get_db()
+    conn = getDb()
     assert sorted(r[0] for r in conn.execute("SELECT label FROM gastos_tipos")) == ["Café", "Coche"]
     assert conn.execute("SELECT COUNT(*) FROM gastos_rows").fetchone()[0] == 1
 
 
-def test_una_tabla_que_no_existe_en_el_esquema_se_ignora(cliente):
+def testUnaTablaQueNoExisteEnElEsquemaSeIgnora(cliente):
     """Un export de una versión anterior no debe reventar la importación."""
     client, cabeceras, _rutas = cliente
-    from core.db import get_db
+    from core.db import getDb
 
     payload = json.dumps({
         "version": 3,
@@ -809,12 +809,12 @@ def test_una_tabla_que_no_existe_en_el_esquema_se_ignora(cliente):
     )
 
     assert respuesta.status_code == 200
-    assert [r[0] for r in get_db().execute("SELECT label FROM gastos_tipos")] == ["Ocio"]
+    assert [r[0] for r in getDb().execute("SELECT label FROM gastos_tipos")] == ["Ocio"]
 
 
-def test_una_columna_que_no_existe_se_descarta_sin_perder_la_fila(cliente):
+def testUnaColumnaQueNoExisteSeDescartaSinPerderLaFila(cliente):
     client, cabeceras, _rutas = cliente
-    from core.db import get_db
+    from core.db import getDb
 
     payload = json.dumps({
         "tables": {"gastos_tipos": [{"label": "Ocio", "columna_fantasma": "x"}]},
@@ -827,10 +827,10 @@ def test_una_columna_que_no_existe_se_descarta_sin_perder_la_fila(cliente):
     )
 
     assert respuesta.status_code == 200
-    assert [r[0] for r in get_db().execute("SELECT label FROM gastos_tipos")] == ["Ocio"]
+    assert [r[0] for r in getDb().execute("SELECT label FROM gastos_tipos")] == ["Ocio"]
 
 
-def test_un_zip_que_no_es_un_zip_es_400(cliente):
+def testUnZipQueNoEsUnZipEs400(cliente):
     client, cabeceras, _rutas = cliente
     respuesta = client.post(
         "/api/import/zip",
@@ -840,7 +840,7 @@ def test_un_zip_que_no_es_un_zip_es_400(cliente):
     assert respuesta.status_code == 400
 
 
-def test_un_prefs_con_ruta_de_escape_no_sale_de_data_json(cliente, tmp_path):
+def testUnPrefsConRutaDeEscapeNoSaleDeDataJson(cliente, tmp_path):
     """En Windows "\\" también separa rutas: comprobar solo "/" no bastaba."""
     client, cabeceras, rutas = cliente
 

@@ -32,7 +32,7 @@ from core.errors import ApiError, ValidationError
 
 log = logging.getLogger(__name__)
 
-tls_bp = Blueprint("tls", __name__)
+tlsBp = Blueprint("tls", __name__)
 
 # Tope de nombres. No hay un límite técnico en Caddy, pero cada nombre es un
 # certificado que emitir y una entrada más en el SAN; una lista larga suele ser
@@ -40,7 +40,7 @@ tls_bp = Blueprint("tls", __name__)
 MAX_NOMBRES = 20
 
 
-def _estado_publico() -> dict:
+def _estadoPublico() -> dict:
     estado = tls.leerEstado()
     proxy = tls.proxyDisponible()
     return {
@@ -60,7 +60,7 @@ def _estado_publico() -> dict:
         # Cuando el HTTPS viene impuesto por .env (dominio público con Let's
         # Encrypt), la interfaz no debe ofrecer un interruptor que machacaría
         # esa configuración. Se lo dice al frontend en vez de dejarle adivinar.
-        "gestionadoPorEntorno": _gestionado_por_entorno(),
+        "gestionadoPorEntorno": _gestionadoPorEntorno(),
         # El nombre por el que ha llegado esta misma petición. Es la mejor
         # sugerencia posible para el certificado: es literalmente lo que el
         # usuario tiene escrito en la barra del navegador, y desde dentro de un
@@ -73,13 +73,13 @@ def _estado_publico() -> dict:
     }
 
 
-def _gestionado_por_entorno() -> bool:
+def _gestionadoPorEntorno() -> bool:
     from core import settings
 
     return settings.httpsActivado()
 
 
-def _validar_nombres(nombres: list[str]) -> None:
+def _validarNombres(nombres: list[str]) -> None:
     """Las dos condiciones que tiene que cumplir la lista para emitir con ella.
 
     Vale igual para preparar y para activar: el certificado que se emite es el
@@ -97,7 +97,7 @@ def _validar_nombres(nombres: list[str]) -> None:
         )
 
 
-def _validar_que_no_te_deja_fuera(nombres: list[str]) -> None:
+def _validarQueNoTeDejaFuera(nombres: list[str]) -> None:
     """No se activa el HTTPS para una lista que no cubra por dónde estás entrando.
 
     Es la única forma de quedarse fuera, y no puede ser lo que nadie quería: al
@@ -122,40 +122,40 @@ def _validar_que_no_te_deja_fuera(nombres: list[str]) -> None:
     )
 
 
-@tls_bp.route("/api/tls", methods=["GET"])
-def get_tls():
-    return jsonify({"ok": True, **_estado_publico()})
+@tlsBp.route("/api/tls", methods=["GET"])
+def getTls():
+    return jsonify({"ok": True, **_estadoPublico()})
 
 
-@tls_bp.route("/api/tls/preparar", methods=["POST"])
-def post_preparar():
+@tlsBp.route("/api/tls/preparar", methods=["POST"])
+def postPreparar():
     """Emite el certificado y deja la CA lista para descargar, sin encender nada.
 
     Al terminar, la conexión sigue exactamente igual que estaba —mismo puerto,
     mismo esquema, misma sesión—: lo único que ha cambiado es que ya hay algo
     que instalar en el móvil y en el portátil.
     """
-    if _gestionado_por_entorno():
+    if _gestionadoPorEntorno():
         raise ApiError(
             "El HTTPS está fijado por la configuración del servidor "
             "(HTTPS_ENABLED en .env). Cámbialo allí, no desde aquí.",
-            status_code=409,
+            statusCode=409,
         )
     if tls.httpsActivo():
         raise ApiError(
             "El HTTPS ya está activo: el certificado se descarga directamente "
             "desde este mismo panel.",
-            status_code=409,
+            statusCode=409,
         )
 
     datos = request.get_json(silent=True) or {}
     nombres = tls.normalizarNombres(datos.get("nombres"))
-    _validar_nombres(nombres)
+    _validarNombres(nombres)
 
     try:
         tls.preparar(nombres)
     except tls.ErrorCaddy as e:
-        raise ApiError(str(e), status_code=502) from e
+        raise ApiError(str(e), statusCode=502) from e
 
     # Se guardan los nombres pero NO se enciende. Así el panel los recuerda si se
     # recarga la página entre instalar el certificado y pulsar «Activar» —que es
@@ -169,16 +169,16 @@ def post_preparar():
         ", ".join(nombres),
     )
 
-    return jsonify({"ok": True, **_estado_publico()})
+    return jsonify({"ok": True, **_estadoPublico()})
 
 
-@tls_bp.route("/api/tls", methods=["POST"])
-def set_tls():
-    if _gestionado_por_entorno():
+@tlsBp.route("/api/tls", methods=["POST"])
+def setTls():
+    if _gestionadoPorEntorno():
         raise ApiError(
             "El HTTPS está fijado por la configuración del servidor "
             "(HTTPS_ENABLED en .env). Cámbialo allí, no desde aquí.",
-            status_code=409,
+            statusCode=409,
         )
 
     datos = request.get_json(silent=True) or {}
@@ -186,15 +186,15 @@ def set_tls():
     nombres = tls.normalizarNombres(datos.get("nombres"))
 
     if activar:
-        _validar_nombres(nombres)
-        _validar_que_no_te_deja_fuera(nombres)
+        _validarNombres(nombres)
+        _validarQueNoTeDejaFuera(nombres)
 
     try:
         tls.aplicar(activar, nombres)
     except tls.ErrorCaddy as e:
         # 502 y no 500: el fallo es del proxy, no de esta aplicación, y el
         # mensaje ya dice qué mirar.
-        raise ApiError(str(e), status_code=502) from e
+        raise ApiError(str(e), statusCode=502) from e
 
     # Solo se guarda si Caddy ha aceptado la configuración. Al revés, un estado
     # que dijera «HTTPS activo» sobre un proxy sirviendo en claro haría que las
@@ -208,7 +208,7 @@ def set_tls():
 
     from core import seguridad_app
 
-    seguridad_app.aplicar_configuracion_sesion(current_app)
+    seguridad_app.aplicarConfiguracionSesion(current_app)
 
     log.info(
         "[tls] HTTPS %s desde Ajustes para %s",
@@ -216,11 +216,11 @@ def set_tls():
         ", ".join(nombres) or "(sin nombres)",
     )
 
-    return jsonify({"ok": True, **_estado_publico(), "estado": estado})
+    return jsonify({"ok": True, **_estadoPublico(), "estado": estado})
 
 
-@tls_bp.route("/api/tls/comprobacion", methods=["POST"])
-def post_comprobacion():
+@tlsBp.route("/api/tls/comprobacion", methods=["POST"])
+def postComprobacion():
     """Deja en pie el puerto de comprobación, para que se pueda abrir desde aquí.
 
     Hace falta porque ese sitio no sobrevive a un reinicio: al arrancar se
@@ -240,20 +240,20 @@ def post_comprobacion():
         raise ApiError(
             "Todavía no hay ningún certificado que comprobar. Pulsa «Emitir el "
             "certificado».",
-            status_code=409,
+            statusCode=409,
         )
 
     try:
         if not tls.sitioDePruebaLevantado():
             tls.aplicar(False, estado["nombres"], preparando=True)
     except tls.ErrorCaddy as e:
-        raise ApiError(str(e), status_code=502) from e
+        raise ApiError(str(e), statusCode=502) from e
 
     return jsonify({"ok": True, "listo": True, "puerto": tls.PUERTO_PREPARACION})
 
 
-@tls_bp.route("/api/tls/prueba", methods=["GET"])
-def get_prueba():
+@tlsBp.route("/api/tls/prueba", methods=["GET"])
+def getPrueba():
     """¿Está el cifrado como el usuario cree que está?
 
     Vale en los dos estados: con el HTTPS puesto comprueba el puerto de siempre
@@ -269,8 +269,8 @@ def get_prueba():
     return jsonify({"ok": True, "puertoPrueba": tls.PUERTO_PREPARACION, **tls.probar()})
 
 
-@tls_bp.route("/api/tls/ca.crt", methods=["GET"])
-def get_ca():
+@tlsBp.route("/api/tls/ca.crt", methods=["GET"])
+def getCa():
     """Certificado raíz en PEM, como descarga.
 
     El tipo es `application/x-x509-ca-cert` porque es el que hace que iOS ofrezca
@@ -280,7 +280,7 @@ def get_ca():
     try:
         pem = tls.raizDeLaCa()
     except tls.ErrorCaddy as e:
-        raise ApiError(str(e), status_code=502) from e
+        raise ApiError(str(e), statusCode=502) from e
 
     respuesta = make_response(pem)
     respuesta.headers["Content-Type"] = "application/x-x509-ca-cert"

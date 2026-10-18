@@ -36,7 +36,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from werkzeug.security import _hash_internal
 
 from core import firma_hmac, paths
-from core.secret_store import fernetDerivado, read_secret_lines, write_secret_lines
+from core.secret_store import fernetDerivado, readSecretLines, writeSecretLines
 from stores import app_data
 
 log = logging.getLogger(__name__)
@@ -131,7 +131,7 @@ def clavesEnClaro() -> dict:
         if origen["claves"]:
             claves[proveedor] = list(origen["claves"])
 
-    atajo = read_secret_lines(firma_hmac.rutaFicheroClave())
+    atajo = readSecretLines(firma_hmac.rutaFicheroClave())
     if atajo:
         claves[CLAVE_ATAJO] = [atajo[0]]
 
@@ -228,9 +228,9 @@ def _fernetDeHashApp(metodo: str, sal: str, resumen: str | None = None, contrase
     return Fernet(base64.urlsafe_b64encode(material))
 
 
-def cifrarClavesConHashApp(claves: dict, hash_app: str) -> dict:
+def cifrarClavesConHashApp(claves: dict, hashApp: str) -> dict:
     """Las claves, cifradas con el hash de la contraseña de la web, listas como JSON."""
-    metodo, sal, resumen = hash_app.split("$", 2)
+    metodo, sal, resumen = hashApp.split("$", 2)
     fernet = _fernetDeHashApp(metodo, sal, resumen=resumen)
     datos = json.dumps(claves, ensure_ascii=False).encode("utf-8")
     return {
@@ -245,7 +245,7 @@ def esPaqueteDeHashApp(paquete) -> bool:
     return isinstance(paquete, dict) and paquete.get("formato") == FORMATO_CLAVES_APP
 
 
-def descifrarClavesConHashApp(paquete, hash_app: str | None = None, contrasena: str | None = None) -> dict:
+def descifrarClavesConHashApp(paquete, hashApp: str | None = None, contrasena: str | None = None) -> dict:
     """Abre un paquete de `cifrarClavesConHashApp`.
 
     Se prueba primero con el hash actual (`hash_app`), que sirve si la contraseña
@@ -256,8 +256,8 @@ def descifrarClavesConHashApp(paquete, hash_app: str | None = None, contrasena: 
         metodo, sal = str(paquete.get("metodo", "")), str(paquete.get("salt", ""))
         datos = str(paquete.get("datos", "")).encode("ascii")
         intentos = []
-        if hash_app and hash_app.count("$") == 2:
-            m, s, resumen = hash_app.split("$", 2)
+        if hashApp and hashApp.count("$") == 2:
+            m, s, resumen = hashApp.split("$", 2)
             if (m, s) == (metodo, sal):
                 intentos.append({"resumen": resumen})
         if contrasena:
@@ -299,7 +299,7 @@ def restaurarClaves(claves) -> list:
         if not utiles:
             continue
 
-        write_secret_lines(destino, utiles)
+        writeSecretLines(destino, utiles)
         escritos.append(destino.name)
 
     return escritos

@@ -16,74 +16,74 @@ from providers import api_stats
 
 
 @pytest.fixture(autouse=True)
-def stats_aisladas(tmp_path, monkeypatch):
+def statsAisladas(tmp_path, monkeypatch):
     from core import paths
 
-    json_dir = tmp_path / "JSON"
-    json_dir.mkdir()
-    monkeypatch.setattr(paths, "JSON_DIR", json_dir, raising=False)
+    jsonDir = tmp_path / "JSON"
+    jsonDir.mkdir()
+    monkeypatch.setattr(paths, "JSON_DIR", jsonDir, raising=False)
     monkeypatch.setattr(paths, "TMP_DIR", tmp_path / "tmp", raising=False)
-    api_stats.reiniciar_para_pruebas()
-    yield json_dir
-    api_stats.reiniciar_para_pruebas()
+    api_stats.reiniciarParaPruebas()
+    yield jsonDir
+    api_stats.reiniciarParaPruebas()
 
 
-def test_cuenta_las_llamadas_por_proveedor():
-    api_stats.record_api_call("Finnhub")
-    api_stats.record_api_call("Finnhub")
-    api_stats.record_api_call("EODHD")
+def testCuentaLasLlamadasPorProveedor():
+    api_stats.recordApiCall("Finnhub")
+    api_stats.recordApiCall("Finnhub")
+    api_stats.recordApiCall("EODHD")
 
-    estado = api_stats.get_today_stats()
+    estado = api_stats.getTodayStats()
 
     assert estado["counts"] == {"Finnhub": 2, "EODHD": 1}
     assert estado["total"] == 3
 
 
-def test_dos_workers_suman_sobre_la_misma_cuenta():
-    """`reiniciar_para_pruebas` deja el proceso como un worker recién arrancado.
+def testDosWorkersSumanSobreLaMismaCuenta():
+    """`reiniciarParaPruebas` deja el proceso como un worker recién arrancado.
 
     Es la situación real del contenedor: dos procesos distintos, sin memoria
     compartida, contando llamadas al mismo proveedor.
     """
-    api_stats.record_api_call("Finnhub")
-    api_stats.reiniciar_para_pruebas()      # ← el otro worker
-    api_stats.record_api_call("Finnhub")
+    api_stats.recordApiCall("Finnhub")
+    api_stats.reiniciarParaPruebas()      # ← el otro worker
+    api_stats.recordApiCall("Finnhub")
 
-    assert api_stats.get_today_stats()["counts"]["Finnhub"] == 2
+    assert api_stats.getTodayStats()["counts"]["Finnhub"] == 2
 
 
-def test_el_recuento_de_ayer_no_se_arrastra(stats_aisladas):
-    (stats_aisladas / "api_stats.json").write_text(
+def testElRecuentoDeAyerNoSeArrastra(statsAisladas):
+    (statsAisladas / "api_stats.json").write_text(
         json.dumps({"date": "2020-01-01", "counts": {"Finnhub": 99}}), encoding="utf-8"
     )
 
-    api_stats.record_api_call("Finnhub")
+    api_stats.recordApiCall("Finnhub")
 
-    assert api_stats.get_today_stats()["counts"] == {"Finnhub": 1}
-
-
-def test_un_fichero_ilegible_no_rompe_el_contador(stats_aisladas):
-    (stats_aisladas / "api_stats.json").write_text("{no es json", encoding="utf-8")
-
-    api_stats.record_api_call("Yahoo Finance")
-
-    assert api_stats.get_today_stats()["counts"] == {"Yahoo Finance": 1}
+    assert api_stats.getTodayStats()["counts"] == {"Finnhub": 1}
 
 
-def test_sin_poder_escribir_se_sigue_contando_en_memoria(monkeypatch):
+def testUnFicheroIlegibleNoRompeElContador(statsAisladas):
+    (statsAisladas / "api_stats.json").write_text("{no es json", encoding="utf-8")
+
+    api_stats.recordApiCall("Yahoo Finance")
+
+    assert api_stats.getTodayStats()["counts"] == {"Yahoo Finance": 1}
+
+
+def testSinPoderEscribirSeSigueContandoEnMemoria(monkeypatch):
     """Una cotización no puede fallar porque el contador no quepa en disco."""
     def _denegado(*_args, **_kwargs):
         raise PermissionError("Permission denied")
 
     monkeypatch.setattr(api_stats, "escribirJsonAtomico", _denegado)
 
-    api_stats.record_api_call("Finnhub")
+    api_stats.recordApiCall("Finnhub")
 
-    assert api_stats.get_today_stats()["counts"] == {"Finnhub": 1}
+    assert api_stats.getTodayStats()["counts"] == {"Finnhub": 1}
 
 
-def test_sin_llamadas_devuelve_el_dia_a_cero():
-    estado = api_stats.get_today_stats()
+def testSinLlamadasDevuelveElDiaACero():
+    estado = api_stats.getTodayStats()
 
     assert estado["counts"] == {}
     assert estado["total"] == 0

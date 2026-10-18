@@ -12,23 +12,23 @@ import json
 import pytest
 from flask import Blueprint, Response
 
-pruebas_bp = Blueprint("pruebas_gzip", __name__)
+pruebasBp = Blueprint("pruebas_gzip", __name__)
 
 TEXTO_GRANDE = "x" * 5000
 TEXTO_PEQUENO = "hola"
 
 
-@pruebas_bp.route("/prueba/json-grande")
-def json_grande():
+@pruebasBp.route("/prueba/json-grande")
+def jsonGrande():
     return Response(json.dumps({"datos": TEXTO_GRANDE}), mimetype="application/json")
 
 
-@pruebas_bp.route("/prueba/texto-pequeno")
-def texto_pequeno():
+@pruebasBp.route("/prueba/texto-pequeno")
+def textoPequeno():
     return Response(TEXTO_PEQUENO, mimetype="text/plain")
 
 
-@pruebas_bp.route("/prueba/binario")
+@pruebasBp.route("/prueba/binario")
 def binario():
     # bytes no comprimibles (mimetype fuera de la lista blanca), del tamaño
     # que sea: nunca debe llevar Content-Encoding.
@@ -36,12 +36,12 @@ def binario():
 
 
 @pytest.fixture
-def cliente(cliente_autenticado):
-    client, cabeceras, _app = cliente_autenticado(pruebas_bp)
+def cliente(clienteAutenticado):
+    client, cabeceras, _app = clienteAutenticado(pruebasBp)
     return client, cabeceras
 
 
-def test_una_respuesta_grande_y_comprimible_se_manda_en_gzip(cliente):
+def testUnaRespuestaGrandeYComprimibleSeMandaEnGzip(cliente):
     client, cabeceras = cliente
 
     respuesta = client.get(
@@ -54,7 +54,7 @@ def test_una_respuesta_grande_y_comprimible_se_manda_en_gzip(cliente):
     assert json.loads(descomprimido)["datos"] == TEXTO_GRANDE
 
 
-def test_sin_accept_encoding_no_se_comprime(cliente):
+def testSinAcceptEncodingNoSeComprime(cliente):
     client, cabeceras = cliente
 
     respuesta = client.get("/prueba/json-grande", headers=cabeceras)
@@ -63,7 +63,7 @@ def test_sin_accept_encoding_no_se_comprime(cliente):
     assert json.loads(respuesta.get_data())["datos"] == TEXTO_GRANDE
 
 
-def test_una_respuesta_pequena_no_se_comprime_aunque_se_acepte(cliente):
+def testUnaRespuestaPequenaNoSeComprimeAunqueSeAcepte(cliente):
     """Por debajo del umbral, la cabecera de gzip pesa más que lo que ahorra."""
     client, cabeceras = cliente
 
@@ -75,7 +75,7 @@ def test_una_respuesta_pequena_no_se_comprime_aunque_se_acepte(cliente):
     assert respuesta.get_data(as_text=True) == TEXTO_PEQUENO
 
 
-def test_un_mimetype_no_comprimible_no_se_toca(cliente):
+def testUnMimetypeNoComprimibleNoSeToca(cliente):
     client, cabeceras = cliente
 
     respuesta = client.get(
@@ -86,7 +86,7 @@ def test_un_mimetype_no_comprimible_no_se_toca(cliente):
     assert respuesta.get_data() == TEXTO_GRANDE.encode()
 
 
-def test_un_estatico_js_se_sirve_comprimido(cliente_autenticado):
+def testUnEstaticoJsSeSirveComprimido(clienteAutenticado):
     """El caso real: send_from_directory con direct_passthrough=True.
 
     Es justo el camino por el que sale todo el JS/CSS propio, y el que un
@@ -97,13 +97,13 @@ def test_un_estatico_js_se_sirve_comprimido(cliente_autenticado):
 
     from core.paths import BASE_DIR
 
-    estaticos_bp = Blueprint("estaticos_prueba", __name__)
+    estaticosBp = Blueprint("estaticos_prueba", __name__)
 
-    @estaticos_bp.route("/prueba/estatico")
+    @estaticosBp.route("/prueba/estatico")
     def estatico():
         return send_from_directory(BASE_DIR, "js/core/dom.js")
 
-    client, cabeceras, _app = cliente_autenticado(estaticos_bp)
+    client, cabeceras, _app = clienteAutenticado(estaticosBp)
 
     original = (BASE_DIR / "js/core/dom.js").read_bytes()
     respuesta = client.get(

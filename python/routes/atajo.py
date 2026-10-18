@@ -25,7 +25,7 @@ from core.errors import ValidationError
 
 log = logging.getLogger(__name__)
 
-atajo_bp = Blueprint("atajo", __name__)
+atajoBp = Blueprint("atajo", __name__)
 
 
 def _urlBase() -> str:
@@ -60,13 +60,13 @@ def _comoTeVeElServidor() -> dict:
     }
 
 
-@atajo_bp.route("/api/atajo", methods=["GET"])
-def get_atajo():
+@atajoBp.route("/api/atajo", methods=["GET"])
+def getAtajo():
     return jsonify({"ok": True, "verTe": _comoTeVeElServidor(), **atajo.estado(_urlBase())})
 
 
-@atajo_bp.route("/api/atajo/acceso", methods=["POST"])
-def post_acceso():
+@atajoBp.route("/api/atajo/acceso", methods=["POST"])
+def postAcceso():
     """Guarda quién puede escribir por los endpoints del Atajo.
 
     Dos cosas y las dos delicadas: si hay que comprobar la firma, y desde qué
@@ -106,8 +106,8 @@ def post_acceso():
     return jsonify({"ok": True, "verTe": _comoTeVeElServidor(), **atajo.estado(_urlBase())})
 
 
-@atajo_bp.route("/api/atajo/clave", methods=["POST"])
-def post_clave():
+@atajoBp.route("/api/atajo/clave", methods=["POST"])
+def postClave():
     """Genera la clave de firma, o la rehace si ya había una.
 
     No pide confirmación aquí: la pide la interfaz, que es donde se puede
@@ -119,8 +119,8 @@ def post_clave():
     return jsonify({"ok": True, "verTe": _comoTeVeElServidor(), "fichero": fichero, **atajo.estado(_urlBase())})
 
 
-@atajo_bp.route("/api/atajo/token", methods=["POST"])
-def post_token():
+@atajoBp.route("/api/atajo/token", methods=["POST"])
+def postToken():
     """El token de dispositivo, para montar el Atajo a mano.
 
     POST y no GET: pasa por el CSRF, no se queda en el historial ni en cachés, y
@@ -133,14 +133,14 @@ def post_token():
     return jsonify({"ok": True, "cabecera": firma_hmac.CABECERA_TOKEN, "token": token})
 
 
-@atajo_bp.route("/api/atajo/prueba", methods=["POST"])
-def post_prueba():
+@atajoBp.route("/api/atajo/prueba", methods=["POST"])
+def postPrueba():
     """Comprobación en seco. Siempre 200: que un paso falle es el resultado."""
     return jsonify({"ok": True, **atajo.probar()})
 
 
-@atajo_bp.route("/api/atajo/descargar", methods=["GET"])
-def get_descargar():
+@atajoBp.route("/api/atajo/descargar", methods=["GET"])
+def getDescargar():
     """El `.shortcut` generado para esta instalación.
 
     `application/octet-stream` a propósito: con un tipo que iOS crea saber

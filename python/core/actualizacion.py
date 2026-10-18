@@ -63,15 +63,15 @@ NOMBRE_FASE = "actualizacion.fase"
 ESPERA_MAXIMA_SEGUNDOS = 900
 
 
-def _archivo_solicitud() -> Path:
+def _archivoSolicitud() -> Path:
     return paths.TMP_DIR / NOMBRE_SOLICITUD
 
 
-def _archivo_estado() -> Path:
+def _archivoEstado() -> Path:
     return paths.TMP_DIR / NOMBRE_ESTADO
 
 
-def _archivo_fase() -> Path:
+def _archivoFase() -> Path:
     return paths.TMP_DIR / NOMBRE_FASE
 
 
@@ -79,7 +79,7 @@ def _ahora() -> str:
     return datetime.now().astimezone().isoformat()
 
 
-def _leer_json(ruta: Path):
+def _leerJson(ruta: Path):
     try:
         # strict=False: un carácter de control suelto en un texto no debe hacer
         # que la pantalla crea que el vigilante no existe.
@@ -93,7 +93,7 @@ def _leer_json(ruta: Path):
         return None
 
 
-def _segundos_desde(marca) -> float | None:
+def _segundosDesde(marca) -> float | None:
     try:
         momento = datetime.fromisoformat(str(marca))
     except (TypeError, ValueError):
@@ -103,29 +103,29 @@ def _segundos_desde(marca) -> float | None:
     return max(0.0, (datetime.now().astimezone() - momento).total_seconds())
 
 
-def _en_marcha(ultimo) -> bool:
+def _enMarcha(ultimo) -> bool:
     """Si el vigilante dijo que empezaba y aún está dentro de plazo."""
     if not ultimo or ultimo.get("estado") != "en_marcha":
         return False
-    segundos = _segundos_desde(ultimo.get("momento"))
+    segundos = _segundosDesde(ultimo.get("momento"))
     return segundos is None or segundos < ESPERA_MAXIMA_SEGUNDOS
 
 
 def estado() -> dict:
     """Qué versión corre, qué se ha pedido y cómo fue el último intento."""
-    solicitud = _leer_json(_archivo_solicitud())
-    ultimo = _leer_json(_archivo_estado())
-    fase = _leer_json(_archivo_fase())
+    solicitud = _leerJson(_archivoSolicitud())
+    ultimo = _leerJson(_archivoEstado())
+    fase = _leerJson(_archivoFase())
 
     return {
         "version": __version__,
         "solicitada": solicitud,
-        "haceSegundos": _segundos_desde((solicitud or {}).get("momento")),
+        "haceSegundos": _segundosDesde((solicitud or {}).get("momento")),
         "ultimo": ultimo,
         # Tal cual la dejó docker-update.sh. Puede ser de la actualización
         # anterior: la pantalla la compara con el momento de su solicitud.
         "fase": fase if isinstance(fase, dict) else None,
-        "enMarcha": _en_marcha(ultimo),
+        "enMarcha": _enMarcha(ultimo),
         # Sin rastro del vigilante, el botón dejaría la señal ahí para siempre.
         # Mejor decirlo que fingir que se está actualizando algo.
         "vigilanteVisto": ultimo is not None,
@@ -151,7 +151,7 @@ def solicitar() -> tuple[dict, str | None]:
         return actual, "Ya hay una actualización en marcha"
 
     paths.TMP_DIR.mkdir(parents=True, exist_ok=True)
-    escribirJsonAtomico(_archivo_solicitud(), {"momento": _ahora(), "version": __version__})
+    escribirJsonAtomico(_archivoSolicitud(), {"momento": _ahora(), "version": __version__})
     log.info("Actualización solicitada desde Ajustes (versión en marcha: %s)", __version__)
 
     return estado(), None

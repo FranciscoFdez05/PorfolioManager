@@ -9,21 +9,21 @@ from urllib.error import URLError
 
 import pytest
 
-from routes.herramientas import herramientas_bp
+from routes.herramientas import herramientasBp
 
 
 @pytest.fixture
-def cliente(cliente_autenticado):
-    client, _cabeceras, _app = cliente_autenticado(herramientas_bp)
+def cliente(clienteAutenticado):
+    client, _cabeceras, _app = clienteAutenticado(herramientasBp)
     return client
 
 
-def test_devuelve_precio_suministro_y_capitalizacion(cliente, monkeypatch):
+def testDevuelvePrecioSuministroYCapitalizacion(cliente, monkeypatch):
     from providers import tradingview_client
 
     monkeypatch.setattr(
         tradingview_client,
-        "fetch_capitalizacion",
+        "fetchCapitalizacion",
         lambda tickers: {
             "BITSTAMP:XRPUSD": {
                 "precio": 1.5, "divisa": "USD", "capitalizacion": 9.4e10,
@@ -42,12 +42,12 @@ def test_devuelve_precio_suministro_y_capitalizacion(cliente, monkeypatch):
     assert data["capitalizacion"] == 9.4e10
 
 
-def test_sin_capitalizacion_no_se_inventa(cliente, monkeypatch):
+def testSinCapitalizacionNoSeInventa(cliente, monkeypatch):
     from providers import tradingview_client
 
     monkeypatch.setattr(
         tradingview_client,
-        "fetch_capitalizacion",
+        "fetchCapitalizacion",
         lambda tickers: {
             "TVC:GOLD": {"precio": 4151.58, "divisa": "USD", "capitalizacion": None, "suministro": None, "nombre": "Gold"}
         },
@@ -60,24 +60,24 @@ def test_sin_capitalizacion_no_se_inventa(cliente, monkeypatch):
     assert data["suministro"] is None
 
 
-def test_ticker_obligatorio(cliente):
+def testTickerObligatorio(cliente):
     assert cliente.get("/api/herramientas/capitalizacion").status_code == 400
 
 
-def test_ticker_sin_cotizacion(cliente, monkeypatch):
+def testTickerSinCotizacion(cliente, monkeypatch):
     from providers import tradingview_client
 
-    monkeypatch.setattr(tradingview_client, "fetch_capitalizacion", lambda tickers: {})
+    monkeypatch.setattr(tradingview_client, "fetchCapitalizacion", lambda tickers: {})
 
     assert cliente.get("/api/herramientas/capitalizacion?ticker=NOPE:NOPE").status_code == 404
 
 
-def test_fallo_de_red_es_503(cliente, monkeypatch):
+def testFalloDeRedEs503(cliente, monkeypatch):
     from providers import tradingview_client
 
     def falla(tickers):
         raise URLError("sin red")
 
-    monkeypatch.setattr(tradingview_client, "fetch_capitalizacion", falla)
+    monkeypatch.setattr(tradingview_client, "fetchCapitalizacion", falla)
 
     assert cliente.get("/api/herramientas/capitalizacion?ticker=X:Y").status_code == 503

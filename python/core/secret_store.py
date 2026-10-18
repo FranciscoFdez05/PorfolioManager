@@ -62,11 +62,11 @@ def fernetDeSecretKey(salt: bytes) -> Fernet | None:
     return _fernetCacheado(secreto, salt)
 
 
-def _get_fernet() -> Fernet | None:
+def _getFernet() -> Fernet | None:
     return fernetDeSecretKey(_SALT)
 
 
-def read_secret_lines(path: Path) -> list:
+def readSecretLines(path: Path) -> list:
     """Devuelve las líneas útiles del fichero, descifrando si hace falta."""
     if not path.exists():
         return []
@@ -77,7 +77,7 @@ def read_secret_lines(path: Path) -> list:
         return []
 
     if raw.startswith(_ENCRYPTED_PREFIX):
-        fernet = _get_fernet()
+        fernet = _getFernet()
         if fernet is None:
             log.error(
                 "%s está cifrado pero SECRET_KEY no está definida: no se pueden "
@@ -103,12 +103,12 @@ def read_secret_lines(path: Path) -> list:
             if line.strip() and not line.strip().startswith("#")]
 
 
-def write_secret_lines(path: Path, lines) -> None:
+def writeSecretLines(path: Path, lines) -> None:
     """Escribe las líneas cifradas de forma atómica (tmp → fsync → rename)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = ("\n".join(str(line).strip() for line in lines if str(line).strip()) + "\n").encode("utf-8")
 
-    fernet = _get_fernet()
+    fernet = _getFernet()
     if fernet is not None:
         payload = _ENCRYPTED_PREFIX + fernet.encrypt(payload)
     else:
@@ -117,34 +117,34 @@ def write_secret_lines(path: Path, lines) -> None:
             "SECRET_KEY en .env para cifrar las claves de API.", path.name
         )
 
-    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    fd, tmpName = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
     try:
         with os.fdopen(fd, "wb") as handle:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(tmp_name, str(path))
+        os.replace(tmpName, str(path))
         try:
             os.chmod(str(path), 0o600)
         except OSError:
             pass  # sistemas de ficheros sin permisos POSIX (p. ej. Windows)
     except Exception:
-        Path(tmp_name).unlink(missing_ok=True)
+        Path(tmpName).unlink(missing_ok=True)
         raise
 
 
-def migrate_plaintext_if_needed(path: Path) -> bool:
+def migratePlaintextIfNeeded(path: Path) -> bool:
     """Reescribe cifrado un fichero que aún esté en texto plano."""
-    if not path.exists() or _get_fernet() is None:
+    if not path.exists() or _getFernet() is None:
         return False
     try:
         if path.read_bytes().startswith(_ENCRYPTED_PREFIX):
             return False
     except OSError:
         return False
-    lines = read_secret_lines(path)
+    lines = readSecretLines(path)
     if not lines:
         return False
-    write_secret_lines(path, lines)
+    writeSecretLines(path, lines)
     log.info("%s migrado a formato cifrado", path.name)
     return True

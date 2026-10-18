@@ -3,7 +3,7 @@ escrituras y cabeceras de respuesta.
 
 Vivía suelta en `server.py` como una sucesión de `@app.before_request`. El
 problema no era la organización, sino que quedaba **fuera del alcance de los
-tests**: importar `server` ejecuta `init_portfolios()` y `ensureDataFile()`, que
+tests**: importar `server` ejecuta `initPortfolios()` y `ensureDataFile()`, que
 escriben sobre los datos reales de quien lance la suite, así que conftest.py
 prohíbe importarlo. Resultado: los cinco controles que deciden si una petición
 entra o no eran justo lo único que nadie comprobaba.
@@ -12,16 +12,16 @@ Recogidos aquí, `instalar(app)` los monta sobre cualquier Flask, y un test pued
 construir una app mínima con los blueprints que le interesen y comprobar de
 verdad que un POST sin token CSRF recibe 403 o que /api/restore exige sesión.
 
-`aplicar_proxy_inverso(app)` está aquí por el mismo motivo: de qué IP se cree
+`aplicarProxyInverso(app)` está aquí por el mismo motivo: de qué IP se cree
 que viene una petición lo decide todo lo de abajo (el límite por IP, el bloqueo
 de login, el filtro de red del Atajo), así que no podía quedarse sin test.
 
 El orden de registro importa y es el que había:
 
-  1. `verify_csrf`      — barato, y rechaza antes de tocar nada.
-  2. `enforce_body_limit` — corta los cuerpos enormes antes de leerlos.
-  3. `limit_writes`     — cuenta solo lo que va a llegar a la vista.
-  4. `require_login`    — el último, para que un 401 no revele si el endpoint
+  1. `verifyCsrf`      — barato, y rechaza antes de tocar nada.
+  2. `enforceBodyLimit` — corta los cuerpos enormes antes de leerlos.
+  3. `limitWrites`     — cuenta solo lo que va a llegar a la vista.
+  4. `requireLogin`    — el último, para que un 401 no revele si el endpoint
                           existía o si el token era válido.
 """
 
@@ -51,8 +51,8 @@ log = logging.getLogger(__name__)
 # como cualquier otra escritura (antes un GET desde otra web bastaba).
 PUBLIC_ENDPOINTS = {"auth.login", "salud.getHealth"}
 # Endpoints del Atajo de iOS. No pueden usar la sesión ni el token CSRF (un
-# Atajo no mantiene cookies), así que quedan fuera de require_login y de
-# verify_csrf y se autentican por su cuenta: filtro de IP en core/red_local.py
+# Atajo no mantiene cookies), así que quedan fuera de requireLogin y de
+# verifyCsrf y se autentican por su cuenta: filtro de IP en core/red_local.py
 # más firma HMAC en core/firma_hmac.py, ambos aplicados dentro de cada vista.
 # Se mantienen aparte de PUBLIC_ENDPOINTS para que quede explícito que estas
 # rutas no son públicas, solo se protegen de otra forma.
@@ -116,7 +116,7 @@ SECRET_KEYS_DE_EJEMPLO = frozenset({"cambia_esto_por_una_clave_aleatoria_larga"}
 SECRET_KEY_MIN_CARACTERES = 32
 
 
-def rechazar_secret_key_insegura(clave: str) -> None:
+def rechazarSecretKeyInsegura(clave: str) -> None:
     """Aborta el arranque con una SECRET_KEY de ejemplo o demasiado corta.
 
     Vacía no se rechaza: entonces el servidor genera una temporal y lo avisa en
@@ -139,7 +139,7 @@ def rechazar_secret_key_insegura(clave: str) -> None:
         )
 
 
-def token_csrf_actual() -> str:
+def tokenCsrfActual() -> str:
     token = session.get("csrf_token")
     if not token:
         token = secrets.token_urlsafe(32)
@@ -147,11 +147,11 @@ def token_csrf_actual() -> str:
     return token
 
 
-def _ip_cliente() -> str:
+def _ipCliente() -> str:
     return request.remote_addr or "desconocida"
 
 
-def _es_asset_publico(path: str) -> bool:
+def _esAssetPublico(path: str) -> bool:
     """CSS/JS/imágenes que la página de login necesita antes de autenticarse."""
     normalizado = path.lstrip("/").replace("\\", "/")
     return (
@@ -161,7 +161,7 @@ def _es_asset_publico(path: str) -> bool:
     )
 
 
-def _origenes_de_comprobacion() -> tuple[str, ...]:
+def _origenesDeComprobacion() -> tuple[str, ...]:
     """El puerto donde el panel comprueba si ESTE navegador se fía del certificado.
 
     Va en `connect-src` porque, si no, la comprobación la bloquea la propia CSP
@@ -175,26 +175,26 @@ def _origenes_de_comprobacion() -> tuple[str, ...]:
     return (f"https://{host}:{tls.PUERTO_PREPARACION}",)
 
 
-def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
+def instalar(app, *, limiteEscrituras=None, limitePesadas=None):
     """Registra los controles sobre `app` y devuelve los dos limitadores.
 
     Se devuelven para que los tests puedan reiniciarlos entre casos: son estado
     en memoria del proceso y, sin eso, el primer test que agota el cubo dejaría
     fallando a todos los siguientes.
     """
-    if limite_escrituras is None:
-        limite_escrituras = LimitadorVentana(
-            settings.escriturasPorMinuto, ventana_segundos=60,
-            max_clientes=settings.maxIpsVigiladas,
+    if limiteEscrituras is None:
+        limiteEscrituras = LimitadorVentana(
+            settings.escriturasPorMinuto, ventanaSegundos=60,
+            maxClientes=settings.maxIpsVigiladas,
         )
-    if limite_pesadas is None:
-        limite_pesadas = LimitadorVentana(
-            settings.escriturasPesadasPorHora, ventana_segundos=3600,
-            max_clientes=settings.maxIpsVigiladas,
+    if limitePesadas is None:
+        limitePesadas = LimitadorVentana(
+            settings.escriturasPesadasPorHora, ventanaSegundos=3600,
+            maxClientes=settings.maxIpsVigiladas,
         )
 
     @app.before_request
-    def verify_csrf():
+    def verifyCsrf():
         if request.method in SAFE_METHODS:
             return
         # El login es la única entrada sin sesión previa; lo protege el propio
@@ -202,12 +202,12 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
         if request.endpoint in PUBLIC_ENDPOINTS or request.endpoint in ATAJO_ENDPOINTS:
             return
         if not session.get("logged_in"):
-            # Sin sesión no hay nada que proteger; require_login responde 401.
+            # Sin sesión no hay nada que proteger; requireLogin responde 401.
             return
         # Fail-closed: una sesión autenticada sin token (por ejemplo emitida por
         # una versión anterior a este control) no se puede validar, así que se
         # rechaza en vez de dejar pasar la petición. Cualquier GET posterior
-        # vuelve a emitir el token en set_csrf_cookie, de modo que la sesión se
+        # vuelve a emitir el token en setCsrfCookie, de modo que la sesión se
         # recupera sola.
         esperado = session.get("csrf_token")
         recibido = request.headers.get(CSRF_HEADER, "") or request.form.get("csrf_token", "")
@@ -216,7 +216,7 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
             abort(403)
 
     @app.before_request
-    def enforce_body_limit():
+    def enforceBodyLimit():
         """Aplica el tope estricto a todo salvo a los endpoints de subida.
 
         MAX_CONTENT_LENGTH (el de la app) se fija al máximo de subida, y aquí se
@@ -244,25 +244,25 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
         return None
 
     @app.before_request
-    def limit_writes():
+    def limitWrites():
         if request.method in SAFE_METHODS:
             return
-        # El login lo frena _seconds_locked_out(), que además distingue entre
+        # El login lo frena _secondsLockedOut(), que además distingue entre
         # intentos fallidos y correctos; contarlo dos veces solo daría 429 donde
         # ya hay un mensaje de bloqueo escrito para el usuario.
         if request.endpoint == "auth.login":
             return
         # Sin sesión (y fuera del Atajo, que se autentica por su cuenta) la
-        # petición acaba en el 401 de require_login sin tocar nada. Contarla
+        # petición acaba en el 401 de requireLogin sin tocar nada. Contarla
         # aquí dejaba que cualquiera agotase el cupo de la IP y el usuario
         # legítimo detrás de esa misma IP (NAT, proxy) recibiera 429.
         if not session.get("logged_in") and request.endpoint not in ATAJO_ENDPOINTS:
             return
 
-        ip = _ip_cliente()
-        espera = limite_escrituras.consumir(ip)
+        ip = _ipCliente()
+        espera = limiteEscrituras.consumir(ip)
         if not espera and request.path.startswith(RUTAS_PESADAS):
-            espera = limite_pesadas.consumir(ip)
+            espera = limitePesadas.consumir(ip)
         if not espera:
             return
 
@@ -275,13 +275,13 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
         return respuesta
 
     @app.before_request
-    def require_login():
+    def requireLogin():
         if request.endpoint in PUBLIC_ENDPOINTS or request.endpoint in ATAJO_ENDPOINTS:
             return
-        if _es_asset_publico(request.path):
+        if _esAssetPublico(request.path):
             return
         if not session.get("logged_in"):
-            return _sin_sesion()
+            return _sinSesion()
 
         # Que la cookie tenga firma válida solo dice que la emitimos nosotros,
         # no que siga valiendo. Aquí se comprueba lo que la firma no cubre:
@@ -291,7 +291,7 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
         if motivo:
             log.info("Sesión rechazada en %s %s: %s", request.method, request.path, motivo)
             session.clear()
-            return _sin_sesion()
+            return _sinSesion()
 
         sesion.refrescar(session)
         # El nombre por el que entra una sesión válida es legítimo por
@@ -299,7 +299,7 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
         red_local.anotarHostConSesion(request.host)
 
     @app.before_request
-    def exigir_objeto_json():
+    def exigirObjetoJson():
         """Un cuerpo JSON de escritura tiene que ser un objeto.
 
         Ninguna ruta acepta otra cosa, pero casi todas hacían
@@ -316,17 +316,17 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
             return make_response({"ok": False, "error": "El cuerpo JSON debe ser un objeto"}, 400)
         return None
 
-    def _sin_sesion():
+    def _sinSesion():
         if request.path.startswith("/api/") or request.is_json:
             abort(401)
         return redirect(url_for("auth.login", next=request.path))
 
     @app.after_request
-    def set_csrf_cookie(response):
+    def setCsrfCookie(response):
         if session.get("logged_in"):
             response.set_cookie(
                 CSRF_COOKIE,
-                token_csrf_actual(),
+                tokenCsrfActual(),
                 httponly=False,          # el JS debe poder leerla para reenviarla
                 samesite=app.config["SESSION_COOKIE_SAMESITE"],
                 # Mismo criterio que la cookie de sesión (_SesionConSecureDinamico).
@@ -335,7 +335,7 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
         return response
 
     @app.after_request
-    def add_security_headers(response):
+    def addSecurityHeaders(response):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -363,16 +363,16 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
             # respuestas no llevan scripts en línea, así que su política queda
             # aún más cerrada.
             response.headers["Content-Security-Policy"] = csp.construir(
-                g.get("csp_nonce", ""), _origenes_de_comprobacion()
+                g.get("csp_nonce", ""), _origenesDeComprobacion()
             )
         return response
 
     @app.after_request
-    def comprimir_respuesta(response):
+    def comprimirRespuesta(response):
         """Gzip para HTML/CSS/JS/JSON cuando el cliente lo acepta.
 
         No hay por qué depender de que haya un proxy delante que comprima (Caddy
-        es opcional, ver `aplicar_proxy_inverso`): sin esto, una instalación sin
+        es opcional, ver `aplicarProxyInverso`): sin esto, una instalación sin
         proxy —o con uno que no comprima— transfiere el JS/CSS propios enteros y
         sin comprimir en cada carga.
         """
@@ -406,10 +406,10 @@ def instalar(app, *, limite_escrituras=None, limite_pesadas=None):
         response.headers["Content-Length"] = str(len(response.get_data()))
         return response
 
-    return limite_escrituras, limite_pesadas
+    return limiteEscrituras, limitePesadas
 
 
-def aplicar_proxy_inverso(app) -> int:
+def aplicarProxyInverso(app) -> int:
     """Instala ProxyFix si hay proxies de confianza declarados. Devuelve cuántos.
 
     Con Caddy (u otro proxy) delante, la conexión que ve gunicorn sale siempre
@@ -460,7 +460,7 @@ class _SesionConSecureDinamico(SecureCookieSessionInterface):
         return tls.httpsActivo()
 
 
-def aplicar_configuracion_sesion(app):
+def aplicarConfiguracionSesion(app):
     """Cookies de sesión y topes de cuerpo. Separado de `instalar` porque son
     valores de `app.config`, no manejadores, y algún test quiere lo uno sin lo
     otro.

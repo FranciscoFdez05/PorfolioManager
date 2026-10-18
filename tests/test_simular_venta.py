@@ -11,23 +11,23 @@ import pytest
 from stores import ventas_fifo
 from stores.asset_store import writeAssetFile
 from stores.ventas_store import (
-    read_ventas_year,
-    sanitize_ventas_payload,
-    validar_para_guardar,
-    write_ventas_year,
+    readVentasYear,
+    sanitizeVentasPayload,
+    validarParaGuardar,
+    writeVentasYear,
 )
 
 
-def crear_activo(asset_id="acme", tipo="accion", filas=()):
-    writeAssetFile(asset_id, {
-        "name": asset_id.upper(),
-        "symbol": asset_id.upper(),
+def crearActivo(assetId="acme", tipo="accion", filas=()):
+    writeAssetFile(assetId, {
+        "name": assetId.upper(),
+        "symbol": assetId.upper(),
         "type": tipo,
         "rows": list(filas),
     })
 
 
-def compra_ficha(fecha, participaciones, precio, comisiones="0"):
+def compraFicha(fecha, participaciones, precio, comisiones="0"):
     return {
         "fechaOperacion": fecha,
         "tipoOperacion": "Compra",
@@ -37,23 +37,23 @@ def compra_ficha(fecha, participaciones, precio, comisiones="0"):
     }
 
 
-def guardar_venta(year, filas):
-    payload, error = sanitize_ventas_payload({"year": year, "rows": filas}, year)
+def guardarVenta(year, filas):
+    payload, error = sanitizeVentasPayload({"year": year, "rows": filas}, year)
     assert error is None, error
-    validar_para_guardar(payload)
-    write_ventas_year(year, payload)
-    return read_ventas_year(year)
+    validarParaGuardar(payload)
+    writeVentasYear(year, payload)
+    return readVentasYear(year)
 
 
 # ── Coste y ganancia ─────────────────────────────────────────────────────────
 
-def test_el_coste_sale_del_fifo_no_del_precio_medio(temp_db):
-    crear_activo(filas=[
-        compra_ficha("01-01-2023", "10", "10"),   # 100 €
-        compra_ficha("01-06-2023", "10", "20"),   # 200 €
+def testElCosteSaleDelFifoNoDelPrecioMedio(tempDb):
+    crearActivo(filas=[
+        compraFicha("01-01-2023", "10", "10"),   # 100 €
+        compraFicha("01-06-2023", "10", "20"),   # 200 €
     ])
 
-    dato, incidencia = ventas_fifo.simular_venta("acme", "01-09-2026", "15", "30")
+    dato, incidencia = ventas_fifo.simularVenta("acme", "01-09-2026", "15", "30")
 
     assert incidencia == ""
     # FIFO: las 10 primeras a 10 € y 5 de las segundas a 20 € = 200 €.
@@ -64,13 +64,13 @@ def test_el_coste_sale_del_fifo_no_del_precio_medio(temp_db):
     assert dato["disponible"] == "20.00000000"
 
 
-def test_detalla_los_lotes_que_consume(temp_db):
-    crear_activo(filas=[
-        compra_ficha("01-01-2023", "10", "10"),
-        compra_ficha("01-06-2023", "10", "20"),
+def testDetallaLosLotesQueConsume(tempDb):
+    crearActivo(filas=[
+        compraFicha("01-01-2023", "10", "10"),
+        compraFicha("01-06-2023", "10", "20"),
     ])
 
-    dato, _ = ventas_fifo.simular_venta("acme", "01-09-2026", "15", "30")
+    dato, _ = ventas_fifo.simularVenta("acme", "01-09-2026", "15", "30")
 
     assert [(lote["fecha"], lote["cantidad"]) for lote in dato["lotes"]] == [
         ("01-01-2023", "10.00000000"),
@@ -80,10 +80,10 @@ def test_detalla_los_lotes_que_consume(temp_db):
 
 # ── Cuota ────────────────────────────────────────────────────────────────────
 
-def test_la_cuota_es_la_del_primer_tramo_cuando_no_hay_mas_ventas(temp_db):
-    crear_activo(filas=[compra_ficha("01-01-2023", "10", "100")])
+def testLaCuotaEsLaDelPrimerTramoCuandoNoHayMasVentas(tempDb):
+    crearActivo(filas=[compraFicha("01-01-2023", "10", "100")])
 
-    dato, _ = ventas_fifo.simular_venta("acme", "01-09-2026", "10", "200")
+    dato, _ = ventas_fifo.simularVenta("acme", "01-09-2026", "10", "200")
 
     # 1.000 € de ganancia, todo dentro del tramo del 19 %.
     assert dato["ganancia"] == "1000.00"
@@ -91,19 +91,19 @@ def test_la_cuota_es_la_del_primer_tramo_cuando_no_hay_mas_ventas(temp_db):
     assert dato["tipoEfectivo"] == "19.00"
 
 
-def test_la_cuota_es_incremental_sobre_lo_ya_vendido_ese_año(temp_db):
+def testLaCuotaEsIncrementalSobreLoYaVendidoEseAño(tempDb):
     """Con 6.000 € ya declarados, la ganancia nueva entra en el tramo del 21 %."""
-    crear_activo(filas=[
-        compra_ficha("01-01-2023", "100", "10"),
-        compra_ficha("02-01-2023", "10", "100"),
+    crearActivo(filas=[
+        compraFicha("01-01-2023", "100", "10"),
+        compraFicha("02-01-2023", "10", "100"),
     ])
     # Venta real de 2026: 6.000 € de ganancia, que agotan el primer tramo.
-    guardar_venta("2026", [{
+    guardarVenta("2026", [{
         "id": "v1", "fecha": "01-03-2026", "assetId": "acme",
         "cantidad": "100", "valorVenta": "70", "comisionVenta": "",
     }])
 
-    dato, _ = ventas_fifo.simular_venta("acme", "01-09-2026", "10", "200")
+    dato, _ = ventas_fifo.simularVenta("acme", "01-09-2026", "10", "200")
 
     assert dato["ganancia"] == "1000.00"
     # Si se hubiera calculado aislada habrían salido 190 € (19 %).
@@ -113,18 +113,18 @@ def test_la_cuota_es_incremental_sobre_lo_ya_vendido_ese_año(temp_db):
     assert dato["cuotaEjercicioDespues"] == "1350.00"
 
 
-def test_una_perdida_anterior_compensa_y_baja_el_tipo(temp_db):
-    crear_activo(filas=[
-        compra_ficha("01-01-2023", "10", "100"),   # 1.000 €
-        compra_ficha("02-01-2023", "10", "100"),
+def testUnaPerdidaAnteriorCompensaYBajaElTipo(tempDb):
+    crearActivo(filas=[
+        compraFicha("01-01-2023", "10", "100"),   # 1.000 €
+        compraFicha("02-01-2023", "10", "100"),
     ])
     # 2024 cierra con 500 € de pérdida.
-    guardar_venta("2024", [{
+    guardarVenta("2024", [{
         "id": "v1", "fecha": "01-03-2024", "assetId": "acme",
         "cantidad": "10", "valorVenta": "50", "comisionVenta": "",
     }])
 
-    dato, _ = ventas_fifo.simular_venta("acme", "01-09-2026", "10", "200")
+    dato, _ = ventas_fifo.simularVenta("acme", "01-09-2026", "10", "200")
 
     assert dato["ganancia"] == "1000.00"
     assert dato["compensadoAnteriores"] == "500.00"
@@ -134,24 +134,24 @@ def test_una_perdida_anterior_compensa_y_baja_el_tipo(temp_db):
 
 # ── Normativa y avisos ───────────────────────────────────────────────────────
 
-def test_la_perdida_recomprada_no_computa(temp_db):
+def testLaPerdidaRecompradaNoComputa(tempDb):
     """Regla de los dos meses: recomprar bloquea la minusvalía (art. 33.5)."""
-    crear_activo(filas=[
-        compra_ficha("01-01-2023", "10", "100"),
-        compra_ficha("15-09-2026", "10", "50"),   # recompra dentro de la ventana
+    crearActivo(filas=[
+        compraFicha("01-01-2023", "10", "100"),
+        compraFicha("15-09-2026", "10", "50"),   # recompra dentro de la ventana
     ])
 
-    dato, _ = ventas_fifo.simular_venta("acme", "01-09-2026", "10", "50")
+    dato, _ = ventas_fifo.simularVenta("acme", "01-09-2026", "10", "50")
 
     assert dato["ganancia"] == "0.00"
     assert dato["perdidaNoComputable"] == "500.00"
     assert dato["notaAntiaplicacion"]
 
 
-def test_vender_mas_de_lo_que_hay_avisa_sin_romper(temp_db):
-    crear_activo(filas=[compra_ficha("01-01-2023", "10", "100")])
+def testVenderMasDeLoQueHayAvisaSinRomper(tempDb):
+    crearActivo(filas=[compraFicha("01-01-2023", "10", "100")])
 
-    dato, incidencia = ventas_fifo.simular_venta("acme", "01-09-2026", "50", "200")
+    dato, incidencia = ventas_fifo.simularVenta("acme", "01-09-2026", "50", "200")
 
     assert incidencia == ""
     assert dato["incidencia"]
@@ -159,14 +159,14 @@ def test_vender_mas_de_lo_que_hay_avisa_sin_romper(temp_db):
     assert dato["disponible"] == "10.00000000"
 
 
-def test_cripto_usa_la_ventana_de_un_año(temp_db):
+def testCriptoUsaLaVentanaDeUnAño(tempDb):
     """Para los no cotizados la recompra bloquea durante un año, no dos meses."""
-    crear_activo("btc", tipo="cripto", filas=[
-        compra_ficha("01-01-2023", "1", "40000"),
-        compra_ficha("01-03-2027", "1", "20000"),   # seis meses después
+    crearActivo("btc", tipo="cripto", filas=[
+        compraFicha("01-01-2023", "1", "40000"),
+        compraFicha("01-03-2027", "1", "20000"),   # seis meses después
     ])
 
-    dato, _ = ventas_fifo.simular_venta("btc", "01-09-2026", "1", "20000")
+    dato, _ = ventas_fifo.simularVenta("btc", "01-09-2026", "1", "20000")
 
     assert dato["perdidaNoComputable"] == "20000.00"
 
@@ -179,19 +179,19 @@ def test_cripto_usa_la_ventana_de_un_año(temp_db):
     (("acme", "01-09-2026", "0", "10"), ventas_fifo.INCIDENCIA_CANTIDAD),
     (("acme", "01-09-2026", "1", "-5"), ventas_fifo.INCIDENCIA_PRECIO),
 ])
-def test_entradas_invalidas(temp_db, args, esperado):
-    crear_activo(filas=[compra_ficha("01-01-2023", "10", "100")])
+def testEntradasInvalidas(tempDb, args, esperado):
+    crearActivo(filas=[compraFicha("01-01-2023", "10", "100")])
 
-    dato, incidencia = ventas_fifo.simular_venta(*args)
+    dato, incidencia = ventas_fifo.simularVenta(*args)
 
     assert dato is None
     assert incidencia == esperado
 
 
-def test_simular_no_guarda_nada(temp_db):
-    crear_activo(filas=[compra_ficha("01-01-2023", "10", "100")])
-    antes = ventas_fifo.cartera_viva()["acme"]["cantidad"]
+def testSimularNoGuardaNada(tempDb):
+    crearActivo(filas=[compraFicha("01-01-2023", "10", "100")])
+    antes = ventas_fifo.carteraViva()["acme"]["cantidad"]
 
-    ventas_fifo.simular_venta("acme", "01-09-2026", "5", "200")
+    ventas_fifo.simularVenta("acme", "01-09-2026", "5", "200")
 
-    assert ventas_fifo.cartera_viva()["acme"]["cantidad"] == antes
+    assert ventas_fifo.carteraViva()["acme"]["cantidad"] == antes

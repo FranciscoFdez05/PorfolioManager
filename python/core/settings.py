@@ -629,7 +629,7 @@ def sombras() -> list[str]:
       está en el fichero es redundante, pero no engaña a nadie.
     * El del fichero **no es el de fábrica**. config.ini se distribuye con todas
       las opciones escritas en su valor por defecto para que sirvan de
-      documentación (lo garantiza `test_config_ini_coincide_con_los_defectos_del_catalogo`),
+      documentación (lo garantiza `testConfigIniCoincideConLosDefectosDelCatalogo`),
       así que una línea sin tocar no es la decisión de nadie. Sin esto, el flujo
       que recomienda el README —config.ini como referencia, los cambios en el
       .env— avisaría en todos los arranques de todos los overrides, y un aviso

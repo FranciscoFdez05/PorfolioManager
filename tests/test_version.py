@@ -23,22 +23,22 @@ RAIZ = Path(__file__).resolve().parent.parent
 SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 
 
-def test_la_version_es_semver():
+def testLaVersionEsSemver():
     assert SEMVER.match(__version__), f"{__version__!r} no es MAYOR.MENOR.PARCHE"
 
 
-def test_pyproject_declara_la_misma_version():
+def testPyprojectDeclaraLaMismaVersion():
     datos = tomllib.loads((RAIZ / "pyproject.toml").read_text("utf-8"))
     assert datos["project"]["version"] == __version__
 
 
-def test_package_json_declara_la_misma_version():
+def testPackageJsonDeclaraLaMismaVersion():
     """El frontend no se publica como paquete, pero la versión se lee en `npm`."""
     datos = json.loads((RAIZ / "package.json").read_text("utf-8"))
     assert datos["version"] == __version__
 
 
-def test_la_plantilla_lleva_el_marcador_de_version():
+def testLaPlantillaLlevaElMarcadorDeVersion():
     """index.html se sirve tal cual salvo por dos sustituciones: el nonce de CSP
     y la versión. Si alguien quita el marcador, la interfaz deja de decir qué
     versión está corriendo y nadie se entera hasta que hace falta saberlo."""
@@ -51,15 +51,15 @@ def test_la_plantilla_lleva_el_marcador_de_version():
     )
 
 
-def test_la_version_sustituye_al_marcador():
-    from core.version import MARCADOR_VERSION, insertar_version
+def testLaVersionSustituyeAlMarcador():
+    from core.version import MARCADOR_VERSION, insertarVersion
 
-    resultado = insertar_version(f'<span class="appVersion">{MARCADOR_VERSION}</span>')
+    resultado = insertarVersion(f'<span class="appVersion">{MARCADOR_VERSION}</span>')
 
     assert resultado == f'<span class="appVersion">{__version__}</span>'
 
 
-def test_el_badge_del_readme_declara_la_misma_version():
+def testElBadgeDelReadmeDeclaraLaMismaVersion():
     """El badge del README es lo primero que se ve del proyecto.
 
     Y es justo lo que nadie mira al publicar: se quedó anunciando la 1.0.0
@@ -85,7 +85,7 @@ def changelog():
     return ruta.read_text("utf-8")
 
 
-def test_el_changelog_tiene_entrada_para_esta_version(changelog):
+def testElChangelogTieneEntradaParaEstaVersion(changelog):
     """Publicar sin decir qué cambió deja al que actualiza sin saber qué mirar."""
     assert f"## [{__version__}]" in changelog, (
         f"CHANGELOG.md no tiene la sección «## [{__version__}]». Añádela en el "
@@ -93,7 +93,7 @@ def test_el_changelog_tiene_entrada_para_esta_version(changelog):
     )
 
 
-def test_las_versiones_del_changelog_van_de_mayor_a_menor(changelog):
+def testLasVersionesDelChangelogVanDeMayorAMenor(changelog):
     versiones = re.findall(r"^## \[(\d+\.\d+\.\d+)\]", changelog, re.M)
     assert versiones, "el CHANGELOG no lista ninguna versión"
 
@@ -105,13 +105,13 @@ def test_las_versiones_del_changelog_van_de_mayor_a_menor(changelog):
     )
 
 
-def test_la_version_actual_encabeza_el_changelog(changelog):
+def testLaVersionActualEncabezaElChangelog(changelog):
     """La primera versión listada tiene que ser la que se está publicando."""
     primera = re.search(r"^## \[(\d+\.\d+\.\d+)\]", changelog, re.M)
     assert primera and primera.group(1) == __version__
 
 
-def test_cada_version_dice_si_toca_el_esquema(changelog):
+def testCadaVersionDiceSiTocaElEsquema(changelog):
     """El dato que decide si la actualización se puede deshacer sin más.
 
     Una versión que sube `ESQUEMA_VERSION` deja una copia previa y se revierte
@@ -119,18 +119,18 @@ def test_cada_version_dice_si_toca_el_esquema(changelog):
     anterior, sin tocar los datos. Quien actualiza necesita saber cuál es.
     """
     secciones = re.split(r"^## \[", changelog, flags=re.M)[1:]
-    sin_indicar = [
+    sinIndicar = [
         s.split("]")[0]
         for s in secciones
         if "Esquema de base de datos:" not in s
     ]
-    assert not sin_indicar, (
-        f"estas versiones no dicen si tocan el esquema: {sin_indicar}. "
+    assert not sinIndicar, (
+        f"estas versiones no dicen si tocan el esquema: {sinIndicar}. "
         f"Añade una línea «Esquema de base de datos: …» en cada una."
     )
 
 
-def test_el_esquema_declarado_coincide_con_el_codigo(changelog):
+def testElEsquemaDeclaradoCoincideConElCodigo(changelog):
     """Si el CHANGELOG dice «sube al 2», `ESQUEMA_VERSION` tiene que ser 2."""
     from core.db import ESQUEMA_VERSION
 

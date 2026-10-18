@@ -29,7 +29,7 @@ def _marca(clave: str):
     return paths.TMP_DIR / f"reclamo-{_CLAVE_VALIDA.sub('_', clave)[:80]}.marca"
 
 
-def reclamar(clave: str, cada_segundos: float | None) -> bool:
+def reclamar(clave: str, cadaSegundos: float | None) -> bool:
     """True si esta llamada se queda la tarea; False si ya la hizo alguien hace poco.
 
     `cada_segundos=None` significa «una sola vez»: mientras exista la marca, no
@@ -51,7 +51,7 @@ def reclamar(clave: str, cada_segundos: float | None) -> bool:
             except (OSError, ValueError):
                 anterior = None
 
-            if anterior is not None and (cada_segundos is None or ahora - anterior < cada_segundos):
+            if anterior is not None and (cadaSegundos is None or ahora - anterior < cadaSegundos):
                 return False
 
             try:

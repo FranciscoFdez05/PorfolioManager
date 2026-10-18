@@ -2,19 +2,19 @@ from urllib.error import HTTPError, URLError
 
 from flask import Blueprint, jsonify, request
 
-from providers.http import motivo_conexion
+from providers.http import motivoConexion
 from stores import market_pulse
 
-market_pulse_bp = Blueprint("market_pulse", __name__)
+marketPulseBp = Blueprint("market_pulse", __name__)
 
 
-def _tradingview_error_message(error):
+def _tradingviewErrorMessage(error):
     if isinstance(error, HTTPError):
         return f"TradingView devolvió HTTP {error.code}"
-    return f"No se pudo conectar con TradingView: {motivo_conexion(error, 'TradingView')}"
+    return f"No se pudo conectar con TradingView: {motivoConexion(error, 'TradingView')}"
 
 
-@market_pulse_bp.route("/api/market/pulse", methods=["GET"])
+@marketPulseBp.route("/api/market/pulse", methods=["GET"])
 def getMarketPulse():
     """Índices, sectores, amplitud, mayores subidas/bajadas, extremos de RSI,
     volumen inusual y el Fear & Greed de cripto, para la página de
@@ -31,46 +31,46 @@ def getMarketPulse():
         resultado["snapshot"] = market_pulse.snapshot()
     except (HTTPError, URLError) as error:
         resultado["snapshot"] = None
-        resultado["snapshotError"] = _tradingview_error_message(error)
+        resultado["snapshotError"] = _tradingviewErrorMessage(error)
 
     try:
-        resultado["movers"] = market_pulse.top_movers(limit=10)
+        resultado["movers"] = market_pulse.topMovers(limit=10)
     except (HTTPError, URLError) as error:
         resultado["movers"] = None
-        resultado["moversError"] = _tradingview_error_message(error)
+        resultado["moversError"] = _tradingviewErrorMessage(error)
 
     try:
         resultado["breadth"] = market_pulse.breadth()
     except (HTTPError, URLError) as error:
         resultado["breadth"] = None
-        resultado["breadthError"] = _tradingview_error_message(error)
+        resultado["breadthError"] = _tradingviewErrorMessage(error)
 
     try:
-        resultado["rsi"] = market_pulse.rsi_extremes(limit=8)
+        resultado["rsi"] = market_pulse.rsiExtremes(limit=8)
     except (HTTPError, URLError) as error:
         resultado["rsi"] = None
-        resultado["rsiError"] = _tradingview_error_message(error)
+        resultado["rsiError"] = _tradingviewErrorMessage(error)
 
     try:
-        resultado["unusualVolume"] = market_pulse.unusual_volume(limit=8)
+        resultado["unusualVolume"] = market_pulse.unusualVolume(limit=8)
     except (HTTPError, URLError) as error:
         resultado["unusualVolume"] = None
-        resultado["unusualVolumeError"] = _tradingview_error_message(error)
+        resultado["unusualVolumeError"] = _tradingviewErrorMessage(error)
 
-    fear_greed_datos, fear_greed_error = market_pulse.fear_greed()
-    resultado["fearGreed"] = fear_greed_datos
-    if fear_greed_error:
-        resultado["fearGreedError"] = fear_greed_error
+    fearGreedDatos, fearGreedError = market_pulse.fearGreed()
+    resultado["fearGreed"] = fearGreedDatos
+    if fearGreedError:
+        resultado["fearGreedError"] = fearGreedError
 
-    fear_greed_historia, fear_greed_historia_error = market_pulse.fear_greed_history()
-    resultado["fearGreedHistory"] = fear_greed_historia
-    if fear_greed_historia_error:
-        resultado["fearGreedHistoryError"] = fear_greed_historia_error
+    fearGreedHistoria, fearGreedHistoriaError = market_pulse.fearGreedHistory()
+    resultado["fearGreedHistory"] = fearGreedHistoria
+    if fearGreedHistoriaError:
+        resultado["fearGreedHistoryError"] = fearGreedHistoriaError
 
     return jsonify(resultado)
 
 
-@market_pulse_bp.route("/api/market/pulse/universe", methods=["GET"])
+@marketPulseBp.route("/api/market/pulse/universe", methods=["GET"])
 def getMarketPulseUniverse():
     """Las filas del treemap de "Distribución" para el universo pedido
     (`sp500`, `cripto` o `nasdaq100`), ya en la misma forma para los tres: el
@@ -82,7 +82,7 @@ def getMarketPulseUniverse():
     try:
         items = market_pulse.universe(clave)
     except (HTTPError, URLError) as error:
-        return jsonify({"ok": False, "error": _tradingview_error_message(error)}), 503
+        return jsonify({"ok": False, "error": _tradingviewErrorMessage(error)}), 503
 
     if items is None:
         return jsonify({"ok": False, "error": "Universo desconocido"}), 400

@@ -4,7 +4,7 @@ ALLOWED_ASSET_TYPES = {"cripto", "acciones", "etfs", "comoditis"}
 _HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 
 
-def sanitize_color(value):
+def sanitizeColor(value):
     s = str(value or "").strip()
     return s if _HEX_COLOR_RE.match(s) else ""
 ALLOWED_MARKET_PROVIDERS = {"finnhub", "eodhd", "yahoo", "alphavantage", "tradingview"}
@@ -22,8 +22,8 @@ _MAX_SHORT = 30
 _MAX_TEXT = 200
 
 
-def _trunc(value, max_len):
-    return str(value or "")[:max_len]
+def _trunc(value, maxLen):
+    return str(value or "")[:maxLen]
 
 
 def slugify(value):
@@ -83,18 +83,18 @@ def normalizeMarketProvider(provider, fallback="finnhub"):
 
 
 def inferMarketProviderFromSymbol(symbol, fallback="finnhub"):
-    normalized_symbol = str(symbol or "").strip().upper()
+    normalizedSymbol = str(symbol or "").strip().upper()
 
-    if not normalized_symbol:
+    if not normalizedSymbol:
         return fallback
 
-    if ":" in normalized_symbol:
+    if ":" in normalizedSymbol:
         return "finnhub"
 
-    if "." in normalized_symbol:
-        exchange_code = normalized_symbol.rsplit(".", 1)[-1]
+    if "." in normalizedSymbol:
+        exchangeCode = normalizedSymbol.rsplit(".", 1)[-1]
 
-        if exchange_code in EODHD_EXCHANGE_CODES:
+        if exchangeCode in EODHD_EXCHANGE_CODES:
             return "eodhd"
 
     return fallback
@@ -128,9 +128,9 @@ def sanitizeAssetRows(rows):
     sanitizedRows = []
 
     for row in rows:
-        legacy_crypto_fee = _trunc(row.get("comisionesSatoshis", row.get("comisiones", "")), _MAX_SHORT).strip()
-        crypto_fee = _trunc(row.get("comisionesCripto", legacy_crypto_fee), _MAX_SHORT).strip()
-        fiat_fee = _trunc(row.get("comisionesFiat") or row.get("comisiones", ""), _MAX_SHORT).strip()
+        legacyCryptoFee = _trunc(row.get("comisionesSatoshis", row.get("comisiones", "")), _MAX_SHORT).strip()
+        cryptoFee = _trunc(row.get("comisionesCripto", legacyCryptoFee), _MAX_SHORT).strip()
+        fiatFee = _trunc(row.get("comisionesFiat") or row.get("comisiones", ""), _MAX_SHORT).strip()
         currency = _trunc(row.get("currency", "EUR"), 10).strip().upper() or "EUR"
 
         if currency not in {"EUR", "USD"}:
@@ -145,23 +145,23 @@ def sanitizeAssetRows(rows):
             "precioParticipacion": _trunc(row.get("precioParticipacion", ""), _MAX_SHORT).strip(),
             "capitalInvertidoBruto": _trunc(row.get("capitalInvertidoBruto", ""), _MAX_SHORT).strip(),
             "costeAnual": _trunc(row.get("costeAnual", ""), _MAX_SHORT).strip(),
-            "comisiones": fiat_fee,
-            "comisionesFiat": fiat_fee,
-            "comisionesCripto": crypto_fee,
-            "comisionesSatoshis": crypto_fee
+            "comisiones": fiatFee,
+            "comisionesFiat": fiatFee,
+            "comisionesCripto": cryptoFee,
+            "comisionesSatoshis": cryptoFee
         })
 
     return sanitizedRows
 
 
 def sanitizeAssetOperationRows(rows):
-    sanitized_rows = []
+    sanitizedRows = []
 
     for index, row in enumerate(rows or []):
         orden = str(row.get("orden", "Compra")).strip().capitalize()
         estado = str(row.get("estado", "Activo")).strip().capitalize()
         currency = str(row.get("currency", "EUR")).strip().upper() or "EUR"
-        precio_currency = str(row.get("precioCurrency", currency)).strip().upper() or currency
+        precioCurrency = str(row.get("precioCurrency", currency)).strip().upper() or currency
 
         if orden not in {"Compra", "Venta"}:
             orden = "Compra"
@@ -172,10 +172,10 @@ def sanitizeAssetOperationRows(rows):
         if currency not in {"EUR", "USD"}:
             currency = "EUR"
 
-        if precio_currency not in {"EUR", "USD"}:
-            precio_currency = currency
+        if precioCurrency not in {"EUR", "USD"}:
+            precioCurrency = currency
 
-        sanitized_rows.append({
+        sanitizedRows.append({
             "id": _trunc(row.get("id", f"operacion-{index + 1}"), _MAX_SHORT).strip() or f"operacion-{index + 1}",
             "assetId": _trunc(row.get("assetId", ""), _MAX_SHORT).strip(),
             "activo": _trunc(row.get("activo", ""), _MAX_NAME).strip(),
@@ -184,7 +184,7 @@ def sanitizeAssetOperationRows(rows):
             "stablecoinSymbol": _trunc(row.get("stablecoinSymbol", ""), _MAX_SYMBOL).strip().upper(),
             "orden": orden,
             "precioOrden": _trunc(row.get("precioOrden", row.get("precio", "")), _MAX_SHORT).strip(),
-            "precioCurrency": precio_currency,
+            "precioCurrency": precioCurrency,
             "cantidad": _trunc(row.get("cantidad", ""), _MAX_SHORT).strip(),
             "comisionesCripto": _trunc(row.get("comisionesCripto", row.get("comisiones", "")), _MAX_SHORT).strip(),
             "comisionesFiat": _trunc(row.get("comisionesFiat", ""), _MAX_SHORT).strip(),
@@ -194,28 +194,28 @@ def sanitizeAssetOperationRows(rows):
             "fechaCierre": _trunc(row.get("fechaCierre", ""), _MAX_SHORT).strip()
         })
 
-    return sanitized_rows
+    return sanitizedRows
 
 
-def sanitizeAssetConversionRows(rows, asset_symbol=""):
-    sanitized_rows = []
-    normalized_symbol = str(asset_symbol or "").strip().upper()
+def sanitizeAssetConversionRows(rows, assetSymbol=""):
+    sanitizedRows = []
+    normalizedSymbol = str(assetSymbol or "").strip().upper()
 
     for index, row in enumerate(rows or []):
-        conversion_type = str(row.get("tipo", row.get("tipoOperacion", ""))).strip()
+        conversionType = str(row.get("tipo", row.get("tipoOperacion", ""))).strip()
 
-        if not conversion_type and normalized_symbol:
-            conversion_type = f"Convertidos a {normalized_symbol}"
+        if not conversionType and normalizedSymbol:
+            conversionType = f"Convertidos a {normalizedSymbol}"
 
-        sanitized_rows.append({
+        sanitizedRows.append({
             "id": str(row.get("id", f"conversion-{index + 1}")).strip() or f"conversion-{index + 1}",
             "fecha": str(row.get("fecha", row.get("fechaOperacion", ""))).strip(),
             "par": str(row.get("par", "")).strip(),
-            "tipo": conversion_type,
+            "tipo": conversionType,
             "cantidad": str(row.get("cantidad", row.get("participaciones", ""))).strip()
         })
 
-    return sanitized_rows
+    return sanitizedRows
 
 
 def sanitizeAssetPayload(requestData, fallbackAssetId=None):
@@ -249,7 +249,7 @@ def sanitizeAssetPayload(requestData, fallbackAssetId=None):
         "change": _trunc(requestData.get("change", "+0,00%"), _MAX_SHORT).strip() or "+0,00%",
         "status": _trunc(requestData.get("status", "Mercado abierto"), _MAX_TEXT).strip() or "Mercado abierto",
         "lastUpdated": _trunc(requestData.get("lastUpdated", ""), _MAX_TEXT).strip(),
-        "color": sanitize_color(requestData.get("color", "")),
+        "color": sanitizeColor(requestData.get("color", "")),
         "tvSymbol": _trunc(requestData.get("tvSymbol", ""), _MAX_TICKER).strip(),
         "convertCurrency": normalizeConvertCurrency(requestData.get("convertCurrency", "")),
         "costeAnual": _trunc(requestData.get("costeAnual", ""), _MAX_SHORT).strip(),

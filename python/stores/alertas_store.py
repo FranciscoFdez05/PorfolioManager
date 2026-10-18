@@ -1,7 +1,7 @@
 """Alertas de precio de los activos.
 
 Una alerta dice «avísame cuando este activo llegue a X». Se evalúa en dos
-momentos, con la misma función (`evaluar_activo`) para que no puedan divergir:
+momentos, con la misma función (`evaluarActivo`) para que no puedan divergir:
 
   * cada vez que el precio de un activo se actualiza en la aplicación (botón de
     refrescar, refresco automático de la web);
@@ -24,7 +24,7 @@ import time
 from decimal import Decimal
 
 from core import dinero, telegram_notifier
-from core.db import get_db
+from core.db import getDb
 
 log = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class AlertaInvalida(ValueError):
     """La alerta que se intenta crear no tiene sentido."""
 
 
-def _como_dict(fila) -> dict:
+def _comoDict(fila) -> dict:
     return {
         "id": fila["id"],
         "assetId": fila["asset_id"],
@@ -59,23 +59,23 @@ def _como_dict(fila) -> dict:
 _COLUMNAS = "id, asset_id, condicion, valor, nota, activa, creada_ts, disparada_ts, precio_disparo"
 
 
-def listar(asset_id=None) -> list:
+def listar(assetId=None) -> list:
     """Alertas de un activo, o de todos, las activas primero."""
-    conn = get_db()
+    conn = getDb()
     consulta = f"SELECT {_COLUMNAS} FROM alertas_precio"
     parametros = ()
-    if asset_id:
+    if assetId:
         consulta += " WHERE asset_id = ?"
-        parametros = (asset_id,)
+        parametros = (assetId,)
     consulta += " ORDER BY activa DESC, id"
-    return [_como_dict(f) for f in conn.execute(consulta, parametros).fetchall()]
+    return [_comoDict(f) for f in conn.execute(consulta, parametros).fetchall()]
 
 
-def contar_activas() -> int:
-    return get_db().execute("SELECT COUNT(*) FROM alertas_precio WHERE activa = 1").fetchone()[0]
+def contarActivas() -> int:
+    return getDb().execute("SELECT COUNT(*) FROM alertas_precio WHERE activa = 1").fetchone()[0]
 
 
-def crear(asset_id, condicion, valor, nota="") -> dict:
+def crear(assetId, condicion, valor, nota="") -> dict:
     """Crea una alerta activa. Lanza `AlertaInvalida` si algo no cuadra."""
     if condicion not in CONDICIONES:
         raise AlertaInvalida("Condición de alerta desconocida")
@@ -87,42 +87,42 @@ def crear(asset_id, condicion, valor, nota="") -> dict:
     if numero <= 0:
         raise AlertaInvalida("El valor de la alerta tiene que ser mayor que cero")
 
-    conn = get_db()
-    if conn.execute("SELECT 1 FROM activos WHERE id = ?", (asset_id,)).fetchone() is None:
+    conn = getDb()
+    if conn.execute("SELECT 1 FROM activos WHERE id = ?", (assetId,)).fetchone() is None:
         raise AlertaInvalida("Activo no encontrado")
 
     cursor = conn.execute(
         "INSERT INTO alertas_precio (asset_id, condicion, valor, nota, activa, creada_ts) "
         "VALUES (?, ?, ?, ?, 1, ?)",
-        (asset_id, condicion, dinero.aTexto(numero), str(nota or "").strip()[:_MAX_NOTA], int(time.time())),
+        (assetId, condicion, dinero.aTexto(numero), str(nota or "").strip()[:_MAX_NOTA], int(time.time())),
     )
     conn.commit()
     fila = conn.execute(f"SELECT {_COLUMNAS} FROM alertas_precio WHERE id = ?", (cursor.lastrowid,)).fetchone()
-    return _como_dict(fila)
+    return _comoDict(fila)
 
 
-def borrar(alerta_id) -> bool:
-    conn = get_db()
-    borradas = conn.execute("DELETE FROM alertas_precio WHERE id = ?", (alerta_id,)).rowcount
+def borrar(alertaId) -> bool:
+    conn = getDb()
+    borradas = conn.execute("DELETE FROM alertas_precio WHERE id = ?", (alertaId,)).rowcount
     conn.commit()
     return borradas > 0
 
 
-def cambiar_estado(alerta_id, activa: bool) -> bool:
+def cambiarEstado(alertaId, activa: bool) -> bool:
     """Activa o pausa una alerta. Activarla borra la marca de «ya saltó»."""
-    conn = get_db()
+    conn = getDb()
     if activa:
         cambiadas = conn.execute(
             "UPDATE alertas_precio SET activa = 1, disparada_ts = NULL, precio_disparo = '' WHERE id = ?",
-            (alerta_id,),
+            (alertaId,),
         ).rowcount
     else:
-        cambiadas = conn.execute("UPDATE alertas_precio SET activa = 0 WHERE id = ?", (alerta_id,)).rowcount
+        cambiadas = conn.execute("UPDATE alertas_precio SET activa = 0 WHERE id = ?", (alertaId,)).rowcount
     conn.commit()
     return cambiadas > 0
 
 
-def cambio_desde_texto(texto):
+def cambioDesdeTexto(texto):
     """Variación diaria en % desde el texto de la ficha («+1,23%»), o None."""
     return dinero.aDecimalONulo(texto, "variación") if str(texto or "").strip() else None
 
@@ -142,7 +142,7 @@ def _formato(numero: Decimal) -> str:
     return dinero.aTextoEs(numero, decimales=2 if abs(numero) >= 1 else 6)
 
 
-def _texto_aviso(activo, alerta, umbral, precio, cambio, cartera) -> str:
+def _textoAviso(activo, alerta, umbral, precio, cambio, cartera) -> str:
     nombre = activo["name"] or activo["id"]
     simbolo = f" ({activo['symbol']})" if activo["symbol"] else ""
     moneda = activo["currency"] or ""
@@ -166,7 +166,7 @@ def _texto_aviso(activo, alerta, umbral, precio, cambio, cartera) -> str:
     return f"{cabecera}\n{cuerpo}"
 
 
-def evaluar_activo(asset_id, precio, cambio=None, cartera="") -> list:
+def evaluarActivo(assetId, precio, cambio=None, cartera="") -> list:
     """Comprueba las alertas activas de `asset_id` contra `precio` y avisa de las que saltan.
 
     `precio` es el actual en la divisa del activo (la misma en la que se puso
@@ -180,22 +180,22 @@ def evaluar_activo(asset_id, precio, cambio=None, cartera="") -> list:
         if precio <= 0:
             return []
 
-        conn = get_db()
+        conn = getDb()
         pendientes = conn.execute(
-            f"SELECT {_COLUMNAS} FROM alertas_precio WHERE asset_id = ? AND activa = 1", (asset_id,)
+            f"SELECT {_COLUMNAS} FROM alertas_precio WHERE asset_id = ? AND activa = 1", (assetId,)
         ).fetchall()
         if not pendientes:
             return []
 
         activo = conn.execute(
-            "SELECT id, name, symbol, currency FROM activos WHERE id = ?", (asset_id,)
+            "SELECT id, name, symbol, currency FROM activos WHERE id = ?", (assetId,)
         ).fetchone()
         if activo is None:
             return []
 
         saltadas = []
         for fila in pendientes:
-            alerta = _como_dict(fila)
+            alerta = _comoDict(fila)
             umbral = dinero.aDecimalONulo(alerta["valor"], "valor de la alerta")
             if umbral is None or not _cumple(alerta["condicion"], umbral, precio, cambio):
                 continue
@@ -212,19 +212,19 @@ def evaluar_activo(asset_id, precio, cambio=None, cartera="") -> list:
                 continue
 
             saltadas.append(alerta)
-            log.info("[alertas] %s: %s %s con precio %s", asset_id, alerta["condicion"], alerta["valor"], precio)
+            log.info("[alertas] %s: %s %s con precio %s", assetId, alerta["condicion"], alerta["valor"], precio)
             telegram_notifier.notificar(
-                "precios", _texto_aviso(activo, alerta, umbral, precio, cambio, cartera)
+                "precios", _textoAviso(activo, alerta, umbral, precio, cambio, cartera)
             )
         return saltadas
     except Exception as error:
-        log.warning("[alertas] No se pudo evaluar %s: %s", asset_id, error)
+        log.warning("[alertas] No se pudo evaluar %s: %s", assetId, error)
         return []
 
 
-def activos_con_alertas() -> list:
+def activosConAlertas() -> list:
     """Datos de mercado de los activos que tienen al menos una alerta activa."""
-    filas = get_db().execute(
+    filas = getDb().execute(
         "SELECT a.id, a.name, a.symbol, a.market_provider, a.market_symbol, a.finnhub_symbol, a.currency "
         "FROM activos a WHERE EXISTS "
         "(SELECT 1 FROM alertas_precio p WHERE p.asset_id = a.id AND p.activa = 1)"
@@ -232,7 +232,7 @@ def activos_con_alertas() -> list:
     return [dict(f) for f in filas]
 
 
-def comprobar_activas(cartera="") -> int:
+def comprobarActivas(cartera="") -> int:
     """Pide la cotización de cada activo con alertas activas y las evalúa. Devuelve cuántas saltaron.
 
     Solo se piden los activos con alerta: vigilar cinco alertas no puede costar
@@ -241,26 +241,26 @@ def comprobar_activas(cartera="") -> int:
     falla se descarta, porque comparar dólares con un umbral en euros haría
     saltar alertas falsas.
     """
-    from stores.helpers import normalize_currency_code
-    from stores.market_data import fetch_asset_quote
+    from stores.helpers import normalizeCurrencyCode
+    from stores.market_data import fetchAssetQuote
 
     total = 0
-    for activo in activos_con_alertas():
+    for activo in activosConAlertas():
         simbolo = str(activo["market_symbol"] or activo["finnhub_symbol"] or "").strip()
         if not simbolo:
             continue
-        moneda = normalize_currency_code(activo["currency"], fallback="EUR")
+        moneda = normalizeCurrencyCode(activo["currency"], fallback="EUR")
         try:
-            quote, error = fetch_asset_quote(simbolo, activo["market_provider"], target_currency=moneda)
+            quote, error = fetchAssetQuote(simbolo, activo["market_provider"], targetCurrency=moneda)
         except Exception as fallo:
             quote, error = None, str(fallo)
         if error or not quote:
             log.info("[alertas] %s sin cotización: %s", activo["id"], error)
             continue
-        if normalize_currency_code(quote.get("currency", ""), fallback="") != moneda:
+        if normalizeCurrencyCode(quote.get("currency", ""), fallback="") != moneda:
             log.info("[alertas] %s: la cotización no llegó en %s; se ignora", activo["id"], moneda)
             continue
-        total += len(evaluar_activo(
-            activo["id"], quote.get("price"), cambio_desde_texto(quote.get("change")), cartera=cartera,
+        total += len(evaluarActivo(
+            activo["id"], quote.get("price"), cambioDesdeTexto(quote.get("change")), cartera=cartera,
         ))
     return total

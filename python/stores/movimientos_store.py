@@ -14,9 +14,9 @@ una fila con otro formato se ordenaría y sumaría mal.
 from datetime import date, datetime
 
 from core import dinero
-from core.db import get_db, transaction
+from core.db import getDb, transaction
 from stores import revisiones
-from stores.cuentas_store import CuentaInvalida, resolver_cuenta
+from stores.cuentas_store import CuentaInvalida, resolverCuenta
 from stores.gastos_store import MONTH_KEYS
 
 TIPOS_VALIDOS = ("ingreso", "gasto")
@@ -133,7 +133,7 @@ def sanitizarMovimiento(payload, conn=None):
     # por su nombre. La categoría es la de siempre. Mover dinero de una cuenta a
     # otra no se apunta aquí: son transferencias, que se hacen desde la web.
     try:
-        cuenta = resolver_cuenta(payload.get("cuenta"), conn)
+        cuenta = resolverCuenta(payload.get("cuenta"), conn)
     except CuentaInvalida as error:
         raise DatosMovimientoInvalidos(str(error)) from None
 
@@ -151,7 +151,7 @@ def sanitizarMovimiento(payload, conn=None):
 
 def _insertarMovimiento(conn, movimiento, tablas, year, month, fechaTabla, cantidad):
     # gastos_years es la lista maestra de años de la pestaña de Gastos: sin
-    # esta fila, read_gastos_year() devuelve None y el movimiento no se ve.
+    # esta fila, readGastosYear() devuelve None y el movimiento no se ve.
     # Ingresos deriva sus años de las propias filas, así que no lo necesita.
     if movimiento["tipo"] == "gasto":
         conn.execute("INSERT OR IGNORE INTO gastos_years (year) VALUES (?)", (year,))
@@ -164,7 +164,7 @@ def _insertarMovimiento(conn, movimiento, tablas, year, month, fechaTabla, canti
     )
 
     # Una categoría nueva escrita desde el Atajo se registra en el catálogo
-    # global, igual que hace write_gastos_year al guardar desde la web.
+    # global, igual que hace writeGastosYear al guardar desde la web.
     if movimiento["categoria"]:
         conn.execute(
             f"INSERT OR IGNORE INTO {tablas['tipos']} (label) VALUES (?)",
@@ -182,7 +182,7 @@ def crearMovimiento(movimiento, conn=None):
     """Inserta el movimiento en la tabla que le corresponde y lo devuelve.
 
     `conn` permite escribir en un portfolio concreto (lo abre la ruta con
-    core.db.open_db_at). Sin él se usa la base de datos activa del proceso.
+    core.db.openDbAt). Sin él se usa la base de datos activa del proceso.
 
     Todo va en una sola transacción para que no pueda quedar la fila insertada
     sin su año registrado (lo que dejaría el gasto invisible en la web app).
@@ -196,7 +196,7 @@ def crearMovimiento(movimiento, conn=None):
     argumentos = (tablas, year, month, fechaTabla, cantidad)
 
     if conn is not None:
-        # open_db_at ya envuelve la llamada en su propia transacción.
+        # openDbAt ya envuelve la llamada en su propia transacción.
         idCreado = _insertarMovimiento(conn, movimiento, *argumentos)
     else:
         with transaction() as conexionActiva:
@@ -228,7 +228,7 @@ def leerCategorias(conn=None):
 
     `conn` apunta a un portfolio concreto; sin él se lee el activo.
     """
-    conn = conn or get_db()
+    conn = conn or getDb()
     categorias = {}
 
     for tipo, tablas in _TABLAS_POR_TIPO.items():

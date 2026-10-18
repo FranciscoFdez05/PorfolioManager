@@ -23,7 +23,7 @@ from core.escritura import (
 
 # ── Nombres ───────────────────────────────────────────────────────────────────
 
-def test_dos_temporales_del_mismo_destino_nunca_coinciden(tmp_path):
+def testDosTemporalesDelMismoDestinoNuncaCoinciden(tmp_path):
     destino = tmp_path / "portfolios.json"
 
     nombres = {rutaTemporal(destino).name for _ in range(50)}
@@ -31,7 +31,7 @@ def test_dos_temporales_del_mismo_destino_nunca_coinciden(tmp_path):
     assert len(nombres) == 50
 
 
-def test_los_temporales_de_varios_hilos_no_coinciden(tmp_path):
+def testLosTemporalesDeVariosHilosNoCoinciden(tmp_path):
     """El caso del contenedor: cuatro hilos por worker sobre el mismo destino."""
     destino = tmp_path / "principal.db"
     nombres = []
@@ -50,7 +50,7 @@ def test_los_temporales_de_varios_hilos_no_coinciden(tmp_path):
     assert len(set(nombres)) == 8
 
 
-def test_el_temporal_no_lo_recoge_un_glob_de_bases_de_datos(tmp_path):
+def testElTemporalNoLoRecogeUnGlobDeBasesDeDatos(tmp_path):
     """Lo que metía una importación a medias en la copia de seguridad."""
     destino = tmp_path / "principal.db"
     rutaTemporal(destino).write_bytes(b"a medias")
@@ -58,7 +58,7 @@ def test_el_temporal_no_lo_recoge_un_glob_de_bases_de_datos(tmp_path):
     assert list(tmp_path.glob("*.db")) == []
 
 
-def test_se_puede_sacar_el_temporal_de_la_carpeta_del_destino(tmp_path):
+def testSePuedeSacarElTemporalDeLaCarpetaDelDestino(tmp_path):
     aparte = tmp_path / "tmp"
 
     tmp = rutaTemporal(tmp_path / "portfolios" / "principal.db", directorio=aparte)
@@ -69,7 +69,7 @@ def test_se_puede_sacar_el_temporal_de_la_carpeta_del_destino(tmp_path):
 
 # ── temporalPara ──────────────────────────────────────────────────────────────
 
-def test_temporalPara_limpia_el_fichero_y_los_sidecars_de_sqlite(tmp_path):
+def testTemporalParaLimpiaElFicheroYLosSidecarsDeSqlite(tmp_path):
     with temporalPara(tmp_path / "principal.db") as tmp:
         tmp.write_bytes(b"copia")
         for sufijo in ("-wal", "-shm"):
@@ -78,7 +78,7 @@ def test_temporalPara_limpia_el_fichero_y_los_sidecars_de_sqlite(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
-def test_temporalPara_limpia_aunque_falle_lo_de_dentro(tmp_path):
+def testTemporalParaLimpiaAunqueFalleLoDeDentro(tmp_path):
     with pytest.raises(RuntimeError), temporalPara(tmp_path / "principal.db") as tmp:
         tmp.write_bytes(b"copia")
         raise RuntimeError("copia interrumpida")
@@ -88,7 +88,7 @@ def test_temporalPara_limpia_aunque_falle_lo_de_dentro(tmp_path):
 
 # ── Escritura atómica ─────────────────────────────────────────────────────────
 
-def test_escribe_el_contenido_y_no_deja_temporales(tmp_path):
+def testEscribeElContenidoYNoDejaTemporales(tmp_path):
     destino = tmp_path / "sub" / "ajustes.json"
 
     escribirJsonAtomico(destino, {"maxBackups": 5})
@@ -97,7 +97,7 @@ def test_escribe_el_contenido_y_no_deja_temporales(tmp_path):
     assert list(tmp_path.glob("sub/*")) == [destino]
 
 
-def test_acepta_texto_y_bytes(tmp_path):
+def testAceptaTextoYBytes(tmp_path):
     escribirAtomico(tmp_path / "a.txt", "cañón")
     escribirAtomico(tmp_path / "b.bin", b"\x00\x01")
 
@@ -105,17 +105,17 @@ def test_acepta_texto_y_bytes(tmp_path):
     assert (tmp_path / "b.bin").read_bytes() == b"\x00\x01"
 
 
-def test_un_fallo_al_escribir_deja_intacto_el_fichero_anterior(tmp_path, monkeypatch):
+def testUnFalloAlEscribirDejaIntactoElFicheroAnterior(tmp_path, monkeypatch):
     """Lo que se perdía con write_text() directo: trunca antes de escribir."""
     destino = tmp_path / "ajustes.json"
     destino.write_text('{"valor": "el bueno"}', encoding="utf-8")
 
     import os as _os
 
-    def _fsync_roto(_fd):
+    def _fsyncRoto(_fd):
         raise OSError("disco lleno")
 
-    monkeypatch.setattr(_os, "fsync", _fsync_roto)
+    monkeypatch.setattr(_os, "fsync", _fsyncRoto)
 
     with pytest.raises(OSError):
         escribirAtomico(destino, '{"valor": "el nuevo"}')
@@ -124,7 +124,7 @@ def test_un_fallo_al_escribir_deja_intacto_el_fichero_anterior(tmp_path, monkeyp
     assert list(tmp_path.iterdir()) == [destino]
 
 
-def test_sobrescribe_un_destino_que_ya_existe(tmp_path):
+def testSobrescribeUnDestinoQueYaExiste(tmp_path):
     destino = tmp_path / "portfolios.json"
     escribirJsonAtomico(destino, {"v": 1})
     escribirJsonAtomico(destino, {"v": 2})
@@ -132,5 +132,5 @@ def test_sobrescribe_un_destino_que_ya_existe(tmp_path):
     assert json.loads(destino.read_text("utf-8")) == {"v": 2}
 
 
-def test_limpiarTemporal_no_protesta_si_ya_no_está(tmp_path):
+def testLimpiarTemporalNoProtestaSiYaNoEstá(tmp_path):
     limpiarTemporal(tmp_path / "no-existe.tmp")

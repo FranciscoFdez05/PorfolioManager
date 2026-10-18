@@ -9,27 +9,27 @@ la respuesta por un fallo parcial.
 from urllib.error import HTTPError, URLError
 
 from routes import market_pulse as route
-from routes.market_pulse import market_pulse_bp
+from routes.market_pulse import marketPulseBp
 
 
-def _cliente(cliente_autenticado):
-    client, cabeceras, _app = cliente_autenticado(market_pulse_bp)
+def _cliente(clienteAutenticado):
+    client, cabeceras, _app = clienteAutenticado(marketPulseBp)
     return client, cabeceras
 
 
-def _sin_fallos(monkeypatch):
+def _sinFallos(monkeypatch):
     monkeypatch.setattr(route.market_pulse, "snapshot", lambda: {"indices": [], "sectores": []})
-    monkeypatch.setattr(route.market_pulse, "top_movers", lambda limit=10: {"subidas": [], "bajadas": []})
+    monkeypatch.setattr(route.market_pulse, "topMovers", lambda limit=10: {"subidas": [], "bajadas": []})
     monkeypatch.setattr(route.market_pulse, "breadth", lambda: {"subidas": 1, "bajadas": 1, "planas": 0, "total": 2})
-    monkeypatch.setattr(route.market_pulse, "rsi_extremes", lambda limit=8: {"sobrecompra": [], "sobreventa": []})
-    monkeypatch.setattr(route.market_pulse, "unusual_volume", lambda limit=8: [])
-    monkeypatch.setattr(route.market_pulse, "fear_greed", lambda: ({"valor": 50, "clasificacion": "Neutral"}, None))
-    monkeypatch.setattr(route.market_pulse, "fear_greed_history", lambda: ([{"valor": 50}], None))
+    monkeypatch.setattr(route.market_pulse, "rsiExtremes", lambda limit=8: {"sobrecompra": [], "sobreventa": []})
+    monkeypatch.setattr(route.market_pulse, "unusualVolume", lambda limit=8: [])
+    monkeypatch.setattr(route.market_pulse, "fearGreed", lambda: ({"valor": 50, "clasificacion": "Neutral"}, None))
+    monkeypatch.setattr(route.market_pulse, "fearGreedHistory", lambda: ([{"valor": 50}], None))
 
 
-def test_devuelve_las_siete_secciones(cliente_autenticado, monkeypatch):
-    _sin_fallos(monkeypatch)
-    client, _cabeceras = _cliente(cliente_autenticado)
+def testDevuelveLasSieteSecciones(clienteAutenticado, monkeypatch):
+    _sinFallos(monkeypatch)
+    client, _cabeceras = _cliente(clienteAutenticado)
 
     respuesta = client.get("/api/market/pulse")
 
@@ -45,11 +45,11 @@ def test_devuelve_las_siete_secciones(cliente_autenticado, monkeypatch):
     assert "fearGreedHistoryError" not in datos
 
 
-def test_rsi_puede_fallar_sin_afectar_al_resto(cliente_autenticado, monkeypatch):
-    _sin_fallos(monkeypatch)
-    monkeypatch.setattr(route.market_pulse, "rsi_extremes", lambda limit=8: (_ for _ in ()).throw(URLError("sin red")))
+def testRsiPuedeFallarSinAfectarAlResto(clienteAutenticado, monkeypatch):
+    _sinFallos(monkeypatch)
+    monkeypatch.setattr(route.market_pulse, "rsiExtremes", lambda limit=8: (_ for _ in ()).throw(URLError("sin red")))
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     respuesta = client.get("/api/market/pulse")
 
     datos = respuesta.get_json()
@@ -58,11 +58,11 @@ def test_rsi_puede_fallar_sin_afectar_al_resto(cliente_autenticado, monkeypatch)
     assert datos["unusualVolume"] == []
 
 
-def test_un_fallo_en_el_screener_no_tumba_las_demas_secciones(cliente_autenticado, monkeypatch):
-    _sin_fallos(monkeypatch)
-    monkeypatch.setattr(route.market_pulse, "top_movers", lambda limit=10: (_ for _ in ()).throw(URLError("sin red")))
+def testUnFalloEnElScreenerNoTumbaLasDemasSecciones(clienteAutenticado, monkeypatch):
+    _sinFallos(monkeypatch)
+    monkeypatch.setattr(route.market_pulse, "topMovers", lambda limit=10: (_ for _ in ()).throw(URLError("sin red")))
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     respuesta = client.get("/api/market/pulse")
 
     assert respuesta.status_code == 200
@@ -74,15 +74,15 @@ def test_un_fallo_en_el_screener_no_tumba_las_demas_secciones(cliente_autenticad
     assert datos["fearGreed"]["valor"] == 50
 
 
-def test_un_http_error_se_traduce_con_el_codigo(cliente_autenticado, monkeypatch):
-    _sin_fallos(monkeypatch)
+def testUnHttpErrorSeTraduceConElCodigo(clienteAutenticado, monkeypatch):
+    _sinFallos(monkeypatch)
 
     def fallo():
         raise HTTPError("http://x", 429, "err", {}, None)
 
     monkeypatch.setattr(route.market_pulse, "snapshot", fallo)
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     respuesta = client.get("/api/market/pulse")
 
     datos = respuesta.get_json()
@@ -90,11 +90,11 @@ def test_un_http_error_se_traduce_con_el_codigo(cliente_autenticado, monkeypatch
     assert "HTTP 429" in datos["snapshotError"]
 
 
-def test_fear_greed_puede_fallar_sin_afectar_al_resto(cliente_autenticado, monkeypatch):
-    _sin_fallos(monkeypatch)
-    monkeypatch.setattr(route.market_pulse, "fear_greed", lambda: (None, "Fear & Greed no devolvió datos"))
+def testFearGreedPuedeFallarSinAfectarAlResto(clienteAutenticado, monkeypatch):
+    _sinFallos(monkeypatch)
+    monkeypatch.setattr(route.market_pulse, "fearGreed", lambda: (None, "Fear & Greed no devolvió datos"))
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     respuesta = client.get("/api/market/pulse")
 
     datos = respuesta.get_json()
@@ -103,11 +103,11 @@ def test_fear_greed_puede_fallar_sin_afectar_al_resto(cliente_autenticado, monke
     assert datos["breadth"]["total"] == 2
 
 
-def test_fear_greed_history_puede_fallar_sin_afectar_al_resto(cliente_autenticado, monkeypatch):
-    _sin_fallos(monkeypatch)
-    monkeypatch.setattr(route.market_pulse, "fear_greed_history", lambda: ([], "sin datos"))
+def testFearGreedHistoryPuedeFallarSinAfectarAlResto(clienteAutenticado, monkeypatch):
+    _sinFallos(monkeypatch)
+    monkeypatch.setattr(route.market_pulse, "fearGreedHistory", lambda: ([], "sin datos"))
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     respuesta = client.get("/api/market/pulse")
 
     datos = respuesta.get_json()
@@ -118,13 +118,13 @@ def test_fear_greed_history_puede_fallar_sin_afectar_al_resto(cliente_autenticad
 
 # ── /api/market/pulse/universe ───────────────────────────────────────────────
 
-def test_universe_devuelve_las_filas_del_tipo_pedido(cliente_autenticado, monkeypatch):
+def testUniverseDevuelveLasFilasDelTipoPedido(clienteAutenticado, monkeypatch):
     monkeypatch.setattr(
         route.market_pulse, "universe",
         lambda clave: [{"symbol": "AMEX:XLK", "primary": "Tecnología", "secondary": "", "change": 0.8, "size": 1}],
     )
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     respuesta = client.get("/api/market/pulse/universe?type=sp500")
 
     assert respuesta.status_code == 200
@@ -134,33 +134,33 @@ def test_universe_devuelve_las_filas_del_tipo_pedido(cliente_autenticado, monkey
     assert datos["items"][0]["primary"] == "Tecnología"
 
 
-def test_universe_desconocido_es_400(cliente_autenticado, monkeypatch):
+def testUniverseDesconocidoEs400(clienteAutenticado, monkeypatch):
     monkeypatch.setattr(route.market_pulse, "universe", lambda clave: None)
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     respuesta = client.get("/api/market/pulse/universe?type=lo-que-sea")
 
     assert respuesta.status_code == 400
     assert respuesta.get_json()["ok"] is False
 
 
-def test_universe_sin_type_usa_sp500_por_defecto(cliente_autenticado, monkeypatch):
+def testUniverseSinTypeUsaSp500PorDefecto(clienteAutenticado, monkeypatch):
     claves = []
     monkeypatch.setattr(route.market_pulse, "universe", lambda clave: claves.append(clave) or [])
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     client.get("/api/market/pulse/universe")
 
     assert claves == ["sp500"]
 
 
-def test_universe_error_de_red_es_503(cliente_autenticado, monkeypatch):
+def testUniverseErrorDeRedEs503(clienteAutenticado, monkeypatch):
     def fallo(clave):
         raise URLError("sin conexión")
 
     monkeypatch.setattr(route.market_pulse, "universe", fallo)
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     respuesta = client.get("/api/market/pulse/universe?type=cripto")
 
     assert respuesta.status_code == 503

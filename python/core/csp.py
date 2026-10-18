@@ -47,7 +47,7 @@ _MARCADOR_NONCE = "__CSP_NONCE__"
 _ORIGENES_FRAME = ("https://www.tradingview.com", "https://s.tradingview.com")
 
 
-def generar_nonce() -> str:
+def generarNonce() -> str:
     return secrets.token_urlsafe(16)
 
 
@@ -58,20 +58,20 @@ def construir(nonce: str = "", origenesConexion: tuple[str, ...] = ()) -> str:
     de comprobación del certificado, que se calcula por petición porque depende
     del host por el que se ha entrado.
     """
-    origenes_script = ["'self'", *[o for o in settings.cspOrigenesScripts() if o]]
+    origenesScript = ["'self'", *[o for o in settings.cspOrigenesScripts() if o]]
     if nonce:
-        origenes_script.append(f"'nonce-{nonce}'")
+        origenesScript.append(f"'nonce-{nonce}'")
 
-    origenes_conexion = ["'self'", *[o for o in origenesConexion if o]]
+    fuentesConexion = ["'self'", *[o for o in origenesConexion if o]]
 
     directivas = [
         ("default-src", ["'self'"]),
-        ("script-src", origenes_script),
+        ("script-src", origenesScript),
         ("style-src", ["'self'", "'unsafe-inline'"]),
         # blob: lo necesitan las descargas de CSV/JSON que genera el frontend.
         ("img-src", ["'self'", "data:", "blob:"]),
         ("font-src", ["'self'"]),
-        ("connect-src", origenes_conexion),
+        ("connect-src", fuentesConexion),
         ("object-src", ["'none'"]),
         ("base-uri", ["'self'"]),
         ("form-action", ["'self'"]),
@@ -81,7 +81,7 @@ def construir(nonce: str = "", origenesConexion: tuple[str, ...] = ()) -> str:
     return "; ".join(f"{nombre} {' '.join(valores)}" for nombre, valores in directivas)
 
 
-def insertar_nonce(html: str, nonce: str) -> str:
+def insertarNonce(html: str, nonce: str) -> str:
     """Rellena el marcador de nonce de index.html.
 
     Si el marcador no está (index.html editado a mano, o servido desde una copia

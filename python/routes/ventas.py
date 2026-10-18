@@ -3,63 +3,63 @@ from datetime import date
 from flask import Blueprint, Response, g, jsonify
 
 from core import csp, informe_renta
-from core.validation import json_body
+from core.validation import jsonBody
 from stores import ventas_fifo
-from stores.gastos_store import normalize_year
+from stores.gastos_store import normalizeYear
 from stores.ventas_store import (
-    create_default_ventas_year,
-    delete_ventas_year,
-    list_ventas_years,
-    migrate_legacy_ventas_if_needed,
-    read_all_ventas_rows,
-    read_ventas_year,
-    sanitize_ventas_payload,
-    validar_para_guardar,
-    write_ventas_year,
+    createDefaultVentasYear,
+    deleteVentasYear as borrarAnioVentas,
+    listVentasYears,
+    migrateLegacyVentasIfNeeded,
+    readAllVentasRows,
+    readVentasYear,
+    sanitizeVentasPayload,
+    validarParaGuardar,
+    writeVentasYear,
 )
 
-ventas_bp = Blueprint("ventas", __name__)
+ventasBp = Blueprint("ventas", __name__)
 
 
-@ventas_bp.route("/api/ventas", methods=["GET"])
+@ventasBp.route("/api/ventas", methods=["GET"])
 def getVentas():
-    default_year = str(date.today().year)
-    years = migrate_legacy_ventas_if_needed(default_year)
+    defaultYear = str(date.today().year)
+    years = migrateLegacyVentasIfNeeded(defaultYear)
     # Un solo cálculo para todo: el FIFO es global y recalcularlo por año
     # daría, además de lento, resultados distintos según el orden de lectura.
-    calculo = ventas_fifo.calcular_todo()
+    calculo = ventas_fifo.calcularTodo()
     return jsonify({
         "years": years,
-        "rows": read_all_ventas_rows(calculo),
+        "rows": readAllVentasRows(calculo),
         "resumenes": {
-            anio: ventas_fifo.serializar_liquidacion(liquidacion)
+            anio: ventas_fifo.serializarLiquidacion(liquidacion)
             for anio, liquidacion in calculo["liquidaciones"].items()
         },
         "incidencias": calculo["incidencias"],
     })
 
 
-@ventas_bp.route("/api/ventas", methods=["POST"])
+@ventasBp.route("/api/ventas", methods=["POST"])
 def createVentasYear():
-    requestData = json_body(required=False)
-    year = normalize_year(requestData.get("year"))
+    requestData = jsonBody(required=False)
+    year = normalizeYear(requestData.get("year"))
 
     if not year:
         return jsonify({"ok": False, "error": "Año inválido"}), 400
 
-    migrate_legacy_ventas_if_needed(year)
+    migrateLegacyVentasIfNeeded(year)
 
-    if read_ventas_year(year) is not None:
+    if readVentasYear(year) is not None:
         return jsonify({"ok": False, "error": "Ese año ya existe"}), 409
 
-    write_ventas_year(year, create_default_ventas_year(year))
-    return jsonify({"ok": True, "year": year, "data": read_ventas_year(year)}), 201
+    writeVentasYear(year, createDefaultVentasYear(year))
+    return jsonify({"ok": True, "year": year, "data": readVentasYear(year)}), 201
 
 
-@ventas_bp.route("/api/ventas/<year>", methods=["GET"])
+@ventasBp.route("/api/ventas/<year>", methods=["GET"])
 def getVentasYear(year):
-    migrate_legacy_ventas_if_needed(normalize_year(year) or str(date.today().year))
-    data = read_ventas_year(year)
+    migrateLegacyVentasIfNeeded(normalizeYear(year) or str(date.today().year))
+    data = readVentasYear(year)
 
     if data is None:
         return jsonify({"ok": False, "error": "Año no encontrado"}), 404
@@ -67,10 +67,10 @@ def getVentasYear(year):
     return jsonify(data)
 
 
-@ventas_bp.route("/api/ventas/<year>", methods=["POST"])
+@ventasBp.route("/api/ventas/<year>", methods=["POST"])
 def saveVentasYear(year):
-    requestData = json_body(required=False)
-    payload, error = sanitize_ventas_payload(requestData, year)
+    requestData = jsonBody(required=False)
+    payload, error = sanitizeVentasPayload(requestData, year)
 
     if error:
         return jsonify({"ok": False, "error": error}), 400
@@ -78,10 +78,10 @@ def saveVentasYear(year):
     # Lanza ValidationError (400 con el detalle de cada fila) si hay datos que
     # no pueden colocarse en la línea temporal. Las incoherencias de saldo sí
     # se guardan, marcadas, y salen en `incidencias`.
-    validar_para_guardar(payload)
+    validarParaGuardar(payload)
 
-    write_ventas_year(payload["year"], payload)
-    data = read_ventas_year(payload["year"])
+    writeVentasYear(payload["year"], payload)
+    data = readVentasYear(payload["year"])
     return jsonify({
         "ok": True,
         "year": data["year"],
@@ -98,27 +98,27 @@ def saveVentasYear(year):
 # documento imprimible— desde un único cálculo, para que no puedan divergir.
 
 
-def _preparar_informe(year):
+def _prepararInforme(year):
     """Devuelve `(informe, error)`; `error` es la respuesta lista para devolver."""
-    normalized_year = normalize_year(year)
-    if not normalized_year:
+    normalizedYear = normalizeYear(year)
+    if not normalizedYear:
         return None, (jsonify({"ok": False, "error": "Año inválido"}), 400)
 
-    data = read_ventas_year(normalized_year)
+    data = readVentasYear(normalizedYear)
     if data is None:
         return None, (jsonify({"ok": False, "error": "Año no encontrado"}), 404)
 
-    return informe_renta.construir(normalized_year, data["rows"], data["resumen"]), None
+    return informe_renta.construir(normalizedYear, data["rows"], data["resumen"]), None
 
 
-@ventas_bp.route("/api/ventas/<year>/informe.csv", methods=["GET"])
+@ventasBp.route("/api/ventas/<year>/informe.csv", methods=["GET"])
 def getInformeCsv(year):
-    informe, error = _preparar_informe(year)
+    informe, error = _prepararInforme(year)
     if error:
         return error
 
     return Response(
-        informe_renta.a_csv(informe),
+        informe_renta.aCsv(informe),
         # charset explícito además del BOM: si el navegador decide el suyo, los
         # acentos se ven mal al abrirlo directamente en vez de descargarlo.
         mimetype="text/csv; charset=utf-8",
@@ -131,38 +131,38 @@ def getInformeCsv(year):
     )
 
 
-@ventas_bp.route("/api/ventas/<year>/informe.html", methods=["GET"])
+@ventasBp.route("/api/ventas/<year>/informe.html", methods=["GET"])
 def getInformeHtml(year):
-    informe, error = _preparar_informe(year)
+    informe, error = _prepararInforme(year)
     if error:
         return error
 
     # El nonce va en `g` para que la CSP que monta core/seguridad_app.py lo
     # recoja en el after_request; sin él, el navegador bloquea el script que
     # engancha el botón de imprimir.
-    g.csp_nonce = csp.generar_nonce()
+    g.csp_nonce = csp.generarNonce()
     return Response(
-        informe_renta.a_html(informe, nonce=g.csp_nonce),
+        informe_renta.aHtml(informe, nonce=g.csp_nonce),
         mimetype="text/html; charset=utf-8",
         headers={"Cache-Control": "no-store"},
     )
 
 
-@ventas_bp.route("/api/ventas/<year>", methods=["DELETE"])
+@ventasBp.route("/api/ventas/<year>", methods=["DELETE"])
 def deleteVentasYear(year):
-    normalized_year = normalize_year(year)
+    normalizedYear = normalizeYear(year)
 
-    if not normalized_year:
+    if not normalizedYear:
         return jsonify({"ok": False, "error": "Año inválido"}), 400
 
-    if not delete_ventas_year(normalized_year):
+    if not borrarAnioVentas(normalizedYear):
         return jsonify({"ok": False, "error": "Año no encontrado"}), 404
 
-    remaining_years = list_ventas_years()
+    remainingYears = listVentasYears()
 
-    if not remaining_years:
+    if not remainingYears:
         actual = str(date.today().year)
-        write_ventas_year(actual, create_default_ventas_year(actual))
-        remaining_years = [actual]
+        writeVentasYear(actual, createDefaultVentasYear(actual))
+        remainingYears = [actual]
 
-    return jsonify({"ok": True, "years": remaining_years})
+    return jsonify({"ok": True, "years": remainingYears})

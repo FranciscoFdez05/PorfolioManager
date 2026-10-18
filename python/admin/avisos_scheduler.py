@@ -25,7 +25,7 @@ import time
 from datetime import datetime
 
 from core import paths, reclamo, settings, telegram_notifier
-from core.db import use_db_path
+from core.db import useDbPath
 
 log = logging.getLogger(__name__)
 
@@ -43,14 +43,14 @@ _ENTRE_RESUMENES = 20 * 3600
 _ENTRE_AVISOS_DISCO = 24 * 3600
 
 
-def rutas_de_portfolios():
+def rutasDePortfolios():
     """[(id, nombre, ruta)] de todos los portfolios cuyo .db existe."""
-    from admin.portfolios_manager import _portfolio_db_path, get_portfolios
+    from admin.portfolios_manager import _portfolioDbPath, getPortfolios
 
     encontrados = []
-    for portfolio in (get_portfolios() or {}).get("portfolios", []):
+    for portfolio in (getPortfolios() or {}).get("portfolios", []):
         try:
-            ruta = _portfolio_db_path(portfolio.get("id", ""))
+            ruta = _portfolioDbPath(portfolio.get("id", ""))
         except ValueError:
             continue
         # Un .db que no existe no se toca: abrirlo lo crearía vacío.
@@ -59,7 +59,7 @@ def rutas_de_portfolios():
     return encontrados
 
 
-def _pasada_alertas() -> int:
+def _pasadaAlertas() -> int:
     from stores import alertas_store
 
     intervalo = settings.alertasIntervaloSegundos()
@@ -67,25 +67,25 @@ def _pasada_alertas() -> int:
         return 0
 
     saltadas = 0
-    for pid, _nombre, ruta in rutas_de_portfolios():
+    for pid, _nombre, ruta in rutasDePortfolios():
         try:
-            with use_db_path(ruta):
-                if alertas_store.contar_activas():
-                    saltadas += alertas_store.comprobar_activas(cartera=pid)
+            with useDbPath(ruta):
+                if alertas_store.contarActivas():
+                    saltadas += alertas_store.comprobarActivas(cartera=pid)
         except Exception as error:
             # Un portfolio con problemas no puede impedir vigilar los demás.
             log.warning("[avisos] Alertas de %s: %s", pid, error)
     return saltadas
 
 
-def texto_resumen() -> str:
+def textoResumen() -> str:
     """El resumen diario de todos los portfolios, listo para enviar."""
     from stores import resumen_cartera
 
     bloques = []
-    for pid, nombre, ruta in rutas_de_portfolios():
+    for pid, nombre, ruta in rutasDePortfolios():
         try:
-            with use_db_path(ruta):
+            with useDbPath(ruta):
                 bloques.append(resumen_cartera.formatear(nombre, resumen_cartera.calcular()))
         except Exception as error:
             log.warning("[avisos] Resumen de %s: %s", pid, error)
@@ -96,7 +96,7 @@ def texto_resumen() -> str:
     return f"🗓 Resumen del {fecha}\n\n" + "\n\n".join(bloques)
 
 
-def _pasada_resumen() -> bool:
+def _pasadaResumen() -> bool:
     if not telegram_notifier.configurado() or not telegram_notifier.preferencias().get("resumen"):
         return False
     if datetime.now().hour < telegram_notifier.resumenHora():
@@ -104,13 +104,13 @@ def _pasada_resumen() -> bool:
     if not reclamo.reclamar("resumen-diario", _ENTRE_RESUMENES):
         return False
 
-    texto = texto_resumen()
+    texto = textoResumen()
     if not texto:
         return False
     return telegram_notifier.notificar("resumen", texto)
 
 
-def _pasada_version() -> bool:
+def _pasadaVersion() -> bool:
     from core import version_remota
     from core.version import __version__
 
@@ -130,7 +130,7 @@ def _pasada_version() -> bool:
     )
 
 
-def _pasada_disco() -> bool:
+def _pasadaDisco() -> bool:
     minimo = settings.espacioMinimoBytes()
     if minimo <= 0:
         return False
@@ -165,16 +165,16 @@ def _bucle():
         return
 
     while not _parada.is_set():
-        _ejecutar("alertas", _pasada_alertas)
-        _ejecutar("resumen", _pasada_resumen)
+        _ejecutar("alertas", _pasadaAlertas)
+        _ejecutar("resumen", _pasadaResumen)
 
         ahora = time.monotonic()
         if ahora >= proxima["version"]:
             proxima["version"] = ahora + _CADA_VERSION
-            _ejecutar("version", _pasada_version)
+            _ejecutar("version", _pasadaVersion)
         if ahora >= proxima["disco"]:
             proxima["disco"] = ahora + _CADA_DISCO
-            _ejecutar("disco", _pasada_disco)
+            _ejecutar("disco", _pasadaDisco)
 
         if _parada.wait(_TICK):
             return

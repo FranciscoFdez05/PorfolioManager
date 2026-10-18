@@ -41,7 +41,7 @@ def _vigia(bandeja, umbral=3, recordatorio=3600):
 
 # ── Cuándo avisa ──────────────────────────────────────────────────────────────
 
-def test_no_avisa_hasta_el_numero_de_fallos_seguidos(bandeja):
+def testNoAvisaHastaElNumeroDeFallosSeguidos(bandeja):
     vigia = _vigia(bandeja, umbral=3)
 
     vigia.procesar(CAIDO, "timeout", 100)
@@ -54,7 +54,7 @@ def test_no_avisa_hasta_el_numero_de_fallos_seguidos(bandeja):
     assert "timeout" in bandeja.textos[0]
 
 
-def test_un_reinicio_corto_no_molesta(bandeja):
+def testUnReinicioCortoNoMolesta(bandeja):
     vigia = _vigia(bandeja, umbral=3)
 
     vigia.procesar(CAIDO, "x", 100)
@@ -66,7 +66,7 @@ def test_un_reinicio_corto_no_molesta(bandeja):
     assert bandeja.textos == [], "los fallos no son seguidos: la racha se reinicia"
 
 
-def test_no_se_repite_el_aviso_dentro_del_recordatorio(bandeja):
+def testNoSeRepiteElAvisoDentroDelRecordatorio(bandeja):
     vigia = _vigia(bandeja, umbral=1, recordatorio=3600)
 
     for instante in (100, 130, 160, 190):
@@ -75,7 +75,7 @@ def test_no_se_repite_el_aviso_dentro_del_recordatorio(bandeja):
     assert len(bandeja.textos) == 1
 
 
-def test_recuerda_que_sigue_caida_pasado_el_plazo(bandeja):
+def testRecuerdaQueSigueCaidaPasadoElPlazo(bandeja):
     vigia = _vigia(bandeja, umbral=1, recordatorio=3600)
 
     vigia.procesar(CAIDO, "x", 100)
@@ -85,7 +85,7 @@ def test_recuerda_que_sigue_caida_pasado_el_plazo(bandeja):
     assert "Sigue igual" in bandeja.textos[1]
 
 
-def test_sin_recordatorio_avisa_una_sola_vez(bandeja):
+def testSinRecordatorioAvisaUnaSolaVez(bandeja):
     vigia = _vigia(bandeja, umbral=1, recordatorio=0)
 
     vigia.procesar(CAIDO, "x", 100)
@@ -94,7 +94,7 @@ def test_sin_recordatorio_avisa_una_sola_vez(bandeja):
     assert len(bandeja.textos) == 1
 
 
-def test_avisa_de_que_vuelve_con_lo_que_duro(bandeja):
+def testAvisaDeQueVuelveConLoQueDuro(bandeja):
     vigia = _vigia(bandeja, umbral=1)
 
     vigia.procesar(CAIDO, "x", 1000)
@@ -104,7 +104,7 @@ def test_avisa_de_que_vuelve_con_lo_que_duro(bandeja):
     assert "🟢" in bandeja.textos[1] and "5 min" in bandeja.textos[1]
 
 
-def test_no_cuenta_la_recuperacion_de_una_caida_de_la_que_no_aviso(bandeja):
+def testNoCuentaLaRecuperacionDeUnaCaidaDeLaQueNoAviso(bandeja):
     vigia = _vigia(bandeja, umbral=3)
 
     vigia.procesar(CAIDO, "x", 100)
@@ -113,7 +113,7 @@ def test_no_cuenta_la_recuperacion_de_una_caida_de_la_que_no_aviso(bandeja):
     assert bandeja.textos == []
 
 
-def test_tras_recuperarse_una_caida_nueva_vuelve_a_avisar(bandeja):
+def testTrasRecuperarseUnaCaidaNuevaVuelveAAvisar(bandeja):
     vigia = _vigia(bandeja, umbral=1)
 
     vigia.procesar(CAIDO, "x", 100)
@@ -124,7 +124,7 @@ def test_tras_recuperarse_una_caida_nueva_vuelve_a_avisar(bandeja):
     assert "🔴" in bandeja.textos[2]
 
 
-def test_degradado_no_es_lo_mismo_que_caido(bandeja):
+def testDegradadoNoEsLoMismoQueCaido(bandeja):
     vigia = _vigia(bandeja, umbral=1)
 
     vigia.procesar(DEGRADADO, "corrupta", 100)
@@ -133,7 +133,7 @@ def test_degradado_no_es_lo_mismo_que_caido(bandeja):
     assert "corrupta" in bandeja.textos[0]
 
 
-def test_pasar_de_caido_a_degradado_avisa_del_cambio(bandeja):
+def testPasarDeCaidoADegradadoAvisaDelCambio(bandeja):
     vigia = _vigia(bandeja, umbral=1)
 
     vigia.procesar(CAIDO, "x", 100)
@@ -145,7 +145,7 @@ def test_pasar_de_caido_a_degradado_avisa_del_cambio(bandeja):
 
 # ── Telegram no disponible ────────────────────────────────────────────────────
 
-def test_si_el_aviso_no_sale_se_reintenta_en_la_siguiente(bandeja):
+def testSiElAvisoNoSaleSeReintentaEnLaSiguiente(bandeja):
     """Una caída de internet suele llevarse la aplicación y Telegram a la vez."""
     vigia = _vigia(bandeja, umbral=1)
     bandeja.disponible = False
@@ -159,7 +159,7 @@ def test_si_el_aviso_no_sale_se_reintenta_en_la_siguiente(bandeja):
     assert len(bandeja.textos) == 1
 
 
-def test_si_la_recuperacion_no_sale_se_reintenta(bandeja):
+def testSiLaRecuperacionNoSaleSeReintenta(bandeja):
     vigia = _vigia(bandeja, umbral=1)
     vigia.procesar(CAIDO, "x", 100)
     bandeja.disponible = False
@@ -177,18 +177,18 @@ def test_si_la_recuperacion_no_sale_se_reintenta(bandeja):
 
 # ── Qué se vigila ─────────────────────────────────────────────────────────────
 
-def test_sin_configurar_se_vigila_la_maquina_local():
-    assert vigilante.leer_objetivos("", 8080) == [("La aplicación", ["http://127.0.0.1:8080/api/health"])]
+def testSinConfigurarSeVigilaLaMaquinaLocal():
+    assert vigilante.leerObjetivos("", 8080) == [("La aplicación", ["http://127.0.0.1:8080/api/health"])]
 
 
-def test_una_url_a_secas_es_la_url_no_un_nombre():
-    assert vigilante.leer_objetivos("http://host:5000/api/health?a=b", 5000) == [
+def testUnaUrlASecasEsLaUrlNoUnNombre():
+    assert vigilante.leerObjetivos("http://host:5000/api/health?a=b", 5000) == [
         ("La aplicación", ["http://host:5000/api/health?a=b"])
     ]
 
 
-def test_nombre_y_alternativas():
-    objetivos = vigilante.leer_objetivos(
+def testNombreYAlternativas():
+    objetivos = vigilante.leerObjetivos(
         "Web=https://caddy:5000/api/health|http://caddy:5000/api/health, Otro=http://x/api/health", 5000
     )
 
@@ -198,10 +198,10 @@ def test_nombre_y_alternativas():
     ]
 
 
-def test_el_valor_que_pone_docker_compose_se_entiende():
+def testElValorQuePoneDockerComposeSeEntiende():
     valor = "La aplicación=https://caddy:5000/api/health|http://caddy:5000/api/health"
 
-    assert vigilante.leer_objetivos(valor, 5000) == [
+    assert vigilante.leerObjetivos(valor, 5000) == [
         ("La aplicación", ["https://caddy:5000/api/health", "http://caddy:5000/api/health"])
     ]
 
@@ -220,13 +220,13 @@ def _http(codigo, cuerpo=b""):
     return HTTPError("http://x", codigo, "err", {}, io.BytesIO(cuerpo))
 
 
-def test_200_es_ok(monkeypatch):
+def test200EsOk(monkeypatch):
     monkeypatch.setattr(vigilante, "urlopen", lambda *a, **k: _Ok())
 
     assert vigilante.sondear(["http://x"]) == (OK, "")
 
 
-def test_503_es_degradado_y_dice_por_que(monkeypatch):
+def test503EsDegradadoYDicePorQue(monkeypatch):
     def _degradada(*a, **k):
         raise _http(503, json.dumps({"ok": False, "fallo": "corrupta"}).encode())
 
@@ -235,16 +235,16 @@ def test_503_es_degradado_y_dice_por_que(monkeypatch):
     assert vigilante.sondear(["http://x"]) == (DEGRADADO, "corrupta")
 
 
-def test_502_del_proxy_es_caido(monkeypatch):
-    def _bad_gateway(*a, **k):
+def test502DelProxyEsCaido(monkeypatch):
+    def _badGateway(*a, **k):
         raise _http(502)
 
-    monkeypatch.setattr(vigilante, "urlopen", _bad_gateway)
+    monkeypatch.setattr(vigilante, "urlopen", _badGateway)
 
     assert vigilante.sondear(["http://x"]) == (CAIDO, "HTTP 502")
 
 
-def test_conexion_rechazada_es_caido(monkeypatch):
+def testConexionRechazadaEsCaido(monkeypatch):
     def _rechazada(*a, **k):
         raise URLError(ConnectionRefusedError("rechazada"))
 
@@ -255,7 +255,7 @@ def test_conexion_rechazada_es_caido(monkeypatch):
     assert estado == CAIDO and "rechazada" in detalle
 
 
-def test_prueba_la_siguiente_alternativa(monkeypatch):
+def testPruebaLaSiguienteAlternativa(monkeypatch):
     """Primero HTTPS y, si no hay, HTTP: el esquema lo elige el usuario en Ajustes."""
     llamadas = []
 
@@ -271,7 +271,7 @@ def test_prueba_la_siguiente_alternativa(monkeypatch):
     assert llamadas == ["https://x", "http://x"]
 
 
-def test_un_timeout_no_lanza(monkeypatch):
+def testUnTimeoutNoLanza(monkeypatch):
     def _lento(*a, **k):
         raise TimeoutError("timed out")
 
@@ -282,7 +282,7 @@ def test_un_timeout_no_lanza(monkeypatch):
 
 # ── Bucle ─────────────────────────────────────────────────────────────────────
 
-def test_el_bucle_avisa_tras_los_fallos_y_cuenta_la_vuelta(bandeja):
+def testElBucleAvisaTrasLosFallosYCuentaLaVuelta(bandeja):
     respuestas = iter([CAIDO, CAIDO, OK, OK])
     esperas = []
 
@@ -297,7 +297,7 @@ def test_el_bucle_avisa_tras_los_fallos_y_cuenta_la_vuelta(bandeja):
     assert esperas == [30, 30, 30], "duerme entre rondas pero no tras la última"
 
 
-def test_un_fallo_del_envio_no_para_la_vigilancia():
+def testUnFalloDelEnvioNoParaLaVigilancia():
     def _cae(texto):
         raise RuntimeError("telegram")
 
@@ -307,7 +307,7 @@ def test_un_fallo_del_envio_no_para_la_vigilancia():
     )
 
 
-def test_varios_objetivos_se_vigilan_por_separado(bandeja):
+def testVariosObjetivosSeVigilanPorSeparado(bandeja):
     def _sonda(urls):
         return (CAIDO, "x") if urls == ["http://a"] else (OK, "")
 
@@ -319,13 +319,13 @@ def test_varios_objetivos_se_vigilan_por_separado(bandeja):
     assert len(bandeja.textos) == 1 and "A" in bandeja.textos[0]
 
 
-def test_duraciones_legibles():
+def testDuracionesLegibles():
     assert vigilante._duracion(20) == "20 s"
     assert vigilante._duracion(300) == "5 min"
     assert vigilante._duracion(3 * 3600 + 120) == "3 h 2 min"
 
 
-def test_por_defecto_avisa_por_el_bot_de_ajustes_sin_pasar_por_las_categorias(datos_aislados, monkeypatch):
+def testPorDefectoAvisaPorElBotDeAjustesSinPasarPorLasCategorias(datosAislados, monkeypatch):
     """Que la aplicación esté caída se cuenta aunque el usuario haya silenciado el resto."""
     from core import telegram_notifier
 
@@ -335,13 +335,13 @@ def test_por_defecto_avisa_por_el_bot_de_ajustes_sin_pasar_por_las_categorias(da
     enviados = []
     monkeypatch.setattr(telegram_notifier, "_enviar", lambda token, chat, texto: enviados.append(texto))
 
-    assert vigilante._enviar_por_telegram("🔴 caída") is True
+    assert vigilante._enviarPorTelegram("🔴 caída") is True
     assert enviados == ["🔴 caída"]
 
 
 # ── TLS hacia el proxy ───────────────────────────────────────────────────────
 
-def _ca_de_prueba(ruta):
+def _caDePrueba(ruta):
     """Una raíz autofirmada cualquiera, para tener un fichero de CA válido."""
     import datetime
 
@@ -364,22 +364,22 @@ def _ca_de_prueba(ruta):
     return ruta
 
 
-def test_con_la_ca_de_caddy_se_verifica_el_certificado(tmp_path):
+def testConLaCaDeCaddySeVerificaElCertificado(tmp_path):
     import ssl
 
-    from vigilante import contexto_tls
+    from vigilante import contextoTls
 
-    contexto = contexto_tls(str(_ca_de_prueba(tmp_path / "root.crt")))
+    contexto = contextoTls(str(_caDePrueba(tmp_path / "root.crt")))
 
     assert contexto.verify_mode == ssl.CERT_REQUIRED
     # El certificado es para los nombres de Ajustes, no para `caddy`.
     assert contexto.check_hostname is False
 
 
-def test_sin_la_ca_no_se_da_por_caida_una_aplicacion_sana(tmp_path):
+def testSinLaCaNoSeDaPorCaidaUnaAplicacionSana(tmp_path):
     """Fuera de Docker no hay CA montada: se sigue sondeando, sin verificar."""
     import ssl
 
-    from vigilante import contexto_tls
+    from vigilante import contextoTls
 
-    assert contexto_tls(str(tmp_path / "no-existe.crt")).verify_mode == ssl.CERT_NONE
+    assert contextoTls(str(tmp_path / "no-existe.crt")).verify_mode == ssl.CERT_NONE

@@ -24,7 +24,7 @@ def _escribir(carpeta, nombre, contenido=""):
 
 # ── Listado ──────────────────────────────────────────────────────────────────
 
-def test_un_html_suelto_ya_es_una_herramienta(carpeta):
+def testUnHtmlSueltoYaEsUnaHerramienta(carpeta):
     from routes.herramientas import listar
 
     _escribir(carpeta, "precio-objetivo.html", "<div>hola</div>")
@@ -39,7 +39,7 @@ def test_un_html_suelto_ya_es_una_herramienta(carpeta):
     assert herramientas[0]["js"] is None
 
 
-def test_la_cabecera_da_titulo_y_descripcion(carpeta):
+def testLaCabeceraDaTituloYDescripcion(carpeta):
     from routes.herramientas import listar
 
     _escribir(carpeta, "inflacion.html", """<!-- herramienta
@@ -55,7 +55,7 @@ descripcion: Lo que valdrán tus euros dentro de unos años.
 
 
 
-def test_el_js_se_enlaza_solo_si_existe(carpeta):
+def testElJsSeEnlazaSoloSiExiste(carpeta):
     from routes.herramientas import listar
 
     _escribir(carpeta, "con-js.html")
@@ -74,7 +74,7 @@ def test_el_js_se_enlaza_solo_si_existe(carpeta):
     "acentuada-ñ.html",
     "con.punto.html",
 ])
-def test_los_nombres_que_no_valen_como_id_se_ignoran(carpeta, nombre):
+def testLosNombresQueNoValenComoIdSeIgnoran(carpeta, nombre):
     from routes.herramientas import listar
 
     _escribir(carpeta, nombre)
@@ -82,7 +82,7 @@ def test_los_nombres_que_no_valen_como_id_se_ignoran(carpeta, nombre):
     assert listar(carpeta) == []
 
 
-def test_se_ordenan_por_titulo(carpeta):
+def testSeOrdenanPorTitulo(carpeta):
     from routes.herramientas import listar
 
     _escribir(carpeta, "zeta.html", "<!-- herramienta\ntitulo: Alfa\n-->")
@@ -91,7 +91,7 @@ def test_se_ordenan_por_titulo(carpeta):
     assert [h["titulo"] for h in listar(carpeta)] == ["Alfa", "Zeta"]
 
 
-def test_sin_carpeta_no_falla(tmp_path):
+def testSinCarpetaNoFalla(tmp_path):
     from routes.herramientas import listar
 
     assert listar(tmp_path / "no-existe") == []
@@ -99,13 +99,13 @@ def test_sin_carpeta_no_falla(tmp_path):
 
 # ── Endpoint ─────────────────────────────────────────────────────────────────
 
-def test_el_endpoint_devuelve_lo_que_hay_en_la_carpeta(cliente_autenticado, carpeta, monkeypatch):
+def testElEndpointDevuelveLoQueHayEnLaCarpeta(clienteAutenticado, carpeta, monkeypatch):
     from routes import herramientas
 
     _escribir(carpeta, "mia.html", "<!-- herramienta\ntitulo: La mía\n-->")
     monkeypatch.setattr(herramientas, "EXTRAS_DIR", carpeta)
 
-    client, _cabeceras, _app = cliente_autenticado(herramientas.herramientas_bp)
+    client, _cabeceras, _app = clienteAutenticado(herramientas.herramientasBp)
     respuesta = client.get("/api/herramientas-extra")
 
     assert respuesta.status_code == 200
@@ -114,12 +114,12 @@ def test_el_endpoint_devuelve_lo_que_hay_en_la_carpeta(cliente_autenticado, carp
     assert [h["titulo"] for h in cuerpo["herramientas"]] == ["La mía"]
 
 
-def test_el_endpoint_pide_sesion(crear_app, carpeta, monkeypatch):
+def testElEndpointPideSesion(crearApp, carpeta, monkeypatch):
     from routes import herramientas
 
     monkeypatch.setattr(herramientas, "EXTRAS_DIR", carpeta)
 
-    app = crear_app(herramientas.herramientas_bp)
+    app = crearApp(herramientas.herramientasBp)
     respuesta = app.test_client().get("/api/herramientas-extra")
 
     assert respuesta.status_code in (401, 403, 302)

@@ -16,15 +16,15 @@ from stores.categorias_store import (
     renombrarCategoria,
 )
 
-categorias_bp = Blueprint("categorias", __name__)
+categoriasBp = Blueprint("categorias", __name__)
 
 
-@categorias_bp.route("/api/categorias/resumen", methods=["GET"])
+@categoriasBp.route("/api/categorias/resumen", methods=["GET"])
 def getCategoriasResumen():
     return jsonify({"ok": True, "categorias": leerResumen()})
 
 
-@categorias_bp.route("/api/categorias/renombrar", methods=["POST"])
+@categoriasBp.route("/api/categorias/renombrar", methods=["POST"])
 def renameCategoria():
     requestData = request.get_json(silent=True) or {}
 
@@ -40,7 +40,7 @@ def renameCategoria():
     return jsonify({"ok": True, "filas": filas})
 
 
-@categorias_bp.route("/api/categorias/eliminar", methods=["POST"])
+@categoriasBp.route("/api/categorias/eliminar", methods=["POST"])
 def deleteCategoria():
     requestData = request.get_json(silent=True) or {}
 

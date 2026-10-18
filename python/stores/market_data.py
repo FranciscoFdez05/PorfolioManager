@@ -22,26 +22,26 @@ import time
 from threading import Lock
 
 from core import proveedores_pausados, settings, telegram_notifier
-from providers.alpha_vantage_client import fetch_quote as _fetch_av_quote
-from providers.eodhd_client import fetch_quote as _fetch_eodhd_quote
-from providers.finnhub_client import convert_quote_currency, fetch_quote as _fetch_finnhub_quote
-from providers.tradingview_client import fetch_quote as _fetch_tradingview_quote
-from providers.yahoo_finance_client import fetch_quote as _fetch_yahoo_quote
+from providers.alpha_vantage_client import fetchQuote as _fetchAvQuote
+from providers.eodhd_client import fetchQuote as _fetchEodhdQuote
+from providers.finnhub_client import convertQuoteCurrency, fetchQuote as _fetchFinnhubQuote
+from providers.tradingview_client import fetchQuote as _fetchTradingviewQuote
+from providers.yahoo_finance_client import fetchQuote as _fetchYahooQuote
 from stores.asset_utils import EODHD_EXCHANGE_CODES, inferMarketProviderFromSymbol, normalizeMarketProvider
 from stores.helpers import (
-    call_alpha_vantage_with_fallbacks,
-    call_eodhd_with_fallbacks,
-    call_finnhub_with_fallbacks,
-    is_rate_limited_error,
-    is_temporary_service_error,
+    callAlphaVantageWithFallbacks,
+    callEodhdWithFallbacks,
+    callFinnhubWithFallbacks,
+    isRateLimitedError,
+    isTemporaryServiceError,
 )
 
 _FETCHERS = {
-    "eodhd": lambda symbol: call_eodhd_with_fallbacks(lambda apiKey: _fetch_eodhd_quote(symbol, apiKey)),
-    "yahoo": lambda symbol: _fetch_yahoo_quote(symbol),
-    "alphavantage": lambda symbol: call_alpha_vantage_with_fallbacks(lambda apiKey: _fetch_av_quote(symbol, apiKey)),
-    "finnhub": lambda symbol: call_finnhub_with_fallbacks(lambda apiKey: _fetch_finnhub_quote(symbol, apiKey)),
-    "tradingview": lambda symbol: _fetch_tradingview_quote(symbol),
+    "eodhd": lambda symbol: callEodhdWithFallbacks(lambda apiKey: _fetchEodhdQuote(symbol, apiKey)),
+    "yahoo": lambda symbol: _fetchYahooQuote(symbol),
+    "alphavantage": lambda symbol: callAlphaVantageWithFallbacks(lambda apiKey: _fetchAvQuote(symbol, apiKey)),
+    "finnhub": lambda symbol: callFinnhubWithFallbacks(lambda apiKey: _fetchFinnhubQuote(symbol, apiKey)),
+    "tradingview": lambda symbol: _fetchTradingviewQuote(symbol),
 }
 
 # El orden de respaldo entre proveedores y el reposo tras un límite de
@@ -60,20 +60,20 @@ _NOMBRE_PROVEEDOR = {
     "tradingview": "TradingView",
 }
 
-_state_lock = Lock()
-_quote_cache: dict = {}          # f"{proveedor}:{symbol}" -> {"quote":, "ts":}
-_provider_resting_until: dict = {}  # proveedor -> time.monotonic() hasta el que evitarlo
+_stateLock = Lock()
+_quoteCache: dict = {}          # f"{proveedor}:{symbol}" -> {"quote":, "ts":}
+_providerRestingUntil: dict = {}  # proveedor -> time.monotonic() hasta el que evitarlo
 
 
-def _is_portable_symbol(symbol):
+def _isPortableSymbol(symbol):
     """Si el símbolo no lleva atada la sintaxis de un proveedor concreto."""
     if ":" in symbol:
         return False
     return not ("." in symbol and symbol.rsplit(".", 1)[-1] in EODHD_EXCHANGE_CODES)
 
 
-def _fallback_chain(primary, symbol):
-    if not _is_portable_symbol(symbol):
+def _fallbackChain(primary, symbol):
+    if not _isPortableSymbol(symbol):
         return (primary,)
     # Solo proveedores que existen: un nombre mal escrito en config.ini no puede
     # romper la cotización, se ignora.
@@ -84,37 +84,37 @@ def _fallback_chain(primary, symbol):
     return (primary, *dict.fromkeys(orden))
 
 
-def _is_provider_resting(provider):
-    until = _provider_resting_until.get(provider)
+def _isProviderResting(provider):
+    until = _providerRestingUntil.get(provider)
     return bool(until and time.monotonic() < until)
 
 
-def _mark_provider_rate_limited(provider):
+def _markProviderRateLimited(provider):
     reposo = settings.reposoLimiteSegundos()
     if reposo <= 0:
         return
-    with _state_lock:
-        _provider_resting_until[provider] = time.monotonic() + reposo
+    with _stateLock:
+        _providerRestingUntil[provider] = time.monotonic() + reposo
 
 
-def _cached_quote(cache_key, ttl):
+def _cachedQuote(cacheKey, ttl):
     if ttl <= 0:
         return None
-    with _state_lock:
-        entry = _quote_cache.get(cache_key)
+    with _stateLock:
+        entry = _quoteCache.get(cacheKey)
     if entry and time.monotonic() - entry["ts"] < ttl:
         return entry["quote"]
     return None
 
 
-def _store_quote(cache_key, quote, ttl):
+def _storeQuote(cacheKey, quote, ttl):
     if ttl <= 0:
         return
-    with _state_lock:
-        _quote_cache[cache_key] = {"quote": quote, "ts": time.monotonic()}
+    with _stateLock:
+        _quoteCache[cacheKey] = {"quote": quote, "ts": time.monotonic()}
 
 
-def fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=None):
+def fetchAssetQuote(symbol, provider=None, useCache=True, targetCurrency=None):
     """Cotización de un símbolo. Devuelve `(quote, error)` como los clientes.
 
     `use_cache=False` salta la lectura de caché sin desactivarla del todo: el
@@ -137,35 +137,35 @@ def fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=Non
     if not symbol:
         return None, "symbol requerido"
 
-    proveedor_principal = normalizeMarketProvider(
+    proveedorPrincipal = normalizeMarketProvider(
         str(provider or "").strip(), fallback=inferMarketProviderFromSymbol(symbol)
     )
-    target_currency = str(target_currency or "").strip().upper() or None
+    targetCurrency = str(targetCurrency or "").strip().upper() or None
 
     ttl = settings.cotizacionTtlSegundos()
-    cache_key = f"{proveedor_principal}:{symbol}:{target_currency or 'nativa'}"
-    if use_cache:
-        cached_quote = _cached_quote(cache_key, ttl)
-        if cached_quote is not None:
-            return cached_quote, None
+    cacheKey = f"{proveedorPrincipal}:{symbol}:{targetCurrency or 'nativa'}"
+    if useCache:
+        cachedQuote = _cachedQuote(cacheKey, ttl)
+        if cachedQuote is not None:
+            return cachedQuote, None
 
-    last_error = None
-    for candidato in _fallback_chain(proveedor_principal, symbol):
-        if _is_provider_resting(candidato) or proveedores_pausados.esta_pausado(candidato):
+    lastError = None
+    for candidato in _fallbackChain(proveedorPrincipal, symbol):
+        if _isProviderResting(candidato) or proveedores_pausados.estaPausado(candidato):
             continue
 
         quote, error = _FETCHERS[candidato](symbol)
 
         if not error:
-            telegram_notifier.notificar_recuperado(_NOMBRE_PROVEEDOR.get(candidato, candidato))
-            if target_currency and target_currency != str(quote.get("currency", "")).strip().upper():
-                converted, conv_error = convert_quote_currency(quote, target_currency)
-                if not conv_error and converted:
+            telegram_notifier.notificarRecuperado(_NOMBRE_PROVEEDOR.get(candidato, candidato))
+            if targetCurrency and targetCurrency != str(quote.get("currency", "")).strip().upper():
+                converted, convError = convertQuoteCurrency(quote, targetCurrency)
+                if not convError and converted:
                     quote = converted
-            _store_quote(cache_key, quote, ttl)
+            _storeQuote(cacheKey, quote, ttl)
             return quote, None
 
-        last_error = error
+        lastError = error
 
         # «No devolvió cotización» es el proveedor contestando bien y sin
         # conocer ese ticker: no es una caída suya. Avisar de ello hacía que
@@ -174,17 +174,17 @@ def fetch_asset_quote(symbol, provider=None, use_cache=True, target_currency=Non
         if "no devolvió cotización" in str(error):
             continue
 
-        if is_rate_limited_error(error):
-            _mark_provider_rate_limited(candidato)
+        if isRateLimitedError(error):
+            _markProviderRateLimited(candidato)
             categoria = "cuota_agotada"
-        elif is_temporary_service_error(error):
+        elif isTemporaryServiceError(error):
             categoria = "no_responde"
         else:
             categoria = "fallo"
-        telegram_notifier.notificar_problema(
+        telegram_notifier.notificarProblema(
             categoria, _NOMBRE_PROVEEDOR.get(candidato, candidato), f"Al cotizar {symbol}: {error}"
         )
 
-    if last_error is None and any(proveedores_pausados.esta_pausado(p) for p in _fallback_chain(proveedor_principal, symbol)):
+    if lastError is None and any(proveedores_pausados.estaPausado(p) for p in _fallbackChain(proveedorPrincipal, symbol)):
         return None, "Los proveedores de este activo están pausados (Ajustes > API)"
-    return None, last_error or "Todos los proveedores de mercado están en reposo por límite de peticiones"
+    return None, lastError or "Todos los proveedores de mercado están en reposo por límite de peticiones"

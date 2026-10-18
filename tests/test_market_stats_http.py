@@ -1,22 +1,22 @@
 """HTTP de /api/tradingview/stats: fundamentales y técnico del scanner.
 
 Nada sale a la red: se sustituye `fetch_tradingview_stats` (el alias con el
-que `routes.market` importa `tradingview_client.fetch_stats`).
+que `routes.market` importa `tradingview_client.fetchStats`).
 """
 
 from urllib.error import URLError
 
-from routes import market as market_route
-from routes.market import market_bp
+from routes import market as marketRoute
+from routes.market import marketBp
 
 
-def _cliente(cliente_autenticado):
-    client, cabeceras, _app = cliente_autenticado(market_bp)
+def _cliente(clienteAutenticado):
+    client, cabeceras, _app = clienteAutenticado(marketBp)
     return client, cabeceras
 
 
-def test_sin_symbols_es_error_de_cliente(cliente_autenticado):
-    client, _cabeceras = _cliente(cliente_autenticado)
+def testSinSymbolsEsErrorDeCliente(clienteAutenticado):
+    client, _cabeceras = _cliente(clienteAutenticado)
 
     respuesta = client.get("/api/tradingview/stats")
 
@@ -24,16 +24,16 @@ def test_sin_symbols_es_error_de_cliente(cliente_autenticado):
     assert respuesta.get_json()["ok"] is False
 
 
-def test_devuelve_los_datos_del_scanner(cliente_autenticado, monkeypatch):
+def testDevuelveLosDatosDelScanner(clienteAutenticado, monkeypatch):
     llamadas = []
 
     def fake(tickers):
         llamadas.append(tickers)
         return {"NASDAQ:AAPL": {"market_cap_basic": 3.1e12, "sector": "Technology"}}
 
-    monkeypatch.setattr(market_route, "fetch_tradingview_stats", fake)
+    monkeypatch.setattr(marketRoute, "fetchTradingviewStats", fake)
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     respuesta = client.get("/api/tradingview/stats?symbols=nasdaq:aapl")
 
     assert respuesta.status_code == 200
@@ -44,24 +44,24 @@ def test_devuelve_los_datos_del_scanner(cliente_autenticado, monkeypatch):
     assert llamadas[0] == ["NASDAQ:AAPL"]
 
 
-def test_symbols_duplicados_se_piden_una_sola_vez(cliente_autenticado, monkeypatch):
+def testSymbolsDuplicadosSePidenUnaSolaVez(clienteAutenticado, monkeypatch):
     llamadas = []
-    monkeypatch.setattr(market_route, "fetch_tradingview_stats", lambda tickers: llamadas.append(tickers) or {})
+    monkeypatch.setattr(marketRoute, "fetchTradingviewStats", lambda tickers: llamadas.append(tickers) or {})
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     client.get("/api/tradingview/stats?symbols=NASDAQ:AAPL,NASDAQ:AAPL,NASDAQ:MSFT")
 
     assert len(llamadas[0]) == 2
     assert set(llamadas[0]) == {"NASDAQ:AAPL", "NASDAQ:MSFT"}
 
 
-def test_error_de_red_se_traduce_a_503(cliente_autenticado, monkeypatch):
+def testErrorDeRedSeTraduceA503(clienteAutenticado, monkeypatch):
     def fake(tickers):
         raise URLError("sin conexión")
 
-    monkeypatch.setattr(market_route, "fetch_tradingview_stats", fake)
+    monkeypatch.setattr(marketRoute, "fetchTradingviewStats", fake)
 
-    client, _cabeceras = _cliente(cliente_autenticado)
+    client, _cabeceras = _cliente(clienteAutenticado)
     respuesta = client.get("/api/tradingview/stats?symbols=NASDAQ:AAPL")
 
     assert respuesta.status_code == 503

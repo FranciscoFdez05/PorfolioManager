@@ -21,7 +21,7 @@ from core import tls
 
 
 @pytest.fixture(autouse=True)
-def estado_aislado(tmp_path, monkeypatch):
+def estadoAislado(tmp_path, monkeypatch):
     """Saca `data/tls/` del repositorio en todos los tests de este fichero.
 
     Se parchean las constantes del módulo y no `paths.DATA_DIR`, por lo mismo
@@ -51,12 +51,12 @@ def caddy(monkeypatch):
 
 # ── Estado ────────────────────────────────────────────────────────────────────
 
-def test_sin_fichero_el_https_esta_apagado():
+def testSinFicheroElHttpsEstaApagado():
     assert tls.leerEstado() == {"activado": False, "nombres": [], "actualizado": None}
     assert tls.httpsActivo() is False
 
 
-def test_el_estado_va_y_vuelve():
+def testElEstadoVaYVuelve():
     tls.guardarEstado(True, ["portfolio.casa", "192.168.1.50"])
 
     estado = tls.leerEstado()
@@ -66,20 +66,20 @@ def test_el_estado_va_y_vuelve():
     assert tls.httpsActivo() is True
 
 
-def test_un_estado_ilegible_se_lee_como_apagado(estado_aislado):
+def testUnEstadoIlegibleSeLeeComoApagado(estadoAislado):
     """Es lo que consulta cada respuesta para decidir si la cookie lleva Secure.
 
     Reventar aquí sería tumbar la aplicación entera por un fichero corrupto, y
     caer del lado de «activado» dejaría fuera a todo el mundo.
     """
-    estado_aislado.mkdir(parents=True, exist_ok=True)
-    (estado_aislado / "estado.json").write_text("{roto", encoding="utf-8")
+    estadoAislado.mkdir(parents=True, exist_ok=True)
+    (estadoAislado / "estado.json").write_text("{roto", encoding="utf-8")
 
     assert tls.leerEstado()["activado"] is False
     assert tls.httpsActivo() is False
 
 
-def test_el_entorno_gana_al_fichero(monkeypatch):
+def testElEntornoGanaAlFichero(monkeypatch):
     """Quien pone HTTPS_ENABLED tiene un proxy propio delante y no pasa por aquí."""
     monkeypatch.setenv("HTTPS_ENABLED", "true")
     assert tls.httpsActivo() is True
@@ -92,12 +92,12 @@ def test_el_entorno_gana_al_fichero(monkeypatch):
     ("http://192.168.1.50", "192.168.1.50"),
     ("  PORTFOLIO.Casa. ", "portfolio.casa"),
 ])
-def test_se_acepta_lo_que_el_usuario_tiene_en_la_barra(entrada, esperado):
+def testSeAceptaLoQueElUsuarioTieneEnLaBarra(entrada, esperado):
     """Exigirle que desmonte la URL solo genera certificados mal emitidos."""
     assert tls.normalizarNombres([entrada]) == [esperado]
 
 
-def test_los_nombres_no_se_repiten():
+def testLosNombresNoSeRepiten():
     assert tls.normalizarNombres(["casa", "https://casa", "CASA"]) == ["casa"]
 
 
@@ -112,19 +112,19 @@ def test_los_nombres_no_se_repiten():
     # Sin nombre no hay nada que objetar.
     (["portfolio.casa"], "", True),
 ])
-def test_se_sabe_si_el_certificado_cubriría_por_donde_entras(nombres, entrando, cubierto):
+def testSeSabeSiElCertificadoCubriríaPorDondeEntras(nombres, entrando, cubierto):
     """La pregunta que decide si activar el HTTPS te deja fuera de tu propia app."""
     assert tls.cubre(nombres, entrando) is cubierto
 
 
-def test_se_descarta_lo_que_rompería_el_caddyfile():
+def testSeDescartaLoQueRomperíaElCaddyfile():
     """Un nombre con espacios o llaves se colaría en la configuración generada."""
     assert tls.normalizarNombres(["", "  ", "a b", "x{y}", "bien"]) == ["bien"]
 
 
 # ── Configuración generada ────────────────────────────────────────────────────
 
-def test_apagado_el_proxy_sirve_en_claro():
+def testApagadoElProxySirveEnClaro():
     conf = tls.construirCaddyfile(False, ["casa"])
 
     assert "tls internal" not in conf
@@ -132,7 +132,7 @@ def test_apagado_el_proxy_sirve_en_claro():
     assert "reverse_proxy porfoliomanager:" in conf
 
 
-def test_encendido_se_emite_certificado_para_cada_nombre():
+def testEncendidoSeEmiteCertificadoParaCadaNombre():
     conf = tls.construirCaddyfile(True, ["portfolio.casa", "192.168.1.50"])
 
     assert "tls internal" in conf
@@ -140,7 +140,7 @@ def test_encendido_se_emite_certificado_para_cada_nombre():
     assert "https://192.168.1.50:" in conf
 
 
-def test_localhost_va_siempre_en_el_certificado():
+def testLocalhostVaSiempreEnElCertificado():
     """Por localhost entran el healthcheck y la comprobación de docker-update.sh.
 
     Caddy rechaza la conexión si el nombre no tiene sitio, así que sin esto una
@@ -152,7 +152,7 @@ def test_localhost_va_siempre_en_el_certificado():
     assert "https://127.0.0.1:" in conf
 
 
-def test_encender_sin_nombres_no_puede_dar_un_proxy_cerrado():
+def testEncenderSinNombresNoPuedeDarUnProxyCerrado():
     """Sin nombres no hay certificado posible: mejor en claro que inaccesible."""
     conf = tls.construirCaddyfile(True, [])
 
@@ -160,7 +160,7 @@ def test_encender_sin_nombres_no_puede_dar_un_proxy_cerrado():
     assert "auto_https off" in conf
 
 
-def test_la_api_de_admin_no_se_publica_pero_sí_escucha():
+def testLaApiDeAdminNoSePublicaPeroSíEscucha():
     """La aplicación tiene que alcanzarla desde su contenedor."""
     assert "admin :2019" in tls.construirCaddyfile(False, [])
 
@@ -169,7 +169,7 @@ def test_la_api_de_admin_no_se_publica_pero_sí_escucha():
 # El paso que evita quedarse fuera: se emite el certificado sin que el puerto por
 # el que está entrando el usuario deje de hablar en claro.
 
-def test_preparando_el_puerto_de_siempre_no_cambia_de_esquema():
+def testPreparandoElPuertoDeSiempreNoCambiaDeEsquema():
     """Es toda la razón de ser de este estado.
 
     Si al preparar el puerto pasara a TLS, estaríamos otra vez donde estábamos:
@@ -184,7 +184,7 @@ def test_preparando_el_puerto_de_siempre_no_cambia_de_esquema():
     assert "reverse_proxy porfoliomanager:" in conf
 
 
-def test_preparando_se_emite_el_certificado_en_un_puerto_interno():
+def testPreparandoSeEmiteElCertificadoEnUnPuertoInterno():
     """El puerto no está publicado en docker-compose: no es una segunda puerta
     de entrada, solo la excusa para que haya un certificado que emitir."""
     conf = tls.construirCaddyfile(False, ["portfolio.casa"], preparando=True)
@@ -194,7 +194,7 @@ def test_preparando_se_emite_el_certificado_en_un_puerto_interno():
     assert f"reverse_proxy porfoliomanager:{tls.PUERTO_PREPARACION}" not in conf
 
 
-def test_se_prepara_con_los_mismos_nombres_con_los_que_se_activará():
+def testSePreparaConLosMismosNombresConLosQueSeActivará():
     """Lo que se instala tiene que valer para lo que luego se sirva: emitir aquí
     una lista y allí otra dejaría al usuario con la CA puesta y el aviso igual."""
     preparado = tls.construirCaddyfile(False, ["portfolio.casa"], preparando=True)
@@ -205,7 +205,7 @@ def test_se_prepara_con_los_mismos_nombres_con_los_que_se_activará():
         assert f"https://{nombre}:" in activado
 
 
-def test_el_sitio_de_comprobación_existe_en_los_dos_estados():
+def testElSitioDeComprobaciónExisteEnLosDosEstados():
     """Antes de encender sirve para probar sin arriesgar nada; con el HTTPS ya
     puesto, para que un aparato nuevo se compruebe sin jugarse la entrada."""
     for conf in (
@@ -216,7 +216,7 @@ def test_el_sitio_de_comprobación_existe_en_los_dos_estados():
         assert "El certificado funciona en este aparato" in conf
 
 
-def test_el_sitio_de_comprobación_no_lleva_a_la_aplicación():
+def testElSitioDeComprobaciónNoLlevaALaAplicación():
     """Es una página fija, no una segunda puerta de entrada: el puerto se
     publica, y lo que se publica tiene que poder mirarse sin encogerse."""
     conf = tls.construirCaddyfile(False, ["casa"], preparando=True)
@@ -225,7 +225,7 @@ def test_el_sitio_de_comprobación_no_lleva_a_la_aplicación():
     assert "reverse_proxy" not in bloque
 
 
-def test_la_página_de_comprobación_no_puede_romper_el_caddyfile():
+def testLaPáginaDeComprobaciónNoPuedeRomperElCaddyfile():
     """Va dentro de un token entrecomillado: una comilla doble lo cerraría y una
     llave sería un marcador de Caddy. Las dos cosas dejarían al proxy sin
     configuración válida justo cuando se va a tocar el TLS."""
@@ -234,7 +234,7 @@ def test_la_página_de_comprobación_no_puede_romper_el_caddyfile():
     assert tls._PAGINA_PRUEBA.isascii()
 
 
-def test_preparar_sin_nombres_deja_el_proxy_como_estaba():
+def testPrepararSinNombresDejaElProxyComoEstaba():
     """Sin nombres no hay nada que emitir, y tocar el proxy para nada solo puede
     salir mal."""
     conf = tls.construirCaddyfile(False, [], preparando=True)
@@ -243,15 +243,15 @@ def test_preparar_sin_nombres_deja_el_proxy_como_estaba():
     assert "auto_https off" in conf
 
 
-def test_preparar_devuelve_la_ca_ya_lista_para_instalar(caddy):
+def testPrepararDevuelveLaCaYaListaParaInstalar(caddy):
     """Devolver antes de tenerla sería ofrecer un botón de descarga que da 502."""
     pem = tls.preparar(["portfolio.casa"])
 
     assert pem.startswith("-----BEGIN CERTIFICATE-----")
-    assert b"tls internal" in _ultimo_load(caddy)
+    assert b"tls internal" in _ultimoLoad(caddy)
 
 
-def test_preparar_espera_a_que_la_ca_exista(monkeypatch):
+def testPrepararEsperaAQueLaCaExista(monkeypatch):
     """La raíz se genera durante la emisión, no al aceptar la configuración: la
     primera vez puede no estar en la respuesta inmediatamente siguiente."""
     intentos = []
@@ -271,7 +271,7 @@ def test_preparar_espera_a_que_la_ca_exista(monkeypatch):
     assert len(intentos) == 3
 
 
-def test_si_la_ca_no_llega_a_aparecer_se_dice(monkeypatch):
+def testSiLaCaNoLlegaAAparecerSeDice(monkeypatch):
     """Callar aquí dejaría el panel ofreciendo un certificado que no existe."""
     monkeypatch.setattr(tls, "_admin", lambda *_a, **_k: b'{"root_certificate": ""}')
     monkeypatch.setattr(tls, "_ESPERA_CA", 0)
@@ -280,11 +280,11 @@ def test_si_la_ca_no_llega_a_aparecer_se_dice(monkeypatch):
         tls.preparar(["casa"])
 
 
-def test_hay_ca_que_instalar_en_cuanto_se_ha_emitido_algo(caddy):
+def testHayCaQueInstalarEnCuantoSeHaEmitidoAlgo(caddy):
     assert tls.caDisponible() is True
 
 
-def test_sin_ca_todavía_el_panel_no_ofrece_descargarla(monkeypatch):
+def testSinCaTodavíaElPanelNoOfreceDescargarla(monkeypatch):
     """Es lo que decide si se enseña el botón de descarga: ofrecerlo sin CA sería
     ofrecer un error."""
     monkeypatch.setattr(tls, "_admin", lambda *_a, **_k: b'{"root_certificate": ""}')
@@ -294,7 +294,7 @@ def test_sin_ca_todavía_el_panel_no_ofrece_descargarla(monkeypatch):
 
 # ── Hablar con el proxy ───────────────────────────────────────────────────────
 
-def test_aplicar_manda_el_caddyfile_a_la_api_de_admin(caddy):
+def testAplicarMandaElCaddyfileALaApiDeAdmin(caddy):
     tls.aplicar(True, ["casa"])
 
     assert len(caddy) == 1
@@ -303,7 +303,7 @@ def test_aplicar_manda_el_caddyfile_a_la_api_de_admin(caddy):
     assert b"tls internal" in caddy[0]["datos"]
 
 
-def test_si_el_proxy_no_responde_se_dice_cuál_es(monkeypatch):
+def testSiElProxyNoRespondeSeDiceCuálEs(monkeypatch):
     def _muerto(*_a, **_k):
         raise OSError("connection refused")
 
@@ -313,7 +313,7 @@ def test_si_el_proxy_no_responde_se_dice_cuál_es(monkeypatch):
         tls.aplicar(True, ["casa"])
 
 
-def test_la_ca_se_pide_por_la_api_y_no_leyendo_su_volumen(caddy):
+def testLaCaSePidePorLaApiYNoLeyendoSuVolumen(caddy):
     """El volumen de Caddy pertenece a root y la aplicación corre sin privilegios."""
     pem = tls.raizDeLaCa()
 
@@ -321,7 +321,7 @@ def test_la_ca_se_pide_por_la_api_y_no_leyendo_su_volumen(caddy):
     assert [c["ruta"] for c in caddy] == ["/pki/ca/local"]
 
 
-def test_sin_ca_todavía_se_explica_en_vez_de_devolver_vacío(monkeypatch):
+def testSinCaTodavíaSeExplicaEnVezDeDevolverVacío(monkeypatch):
     monkeypatch.setattr(tls, "_admin", lambda *_a, **_k: b'{"root_certificate": ""}')
 
     with pytest.raises(tls.ErrorCaddy, match="Activa el HTTPS"):
@@ -330,7 +330,7 @@ def test_sin_ca_todavía_se_explica_en_vez_de_devolver_vacío(monkeypatch):
 
 # ── Arranque ──────────────────────────────────────────────────────────────────
 
-def test_al_arrancar_se_reaplica_el_estado_guardado(caddy, monkeypatch):
+def testAlArrancarSeReaplicaElEstadoGuardado(caddy, monkeypatch):
     """Caddy y el estado pueden separarse (contenedor recreado, arranque a mano).
 
     Si el proxy volviera a servir en claro con el estado diciendo que hay HTTPS,
@@ -341,10 +341,10 @@ def test_al_arrancar_se_reaplica_el_estado_guardado(caddy, monkeypatch):
     tls.guardarEstado(True, ["casa"])
     tls.converger()
 
-    assert b"tls internal" in _ultimo_load(caddy)
+    assert b"tls internal" in _ultimoLoad(caddy)
 
 
-def test_converger_no_impide_arrancar_si_el_proxy_está_caído(monkeypatch):
+def testConvergerNoImpideArrancarSiElProxyEstáCaído(monkeypatch):
     """Tiene que haber interfaz desde la que arreglarlo."""
     def _muerto(*_a, **_k):
         raise OSError("connection refused")
@@ -357,7 +357,7 @@ def test_converger_no_impide_arrancar_si_el_proxy_está_caído(monkeypatch):
     tls.converger()  # no lanza
 
 
-def test_converger_reintenta_mientras_el_proxy_arranca(monkeypatch):
+def testConvergerReintentaMientrasElProxyArranca(monkeypatch):
     """Los dos contenedores arrancan a la vez y `depends_on` no espera a que
     Caddy escuche: el primer intento cae en esa ventana con frecuencia."""
     intentos = []
@@ -378,16 +378,16 @@ def test_converger_reintenta_mientras_el_proxy_arranca(monkeypatch):
     assert len(intentos) == 3
 
 
-def test_con_https_impuesto_por_entorno_no_se_toca_el_proxy(caddy, monkeypatch):
+def testConHttpsImpuestoPorEntornoNoSeTocaElProxy(caddy, monkeypatch):
     """Ahí el TLS lo lleva un proxy propio: reconfigurarlo lo machacaría."""
     monkeypatch.setenv("PROXY_FIX_HOPS", "1")
     monkeypatch.setenv("HTTPS_ENABLED", "true")
     tls.converger()
 
-    assert _ultimo_load(caddy) is None
+    assert _ultimoLoad(caddy) is None
 
 
-def test_converger_no_hace_nada_sin_proxy_delante(caddy, monkeypatch):
+def testConvergerNoHaceNadaSinProxyDelante(caddy, monkeypatch):
     """La instalación sin Docker no tiene Caddy: sin esto, cada arranque se
     comía hasta 8 s reintentando contra un `http://caddy:2019` que no
     responde nunca en ese despliegue."""
@@ -399,7 +399,7 @@ def test_converger_no_hace_nada_sin_proxy_delante(caddy, monkeypatch):
     assert caddy == []
 
 
-def test_el_aviso_de_http_plano_solo_sale_sin_https():
+def testElAvisoDeHttpPlanoSoloSaleSinHttps():
     assert "claro" in tls.avisoSinHttps()
 
     tls.guardarEstado(True, ["casa"])
@@ -408,7 +408,7 @@ def test_el_aviso_de_http_plano_solo_sale_sin_https():
 
 # ── Nombres sugeridos ─────────────────────────────────────────────────────────
 
-def test_se_sugiere_el_nombre_de_la_barra_y_la_ip_de_la_lan(monkeypatch):
+def testSeSugiereElNombreDeLaBarraYLaIpDeLaLan(monkeypatch):
     """Las dos juntas, porque olvidar la IP de la LAN es el fallo silencioso de
     esta pantalla: el certificado se emite bien, pero no cubre por donde se
     entra desde el móvil."""
@@ -417,7 +417,7 @@ def test_se_sugiere_el_nombre_de_la_barra_y_la_ip_de_la_lan(monkeypatch):
     assert tls.nombresSugeridos("portfolio.casa:5000") == ["portfolio.casa", "192.168.1.163"]
 
 
-def test_sin_ip_de_la_lan_se_sugiere_lo_que_haya(monkeypatch):
+def testSinIpDeLaLanSeSugiereLoQueHaya(monkeypatch):
     """Fuera de Docker nadie rellena PORTFOLIO_LAN_IP, y el panel tiene que
     seguir llegando con algo puesto."""
     monkeypatch.delenv("PORTFOLIO_LAN_IP", raising=False)
@@ -425,7 +425,7 @@ def test_sin_ip_de_la_lan_se_sugiere_lo_que_haya(monkeypatch):
     assert tls.nombresSugeridos("localhost:5000") == ["localhost"]
 
 
-def test_no_se_sugiere_dos_veces_lo_mismo(monkeypatch):
+def testNoSeSugiereDosVecesLoMismo(monkeypatch):
     """Se entra por la IP de la LAN: las dos pistas coinciden."""
     monkeypatch.setenv("PORTFOLIO_LAN_IP", "192.168.1.163")
 
@@ -434,7 +434,7 @@ def test_no_se_sugiere_dos_veces_lo_mismo(monkeypatch):
 
 # ── Comprobación ──────────────────────────────────────────────────────────────
 
-def test_el_resumen_saca_del_certificado_lo_que_se_pregunta():
+def testElResumenSacaDelCertificadoLoQueSePregunta():
     """Qué nombres cubre y cuánto le queda: lo demás del certificado no le
     resuelve ninguna duda a quien mira el panel."""
     fin = time.time() + 30 * 86400
@@ -454,7 +454,7 @@ def test_el_resumen_saca_del_certificado_lo_que_se_pregunta():
     assert resumen["dias"] in (29, 30)
 
 
-def test_un_certificado_sin_fecha_no_revienta_la_prueba():
+def testUnCertificadoSinFechaNoRevientaLaPrueba():
     """Viene de la red: si el campo falta o es raro, se informa sin fecha en vez
     de tumbar la comprobación entera."""
     resumen = tls._resumenCertificado({"notAfter": "el mes que viene"})
@@ -463,7 +463,7 @@ def test_un_certificado_sin_fecha_no_revienta_la_prueba():
     assert resumen["dias"] is None
 
 
-def test_sin_certificado_todavía_la_prueba_dice_qué_falta(caddy):
+def testSinCertificadoTodavíaLaPruebaDiceQuéFalta(caddy):
     """Servir en claro es una decisión legítima del usuario, no un error. Pero
     aquí no hay nada que comprobar, y decirlo es más útil que un resultado
     vacío: lo que falta es pulsar el botón de emitir."""
@@ -475,7 +475,7 @@ def test_sin_certificado_todavía_la_prueba_dice_qué_falta(caddy):
     assert salida["nombres"] == []
 
 
-def test_el_certificado_se_comprueba_antes_de_activar(caddy, monkeypatch):
+def testElCertificadoSeCompruebaAntesDeActivar(caddy, monkeypatch):
     """El arreglo entero: la comprobación deja de ser un diagnóstico póstumo.
 
     Con el HTTPS apagado pero el certificado ya emitido, se comprueba contra el
@@ -502,7 +502,7 @@ def test_el_certificado_se_comprueba_antes_de_activar(caddy, monkeypatch):
     assert salida["error"] is None
 
 
-def test_con_el_https_puesto_se_comprueba_el_puerto_de_verdad(caddy, monkeypatch):
+def testConElHttpsPuestoSeCompruebaElPuertoDeVerdad(caddy, monkeypatch):
     """Ahí la pregunta ya es otra: no si el certificado vale, sino si el puerto
     por el que entra la gente lo está sirviendo."""
     puertos = []
@@ -522,7 +522,7 @@ def test_con_el_https_puesto_se_comprueba_el_puerto_de_verdad(caddy, monkeypatch
     assert puertos == [tls.settings.puerto()]
 
 
-def test_la_prueba_vuelve_a_levantar_el_sitio_de_comprobación(monkeypatch):
+def testLaPruebaVuelveALevantarElSitioDeComprobación(monkeypatch):
     """Se cae al reiniciar la aplicación, porque al arrancar se reaplica el
     estado guardado y ahí el HTTPS está apagado.
 
@@ -554,7 +554,7 @@ def test_la_prueba_vuelve_a_levantar_el_sitio_de_comprobación(monkeypatch):
     assert f"https://casa:{tls.PUERTO_PREPARACION}".encode() in cargas[-1]
 
 
-def test_con_el_proxy_caido_la_prueba_dice_dónde_mirar(monkeypatch):
+def testConElProxyCaidoLaPruebaDiceDóndeMirar(monkeypatch):
     def _muerto(ruta, datos=None, tipo=None):
         raise OSError("connection refused")
 
@@ -568,7 +568,7 @@ def test_con_el_proxy_caido_la_prueba_dice_dónde_mirar(monkeypatch):
     assert salida["nombres"] == []
 
 
-def test_se_comprueba_cada_nombre_y_manda_el_que_caduca_antes(caddy, monkeypatch):
+def testSeCompruebaCadaNombreYMandaElQueCaducaAntes(caddy, monkeypatch):
     """El resumen se queda con el plazo más corto porque es el que va a dar el
     primer susto; con el más largo, un certificado a punto de caducar se
     escondería detrás de otro recién emitido."""
@@ -590,7 +590,7 @@ def test_se_comprueba_cada_nombre_y_manda_el_que_caduca_antes(caddy, monkeypatch
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-def _ultimo_load(caddy):
+def _ultimoLoad(caddy):
     """Última configuración cargada. `proxyDisponible()` también llama a la API,
     así que mirar la última llamada a secas daría el sondeo, no el /load."""
     cargas = [c for c in caddy if c["ruta"] == "/load"]
@@ -598,16 +598,16 @@ def _ultimo_load(caddy):
 
 
 @pytest.fixture
-def bp_tls():
-    from routes.tls import tls_bp
-    return tls_bp
+def bpTls():
+    from routes.tls import tlsBp
+    return tlsBp
 
 
-def test_los_endpoints_exigen_sesion(crear_app, bp_tls):
+def testLosEndpointsExigenSesion(crearApp, bpTls):
     """Un certificado raíz es público, pero instalarlo es decidir confiar en una
     autoridad para todos los sitios: servirlo sin autenticar invita a que alguien
     enlace a él desde fuera."""
-    client = crear_app(bp_tls).test_client()
+    client = crearApp(bpTls).test_client()
 
     assert client.get("/api/tls").status_code == 401
     assert client.get("/api/tls/ca.crt").status_code == 401
@@ -615,11 +615,11 @@ def test_los_endpoints_exigen_sesion(crear_app, bp_tls):
     assert client.post("/api/tls/preparar", json={"nombres": ["casa"]}).status_code == 401
 
 
-def test_el_estado_sugiere_el_nombre_por_el_que_has_entrado(cliente_autenticado, bp_tls, caddy):
+def testElEstadoSugiereElNombrePorElQueHasEntrado(clienteAutenticado, bpTls, caddy):
     """Desde dentro de un contenedor no hay forma de saber la IP de la LAN, pero
     el Host de esta misma petición es literalmente lo que el usuario tiene
     escrito en la barra del navegador."""
-    client, _cab, _app = cliente_autenticado(bp_tls)
+    client, _cab, _app = clienteAutenticado(bpTls)
 
     datos = client.get("/api/tls").get_json()
 
@@ -634,7 +634,7 @@ def test_el_estado_sugiere_el_nombre_por_el_que_has_entrado(cliente_autenticado,
     assert datos["puertoPrueba"] == tls.PUERTO_PREPARACION
 
 
-def test_preparar_emite_el_certificado_sin_encender_nada(cliente_autenticado, bp_tls, caddy):
+def testPrepararEmiteElCertificadoSinEncenderNada(clienteAutenticado, bpTls, caddy):
     """El caso entero de este endpoint: al terminar hay algo que instalar y la
     conexión sigue exactamente como estaba.
 
@@ -642,7 +642,7 @@ def test_preparar_emite_el_certificado_sin_encender_nada(cliente_autenticado, bp
     ya solo habla TLS y el navegador la rechazaría: el usuario se quedaría fuera
     con el certificado sin descargar, que es justo lo que se viene a evitar.
     """
-    client, cab, app = cliente_autenticado(bp_tls)
+    client, cab, app = clienteAutenticado(bpTls)
 
     res = client.post("/api/tls/preparar", headers=cab, json={
         "nombres": ["https://portfolio.casa:5000/"],
@@ -661,41 +661,41 @@ def test_preparar_emite_el_certificado_sin_encender_nada(cliente_autenticado, bp
     assert app.config["SESSION_COOKIE_SECURE"] is False
 
 
-def test_preparar_deja_el_puerto_de_la_aplicacion_en_claro(cliente_autenticado, bp_tls, caddy):
-    client, cab, _app = cliente_autenticado(bp_tls)
+def testPrepararDejaElPuertoDeLaAplicacionEnClaro(clienteAutenticado, bpTls, caddy):
+    client, cab, _app = clienteAutenticado(bpTls)
 
     client.post("/api/tls/preparar", headers=cab, json={"nombres": ["portfolio.casa"]})
 
-    cargado = _ultimo_load(caddy).decode()
+    cargado = _ultimoLoad(caddy).decode()
     assert f"http://:{tls.settings.puerto()} {{" in cargado
     assert f"https://portfolio.casa:{tls.PUERTO_PREPARACION}" in cargado
 
 
-def test_preparar_sin_nombres_se_rechaza(cliente_autenticado, bp_tls, caddy):
+def testPrepararSinNombresSeRechaza(clienteAutenticado, bpTls, caddy):
     """La misma validación que activar: el certificado que se emite es el mismo,
     y lo que no vale en un paso no puede colarse por el otro."""
-    client, cab, _app = cliente_autenticado(bp_tls)
+    client, cab, _app = clienteAutenticado(bpTls)
 
     res = client.post("/api/tls/preparar", headers=cab, json={"nombres": []})
 
     assert res.status_code == 400
     assert res.get_json()["field"] == "nombres"
-    assert _ultimo_load(caddy) is None
+    assert _ultimoLoad(caddy) is None
 
 
-def test_preparar_con_el_https_ya_puesto_no_toca_el_proxy(cliente_autenticado, bp_tls, caddy):
+def testPrepararConElHttpsYaPuestoNoTocaElProxy(clienteAutenticado, bpTls, caddy):
     """Ahí no hay nada que preparar —la CA ya existe y se descarga tal cual—, y
     recargar el proxy con la configuración en claro tiraría al usuario."""
-    client, cab, _app = cliente_autenticado(bp_tls)
+    client, cab, _app = clienteAutenticado(bpTls)
     client.post("/api/tls", headers=cab, json={"activado": True, "nombres": ["casa"]})
 
     res = client.post("/api/tls/preparar", headers=cab, json={"nombres": ["casa"]})
 
     assert res.status_code == 409
-    assert b"tls internal" in _ultimo_load(caddy)
+    assert b"tls internal" in _ultimoLoad(caddy)
 
 
-def test_la_comprobacion_levanta_el_puerto_si_se_ha_caido(cliente_autenticado, bp_tls, monkeypatch):
+def testLaComprobacionLevantaElPuertoSiSeHaCaido(clienteAutenticado, bpTls, monkeypatch):
     """El sitio de comprobación no sobrevive a un reinicio: al arrancar se
     reaplica el estado guardado, y con el HTTPS apagado ahí no hay TLS.
 
@@ -714,7 +714,7 @@ def test_la_comprobacion_levanta_el_puerto_si_se_ha_caido(cliente_autenticado, b
         return b'{"apps": {"http": {"servers": {"srv0": {"listen": [":5000"]}}}}}'
 
     monkeypatch.setattr(tls, "_admin", _admin)
-    client, cab, _app = cliente_autenticado(bp_tls)
+    client, cab, _app = clienteAutenticado(bpTls)
     tls.guardarEstado(False, ["192.168.1.163"])
 
     res = client.post("/api/tls/comprobacion", headers=cab)
@@ -726,7 +726,7 @@ def test_la_comprobacion_levanta_el_puerto_si_se_ha_caido(cliente_autenticado, b
     assert f"http://:{tls.settings.puerto()}".encode() in cargas[-1]
 
 
-def test_la_comprobacion_no_toca_el_proxy_si_ya_está_en_pie(cliente_autenticado, bp_tls, monkeypatch):
+def testLaComprobacionNoTocaElProxySiYaEstáEnPie(clienteAutenticado, bpTls, monkeypatch):
     """Recargar la configuración por gusto es tocar el proxy que sostiene la
     sesión: si el puerto ya está, no se hace nada."""
     cargas = []
@@ -740,15 +740,15 @@ def test_la_comprobacion_no_toca_el_proxy_si_ya_está_en_pie(cliente_autenticado
         return f'{{"listen": [":{tls.PUERTO_PREPARACION}"]}}'.encode()
 
     monkeypatch.setattr(tls, "_admin", _admin)
-    client, cab, _app = cliente_autenticado(bp_tls)
+    client, cab, _app = clienteAutenticado(bpTls)
     tls.guardarEstado(False, ["casa"])
 
     assert client.post("/api/tls/comprobacion", headers=cab).status_code == 200
     assert cargas == []
 
 
-def test_la_comprobacion_sin_certificado_dice_qué_falta(cliente_autenticado, bp_tls, caddy):
-    client, cab, _app = cliente_autenticado(bp_tls)
+def testLaComprobacionSinCertificadoDiceQuéFalta(clienteAutenticado, bpTls, caddy):
+    client, cab, _app = clienteAutenticado(bpTls)
 
     res = client.post("/api/tls/comprobacion", headers=cab)
 
@@ -756,17 +756,17 @@ def test_la_comprobacion_sin_certificado_dice_qué_falta(cliente_autenticado, bp
     assert "Emitir el certificado" in res.get_json()["error"]
 
 
-def test_activar_sin_nombres_se_rechaza(cliente_autenticado, bp_tls, caddy):
-    client, cab, _app = cliente_autenticado(bp_tls)
+def testActivarSinNombresSeRechaza(clienteAutenticado, bpTls, caddy):
+    client, cab, _app = clienteAutenticado(bpTls)
 
     res = client.post("/api/tls", headers=cab, json={"activado": True, "nombres": []})
 
     assert res.status_code == 400
     assert res.get_json()["field"] == "nombres"
-    assert _ultimo_load(caddy) is None
+    assert _ultimoLoad(caddy) is None
 
 
-def test_no_se_activa_un_certificado_que_no_cubre_por_donde_entras(cliente_autenticado, bp_tls, caddy):
+def testNoSeActivaUnCertificadoQueNoCubrePorDondeEntras(clienteAutenticado, bpTls, caddy):
     """El fallo que se lleva por delante el acceso, y no puede ser lo que nadie
     quería.
 
@@ -776,9 +776,9 @@ def test_no_se_activa_un_certificado_que_no_cubre_por_donde_entras(cliente_auten
     nombre falta.
     """
     from core.errors import ValidationError
-    from routes.tls import _validar_que_no_te_deja_fuera
+    from routes.tls import _validarQueNoTeDejaFuera
 
-    _client, _cab, app = cliente_autenticado(bp_tls)
+    _client, _cab, app = clienteAutenticado(bpTls)
 
     # Se entra por la petición y no por el cliente porque cambiarle el Host le
     # cambia también el origen de la cookie: se acabaría comprobando el login,
@@ -787,17 +787,17 @@ def test_no_se_activa_un_certificado_que_no_cubre_por_donde_entras(cliente_auten
         app.test_request_context("/api/tls", headers={"Host": "192.168.1.50:5000"}),
         pytest.raises(ValidationError) as fallo,
     ):
-        _validar_que_no_te_deja_fuera(["portfolio.casa"])
+        _validarQueNoTeDejaFuera(["portfolio.casa"])
 
     assert "192.168.1.50" in str(fallo.value)
-    assert _ultimo_load(caddy) is None
+    assert _ultimoLoad(caddy) is None
     assert tls.leerEstado()["activado"] is False
 
 
-def test_activar_desde_localhost_no_se_bloquea(cliente_autenticado, bp_tls, caddy):
+def testActivarDesdeLocalhostNoSeBloquea(clienteAutenticado, bpTls, caddy):
     """Es el caso normal de quien enciende esto desde el propio servidor: el
     certificado lleva localhost siempre, así que nadie se queda fuera."""
-    client, cab, _app = cliente_autenticado(bp_tls)
+    client, cab, _app = clienteAutenticado(bpTls)
 
     res = client.post("/api/tls", headers=cab, json={
         "activado": True, "nombres": ["192.168.1.50"],
@@ -806,8 +806,8 @@ def test_activar_desde_localhost_no_se_bloquea(cliente_autenticado, bp_tls, cadd
     assert res.status_code == 200
 
 
-def test_activar_configura_el_proxy_y_guarda_el_estado(cliente_autenticado, bp_tls, caddy):
-    client, cab, app = cliente_autenticado(bp_tls)
+def testActivarConfiguraElProxyYGuardaElEstado(clienteAutenticado, bpTls, caddy):
+    client, cab, app = clienteAutenticado(bpTls)
 
     res = client.post("/api/tls", headers=cab, json={
         "activado": True, "nombres": ["https://portfolio.casa:5000/"],
@@ -815,14 +815,14 @@ def test_activar_configura_el_proxy_y_guarda_el_estado(cliente_autenticado, bp_t
 
     assert res.status_code == 200
     assert res.get_json()["activado"] is True
-    assert b"tls internal" in _ultimo_load(caddy)
+    assert b"tls internal" in _ultimoLoad(caddy)
     assert tls.leerEstado()["nombres"] == ["portfolio.casa"]
     # La política de la cookie cambia sin reiniciar: Flask la lee de app.config
     # en cada respuesta, así que la siguiente ya sale con Secure.
     assert app.config["SESSION_COOKIE_SECURE"] is True
 
 
-def test_si_el_proxy_rechaza_la_configuracion_no_se_guarda_nada(cliente_autenticado, bp_tls, monkeypatch):
+def testSiElProxyRechazaLaConfiguracionNoSeGuardaNada(clienteAutenticado, bpTls, monkeypatch):
     """El orden es lo que evita el bloqueo total.
 
     Un estado que dijera «HTTPS activo» sobre un proxy sirviendo en claro haría
@@ -833,7 +833,7 @@ def test_si_el_proxy_rechaza_la_configuracion_no_se_guarda_nada(cliente_autentic
         raise OSError("connection refused")
 
     monkeypatch.setattr(tls, "_admin", _muerto)
-    client, cab, app = cliente_autenticado(bp_tls)
+    client, cab, app = clienteAutenticado(bpTls)
 
     res = client.post("/api/tls", headers=cab, json={"activado": True, "nombres": ["casa"]})
 
@@ -842,34 +842,34 @@ def test_si_el_proxy_rechaza_la_configuracion_no_se_guarda_nada(cliente_autentic
     assert app.config["SESSION_COOKIE_SECURE"] is False
 
 
-def test_desactivar_devuelve_el_proxy_a_texto_plano(cliente_autenticado, bp_tls, caddy):
-    client, cab, app = cliente_autenticado(bp_tls)
+def testDesactivarDevuelveElProxyATextoPlano(clienteAutenticado, bpTls, caddy):
+    client, cab, app = clienteAutenticado(bpTls)
     client.post("/api/tls", headers=cab, json={"activado": True, "nombres": ["casa"]})
 
     res = client.post("/api/tls", headers=cab, json={"activado": False})
 
     assert res.status_code == 200
-    assert b"tls internal" not in _ultimo_load(caddy)
+    assert b"tls internal" not in _ultimoLoad(caddy)
     assert tls.leerEstado()["activado"] is False
     assert app.config["SESSION_COOKIE_SECURE"] is False
 
 
-def test_con_https_impuesto_por_entorno_el_interruptor_se_niega(cliente_autenticado, bp_tls, caddy, monkeypatch):
+def testConHttpsImpuestoPorEntornoElInterruptorSeNiega(clienteAutenticado, bpTls, caddy, monkeypatch):
     """Aceptarlo machacaría la configuración del proxy que lleva ese despliegue."""
     monkeypatch.setenv("HTTPS_ENABLED", "true")
-    client, cab, _app = cliente_autenticado(bp_tls)
+    client, cab, _app = clienteAutenticado(bpTls)
 
     assert client.get("/api/tls").get_json()["gestionadoPorEntorno"] is True
 
     res = client.post("/api/tls", headers=cab, json={"activado": False})
     assert res.status_code == 409
-    assert _ultimo_load(caddy) is None
+    assert _ultimoLoad(caddy) is None
 
 
-def test_la_ca_se_descarga_como_fichero(cliente_autenticado, bp_tls, caddy):
+def testLaCaSeDescargaComoFichero(clienteAutenticado, bpTls, caddy):
     """El tipo x-x509-ca-cert es el que hace que iOS ofrezca instalarlo como
     perfil en vez de enseñarlo como texto."""
-    client, _cab, _app = cliente_autenticado(bp_tls)
+    client, _cab, _app = clienteAutenticado(bpTls)
 
     res = client.get("/api/tls/ca.crt")
 
@@ -879,10 +879,10 @@ def test_la_ca_se_descarga_como_fichero(cliente_autenticado, bp_tls, caddy):
     assert res.data.startswith(b"-----BEGIN CERTIFICATE-----")
 
 
-def test_la_prueba_contesta_aunque_no_haya_nada_que_comprobar(cliente_autenticado, bp_tls, caddy):
+def testLaPruebaContestaAunqueNoHayaNadaQueComprobar(clienteAutenticado, bpTls, caddy):
     """Con el HTTPS apagado sigue siendo un 200: la interfaz necesita pintar el
     estado, no un error."""
-    client, _cab, _app = cliente_autenticado(bp_tls)
+    client, _cab, _app = clienteAutenticado(bpTls)
 
     datos = client.get("/api/tls/prueba").get_json()
 

@@ -17,21 +17,21 @@ import pytest
 
 
 @pytest.fixture
-def cliente(cliente_autenticado, datos_aislados, monkeypatch):
-    from routes.portfolios import portfolios_bp
+def cliente(clienteAutenticado, datosAislados, monkeypatch):
+    from routes.portfolios import portfoliosBp
 
     monkeypatch.setenv("ESCRITURAS_POR_MINUTO", "0")
     monkeypatch.setenv("ESCRITURAS_PESADAS_POR_HORA", "0")
 
-    client, cabeceras, _app = cliente_autenticado(portfolios_bp)
-    datos_aislados["meta"].write_text(
+    client, cabeceras, _app = clienteAutenticado(portfoliosBp)
+    datosAislados["meta"].write_text(
         json.dumps({"active": "principal", "portfolios": [{"id": "principal", "name": "Principal"}]}),
         encoding="utf-8",
     )
-    return client, cabeceras, datos_aislados
+    return client, cabeceras, datosAislados
 
 
-def _db_de_prueba(ruta):
+def _dbDePrueba(ruta):
     conn = sqlite3.connect(str(ruta))
     conn.execute("CREATE TABLE activos (id TEXT PRIMARY KEY, name TEXT)")
     conn.execute("INSERT INTO activos VALUES ('btc', 'Bitcoin')")
@@ -49,9 +49,9 @@ def _subir(client, cabeceras, nombre, contenido, portfolio="Importada"):
     )
 
 
-def test_importa_un_db_suelto(cliente, tmp_path):
+def testImportaUnDbSuelto(cliente, tmp_path):
     client, cabeceras, rutas = cliente
-    contenido = _db_de_prueba(tmp_path / "origen.db")
+    contenido = _dbDePrueba(tmp_path / "origen.db")
 
     respuesta = _subir(client, cabeceras, "portfolio_principal.db", contenido)
 
@@ -59,10 +59,10 @@ def test_importa_un_db_suelto(cliente, tmp_path):
     assert (rutas["portfolios"] / "importada.db").exists()
 
 
-def test_importa_el_zip_que_genera_exportar_zip(cliente, tmp_path):
+def testImportaElZipQueGeneraExportarZip(cliente, tmp_path):
     """Lo que fallaba: el zip de export se rechazaba por «no es SQLite»."""
     client, cabeceras, rutas = cliente
-    contenido = _db_de_prueba(tmp_path / "origen.db")
+    contenido = _dbDePrueba(tmp_path / "origen.db")
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
@@ -83,10 +83,10 @@ def test_importa_el_zip_que_genera_exportar_zip(cliente, tmp_path):
         conn.close()
 
 
-def test_un_zip_con_varias_carteras_manda_a_restaurar(cliente, tmp_path):
+def testUnZipConVariasCarterasMandaARestaurar(cliente, tmp_path):
     """Una copia de seguridad completa no cabe en «una cartera nueva»."""
     client, cabeceras, _rutas = cliente
-    contenido = _db_de_prueba(tmp_path / "origen.db")
+    contenido = _dbDePrueba(tmp_path / "origen.db")
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
@@ -103,7 +103,7 @@ def test_un_zip_con_varias_carteras_manda_a_restaurar(cliente, tmp_path):
     assert "cripto" in error and "principal" in error
 
 
-def test_un_zip_sin_bases_de_datos_se_rechaza(cliente):
+def testUnZipSinBasesDeDatosSeRechaza(cliente):
     client, cabeceras, _rutas = cliente
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
@@ -116,7 +116,7 @@ def test_un_zip_sin_bases_de_datos_se_rechaza(cliente):
     assert "no contiene ninguna base de datos" in respuesta.get_json()["error"]
 
 
-def test_un_fichero_que_no_es_ni_db_ni_zip_se_rechaza(cliente):
+def testUnFicheroQueNoEsNiDbNiZipSeRechaza(cliente):
     client, cabeceras, _rutas = cliente
 
     respuesta = _subir(client, cabeceras, "notas.txt", b"esto no es una base de datos")
@@ -125,10 +125,10 @@ def test_un_fichero_que_no_es_ni_db_ni_zip_se_rechaza(cliente):
     assert "SQLite" in respuesta.get_json()["error"]
 
 
-def test_la_importacion_no_deja_temporales_entre_las_carteras(cliente, tmp_path):
+def testLaImportacionNoDejaTemporalesEntreLasCarteras(cliente, tmp_path):
     """El temporal de la subida vive en data/tmp, no en data/portfolios."""
     client, cabeceras, rutas = cliente
-    contenido = _db_de_prueba(tmp_path / "origen.db")
+    contenido = _dbDePrueba(tmp_path / "origen.db")
 
     _subir(client, cabeceras, "portfolio_principal.db", contenido)
 
