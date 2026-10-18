@@ -1,0 +1,304 @@
+{
+  "segundosImportApp": 2.837,
+  "iteraciones": 200,
+  "endpoints": {
+    "/api/activos": {
+      "estado": 200,
+      "bytes": 2908,
+      "p50": 3.062,
+      "p95": 3.844,
+      "p99": 4.289,
+      "media": 3.125,
+      "sentenciasSql": 3
+    },
+    "/api/activos/{activo}": {
+      "estado": 200,
+      "bytes": 490,
+      "p50": 1.407,
+      "p95": 1.758,
+      "p99": 2.36,
+      "media": 1.469,
+      "sentenciasSql": 4
+    },
+    "/api/activos/rendimiento-batch": {
+      "estado": 200,
+      "bytes": 1413,
+      "p50": 3.502,
+      "p95": 4.364,
+      "p99": 5.197,
+      "media": 3.601,
+      "sentenciasSql": 4
+    },
+    "/api/ventas": {
+      "estado": 200,
+      "bytes": 567,
+      "p50": 1.833,
+      "p95": 2.143,
+      "p99": 2.409,
+      "media": 1.872,
+      "sentenciasSql": 6
+    },
+    "/api/ventas/{year}": {
+      "estado": 200,
+      "bytes": 555,
+      "p50": 1.995,
+      "p95": 2.388,
+      "p99": 2.64,
+      "media": 2.022,
+      "sentenciasSql": 7
+    },
+    "/api/operaciones": {
+      "estado": 200,
+      "bytes": 456,
+      "p50": 1.593,
+      "p95": 2.212,
+      "p99": 3.024,
+      "media": 1.687,
+      "sentenciasSql": 3
+    },
+    "/api/transacciones": {
+      "estado": 200,
+      "bytes": 416,
+      "p50": 1.185,
+      "p95": 1.36,
+      "p99": 1.677,
+      "media": 1.216,
+      "sentenciasSql": 1
+    },
+    "/api/dividendos": {
+      "estado": 200,
+      "bytes": 958,
+      "p50": 1.519,
+      "p95": 1.876,
+      "p99": 2.001,
+      "media": 1.565,
+      "sentenciasSql": 1
+    },
+    "/api/intereses": {
+      "estado": 200,
+      "bytes": 295,
+      "p50": 1.375,
+      "p95": 1.741,
+      "p99": 2.058,
+      "media": 1.413,
+      "sentenciasSql": 4
+    },
+    "/api/gastos": {
+      "estado": 200,
+      "bytes": 19,
+      "p50": 1.178,
+      "p95": 1.518,
+      "p99": 2.072,
+      "media": 1.231,
+      "sentenciasSql": 1
+    },
+    "/api/gastos/{year}": {
+      "estado": 200,
+      "bytes": 3155,
+      "p50": 2.529,
+      "p95": 3.138,
+      "p99": 3.77,
+      "media": 2.601,
+      "sentenciasSql": 16
+    },
+    "/api/ingresos": {
+      "estado": 200,
+      "bytes": 19,
+      "p50": 1.25,
+      "p95": 1.743,
+      "p99": 2.191,
+      "media": 1.334,
+      "sentenciasSql": 1
+    },
+    "/api/ingresos/{year}": {
+      "estado": 200,
+      "bytes": 1064,
+      "p50": 1.894,
+      "p95": 2.388,
+      "p99": 2.764,
+      "media": 1.958,
+      "sentenciasSql": 17
+    },
+    "/api/cuentas": {
+      "estado": 200,
+      "bytes": 514,
+      "p50": 4.219,
+      "p95": 5.037,
+      "p99": 5.459,
+      "media": 4.293,
+      "sentenciasSql": 12
+    },
+    "/api/cuentas/saldos-mes?year={year}&month={mes}": {
+      "estado": 200,
+      "bytes": 293,
+      "p50": 5.378,
+      "p95": 6.324,
+      "p99": 7.711,
+      "media": 5.499,
+      "sentenciasSql": 20
+    },
+    "/api/transferencias": {
+      "estado": 200,
+      "bytes": 308,
+      "p50": 1.379,
+      "p95": 1.69,
+      "p99": 1.956,
+      "media": 1.412,
+      "sentenciasSql": 2
+    },
+    "/api/settings": {
+      "estado": 200,
+      "bytes": 803,
+      "p50": 1.896,
+      "p95": 2.228,
+      "p99": 2.646,
+      "media": 1.935,
+      "sentenciasSql": 0
+    },
+    "/api/portfolios": {
+      "estado": 200,
+      "bytes": 190,
+      "p50": 1.225,
+      "p95": 1.434,
+      "p99": 1.594,
+      "media": 1.251,
+      "sentenciasSql": 0
+    },
+    "/api/metricas/inversiones": {
+      "estado": 200,
+      "bytes": 272,
+      "p50": 1.605,
+      "p95": 2.088,
+      "p99": 2.32,
+      "media": 1.657,
+      "sentenciasSql": 2
+    },
+    "/api/portfolio/history?range=1M": {
+      "estado": 200,
+      "bytes": 17707,
+      "p50": 7.532,
+      "p95": 12.457,
+      "p99": 13.129,
+      "media": 8.039,
+      "sentenciasSql": 1
+    },
+    "/api/portfolio/history?range=ALL": {
+      "estado": 200,
+      "bytes": 105191,
+      "p50": 43.794,
+      "p95": 57.457,
+      "p99": 63.376,
+      "media": 45.38,
+      "sentenciasSql": 1
+    },
+    "/api/portfolio/history/by-type?range=1M": {
+      "estado": 200,
+      "bytes": 26070,
+      "p50": 11.547,
+      "p95": 15.391,
+      "p99": 17.2,
+      "media": 12.018,
+      "sentenciasSql": 3
+    },
+    "/api/portfolio/history/by-type?range=ALL": {
+      "estado": 200,
+      "bytes": 137523,
+      "p50": 57.688,
+      "p95": 69.655,
+      "p99": 75.744,
+      "media": 59.687,
+      "sentenciasSql": 3
+    },
+    "/api/portfolio/rentabilidad": {
+      "estado": 200,
+      "bytes": 1509,
+      "p50": 40.661,
+      "p95": 55.314,
+      "p99": 58.371,
+      "media": 43.47,
+      "sentenciasSql": 1
+    },
+    "/api/bonos": {
+      "estado": 200,
+      "bytes": 12,
+      "p50": 1.208,
+      "p95": 1.513,
+      "p99": 1.715,
+      "media": 1.241,
+      "sentenciasSql": 1
+    },
+    "/api/rentafija": {
+      "estado": 200,
+      "bytes": 12,
+      "p50": 1.163,
+      "p95": 1.619,
+      "p99": 1.833,
+      "media": 1.224,
+      "sentenciasSql": 1
+    },
+    "/api/trading": {
+      "estado": 200,
+      "bytes": 12,
+      "p50": 1.225,
+      "p95": 1.518,
+      "p99": 1.838,
+      "media": 1.255,
+      "sentenciasSql": 1
+    },
+    "/api/staking": {
+      "estado": 200,
+      "bytes": 15,
+      "p50": 1.148,
+      "p95": 1.559,
+      "p99": 1.746,
+      "media": 1.196,
+      "sentenciasSql": 1
+    },
+    "/api/privatemarket": {
+      "estado": 200,
+      "bytes": 12,
+      "p50": 1.163,
+      "p95": 1.518,
+      "p99": 1.974,
+      "media": 1.216,
+      "sentenciasSql": 1
+    },
+    "/api/health": {
+      "estado": 200,
+      "bytes": 412,
+      "p50": 124.547,
+      "p95": 143.593,
+      "p99": 168.49,
+      "media": 121.348,
+      "sentenciasSql": 4
+    },
+    "/": {
+      "estado": 200,
+      "bytes": 24305,
+      "p50": 6.451,
+      "p95": 7.574,
+      "p99": 8.076,
+      "media": 6.411,
+      "sentenciasSql": 0
+    },
+    "/js/core/app-core.js": {
+      "estado": 200,
+      "bytes": 16297,
+      "p50": 1.64,
+      "p95": 2.078,
+      "p99": 2.296,
+      "media": 1.613,
+      "sentenciasSql": 0
+    },
+    "/css/components.css": {
+      "estado": 200,
+      "bytes": 18681,
+      "p50": 1.484,
+      "p95": 2.009,
+      "p99": 2.415,
+      "media": 1.496,
+      "sentenciasSql": 0
+    }
+  },
+  "perfiles": {}
+}
