@@ -22,6 +22,23 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.8.1] — 2026-10-19
+
+**Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Corregido
+
+- **Paneles: los controles de la cabecera, también en los ajustes.** En un widget
+  estrecho la cabecera cortaba sus controles (el intervalo del análisis técnico,
+  el periodo y el tamaño del mapa de mercado…) y los últimos no se podían pulsar.
+  Ahora el ⚙ de cada widget los repite en una sección «Cabecera», la primera de
+  la ventana, y los cambios se ven a la vez en los dos sitios.
+- **Paneles: la barra de arriba ya no se va con el scroll.** Las pestañas y los
+  botones (⚙, + Widget, Importar / Exportar, ↻, ✕) se quedan fijos; solo se
+  desplazan los widgets. Arrastrar un widget hasta el borde sigue desplazando la
+  rejilla.
+
 ## [4.8.0] — 2026-10-18
 
 **Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la

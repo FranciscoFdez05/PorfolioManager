@@ -12,9 +12,11 @@
     z-index: 950;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 14px 18px 0;
-    overflow-y: auto;
+    gap: 8px;
+    padding-top: 14px;
+    /* Solo se desplaza el contenido (.pnBody): la barra de pestañas y
+       botones se queda siempre a la vista. */
+    overflow: hidden;
     background: var(--bg-app);
 }
 
@@ -35,6 +37,8 @@ body.pnPantallaCompleta {
 
 /* ── Barra de pestañas ─────────────────────────────────────────── */
 .pnBar {
+    flex-shrink: 0;
+    padding: 0 18px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -176,9 +180,12 @@ body.pnPantallaCompleta {
     }
 }
 
+/* El margen deja ver entero el anillo del widget que se está ajustando. */
 .pnBody {
     flex: 1;
     min-height: 0;
+    padding: 4px 18px 0;
+    overflow-y: auto;
 }
 
 .pnCargando,
@@ -2019,8 +2026,14 @@ body.money-hidden .pnMoney {
     accent-color: var(--accent);
 }
 
-.pnAjActivos {
+.pnAjActivos,
+.pnAjCabChip {
     align-self: flex-start;
+}
+
+.pnAjCabChip {
+    max-width: 100%;
+    border-color: var(--border-mid);
 }
 
 .pnAjLimpiar {
@@ -2242,7 +2255,13 @@ body.money-hidden .pnMoney {
 /* ── Móvil: una columna, sin estirar ───────────────────────────── */
 @media (max-width: 900px) {
     .pnPage {
-        padding: 10px 12px 0;
+        padding-top: 10px;
+    }
+
+    .pnBar,
+    .pnBody {
+        padding-right: 12px;
+        padding-left: 12px;
     }
 
     .pnGrid {

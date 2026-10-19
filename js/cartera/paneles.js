@@ -1506,6 +1506,12 @@ function pnPintarWidget(w) {
         console.error("Paneles: error pintando", w.tipo, error)
         cuerpo.innerHTML = `<div class="pnVacio">No se pudo pintar este widget</div>`
     }
+    pnRefrescarCabeceraAjustes(w)
+}
+
+/** Si el widget tiene sus ajustes abiertos, su sección «Cabecera» se pone al día. */
+function pnRefrescarCabeceraAjustes(w) {
+    pnVentanaAjustes("w:" + w.id)?._pintarCabecera?.()
 }
 
 function pnDestruirChart(id) {
@@ -1633,7 +1639,7 @@ function pnBindArrastre(el) {
         if (e.button !== 0) return
         e.preventDefault()
         const grid = el.parentElement
-        const pagina = document.getElementById("pnPage")
+        const pagina = document.getElementById("pnBody")
         const casa = { siguiente: el.nextElementSibling }
         let x = e.clientX
         let y = e.clientY
@@ -1846,15 +1852,27 @@ function pnCerrarMenu() {
     pop.remove()
 }
 
+/**
+ * Los controles de la cabecera salen también en los ajustes del widget (en
+ * «Cabecera»): en un widget estrecho la cabecera los corta y los últimos no
+ * se pueden pulsar. `_cab` dice cómo repetirlos allí: un desplegable que se
+ * abre anclado al botón que se pulse, o una botonera (pnSegmentado).
+ */
+function pnControlCabecera(btn, etiqueta, abrir) {
+    btn._cab = { etiqueta, abrir }
+    btn.addEventListener("click", () => abrir(btn))
+    return btn
+}
+
 /** Desplegable de una opción: el chip muestra la elegida. */
-function pnChip(ctrls, texto, items, valor, alElegir, extra = "") {
+function pnChip(ctrls, texto, items, valor, alElegir, etiqueta = "") {
     const btn = document.createElement("button")
     btn.type = "button"
-    btn.className = "pnChip " + extra
+    btn.className = "pnChip"
     btn.innerHTML = `<span>${escapeHtml(texto)}</span><span class="pnChipFlecha">▾</span>`
-    btn.addEventListener("click", () =>
+    pnControlCabecera(btn, etiqueta, (ancla) =>
         pnMenu(
-            btn,
+            ancla,
             items.map((it) => ({ ...it, activo: it.valor === valor })),
             alElegir
         )
@@ -1864,8 +1882,9 @@ function pnChip(ctrls, texto, items, valor, alElegir, extra = "") {
 }
 
 /** Botonera segmentada para pocas opciones que se cambian a menudo. */
-function pnSegmentado(ctrls, items, valor, alElegir) {
+function pnSegmentado(ctrls, items, valor, alElegir, etiqueta = "") {
     const cont = document.createElement("div")
+    cont._cab = { etiqueta, items, valor, alElegir }
     cont.className = "pnSeg"
     cont.innerHTML = items
         .map(
@@ -2770,7 +2789,8 @@ function pnPintarSecciones(cuerpo, secciones, cfg, aplicar, extraHtml = "") {
     const campoDe = (clave) => campos.find((c) => c.clave === clave)
 
     cuerpo.onclick = (e) => {
-        const seg = e.target.closest(".pnAjSeg .pnSegBtn")
+        // Los de la sección «Cabecera» no tienen clave: los lleva pnAbrirAjustes.
+        const seg = e.target.closest(".pnAjSeg .pnSegBtn[data-clave]")
         if (seg) {
             const campo = campoDe(seg.dataset.clave)
             aplicar(seg.dataset.clave, seg.dataset.valor === campo?.defecto ? undefined : seg.dataset.valor)
@@ -2852,9 +2872,58 @@ function pnAbrirAjustes(w) {
             <button type="button" class="pnBtn pnPeligro" data-accion="quitar">Quitar del panel</button>
         </section>`
 
+    // Los controles de la cabecera, repetidos (pnControlCabecera). Se leen del
+    // widget pintado, así que siempre son los mismos que se ven arriba.
+    const controlesCabecera = () => [...(pnWidgetEl(w)?.querySelectorAll(".pnWCtrls > *") || [])].filter((c) => c._cab)
+
+    const cabecera = () => {
+        const controles = controlesCabecera()
+        if (!controles.length) return ""
+        const campos = controles.map((c, i) => {
+            const etiqueta = `<span class="pnAjEtiqueta">${escapeHtml(c._cab.etiqueta || "Opción")}</span>`
+            if (c._cab.abrir) {
+                const clases = c.className.replace("pnAbierto", "").trim()
+                return `<div class="pnAjCampo">${etiqueta}<button type="button" class="${escapeAttr(clases)} pnAjCabChip" data-cab="${i}">${c.innerHTML}</button></div>`
+            }
+            const botones = c._cab.items
+                .map(
+                    (it) =>
+                        `<button type="button" class="pnSegBtn${it.valor === c._cab.valor ? " active" : ""}" data-cab="${i}" data-valor="${escapeAttr(it.valor)}">${escapeHtml(it.texto)}</button>`
+                )
+                .join("")
+            return `<div class="pnAjCampo">${etiqueta}<div class="pnSeg pnAjSeg">${botones}</div></div>`
+        })
+        return `<section class="pnAjSeccion pnAjCabecera"><h4>Cabecera</h4>${campos.join("")}</section>`
+    }
+
     const pintar = () => {
-        pnPintarSecciones(cuerpo, secciones, w.cfg, aplicar, general())
+        pnPintarSecciones(cuerpo, secciones, w.cfg, aplicar, cabecera() + general())
         cuerpo.insertAdjacentHTML("beforeend", pie())
+    }
+
+    // Tras repintar el widget solo se rehace «Cabecera». Con un menú abierto
+    // desde ella se cambia el contenido de los botones sin sustituirlos, para
+    // no dejar el menú anclado a un botón que ya no está.
+    aside._pintarCabecera = () => {
+        const vieja = cuerpo.querySelector(".pnAjCabecera")
+        const plantilla = document.createElement("template")
+        plantilla.innerHTML = cabecera()
+        const nueva = plantilla.content.firstElementChild
+        const ancla = document.getElementById("pnPop")?._anchor
+        if (vieja && nueva && ancla && vieja.contains(ancla)) {
+            const antes = vieja.querySelectorAll("[data-cab]")
+            const ahora = nueva.querySelectorAll("[data-cab]")
+            if (antes.length === ahora.length) {
+                antes.forEach((b, i) => {
+                    b.innerHTML = ahora[i].innerHTML
+                    b.classList.toggle("active", ahora[i].classList.contains("active"))
+                })
+                return
+            }
+        }
+        if (vieja && nueva) vieja.replaceWith(nueva)
+        else if (vieja) vieja.remove()
+        else if (nueva) cuerpo.prepend(nueva)
     }
 
     function aplicar(clave, valor, { mantenerMenu = false } = {}) {
@@ -2902,6 +2971,13 @@ function pnAbrirAjustes(w) {
         }
     })
     cuerpo.addEventListener("click", (e) => {
+        const cab = e.target.closest("[data-cab]")
+        if (cab) {
+            const control = controlesCabecera()[Number(cab.dataset.cab)]
+            if (control?._cab.abrir) control._cab.abrir(cab)
+            else if (control && cab.dataset.valor !== control._cab.valor) control._cab.alElegir(cab.dataset.valor)
+            return
+        }
         const accion = e.target.closest("[data-accion]")?.dataset.accion
         const panel = pnPanelActivo()
         if (!accion || !panel) return
@@ -3102,8 +3178,8 @@ function pnPintarMapa(w, cuerpo, ctrls) {
     chipActivos.className = "pnChip"
     const textoChip = () => pnTextoFiltro(cfg, def.mercado ? "Todos los activos" : "Toda la cartera")
     chipActivos.innerHTML = `<span>${escapeHtml(textoChip())}</span><span class="pnChipFlecha">▾</span>`
-    chipActivos.addEventListener("click", () =>
-        pnSelectorActivos(chipActivos, {
+    pnControlCabecera(chipActivos, "Activos", (ancla) =>
+        pnSelectorActivos(ancla, {
             opciones: pnTodosLosActivos().filter((a) => !a.oculto || cfg.ocultos === true),
             seleccion: pnLista(cfg, "activos"),
             alCambiar: (ids) => {
@@ -3118,18 +3194,26 @@ function pnPintarMapa(w, cuerpo, ctrls) {
                     setTimeout(() => {
                         pnDibujarMapa(w, cuerpo)
                         chipActivos.querySelector("span").textContent = textoChip()
+                        pnRefrescarCabeceraAjustes(w)
                     }, 120)
                 )
             }
         })
     )
     ctrls.appendChild(chipActivos)
-    pnChip(ctrls, def.periodos.find((p) => p.valor === periodo).texto, def.periodos, periodo, (v) => {
-        if (v === "dia") delete cfg.periodo
-        else cfg.periodo = v
-        pnGuardar()
-        pnPintarWidget(w)
-    })
+    pnChip(
+        ctrls,
+        def.periodos.find((p) => p.valor === periodo).texto,
+        def.periodos,
+        periodo,
+        (v) => {
+            if (v === "dia") delete cfg.periodo
+            else cfg.periodo = v
+            pnGuardar()
+            pnPintarWidget(w)
+        },
+        "Periodo"
+    )
     pnChip(
         ctrls,
         tamano === "igual" ? "Mismo tamaño" : "Por valor",
@@ -3143,7 +3227,8 @@ function pnPintarMapa(w, cuerpo, ctrls) {
             else cfg.tamano = v
             pnGuardar()
             pnPintarWidget(w)
-        }
+        },
+        "Tamaño"
     )
 
     const leyenda = pnSi(cfg, "leyenda", false)
@@ -3415,21 +3500,20 @@ function pnPintarGrafico(w, cuerpo, ctrls) {
     const activo = pnBuscarActivo(cfg.activo) || porDefecto || null
 
     ctrls.innerHTML = ""
-    const chip = document.createElement("button")
-    chip.type = "button"
-    chip.className = "pnChip pnChipActivo"
-    chip.innerHTML = `<span>${escapeHtml(activo ? activo.nombre : "Elegir activo")}</span>${
-        activo?.tv ? `<small>${escapeHtml(activo.tv)}</small>` : ""
-    }<span class="pnChipFlecha">▾</span>`
-    chip.addEventListener("click", () => pnMenuActivoGrafico(chip, w))
-    ctrls.appendChild(chip)
+    pnChipActivo(ctrls, w, activo)
 
-    pnSegmentado(ctrls, PN_INTERVALOS, intervalo, (v) => {
-        if (v === "D") delete cfg.intervalo
-        else cfg.intervalo = v
-        pnGuardar()
-        pnPintarWidget(w)
-    })
+    pnSegmentado(
+        ctrls,
+        PN_INTERVALOS,
+        intervalo,
+        (v) => {
+            if (v === "D") delete cfg.intervalo
+            else cfg.intervalo = v
+            pnGuardar()
+            pnPintarWidget(w)
+        },
+        "Intervalo"
+    )
 
     if (!activo?.tv) {
         cuerpo.innerHTML = `<div class="pnVacio">Elige un activo para ver su gráfico</div>`
@@ -3591,7 +3675,7 @@ function pnChipActivo(ctrls, w, activo) {
     chip.innerHTML = `<span>${escapeHtml(activo ? activo.nombre : "Elegir activo")}</span>${
         activo?.tv ? `<small>${escapeHtml(activo.tv)}</small>` : ""
     }<span class="pnChipFlecha">▾</span>`
-    chip.addEventListener("click", () => pnMenuActivoGrafico(chip, w))
+    pnControlCabecera(chip, "Activo", (ancla) => pnMenuActivoGrafico(ancla, w))
     ctrls.appendChild(chip)
 }
 
@@ -3631,7 +3715,7 @@ function pnPintarEmbebido(w, cuerpo, ctrls) {
                 PN_RANGOS_INSTRUMENTO.map((r) => r.valor),
                 "12M"
             )
-            pnSegmentado(ctrls, PN_RANGOS_INSTRUMENTO, rango, cambiar("rango", "12M"))
+            pnSegmentado(ctrls, PN_RANGOS_INSTRUMENTO, rango, cambiar("rango", "12M"), "Rango")
             config = { ...base, symbol: activo?.tv, dateRange: rango, chartOnly: !pnSi(cfg, "cabecera") }
             break
         }
@@ -3647,7 +3731,8 @@ function pnPintarEmbebido(w, cuerpo, ctrls) {
                 PN_INTERVALOS_TECNICO.find((i) => i.valor === intervalo).texto,
                 PN_INTERVALOS_TECNICO,
                 intervalo,
-                cambiar("intervalo", "1D")
+                cambiar("intervalo", "1D"),
+                "Intervalo"
             )
             config = {
                 ...base,
@@ -3672,7 +3757,8 @@ function pnPintarEmbebido(w, cuerpo, ctrls) {
                     { valor: "activo", texto: "Del activo" }
                 ],
                 modo,
-                cambiar("modo", "general")
+                cambiar("modo", "general"),
+                "Noticias"
             )
             locale = "en"
             config = {
@@ -3695,7 +3781,8 @@ function pnPintarEmbebido(w, cuerpo, ctrls) {
                 PN_IMPORTANCIAS.find((i) => i.valor === importancia).texto,
                 PN_IMPORTANCIAS,
                 importancia,
-                cambiar("importancia", "-1,0,1")
+                cambiar("importancia", "-1,0,1"),
+                "Importancia"
             )
             const paises = pnLista(cfg, "paises").filter((p) => PN_PAISES.some((x) => x.valor === p))
             config = {
@@ -3810,7 +3897,8 @@ function pnPintarCartera(w, cuerpo, ctrls) {
             else delete cfg.tipos
             pnGuardar()
             pnPintarWidget(w)
-        }
+        },
+        "Tipos"
     )
 
     // El peso es sobre toda la cartera, no sobre lo filtrado: «un 8 % de lo
@@ -3941,8 +4029,8 @@ function pnPintarFavoritos(w, cuerpo, ctrls) {
     btn.type = "button"
     btn.className = "pnChip"
     btn.innerHTML = `<span>${pnLista(cfg, "activos").length ? "Editar lista" : "Elegir activos"}</span><span class="pnChipFlecha">▾</span>`
-    btn.addEventListener("click", () =>
-        pnSelectorActivos(btn, {
+    pnControlCabecera(btn, "Activos", (ancla) =>
+        pnSelectorActivos(ancla, {
             opciones: pnTodosLosActivos().filter((a) => !a.oculto || cfg.ocultos === true),
             seleccion: pnLista(cfg, "activos"),
             alCambiar: (ids) => {
@@ -4017,12 +4105,18 @@ function pnPintarRendimiento(w, cuerpo, ctrls) {
     const cabecera = pnSi(cfg, "cabecera")
 
     ctrls.innerHTML = ""
-    pnSegmentado(ctrls, PN_RANGOS, rango, (v) => {
-        if (v === "3M") delete cfg.rango
-        else cfg.rango = v
-        pnGuardar()
-        pnPintarWidget(w)
-    })
+    pnSegmentado(
+        ctrls,
+        PN_RANGOS,
+        rango,
+        (v) => {
+            if (v === "3M") delete cfg.rango
+            else cfg.rango = v
+            pnGuardar()
+            pnPintarWidget(w)
+        },
+        "Rango"
+    )
 
     cuerpo.innerHTML = `
         <div class="pnRend">
@@ -4178,7 +4272,8 @@ function pnPintarDistribucion(w, cuerpo, ctrls) {
             else cfg.por = v
             pnGuardar()
             pnPintarWidget(w)
-        }
+        },
+        "Agrupar por"
     )
 
     const pos = pnActivosDelWidget(cfg)
@@ -4583,7 +4678,7 @@ function pnPintarMiedoCodicia(w, cuerpo, ctrls) {
     const conHistorial = vista !== "indicador"
 
     ctrls.innerHTML = ""
-    if (conHistorial) pnSegmentado(ctrls, PN_RANGOS_FG, rango.valor, pnCambiarOpcion(w, "rango", "3M"))
+    if (conHistorial) pnSegmentado(ctrls, PN_RANGOS_FG, rango.valor, pnCambiarOpcion(w, "rango", "3M"), "Rango")
 
     pnConPulso(w, cuerpo, (d) => {
         const fg = d.fearGreed
@@ -4769,7 +4864,7 @@ function pnPintarSectores(w, cuerpo, ctrls) {
         "sp500"
     )
     ctrls.innerHTML = ""
-    pnSegmentado(ctrls, PN_UNIVERSOS, universo, pnCambiarOpcion(w, "universo", "sp500"))
+    pnSegmentado(ctrls, PN_UNIVERSOS, universo, pnCambiarOpcion(w, "universo", "sp500"), "Universo")
 
     pnConPulso(
         w,
@@ -4841,7 +4936,8 @@ function pnPintarEscaner(w, cuerpo, ctrls) {
         PN_LISTAS_ESCANER.find((l) => l.valor === lista).texto,
         PN_LISTAS_ESCANER,
         lista,
-        pnCambiarOpcion(w, "lista", "suben")
+        pnCambiarOpcion(w, "lista", "suben"),
+        "Lista"
     )
 
     pnConPulso(w, cuerpo, (d) => {
@@ -4971,7 +5067,7 @@ function pnPintarMetrica(w, cuerpo, ctrls) {
     chip.type = "button"
     chip.className = "pnChip"
     chip.innerHTML = `<span>${escapeHtml(m ? "Cambiar" : "Elegir métrica")}</span><span class="pnChipFlecha">▾</span>`
-    chip.addEventListener("click", () => pnMenuMetricas(chip, w))
+    pnControlCabecera(chip, "Métrica", (ancla) => pnMenuMetricas(ancla, w))
     ctrls.appendChild(chip)
 
     if (!m) {
