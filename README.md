@@ -1,9 +1,16 @@
-# PorfolioManager
+<p align="center">
+  <img src="img/logo-192.png" alt="PorfolioManager" width="128">
+</p>
 
-[![CI](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg)](https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml)
-[![Versión](https://img.shields.io/badge/versi%C3%B3n-4.8.0-blue)](CHANGELOG.md)
-[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
-[![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-green)](LICENSE)
+<h1 align="center">PorfolioManager</h1>
+
+<p align="center">
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-4.8.0-blue" alt="Versión 4.8.0"></a>
+  <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python 3.11 | 3.12 | 3.13">
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker Compose">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue" alt="License: GPL-3.0"></a>
+</p>
 
 Aplicación web **autoalojada** para el seguimiento de una cartera de inversión personal. Todo se guarda en SQLite y corre en tu máquina o en un servidor doméstico con Docker. Las cotizaciones externas son opcionales: sin claves de API, los precios los introduces tú.
 
