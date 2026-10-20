@@ -60,7 +60,10 @@ def normalizarImporte(valor):
     if not importe.is_finite():
         raise DatosMovimientoInvalidos("El campo 'importe' debe ser un número finito")
 
-    importe = dinero.redondear(importe)
+    try:
+        importe = dinero.redondear(importe)
+    except dinero.ImporteInvalido:
+        raise DatosMovimientoInvalidos("El campo 'importe' es demasiado grande") from None
     if importe <= 0:
         raise DatosMovimientoInvalidos("El campo 'importe' debe ser mayor que cero")
 

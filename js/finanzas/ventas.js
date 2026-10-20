@@ -7,6 +7,10 @@
 // de cada venta.
 
 let currentVentasData = { rows: [], resumen: null, incidencias: [] }
+// Copia de lo último que se leyó o se guardó en el servidor, solo con los datos
+// de hecho de cada venta. Ante un 409 (el ejercicio cambió desde otro sitio) es
+// la base de la fusión: ver core/fusion-anual.js.
+let ventasBaseFilas = []
 let ventasPersistenceBound = false
 let ventasAssets = []
 let ventasYears = []
@@ -79,6 +83,7 @@ async function saveVentasData(year, payload, options = {}) {
             : ""
         const error = new Error(data?.error || `HTTP ${response.status}`)
         error.detalle = detalle
+        error.status = response.status
         throw error
     }
 
@@ -135,8 +140,49 @@ function applyVentasPayload(payload) {
         year: currentVentasYear,
         rows: Array.isArray(payload?.rows) ? payload.rows.map(normalizeVentaRow) : [],
         resumen: payload?.resumen || null,
-        incidencias: Array.isArray(payload?.incidencias) ? payload.incidencias : []
+        incidencias: Array.isArray(payload?.incidencias) ? payload.incidencias : [],
+        revision: Number.isInteger(payload?.revision) ? payload.revision : null
     }
+    ventasBaseFilas = currentVentasData.rows.map(filaDeHechoVenta)
+}
+
+// Lo que identifica una venta a efectos de la fusión: los datos de hecho. El
+// nombre del activo es una etiqueta que resuelve el servidor y no cuenta.
+function filaDeHechoVenta(row) {
+    return {
+        id: row.id,
+        fecha: row.fecha,
+        assetId: row.assetId,
+        cantidad: row.cantidad,
+        valorVenta: row.valorVenta,
+        comisionVenta: row.comisionVenta
+    }
+}
+
+// Fusión a tres bandas tras un 409: lo que el usuario cambió respecto a la
+// copia que cargó, aplicado sobre lo que hay ahora en el servidor.
+async function fusionarVentasTrasConflicto(payload) {
+    const servidor = await loadVentasYear(payload.year)
+    const filas = fusionarListaTresVias(
+        ventasBaseFilas,
+        payload.rows.map(filaDeHechoVenta),
+        (servidor.rows || []).map((row) => filaDeHechoVenta(normalizeVentaRow(row))),
+        claveEstableAnual
+    )
+    const respuesta = await saveVentasData(payload.year, {
+        year: payload.year,
+        rows: filas,
+        revision: servidor.revision
+    })
+    if (typeof showToast === "function") {
+        showToast(
+            "Este ejercicio había cambiado desde otro sitio (otra pestaña, otro dispositivo). Se han combinado los cambios.",
+            {
+                type: "warning"
+            }
+        )
+    }
+    return respuesta
 }
 
 function bindVentasEvents() {
@@ -256,7 +302,7 @@ function openVentasModal(rowIndex = -1) {
             ${buildVentasAssetOptions(rowData.assetId || "")}
         </select>
         <label class="assetModalLabel" for="ventaCantidadInput">Cantidad</label>
-        <input id="ventaCantidadInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasNumber(rowData.cantidad) || "")}" placeholder="0">
+        <input id="ventaCantidadInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasNumberInput(rowData.cantidad) || "")}" placeholder="0">
         <label class="assetModalLabel" for="ventaValorInput">Valor de venta (por unidad)</label>
         <input id="ventaValorInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasMoney(rowData.valorVenta) || "")}" placeholder="0,00">
         <label class="assetModalLabel" for="ventaComisionInput">Comisión de la venta</label>
@@ -286,9 +332,12 @@ function openVentasModal(rowIndex = -1) {
         const cantidadRaw = modal.querySelector("#ventaCantidadInput")?.value.trim() || ""
         const valorVentaRaw = modal.querySelector("#ventaValorInput")?.value.trim() || ""
         const comisionRaw = modal.querySelector("#ventaComisionInput")?.value.trim() || ""
-        const cantidad = cantidadRaw ? formatVentasNumber(cantidadRaw) : ""
-        const valorVenta = valorVentaRaw ? stripCurrencyText(formatVentasMoney(valorVentaRaw)) : ""
-        const comisionVenta = comisionRaw ? stripCurrencyText(formatVentasMoney(comisionRaw)) : ""
+        // En formato canónico (punto decimal, sin miles): el servidor lo lee con
+        // dinero.aDecimal. Antes se guardaba el texto con el formato de pantalla,
+        // y "12.000" acciones (es-ES) valían 12 para el FIFO.
+        const cantidad = toCanonicalNumber(cantidadRaw)
+        const valorVenta = toCanonicalNumber(valorVentaRaw)
+        const comisionVenta = toCanonicalNumber(comisionRaw)
 
         // El servidor valida de verdad; aquí solo se evita el viaje inútil.
         if (!fecha || !assetId || !cantidad || !valorVenta) {
@@ -634,6 +683,22 @@ function formatVentasNumber(value) {
     })
 }
 
+// Para rellenar el campo de edición: sin separador de miles y con el decimal del
+// locale activo, de modo que volver a leerlo con toCanonicalNumber da lo mismo.
+function formatVentasNumberInput(value) {
+    const parsedValue = parseLooseNumber(value)
+
+    if (parsedValue === null || String(value || "").trim() === "") {
+        return ""
+    }
+
+    return parsedValue.toLocaleString(window._numLocale || "es-ES", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 8,
+        useGrouping: false
+    })
+}
+
 function formatVentasMoney(value) {
     const parsedValue = parseLooseNumber(value)
 
@@ -746,10 +811,21 @@ async function persistVentasData(options = {}) {
             cantidad: row.cantidad,
             valorVenta: row.valorVenta,
             comisionVenta: row.comisionVenta
-        }))
+        })),
+        ...(Number.isInteger(currentVentasData.revision) ? { revision: currentVentasData.revision } : {})
     }
 
-    const respuesta = await saveVentasData(currentVentasYear, payload, options)
+    let respuesta
+    try {
+        respuesta = await saveVentasData(currentVentasYear, payload, options)
+    } catch (error) {
+        // Con keepalive la página puede estar cerrándose: no hay tiempo de
+        // fusionar. La revisión no avanza y en el servidor no se ha borrado nada.
+        if (error?.status !== 409 || options.keepalive) {
+            throw error
+        }
+        respuesta = await fusionarVentasTrasConflicto(payload)
+    }
 
     if (respuesta?.rows) {
         applyVentasPayload(respuesta)

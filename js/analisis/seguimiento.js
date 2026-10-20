@@ -850,7 +850,7 @@ async function initSeguimientoLogic() {
                 const tipo = AV_SEG_TYPE_LABELS[a.type] || a.type || ""
                 const color = AV_SEG_TYPE_COLORS[a.type] || "#888"
                 return `<div class="segSuggestionItem" data-idx="${i}" data-name="${escapeHtml(a.name || a.symbol || "")}" data-ticker="${escapeHtml(ticker)}" data-tipo="${escapeHtml(a.type || "acciones")}">
-                <span class="segSuggBadge" style="background:${color}22;color:${color};border-color:${color}44">${tipo}</span>
+                <span class="segSuggBadge" style="background:${color}22;color:${color};border-color:${color}44">${escapeHtml(tipo)}</span>
                 <span class="segSuggName">${escapeHtml(a.name || a.symbol || "")}</span>
                 ${ticker ? `<span class="segSuggTicker">${escapeHtml(ticker)}</span>` : ""}
             </div>`

@@ -21,13 +21,9 @@ gastosBp = Blueprint("gastos", __name__)
 
 @gastosBp.route("/api/gastos", methods=["GET"])
 def getGastosYears():
-    years = listGastosYears()
-
-    if not years:
-        defaultYear = str(date.today().year)
-        payload = createDefaultGastosYear(defaultYear)
-        writeGastosYear(defaultYear, payload)
-        years = [defaultYear]
+    # Sin ningún año se ofrece el actual sin crearlo: la lectura no escribe, y
+    # el año se guarda la primera vez que el usuario guarda.
+    years = listGastosYears() or [str(date.today().year)]
 
     return jsonify({"years": years})
 
@@ -64,6 +60,12 @@ def createGastosYear():
 @gastosBp.route("/api/gastos/<year>", methods=["GET"])
 def getGastosYear(year):
     data = readGastosYear(year)
+
+    if data is None and not listGastosYears() and normalizeYear(year) == str(date.today().year):
+        # El año actual de una cartera sin gastos: vacío, sin persistirlo.
+        data = createDefaultGastosYear(year)
+        data["gastosTipos"] = readGastosTypes()
+        data["revision"] = 0
 
     if data is None:
         return jsonify({"ok": False, "error": "Año no encontrado"}), 404

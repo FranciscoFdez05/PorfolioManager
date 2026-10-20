@@ -199,6 +199,25 @@ if [ -z "$(env_get LOGIN_PASSWORD_HASH)" ] && [ ! -f data/auth.dat ]; then
             exit 1
         fi
 
+        # El mismo mínimo que exige Ajustes al cambiarla: sin esto, la primera
+        # contraseña (la que más tiempo suele durar) era la única sin límite. Se
+        # lee de auth.py para que no haya dos valores que mantener a la par.
+        MIN_LARGO=$(sed -n 's/^MIN_LARGO_CONTRASENA = \([0-9][0-9]*\).*/\1/p' python/routes/auth.py)
+        [ -n "$MIN_LARGO" ] || MIN_LARGO=10
+        # Caracteres y no bytes: en dash (y en cualquier sh con locale C) ${#PW}
+        # cuenta bytes, y una contraseña con acentos pasaba el mínimo con menos
+        # caracteres de los exigidos. Python la cuenta como lo hace la
+        # aplicación; ${#PW} queda solo de respaldo si no se pudo ejecutar.
+        export PW
+        LARGO_PW=$(run_py "import os; print(len(os.environ['PW']))" 2>/dev/null) || LARGO_PW=""
+        [ -n "$LARGO_PW" ] || LARGO_PW="${#PW}"
+        if [ "$LARGO_PW" -lt "$MIN_LARGO" ]; then
+            unset PW PW2
+            echo "La contraseña debe tener al menos $MIN_LARGO caracteres. No se han" >&2
+            echo "configurado credenciales; vuelve a ejecutar ./docker-up.sh." >&2
+            exit 1
+        fi
+
         # Las iteraciones salen de [seguridad] hash_iteraciones, para que el
         # hash del primer arranque use el mismo coste que los que genere luego
         # la aplicación al cambiar la contraseña desde Ajustes.

@@ -217,7 +217,8 @@ def _asInt(value, default, allowed=None):
     inutilizable, porque no había forma de corregir el ajuste desde la UI."""
     try:
         result = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError: int(float("inf")) o 1e999 no caben en un entero.
         return default
     if allowed is not None and result not in allowed:
         return default
@@ -673,7 +674,7 @@ def _mapaBooleanos(permitidas=None):
 def _porcentaje(valor, defecto):
     try:
         return max(0.0, min(100.0, float(valor)))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OverflowError):
         return defecto
 
 

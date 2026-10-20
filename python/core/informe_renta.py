@@ -81,7 +81,7 @@ def _dec(valor):
 
 def _es(valor):
     """Importe en formato español, que es como se teclea en Renta Web."""
-    cantidad = _dec(valor).quantize(Decimal("0.01"))
+    cantidad = dinero.redondear(_dec(valor))
     entero, _punto, decimales = f"{abs(cantidad):.2f}".partition(".")
     grupos = []
     while len(entero) > 3:

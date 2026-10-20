@@ -1,4 +1,4 @@
-"""Revisión por año de gastos e ingresos: detecta guardados hechos sobre una copia antigua.
+"""Revisión por año de gastos, ingresos y ventas, y por activo: detecta guardados sobre una copia antigua.
 
 La pestaña de Gastos (o Ingresos) carga un año entero y, al guardar, manda el
 año entero; el servidor sustituye todas las filas por esas. Entre la carga y el
@@ -18,7 +18,10 @@ revisión fuera dejaría colarse a otra escritura entre la lectura y el guardado
 
 from core.db import getDb
 
-AMBITOS = ("gastos", "ingresos")
+# "gastos" e "ingresos" llevan el año como clave; "ventas", también el año; y
+# "activos", el id del activo (la ficha se guarda entera, con sus filas, igual
+# que un año de gastos). La tabla guarda la clave en la columna `year` como texto.
+AMBITOS = ("gastos", "ingresos", "ventas", "activos")
 
 
 class ConflictoRevision(Exception):

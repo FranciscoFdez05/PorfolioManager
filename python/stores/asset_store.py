@@ -1,5 +1,5 @@
 from core.db import getDb, transactional
-from stores import rendimiento_activo
+from stores import rendimiento_activo, revisiones
 from stores.asset_utils import slugify
 
 
@@ -140,6 +140,41 @@ def updateAssetMarketData(assetId, data):
     conn.commit()
 
 
+@transactional
+def updateAssetQuote(assetId, quote, divisaLeida, simboloLeido):
+    """Guarda una cotización solo si el activo sigue como estaba al pedirla.
+
+    Pedir la cotización al proveedor tarda segundos. Si en ese tiempo se cambió
+    la divisa del activo o su ticker, el precio que llega ya no corresponde y
+    escribirlo mezclaría monedas. La condición va en el propio UPDATE, así que
+    no queda ventana entre comprobar y escribir. Solo toca los campos de la
+    cotización; nada de lo demás que se haya editado entretanto.
+
+    Args:
+        assetId: Identificador del activo.
+        quote: Dict con provider, symbol, price, currency, change, status y lastUpdated.
+        divisaLeida: Valor de `currency` tal como se leyó antes de pedir la cotización.
+        simboloLeido: Valor de `market_symbol` tal como se leyó antes.
+
+    Returns:
+        True si se guardó; False si el activo ya no existe o cambió de divisa o ticker.
+    """
+    conn = getDb()
+    resultado = conn.execute(
+        "UPDATE activos SET market_provider=?, market_symbol=?, finnhub_symbol=?, "
+        "price=?, currency=?, change=?, status=?, last_updated=? "
+        "WHERE id=? AND currency=? AND market_symbol=?",
+        (
+            quote["provider"], quote["symbol"], quote["symbol"],
+            quote["price"], quote["currency"], quote["change"], quote["status"],
+            quote["lastUpdated"],
+            slugify(assetId), divisaLeida, simboloLeido,
+        ),
+    )
+    conn.commit()
+    return resultado.rowcount > 0
+
+
 def _fxPrevios(conn, tabla, columnaFecha, safeId):
     """Tipos de cambio ya anotados en las filas de un activo, por (fecha, divisa).
 
@@ -170,9 +205,16 @@ def _fxDeFila(fila, previos, fecha, divisa):
 
 
 @transactional
-def writeAssetFile(assetId, data):
+def writeAssetFile(assetId, data, revisionEsperada=None):
+    """Sustituye el activo entero. Devuelve la revisión nueva.
+
+    Con `revisionEsperada` lanza ConflictoRevision si el activo se guardó desde
+    otro sitio después de que el cliente lo leyera (ver stores/revisiones.py).
+    """
     conn = getDb()
     safeId = slugify(assetId)
+    revisiones.tomarBloqueo(conn)
+    revisiones.comprobar(conn, "activos", safeId, revisionEsperada)
     fxFilas = _fxPrevios(conn, "activo_rows", "fecha_operacion", safeId)
     fxOperaciones = _fxPrevios(conn, "activo_operation_rows", "fecha_apertura", safeId)
 
@@ -259,7 +301,9 @@ def writeAssetFile(assetId, data):
         ]
     )
 
+    nueva = revisiones.avanzar(conn, "activos", safeId)
     conn.commit()
+    return nueva
 
 
 def listAssets():
@@ -353,6 +397,10 @@ def deleteAssetFile(assetId):
     conn = getDb()
     safeId = slugify(assetId)
     result = conn.execute("DELETE FROM activos WHERE id = ?", (safeId,))
+    if result.rowcount > 0:
+        # Una pestaña que aún tenga el activo abierto no debe poder resucitarlo
+        # al guardar con la revisión de antes del borrado.
+        revisiones.avanzar(conn, "activos", safeId)
     conn.commit()
     return result.rowcount > 0
 

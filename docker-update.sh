@@ -103,7 +103,11 @@ paso()   { printf '\n\033[36m── %s\033[0m\n' "$*"; }
 # estado: la aplicación lo lee cada pocos segundos. Si falla, se sigue.
 fase() {
     [ -n "$PM_FASE_ARCHIVO" ] || return 0
-    temporal="$PM_FASE_ARCHIVO.tmp.$$"
+    # mktemp: el directorio lo comparte el contenedor y un nombre predecible le
+    # dejaría plantar un enlace simbólico que este `>` seguiría en el host.
+    temporal=$(mktemp "$PM_FASE_ARCHIVO.tmp.XXXXXX" 2>/dev/null) || return 0
+    # mktemp crea en 0600 y mv lo conserva: el contenedor debe poder leerlo.
+    chmod 644 "$temporal" 2>/dev/null || true
     printf '{"fase": "%s", "momento": "%s", "detalle": "%s"}\n' "$1" "$(date -Is)" "${2:-}" \
         > "$temporal" 2>/dev/null && mv -f "$temporal" "$PM_FASE_ARCHIVO" 2>/dev/null \
         || rm -f "$temporal" 2>/dev/null

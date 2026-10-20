@@ -438,14 +438,10 @@ function getSelectedOverviewTypes() {
         .filter((v) => v !== "todos")
 }
 
+// Mismo criterio que el servidor (ver shared-utils.js): el punto es decimal.
+// Antes quitaba todos los puntos y "0.5" participaciones se contaban como 5.
 function parseParticipationNumber(value) {
-    const cleanValue = String(value || "")
-        .replace(/\s/g, "")
-        .replace(/\./g, "")
-        .replace(",", ".")
-
-    const parsedValue = parseFloat(cleanValue)
-    return Number.isNaN(parsedValue) ? 0 : parsedValue
+    return parseLooseNumber(value) ?? 0
 }
 
 function getCryptoRowCommissionCrypto(row = {}) {

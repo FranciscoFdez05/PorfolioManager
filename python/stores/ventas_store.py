@@ -11,7 +11,7 @@ del navegador y los escribía sin mirarlos.
 
 from core.db import getDb, transactional
 from core.errors import ValidationError
-from stores import ventas_fifo
+from stores import revisiones, ventas_fifo
 from stores.gastos_store import normalizeYear
 
 _MAX_SHORT = 30
@@ -63,8 +63,15 @@ def sanitizeVentasPayload(payload, fallbackYear=None):
 
 
 def listVentasYears():
+    # La unión con `ventas` recoge los años de datos antiguos que tengan filas
+    # sin su entrada en ventas_years, sin escribir nada: antes lo arreglaba un
+    # INSERT en cada GET.
     conn = getDb()
-    return [r["year"] for r in conn.execute("SELECT year FROM ventas_years ORDER BY year").fetchall()]
+    return [
+        r["year"] for r in conn.execute(
+            "SELECT year FROM ventas_years UNION SELECT year FROM ventas ORDER BY year"
+        ).fetchall()
+    ]
 
 
 def _filaBase(r):
@@ -92,7 +99,7 @@ def readVentasYear(year, calculo=None):
         return None
 
     conn = getDb()
-    if not conn.execute("SELECT 1 FROM ventas_years WHERE year = ?", (normalized,)).fetchone():
+    if normalized not in listVentasYears():
         return None
 
     filas = conn.execute(
@@ -111,6 +118,7 @@ def readVentasYear(year, calculo=None):
         "incidencias": [
             i for i in calculo["incidencias"] if str(i["year"]) == normalized
         ],
+        "revision": revisiones.leer(conn, "ventas", normalized),
     }
 
 
@@ -122,8 +130,12 @@ def _combinar(fila, calculo):
 
 
 @transactional
-def writeVentasYear(year, data):
+def writeVentasYear(year, data, revisionEsperada=None):
     """Guarda las filas del ejercicio y recalcula la fiscalidad de todos.
+
+    Con `revisionEsperada` lanza ConflictoRevision si el ejercicio se guardó
+    desde otro sitio después de que el cliente lo leyera (ver
+    stores/revisiones.py).
 
     El recálculo abarca todos los ejercicios, no solo el que se guarda: añadir
     una venta en 2025 cambia qué lotes quedan vivos para 2026, y dejar 2026 con
@@ -135,6 +147,8 @@ def writeVentasYear(year, data):
         return
 
     conn = getDb()
+    revisiones.tomarBloqueo(conn)
+    revisiones.comprobar(conn, "ventas", normalized, revisionEsperada)
     # El nombre del activo se guarda resuelto desde `activos`: es solo una
     # etiqueta para que un backup o una exportación se lean sin la otra tabla,
     # y depender de lo que mande el cliente la dejaba vacía o desfasada.
@@ -167,6 +181,7 @@ def writeVentasYear(year, data):
             for r in data.get("rows", [])
         ]
     )
+    revisiones.avanzar(conn, "ventas", normalized)
     conn.commit()
 
     return refrescarCalculo()
@@ -257,6 +272,9 @@ def deleteVentasYear(year):
     conn = getDb()
     conn.execute("DELETE FROM ventas WHERE year = ?", (normalized,))
     result = conn.execute("DELETE FROM ventas_years WHERE year = ?", (normalized,))
+    # Una pestaña que aún tenga el ejercicio abierto no debe poder resucitarlo
+    # al guardar con la revisión de antes del borrado.
+    revisiones.avanzar(conn, "ventas", normalized)
     conn.commit()
 
     if result.rowcount > 0:

@@ -176,6 +176,7 @@ function renderAssetTablePage(asset) {
 
     currentAssetPersistedOperationRows = Array.isArray(asset.operationRows) ? asset.operationRows : []
     currentAssetPersistedConversionRows = conversionRows
+    currentAssetRevision = Number.isInteger(asset.revision) ? asset.revision : null
     renderAssetRows(primaryRows)
     renderAssetCompletedOperationsSection(asset)
     renderAssetTransaccionesSection(asset)
@@ -298,14 +299,14 @@ function renderAssetRows(rows) {
         rowElement.innerHTML = `
             <td data-field="fechaOperacion">${escapeHtml(rowData.fechaOperacion || "")}</td>
             <td data-field="tipoOperacion">${escapeHtml(rowData.tipoOperacion || "Compra")}</td>
-            <td data-field="participaciones">${formatAssetParticipationValue(rowData.participaciones, assetType)}</td>
-            <td data-field="precioParticipacion">${moneyMono(rowData.precioParticipacion, "precioParticipacion")}</td>
+            <td data-field="participaciones" data-value="${escapeAttr(toCanonicalNumber(rowData.participaciones))}">${formatAssetParticipationValue(rowData.participaciones, assetType)}</td>
+            <td data-field="precioParticipacion" data-value="${escapeAttr(toCanonicalNumber(rowData.precioParticipacion))}">${moneyMono(rowData.precioParticipacion, "precioParticipacion")}</td>
             ${isCrypto ? `<td data-field="currency">${escapeHtml(rowCurrency)}</td>` : ""}
-            <td data-field="capitalInvertidoBruto">${moneyMono(rowData.capitalInvertidoBruto, "capitalInvertidoBruto")}</td>
+            <td data-field="capitalInvertidoBruto" data-value="${escapeAttr(toCanonicalNumber(rowData.capitalInvertidoBruto))}">${moneyMono(rowData.capitalInvertidoBruto, "capitalInvertidoBruto")}</td>
             ${
                 isCrypto
-                    ? `<td data-field="comisionesCripto">${cryptoCommissionValue}</td><td data-field="comisionesFiat">${cryptoFiatCommissionValue}</td>`
-                    : `<td data-field="comisiones">${moneyMono(rowData.comisiones, "comisiones")}</td>`
+                    ? `<td data-field="comisionesCripto" data-value="${escapeAttr(toCanonicalNumber(getCryptoRowCommissionCrypto(rowData)))}">${cryptoCommissionValue}</td><td data-field="comisionesFiat" data-value="${escapeAttr(toCanonicalNumber(getCryptoRowCommissionFiat(rowData)))}">${cryptoFiatCommissionValue}</td>`
+                    : `<td data-field="comisiones" data-value="${escapeAttr(toCanonicalNumber(rowData.comisiones))}">${moneyMono(rowData.comisiones, "comisiones")}</td>`
             }
             <td class="rowTotal">${formatMoney(0, getAssetTableMoneyCurrency(assetType, "capitalInvertidoNeto", assetCurrency, rowCurrency))}</td>
             <td class="rowActionsCell">
@@ -325,6 +326,22 @@ function renderAssetRows(rows) {
 
     updateAssetTableTotals()
 }
+
+// saveAssetDataToServer avisa de cada guardado correcto (ver assets.js). La
+// ficha abierta anota la revisión nueva y, si el servidor había cambiado y se
+// fusionaron los cambios, adopta las filas fusionadas: si siguiera con las
+// suyas, el siguiente autoguardado borraría las que llegaron de otro sitio.
+document.addEventListener("activo-guardado", (evento) => {
+    const { id, revision, fusionado } = evento.detail || {}
+    if (!id || id !== currentAssetId) return
+
+    if (Number.isInteger(revision)) currentAssetRevision = revision
+    if (fusionado && document.getElementById("assetOperationsBody")) {
+        currentAssetPersistedOperationRows = Array.isArray(fusionado.operationRows) ? fusionado.operationRows : []
+        currentAssetPersistedConversionRows = Array.isArray(fusionado.conversionRows) ? fusionado.conversionRows : []
+        renderAssetRows(getPrimaryAssetRows(fusionado))
+    }
+})
 
 function collectAssetRowsFromTable() {
     return _assetDisplayRows
@@ -364,6 +381,7 @@ function buildCurrentAssetPayload() {
         costeAnual: assetPage?.dataset.assetCosteAnual || "",
         operationRows: currentAssetPersistedOperationRows,
         conversionRows: currentAssetPersistedConversionRows,
+        ...(currentAssetRevision === null ? {} : { revision: currentAssetRevision }),
         order: Number(document.querySelector(`.assetBtn[data-asset-id="${currentAssetId}"]`)?.dataset.assetOrder || 0),
         rows: collectAssetRowsFromTable()
     }
@@ -377,15 +395,27 @@ function updateAssetTableTotals() {
 
     rowElements.forEach((rowElement) => {
         const rowCurrency = getAssetRowCurrency(rowElement, assetCurrency)
+        // El valor canónico va en data-value: el texto de la celda es el de
+        // pantalla, con el separador del locale activo ("1,234.56 €" en en-US),
+        // y volver a leerlo daba cifras mil veces menores.
+        const celda = (campo) => {
+            const elemento = rowElement.querySelector(`[data-field="${campo}"]`)
+            return elemento?.dataset.value ?? elemento?.textContent ?? ""
+        }
         const rowData = {
-            participaciones: rowElement.querySelector('[data-field="participaciones"]')?.textContent || "",
-            precioParticipacion: rowElement.querySelector('[data-field="precioParticipacion"]')?.textContent || "",
-            capitalInvertidoBruto: rowElement.querySelector('[data-field="capitalInvertidoBruto"]')?.textContent || ""
+            participaciones: celda("participaciones"),
+            precioParticipacion: celda("precioParticipacion"),
+            capitalInvertidoBruto: celda("capitalInvertidoBruto")
         }
         const bruto = getRowGrossAmount(rowData)
         const comisionesCell = rowElement.querySelector('[data-field="comisiones"], [data-field="comisionesFiat"]')
         const comisiones =
-            parseLooseNumber(comisionesCell?.querySelector("input")?.value || comisionesCell?.textContent || "") || 0
+            parseLooseNumber(
+                comisionesCell?.querySelector("input")?.value ||
+                    comisionesCell?.dataset.value ||
+                    comisionesCell?.textContent ||
+                    ""
+            ) || 0
         const neto = bruto - comisiones
         const rowTotalCell = rowElement.querySelector(".rowTotal")
 
@@ -1167,13 +1197,15 @@ async function saveAssetRowFromModal() {
         tipoOperacion: g("arModalTipo") || "Compra",
         exchange: isCrypto ? g("arModalExchange") : "",
         currency: isCrypto ? g("arModalCurrency") || assetCurrency : assetCurrency,
-        participaciones: g("arModalParticipaciones"),
-        precioParticipacion: g("arModalPrecio"),
-        capitalInvertidoBruto: g("arModalCapital"),
-        comisiones: !isCrypto ? g("arModalComisiones") : "",
-        comisionesFiat: isCrypto ? g("arModalComisionesFiat") : "",
-        comisionesCripto: isCrypto ? g("arModalComisionesCripto") : "",
-        comisionesSatoshis: isCrypto ? g("arModalComisionesCripto") : ""
+        // Lo tecleado se guarda en formato canónico (punto decimal, sin miles):
+        // el servidor lo lee con dinero.aDecimal y no sabe de locales.
+        participaciones: toCanonicalNumber(g("arModalParticipaciones")),
+        precioParticipacion: toCanonicalNumber(g("arModalPrecio")),
+        capitalInvertidoBruto: toCanonicalNumber(g("arModalCapital")),
+        comisiones: !isCrypto ? toCanonicalNumber(g("arModalComisiones")) : "",
+        comisionesFiat: isCrypto ? toCanonicalNumber(g("arModalComisionesFiat")) : "",
+        comisionesCripto: isCrypto ? toCanonicalNumber(g("arModalComisionesCripto")) : "",
+        comisionesSatoshis: isCrypto ? toCanonicalNumber(g("arModalComisionesCripto")) : ""
     }
 
     if (rowIndex >= 0) {

@@ -11,6 +11,11 @@ let currentAssetPersistedOperationRows = []
 let currentAssetPersistedConversionRows = []
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _assetDisplayRows = []
+// Revisión del activo que tiene abierta la ficha (ver stores/revisiones.py): se
+// reenvía al guardar para que el servidor rechace un guardado hecho sobre una
+// copia vieja en vez de borrar lo que se guardó desde otro sitio.
+// eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
+let currentAssetRevision = null
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _assetSortKey = null
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
@@ -367,15 +372,26 @@ async function _enviarLoteActivos() {
     for (let i = 0; i < ids.length; i += _activosPorLote) {
         const trozo = ids.slice(i, i + _activosPorLote)
         let fichas = null
+        let revisiones = {}
         try {
             const response = await fetch(`/api/activos-lote?ids=${trozo.map(encodeURIComponent).join(",")}`)
-            if (response.ok) fichas = (await response.json()).assets || {}
+            if (response.ok) {
+                const cuerpo = await response.json()
+                fichas = cuerpo.assets || {}
+                revisiones = cuerpo.revisiones || {}
+            }
         } catch {
             fichas = null
         }
         trozo.forEach((id) => {
             const esperando = pendientes.get(id)
             const ficha = fichas?.[id]
+            // La revisión viaja dentro de la ficha que recibe quien la pidió: si
+            // la guarda, el servidor sabe sobre qué copia se editó.
+            if (ficha && Number.isInteger(revisiones[id])) {
+                ficha.revision = revisiones[id]
+                _recordarBaseActivo(ficha)
+            }
             esperando.forEach(({ resolve, reject }, n) => {
                 if (!ficha) reject(new Error("No se pudo cargar el activo"))
                 // Cada llamador recibe su propia copia: algunos modifican la
@@ -386,18 +402,101 @@ async function _enviarLoteActivos() {
     }
 }
 
-async function saveAssetDataToServer(assetData) {
-    const response = await fetch(`/api/activos/${assetData.id}`, {
+// Copia de cada activo tal como estaba en el servidor en cada revisión que se ha
+// leído (clave "id:revisión"). Es la base de la fusión cuando el servidor
+// rechaza un guardado con 409: hace falta la copia sobre la que se editó, no la
+// última que se haya leído, que puede ser de otra pestaña.
+const _basesActivos = new Map()
+const _maxBasesActivos = 100
+
+function _recordarBaseActivo(ficha) {
+    if (!Number.isInteger(ficha?.revision)) return
+    const clave = `${ficha.id}:${ficha.revision}`
+    _basesActivos.delete(clave)
+    _basesActivos.set(clave, structuredClone(ficha))
+    while (_basesActivos.size > _maxBasesActivos) {
+        _basesActivos.delete(_basesActivos.keys().next().value)
+    }
+}
+
+// Las columnas fx_* las rellena el servidor por su cuenta (fx_historico): no
+// forman parte de la identidad de una fila a efectos de la fusión.
+function _claveFilaActivo(fila) {
+    const copia = { ...fila }
+    delete copia.fxRate
+    delete copia.fxFecha
+    delete copia.fxOrigen
+    return claveEstableAnual(copia)
+}
+
+function _enviarActivo(assetData) {
+    return fetch(`/api/activos/${assetData.id}`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
         body: JSON.stringify(assetData)
     })
+}
+
+// Fusión a tres bandas tras un 409 (ver core/fusion-anual.js): lo que el
+// usuario cambió respecto a la copia que cargó, aplicado sobre lo que hay ahora
+// en el servidor. Los datos de mercado se toman del servidor, que es quien los
+// refresca.
+async function _fusionarActivoTrasConflicto(local) {
+    const base = _basesActivos.get(`${local.id}:${local.revision}`)
+    const servidor = await loadAssetData(local.id)
+    if (!base || !Number.isInteger(servidor.revision)) {
+        throw new Error("El activo ha cambiado desde otro sitio y no se ha podido combinar. Recarga la página.")
+    }
+
+    const fusionado = { ...local, revision: servidor.revision }
+    for (const campo of ["price", "change", "status", "lastUpdated"]) {
+        fusionado[campo] = servidor[campo]
+    }
+    for (const campo of ["rows", "operationRows", "conversionRows"]) {
+        fusionado[campo] = fusionarListaTresVias(base[campo], local[campo], servidor[campo], _claveFilaActivo)
+    }
+    return fusionado
+}
+
+async function saveAssetDataToServer(assetData) {
+    let enviado = assetData
+    let fusionado = false
+    let response = await _enviarActivo(enviado)
+
+    if (response.status === 409) {
+        enviado = await _fusionarActivoTrasConflicto(assetData)
+        fusionado = true
+        response = await _enviarActivo(enviado)
+    }
 
     if (!response.ok) {
         const errorText = await response.text()
         throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    const cuerpo = await response.json().catch(() => null)
+    if (Number.isInteger(cuerpo?.revision)) {
+        enviado.revision = cuerpo.revision
+        assetData.revision = cuerpo.revision
+        _recordarBaseActivo(enviado)
+    }
+
+    // La ficha abierta se entera por aquí de la revisión nueva y, si hubo
+    // fusión, de las filas que llegaron desde otro sitio.
+    document.dispatchEvent(
+        new CustomEvent("activo-guardado", {
+            detail: { id: enviado.id, revision: enviado.revision, fusionado: fusionado ? enviado : null }
+        })
+    )
+    if (fusionado && typeof showToast === "function") {
+        showToast(
+            "Este activo había cambiado desde otro sitio (otra pestaña, otro dispositivo). Se han combinado los cambios.",
+            {
+                type: "warning"
+            }
+        )
     }
 }
 

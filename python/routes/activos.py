@@ -5,13 +5,13 @@ from flask import Blueprint, jsonify, request
 from core import dinero, pnl_divisa
 from core.db import getActiveDbPath, getDb
 from providers.finnhub_client import convertAmount
-from stores import alertas_store, rendimiento_activo
+from stores import alertas_store, rendimiento_activo, revisiones
 from stores.asset_store import (
     deleteAssetFile,
     getAssetFile,
     listAssets,
     readAssetFile,
-    updateAssetMarketData,
+    updateAssetQuote,
     updateAssetsOrder,
     writeAssetFile,
 )
@@ -283,11 +283,25 @@ def getActivosLote():
         return jsonify({"ok": False, "error": f"Indica entre 1 y {_MAX_IDS_LOTE} ids"}), 400
 
     fichas = {}
+    revisionesPorActivo = {}
     for assetId in ids:
         data = readAssetFile(assetId)
         if data is not None:
             fichas[assetId] = data
-    return jsonify({"assets": fichas})
+            revisionesPorActivo[assetId] = revisiones.actual("activos", slugify(assetId))
+    # La revisión va aparte y no dentro de cada ficha: la ficha tiene que seguir
+    # siendo idéntica a la de /api/activos/<id>. El cliente la reenvía al
+    # guardar y, si otra pestaña u otro dispositivo guardó el activo entretanto,
+    # el guardado se rechaza con un 409 (ver stores/revisiones.py).
+    return jsonify({"assets": fichas, "revisiones": revisionesPorActivo})
+
+
+def _respuestaConflicto(conflicto):
+    """La misma respuesta 409 que gastos e ingresos (ver stores/revisiones.py)."""
+    return jsonify({
+        "ok": False, "conflicto": True, "revision": conflicto.actual,
+        "error": "Este activo ha cambiado desde otro sitio (otra pestaña u otro dispositivo)",
+    }), 409
 
 
 @activosBp.route("/api/activos/<assetId>", methods=["POST"])
@@ -297,6 +311,11 @@ def saveActivo(assetId):
 
     if error:
         return jsonify({"ok": False, "error": error}), 400
+
+    try:
+        esperada = revisiones.revisionDePeticion(requestData)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
 
     existingAsset = readAssetFile(assetId) or {}
 
@@ -331,8 +350,11 @@ def saveActivo(assetId):
     if proveedorExistente and normalizeMarketProvider(requestData.get("marketProvider", ""), fallback="") == "":
         payload["marketProvider"] = proveedorExistente
 
-    writeAssetFile(assetId, payload)
-    return jsonify({"ok": True})
+    try:
+        nueva = writeAssetFile(assetId, payload, revisionEsperada=esperada)
+    except revisiones.ConflictoRevision as conflicto:
+        return _respuestaConflicto(conflicto)
+    return jsonify({"ok": True, "revision": nueva})
 
 
 @activosBp.route("/api/activos/<assetId>/refresh-market-data", methods=["POST"])
@@ -376,15 +398,28 @@ def refreshActivoMarketData(assetId):
                      "se mantiene el último precio",
         }), 503
 
-    assetData["marketProvider"] = marketProvider
-    assetData["marketSymbol"] = quote["symbol"]
-    assetData["finnhubSymbol"] = quote["symbol"]
-    assetData["price"] = quote["price"]
-    assetData["currency"] = targetCurrency
-    assetData["change"] = quote["change"]
-    assetData["status"] = quote["status"]
-    assetData["lastUpdated"] = quote["lastUpdated"]
-    updateAssetMarketData(assetId, assetData)
+    # Solo se escriben los campos de la cotización, y solo si el activo sigue
+    # con la misma divisa y ticker con los que se pidió: la consulta al
+    # proveedor tarda, y un cambio de divisa hecho mientras tanto dejaría un
+    # precio en la moneda vieja con la etiqueta de la nueva.
+    guardada = updateAssetQuote(
+        assetId,
+        {
+            "provider": marketProvider, "symbol": quote["symbol"], "price": quote["price"],
+            "currency": targetCurrency, "change": quote["change"], "status": quote["status"],
+            "lastUpdated": quote["lastUpdated"],
+        },
+        divisaLeida=assetData.get("currency"),
+        simboloLeido=assetData.get("marketSymbol"),
+    )
+    if not guardada:
+        return jsonify({
+            "ok": False,
+            "error": "El activo cambió (divisa, ticker o borrado) mientras se consultaba la "
+                     "cotización; no se ha guardado el precio. Vuelve a actualizar.",
+        }), 409
+
+    assetData = readAssetFile(assetId)
 
     # Un precio nuevo puede cumplir una alerta: se evalúa aquí, además de en el
     # hilo de fondo, para que refrescar a mano (o el refresco automático de la
@@ -427,6 +462,7 @@ def changeActivoCurrency(assetId):
     if currentCurrency == targetCurrency:
         return jsonify({"ok": True, "asset": assetData, "converted": False})
 
+    revisionLeida = revisiones.actual("activos", slugify(assetId))
     convertedPrice = parseLooseNumber(assetData.get("price", ""))
 
     if convertedPrice is not None:
@@ -462,7 +498,15 @@ def changeActivoCurrency(assetId):
     if assetData.get("convertCurrency"):
         assetData["convertCurrency"] = targetCurrency
     assetData["status"] = f"Activo convertido de {currentCurrency} a {targetCurrency}"
-    writeAssetFile(assetId, assetData)
+    # La conversión consulta el tipo de cambio por red y tarda: si mientras tanto
+    # se guardó el activo desde otro sitio, escribirlo entero con lo leído antes
+    # borraría esos cambios. Con la revisión de entonces, el guardado se rechaza.
+    try:
+        assetData["revision"] = writeAssetFile(
+            assetId, assetData, revisionEsperada=revisionLeida
+        )
+    except revisiones.ConflictoRevision as conflicto:
+        return _respuestaConflicto(conflicto)
 
     return jsonify({"ok": True, "asset": assetData, "converted": True})
 

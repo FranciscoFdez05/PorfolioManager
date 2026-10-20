@@ -150,6 +150,13 @@ CSRF_COOKIE = "csrf_token"
 CSRF_HEADER = "X-CSRF-Token"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 
+# POST que en realidad solo leen del proveedor de cotizaciones y refrescan un
+# precio: la interfaz lanza uno por activo al abrir (hasta 4 a la vez) y con más
+# de ~100 activos agotaban el cupo de escrituras de la IP, dejando sin guardar
+# nada más durante un minuto. Siguen pasando por la sesión y el CSRF; solo se
+# libran del contador. Las llamadas al proveedor tienen su propio control.
+ENDPOINTS_FUERA_DEL_CUPO = {"activos.refreshActivoMarketData"}
+
 
 # ── SECRET_KEY ────────────────────────────────────────────────────────────────
 # Los valores de ejemplo que se han publicado en .env.example. Están aquí y no
@@ -293,6 +300,8 @@ def instalar(app, *, limiteEscrituras=None, limitePesadas=None):
         # intentos fallidos y correctos; contarlo dos veces solo daría 429 donde
         # ya hay un mensaje de bloqueo escrito para el usuario.
         if request.endpoint == "auth.login":
+            return
+        if request.endpoint in ENDPOINTS_FUERA_DEL_CUPO:
             return
         # Sin sesión (y fuera del Atajo, que se autentica por su cuenta) la
         # petición acaba en el 401 de requireLogin sin tocar nada. Contarla

@@ -24,7 +24,7 @@ import threading
 from dataclasses import replace
 from decimal import Decimal
 
-from core import fifo, fiscal_es
+from core import dinero, fifo, fiscal_es
 from core.db import getDb
 from core.fifo import ADQUISICION, TRANSMISION, Operacion
 
@@ -650,4 +650,8 @@ def _money(value, escala="0.01"):
     """Importe como cadena con punto decimal, apta para JSON y para la BD."""
     if value is None or value == "":
         return ""
-    return f"{fifo.cuantizar(Decimal(value), Decimal(escala)):f}"
+    # ROUND_HALF_UP de dinero.redondear, como el resto de la aplicación: el
+    # medio-par de fifo.cuantizar dejaba 0,125 en 0,12 aquí y en 0,13 en las
+    # demás pantallas.
+    decimales = -Decimal(escala).as_tuple().exponent
+    return f"{dinero.redondear(Decimal(value), decimales):f}"

@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# El token del workflow solo necesita leer el repo; sin esto hereda los
+# permisos por defecto de la configuración del repositorio.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true

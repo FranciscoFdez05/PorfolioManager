@@ -4,8 +4,8 @@
 
 | Versión | Soporte |
 |---|---|
-| 1.0.x | Sí |
-| < 1.0 | No |
+| 4.8.x | Sí |
+| < 4.8 | No |
 
 ## Cómo informar de una vulnerabilidad
 

@@ -67,13 +67,19 @@ def testElBadgeDelReadmeDeclaraLaMismaVersion():
     este fichero, aquí no se rompe nada al ejecutar, así que solo lo detecta
     algo así.
     """
-    readme = (RAIZ / "README.md").read_text("utf-8")
-    esperado = f"badge/versi%C3%B3n-{__version__}-blue"
+    # README.md está en inglés y docs/README-ESP.md en español: cada uno lleva
+    # su badge con el texto de su idioma.
+    badges = {
+        "README.md": f"badge/version-{__version__}-blue",
+        "docs/README-ESP.md": f"badge/versi%C3%B3n-{__version__}-blue",
+    }
 
-    assert esperado in readme, (
-        f"el badge del README no anuncia la {__version__}. Actualízalo en el "
-        f"mismo commit en que subas la versión."
-    )
+    for ruta, esperado in badges.items():
+        readme = (RAIZ / ruta).read_text("utf-8")
+        assert esperado in readme, (
+            f"el badge de {ruta} no anuncia la {__version__}. Actualízalo en el "
+            f"mismo commit en que subas la versión."
+        )
 
 
 # ── CHANGELOG ─────────────────────────────────────────────────────────────────

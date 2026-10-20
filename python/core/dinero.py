@@ -179,7 +179,13 @@ def redondear(valor, decimales=2) -> Decimal:
     El modo por defecto de `Decimal` es ROUND_HALF_EVEN, que deja 2,675 en
     2,67. En un importe eso se lee como un céntimo perdido.
     """
-    return aDecimal(valor).quantize(Decimal(1).scaleb(-decimales), rounding=ROUND_HALF_UP)
+    try:
+        return aDecimal(valor).quantize(Decimal(1).scaleb(-decimales), rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        # Con más dígitos que la precisión del contexto (28) quantize lanza
+        # InvalidOperation, que no es ValueError y se escapaba de los except
+        # que esperan ImporteInvalido.
+        raise ImporteInvalido(f"«importe» tiene demasiados dígitos: {valor!r}") from None
 
 
 def _recortar(numero: Decimal) -> Decimal:

@@ -1,3 +1,5 @@
+[🇪🇸 Español](docs/README-ESP.md) | [🇬🇧 English](README.md)
+
 <p align="center">
   <img src="img/logo-192.png" alt="PorfolioManager" width="128">
 </p>
@@ -5,54 +7,115 @@
 <h1 align="center">PorfolioManager</h1>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-4.8.1-blue" alt="Versión 4.8.0"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-4.8.1-blue" alt="Version"></a>
   <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python 3.11 | 3.12 | 3.13">
-  <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker Compose">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue" alt="License: GPL-3.0"></a>
+  <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python">
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue" alt="License"></a>
 </p>
 
-Aplicación web **autoalojada** para el seguimiento de una cartera de inversión personal. Todo se guarda en SQLite y corre en tu máquina o en un servidor doméstico con Docker. Las cotizaciones externas son opcionales: sin claves de API, los precios los introduces tú.
+---
 
-## Características
+**Self-hosted** web app to track a personal investment portfolio. Everything is stored in SQLite and runs on your own machine or a home server with Docker.
 
-- **Cartera** — resumen, ficha por activo con precio medio, rendimiento y desglose entre efecto activo y efecto divisa, y planes de inversión.
-- **Finanzas** — gastos, ingresos, mensualidades, cuentas de dinero, dividendos, renta fija y bonos.
-- **Fiscalidad española** — ventas con FIFO, regla de los dos meses y compensación de pérdidas; informe anual en CSV y HTML.
-- **Métricas** — TWR, XIRR, drawdown, volatilidad y comparación con índices.
-- **Cripto** — stablecoins, operaciones, conversiones, staking y earn.
-- **Operación** — backups automáticos, avisos y comandos por Telegram, HTTPS desde la propia aplicación y Atajo de iOS para apuntar gastos.
+Market quotes are optional: without API keys you enter prices yourself. The interface is in Spanish.
 
-## Instalación
+## ✨ Features ✨
 
-Con Docker:
+- **Portfolio**: summary, per-asset page with average price and performance split into asset effect and currency effect, and investment plans.
+- **Finances**: expenses, income, monthly payments, cash accounts, dividends, fixed income and bonds.
+- **Spanish taxation**: sales with FIFO, the two-month rule and loss offsetting; annual report in CSV and HTML.
+- **Metrics**: TWR, XIRR, drawdown, volatility and comparison against indices.
+- **Crypto**: stablecoins, trades, conversions, staking and earn.
+- **Operations**: automatic backups, Telegram alerts and commands, HTTPS enabled from the app itself, and an iOS Shortcut to log expenses from your phone.
+- **Self-updating**: `docker-update.sh` checks that the new version answers on `/api/health` and rolls back to the previous image if it does not.
+
+## 🖥️ Requirements
+
+| To | You need |
+|---|---|
+| **Use it** | Docker with Compose v2 (Linux server recommended), or Python 3.11+ without Docker |
+| **Develop** | Python 3.11+ (CI tests 3.11, 3.12 and 3.13) and Node.js 20 for the frontend linter and tests |
+
+## 📦 Installation guide ⚙️
+
+### Option 1: Docker (recommended)
 
 ```bash
 git clone https://github.com/FranciscoFdez05/PorfolioManager.git
 cd PorfolioManager
-./docker-setup
+./docker-setup   # creates .env, generates SECRET_KEY, asks for credentials and port, starts the stack
 ```
 
-Sin Docker (Python 3.11+):
+Run it as your normal user, without `sudo`. The app is served at `http://localhost:5000` (or `http://<SERVER_IP>:5000` from another device on the LAN). Data is kept in `data/`, `logs/` and `API/`.
+
+> [!WARNING]
+> Out of the box the app is served over plain HTTP, so the password and session cookie travel unencrypted. Before using it from another device, enable HTTPS in **Ajustes › Seguridad › HTTPS**. See [SECURITY.md](SECURITY.md).
+
+To update an existing installation:
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python python/server.py
+./docker-update.sh              # git pull, build, start and health check, with automatic rollback
+./docker-update.sh --sin-pull   # same, without git pull
 ```
 
-La aplicación queda en `http://localhost:5000`.
+### Option 2: from source
 
-## Documentación
+```bash
+git clone https://github.com/FranciscoFdez05/PorfolioManager.git
+cd PorfolioManager
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python python/server.py   # http://localhost:5000
+```
 
-La guía completa está en **[DOCUMENTACION.md](DOCUMENTACION.md)**: configuración, claves API, actualización y migraciones, backups, HTTPS, seguridad, Telegram, fiscalidad y desarrollo.
+### Environment variables
 
-Otros documentos: [CHANGELOG](CHANGELOG.md) · [SECURITY](SECURITY.md) · [CONTRIBUTING](CONTRIBUTING.md) · [Atajo de iOS](docs/atajo-ios.md) · [Herramientas extra](docs/herramientas-extra.md)
+Secrets live in `.env` (copy `.env.example`; `./docker-setup` does it for you). The rest of the settings are in `config.ini`.
 
-## Stack
+| Variable | Description | Required | Default |
+|---|---|---|---|
+| `SECRET_KEY` | Signs sessions and encrypts stored API keys and credentials | Yes | Generated by `docker-setup` |
+| `LOGIN_USERNAME` | Initial user, used only on first start | Yes | `admin` |
+| `LOGIN_PASSWORD_HASH` | Hash of the initial password (`docker-setup` generates it) | Yes | empty |
+| `FINNHUB_API_KEY`, `EODHD_API_KEYS`, `ALPHA_VANTAGE_API_KEYS` | Market data keys; normally set in Ajustes › API instead | No | empty |
+| `TZ` | Container time zone (logs and backups) | No | `Europe/Madrid` |
+| `PORT` | HTTP port; overrides `config.ini` | No | `5000` |
+| `PUID` / `PGID` | User and group the container writes as (Linux) | No | Set by `docker-setup` |
 
-Python · Flask · Gunicorn · SQLite · JavaScript sin frameworks · Chart.js · Docker
+## 📋 Usage guide 🕹️
 
-## Licencia
+1. Open `http://localhost:5000` and sign in with the credentials you chose in `docker-setup`.
+2. Add your assets and operations. Without API keys, enter prices manually.
+3. Optionally add Finnhub, EODHD or Alpha Vantage keys in **Ajustes › API** to get automatic quotes.
+4. Enable HTTPS in **Ajustes › Seguridad › HTTPS** if you access it from other devices.
+5. Optionally set up Telegram in **Ajustes › Telegram** (alerts and commands such as `/estado`, `/cartera`, `/backup`).
 
-[GPL-3.0](LICENSE)
+```bash
+docker logs -f PorfolioManager   # follow the logs
+docker compose down              # stop the stack
+```
+
+Extra documentation:
+
+- [DOCUMENTACION.md](DOCUMENTACION.md): full guide (configuration, API keys, backups, HTTPS, Telegram, taxation, development). In Spanish.
+- [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md)
+- [iOS Shortcut](docs/atajo-ios.md) and [custom tools](docs/herramientas-extra.md)
+- [Update watcher](tools/actualizador/README.md) to update from the settings page
+
+## 🤝 Contributing 🤝
+
+1. Fork the repository.
+2. Create a branch: `git checkout -b feature/new-feature`.
+3. Make sure `pytest -m "not network"`, `ruff check .` and `npm test` pass.
+4. Commit and open a Pull Request.
+
+## 📜 License
+
+📄 This project is licensed under the GPL-3.0 License. See the [`LICENSE`](LICENSE) file for details.
+
+---
+
+<p align="center">
+  Developed with ❤️ by <a href="https://github.com/FranciscoFdez05">Francisco</a>
+</p>

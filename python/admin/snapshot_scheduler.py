@@ -99,7 +99,15 @@ def ejecutarUnaVez(refrescarPrecios=True) -> int:
     from stores.valoracion import valorarPortfolio
 
     guardados = 0
-    for ruta in _rutasObjetivo():
+    try:
+        rutas = _rutasObjetivo()
+    except Exception as e:
+        # Un portfolios.json ilegible o un fallo de disco aquí no puede matar
+        # el hilo: sin esta guarda, los snapshots paraban hasta reiniciar.
+        log.warning("[snapshots] No se pudo determinar qué portfolios guardar: %s", e)
+        return 0
+
+    for ruta in rutas:
         try:
             with useDbPath(ruta):
                 if not reservarBucket():

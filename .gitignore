@@ -6,6 +6,18 @@ data/backups/*
 data/JSON/*
 !data/.gitkeep
 
+# Bases, credenciales y copias fuera de data/ (p. ej. un sqlite3 lanzado desde
+# la raíz o un export descargado a la carpeta del repo): el repo es público.
+*.db
+*.db-wal
+*.db-shm
+*.sqlite*
+auth.dat
+*.key
+backup_*.zip
+portfolio-export*.json
+portfolio-export*.zip
+
 # =========================
 # LOGS
 # =========================

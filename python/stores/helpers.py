@@ -1,6 +1,7 @@
 from core import dinero
 from core.db import transaction
 from providers.finnhub_client import convertAmount
+from stores import revisiones
 from stores.app_data import (
     readAlphaVantageApiKey,
     readEodhdApiKey,
@@ -288,3 +289,6 @@ def syncCompletedOperationsIntoAssets(rows):
                     for valores in deseadas
                 ],
             )
+            # Una ficha abierta con las operaciones de antes no debe poder
+            # devolverlas al guardar sin que el servidor se entere.
+            revisiones.avanzar(conn, "activos", assetId)

@@ -4,7 +4,7 @@ from flask import Blueprint, Response, g, jsonify
 
 from core import csp, informe_renta
 from core.validation import jsonBody
-from stores import ventas_fifo
+from stores import revisiones, ventas_fifo
 from stores.gastos_store import normalizeYear
 from stores.ventas_store import (
     createDefaultVentasYear,
@@ -23,8 +23,9 @@ ventasBp = Blueprint("ventas", __name__)
 
 @ventasBp.route("/api/ventas", methods=["GET"])
 def getVentas():
-    defaultYear = str(date.today().year)
-    years = migrateLegacyVentasIfNeeded(defaultYear)
+    # Sin ningún ejercicio se ofrece el actual sin crearlo: la lectura no
+    # escribe, y el año se guarda la primera vez que el usuario guarda.
+    years = listVentasYears() or [str(date.today().year)]
     # Un solo cálculo para todo: el FIFO es global y recalcularlo por año
     # daría, además de lento, resultados distintos según el orden de lectura.
     calculo = ventas_fifo.calcularTodo()
@@ -58,8 +59,11 @@ def createVentasYear():
 
 @ventasBp.route("/api/ventas/<year>", methods=["GET"])
 def getVentasYear(year):
-    migrateLegacyVentasIfNeeded(normalizeYear(year) or str(date.today().year))
     data = readVentasYear(year)
+
+    if data is None and not listVentasYears() and normalizeYear(year) == str(date.today().year):
+        # El ejercicio actual de una cartera sin ventas: vacío, sin persistirlo.
+        data = {**createDefaultVentasYear(year), "resumen": None, "incidencias": [], "revision": 0}
 
     if data is None:
         return jsonify({"ok": False, "error": "Año no encontrado"}), 404
@@ -80,7 +84,18 @@ def saveVentasYear(year):
     # se guardan, marcadas, y salen en `incidencias`.
     validarParaGuardar(payload)
 
-    writeVentasYear(payload["year"], payload)
+    try:
+        esperada = revisiones.revisionDePeticion(requestData)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    try:
+        writeVentasYear(payload["year"], payload, revisionEsperada=esperada)
+    except revisiones.ConflictoRevision as conflicto:
+        return jsonify({
+            "ok": False, "conflicto": True, "revision": conflicto.actual,
+            "error": "Este año ha cambiado desde otro sitio (otra pestaña u otro dispositivo)",
+        }), 409
     data = readVentasYear(payload["year"])
     return jsonify({
         "ok": True,
@@ -88,6 +103,7 @@ def saveVentasYear(year):
         "rows": data["rows"],
         "resumen": data["resumen"],
         "incidencias": data["incidencias"],
+        "revision": data["revision"],
     })
 
 

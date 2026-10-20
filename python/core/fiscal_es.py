@@ -68,8 +68,11 @@ CLAVES_TRAMOS = ("tramo1", "tramo2", "tramo3", "tramo4", "tramo5")
 # negociación en mercados regulados (art. 33.5.f) y un año para los que no lo
 # están (art. 33.5.g). La DGT ha venido aplicando el supuesto de no cotizados a
 # las monedas virtuales (entre otras, V1948-21), así que cripto usa un año.
-VENTANA_COTIZADOS = timedelta(days=60)
-VENTANA_NO_COTIZADOS = timedelta(days=365)
+#
+# Se miden en meses naturales y no en días: "dos meses" desde el 31 de diciembre
+# llega al 28 o 29 de febrero, no al 1 de marzo que daría una ventana de 60 días.
+VENTANA_COTIZADOS = 2
+VENTANA_NO_COTIZADOS = 12
 
 _TIPOS_NO_COTIZADOS = {"cripto", "criptomoneda", "crypto", "no cotizado", "private"}
 
@@ -90,11 +93,36 @@ def escalaDelEjercicio(anio):
 
 
 def ventanaAntiaplicacion(tipoActivo):
-    """Plazo de recompra que bloquea la pérdida, según el tipo de activo."""
+    """Plazo de recompra, en meses naturales, que bloquea la pérdida según el tipo de activo."""
     normalizado = str(tipoActivo or "").strip().lower()
     if normalizado in _TIPOS_NO_COTIZADOS:
         return VENTANA_NO_COTIZADOS
     return VENTANA_COTIZADOS
+
+
+def sumarMeses(fecha: date, meses: int) -> date:
+    """Desplaza `fecha` un número de meses naturales (negativo hacia atrás).
+
+    Si el día no existe en el mes de destino se queda en el último de ese mes:
+    el 31 de diciembre más dos meses es el 28 o 29 de febrero.
+
+    Args:
+        fecha: Fecha de partida.
+        meses: Meses a sumar; puede ser negativo.
+
+    Returns:
+        La fecha desplazada.
+
+    Example:
+        >>> sumarMeses(date(2025, 12, 31), 2)
+        datetime.date(2026, 2, 28)
+    """
+    indice = fecha.year * 12 + (fecha.month - 1) + meses
+    anio, mes = divmod(indice, 12)
+    mes += 1
+    siguiente = date(anio + (mes // 12), mes % 12 + 1, 1)
+    ultimoDia = (siguiente - timedelta(days=1)).day
+    return date(anio, mes, min(fecha.day, ultimoDia))
 
 
 @dataclass
@@ -184,8 +212,8 @@ def _detectarAntiaplicacion(resultados, operaciones, ventana):
             continue
 
         perdida = -resultado.ganancia
-        inicio = resultado.fecha - ventana
-        fin = resultado.fecha + ventana
+        inicio = sumarMeses(resultado.fecha, -ventana)
+        fin = sumarMeses(resultado.fecha, ventana)
 
         candidatas = [
             op for op in adquisiciones
@@ -207,7 +235,7 @@ def _detectarAntiaplicacion(resultados, operaciones, ventana):
             "importe": importeBloqueado,
             "nota": (
                 f"Pérdida no computable por recompra de {_num(bloqueable)} "
-                f"participaciones dentro de los {ventana.days} días anteriores "
+                f"participaciones dentro de los {ventana} meses anteriores "
                 f"o posteriores a la venta (art. 33.5 LIRPF)."
             ),
         }

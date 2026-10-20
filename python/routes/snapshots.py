@@ -83,7 +83,11 @@ def _aReal(value):
     numero = dinero.aDecimalONulo(value)
     if numero is None:
         return None
-    return float(dinero.redondear(numero))
+    try:
+        return float(dinero.redondear(numero))
+    except dinero.ImporteInvalido:
+        # Demasiados dígitos para Decimal: se trata como un importe ilegible.
+        return None
 
 
 def guardarSnapshot(totalValue, totalInvested, assets=(), nowTs=None) -> bool:

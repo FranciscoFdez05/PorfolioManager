@@ -1,16 +1,27 @@
-// Un punto es separador de MILES solo si agrupa de tres en tres ("1.234").
-// Si no, es el separador decimal ("1234.56").
+// Cómo se lee un importe escrito como texto. Es el mismo criterio que aplica el
+// servidor en `python/core/dinero.py` (`aDecimal`), y tests-js/shared-utils
+// comprueba las dos mitades contra la misma tabla de entradas
+// (tests-js/importes-casos.json, que pytest también recorre):
 //
-// Antes se descartaban todos los puntos sin mirar, y eso multiplicaba por cien
-// cualquier importe que llegara en el formato canónico que usa el servidor:
-// parseEuroNumber("1234.56") devolvía 123456. No saltaba a la vista porque la
-// mayoría de columnas se guardan en formato español, pero basta con que un
-// endpoint devuelva un número ya serializado (los snapshots, el motor FIFO, un
-// tipo de cambio) para que un total salga cien veces mayor.
+//   * Un punto es SIEMPRE el separador decimal: "1.234" son mil doscientos
+//     treinta y cuatro milésimas, no mil doscientos treinta y cuatro. Antes el
+//     navegador lo leía como miles y el servidor como decimal, así que "0.001"
+//     BTC se veía como 1 BTC en pantalla y valía 0,001 en todos los cálculos
+//     del servidor.
+//   * Si hay coma, la coma es el decimal y los puntos son de miles
+//     ("1.234,56"). Es el formato español en el que están guardados los
+//     importes antiguos.
+//   * Con coma y punto a la vez, el que va el último es el decimal: "1,234.56"
+//     (lo que escribe o pinta un locale en-US) también se lee bien. Eso solo
+//     lo hace el navegador; el servidor recibe el importe ya en canónico (ver
+//     `toCanonicalNumber`).
+//   * Un número con más de un separador decimal ("1.234.567", "1,2,3") es
+//     ilegible: no se adivina.
 //
-// Cuando hay coma no hay ambigüedad posible: la coma es el decimal y el punto
-// solo puede ser de miles, que es lo que se hacía y se conserva.
-const MILES_ES = /^-?\d{1,3}(\.\d{3})+$/
+// El espacio de miles (NBSP, U+202F) y los símbolos de divisa se descartan
+// antes de mirar nada.
+const SIMBOLOS_IMPORTE = /[€$£¥₿¢₽₩₹%]|(?:EUR|USD|GBP|CHF|JPY|CAD|AUD|BTC|ETH|SATS?)/gi
+const NUMERO_CANONICO = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/
 
 // Cuentas de dinero: la bancaria (la de Gastos e Ingresos, y la de siempre), las
 // de ahorro, los exchanges, los brokers… Gastos e Ingresos las piden para elegir
@@ -52,11 +63,21 @@ function construirSelectorCuenta(selectId, actual = "") {
     return `<select id="${selectId}" class="assetModalSelect"><option value=""${actual ? "" : " selected"}>${esc(nombreDeCuentaBancaria())}</option>${opciones}</select>`
 }
 
+// Texto con un único separador decimal (".") listo para Number(), o con más de
+// uno si el original era ilegible: quien lo usa lo descarta con `tieneUnSoloPunto`.
 function normalizeDecimalSeparators(text) {
-    if (text.includes(",")) {
-        return text.replaceAll(".", "").replace(",", ".")
+    const ultimaComa = text.lastIndexOf(",")
+    if (ultimaComa === -1) {
+        return text
     }
-    return MILES_ES.test(text) ? text.replaceAll(".", "") : text
+    if (ultimaComa > text.lastIndexOf(".")) {
+        return text.replaceAll(".", "").replaceAll(",", ".")
+    }
+    return text.replaceAll(",", "")
+}
+
+function tieneUnSoloPunto(text) {
+    return text.split(".").length <= 2
 }
 
 function parseEuroNumber(value) {
@@ -65,6 +86,9 @@ function parseEuroNumber(value) {
     }
 
     const cleanValue = normalizeDecimalSeparators(value.toString().replaceAll("€", "").replaceAll(/\s/g, ""))
+    if (!tieneUnSoloPunto(cleanValue)) {
+        return 0
+    }
 
     const parsedValue = parseFloat(cleanValue)
     return Number.isNaN(parsedValue) ? 0 : parsedValue
@@ -76,9 +100,61 @@ function parseDollarNumber(value) {
     }
 
     const cleanValue = normalizeDecimalSeparators(value.toString().replaceAll("$", "").replaceAll(/\s/g, ""))
+    if (!tieneUnSoloPunto(cleanValue)) {
+        return 0
+    }
 
     const parsedValue = parseFloat(cleanValue)
     return Number.isNaN(parsedValue) ? 0 : parsedValue
+}
+
+// Espejo estricto de `dinero.aDecimal`: el importe como texto canónico (punto
+// decimal, sin miles ni símbolos) o null si no se puede leer. A diferencia de
+// parseEuroNumber, que perdona ("12abc" da 12) porque sus llamadores acumulan
+// el resultado, esta no adivina: un importe ilegible tiene que verse.
+function parseDecimalStrict(value) {
+    if (value === null || value === undefined) {
+        return null
+    }
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? String(value) : null
+    }
+    const texto = String(value).replaceAll(/\s/g, "").replaceAll(SIMBOLOS_IMPORTE, "")
+    if (!texto) {
+        return null
+    }
+    const limpio = normalizeDecimalSeparators(texto)
+    return NUMERO_CANONICO.test(limpio) ? limpio : null
+}
+
+// Separador decimal del locale activo ("," en es-ES y fr-FR, "." en en-US).
+function separadorDecimalDelLocale() {
+    try {
+        const partes = new Intl.NumberFormat(_nl()).formatToParts(1.1)
+        return partes.find((parte) => parte.type === "decimal")?.value || ","
+    } catch {
+        return ","
+    }
+}
+
+// Lo que el navegador manda al servidor al guardar un importe tecleado: formato
+// canónico (punto decimal, sin separador de miles ni símbolos). El servidor lo
+// lee con `dinero.aDecimal`, que no sabe de locales: "1,234.56" tecleado en
+// en-US se leería allí como 1,23456. Con el locale activo en punto decimal, la
+// coma seguida de grupos de tres cifras ("1,234") es separador de miles.
+// Lo que no se entiende se devuelve tal cual (recortado) para que lo valide el
+// servidor y no se pierda lo tecleado.
+function toCanonicalNumber(value) {
+    const original = String(value ?? "").trim()
+    if (!original) {
+        return ""
+    }
+    let texto = original.replaceAll(/\s/g, "").replaceAll(SIMBOLOS_IMPORTE, "")
+    if (separadorDecimalDelLocale() === "." && /^[+-]?\d{1,3}(,\d{3})+(\.\d*)?$/.test(texto)) {
+        texto = texto.replaceAll(",", "")
+    }
+    const canonico = parseDecimalStrict(texto)
+    return canonico === null ? original : canonico.replace(/^\+/, "")
 }
 
 function _nl() {
@@ -473,7 +549,11 @@ function parseLooseNumber(value) {
     // El mismo criterio que parseEuroNumber: los dos parsers leen las mismas
     // columnas y discrepaban entre ellos ("1234.56" daba 1234,56 aquí y
     // 123.456 allí), así que el resultado dependía de cuál tocara esa pantalla.
-    const parsed = Number(normalizeDecimalSeparators(text))
+    const normalizado = normalizeDecimalSeparators(text)
+    if (!tieneUnSoloPunto(normalizado)) {
+        return null
+    }
+    const parsed = Number(normalizado)
     return Number.isFinite(parsed) ? parsed : null
 }
 

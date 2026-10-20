@@ -59,7 +59,14 @@ def _numero(valor) -> bool:
     guardaran, /api/settings devolvería algo que el navegador no puede leer y
     la aplicación entera se quedaría sin ajustes.
     """
-    return isinstance(valor, (int, float)) and not isinstance(valor, bool) and math.isfinite(valor)
+    if not isinstance(valor, (int, float)) or isinstance(valor, bool):
+        return False
+    try:
+        return math.isfinite(valor)
+    except OverflowError:
+        # Un entero de cientos de dígitos no cabe en un float: no es un tamaño
+        # ni una opción razonable, y math.isfinite lanza en vez de decir que no.
+        return False
 
 
 def _entero(valor, minimo, maximo, defecto):
@@ -75,9 +82,7 @@ def _opciones(cfg) -> dict:
     for clave, valor in cfg.items():
         if not isinstance(clave, str) or not clave or len(clave) > _MAX_CLAVE or clave in _CLAVES_PROHIBIDAS:
             continue
-        if isinstance(valor, bool):
-            limpio[clave] = valor
-        elif _numero(valor):
+        if isinstance(valor, bool) or _numero(valor):
             limpio[clave] = valor
         elif isinstance(valor, str):
             limpio[clave] = valor[: _MAX_NOTA if clave == "texto" else _MAX_TEXTO]

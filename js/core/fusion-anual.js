@@ -136,6 +136,7 @@
         return datos == null ? null : JSON.parse(JSON.stringify(datos))
     }
 
+    window.claveEstableAnual = claveEstable
     window.fusionarListaTresVias = fusionarListaTresVias
     window.fusionarAnioTresVias = fusionarAnioTresVias
     window.clonarDatosAnuales = clonarDatosAnuales

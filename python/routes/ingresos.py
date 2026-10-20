@@ -21,13 +21,8 @@ ingresosBp = Blueprint("ingresos", __name__)
 
 @ingresosBp.route("/api/ingresos", methods=["GET"])
 def getIngresosYears():
-    years = listIngresosYears()
-
-    if not years:
-        defaultYear = str(date.today().year)
-        payload = createDefaultIngresosYear(defaultYear)
-        writeIngresosYear(defaultYear, payload)
-        years = [defaultYear]
+    # Sin ningún año se ofrece el actual sin crearlo: la lectura no escribe.
+    years = listIngresosYears() or [str(date.today().year)]
 
     return jsonify({"years": years})
 

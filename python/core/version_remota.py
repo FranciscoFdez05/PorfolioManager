@@ -66,7 +66,7 @@ RUTA_CHANGELOG = "CHANGELOG.md"
 MAX_BYTES_CHANGELOG = 128 * 1024
 MAX_NOVEDADES = 8
 MAX_CARACTERES_NOVEDAD = 8000
-_PATRON_SECCION = re.compile(r"^## \[(\d+\.\d+\.\d+)\][ \t]*(?:[—–-][ \t]*(\S+))?[ \t]*$", re.M)
+_PATRON_SECCION = re.compile(r"^## \[(\d+\.\d+\.\d+)\][ \t]*(?:[\u2014\u2013-][ \t]*(\S+))?[ \t]*$", re.M)
 _PATRON_REPOSITORIO = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$")
 _PATRON_RAMA = re.compile(r"^[A-Za-z0-9._/-]+$")
 
