@@ -2495,15 +2495,18 @@ function renderGastosMonthTable() {
 
     body.innerHTML = ""
 
-    const rows = [...(currentGastosData.months?.[currentGastosMonth]?.rows || [])].sort(
-        (a, b) => gastoParseDate(a.fecha) - gastoParseDate(b.fecha)
-    )
+    // El índice de cada fila es el de los datos sin ordenar: Editar y Eliminar
+    // lo usan sobre currentGastosData, no sobre el orden en que se pinta.
+    const indexed = (currentGastosData.months?.[currentGastosMonth]?.rows || [])
+        .map((row, index) => ({ row, index }))
+        .sort((a, b) => gastoParseDate(a.row.fecha) - gastoParseDate(b.row.fecha))
+    const rows = indexed.map(({ row }) => row)
 
     // Los cargos de las mensualidades se intercalan por fecha, solo para verlos:
     // no son filas del mes (no se guardan) y no entran en el total ni en los
     // resúmenes de al lado, porque esos importes ya cuentan como mensualidades.
     const lineas = [
-        ...rows.map((row, index) => ({ dia: gastoParseDate(row.fecha), row, index })),
+        ...indexed.map(({ row, index }) => ({ dia: gastoParseDate(row.fecha), row, index })),
         ...getMensualidadesDelMes(currentGastosMonth)
     ].sort((a, b) => a.dia - b.dia)
 

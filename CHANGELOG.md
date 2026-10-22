@@ -22,6 +22,64 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.8.2] — 2026-10-22
+
+**Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la
+actualización basta con volver a la imagen anterior.
+
+### Corregido
+
+- **Gastos e ingresos: el «···» de una fila abría o borraba otra.** La tabla del
+  mes se pinta ordenada por fecha, pero cada fila llevaba su posición en ese
+  orden y Editar y Eliminar la buscaban en los datos tal como están guardados.
+  Con las filas guardadas en otro orden, Editar abría otro movimiento y Eliminar
+  podía borrar uno distinto del pulsado. Ahora cada fila apunta a su propio
+  movimiento.
+- **Importes: el mismo criterio en el navegador y en el servidor.** Un punto sin
+  coma es siempre el separador decimal: «0.001» BTC se veía como 1 BTC en
+  pantalla y valía 0,001 en los cálculos del servidor. Con coma, la coma es el
+  decimal y los puntos son de miles («1.234,56»); con los dos, el último es el
+  decimal («1,234.56»). Lo tecleado se guarda en formato canónico, así que con
+  el idioma en inglés ya no se leen cifras mil veces menores, y «12.000»
+  acciones ya no cuentan como 12 en el FIFO.
+- **Activos y ventas: un guardado desde otra pestaña ya no se pierde.** Como ya
+  pasaba en gastos e ingresos, cada activo y cada ejercicio de ventas llevan
+  una revisión. Si se guardaron desde otro sitio, el guardado se rechaza y los
+  cambios de los dos lados se fusionan en vez de pisarse.
+- **Cotizaciones: sin precios en la divisa equivocada.** Si se cambia la divisa
+  o el ticker de un activo mientras se consulta su cotización, el precio que
+  llega se descarta en vez de guardarse con la etiqueta nueva. El refresco
+  tampoco pisa ya lo que se haya editado del activo entretanto.
+- **Refrescar precios ya no agota el cupo de escrituras.** Con más de unos 100
+  activos, el refresco al abrir dejaba la IP sin poder guardar nada durante un
+  minuto.
+- **Fiscalidad: la ventana de recompra se mide en meses.** La regla de
+  antiaplicación de pérdidas cuenta dos meses (o un año) naturales, no 60 o 365
+  días: desde el 31 de diciembre llega al 28 o 29 de febrero.
+- **Redondeo de ventas.** Las ventas redondeaban los medios al par (0,125 → 0,12)
+  y el resto de pantallas hacia arriba (0,13). Ahora todas redondean hacia arriba.
+- **Participaciones con decimales en el resumen.** «0.5» participaciones se
+  contaban como 5.
+- **Importes desmesurados.** Un importe o un ajuste con más dígitos de los que
+  caben se rechaza con un error claro en vez de provocar un fallo del servidor.
+- **Abrir Gastos o Ingresos ya no escribe nada.** Sin ningún año guardado, el
+  año actual se ofrece sin crearlo y se guarda con el primer cambio.
+- **Snapshots.** Un `portfolios.json` ilegible ya no detiene los snapshots
+  automáticos hasta reiniciar.
+- **Actualizar desde Ajustes.** Un cerrojo que se queda huérfano (reinicio del
+  host o proceso matado a mitad) ya no deja el botón sin efecto para siempre.
+
+### Seguridad
+
+- `docker-up.sh` exige a la primera contraseña el mismo largo mínimo que
+  Ajustes, contado en caracteres y no en bytes.
+- El actualizador y `docker-update.sh` crean sus temporales con `mktemp` y
+  escriben el registro por un descriptor ya abierto. Así, desde el contenedor
+  no se puede redirigir con un enlace simbólico una escritura del host.
+- La etiqueta de tipo en las sugerencias de Seguimiento se escapa.
+- `.gitignore` cubre también bases, credenciales y exportaciones fuera de
+  `data/`.
+
 ## [4.8.1] — 2026-10-19
 
 **Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la

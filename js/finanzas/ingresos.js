@@ -1712,10 +1712,13 @@ function renderIngresosMonthTable() {
     const body = document.getElementById("ingresosMovementsBody")
     if (!body || !currentIngresosData) return
     body.innerHTML = ""
-    const rows = [...(currentIngresosData.months?.[currentIngresosMonth]?.rows || [])].sort(
-        (a, b) => ingresoParseDate(a.fecha) - ingresoParseDate(b.fecha)
-    )
-    rows.forEach((row, index) => body.appendChild(buildIngresoMovementRow(row, index)))
+    // El índice de cada fila es el de los datos sin ordenar: Editar y Eliminar
+    // lo usan sobre currentIngresosData, no sobre el orden en que se pinta.
+    const indexed = (currentIngresosData.months?.[currentIngresosMonth]?.rows || [])
+        .map((row, index) => ({ row, index }))
+        .sort((a, b) => ingresoParseDate(a.row.fecha) - ingresoParseDate(b.row.fecha))
+    const rows = indexed.map(({ row }) => row)
+    indexed.forEach(({ row, index }) => body.appendChild(buildIngresoMovementRow(row, index)))
 
     const total = rows.reduce((sum, row) => sum + parseEuroNumber(row.cantidad || ""), 0)
     const totalTr = document.createElement("tr")
