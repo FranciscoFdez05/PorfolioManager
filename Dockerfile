@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12.15-slim@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -25,6 +25,6 @@ RUN chmod +x /app/entrypoint.sh
 
 # Solo documentativo: el puerto real sale de [server] port en config.ini y lo
 # aplican entrypoint.sh (dentro) y docker-compose.yml (en el mapeo).
-EXPOSE 5000
+EXPOSE 5050
 
 ENTRYPOINT ["/app/entrypoint.sh"]

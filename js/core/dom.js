@@ -121,9 +121,55 @@
      * showToast("No se pudo guardar", { type: "error" })
      * type: "error" | "success" | "warning" | "info" (por defecto)
      */
+    // Los avisos persistentes (algo no se ha guardado) se agrupan en uno solo, con
+    // una línea por mensaje distinto y un botón para cerrarlo; se cierran también
+    // al cambiar de pantalla. Cuatro avisos apilados tapaban la barra lateral.
+    let persistentToast = null
+
+    function closePersistentToasts() {
+        if (persistentToast && persistentToast.parentNode) persistentToast.parentNode.removeChild(persistentToast)
+        persistentToast = null
+    }
+
+    function showPersistentToast(message, options) {
+        const host = ensureToastHost()
+        const text = String(message == null ? "" : message)
+
+        if (!persistentToast || !host.contains(persistentToast)) {
+            persistentToast = document.createElement("div")
+            persistentToast.className = "appToast isVisible"
+            if (options.type === "error") persistentToast.classList.add("isError")
+            else if (options.type === "warning") persistentToast.classList.add("isWarning")
+            persistentToast.setAttribute("role", "alert")
+            const close = document.createElement("button")
+            close.type = "button"
+            close.className = "appToastClose"
+            close.setAttribute("aria-label", "Cerrar aviso")
+            close.textContent = "×"
+            close.style.cssText =
+                "float:right;margin:-4px -6px 0 8px;background:none;border:0;color:inherit;font-size:20px;cursor:pointer;line-height:1"
+            close.addEventListener("click", closePersistentToasts)
+            persistentToast.appendChild(close)
+            host.appendChild(persistentToast)
+        }
+
+        const repetida = Array.from(persistentToast.querySelectorAll("p")).some(function (line) {
+            return line.textContent === text
+        })
+        if (!repetida) {
+            const line = document.createElement("p")
+            line.style.margin = "0 0 6px"
+            line.textContent = text
+            persistentToast.appendChild(line)
+        }
+        if (options.type === "error") persistentToast.classList.add("isError")
+        return persistentToast
+    }
+
     function showToast(message, options) {
         options = options || {}
         if (!document.body) return null
+        if (options.persistent) return showPersistentToast(message, options)
 
         const host = ensureToastHost()
         const toast = document.createElement("div")
@@ -140,22 +186,27 @@
             toast.classList.add("isVisible")
         })
 
-        const duration = options.duration != null ? options.duration : options.type === "error" ? 6000 : 3500
-        setTimeout(function () {
+        function cerrar() {
             toast.classList.remove("isVisible")
             setTimeout(function () {
                 if (toast.parentNode) toast.parentNode.removeChild(toast)
             }, 220)
-        }, duration)
+        }
+
+        const duration = options.duration != null ? options.duration : options.type === "error" ? 6000 : 3500
+        setTimeout(cerrar, duration)
 
         return toast
     }
 
     /** Muestra un error de forma consistente y lo deja en consola para depurar. */
-    function showError(message, error) {
+    function showError(message, error, options) {
         if (error) console.error(message, error)
         const detail = error && window.Api ? window.Api.describeError(error) : ""
-        showToast(detail && detail !== message ? message + ": " + detail : message, { type: "error" })
+        showToast(
+            detail && detail !== message ? message + ": " + detail : message,
+            Object.assign({ type: "error" }, options || {})
+        )
     }
 
     window.escapeHtml = escapeHtml
@@ -164,5 +215,6 @@
     window.el = el
     window.setText = setText
     window.showToast = showToast
+    window.closePersistentToasts = closePersistentToasts
     window.showError = showError
 })()

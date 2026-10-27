@@ -245,19 +245,41 @@
         if (!frame) frame = requestAnimationFrame(procesar)
     }
 
+    // Tablas que cuelgan de cada contenedor observado.
+    const tablasDelPadre = new WeakMap()
+
     const alCambiarTamano = new ResizeObserver((entradas) => {
         for (const entrada of entradas) {
             const ancho = Math.round(entrada.contentRect.width)
             if (anchoObservado.get(entrada.target) === ancho) continue
             anchoObservado.set(entrada.target, ancho)
-            programar(entrada.target)
+            const tablas = tablasDelPadre.get(entrada.target)
+            if (tablas) tablas.forEach((tabla) => tabla.isConnected && programar(tabla))
+            else programar(entrada.target)
         }
     })
+
+    // Con las columnas fijadas en px la tabla ya no encoge con su caja, así que
+    // su propio ancho no cambia al estrechar la ventana (o abrir el lateral) y
+    // se quedaba desbordada con el reparto del ancho anterior. Por eso se
+    // observa también el contenedor.
+    function observarPadre(tabla) {
+        const padre = tabla.parentElement
+        if (!padre) return
+        let tablas = tablasDelPadre.get(padre)
+        if (!tablas) {
+            tablas = new Set()
+            tablasDelPadre.set(padre, tablas)
+            alCambiarTamano.observe(padre)
+        }
+        tablas.add(tabla)
+    }
 
     function registrar(tabla) {
         if (registradas.has(tabla)) return
         registradas.add(tabla)
         alCambiarTamano.observe(tabla)
+        observarPadre(tabla)
         programar(tabla)
     }
 

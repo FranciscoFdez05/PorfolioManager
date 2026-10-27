@@ -23,10 +23,10 @@ function _initAjustesClaves(settings) {
     function setKeyStatus(el, count) {
         if (!el) return
         if (count > 0) {
-            el.textContent = `✓ ${count} clave${count > 1 ? "s" : ""}`
+            el.replaceChildren(crearIcono("Ok"), ` ${count} clave${count > 1 ? "s" : ""}`)
             el.className = "ajustesKeyStatus ok"
         } else {
-            el.textContent = "✗ No configurada"
+            el.replaceChildren(crearIcono("Error"), " No configurada")
             el.className = "ajustesKeyStatus missing"
         }
     }
@@ -39,11 +39,8 @@ function _initAjustesClaves(settings) {
     // el proveedor pasando a la siguiente cuando una se queda sin cuota— «2
     // claves» no permite saber cuáles son ni si la que está fallando sigue ahí.
     const _OJO_SVG =
-        '<svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-        '<path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/>' +
-        '<circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>' +
-        '<svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none">' +
-        '<path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
+        '<span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>' +
+        '<span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>'
 
     const _proveedoresClaves = {
         finnhub: { lista: document.getElementById("ajustesFinnhubKeyList"), estado: finnhubStatus },
@@ -199,8 +196,9 @@ function _initAjustesClaves(settings) {
                 const borrar = document.createElement("button")
                 borrar.type = "button"
                 borrar.className = "ajustesKeyRowDel"
-                borrar.textContent = "✕"
+                borrar.appendChild(crearIcono("Borrar"))
                 borrar.title = "Eliminar clave"
+                borrar.setAttribute("aria-label", "Eliminar clave")
                 borrar.addEventListener("click", () => _borrarClave(proveedor, clave, claves.length, fila))
                 fila.appendChild(borrar)
             }

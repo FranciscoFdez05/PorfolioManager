@@ -181,7 +181,7 @@ async function initPortfolioSwitcher() {
             const expBtn = document.createElement("button")
             expBtn.className = "portfolioActionBtn"
             expBtn.title = "Exportar"
-            expBtn.textContent = "⬇️"
+            expBtn.appendChild(crearIcono("Descargar"))
             expBtn.addEventListener("click", async (e) => {
                 e.stopPropagation()
                 closeMenu()
@@ -198,7 +198,7 @@ async function initPortfolioSwitcher() {
             const renBtn = document.createElement("button")
             renBtn.className = "portfolioActionBtn"
             renBtn.title = "Renombrar"
-            renBtn.textContent = "✏️"
+            renBtn.appendChild(crearIcono("Editar"))
             renBtn.addEventListener("click", (e) => {
                 e.stopPropagation()
                 closeMenu()
@@ -211,7 +211,7 @@ async function initPortfolioSwitcher() {
                 const delBtn = document.createElement("button")
                 delBtn.className = "portfolioActionBtn portfolioDeleteBtn"
                 delBtn.title = "Eliminar"
-                delBtn.textContent = "🗑"
+                delBtn.appendChild(crearIcono("Borrar"))
                 delBtn.addEventListener("click", async (e) => {
                     e.stopPropagation()
                     closeMenu()

@@ -64,8 +64,9 @@ function _initAjustesCopias() {
             restoreBtn.addEventListener("click", () => restoreBackup(filename, restoreBtn))
             const deleteBtn = document.createElement("button")
             deleteBtn.className = "ajustesDeleteBackupBtn"
-            deleteBtn.textContent = "✕"
+            deleteBtn.appendChild(crearIcono("Borrar"))
             deleteBtn.title = "Eliminar backup"
+            deleteBtn.setAttribute("aria-label", "Eliminar backup")
             deleteBtn.addEventListener("click", () => deleteBackup(filename, item))
             item.appendChild(label)
             item.appendChild(restoreBtn)
@@ -241,6 +242,21 @@ function _initAjustesDatos() {
         return volcado
     }
 
+    // Un 502/504 lo devuelve el proxy, no la aplicación: no trae JSON y casi
+    // siempre significa que el servidor se quedó sin memoria o sin tiempo.
+    async function _motivoFalloExport(res) {
+        try {
+            const data = await res.json()
+            if (data?.error) return `Error al exportar: ${data.error}`
+        } catch {
+            /* sin cuerpo JSON: se explica por el código */
+        }
+        if (res.status === 502 || res.status === 504) {
+            return `Error al exportar: el servidor no respondió (HTTP ${res.status}). Revisa los logs del contenedor.`
+        }
+        return `Error al exportar (HTTP ${res.status})`
+    }
+
     async function _doExport(url, filename, btn, cuerpo) {
         btn.disabled = true
         showMsg(exportMsg, "Preparando…", "")
@@ -255,7 +271,12 @@ function _initAjustesDatos() {
                       }
                     : undefined
             )
-            if (!res.ok) throw new Error()
+            if (!res.ok) {
+                // El servidor explica por qué (base dañada, disco sin permisos):
+                // con un "Error al exportar" a secas no había forma de saberlo.
+                showMsg(exportMsg, await _motivoFalloExport(res), "error")
+                return
+            }
             const blob = await res.blob()
             const a = document.createElement("a")
             a.href = URL.createObjectURL(blob)

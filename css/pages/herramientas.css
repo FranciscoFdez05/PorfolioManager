@@ -805,6 +805,280 @@
     color: #f87171;
 }
 
+/* Par como en el exchange (ETHBTC) y, al lado, la contraparte con su color. */
+.conversionesTable .cvParTexto {
+    margin-right: 8px;
+    color: var(--text-bright);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.conversionesTable .cvParContraparte {
+    font-size: 11px;
+}
+
+/* Precio de cambio en dos columnas, como en los extractos de los exchanges:
+   el directo destacado y el inverso más tenue. */
+.conversionesTable .cvPrecio,
+.conversionesTable .cvPrecioInverso,
+.conversionesTable .cvValorHoy {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.conversionesTable .cvPrecio {
+    color: var(--text-subtle);
+}
+
+.conversionesTable .cvPrecioInverso {
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.conversionesTable .cvValorHoy {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+
+/* Valor de mercado en euros de la conversión: lo que necesita el informe de la
+   renta. Sin él la fila lleva una marca que invita a completarlo. */
+.conversionesTable .cvValorEur {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-bright);
+    font-weight: 600;
+}
+
+.conversionesTable .cvSinValor {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: help;
+}
+
+.conversionesTable tbody.cvSoloSinValor tr:not(.cvFilaSinValor) {
+    display: none;
+}
+
+#cvFiltroSinValorBtn.cvFiltroActivo {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* Con muchas criptos el selector no cabe en una línea: la barra salta de
+   línea y los botones bajan, en vez de montarse sobre las etiquetas. */
+.operationsToolbar.cvToolbar {
+    flex-wrap: wrap;
+}
+
+/* Sustituye a lo anterior: como en Transacciones, la barra va en una sola
+   línea y es la tira de criptos la que se desplaza de lado si no caben. */
+.operationsToolbar.cvToolbar {
+    flex-wrap: nowrap;
+}
+
+.cvToolbar > .operationsToolbarLeft {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+}
+
+.cvToolbar #conversionesAssetMenu {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+
+.cvToolbar #conversionesAssetMenu > * {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.cvToolbar > .operationsToolbarRight {
+    flex: 0 0 auto;
+}
+
+.cvAyuda,
+.cvError {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--text-dim);
+}
+
+.cvError {
+    color: var(--color-neg-bright);
+}
+
+/* ── Popup de conversión como el intercambio de un exchange ──
+   «Vendes» arriba y «Compras» abajo, cada uno con su cantidad grande y su
+   cripto a la derecha; el botón ⇅ invierte el sentido. Debajo, par, precio y
+   precio inverso como en los extractos. */
+.cvModal {
+    width: min(520px, 100%);
+}
+
+.cvSwap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cvSwapFila {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-mid);
+    border-radius: 12px;
+    background: var(--bg-header);
+}
+
+.cvSwapEtiqueta {
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.cvSwapLinea {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cvSwapCantidad {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-bright);
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.cvSwapCantidad::placeholder {
+    color: var(--text-dim);
+}
+
+.cvSwapMoneda {
+    flex: none;
+    padding: 6px 14px;
+    border: 1px solid var(--border-mid);
+    border-radius: 20px;
+    color: var(--text-bright);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.cvSwapLinea .csWrapper,
+.cvSwapLinea .cvSwapSelect {
+    flex: 0 0 190px;
+    width: 190px;
+}
+
+.cvSwapInvertir {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 2;
+    width: 34px;
+    height: 34px;
+    margin: -17px 0 0 -17px;
+    border: 1px solid var(--border-mid);
+    border-radius: 50%;
+    background: var(--bg-surface);
+    color: var(--text-subtle);
+    font-size: 16px;
+    cursor: pointer;
+    transition:
+        border-color 0.15s,
+        color 0.15s;
+}
+
+.cvSwapInvertir:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.cvSwapComision {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+}
+
+.cvSwapEtiqueta em {
+    font-style: normal;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.cvSwapCantidadPeque {
+    font-size: 16px;
+}
+
+.conversionesTable .cvComision {
+    color: var(--text-dim);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.cvSwapResumen {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 16px;
+    border: 1px dashed var(--border-mid);
+    border-radius: 10px;
+}
+
+.cvSwapResumenFila {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--text-dim);
+    font-size: 12px;
+}
+
+.cvSwapResumenFila strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.conversionesTable .cvSimbolo {
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+/* Cantidad de una conversión con su signo: verde lo que entra, rojo lo que sale. */
+.conversionesTable .cvCantidadIn {
+    color: #4ade80;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.conversionesTable .cvCantidadOut {
+    color: #f87171;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 1100px) {
     .toolsHero {
         grid-template-columns: 1fr;

@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="css/themes/noche-clara.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/components/iconos.css">
     <!-- css/pages.css llegó a 7.022 líneas con dieciséis pantallas dentro. Está
          troceado en css/pages/, y el orden de estos <link> es exactamente el que
          tenían las secciones en aquel fichero: la cascada no cambia. Al añadir
@@ -38,6 +39,7 @@
     <link rel="stylesheet" href="css/pages/ingresos-kpi.css">
     <link rel="stylesheet" href="css/pages/ahorro.css">
     <link rel="stylesheet" href="css/pages/cuenta-ahorro.css">
+    <link rel="stylesheet" href="css/pages/intereses.css">
     <link rel="stylesheet" href="css/pages/cuentas.css">
     <link rel="stylesheet" href="css/pages/calendario.css">
     <link rel="stylesheet" href="css/pages/ventas.css">
@@ -264,7 +266,7 @@
                 <button class="navBtn" data-page="planesInversion" data-module="planes">Planes</button>
                 <button class="navBtn" data-page="herramientas" data-module="herramientas">Herramientas</button>
                 <button class="navBtn" data-page="metricas" data-module="metricas">Métricas</button>
-                <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores">👁</button>
+                <button id="toggleMoneyBtn" class="navMoneyToggleBtn" type="button" title="Ocultar valores"><span class="icono iconoOjo" aria-hidden="true"></span></button>
 
                 <!-- Lo que hay a partir de aquí es el dinero que entra y sale, que
                      no es lo mismo que el patrimonio de la izquierda. El separador
@@ -284,7 +286,7 @@
                     </div>
                 </div>
 
-                <button class="navBtn navBtnFinal" data-page="ajustes">⚙️</button>
+                <button class="navBtn navBtnFinal" data-page="ajustes" title="Ajustes" aria-label="Ajustes"><span class="icono iconoAjustes" aria-hidden="true"></span></button>
 
             </div>
 
@@ -593,7 +595,7 @@
     <div class="calendarioModal" role="dialog" aria-modal="true" aria-labelledby="calendarioModalTitle">
         <div class="calendarioModalHeader">
             <h3 class="assetModalTitle" id="calendarioModalTitle">Calendario Dividendos</h3>
-            <button id="closeCalendarioDividendosBtn" class="calendarioCloseBtn" type="button" aria-label="Cerrar">✕</button>
+            <button id="closeCalendarioDividendosBtn" class="calendarioCloseBtn" type="button" aria-label="Cerrar"><span class="icono iconoCerrar" aria-hidden="true"></span></button>
         </div>
         <div class="calendarioModalBody">
             <table class="calendarioTable" id="calendarioTable">
@@ -693,55 +695,55 @@
     <div class="sttSidebar">
         <div class="sttSidebarHeader">
             <span class="sttSidebarTitle">Ajustes</span>
-            <button class="sttCloseBtn" id="sttCloseBtn" type="button" aria-label="Cerrar ajustes">✕</button>
+            <button class="sttCloseBtn" id="sttCloseBtn" type="button" aria-label="Cerrar ajustes"><span class="icono iconoCerrar" aria-hidden="true"></span></button>
         </div>
         <nav class="sttNav">
 
             <button class="sttNavBtn active" data-stt="apariencia" type="button">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 2v1.5M10 16.5V18M18 10h-1.5M3.5 10H2M15.657 4.343l-1.06 1.06M5.403 14.597l-1.06 1.06M15.657 15.657l-1.06-1.06M5.403 5.403l-1.06-1.06" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <span class="icono iconoPaleta" aria-hidden="true"></span>
                 Apariencia
             </button>
 
             <button class="sttNavBtn" data-stt="cuenta" type="button">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 17c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <span class="icono iconoUsuario" aria-hidden="true"></span>
                 Cuenta
             </button>
             <button class="sttNavBtn" data-stt="seguridad" type="button">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 2.5 4 5v4.5c0 3.4 2.4 6.6 6 8 3.6-1.4 6-4.6 6-8V5l-6-2.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="m7.5 10 1.8 1.8L12.8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="icono iconoEscudo" aria-hidden="true"></span>
                 Seguridad
             </button>
 
             <div class="sttNavDivider"></div>
 
             <button class="sttNavBtn" data-stt="portfolio" type="button">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 5V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1" stroke="currentColor" stroke-width="1.5"/><path d="M2 9h16" stroke="currentColor" stroke-width="1.5"/></svg>
+                <span class="icono iconoPortfolio" aria-hidden="true"></span>
                 Portfolio
             </button>
 
             <button class="sttNavBtn" data-stt="automatizacion" type="button">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="icono iconoReloj" aria-hidden="true"></span>
                 Automatización
             </button>
 
             <button class="sttNavBtn" data-stt="api" type="button">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 7.5a5 5 0 1 0-5 5 5 5 0 0 0 5-5ZM7.5 12.5 4 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 16h2v2H4v-2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                <span class="icono iconoClave" aria-hidden="true"></span>
                 API
             </button>
 
             <div class="sttNavDivider"></div>
 
             <button class="sttNavBtn" data-stt="conexiones" type="button">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="7" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="7" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 10h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <span class="icono iconoConexion" aria-hidden="true"></span>
                 Conexiones
             </button>
 
             <button class="sttNavBtn" data-stt="datos" type="button">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h12a1 1 0 0 1 1 1v2H3V5a1 1 0 0 1 1-1ZM3 7h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 11h4M10 9v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <span class="icono iconoDatos" aria-hidden="true"></span>
                 Datos
             </button>
 
             <button class="sttNavBtn" data-stt="modulos" type="button">
-                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                <span class="icono iconoModulos" aria-hidden="true"></span>
                 Módulos
             </button>
 
@@ -757,7 +759,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M10 2v1.5M10 16.5V18M18 10h-1.5M3.5 10H2M15.657 4.343l-1.06 1.06M5.403 14.597l-1.06 1.06M15.657 15.657l-1.06-1.06M5.403 5.403l-1.06-1.06" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoPaleta" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Paleta de color</div>
@@ -784,7 +786,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="16" height="2.5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="8.75" width="16" height="2.5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="14.5" width="16" height="2.5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+                        <span class="icono iconoDensidad" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Densidad del sidebar</div>
@@ -802,7 +804,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3.5a6.5 6.5 0 1 1-6.14 4.36" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M3.2 4.2v3.2h3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 6.6V10l2.3 1.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoRotacion" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Rotación del detalle de activo</div>
@@ -832,7 +834,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoOjoTachado" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Privacidad al inicio</div>
@@ -843,7 +845,7 @@
                 <div class="ajustesSwitchRow">
                     <div class="ajustesSwitchLabel">
                         Ocultar valores al iniciar
-                        <small>Equivale a pulsar el botón 👁 al abrir la app</small>
+                        <small>Equivale a pulsar el botón <span class="icono iconoOjo" aria-hidden="true"></span> al abrir la app</small>
                     </div>
                     <label class="ajustesSwitch">
                         <input type="checkbox" id="ajustesOcultarInicio">
@@ -855,7 +857,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 10h14M3 6h5M3 14h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 13l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoNumeros" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Formato de números</div>
@@ -874,7 +876,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="16" height="15" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 8h16M6 2v2M14 2v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M6 12h2v2H6v-2Z" fill="currentColor"/></svg>
+                        <span class="icono iconoCalendario" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Formato de fecha</div>
@@ -899,7 +901,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="7" r="3.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 17c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoUsuario" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Cambiar nombre de usuario</div>
@@ -912,8 +914,8 @@
                     <div class="ajustesInputRow">
                         <input id="ajustesCredUserCurrentPwd" class="ajustesInput" type="password" placeholder="Contraseña actual…" autocomplete="current-password">
                         <button class="ajustesToggleBtn" type="button" data-target="ajustesCredUserCurrentPwd" title="Mostrar/ocultar">
-                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
                         </button>
                     </div>
                 </div>
@@ -932,7 +934,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="9" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 9V6a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14" r="1.5" fill="currentColor"/></svg>
+                        <span class="icono iconoContrasena" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Cambiar contraseña</div>
@@ -945,8 +947,8 @@
                     <div class="ajustesInputRow">
                         <input id="ajustesCredPwdCurrentPwd" class="ajustesInput" type="password" placeholder="Contraseña actual…" autocomplete="current-password">
                         <button class="ajustesToggleBtn" type="button" data-target="ajustesCredPwdCurrentPwd" title="Mostrar/ocultar">
-                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
                         </button>
                     </div>
                 </div>
@@ -955,8 +957,8 @@
                     <div class="ajustesInputRow">
                         <input id="ajustesCredNewPwd" class="ajustesInput" type="password" placeholder="Nueva contraseña…" autocomplete="new-password">
                         <button class="ajustesToggleBtn" type="button" data-target="ajustesCredNewPwd" title="Mostrar/ocultar">
-                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
                         </button>
                     </div>
                 </div>
@@ -965,14 +967,104 @@
                     <div class="ajustesInputRow">
                         <input id="ajustesCredNewPwd2" class="ajustesInput" type="password" placeholder="Repite la contraseña…" autocomplete="new-password">
                         <button class="ajustesToggleBtn" type="button" data-target="ajustesCredNewPwd2" title="Mostrar/ocultar">
-                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
                         </button>
                     </div>
                 </div>
                 <div class="ajustesActions">
                     <button id="ajustesGuardarCredPwdBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
                     <span id="ajustesCredPwdMsg" class="ajustesStatusMsg"></span>
+                </div>
+            </div>
+
+            <div class="ajustesSection" id="ajustes2faSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <span class="icono iconoEscudo" aria-hidden="true"></span>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Verificación en dos pasos</div>
+                        <div class="ajustesSectionDesc">Opcional. Al iniciar sesión, además de la contraseña se pide un código que llega por Telegram. Si pierdes el acceso a Telegram, entras una vez con la frase de recuperación y la verificación se desactiva.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesSectionDesc">Estado: <strong id="ajustes2faEstado">—</strong></div>
+                <div id="ajustes2faSinTelegram" class="ajustesAviso" hidden>Para activarla, configura antes el bot en Ajustes › Telegram y comprueba que funciona con «Probar».</div>
+
+                <!-- Activar: contraseña y largo de la frase -->
+                <div id="ajustes2faActivar" class="ajustes2faBloque" hidden>
+                    <div class="ajustesField">
+                        <label class="ajustesLabel" for="ajustes2faPwdActivar">Contraseña actual</label>
+                        <div class="ajustesInputRow">
+                            <input id="ajustes2faPwdActivar" class="ajustesInput" type="password" placeholder="Contraseña actual…" autocomplete="current-password">
+                            <button class="ajustesToggleBtn" type="button" data-target="ajustes2faPwdActivar" title="Mostrar/ocultar">
+                                <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                                <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ajustesField">
+                        <label class="ajustesLabel" for="ajustes2faPalabras">Palabras de la frase de recuperación</label>
+                        <select id="ajustes2faPalabras" class="ajustesSelect" data-no-custom>
+                            <option value="6">6 palabras</option>
+                            <option value="12" selected>12 palabras</option>
+                            <option value="24">24 palabras</option>
+                        </select>
+                    </div>
+                    <div class="ajustesActions">
+                        <button id="ajustes2faIniciarBtn" class="primaryButton" type="button" data-no-autohide="true">Activar</button>
+                    </div>
+                </div>
+
+                <!-- Confirmar: frase generada, código de Telegram y frase escrita -->
+                <div id="ajustes2faConfirmar" class="ajustes2faBloque" hidden>
+                    <div class="ajustesAviso">Apunta esta frase en papel, en orden, y guárdala en un sitio seguro. No se volverá a mostrar y es la única forma de entrar si pierdes el acceso a Telegram.</div>
+                    <ol id="ajustes2faFrase" class="ajustes2faFrase"></ol>
+                    <div class="ajustesField">
+                        <label class="ajustesLabel" for="ajustes2faCodigoActivar">Código recibido por Telegram</label>
+                        <input id="ajustes2faCodigoActivar" class="ajustesInput" type="text" inputmode="numeric" maxlength="8" placeholder="123456" autocomplete="one-time-code">
+                    </div>
+                    <div class="ajustesField">
+                        <label class="ajustesLabel" for="ajustes2faFraseConfirmar">Escribe la frase para confirmar que la has apuntado</label>
+                        <textarea id="ajustes2faFraseConfirmar" class="ajustesInput ajustes2faTextarea" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="palabra1 palabra2 …"></textarea>
+                    </div>
+                    <div class="ajustesActions">
+                        <button id="ajustes2faConfirmarBtn" class="primaryButton" type="button" data-no-autohide="true">Confirmar y activar</button>
+                        <button id="ajustes2faCancelarBtn" class="secondaryButton" type="button">Cancelar</button>
+                    </div>
+                </div>
+
+                <!-- Desactivar: contraseña más código o frase -->
+                <div id="ajustes2faDesactivar" class="ajustes2faBloque" hidden>
+                    <div class="ajustesField">
+                        <label class="ajustesLabel" for="ajustes2faPwdDesactivar">Contraseña actual</label>
+                        <div class="ajustesInputRow">
+                            <input id="ajustes2faPwdDesactivar" class="ajustesInput" type="password" placeholder="Contraseña actual…" autocomplete="current-password">
+                            <button class="ajustesToggleBtn" type="button" data-target="ajustes2faPwdDesactivar" title="Mostrar/ocultar">
+                                <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                                <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="ajustesField">
+                        <label class="ajustesLabel" for="ajustes2faCodigoDesactivar">Código de Telegram</label>
+                        <div class="ajustesInputRow">
+                            <input id="ajustes2faCodigoDesactivar" class="ajustesInput" type="text" inputmode="numeric" maxlength="8" placeholder="123456" autocomplete="one-time-code">
+                            <button id="ajustes2faEnviarCodigoBtn" class="ajustesSecondaryBtn" type="button">Enviar código</button>
+                        </div>
+                    </div>
+                    <div class="ajustesField">
+                        <label class="ajustesLabel" for="ajustes2faFraseDesactivar">O, si no te llega el código, la frase de recuperación</label>
+                        <textarea id="ajustes2faFraseDesactivar" class="ajustesInput ajustes2faTextarea" autocomplete="off" autocapitalize="none" spellcheck="false"></textarea>
+                    </div>
+                    <div class="ajustesActions">
+                        <button id="ajustes2faDesactivarBtn" class="dangerButton" type="button" data-no-autohide="true">Desactivar</button>
+                    </div>
+                </div>
+
+                <div class="ajustesActions">
+                    <span id="ajustes2faMsg" class="ajustesStatusMsg"></span>
                 </div>
             </div>
         </div>
@@ -984,7 +1076,7 @@
             <div class="ajustesSection" id="ajustesTlsSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="9" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoHttps" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">HTTPS</div>
@@ -1050,7 +1142,7 @@
                     </div>
                     <div class="ajustesActions">
                         <a id="ajustesTlsCaBtn" class="ajustesSecondaryBtn" href="/api/tls/ca.crt" download>
-                            <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                            <span class="icono iconoDescargar" aria-hidden="true"></span>
                             Descargar certificado
                         </a>
                     </div>
@@ -1126,7 +1218,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 3.5L16 2M6 3.5L4 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                        <span class="icono iconoInactividad" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Cierre por inactividad</div>
@@ -1160,7 +1252,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 5v10M7.5 7.5h4a1.5 1.5 0 0 1 0 3h-3a1.5 1.5 0 0 0 0 3H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoMoneda" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Moneda base</div>
@@ -1181,7 +1273,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 7h11l-3-3M16 13H5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoCambio" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Tipos de cambio</div>
@@ -1217,7 +1309,7 @@
                 </div>
                 <div class="ajustesActions">
                     <button id="ajustesCambioBtn" class="ajustesSecondaryBtn" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c2 0 3.7.9 4.8 2.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M13.5 2.5V5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoRecargar" aria-hidden="true"></span>
                         Comprobar ahora
                     </button>
                     <span id="ajustesCambioMsg" class="ajustesStatusMsg"></span>
@@ -1227,7 +1319,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 10h2m4 0h2M10 7v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoBillete" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Divisas fiat</div>
@@ -1250,7 +1342,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10h12M4 6h7M4 14h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="15.5" cy="14" r="1.2" fill="currentColor"/></svg>
+                        <span class="icono iconoDecimales" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Decimales en precios</div>
@@ -1296,7 +1388,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoOjoTachado" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Activos ocultos</div>
@@ -1317,7 +1409,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoReloj" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Actualización de precios</div>
@@ -1339,7 +1431,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3v2M10 15v2M3 10H1M19 10h-2M4.93 4.93l1.41 1.41M13.66 13.66l1.41 1.41M4.93 15.07l1.41-1.41M13.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/></svg>
+                        <span class="icono iconoUmbral" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Umbral de cotizaciones</div>
@@ -1367,7 +1459,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 14l4-4 3 3 4-5 3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
+                        <span class="icono iconoGraficoLinea" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Evolución del portfolio</div>
@@ -1404,7 +1496,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M7 10l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoHorario" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Solo horario de mercado</div>
@@ -1459,7 +1551,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.5 10a6.5 6.5 0 1 1-1.9-4.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M16.5 3v3.5H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoRecargar" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Actualizar la aplicación</div>
@@ -1472,7 +1564,7 @@
                 <div class="ajustesAviso" id="ajustesUpdateAviso" hidden></div>
                 <div class="ajustesActions">
                     <button id="ajustesUpdateBtn" class="primaryButton" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 8a5 5 0 1 1-1.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13 2.5v3h-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoRecargar" aria-hidden="true"></span>
                         <span id="ajustesUpdateBtnTexto">Actualizar ahora</span>
                     </button>
                     <button id="ajustesUpdateCheckBtn" class="secondaryButton" type="button">Comprobar si hay versión nueva</button>
@@ -1488,7 +1580,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10.5 5.5 10l2-5 2.5 10 2.5-7 1.5 4h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoPulso" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Estado de las APIs</div>
@@ -1501,7 +1593,7 @@
                 </div>
                 <div class="ajustesActions">
                     <button id="ajustesRefreshApiEstadoBtn" class="ajustesSecondaryBtn" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c2 0 3.7.9 4.8 2.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M13.5 2.5V5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoRecargar" aria-hidden="true"></span>
                         Comprobar ahora
                     </button>
                     <span id="ajustesApiEstadoMsg" class="ajustesStatusMsg"></span>
@@ -1511,7 +1603,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 14l4-4 3 3 4-5 3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>
+                        <span class="icono iconoGraficoLinea" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Peticiones API hoy</div>
@@ -1524,7 +1616,7 @@
                 </div>
                 <div class="ajustesActions">
                     <button id="ajustesRefreshApiStatsBtn" class="ajustesSecondaryBtn" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c2 0 3.7.9 4.8 2.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M13.5 2.5V5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoRecargar" aria-hidden="true"></span>
                         Actualizar
                     </button>
                 </div>
@@ -1533,7 +1625,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12.5 7.5a5 5 0 1 0-5 5 5 5 0 0 0 5-5ZM7.5 12.5 4 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 16h2v2H4v-2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoClave" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Claves API</div>
@@ -1549,8 +1641,8 @@
                     <div class="ajustesInputRow">
                         <input id="ajustesFinnhubKey" class="ajustesInput" type="password" placeholder="Nueva clave Finnhub…" autocomplete="off">
                         <button class="ajustesToggleBtn" type="button" data-target="ajustesFinnhubKey" title="Mostrar/ocultar">
-                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
                         </button>
                         <button id="ajustesGuardarFinnhubBtn" class="ajustesAddBtn" type="button">Añadir</button>
                     </div>
@@ -1565,8 +1657,8 @@
                     <div class="ajustesInputRow">
                         <input id="ajustesEodhdKeys" class="ajustesInput" type="password" placeholder="Nueva clave EODHD…" autocomplete="off">
                         <button class="ajustesToggleBtn" type="button" data-target="ajustesEodhdKeys" title="Mostrar/ocultar">
-                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
                         </button>
                         <button id="ajustesGuardarEodhdBtn" class="ajustesAddBtn" type="button">Añadir</button>
                     </div>
@@ -1581,8 +1673,8 @@
                     <div class="ajustesInputRow">
                         <input id="ajustesAlphaVantageKeys" class="ajustesInput" type="password" placeholder="Nueva clave Alpha Vantage…" autocomplete="off">
                         <button class="ajustesToggleBtn" type="button" data-target="ajustesAlphaVantageKeys" title="Mostrar/ocultar">
-                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
                         </button>
                         <button id="ajustesGuardarAlphaVantageBtn" class="ajustesAddBtn" type="button">Añadir</button>
                     </div>
@@ -1599,7 +1691,7 @@
             <div class="ajustesSection" id="ajustesAtajoSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="2" width="10" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 4.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="15" r="1" fill="currentColor"/></svg>
+                        <span class="icono iconoMovil" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Atajo de iOS</div>
@@ -1665,7 +1757,7 @@
                         </div>
                         <div class="ajustesAtajoPasoAccion">
                             <a id="ajustesAtajoDescargarBtn" class="ajustesAddBtn" href="/api/atajo/descargar" download>
-                                <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v8m0 0 3-3m-3 3L5 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 11.5v1a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                                <span class="icono iconoDescargar" aria-hidden="true"></span>
                                 Descargar el atajo
                             </a>
                         </div>
@@ -1761,7 +1853,7 @@
             <div class="ajustesSection" id="ajustesTelegramSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17.5 2.5 2 9l5 1.8m10.5-8.3-3 13-6.2-4.7m9.2-8.3L6.8 12.1m0 0L6 17l2.6-3.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoTelegram" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Telegram</div>
@@ -1790,8 +1882,8 @@
                     <div class="ajustesInputRow">
                         <input id="ajustesTelegramToken" class="ajustesInput" type="password" placeholder="123456789:AA…" autocomplete="off">
                         <button class="ajustesToggleBtn" type="button" data-target="ajustesTelegramToken" title="Mostrar/ocultar">
-                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
                         </button>
                     </div>
                 </div>
@@ -1861,7 +1953,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h12a1 1 0 0 1 1 1v2H3V5a1 1 0 0 1 1-1ZM3 7h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 11h4M10 9v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoArchivo" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Copias de seguridad</div>
@@ -1871,7 +1963,7 @@
                 <div class="ajustesSectionDivider"></div>
                 <div class="ajustesActions">
                     <button id="ajustesCrearBackupBtn" class="primaryButton" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3v8M4.5 7.5 8 11l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoGuardar" aria-hidden="true"></span>
                         Crear backup ahora
                     </button>
                     <span id="ajustesBackupMsg" class="ajustesStatusMsg"></span>
@@ -1884,7 +1976,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c2 0 3.7.9 4.8 2.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.5 2.5V5H11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10.5h10M5 13.5h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                        <span class="icono iconoHistorial" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Auto-backup</div>
@@ -1918,8 +2010,8 @@
                     <div class="ajustesInputRow">
                         <input id="ajustesBackupContrasena" class="ajustesInput" type="password" placeholder="Nueva contraseña (mín. 8 caracteres)…" autocomplete="new-password" maxlength="200">
                         <button class="ajustesToggleBtn" type="button" data-target="ajustesBackupContrasena" title="Mostrar/ocultar">
-                            <svg class="ajustesEyeShow" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 10s3-6 8-6 8 6 8 6-3 6-8 6-8-6-8-6Z" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/></svg>
-                            <svg class="ajustesEyeHide" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none"><path d="M3 3l14 14M8.46 8.54A3 3 0 0 0 10 13a3 3 0 0 0 2.54-4.54M6.1 6.16C3.9 7.4 2 10 2 10s3 6 8 6c1.5 0 2.9-.4 4.1-1.1M12.7 5.4A8.2 8.2 0 0 0 10 4C5 4 2 10 2 10s.8 1.6 2.3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
                         </button>
                     </div>
                     <div class="ajustesInputRow" style="margin-top:10px">
@@ -1940,7 +2032,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4h12a1 1 0 0 1 1 1v2H3V5a1 1 0 0 1 1-1ZM3 7h14v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 11h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoUmbral" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Límite de backups</div>
@@ -1967,7 +2059,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3v10M6.5 9.5 10 13l3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoDescargar" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Exportar datos</div>
@@ -1977,11 +2069,11 @@
                 <div class="ajustesSectionDivider"></div>
                 <div class="ajustesActions">
                     <button id="ajustesExportJsonBtn" class="primaryButton" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3v8M5 7.5 8 10.5l3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoDescargar" aria-hidden="true"></span>
                         Exportar como JSON
                     </button>
                     <button id="ajustesExportZipBtn" class="secondaryButton" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 2h7l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7 6v5M5 9.5 7 11.5l2-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoZip" aria-hidden="true"></span>
                         Exportar como ZIP
                     </button>
                     <span id="ajustesExportMsg" class="ajustesStatusMsg"></span>
@@ -2003,7 +2095,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 14V4M6.5 7.5 10 4l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoSubir" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Importar datos</div>
@@ -2013,11 +2105,11 @@
                 <div class="ajustesSectionDivider"></div>
                 <div class="ajustesActions">
                     <button id="ajustesImportJsonBtn" class="primaryButton" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 11V3M5 7.5 8 4.5l3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        <span class="icono iconoSubir" aria-hidden="true"></span>
                         Importar JSON
                     </button>
                     <button id="ajustesImportZipBtn" class="secondaryButton" type="button">
-                        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 2h7l3 3v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7 10V6M5 7.5 7 5.5l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoZip" aria-hidden="true"></span>
                         Importar ZIP
                     </button>
                     <input id="ajustesImportJsonInput" aria-label="Fichero JSON a importar" type="file" accept=".json" style="display:none">
@@ -2029,7 +2121,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7h11M11 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 13H6M9 16l-3-3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span class="icono iconoCambio" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Tipos de cambio históricos</div>
@@ -2050,7 +2142,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 6h10l-1 10H6L5 6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3 6h14M8 6V4h4v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 9v5M11 9v5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                        <span class="icono iconoBorrar" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Purgar historial antiguo</div>
@@ -2083,7 +2175,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+                        <span class="icono iconoModulos" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Módulos visibles</div>
@@ -2203,7 +2295,7 @@
             <div class="ajustesSection">
                 <div class="ajustesSectionHeader">
                     <div class="ajustesSectionIconWrap">
-                        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="13" width="3" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="8" y="8" width="3" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="3" width="3" height="15" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+                        <span class="icono iconoGraficoBarras" aria-hidden="true"></span>
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Métricas del panel superior</div>
@@ -2228,6 +2320,7 @@
 <script defer src="js/cartera/assets-modales.js"></script>
 <script defer src="js/cartera/activos-pagina.js"></script>
 <script defer src="js/finanzas/intereses.js"></script>
+<script defer src="js/finanzas/intereses-resumen.js"></script>
 <script defer src="js/finanzas/dividendos.js"></script>
 <script defer src="js/finanzas/gastos.js"></script>
 <script defer src="js/finanzas/ingresos.js"></script>
@@ -2247,6 +2340,7 @@
 <script defer src="js/analisis/metricas-graficos.js"></script>
 <script defer src="js/analisis/metricas-flujos.js"></script>
 <script defer src="js/analisis/metricas-rentabilidad.js"></script>
+<script defer src="js/analisis/metricas-finanzas.js"></script>
 <script defer src="js/analisis/metricas-init.js"></script>
 <script defer src="js/analisis/metricas-evolucion.js"></script>
 <script defer src="js/ajustes/ajustes-api.js"></script>
@@ -2273,8 +2367,6 @@
 <script defer src="js/finanzas/cuenta-ahorro.js"></script>
 <script defer src="js/finanzas/cuentas.js"></script>
 <script defer src="js/finanzas/calendario.js"></script>
-<script defer src="js/vendor/html2canvas-pro.min.js?v=2.4.5"></script>
-<script defer src="js/vendor/jspdf.umd.min.js?v=4.2.1"></script>
 <script defer src="js/core/informes.js"></script>
 </body>
 </html>

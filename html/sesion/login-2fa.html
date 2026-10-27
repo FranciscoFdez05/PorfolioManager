@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Manager — Verificación</title>
+    <link rel="icon" href="/img/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+    <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{
+            background:#0b1120;
+            color:#e5edf9;
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+            min-height:100vh;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+        .loginCard{
+            background:#0f1724;
+            border:1px solid #1e2d45;
+            border-radius:16px;
+            padding:48px 44px 44px;
+            width:100%;
+            max-width:420px;
+            box-shadow:0 8px 40px rgba(0,0,0,.45);
+        }
+        .loginTitle{
+            font-size:1.5rem;
+            font-weight:600;
+            color:#ccd6f6;
+            margin-bottom:12px;
+            text-align:center;
+            letter-spacing:.3px;
+        }
+        .loginTitle span{color:#3b82f6}
+        .loginLogo{
+            display:block;
+            width:72px;
+            height:72px;
+            margin:0 auto 16px;
+        }
+        .loginTexto{
+            font-size:0.88rem;
+            color:#94a3b8;
+            text-align:center;
+            line-height:1.5;
+            margin-bottom:28px;
+        }
+        .field{margin-bottom:24px}
+        label{
+            display:block;
+            font-size:0.78rem;
+            color:#94a3b8;
+            margin-bottom:8px;
+            text-transform:uppercase;
+            letter-spacing:.6px;
+        }
+        input,textarea{
+            width:100%;
+            padding:12px 15px;
+            background:#111827;
+            border:1px solid #273246;
+            border-radius:9px;
+            color:#e5edf9;
+            font-size:0.95rem;
+            font-family:inherit;
+            outline:none;
+            transition:border-color .15s;
+        }
+        input:focus,textarea:focus{border-color:#3b82f6}
+        #codigo{
+            font-size:1.5rem;
+            letter-spacing:.5em;
+            text-align:center;
+        }
+        textarea{resize:vertical;min-height:96px}
+        button[type=submit]{
+            width:100%;
+            padding:13px;
+            background:#3b82f6;
+            color:#fff;
+            border:none;
+            border-radius:9px;
+            font-size:1rem;
+            font-weight:600;
+            cursor:pointer;
+            transition:background .15s;
+        }
+        button[type=submit]:hover{background:#1d4ed8}
+        /* button.botonSecundario y no .botonSecundario: también es de tipo
+           submit, y button[type=submit] le ganaría por especificidad. */
+        button.botonSecundario{
+            width:auto;
+            background:none;
+            border:none;
+            color:#60a5fa;
+            font-size:0.85rem;
+            font-weight:400;
+            font-family:inherit;
+            cursor:pointer;
+            padding:0;
+        }
+        button.botonSecundario:hover{background:none;text-decoration:underline}
+        .enlaces{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:12px;
+            margin-top:20px;
+            font-size:0.85rem;
+        }
+        .enlaces a{color:#60a5fa;text-decoration:none}
+        .enlaces a:hover{text-decoration:underline}
+        .loginError,.loginAviso{
+            border-radius:9px;
+            padding:10px 14px;
+            font-size:0.85rem;
+            margin-bottom:24px;
+            text-align:center;
+        }
+        .loginError{
+            background:rgba(231,76,60,.15);
+            border:1px solid rgba(231,76,60,.4);
+            color:#e74c3c;
+        }
+        .loginAviso{
+            background:rgba(59,130,246,.12);
+            border:1px solid rgba(59,130,246,.4);
+            color:#93c5fd;
+        }
+        /* Una sola plantilla para los dos modos: el servidor pone el modo en
+           data-modo y se oculta el otro. Sin JavaScript, así funciona igual
+           aunque el script no cargue. */
+        body[data-modo="codigo"] .soloFrase,
+        body[data-modo="frase"] .soloCodigo{display:none}
+    </style>
+</head>
+<body data-modo="__MODO__">
+<div class="loginCard">
+    <img class="loginLogo" src="/img/logo-192.png" alt="" width="72" height="72">
+    <p class="loginTitle">Verificación <span>en dos pasos</span></p>
+    <p class="loginTexto soloCodigo">Te hemos enviado un código de 6 dígitos por Telegram. Caduca en __MINUTOS__ min.</p>
+    <p class="loginTexto soloFrase">Escribe tu frase de recuperación. Al entrar con ella, la verificación en dos pasos se desactiva hasta que la vuelvas a activar.</p>
+    <!-- ERROR_PLACEHOLDER -->
+    <!-- AVISO_PLACEHOLDER -->
+
+    <div class="soloCodigo">
+        <form method="POST" action="/login/2fa">
+            <input type="hidden" name="accion" value="codigo">
+            <div class="field">
+                <label for="codigo">Código</label>
+                <input id="codigo" name="codigo" type="text" inputmode="numeric" pattern="[0-9 ]*"
+                       maxlength="8" autocomplete="one-time-code" required>
+            </div>
+            <button type="submit">Verificar</button>
+        </form>
+        <div class="enlaces">
+            <form method="POST" action="/login/2fa">
+                <input type="hidden" name="accion" value="reenviar">
+                <button class="botonSecundario" type="submit">Reenviar código</button>
+            </form>
+            <a href="/login/2fa?modo=frase">Usar la frase de recuperación</a>
+        </div>
+    </div>
+
+    <div class="soloFrase">
+        <form method="POST" action="/login/2fa?modo=frase">
+            <input type="hidden" name="accion" value="frase">
+            <div class="field">
+                <label for="frase">Frase de recuperación</label>
+                <textarea id="frase" name="frase" autocomplete="off" autocapitalize="none"
+                          spellcheck="false" required></textarea>
+            </div>
+            <button type="submit">Entrar</button>
+        </form>
+        <div class="enlaces">
+            <a href="/login/2fa">Volver al código</a>
+            <a href="/login">Cancelar</a>
+        </div>
+    </div>
+</div>
+<!-- Lleva nonce para que la CSP lo deje correr (ver login.html). Solo pone el
+     foco en el campo visible; la página funciona igual sin él. -->
+<script nonce="__CSP_NONCE__">
+    (function () {
+        var campo = document.getElementById(document.body.dataset.modo === 'frase' ? 'frase' : 'codigo');
+        if (campo) campo.focus();
+    })();
+</script>
+</body>
+</html>

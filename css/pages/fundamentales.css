@@ -301,8 +301,111 @@
     color: var(--accent-hover);
 }
 
+/* Segunda fila del panel (rendimiento, rango, fundamentales). */
+.fnDetailGrid + .fnDetailGrid {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-soft);
+}
+
+/* Título del bloque con su rating parcial o sus selectores a la derecha. */
+.fnDetailColHead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 24px;
+    margin-bottom: 8px;
+}
+.fnDetailColHead h4 {
+    margin: 0;
+}
+
+.fnRatingMini {
+    padding: 2px 8px;
+    font-size: 0.66rem;
+}
+
+.fnDetailSubHead {
+    margin: 12px 0 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+}
+
+.fnDetailSub {
+    margin-left: 4px;
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: var(--text-dim);
+}
+
+/* `.fnDetailLine span:last-child` y `.fnDetailRow2 span:last-child` también
+   alcanzan al span coloreado de dentro y le quitarían el verde/rojo. */
+.fnDetailCol span.fnPos {
+    color: var(--color-pos-bright);
+}
+.fnDetailCol span.fnNeg {
+    color: var(--color-neg-bright);
+}
+
+.fnPivotChips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.fnPivotMethods {
+    margin-bottom: 6px;
+}
+.fnPivotChip {
+    padding: 2px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border-soft);
+    background: var(--bg-surface);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 0.68rem;
+    line-height: 1.5;
+    cursor: pointer;
+    transition:
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+.fnPivotChip:hover {
+    border-color: var(--accent);
+    color: var(--accent-hover);
+}
+.fnPivotChip.active {
+    border-color: var(--accent);
+    color: var(--accent-hover);
+    font-weight: 600;
+}
+
 @media (max-width: 900px) {
     .fnDetailGrid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Fundamentales ajustada al alto visible (fitPageActive, ver base.css): sin
+   scroll de mainContent; la tabla se queda con el hueco que dejan los bloques
+   de arriba y hace scroll por dentro. En pantallas estrechas, como antes. */
+@media (min-width: 1201px) {
+    .fitPageActive .fundamentalesPage {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .fitPageActive .fundamentalesPage > * {
+        flex: 0 0 auto;
+    }
+
+    .fitPageActive .fundamentalesPage .fnTableWrap {
+        flex: 0 1 auto;
+        min-height: 140px;
+        max-height: none;
     }
 }

@@ -1,13 +1,25 @@
 <div class="bonosPage">
 
     <div class="bonosToolbar">
-        <div class="bonosFilters" id="bonosFilters">
-            <label class="bonosFilterBtn" data-tipo="all"><input type="checkbox" checked><span>Todos</span></label>
-            <label class="bonosFilterBtn" data-tipo="if"><input type="checkbox" checked><span>Interés Fijo</span></label>
-            <label class="bonosFilterBtn" data-tipo="corporativo"><input type="checkbox" checked><span>Corporativos</span></label>
-            <label class="bonosFilterBtn" data-tipo="gubernamental"><input type="checkbox" checked><span>Gubernamentales</span></label>
+        <div class="bonosToolbarLeft">
+            <div class="overviewSearch" id="bonosSearchBox">
+                <button class="overviewSearchBtn" id="bonosSearchBtn" type="button" aria-label="Buscar bono" title="Buscar bono">
+                    <span class="icono iconoBuscar" aria-hidden="true"></span>
+                </button>
+                <input type="text" class="overviewSearchInput" id="bonosSearch" aria-label="Buscar bono" placeholder="Buscar instrumento..." autocomplete="off" spellcheck="false" hidden>
+            </div>
+            <div class="overviewDivider"></div>
+            <div class="bonosFilters" id="bonosFilters">
+                <label class="bonosFilterBtn" data-tipo="all"><input type="checkbox" checked><span>Todos</span></label>
+                <label class="bonosFilterBtn" data-tipo="if"><input type="checkbox" checked><span>Interés Fijo</span></label>
+                <label class="bonosFilterBtn" data-tipo="corporativo"><input type="checkbox" checked><span>Corporativos</span></label>
+                <label class="bonosFilterBtn" data-tipo="gubernamental"><input type="checkbox" checked><span>Gubernamentales</span></label>
+            </div>
         </div>
-        <button id="saveBonosBtn" class="primaryButton">Guardar</button>
+        <div class="bonosToolbarRight">
+            <button id="bonosAddBtn" class="primaryButton">Añadir bono</button>
+            <button id="saveBonosBtn" class="primaryButton">Guardar</button>
+        </div>
     </div>
 
     <div class="bonosSummary">
@@ -63,9 +75,5 @@
     </div>
 
     <p class="overviewEmpty hidden" id="bonosEmptyMsg">No hay bonos registrados.</p>
-
-    <div class="dividendosActions">
-        <button id="bonosAddBtn" class="primaryButton">Añadir fila</button>
-    </div>
 
 </div>

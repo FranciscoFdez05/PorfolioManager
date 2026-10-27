@@ -1,16 +1,28 @@
 <div class="pmPage">
 
     <div class="pmToolbar">
-        <div class="pmFilters" id="pmFilters">
-            <label class="pmFilterBtn" data-tipo="all"><input type="checkbox" checked><span>Todos</span></label>
-            <label class="pmFilterBtn" data-tipo="pe"><input type="checkbox" checked><span>Private Equity</span></label>
-            <label class="pmFilterBtn" data-tipo="vc"><input type="checkbox" checked><span>Venture Capital</span></label>
-            <label class="pmFilterBtn" data-tipo="credito"><input type="checkbox" checked><span>Crédito</span></label>
-            <label class="pmFilterBtn" data-tipo="inmobiliario"><input type="checkbox" checked><span>Inmobiliario</span></label>
-            <label class="pmFilterBtn" data-tipo="infraestructura"><input type="checkbox" checked><span>Infraestructura</span></label>
-            <label class="pmFilterBtn" data-tipo="otros"><input type="checkbox" checked><span>Otros</span></label>
+        <div class="pmToolbarLeft">
+            <div class="overviewSearch" id="pmSearchBox">
+                <button class="overviewSearchBtn" id="pmSearchBtn" type="button" aria-label="Buscar inversión" title="Buscar inversión">
+                    <span class="icono iconoBuscar" aria-hidden="true"></span>
+                </button>
+                <input type="text" class="overviewSearchInput" id="pmSearch" aria-label="Buscar inversión" placeholder="Buscar nombre o gestor..." autocomplete="off" spellcheck="false" hidden>
+            </div>
+            <div class="overviewDivider"></div>
+            <div class="pmFilters" id="pmFilters">
+                <label class="pmFilterBtn" data-tipo="all"><input type="checkbox" checked><span>Todos</span></label>
+                <label class="pmFilterBtn" data-tipo="pe"><input type="checkbox" checked><span>Private Equity</span></label>
+                <label class="pmFilterBtn" data-tipo="vc"><input type="checkbox" checked><span>Venture Capital</span></label>
+                <label class="pmFilterBtn" data-tipo="credito"><input type="checkbox" checked><span>Crédito</span></label>
+                <label class="pmFilterBtn" data-tipo="inmobiliario"><input type="checkbox" checked><span>Inmobiliario</span></label>
+                <label class="pmFilterBtn" data-tipo="infraestructura"><input type="checkbox" checked><span>Infraestructura</span></label>
+                <label class="pmFilterBtn" data-tipo="otros"><input type="checkbox" checked><span>Otros</span></label>
+            </div>
         </div>
-        <button id="savePmBtn" class="primaryButton">Guardar</button>
+        <div class="pmToolbarRight">
+            <button id="pmAddBtn" class="primaryButton">Añadir inversión</button>
+            <button id="savePmBtn" class="primaryButton">Guardar</button>
+        </div>
     </div>
 
     <div class="pmSummary">
@@ -64,6 +76,11 @@
                     <th class="mThSort" data-sortkey="9">Valor actual<span class="mSortArrow"></span></th>
                     <th class="mThSort" data-sortkey="10">Neto<span class="mSortArrow"></span></th>
                     <th class="mThSort" data-sortkey="11">TVPI<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="12" title="Parte del compromiso que aún no se ha llamado">Pendiente<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="13" title="Llamado sobre comprometido">% llamado<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="14" title="Distribuido sobre llamado">DPI<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="15" title="Valor actual sobre llamado">RVPI<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="16" title="Neto sobre llamado">Rend. %<span class="mSortArrow"></span></th>
                     <th class="rowActionsCell"></th>
                 </tr>
             </thead>
@@ -72,9 +89,5 @@
     </div>
 
     <p class="overviewEmpty hidden" id="pmEmptyMsg">No hay inversiones en mercado privado registradas.</p>
-
-    <div class="dividendosActions">
-        <button id="pmAddBtn" class="primaryButton">+ Añadir inversión</button>
-    </div>
 
 </div>

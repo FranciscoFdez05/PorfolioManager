@@ -53,11 +53,32 @@
     display: none;
 }
 
+/* Igual que en Gastos: una fila con scroll lateral arrastrando. */
 .ingresosYearList {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
+    display: flex;
     gap: 5px;
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Hueco para el translateY del hover, que el overflow recortaría. */
+    padding: 2px 0;
+    margin: -2px 0;
+    scrollbar-width: none;
+    cursor: grab;
+}
+
+.ingresosYearList::-webkit-scrollbar {
+    display: none;
+}
+
+.ingresosYearList.dragging {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.ingresosYearList > .ingresosYearBtn {
+    flex: 0 0 calc((100% - 55px) / 12);
 }
 
 .ingresosYearBtn,
@@ -114,7 +135,7 @@
 
 .ingresosMonthTab {
     min-width: auto;
-    height: 34px;
+    height: 38px;
     font-size: 14px;
     font-weight: 600;
     padding: 0 14px;
@@ -141,7 +162,7 @@
 .ingresosMovementsWrapper {
     overflow-y: auto;
     overflow-x: hidden;
-    max-height: 525px;
+    max-height: 610px;
 }
 
 .ingresosAnnualWrapper::-webkit-scrollbar,
@@ -299,31 +320,28 @@
     font-weight: 700;
 }
 
+/* Igual que .gastosMonthTabs: el mes de Gastos e Ingresos se ve idéntico. */
 .ingresosMonthTabs {
     display: flex;
-    gap: 6px;
+    gap: 5px;
     flex-wrap: nowrap;
+    margin: 0;
     flex: 1 1 auto;
     width: 100%;
+    padding-top: 3px;
+    margin-top: -3px;
 }
 
-/* Fijo abajo a la izquierda: sticky lo mantiene visible al hacer scroll y
-   margin-top: auto lo baja al fondo cuando la página es corta. */
 .ingresosActions {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
     margin-top: auto;
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    padding: 8px 0;
-    justify-content: flex-start;
 }
 
 /* Las métricas de la derecha hacen scroll vertical propio, a la altura de la tabla. */
 #ingresosResumenLado {
-    max-height: 525px;
+    max-height: 610px;
     overflow-y: auto;
     scrollbar-width: thin;
     padding-right: 4px;

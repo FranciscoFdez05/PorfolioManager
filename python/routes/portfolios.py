@@ -124,9 +124,14 @@ def _readAssetFromPortfolioDb(conn, assetId, pid, portfolioName):
             "par": r["par"],
             "tipo": r["tipo"],
             "cantidad": r["cantidad"],
+            "cantidadContraparte": r["cantidad_contraparte"],
+            "comision": r["comision"],
+            "comisionMoneda": r["comision_moneda"],
+            "valorEur": r["valor_eur"],
         }
         for r in conn.execute(
-            "SELECT id, fecha, par, tipo, cantidad FROM activo_conversion_rows "
+            "SELECT id, fecha, par, tipo, cantidad, cantidad_contraparte, comision, comision_moneda, valor_eur "
+            "FROM activo_conversion_rows "
             "WHERE asset_id = ? ORDER BY rowid",
             (safeId,)
         ).fetchall()

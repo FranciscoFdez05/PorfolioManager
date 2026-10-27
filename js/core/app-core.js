@@ -392,7 +392,8 @@ function applyAutoRefresh(minutes) {
         // y dejaba el sidebar sin repintar, así que los precios parados no
         // llegaban ni a ponerse en gris ni a explicar por qué no se movían.
         await refreshAssetsSidebar()
-        await refreshOverviewMarketData(null, { respetarPausa: true })
+        // El tope iguala la edad máxima del precio al intervalo elegido.
+        await refreshOverviewMarketData(null, { respetarPausa: true, maxEdadSegundos: minutes * 60 })
     }
 
     const nowMs = Date.now()
@@ -679,35 +680,58 @@ function initScrollLateral(elemento, clases) {
     )
 
     // ── Arrastre con el botón izquierdo ──
+    // Mínimo recorrido para que pulsar cuente como arrastre y no como clic.
+    const UMBRAL_ARRASTRE = 5
     let xInicial = 0
     let scrollInicial = 0
+    let pulsado = false
     let arrastrando = false
 
     elemento.addEventListener("pointerdown", (evento) => {
         if (evento.button !== 0 || sobrante() <= 0) return
-        arrastrando = true
+        pulsado = true
+        arrastrando = false
         xInicial = evento.clientX
         scrollInicial = elemento.scrollLeft
-        elemento.classList.add(clases.arrastrando)
-        elemento.setPointerCapture(evento.pointerId)
     })
 
     elemento.addEventListener("pointermove", (evento) => {
-        if (!arrastrando) return
+        if (!pulsado) return
+        const desplazamiento = evento.clientX - xInicial
+        if (!arrastrando) {
+            if (Math.abs(desplazamiento) < UMBRAL_ARRASTRE) return
+            // La captura no se toma al pulsar: con ella puesta el clic va a la
+            // tira y no a la pestaña, y pulsar una dejaba de seleccionarla.
+            arrastrando = true
+            elemento.classList.add(clases.arrastrando)
+            elemento.setPointerCapture(evento.pointerId)
+        }
         // El navegador ya recorta el valor a [0, sobrante]: el arrastre no puede
         // pasar del último elemento ni del primero.
-        elemento.scrollLeft = scrollInicial - (evento.clientX - xInicial)
+        elemento.scrollLeft = scrollInicial - desplazamiento
     })
 
     const soltar = (evento) => {
+        pulsado = false
         if (!arrastrando) return
-        arrastrando = false
         elemento.classList.remove(clases.arrastrando)
         elemento.releasePointerCapture?.(evento.pointerId)
     }
 
     elemento.addEventListener("pointerup", soltar)
     elemento.addEventListener("pointercancel", soltar)
+
+    // Soltar tras arrastrar no debe contar como clic en la pestaña de debajo.
+    elemento.addEventListener(
+        "click",
+        (evento) => {
+            if (!arrastrando) return
+            arrastrando = false
+            evento.preventDefault()
+            evento.stopPropagation()
+        },
+        true
+    )
 
     // Arrastrar sobre texto dispara el arrastre nativo del navegador y se lleva
     // el gesto a medias; la selección la corta el CSS del estado "arrastrando".
@@ -729,6 +753,35 @@ function initScrollLateral(elemento, clases) {
 
     actualizarBordes()
     return actualizarBordes
+}
+
+// Recalcular de cada tira ya montada. WeakMap y no dataset: lo guardado es una
+// función, y al salir de la página el nodo y su entrada se van juntos.
+const _tirasPestanas = new WeakMap()
+
+/**
+ * Scroll lateral de una tira de pestañas que se repinta entera en cada render.
+ *
+ * Las de cuentas y años de Intereses y Dividendos rehacen su contenido con
+ * innerHTML, pero el contenedor es el mismo durante la visita: la primera
+ * llamada monta initScrollLateral() y las siguientes solo recalculan si sobra
+ * algo, que es lo que cambia al añadir o quitar pestañas.
+ *
+ * @param {HTMLElement|null} elemento Contenedor de las pestañas.
+ */
+function refrescarTiraPestanas(elemento) {
+    if (!elemento) return
+    let actualizar = _tirasPestanas.get(elemento)
+    if (!actualizar) {
+        actualizar = initScrollLateral(elemento, {
+            scrollable: "tiraPestanasScrollable",
+            inicio: "tiraPestanasFadeStart",
+            fin: "tiraPestanasFadeEnd",
+            arrastrando: "tiraPestanasDragging"
+        })
+        _tirasPestanas.set(elemento, actualizar)
+    }
+    actualizar()
 }
 
 function initMetricsScroll(metrics, sideWrapper) {
@@ -1008,6 +1061,7 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
     }
 
     // Paneles se abre a pantalla completa y su botón de salir vuelve aquí.
+    if (window._paginaActual !== page && typeof closePersistentToasts === "function") closePersistentToasts()
     if (window._paginaActual !== page) window._paginaAnterior = window._paginaActual
     window._paginaActual = page
 
@@ -1061,7 +1115,21 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             mainContent.classList.toggle("gridPageActive", gridPages.includes(page))
             // Páginas cuyo contenido cabe en la ventana si sus tablas hacen
             // scroll dentro en vez de alargar mainContent (ver base.css).
-            const fitPages = ["vistaGeneral", "gastos", "ingresos", "calendario"]
+            const fitPages = [
+                "vistaGeneral",
+                "gastos",
+                "ingresos",
+                "calendario",
+                "ventas",
+                "operaciones",
+                "operacionesBolsa",
+                "transacciones",
+                "conversiones",
+                "Trading",
+                "bonos",
+                "privateMarket",
+                "fundamentales"
+            ]
             mainContent.classList.toggle("fitPageActive", fitPages.includes(page))
         }
 
@@ -1432,14 +1500,14 @@ function initMoneyToggle() {
         document.body.classList.add("money-hidden")
         btn.classList.add("money-hidden-active")
         btn.title = "Mostrar valores"
-        btn.textContent = "🙈"
+        btn.innerHTML = iconoHtml("OjoTachado")
         if (ocultarAlInicio) localStorage.setItem("moneyHidden", "1")
     }
     btn.addEventListener("click", () => {
         const isHidden = document.body.classList.toggle("money-hidden")
         btn.classList.toggle("money-hidden-active", isHidden)
         btn.title = isHidden ? "Mostrar valores" : "Ocultar valores"
-        btn.textContent = isHidden ? "🙈" : "👁"
+        btn.innerHTML = iconoHtml(isHidden ? "OjoTachado" : "Ojo")
         localStorage.setItem("moneyHidden", isHidden ? "1" : "0")
     })
 }

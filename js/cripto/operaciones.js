@@ -57,8 +57,16 @@ let currentOperationsData = { rows: [] }
 let operationsAutosaveTimeout = null
 let operationsAssetRefreshTimeout = null
 let operationsPersistenceBound = false
+// Solo se guarda al ocultar o cerrar la pestaña si hubo cambios locales: sin
+// esta marca, una pestaña con la lista vieja pisaba lo guardado desde otro sitio.
+let operationsHasPendingChanges = false
+// Revisión que el servidor tenía al cargar o guardar por última vez, y copia de
+// las filas de entonces: la base de la fusión si otro sitio guarda antes.
+let operationsRevision = null
+let operationsBaseRows = []
 let currentOperationTypeFilter = new Set(OPERATION_ORDER_OPTIONS)
 let currentOperationStatusFilter = new Set(OPERATION_STATUS_OPTIONS)
+let operationsSearchQuery = ""
 let collapsedOperationYears = new Set()
 let operationsAssets = []
 let operationsStablecoinsData = { catalog: [], enabledSymbols: [], rows: [] }
@@ -146,8 +154,11 @@ async function saveOperacionesData(payload, options = {}) {
 
     if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        const error = new Error(`HTTP ${response.status}: ${errorText}`)
+        error.status = response.status
+        throw error
     }
+    return await response.json().catch(() => null)
 }
 
 async function loadOperationAssets() {
@@ -557,17 +568,31 @@ function getOperationPairOptions(assetId) {
     return quoteSymbols.map((quoteSymbol) => `${asset.baseSymbol || asset.symbol}/${quoteSymbol}`)
 }
 
-function normalizeOperationRow(row = {}, index = 0) {
+function normalizeOperationRow(row = {}, index = 0, conservarGuardado = false) {
     const inferredAsset = findOperationAssetByName(row.activo || "")
     const assetId = String(row.assetId || inferredAsset?.id || "").trim()
     const asset = getOperationAssetById(assetId) || inferredAsset
-    const stablecoinSymbol = getOperationStablecoinSymbol(row)
+    // Con `conservarGuardado` (filas que vienen del servidor o que solo cambian
+    // de estado) se respeta lo que la fila ya trae: recalcular la divisa y la
+    // stablecoin desde el par alteraba filas que nadie había tocado (con el par
+    // ilegible la divisa pasaba a USD). Solo se deriva lo que falta. Sin él, la
+    // fila se recalcula desde el par, que es lo que quiere el formulario y el
+    // pintado de la tabla.
+    const stablecoinSymbol =
+        conservarGuardado && typeof row.stablecoinSymbol === "string"
+            ? row.stablecoinSymbol.trim().toUpperCase()
+            : getOperationStablecoinSymbol(row)
     const pairOptions = getOperationPairOptions(asset?.id || assetId)
     const defaultPair =
         stablecoinSymbol && asset ? `${asset.baseSymbol || asset.symbol}/${stablecoinSymbol}` : pairOptions[0] || ""
-    const pair = String(row.par || defaultPair || "").trim()
+    const pair =
+        conservarGuardado && typeof row.par === "string"
+            ? row.par.trim()
+            : String(row.par || defaultPair || "").trim()
     const quoteSymbol = pair.includes("/") ? pair.split("/").pop() : ""
-    const inferredCurrency = normalizeCurrencyCode(quoteSymbol || stablecoinSymbol || "USD")
+    const inferredCurrency = normalizeCurrencyCode(
+        (conservarGuardado && row.currency) || quoteSymbol || stablecoinSymbol || "USD"
+    )
 
     return {
         id: String(row.id || `operacion-${index + 1}`).trim() || `operacion-${index + 1}`,
@@ -578,7 +603,7 @@ function normalizeOperationRow(row = {}, index = 0) {
         stablecoinSymbol,
         orden: OPERATION_ORDER_OPTIONS.includes(String(row.orden || "").trim()) ? String(row.orden).trim() : "Compra",
         precioOrden: String(row.precioOrden || row.precio || "").trim(),
-        precioCurrency: inferredCurrency,
+        precioCurrency: normalizeCurrencyCode((conservarGuardado && row.precioCurrency) || inferredCurrency),
         cantidad: String(row.cantidad || "").trim(),
         comisionesCripto: String(row.comisionesCripto || row.comisiones || "").trim(),
         comisionesFiat: String(row.comisionesFiat || "").trim(),
@@ -612,6 +637,7 @@ async function initOperacionesBolsaLogic() {
 
 async function initOperationsPage(scope) {
     operationsScope = OPERATION_SCOPES[scope] ? scope : "cripto"
+    operationsSearchQuery = ""
 
     const { operationsPayload, assets, stablecoinsPayload, transaccionesPayload } = await loadOperacionesDependencies()
 
@@ -620,9 +646,11 @@ async function initOperationsPage(scope) {
     operationsTransaccionesRows = Array.isArray(transaccionesPayload?.rows) ? transaccionesPayload.rows : []
     currentOperationsData = {
         rows: Array.isArray(operationsPayload?.rows)
-            ? operationsPayload.rows.map((row, index) => normalizeOperationRow(row, index))
+            ? operationsPayload.rows.map((row, index) => normalizeOperationRow(row, index, true))
             : []
     }
+    operationsRevision = Number.isInteger(operationsPayload?.revision) ? operationsPayload.revision : null
+    operationsBaseRows = JSON.parse(JSON.stringify(currentOperationsData.rows))
     currentOperationTypeFilter = loadOperationsFilterState("type", OPERATION_ORDER_OPTIONS)
     currentOperationStatusFilter = loadOperationsFilterState("status", OPERATION_STATUS_OPTIONS)
     collapsedOperationYears = loadOperationsCollapsedYears()
@@ -640,6 +668,8 @@ function bindOperationsEvents() {
     const addButton = document.getElementById("addOperationRowBtn")
     const saveButton = document.getElementById("saveOperationsBtn")
     const filterInputs = document.querySelectorAll(".operationsFilters input[type='checkbox']")
+
+    bindOperationsToolbar()
 
     if (operationsBody && !operationsBody.dataset.bound) {
         operationsBody.dataset.bound = "true"
@@ -791,8 +821,46 @@ function getFilteredOperationsRows() {
     return (currentOperationsData.rows || []).filter((row) => {
         const typeMatches = currentOperationTypeFilter.has(row.orden)
         const statusMatches = currentOperationStatusFilter.has(row.estado)
-        return typeMatches && statusMatches && isOperationRowInScope(row)
+        return typeMatches && statusMatches && isOperationRowInScope(row) && doesOperationRowMatchSearch(row)
     })
+}
+
+function doesOperationRowMatchSearch(row) {
+    const query = operationsSearchQuery.trim().toLowerCase()
+    if (!query) return true
+    return `${row.activo} ${row.par}`.toLowerCase().includes(query)
+}
+
+function bindOperationsToolbar() {
+    const searchInput = document.getElementById("operationsSearch")
+    const searchBox = document.getElementById("operationsSearchBox")
+    const searchBtn = document.getElementById("operationsSearchBtn")
+
+    if (searchInput && searchBtn && !searchBtn.dataset.bound) {
+        searchBtn.dataset.bound = "true"
+        searchBtn.addEventListener("click", () => {
+            const opening = searchInput.hidden
+            searchInput.hidden = !opening
+            searchBox?.classList.toggle("open", opening)
+            if (opening) {
+                searchInput.focus()
+                return
+            }
+            searchInput.value = ""
+            operationsSearchQuery = ""
+            syncOperationsDataFromTable()
+            renderOperationsTable()
+        })
+        searchInput.addEventListener("input", () => {
+            operationsSearchQuery = searchInput.value
+            syncOperationsDataFromTable()
+            renderOperationsTable()
+        })
+        searchInput.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") searchBtn.click()
+        })
+    }
+
 }
 
 function renderOperationsStablecoinPanel() {
@@ -802,46 +870,64 @@ function renderOperationsStablecoinPanel() {
         return
     }
 
-    const enabledStablecoins = getOperationsEnabledStablecoinSymbols()
+    // Solo se desplazan las stablecoins: la etiqueta y lo bloqueado en fiat se
+    // quedan siempre a la vista.
+    activarArrastreHorizontal(panel, () => panel.querySelector(".operationsPairsSummaryScroll"))
+    activarDesplazamientoAutomatico(panel, () => panel.querySelector(".operationsPairsSummaryScroll"))
 
     const fiatLocked = getOperationsLockedFiatTotalsFromActiveBuys(getScopedOperationRows())
     const fiatItems = Object.entries(fiatLocked)
         .filter(([, locked]) => locked > 0)
         .map(([symbol, locked]) => ({ symbol, locked }))
 
-    if (!enabledStablecoins.length && !fiatItems.length) {
-        panel.innerHTML = ""
-        panel.classList.add("hidden")
-        return
-    }
-
     panel.classList.remove("hidden")
     const summary = buildOperationsStablecoinBalanceSummary(operationsStablecoinsData, getScopedOperationRows())
-    const stablecoinItems = Object.values(summary)
+    const isStockScope = !getOperationsScopeConfig().useStablecoins
+    const stablecoinItems = isStockScope ? [] : Object.values(summary)
 
-    panel.innerHTML = `
-        <span class="operationsPairsSummaryLabel">Par - saldo disponible</span>
-        <div class="operationsPairsSummaryValues">
-            ${stablecoinItems
-                .map(
-                    (item) => `
+    // En bolsa se opera en la divisa base, no en pares con stablecoins, y no hay
+    // origen de datos para el saldo libre: solo se muestra lo bloqueado, a cero si no hay nada.
+    if (isStockScope && !fiatItems.length) {
+        fiatItems.push({ symbol: String(window._monedaBase || "EUR").toUpperCase(), locked: 0 })
+    }
+
+    const stablecoinHtml = stablecoinItems
+        .map(
+            (item) => `
                 <span class="operationsPairsSummaryItem">
                     ${item.symbol} ${formatMoney(item.available, "USD")}
-                    <span class="operationsPairsSummaryHint">(bloqueado ${formatMoney(item.locked, "USD")})</span>
-                </span>
-            `
-                )
-                .join("")}
-            ${fiatItems
-                .map(
-                    (item) => `
+                    ${item.locked > 0 ? `<span class="operationsPairsSummaryHint">(bloqueado ${formatMoney(item.locked, "USD")})</span>` : ""}
+                </span>`
+        )
+        .join("")
+    const fiatHtml = fiatItems
+        .map(
+            (item) => `
                 <span class="operationsPairsSummaryItem">
                     ${item.symbol}
-                    <span class="operationsPairsSummaryHint">(bloqueado ${formatMoney(item.locked, item.symbol)})</span>
-                </span>
-            `
-                )
-                .join("")}
+                    ${
+                        isStockScope
+                            ? formatMoney(item.locked, item.symbol)
+                            : `<span class="operationsPairsSummaryHint">(bloqueado ${formatMoney(item.locked, item.symbol)})</span>`
+                    }
+                </span>`
+        )
+        .join("")
+
+    // En cripto se separan visualmente las stablecoins de las divisas fiat.
+    const buildGroup = (title, itemsHtml, desplazable = false) =>
+        itemsHtml
+            ? `<div class="operationsPairsSummaryGroup${desplazable ? " operationsPairsSummaryGroupScroll" : ""}">
+                <span class="operationsPairsSummaryTag">${title}</span>${
+                    desplazable ? `<div class="operationsPairsSummaryScroll">${itemsHtml}</div>` : itemsHtml
+                }
+            </div>`
+            : ""
+
+    panel.innerHTML = `
+        <span class="operationsPairsSummaryLabel">${isStockScope ? "Saldo bloqueado" : "Par - saldo disponible"}</span>
+        <div class="operationsPairsSummaryValues">
+            ${isStockScope ? fiatHtml : `${buildGroup("Stablecoins", stablecoinHtml, true)}${buildGroup("Fiat", fiatHtml)}`}
         </div>
     `
 }
@@ -995,9 +1081,11 @@ function refreshOperationsRowPrice(tr) {
     const rowData = (currentOperationsData.rows || []).find((r) => r.id === rowId)
     if (!rowData) {
         priceEl.textContent = ""
+        renderOperationsRecorridoCell(tr, null)
         return
     }
     const asset = getOperationAssetById(rowData.assetId)
+    renderOperationsRecorridoCell(tr, getOperationsRecorrido(normalizeOperationRow(rowData), asset))
     const price = parseLooseNumber(asset?.price)
     if (!asset || price === null || price <= 0) {
         priceEl.textContent = ""
@@ -1006,6 +1094,59 @@ function refreshOperationsRowPrice(tr) {
     }
     priceEl.textContent = formatMoney(price, asset.currency || "EUR")
     priceEl.className = "operationsTickerPrice"
+}
+
+/**
+ * Calcula cuánto tiene que moverse el precio actual para llegar al de la orden.
+ *
+ * Solo tiene sentido en las órdenes que siguen abiertas: en las completadas o
+ * canceladas el precio de la orden ya no es un objetivo.
+ *
+ * @param {Object} row Operación normalizada (con precioOrden y precioCurrency).
+ * @param {Object|null} asset Activo con su precio actual y su divisa.
+ * @returns {{diff: number, pct: number, currency: string}|null} Diferencia
+ *     orden - actual y su porcentaje sobre el actual, o null si no se puede
+ *     calcular.
+ */
+function getOperationsRecorrido(row = {}, asset = null) {
+    if (row.estado !== "Activo" || !asset) {
+        return null
+    }
+
+    const currentPrice = parseLooseNumber(asset.price)
+    const orderPrice = parseLooseNumber(row.precioOrden)
+    if (currentPrice === null || currentPrice <= 0 || orderPrice === null || orderPrice <= 0) {
+        return null
+    }
+
+    // Sin tipo de cambio a mano, comparar un precio en USD con otro en EUR
+    // daría un recorrido falso: mejor no enseñar nada.
+    const currency = normalizeCurrencyCode(asset.currency || "EUR")
+    if (currency !== normalizeCurrencyCode(row.precioCurrency || currency)) {
+        return null
+    }
+
+    const diff = orderPrice - currentPrice
+    return { diff, pct: (diff / currentPrice) * 100, currency }
+}
+
+function renderOperationsRecorridoCell(tr, recorrido) {
+    const cell = tr.querySelector(".operationsRecorridoCell")
+    if (!cell) return
+
+    if (!recorrido) {
+        cell.innerHTML = ""
+        return
+    }
+
+    const isUp = recorrido.diff >= 0
+    const sign = isUp ? "+" : ""
+    const pctText = recorrido.pct.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    cell.innerHTML = `
+        <span class="operationsRecorrido ${isUp ? "is-up" : "is-down"}">
+            <span class="operationsRecorridoPct">${sign}${pctText} %</span>
+            <span class="operationsRecorridoAmount">${sign}${formatMoney(recorrido.diff, recorrido.currency)}</span>
+        </span>`
 }
 
 function buildOperationRow(row) {
@@ -1022,11 +1163,11 @@ function buildOperationRow(row) {
         <td class="operationsTickerCell">
             <span class="operationsTickerPrice"></span>
         </td>
+        <td class="operationsRecorridoCell"></td>
         <td>${escapeHtml(normalizedRow.orden)}</td>
         <td>${formatOperationsMoney(normalizedRow.precioOrden, normalizedRow.precioCurrency || "USD")}</td>
         <td>${formatOperationsQuantity(normalizedRow.cantidad)}</td>
         <td>${formatOperationsMoney(normalizedRow.total, normalizedRow.currency || "USD")}</td>
-        <td data-field="comisionesCripto">${formatOperationsCryptoCommissionCell(normalizedRow)}</td>
         <td data-field="comisionesFiat">${formatOperationsMoney(normalizedRow.comisionesFiat, "EUR")}</td>
         <td class="operationsEstadoCell" data-field="estado">${formatOperationsStatusCell(normalizedRow)}</td>
         <td>${escapeHtml(normalizedRow.fechaCierre)}</td>
@@ -1074,41 +1215,6 @@ function formatOperationsQuantity(value) {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
     })
-}
-
-function getOperationBaseSymbol(row = {}) {
-    const pair = String(row.par || "")
-        .trim()
-        .toUpperCase()
-
-    if (pair.includes("/")) {
-        return pair.split("/")[0]
-    }
-
-    const asset = getOperationAssetById(row.assetId)
-    return String(asset?.baseSymbol || asset?.symbol || "")
-        .trim()
-        .toUpperCase()
-}
-
-function formatOperationsCryptoCommissionCell(row = {}) {
-    const formattedAmount = formatOperationsQuantity(row.comisionesCripto)
-
-    if (!formattedAmount) {
-        return ""
-    }
-
-    const amount = parseLooseNumber(row.comisionesCripto) || 0
-    const symbol = getOperationBaseSymbol(row)
-    const asset = getOperationAssetById(row.assetId)
-    const price = parseLooseNumber(asset?.price)
-    const priceCurrency = asset?.currency || "EUR"
-    const hint =
-        amount > 0 && price !== null && price > 0
-            ? `<span class="operationsFeeHint">≈ ${formatMoney(amount * price, priceCurrency)}</span>`
-            : ""
-
-    return `<span class="operationsFeeAmount">${formattedAmount}${symbol ? ` ${escapeHtml(symbol)}` : ""}</span>${hint}`
 }
 
 function getOperationsStatusModifier(estado) {
@@ -1182,7 +1288,7 @@ function changeOperationRowStatus(rowId, nextStatus, select = null) {
         return
     }
 
-    const updatedRow = normalizeOperationRow({ ...rows[rowIndex], estado: nextStatus })
+    const updatedRow = normalizeOperationRow({ ...rows[rowIndex], estado: nextStatus }, 0, true)
     const balanceWarning = getOperationsInsufficientBalanceMessage(updatedRow, rowId)
 
     if (balanceWarning) {
@@ -1232,10 +1338,11 @@ function requestOperationRowDeletion(rowId) {
                 if (isCancelled) {
                     currentRows.splice(targetIndex, 1)
                 } else {
-                    currentRows[targetIndex] = normalizeOperationRow({
-                        ...currentRows[targetIndex],
-                        estado: "Cancelado"
-                    })
+                    currentRows[targetIndex] = normalizeOperationRow(
+                        { ...currentRows[targetIndex], estado: "Cancelado" },
+                        0,
+                        true
+                    )
                 }
             }
             renderOperationsTable()
@@ -1273,31 +1380,90 @@ function syncOperationsDataFromTable() {
 }
 
 function scheduleOperationsAutosave(delay = 500) {
+    operationsHasPendingChanges = true
     window.clearTimeout(operationsAutosaveTimeout)
     operationsAutosaveTimeout = window.setTimeout(async () => {
         try {
             await persistOperationsData()
         } catch (error) {
-            showError("No se pudieron guardar las operaciones", error)
+            showError("No se pudieron guardar las operaciones", error, { persistent: true })
         }
     }, delay)
 }
 
+// Los guardados van de uno en uno: dos a la vez chocaban entre sí con un 409 y
+// se fusionaban dos veces.
+let operationsPersistChain = Promise.resolve()
+
 async function persistOperationsData(options = {}) {
+    const turno = operationsPersistChain.catch(() => {}).then(() => guardarOperacionesAhora(options))
+    operationsPersistChain = turno
+    return turno
+}
+
+async function guardarOperacionesAhora(options = {}) {
     syncOperationsDataFromTable()
     window.clearTimeout(operationsAutosaveTimeout)
     window.clearTimeout(operationsAssetRefreshTimeout)
     if (typeof setExternalOperacionesRowsForAssets === "function") {
         setExternalOperacionesRowsForAssets(currentOperationsData.rows || [])
     }
-    await saveOperacionesData(currentOperationsData, options)
+    operationsHasPendingChanges = false
+    const payload = {
+        ...currentOperationsData,
+        ...(Number.isInteger(operationsRevision) ? { revision: operationsRevision } : {})
+    }
+    try {
+        let respuesta
+        try {
+            respuesta = await saveOperacionesData(payload, options)
+        } catch (error) {
+            // Con keepalive la página puede estar cerrándose: no hay tiempo de
+            // fusionar, y en el servidor no se ha borrado nada.
+            if (error?.status !== 409 || options.keepalive) throw error
+            respuesta = await fusionarOperacionesTrasConflicto(payload)
+        }
+        if (Number.isInteger(respuesta?.revision)) operationsRevision = respuesta.revision
+        operationsBaseRows = JSON.parse(JSON.stringify(currentOperationsData.rows))
+    } catch (error) {
+        operationsHasPendingChanges = true
+        throw error
+    }
     if (typeof refreshSelectedAssetFromExternalData === "function") {
         await refreshSelectedAssetFromExternalData()
     }
 }
 
+// Otra pestaña u otro dispositivo guardó las operaciones entretanto: se aplican
+// los cambios de esta pestaña (respecto a lo que cargó) sobre lo que hay ahora.
+async function fusionarOperacionesTrasConflicto(payload) {
+    const servidor = await loadOperacionesData()
+    const filasServidor = (servidor.rows || []).map((row, index) => normalizeOperationRow(row, index, true))
+    const { filas, descartadas } = resolverConflictosPorId(
+        fusionarListaTresVias(operationsBaseRows, payload.rows, filasServidor, claveEstableAnual),
+        filasServidor
+    )
+    currentOperationsData = { ...currentOperationsData, rows: filas }
+    let respuesta
+    try {
+        respuesta = await saveOperacionesData({ ...currentOperationsData, revision: servidor.revision })
+    } catch (error) {
+        // No se ha podido guardar: la pestaña vuelve a lo que hay en el servidor
+        // para no enseñar como guardado lo que no lo está.
+        currentOperationsData = { ...currentOperationsData, rows: filasServidor }
+        operationsRevision = Number.isInteger(servidor.revision) ? servidor.revision : null
+        operationsBaseRows = JSON.parse(JSON.stringify(filasServidor))
+        renderOperationsTable()
+        error.message = `No se han guardado tus cambios en las operaciones; se han recargado las del servidor. (${error.message})`
+        throw error
+    }
+    renderOperationsTable()
+    avisarFusion("las operaciones", descartadas.length)
+    return respuesta
+}
+
 async function flushOperationsPendingChanges() {
-    if (!document.getElementById("operationsBody")) {
+    if (!document.getElementById("operationsBody") || !operationsHasPendingChanges) {
         return
     }
 
@@ -1312,7 +1478,7 @@ function bindOperationsPersistenceGuards() {
     operationsPersistenceBound = true
 
     window.addEventListener("beforeunload", () => {
-        if (!document.getElementById("operationsBody")) {
+        if (!document.getElementById("operationsBody") || !operationsHasPendingChanges) {
             return
         }
 
@@ -1322,7 +1488,11 @@ function bindOperationsPersistenceGuards() {
     })
 
     document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState !== "hidden" || !document.getElementById("operationsBody")) {
+        if (
+            document.visibilityState !== "hidden" ||
+            !document.getElementById("operationsBody") ||
+            !operationsHasPendingChanges
+        ) {
             return
         }
 
@@ -1384,23 +1554,19 @@ function openOperacionRowModal(rowId) {
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Precio orden</label>
-            <input id="opModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(stripCurrencyText(rowData.precioOrden || ""))}">
+            <input id="opModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="${operationsScope === "bolsa" ? "150,25" : "62000,00"}" value="${escapeHtml(stripCurrencyText(rowData.precioOrden || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Cantidad</label>
-            <input id="opModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.cantidad)}">
-        </div>
-        <div class="assetRowModalField">
-            <label class="assetRowModalLabel">${operationsScope === "bolsa" ? "Comisiones en títulos" : "Comisiones cripto"}</label>
-            <input id="opModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.comisionesCripto)}">
+            <input id="opModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="${operationsScope === "bolsa" ? "10" : "0,05"}" value="${escapeHtml(rowData.cantidad)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Comisiones €</label>
-            <input id="opModalComisionesFiat" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(stripCurrencyText(rowData.comisionesFiat || ""))}">
+            <input id="opModalComisionesFiat" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="1,50" value="${escapeHtml(stripCurrencyText(rowData.comisionesFiat || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Total</label>
-            <input id="opModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(stripCurrencyText(rowData.total || ""))}">
+            <input id="opModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="${operationsScope === "bolsa" ? "1502,50" : "3100,00"}" value="${escapeHtml(stripCurrencyText(rowData.total || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Estado</label>
@@ -1420,7 +1586,7 @@ function openOperacionRowModal(rowId) {
     overlay.dataset.rowId = rowId || ""
 
     const modal = document.createElement("div")
-    modal.className = "assetModal assetRowModal"
+    modal.className = "assetModal assetRowModal operacionRowModal"
 
     const titleEl = document.createElement("h3")
     titleEl.className = "assetModalTitle assetRowModalTitle"
@@ -1478,6 +1644,8 @@ function saveOperacionRowFromModal() {
     const overlay = document.getElementById("operacionRowModalOverlay")
     const rowId = overlay?.dataset.rowId || ""
     const g = (id) => document.getElementById(id)?.value ?? ""
+    // El campo ya no se edita en el popup; se conserva el valor que tuviera la fila.
+    const existingRow = (currentOperationsData.rows || []).find((r) => r.id === rowId)
 
     const rowData = normalizeOperationRow({
         id: rowId || `operacion-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -1487,12 +1655,19 @@ function saveOperacionRowFromModal() {
         orden: g("opModalOrden"),
         precioOrden: g("opModalPrecio"),
         cantidad: g("opModalCantidad"),
-        comisionesCripto: g("opModalComisiones"),
+        comisionesCripto: existingRow?.comisionesCripto || "",
         comisionesFiat: g("opModalComisionesFiat"),
         total: g("opModalTotal"),
         estado: g("opModalEstado"),
         fechaCierre: g("opModalFechaCierre")
     })
+
+    // Con un par que no se puede interpretar la divisa no se puede sacar de él:
+    // se conserva la que ya tenía la fila en vez de caer en USD.
+    if (existingRow && !rowData.par.includes("/")) {
+        rowData.currency = existingRow.currency || rowData.currency
+        rowData.precioCurrency = existingRow.precioCurrency || rowData.precioCurrency
+    }
 
     const balanceWarning = getOperationsInsufficientBalanceMessage(rowData, rowId)
 

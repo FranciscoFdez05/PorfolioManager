@@ -73,8 +73,14 @@
 }
 
 .portfolioActionBtn {
+    /* Flex para centrar el icono: en línea queda apoyado en la línea base. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: none;
     border: none;
+    /* El icono pinta con currentColor: sin esto toma el negro por defecto de <button>. */
+    color: inherit;
     cursor: pointer;
     padding: 2px 4px;
     font-size: 0.75rem;

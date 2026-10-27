@@ -64,6 +64,21 @@
     justify-content: space-between;
 }
 
+.bonosToolbarLeft {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.bonosToolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
 .bonosFilters {
     display: flex;
     gap: 6px;
@@ -210,4 +225,25 @@
 .bonosTotalCell {
     font-weight: 600;
     color: var(--text-subtle);
+}
+
+/* Renta fija (Bonos) ajustada al alto visible (fitPageActive, ver base.css): sin
+   scroll de mainContent; la tabla se queda con el hueco que dejan los bloques
+   de arriba y hace scroll por dentro. En pantallas estrechas, como antes. */
+@media (min-width: 1201px) {
+    .fitPageActive .bonosPage {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .fitPageActive .bonosPage > * {
+        flex: 0 0 auto;
+    }
+
+    .fitPageActive .bonosPage .bonosTableWrapper {
+        flex: 0 1 auto;
+        min-height: 140px;
+        max-height: none;
+    }
 }

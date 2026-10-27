@@ -49,7 +49,13 @@ def sanitizeVentasPayload(payload, fallbackYear=None):
     if not year:
         return None, "Año inválido"
 
-    rows = sanitizeVentasRows(payload.get("rows", []))
+    crudas = payload.get("rows", [])
+    if isinstance(crudas, list) and len(crudas) > _MAX_FILAS:
+        # Recortar en silencio borraba las sobrantes al guardar (el ejercicio se
+        # sustituye entero): mejor rechazar que perder ventas.
+        return None, f"Un ejercicio admite como máximo {_MAX_FILAS} ventas"
+
+    rows = sanitizeVentasRows(crudas)
 
     vistos = set()
     for row in rows:
@@ -83,11 +89,12 @@ def _filaBase(r):
         "cantidad": r["cantidad"],
         "valorVenta": r["valor_venta"],
         "comisionVenta": r["comision_venta"],
+        "currency": r["currency"],
     }
 
 
 _SELECT_BASE = (
-    "SELECT id, year, fecha, asset_id, activo, cantidad, valor_venta, comision_venta "
+    "SELECT id, year, fecha, asset_id, activo, cantidad, valor_venta, comision_venta, currency "
     "FROM ventas"
 )
 
@@ -118,6 +125,8 @@ def readVentasYear(year, calculo=None):
         "incidencias": [
             i for i in calculo["incidencias"] if str(i["year"]) == normalized
         ],
+        # Permutas cripto-cripto del ejercicio: ya cuentan en el resumen.
+        "permutas": calculo.get("permutas", {}).get(normalized, []),
         "revision": revisiones.leer(conn, "ventas", normalized),
     }
 
@@ -152,7 +161,21 @@ def writeVentasYear(year, data, revisionEsperada=None):
     # El nombre del activo se guarda resuelto desde `activos`: es solo una
     # etiqueta para que un backup o una exportación se lean sin la otra tabla,
     # y depender de lo que mande el cliente la dejaba vacía o desfasada.
-    nombres = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM activos")}
+    nombres = {}
+    monedasActivos = {}
+    for r in conn.execute("SELECT id, name, currency FROM activos"):
+        nombres[r["id"]] = r["name"]
+        monedasActivos[r["id"]] = r["currency"]
+    # La divisa en que se tecleó cada venta se conserva al reescribir el
+    # ejercicio: si el activo cambió de divisa después, el valor de venta sigue
+    # estando en la antigua y su tipo de cambio solo vale para esa.
+    monedasPrevias = {
+        (r["id"], r["asset_id"]): r["currency"]
+        for r in conn.execute(
+            "SELECT id, asset_id, currency FROM ventas WHERE year = ? AND currency != ''",
+            (normalized,),
+        )
+    }
 
     # El tipo de cambio de cada venta lo rellena fx_historico y el formulario no
     # lo manda: reescribir el ejercicio sin heredarlo lo borraba en cada guardado.
@@ -170,13 +193,15 @@ def writeVentasYear(year, data, revisionEsperada=None):
     conn.execute("DELETE FROM ventas WHERE year = ?", (normalized,))
     conn.executemany(
         "INSERT INTO ventas (id, year, fecha, asset_id, activo, cantidad, valor_venta, comision_venta, "
-        "fx_rate, fx_fecha, fx_origen) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "currency, fx_rate, fx_fecha, fx_origen) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), normalized, r.get("fecha", ""), r.get("assetId", ""),
              nombres.get(r.get("assetId", ""), r.get("activo", "")),
              r.get("cantidad", ""), r.get("valorVenta", ""),
              r.get("comisionVenta", ""),
+             monedasPrevias.get((r.get("id", ""), r.get("assetId", "")))
+             or monedasActivos.get(r.get("assetId", "")) or "EUR",
              *fxPrevios.get((r.get("fecha", ""), r.get("assetId", "")), ("", "", "")))
             for r in data.get("rows", [])
         ]
@@ -242,6 +267,7 @@ def validarParaGuardar(data):
             "asset_id": row.get("assetId", ""),
             "cantidad": row.get("cantidad", ""),
             "valor_venta": row.get("valorVenta", ""),
+            "comision_venta": row.get("comisionVenta", ""),
             "fecha": row.get("fecha", ""),
             "year": data.get("year", ""),
         }

@@ -12,7 +12,12 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from admin.backup_manager import _removeWalSidecars, _rutaBloqueo, checkIntegrity, problemaDePortfolio
+from admin.backup_manager import (
+    _removeWalSidecars,
+    _rutaBloqueo,
+    problemaDePortfolio,
+    problemasDeIntegridad,
+)
 from core import clave_copias, exportables, paths, settings, telegram_notifier, zip_seguro
 from core.bloqueo import BloqueoOcupado, exclusivo
 from core.copia_sqlite import copiar as copiarSqlite
@@ -175,6 +180,29 @@ def _reemplazarAtomicoViaSqlite(origen: Path, destino: Path):
     _removeWalSidecars(destino)
 
 
+# Cuántas carpetas de copia previa se conservan en data/pre_restore. Cada
+# restauración copia todos los portfolios, y sin tope el disco crecía sin límite.
+_MAX_COPIAS_PREVIAS = 10
+
+
+def _podarCopiasPrevias(carpeta: Path, conservar: int = _MAX_COPIAS_PREVIAS) -> None:
+    """Borra las carpetas de copia previa más antiguas, dejando `conservar`.
+
+    Solo toca subcarpetas: los JSON de snapshots que deja el purgado viven en la
+    misma carpeta y no se cuentan.
+
+    Args:
+        carpeta: Carpeta data/pre_restore.
+        conservar: Número de copias recientes a mantener.
+    """
+    try:
+        copias = sorted((p for p in carpeta.iterdir() if p.is_dir()), key=lambda p: p.stat().st_mtime)
+        for antigua in copias[:-conservar] if conservar > 0 else copias:
+            shutil.rmtree(antigua, ignore_errors=True)
+    except OSError as error:
+        log.warning(f"[backup] No se pudo podar pre_restore: {error}")
+
+
 def _safetyCopyBeforeRestore() -> Path | None:
     """Guarda el estado actual de todos los portfolios antes de sobrescribirlos.
 
@@ -186,6 +214,12 @@ def _safetyCopyBeforeRestore() -> Path | None:
         return None
     ts = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
     destDir = DATA_DIR / "pre_restore" / ts
+    # Dos restauraciones en el mismo segundo compartían carpeta y la segunda
+    # mezclaba su copia con la primera.
+    contador = 2
+    while destDir.exists():
+        destDir = DATA_DIR / "pre_restore" / f"{ts}_{contador}"
+        contador += 1
     try:
         destDir.mkdir(parents=True, exist_ok=True)
         for dbFile in sorted(_PORTFOLIOS_DIR.glob("*.db")):
@@ -202,6 +236,7 @@ def _safetyCopyBeforeRestore() -> Path | None:
             for prefsFile in sorted(_JSON_DIR.glob("prefs_*.json")):
                 shutil.copy2(str(prefsFile), str(destDir / prefsFile.name))
         log.info(f"[backup] Copia previa al restore guardada en {destDir}")
+        _podarCopiasPrevias(destDir.parent)
         return destDir
     except Exception as e:
         log.error(f"[backup] No se pudo crear la copia previa al restore: {e}")
@@ -219,6 +254,25 @@ def bloqueoRestauracion():
     """
     with _bloqueoCruzado(), _BACKUP_LOCK:
         yield
+
+
+@contextmanager
+def bloqueoSiLibre():
+    """Los mismos dos cerrojos que `bloqueoRestauracion`, sin esperar.
+
+    Para tareas que no pueden convivir con una importación o una restauración
+    pero tampoco merece la pena esperarlas, como guardar un punto del
+    histórico: se salta y vuelve en el siguiente hueco. Lanza `BloqueoOcupado`
+    si hay una copia, un restore o una importación en curso, en este proceso o
+    en el otro worker.
+    """
+    if not _BACKUP_LOCK.acquire(blocking=False):
+        raise BloqueoOcupado("hay una copia, restauración o importación en curso en este proceso")
+    try:
+        with exclusivo(_rutaBloqueo(), espera=0):
+            yield
+    finally:
+        _BACKUP_LOCK.release()
 
 
 def copiaPreviaObligatoria() -> tuple[Path | None, bool]:
@@ -548,9 +602,11 @@ def _escribirBackup(*, automatico: bool) -> str:
                     with _copiaTemporal(dbFile) as copia:
                         # Una copia dañada no entra: sustituiría en la rotación
                         # a otras buenas y no serviría para restaurar nada.
-                        if not checkIntegrity(copia):
+                        problemas = problemasDeIntegridad(copia)
+                        if problemas:
                             raise RuntimeError(
-                                f"El portfolio {dbFile.name} no pasa la comprobación de integridad"
+                                f"El portfolio {dbFile.name} no pasa la comprobación de integridad: "
+                                + "; ".join(problemas)
                             )
                         zf.write(str(copia), f"portfolios/{dbFile.name}")
                     snapJson = _exportSnapshotsJson(dbFile)
@@ -822,6 +878,12 @@ def _restaurarDesdeZip(backupPath: Path, claves, ignorados: list) -> list:
 def _restaurarDbSuelto(backupPath: Path, filename: str) -> None:
     """Formato legacy .db: restaura solo el portfolio activo."""
     from core.db import getActiveDbPath
+
+    # La misma validación que las entradas de un ZIP: una copia dañada no debe
+    # sustituir a la base buena.
+    problema = problemaDePortfolio(backupPath, exigirActivos=False)
+    if problema:
+        raise RuntimeError(f"La copia {filename} no es una base de datos válida: {problema}")
 
     _reemplazarAtomicoViaSqlite(backupPath, getActiveDbPath())
     tsM = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', filename)

@@ -1,6 +1,7 @@
 from core.db import getDb, transactional
 from stores import rendimiento_activo, revisiones
 from stores.asset_utils import slugify
+from stores.fx_historico import tipoActualConMemo
 
 
 def readAssetFile(assetId):
@@ -104,9 +105,14 @@ def readAssetFile(assetId):
             "par": r["par"],
             "tipo": r["tipo"],
             "cantidad": r["cantidad"],
+            "cantidadContraparte": r["cantidad_contraparte"],
+            "comision": r["comision"],
+            "comisionMoneda": r["comision_moneda"],
+            "valorEur": r["valor_eur"],
         }
         for r in conn.execute(
-            "SELECT id, fecha, par, tipo, cantidad FROM activo_conversion_rows "
+            "SELECT id, fecha, par, tipo, cantidad, cantidad_contraparte, comision, comision_moneda, valor_eur "
+            "FROM activo_conversion_rows "
             "WHERE asset_id = ? ORDER BY rowid",
             (safeId,)
         ).fetchall()
@@ -292,11 +298,13 @@ def writeAssetFile(assetId, data, revisionEsperada=None):
 
     conn.execute("DELETE FROM activo_conversion_rows WHERE asset_id = ?", (safeId,))
     conn.executemany(
-        "INSERT INTO activo_conversion_rows (id, asset_id, fecha, par, tipo, cantidad) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO activo_conversion_rows "
+        "(id, asset_id, fecha, par, tipo, cantidad, cantidad_contraparte, comision, comision_moneda, valor_eur) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (r.get("id", ""), safeId, r.get("fecha", ""), r.get("par", ""),
-             r.get("tipo", ""), r.get("cantidad", ""))
+             r.get("tipo", ""), r.get("cantidad", ""), r.get("cantidadContraparte", ""),
+             r.get("comision", ""), r.get("comisionMoneda", ""), r.get("valorEur", ""))
             for r in data.get("conversionRows", [])
         ]
     )
@@ -316,12 +324,12 @@ def listAssets():
     ).fetchall()
 
     assetRows = conn.execute(
-        "SELECT asset_id, tipo_operacion, participaciones, capital_invertido_bruto, "
-        "comisiones, comisiones_fiat FROM activo_rows"
+        "SELECT asset_id, fecha_operacion, tipo_operacion, participaciones, capital_invertido_bruto, "
+        "comisiones, comisiones_fiat, comisiones_cripto FROM activo_rows ORDER BY id"
     ).fetchall()
 
     opRows = conn.execute(
-        "SELECT asset_id, orden, cantidad, comisiones_cripto, total "
+        "SELECT asset_id, fecha_apertura, orden, cantidad, comisiones_cripto, total "
         "FROM activo_operation_rows WHERE estado = 'Completado'"
     ).fetchall()
 
@@ -333,6 +341,8 @@ def listAssets():
     for row in opRows:
         opRowsByAsset.setdefault(row["asset_id"], []).append(row)
 
+    posiciones = rendimiento_activo.cargarPosiciones(conn)
+
     assetsWithRows = set()
     for assetId, assetR in rowsByAsset.items():
         if any(r["participaciones"] or r["capital_invertido_bruto"] for r in assetR):
@@ -341,16 +351,23 @@ def listAssets():
         if any(r["cantidad"] or r["total"] for r in opR):
             assetsWithRows.add(assetId)
 
+    tipoDeCambio = tipoActualConMemo()
     result = []
     for r in rows:
         assetId = r["id"]
         # El mismo cálculo que la tabla principal (rendimiento-batch): en Decimal
         # y con el mismo lector de importes. Antes eran dos copias, esta en float.
+        datos = posiciones.get(assetId, {})
         totales = rendimiento_activo.calcular(
-            rowsByAsset.get(assetId, []),
-            opRowsByAsset.get(assetId, []),
+            datos.get("filas", []),
+            datos.get("operaciones", []),
             str(r["type"] or "").strip().lower() == "cripto",
             r["price"],
+            datos.get("ventas", []),
+            datos.get("transacciones", []),
+            datos.get("conversiones", []),
+            str(r["currency"] or "EUR").strip().upper() or "EUR",
+            tipoDeCambio,
         ).paraJson()
 
         result.append({

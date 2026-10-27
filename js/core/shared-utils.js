@@ -211,6 +211,44 @@ function currencySuffix(currency) {
     return SUFIJO_DIVISA[normalized] || normalized
 }
 
+// Luminancia relativa (WCAG) de un color [r, g, b] en 0-255.
+function _luminanciaColor(rgb) {
+    const [r, g, b] = rgb.map((canal) => {
+        const c = canal / 255
+        return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+// Devuelve un color que se lea sobre el fondo del tema actual a partir del que
+// eligió el usuario (p. ej. el de un activo). Si es demasiado oscuro para un tema
+// oscuro, o demasiado claro para el claro, lo acerca al blanco o al negro lo
+// justo para llegar al mínimo; los que ya se leen bien salen tal cual. Siempre
+// devuelve #rrggbb, así que se le puede añadir un sufijo de opacidad ("22").
+function colorLegibleEnTema(color) {
+    const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(color || "").trim())
+    if (!match) return color
+
+    const hex = match[1].length === 3 ? [...match[1]].map((c) => c + c).join("") : match[1]
+    const original = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16))
+    const temaClaro = document.documentElement.getAttribute("data-theme") === "light"
+    // Por debajo de 0,15 de luminancia un color se pierde en el fondo oscuro, y
+    // por encima de 0,45 en el claro. Si hay que corregirlo, no basta con
+    // dejarlo en el límite (se seguía viendo apagado): se lleva hasta 0,3 y 0,35,
+    // con margen. Los colores que ya se leen no se tocan.
+    const luminancia = _luminanciaColor(original)
+    if (temaClaro ? luminancia <= 0.45 : luminancia >= 0.15) return `#${hex.toLowerCase()}`
+    const suficiente = (rgb) => (temaClaro ? _luminanciaColor(rgb) <= 0.35 : _luminanciaColor(rgb) >= 0.3)
+    const destino = temaClaro ? 0 : 255
+
+    let ajustado = original
+    for (let mezcla = 0.05; !suficiente(ajustado) && mezcla <= 1; mezcla += 0.05) {
+        ajustado = original.map((canal) => Math.round(canal + (destino - canal) * mezcla))
+    }
+
+    return `#${ajustado.map((canal) => canal.toString(16).padStart(2, "0")).join("")}`
+}
+
 function formatMoneyWithDecimals(value, currency = "EUR", decimals = 2) {
     const formattedNumber = new Intl.NumberFormat(_nl(), {
         minimumFractionDigits: decimals,
@@ -1188,6 +1226,292 @@ function _buildCustomSelect(select) {
     }).observe(select, { childList: true })
 }
 
+// Pasa a dos columnas un popup hecho de etiquetas y campos sueltos (assetModal):
+// agrupa cada etiqueta con el campo que la sigue y los mete en una rejilla.
+// Lo que no es pareja etiqueta-campo (avisos, botones) se queda fuera, debajo.
+// Hay que llamarlo antes de añadir el popup al documento, para que los
+// desplegables y el botón "Hoy" se monten ya dentro de su casilla.
+function ponerModalEnDosColumnas(modal) {
+    const labels = [...modal.children].filter((el) => el.matches("label.assetModalLabel"))
+    if (!labels.length) return
+
+    const grid = document.createElement("div")
+    grid.className = "modalCampos"
+    labels[0].before(grid)
+
+    labels.forEach((label) => {
+        const control = label.nextElementSibling
+        const campo = document.createElement("div")
+        campo.className = "modalCampo"
+        campo.appendChild(label)
+        if (control?.matches("input, select, textarea")) campo.appendChild(control)
+        grid.appendChild(campo)
+    })
+
+    modal.classList.add("modalDosColumnas")
+}
+
+// Scroll lateral arrastrando con el ratón, como la barra de filtros de Vista
+// general. Hasta 5px de movimiento cuenta como clic normal; después, el soltar
+// no llega como clic a lo que haya debajo (un botón de borrar, por ejemplo).
+// `obtenerObjetivo` sirve cuando lo que se desplaza es una parte del contenedor
+// que se vuelve a pintar a menudo: se escucha en el contenedor, que no cambia,
+// y se busca la parte desplazable en cada arrastre.
+function activarArrastreHorizontal(contenedor, obtenerObjetivo = () => contenedor) {
+    if (!contenedor || contenedor.dataset.arrastreBound) return
+    contenedor.dataset.arrastreBound = "true"
+
+    let inicioX = 0
+    let inicioScroll = 0
+    let pulsado = false
+    let movido = false
+    let objetivo = null
+
+    contenedor.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || event.target.closest("input, select, textarea")) return
+        objetivo = obtenerObjetivo()
+        if (!objetivo) return
+        pulsado = true
+        movido = false
+        inicioX = event.clientX
+        inicioScroll = objetivo.scrollLeft
+    })
+    // En window para no perder el arrastre si el puntero sale del contenedor;
+    // se ignora en cuanto el contenedor deja de estar en la página.
+    window.addEventListener("pointermove", (event) => {
+        if (!pulsado || !contenedor.isConnected) return
+        const desplazamiento = event.clientX - inicioX
+        if (!movido && Math.abs(desplazamiento) < 5) return
+        movido = true
+        contenedor.classList.add("dragging")
+        objetivo.scrollLeft = inicioScroll - desplazamiento
+    })
+    window.addEventListener("pointerup", () => {
+        pulsado = false
+        contenedor.classList.remove("dragging")
+    })
+    contenedor.addEventListener(
+        "click",
+        (event) => {
+            if (!movido) return
+            movido = false
+            event.preventDefault()
+            event.stopPropagation()
+        },
+        true
+    )
+}
+
+// Orden de las barras de años: el año en curso siempre el primero (a la
+// izquierda) y detrás el resto, del más reciente al más antiguo, para que los
+// años viejos se vayan al scroll lateral en vez de empujar al actual.
+function ordenarAniosRecientesPrimero(anios, anioEnCurso = new Date().getFullYear()) {
+    const enCurso = String(anioEnCurso)
+    return [...anios].sort((a, b) => {
+        if (String(a) === enCurso) return -1
+        if (String(b) === enCurso) return 1
+        return Number(b) - Number(a)
+    })
+}
+
+// Desplaza solo, despacio y sin pausas lo que no cabe, como una cinta continua:
+// detrás del último elemento vuelve a aparecer el primero. Para eso duplica una
+// vez el contenido (la copia va marcada y oculta a lectores de pantalla) y, al
+// llegar al final de la primera vuelta, resta su ancho: el salto no se nota
+// porque en ese punto se ve exactamente lo mismo. Se detiene mientras el ratón
+// está encima (para leer o arrastrar) y no hace nada si todo cabe o si el
+// sistema pide reducir animaciones. Se apaga solo cuando el contenedor sale de
+// la página. `obtenerObjetivo` funciona igual que en activarArrastreHorizontal;
+// si el objetivo se repinta, el nuevo se duplica en el siguiente fotograma.
+function activarDesplazamientoAutomatico(contenedor, obtenerObjetivo = () => contenedor) {
+    if (!contenedor || contenedor.dataset.autoScrollBound) return
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return
+    contenedor.dataset.autoScrollBound = "true"
+
+    const pixelesPorSegundo = 22
+    let encima = false
+    let posicion = null
+    let anterior = null
+
+    contenedor.addEventListener("pointerenter", () => {
+        encima = true
+    })
+    contenedor.addEventListener("pointerleave", () => {
+        encima = false
+        // Al soltar, sigue desde donde lo haya dejado el usuario.
+        posicion = null
+    })
+
+    // Ancho de una vuelta: de dónde empieza el primer elemento a dónde empieza
+    // su copia, así incluye el hueco entre el último y el primero.
+    const anchoVuelta = (objetivo) => {
+        const primero = objetivo.firstElementChild
+        const primeraCopia = objetivo.querySelector(":scope > [data-copia-cinta]")
+        return primero && primeraCopia ? primeraCopia.offsetLeft - primero.offsetLeft : 0
+    }
+
+    const duplicar = (objetivo) => {
+        const originales = [...objetivo.children]
+        originales.forEach((hijo) => {
+            const copia = hijo.cloneNode(true)
+            copia.dataset.copiaCinta = "true"
+            copia.setAttribute("aria-hidden", "true")
+            objetivo.appendChild(copia)
+        })
+        objetivo.dataset.cintaDuplicada = "true"
+    }
+
+    const paso = (ahora) => {
+        if (!contenedor.isConnected) return
+        const transcurrido = anterior === null ? 0 : Math.min(0.1, (ahora - anterior) / 1000)
+        anterior = ahora
+        const objetivo = obtenerObjetivo()
+
+        if (objetivo && !objetivo.dataset.cintaDuplicada && objetivo.scrollWidth > objetivo.clientWidth) {
+            duplicar(objetivo)
+            posicion = null
+        }
+
+        const vuelta = objetivo?.dataset.cintaDuplicada ? anchoVuelta(objetivo) : 0
+        if (vuelta > 0 && !encima) {
+            // La posición se lleva aparte porque scrollLeft redondea y, a esta
+            // velocidad, se quedaría parado; además sobrevive a que se repinte.
+            if (posicion === null) posicion = objetivo.scrollLeft % vuelta
+            posicion += pixelesPorSegundo * transcurrido
+            if (posicion >= vuelta) posicion -= vuelta
+            objetivo.scrollLeft = posicion
+        }
+
+        requestAnimationFrame(paso)
+    }
+
+    requestAnimationFrame(paso)
+}
+
+// Menú «···» de acciones de una página (botón + desplegable .interesesMenuDropdown
+// con la clase `hidden`). Se cierra al elegir una opción y al pulsar fuera; el
+// listener del documento se retira solo cuando el menú ya no está en pantalla.
+function activarMenuAcciones(boton, menu) {
+    if (!boton || !menu || boton.dataset.menuBound) return
+    boton.dataset.menuBound = "true"
+    boton.addEventListener("click", (event) => {
+        event.stopPropagation()
+        menu.classList.toggle("hidden")
+    })
+    menu.addEventListener("click", () => menu.classList.add("hidden"))
+    const cerrar = (event) => {
+        if (!menu.isConnected) {
+            document.removeEventListener("click", cerrar)
+            return
+        }
+        if (!menu.contains(event.target)) menu.classList.add("hidden")
+    }
+    document.addEventListener("click", cerrar)
+}
+
+// Lupa de búsqueda de las tablas. Es declarativa: basta con poner en la página
+//   <div class="overviewSearch tablaBusqueda" data-busca-en="#ventasBody"> … </div>
+// (botón + input oculto, como la de Vista general) y el observador de abajo la
+// activa. Filtra por el texto visible de cada fila de los tbody indicados (se
+// admiten varios separados por comas) y vuelve a filtrar cuando la tabla se
+// repinta, porque casi todas las páginas regeneran el tbody entero. Oculta con
+// una clase propia para no pisar los filtros de cada página, que usan
+// style.display o sus propias clases.
+function _filtrarTablaBusqueda(caja) {
+    const consulta = (caja.querySelector("input")?.value || "").trim().toLowerCase()
+    document.querySelectorAll(caja.dataset.buscaEn).forEach((tbody) => {
+        ;[...tbody.rows].forEach((fila) => {
+            const coincide = !consulta || fila.textContent.toLowerCase().includes(consulta)
+            fila.classList.toggle("filaOcultaBusqueda", !coincide)
+        })
+    })
+    _filtrarAniosBusqueda(caja, consulta)
+}
+
+// Barra de años que va junto a la lupa: en todas las páginas es una hermana
+// suya con id terminado en "YearList".
+function _barraAniosDeBusqueda(caja) {
+    return caja.parentElement?.querySelector('[id$="YearList"]') || null
+}
+
+// La tabla solo tiene las filas del año elegido, así que buscar "2015" desde
+// 2023 no encontraba nada. Con una consulta numérica se dejan en la barra los
+// años que la contienen y, si coincide entera con uno, se salta a él; el
+// repintado de la tabla vuelve a pasar por aquí y ya lo encuentra activo.
+// Una consulta de texto no oculta años: buscar un activo no tiene que vaciar
+// la barra.
+function _filtrarAniosBusqueda(caja, consulta) {
+    const barra = _barraAniosDeBusqueda(caja)
+    if (!barra) return
+
+    const esAnio = /^\d{1,4}$/.test(consulta)
+    let exacto = null
+    ;[...barra.children].forEach((boton) => {
+        const texto = boton.textContent.trim()
+        // Lo que no es un año (botones de añadir, "Todo") se queda siempre.
+        if (!/^\d{4}$/.test(texto)) return
+        boton.classList.toggle("anioOcultoBusqueda", esAnio && !texto.includes(consulta))
+        if (esAnio && texto === consulta) exacto = boton
+    })
+
+    // En Gastos e Ingresos pulsar el año ya activo cambia de vista: solo se
+    // pulsa si no lo está.
+    if (exacto && !exacto.classList.contains("active")) {
+        exacto.click()
+        return
+    }
+    barra.querySelector(".active:not(.anioOcultoBusqueda)")?.scrollIntoView({ block: "nearest", inline: "nearest" })
+    // Ocultar años cambia lo que sobra: el evento hace que la tira recalcule
+    // su difuminado (initScrollLateral lo escucha).
+    barra.dispatchEvent(new Event("scroll"))
+}
+
+function _activarBusquedaTabla(caja) {
+    if (caja.dataset.busquedaBound) return
+    caja.dataset.busquedaBound = "true"
+
+    const boton = caja.querySelector(".overviewSearchBtn")
+    const input = caja.querySelector("input")
+    if (!boton || !input) return
+
+    boton.addEventListener("click", () => {
+        const abrir = input.hidden
+        input.hidden = !abrir
+        caja.classList.toggle("open", abrir)
+        if (abrir) {
+            input.focus()
+            return
+        }
+        input.value = ""
+        _filtrarTablaBusqueda(caja)
+    })
+    input.addEventListener("input", () => _filtrarTablaBusqueda(caja))
+    input.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") boton.click()
+    })
+
+    // Solo hace falta volver a filtrar si hay algo escrito; con la consulta
+    // vacía las filas nuevas ya salen visibles.
+    const alRepintar = new MutationObserver(() => {
+        if (input.value.trim()) _filtrarTablaBusqueda(caja)
+    })
+    document.querySelectorAll(caja.dataset.buscaEn).forEach((tbody) => alRepintar.observe(tbody, { childList: true }))
+    // La barra de años también se rehace entera y perdería los ocultos.
+    const barra = _barraAniosDeBusqueda(caja)
+    if (barra) alRepintar.observe(barra, { childList: true })
+}
+
+// Tiras con scroll lateral que no montan su propio arrastre: la navegación y,
+// en pantallas estrechas, las pestañas de mes y los selectores de Métricas.
+// Los contenedores no cambian durante la visita (solo su contenido), así que
+// basta con engancharlos una vez al aparecer.
+const _SELECTOR_TIRAS_ARRASTRABLES = ".tabs, .gastosMonthTabs, .ingresosMonthTabs, .ahorroMonthTabs, .dividendosMonthTabs, .mToggleGroup"
+
+function _activarArrastreTiras(raiz) {
+    if (raiz.matches?.(_SELECTOR_TIRAS_ARRASTRABLES)) activarArrastreHorizontal(raiz)
+    raiz.querySelectorAll?.(_SELECTOR_TIRAS_ARRASTRABLES).forEach((tira) => activarArrastreHorizontal(tira))
+}
+
 // Las fechas se teclean a mano en formato dd-mm-aaaa en todos los popups. Para
 // no escribir la de hoy una y otra vez, cada campo de fecha recibe un botón
 // "Hoy" que la rellena. Se detectan por el placeholder, común a todos ellos.
@@ -1236,12 +1560,16 @@ new MutationObserver((mutations) => {
             node.querySelectorAll?.("select:not([data-no-custom])").forEach(_buildCustomSelect)
             if (node.tagName === "INPUT") _buildDateTodayButton(node)
             node.querySelectorAll?.("input[placeholder]").forEach(_buildDateTodayButton)
+            if (node.matches?.(".tablaBusqueda[data-busca-en]")) _activarBusquedaTabla(node)
+            node.querySelectorAll?.(".tablaBusqueda[data-busca-en]").forEach(_activarBusquedaTabla)
+            _activarArrastreTiras(node)
         }
     }
 }).observe(document.body, { childList: true, subtree: true })
 
 document.querySelectorAll("select:not([data-no-custom])").forEach(_buildCustomSelect)
 document.querySelectorAll("input[placeholder]").forEach(_buildDateTodayButton)
+_activarArrastreTiras(document)
 
 // ── Distribución en donut ──────────────────────────────────────────────────
 // Usada por los meses de Gastos e Ingresos: un anillo con el reparto de un total
@@ -1329,4 +1657,21 @@ function buildDistribucionHtml(titulo, partes, textoVacio = "Sin movimientos est
             </svg>
             <ul class="movLeyenda">${leyenda}</ul>
         </div>`
+}
+
+// Iconos de la interfaz: archivos en img/icons/ pintados por css/components/iconos.css
+// (una clase por imagen, "iconoAjustes", "iconoOjoTachado"…). Se usan en vez de
+// emojis porque un emoji se ve distinto en cada sistema y no sigue el color del
+// tema. `nombre` es la parte tras "icono": crearIcono("Ojo") → .iconoOjo.
+// Decorativos: el texto accesible va en el title/aria-label del botón que los lleva.
+function iconoHtml(nombre, clasesExtra = "") {
+    const extra = clasesExtra ? ` ${clasesExtra}` : ""
+    return `<span class="icono icono${nombre}${extra}" aria-hidden="true"></span>`
+}
+
+function crearIcono(nombre) {
+    const icono = document.createElement("span")
+    icono.className = `icono icono${nombre}`
+    icono.setAttribute("aria-hidden", "true")
+    return icono
 }

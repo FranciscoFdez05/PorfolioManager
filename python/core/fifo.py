@@ -48,6 +48,11 @@ TRANSMISION = "transmision"
 # que hay), y la página tiene que poder cargar y enseñar cuál es la fila mala.
 INCIDENCIA_STOCK = "stock_insuficiente"
 INCIDENCIA_SIN_LOTES = "sin_adquisiciones"
+# Defectos de los datos de una operación que contaminan el resultado de toda
+# venta que se apoye en ella: un importe ilegible en una compra y un tipo de
+# cambio que falta en una operación en divisa.
+INCIDENCIA_COMPRA_ILEGIBLE = "compra_importe_ilegible"
+INCIDENCIA_SIN_TIPO = "tipo_cambio_pendiente"
 
 
 class FifoError(ValueError):
@@ -132,6 +137,7 @@ class Operacion:
     orden: int = 0
     origen: str = ""                      # "ficha" | "ventas": de dónde salió la fila
     fiscal: bool = True                   # si genera resultado declarable
+    defecto: str = ""                     # incidencia de sus datos; vacío si están bien
 
     def claveOrden(self):
         # Una adquisición del mismo día se coloca antes que la transmisión: no
@@ -158,6 +164,8 @@ class Lote:
     # Cantidad de este lote ya usada como "recompra" para bloquear una pérdida,
     # para que una sola recompra no bloquee dos minusvalías distintas.
     bloqueoUsado: Decimal = Decimal("0")
+    # Defecto en los datos de la compra (ver `Operacion.defecto`).
+    defecto: str = ""
 
     @property
     def costeUnitario(self) -> Decimal:
@@ -266,6 +274,7 @@ def aplicarFifo(operaciones, perdidasDiferidas=None):
                 restante=op.cantidad,
                 origen=op.origen,
                 perdidaDiferida=diferidas.get(op.ref, Decimal("0")),
+                defecto=op.defecto,
             ))
             continue
 
@@ -302,6 +311,10 @@ def _transmitir(lotes, op):
     costeTotal = Decimal("0")
     liberadaTotal = Decimal("0")
     consumos = []
+    # Una venta con datos defectuosos, o apoyada en una compra defectuosa, no
+    # tiene un resultado fiable: se consume igual (para no descuadrar las
+    # siguientes) pero sale con incidencia y no entra en la liquidación.
+    defecto = op.defecto
 
     for lote in lotes:
         if pendiente <= 0:
@@ -334,6 +347,7 @@ def _transmitir(lotes, op):
         costeTotal += coste
         lote.restante -= tomado
         pendiente -= tomado
+        defecto = defecto or lote.defecto
 
     return Resultado(
         ref=op.ref,
@@ -347,6 +361,7 @@ def _transmitir(lotes, op):
         disponibleAntes=disponible,
         fiscal=op.fiscal,
         origen=op.origen,
+        incidencia=defecto,
         perdidaDiferidaLiberada=liberadaTotal,
     )
 

@@ -178,7 +178,7 @@ PORT=$(sed -n 's/^PORT=//p' .env | head -n 1)
 if [ -z "$PORT" ]; then
     PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
 fi
-[ -n "$PORT" ] || PORT=5000
+[ -n "$PORT" ] || PORT=5050
 export PORT
 export PORTFOLIO_VERSION="$VERSION_NUEVA"
 

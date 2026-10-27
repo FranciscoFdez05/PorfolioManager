@@ -17,7 +17,10 @@ function _initAjustesTelegram() {
 
     function setTelegramStatus(configurado) {
         if (!telegramStatus) return
-        telegramStatus.textContent = configurado ? "✓ Configurado" : "✗ No configurado"
+        telegramStatus.replaceChildren(
+            crearIcono(configurado ? "Ok" : "Error"),
+            configurado ? " Configurado" : " No configurado"
+        )
         telegramStatus.className = "ajustesKeyStatus " + (configurado ? "ok" : "missing")
     }
 
@@ -114,6 +117,104 @@ function _initAjustesTelegram() {
 
     cargarTelegram()
 
+    // Con la verificación en dos pasos activa, el bot es el segundo factor y
+    // cambiarlo pide la contraseña más un código enviado al chat actual o la
+    // frase de recuperación. El bloque se crea aquí en vez de en index.html y
+    // solo aparece cuando el servidor contesta que hace falta.
+    const verificacion = crearBloqueVerificacion()
+
+    function crearCampo(id, etiquetaTexto, control, extra) {
+        const campo = document.createElement("div")
+        campo.className = "ajustesField"
+        const etiqueta = document.createElement("label")
+        etiqueta.className = "ajustesLabel"
+        etiqueta.htmlFor = id
+        etiqueta.textContent = etiquetaTexto
+        control.id = id
+        control.classList.add("ajustesInput")
+        if (extra) {
+            const fila = document.createElement("div")
+            fila.className = "ajustesInputRow"
+            fila.append(control, extra)
+            campo.append(etiqueta, fila)
+        } else {
+            campo.append(etiqueta, control)
+        }
+        return campo
+    }
+
+    function crearBloqueVerificacion() {
+        const acciones = guardarTelegramBtn?.closest(".ajustesActions")
+        if (!acciones) return null
+
+        const password = document.createElement("input")
+        password.type = "password"
+        password.autocomplete = "current-password"
+        password.placeholder = "Contraseña actual…"
+
+        const codigo = document.createElement("input")
+        codigo.type = "text"
+        codigo.inputMode = "numeric"
+        codigo.maxLength = 8
+        codigo.autocomplete = "one-time-code"
+        codigo.placeholder = "123456"
+
+        const enviarCodigoBtn = document.createElement("button")
+        enviarCodigoBtn.type = "button"
+        enviarCodigoBtn.className = "ajustesSecondaryBtn"
+        enviarCodigoBtn.textContent = "Enviar código"
+
+        const frase = document.createElement("textarea")
+        frase.classList.add("ajustes2faTextarea")
+        frase.autocomplete = "off"
+        frase.setAttribute("autocapitalize", "none")
+        frase.spellcheck = false
+
+        const bloque = document.createElement("div")
+        bloque.className = "ajustes2faBloque"
+        bloque.hidden = true
+        bloque.append(
+            crearCampo("ajustesTelegramPwd2fa", "Contraseña actual", password),
+            crearCampo("ajustesTelegramCodigo2fa", "Código enviado al chat actual", codigo, enviarCodigoBtn),
+            crearCampo("ajustesTelegramFrase2fa", "O, si el bot actual ya no funciona, la frase de recuperación", frase)
+        )
+        acciones.before(bloque)
+
+        enviarCodigoBtn.addEventListener("click", async () => {
+            enviarCodigoBtn.disabled = true
+            try {
+                const res = await fetch("/api/settings/telegram/codigo", { method: "POST" })
+                const data = await res.json()
+                showMsg(
+                    telegramMsg,
+                    data.ok ? "Código enviado al chat actual" : data.error || "No se pudo enviar",
+                    data.ok ? "ok" : "error"
+                )
+            } catch {
+                showMsg(telegramMsg, "Error de red", "error")
+            } finally {
+                enviarCodigoBtn.disabled = false
+            }
+        })
+
+        return {
+            bloque,
+            datos() {
+                if (bloque.hidden) return {}
+                return { currentPassword: password.value, codigo: codigo.value.trim(), frase: frase.value }
+            },
+            mostrar() {
+                bloque.hidden = false
+            },
+            ocultar() {
+                password.value = ""
+                codigo.value = ""
+                frase.value = ""
+                bloque.hidden = true
+            }
+        }
+    }
+
     // Guarda lo que haya en los campos. La usan tanto el botón "Guardar" como
     // "Enviar prueba": probar sin haber guardado antes es justo lo que se
     // esperaría de un botón que dice "enviar", así que prueba guarda primero
@@ -129,10 +230,15 @@ function _initAjustesTelegram() {
             const res = await fetch("/api/settings/telegram", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token, chatId })
+                body: JSON.stringify({ token, chatId, ...(verificacion?.datos() || {}) })
             })
             const data = await res.json()
-            if (data.ok) setTelegramStatus(true)
+            if (data.ok) {
+                setTelegramStatus(true)
+                verificacion?.ocultar()
+            } else if (data.requiereVerificacion) {
+                verificacion?.mostrar()
+            }
             return data
         } catch {
             return { ok: false, error: "Error de red" }

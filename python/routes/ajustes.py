@@ -5,21 +5,38 @@ import io
 import json
 import logging
 import re
+import sqlite3
+import tempfile
 import zipfile
+from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 
-from core import clave_copias, exportables, paths, proveedores_pausados, sesion, settings, telegram_notifier, zip_seguro
+from admin.backup_manager import problemasDeIntegridad
+from core import (
+    clave_copias,
+    dinero,
+    dos_factores,
+    exportables,
+    paths,
+    proveedores_pausados,
+    sesion,
+    settings,
+    telegram_notifier,
+    zip_seguro,
+)
 from core.copia_sqlite import copiar as copiarSqlite
 from core.db import getActiveDbPath, getDb
 from core.errors import registrarFalloEscritura
 from core.escritura import escribirJsonAtomico, temporalPara
 from core.paths import AJUSTES_JSON as _AJUSTES_JSON, API_DIR as _API_DIR, JSON_DIR
 from core.secret_store import readSecretLines, writeSecretLines
+from core.validation import jsonBody
 from providers import estado as estadoProveedores
 from providers.api_stats import getTodayStats
+from routes import auth
 from stores import app_data
 from stores.cuenta_ahorro_store import normalizarConfig, vinculosDeConfig
 from stores.cuentas_store import importarVinculos
@@ -150,6 +167,50 @@ def _sanear(guardado, defaults: dict) -> dict:
             valor = [v for v in valor if isinstance(v, str)]
         limpio[clave] = valor
     return limpio
+
+
+def _coercionarImportados(guardado: dict, defaults: dict, actuales: dict | None = None) -> tuple[dict, list]:
+    """Ajustes de un fichero importado, con los números escritos como texto convertidos.
+
+    `_sanear` descarta al leer lo que no tiene la forma esperada y deja el valor
+    de fábrica: un `"20"` en un ajuste numérico acababa en 0 sin que nadie se
+    enterase. Aquí un texto que es un número válido pasa a número, y lo que no
+    se puede convertir se devuelve en la lista de ignorados para avisar.
+
+    Args:
+        guardado: Ajustes tal cual vienen en el fichero.
+        defaults: Valores de fábrica, que fijan el tipo esperado de cada clave.
+        actuales: Ajustes que ya hay guardados. Un valor que no vale conserva el
+            de aquí (y no el de fábrica, que desactivaba cosas como el refresco
+            automático); sin valor anterior, la clave se omite.
+
+    Returns:
+        `(ajustes, ignorados)`: los ajustes a guardar y los nombres de las claves
+        cuyo valor no vale.
+    """
+    resultado = dict(guardado)
+    ignorados = []
+    for clave, valor in guardado.items():
+        if clave not in defaults or _tipoCompatible(valor, defaults[clave]):
+            continue
+        defecto = defaults[clave]
+        numerico = isinstance(defecto, (int, float)) and not isinstance(defecto, bool)
+        numero = dinero.aDecimalONulo(valor) if numerico and isinstance(valor, str) else None
+        if numero is None:
+            ignorados.append(clave)
+        elif isinstance(defecto, int):
+            if numero != numero.to_integral_value():
+                ignorados.append(clave)
+            else:
+                resultado[clave] = int(numero)
+        else:
+            resultado[clave] = float(numero)
+    for clave in ignorados:
+        if actuales and clave in actuales:
+            resultado[clave] = actuales[clave]
+        else:
+            resultado.pop(clave, None)
+    return resultado, ignorados
 
 
 def _readAjustes():
@@ -407,7 +468,7 @@ def verApiKey():
 
 @ajustesBp.route("/api/settings/apikey", methods=["POST"])
 def appendApiKey():
-    data = request.get_json(silent=True) or {}
+    data = jsonBody()
     if data.get("finnhubKey"):
         _appendKeyFile(_API_DIR / "finnhub.key", str(data["finnhubKey"]).strip())
     if data.get("eodhdKeys"):
@@ -434,7 +495,7 @@ def deleteApiKey():
     La clave va en el cuerpo y no en la URL para no dejarla escrita en los logs
     del proxy ni en el historial del navegador, que es donde acaban las rutas.
     """
-    datos = request.get_json(silent=True) or {}
+    datos = jsonBody()
     fichero = _ficheroDeClaves(datos.get("proveedor"))
 
     if fichero is None:
@@ -485,7 +546,7 @@ def getApiEstado():
 @ajustesBp.route("/api/settings/apis-pausadas", methods=["POST"])
 def saveApiPausada():
     """Pausa o reanuda un proveedor de cotizaciones: {proveedor, pausada}."""
-    data = request.get_json(silent=True) or {}
+    data = jsonBody()
     proveedor = str(data.get("proveedor") or "").strip().lower()
     if proveedor not in proveedores_pausados.PAUSABLES:
         return jsonify({"ok": False, "error": "Ese proveedor no se puede pausar"}), 400
@@ -533,7 +594,7 @@ def getTelegramSettings():
 @ajustesBp.route("/api/settings/telegram/avisos", methods=["POST"])
 def saveTelegramAvisos():
     """Qué tipos de aviso se mandan y a qué hora sale el resumen diario."""
-    data = request.get_json(silent=True) or {}
+    data = jsonBody()
     gcfg = _readAjustes()
 
     if "avisos" in data:
@@ -561,7 +622,7 @@ def saveTelegramAvisos():
 
 @ajustesBp.route("/api/settings/telegram", methods=["POST"])
 def saveTelegramSettings():
-    data = request.get_json(silent=True) or {}
+    data = jsonBody()
     token = str(data.get("token") or "").strip()
     chatId = str(data.get("chatId") or "").strip()
     if not token:
@@ -570,12 +631,35 @@ def saveTelegramSettings():
         token, _chatGuardado = telegram_notifier.leerConfig()
     if not token or not chatId:
         return jsonify({"ok": False, "error": "Rellena el token del bot y el ID de chat"}), 400
+    anteriores = telegram_notifier.leerConfig()
+    if (token, chatId) == anteriores:
+        # Nada que cambiar: «Enviar prueba» guarda antes de probar y no debe
+        # pedir la verificación en dos pasos para dejarlo todo igual.
+        return jsonify({"ok": True})
+    rechazo = auth.autorizarCambioTelegram(data if isinstance(data, dict) else {})
+    if rechazo:
+        return rechazo
+    if dos_factores.activa() and all(anteriores):
+        # Al chat que deja de recibir los códigos, antes de perderlo: si el
+        # cambio no lo ha hecho el usuario, es la última ocasión de enterarse.
+        telegram_notifier.responder(
+            f"Se ha cambiado el bot o el chat de Telegram de PortfolioManager (desde {request.remote_addr}). "
+            "Los códigos de la verificación en dos pasos dejarán de llegar aquí. Si no has sido tú, "
+            "entra con la frase de recuperación y cambia la contraseña."
+        )
     telegram_notifier.escribirConfig(token, chatId)
     return jsonify({"ok": True})
 
 
 @ajustesBp.route("/api/settings/telegram", methods=["DELETE"])
 def deleteTelegramSettings():
+    # Sin bot no llega el código del login: borrarlo con la 2FA activa obligaría
+    # a gastar la frase de recuperación en el siguiente inicio de sesión.
+    if dos_factores.activa():
+        return jsonify({
+            "ok": False,
+            "error": "Desactiva antes la verificación en dos pasos (Ajustes > Cuenta): el código del login llega por este bot.",
+        }), 409
     telegram_notifier.borrarConfig()
     return jsonify({"ok": True})
 
@@ -760,7 +844,7 @@ def _aplicar(cfg: dict, data: dict, normalizadores: dict) -> None:
 
 @ajustesBp.route("/api/settings", methods=["POST"])
 def saveSettings():
-    data = request.get_json(silent=True) or {}
+    data = jsonBody()
     pid  = _activePortfolioId()
 
     if data.get("finnhubKey"):
@@ -818,8 +902,12 @@ def _realTables(conn) -> list:
     return seguras
 
 
-def _buildExport(conn, pid: str) -> dict:
-    """Volcado completo de la BD activa.
+class ExportacionRechazada(Exception):
+    """La base de datos no está en condiciones de exportarse (p. ej. dañada)."""
+
+
+def _escribirExport(destino, conn, pid: str) -> None:
+    """Escribe en `destino` (binario) el volcado completo de `conn`, fila a fila.
 
     Antes se exportaba una lista fija de 11 nombres de los que 4 ni existían
     ('gastos', 'ingresos', 'stablecoins', 'seguimiento'), y quedaban fuera
@@ -827,32 +915,135 @@ def _buildExport(conn, pid: str) -> dict:
     gastos_rows, mensualidades, ingresos_rows, intereses_v2, staking_rows,
     earn_rows, trading, renta_fija, private_market… El "export completo" perdía
     casi todos los datos. Ahora se enumera el esquema real.
+
+    El JSON se genera por partes en vez de con un único `json.dumps`: con
+    cientos de miles de filas de `asset_snapshots`, el dict con todas las filas
+    más el texto con sangría pasaban de 600 MB por petición, y con el
+    `mem_limit` del contenedor el kernel mataba al worker a mitad de export. La
+    estructura es la misma de siempre (`version` 3), así que la importación no
+    cambia.
+
+    Args:
+        destino: Fichero binario abierto para escritura.
+        conn: Conexión a la base que se vuelca.
+        pid: Portfolio cuyas preferencias se incluyen.
     """
-    export = {
+    cabecera = {
         "exported_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "version": 3,
         "ajustes": _readAjustes(),
         "portfolio_prefs": _readPrefs(pid),
-        "tables": {},
     }
-    for table in _realTables(conn):
-        rows = conn.execute(f'SELECT * FROM "{table}"').fetchall()
-        export["tables"][table] = [dict(r) for r in rows]
-    return export
+    texto = io.TextIOWrapper(destino, encoding="utf-8", newline="\n", write_through=False)
+    try:
+        texto.write("{\n")
+        for clave, valor in cabecera.items():
+            texto.write(f"  {json.dumps(clave)}: {json.dumps(valor, ensure_ascii=False)},\n")
+        texto.write('  "tables": {')
+        for indice, table in enumerate(_realTables(conn)):
+            texto.write(f'{"," if indice else ""}\n    {json.dumps(table)}: [')
+            cursor = conn.execute(f'SELECT * FROM "{table}"')
+            columnas = [descripcion[0] for descripcion in cursor.description]
+            vacia = True
+            for fila in cursor:
+                texto.write(f'{"" if vacia else ","}\n      ')
+                texto.write(json.dumps(dict(zip(columnas, fila, strict=True)), ensure_ascii=False))
+                vacia = False
+            texto.write("]" if vacia else "\n    ]")
+        texto.write("\n  }\n}\n")
+        texto.flush()
+    finally:
+        # detach() y no close(): quien abrió `destino` decide cuándo cerrarlo
+        # (una entrada de ZIP, un temporal que aún hay que enviar).
+        texto.detach()
+
+
+@contextmanager
+def _copiaComprobada(dbPath):
+    """Copia consistente de `dbPath` en data/tmp, ya verificada.
+
+    Se exporta desde la copia y no desde la base viva: así el JSON y el .db del
+    ZIP salen del mismo instante, y la integridad comprobada es la de lo que se
+    entrega. Una base dañada no se exporta: el usuario se llevaría un fichero
+    que parece una copia y no sirve para restaurar.
+
+    El temporal va a data/tmp. Antes se llamaba `_tmp_export_<portfolio>.db` y
+    se creaba **dentro de data/portfolios**, donde todo el proyecto hace
+    `glob("*.db")` para saber qué portfolios existen: exportar mientras corría
+    una copia de seguridad metía la exportación a medias en el backup como si
+    fuera un portfolio más.
+
+    Raises:
+        ExportacionRechazada: La copia no pasa `integrity_check` o
+            `foreign_key_check`; el mensaje dice qué falla.
+    """
+    with temporalPara(dbPath, directorio=paths.TMP_DIR) as tmp:
+        copiarSqlite(dbPath, tmp, timeout=settings.dbTimeout())
+        problemas = problemasDeIntegridad(tmp)
+        if problemas:
+            log.error("[export] %s no pasa la comprobación de integridad: %s", dbPath.name, problemas)
+            raise ExportacionRechazada(
+                f"La base de datos del portfolio está dañada y no se exporta: {'; '.join(problemas)}"
+            )
+        yield tmp
+
+
+def _abrirCopia(ruta):
+    """Conexión de solo lectura a una copia temporal del export."""
+    return closing(sqlite3.connect(f"{Path(ruta).resolve().as_uri()}?mode=ro", uri=True))
+
+
+def _temporalDeSalida():
+    """Fichero anónimo en data/tmp para la respuesta.
+
+    Anónimo para que no quede nada en disco si el worker muere a mitad: el
+    sistema lo borra al cerrarse, y Werkzeug lo cierra al terminar de enviarlo.
+    """
+    paths.TMP_DIR.mkdir(parents=True, exist_ok=True)
+    return tempfile.TemporaryFile(dir=paths.TMP_DIR)
+
+
+def _verificarZip(fichero) -> None:
+    """Comprueba el CRC de todas las entradas del ZIP antes de entregarlo.
+
+    Raises:
+        ExportacionRechazada: Alguna entrada no se lee igual que se escribió.
+    """
+    fichero.seek(0)
+    with zipfile.ZipFile(fichero) as zf:
+        mala = zf.testzip()
+    if mala:
+        raise ExportacionRechazada(f"El ZIP generado está corrupto ({mala}); vuelve a intentarlo")
+    fichero.seek(0)
+
+
+def _respuestaFalloExport(error: Exception):
+    """Respuesta JSON con la causa real, para que la pantalla pueda enseñarla."""
+    if isinstance(error, ExportacionRechazada):
+        return jsonify({"ok": False, "error": str(error)}), 409
+    mensaje = registrarFalloEscritura(log, "[export] No se pudo generar la exportación", error, paths.TMP_DIR)
+    return jsonify({"ok": False, "error": mensaje}), 500
+
+
+def _enviarTemporal(fichero, mimetype: str, nombre: str):
+    fichero.seek(0)
+    return send_file(fichero, mimetype=mimetype, as_attachment=True, download_name=nombre)
 
 
 @ajustesBp.route("/api/export/json", methods=["GET"])
 def exportJson():
     pid  = _activePortfolioId()
-    conn = getDb()
-    export = _buildExport(conn, pid)
-
-    payload = json.dumps(export, ensure_ascii=False, indent=2)
-    return Response(
-        payload,
-        mimetype="application/json",
-        headers={"Content-Disposition": "attachment; filename=portfolio-export.json"}
-    )
+    getDb().commit()
+    salida = None
+    try:
+        salida = _temporalDeSalida()
+        with _copiaComprobada(getActiveDbPath()) as copia, _abrirCopia(copia) as conn:
+            _escribirExport(salida, conn, pid)
+        return _enviarTemporal(salida, "application/json", "portfolio-export.json")
+    except (ExportacionRechazada, OSError, sqlite3.Error) as e:
+        if salida is not None:
+            salida.close()
+        return _respuestaFalloExport(e)
 
 
 @ajustesBp.route("/api/export/zip", methods=["GET", "POST"])
@@ -865,8 +1056,6 @@ def exportZip():
     incluyen si nadie las pide expresamente.
     """
     pid  = _activePortfolioId()
-    conn = getDb()
-    export = _buildExport(conn, pid)
 
     peticion = request.get_json(silent=True) if request.method == "POST" else None
     peticion = peticion if isinstance(peticion, dict) else {}
@@ -877,18 +1066,30 @@ def exportZip():
     if len(contrasena) > exportables.MAX_LARGO_CONTRASENA:
         return jsonify({"ok": False, "error": "La contraseña es demasiado larga"}), 400
 
-    jsonBytes = json.dumps(export, ensure_ascii=False, indent=2).encode("utf-8")
-
-    buf = io.BytesIO()
+    getDb().commit()
     dateStr = datetime.datetime.now().strftime("%Y-%m-%d")
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"portfolio-export-{dateStr}.json", jsonBytes)
-        dbPath = getActiveDbPath()
-        if dbPath.exists():
-            # Copia vía API de backup: zf.write() del .db en caliente puede
-            # capturar páginas a medias y dejar en el zip una BD corrupta,
-            # porque los cambios recientes viven aún en el fichero -wal.
-            zf.writestr(f"portfolio-{dateStr}.db", _consistentDbBytes(dbPath))
+    salida = None
+    try:
+        salida = _temporalDeSalida()
+        with _copiaComprobada(getActiveDbPath()) as copia:
+            _escribirZipExport(salida, copia, pid, dateStr, ui, incluirClaves, contrasena)
+        _verificarZip(salida)
+        return _enviarTemporal(salida, "application/zip", f"portfolio-export-{dateStr}.zip")
+    except (ExportacionRechazada, OSError, sqlite3.Error, zipfile.BadZipFile) as e:
+        if salida is not None:
+            salida.close()
+        return _respuestaFalloExport(e)
+
+
+def _escribirZipExport(salida, copia, pid: str, dateStr: str, ui: dict, incluirClaves: bool, contrasena: str) -> None:
+    """Escribe en `salida` el ZIP de exportación a partir de la copia ya comprobada."""
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as zf:
+        with _abrirCopia(copia) as conn, zf.open(f"portfolio-export-{dateStr}.json", "w") as entrada:
+            _escribirExport(entrada, conn, pid)
+        # La copia ya es consistente (API de backup de SQLite, con el WAL
+        # pendiente): zf.write() del .db en caliente podía capturar páginas a
+        # medias y dejar en el zip una BD corrupta.
+        zf.write(str(copia), f"portfolio-{dateStr}.db")
         if _AJUSTES_JSON.exists():
             zf.write(str(_AJUSTES_JSON), "ajustes.json")
         prefsFile = _prefsPath(pid)
@@ -916,25 +1117,58 @@ def exportZip():
                 zf.writestr(exportables.FICHERO_CLAVES, json.dumps(claves, ensure_ascii=False, indent=2))
                 log.info("[export] ZIP generado CON claves de API en claro (%d proveedores)", len(claves))
 
-    buf.seek(0)
-    return Response(
-        buf.read(),
-        mimetype="application/zip",
-        headers={"Content-Disposition": f"attachment; filename=portfolio-export-{dateStr}.zip"}
+
+def _mensajeDeIntegridad(error, tabla, numero) -> str:
+    """Texto para el usuario de un fallo de integridad, sin el mensaje de SQLite."""
+    texto = str(error)
+    columna = texto.rsplit(".", 1)[-1].strip() if "." in texto else ""
+    if texto.startswith("NOT NULL") and columna:
+        return f"Tabla «{tabla}», fila {numero}: falta el campo obligatorio «{columna}»"
+    if texto.startswith(("UNIQUE", "PRIMARY KEY")) and columna:
+        return f"Tabla «{tabla}», fila {numero}: el valor de «{columna}» está repetido"
+    return f"Tabla «{tabla}», fila {numero}: los datos no son válidos"
+
+
+def _comprobarClavesAjenas(conn, tablas) -> None:
+    """Rechaza la importación si alguna fila apunta a algo que no existe.
+
+    Las claves ajenas se comprueban al confirmar (`defer_foreign_keys`), y el fallo
+    salía como un 500 con «FOREIGN KEY constraint failed». Aquí se busca la fila
+    y el campo concretos para decirlo.
+    """
+    violaciones = [v for v in conn.execute("PRAGMA foreign_key_check").fetchall() if v[0] in tablas]
+    if not violaciones:
+        return
+    tabla, rowid, padre, fkid = violaciones[0][0], violaciones[0][1], violaciones[0][2], violaciones[0][3]
+    campo = next(
+        (f[3] for f in conn.execute(f'PRAGMA foreign_key_list("{tabla}")').fetchall() if f[0] == fkid), "?"
+    )
+    valor = conn.execute(f'SELECT "{campo}" FROM "{tabla}" WHERE rowid = ?', (rowid,)).fetchone()
+    numero = conn.execute(f'SELECT COUNT(*) FROM "{tabla}" WHERE rowid <= ?', (rowid,)).fetchone()[0]
+    if not valor or valor[0] is None or str(valor[0]).strip() == "":
+        raise ImportacionInvalida(f"Tabla «{tabla}», fila {numero}: falta el campo obligatorio «{campo}»")
+    raise ImportacionInvalida(
+        f"Tabla «{tabla}», fila {numero}: «{campo}» vale «{valor[0]}» y no existe en «{padre}»"
     )
 
 
-def _consistentDbBytes(dbPath) -> bytes:
-    """Bytes de una copia consistente del .db (incluye el WAL pendiente).
+class ImportacionInvalida(RuntimeError):
+    """El fichero a importar trae una fila que no se puede guardar. La ruta responde 400."""
 
-    El temporal va a data/tmp. Antes se llamaba `_tmp_export_<portfolio>.db` y
-    se creaba **dentro de data/portfolios**, donde todo el proyecto hace
-    `glob("*.db")` para saber qué portfolios existen: exportar mientras corría
-    una copia de seguridad metía la exportación a medias en el backup como si
-    fuera un portfolio más.
-    """
-    with temporalPara(dbPath, directorio=paths.TMP_DIR) as tmp:
-        return copiarSqlite(dbPath, tmp, timeout=settings.dbTimeout()).read_bytes()
+
+# Campos que, además de las claves de texto, no pueden venir vacíos aunque el
+# esquema los admita con valor por defecto: una fila sin ellos no se puede
+# situar en el tiempo o no sabe de qué es.
+_CAMPOS_OBLIGATORIOS = {
+    "trading": ("fecha",),
+    "activo_rows": ("fecha_operacion",),
+    "activos": ("name",),
+    "ventas": ("fecha",),
+}
+
+
+def _estaVacio(valor) -> bool:
+    return valor is None or (isinstance(valor, str) and not valor.strip())
 
 
 def _restoreTablesFromDict(conn, data: dict):
@@ -980,21 +1214,48 @@ def _restoreTablesFromDict(conn, data: dict):
             if not rows or not isinstance(rows[0], dict):
                 continue
             actualCols = {r[1] for r in conn.execute(f'PRAGMA table_info("{table}")').fetchall()}
-            validCols = [c for c in rows[0] if c in actualCols]
-            if not validCols:
-                continue
-            colStr      = ", ".join(f'"{c}"' for c in validCols)
-            placeholders = ", ".join("?" for _ in validCols)
-            conn.executemany(
-                f'INSERT OR IGNORE INTO "{table}" ({colStr}) VALUES ({placeholders})',
-                [[row.get(c) for c in validCols] for row in rows if isinstance(row, dict)],
-            )
+            # Cada fila lleva sus propias columnas: sacarlas solo de la primera
+            # perdía las que otras filas sí traían y rellenaba con NULL las que
+            # les faltaban. INSERT a secas (sin OR IGNORE): una fila que no cabe
+            # revierte la importación entera, en vez de descartarse en silencio
+            # con las tablas ya vaciadas.
+            clavesTexto = {
+                r[1] for r in conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+                if r[5] and str(r[2]).upper() == "TEXT"
+            }
+            for numero, row in enumerate(rows, start=1):
+                if not isinstance(row, dict):
+                    continue
+                # Una clave de texto NULL entra en SQLite sin error (solo las
+                # enteras la rechazan), y un campo obligatorio vacío tampoco
+                # falla: hay que mirarlos aquí.
+                nulas = [c for c in clavesTexto if c in row and row[c] is None]
+                vacios = [c for c in _CAMPOS_OBLIGATORIOS.get(table, ()) if _estaVacio(row.get(c))]
+                for campo in nulas + vacios:
+                    raise ImportacionInvalida(
+                        f"Tabla «{table}», fila {numero}: falta el campo obligatorio «{campo}»"
+                    )
+                columnas = tuple(c for c in row if c in actualCols)
+                if not columnas:
+                    continue
+                colStr      = ", ".join(f'"{c}"' for c in columnas)
+                placeholders = ", ".join("?" for _ in columnas)
+                try:
+                    conn.execute(
+                        f'INSERT INTO "{table}" ({colStr}) VALUES ({placeholders})',
+                        [row[c] for c in columnas],
+                    )
+                except sqlite3.IntegrityError as error:
+                    raise ImportacionInvalida(_mensajeDeIntegridad(error, table, numero)) from error
+        _comprobarClavesAjenas(conn, targets)
         conn.commit()
     except Exception as e:
         try:
             conn.rollback()
         except Exception:
             pass
+        if isinstance(e, ImportacionInvalida):
+            raise
         raise RuntimeError(f"Error restaurando datos: {e}") from e
 
 
@@ -1030,19 +1291,30 @@ def importJson():
             pid  = _activePortfolioId()
             conn = getDb()
 
-            if "ajustes" in data and isinstance(data["ajustes"], dict):
-                _writeAjustes(data["ajustes"])
-            if "portfolio_prefs" in data and isinstance(data["portfolio_prefs"], dict):
-                _writePrefs(pid, data["portfolio_prefs"])
-
             try:
                 _restoreTablesFromDict(conn, data)
+            except ImportacionInvalida as e:
+                return jsonify({"ok": False, "error": str(e)}), 400
             except RuntimeError as e:
                 return jsonify({"ok": False, "error": str(e)}), 500
+
+            # Después de las tablas: si la importación falla, los ajustes y las
+            # preferencias que ya había no se tocan.
+            ignorados = []
+            if "ajustes" in data and isinstance(data["ajustes"], dict):
+                ajustes, rechazados = _coercionarImportados(data["ajustes"], _GLOBAL_DEFAULTS, _readAjustes())
+                ignorados += rechazados
+                _writeAjustes(ajustes)
+            if "portfolio_prefs" in data and isinstance(data["portfolio_prefs"], dict):
+                prefs, rechazados = _coercionarImportados(data["portfolio_prefs"], _PORTFOLIO_DEFAULTS, _readPrefs(pid))
+                ignorados += rechazados
+                _writePrefs(pid, prefs)
     except BloqueoOcupado:
         return _respuestaBloqueoOcupado()
 
-    return jsonify({"ok": True, "copiaPrevia": copia.name if copia else None})
+    if ignorados:
+        log.warning("[import] Ajustes con un valor no válido, vueltos a su valor de fábrica: %s", ", ".join(ignorados))
+    return jsonify({"ok": True, "copiaPrevia": copia.name if copia else None, "ajustesIgnorados": ignorados})
 
 
 def _jsonDeZip(zf, nombre):

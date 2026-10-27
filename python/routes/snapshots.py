@@ -3,12 +3,13 @@ import json
 import logging
 import time
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from core import dinero, rentabilidad, settings
 from core.db import getDb, transaction
 from routes.ajustes import DEFAULT_SNAPSHOT_MINUTES, _readAjustes
-from stores import historico_tipos
+from stores import historico_snapshots, historico_tipos
+from stores.flujos_snapshot import tomarFlujo
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +31,25 @@ def _intervalSeconds() -> int:
 
 def _sameBucket(tsA: int, tsB: int, interval: int) -> bool:
     return tsA // interval == tsB // interval
+
+
+def tramoOcupado(nowTs=None) -> bool:
+    """Si el último snapshot ya cae en el hueco horario de `nowTs`.
+
+    Lectura previa y barata para no valorar la cartera (decenas de ms) cuando el
+    punto se va a rechazar igualmente. No es la comprobación definitiva: esa
+    sigue dentro del BEGIN IMMEDIATE de `guardarSnapshot`, que es la única que
+    cierra la carrera entre workers.
+
+    Args:
+        nowTs: Instante a comprobar; por defecto, ahora.
+
+    Returns:
+        True si el hueco está ocupado.
+    """
+    nowTs = int(nowTs if nowTs is not None else time.time())
+    last = getDb().execute("SELECT ts FROM portfolio_snapshots ORDER BY ts DESC LIMIT 1").fetchone()
+    return bool(last) and _sameBucket(nowTs, last["ts"], _intervalSeconds())
 
 
 def reservarBucket(nowTs=None) -> bool:
@@ -113,9 +133,11 @@ def guardarSnapshot(totalValue, totalInvested, assets=(), nowTs=None) -> bool:
             conn.rollback()
             return False
 
+        # Mismo instante y misma transacción que el valor: el flujo es lo que ha
+        # entrado o salido entre este punto y el anterior (stores/flujos_snapshot.py).
         conn.execute(
-            "INSERT INTO portfolio_snapshots (ts, total_value, total_invested) VALUES (?, ?, ?)",
-            (nowTs, _aReal(totalValue) or 0.0, _aReal(totalInvested) or 0.0)
+            "INSERT INTO portfolio_snapshots (ts, total_value, total_invested, flujo) VALUES (?, ?, ?, ?)",
+            (nowTs, _aReal(totalValue) or 0.0, _aReal(totalInvested) or 0.0, tomarFlujo(conn))
         )
 
         # Guardar valor en EUR por activo para histórico del heatmap
@@ -138,6 +160,25 @@ def guardarSnapshot(totalValue, totalInvested, assets=(), nowTs=None) -> bool:
         raise
 
 
+# Diferencia relativa máxima entre el total que calcula la pestaña (precios
+# recién refrescados) y el que calcula el servidor (últimos precios guardados).
+_TOLERANCIA_SNAPSHOT = 0.02
+
+
+def _omitido(motivo: str):
+    """Respuesta de un snapshot que no se guarda, con el motivo.
+
+    Motivos: sin_totales, pestana_sin_precios, sin_posiciones,
+    valoracion_incompleta, totales_distintos, importacion_en_curso y
+    tramo_ocupado.
+    """
+    return jsonify({"ok": True, "skipped": True, "motivo": motivo})
+
+
+def _coinciden(cliente: float, servidor: float) -> bool:
+    return abs(cliente - servidor) <= _TOLERANCIA_SNAPSHOT * max(abs(servidor), 1.0)
+
+
 @snapshotsBp.route("/api/portfolio/snapshot", methods=["POST"])
 def saveSnapshot():
     body           = request.get_json(silent=True) or {}
@@ -145,25 +186,63 @@ def saveSnapshot():
     frontendInv   = body.get("total_invested")
 
     if frontendValue is None or frontendInv is None:
-        return jsonify({"ok": True, "skipped": True})
+        return _omitido("sin_totales")
 
     totalValue    = _aReal(frontendValue)
     totalInvested = _aReal(frontendInv)
     if totalValue is None or totalInvested is None:
         return jsonify({"ok": False, "error": "Valores numéricos inválidos"}), 400
+    if totalValue < 0 or totalInvested < 0:
+        return jsonify({"ok": False, "error": "Los valores no pueden ser negativos"}), 400
+    if totalValue == 0 and totalInvested > 0:
+        # Una página que aún no ha cargado los precios manda valor cero con lo
+        # invertido ya calculado; guardarlo ocuparía el hueco con un punto falso
+        # y rechazaría el bueno ("gana el primero").
+        return _omitido("pestana_sin_precios")
 
-    assets = body.get("assets")
-    if not isinstance(assets, list):
-        assets = []
+    # Los totales de la pestaña solo se validan arriba: una pestaña a medio cargar
+    # (o con otra cartera) mandaba un punto falso que ocupaba el hueco del bueno.
+    # El punto que se guarda lo calcula el servidor con sus datos, igual que el
+    # hilo de fondo; el hueco sigue siendo del primero que llegue.
+    from core.bloqueo import BloqueoOcupado
+    from routes.backup import bloqueoSiLibre
+    from stores.valoracion import valorarPortfolio
 
-    # El frontend envía netoEur recién calculado con precios de mercado frescos,
-    # así que su punto vale igual que el del hilo del servidor: gana el primero
-    # que llegue al bucket.
-    guardado = guardarSnapshot(totalValue, totalInvested, assets)
+    try:
+        # Una importación o un restore está sustituyendo la cartera.
+        with bloqueoSiLibre():
+            if tramoOcupado():
+                return _omitido("tramo_ocupado")
+            valoracion = valorarPortfolio(refrescarPrecios=False)
+            if valoracion["activos"] == 0:
+                return _omitido("sin_posiciones")
+            if not valoracion["completa"]:
+                return _omitido("valoracion_incompleta")
+            if not _coinciden(totalValue, valoracion["total_value"]):
+                # Dos cálculos independientes que no coinciden: o la pestaña está
+                # a medio cargar, o la valoración del servidor no cuenta algo. En
+                # los dos casos un punto guardado ahora sería falso.
+                log.warning(
+                    "[snapshots] El navegador calcula %.2f y el servidor %.2f; no se guarda el punto",
+                    totalValue, valoracion["total_value"],
+                )
+                return _omitido("totales_distintos")
+            log.info(
+                "[snapshots] Manual: el navegador calcula %.2f y el servidor %.2f; se guarda el del servidor",
+                totalValue, valoracion["total_value"],
+            )
+            guardado = guardarSnapshot(
+                valoracion["total_value"], valoracion["total_invested"], valoracion["assets"]
+            )
+    except BloqueoOcupado:
+        return _omitido("importacion_en_curso")
     if not guardado:
-        return jsonify({"ok": True, "skipped": True})
+        return _omitido("tramo_ocupado")
 
-    return jsonify({"ok": True, "skipped": False, "total_value": totalValue, "total_invested": totalInvested})
+    return jsonify({
+        "ok": True, "skipped": False,
+        "total_value": valoracion["total_value"], "total_invested": valoracion["total_invested"],
+    })
 
 
 @snapshotsBp.route("/api/portfolio/history", methods=["GET"])
@@ -182,22 +261,27 @@ def getHistory():
     if rangeParam == "YTD":
         jan1 = int(datetime.datetime(datetime.datetime.now().year, 1, 1).timestamp())
         rows = conn.execute(
-            "SELECT ts, total_value, total_invested FROM portfolio_snapshots "
+            "SELECT ts, total_value, total_invested, flujo FROM portfolio_snapshots "
             "WHERE ts >= ? ORDER BY ts ASC", (jan1,)
         ).fetchall()
     elif seconds is None:
-        rows = conn.execute(
-            "SELECT ts, total_value, total_invested FROM portfolio_snapshots ORDER BY ts ASC"
-        ).fetchall()
+        # El historial completo es lo caro (18 000 filas): su cuerpo JSON se
+        # reutiliza mientras la tabla no cambie (stores/historico_snapshots.py).
+        def construir(snaps):
+            return jsonify({"ok": True, "range": rangeParam, "data": snaps}).get_data()
+
+        return current_app.response_class(
+            historico_snapshots.cuerpoHistorialCompleto(construir, conn), mimetype="application/json"
+        )
     else:
         rows = conn.execute(
-            "SELECT ts, total_value, total_invested FROM portfolio_snapshots "
+            "SELECT ts, total_value, total_invested, flujo FROM portfolio_snapshots "
             "WHERE ts >= ? ORDER BY ts ASC", (nowTs - seconds,)
         ).fetchall()
 
     return jsonify({
         "ok": True, "range": rangeParam,
-        "data": [{"ts": r["ts"], "v": r["total_value"], "i": r["total_invested"]} for r in rows]
+        "data": [{"ts": r["ts"], "v": r["total_value"], "i": r["total_invested"], "f": r["flujo"]} for r in rows]
     })
 
 
@@ -218,13 +302,19 @@ def getHistoryByType():
     # petición eran 530 ms con el rango completo.
     if rangeParam == "YTD":
         jan1 = int(datetime.datetime(datetime.datetime.now().year, 1, 1).timestamp())
-        data = historico_tipos.seriePorTipo(jan1)
+        desdeTs = jan1
     elif seconds is None:
-        data = historico_tipos.seriePorTipo()
+        desdeTs = None
     else:
-        data = historico_tipos.seriePorTipo(nowTs - seconds)
+        desdeTs = nowTs - seconds
 
-    return jsonify({"ok": True, "range": rangeParam, "data": data})
+    # El cuerpo JSON también se guarda, con la misma vigencia que el agregado.
+    def construir(data):
+        return jsonify({"ok": True, "range": rangeParam, "data": data}).get_data()
+
+    return current_app.response_class(
+        historico_tipos.cuerpoPorTipo(rangeParam, desdeTs, construir), mimetype="application/json"
+    )
 
 
 @snapshotsBp.route("/api/portfolio/rentabilidad", methods=["GET"])
@@ -236,19 +326,21 @@ def getRentabilidad():
     sin esto las KPIs de rentabilidad no cuadrarían con las de arriba.
     """
     conn = getDb()
-    rows = conn.execute(
-        "SELECT ts, total_value, total_invested FROM portfolio_snapshots ORDER BY ts ASC"
-    ).fetchall()
-    snaps = [{"ts": r["ts"], "v": r["total_value"], "i": r["total_invested"]} for r in rows]
-
     valorVivo     = _aReal(request.args.get("value"))
     invertidoVivo = _aReal(request.args.get("invested"))
+    if valorVivo is None or invertidoVivo is None:
+        # Sin punto vivo el resultado solo depende de la tabla: se reutiliza
+        # mientras no cambie (stores/historico_snapshots.py).
+        return jsonify({"ok": True, **historico_snapshots.resumenSinVivo(conn)})
+
+    snaps = historico_snapshots.snapshots(conn)
     if valorVivo is not None and invertidoVivo is not None:
         ahora = int(time.time())
         # Mismo criterio que el gráfico de evolución: si el último snapshot es
         # de hace nada, se sustituye en vez de añadir un punto pegado a él.
         if snaps and ahora - snaps[-1]["ts"] < 120:
-            snaps[-1] = {"ts": ahora, "v": valorVivo, "i": invertidoVivo}
+            # El flujo del punto sustituido sigue valiendo: es lo que entró desde el anterior.
+            snaps[-1] = {"ts": ahora, "v": valorVivo, "i": invertidoVivo, "f": snaps[-1].get("f")}
         else:
             snaps.append({"ts": ahora, "v": valorVivo, "i": invertidoVivo})
 

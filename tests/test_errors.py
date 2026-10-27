@@ -106,5 +106,5 @@ def testRequestIdEntranteSeAcota(client):
 
 def testApiErrorAdmiteStatusPersonalizado():
     error = ApiError("demasiadas peticiones", 429)
-    assert error.status_code == 429
+    assert error.statusCode == 429
     assert error.to_dict() == {"ok": False, "error": "demasiadas peticiones"}

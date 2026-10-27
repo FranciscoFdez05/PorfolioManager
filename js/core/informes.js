@@ -298,8 +298,58 @@ function infRepartirHojas(altoTotal, altoHoja, cortes) {
     return hojas
 }
 
-// Pinta el informe fuera de la pantalla, lo pasa a imagen y descarga el PDF.
-async function infDescargarPdf(html, nombreArchivo) {
+// html2canvas y jsPDF pesan unos 200 KB comprimidos y solo hacen falta al
+// exportar un PDF: se descargan la primera vez, no en cada carga de la página.
+// La CSP los admite sin nonce porque script-src incluye 'self'.
+const INF_LIBRERIAS_PDF = ["js/vendor/html2canvas-pro.min.js?v=2.4.5", "js/vendor/jspdf.umd.min.js?v=4.2.1"]
+let infLibreriasPdf = null
+
+function infCargarScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement("script")
+        script.src = src
+        script.onload = resolve
+        script.onerror = () => reject(new Error(`No se pudo cargar ${src}`))
+        document.head.appendChild(script)
+    })
+}
+
+// Una sola descarga aunque se pida el PDF dos veces seguidas; si falla se
+// olvida la promesa para que el siguiente intento vuelva a probar.
+function infCargarLibreriasPdf() {
+    if (typeof html2canvas === "function" && window.jspdf?.jsPDF) return Promise.resolve()
+    if (!infLibreriasPdf) {
+        infLibreriasPdf = Promise.all(INF_LIBRERIAS_PDF.map(infCargarScript)).catch((error) => {
+            infLibreriasPdf = null
+            throw error
+        })
+    }
+    return infLibreriasPdf
+}
+
+// Devuelve el control al navegador para que repinte (el aviso de progreso) y
+// atienda la interfaz. Cada hoja pasa por una conversión a PNG de cientos de
+// ms y, encadenadas sin respiro, dejaban la página congelada varios segundos.
+// setTimeout y no requestAnimationFrame: este último no se dispara con la
+// pestaña en segundo plano y el informe se quedaría parado a medias.
+function infCederHilo() {
+    return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+/**
+ * Pinta el informe fuera de la pantalla, lo pasa a imagen y descarga el PDF.
+ *
+ * @param {string} html Contenido del informe ya maquetado.
+ * @param {string} nombreArchivo Nombre del PDF, sin extensión.
+ * @param {((texto: string) => void) | null} alProgresar Recibe el texto del
+ *     paso en curso («Generando informe… página 3 de 6»).
+ */
+async function infDescargarPdf(html, nombreArchivo, alProgresar = null) {
+    try {
+        await infCargarLibreriasPdf()
+    } catch (error) {
+        console.error(error)
+    }
     if (typeof html2canvas !== "function" || !window.jspdf?.jsPDF) {
         throw new Error("No se han cargado las librerías del PDF (js/vendor/)")
     }
@@ -316,6 +366,9 @@ async function infDescargarPdf(html, nombreArchivo) {
 
     try {
         await document.fonts?.ready
+        // html2canvas es un único bloque largo: el aviso tiene que verse antes.
+        alProgresar?.("Generando informe… preparando las páginas")
+        await infCederHilo()
         const cortes = infPuntosDeCorte(contenedor)
         const lienzo = await html2canvas(contenedor, {
             scale: INF_ESCALA,
@@ -332,7 +385,9 @@ async function infDescargarPdf(html, nombreArchivo) {
         const trozo = document.createElement("canvas")
         const ctx = trozo.getContext("2d")
 
-        hojas.forEach(([desde, hasta], i) => {
+        for (const [i, [desde, hasta]] of hojas.entries()) {
+            alProgresar?.(`Generando informe… página ${i + 1} de ${hojas.length}`)
+            await infCederHilo()
             if (i > 0) pdf.addPage()
             const y0 = Math.round(desde * INF_ESCALA)
             const alto = Math.max(1, Math.round(hasta * INF_ESCALA) - y0)
@@ -356,7 +411,7 @@ async function infDescargarPdf(html, nombreArchivo) {
             pdf.setTextColor(148, 163, 184)
             pdf.text(nombreArchivo, P.margenX, P.alto - P.margenY + 2)
             pdf.text(`${i + 1} / ${hojas.length}`, P.ancho - P.margenX, P.alto - P.margenY + 2, { align: "right" })
-        })
+        }
 
         pdf.save(`${nombreArchivo}.pdf`)
     } finally {
@@ -366,26 +421,45 @@ async function infDescargarPdf(html, nombreArchivo) {
 
 // Envuelve la generación: el botón dice que está trabajando (cargar todos los
 // activos tarda) y un fallo se avisa en vez de quedarse en la consola.
+// El botón queda deshabilitado mientras dura (dos informes a la vez se pisarían
+// el contenedor #informeImprimible) y un aviso dice por qué hoja va: el botón
+// vive en un menú ··· que se cierra al pulsarlo, así que su texto no lo ve nadie.
 async function infGenerar(boton, generar) {
     if (boton?.dataset.generando) return
     const textoOriginal = boton?.textContent || ""
     if (boton) {
         boton.dataset.generando = "true"
+        boton.disabled = true
         boton.textContent = "Generando informe…"
+    }
+    const aviso = infAbrirAvisoProgreso("Generando informe…")
+    const alProgresar = (texto) => {
+        if (aviso) aviso.textContent = texto
     }
     document.documentElement.style.cursor = "progress"
     try {
-        await generar()
+        await generar(alProgresar)
     } catch (error) {
         console.error("No se pudo generar el informe:", error)
         alert("No se pudo generar el informe. Revisa la consola para más detalles.")
     } finally {
+        aviso?.remove()
         document.documentElement.style.cursor = ""
         if (boton) {
             delete boton.dataset.generando
+            boton.disabled = false
             boton.textContent = textoOriginal
         }
     }
+}
+
+// Un aviso de los de siempre (showToast) que no se cierra solo: lo quita
+// infGenerar al acabar. La duración es solo una red por si algo se colgara.
+const INF_AVISO_MAX_MS = 5 * 60 * 1000
+
+function infAbrirAvisoProgreso(texto) {
+    if (typeof showToast !== "function") return null
+    return showToast(texto, { duration: INF_AVISO_MAX_MS })
 }
 
 // ── informe del portfolio ──────────────────────────────────────────────────
@@ -767,13 +841,17 @@ function infHtmlPortfolio(datos) {
 }
 
 async function descargarInformePortfolio(boton = null) {
-    await infGenerar(boton, async () => {
+    await infGenerar(boton, async (alProgresar) => {
         const datos = await infDatosPortfolio()
         if (!datos.activos.length && !datos.dividendos.length) {
             alert("No hay activos para incluir en el informe.")
             return
         }
-        await infDescargarPdf(infHtmlPortfolio(datos), `informe-portfolio-${new Date().toISOString().slice(0, 10)}`)
+        await infDescargarPdf(
+            infHtmlPortfolio(datos),
+            `informe-portfolio-${new Date().toISOString().slice(0, 10)}`,
+            alProgresar
+        )
     })
 }
 
@@ -1109,9 +1187,9 @@ function infHtmlFinanzas(datos) {
 }
 
 async function descargarInformeFinanzas(anio, boton = null) {
-    await infGenerar(boton, async () => {
+    await infGenerar(boton, async (alProgresar) => {
         const year = String(anio || new Date().getFullYear())
         const datos = await infDatosFinanzas(year)
-        await infDescargarPdf(infHtmlFinanzas(datos), `informe-finanzas-${year}`)
+        await infDescargarPdf(infHtmlFinanzas(datos), `informe-finanzas-${year}`, alProgresar)
     })
 }

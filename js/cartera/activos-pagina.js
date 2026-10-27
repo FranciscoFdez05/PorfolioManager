@@ -440,7 +440,7 @@ function openTVChartModal(tvSymbol, displayName) {
                 <span class="tvChartModalTitle">${escapeHtml(displayName || tvSymbol)}</span>
                 <span class="tvChartModalSym">${escapeHtml(tvSymbol)}</span>
                 <div class="tvChartHeaderSpacer"></div>
-                <button type="button" class="tvChartCloseBtn" title="Cerrar">✕</button>
+                <button type="button" class="tvChartCloseBtn" title="Cerrar" aria-label="Cerrar">${iconoHtml("Cerrar")}</button>
             </div>
             <div class="tvChartIframeWrap">
                 <iframe src="${escapeAttr(buildTVIframeUrl(tvSymbol))}" frameborder="0" allowtransparency="true" scrolling="no" allowfullscreen
@@ -567,7 +567,25 @@ async function initActivosPageLogic() {
             _activosSearch = search.value.trim()
             avRender()
         })
+        search.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") searchBtn?.click()
+        })
     }
+
+    const searchBox = document.getElementById("activosSearchBox")
+    const searchBtn = document.getElementById("activosSearchBtn")
+    searchBtn?.addEventListener("click", () => {
+        const abrir = search.hidden
+        search.hidden = !abrir
+        searchBox.classList.toggle("open", abrir)
+        if (abrir) {
+            search.focus()
+        } else {
+            search.value = ""
+            _activosSearch = ""
+            avRender()
+        }
+    })
 
     avLoadMetrics()
 

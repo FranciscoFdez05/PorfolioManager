@@ -21,6 +21,21 @@
     justify-content: space-between;
 }
 
+.pmToolbarLeft {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.pmToolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
 .pmFilters {
     display: flex;
     gap: 6px;
@@ -220,4 +235,134 @@
 .pmNetoNeg {
     color: #e74c3c;
     font-weight: 600;
+}
+
+/* Inversión con varias compras: una fila de totales que se despliega con un
+   clic, como los activos de Planes de inversión. */
+.pmGrupoRow {
+    cursor: pointer;
+}
+
+.pmGrupoRowOpen td {
+    background: var(--bg-elevated) !important;
+    border-bottom-color: transparent;
+}
+
+.pmCeldaGrupo,
+.pmCeldaCompra {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.pmGrupoNombre {
+    font-weight: 600;
+}
+
+.pmGrupoSub {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+.pmChevron {
+    flex-shrink: 0;
+    width: 0;
+    height: 0;
+    margin-right: 2px;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 5px solid var(--text-dim);
+    transition: transform 0.15s ease;
+}
+
+.pmGrupoRowOpen .pmChevron {
+    transform: rotate(90deg);
+}
+
+/* Compras del grupo desplegado: más tenues y sangradas lo que ocupa el
+   triángulo, para que "Compra N" caiga debajo del nombre. */
+.pmTable tbody tr.pmCompraRow td {
+    background: var(--bg-inset);
+    font-size: 0.8rem;
+}
+
+/* Campo "Nombre" del popup: se escribe como un input y despliega las
+   inversiones existentes. El margen pasa del input al envoltorio, como en
+   .dateFieldWrap, para que el botón quede centrado en el input. */
+.pmComboWrap {
+    position: relative;
+    margin-bottom: 18px;
+}
+
+.pmComboWrap > .assetModalInput {
+    width: 100%;
+    margin-bottom: 0;
+    padding-right: 34px;
+}
+
+.pmComboArrow {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 32px;
+    border: 0;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+
+.pmComboOpen .pmComboArrow {
+    transform: rotate(180deg);
+}
+
+.pmComboMenu .csOption {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.pmComboDetalle {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+.pmComboMenu .pmComboNueva {
+    color: var(--text-dim);
+    font-style: italic;
+}
+
+.pmCeldaCompra {
+    padding-left: 15px;
+    border-left: 2px solid var(--border-mid);
+    margin-left: 4px;
+}
+
+/* Mercado privado ajustada al alto visible (fitPageActive, ver base.css): sin
+   scroll de mainContent; la tabla se queda con el hueco que dejan los bloques
+   de arriba y hace scroll por dentro. En pantallas estrechas, como antes. */
+@media (min-width: 1201px) {
+    .fitPageActive .pmPage {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .fitPageActive .pmPage > * {
+        flex: 0 0 auto;
+    }
+
+    .fitPageActive .pmPage .pmTableWrapper {
+        flex: 0 1 auto;
+        min-height: 140px;
+        max-height: none;
+    }
 }

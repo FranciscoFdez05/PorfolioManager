@@ -1565,3 +1565,174 @@ function _initAjustesCredenciales() {
         })
     }
 }
+
+// --- Verificación en dos pasos (Ajustes › Cuenta) ---
+// Tres estados de la sección: activar (desactivada), confirmar (frase mostrada
+// y código enviado) y desactivar (activada). El servidor guarda el reto; aquí
+// solo se enseña el bloque que toca.
+function _initAjustes2fa() {
+    const seccion = document.getElementById("ajustes2faSection")
+    if (!seccion) return
+    const $ = (id) => document.getElementById(id)
+    const estadoEl = $("ajustes2faEstado")
+    const sinTelegram = $("ajustes2faSinTelegram")
+    const bloques = {
+        activar: $("ajustes2faActivar"),
+        confirmar: $("ajustes2faConfirmar"),
+        desactivar: $("ajustes2faDesactivar")
+    }
+    const msg = $("ajustes2faMsg")
+
+    function mostrar(nombre) {
+        for (const [clave, bloque] of Object.entries(bloques)) {
+            if (bloque) bloque.hidden = clave !== nombre
+        }
+    }
+
+    function vaciar(...ids) {
+        ids.forEach((id) => {
+            const el = $(id)
+            if (el) el.value = ""
+        })
+    }
+
+    async function enviar(url, cuerpo) {
+        const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(cuerpo || {})
+        })
+        return res.json()
+    }
+
+    // Botón ocupado mientras dura la petición, con el error de red ya tratado.
+    async function conBoton(btn, accion) {
+        if (btn) btn.disabled = true
+        try {
+            await accion()
+        } catch {
+            showMsg(msg, "Error de red", "error")
+        } finally {
+            if (btn) btn.disabled = false
+        }
+    }
+
+    async function cargar() {
+        try {
+            const res = await fetch("/api/settings/2fa")
+            const data = await res.json()
+            if (!data.ok) return
+            if (estadoEl) estadoEl.textContent = data.activa ? "Activada" : "Desactivada"
+            if (sinTelegram) sinTelegram.hidden = data.activa || data.telegramConfigurado
+            if (data.activa) mostrar("desactivar")
+            else mostrar(data.telegramConfigurado ? "activar" : null)
+        } catch {
+            if (estadoEl) estadoEl.textContent = "No disponible"
+        }
+    }
+
+    function pintarFrase(frase) {
+        const lista = $("ajustes2faFrase")
+        if (!lista) return
+        lista.replaceChildren(
+            ...frase.split(" ").map((palabra) => {
+                const li = document.createElement("li")
+                li.textContent = palabra
+                return li
+            })
+        )
+    }
+
+    const iniciarBtn = $("ajustes2faIniciarBtn")
+    iniciarBtn?.addEventListener("click", () =>
+        conBoton(iniciarBtn, async () => {
+            const currentPassword = $("ajustes2faPwdActivar")?.value || ""
+            if (!currentPassword) {
+                showMsg(msg, "Introduce la contraseña actual", "error")
+                return
+            }
+            showMsg(msg, "Enviando código…", "")
+            const palabras = Number($("ajustes2faPalabras")?.value || 12)
+            const data = await enviar("/api/settings/2fa/activar/iniciar", { currentPassword, palabras })
+            if (!data.ok) {
+                showMsg(msg, data.error || "No se pudo iniciar la activación", "error")
+                return
+            }
+            vaciar("ajustes2faPwdActivar", "ajustes2faCodigoActivar", "ajustes2faFraseConfirmar")
+            pintarFrase(data.frase)
+            mostrar("confirmar")
+            showMsg(msg, "Código enviado por Telegram", "ok")
+        })
+    )
+
+    const confirmarBtn = $("ajustes2faConfirmarBtn")
+    confirmarBtn?.addEventListener("click", () =>
+        conBoton(confirmarBtn, async () => {
+            const codigo = $("ajustes2faCodigoActivar")?.value.trim() || ""
+            const frase = $("ajustes2faFraseConfirmar")?.value || ""
+            if (!codigo || !frase.trim()) {
+                showMsg(msg, "Escribe el código y la frase", "error")
+                return
+            }
+            const data = await enviar("/api/settings/2fa/activar/confirmar", { codigo, frase })
+            if (!data.ok) {
+                showMsg(msg, data.error || "No se pudo activar", "error")
+                return
+            }
+            $("ajustes2faFrase")?.replaceChildren()
+            vaciar("ajustes2faCodigoActivar", "ajustes2faFraseConfirmar")
+            showMsg(msg, "Verificación en dos pasos activada", "ok")
+            await cargar()
+        })
+    )
+
+    $("ajustes2faCancelarBtn")?.addEventListener("click", () => {
+        // El reto pendiente caduca solo en el servidor; aquí basta con no
+        // dejar la frase a la vista.
+        $("ajustes2faFrase")?.replaceChildren()
+        vaciar("ajustes2faCodigoActivar", "ajustes2faFraseConfirmar")
+        mostrar("activar")
+    })
+
+    const enviarCodigoBtn = $("ajustes2faEnviarCodigoBtn")
+    enviarCodigoBtn?.addEventListener("click", () =>
+        conBoton(enviarCodigoBtn, async () => {
+            const data = await enviar("/api/settings/2fa/codigo")
+            showMsg(msg, data.ok ? "Código enviado por Telegram" : data.error || "No se pudo enviar", data.ok ? "ok" : "error")
+        })
+    )
+
+    const desactivarBtn = $("ajustes2faDesactivarBtn")
+    desactivarBtn?.addEventListener("click", () =>
+        conBoton(desactivarBtn, async () => {
+            const currentPassword = $("ajustes2faPwdDesactivar")?.value || ""
+            const codigo = $("ajustes2faCodigoDesactivar")?.value.trim() || ""
+            const frase = $("ajustes2faFraseDesactivar")?.value || ""
+            if (!currentPassword) {
+                showMsg(msg, "Introduce la contraseña actual", "error")
+                return
+            }
+            if (!codigo && !frase.trim()) {
+                showMsg(msg, "Escribe el código de Telegram o la frase de recuperación", "error")
+                return
+            }
+            const data = await enviar("/api/settings/2fa/desactivar", { currentPassword, codigo, frase })
+            if (!data.ok) {
+                showMsg(msg, data.error || "No se pudo desactivar", "error")
+                return
+            }
+            vaciar("ajustes2faPwdDesactivar", "ajustes2faCodigoDesactivar", "ajustes2faFraseDesactivar")
+            showMsg(msg, "Verificación en dos pasos desactivada", "ok")
+            await cargar()
+        })
+    )
+
+    // Se recarga al entrar en Cuenta: el bot de Telegram se configura en otra
+    // pestaña de Ajustes y, sin esto, seguiría diciendo que falta. Mientras se
+    // confirma no se toca, para no esconder la frase que se está apuntando.
+    document.querySelector('.sttNavBtn[data-stt="cuenta"]')?.addEventListener("click", () => {
+        if (bloques.confirmar?.hidden !== false) cargar()
+    })
+
+    cargar()
+}

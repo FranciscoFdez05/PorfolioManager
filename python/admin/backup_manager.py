@@ -156,6 +156,44 @@ def checkIntegrity(dbPath: Path) -> bool:
     return _estadoIntegridad(dbPath) == "ok"
 
 
+def problemasDeIntegridad(dbPath: Path, maxProblemas: int = 5) -> list[str]:
+    """Qué encuentran mal `integrity_check` y `foreign_key_check` en `dbPath`.
+
+    A diferencia de `checkIntegrity`, que solo dice sí o no, devuelve el motivo:
+    es lo que se le enseña al usuario cuando una copia o una exportación se
+    rechaza, y sin él no hay forma de saber si el daño es una página rota o una
+    fila huérfana. Pensada para copias ya cerradas (el temporal de un backup o
+    de un export): sobre la base viva, un «database is locked» no es corrupción
+    y para eso está `_estadoIntegridad`.
+
+    Args:
+        dbPath: Base SQLite a comprobar.
+        maxProblemas: Tope de problemas que se devuelven de cada comprobación;
+            una base muy dañada puede dar miles y el mensaje no los necesita.
+
+    Returns:
+        Lista vacía si la base está sana; si no, descripciones legibles.
+    """
+    conn = None
+    try:
+        conn = sqlite3.connect(str(dbPath), timeout=settings.backupSqliteTimeout())
+        problemas = [
+            fila[0] for fila in conn.execute(f"PRAGMA integrity_check({int(maxProblemas)})").fetchall()
+            if fila[0] != "ok"
+        ]
+        huerfanas = conn.execute("PRAGMA foreign_key_check").fetchmany(maxProblemas)
+        problemas += [
+            f"{tabla} (fila {rowid}) apunta a un registro de {padre} que no existe"
+            for tabla, rowid, padre, _fk in huerfanas
+        ]
+        return problemas
+    except sqlite3.DatabaseError as e:
+        return [f"no se puede leer: {e}"]
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 def problemaDePortfolio(dbPath: Path, exigirActivos: bool = True) -> str | None:
     """Motivo por el que un .db subido no puede ocupar el lugar de un portfolio.
 

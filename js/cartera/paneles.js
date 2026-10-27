@@ -889,7 +889,7 @@ function pnRenderTabs() {
             (p) => `
             <div class="pnTab${p.id === _pnConfig.activo ? " active" : ""}" data-panel="${escapeAttr(p.id)}" title="Doble clic para renombrar">
                 <span class="pnTabNombre">${escapeHtml(p.nombre)}</span>
-                <button class="pnTabCerrar" type="button" title="Borrar panel" aria-label="Borrar panel">×</button>
+                <button class="pnTabCerrar" type="button" title="Borrar panel" aria-label="Borrar panel">${iconoHtml("Cerrar")}</button>
             </div>`
         )
         .join("")
@@ -1406,8 +1406,8 @@ function pnCrearWidget(w) {
             <span class="pnWTitulo">${escapeHtml(w.cfg.titulo || t.nombre)}</span>
             <div class="pnWCtrls"></div>
             <button class="pnAsa" type="button" title="Arrastrar para reordenar" aria-label="Arrastrar para reordenar">${PN_ASA_SVG}</button>
-            <button class="pnWMenuBtn pnWAjustesBtn" type="button" title="Ajustes del widget" aria-label="Ajustes del widget">⚙</button>
-            <button class="pnWMenuBtn" type="button" title="Opciones del widget" aria-label="Opciones del widget">⋮</button>
+            <button class="pnWMenuBtn pnWAjustesBtn" type="button" title="Ajustes del widget" aria-label="Ajustes del widget">${iconoHtml("Ajustes")}</button>
+            <button class="pnWMenuBtn" type="button" title="Opciones del widget" aria-label="Opciones del widget">${iconoHtml("Opciones")}</button>
         </header>
         <div class="pnWBody"></div>
         <div class="pnResize" title="Arrastra para cambiar el tamaño"></div>`
@@ -1889,7 +1889,7 @@ function pnSegmentado(ctrls, items, valor, alElegir, etiqueta = "") {
     cont.innerHTML = items
         .map(
             (it) =>
-                `<button type="button" class="pnSegBtn${it.valor === valor ? " active" : ""}" data-valor="${escapeAttr(it.valor)}">${escapeHtml(it.texto)}</button>`
+                `<button type="button" class="pnSegBtn${it.valor === valor ? " active" : ""}" data-valor="${escapeAttr(it.valor)}">${it.marcado ? `${iconoHtml("Marcado")} ` : ""}${escapeHtml(it.texto)}</button>`
         )
         .join("")
     cont.addEventListener("click", (e) => {
@@ -1902,7 +1902,7 @@ function pnSegmentado(ctrls, items, valor, alElegir, etiqueta = "") {
 
 // La lupa va como elemento propio y no como fondo del campo: el tema claro
 // pone `background` con !important a todos los campos y la borraba.
-const PN_LUPA = `<svg class="pnLupa" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`
+const PN_LUPA = `<span class="icono iconoBuscar pnLupa" aria-hidden="true"></span>`
 
 /**
  * Selector de activos con casillas, buscador y atajos por tipo. `vacioEsTodos`
@@ -2620,7 +2620,7 @@ function pnCrearAside(clave, titulo, subtitulo, ancla = null) {
     aside.innerHTML = `
         <header class="pnAjCab">
             <div><b>${escapeHtml(titulo)}</b><small>${escapeHtml(subtitulo)}</small></div>
-            <button class="pnIconBtn" type="button" data-accion="cerrar" title="Cerrar (Esc)" aria-label="Cerrar">✕</button>
+            <button class="pnIconBtn" type="button" data-accion="cerrar" title="Cerrar (Esc)" aria-label="Cerrar">${iconoHtml("Cerrar")}</button>
         </header>
         <div class="pnAjCuerpo"></div>`
     aside.querySelector("[data-accion=cerrar]").addEventListener("click", () => pnCerrarAjustes(aside))
@@ -3298,7 +3298,7 @@ function pnDibujarMapa(w, cuerpo) {
     const total = items.reduce((s, a) => s + (igual ? 1 : a.netoEur), 0)
 
     const enriquecidos = items.map((a) => {
-        let valor = null
+        let valor
         if (periodo === "dia") valor = a.dia
         else if (periodo === "todo") valor = a.invertidoEur > 0 ? a.rendPct : null
         else valor = hist[a.id] ?? null
@@ -3888,7 +3888,7 @@ function pnPintarCartera(w, cuerpo, ctrls) {
         pnTextoFiltro(cfg, "Todos los tipos"),
         [
             { valor: "", texto: "Todos los tipos" },
-            ...PN_TIPOS_ACTIVO.map((t) => ({ ...t, texto: (tipos.includes(t.valor) ? "✓ " : "") + t.texto }))
+            ...PN_TIPOS_ACTIVO.map((t) => ({ ...t, marcado: tipos.includes(t.valor) }))
         ],
         tipos.length ? null : "",
         (v) => {
@@ -4985,8 +4985,10 @@ const PN_METRICAS = [
     { clave: "mSectionDivMensual", titulo: "Dividendos por mes", grupo: "Finanzas" },
     { clave: "mSectionIntereses", titulo: "Cuenta remunerada", grupo: "Finanzas" },
     { clave: "mSectionPasivosEvol", titulo: "Ingresos pasivos", grupo: "Finanzas" },
+    { clave: "kpiRentaFija", titulo: "Renta fija (indicadores)", grupo: "Finanzas" },
     { clave: "mSectionRentaFija", titulo: "Renta fija", grupo: "Finanzas" },
     { clave: "mSectionBonos", titulo: "Bonos", grupo: "Finanzas" },
+    { clave: "kpiPrivateMarket", titulo: "Mercado privado (indicadores)", grupo: "Finanzas" },
     { clave: "kpi:3", titulo: "Gastos (indicadores)", grupo: "Gastos e ingresos" },
     { clave: "mSectionGastos", titulo: "Gastos", grupo: "Gastos e ingresos" },
     { clave: "kpi:4", titulo: "Ingresos (indicadores)", grupo: "Gastos e ingresos" },
@@ -5018,7 +5020,12 @@ function pnCargarMetricas() {
         almacen.innerHTML = await res.text()
         await initMetricasLogic()
         almacen.querySelectorAll(".metricasSection[id]").forEach((s) => estado.piezas.set(s.id, s))
-        almacen.querySelectorAll(".metricasKpiRow").forEach((k, i) => estado.piezas.set("kpi:" + i, k))
+        // Las filas con data-pn-clave van por su clave y no cuentan en el índice:
+        // así las kpi:N que ya hay guardadas en los paneles siguen apuntando a la misma fila.
+        almacen
+            .querySelectorAll(".metricasKpiRow:not([data-pn-clave])")
+            .forEach((k, i) => estado.piezas.set("kpi:" + i, k))
+        almacen.querySelectorAll(".metricasKpiRow[data-pn-clave]").forEach((k) => estado.piezas.set(k.dataset.pnClave, k))
     })().catch((error) => {
         if (_pnMetricas === estado) _pnMetricas = null
         almacen.remove()

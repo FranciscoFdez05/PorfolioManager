@@ -205,7 +205,7 @@ function hEtiquetaTipo(tipo) {
 }
 
 async function hCargarSelectoresDeActivos() {
-    let activos = []
+    let activos
     try {
         activos = await hActivos()
     } catch (error) {
@@ -694,7 +694,7 @@ function hIniciarHerramientaExtra(id) {
 }
 
 async function hCargarHerramientasExtra() {
-    let lista = []
+    let lista
     try {
         const respuesta = await fetch("/api/herramientas-extra")
         if (!respuesta.ok) return
@@ -980,7 +980,7 @@ function hAddPrecioMedioRow() {
         <td><input type="number" class="hPrecioInput" placeholder="0.00" step="0.01" min="0"></td>
         <td><input type="number" class="hPrecioInput" placeholder="1" step="0.0001" min="0"></td>
         <td class="hPmTotal">---</td>
-        <td><button class="hPrecioDeleteBtn" title="Eliminar">✕</button></td>
+        <td><button class="hPrecioDeleteBtn" title="Eliminar" aria-label="Eliminar">${iconoHtml("Borrar")}</button></td>
     `
     tr.querySelectorAll("input").forEach((inp) => inp.addEventListener("input", () => hUpdatePmRowTotal(tr)))
     tr.querySelector(".hPrecioDeleteBtn").addEventListener("click", () => {
@@ -1552,7 +1552,7 @@ async function hCapBuscar(inputId, listaId, alElegir) {
     lista.classList.remove("hidden")
     lista.replaceChildren(hCapNota("Buscando..."))
 
-    let resultados = []
+    let resultados
     try {
         const res = await fetch(`/api/tradingview/search?q=${encodeURIComponent(texto)}`)
         const data = await res.json()
@@ -1880,7 +1880,7 @@ async function hCapCalcular() {
     const sinConvertir = []
     for (const ref of [..._hCapFijas, ..._hCapRefs]) {
         if (!(ref.capital > 0)) continue
-        let tipo = null
+        let tipo
         try {
             tipo = await hCapTipoCambio(ref.divisa, divisa)
         } catch {

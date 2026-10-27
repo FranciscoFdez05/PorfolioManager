@@ -57,6 +57,23 @@ def createGastosYear():
     return jsonify({"ok": True, "year": year, "data": payload}), 201
 
 
+@gastosBp.route("/api/gastos/todos", methods=["GET"])
+def getGastosTodos():
+    """Todos los años guardados con su contenido, en una sola respuesta.
+
+    Es lo que necesita el resumen anual de Métricas: antes pedía
+    `/api/gastos/<año>` una vez por año. Cada valor es idéntico a lo que
+    devuelve `GET /api/gastos/<año>`.
+    """
+    years = {}
+    for year in listGastosYears():
+        data = readGastosYear(year)
+        if data is not None:
+            years[year] = data
+
+    return jsonify({"years": years})
+
+
 @gastosBp.route("/api/gastos/<year>", methods=["GET"])
 def getGastosYear(year):
     data = readGastosYear(year)

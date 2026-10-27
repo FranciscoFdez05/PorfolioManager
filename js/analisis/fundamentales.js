@@ -15,6 +15,26 @@ let _fnSearch = ""
 let _fnExpandedIds = new Set()
 let _fnCache = null // { ts, rows }
 const _FN_CACHE_TTL = 3 * 60 * 1000
+// El método y el periodo de los pivotes no se reinician al volver a la página:
+// es una preferencia de lectura, no un filtro de la tabla.
+let _fnPivotMethod = "Classic"
+let _fnPivotPeriod = "M"
+
+// Sufijo de columna de cada periodo: lo explica `PIVOT_PERIODS` en
+// tradingview_client.py, que es quien pide estas columnas al scanner.
+const FN_PIVOT_PERIODS = {
+    M: { label: "Mensual", suffix: "" },
+    W: { label: "Semanal", suffix: "|240" },
+    Y: { label: "Anual", suffix: "|1W" }
+}
+const FN_PIVOT_METHODS = {
+    Classic: "Clásicos",
+    Fibonacci: "Fibonacci",
+    Camarilla: "Camarilla",
+    Woodie: "Woodie",
+    Demark: "DeMark"
+}
+const FN_PIVOT_LEVELS = ["R3", "R2", "R1", "Middle", "S1", "S2", "S3"]
 
 // Umbrales del propio "Technical Rating" de TradingView (documentados en su
 // web): de -1 a 1, igual para cualquier instrumento. No es una preferencia
@@ -64,7 +84,8 @@ async function initFundamentalesLogic() {
         }
 
         typeFiltersEl.querySelectorAll(".activosFilterBtn").forEach((b) => {
-            const isActive = _fnActiveTypes.has("all") ? b.dataset.type === "all" : _fnActiveTypes.has(b.dataset.type)
+            // Con "Todos" se encienden todos, como en el resto de filtros de la app.
+            const isActive = _fnActiveTypes.has("all") || _fnActiveTypes.has(b.dataset.type)
             b.classList.toggle("active", isActive)
             const input = b.querySelector("input")
             if (input) input.checked = isActive
@@ -87,6 +108,16 @@ async function initFundamentalesLogic() {
     // Delegado: la tabla se regenera enteras al filtrar, así que escuchar en
     // el tbody (que no cambia de nodo) evita reenganchar listeners en cada fila.
     tbody?.addEventListener("click", (e) => {
+        // La elección de pivotes es una sola para toda la tabla aunque los
+        // botones estén en cada panel: así se comparan los mismos niveles.
+        const pivotChip = e.target.closest(".fnPivotChip")
+        if (pivotChip) {
+            const { pivot, value } = pivotChip.dataset
+            if (pivot === "method" && FN_PIVOT_METHODS[value]) _fnPivotMethod = value
+            if (pivot === "period" && FN_PIVOT_PERIODS[value]) _fnPivotPeriod = value
+            fnRenderTable()
+            return
+        }
         const expandBtn = e.target.closest(".fnExpandBtn")
         if (expandBtn) {
             e.stopPropagation()
@@ -267,38 +298,191 @@ function fnBuildRowHtml(row, rank) {
 function fnBuildDetailHtml(row) {
     const s = row.stats || {}
     const cur = row.currency
-    const ma = (label, sma, ema) =>
-        `<div class="fnDetailRow2"><span>${label}</span><span>${fnPrice(sma, cur)}</span><span>${fnPrice(ema, cur)}</span></div>`
-    const line = (label, value) => `<div class="fnDetailLine"><span>${label}</span><span>${value}</span></div>`
 
     return `
         <div class="fnDetailGrid">
-            <div class="fnDetailCol">
-                <h4>Medias móviles</h4>
-                <div class="fnDetailRow2 fnDetailHead"><span></span><span>SMA</span><span>EMA</span></div>
-                ${ma("20", s.SMA20, s.EMA20)}
-                ${ma("50", s.SMA50, s.EMA50)}
-                ${ma("100", s.SMA100, s.EMA100)}
-                ${ma("200", s.SMA200, s.EMA200)}
+            ${fnDetailMovingAverages(s, cur)}
+            ${fnDetailOscillators(s)}
+            ${fnDetailPivots(s, cur)}
+        </div>
+        <div class="fnDetailGrid">
+            ${fnDetailPerformance(s)}
+            ${fnDetailRange(s, cur)}
+            ${fnDetailFundamentals(s, cur)}
+        </div>`
+}
+
+function fnDetailLine(label, value, extraCls = "") {
+    return `<div class="fnDetailLine ${extraCls}"><span>${label}</span><span>${value}</span></div>`
+}
+
+// Rating parcial de TradingView (solo medias o solo osciladores) junto al
+// título del bloque: misma escala y mismos umbrales que el rating de la tabla.
+function fnDetailColHead(title, ratingValue) {
+    if (ratingValue === undefined) return `<div class="fnDetailColHead"><h4>${title}</h4></div>`
+    const rating = fnRatingInfo(ratingValue)
+    return `<div class="fnDetailColHead"><h4>${title}</h4><span class="fnRatingBadge fnRatingMini ${rating.cls}">${rating.label}</span></div>`
+}
+
+// Verde si el precio está por encima de la media (tendencia alcista frente a
+// ella) y rojo si está por debajo, como la columna "Acción" de TradingView.
+function fnMaCell(value, close, cur) {
+    const ma = fnToNumber(value)
+    const price = fnToNumber(close)
+    const cls = ma === null || price === null || price === ma ? "" : price > ma ? "fnPos" : "fnNeg"
+    return `<span class="${cls}">${fnPrice(value, cur)}</span>`
+}
+
+function fnDetailMovingAverages(s, cur) {
+    const ma = (label, sma, ema) =>
+        `<div class="fnDetailRow2"><span>${label}</span>${fnMaCell(sma, s.close, cur)}${fnMaCell(ema, s.close, cur)}</div>`
+
+    return `
+        <div class="fnDetailCol">
+            ${fnDetailColHead("Medias móviles", s["Recommend.MA"])}
+            <div class="fnDetailRow2 fnDetailHead"><span></span><span>SMA</span><span>EMA</span></div>
+            ${ma("20", s.SMA20, s.EMA20)}
+            ${ma("50", s.SMA50, s.EMA50)}
+            ${ma("100", s.SMA100, s.EMA100)}
+            ${ma("200", s.SMA200, s.EMA200)}
+            <h5 class="fnDetailSubHead">Otras medias y bandas</h5>
+            ${fnDetailLine("Ichimoku (línea base)", fnMaCell(s["Ichimoku.BLine"], s.close, cur))}
+            ${fnDetailLine("VWMA (20)", fnMaCell(s.VWMA, s.close, cur))}
+            ${fnDetailLine("Hull MA (9)", fnMaCell(s.HullMA9, s.close, cur))}
+            ${fnDetailLine("Bollinger superior (20)", fnPrice(s["BB.upper"], cur))}
+            ${fnDetailLine("Bollinger inferior (20)", fnPrice(s["BB.lower"], cur))}
+        </div>`
+}
+
+function fnDetailOscillators(s) {
+    return `
+        <div class="fnDetailCol">
+            ${fnDetailColHead("Osciladores", s["Recommend.Other"])}
+            ${fnDetailLine("MACD", fnRatio(s["MACD.macd"]))}
+            ${fnDetailLine("Señal MACD", fnRatio(s["MACD.signal"]))}
+            ${fnDetailLine("ADX", fnRatio(s.ADX))}
+            ${fnDetailLine("Estocástico %K", fnRatio(s["Stoch.K"]))}
+            ${fnDetailLine("Estocástico %D", fnRatio(s["Stoch.D"]))}
+            ${fnDetailLine("Estocástico RSI %K", fnRatio(s["Stoch.RSI.K"]))}
+            ${fnDetailLine("CCI (20)", fnRatio(s.CCI20))}
+            ${fnDetailLine("Momentum (10)", fnRatio(s.Mom))}
+            ${fnDetailLine("Awesome Oscillator", fnRatio(s.AO))}
+            ${fnDetailLine("Williams %R (14)", fnRatio(s["W.R"]))}
+            ${fnDetailLine("Ultimate Oscillator", fnRatio(s.UO))}
+        </div>`
+}
+
+// Botones y no <select>: shared-utils convierte cada <select> nuevo en un
+// desplegable propio que deja su menú en <body> y dos listeners en document
+// sin limpiarlos nunca, y esta tabla se regenera entera a cada tecla del
+// buscador con un panel por fila.
+function fnPivotChipsHtml(kind, options, selected) {
+    const chips = Object.entries(options)
+        .map(
+            ([value, label]) =>
+                `<button type="button" class="fnPivotChip ${value === selected ? "active" : ""}" data-pivot="${kind}" data-value="${value}" aria-pressed="${value === selected}">${label}</button>`
+        )
+        .join("")
+    return `<span class="fnPivotChips" role="group" aria-label="${kind === "method" ? "Método de pivotes" : "Periodo de pivotes"}">${chips}</span>`
+}
+
+function fnDetailPivots(s, cur) {
+    const suffix = FN_PIVOT_PERIODS[_fnPivotPeriod].suffix
+    const periodLabels = Object.fromEntries(Object.entries(FN_PIVOT_PERIODS).map(([k, v]) => [k, v.label]))
+
+    // Solo los niveles que el método publica: DeMark no tiene R2/R3/S2/S3 y
+    // pintarlos con "—" haría creer que falta un dato que no existe.
+    const lines = FN_PIVOT_LEVELS.map((level) => ({
+        level,
+        value: s[`Pivot.M.${_fnPivotMethod}.${level}${suffix}`]
+    }))
+        .filter(({ value }) => fnToNumber(value) !== null)
+        .map(({ level, value }) =>
+            level === "Middle"
+                ? fnDetailLine("P", fnPrice(value, cur), "fnDetailPivotMid")
+                : fnDetailLine(level, fnPrice(value, cur))
+        )
+        .join("")
+
+    return `
+        <div class="fnDetailCol">
+            <div class="fnDetailColHead">
+                <h4>Pivotes</h4>
+                ${fnPivotChipsHtml("period", periodLabels, _fnPivotPeriod)}
             </div>
-            <div class="fnDetailCol">
-                <h4>Osciladores</h4>
-                ${line("MACD", fnRatio(s["MACD.macd"]))}
-                ${line("Señal MACD", fnRatio(s["MACD.signal"]))}
-                ${line("ADX", fnRatio(s.ADX))}
-                ${line("Estocástico %K", fnRatio(s["Stoch.K"]))}
-                ${line("Estocástico %D", fnRatio(s["Stoch.D"]))}
-            </div>
-            <div class="fnDetailCol">
-                <h4>Pivotes clásicos (mensual)</h4>
-                ${line("R3", fnPrice(s["Pivot.M.Classic.R3"], cur))}
-                ${line("R2", fnPrice(s["Pivot.M.Classic.R2"], cur))}
-                ${line("R1", fnPrice(s["Pivot.M.Classic.R1"], cur))}
-                <div class="fnDetailLine fnDetailPivotMid"><span>P</span><span>${fnPrice(s["Pivot.M.Classic.Middle"], cur)}</span></div>
-                ${line("S1", fnPrice(s["Pivot.M.Classic.S1"], cur))}
-                ${line("S2", fnPrice(s["Pivot.M.Classic.S2"], cur))}
-                ${line("S3", fnPrice(s["Pivot.M.Classic.S3"], cur))}
-            </div>
+            <div class="fnPivotMethods">${fnPivotChipsHtml("method", FN_PIVOT_METHODS, _fnPivotMethod)}</div>
+            ${lines || `<span class="fnNd">Sin pivotes para este activo</span>`}
+        </div>`
+}
+
+function fnDetailPerformance(s) {
+    const perf = (label, value) => {
+        const num = fnToNumber(value)
+        const cls = num > 0 ? "fnPos" : num < 0 ? "fnNeg" : ""
+        return fnDetailLine(label, `<span class="${cls}">${fnPercentSigned(value)}</span>`)
+    }
+
+    return `
+        <div class="fnDetailCol">
+            ${fnDetailColHead("Rendimiento")}
+            ${perf("1 semana", s["Perf.W"])}
+            ${perf("1 mes", s["Perf.1M"])}
+            ${perf("3 meses", s["Perf.3M"])}
+            ${perf("6 meses", s["Perf.6M"])}
+            ${perf("En lo que va de año", s["Perf.YTD"])}
+            ${perf("1 año", s["Perf.Y"])}
+        </div>`
+}
+
+// Distancia del precio a un nivel de referencia: "-28,4 %" bajo un máximo.
+function fnDistanceHtml(close, level) {
+    const price = fnToNumber(close)
+    const ref = fnToNumber(level)
+    if (price === null || ref === null || ref === 0) return ""
+    return ` <small class="fnDetailSub">${fnPercentSigned((price / ref - 1) * 100, 1)}</small>`
+}
+
+function fnDetailRange(s, cur) {
+    const level = (value) => fnPrice(value, cur) + fnDistanceHtml(s.close, value)
+    const relVol = fnToNumber(s.relative_volume_10d_calc)
+
+    return `
+        <div class="fnDetailCol">
+            ${fnDetailColHead("Rango y volatilidad")}
+            ${fnDetailLine("Máximo 52 semanas", level(s.price_52_week_high))}
+            ${fnDetailLine("Mínimo 52 semanas", level(s.price_52_week_low))}
+            ${fnDetailLine("Máximo histórico", level(s["High.All"]))}
+            ${fnDetailLine("ATR (14)", fnPrice(s.ATR, cur))}
+            ${fnDetailLine("Volatilidad día / semana / mes", [s["Volatility.D"], s["Volatility.W"], s["Volatility.M"]].map((v) => fnPercentPlain(v)).join(" · "))}
+            ${fnDetailLine("Volumen relativo (10 d)", relVol === null ? "—" : `${fnRatio(relVol)} ×`)}
+            ${fnDetailLine("Beta (1 año)", fnRatio(s.beta_1_year))}
+        </div>`
+}
+
+// Solo las líneas con dato: una cripto o una materia prima no tienen márgenes
+// ni resultados, y una columna entera de "—" no aporta nada.
+function fnDetailFundamentals(s, fallbackCurrency) {
+    const fundCur = s.fundamental_currency_code || fallbackCurrency
+    const items = [
+        ["Margen bruto", s.gross_margin, (v) => fnPercentPlain(v)],
+        ["Margen operativo", s.operating_margin, (v) => fnPercentPlain(v)],
+        ["Margen neto", s.net_margin, (v) => fnPercentPlain(v)],
+        ["Free cash flow (M)", s.free_cash_flow, (v) => fnMarketCap(v, fundCur)],
+        ["Valor de empresa (M)", s.enterprise_value_current, (v) => fnMarketCap(v, fundCur)],
+        ["EV / EBITDA", s.enterprise_value_ebitda_ttm, (v) => fnRatio(v)],
+        ["Próximos resultados", s.earnings_release_next_date, fnUnixDate],
+        ["Patrimonio del fondo (M)", s.aum, (v) => fnMarketCap(v, fundCur)],
+        ["Gastos corrientes (TER)", s.expense_ratio, (v) => fnPercentPlain(v)]
+    ]
+    const lines = items
+        .filter(([, value]) => fnToNumber(value) !== null)
+        .map(([label, value, format]) => fnDetailLine(label, format(value)))
+        .join("")
+
+    return `
+        <div class="fnDetailCol">
+            ${fnDetailColHead("Fundamentales ampliados")}
+            ${lines || `<span class="fnNd">Sin datos fundamentales para este tipo de activo</span>`}
         </div>`
 }
 
@@ -317,6 +501,21 @@ function fnToggleExpand(id) {
 
 function fnTypeLabel(type) {
     return FN_TYPE_LABELS[type] || (type ? type[0].toUpperCase() + type.slice(1) : "—")
+}
+
+// Número del scanner o null si no hay dato: `None` en Python llega como null,
+// y un 0 legítimo (variación nula) no debe confundirse con "sin dato".
+function fnToNumber(value) {
+    if (value === null || value === undefined || value === "") return null
+    const num = typeof value === "number" ? value : parseFloat(value)
+    return isNaN(num) ? null : num
+}
+
+// El scanner da las fechas de resultados en segundos Unix.
+function fnUnixDate(value) {
+    const seconds = fnToNumber(value)
+    if (seconds === null) return "—"
+    return new Date(seconds * 1000).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })
 }
 
 function fnRatingInfo(value) {

@@ -1,5 +1,8 @@
 import re
 
+from core import dinero
+from core.errors import ValidationError
+
 ALLOWED_ASSET_TYPES = {"cripto", "acciones", "etfs", "comoditis"}
 _HEX_COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 
@@ -197,6 +200,25 @@ def sanitizeAssetOperationRows(rows):
     return sanitizedRows
 
 
+def _valorEurCanonico(valor, indice):
+    """Valor de mercado en euros de una conversión: texto canónico, o vacío si no hay.
+
+    Raises:
+        ValidationError: Si no es un importe legible o es negativo.
+    """
+    texto = str(valor if valor is not None else "").strip()
+    if not texto:
+        return ""
+    campo = f"conversionRows[{indice}].valorEur"
+    try:
+        importe = dinero.aDecimal(texto, campo)
+    except dinero.ImporteInvalido:
+        raise ValidationError("El valor en euros de la conversión no es un importe válido", field=campo) from None
+    if importe < 0:
+        raise ValidationError("El valor en euros de la conversión no puede ser negativo", field=campo)
+    return dinero.aTexto(importe, campo)
+
+
 def sanitizeAssetConversionRows(rows, assetSymbol=""):
     sanitizedRows = []
     normalizedSymbol = str(assetSymbol or "").strip().upper()
@@ -212,7 +234,11 @@ def sanitizeAssetConversionRows(rows, assetSymbol=""):
             "fecha": str(row.get("fecha", row.get("fechaOperacion", ""))).strip(),
             "par": str(row.get("par", "")).strip(),
             "tipo": conversionType,
-            "cantidad": str(row.get("cantidad", row.get("participaciones", ""))).strip()
+            "cantidad": str(row.get("cantidad", row.get("participaciones", ""))).strip(),
+            "cantidadContraparte": str(row.get("cantidadContraparte", "")).strip()[:_MAX_SHORT],
+            "comision": str(row.get("comision", "")).strip()[:_MAX_SHORT],
+            "comisionMoneda": str(row.get("comisionMoneda", "")).strip().upper()[:_MAX_SHORT],
+            "valorEur": _valorEurCanonico(row.get("valorEur", ""), index)
         })
 
     return sanitizedRows

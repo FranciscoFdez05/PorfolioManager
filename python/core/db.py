@@ -172,6 +172,10 @@ CREATE TABLE IF NOT EXISTS activo_conversion_rows (
     par      TEXT NOT NULL DEFAULT '',
     tipo     TEXT NOT NULL DEFAULT '',
     cantidad TEXT NOT NULL DEFAULT '',
+    cantidad_contraparte TEXT NOT NULL DEFAULT '',
+    comision TEXT NOT NULL DEFAULT '',
+    comision_moneda TEXT NOT NULL DEFAULT '',
+    valor_eur TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (id, asset_id)
 );
 
@@ -666,7 +670,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id,
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 21
+ESQUEMA_VERSION = 26
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1620,6 +1624,100 @@ def _esquema21(conn):
     columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(transacciones)")}
     if "wallet_desde" not in columnas:
         conn.execute("ALTER TABLE transacciones ADD COLUMN wallet_desde TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(22)
+def _esquema22(conn):
+    """Cantidad de la contraparte en las conversiones cripto.
+
+    Una conversión cambia una cripto de la cartera por otra (BTC por ETH), pero
+    solo se guardaba la cantidad del activo de la ficha. `cantidad_contraparte`
+    es la de la otra cripto del par. Vacío = sin indicar, que es lo que quedan
+    las conversiones que ya existen; no interviene en ningún cálculo.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(activo_conversion_rows)")}
+    if "cantidad_contraparte" not in columnas:
+        conn.execute("ALTER TABLE activo_conversion_rows ADD COLUMN cantidad_contraparte TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(23)
+def _esquema23(conn):
+    """Comisión de las conversiones cripto.
+
+    `comision` es lo que cobró el exchange por la conversión y `comision_moneda`
+    en qué se cobró (una de las dos criptos del par o una divisa). Vacío = sin
+    comisión o sin indicar; es informativa y no entra en el cálculo de
+    posiciones.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(activo_conversion_rows)")}
+    if "comision" not in columnas:
+        conn.execute("ALTER TABLE activo_conversion_rows ADD COLUMN comision TEXT NOT NULL DEFAULT ''")
+    if "comision_moneda" not in columnas:
+        conn.execute("ALTER TABLE activo_conversion_rows ADD COLUMN comision_moneda TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(25)
+def _esquema25(conn):
+    """Flujo de dinero de cada snapshot.
+
+    TWR, XIRR y Dietz necesitan saber cuánto dinero entró o salió entre dos
+    puntos del histórico. Se deducía de la variación de `total_invested`, que es
+    un coste: al vender, lo que sale del invertido es el coste de lo vendido y no
+    lo cobrado, así que la ganancia realizada desaparecía del rendimiento.
+    `flujo` es el flujo neto real en euros desde el snapshot anterior (compras
+    con comisión, ventas cobradas netas, con el tipo de cambio de cada
+    operación). NULL = no se guardó o no se pudo calcular; los puntos que ya
+    existen quedan así y se siguen estimando con la variación del invertido.
+    `snapshot_flujo_base` recuerda el total de caja con el que se calculó el
+    último flujo, para que una operación con fecha antigua entre en el flujo del
+    siguiente snapshot y no reescriba los ya guardados.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(portfolio_snapshots)")}
+    if columnas and "flujo" not in columnas:
+        conn.execute("ALTER TABLE portfolio_snapshots ADD COLUMN flujo REAL")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS snapshot_flujo_base ("
+        "id INTEGER PRIMARY KEY CHECK (id = 1), total REAL NOT NULL, firma TEXT NOT NULL DEFAULT '')"
+    )
+
+
+@_migracion(24)
+def _esquema24(conn):
+    """Divisa de cada venta.
+
+    `valor_venta` y `comision_venta` están en la divisa del activo en el momento
+    de guardar la venta. Si el activo cambia de divisa después, la venta tiene
+    que seguir diciendo en cuál se tecleó, porque el tipo de cambio de `fx_rate`
+    solo vale para esa. Las ventas que ya existen toman la divisa que tiene
+    ahora su activo, que es la que usaba `fx_historico` al rellenar su tipo.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(ventas)")}
+    if "currency" not in columnas:
+        conn.execute("ALTER TABLE ventas ADD COLUMN currency TEXT NOT NULL DEFAULT ''")
+    columnasActivos = {fila[1] for fila in conn.execute("PRAGMA table_info(activos)")}
+    if "currency" in columnasActivos:
+        conn.execute(
+            "UPDATE ventas SET currency = COALESCE("
+            "(SELECT a.currency FROM activos a WHERE a.id = ventas.asset_id), 'EUR') "
+            "WHERE currency = ''"
+        )
+    else:
+        conn.execute("UPDATE ventas SET currency = 'EUR' WHERE currency = ''")
+
+
+@_migracion(26)
+def _esquema26(conn):
+    """Valor de mercado de cada conversión cripto.
+
+    Convertir una cripto en otra es una permuta: la ganancia de lo entregado y el
+    coste de lo recibido salen del valor de mercado en euros en ese momento, y la
+    aplicación no puede reconstruirlo. `valor_eur` es lo que el usuario anota
+    (texto canónico, vacío = sin valor). Las conversiones que ya existen quedan
+    vacías y sus permutas siguen saliendo con incidencia hasta que se complete.
+    """
+    columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(activo_conversion_rows)")}
+    if "valor_eur" not in columnas:
+        conn.execute("ALTER TABLE activo_conversion_rows ADD COLUMN valor_eur TEXT NOT NULL DEFAULT ''")
 
 
 class _CerrarAlTerminarElHilo:

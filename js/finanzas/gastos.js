@@ -480,7 +480,15 @@ function closeGastosCreateModal() {
     }
 }
 
-function openGastosCreateModal({ title, bodyHtml, onSubmit, onReady, submitLabel = "Guardar", modalClass = "" }) {
+function openGastosCreateModal({
+    title,
+    bodyHtml,
+    onSubmit,
+    onReady,
+    submitLabel = "Guardar",
+    modalClass = "",
+    dosColumnas = false
+}) {
     closeGastosCreateModal()
 
     const overlay = document.createElement("div")
@@ -534,6 +542,11 @@ function openGastosCreateModal({ title, bodyHtml, onSubmit, onReady, submitLabel
             guardando = false
         }
     })
+
+    // Antes de montar el popup, para que los desplegables se creen ya en su casilla.
+    if (dosColumnas) {
+        ponerModalEnDosColumnas(modal.querySelector(".gastosCreateModalBody"))
+    }
 
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
@@ -1008,6 +1021,8 @@ function openGastoMovementModal(rowIndex = -1) {
             <textarea id="gastosMovimientoNota" class="assetModalInput movNotaInput" rows="3" maxlength="300" placeholder="Solo se ve al pulsar el gasto en la tabla">${escapeGastosHtml(rowData.nota || "")}</textarea>
         `,
         submitLabel: "Guardar",
+        modalClass: "gastosCreateModalWide",
+        dosColumnas: true,
         onSubmit: async ({ getValue, setFeedback }) => {
             const fecha = String(getValue("gastosMovimientoFecha")).trim()
             const nombre = String(getValue("gastosMovimientoNombre")).trim()
@@ -1073,7 +1088,7 @@ function openGastoMovementModal(rowIndex = -1) {
 
 async function loadGastosYears() {
     const data = await Api.get("/api/gastos")
-    return Array.isArray(data?.years) ? data.years : []
+    return Array.isArray(data?.years) ? ordenarAniosRecientesPrimero(data.years) : []
 }
 
 async function loadGastosYear(year) {
@@ -1264,7 +1279,7 @@ function bindGastosEvents() {
                 requireText: String(currentGastosYear),
                 onConfirm: async () => {
                     const response = await deleteGastosYearRequest(currentGastosYear)
-                    gastosYears = Array.isArray(response.years) ? response.years : await loadGastosYears()
+                    gastosYears = Array.isArray(response.years) ? ordenarAniosRecientesPrimero(response.years) : await loadGastosYears()
                     currentGastosYear = gastosYears[0]
                     currentGastosView = "year"
                     currentGastosMonth = "enero"
@@ -1361,6 +1376,9 @@ function renderGastosYearButtons() {
         })
         list.appendChild(button)
     })
+
+    activarArrastreHorizontal(list)
+    list.querySelector(".gastosYearBtn.active")?.scrollIntoView({ block: "nearest", inline: "nearest" })
 }
 
 function buildMonthlyExpenseTotals() {
@@ -1514,8 +1532,8 @@ function renderGastosAnnualTable() {
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
-                    <button type="button" class="rowMenuItem gastosEyeBtn${mensSectionHidden ? "" : " active"}" data-gastos-eye-mens="1">👁 ${mensSectionHidden ? "Mostrar" : "Ocultar"}</button>
-                    <button type="button" class="rowMenuItem" data-gastos-toggle-pausadas="1"${pausadasCount ? "" : " disabled"}>${gastosMostrarPausadas ? "🚫" : "⏸"} ${gastosMostrarPausadas ? "Ocultar" : "Mostrar"} pausadas${pausadasCount ? ` (${pausadasCount})` : ""}</button>
+                    <button type="button" class="rowMenuItem gastosEyeBtn${mensSectionHidden ? "" : " active"}" data-gastos-eye-mens="1">${iconoHtml(mensSectionHidden ? "Ojo" : "OjoTachado")} ${mensSectionHidden ? "Mostrar" : "Ocultar"}</button>
+                    <button type="button" class="rowMenuItem" data-gastos-toggle-pausadas="1"${pausadasCount ? "" : " disabled"}>${iconoHtml(gastosMostrarPausadas ? "OjoTachado" : "Pausa")} ${gastosMostrarPausadas ? "Ocultar" : "Mostrar"} pausadas${pausadasCount ? ` (${pausadasCount})` : ""}</button>
                 </div>
             </div>
         </td>`
@@ -1598,7 +1616,7 @@ function renderGastosAnnualTable() {
                         <button type="button" class="rowMenuItem" data-gastos-move-type-row="${rowIndex}" data-gastos-move-dir="up" ${rowIndex === 0 ? "disabled" : ""}>▲ Subir</button>
                         <button type="button" class="rowMenuItem" data-gastos-move-type-row="${rowIndex}" data-gastos-move-dir="down" ${rowIndex === totalTypes - 1 ? "disabled" : ""}>▼ Bajar</button>
                         <hr>
-                        <button type="button" class="rowMenuItem gastosEyeBtn${isHidden ? "" : " active"}" data-gastos-eye-type="${rowIndex}">👁 ${isHidden ? "Mostrar" : "Ocultar"}</button>
+                        <button type="button" class="rowMenuItem gastosEyeBtn${isHidden ? "" : " active"}" data-gastos-eye-type="${rowIndex}">${iconoHtml(isHidden ? "Ojo" : "OjoTachado")} ${isHidden ? "Mostrar" : "Ocultar"}</button>
                         <button type="button" class="rowMenuItem assetRowEditBtn gastosAnnualEditBtn" data-annual-edit-type="${rowIndex}">Editar</button>
                         <hr>
                         <button type="button" class="rowMenuItem rowMenuItemDanger assetRowDeleteBtn" data-gastos-delete-type-row="${rowIndex}">Eliminar</button>

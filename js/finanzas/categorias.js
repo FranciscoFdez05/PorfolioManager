@@ -113,7 +113,7 @@ function construirFilaCategoria(panel, fila, indice, total) {
             <span class="catUso" title="${tituloUso}">${enUso ? fila.usos : ""}</span>
             <button type="button" class="catIconBtn" data-cat-move="${panel.clave}" data-cat-index="${indice}" data-cat-dir="up" ${indice === 0 ? "disabled" : ""} title="Subir">▲</button>
             <button type="button" class="catIconBtn" data-cat-move="${panel.clave}" data-cat-index="${indice}" data-cat-dir="down" ${indice === total - 1 ? "disabled" : ""} title="Bajar">▼</button>
-            <button type="button" class="catIconBtn catIconBtnDanger" data-cat-delete="${panel.clave}" data-cat-index="${indice}" ${enUso ? "disabled" : ""} title="${enUso ? "En uso: no se puede eliminar" : "Eliminar"}">✕</button>
+            <button type="button" class="catIconBtn catIconBtnDanger" data-cat-delete="${panel.clave}" data-cat-index="${indice}" ${enUso ? "disabled" : ""} title="${enUso ? "En uso: no se puede eliminar" : "Eliminar"}" aria-label="Eliminar">${iconoHtml("Borrar")}</button>
         </li>
     `
 }

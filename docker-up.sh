@@ -179,31 +179,47 @@ esac
 # Sin ellas el contenedor arranca pero no deja entrar a nadie, así que se piden
 # aquí en el primer arranque. El hash es pbkdf2:sha256 en el mismo formato que
 # genera werkzeug, que es quien lo verifica luego en el login.
-if [ -z "$(env_get LOGIN_PASSWORD_HASH)" ] && [ ! -f data/auth.dat ]; then
-    if [ -t 0 ]; then
-        printf 'Usuario de acceso [admin]: '
-        read -r LOGIN_USER
-        [ -n "$LOGIN_USER" ] || LOGIN_USER="admin"
+#
+# Un error al escribirlas (no coinciden, vacía, corta) vuelve a preguntar en vez
+# de cortar el script: antes había que lanzarlo entero otra vez. La otra vía es
+# crear la cuenta desde la web: la aplicación arranca sin cuenta, deja un código
+# de un solo uso en data/tmp/alta-inicial.txt y este script lo muestra al final.
+# El código es lo que impide que otro de la red se adelante en /setup.
 
-        stty -echo 2>/dev/null || true
-        printf 'Contraseña: '
-        read -r PW
-        printf '\nRepite la contraseña: '
-        read -r PW2
-        stty echo 2>/dev/null || true
-        printf '\n'
+pedir_contrasena() {
+    # Lee la contraseña dos veces sin eco. El trap devuelve el eco si se corta
+    # con Ctrl+C a mitad: si no, la terminal se quedaba sin mostrar lo escrito.
+    # Un fin de entrada (Ctrl+D) cierra como Ctrl+C: tratarlo como contraseña
+    # vacía dejaba el bucle de credenciales_terminal preguntando sin fin.
+    trap 'stty echo 2>/dev/null; printf "\n"; exit 130' INT TERM
+    stty -echo 2>/dev/null || true
+    printf 'Contraseña: '
+    read -r PW || kill -INT $$
+    printf '\nRepite la contraseña: '
+    read -r PW2 || kill -INT $$
+    stty echo 2>/dev/null || true
+    trap - INT TERM
+    printf '\n'
+}
 
+credenciales_terminal() {
+    printf 'Usuario de acceso [admin]: '
+    read -r LOGIN_USER || LOGIN_USER=""
+    [ -n "$LOGIN_USER" ] || LOGIN_USER="admin"
+
+    # El mismo mínimo que exige Ajustes al cambiarla: sin esto, la primera
+    # contraseña (la que más tiempo suele durar) era la única sin límite. Se
+    # lee de auth.py para que no haya dos valores que mantener a la par.
+    MIN_LARGO=$(sed -n 's/^MIN_LARGO_CONTRASENA = \([0-9][0-9]*\).*/\1/p' python/routes/auth.py)
+    [ -n "$MIN_LARGO" ] || MIN_LARGO=10
+
+    while true; do
+        pedir_contrasena
         if [ -z "$PW" ] || [ "$PW" != "$PW2" ]; then
-            echo "Las contraseñas no coinciden (o está vacía). No se han configurado" >&2
-            echo "credenciales; vuelve a ejecutar ./docker-up.sh." >&2
-            exit 1
+            echo "  Las contraseñas no coinciden (o está vacía). Prueba otra vez." >&2
+            continue
         fi
 
-        # El mismo mínimo que exige Ajustes al cambiarla: sin esto, la primera
-        # contraseña (la que más tiempo suele durar) era la única sin límite. Se
-        # lee de auth.py para que no haya dos valores que mantener a la par.
-        MIN_LARGO=$(sed -n 's/^MIN_LARGO_CONTRASENA = \([0-9][0-9]*\).*/\1/p' python/routes/auth.py)
-        [ -n "$MIN_LARGO" ] || MIN_LARGO=10
         # Caracteres y no bytes: en dash (y en cualquier sh con locale C) ${#PW}
         # cuenta bytes, y una contraseña con acentos pasaba el mínimo con menos
         # caracteres de los exigidos. Python la cuenta como lo hace la
@@ -212,35 +228,74 @@ if [ -z "$(env_get LOGIN_PASSWORD_HASH)" ] && [ ! -f data/auth.dat ]; then
         LARGO_PW=$(run_py "import os; print(len(os.environ['PW']))" 2>/dev/null) || LARGO_PW=""
         [ -n "$LARGO_PW" ] || LARGO_PW="${#PW}"
         if [ "$LARGO_PW" -lt "$MIN_LARGO" ]; then
-            unset PW PW2
-            echo "La contraseña debe tener al menos $MIN_LARGO caracteres. No se han" >&2
-            echo "configurado credenciales; vuelve a ejecutar ./docker-up.sh." >&2
-            exit 1
+            echo "  La contraseña debe tener al menos $MIN_LARGO caracteres. Prueba otra vez." >&2
+            continue
         fi
+        break
+    done
 
-        # Las iteraciones salen de [seguridad] hash_iteraciones, para que el
-        # hash del primer arranque use el mismo coste que los que genere luego
-        # la aplicación al cambiar la contraseña desde Ajustes.
-        ITERACIONES=$(run_py_file tools/leer_ajuste.py seguridad.hash_iteraciones) || ITERACIONES=""
-        [ -n "$ITERACIONES" ] || ITERACIONES=600000
+    # Las iteraciones salen de [seguridad] hash_iteraciones, para que el
+    # hash del primer arranque use el mismo coste que los que genere luego
+    # la aplicación al cambiar la contraseña desde Ajustes.
+    ITERACIONES=$(run_py_file tools/leer_ajuste.py seguridad.hash_iteraciones) || ITERACIONES=""
+    [ -n "$ITERACIONES" ] || ITERACIONES=600000
 
-        export PW ITERACIONES
-        HASH=$(run_py "
+    export PW ITERACIONES
+    # Si el hash no se puede calcular, repetir la contraseña no lo arregla: se
+    # sigue por la web en vez de abortar con el .env ya a medio preparar.
+    if ! HASH=$(run_py "
 import hashlib, os, secrets
 pw = os.environ['PW'].encode()
 salt = secrets.token_hex(8)
 it = int(os.environ['ITERACIONES'])
 print('pbkdf2:sha256:%d\$%s\$%s' % (
     it, salt, hashlib.pbkdf2_hmac('sha256', pw, salt.encode(), it).hex()))
-")
+") || [ -z "$HASH" ]; then
         unset PW PW2
-        env_set LOGIN_USERNAME "$LOGIN_USER"
-        env_set LOGIN_PASSWORD_HASH "$HASH"
-        echo "Credenciales guardadas en .env (podrás cambiarlas desde Ajustes)."
+        echo "AVISO: no se pudo calcular el hash de la contraseña. La cuenta se" >&2
+        echo "       creará desde la web; el código te lo doy al terminar." >&2
+        return 0
+    fi
+    unset PW PW2
+    env_set LOGIN_USERNAME "$LOGIN_USER"
+    env_set LOGIN_PASSWORD_HASH "$HASH"
+    echo "Credenciales guardadas en .env (podrás cambiarlas desde Ajustes)."
+}
+
+elegir_alta() {
+    # Cualquier respuesta que no sea 1, 2 o 3 vuelve a preguntar. Un fin de
+    # entrada (Ctrl+D) cuenta como cerrar: si no, el bucle no acabaría nunca.
+    while true; do
+        echo
+        echo "No hay ninguna cuenta de acceso. ¿Cómo quieres configurarla?"
+        echo "  1) Desde la web (al terminar te doy la dirección y un código de verificación)"
+        echo "  2) Desde esta terminal"
+        echo "  3) Cerrar"
+        printf 'Opción [1-3]: '
+        read -r OPCION || OPCION=3
+        case "$OPCION" in
+            1|2|3) return 0 ;;
+        esac
+        echo "  Escribe 1, 2 o 3." >&2
+    done
+}
+
+if [ -z "$(env_get LOGIN_PASSWORD_HASH)" ] && [ ! -f data/auth.dat ]; then
+    if [ -t 0 ]; then
+        elegir_alta
+        case "$OPCION" in
+            1) echo "De acuerdo: la dirección y el código, al terminar de arrancar." ;;
+            2) credenciales_terminal ;;
+            3)
+                echo "Cerrado. No se ha arrancado nada; vuelve a lanzar ./docker-setup cuando quieras."
+                exit 0
+                ;;
+        esac
     else
-        echo "AVISO: LOGIN_PASSWORD_HASH está vacío y no hay terminal interactiva," >&2
-        echo "       así que nadie podrá iniciar sesión. Ejecuta ./docker-up.sh" >&2
-        echo "       desde una terminal, o rellena el valor a mano en .env." >&2
+        # Sin terminal no se puede preguntar, pero tampoco hace falta dejar la
+        # instalación sin forma de entrar: se sigue por la web.
+        echo "AVISO: no hay cuenta de acceso ni terminal interactiva. La cuenta se" >&2
+        echo "       creará desde la web; el código te lo doy al terminar." >&2
     fi
 fi
 
@@ -305,7 +360,7 @@ PORT=$(env_get PORT)
 if [ -z "$PORT" ]; then
     PORT=$(run_py_file tools/leer_ajuste.py server.port) || PORT=""
 fi
-[ -n "$PORT" ] || PORT=5000
+[ -n "$PORT" ] || PORT=5050
 
 # Se pregunta en cada arranque con terminal, con el valor actual como respuesta
 # por defecto. Que el 5000 esté ocupado en el host es el tropiezo más común de
@@ -460,6 +515,32 @@ if [ "$ESQUEMA" = "http" ]; then
 else
     echo "HTTPS activo. Si un aparato aún avisa del certificado, es que le falta"
     echo "la CA: descárgala desde Ajustes › Seguridad › HTTPS e instálala en él."
+fi
+
+# ── 10. Alta desde la web ─────────────────────────────────────────────────────
+# Se mira el estado real y no solo la opción elegida: también cubre a quien
+# lanza el script sin terminal o borró las credenciales a mano. El fichero lo
+# crea la aplicación al arrancar; los reintentos cubren a un worker que aún no
+# ha terminado de importar cuando el healthcheck ya ha dado el visto bueno.
+CODIGO_ALTA=data/tmp/alta-inicial.txt
+if [ -z "$(env_get LOGIN_PASSWORD_HASH)" ] && [ ! -f data/auth.dat ]; then
+    ESPERA=10
+    while [ ! -s "$CODIGO_ALTA" ] && [ "$ESPERA" -gt 0 ]; do
+        ESPERA=$((ESPERA - 1))
+        sleep 1
+    done
+    echo
+    if [ -r "$CODIGO_ALTA" ]; then
+        echo "Crea la cuenta de acceso desde el navegador:"
+        echo "  Abre       : $ESQUEMA://$LAN_IP:$PORT/setup"
+        echo "  Código     : $(head -n 1 "$CODIGO_ALTA")"
+        echo "Solo sirve una vez y únicamente mientras no exista ninguna cuenta. Si te"
+        echo "equivocas, la página te lo vuelve a pedir; no hace falta relanzar nada."
+    else
+        echo "AVISO: no hay cuenta de acceso y no encuentro el código de alta en" >&2
+        echo "       $CODIGO_ALTA. Míralo en el log con:" >&2
+        echo "           docker compose logs $SERVICIO | grep setup" >&2
+    fi
 fi
 echo
 echo "Para actualizar más adelante: ./docker-update.sh"

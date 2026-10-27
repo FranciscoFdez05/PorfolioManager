@@ -153,3 +153,32 @@
     background: var(--bg-hover, rgba(255, 255, 255, 0.06));
     border-color: var(--accent, #3a7bd5);
 }
+
+/* Ajustada al alto visible (fitPageActive, ver base.css): mainContent no hace
+   scroll; la tabla se queda con el hueco que dejan la barra de años y el
+   resumen del ejercicio y hace scroll por dentro. */
+@media (min-width: 1201px) {
+    /* Menos aire entre bloques para que la tabla gane alto: el margen negativo
+       come parte del padding superior de contentArea. */
+    .fitPageActive .ventasPageExpanded {
+        min-height: 0;
+        overflow: hidden;
+        gap: 8px;
+        margin-top: -10px;
+    }
+
+    .fitPageActive .ventasPageExpanded .ventasResumen {
+        margin-top: 0;
+    }
+
+    .fitPageActive .ventasPageExpanded .interesesYearBar,
+    .fitPageActive .ventasPageExpanded .ventasResumen {
+        flex: 0 0 auto;
+    }
+
+    .fitPageActive .ventasPageExpanded .operationsTableWrapper {
+        flex: 0 1 auto;
+        min-height: 140px;
+        max-height: none;
+    }
+}

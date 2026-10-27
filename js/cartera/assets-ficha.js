@@ -87,11 +87,11 @@ function renderAssetTablePage(asset) {
                         <button id="assetMenuBtn" class="assetMenuTrigger" type="button" aria-label="Más opciones">⋯</button>
                         <div class="assetMenuDropdown" id="assetMenuDropdown">
                             <button id="refreshAssetMarketBtn" class="assetMenuItem assetMenuItemRefresh" type="button">
-                                <span class="assetMenuIcon">↻</span>
+                                <span class="assetMenuIcon">${iconoHtml("Recargar")}</span>
                                 <span class="assetMenuText">Actualizar cotización <span class="assetBtnProvider">(${String(asset.marketProvider || inferMarketProviderFromSymbol(asset.marketSymbol || asset.finnhubSymbol || "")).toUpperCase()})</span></span>
                             </button>
                             <button id="editAssetNameBtn" class="assetMenuItem" type="button">
-                                <span class="assetMenuIcon">✎</span>
+                                <span class="assetMenuIcon">${iconoHtml("Editar")}</span>
                                 <span class="assetMenuText">Editar nombre del activo</span>
                             </button>
                             <div class="assetMenuCurrencyRow" id="assetCurrencyRow">
@@ -102,7 +102,7 @@ function renderAssetTablePage(asset) {
                             </div>
                             <div class="assetMenuSep"></div>
                             <button id="deleteAssetBtn" class="assetMenuItem assetMenuItemDanger" type="button">
-                                <span class="assetMenuIcon">🗑</span>
+                                <span class="assetMenuIcon">${iconoHtml("Borrar")}</span>
                                 <span class="assetMenuText">Eliminar activo</span>
                             </button>
                         </div>
@@ -339,7 +339,18 @@ document.addEventListener("activo-guardado", (evento) => {
     if (fusionado && document.getElementById("assetOperationsBody")) {
         currentAssetPersistedOperationRows = Array.isArray(fusionado.operationRows) ? fusionado.operationRows : []
         currentAssetPersistedConversionRows = Array.isArray(fusionado.conversionRows) ? fusionado.conversionRows : []
+        // Precio y divisa son los del servidor tras la fusión: la cabecera
+        // seguía enseñando los de la copia antigua ("150,00 $").
+        const pagina = document.querySelector(".assetTablePage")
+        if (pagina) {
+            pagina.dataset.assetPrice = fusionado.price || pagina.dataset.assetPrice
+            pagina.dataset.assetCurrency = fusionado.currency || pagina.dataset.assetCurrency
+            pagina.dataset.assetChange = fusionado.change || pagina.dataset.assetChange
+            pagina.dataset.assetStatus = fusionado.status || pagina.dataset.assetStatus
+            pagina.dataset.assetLastUpdated = fusionado.lastUpdated || pagina.dataset.assetLastUpdated
+        }
         renderAssetRows(getPrimaryAssetRows(fusionado))
+        refreshAssetHeaderStats(fusionado)
     }
 })
 
@@ -1080,17 +1091,17 @@ function openAssetRowModal(rowIndex) {
                 ? `
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Exchange</label>
-            <input id="arModalExchange" class="assetRowModalInput" type="text" value="${escapeAttr(rowData.exchange || "")}">
+            <input id="arModalExchange" class="assetRowModalInput" type="text" placeholder="Ej: Binance" value="${escapeAttr(rowData.exchange || "")}">
         </div>`
                 : ""
         }
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Participaciones</label>
-            <input id="arModalParticipaciones" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(rowData.participaciones || "")}">
+            <input id="arModalParticipaciones" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="${isCrypto ? "0,05" : "10"}" value="${escapeAttr(rowData.participaciones || "")}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Precio participación</label>
-            <input id="arModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(rowData.precioParticipacion || "")}">
+            <input id="arModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="${isCrypto ? "62000,00" : "150,25"}" value="${escapeAttr(rowData.precioParticipacion || "")}">
         </div>
         ${
             isCrypto
@@ -1106,23 +1117,23 @@ function openAssetRowModal(rowIndex) {
         }
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Capital invertido bruto</label>
-            <input id="arModalCapital" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(rowData.capitalInvertidoBruto || "")}">
+            <input id="arModalCapital" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="${isCrypto ? "3100,00" : "1502,50"}" value="${escapeAttr(rowData.capitalInvertidoBruto || "")}">
         </div>
         ${
             isCrypto
                 ? `
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Comisiones cripto</label>
-            <input id="arModalComisionesCripto" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(rowData.comisionesCripto || rowData.comisionesSatoshis || "")}">
+            <input id="arModalComisionesCripto" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="0,0001" value="${escapeAttr(rowData.comisionesCripto || rowData.comisionesSatoshis || "")}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Comisiones fiat</label>
-            <input id="arModalComisionesFiat" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(rowData.comisionesFiat || "")}">
+            <input id="arModalComisionesFiat" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="1,50" value="${escapeAttr(rowData.comisionesFiat || "")}">
         </div>`
                 : `
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Comisiones</label>
-            <input id="arModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(rowData.comisiones || "")}">
+            <input id="arModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="1,50" value="${escapeAttr(rowData.comisiones || "")}">
         </div>`
         }
     `

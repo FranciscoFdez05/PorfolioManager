@@ -125,7 +125,8 @@ let _dragSrc = null
 let _dragHome = null
 let _dragDropped = false
 
-const _HANDLE_SVG = `<svg viewBox="0 0 10 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><circle cx="2.5" cy="2" r="1.5"/><circle cx="7.5" cy="2" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="14" r="1.5"/><circle cx="7.5" cy="14" r="1.5"/></svg>`
+// Literal y no iconoHtml(): se evalúa al cargar el script, antes que shared-utils.js.
+const _HANDLE_SVG = `<span class="icono iconoArrastrar" aria-hidden="true"></span>`
 
 function _buildPageColumns(pageEl) {
     const sections = [...pageEl.querySelectorAll(":scope > .ajustesSection")]
@@ -249,8 +250,8 @@ function _buildInlineSelect(sel) {
     labelEl.className = "ajustesDropLabel"
 
     const arrowEl = document.createElement("span")
-    arrowEl.className = "ajustesDropArrow"
-    arrowEl.textContent = "▾"
+    arrowEl.className = "icono iconoDesplegar ajustesDropArrow"
+    arrowEl.setAttribute("aria-hidden", "true")
 
     trigger.appendChild(labelEl)
     trigger.appendChild(arrowEl)
@@ -368,6 +369,7 @@ async function initAjustesLogic() {
     _initAjustesEstadoApis()
     _initAjustesAtajoHttps()
     _initAjustesCredenciales()
+    _initAjustes2fa()
     _initAjustesApariencia(settings)
     _initAjustesActualizacion()
     _initAjustesDatos()

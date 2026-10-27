@@ -257,7 +257,7 @@ def syncCompletedOperationsIntoAssets(rows):
     columnas = [c for c, _ in _CAMPOS_OPERACION]
     lista = ", ".join(columnas)
 
-    with transaction() as conn:
+    def desfasados(conn):
         existentes = {}
         for fila in conn.execute(
             f"SELECT asset_id, {lista}, fx_rate, fx_fecha, fx_origen "
@@ -265,6 +265,7 @@ def syncCompletedOperationsIntoAssets(rows):
         ):
             existentes.setdefault(fila["asset_id"], []).append(fila)
 
+        pendientes = []
         idsActivos = {r[0] for r in conn.execute("SELECT id FROM activos")}
         for assetId in idsActivos:
             deseadas = [
@@ -272,9 +273,19 @@ def syncCompletedOperationsIntoAssets(rows):
                 for op in operationsByAsset.get(assetId, [])
             ]
             previas = existentes.get(assetId, [])
-            if [tuple(str(f[c]) for c in columnas) for f in previas] == deseadas:
-                continue
+            if [tuple(str(f[c]) for c in columnas) for f in previas] != deseadas:
+                pendientes.append((assetId, previas, deseadas))
+        return pendientes
 
+    with transaction() as conn:
+        # Lo normal es que no haya nada que escribir (esto cuelga de un GET): se
+        # comprueba sin tomar el bloqueo de escritura, y solo si hay algo se
+        # toma y se vuelve a comprobar, porque entre una cosa y otra otro proceso
+        # pudo haber cambiado las filas y el diff ya no valdría.
+        if not desfasados(conn):
+            return
+        revisiones.tomarBloqueo(conn)
+        for assetId, previas, deseadas in desfasados(conn):
             fx = {(f["fecha_apertura"], f["currency"]): (f["fx_rate"], f["fx_fecha"], f["fx_origen"])
                   for f in previas if f["fx_rate"]}
             indiceFecha = columnas.index("fecha_apertura")

@@ -351,3 +351,26 @@ def testUnaBdYaEnLa19RecibeLaCuentaPorMesDeLosIngresosRecurrentes(tempDb):
 
     assert conexion.execute("PRAGMA user_version").fetchone()[0] == db.ESQUEMA_VERSION
     assert "cuentas_cobro" in {f[1] for f in conexion.execute("PRAGMA table_info(ingresos_recurrentes)")}
+
+
+def testLosPasos22Y23AnadenLasColumnasNuevasSinTocarLasConversiones(tempDb):
+    """Una base anterior al paso 22 conserva sus conversiones y gana las columnas vacías."""
+    from core import db
+
+    conexion = db.getDb()
+    conexion.execute("INSERT INTO activos (id, name) VALUES ('bitcoin', 'Bitcoin')")
+    for columna in ("cantidad_contraparte", "comision", "comision_moneda"):
+        conexion.execute(f"ALTER TABLE activo_conversion_rows DROP COLUMN {columna}")
+    conexion.execute(
+        "INSERT INTO activo_conversion_rows (id, asset_id, fecha, par, tipo, cantidad) "
+        "VALUES ('c1', 'bitcoin', '10-01-2026', 'BTC/ETH', 'BTC convertidos', '0,01')"
+    )
+    conexion.execute("PRAGMA user_version = 21")
+
+    db._migrate(conexion)
+
+    fila = conexion.execute(
+        "SELECT cantidad, cantidad_contraparte, comision, comision_moneda FROM activo_conversion_rows WHERE id = 'c1'"
+    ).fetchone()
+    assert tuple(fila) == ("0,01", "", "", "")
+    assert conexion.execute("PRAGMA user_version").fetchone()[0] == db.ESQUEMA_VERSION

@@ -1,6 +1,6 @@
 {
   "name": "porfoliomanager-frontend",
-  "version": "4.8.2",
+  "version": "4.9.0",
   "private": true,
   "type": "module",
   "description": "Tooling del frontend. La aplicación no se empaqueta: js/ se sirve tal cual con etiquetas <script>, así que aquí solo hay linter, formateador y las pruebas de los módulos de js/core/.",
@@ -14,11 +14,11 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "@eslint/js": "^9.17.0",
-    "eslint": "^9.17.0",
-    "globals": "^15.14.0",
-    "jsdom": "^25.0.1",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "jsdom": "^29.1.1",
     "prettier": "^3.4.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.5"
   }
 }

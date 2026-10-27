@@ -34,6 +34,42 @@ saludBp = Blueprint("salud", __name__)
 # solo", que es la primera pregunta cuando algo va raro.
 _ARRANQUE = time.monotonic()
 
+# Último quick_check correcto: (base y generación, instante hasta el que vale).
+# Solo se guardan los aciertos: un fallo se vuelve a comprobar en cada llamada.
+_quickCheckVigente = None
+
+
+def _quickCheckReciente(clave) -> bool:
+    """Si hay un quick_check correcto de esta base aún dentro de su vigencia."""
+    vigente = _quickCheckVigente
+    return vigente is not None and vigente[0] == clave and time.monotonic() < vigente[1]
+
+
+def _resultadoQuickCheck(conexion):
+    """Texto en minúsculas que devuelve `PRAGMA quick_check`, con caché por TTL.
+
+    La clave incluye la ruta de la base y la generación de `core.db`, que sube al
+    restaurar, importar o cambiar de portfolio: así un cambio de base nunca
+    hereda el resultado de la anterior.
+
+    Args:
+        conexion: Conexión a la base activa.
+
+    Returns:
+        "ok" o el motivo que da SQLite.
+    """
+    global _quickCheckVigente
+    ttl = settings.healthQuickCheckTtlSegundos()
+    clave = (str(db.getActiveDbPath()), db._resetGeneration)
+    if ttl > 0 and _quickCheckReciente(clave):
+        return "ok"
+
+    resultado = conexion.execute("PRAGMA quick_check(1)").fetchone()
+    estadoBd = (resultado[0] if resultado else "sin respuesta").lower()
+    if estadoBd == "ok" and ttl > 0:
+        _quickCheckVigente = (clave, time.monotonic() + ttl)
+    return estadoBd
+
 
 def _comprobarBd():
     """(sano, detalle) de la base de datos activa.
@@ -49,8 +85,7 @@ def _comprobarBd():
         conexion = db.getDb()
         conexion.execute("SELECT 1").fetchone()
 
-        resultado = conexion.execute("PRAGMA quick_check(1)").fetchone()
-        estadoBd = (resultado[0] if resultado else "sin respuesta").lower()
+        estadoBd = _resultadoQuickCheck(conexion)
         if estadoBd != "ok":
             return False, {"bd": "corrupta", "detalle": estadoBd}
 

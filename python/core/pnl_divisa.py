@@ -105,6 +105,10 @@ def descomponer(invertido, valorActual, fxCompra, fxActual, completo=True):
     v1 = _dec(valorActual)
     r0 = _dec(fxCompra, Decimal("1"))
     r1 = _dec(fxActual, Decimal("1"))
+    # Sin tipo actual se valora a 1, y presentarlo como completo inventaría un
+    # efecto divisa: el desglose queda marcado como aproximado.
+    if fxActual is None or str(fxActual).strip() == "":
+        completo = False
 
     # Un tipo de cambio de cero o negativo no existe; tomarlo al pie de la letra
     # daría una posición valorada en cero sin ninguna señal de que algo va mal.
@@ -144,6 +148,9 @@ def descomponerLotes(lotes, fxActual, completo=True):
     """
     total = efectoActivo = efectoDivisa = Decimal("0")
     cruzado = invertidoEur = valorEur = Decimal("0")
+
+    if fxActual is None or str(fxActual).strip() == "" or _dec(fxActual) <= 0:
+        completo = False
 
     for lote in lotes:
         fxCompra = lote.get("fxCompra")

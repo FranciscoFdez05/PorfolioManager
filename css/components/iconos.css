@@ -1,0 +1,229 @@
+/*
+ * Iconos de la interfaz como archivos en img/icons/ (Lucide, licencia ISC: ver
+ * img/icons/LICENSE-lucide.txt).
+ *
+ * Se pintan con mask-image + background-color: currentColor en vez de <img>
+ * para que hereden el color del texto: así siguen los temas claro/oscuro y el
+ * color de acento de los estados activos igual que los SVG en línea de antes.
+ * Las rutas van aquí y no en un style= porque una url() relativa se resuelve
+ * contra esta hoja, sea cual sea la página que la cargue.
+ *
+ * Uso: <span class="icono iconoAjustes" aria-hidden="true"></span>
+ * Un mismo significado reutiliza la misma clase (la rueda de ajustes de la
+ * navegación y la de los paneles son iconoAjustes).
+ */
+
+.icono {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    vertical-align: -0.125em;
+    background-color: currentColor;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+}
+
+/* general */
+.iconoAjustes {
+    -webkit-mask-image: url("../../img/icons/general/ajustes.svg");
+    mask-image: url("../../img/icons/general/ajustes.svg");
+}
+.iconoArrastrar {
+    -webkit-mask-image: url("../../img/icons/general/arrastrar.svg");
+    mask-image: url("../../img/icons/general/arrastrar.svg");
+}
+.iconoAviso {
+    -webkit-mask-image: url("../../img/icons/general/aviso.svg");
+    mask-image: url("../../img/icons/general/aviso.svg");
+}
+.iconoBorrar {
+    -webkit-mask-image: url("../../img/icons/general/borrar.svg");
+    mask-image: url("../../img/icons/general/borrar.svg");
+}
+.iconoBuscar {
+    -webkit-mask-image: url("../../img/icons/general/buscar.svg");
+    mask-image: url("../../img/icons/general/buscar.svg");
+}
+.iconoCalendario {
+    -webkit-mask-image: url("../../img/icons/general/calendario.svg");
+    mask-image: url("../../img/icons/general/calendario.svg");
+}
+.iconoCerrar {
+    -webkit-mask-image: url("../../img/icons/general/cerrar.svg");
+    mask-image: url("../../img/icons/general/cerrar.svg");
+}
+.iconoDescargar {
+    -webkit-mask-image: url("../../img/icons/general/descargar.svg");
+    mask-image: url("../../img/icons/general/descargar.svg");
+}
+.iconoDesplegar {
+    -webkit-mask-image: url("../../img/icons/general/desplegar.svg");
+    mask-image: url("../../img/icons/general/desplegar.svg");
+}
+.iconoEditar {
+    -webkit-mask-image: url("../../img/icons/general/editar.svg");
+    mask-image: url("../../img/icons/general/editar.svg");
+}
+.iconoError {
+    -webkit-mask-image: url("../../img/icons/general/error.svg");
+    mask-image: url("../../img/icons/general/error.svg");
+}
+.iconoGuardar {
+    -webkit-mask-image: url("../../img/icons/general/guardar.svg");
+    mask-image: url("../../img/icons/general/guardar.svg");
+}
+.iconoMarcado {
+    -webkit-mask-image: url("../../img/icons/general/marcado.svg");
+    mask-image: url("../../img/icons/general/marcado.svg");
+}
+.iconoOjoTachado {
+    -webkit-mask-image: url("../../img/icons/general/ojo-tachado.svg");
+    mask-image: url("../../img/icons/general/ojo-tachado.svg");
+}
+.iconoOjo {
+    -webkit-mask-image: url("../../img/icons/general/ojo.svg");
+    mask-image: url("../../img/icons/general/ojo.svg");
+}
+.iconoOk {
+    -webkit-mask-image: url("../../img/icons/general/ok.svg");
+    mask-image: url("../../img/icons/general/ok.svg");
+}
+.iconoOpciones {
+    -webkit-mask-image: url("../../img/icons/general/opciones.svg");
+    mask-image: url("../../img/icons/general/opciones.svg");
+}
+.iconoPausa {
+    -webkit-mask-image: url("../../img/icons/general/pausa.svg");
+    mask-image: url("../../img/icons/general/pausa.svg");
+}
+.iconoRecargar {
+    -webkit-mask-image: url("../../img/icons/general/recargar.svg");
+    mask-image: url("../../img/icons/general/recargar.svg");
+}
+.iconoReloj {
+    -webkit-mask-image: url("../../img/icons/general/reloj.svg");
+    mask-image: url("../../img/icons/general/reloj.svg");
+}
+.iconoSubir {
+    -webkit-mask-image: url("../../img/icons/general/subir.svg");
+    mask-image: url("../../img/icons/general/subir.svg");
+}
+.iconoUsuario {
+    -webkit-mask-image: url("../../img/icons/general/usuario.svg");
+    mask-image: url("../../img/icons/general/usuario.svg");
+}
+
+/* ajustes */
+.iconoArchivo {
+    -webkit-mask-image: url("../../img/icons/ajustes/archivo.svg");
+    mask-image: url("../../img/icons/ajustes/archivo.svg");
+}
+.iconoBillete {
+    -webkit-mask-image: url("../../img/icons/ajustes/billete.svg");
+    mask-image: url("../../img/icons/ajustes/billete.svg");
+}
+.iconoCambio {
+    -webkit-mask-image: url("../../img/icons/ajustes/cambio.svg");
+    mask-image: url("../../img/icons/ajustes/cambio.svg");
+}
+.iconoClave {
+    -webkit-mask-image: url("../../img/icons/ajustes/clave.svg");
+    mask-image: url("../../img/icons/ajustes/clave.svg");
+}
+.iconoConexion {
+    -webkit-mask-image: url("../../img/icons/ajustes/conexion.svg");
+    mask-image: url("../../img/icons/ajustes/conexion.svg");
+}
+.iconoContrasena {
+    -webkit-mask-image: url("../../img/icons/ajustes/contrasena.svg");
+    mask-image: url("../../img/icons/ajustes/contrasena.svg");
+}
+.iconoDatos {
+    -webkit-mask-image: url("../../img/icons/ajustes/datos.svg");
+    mask-image: url("../../img/icons/ajustes/datos.svg");
+}
+.iconoDecimales {
+    -webkit-mask-image: url("../../img/icons/ajustes/decimales.svg");
+    mask-image: url("../../img/icons/ajustes/decimales.svg");
+}
+.iconoDensidad {
+    -webkit-mask-image: url("../../img/icons/ajustes/densidad.svg");
+    mask-image: url("../../img/icons/ajustes/densidad.svg");
+}
+.iconoEscudo {
+    -webkit-mask-image: url("../../img/icons/ajustes/escudo.svg");
+    mask-image: url("../../img/icons/ajustes/escudo.svg");
+}
+.iconoGraficoBarras {
+    -webkit-mask-image: url("../../img/icons/ajustes/grafico-barras.svg");
+    mask-image: url("../../img/icons/ajustes/grafico-barras.svg");
+}
+.iconoGraficoLinea {
+    -webkit-mask-image: url("../../img/icons/ajustes/grafico-linea.svg");
+    mask-image: url("../../img/icons/ajustes/grafico-linea.svg");
+}
+.iconoHistorial {
+    -webkit-mask-image: url("../../img/icons/ajustes/historial.svg");
+    mask-image: url("../../img/icons/ajustes/historial.svg");
+}
+.iconoHorario {
+    -webkit-mask-image: url("../../img/icons/ajustes/horario.svg");
+    mask-image: url("../../img/icons/ajustes/horario.svg");
+}
+.iconoHttps {
+    -webkit-mask-image: url("../../img/icons/ajustes/https.svg");
+    mask-image: url("../../img/icons/ajustes/https.svg");
+}
+.iconoInactividad {
+    -webkit-mask-image: url("../../img/icons/ajustes/inactividad.svg");
+    mask-image: url("../../img/icons/ajustes/inactividad.svg");
+}
+.iconoModulos {
+    -webkit-mask-image: url("../../img/icons/ajustes/modulos.svg");
+    mask-image: url("../../img/icons/ajustes/modulos.svg");
+}
+.iconoMoneda {
+    -webkit-mask-image: url("../../img/icons/ajustes/moneda.svg");
+    mask-image: url("../../img/icons/ajustes/moneda.svg");
+}
+.iconoMovil {
+    -webkit-mask-image: url("../../img/icons/ajustes/movil.svg");
+    mask-image: url("../../img/icons/ajustes/movil.svg");
+}
+.iconoNumeros {
+    -webkit-mask-image: url("../../img/icons/ajustes/numeros.svg");
+    mask-image: url("../../img/icons/ajustes/numeros.svg");
+}
+.iconoPaleta {
+    -webkit-mask-image: url("../../img/icons/ajustes/paleta.svg");
+    mask-image: url("../../img/icons/ajustes/paleta.svg");
+}
+.iconoPortfolio {
+    -webkit-mask-image: url("../../img/icons/ajustes/portfolio.svg");
+    mask-image: url("../../img/icons/ajustes/portfolio.svg");
+}
+.iconoPulso {
+    -webkit-mask-image: url("../../img/icons/ajustes/pulso.svg");
+    mask-image: url("../../img/icons/ajustes/pulso.svg");
+}
+.iconoRotacion {
+    -webkit-mask-image: url("../../img/icons/ajustes/rotacion.svg");
+    mask-image: url("../../img/icons/ajustes/rotacion.svg");
+}
+.iconoTelegram {
+    -webkit-mask-image: url("../../img/icons/ajustes/telegram.svg");
+    mask-image: url("../../img/icons/ajustes/telegram.svg");
+}
+.iconoUmbral {
+    -webkit-mask-image: url("../../img/icons/ajustes/umbral.svg");
+    mask-image: url("../../img/icons/ajustes/umbral.svg");
+}
+.iconoZip {
+    -webkit-mask-image: url("../../img/icons/ajustes/zip.svg");
+    mask-image: url("../../img/icons/ajustes/zip.svg");
+}

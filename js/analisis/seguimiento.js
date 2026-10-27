@@ -300,11 +300,10 @@ function segUpdateHiddenBtn() {
     if (!btn) return
     const hidden = segLoadHidden()
     const count = [...hidden].filter((id) => id.startsWith("portfolio_")).length
-    if (count > 0) {
-        btn.style.display = ""
-        if (badge) badge.textContent = count
-    } else {
-        btn.style.display = "none"
+    btn.style.display = ""
+    if (badge) {
+        badge.textContent = count
+        badge.classList.toggle("hidden", count === 0)
     }
 }
 
@@ -572,6 +571,8 @@ async function segRefreshCustomPrices() {
 async function initSeguimientoLogic() {
     const addBtn = document.getElementById("seguimientoAddBtn")
     const searchInput = document.getElementById("seguimientoSearch")
+    const searchBox = document.getElementById("seguimientoSearchBox")
+    const searchBtn = document.getElementById("seguimientoSearchBtn")
     const modalOverlay = document.getElementById("seguimientoModalOverlay")
     const confirmBtn = document.getElementById("seguimientoConfirmBtn")
     const cancelBtn = document.getElementById("seguimientoCancelBtn")
@@ -814,6 +815,21 @@ async function initSeguimientoLogic() {
     searchInput?.addEventListener("input", () => {
         _segSearch = searchInput.value
         segRenderGrid()
+    })
+    searchBtn?.addEventListener("click", () => {
+        const abrir = searchInput.hidden
+        searchInput.hidden = !abrir
+        searchBox.classList.toggle("open", abrir)
+        if (abrir) {
+            searchInput.focus()
+        } else {
+            searchInput.value = ""
+            _segSearch = ""
+            segRenderGrid()
+        }
+    })
+    searchInput?.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") searchBtn.click()
     })
 
     // autocomplete

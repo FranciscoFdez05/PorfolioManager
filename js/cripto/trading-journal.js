@@ -5,6 +5,13 @@ const TRADING_RESULTADO_OPTIONS = ["PROFIT", "PÉRDIDA"]
 let currentTradingData = { rows: [] }
 let tradingAutosaveTimeout = null
 let tradingPersistenceBound = false
+// Solo se guarda al ocultar o cerrar la pestaña si hubo cambios locales: sin
+// esta marca, una pestaña con la lista vieja pisaba lo guardado desde otro sitio.
+let tradingHasPendingChanges = false
+// Revisión que el servidor tenía al cargar o guardar por última vez, y copia de
+// las filas de entonces: la base de la fusión si otro sitio guarda antes.
+let tradingRevision = null
+let tradingBaseRows = []
 
 let _tFilterTipo = new Set(TRADING_TIPO_OPTIONS)
 let _tFilterDireccion = new Set(TRADING_DIRECCION_OPTIONS)
@@ -29,8 +36,11 @@ async function saveTradingDataApi(payload, options = {}) {
     })
     if (!response.ok) {
         const text = await response.text()
-        throw new Error(`HTTP ${response.status}: ${text}`)
+        const error = new Error(`HTTP ${response.status}: ${text}`)
+        error.status = response.status
+        throw error
     }
+    return await response.json().catch(() => null)
 }
 
 // ── Normalize ──────────────────────────────────────────────────────────────
@@ -115,6 +125,8 @@ async function initTradingJournalLogic() {
     currentTradingData = {
         rows: Array.isArray(payload?.rows) ? payload.rows.map((r) => normalizeTradingRow(r)) : []
     }
+    tradingRevision = Number.isInteger(payload?.revision) ? payload.revision : null
+    tradingBaseRows = JSON.parse(JSON.stringify(currentTradingData.rows))
     _tFilterTipo = loadTradingFilterState("tipo", TRADING_TIPO_OPTIONS)
     _tFilterDireccion = loadTradingFilterState("direccion", TRADING_DIRECCION_OPTIONS)
     _tFilterResultado = loadTradingFilterState("resultado", TRADING_RESULTADO_OPTIONS)
@@ -561,7 +573,7 @@ async function openTradingModal(tradeId) {
     overlay.dataset.tradeId = tradeId || ""
 
     const modal = document.createElement("div")
-    modal.className = "assetModal assetRowModal"
+    modal.className = "assetModal assetRowModal modalDosColumnas"
 
     const title = document.createElement("h3")
     title.className = "assetModalTitle assetRowModalTitle"
@@ -700,23 +712,83 @@ function saveTradingFromModal(overlay) {
 // ── Persistence ────────────────────────────────────────────────────────────
 
 function scheduleTradingAutosave(delay = 500) {
+    tradingHasPendingChanges = true
     window.clearTimeout(tradingAutosaveTimeout)
     tradingAutosaveTimeout = window.setTimeout(async () => {
         try {
             await persistTradingData()
         } catch (err) {
-            showError("No se pudieron guardar los trades", err)
+            showError("No se pudieron guardar los trades", err, { persistent: true })
         }
     }, delay)
 }
 
+// Los guardados van de uno en uno: dos a la vez (el autoguardado y el de ocultar
+// la pestaña) chocaban entre sí con un 409, se fusionaban dos veces y el aviso
+// de «se han combinado» salía duplicado.
+let tradingPersistChain = Promise.resolve()
+
 async function persistTradingData(options = {}) {
     window.clearTimeout(tradingAutosaveTimeout)
-    await saveTradingDataApi(currentTradingData, options)
+    const turno = tradingPersistChain.catch(() => {}).then(() => guardarTradingAhora(options))
+    tradingPersistChain = turno
+    return turno
+}
+
+async function guardarTradingAhora(options = {}) {
+    tradingHasPendingChanges = false
+    const payload = {
+        rows: currentTradingData.rows,
+        ...(Number.isInteger(tradingRevision) ? { revision: tradingRevision } : {})
+    }
+    try {
+        let respuesta
+        try {
+            respuesta = await saveTradingDataApi(payload, options)
+        } catch (error) {
+            // Con keepalive la página puede estar cerrándose: no hay tiempo de
+            // fusionar, y en el servidor no se ha borrado nada.
+            if (error?.status !== 409 || options.keepalive) throw error
+            respuesta = await fusionarTradingTrasConflicto(payload)
+        }
+        if (Number.isInteger(respuesta?.revision)) tradingRevision = respuesta.revision
+        tradingBaseRows = JSON.parse(JSON.stringify(currentTradingData.rows))
+    } catch (error) {
+        tradingHasPendingChanges = true
+        throw error
+    }
+}
+
+// Otra pestaña u otro dispositivo guardó los trades entretanto: se aplican los
+// cambios de esta pestaña (respecto a lo que cargó) sobre lo que hay ahora.
+async function fusionarTradingTrasConflicto(payload) {
+    const servidor = await loadTradingData()
+    const filasServidor = (servidor.rows || []).map((row) => normalizeTradingRow(row))
+    const { filas, descartadas } = resolverConflictosPorId(
+        fusionarListaTresVias(tradingBaseRows, payload.rows, filasServidor, claveEstableAnual),
+        filasServidor
+    )
+    currentTradingData = { rows: filas }
+    let respuesta
+    try {
+        respuesta = await saveTradingDataApi({ rows: filas, revision: servidor.revision })
+    } catch (error) {
+        // No se ha podido guardar: la pestaña vuelve a lo que hay en el servidor
+        // para no enseñar como guardado lo que no lo está.
+        currentTradingData = { rows: filasServidor }
+        tradingRevision = Number.isInteger(servidor.revision) ? servidor.revision : null
+        tradingBaseRows = JSON.parse(JSON.stringify(filasServidor))
+        renderTradingView()
+        error.message = `No se han guardado tus cambios en los trades; se han recargado los del servidor. (${error.message})`
+        throw error
+    }
+    renderTradingView()
+    avisarFusion("los trades", descartadas.length)
+    return respuesta
 }
 
 async function flushTradingPendingChanges() {
-    if (!document.getElementById("tradingBody")) return
+    if (!document.getElementById("tradingBody") || !tradingHasPendingChanges) return
     await persistTradingData({ keepalive: true })
 }
 
@@ -725,12 +797,12 @@ function bindTradingPersistenceGuards() {
     tradingPersistenceBound = true
 
     window.addEventListener("beforeunload", () => {
-        if (!document.getElementById("tradingBody")) return
+        if (!document.getElementById("tradingBody") || !tradingHasPendingChanges) return
         persistTradingData({ keepalive: true }).catch(console.error)
     })
 
     document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState !== "hidden" || !document.getElementById("tradingBody")) return
+        if (document.visibilityState !== "hidden" || !document.getElementById("tradingBody") || !tradingHasPendingChanges) return
         persistTradingData({ keepalive: true }).catch(console.error)
     })
 }

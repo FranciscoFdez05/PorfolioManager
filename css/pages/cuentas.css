@@ -17,13 +17,39 @@
     gap: 16px;
 }
 
-/* Misma rejilla que los años de Gastos, Ingresos y Cuenta de ahorro. */
+/* Misma tira de años que Intereses, Dividendos y las páginas de Cripto: una
+   sola línea con scroll lateral, y el botón principal y el ··· a la derecha. */
 .cuentasYearList {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 5px;
-    flex: 1 1 auto;
-    margin-right: 152px;
+    display: flex;
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+    padding-bottom: 6px;
+}
+
+.cuentasYearList::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+}
+
+.cuentasYearList::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.cuentasYearList > * {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.cuentasTopBar > #cuentasAddRowBtn {
+    flex-shrink: 0;
 }
 
 .cuentasLayout {

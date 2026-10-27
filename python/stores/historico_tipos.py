@@ -35,6 +35,7 @@ _SQL_AGREGADO = """SELECT s.ts, a.type, SUM(s.price_eur) AS v, SUM(s.cost_eur) A
 _lock = threading.Lock()
 _cache = {}  # ruta de la BD -> estado del agregado
 _MAX_BDS = 4
+_MAX_CUERPOS = 32  # cuerpos serializados por estado del agregado
 
 
 def _firmaActivos(conn):
@@ -101,7 +102,7 @@ def _agregado(conn):
 
         puntos = _puntos(sumas)
         estado = {"firma": firma, "filas": filas, "maxId": maxId, "sumas": sumas,
-                  "puntos": puntos, "tsOrdenados": [p["ts"] for p in puntos]}
+                  "puntos": puntos, "tsOrdenados": [p["ts"] for p in puntos], "cuerpos": {}}
         _cache.pop(clave, None)
         _cache[clave] = estado
         while len(_cache) > _MAX_BDS:
@@ -115,6 +116,40 @@ def seriePorTipo(desdeTs=None):
     if desdeTs is None:
         return estado["puntos"]
     return estado["puntos"][bisect.bisect_left(estado["tsOrdenados"], desdeTs):]
+
+
+def cuerpoPorTipo(rangeParam, desdeTs, construir) -> bytes:
+    """Cuerpo JSON ya serializado de `history/by-type` para un rango.
+
+    Serializar los puntos era la mitad del coste de la respuesta con el rango
+    completo (30 de 62 ms). El cuerpo se guarda dentro del estado del agregado,
+    así que se invalida solo: cualquier cambio que rehaga el agregado (filas
+    nuevas, cambio de tipo, restauración, otro portfolio) crea un estado nuevo
+    sin cuerpos. La clave incluye el índice del primer punto del rango, porque
+    los rangos relativos (1D, 1M...) deslizan su inicio con el tiempo.
+
+    Args:
+        rangeParam: Nombre del rango tal como sale en la respuesta.
+        desdeTs: Primer `ts` incluido (todos si es None).
+        construir: Función `(puntos) -> bytes` que serializa; solo se llama si
+            el cuerpo no está guardado.
+
+    Returns:
+        El cuerpo, idéntico al que se obtendría sin caché.
+    """
+    estado = _agregado(db.getDb())
+    inicio = 0 if desdeTs is None else bisect.bisect_left(estado["tsOrdenados"], desdeTs)
+    clave = (rangeParam, inicio)
+    with _lock:
+        cuerpos = estado["cuerpos"]
+        cuerpo = cuerpos.get(clave)
+        if cuerpo is None:
+            cuerpo = construir(estado["puntos"][inicio:])
+            # Tope por si llegan nombres de rango arbitrarios en la URL.
+            if len(cuerpos) >= _MAX_CUERPOS:
+                cuerpos.clear()
+            cuerpos[clave] = cuerpo
+        return cuerpo
 
 
 def invalidar():

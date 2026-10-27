@@ -176,6 +176,78 @@ def testTopCryptosSeParaEnElLimiteDeMonedasUnicas(monkeypatch):
     assert [f["ticker"] for f in filas] == ["BTC", "ETH"]
 
 
+def _screenerConStablecoins(stablecoins, filasCripto, peticiones=None):
+    """Fake de `fetchScreener` que responde según el mercado: `coin` para la
+    consulta de categorías y `crypto` para los pares."""
+    def fake(filterClauses, columns, sortBy=None, sortOrder="desc", limit=50,
+             instrumentTypes=None, market="america", timeout=None):
+        if peticiones is not None:
+            peticiones.append(market)
+        if market == "coin":
+            return {"data": stablecoins}
+        return {"data": filasCripto}
+    return fake
+
+
+def testStablecoinBasesSoloAceptaFilasConLaCategoria(monkeypatch):
+    """El filtro del servidor no basta: una fila sin la categoría en su propia
+    lista (o con la lista a null) no se toma por stablecoin."""
+    monkeypatch.setattr(tradingview_client, "fetchScreener", _screenerConStablecoins([
+        {"s": "CRYPTO:USDTUSD", "d": ["USDT", ["stablecoins", "fiat-stablecoins"]]},
+        {"s": "CRYPTO:BTCUSD", "d": ["BTC", ["cryptocurrencies"]]},
+        {"s": "CRYPTO:XUSD", "d": ["X", None]},
+        {"s": "CRYPTO:ROTA", "d": ["ROTA"]},
+    ], []))
+
+    assert market_pulse.stablecoinBases() == frozenset({"USDT"})
+
+
+def testTopCryptosExcluyeStablecoinsSinPerderHuecosDelLimite(monkeypatch):
+    peticiones = []
+    monkeypatch.setattr(tradingview_client, "fetchScreener", _screenerConStablecoins(
+        [{"s": "CRYPTO:USDTUSD", "d": ["USDT", ["stablecoins"]]}],
+        [
+            _filaCripto("BINANCE:BTCUSD", "BTC", "Bitcoin", 85000.0, 0.5, 3),
+            _filaCripto("BINANCE:USDTUSD", "USDT", "Tether USDt", 1.0, 0.0, 2),
+            _filaCripto("BINANCE:ETHUSD", "ETH", "Ethereum", 2700.0, 0.8, 1),
+        ],
+        peticiones,
+    ))
+
+    filas = market_pulse.topCryptos(limit=2, excludeStablecoins=True)
+
+    assert [f["ticker"] for f in filas] == ["BTC", "ETH"]
+    assert sorted(peticiones) == ["coin", "crypto"]
+
+
+def testTopCryptosSinExcluirNoPreguntaPorCategorias(monkeypatch):
+    peticiones = []
+    monkeypatch.setattr(tradingview_client, "fetchScreener", _screenerConStablecoins(
+        [{"s": "CRYPTO:USDTUSD", "d": ["USDT", ["stablecoins"]]}],
+        [_filaCripto("BINANCE:USDTUSD", "USDT", "Tether USDt", 1.0, 0.0, 2)],
+        peticiones,
+    ))
+
+    filas = market_pulse.topCryptos(limit=5)
+
+    assert [f["ticker"] for f in filas] == ["USDT"]
+    assert peticiones == ["crypto"]
+
+
+def testUniverseCriptoNoEnsenaStablecoins(monkeypatch):
+    monkeypatch.setattr(tradingview_client, "fetchScreener", _screenerConStablecoins(
+        [{"s": "CRYPTO:USDCUSD", "d": ["USDC", ["stablecoins"]]}],
+        [
+            _filaCripto("BINANCE:BTCUSD", "BTC", "Bitcoin", 85000.0, 0.5, 3),
+            _filaCripto("COINBASE:USDCUSD", "USDC", "USDC", 1.0, -0.01, 2),
+        ],
+    ))
+
+    filas = market_pulse.universe("cripto")
+
+    assert [f["primary"] for f in filas] == ["BTC"]
+
+
 def _filaNasdaq(symbol, ticker, desc, precio, cambio, cap, enNdx):
     indices = [{"name": "NASDAQ 100", "proname": "NASDAQ:NDX"}] if enNdx else [{"name": "Russell 3000", "proname": "TVC:RUA"}]
     return {"s": symbol, "d": [ticker, desc, precio, cambio, cap, indices]}

@@ -27,9 +27,10 @@ describe("parseEuroNumber", () => {
         ["-1.234,56", -1234.56],
         ["83,58 €", 83.58],
         ["1.234.567,89", 1234567.89],
-        // Miles sin decimales: el punto agrupa de tres en tres.
-        ["1.234", 1234],
-        ["1.234.567", 1234567],
+        // B-01: un punto sin coma es siempre el decimal, nunca miles. Con varios
+        // puntos y sin coma el texto es ambiguo y se lee como 0.
+        ["1.234", 1.234],
+        ["1.234.567", 0],
         // Formato canónico, el que serializan el motor FIFO y los snapshots.
         // Este es el caso que estaba roto: devolvía 123456.
         ["1234.56", 1234.56],
@@ -78,7 +79,8 @@ describe("parseLooseNumber", () => {
     it.each([
         ["1.234,56", 1234.56],
         ["1234.56", 1234.56],
-        ["1.234", 1234],
+        // B-01: el punto solo es decimal.
+        ["1.234", 1.234],
         ["12,5%", 12.5],
         ["83,58 €", 83.58],
         [42, 42]
@@ -258,5 +260,25 @@ describe("cuenta bancaria renombrada", () => {
         expect(construirSelectorCuenta("cuenta")).toContain('<option value="" selected>BBVA nómina</option>')
 
         window._cuentasDinero = antes
+    })
+})
+
+describe("ordenarAniosRecientesPrimero", () => {
+    it("pone el año en curso primero y el resto del más reciente al más antiguo", () => {
+        expect(ordenarAniosRecientesPrimero(["2012", "2024", "2026", "2025"], 2026)).toEqual(["2026", "2025", "2024", "2012"])
+    })
+
+    it("un año futuro va detrás del año en curso", () => {
+        expect(ordenarAniosRecientesPrimero(["2025", "2027", "2026"], 2026)).toEqual(["2026", "2027", "2025"])
+    })
+
+    it("sin el año en curso queda en orden descendente", () => {
+        expect(ordenarAniosRecientesPrimero(["2019", "2023", "2021"], 2026)).toEqual(["2023", "2021", "2019"])
+    })
+
+    it("no modifica la lista original", () => {
+        const anios = ["2024", "2026"]
+        ordenarAniosRecientesPrimero(anios, 2026)
+        expect(anios).toEqual(["2024", "2026"])
     })
 })

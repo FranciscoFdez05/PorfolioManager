@@ -1,12 +1,18 @@
-<section class="toolsPage">
-    <div class="toolsHero">
-        <div class="toolsAssetPicker">
-            <label class="toolsLabel" for="conversionesAssetSelect">Activo</label>
-            <select id="conversionesAssetSelect" class="operationsSelect toolsAssetSelect"></select>
+<section class="operationsPage operationsPageCompact conversionesPage">
+    <div class="operationsToolbar cvToolbar">
+        <div class="operationsToolbarLeft">
+            <div class="overviewSearch tablaBusqueda" data-busca-en="#conversionesBody">
+                <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                    <span class="icono iconoBuscar" aria-hidden="true"></span>
+                </button>
+                <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+            </div>
+            <div class="overviewDivider tablaBusquedaDivisor"></div>
+            <div id="conversionesAssetMenu" class="transaccionesFilters"></div>
         </div>
-        <div class="toolsSelectedAsset" id="conversionesSelectedAsset">
-            <div class="toolsSelectedLabel">Conversiones</div>
-            <div class="toolsSelectedValue">Selecciona un activo</div>
+        <div class="operationsToolbarRight">
+            <button id="cvFiltroSinValorBtn" class="secondaryButton hidden" type="button" aria-pressed="false" title="Muestra solo las conversiones a las que falta el valor en euros"></button>
+            <button id="addConversionRowBtn" class="primaryButton" type="button">Añadir conversión</button>
         </div>
     </div>
 
@@ -29,24 +35,26 @@
         </div>
     </div>
 
-    <div class="conversionesTableWrapper">
+    <div class="operationsTableWrapper" id="conversionesTableWrapper">
         <table class="operationsTable conversionesTable">
             <thead>
                 <tr>
                     <th class="mThSort" data-sortkey="0">Fecha<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="1">Par<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="2">Tipo<span class="mSortArrow"></span></th>
-                    <th class="mThSort" data-sortkey="3">Cantidad<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="1">Operación<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="2" title="Lo que se vende seguido de lo que se compra, como en el exchange">Par<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="3" title="Lo que se entregó en la conversión">Vendido<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="4" title="Lo que se recibió en la conversión">Comprado<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="5" title="Cuánto se recibe por cada unidad vendida">Precio<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="6" title="Cuánto se entrega por cada unidad comprada">Precio inverso<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="7" title="Lo que cobró el exchange por la conversión">Comisión<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="8" title="Valor de mercado en euros en el momento de la conversión; necesario para el informe de la renta">Valor (€)<span class="mSortArrow"></span></th>
+                    <th class="mThSort" data-sortkey="9" title="Lo convertido de esta cripto al precio de hoy">Valor hoy<span class="mSortArrow"></span></th>
                     <th class="rowActionsCell"></th>
                 </tr>
             </thead>
             <tbody id="conversionesBody"></tbody>
         </table>
     </div>
+    <p class="overviewEmpty hidden" id="conversionesNoAssetMsg">No hay criptos creadas en Activos para registrar conversiones.</p>
     <p class="overviewEmpty hidden" id="conversionesEmptyMsg">No hay conversiones registradas.</p>
-
 </section>
-
-<div class="operationsActions">
-    <button id="addConversionRowBtn" class="primaryButton" type="button">Añadir fila</button>
-</div>

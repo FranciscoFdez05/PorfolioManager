@@ -232,7 +232,7 @@ async function initVistaGeneralLogic() {
         informeBtn.addEventListener("click", () => descargarInformePortfolio(informeBtn))
     }
 
-    const scroller = document.querySelector(".overviewScroll")
+    const scroller = document.getElementById("overviewExtremes")
     if (scroller && !scroller.dataset.bound) {
         scroller.dataset.bound = "true"
         let startX = 0
@@ -241,6 +241,9 @@ async function initVistaGeneralLogic() {
         let moved = false
         scroller.addEventListener("pointerdown", (e) => {
             if (e.button !== 0 || e.target.closest("input[type='text']")) return
+            // Agarrar la barra de desplazamiento ya la mueve el navegador; si además
+            // arrastráramos el contenido los dos gestos se pelearían.
+            if (e.clientY > scroller.getBoundingClientRect().top + scroller.clientHeight) return
             pressed = true
             moved = false
             startX = e.clientX
@@ -354,12 +357,18 @@ async function initVistaGeneralLogic() {
  * una explicación de por qué no—, que es como se comportaba antes de que la
  * pausa existiera.
  */
-async function refreshOverviewMarketData(buttonElement = null, { respetarPausa = false } = {}) {
-    const originalLabel = buttonElement?.textContent || ""
+async function refreshOverviewMarketData(buttonElement = null, { respetarPausa = false, maxEdadSegundos = null } = {}) {
+    // El botón de la Vista general lleva icono y texto aparte: solo cambia el
+    // texto, para que el icono siga ahí (y gire) mientras dura.
+    const labelElement = buttonElement?.querySelector(".overviewRefreshTexto") || buttonElement
+    const originalLabel = labelElement?.textContent || ""
+    let actualizados = 0
+    let fallidos = 0
 
     if (buttonElement) {
         buttonElement.disabled = true
-        buttonElement.textContent = "Actualizando..."
+        buttonElement.setAttribute("aria-busy", "true")
+        labelElement.textContent = "Actualizando..."
     }
 
     try {
@@ -382,9 +391,13 @@ async function refreshOverviewMarketData(buttonElement = null, { respetarPausa =
             while (cola.length) {
                 const asset = cola.shift()
                 try {
-                    await refreshAssetMarketDataOnServer(asset.id)
+                    // Solo el botón (acción explícita del usuario) fuerza un precio
+                    // nuevo; la carga y el refresco automáticos admiten la caché.
+                    await refreshAssetMarketDataOnServer(asset.id, { usarCache: !buttonElement, maxEdadSegundos })
                     _falloApiPorActivo.delete(asset.id)
+                    actualizados++
                 } catch (error) {
+                    fallidos++
                     // Se guarda para que el sidebar pueda marcarlo con ⚠ y decir de
                     // qué se queja el proveedor. Antes solo iba a la consola, donde
                     // no lo veía nadie sin abrir las herramientas del navegador.
@@ -407,12 +420,60 @@ async function refreshOverviewMarketData(buttonElement = null, { respetarPausa =
                 await refreshOperationsTickerPrices()
             } catch {}
         }
+        // Solo quien pulsa el botón espera respuesta; el refresco automático
+        // no avisa de nada cada X minutos.
+        if (buttonElement && typeof showToast === "function") {
+            const aviso = resumenActualizacionCotizaciones({
+                actualizados,
+                fallidos,
+                sinTicker: assets.length - assetsWithTicker.length
+            })
+            showToast(aviso.mensaje, { type: aviso.tipo })
+        }
     } finally {
         if (buttonElement) {
             buttonElement.disabled = false
-            buttonElement.textContent = originalLabel
+            buttonElement.removeAttribute("aria-busy")
+            labelElement.textContent = originalLabel
         }
     }
+}
+
+/**
+ * Texto y tipo del aviso que cierra «Actualizar cotizaciones».
+ *
+ * Los activos sin ticker no se piden (no hay a quién preguntar) y se cuentan
+ * aparte para que no parezcan fallos. Un proveedor pausado en Ajustes > API
+ * no se llega a consultar: el servidor lo salta y contesta con error, así que
+ * ese activo cuenta como fallido y la barra lateral dice el motivo.
+ *
+ * @param {{actualizados: number, fallidos: number, sinTicker: number}} cuentas
+ * @returns {{mensaje: string, tipo: "success" | "warning" | "error" | "info"}}
+ */
+function resumenActualizacionCotizaciones({ actualizados, fallidos, sinTicker }) {
+    const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`
+    const partes = []
+
+    if (actualizados + fallidos === 0) {
+        partes.push("Ningún activo tiene ticker de mercado: no hay cotizaciones que pedir.")
+    } else {
+        partes.push(`Cotizaciones actualizadas: ${actualizados} de ${actualizados + fallidos}.`)
+        if (fallidos) {
+            partes.push(
+                `${plural(fallidos, "ha fallado", "han fallado")}; el motivo sale junto al activo en la barra lateral.`
+            )
+        }
+    }
+    if (sinTicker && actualizados + fallidos > 0) {
+        partes.push(`${plural(sinTicker, "activo sin ticker no se pide", "activos sin ticker no se piden")}.`)
+    }
+
+    let tipo = "success"
+    if (actualizados + fallidos === 0) tipo = "info"
+    else if (fallidos && !actualizados) tipo = "error"
+    else if (fallidos) tipo = "warning"
+
+    return { mensaje: partes.join(" "), tipo }
 }
 
 function initSidebarFilterBar() {
@@ -586,6 +647,12 @@ function getAssetConversionRows(asset = {}) {
             par: String(row.par || "").trim(),
             tipo: normalizeAssetConversionTypeLabel(row.tipo || row.tipoOperacion || "", asset),
             cantidad: String(row.cantidad || row.participaciones || "").trim(),
+            // Hay que copiarla aquí: estas filas son también las que se vuelven a
+            // guardar desde la ficha del activo, y lo que no esté se borraría.
+            cantidadContraparte: String(row.cantidadContraparte || "").trim(),
+            comision: String(row.comision || "").trim(),
+            comisionMoneda: String(row.comisionMoneda || "").trim(),
+            valorEur: String(row.valorEur || "").trim(),
             sortIndex: index
         }
         const dedupeKey = [normalizedRow.fecha, normalizedRow.par, normalizedRow.tipo, normalizedRow.cantidad].join("|")
@@ -927,23 +994,22 @@ async function buildOverviewRow(asset) {
           completedOperationsImpact.commissionTotal +
           transaccionesImpact.commissionTotal
         : 0
-    // Las comisiones € de las operaciones spot completadas cuentan como las de
-    // cualquier compra: su lote las lleva sumadas al Total en el coste bruto y
-    // aquí se descuentan para el neto y el precio medio.
-    const comisionesFiatOperaciones = isCrypto
-        ? (
-              await Promise.all(
-                  completedOperationsImpact.rows
-                      .filter(
-                          (row) =>
-                              String(row.orden || "")
-                                  .trim()
-                                  .toLowerCase() === "compra"
-                      )
-                      .map((row) => convertAmountForDisplay(getOperationRowFiatCommission(row), "EUR", assetCurrency))
-              )
-          ).reduce((total, value) => total + value, 0)
-        : 0
+    // Las comisiones € de las operaciones completadas cuentan como las de
+    // cualquier compra, en todos los tipos de activo: su lote las lleva sumadas
+    // al Total en el coste bruto y aquí se descuentan para el neto y el precio
+    // medio. El invertido neto es siempre el importe sin comisiones.
+    const comisionesFiatOperaciones = (
+        await Promise.all(
+            completedOperationsImpact.rows
+                .filter(
+                    (row) =>
+                        String(row.orden || "")
+                            .trim()
+                            .toLowerCase() === "compra"
+                )
+                .map((row) => convertAmountForDisplay(getOperationRowFiatCommission(row), "EUR", assetCurrency))
+        )
+    ).reduce((total, value) => total + value, 0)
     const comisionesFiat = isCrypto
         ? (
               await Promise.all(
@@ -953,7 +1019,8 @@ async function buildOverviewRow(asset) {
                   })
               )
           ).reduce((total, value) => total + value, 0) + comisionesFiatOperaciones
-        : rows.reduce((total, row) => total + (parseLooseNumber(row.comisiones || "") || 0), 0)
+        : rows.reduce((total, row) => total + (parseLooseNumber(row.comisiones || "") || 0), 0) +
+          comisionesFiatOperaciones
     const invertidoNeto = invertidoBruto - comisionesFiat
     const valorActual = parseLooseNumber(asset.price || "") || 0
     const netoActual = participaciones * valorActual
@@ -977,6 +1044,22 @@ async function buildOverviewRow(asset) {
         netoActual,
         rendimiento
     }
+}
+
+// Un filtro de tipo sin ningún activo detrás no aporta nada: se
+// oculta. Se usa display y no `hidden` porque la clase del chip fija su propio
+// display y el atributo no ganaría.
+function updateOverviewFilterVisibility(assets) {
+    const countByType = {}
+    assets.forEach((asset) => {
+        countByType[asset.type] = (countByType[asset.type] || 0) + 1
+    })
+
+    document.querySelectorAll('#overviewFilters input[type="checkbox"]').forEach((input) => {
+        if (input.value === "todos") return
+        const label = input.closest("label")
+        if (label) label.style.display = countByType[input.value] ? "" : "none"
+    })
 }
 
 let _ovSortKey = "sidebarOrder"
@@ -1242,6 +1325,7 @@ async function renderVistaGeneralTable() {
 
     try {
         const assets = await loadAssetsList()
+        updateOverviewFilterVisibility(assets)
         const selectedTypes = new Set(getSelectedOverviewTypes())
 
         if (!selectedTypes.size) {

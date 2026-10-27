@@ -24,9 +24,9 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -34,8 +34,7 @@ jobs:
       - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          pip install --require-hashes -r requirements-dev.txt
 
       - name: Lint (ruff)
         run: ruff check .
@@ -63,7 +62,7 @@ jobs:
       - name: Publicar el informe de cobertura
         # Solo de una versión: tres artefactos idénticos no aportan nada.
         if: matrix.python-version == '3.12'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: cobertura
           path: coverage.xml
@@ -72,11 +71,11 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: Instalar dependencias
@@ -104,9 +103,9 @@ jobs:
   auditoria:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
           cache: pip
@@ -114,7 +113,7 @@ jobs:
       - name: Instalar pip-audit
         run: |
           python -m pip install --upgrade pip
-          pip install pip-audit
+          pip install pip-audit==2.10.1
 
       # Informativo: un aviso publicado hoy no debe bloquear un PR que no lo
       # introdujo. Lo que importa es que aparezca en el resumen del workflow, y
@@ -130,7 +129,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Comprobar que la imagen construye
         run: docker build -t porfoliomanager:ci .
 
@@ -142,8 +141,8 @@ jobs:
       - name: El contenedor arranca y escribe en los volúmenes montados
         run: |
           mkdir -p ci-datos/data ci-datos/logs ci-datos/API
-          docker run -d --name pm-ci -p 5000:5000 \
-            -e PORT=5000 \
+          docker run -d --name pm-ci -p 5050:5050 \
+            -e PORT=5050 \
             -e SECRET_KEY=clave-solo-para-ci-0123456789abcdef \
             -e PUID="$(id -u)" -e PGID="$(id -g)" \
             -v "$PWD/ci-datos/data:/app/data" \
@@ -152,7 +151,7 @@ jobs:
             porfoliomanager:ci
           sano=0
           for _ in $(seq 1 30); do
-            if curl -fsS http://localhost:5000/api/health >/dev/null 2>&1; then sano=1; break; fi
+            if curl -fsS http://localhost:5050/api/health >/dev/null 2>&1; then sano=1; break; fi
             sleep 2
           done
           docker logs pm-ci
@@ -187,3 +186,32 @@ jobs:
             || { echo "::error::no explicó que no podía escribir"; exit 1; }
           grep -q "chown" salida-ro.txt \
             || { echo "::error::no indicó cómo arreglarlo"; exit 1; }
+
+      # Informativo, con el mismo criterio que pip-audit: este escaneo no bloquea
+      # el PR, solo tiene que verse en el resumen. pip-audit cubre las
+      # dependencias de Python, pero no los paquetes del sistema de la imagen
+      # base ni los de la imagen de Caddy, que es donde viven los CVE del SO (el
+      # de SQLite, los del propio Caddy). Trivy escanea ambas imágenes.
+      - name: Instalar Trivy
+        # Versión fija y checksum SHA-256 del tarball escrito aquí, no leído de la
+        # misma release: si el binario publicado cambia, `sha256sum -c` falla.
+        # Antes se ejecutaba install.sh desde la rama main, sin verificar nada.
+        env:
+          TRIVY_VERSION: "0.76.1"
+          TRIVY_SHA256: "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0"
+        run: |
+          curl -sfL -o trivy.tar.gz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  trivy.tar.gz" | sha256sum -c -
+          sudo tar -xzf trivy.tar.gz -C /usr/local/bin trivy
+          rm trivy.tar.gz
+          trivy --version
+
+      # --ignore-unfixed: solo lo que tiene parche disponible, que es lo
+      # accionable; un CVE del SO sin fix aún no se puede resolver aquí.
+      - name: Escanear la imagen de la aplicación
+        continue-on-error: true
+        run: trivy image --severity HIGH,CRITICAL --ignore-unfixed --no-progress porfoliomanager:ci
+
+      - name: Escanear la imagen de Caddy
+        continue-on-error: true
+        run: trivy image --severity HIGH,CRITICAL --ignore-unfixed --no-progress caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f

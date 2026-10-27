@@ -163,7 +163,7 @@ describe("cómo se ve un fallo del proveedor", () => {
         _falloApiPorActivo.set("apple", "Clave de API rechazada")
         await renderAssetsList([ACCION])
 
-        expect(boton("apple").querySelector(".assetBtnAviso").textContent).toBe("⚠")
+        expect(boton("apple").querySelector(".assetBtnAviso .iconoAviso")).not.toBeNull()
         expect(boton("apple").className).toContain("falloApi")
         expect(boton("apple").title).toContain("Clave de API rechazada")
     })

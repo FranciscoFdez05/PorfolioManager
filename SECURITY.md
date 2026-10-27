@@ -29,7 +29,7 @@ La aplicación está pensada para correr **en una red local o detrás de una VPN
 
 **No lo es:**
 
-- **Exponer la aplicación directamente a internet.** No está pensada para eso: no hay segundo factor ni aislamiento entre usuarios. Ponla detrás de una VPN. (Que se pueda servir por HTTPS no cambia esto: el TLS evita que la contraseña viaje en claro, no sustituye a lo demás.)
+- **Exponer la aplicación directamente a internet.** No está pensada para eso: no hay aislamiento entre usuarios y la verificación en dos pasos por Telegram es opcional. Ponla detrás de una VPN. (Que se pueda servir por HTTPS no cambia esto: el TLS evita que la contraseña viaje en claro, no sustituye a lo demás.)
 - Que alguien con acceso al servidor lea la base de datos. SQLite no está cifrado en reposo; eso lo resuelve el cifrado del disco.
 - Que `SECRET_KEY` esté en `.env` en claro. Es la raíz de la que se derivan las demás claves y tiene que estar disponible al arrancar sin intervención.
 - Denegación de servicio por fuerza bruta contra tu propia LAN.

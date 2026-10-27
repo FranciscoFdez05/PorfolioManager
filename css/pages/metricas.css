@@ -501,6 +501,10 @@
     flex-wrap: wrap;
     gap: 10px;
     flex-shrink: 0;
+    /* Sin tope crecía hasta el ancho de todas sus tiras en una línea y la
+       segunda (las cuentas de Saldo del mes) se salía de la página en vez de
+       bajar a la siguiente. */
+    max-width: 100%;
 }
 
 .mDivMensualTablaBtn {
@@ -666,6 +670,37 @@
     gap: 2px;
 }
 
+/* Con muchos años o muchas cuentas la tira crecía sin límite y empujaba la
+   cabecera fuera de la pantalla. Se corta en unos ocho botones y el resto se
+   alcanza con la barra fina de abajo (la misma del panel superior) o
+   arrastrando, que ya lo engancha _activarArrastreTiras() para todo
+   .mToggleGroup. Las tiras cortas (modo, rango) no llegan al tope. */
+.metricasPage .mToggleGroup {
+    max-width: min(100%, 560px);
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+
+.metricasPage .mToggleGroup::-webkit-scrollbar {
+    height: 6px;
+}
+
+.metricasPage .mToggleGroup::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.metricasPage .mToggleGroup::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.metricasPage .mToggleGroup::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
 .mToggleBtn,
 .mDistMetricBtn {
     background: transparent;
@@ -797,6 +832,9 @@
 .mActivosFilterBtn[data-atype="rentaFija"]::before {
     background: #1abc9c;
 }
+.mActivosFilterBtn[data-atype="privateMarket"]::before {
+    background: #a78bfa;
+}
 
 .mActivosFilterBtn[data-atype="todos"].active,
 .mActivosFilterBtn[data-atype="todos"]:has(input:checked) {
@@ -825,6 +863,10 @@
 .mActivosFilterBtn[data-atype="rentaFija"].active,
 .mActivosFilterBtn[data-atype="rentaFija"]:has(input:checked) {
     border-color: #1abc9c44;
+}
+.mActivosFilterBtn[data-atype="privateMarket"].active,
+.mActivosFilterBtn[data-atype="privateMarket"]:has(input:checked) {
+    border-color: #a78bfa44;
 }
 
 /* Dot colors — gasto categories */
@@ -913,6 +955,107 @@
     position: relative;
 }
 
+/* Donut con leyenda HTML al lado: la nativa de Chart.js no hace scroll y,
+   con muchos activos, cortaba las columnas que no cabían en el canvas. El
+   canvas va en su propio contenedor porque Chart.js toma el tamaño del padre. */
+.mDonutConLeyenda {
+    display: flex;
+    gap: 16px;
+}
+
+.mDonutLienzo {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+}
+
+.mDonutLeyenda {
+    flex: 1 1 0;
+    min-width: 0;
+    max-height: 100%;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    /* "safe": centrada mientras quepa; si desborda vuelve a arriba para que el
+       scroll no deje filas inaccesibles por encima. */
+    align-content: safe center;
+    gap: 2px 10px;
+    margin: 0;
+    padding: 0 4px 0 0;
+    list-style: none;
+    /* Scroll fino y visible como el de la lista de activos (.assetsList): el
+       global de base.css lo oculta y no se intuía que hubiera más activos. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-hard) transparent;
+}
+
+.mDonutLeyenda::-webkit-scrollbar {
+    width: 6px;
+}
+
+.mDonutLeyenda::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.mDonutLeyenda::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hard);
+}
+
+.mDonutLeyenda::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.mDonutLeyenda[hidden] {
+    display: none;
+}
+
+.mDonutLeyendaItem {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    width: 100%;
+    padding: 4px 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-subtle);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mDonutLeyendaItem:hover {
+    background: var(--bg-surface);
+}
+
+.mDonutLeyendaPunto {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+
+.mDonutLeyendaNombre {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mDonutLeyendaPct {
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+}
+
+/* Igual que la leyenda de Chart.js: la porción oculta se tacha. */
+.mDonutLeyendaOculto .mDonutLeyendaNombre,
+.mDonutLeyendaOculto .mDonutLeyendaPct {
+    text-decoration: line-through;
+    opacity: 0.5;
+}
+
 /* ── Comparativa filter buttons ── */
 .mComparativaHeader {
     flex-direction: column;
@@ -982,6 +1125,12 @@
 }
 #mChartDivAxisWrap {
     background: var(--bg-elevated);
+}
+
+/* Contenedor del canvas dentro de una tarjeta con scroll: Chart.js toma de
+   aquí el alto completo (lo fija mAjustarAltoConScroll). */
+.mChartScrollInner {
+    position: relative;
 }
 
 /* ── Table ── */
@@ -1095,6 +1244,15 @@
         min-height: 0;
         max-height: none;
     }
+}
+
+/* La tabla de Vista general con el mismo aspecto que las de Activos y
+   Watchlist (.activosTableWrap): sin el fondo elevado ni la sombra de tarjeta
+   de gráfico, solo el borde suave sobre el fondo de la página. */
+.overviewPage .metricasChartCard.metricasTableCard {
+    background: transparent;
+    border-color: var(--border-soft);
+    box-shadow: none;
 }
 
 #overviewTable thead th {
@@ -1259,4 +1417,137 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+}
+
+/* Renta Fija y Bonos: las dos tarjetas de cada pareja con el mismo alto. A
+   diferencia del caso general (align-items: start, ver .metricasChartsGrid2),
+   aquí el gráfico crece hasta llenar la tarjeta, así que no queda hueco vacío. */
+#mSectionRentaFija .metricasChartsGrid2,
+#mSectionBonos .metricasChartsGrid2 {
+    align-items: stretch;
+}
+
+#mSectionRentaFija .metricasChartCard,
+#mSectionBonos .metricasChartCard {
+    display: flex;
+    flex-direction: column;
+}
+
+#mSectionRentaFija .metricasChartWrap,
+#mSectionBonos .metricasChartWrap {
+    flex: 1 1 auto;
+}
+
+/* Lo mismo para todas las parejas: las dos tarjetas de una fila miden siempre
+   lo mismo. El gráfico de la tarjeta corta crece hasta llenarla (nunca baja
+   de su alto propio, por eso no encoge), así que tampoco queda hueco vacío.
+   Las tarjetas sin gráfico (tablas de estadísticas) solo se estiran. */
+.metricasChartsGrid2 {
+    align-items: stretch;
+}
+
+.metricasChartsGrid2 > .metricasChartCard {
+    display: flex;
+    flex-direction: column;
+}
+
+.metricasChartsGrid2 > .metricasChartCard > .metricasChartWrap {
+    flex: 1 0 auto;
+}
+
+/* ── Finanzas: histórico de ingresos, vencimientos y mercado privado ── */
+.mFinFila {
+    margin-top: 16px;
+}
+
+.mFinKpis {
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+/* Las tarjetas de tabla no llevan padding (metricasTableCard): el título lo
+   pone aquí para alinearse con el de las tarjetas de gráfico. */
+.mFinTablaTitulo {
+    margin: 0;
+    padding: 18px 20px 14px;
+}
+
+/* Alto acotado con scroll propio y cabecera fija: con muchos fondos o
+   pagadores la tabla empujaba el resto de la página. Mismo scroll fino que la
+   leyenda de los donuts. */
+.mFinTablaScroll {
+    max-height: 420px;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-hard) transparent;
+}
+
+.mFinTablaScroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.mFinTablaScroll::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.mFinTablaScroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.mFinTabla thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-header);
+}
+
+.mFinTabla td {
+    white-space: nowrap;
+}
+
+/* Cuando ni con las cabeceras partidas cabe, tablas.js deja la tabla como la
+   pinta esta hoja: los nombres, las cabeceras y la etiqueta de la barra se
+   parten en líneas y el relleno se estrecha para que no haga falta el scroll
+   lateral. Los importes siguen en una sola línea. */
+.mFinTabla:not(.tablaHuecosIguales) th,
+.mFinTabla:not(.tablaHuecosIguales) td.mTdName,
+.mFinTabla:not(.tablaHuecosIguales) td.mFinTexto,
+.mFinTabla:not(.tablaHuecosIguales) .mTypeBadge,
+.mFinTabla:not(.tablaHuecosIguales) .mCartBar span {
+    white-space: normal;
+}
+
+.mFinTabla:not(.tablaHuecosIguales) th,
+.mFinTabla:not(.tablaHuecosIguales) td {
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.mFinTabla:not(.tablaHuecosIguales) .mCartBar {
+    min-width: 0;
+}
+
+/* Una tabla en media columna no cabe en portátiles (seis columnas de importes
+   en ~440px): esa pareja pasa antes a una columna. */
+@media (max-width: 1400px) {
+    .metricasChartsGrid2:has(.mFinTabla) {
+        grid-template-columns: 1fr;
+    }
+}
+
+.mFinTabla td.mFinVencido {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.mFinTabla td.mFinVencePronto {
+    /* Mismo naranja de aviso que la línea de variación de dividendos. */
+    color: #f39c12;
+    font-weight: 600;
+}
+
+.mFinTabla tr.mFinFilaApagada td {
+    opacity: 0.55;
 }

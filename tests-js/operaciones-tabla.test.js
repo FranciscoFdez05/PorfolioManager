@@ -223,3 +223,79 @@ describe("grupos de año plegables", () => {
         expect(filasDelAnio("2025")).toEqual(["op-btc-1"])
     })
 })
+
+// Recorrido: lo que le falta al precio actual para llegar al de la orden, en %
+// y en importe. Verde si tiene que subir, rojo si tiene que bajar, y vacío
+// cuando no hay objetivo (orden cerrada) o no se puede comparar (otra divisa).
+describe("columna Recorrido", () => {
+    const ACTIVO_ETH = { id: "ethereum", price: "2116,16", currency: "EUR" }
+
+    function recorridoDe(rowId) {
+        return document.querySelector(`tr[data-operation-id="${rowId}"] .operationsRecorridoCell`)
+    }
+
+    it("sustituye a la columna de comisiones cripto", () => {
+        const cabeceras = [...document.querySelectorAll(".operationsTable thead th")].map((th) => th.textContent.trim())
+
+        expect(cabeceras).not.toContain("Comisiones cripto")
+        expect(cabeceras.indexOf("Recorrido")).toBe(cabeceras.indexOf("Precio Actual") + 1)
+        expect(document.querySelector('tr[data-operation-id="op-eth-1"]').cells).toHaveLength(cabeceras.length)
+    })
+
+    it("una compra por debajo del precio actual tiene que bajar", () => {
+        const recorrido = getOperationsRecorrido(
+            { estado: "Activo", precioOrden: "2085", precioCurrency: "EUR" },
+            ACTIVO_ETH
+        )
+
+        expect(recorrido.diff).toBeCloseTo(-31.16, 2)
+        expect(recorrido.pct).toBeCloseTo(-1.4725, 3)
+        expect(recorrido.currency).toBe("EUR")
+    })
+
+    it("una orden por encima del precio actual tiene que subir", () => {
+        const recorrido = getOperationsRecorrido(
+            { estado: "Activo", precioOrden: "2327,776", precioCurrency: "EUR" },
+            ACTIVO_ETH
+        )
+
+        expect(recorrido.diff).toBeCloseTo(211.616, 3)
+        expect(recorrido.pct).toBeCloseTo(10, 6)
+    })
+
+    it("no calcula nada en órdenes cerradas, sin precio o en otra divisa", () => {
+        const base = { estado: "Activo", precioOrden: "2085", precioCurrency: "EUR" }
+
+        expect(getOperationsRecorrido({ ...base, estado: "Completado" }, ACTIVO_ETH)).toBeNull()
+        expect(getOperationsRecorrido({ ...base, estado: "Cancelado" }, ACTIVO_ETH)).toBeNull()
+        expect(getOperationsRecorrido({ ...base, precioOrden: "" }, ACTIVO_ETH)).toBeNull()
+        expect(getOperationsRecorrido(base, { ...ACTIVO_ETH, price: "" })).toBeNull()
+        expect(getOperationsRecorrido(base, null)).toBeNull()
+        expect(getOperationsRecorrido({ ...base, precioCurrency: "USD" }, ACTIVO_ETH)).toBeNull()
+    })
+
+    it("en la tabla deja vacías las cerradas y las de otra divisa", () => {
+        // op-eth-1 está en ETH/USDT y el activo cotiza en EUR.
+        expect(recorridoDe("op-eth-1").textContent.trim()).toBe("")
+        expect(recorridoDe("op-btc-1").textContent.trim()).toBe("")
+    })
+
+    it("pinta en verde lo que tiene que subir y en rojo lo que tiene que bajar", () => {
+        const fila = currentOperationsData.rows.find((row) => row.id === "op-eth-1")
+        fila.par = "ETH/EUR"
+
+        fila.precioOrden = "2640"
+        renderOperationsTable()
+        const sube = recorridoDe("op-eth-1").querySelector(".operationsRecorrido")
+        expect(sube.classList.contains("is-up")).toBe(true)
+        expect(sube.querySelector(".operationsRecorridoPct").textContent).toBe("+10,00 %")
+        expect(sube.querySelector(".operationsRecorridoAmount").textContent).toContain("+240")
+
+        fila.precioOrden = "2160"
+        renderOperationsTable()
+        const baja = recorridoDe("op-eth-1").querySelector(".operationsRecorrido")
+        expect(baja.classList.contains("is-down")).toBe(true)
+        expect(baja.querySelector(".operationsRecorridoPct").textContent).toBe("-10,00 %")
+        expect(baja.querySelector(".operationsRecorridoAmount").textContent).toContain("-240")
+    })
+})

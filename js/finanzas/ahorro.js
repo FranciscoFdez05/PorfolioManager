@@ -453,9 +453,9 @@ function renderAhorroCategorias(gastosByTipo, totalIngresos) {
         const excesoEur = overBudget ? realEur - objEur : 0
 
         const statusBadge = overBudget
-            ? `<span class="ahorroCatStatus over">⚠ Excedido en ${formatEuro(excesoEur)}</span>`
+            ? `<span class="ahorroCatStatus over">${iconoHtml("Aviso")} Excedido en ${formatEuro(excesoEur)}</span>`
             : hasObj
-              ? `<span class="ahorroCatStatus ok">✓ Dentro</span>`
+              ? `<span class="ahorroCatStatus ok">${iconoHtml("Ok")} Dentro</span>`
               : ""
 
         row.innerHTML = `

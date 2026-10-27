@@ -49,11 +49,34 @@
     padding: 0 2px;
 }
 
+/* Una sola fila con el año en curso a la izquierda; los que no caben se
+   alcanzan arrastrando (activarArrastreHorizontal). Cada año mide como cuando
+   esto era una rejilla de 12 columnas. */
 .gastosYearList {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
+    display: flex;
     gap: 5px;
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Hueco para el translateY del hover, que el overflow recortaría. */
+    padding: 2px 0;
+    margin: -2px 0;
+    scrollbar-width: none;
+    cursor: grab;
+}
+
+.gastosYearList::-webkit-scrollbar {
+    display: none;
+}
+
+.gastosYearList.dragging {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.gastosYearList > .gastosYearBtn {
+    flex: 0 0 calc((100% - 55px) / 12);
 }
 
 .gastosYearBtn,
@@ -1514,6 +1537,13 @@
     align-items: start;
 }
 
+/* La cabecera del mes no lleva contenido: vacía sumaría otro hueco del gap de
+   la página entre las pestañas de meses y la tabla. */
+.gastosMonthHeader:empty,
+.ingresosMonthHeader:empty {
+    display: none;
+}
+
 /* Con la tabla oculta (vista anual o mensualidades) tampoco se enseña el resumen. */
 .movMonthLayout:has(> .gastosMovementsWrapper.hidden),
 .movMonthLayout:has(> .ingresosMovementsWrapper.hidden) {
@@ -1524,6 +1554,42 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
+}
+
+/* Barra fina del color de los bordes, como la del calendario. scrollbar-color
+   manda en Chrome sobre ::-webkit-scrollbar, así que van las dos. */
+.movResumenLado,
+#ingresosResumenLado {
+    scrollbar-color: var(--border-mid) transparent;
+}
+
+.movResumenLado::-webkit-scrollbar,
+#ingresosResumenLado::-webkit-scrollbar {
+    display: block;
+    width: 6px;
+}
+
+.movResumenLado::-webkit-scrollbar-track,
+#ingresosResumenLado::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.movResumenLado::-webkit-scrollbar-thumb,
+#ingresosResumenLado::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.movResumenLado::-webkit-scrollbar-thumb:hover,
+#ingresosResumenLado::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hard);
+}
+
+/* ponerModalEnDosColumnas marca el cuerpo con .modalDosColumnas: aquí el ancho y
+   el alto los pone el popup, el cuerpo conserva los suyos. */
+.gastosCreateModalBody.modalDosColumnas {
+    width: auto;
+    max-height: min(calc(62 * var(--vh)), 620px);
 }
 
 .movResumenCard {

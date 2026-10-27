@@ -56,6 +56,22 @@ def createIngresosYear():
     return jsonify({"ok": True, "year": year, "data": payload}), 201
 
 
+@ingresosBp.route("/api/ingresos/todos", methods=["GET"])
+def getIngresosTodos():
+    """Todos los años guardados con su contenido, en una sola respuesta.
+
+    Sustituye a una petición `/api/ingresos/<año>` por año en el resumen anual
+    de Métricas. Cada valor es idéntico a lo que devuelve `GET /api/ingresos/<año>`.
+    """
+    years = {}
+    for year in listIngresosYears():
+        data = readIngresosYear(year)
+        if data is not None:
+            years[year] = data
+
+    return jsonify({"years": years})
+
+
 @ingresosBp.route("/api/ingresos/<year>", methods=["GET"])
 def getIngresosYear(year):
     data = readIngresosYear(year)

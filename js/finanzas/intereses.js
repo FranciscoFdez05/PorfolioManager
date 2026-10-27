@@ -34,12 +34,12 @@ function renderCuentasSidebar() {
         item.dataset.cuentaId = cuenta.id
         // Las de antes de que tuvieran que ser una cuenta pueden no tenerla todavía.
         const sinCuenta = !cuenta.cuenta
-        const titulo = sinCuenta ? `${cuenta.nombre} · sin cuenta: elígela con ✎` : cuenta.nombre
+        const titulo = sinCuenta ? `${cuenta.nombre} · sin cuenta: elígela con el botón de editar` : cuenta.nombre
         item.innerHTML = `
-            <span class="cuentaItemName" title="${escapeInteresesHtml(titulo)}">${escapeInteresesHtml(cuenta.nombre)}${sinCuenta ? " ⚠" : ""}</span>
+            <span class="cuentaItemName" title="${escapeInteresesHtml(titulo)}">${escapeInteresesHtml(cuenta.nombre)}${sinCuenta ? ` ${iconoHtml("Aviso")}` : ""}</span>
             <div class="cuentaItemActions">
-                <button type="button" class="cuentaItemRenameBtn" data-id="${cuenta.id}" title="Cambiar de cuenta">✎</button>
-                <button type="button" class="cuentaItemDeleteBtn" data-id="${cuenta.id}" title="Eliminar">✕</button>
+                <button type="button" class="cuentaItemRenameBtn" data-id="${cuenta.id}" title="Cambiar de cuenta" aria-label="Cambiar de cuenta">${iconoHtml("Editar")}</button>
+                <button type="button" class="cuentaItemDeleteBtn" data-id="${cuenta.id}" title="Eliminar" aria-label="Eliminar">${iconoHtml("Borrar")}</button>
             </div>
         `
         item.addEventListener("click", (e) => {
@@ -48,6 +48,7 @@ function renderCuentasSidebar() {
         })
         list.appendChild(item)
     })
+    refrescarTiraPestanas(list)
 }
 
 function selectCuenta(id) {
@@ -152,7 +153,7 @@ function openCuentaNameModal({ title, defaultValue = "", onConfirm }) {
 // Elegir la cuenta de «Cuentas» que es (o pasa a ser) remunerada. Solo se
 // ofrecen las que no lo son ya, más la actual.
 async function openCuentaRemuneradaPicker({ title, actual = null, onConfirm }) {
-    let cuentas = []
+    let cuentas
     try {
         const data = await Api.get("/api/cuentas")
         cuentas = Array.isArray(data?.cuentas) ? data.cuentas : []
@@ -318,7 +319,9 @@ function renderInteresesYearBar(years) {
     const list = document.getElementById("interesesYearList")
     if (!list) return
     list.innerHTML = ""
-    years.forEach((year) => {
+    // El más reciente a la izquierda; `years` sigue ascendente porque el resto
+    // del código toma el último como año por defecto.
+    ;[...years].reverse().forEach((year) => {
         const btn = document.createElement("button")
         btn.type = "button"
         btn.className = `interesesYearBtn${year === currentInteresesYear ? " active" : ""}`
@@ -329,6 +332,7 @@ function renderInteresesYearBar(years) {
         })
         list.appendChild(btn)
     })
+    refrescarTiraPestanas(list)
 }
 
 function escapeInteresesHtml(value) {
@@ -455,7 +459,7 @@ async function renderInteresesTable() {
         return
     }
 
-    const data = await loadInteresesData()
+    const [data] = await Promise.all([loadInteresesData(), cargarInteresesSaldos()])
     loadCuentasFromData(data)
 }
 
@@ -613,6 +617,8 @@ function updateTotals() {
     if (topTotalInteres) {
         topTotalInteres.textContent = formatEuro(totalNeto)
     }
+
+    renderInteresesResumen()
 }
 
 // ----- Acciones de fila -----

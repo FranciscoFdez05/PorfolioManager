@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, request
 
+from core.validation import primerIdDuplicado
+from stores import revisiones
 from stores.app_data import (
     readBonosFile,
     readDividendoCalendar,
@@ -147,12 +149,14 @@ def saveDividendoCalendar():
 
 @registrosBp.route("/api/transacciones", methods=["GET"])
 def getTransacciones():
-    return jsonify(readTransaccionesFile())
+    return jsonify({**readTransaccionesFile(), "revision": revisiones.actual("transacciones", revisiones.CLAVE_UNICA)})
 
 
 @registrosBp.route("/api/transacciones", methods=["POST"])
 def saveTransacciones():
     requestData = request.get_json(silent=True) or {}
+    if "rows" not in requestData:
+        return jsonify({"ok": False, "error": "JSON inválido: falta rows"}), 400
     rows = requestData.get("rows", [])
 
     if not isinstance(rows, list):
@@ -178,8 +182,20 @@ def saveTransacciones():
             "nota": str(row.get("nota", "")).strip()
         })
 
-    writeTransaccionesFile({"rows": sanitizedRows})
-    return jsonify({"ok": True})
+    duplicado = primerIdDuplicado(sanitizedRows)
+    if duplicado is not None:
+        return jsonify({"ok": False, "error": f"Hay dos registros con el mismo identificador ({duplicado})"}), 400
+
+    try:
+        esperada = revisiones.revisionDePeticion(requestData)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    try:
+        nueva = writeTransaccionesFile({"rows": sanitizedRows}, revisionEsperada=esperada)
+    except revisiones.ConflictoRevision as conflicto:
+        return revisiones.respuestaConflicto(conflicto, "Las transacciones han cambiado desde otro sitio (otra pestaña u otro dispositivo)")
+    return jsonify({"ok": True, "revision": nueva})
 
 
 @registrosBp.route("/api/bonos", methods=["GET"])

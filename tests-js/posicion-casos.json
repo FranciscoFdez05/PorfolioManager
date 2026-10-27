@@ -1,0 +1,220 @@
+{
+    "comentario": "Una cartera cripto con todas las fuentes de participaciones y de coste. Lo leen pytest (valoración del servidor) y Vitest (reconstrucción del navegador): las dos tienen que dar la misma cantidad y el mismo invertido.",
+    "cantidadEsperada": "2.0025",
+    "asset": {
+        "id": "btc",
+        "name": "Bitcoin",
+        "symbol": "BTC",
+        "type": "cripto",
+        "currency": "EUR",
+        "price": "100,00",
+        "rows": [
+            {
+                "fechaOperacion": "01-01-2025",
+                "tipoOperacion": "Compra",
+                "participaciones": "1",
+                "capitalInvertidoBruto": "100",
+                "comisionesCripto": "0.01",
+                "currency": "EUR",
+                "comisionesFiat": "1.5"
+            },
+            {
+                "fechaOperacion": "10-01-2025",
+                "tipoOperacion": "Venta",
+                "participaciones": "0.2",
+                "capitalInvertidoBruto": "20",
+                "comisionesCripto": "0.002",
+                "currency": "EUR",
+                "comisionesFiat": "0.5"
+            },
+            {
+                "fechaOperacion": "05-01-2025",
+                "tipoOperacion": "Convertidos a BTC",
+                "participaciones": "0.5",
+                "currency": "EUR"
+            },
+            {
+                "fechaOperacion": "06-01-2025",
+                "tipoOperacion": "BTC convertidos",
+                "participaciones": "0.1",
+                "currency": "EUR"
+            },
+            {
+                "fechaOperacion": "08-01-2025",
+                "tipoOperacion": "Compra",
+                "participaciones": "0.1",
+                "capitalInvertidoBruto": "10",
+                "comisionesFiat": "0.2",
+                "currency": "USD"
+            }
+        ],
+        "conversionRows": [
+            {
+                "id": "c1",
+                "fecha": "05-01-2025",
+                "par": "",
+                "tipo": "Convertidos a BTC",
+                "cantidad": "0.5"
+            },
+            {
+                "id": "c2",
+                "fecha": "07-01-2025",
+                "par": "",
+                "tipo": "Convertidos a BTC",
+                "cantidad": "0.3"
+            }
+        ],
+        "operationRows": [
+            {
+                "id": "o1",
+                "assetId": "btc",
+                "fechaApertura": "02-02-2025",
+                "par": "BTC/EUR",
+                "orden": "Compra",
+                "cantidad": "0.4",
+                "comisionesCripto": "0.004",
+                "total": "40",
+                "currency": "EUR",
+                "precioCurrency": "EUR",
+                "precioOrden": "100",
+                "estado": "Completado",
+                "comisionesFiat": "0.3"
+            },
+            {
+                "id": "o2",
+                "assetId": "btc",
+                "fechaApertura": "BTC/EUR",
+                "par": "03-02-2025",
+                "orden": "Compra",
+                "cantidad": "0.05",
+                "comisionesCripto": "",
+                "total": "5",
+                "currency": "EUR",
+                "precioCurrency": "EUR",
+                "precioOrden": "100",
+                "estado": "Completado"
+            },
+            {
+                "id": "o3",
+                "assetId": "btc",
+                "fechaApertura": "04-02-2025",
+                "par": "BTC/EUR",
+                "orden": "Compra",
+                "cantidad": "0.7",
+                "comisionesCripto": "",
+                "total": "70",
+                "currency": "EUR",
+                "precioCurrency": "EUR",
+                "precioOrden": "100",
+                "estado": "Activo"
+            },
+            {
+                "id": "o4",
+                "assetId": "btc",
+                "fechaApertura": "05-02-2025",
+                "par": "BTC/EUR",
+                "orden": "Venta",
+                "cantidad": "0.1",
+                "comisionesCripto": "",
+                "total": "10",
+                "currency": "EUR",
+                "precioCurrency": "EUR",
+                "precioOrden": "100",
+                "estado": "Completado"
+            },
+            {
+                "id": "o5",
+                "assetId": "btc",
+                "fechaApertura": "06-02-2025",
+                "par": "BTC/USD",
+                "orden": "Compra",
+                "cantidad": "0.02",
+                "comisionesCripto": "",
+                "comisionesFiat": "0.1",
+                "total": "9",
+                "currency": "USD",
+                "precioCurrency": "USD",
+                "precioOrden": "",
+                "estado": "Completado"
+            }
+        ]
+    },
+    "ventas": [
+        {
+            "id": "v1",
+            "fecha": "01-03-2025",
+            "assetId": "btc",
+            "cantidad": "0.05"
+        }
+    ],
+    "transacciones": [
+        {
+            "id": "t1",
+            "assetId": "btc",
+            "fechaOperacion": "01-04-2025",
+            "walletTipo": "recibida",
+            "total": "0.2",
+            "comisionRed": ""
+        },
+        {
+            "id": "t2",
+            "assetId": "btc",
+            "fechaOperacion": "02-04-2025",
+            "walletTipo": "enviada",
+            "total": "0.1",
+            "comisionRed": "0.001"
+        },
+        {
+            "id": "t3",
+            "assetId": "btc",
+            "fechaOperacion": "03-04-2025",
+            "walletTipo": "entre_wallet",
+            "total": "0.3",
+            "comisionRed": "0.0005"
+        }
+    ],
+    "tipoUsdEur": "0.9",
+    "invertidoBrutoEsperado": "106.590909",
+    "invertidoNetoEsperado": "104.010909",
+    "accionesComentario": "Un ETF (no cripto) con una compra en la ficha (1000 de capital y 2 de comision) y una compra completada en Operaciones (10 a 50 mas 1,5 de comision en euros). El invertido neto es el importe sin comisiones, venga de donde venga: 1000 + 500 en bruto con comisiones (1501,5 de coste del lote) menos 2 y 1,5.",
+    "acciones": {
+        "asset": {
+            "id": "etf",
+            "name": "ETF",
+            "symbol": "ETF",
+            "type": "etfs",
+            "currency": "EUR",
+            "price": "100,00",
+            "rows": [
+                {
+                    "fechaOperacion": "01-01-2025",
+                    "tipoOperacion": "Compra",
+                    "participaciones": "10",
+                    "precioParticipacion": "100",
+                    "capitalInvertidoBruto": "1000",
+                    "comisiones": "2",
+                    "currency": "EUR"
+                }
+            ],
+            "operationRows": [
+                {
+                    "id": "e1",
+                    "assetId": "etf",
+                    "fechaApertura": "02-02-2025",
+                    "par": "ETF/EUR",
+                    "orden": "Compra",
+                    "cantidad": "10",
+                    "total": "",
+                    "currency": "EUR",
+                    "precioCurrency": "EUR",
+                    "precioOrden": "50",
+                    "estado": "Completado",
+                    "comisionesFiat": "1.5"
+                }
+            ]
+        },
+        "cantidadEsperada": "20",
+        "invertidoBrutoEsperado": "1501.5",
+        "invertidoNetoEsperado": "1498"
+    }
+}

@@ -195,30 +195,39 @@ function cntTipoOptions(actual = "exchange") {
 function cntAbrirModalCuenta(cuenta = null) {
     openGastosCreateModal({
         title: cuenta ? "Editar cuenta" : "Nueva cuenta",
+        modalClass: "gastosCreateModalWide mensFormModal",
         bodyHtml: `
-            <label class="assetModalLabel" for="cntCuentaNombre">Nombre</label>
-            <input id="cntCuentaNombre" class="assetModalInput" type="text" maxlength="60" value="${escapeGastosHtml(cuenta?.nombre || "")}" placeholder="Ej: Binance, Degiro, Cuenta nómina">
-
-            <label class="assetModalLabel" for="cntCuentaTipo">Tipo</label>
-            <select id="cntCuentaTipo" class="assetModalSelect"${cuenta ? " disabled" : ""}>${cntTipoOptions(cuenta?.tipo || "exchange")}</select>
-
-            <label class="assetModalLabel" for="cntCuentaSaldo">Saldo inicial <span class="assetModalLabelHint">opcional</span></label>
-            <input id="cntCuentaSaldo" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(cuenta ? cntSaldoInicialTexto(cuenta) : "")}" placeholder="0,00">
-            <p class="cuentasHint">Lo que ya había en la cuenta antes de empezar a apuntar movimientos. Las cuentas de ahorro aparecen también en la ventana Cuenta de ahorro.</p>
-
-            <label class="assetModalLabel">Cuenta remunerada</label>
-            <label class="cuentaAhorroCheck">
-                <input id="cntCuentaRemunerada" type="checkbox"${cuenta?.remunerada ? " checked" : ""}>
-                <span>Esta cuenta es remunerada</span>
-            </label>
-            <p class="cuentasHint">Sus intereses (Finanzas › Cuenta Remunerada) se suman al saldo. Al desmarcarla se conservan los intereses apuntados, sin vincular.</p>
-
-            <label class="assetModalLabel">Dividendos</label>
-            <label class="cuentaAhorroCheck">
-                <input id="cntCuentaDividendos" type="checkbox"${cuenta?.dividendos ? " checked" : ""}>
-                <span>Cobrar en esta cuenta los dividendos de mis activos</span>
-            </label>
-            <p class="cuentasHint">Se suman al saldo de la cuenta, pasados a euros.</p>
+            <div class="mensFormGrid">
+                <div class="gastosCreateModalField mensFormFieldWide">
+                    <label class="assetModalLabel" for="cntCuentaNombre">Nombre</label>
+                    <input id="cntCuentaNombre" class="assetModalInput" type="text" maxlength="60" value="${escapeGastosHtml(cuenta?.nombre || "")}" placeholder="Ej: Binance, Degiro, Cuenta nómina">
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cntCuentaTipo">Tipo</label>
+                    <select id="cntCuentaTipo" class="assetModalSelect"${cuenta ? " disabled" : ""}>${cntTipoOptions(cuenta?.tipo || "exchange")}</select>
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cntCuentaSaldo">Saldo inicial <span class="assetModalLabelHint">opcional</span></label>
+                    <input id="cntCuentaSaldo" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(cuenta ? cntSaldoInicialTexto(cuenta) : "")}" placeholder="0,00">
+                </div>
+                <p class="cuentasHint mensFormFieldWide">Lo que ya había en la cuenta antes de empezar a apuntar movimientos. Las cuentas de ahorro aparecen también en la ventana Cuenta de ahorro.</p>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel">Cuenta remunerada</label>
+                    <label class="cuentaAhorroCheck">
+                        <input id="cntCuentaRemunerada" type="checkbox"${cuenta?.remunerada ? " checked" : ""}>
+                        <span>Esta cuenta es remunerada</span>
+                    </label>
+                    <p class="cuentasHint">Sus intereses (Finanzas › Cuenta Remunerada) se suman al saldo. Al desmarcarla se conservan los intereses apuntados, sin vincular.</p>
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel">Dividendos</label>
+                    <label class="cuentaAhorroCheck">
+                        <input id="cntCuentaDividendos" type="checkbox"${cuenta?.dividendos ? " checked" : ""}>
+                        <span>Cobrar en esta cuenta los dividendos de mis activos</span>
+                    </label>
+                    <p class="cuentasHint">Se suman al saldo de la cuenta, pasados a euros.</p>
+                </div>
+            </div>
         `,
         submitLabel: "Guardar",
         onSubmit: async ({ modal, getValue, setFeedback }) => {
@@ -289,10 +298,11 @@ function cntRenderYears() {
     const list = document.getElementById("cuentasYearList")
     if (!list) return
     list.innerHTML = ""
-    ;[["", "Todos"], ...cntYears.map((y) => [y, y])].forEach(([valor, etiqueta]) => {
+    // Como en Intereses: el más reciente a la izquierda, tras «Todos».
+    ;[["", "Todos"], ...[...cntYears].reverse().map((y) => [y, y])].forEach(([valor, etiqueta]) => {
         const btn = document.createElement("button")
         btn.type = "button"
-        btn.className = `gastosYearBtn${valor === cntYear ? " active" : ""}`
+        btn.className = `interesesYearBtn${valor === cntYear ? " active" : ""}`
         btn.textContent = etiqueta
         btn.addEventListener("click", () => {
             cntYear = valor
@@ -300,6 +310,7 @@ function cntRenderYears() {
         })
         list.appendChild(btn)
     })
+    refrescarTiraPestanas(list)
 }
 
 function cntFechaClave(fecha) {
@@ -412,27 +423,39 @@ function cntAbrirModalTransferencia(transferencia = null) {
 
     openGastosCreateModal({
         title: transferencia ? "Editar transferencia" : "Nueva transferencia",
+        // Dos columnas, como el modal de Mensualidades: en una sola no cabía sin scroll.
+        modalClass: "gastosCreateModalWide mensFormModal",
         bodyHtml: `
-            <label class="assetModalLabel" for="cntTransOrigen">De la cuenta</label>
-            <select id="cntTransOrigen" class="assetModalSelect">${cntOpcionesCuenta(origen)}</select>
-
-            <label class="assetModalLabel" for="cntTransDestino">A la cuenta</label>
-            <select id="cntTransDestino" class="assetModalSelect">${cntOpcionesCuenta(destino)}</select>
-
-            <label class="assetModalLabel" for="cntTransFecha">Fecha</label>
-            <input id="cntTransFecha" class="assetModalInput" type="text" value="${escapeGastosHtml(transferencia?.fecha || todayDateString())}" placeholder="dd-mm-aaaa">
-
-            <label class="assetModalLabel" for="cntTransCantidad">Cantidad</label>
-            <input id="cntTransCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(transferencia?.cantidad || "")}" placeholder="0,00">
-
-            <label class="assetModalLabel" for="cntTransComision">Comisión <span class="assetModalLabelHint">opcional · la paga la cuenta de origen</span></label>
-            <input id="cntTransComision" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(transferencia?.comision || "")}" placeholder="0,00">
-
-            <label class="assetModalLabel" for="cntTransConcepto">Concepto <span class="assetModalLabelHint">opcional</span></label>
-            <input id="cntTransConcepto" class="assetModalInput" type="text" maxlength="120" value="${escapeGastosHtml(transferencia?.concepto || "")}" placeholder="Ej: Compra de cripto">
-
-            <label class="assetModalLabel" for="cntTransNota">Nota <span class="assetModalLabelHint">opcional</span></label>
-            <textarea id="cntTransNota" class="assetModalInput movNotaInput" rows="2" maxlength="300">${escapeGastosHtml(transferencia?.nota || "")}</textarea>
+            <div class="mensFormGrid">
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cntTransOrigen">De la cuenta</label>
+                    <select id="cntTransOrigen" class="assetModalSelect">${cntOpcionesCuenta(origen)}</select>
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cntTransDestino">A la cuenta</label>
+                    <select id="cntTransDestino" class="assetModalSelect">${cntOpcionesCuenta(destino)}</select>
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cntTransFecha">Fecha</label>
+                    <input id="cntTransFecha" class="assetModalInput" type="text" value="${escapeGastosHtml(transferencia?.fecha || todayDateString())}" placeholder="dd-mm-aaaa">
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cntTransCantidad">Cantidad</label>
+                    <input id="cntTransCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(transferencia?.cantidad || "")}" placeholder="0,00">
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cntTransComision">Comisión <span class="assetModalLabelHint">opcional · la paga el origen</span></label>
+                    <input id="cntTransComision" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(transferencia?.comision || "")}" placeholder="0,00">
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cntTransConcepto">Concepto <span class="assetModalLabelHint">opcional</span></label>
+                    <input id="cntTransConcepto" class="assetModalInput" type="text" maxlength="120" value="${escapeGastosHtml(transferencia?.concepto || "")}" placeholder="Ej: Compra de cripto">
+                </div>
+                <div class="gastosCreateModalField mensFormFieldWide">
+                    <label class="assetModalLabel" for="cntTransNota">Nota <span class="assetModalLabelHint">opcional</span></label>
+                    <textarea id="cntTransNota" class="assetModalInput movNotaInput" rows="2" maxlength="300" placeholder="Opcional: motivo de la transferencia…">${escapeGastosHtml(transferencia?.nota || "")}</textarea>
+                </div>
+            </div>
             <p class="cuentasHint">Mover dinero entre tus cuentas no es un gasto ni un ingreso: no cuenta en Gastos, Ingresos ni en la tasa de ahorro. La comisión se suma a lo que sale de la cuenta de origen; la de destino recibe solo la cantidad.</p>
         `,
         submitLabel: "Guardar",
@@ -535,7 +558,6 @@ function cntBind() {
     }
 
     const on = (id, handler) => document.getElementById(id)?.addEventListener("click", handler)
-    on("cuentasNuevaTransferenciaBtn", () => cntAbrirModalTransferencia())
     on("cuentasAddRowBtn", () => cntAbrirModalTransferencia())
     on("cuentasNuevaCuentaBtn", () => cntAbrirModalCuenta())
     on("cuentasCsvBtn", cntDescargarCsv)

@@ -172,6 +172,28 @@ def testUnFalloDePermisosSeDevuelveConSuCausa(cliente, monkeypatch):
     assert str(rutas["backups"]) in datos["error"]
 
 
+def testUnPortfolioDanadoNoSeCopiaYSeDiceQueFalla(cliente):
+    """La copia comprueba la integridad de cada portfolio antes de meterlo en el
+    zip; el error dice cuál y por qué, y no queda ningún zip a medias."""
+    client, cabeceras, rutas = cliente
+    ruta = _crearDb(rutas["portfolios"] / "principal.db")
+    conn = sqlite3.connect(str(ruta))
+    conn.executescript(
+        "CREATE TABLE activos (id TEXT PRIMARY KEY);"
+        "CREATE TABLE activo_rows (id INTEGER PRIMARY KEY, activo TEXT REFERENCES activos(id));"
+        "INSERT INTO activo_rows (activo) VALUES ('fantasma');"
+    )
+    conn.close()
+
+    respuesta = client.post("/api/backup", headers=cabeceras)
+    datos = respuesta.get_json()
+
+    assert respuesta.status_code == 500
+    assert "principal.db no pasa la comprobación de integridad" in datos["error"]
+    assert "activo_rows" in datos["error"]
+    assert list(rutas["backups"].glob("*.zip")) == []
+
+
 def testNoSeEmpiezaElZipSiElDestinoNoEsEscribible(cliente, monkeypatch):
     """La comprobación va antes de tocar nada, para no dejar un zip a medias."""
     from core import paths

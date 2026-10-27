@@ -5,6 +5,13 @@ let currentStablecoinsOperationsRows = []
 let currentStablecoinsTransaccionesRows = []
 let stablecoinsAutosaveTimeout = null
 let stablecoinsPersistenceBound = false
+// Solo se guarda al ocultar o cerrar la pestaña si hubo cambios locales: sin
+// esta marca, una pestaña con la lista vieja pisaba lo guardado desde otro sitio.
+let stablecoinsHasPendingChanges = false
+// Revisión que el servidor tenía al cargar o guardar por última vez, y copia de
+// los datos de entonces: la base de la fusión si otro sitio guarda antes.
+let stablecoinsRevision = null
+let stablecoinsBase = { catalog: [], enabledSymbols: [], rows: [] }
 let stablecoinsPersistChain = Promise.resolve()
 
 async function loadStablecoinsData() {
@@ -29,7 +36,9 @@ async function saveStablecoinsData(payload, options = {}) {
 
     if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        const error = new Error(`HTTP ${response.status}: ${errorText}`)
+        error.status = response.status
+        throw error
     }
 
     return await response.json()
@@ -365,6 +374,8 @@ async function initStablecoinsLogic() {
     ])
 
     currentStablecoinsData = normalizeStablecoinsPayload(stablecoinsPayload)
+    stablecoinsRevision = Number.isInteger(stablecoinsPayload?.revision) ? stablecoinsPayload.revision : null
+    stablecoinsBase = JSON.parse(JSON.stringify(currentStablecoinsData))
     currentStablecoinsOperationsRows = Array.isArray(operationsPayload?.rows) ? operationsPayload.rows : []
     currentStablecoinsTransaccionesRows = Array.isArray(transaccionesPayload?.rows) ? transaccionesPayload.rows : []
     bindStablecoinsPersistenceGuards()
@@ -386,6 +397,26 @@ function bindStablecoinsEvents() {
     const modalOverlay = document.getElementById("stablecoinModalOverlay")
     const searchButton = document.getElementById("stablecoinSearchBtn")
     const searchInput = document.getElementById("stablecoinSearchInput")
+    const menuButton = document.getElementById("stablecoinsMenuBtn")
+    const menuDropdown = document.getElementById("stablecoinsMenuDropdown")
+
+    if (menuButton && menuDropdown && !menuButton.dataset.bound) {
+        menuButton.dataset.bound = "true"
+        menuButton.addEventListener("click", (event) => {
+            event.stopPropagation()
+            menuDropdown.classList.toggle("hidden")
+        })
+        // Cualquier opción del menú lo cierra; sus propias acciones van aparte.
+        menuDropdown.addEventListener("click", () => menuDropdown.classList.add("hidden"))
+        // Cada visita crea un botón nuevo; el listener del anterior se desactiva
+        // solo al dejar de estar conectado al DOM.
+        document.addEventListener("click", (event) => {
+            if (!menuButton.isConnected) return
+            if (!event.target.closest("#stablecoinsMenuBtn") && !event.target.closest("#stablecoinsMenuDropdown")) {
+                menuDropdown.classList.add("hidden")
+            }
+        })
+    }
 
     if (body && !body.dataset.bound) {
         body.dataset.bound = "true"
@@ -401,6 +432,7 @@ function bindStablecoinsEvents() {
         summaryContainer.dataset.bound = "true"
         summaryContainer.addEventListener("click", handleStablecoinSummaryClick)
     }
+    activarArrastreHorizontal(summaryContainer)
 
     if (addButton && !addButton.dataset.bound) {
         addButton.dataset.bound = "true"
@@ -515,49 +547,119 @@ function renderStablecoinsEnabledMenu() {
     })
 }
 
-function renderStablecoinsSummary() {
-    const summaryContainer = document.getElementById("stablecoinsSummary")
-    const headerPanel = document.querySelector(".stablecoinsHeaderPanel")
+// Moneda por defecto del usuario (Ajustes). Las compras solo admiten EUR y USD
+// (ver normalizeStablecoinMovementRow), así que fuera de esas dos se usa USD.
+function getStablecoinsBaseCurrency() {
+    const base = normalizeCurrencyCode(window._monedaBase || "EUR")
+    return base === "EUR" || base === "USD" ? base : "USD"
+}
 
-    if (!summaryContainer || !headerPanel) {
+// Divisa a la que está ligada cada stablecoin: las de euro llevan EUR en el
+// símbolo (EURC, EURT...); el resto se toman como dólar.
+function getStablecoinPegCurrency(symbol) {
+    return String(symbol || "").includes("EUR") ? "EUR" : "USD"
+}
+
+function formatStablecoinUnits(value, symbol) {
+    const amount = Number(value) || 0
+    return `${amount.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${symbol}`
+}
+
+// Cifras de la tarjeta en la moneda por defecto: a cuánto está hoy una unidad,
+// cuánto vale el saldo y a qué precio medio se compró. El cambio viene del
+// servidor; si falla, esas cifras se quedan sin valor y la tarjeta sigue.
+async function buildStablecoinComparison(item, base) {
+    const comparison = { rate: null, availableBase: null, averagePrice: null }
+    const compras = (currentStablecoinsData.rows || []).filter(
+        (row) => row.stablecoinSymbol === item.symbol && row.tipo === "Compra"
+    )
+
+    try {
+        comparison.rate = await convertAmountForDisplay(1, getStablecoinPegCurrency(item.symbol), base)
+        comparison.availableBase = item.available * comparison.rate
+
+        const pagado = await Promise.all(
+            compras.map((row) => convertAmountForDisplay(parseLooseNumber(row.total) || 0, row.currency, base))
+        )
+        const totalPagado = pagado.reduce((total, value) => total + value, 0)
+        comparison.averagePrice = item.manualBuys > 0 ? totalPagado / item.manualBuys : null
+    } catch (error) {
+        console.warn(`No se pudo comparar ${item.symbol} con ${base}.`, error)
+    }
+
+    return comparison
+}
+
+function buildStablecoinSummaryCard(item, comparison, base) {
+    const card = document.createElement("article")
+    card.className = "stablecoinSummaryCard"
+    const enMonedaBase = (value) => (value === null ? "—" : formatMoney(value, base))
+    card.innerHTML = `
+        <div class="stablecoinSummaryHeader">
+            <div class="stablecoinSummaryHeaderCopy">
+                <h4>${escapeHtml(item.symbol)}</h4>
+                <span>Saldo disponible</span>
+            </div>
+            <button type="button" class="stablecoinSummaryDeleteBtn" data-symbol="${escapeHtml(item.symbol)}" title="Eliminar stablecoin" aria-label="Eliminar stablecoin">${iconoHtml("Borrar")}</button>
+        </div>
+        <div class="stablecoinSummaryMain">${escapeHtml(formatStablecoinUnits(item.available, item.symbol))}</div>
+        <div class="stablecoinSummaryEquiv">
+            ≈ ${enMonedaBase(comparison.availableBase)}
+            <span>· 1 ${escapeHtml(item.symbol)} = ${enMonedaBase(comparison.rate)}</span>
+        </div>
+        <div class="stablecoinSummaryMeta">
+            <div class="stablecoinSummaryStat" title="Total de ${escapeHtml(item.symbol)} comprado">
+                <span>Comprado</span>
+                <strong>${escapeHtml(formatStablecoinUnits(item.manualBuys, item.symbol))}</strong>
+            </div>
+            <div class="stablecoinSummaryStat" title="Lo que costó cada ${escapeHtml(item.symbol)} de media, en ${base}">
+                <span>Precio medio</span>
+                <strong>${enMonedaBase(comparison.averagePrice)}</strong>
+            </div>
+            <div class="stablecoinSummaryStat" title="Reservado en operaciones activas">
+                <span>Bloqueado</span>
+                <strong>${escapeHtml(formatStablecoinUnits(item.locked, item.symbol))}</strong>
+            </div>
+        </div>
+    `
+    return card
+}
+
+// Puede llamarse varias veces seguidas mientras esperan los tipos de cambio:
+// solo pinta la última.
+let stablecoinsSummaryRenderToken = 0
+
+async function renderStablecoinsSummary() {
+    const summaryContainer = document.getElementById("stablecoinsSummary")
+
+    if (!summaryContainer) {
         return
     }
 
+    const token = ++stablecoinsSummaryRenderToken
     const enabledSymbols = getEnabledStablecoinSymbols(currentStablecoinsData)
-    const summary = buildStablecoinBalanceSummary(currentStablecoinsData, currentStablecoinsOperationsRows)
-    summaryContainer.innerHTML = ""
 
     if (!enabledSymbols.length) {
+        summaryContainer.innerHTML = ""
         summaryContainer.classList.add("hidden")
-        headerPanel.classList.add("stablecoinsHeaderPanelCompact")
         return
     }
 
-    summaryContainer.classList.remove("hidden")
-    headerPanel.classList.remove("stablecoinsHeaderPanelCompact")
+    const base = getStablecoinsBaseCurrency()
+    const items = Object.values(
+        buildStablecoinBalanceSummary(currentStablecoinsData, currentStablecoinsOperationsRows)
+    ).filter((item) => item.enabled)
+    const comparisons = await Promise.all(items.map((item) => buildStablecoinComparison(item, base)))
 
-    Object.values(summary)
-        .filter((item) => item.enabled)
-        .forEach((item) => {
-            const card = document.createElement("article")
-            card.className = "stablecoinSummaryCard"
-            card.innerHTML = `
-            <div class="stablecoinSummaryHeader">
-                <div class="stablecoinSummaryHeaderCopy">
-                    <h4>${escapeHtml(item.symbol)}</h4>
-                    <span>Saldo disponible</span>
-                </div>
-                <button type="button" class="stablecoinSummaryDeleteBtn" data-symbol="${escapeHtml(item.symbol)}" title="Eliminar stablecoin">×</button>
-            </div>
-            <div class="stablecoinSummaryMain">${formatMoney(item.available, "USD")}</div>
-            <div class="stablecoinSummaryMeta">
-                <span>Bloqueado en operaciones activas: ${formatMoney(item.locked, "USD")}</span>
-                <span>Operaciones completadas: ${formatMoney(item.operationsBuys - item.operationsSales, "USD")}</span>
-                <span>Comisiones pagadas: ${formatMoney(item.totalComisiones, "USD")}</span>
-            </div>
-        `
-            summaryContainer.appendChild(card)
-        })
+    if (token !== stablecoinsSummaryRenderToken) {
+        return
+    }
+
+    summaryContainer.innerHTML = ""
+    summaryContainer.classList.remove("hidden")
+    items.forEach((item, index) => {
+        summaryContainer.appendChild(buildStablecoinSummaryCard(item, comparisons[index], base))
+    })
 }
 
 function handleStablecoinSummaryClick(event) {
@@ -650,9 +752,8 @@ function buildStablecoinRow(row) {
     tr.innerHTML = `
         <td>${escapeHtml(row.stablecoinSymbol)}</td>
         <td>${escapeHtml(row.fecha)}</td>
-        <td>${escapeHtml(row.tipo)}</td>
+        <td>${row.tipo === "Venta" ? "−" : ""}${formatStablecoinQuantity(row.cantidad)}</td>
         <td>${escapeHtml(row.currency)}</td>
-        <td>${formatStablecoinQuantity(row.cantidad)}</td>
         <td>${formatOperationsMoney(row.precio, row.currency || "USD")}</td>
         <td>${formatOperationsMoney(row.total, row.currency || "USD")}</td>
         <td>${row.comisiones ? formatOperationsMoney(row.comisiones, row.currency || "USD") : ""}</td>
@@ -866,12 +967,13 @@ async function handleStablecoinFinnhubSearch() {
 }
 
 function scheduleStablecoinsAutosave(delay = 500) {
+    stablecoinsHasPendingChanges = true
     window.clearTimeout(stablecoinsAutosaveTimeout)
     stablecoinsAutosaveTimeout = window.setTimeout(async () => {
         try {
             await persistStablecoinsData()
         } catch (error) {
-            showError("No se pudieron guardar las stablecoins", error)
+            showError("No se pudieron guardar las stablecoins", error, { persistent: true })
         }
     }, delay)
 }
@@ -880,16 +982,81 @@ async function persistStablecoinsData(options = {}) {
     window.clearTimeout(stablecoinsAutosaveTimeout)
     const payloadSnapshot = buildStablecoinsPayloadSnapshot()
     currentStablecoinsData = payloadSnapshot
+    stablecoinsHasPendingChanges = false
 
     stablecoinsPersistChain = stablecoinsPersistChain
         .catch(() => {})
-        .then(() => saveStablecoinsData(payloadSnapshot, options))
+        .then(() =>
+            saveStablecoinsData(
+                { ...payloadSnapshot, ...(Number.isInteger(stablecoinsRevision) ? { revision: stablecoinsRevision } : {}) },
+                options
+            )
+        )
 
-    await stablecoinsPersistChain
+    try {
+        let respuesta
+        try {
+            respuesta = await stablecoinsPersistChain
+        } catch (error) {
+            // Con keepalive la página puede estar cerrándose: no hay tiempo de
+            // fusionar, y en el servidor no se ha borrado nada.
+            if (error?.status !== 409 || options.keepalive) throw error
+            respuesta = await fusionarStablecoinsTrasConflicto(payloadSnapshot)
+        }
+        if (Number.isInteger(respuesta?.revision)) stablecoinsRevision = respuesta.revision
+        stablecoinsBase = JSON.parse(JSON.stringify(currentStablecoinsData))
+    } catch (error) {
+        stablecoinsHasPendingChanges = true
+        throw error
+    }
+}
+
+// Otra pestaña u otro dispositivo guardó las stablecoins entretanto: se aplican
+// los cambios de esta pestaña (respecto a lo que cargó) sobre lo que hay ahora,
+// en el catálogo, las activadas y las filas.
+async function fusionarStablecoinsTrasConflicto(payloadSnapshot) {
+    const crudo = await loadStablecoinsData()
+    const servidor = normalizeStablecoinsPayload(crudo)
+    const revisionServidor = Number.isInteger(crudo?.revision) ? crudo.revision : stablecoinsRevision
+    const filasFusionadas = resolverConflictosPorId(
+        fusionarListaTresVias(stablecoinsBase.rows, payloadSnapshot.rows, servidor.rows, claveEstableAnual),
+        servidor.rows
+    )
+    const fusionado = normalizeStablecoinsPayload({
+        catalog: fusionarListaTresVias(stablecoinsBase.catalog, payloadSnapshot.catalog, servidor.catalog, claveEstableAnual),
+        enabledSymbols: fusionarListaTresVias(
+            stablecoinsBase.enabledSymbols,
+            payloadSnapshot.enabledSymbols,
+            servidor.enabledSymbols,
+            claveEstableAnual
+        ),
+        rows: filasFusionadas.filas
+    })
+    currentStablecoinsData = fusionado
+    let respuesta
+    try {
+        respuesta = await saveStablecoinsData({ ...fusionado, revision: revisionServidor })
+    } catch (error) {
+        // No se ha podido guardar: la pestaña vuelve a lo que hay en el servidor
+        // para no enseñar como guardado lo que no lo está.
+        currentStablecoinsData = servidor
+        stablecoinsRevision = revisionServidor
+        stablecoinsBase = JSON.parse(JSON.stringify(servidor))
+        renderStablecoinsEnabledMenu()
+        renderStablecoinsSummary()
+        renderStablecoinsTable()
+        error.message = `No se han guardado tus cambios en las stablecoins; se han recargado las del servidor. (${error.message})`
+        throw error
+    }
+    renderStablecoinsEnabledMenu()
+    renderStablecoinsSummary()
+    renderStablecoinsTable()
+    avisarFusion("las stablecoins", filasFusionadas.descartadas.length)
+    return respuesta
 }
 
 async function flushStablecoinsPendingChanges() {
-    if (!document.getElementById("stablecoinsBody")) {
+    if (!document.getElementById("stablecoinsBody") || !stablecoinsHasPendingChanges) {
         return
     }
 
@@ -904,7 +1071,7 @@ function bindStablecoinsPersistenceGuards() {
     stablecoinsPersistenceBound = true
 
     window.addEventListener("beforeunload", () => {
-        if (!document.getElementById("stablecoinsBody")) {
+        if (!document.getElementById("stablecoinsBody") || !stablecoinsHasPendingChanges) {
             return
         }
 
@@ -914,7 +1081,11 @@ function bindStablecoinsPersistenceGuards() {
     })
 
     document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState !== "hidden" || !document.getElementById("stablecoinsBody")) {
+        if (
+            document.visibilityState !== "hidden" ||
+            !document.getElementById("stablecoinsBody") ||
+            !stablecoinsHasPendingChanges
+        ) {
             return
         }
 
@@ -931,6 +1102,8 @@ function openStablecoinRowModal(rowId) {
     const isEdit = rowIndex >= 0
     const rowData = isEdit ? { ...currentStablecoinsData.rows[rowIndex] } : createEmptyStablecoinRow()
     const symbolOptions = getStablecoinRowSymbolOptions(rowData.stablecoinSymbol)
+    // Una compra nueva se paga por defecto en la moneda del usuario.
+    const currencyActual = isEdit ? rowData.currency : getStablecoinsBaseCurrency()
 
     const fieldsHtml = `
         <div class="assetRowModalField">
@@ -944,36 +1117,30 @@ function openStablecoinRowModal(rowId) {
             <input id="scModalFecha" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.fecha)}" placeholder="dd-mm-aaaa">
         </div>
         <div class="assetRowModalField">
-            <label class="assetRowModalLabel">Tipo</label>
-            <select id="scModalTipo" class="assetRowModalSelect">
-                ${STABLECOIN_MOVEMENT_TYPES.map((t) => `<option value="${t}"${rowData.tipo === t ? " selected" : ""}>${t}</option>`).join("")}
-            </select>
-        </div>
-        <div class="assetRowModalField">
-            <label class="assetRowModalLabel">Divisa fiat</label>
+            <label class="assetRowModalLabel">Pagado en</label>
             <select id="scModalCurrency" class="assetRowModalSelect">
-                ${OPERATION_CURRENCY_OPTIONS.map((c) => `<option value="${c}"${(rowData.currency || "USD") === c ? " selected" : ""}>${c}</option>`).join("")}
+                ${["EUR", "USD"].map((c) => `<option value="${c}"${currencyActual === c ? " selected" : ""}>${c}</option>`).join("")}
             </select>
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Cantidad</label>
-            <input id="scModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.cantidad)}">
+            <input id="scModalCantidad" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="500" value="${escapeHtml(rowData.cantidad)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Precio unitario</label>
-            <input id="scModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(stripCurrencyText(rowData.precio || ""))}">
+            <input id="scModalPrecio" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="0,92" value="${escapeAttr(stripCurrencyText(rowData.precio || ""))}">
         </div>
         <div class="assetRowModalField">
-            <label class="assetRowModalLabel">Total fiat</label>
-            <input id="scModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(stripCurrencyText(rowData.total || ""))}">
+            <label class="assetRowModalLabel">Total pagado</label>
+            <input id="scModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="460,00" value="${escapeAttr(stripCurrencyText(rowData.total || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Comisiones</label>
-            <input id="scModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeAttr(stripCurrencyText(rowData.comisiones || ""))}">
+            <input id="scModalComisiones" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="0,50" value="${escapeAttr(stripCurrencyText(rowData.comisiones || ""))}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Nota</label>
-            <input id="scModalNota" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.nota)}">
+            <input id="scModalNota" class="assetRowModalInput" type="text" placeholder="Opcional: motivo, plataforma…" value="${escapeHtml(rowData.nota)}">
         </div>
     `
 
@@ -983,11 +1150,11 @@ function openStablecoinRowModal(rowId) {
     overlay.dataset.rowId = rowId || ""
 
     const modal = document.createElement("div")
-    modal.className = "assetModal assetRowModal"
+    modal.className = "assetModal assetRowModal modalDosColumnas"
 
     const title = document.createElement("h3")
     title.className = "assetModalTitle assetRowModalTitle"
-    title.textContent = isEdit ? "Editar movimiento" : "Añadir movimiento"
+    title.textContent = isEdit ? "Editar compra" : "Añadir compra"
 
     const fields = document.createElement("div")
     fields.className = "assetRowModalFields"
@@ -1008,7 +1175,7 @@ function openStablecoinRowModal(rowId) {
         footer.querySelector("#scRowModalDeleteBtn").addEventListener("click", () => {
             openConfirmModal({
                 title: "Eliminar fila",
-                message: "¿Quieres eliminar este movimiento?",
+                message: "¿Quieres eliminar esta compra?",
                 confirmLabel: "Eliminar",
                 onConfirm: () => {
                     currentStablecoinsData.rows = (currentStablecoinsData.rows || []).filter((r) => r.id !== rowId)
@@ -1038,12 +1205,15 @@ function saveStablecoinRowFromModal() {
     const g = (id) => document.getElementById(id)?.value ?? ""
 
     const rawComisiones = g("scModalComisiones")
+    // Ya solo se registran compras. Una venta antigua conserva su tipo al
+    // editarla para no cambiar el saldo sin querer.
+    const filaAnterior = (currentStablecoinsData.rows || []).find((r) => r.id === rowId)
 
     const rowData = normalizeStablecoinMovementRow({
         id: rowId || `stablecoin-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         stablecoinSymbol: g("scModalSymbol"),
         fecha: g("scModalFecha"),
-        tipo: g("scModalTipo"),
+        tipo: filaAnterior?.tipo || "Compra",
         currency: g("scModalCurrency"),
         cantidad: g("scModalCantidad"),
         precio: g("scModalPrecio"),

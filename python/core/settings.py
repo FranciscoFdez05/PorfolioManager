@@ -111,7 +111,7 @@ CATALOGO: tuple[Ajuste, ...] = (
     # docker-up.sh ya lee de ahí el puerto para el mapeo del contenedor.
     Ajuste("server", "host", TEXTO, "0.0.0.0", env="HOST",
            descripcion="Interfaz en la que escucha el servidor de desarrollo."),
-    Ajuste("server", "port", ENTERO, 5000, env="PORT", minimo=1, maximo=65535,
+    Ajuste("server", "port", ENTERO, 5050, env="PORT", minimo=1, maximo=65535,
            descripcion="Puerto HTTP. Fuente de verdad del proyecto: docker-up.sh lo lee de aquí."),
     Ajuste("server", "debug", BOOLEANO, False, env="FLASK_DEBUG",
            descripcion="Modo debug de Flask. Nunca en producción: expone la consola de depuración."),
@@ -165,6 +165,16 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("seguridad", "escrituras_por_minuto", ENTERO, 120, env="ESCRITURAS_POR_MINUTO",
            minimo=0, maximo=100_000,
            descripcion="Peticiones de escritura (POST/PUT/PATCH/DELETE) por IP y minuto. 0 desactiva el límite."),
+    Ajuste("seguridad", "codigo_2fa_minutos", ENTERO, 5, env="CODIGO_2FA_MINUTOS", minimo=1, maximo=60,
+           descripcion="Minutos que vale el código de la verificación en dos pasos enviado por Telegram."),
+    Ajuste("seguridad", "intentos_codigo_2fa", ENTERO, 5, env="INTENTOS_CODIGO_2FA", minimo=1, maximo=20,
+           descripcion="Códigos incorrectos que admite cada envío antes de anularlo."),
+    Ajuste("seguridad", "reenvio_2fa_segundos", ENTERO, 60, env="REENVIO_2FA_SEGUNDOS", minimo=0, maximo=3600,
+           descripcion="Espera mínima entre dos envíos del código de la verificación en dos pasos."),
+    Ajuste("seguridad", "segundo_paso_minutos", ENTERO, 15, env="SEGUNDO_PASO_MINUTOS", minimo=1, maximo=120,
+           descripcion="Minutos que se tiene para completar el segundo paso del login desde que se acierta la contraseña."),
+    Ajuste("seguridad", "fallos_2fa_por_hora", ENTERO, 20, env="FALLOS_2FA_POR_HORA", minimo=1, maximo=1000,
+           descripcion="Códigos o frases incorrectos por hora, de cualquier IP, que suspenden el segundo paso del login."),
     Ajuste("seguridad", "escrituras_pesadas_por_hora", ENTERO, 30, env="ESCRITURAS_PESADAS_POR_HORA",
            minimo=0, maximo=100_000,
            descripcion="Tope por IP y hora de backup/restore/importación, que copian bases enteras. 0 lo desactiva."),
@@ -210,11 +220,16 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("base_datos", "busy_timeout_ms", ENTERO, 5000, env="DB_BUSY_TIMEOUT_MS", minimo=0, maximo=600_000,
            descripcion="PRAGMA busy_timeout: milisegundos que SQLite reintenta antes de dar 'database is locked'."),
 
+    Ajuste("base_datos", "health_quick_check_ttl_segundos", ENTERO, 30, env="DB_HEALTH_QUICK_CHECK_TTL",
+           minimo=0, maximo=3600,
+           descripcion="Segundos que /api/health reutiliza el resultado de PRAGMA quick_check "
+                       "(SELECT 1 se ejecuta siempre). 0 lo ejecuta en cada llamada."),
+
     # [mercado]
     Ajuste("mercado", "historico_ttl_segundos", ENTERO, 4 * 3600, env="MERCADO_HISTORICO_TTL",
            minimo=0, maximo=30 * 24 * 3600,
            descripcion="Vida de la caché del histórico de precios. 0 desactiva la caché."),
-    Ajuste("mercado", "cotizacion_ttl_segundos", ENTERO, 30, env="MERCADO_COTIZACION_TTL",
+    Ajuste("mercado", "cotizacion_ttl_segundos", ENTERO, 90, env="MERCADO_COTIZACION_TTL",
            minimo=0, maximo=3600,
            descripcion="Vida de la caché de cotizaciones en memoria (dashboard, cartera y gráfico "
                        "piden el mismo activo casi a la vez). 0 desactiva la caché."),
@@ -257,6 +272,12 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("proveedores", "max_respuesta_mb", ENTERO, 8, env="PROVEEDORES_MAX_RESPUESTA_MB",
            minimo=1, maximo=512,
            descripcion="Tamaño máximo de una respuesta. Protege la memoria del proceso."),
+    Ajuste("proveedores", "cambio_vigencia_segundos", ENTERO, 600, env="PROVEEDORES_CAMBIO_VIGENCIA",
+           minimo=0, maximo=86400,
+           descripcion="Segundos que se reutiliza un tipo de cambio actual antes de pedirlo de nuevo. 0 lo desactiva."),
+    Ajuste("proveedores", "cambio_obsoleto_max_segundos", ENTERO, 86400, env="PROVEEDORES_CAMBIO_OBSOLETO_MAX",
+           minimo=0, maximo=604800,
+           descripcion="Antigüedad máxima del último tipo de cambio conocido que se usa si el proveedor falla. 0 lo desactiva."),
     Ajuste("proveedores", "user_agent", TEXTO, "PortfolioPython/1.0", env="PROVEEDORES_USER_AGENT",
            descripcion="Cabecera User-Agent con la que se identifica el cliente."),
 
@@ -431,6 +452,28 @@ def escriturasPorMinuto() -> int:
     return obtener("seguridad.escrituras_por_minuto")
 
 
+def codigo2faMinutos() -> int:
+    return obtener("seguridad.codigo_2fa_minutos")
+
+
+def intentosCodigo2fa() -> int:
+    return obtener("seguridad.intentos_codigo_2fa")
+
+
+def reenvio2faSegundos() -> int:
+    return obtener("seguridad.reenvio_2fa_segundos")
+
+
+def segundoPasoSegundos() -> int:
+    """Segundos que admite el segundo paso del login desde que se acertó la contraseña."""
+    return obtener("seguridad.segundo_paso_minutos") * 60
+
+
+def fallos2faPorHora() -> int:
+    """Fallos de código o frase por hora, sumando todas las IPs, que suspenden el login con 2FA."""
+    return obtener("seguridad.fallos_2fa_por_hora")
+
+
 def escriturasPesadasPorHora() -> int:
     return obtener("seguridad.escrituras_pesadas_por_hora")
 
@@ -453,6 +496,10 @@ def dbTimeout() -> int:
 
 def dbBusyTimeoutMs() -> int:
     return obtener("base_datos.busy_timeout_ms")
+
+
+def healthQuickCheckTtlSegundos() -> int:
+    return obtener("base_datos.health_quick_check_ttl_segundos")
 
 
 def historicoTtlSegundos() -> int:
@@ -493,6 +540,14 @@ def proveedorTimeout() -> float:
 
 def proveedorReintentos() -> int:
     return obtener("proveedores.reintentos")
+
+
+def proveedorCambioVigencia() -> int:
+    return obtener("proveedores.cambio_vigencia_segundos")
+
+
+def proveedorCambioObsoletoMax() -> int:
+    return obtener("proveedores.cambio_obsoleto_max_segundos")
 
 
 def proveedorBackoffInicial() -> float:

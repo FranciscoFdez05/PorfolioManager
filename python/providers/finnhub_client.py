@@ -1,10 +1,11 @@
 import logging
 import re
+import threading
 import time
 from datetime import datetime
 from urllib.error import HTTPError, URLError
 
-from core import dinero
+from core import dinero, settings
 from providers import (
     compactSymbol as _compactSymbol,
     fetchJson,
@@ -395,7 +396,84 @@ def fetchQuote(symbol, apiKey, timeout=None):
     }, None
 
 
+# {(origen, destino): (instante, tipo)}: último tipo obtenido de cada par. Sirve
+# a la vez de caché con vigencia y de respaldo si el proveedor deja de contestar.
+_exchangeRateCache = {}
+_exchangeRateLocks = {}
+_exchangeRateGuard = threading.Lock()
+
+
+def _exchangeRateLock(pair):
+    """Cerrojo propio de un par de divisas.
+
+    Un cerrojo por par y no uno global: así una petición lenta de USD/EUR no
+    retiene a quien pide GBP/EUR, y varios hilos que piden el mismo par a la
+    vez hacen una sola llamada de red (los demás leen lo que dejó el primero).
+    """
+    with _exchangeRateGuard:
+        return _exchangeRateLocks.setdefault(pair, threading.Lock())
+
+
+def clearExchangeRateCache():
+    """Vacía la caché de tipos de cambio (para tests y para forzar una lectura nueva)."""
+    with _exchangeRateGuard:
+        _exchangeRateCache.clear()
+
+
 def fetchExchangeRate(sourceCurrency, targetCurrency, timeout=None):
+    """Tipo de cambio actual `source -> target` como `(tipo, error)`.
+
+    Es el único punto por el que sale a la red el cambio de hoy, así que la
+    caché vive aquí y la comparten todos los llamadores. Un tipo se reutiliza
+    durante `proveedores.cambio_vigencia_segundos`; si el proveedor falla se
+    devuelve el último conocido mientras no pase de
+    `proveedores.cambio_obsoleto_max_segundos`, en vez de dejar sin cambio a
+    pantallas enteras por un fallo transitorio. Los errores no se cachean.
+
+    Args:
+        sourceCurrency: Divisa de origen.
+        targetCurrency: Divisa de destino.
+        timeout: Segundos por intento; con None se usa el de `[proveedores]`.
+
+    Returns:
+        `(tipo, None)` si hay valor, `(None, mensaje)` si no hay ni caché.
+    """
+    pair = (_normalizeCurrencyCode(sourceCurrency), _normalizeCurrencyCode(targetCurrency))
+    if pair[0] == pair[1]:
+        return 1.0, None
+
+    vigencia = settings.proveedorCambioVigencia()
+    if vigencia <= 0:
+        return _requestExchangeRate(sourceCurrency, targetCurrency, timeout=timeout)
+
+    def fresco():
+        recordado = _exchangeRateCache.get(pair)
+        if recordado is not None and time.monotonic() - recordado[0] < vigencia:
+            return recordado[1]
+        return None
+
+    rate = fresco()
+    if rate is not None:
+        return rate, None
+
+    with _exchangeRateLock(pair):
+        rate = fresco()
+        if rate is not None:
+            return rate, None
+
+        rate, error = _requestExchangeRate(sourceCurrency, targetCurrency, timeout=timeout)
+        if not error and rate:
+            _exchangeRateCache[pair] = (time.monotonic(), rate)
+            return rate, None
+
+        recordado = _exchangeRateCache.get(pair)
+        if recordado is not None and time.monotonic() - recordado[0] < settings.proveedorCambioObsoletoMax():
+            log.warning("[cambio] %s/%s: %s; se usa el último tipo conocido", pair[0], pair[1], error)
+            return recordado[1], None
+        return rate, error
+
+
+def _requestExchangeRate(sourceCurrency, targetCurrency, timeout=None):
     source = _normalizeCurrencyCode(sourceCurrency)
     target = _normalizeCurrencyCode(targetCurrency)
 

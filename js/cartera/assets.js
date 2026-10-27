@@ -305,13 +305,19 @@ async function buildOverviewDisplayRow(asset) {
 
 async function buildSummaryMetricsInEuros(summary) {
     const baseCurrency = summary.currency
-    const invertidoBrutoEur = await convertAmountForDisplay(summary.invertidoBruto, baseCurrency, "EUR")
+    // Invertido NETO (bruto menos comisiones), que es el que enseña la ficha del
+    // activo: la lista, la barra superior, el mapa de calor y el histórico
+    // tienen que dar la misma cifra que la ficha, y el servidor calcula esa
+    // misma (stores/rendimiento_activo.py). `invertidoBrutoEur` conserva el
+    // nombre por quienes ya lo leen.
+    const invertidoEur = await convertAmountForDisplay(summary.invertidoNeto, baseCurrency, "EUR")
     const netoActualEur = await convertAmountForDisplay(summary.netoActual, baseCurrency, "EUR")
-    const rendimientoEur = netoActualEur - invertidoBrutoEur
+    const rendimientoEur = netoActualEur - invertidoEur
 
     return {
         netoActualEur,
-        invertidoBrutoEur,
+        invertidoEur,
+        invertidoBrutoEur: invertidoEur,
         rendimientoEur
     }
 }
@@ -450,8 +456,27 @@ async function _fusionarActivoTrasConflicto(local) {
         throw new Error("El activo ha cambiado desde otro sitio y no se ha podido combinar. Recarga la página.")
     }
 
+    // Si el activo cambió de divisa desde otro sitio, las filas nuevas de esta
+    // pestaña están tecleadas en la divisa antigua y, al fusionarlas, se
+    // contarían como si fueran de la nueva (100 $ pasarían a ser 100 €).
+    // Convertirlas exigiría un tipo de cambio que aquí no hay, así que lo más
+    // seguro es no guardar nada y pedir que se recargue.
+    const divisaLocal = String(local.currency || "").trim().toUpperCase()
+    const divisaServidor = String(servidor.currency || "").trim().toUpperCase()
+    const hayFilasNuevas = ["rows", "operationRows", "conversionRows"].some(
+        (campo) => JSON.stringify(local[campo] || []) !== JSON.stringify(base[campo] || [])
+    )
+    if (hayFilasNuevas && divisaLocal && divisaServidor && divisaLocal !== divisaServidor) {
+        throw new Error(
+            `El activo ha cambiado de divisa (${divisaLocal} a ${divisaServidor}) desde otro sitio. ` +
+                "No se ha guardado nada: recarga la página y vuelve a introducir los cambios."
+        )
+    }
+
     const fusionado = { ...local, revision: servidor.revision }
-    for (const campo of ["price", "change", "status", "lastUpdated"]) {
+    // La divisa va con el precio: si otra pestaña convirtió el activo, el precio
+    // del servidor ya viene en la nueva y la local dejaría una etiqueta falsa.
+    for (const campo of ["price", "change", "status", "lastUpdated", "currency"]) {
         fusionado[campo] = servidor[campo]
     }
     for (const campo of ["rows", "operationRows", "conversionRows"]) {
@@ -539,7 +564,7 @@ async function createAssetOnServer(
 
     if (!response.ok) {
         const errorText = await response.text()
-        let serverMessage = ""
+        let serverMessage
 
         try {
             serverMessage = JSON.parse(errorText)?.error || ""
@@ -743,10 +768,19 @@ function getAssetVentasRows(asset) {
         : []
 }
 
-async function refreshAssetMarketDataOnServer(assetId) {
-    const response = await fetch(`/api/activos/${assetId}/refresh-market-data`, {
-        method: "POST"
-    })
+// Por defecto pide un precio nuevo al proveedor (acciones del usuario). La carga
+// y el refresco automáticos pasan `usarCache` para aceptar el del servidor
+// dentro de su TTL; el automático añade `maxEdadSegundos` (su intervalo) para
+// no recibir uno más viejo que eso.
+async function refreshAssetMarketDataOnServer(assetId, { usarCache = false, maxEdadSegundos = null } = {}) {
+    const opciones = { method: "POST" }
+    if (usarCache) {
+        const cuerpo = { usarCache: true }
+        if (Number.isFinite(maxEdadSegundos) && maxEdadSegundos > 0) cuerpo.maxEdadSegundos = maxEdadSegundos
+        opciones.headers = { "Content-Type": "application/json" }
+        opciones.body = JSON.stringify(cuerpo)
+    }
+    const response = await fetch(`/api/activos/${assetId}/refresh-market-data`, opciones)
 
     if (!response.ok) {
         const errorText = await response.text()

@@ -92,26 +92,39 @@ def _es(valor):
     return f"{signo}{'.'.join(grupos)},{decimales}"
 
 
-def construir(anio, filas, resumen):
+def construir(anio, filas, resumen, permutas=()):
     """Estructura intermedia que comparten el CSV y el HTML.
+
+    `permutas` son las permutas cripto por cripto del ejercicio: transmisiones
+    diferenciadas (tipo «permuta») que no se mezclan con las ventas, aunque su
+    resultado ya forme parte del resumen.
 
     Se calcula una sola vez y la usan las dos salidas: si el CSV y el HTML se
     construyeran por separado acabarían divergiendo, y la discrepancia entre el
     fichero que se archiva y el que se mira es justo lo que no se detecta.
     """
     computables = [f for f in filas if not f.get("incidencia")]
-    incidencias = [f for f in filas if f.get("incidencia")]
+    permutasComputables = [f for f in permutas if not f.get("incidencia")]
+    incidencias = [f for f in filas if f.get("incidencia")] + [f for f in permutas if f.get("incidencia")]
 
-    ganancias = sum((_dec(f["dineroDeclarar"]) for f in computables
+    resultados = [*computables, *permutasComputables]
+    ganancias = sum((_dec(f["dineroDeclarar"]) for f in resultados
                      if _dec(f["dineroDeclarar"]) > 0), Decimal("0"))
-    perdidas = sum((-_dec(f["dineroDeclarar"]) for f in computables
+    perdidas = sum((-_dec(f["dineroDeclarar"]) for f in resultados
                     if _dec(f["dineroDeclarar"]) < 0), Decimal("0"))
 
     resumen = resumen or {}
+    # Las del resumen se redondean una sola vez desde el cálculo exacto; sumar
+    # filas ya redondeadas puede dar céntimos de más y no cuadrar con el saldo.
+    if resumen.get("ganancias") not in (None, ""):
+        ganancias = _dec(resumen["ganancias"])
+    if resumen.get("perdidas") not in (None, ""):
+        perdidas = _dec(resumen["perdidas"])
     return {
         "anio": str(anio),
         "generado": date.today().strftime("%d-%m-%Y"),
         "detalle": computables,
+        "permutas": permutasComputables,
         "incidencias": incidencias,
         # Conceptos en el orden en que los pide el apartado de la declaración.
         "totales": [
@@ -177,6 +190,18 @@ def aCsv(informe):
             _es(fila.get(clave))
             for clave, _etiqueta in COLUMNAS_DETALLE
         ])
+
+    if informe["permutas"]:
+        escritor.writerow([])
+        escritor.writerow(["PERMUTAS DE CRIPTO POR CRIPTO (transmisión de lo entregado, a valor de mercado)"])
+        escritor.writerow([etiqueta for _clave, etiqueta in COLUMNAS_DETALLE])
+        for fila in informe["permutas"]:
+            escritor.writerow([
+                _textoCsv(fila.get(clave, "")) if clave in ("fecha", "cantidad") else
+                _textoCsv(f"{fila.get('activo', '')} ({fila.get('par', '')})") if clave == "activo" else
+                _es(fila.get(clave))
+                for clave, _etiqueta in COLUMNAS_DETALLE
+            ])
 
     escritor.writerow([])
     escritor.writerow(["RESUMEN DEL EJERCICIO"])
@@ -325,6 +350,28 @@ def aHtml(informe, nonce=""):
         )
     else:
         partes.append('<p class="vacio">Sin transmisiones en este ejercicio.</p>')
+
+    # ── Permutas ──
+    if informe["permutas"]:
+        partes.append("<h2>Permutas de cripto por cripto</h2>")
+        cabeceras = "".join(
+            f'<th class="{"num" if clave not in ("fecha", "activo") else ""}">'
+            f"{html.escape(etiqueta)}</th>"
+            for clave, etiqueta in COLUMNAS_DETALLE
+        )
+        cuerpo = []
+        for fila in informe["permutas"]:
+            celdas = [
+                f'<td>{html.escape(str(fila.get("fecha", "")))}</td>',
+                f'<td>{html.escape(str(fila.get("activo", "")))} ({html.escape(str(fila.get("par", "")))})</td>',
+                f'<td class="num">{html.escape(str(fila.get("cantidad", "")))}</td>',
+            ]
+            celdas += [_numHtml(fila.get(clave)) for clave, _e in COLUMNAS_DETALLE[3:]]
+            cuerpo.append(_filaHtml(celdas))
+        partes.append(
+            f"<table><thead><tr>{cabeceras}</tr></thead>"
+            f"<tbody>{''.join(cuerpo)}</tbody></table>"
+        )
 
     # ── Resumen ──
     partes.append("<h2>Resumen del ejercicio</h2>")

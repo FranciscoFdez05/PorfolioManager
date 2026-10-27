@@ -175,6 +175,7 @@ function mRenderAll(payload) {
         dividendos,
         bonos,
         rentaFija,
+        privateMarket,
         gastosYearsList,
         gastosYearData,
         ingresosYearsList,
@@ -185,8 +186,9 @@ function mRenderAll(payload) {
     } = payload
     const b = bonos || [],
         rf = rentaFija || []
-    mRenderDistTipos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
-    mRenderDistActivos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric)
+    const pm = privateMarket || []
+    mRenderDistTipos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric, pm)
+    mRenderDistActivos(summaries, _metricasDisplayType, b, rf, _metricasDistMetric, pm)
     mRenderRendTipos(summaries)
     mRenderRendActivos(summaries)
     const colorMap = Object.fromEntries(summaries.map((s) => [s.name, s.color]).filter(([, c]) => c))
@@ -199,6 +201,9 @@ function mRenderAll(payload) {
     mRenderBonosInst(b)
     mRenderRentaFijaTipos(rf)
     mRenderRentaFijaInst(rf)
+    mRenderIngresosHistorico(dividendos, payload.cuentasRemuneradas || [], b, rf)
+    mRenderVencimientos(b, rf)
+    mRenderPrivateMarket(pm)
     mRenderGastos(gastosYearsList || [], gastosYearData || null)
     mRenderIngresos(ingresosYearData || null)
     mRenderIngresosSection(ingresosYearsList || [], ingresosYearData || null)
@@ -298,14 +303,17 @@ function mRenderTradingDireccion(rows) {
     const longs = rows.filter((r) => r.direccion === "LONG")
     const shorts = rows.filter((r) => r.direccion === "SHORT")
 
+    const dirLabels = ["LONG", "SHORT"]
+    const dirValues = [longs.length, shorts.length]
+    const dirColors = ["#2ecc71", "#e74c3c"]
     mCreateChart("mChartTradingDireccion", {
         type: "doughnut",
         data: {
-            labels: ["LONG", "SHORT"],
+            labels: dirLabels,
             datasets: [
                 {
-                    data: [longs.length, shorts.length],
-                    backgroundColor: ["#2ecc71", "#e74c3c"],
+                    data: dirValues,
+                    backgroundColor: dirColors,
                     borderColor: "#0b1120",
                     borderWidth: 3,
                     hoverOffset: 10
@@ -317,7 +325,7 @@ function mRenderTradingDireccion(rows) {
             cutout: "60%",
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
-                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                legend: { display: false },
                 tooltip: {
                     callbacks: {
                         label: (c) =>
@@ -327,6 +335,7 @@ function mRenderTradingDireccion(rows) {
             }
         }
     })
+    mRenderDonutLeyenda("mChartTradingDireccion", dirLabels, dirColors, dirValues, longs.length + shorts.length)
 
     const statsEl = document.getElementById("mTradingDireccionStats")
     if (!statsEl) return
@@ -383,14 +392,17 @@ function mRenderTradingWinLoss(rows, filter = "todos") {
     const profits = filtered.filter((r) => r.resultado === "PROFIT").length
     const perdidas = filtered.filter((r) => r.resultado === "PÉRDIDA").length
 
+    const wlLabels = ["Aciertos", "Fallos"]
+    const wlValues = [profits, perdidas]
+    const wlColors = ["#2ecc71cc", "#e74c3ccc"]
     mCreateChart("mChartTradingWinLoss", {
         type: "doughnut",
         data: {
-            labels: ["Aciertos", "Fallos"],
+            labels: wlLabels,
             datasets: [
                 {
-                    data: [profits, perdidas],
-                    backgroundColor: ["#2ecc71cc", "#e74c3ccc"],
+                    data: wlValues,
+                    backgroundColor: wlColors,
                     borderColor: ["#2ecc71", "#e74c3c"],
                     borderWidth: 2,
                     hoverOffset: 10
@@ -402,7 +414,7 @@ function mRenderTradingWinLoss(rows, filter = "todos") {
             cutout: "58%",
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
-                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                legend: { display: false },
                 tooltip: {
                     callbacks: {
                         label: (c) =>
@@ -412,6 +424,7 @@ function mRenderTradingWinLoss(rows, filter = "todos") {
             }
         }
     })
+    mRenderDonutLeyenda("mChartTradingWinLoss", wlLabels, wlColors, wlValues, profits + perdidas)
 
     const mediaEl = document.getElementById("mTradingMediaTable")
     if (!mediaEl) return
@@ -559,7 +572,7 @@ async function initMetricasLogic() {
     _metricasSortDir = getChartPref("metricasSortDir", "desc")
     const _divYearToggle = document.getElementById("mDivYearToggle")
     if (_divYearToggle) _divYearToggle.dataset.bound = ""
-    const _allActivosTypes = ["cripto", "acciones", "etfs", "comoditis", "rentaFija"]
+    const _allActivosTypes = ["cripto", "acciones", "etfs", "comoditis", "rentaFija", "privateMarket"]
     const _savedHidden = window._metricasActivosHidden || []
     _metricasActivosFilter = new Set(_allActivosTypes.filter((t) => !_savedHidden.includes(t)))
     _metricasGastosTipoFilter = new Set()
@@ -582,7 +595,7 @@ async function initMetricasLogic() {
         mInitEvolucion()
         mInitEvolucionTipos()
 
-        const _allTypes = ["cripto", "acciones", "etfs", "comoditis", "rentaFija"]
+        const _allTypes = ["cripto", "acciones", "etfs", "comoditis", "rentaFija", "privateMarket"]
         const _todosBtn = document.querySelector(".mActivosFilterBtn[data-atype='todos']")
         const _specificBtns = [...document.querySelectorAll(".mActivosFilterBtn[data-atype]:not([data-atype='todos'])")]
 
@@ -616,7 +629,8 @@ async function initMetricasLogic() {
                 _metricasDisplayType,
                 _metricasPayload.bonos || [],
                 _metricasPayload.rentaFija || [],
-                _metricasDistMetric
+                _metricasDistMetric,
+                _metricasPayload.privateMarket || []
             )
         }
 
@@ -673,14 +687,16 @@ async function initMetricasLogic() {
                     _metricasDisplayType,
                     _metricasPayload.bonos || [],
                     _metricasPayload.rentaFija || [],
-                    _metricasDistMetric
+                    _metricasDistMetric,
+                    _metricasPayload.privateMarket || []
                 )
                 mRenderDistActivos(
                     _metricasPayload.summaries,
                     _metricasDisplayType,
                     _metricasPayload.bonos || [],
                     _metricasPayload.rentaFija || [],
-                    _metricasDistMetric
+                    _metricasDistMetric,
+                    _metricasPayload.privateMarket || []
                 )
             })
         })
@@ -703,14 +719,16 @@ async function initMetricasLogic() {
                     _metricasDisplayType,
                     _metricasPayload.bonos || [],
                     _metricasPayload.rentaFija || [],
-                    _metricasDistMetric
+                    _metricasDistMetric,
+                    _metricasPayload.privateMarket || []
                 )
                 mRenderDistActivos(
                     _metricasPayload.summaries,
                     _metricasDisplayType,
                     _metricasPayload.bonos || [],
                     _metricasPayload.rentaFija || [],
-                    _metricasDistMetric
+                    _metricasDistMetric,
+                    _metricasPayload.privateMarket || []
                 )
             })
         })

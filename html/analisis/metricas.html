@@ -162,8 +162,11 @@
         <div class="metricasChartsGrid2 mChartsGridEqualize">
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Por tipo de activo</div>
-                <div class="metricasChartWrap" style="height:280px">
-                    <canvas id="mChartTipos"></canvas>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:280px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartTipos"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartTiposLeyenda" hidden></ul>
                 </div>
             </div>
             <div class="metricasChartCard">
@@ -176,10 +179,14 @@
                         <label class="mActivosFilterBtn" data-atype="etfs"><input type="checkbox" value="etfs" checked><span>ETFs</span></label>
                         <label class="mActivosFilterBtn" data-atype="comoditis"><input type="checkbox" value="comoditis" checked><span>Comoditis</span></label>
                         <label class="mActivosFilterBtn" data-atype="rentaFija"><input type="checkbox" value="rentaFija" checked><span>Renta Fija</span></label>
+                        <label class="mActivosFilterBtn" data-atype="privateMarket"><input type="checkbox" value="privateMarket" checked><span>Private Market</span></label>
                     </div>
                 </div>
-                <div class="metricasChartWrap" style="height:280px">
-                    <canvas id="mChartActivos"></canvas>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:280px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartActivos"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartActivosLeyenda" hidden></ul>
                 </div>
             </div>
         </div>
@@ -199,8 +206,10 @@
             </div>
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Por activo individual</div>
-                <div class="metricasChartWrap metricasChartDynamic" id="mChartRendActivosWrap">
-                    <canvas id="mChartRendActivos"></canvas>
+                <div class="metricasChartWrap metricasChartDynamic metricasChartDivScroll" id="mChartRendActivosWrap">
+                    <div class="mChartScrollInner">
+                        <canvas id="mChartRendActivos"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -358,64 +367,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="metricasKpiGroupSep"></div>
-        <div class="metricasKpiGroup mkpiGroupBonos mkpiGroupRf" id="mkpiGroupRf">
-            <span class="metricasKpiGroupLabel">Renta Fija</span>
-            <div class="metricasKpiCards">
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">Neto</div>
-                    <div class="mkpiValue" id="mkpiBonos">---</div>
-                </div>
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">Gubernamentales</div>
-                    <div class="mkpiValue" id="mkpiBonosGub">---</div>
-                </div>
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">Corporativos</div>
-                    <div class="mkpiValue" id="mkpiBonosCorp">---</div>
-                </div>
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">Interés Fijo</div>
-                    <div class="mkpiValue" id="mkpiRentaFija">---</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="metricasKpiGroupSep"></div>
-        <div class="metricasKpiGroup" id="mkpiGroupPm">
-            <span class="metricasKpiGroupLabel">Mercado Privado</span>
-            <div class="metricasKpiCards">
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">Llamado</div>
-                    <div class="mkpiValue" id="mkpiPmLlamado">---</div>
-                </div>
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">Distribuido</div>
-                    <div class="mkpiValue" id="mkpiPmDistribuido">---</div>
-                </div>
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">Valor actual</div>
-                    <div class="mkpiValue" id="mkpiPmValorActual">---</div>
-                </div>
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">Neto (P&L)</div>
-                    <div class="mkpiValue" id="mkpiPmNeto">---</div>
-                </div>
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">TVPI</div>
-                    <div class="mkpiValue" id="mkpiPmTvpi">---</div>
-                </div>
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">DPI</div>
-                    <div class="mkpiValue" id="mkpiPmDpi">---</div>
-                </div>
-                <div class="metricasKpiCard">
-                    <div class="mkpiLabel">RVPI</div>
-                    <div class="mkpiValue" id="mkpiPmRvpi">---</div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- -- Dividendos ----------------------------------------- -->
@@ -440,8 +391,11 @@
             </div>
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Distribución por acción</div>
-                <div class="metricasChartWrap" id="mChartDivDonutWrap">
-                    <canvas id="mChartDividendosDonut"></canvas>
+                <div class="metricasChartWrap mDonutConLeyenda" id="mChartDivDonutWrap">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartDividendosDonut"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartDividendosDonutLeyenda" hidden></ul>
                 </div>
             </div>
         </div>
@@ -518,6 +472,103 @@
         </div>
     </div>
 
+    <!-- -- Ingresos: histórico anual y detalle ------------------- -->
+    <div class="metricasSection" id="mSectionIngresosHistorico" data-mcat="finanzas">
+        <div class="metricasSectionHeader">
+            <span class="metricasSectionTitle">Histórico de ingresos</span>
+        </div>
+        <div class="metricasChartsGrid2">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Dividendos netos por año</div>
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartDivAnual"></canvas>
+                </div>
+            </div>
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Cuentas remuneradas por año</div>
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartInteresesAnual"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid2 mFinFila">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Origen de los ingresos pasivos</div>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:260px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartPasivosOrigen"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartPasivosOrigenLeyenda" hidden></ul>
+                </div>
+            </div>
+            <div class="metricasChartCard metricasTableCard">
+                <div class="metricasChartTitle mFinTablaTitulo">Resumen por cuenta remunerada</div>
+                <div class="mFinTablaScroll">
+                    <table class="metricasTable mFinTabla" id="mCuentasResumenTable">
+                        <thead>
+                            <tr>
+                                <th>Cuenta</th>
+                                <th>Meses</th>
+                                <th>Bruto</th>
+                                <th>Impuestos</th>
+                                <th>Neto</th>
+                                <th>Media/mes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mCuentasResumenBody"></tbody>
+                        <tfoot id="mCuentasResumenFoot"></tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid1 mFinFila">
+            <div class="metricasChartCard metricasTableCard">
+                <div class="metricasChartTitle mFinTablaTitulo">Pagadores de dividendos</div>
+                <div class="mFinTablaScroll">
+                    <table class="metricasTable mFinTabla" id="mDivPagadoresTable">
+                        <thead>
+                            <tr>
+                                <th>Instrumento</th>
+                                <th>Cobros</th>
+                                <th>Total neto</th>
+                                <th>% del total</th>
+                                <th id="mDivPagadoresAnioPrev">Año anterior</th>
+                                <th id="mDivPagadoresAnio">Este año</th>
+                                <th>Variación</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mDivPagadoresBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- -- Renta Fija KPIs -- -->
+    <div class="metricasKpiRow" data-mcat="finanzas" data-pn-clave="kpiRentaFija">
+        <div class="metricasKpiGroup mkpiGroupBonos mkpiGroupRf" id="mkpiGroupRf">
+            <span class="metricasKpiGroupLabel">Renta Fija</span>
+            <div class="metricasKpiCards">
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Neto</div>
+                    <div class="mkpiValue" id="mkpiBonos">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Gubernamentales</div>
+                    <div class="mkpiValue" id="mkpiBonosGub">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Corporativos</div>
+                    <div class="mkpiValue" id="mkpiBonosCorp">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Interés Fijo</div>
+                    <div class="mkpiValue" id="mkpiRentaFija">---</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- -- Renta Fija ------------------------------------------- -->
     <div class="metricasSection" id="mSectionRentaFija" data-mcat="finanzas">
         <div class="metricasSectionHeader">
@@ -526,14 +577,19 @@
         <div class="metricasChartsGrid2">
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Distribución por tipo</div>
-                <div class="metricasChartWrap" style="height:240px">
-                    <canvas id="mChartRfTipos"></canvas>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:240px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartRfTipos"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartRfTiposLeyenda" hidden></ul>
                 </div>
             </div>
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Interés neto por instrumento</div>
-                <div class="metricasChartWrap metricasChartDynamic" id="mChartRfInstWrap">
-                    <canvas id="mChartRfInst"></canvas>
+                <div class="metricasChartWrap metricasChartDynamic metricasChartDivScroll" id="mChartRfInstWrap">
+                    <div class="mChartScrollInner">
+                        <canvas id="mChartRfInst"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -547,14 +603,176 @@
         <div class="metricasChartsGrid2">
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Distribución por tipo</div>
-                <div class="metricasChartWrap" style="height:240px">
-                    <canvas id="mChartBonosTipos"></canvas>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:240px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartBonosTipos"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartBonosTiposLeyenda" hidden></ul>
                 </div>
             </div>
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Interés neto por instrumento</div>
-                <div class="metricasChartWrap metricasChartDynamic" id="mChartBonosInstWrap">
-                    <canvas id="mChartBonosInst"></canvas>
+                <div class="metricasChartWrap metricasChartDynamic metricasChartDivScroll" id="mChartBonosInstWrap">
+                    <div class="mChartScrollInner">
+                        <canvas id="mChartBonosInst"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- -- Vencimientos de renta fija y bonos -------------------- -->
+    <div class="metricasSection" id="mSectionVencimientos" data-mcat="finanzas">
+        <div class="metricasSectionHeader">
+            <span class="metricasSectionTitle">Vencimientos de renta fija y bonos</span>
+        </div>
+        <div class="metricasKpiCards mFinKpis">
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">Capital vivo</div>
+                <div class="mkpiValue" id="mkpiRfCapitalVivo">---</div>
+            </div>
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">Rentab. media</div>
+                <div class="mkpiValue" id="mkpiRfRentMedia">---</div>
+            </div>
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">Interés bruto/año</div>
+                <div class="mkpiValue" id="mkpiRfInteresAnual">---</div>
+            </div>
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">Próximo vencimiento</div>
+                <div class="mkpiValue" id="mkpiRfProximo">---</div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid1 mFinFila">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Capital que vence por año</div>
+                <div class="metricasChartWrap" style="height:260px">
+                    <canvas id="mChartVencimientos"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid1 mFinFila">
+            <div class="metricasChartCard metricasTableCard">
+                <div class="metricasChartTitle mFinTablaTitulo">Posiciones por vencimiento</div>
+                <div class="mFinTablaScroll">
+                    <table class="metricasTable mFinTabla" id="mVencimientosTable">
+                        <thead>
+                            <tr>
+                                <th>Instrumento</th>
+                                <th>Tipo</th>
+                                <th>Invertido</th>
+                                <th>Rentab.</th>
+                                <th>Vencimiento</th>
+                                <th>Quedan</th>
+                                <th>Interés neto</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mVencimientosBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- -- Mercado privado KPIs -- -->
+    <div class="metricasKpiRow" data-mcat="finanzas" data-pn-clave="kpiPrivateMarket">
+        <div class="metricasKpiGroup" id="mkpiGroupPm">
+            <span class="metricasKpiGroupLabel">Mercado Privado</span>
+            <div class="metricasKpiCards">
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Llamado</div>
+                    <div class="mkpiValue" id="mkpiPmLlamado">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Distribuido</div>
+                    <div class="mkpiValue" id="mkpiPmDistribuido">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Valor actual</div>
+                    <div class="mkpiValue" id="mkpiPmValorActual">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">Neto (P&L)</div>
+                    <div class="mkpiValue" id="mkpiPmNeto">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">TVPI</div>
+                    <div class="mkpiValue" id="mkpiPmTvpi">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">DPI</div>
+                    <div class="mkpiValue" id="mkpiPmDpi">---</div>
+                </div>
+                <div class="metricasKpiCard">
+                    <div class="mkpiLabel">RVPI</div>
+                    <div class="mkpiValue" id="mkpiPmRvpi">---</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- -- Mercado privado -------------------------------------- -->
+    <div class="metricasSection" id="mSectionPrivateMarket" data-mcat="finanzas">
+        <div class="metricasSectionHeader">
+            <span class="metricasSectionTitle">Mercado privado</span>
+        </div>
+        <div class="metricasKpiCards mFinKpis">
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">Comprometido</div>
+                <div class="mkpiValue" id="mkpiPmComprometido">---</div>
+            </div>
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">Pendiente de llamar</div>
+                <div class="mkpiValue" id="mkpiPmPendiente">---</div>
+            </div>
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">% llamado</div>
+                <div class="mkpiValue" id="mkpiPmPctLlamado">---</div>
+            </div>
+            <div class="metricasKpiCard">
+                <div class="mkpiLabel">Fondos</div>
+                <div class="mkpiValue" id="mkpiPmFondos">---</div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid2 mFinFila">
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Por vintage</div>
+                <div class="metricasChartWrap" style="height:280px">
+                    <canvas id="mChartPmVintage"></canvas>
+                </div>
+            </div>
+            <div class="metricasChartCard">
+                <div class="metricasChartTitle">Valor actual por tipo</div>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:280px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartPmTipos"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartPmTiposLeyenda" hidden></ul>
+                </div>
+            </div>
+        </div>
+        <div class="metricasChartsGrid1 mFinFila">
+            <div class="metricasChartCard metricasTableCard">
+                <div class="metricasChartTitle mFinTablaTitulo">Detalle por fondo</div>
+                <div class="mFinTablaScroll">
+                    <table class="metricasTable mFinTabla" id="mPmFondosTable">
+                        <thead>
+                            <tr>
+                                <th>Fondo</th>
+                                <th>Tipo</th>
+                                <th>Gestora</th>
+                                <th>Vintage</th>
+                                <th>Comprometido</th>
+                                <th>Llamado</th>
+                                <th>Distribuido</th>
+                                <th>Valor actual</th>
+                                <th>TVPI</th>
+                                <th>DPI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mPmFondosBody"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -613,8 +831,11 @@
                     <div class="metricasChartTitle" id="mGastosTipoTitle">Por tipo</div>
                 </div>
                 <div class="mGastosMonthToggle" id="mGastosMonthToggle"></div>
-                <div class="metricasChartWrap" style="height:300px">
-                    <canvas id="mChartGastosTipo"></canvas>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:300px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartGastosTipo"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartGastosTipoLeyenda" hidden></ul>
                 </div>
             </div>
         </div>
@@ -683,8 +904,11 @@
                     <div class="metricasChartTitle" id="mIngresosTipoTitle">Por tipo</div>
                 </div>
                 <div class="mIngresosMonthToggle" id="mIngresosMonthToggle"></div>
-                <div class="metricasChartWrap" style="height:300px">
-                    <canvas id="mChartIngresosTipo"></canvas>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:300px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartIngresosTipo"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartIngresosTipoLeyenda" hidden></ul>
                 </div>
             </div>
         </div>
@@ -802,8 +1026,11 @@
         <div class="metricasChartsGrid2" style="margin-top:12px">
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Reparto acumulado</div>
-                <div class="metricasChartWrap" style="height:280px">
-                    <canvas id="mChartAnualReparto"></canvas>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:280px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartAnualReparto"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartAnualRepartoLeyenda" hidden></ul>
                 </div>
             </div>
             <div class="metricasChartCard">
@@ -881,8 +1108,11 @@
         <div class="metricasChartsGrid2">
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">Distribución de posiciones</div>
-                <div class="metricasChartWrap" style="height:260px">
-                    <canvas id="mChartTradingDireccion"></canvas>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:260px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartTradingDireccion"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartTradingDireccionLeyenda" hidden></ul>
                 </div>
             </div>
             <div class="metricasChartCard">
@@ -905,8 +1135,11 @@
         <div class="metricasChartsGrid2">
             <div class="metricasChartCard">
                 <div class="metricasChartTitle">% Aciertos vs Fallos</div>
-                <div class="metricasChartWrap" style="height:280px">
-                    <canvas id="mChartTradingWinLoss"></canvas>
+                <div class="metricasChartWrap mDonutConLeyenda" style="height:280px">
+                    <div class="mDonutLienzo">
+                        <canvas id="mChartTradingWinLoss"></canvas>
+                    </div>
+                    <ul class="mDonutLeyenda" id="mChartTradingWinLossLeyenda" hidden></ul>
                 </div>
             </div>
             <div class="metricasChartCard">

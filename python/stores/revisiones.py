@@ -21,7 +21,11 @@ from core.db import getDb
 # "gastos" e "ingresos" llevan el año como clave; "ventas", también el año; y
 # "activos", el id del activo (la ficha se guarda entera, con sus filas, igual
 # que un año de gastos). La tabla guarda la clave en la columna `year` como texto.
-AMBITOS = ("gastos", "ingresos", "ventas", "activos")
+#
+# Trading, operaciones, stablecoins y transacciones son una sola lista por
+# cartera, sin año ni id: llevan la clave fija `CLAVE_UNICA`.
+AMBITOS = ("gastos", "ingresos", "ventas", "activos", "trading", "operaciones", "stablecoins", "transacciones")
+CLAVE_UNICA = "todo"
 
 
 class ConflictoRevision(Exception):
@@ -79,6 +83,15 @@ def tomarBloqueo(conn):
     """Abre la transacción con el bloqueo de escritura ya tomado."""
     if not conn.in_transaction:
         conn.execute("BEGIN IMMEDIATE")
+
+
+def respuestaConflicto(conflicto, mensaje="Estos datos han cambiado desde otro sitio (otra pestaña u otro dispositivo)"):
+    """La respuesta 409 común: `conflicto`, la revisión actual y un texto para el usuario."""
+    from flask import jsonify
+
+    return jsonify({
+        "ok": False, "conflicto": True, "revision": conflicto.actual, "error": mensaje,
+    }), 409
 
 
 def revisionDePeticion(datos):

@@ -3,6 +3,13 @@
     <!-- Selector de plan y acciones. Queda fuera del scroll de la tabla: con
          varios planes hay que poder cambiar de uno a otro sin subir. -->
     <div class="pinvToolbar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#pinvTable tbody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
         <div class="pinvPlanTabs" id="pinvPlanTabs"></div>
         <div class="pinvToolbarActions">
             <button type="button" id="pinvArchivoBtn" class="secondaryButton pinvArchivoBtn" title="Archivar planes, ver los archivados y recuperarlos">Archivados</button>

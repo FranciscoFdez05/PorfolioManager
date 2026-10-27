@@ -1,4 +1,5 @@
 import hmac
+import html as htmlLib
 import json
 import logging
 import os
@@ -10,13 +11,13 @@ from contextlib import contextmanager
 from urllib.parse import urlsplit
 
 from cryptography.fernet import Fernet, InvalidToken
-from flask import Blueprint, g, jsonify, make_response, redirect, request, session, url_for
+from flask import Blueprint, Response, g, jsonify, make_response, redirect, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from core import csp, paths, sesion, settings, telegram_notifier
+from core import alta_inicial, csp, dos_factores, paths, sesion, settings, telegram_notifier
 from core.bloqueo import exclusivo
 from core.escritura import escribirAtomico, escribirJsonAtomico
-from core.paths import AUTH_FILE as _AUTH_FILE, LOGIN_HTML
+from core.paths import AUTH_FILE as _AUTH_FILE, LOGIN_2FA_HTML, LOGIN_HTML, SETUP_HTML
 from core.secret_store import fernetDeSecretKey
 
 authBp = Blueprint("auth", __name__)
@@ -268,8 +269,12 @@ def login():
     # como no almacenable, ver más abajo) y aquí se devuelve a la app.
     if session.get("logged_in"):
         return redirect(_safeNextUrl(request.args.get("next") or "/"))
+    if faltanCredenciales():
+        return redirect(url_for("auth.setup"))
 
-    error = None
+    # Un segundo paso que no se puede completar (código caducado, intentos
+    # agotados) devuelve aquí con su motivo.
+    error = session.pop("errorLogin", None)
     if request.method == "POST" and not _mismoOrigen():
         # Login CSRF: otra web podía enviar este formulario y dejar al usuario
         # dentro de la aplicación con una cuenta elegida por ella.
@@ -301,20 +306,15 @@ def login():
             # distinto, la diferencia de tiempo se invertía pero seguía ahí.
             passOk = check_password_hash(passwordHash if userOk else _senuelo(passwordHash), password)
             if userOk and passOk:
-                _clearFailures(ip)
-                session.clear()
-                session["logged_in"] = True
-                # Permanente: sobrevive al cierre del navegador, que es lo que
-                # hace que el móvil y el portátil puedan tener cada uno la suya
-                # abierta sin volver a entrar. Caducidad y revocación, en
-                # core/sesion.py.
-                session.permanent = True
-                # Identificador nuevo y marcas de tiempo: es lo que permite
-                # caducar la sesión y revocarla en el logout. Va después de
-                # clear() para que no herede nada de la sesión anterior.
-                sesion.abrir(session)
+                nextUrl = _safeNextUrl(request.args.get("next") or "/")
+                # Con la 2FA activa la contraseña correcta no abre sesión ni
+                # limpia los fallos de la IP: si los limpiase, repetir el login
+                # daría intentos de código sin fin.
+                if dos_factores.activa():
+                    return _pedirSegundoPaso(nextUrl)
+                _abrirSesion(ip)
                 telegram_notifier.notificar("sesion", f"🔑 Inicio de sesión desde {ip}")
-                return redirect(_safeNextUrl(request.args.get("next") or "/"))
+                return redirect(nextUrl)
 
             _recordFailure(ip)
             logger.warning("Intento de login fallido desde %s", ip)
@@ -326,6 +326,11 @@ def login():
         "<!-- ERROR_PLACEHOLDER -->",
         f'<p class="loginError">{error}</p>' if error else "",
     )
+    return _paginaSinCache(html)
+
+
+def _paginaSinCache(html: str):
+    """Respuesta para las páginas de acceso: con nonce de CSP y sin caché."""
     # El botón de mostrar/ocultar la contraseña va en un script en línea. Con
     # la CSP sin 'unsafe-inline' solo corre si lleva el nonce de la petición,
     # que el after_request de core/seguridad_app.py recoge de `g`.
@@ -339,6 +344,366 @@ def login():
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     return response
+
+
+def _abrirSesion(ip: str) -> None:
+    """Abre la sesión autenticada tras superar todas las comprobaciones."""
+    _clearFailures(ip)
+    session.clear()
+    session["logged_in"] = True
+    # Permanente: sobrevive al cierre del navegador, que es lo que
+    # hace que el móvil y el portátil puedan tener cada uno la suya
+    # abierta sin volver a entrar. Caducidad y revocación, en
+    # core/sesion.py.
+    session.permanent = True
+    # Identificador nuevo y marcas de tiempo: es lo que permite
+    # caducar la sesión y revocarla en el logout. Va después de
+    # clear() para que no herede nada de la sesión anterior.
+    sesion.abrir(session)
+
+
+# ── Alta inicial desde la web ─────────────────────────────────────────────────
+# Solo con la instalación sin ninguna credencial. Un auth.dat que existe pero no
+# se puede leer (SECRET_KEY cambiada) NO cuenta como «sin credenciales»: si
+# contase, cualquiera de la LAN podría sustituir la cuenta buena por la suya.
+
+
+class ErrorAlta(ValueError):
+    """Dato del formulario de alta que no es válido; el mensaje es para el usuario."""
+
+
+def faltanCredenciales() -> bool:
+    """Indica si no hay cuenta configurada: ni auth.dat ni LOGIN_USERNAME/LOGIN_PASSWORD_HASH.
+
+    Returns:
+        True si la instalación está esperando el alta inicial.
+    """
+    if _AUTH_FILE.exists():
+        return False
+    return not (os.environ.get("LOGIN_USERNAME", "").strip()
+                and os.environ.get("LOGIN_PASSWORD_HASH", "").strip())
+
+
+def prepararAltaInicial() -> None:
+    """Al arrancar sin cuenta, crea el código de alta y lo deja en el log.
+
+    Lo llama server.py al importarse. Sin cuenta no hay nada más que hacer, así
+    que el aviso va como WARNING para que se vea en `docker compose logs`.
+    """
+    if not faltanCredenciales():
+        return
+    try:
+        codigo = alta_inicial.obtenerCodigo()
+    except OSError as error:
+        logger.critical("No hay credenciales y no se pudo crear el código de alta inicial: %s", error)
+        return
+    logger.warning(
+        "No hay credenciales configuradas. Abre /setup en el navegador y usa el código %s "
+        "(también está en %s).", codigo, alta_inicial.ruta(),
+    )
+
+
+def _validarAlta(username: str, password: str, password2: str) -> None:
+    """Comprueba usuario y contraseña con la misma política que Ajustes.
+
+    Raises:
+        ErrorAlta: Con el motivo, listo para enseñarlo en el formulario.
+    """
+    if not username:
+        raise ErrorAlta("El usuario no puede estar vacío")
+    if len(username) > MAX_LARGO_USUARIO:
+        raise ErrorAlta(f"El usuario no puede pasar de {MAX_LARGO_USUARIO} caracteres")
+    if password != password2:
+        raise ErrorAlta("Las contraseñas no coinciden")
+    if len(password) < MIN_LARGO_CONTRASENA:
+        raise ErrorAlta(f"La contraseña debe tener al menos {MIN_LARGO_CONTRASENA} caracteres")
+    if len(password) > MAX_LARGO_CONTRASENA:
+        raise ErrorAlta("La contraseña es demasiado larga")
+
+
+def _crearCuentaInicial(username: str, password: str) -> bool:
+    """Guarda la cuenta y consume el código. False si otra petición se adelantó.
+
+    Bajo el mismo cerrojo que crea el código: dos envíos simultáneos con el
+    código bueno no pueden acabar creando dos cuentas, la segunda pisando a la
+    primera.
+    """
+    with exclusivo(alta_inicial.cerrojo(), espera=5, obligatorio=False):
+        if not faltanCredenciales():
+            return False
+        _saveCredentials(username, generate_password_hash(password, method=settings.metodoHashPassword()))
+        alta_inicial.consumir()
+    return True
+
+
+def _atenderAlta(ip: str):
+    """Procesa el POST de /setup. Devuelve (respuesta, error)."""
+    form = request.form
+    # El código va primero y es lo único que cuenta como intento fallido:
+    # equivocarse al repetir la contraseña no es un ataque.
+    if not alta_inicial.coincide(form.get("codigo", "")):
+        _recordFailure(ip)
+        logger.warning("Código de alta inicial incorrecto desde %s", ip)
+        _avisarSiSeBloquea(ip)
+        return None, "El código de verificación no es correcto"
+    username = form.get("username", "").strip()
+    password = form.get("password", "")
+    try:
+        _validarAlta(username, password, form.get("password2", ""))
+    except ErrorAlta as error:
+        return None, str(error)
+    try:
+        creada = _crearCuentaInicial(username, password)
+    except OSError as error:
+        logger.error("No se pudo guardar la cuenta inicial: %s", error)
+        return None, "No se pudo guardar la cuenta en el servidor. Revisa los permisos de data/."
+    if not creada:
+        return redirect(url_for("auth.login")), None
+    logger.info("Cuenta inicial creada desde la web (%s)", ip)
+    _abrirSesion(ip)
+    return redirect("/"), None
+
+
+@authBp.route("/setup", methods=["GET", "POST"])
+def setup():
+    """Alta de la primera cuenta, protegida por el código que deja el arranque."""
+    if not faltanCredenciales():
+        return redirect(url_for("auth.login"))
+    if request.method == "POST" and not _mismoOrigen():
+        logger.warning("Alta inicial rechazada: el formulario llega desde otro origen (%s)",
+                       request.headers.get("Origin") or request.headers.get("Referer"))
+        return "Origen no permitido", 403
+
+    error = None
+    if request.method == "POST":
+        ip = _clientIp()
+        locked = _secondsLockedOut(ip)
+        if locked:
+            error = f"Demasiados intentos fallidos. Vuelve a intentarlo en {locked // 60 + 1} min."
+        else:
+            respuesta, error = _atenderAlta(ip)
+            if respuesta is not None:
+                return respuesta
+    else:
+        # Por si se borró el fichero con la app en marcha: así siempre hay un
+        # código que buscar en el servidor.
+        try:
+            alta_inicial.obtenerCodigo()
+        except OSError as errorDisco:
+            logger.critical("No se pudo crear el código de alta inicial: %s", errorDisco)
+
+    # Tras un error se conserva lo escrito, salvo las contraseñas, para no
+    # obligar a repetirlo todo. El código solo si era el bueno.
+    codigo = request.form.get("codigo", "") if request.method == "POST" else ""
+    html = SETUP_HTML.read_text("utf-8")
+    html = html.replace("<!-- ERROR_PLACEHOLDER -->", f'<p class="loginError">{error}</p>' if error else "")
+    html = html.replace("__USUARIO__", htmlLib.escape(request.form.get("username", "admin").strip(), quote=True))
+    html = html.replace("__CODIGO__", htmlLib.escape(codigo if alta_inicial.coincide(codigo) else "", quote=True))
+    html = html.replace("__FICHERO_CODIGO__", f"data/tmp/{alta_inicial.NOMBRE_FICHERO}")
+    html = html.replace("__MIN_LARGO__", str(MIN_LARGO_CONTRASENA))
+    return _paginaSinCache(html)
+
+
+# ── Verificación en dos pasos en el login ─────────────────────────────────────
+# El reto pendiente se guarda en el servidor (core/dos_factores.py); en la
+# cookie solo va su identificador y adónde ir después. Sin `logged_in`, esa
+# cookie no da acceso a nada más que a esta página.
+
+_AVISO_SIN_TELEGRAM = ("No se ha podido enviar el código por Telegram. "
+                       "Vuelve a pedirlo o entra con la frase de recuperación.")
+
+
+# Cuándo se acertó la contraseña y con qué época de credenciales. La cookie sin
+# `logged_in` vive lo que PERMANENT_SESSION_LIFETIME y `sesion.motivoInvalidez`
+# no la mira: sin esto, una cookie del primer paso guardada antes de cambiar la
+# contraseña seguía sirviendo para entrar con la frase meses después.
+_INICIO_2FA = "inicio2fa"
+_EPOCA_2FA = "epoca2fa"
+
+_MOTIVO_CADUCADO = "La verificación ha caducado. Vuelve a escribir la contraseña."
+
+
+def _mensajeSuspension(segundos: int) -> str:
+    return ("Demasiados códigos incorrectos: la verificación en dos pasos queda suspendida. "
+            f"Vuelve a intentarlo en {segundos // 60 + 1} min.")
+
+
+def _pedirSegundoPaso(nextUrl: str):
+    session.clear()
+    suspension = dos_factores.segundosSuspension()
+    if suspension:
+        # Ni siquiera se manda el código: con la suspensión activa no se podría usar.
+        session["errorLogin"] = _mensajeSuspension(suspension)
+        return redirect(url_for("auth.login"))
+    retoId, enviado = dos_factores.crearReto("login")
+    session["reto2fa"] = retoId
+    session["next2fa"] = nextUrl
+    session[_INICIO_2FA] = time.time()
+    session[_EPOCA_2FA] = sesion.leerEstado()["epoca"]
+    if not enviado:
+        session["aviso2fa"] = _AVISO_SIN_TELEGRAM
+    return redirect(url_for("auth.loginDosPasos"))
+
+
+def _motivoSegundoPasoInvalido() -> str | None:
+    """Por qué el primer paso guardado en la cookie ya no vale, o None si sigue vigente.
+
+    Returns:
+        El mensaje para el usuario. Caducado y contraseña cambiada comparten
+        mensaje a propósito: quien reutiliza una cookie vieja no tiene por qué
+        saber cuál de las dos cosas ha pasado.
+    """
+    inicio = session.get(_INICIO_2FA)
+    ahora = time.time()
+    # Sin marca (cookie anterior a este control) o con una marca en el futuro
+    # no se puede saber cuándo se acertó la contraseña: se rechaza.
+    if not isinstance(inicio, (int, float)) or inicio > ahora + 60:
+        return _MOTIVO_CADUCADO
+    if ahora - inicio > settings.segundoPasoSegundos():
+        logger.info("Segundo paso caducado (%d s desde la contraseña)", int(ahora - inicio))
+        return _MOTIVO_CADUCADO
+    if session.get(_EPOCA_2FA) != sesion.leerEstado()["epoca"]:
+        logger.warning("Segundo paso rechazado: las credenciales han cambiado desde el primer paso (%s)",
+                       _clientIp())
+        return _MOTIVO_CADUCADO
+    suspension = dos_factores.segundosSuspension()
+    if suspension:
+        return _mensajeSuspension(suspension)
+    return None
+
+
+def _volverAlLogin(motivo: str):
+    """Abandona el segundo paso: hay que volver a escribir la contraseña."""
+    dos_factores.descartarReto(session.get("reto2fa", ""))
+    session.clear()
+    session["errorLogin"] = motivo
+    return redirect(url_for("auth.login"))
+
+
+def _falloSegundoPaso(ip: str, que: str) -> None:
+    # Cuenta para el mismo bloqueo por IP que la contraseña: es lo que impide
+    # probar códigos a fuerza bruta.
+    _recordFailure(ip)
+    logger.warning("%s incorrecto en la verificación en dos pasos desde %s", que, ip)
+    _avisarSiSeBloquea(ip)
+    # El bloqueo por IP no frena a quien cambia de IP: cada contraseña acertada
+    # da un reto nuevo con sus intentos. El tope global sí.
+    try:
+        suspendida = dos_factores.anotarFalloGlobal()
+    except OSError as error:
+        logger.error("No se pudo anotar el fallo en el contador global de la 2FA: %s", error)
+        return
+    if suspendida:
+        _avisarSuspension(ip)
+
+
+def _avisarSuspension(ip: str) -> None:
+    """Registra y cuenta por Telegram que el segundo paso del login queda suspendido.
+
+    Va por `responder` y no por `notificar`: es un aviso que el usuario tiene que
+    ver aunque haya silenciado los avisos, porque también le impide entrar a él.
+    """
+    minutos = dos_factores.VENTANA_FALLOS_SEGUNDOS // 60
+    logger.warning("Verificación en dos pasos suspendida %d min: %d fallos en una hora (último desde %s)",
+                   minutos, settings.fallos2faPorHora(), ip)
+    telegram_notifier.responder(
+        f"Se han fallado {settings.fallos2faPorHora()} códigos o frases de la verificación en dos pasos "
+        f"en una hora (el último desde {ip}). El login queda suspendido {minutos} min. "
+        "Quien lo intenta conoce tu contraseña: cámbiala."
+    )
+
+
+def _completarSegundoPaso(ip: str, conFrase: bool):
+    nextUrl = _safeNextUrl(session.get("next2fa") or "/")
+    dos_factores.descartarReto(session.get("reto2fa", ""))
+    _abrirSesion(ip)
+    if conFrase:
+        # La frase solo vale una vez: tras usarla la 2FA queda desactivada
+        # hasta que se vuelva a activar desde Ajustes con una frase nueva.
+        dos_factores.desactivar()
+        logger.warning("Acceso con la frase de recuperación desde %s; 2FA desactivada", ip)
+        telegram_notifier.notificar(
+            "seguridad",
+            f"Se ha entrado con la frase de recuperación desde {ip}. La verificación en dos pasos "
+            "queda desactivada: vuelve a activarla en Ajustes > Cuenta. Si no has sido tú, cambia la contraseña.",
+        )
+    else:
+        telegram_notifier.notificar("sesion", f"Inicio de sesión con verificación en dos pasos desde {ip}")
+    return redirect(nextUrl)
+
+
+def _atenderSegundoPaso(ip: str):
+    """Procesa el POST de /login/2fa. Devuelve (respuesta, error, aviso)."""
+    accion = request.form.get("accion", "codigo")
+    retoId = session.get("reto2fa", "")
+
+    if accion == "reenviar":
+        try:
+            enviado = dos_factores.reenviar(retoId, "login")
+        except dos_factores.EsperaReenvio as espera:
+            return None, str(espera), None
+        except dos_factores.RetoInvalido as error:
+            return _volverAlLogin(str(error)), None, None
+        return None, None, "Código reenviado." if enviado else _AVISO_SIN_TELEGRAM
+
+    if accion == "frase":
+        # Igual que el código: la frase solo vale mientras el reto de este
+        # login siga vivo. Se mira antes que la frase para no gastar el hash.
+        try:
+            dos_factores.datosReto(retoId, "login")
+        except dos_factores.RetoInvalido as error:
+            _falloSegundoPaso(ip, "Frase de recuperación")
+            return _volverAlLogin(str(error)), None, None
+        if dos_factores.fraseGuardadaCoincide(request.form.get("frase", "")):
+            return _completarSegundoPaso(ip, conFrase=True), None, None
+        _falloSegundoPaso(ip, "Frase de recuperación")
+        return None, "La frase de recuperación no es correcta", None
+
+    try:
+        dos_factores.comprobarCodigo(retoId, "login", request.form.get("codigo", ""))
+    except dos_factores.CodigoIncorrecto:
+        _falloSegundoPaso(ip, "Código")
+        return None, "Código incorrecto", None
+    except dos_factores.RetoInvalido as error:
+        _falloSegundoPaso(ip, "Código")
+        return _volverAlLogin(str(error)), None, None
+    return _completarSegundoPaso(ip, conFrase=False), None, None
+
+
+@authBp.route("/login/2fa", methods=["GET", "POST"])
+def loginDosPasos():
+    """Segundo paso del login: código de Telegram o frase de recuperación."""
+    if session.get("logged_in"):
+        return redirect("/")
+    if not session.get("reto2fa"):
+        return redirect(url_for("auth.login"))
+    if request.method == "POST" and not _mismoOrigen():
+        logger.warning("Segundo paso rechazado: el formulario llega desde otro origen (%s)",
+                       request.headers.get("Origin") or request.headers.get("Referer"))
+        return "Origen no permitido", 403
+    motivo = _motivoSegundoPasoInvalido()
+    if motivo:
+        return _volverAlLogin(motivo)
+
+    error = None
+    aviso = session.pop("aviso2fa", None)
+    if request.method == "POST":
+        ip = _clientIp()
+        locked = _secondsLockedOut(ip)
+        if locked:
+            error = f"Demasiados intentos fallidos. Vuelve a intentarlo en {locked // 60 + 1} min."
+        else:
+            respuesta, error, aviso = _atenderSegundoPaso(ip)
+            if respuesta is not None:
+                return respuesta
+
+    usarFrase = request.args.get("modo") == "frase"
+    html = LOGIN_2FA_HTML.read_text("utf-8")
+    html = html.replace("<!-- ERROR_PLACEHOLDER -->", f'<p class="loginError">{error}</p>' if error else "")
+    html = html.replace("<!-- AVISO_PLACEHOLDER -->", f'<p class="loginAviso">{aviso}</p>' if aviso else "")
+    html = html.replace("__MODO__", "frase" if usarFrase else "codigo")
+    html = html.replace("__MINUTOS__", str(settings.codigo2faMinutos()))
+    return _paginaSinCache(html)
 
 
 def _mismoOrigen() -> bool:
@@ -477,3 +842,245 @@ def changePassword():
     _renovarSesiones()
     telegram_notifier.notificar("seguridad", f"🔐 Se ha cambiado la contraseña de acceso (desde {_clientIp()}).")
     return jsonify({"ok": True})
+
+
+# ── Verificación en dos pasos: Ajustes > Cuenta ───────────────────────────────
+# Activar y desactivar piden la contraseña actual, y desactivar además el
+# código o la frase: una cookie robada no basta para quitar la 2FA.
+
+def _errorJson(mensaje: str, estado: int = 400):
+    return jsonify({"ok": False, "error": mensaje}), estado
+
+
+def _comprobarContrasenaActual(currentPassword: str, para: str):
+    """None si la contraseña es la actual; si no, la respuesta de error.
+
+    Anota el fallo en el mismo contador que /login, por lo mismo que
+    `_rechazarSiBloqueado`.
+    """
+    _usuario, passwordHash = _loadCredentials()
+    if check_password_hash(passwordHash, currentPassword):
+        return None
+    ip = _clientIp()
+    _recordFailure(ip)
+    logger.warning("Contraseña actual incorrecta al %s desde %s", para, ip)
+    _avisarSiSeBloquea(ip)
+    return _errorJson("Contraseña actual incorrecta")
+
+
+@authBp.route("/api/settings/2fa", methods=["GET"])
+def getDosFactores():
+    return jsonify({
+        "ok": True,
+        "activa": dos_factores.activa(),
+        "telegramConfigurado": telegram_notifier.configurado(),
+        "largosFrase": list(dos_factores.LARGOS_FRASE),
+        "minutosCodigo": settings.codigo2faMinutos(),
+    })
+
+
+@authBp.route("/api/settings/2fa/activar/iniciar", methods=["POST"])
+def iniciarActivacionDosFactores():
+    """Comprueba la contraseña, genera la frase y manda el código de activación."""
+    bloqueado = _rechazarSiBloqueado()
+    if bloqueado:
+        return bloqueado
+    data = _cuerpoDict()
+    if dos_factores.activa():
+        return _errorJson("La verificación en dos pasos ya está activada")
+    if not telegram_notifier.configurado():
+        return _errorJson("Configura antes el bot en Ajustes > Telegram")
+    numPalabras = data.get("palabras")
+    # type() y no isinstance: True pasaría por 1 y 6.0 por 6.
+    if type(numPalabras) is not int or numPalabras not in dos_factores.LARGOS_FRASE:
+        return _errorJson("Elige una frase de 6, 12 o 24 palabras")
+    errorClave = _comprobarContrasenaActual(_texto(data.get("currentPassword")), "activar la 2FA")
+    if errorClave:
+        return errorClave
+    _clearFailures(_clientIp())
+
+    frase = dos_factores.generarFrase(numPalabras)
+    retoId, enviado = dos_factores.crearReto("activar", {"fraseHash": dos_factores.hashFrase(frase)})
+    if not enviado:
+        dos_factores.descartarReto(retoId)
+        return _errorJson("No se pudo enviar el código por Telegram. Comprueba el bot con «Probar» "
+                          "en Ajustes > Telegram.", 502)
+    session["reto2faAjustes"] = retoId
+    return jsonify({"ok": True, "frase": frase})
+
+
+@authBp.route("/api/settings/2fa/activar/confirmar", methods=["POST"])
+def confirmarActivacionDosFactores():
+    """Activa la 2FA si el código es el enviado y la frase la que se enseñó."""
+    data = _cuerpoDict()
+    retoId = session.get("reto2faAjustes", "")
+    try:
+        datos = dos_factores.datosReto(retoId, "activar")
+        # La frase se mira antes que el código para no gastar el código si solo
+        # falla la frase (un error al copiarla, lo más probable).
+        if not dos_factores.fraseCoincide(_texto(data.get("frase")), datos.get("fraseHash", "")):
+            return _errorJson("La frase no coincide con la que se te ha mostrado")
+        dos_factores.comprobarCodigo(retoId, "activar", _texto(data.get("codigo")))
+    except dos_factores.CodigoIncorrecto:
+        return _errorJson("Código incorrecto")
+    except dos_factores.RetoInvalido as error:
+        session.pop("reto2faAjustes", None)
+        return _errorJson(f"{error} Pulsa de nuevo «Activar».")
+
+    session.pop("reto2faAjustes", None)
+    try:
+        dos_factores.activar(datos["fraseHash"])
+    except OSError as error:
+        logger.error("No se pudo guardar la activación de la 2FA: %s", error)
+        return _errorJson("No se pudo guardar la configuración en el servidor", 500)
+    telegram_notifier.notificar("seguridad", f"Verificación en dos pasos activada (desde {_clientIp()}).")
+    return jsonify({"ok": True})
+
+
+@authBp.route("/api/settings/2fa/codigo", methods=["POST"])
+def enviarCodigoDesactivacion():
+    """Manda el código para desactivar; si ya hay uno pendiente, lo reenvía."""
+    if not dos_factores.activa():
+        return _errorJson("La verificación en dos pasos no está activada")
+    retoId = session.get("reto2faDesactivar", "")
+    try:
+        enviado = dos_factores.reenviar(retoId, "desactivar")
+    except dos_factores.EsperaReenvio as espera:
+        respuesta, estado = _errorJson(str(espera), 429)
+        respuesta.headers["Retry-After"] = str(espera.segundos)
+        return respuesta, estado
+    except dos_factores.RetoInvalido:
+        retoId, enviado = dos_factores.crearReto("desactivar")
+        session["reto2faDesactivar"] = retoId
+    if not enviado:
+        return _errorJson("No se pudo enviar el código por Telegram. Usa la frase de recuperación.", 502)
+    return jsonify({"ok": True})
+
+
+@authBp.route("/api/settings/2fa/desactivar", methods=["POST"])
+def desactivarDosFactores():
+    """Desactiva la 2FA con la contraseña actual más el código o la frase."""
+    bloqueado = _rechazarSiBloqueado()
+    if bloqueado:
+        return bloqueado
+    if not dos_factores.activa():
+        return _errorJson("La verificación en dos pasos no está activada")
+    data = _cuerpoDict()
+    errorClave = _comprobarContrasenaActual(_texto(data.get("currentPassword")), "desactivar la 2FA")
+    if errorClave:
+        return errorClave
+
+    ip = _clientIp()
+    frase = _texto(data.get("frase")).strip()
+    if frase:
+        if not dos_factores.fraseGuardadaCoincide(frase):
+            _falloSegundoPaso(ip, "Frase de recuperación")
+            return _errorJson("La frase de recuperación no es correcta")
+    else:
+        try:
+            dos_factores.comprobarCodigo(session.get("reto2faDesactivar", ""), "desactivar",
+                                         _texto(data.get("codigo")))
+        except dos_factores.CodigoIncorrecto:
+            _falloSegundoPaso(ip, "Código")
+            return _errorJson("Código incorrecto")
+        except dos_factores.RetoInvalido as error:
+            session.pop("reto2faDesactivar", None)
+            return _errorJson(f"{error} Pide otro código.")
+
+    _clearFailures(ip)
+    session.pop("reto2faDesactivar", None)
+    try:
+        dos_factores.desactivar()
+    except OSError as error:
+        logger.error("No se pudo desactivar la 2FA: %s", error)
+        return _errorJson("No se pudo guardar la configuración en el servidor", 500)
+    telegram_notifier.notificar("seguridad", f"Verificación en dos pasos desactivada (desde {ip}).")
+    return jsonify({"ok": True})
+
+
+# ── Verificación en dos pasos: cambiar el bot de Telegram ─────────────────────
+# Con la 2FA activa, el bot y el chat son el segundo factor: cambiarlos solo con
+# la sesión permitía a una cookie robada mandarse los códigos a su propio chat y
+# desactivar la 2FA. Se pide lo mismo que para desactivarla: la contraseña más
+# un código enviado al chat ACTUAL o la frase de recuperación.
+
+_RETO_TELEGRAM = "reto2faTelegram"
+
+
+@authBp.route("/api/settings/telegram/codigo", methods=["POST"])
+def enviarCodigoCambioTelegram():
+    """Manda al chat actual el código que autoriza cambiar el bot o el chat.
+
+    Si ya hay uno pendiente, lo reenvía respetando la espera entre envíos.
+    """
+    if not dos_factores.activa():
+        return _errorJson("La verificación en dos pasos no está activada")
+    retoId = session.get(_RETO_TELEGRAM, "")
+    try:
+        enviado = dos_factores.reenviar(retoId, "telegram")
+    except dos_factores.EsperaReenvio as espera:
+        respuesta, estado = _errorJson(str(espera), 429)
+        respuesta.headers["Retry-After"] = str(espera.segundos)
+        return respuesta, estado
+    except dos_factores.RetoInvalido:
+        retoId, enviado = dos_factores.crearReto("telegram")
+        session[_RETO_TELEGRAM] = retoId
+    if not enviado:
+        return _errorJson("No se pudo enviar el código por Telegram. Usa la frase de recuperación.", 502)
+    return jsonify({"ok": True})
+
+
+def autorizarCambioTelegram(data: dict) -> tuple[Response, int] | None:
+    """Comprueba que se puede cambiar el bot o el chat de Telegram.
+
+    Sin la 2FA activa no exige nada, como hasta ahora. Con ella, la contraseña
+    actual más el código enviado al chat actual o la frase de recuperación. El
+    código se consume solo si todo es correcto.
+
+    Args:
+        data: Cuerpo JSON de la petición, con `currentPassword` y `codigo` o `frase`.
+
+    Returns:
+        None si se puede seguir; si no, la respuesta de error con su estado
+        (403 cuando faltan las credenciales, 400 si son incorrectas, 429 si la
+        IP está bloqueada).
+    """
+    if not dos_factores.activa():
+        return None
+    bloqueado = _rechazarSiBloqueado()
+    if bloqueado:
+        return bloqueado
+    currentPassword = _texto(data.get("currentPassword"))
+    frase = _texto(data.get("frase")).strip()
+    codigo = _texto(data.get("codigo")).strip()
+    if not currentPassword or not (frase or codigo):
+        # `requiereVerificacion` le dice al formulario que pida los datos que faltan.
+        respuesta = jsonify({
+            "ok": False,
+            "requiereVerificacion": True,
+            "error": "Con la verificación en dos pasos activa, confirma el cambio con tu contraseña "
+                     "y un código enviado al chat actual o la frase de recuperación.",
+        })
+        return respuesta, 403
+    errorClave = _comprobarContrasenaActual(currentPassword, "cambiar el bot de Telegram")
+    if errorClave:
+        return errorClave
+
+    ip = _clientIp()
+    if frase:
+        if not dos_factores.fraseGuardadaCoincide(frase):
+            _falloSegundoPaso(ip, "Frase de recuperación")
+            return _errorJson("La frase de recuperación no es correcta")
+    else:
+        try:
+            dos_factores.comprobarCodigo(session.get(_RETO_TELEGRAM, ""), "telegram", codigo)
+        except dos_factores.CodigoIncorrecto:
+            _falloSegundoPaso(ip, "Código")
+            return _errorJson("Código incorrecto")
+        except dos_factores.RetoInvalido as error:
+            session.pop(_RETO_TELEGRAM, None)
+            return _errorJson(f"{error} Pide otro código.")
+
+    _clearFailures(ip)
+    session.pop(_RETO_TELEGRAM, None)
+    return None

@@ -155,6 +155,22 @@ def oneOf(value, options, field="valor", *, default=None, upper=False,
     )
 
 
+def primerIdDuplicado(filas, campo="id"):
+    """El primer valor de `campo` que aparece en más de una fila, o None.
+
+    Las tablas que se guardan enteras tienen el id como clave primaria: dos filas
+    con el mismo id hacían fallar el INSERT con un 500. Quien guarda lo comprueba
+    antes y responde 400 diciendo cuál es.
+    """
+    vistos = set()
+    for fila in filas:
+        valor = fila.get(campo)
+        if valor in vistos:
+            return valor
+        vistos.add(valor)
+    return None
+
+
 def asRows(value, field="rows", *, maxRows=MAX_ROWS) -> list:
     """Lista de objetos tal como la envían las tablas del frontend."""
     if value is None:

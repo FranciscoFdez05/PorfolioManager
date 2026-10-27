@@ -11,8 +11,7 @@ Para una **funcionalidad nueva**, coméntala en una issue antes de escribir cód
 ## Poner en marcha el entorno
 
 ```bash
-pip install -r requirements.txt     # versiones exactas, con hashes
-pip install -r requirements-dev.txt # herramientas de desarrollo
+pip install --require-hashes -r requirements-dev.txt # producción + herramientas, versiones exactas y hashes
 npm ci
 ```
 

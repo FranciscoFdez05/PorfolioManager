@@ -22,6 +22,162 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [4.9.0] — 2026-10-27
+
+**Esquema de base de datos:** sube al **26**. Al arrancar se añaden columnas
+(la divisa de cada venta, `ventas.currency`, se rellena con la de su activo, y el
+flujo de dinero de cada snapshot, `portfolio_snapshots.flujo`, vacío en los
+puntos que ya existen, y el valor de mercado de cada conversión cripto,
+`activo_conversion_rows.valor_eur`, vacío en las que ya existen);
+para deshacer la actualización hay que volver a la imagen anterior y
+restaurar la copia `pre-esquema-21-a-…` que se guarda al migrar.
+
+**Puerto por defecto:** pasa del 5000 al **5050** (ver «Cambiado»).
+
+### Añadido
+
+- **Conversiones: cantidad de la contraparte.** Cada conversión guarda también
+  cuánto se recibió o entregó de la otra cripto del par (`cantidad_contraparte`
+  en `activo_conversion_rows`). Las conversiones que ya existían la tienen vacía
+  y se ven igual que antes; el dato es informativo y no entra en ningún cálculo
+  de posiciones.
+- **Conversiones: comisión.** Cantidad y moneda de lo que cobró el exchange
+  (`comision` y `comision_moneda`), opcional e informativa como la anterior.
+- **Fundamentales: panel desplegable ampliado.** Rating parcial de medias y de
+  osciladores; cada media coloreada según el precio esté por encima o por
+  debajo; Ichimoku, VWMA, Hull MA y bandas de Bollinger; Estocástico RSI, CCI,
+  Momentum, Awesome Oscillator, Williams %R y Ultimate Oscillator; pivotes
+  clásicos, Fibonacci, Camarilla, Woodie y DeMark en mensual, semanal o anual;
+  rendimiento a 1 semana, 1, 3 y 6 meses, en el año y a 1 año; máximo y mínimo
+  de 52 semanas y máximo histórico con la distancia al precio, ATR,
+  volatilidad, volumen relativo y beta; y, en acciones y ETF, márgenes, free
+  cash flow, valor de empresa, EV/EBITDA, próximos resultados, patrimonio y
+  gastos del fondo. Todo sale de la misma petición al scanner de TradingView.
+- **Cuenta remunerada: gráficas y resumen del año.** Bajo la tabla, barras de
+  neto e impuestos por mes y la línea del neto acumulado, con tooltip por mes.
+  Junto a Total e Impuestos, una tarjeta con bruto, media mensual, mejor mes,
+  retención, variación frente al año anterior (en los mismos meses) y una TAE
+  aproximada: intereses brutos de los últimos 12 meses entre el saldo actual de
+  la cuenta enlazada en Finanzas › Cuentas.
+
+- **Ventas: permutas de cripto por cripto.** Una conversión entre criptos se
+  trata como una permuta (DGT V0999-18 y siguientes): transmisión de lo
+  entregado, valorada a mercado en ese momento y con su ganancia o pérdida por
+  FIFO, más la adquisición de lo recibido por ese mismo valor. Entran en el
+  cálculo del ejercicio y salen en el informe de la renta como «permutas»,
+  aparte de las ventas a fiat. El valor de mercado solo se toma de la propia
+  conversión (columna opcional `valor_eur`); sin él la permuta sale con
+  incidencia y no se inventa nada. Las transferencias entre wallets propias no
+  son hecho imponible: solo la comisión de red reduce existencias. Un activo
+  recibido por conversión ya no da «stock insuficiente» al venderse.
+- **Verificación en dos pasos por Telegram (opcional).** Con ella activada,
+  usuario y contraseña ya no bastan: el servidor manda un código de un solo uso
+  al chat de Telegram configurado y la sesión no se abre hasta escribirlo. Se
+  activa en Ajustes › Cuenta y genera una frase de recuperación (deja entrar una
+  vez y desactiva la 2FA). El código caduca, admite pocos intentos por envío,
+  los fallos cuentan para el bloqueo por IP y hay un freno global por hora que
+  avisa por Telegram. Los plazos se ajustan en `config.ini`
+  (`CODIGO_2FA_MINUTOS`, `INTENTOS_CODIGO_2FA`, `REENVIO_2FA_SEGUNDOS`,
+  `SEGUNDO_PASO_MINUTOS`, `FALLOS_2FA_POR_HORA`). Borrar `data/dos_factores.dat`
+  desde el servidor es la salida de emergencia.
+- **Alta de la cuenta desde la web.** La aplicación puede arrancar sin cuenta:
+  `/setup` pide un código de un solo uso que se deja en
+  `data/tmp/alta-inicial.txt` y en el log, para que nadie de la red se adelante.
+  `docker-up.sh` lo muestra al final y ofrece crear la cuenta por terminal o por
+  la web.
+- **Métricas: ingresos, vencimientos y mercado privado.** Histórico de ingresos
+  por origen (dividendos, cuentas, bonos, renta fija), vencimientos de renta
+  fija y bonos, y gráficas de mercado privado (llamado, distribuido y valor
+  actual).
+- **Mercado privado: compras agrupadas por inversión**, con fila de totales
+  desplegable que conserva lo abierto al editar.
+- **Conversiones: valor de mercado.** Columna opcional `valor_eur`, con un botón
+  que cuenta y filtra las conversiones que aún no la tienen, y selector de
+  cripto con el color de Activos.
+- **Rendimiento (TWR, XIRR, Dietz) con el flujo real de dinero.** Cada snapshot
+  guarda cuánto dinero entró o salió desde el anterior (compras y cobros de
+  ventas netos de comisión), en vez de deducirlo del cambio en lo invertido, que
+  es un coste: antes la ganancia realizada desaparecía del rendimiento. Los
+  tramos con operaciones sin convertir a euros quedan sin flujo y no se inventan.
+- **Iconos como archivos** (`img/icons/`, Lucide, licencia ISC) en vez de SVG en
+  línea, coloreados con el tema.
+- **Herramienta `tools/detectar_snapshots_erroneos.py`.** Lista los snapshots del
+  histórico mal valorados comparando el invertido guardado con el reconstruido.
+  Solo informa; no borra nada.
+- **Informes PDF.** `html2canvas` y `jsPDF` se descargan al exportar por primera
+  vez y no en cada carga, y la exportación muestra progreso sin congelar la
+  página.
+- **Ajustes de caché en `config.ini`:** `DB_HEALTH_QUICK_CHECK_TTL`,
+  `MERCADO_COTIZACION_TTL`, `PROVEEDORES_CAMBIO_VIGENCIA` y
+  `PROVEEDORES_CAMBIO_OBSOLETO_MAX`.
+
+### Cambiado
+
+- **Puerto por defecto: 5050 en vez de 5000.** El 5000 lo usan otros programas
+  en local (Steam, por ejemplo, manda `POST /` a `127.0.0.1:5000` cada 100 ms y
+  llenaba el log de 401). Las instalaciones con Docker que ya tienen `PORT` en
+  su `.env` —lo escribe `docker-up.sh` en el primer arranque— siguen en el
+  puerto que tenían; solo cambia el valor de partida de las nuevas y de la
+  ejecución sin Docker.
+
+- **Invertido neto: comisiones de Operaciones también en acciones y ETF.** El
+  invertido neto es siempre el importe sin comisiones, venga de la ficha o de
+  una compra de Operaciones y sea cual sea el tipo de activo. Antes, en los no
+  cripto, la comisión de las compras de Operaciones se quedaba dentro del neto.
+  El cálculo fiscal no cambia: allí la comisión sigue sumando al coste de
+  adquisición.
+
+- **Rendimiento: cachés en servidor.** El histórico de snapshots ya convertido,
+  su JSON y el resumen de rentabilidad se guardan por proceso y se invalidan
+  cuando cambia la tabla (~2 ms frente a 40-50 ms por petición); las
+  cotizaciones y los tipos de cambio actuales tienen caché con vigencia y
+  respaldo si el proveedor falla; `/api/health` reutiliza el `quick_check`.
+- **Fundamentales** pasa a ser un panel desplegable más amplio (ver «Añadido») y
+  Mercado de privado, Métricas, Operaciones y Herramientas estrenan estilos.
+- **Dependencias de desarrollo con hashes.** `requirements-dev.txt` se genera
+  con `pip-compile --generate-hashes` desde `requirements-dev.in`; eslint 10,
+  vitest 5, jsdom 29 y globals 17 en el frontend. Las acciones de GitHub van
+  fijadas por SHA.
+
+### Corregido
+
+- **Valoración del histórico con datos ausentes.** Un activo sin precio se valora
+  con el último conocido o a su coste, y un cambio caído usa el último de la
+  caché; nunca 0 € ni un precio inventado. Todo fallback se registra y se marca.
+- **Variaciones absurdas descartadas.** Un snapshot con otra escala o de una
+  cartera a medio cargar ya no se muestra como movimiento de precio.
+- **Snapshots:** un guardado con la cartera sin precios cargados (valor cero) o
+  que se aleja del cálculo del servidor se rechaza con su motivo.
+- **Guardar al ocultar la pestaña** solo ocurre si hubo cambios locales: una
+  pestaña con la lista vieja ya no pisa lo guardado desde otro sitio
+  (Operaciones y Stablecoins, con revisión y fusión).
+- **Operaciones: filas intactas.** Las filas que vienen del servidor conservan su
+  divisa y stablecoin en vez de recalcularse desde el par.
+- **Ventas:** la comisión en cripto sale de las participaciones y el cálculo
+  respeta la divisa de cada venta.
+- **Colores ilegibles.** El color elegido para un activo se ajusta para leerse
+  sobre el fondo del tema claro u oscuro, y los donuts con muchos activos
+  pequeños ya no se ven como franjas oscuras.
+- **Importar/exportar:** el ZIP se genera desde una copia consistente (API de
+  backup de SQLite) y se comprueba su CRC; la importación valida los ajustes,
+  rechaza filas que apuntan a algo inexistente y se revierte entera si una fila
+  no cabe en vez de descartar en silencio con las tablas ya vaciadas.
+- **Paneles:** las filas de KPI con clave ya no desplazan las `kpi:N` guardadas.
+- **Fundamentales:** FCF y EV se convierten a la divisa de cotización cuando los
+  estados financieros vienen en otra.
+
+### Seguridad
+
+- Instalación sin cuenta protegida por el código de un solo uso de `/setup`, y
+  un `auth.dat` ilegible (SECRET_KEY cambiada) no cuenta como «sin credenciales».
+- Las páginas de acceso llevan nonce de CSP y no se cachean.
+- Cambiar o quitar el bot de Telegram con la 2FA activa avisa al chat anterior y
+  no permite dejar la 2FA sin forma de recibir códigos.
+- Trivy escanea en CI las imágenes de la aplicación y de Caddy (informativo), con
+  versión y SHA-256 fijados.
+
+---
+
 ## [4.8.2] — 2026-10-22
 
 **Esquema de base de datos:** no lo toca (sigue en la **21**). Para deshacer la

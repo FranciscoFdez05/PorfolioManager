@@ -1,5 +1,7 @@
 from flask import Blueprint, jsonify, request
 
+from core.validation import primerIdDuplicado
+from stores import revisiones
 from stores.app_data import readTradingFile, writeTradingFile
 
 tradingBp = Blueprint("trading", __name__)
@@ -11,12 +13,14 @@ _RESULTADO_OPTIONS = {"PROFIT", "PÉRDIDA"}
 
 @tradingBp.route("/api/trading", methods=["GET"])
 def getTrading():
-    return jsonify(readTradingFile())
+    return jsonify({**readTradingFile(), "revision": revisiones.actual("trading", revisiones.CLAVE_UNICA)})
 
 
 @tradingBp.route("/api/trading", methods=["POST"])
 def saveTrading():
     requestData = request.get_json(silent=True) or {}
+    if "rows" not in requestData:
+        return jsonify({"ok": False, "error": "JSON inválido: falta rows"}), 400
     rows = requestData.get("rows", [])
 
     if not isinstance(rows, list):
@@ -55,5 +59,17 @@ def saveTrading():
             "ganancia_neta": str(row.get("ganancia_neta", "")).strip(),
         })
 
-    writeTradingFile({"rows": sanitized})
-    return jsonify({"ok": True})
+    duplicado = primerIdDuplicado(sanitized)
+    if duplicado is not None:
+        return jsonify({"ok": False, "error": f"Hay dos trades con el mismo identificador ({duplicado})"}), 400
+
+    try:
+        esperada = revisiones.revisionDePeticion(requestData)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    try:
+        nueva = writeTradingFile({"rows": sanitized}, revisionEsperada=esperada)
+    except revisiones.ConflictoRevision as conflicto:
+        return revisiones.respuestaConflicto(conflicto, "Los trades han cambiado desde otro sitio (otra pestaña u otro dispositivo)")
+    return jsonify({"ok": True, "revision": nueva})

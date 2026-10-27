@@ -25,6 +25,18 @@ function renderStakingCriptosSidebar() {
     if (!list) return
     list.innerHTML = ""
 
+    // Sin ninguna cripto la fila se quedaba solo con la lupa: se ofrece crear
+    // la primera desde aquí, con la misma acción que la opción del menú «···».
+    if (!_stakingCriptos.length) {
+        const nueva = document.createElement("button")
+        nueva.type = "button"
+        nueva.className = "cuentaItem cuentaItemNueva"
+        nueva.textContent = "+ Añadir cripto"
+        nueva.addEventListener("click", () => document.getElementById("addStakingCriptoBtn")?.click())
+        list.appendChild(nueva)
+        return
+    }
+
     _stakingCriptos.forEach((cripto) => {
         const item = document.createElement("div")
         item.className = `cuentaItem${cripto.id === stakingCurrentCriptoId ? " active" : ""}`
@@ -32,8 +44,8 @@ function renderStakingCriptosSidebar() {
         item.innerHTML = `
             <span class="cuentaItemName" title="${escapeStakingHtml(cripto.nombre)}">${escapeStakingHtml(cripto.nombre)}</span>
             <div class="cuentaItemActions">
-                <button type="button" class="cuentaItemRenameBtn" data-id="${cripto.id}" title="Renombrar">✎</button>
-                <button type="button" class="cuentaItemDeleteBtn" data-id="${cripto.id}" title="Eliminar">✕</button>
+                <button type="button" class="cuentaItemRenameBtn" data-id="${cripto.id}" title="Renombrar" aria-label="Renombrar">${iconoHtml("Editar")}</button>
+                <button type="button" class="cuentaItemDeleteBtn" data-id="${cripto.id}" title="Eliminar" aria-label="Eliminar">${iconoHtml("Borrar")}</button>
             </div>
         `
         item.addEventListener("click", (e) => {
@@ -42,6 +54,7 @@ function renderStakingCriptosSidebar() {
         })
         list.appendChild(item)
     })
+    refrescarTiraPestanas(list)
 }
 
 function selectStakingCripto(id) {
@@ -78,7 +91,9 @@ function renderStakingYearBar(years) {
     const list = document.getElementById("stakingYearList")
     if (!list) return
     list.innerHTML = ""
-    years.forEach((year) => {
+    // El más reciente a la izquierda; `years` sigue ascendente porque el resto
+    // del código toma el último como año por defecto.
+    ;[...years].reverse().forEach((year) => {
         const btn = document.createElement("button")
         btn.type = "button"
         btn.className = `interesesYearBtn${year === stakingCurrentYear ? " active" : ""}`
@@ -89,6 +104,7 @@ function renderStakingYearBar(years) {
         })
         list.appendChild(btn)
     })
+    refrescarTiraPestanas(list)
 }
 
 function escapeStakingHtml(value) {
@@ -596,6 +612,8 @@ async function initStakingLogic() {
         stakingBody.dataset.bound = "true"
         stakingBody.addEventListener("click", handleStakingRowActionClick)
     }
+
+    activarMenuAcciones(document.getElementById("stakingMenuBtn"), document.getElementById("stakingMenuDropdown"))
 
     const addRowBtn = document.getElementById("addStakingRowBtn")
     if (addRowBtn && !addRowBtn.dataset.bound) {

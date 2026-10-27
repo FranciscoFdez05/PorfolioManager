@@ -985,6 +985,10 @@ body {
 }
 
 .navBtn[data-page="ajustes"] {
+    /* Flex para centrar el icono: en línea queda apoyado en la línea base. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 40px;
     padding: 0;
     font-size: 18px;
@@ -1145,4 +1149,11 @@ body {
 .toggleButton:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+}
+
+/* Cabeceras de tabla con un único tamaño en toda la app. Cada página fijaba el
+   suyo (de 0,62 a 14px) y con clases de más especificidad, así que la única
+   forma de unificarlo sin tocar una a una es el !important. */
+thead th {
+    font-size: 0.68rem !important;
 }

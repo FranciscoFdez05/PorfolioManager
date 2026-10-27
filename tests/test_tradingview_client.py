@@ -377,6 +377,44 @@ def testFetchStatsUnaSolaPeticionParaVariosTickers(monkeypatch):
     assert set(peticiones[0]) == {"NASDAQ:AAPL", "NASDAQ:MSFT"}
 
 
+def testFetchStatsPideLosPivotesDeCadaMetodoYPeriodo(monkeypatch):
+    peticiones = []
+
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        peticiones.append(jsonBody["columns"])
+        return {"data": []}
+
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
+
+    tradingview_client.fetchStats(["NASDAQ:AAPL"])
+
+    columnas = peticiones[0]
+    for method in tradingview_client.PIVOT_METHODS:
+        for suffix in tradingview_client.PIVOT_PERIODS.values():
+            for level in tradingview_client.PIVOT_LEVELS:
+                assert f"Pivot.M.{method}.{level}{suffix}" in columnas
+    # Una columna repetida desplazaría el emparejamiento nombre-valor de la fila.
+    assert len(columnas) == len(set(columnas))
+
+
+def testFetchStatsIncluyeRendimientoYVolatilidad(monkeypatch):
+    peticiones = []
+
+    def fakeFetch(url, params=None, timeout=None, jsonBody=None, headers=None):
+        peticiones.append(jsonBody["columns"])
+        columnas = jsonBody["columns"]
+        return {"data": [{"s": "BITVAVO:BTCEUR", "d": [-3.4 if c == "Perf.1M" else None for c in columnas]}]}
+
+    monkeypatch.setattr(tradingview_client, "_fetchJson", fakeFetch)
+
+    stats = tradingview_client.fetchStats(["BITVAVO:BTCEUR"])
+
+    for columna in ("Perf.W", "Perf.YTD", "price_52_week_high", "High.All", "ATR", "Volatility.D",
+                    "Recommend.MA", "Recommend.Other", "CCI20", "fundamental_currency_code"):
+        assert columna in peticiones[0]
+    assert stats["BITVAVO:BTCEUR"]["Perf.1M"] == -3.4
+
+
 def testFetchStatsSinTickersNoLlamaALaRed(monkeypatch):
     def fakeFetch(*a, **kw):
         raise AssertionError("no debería llamar a la red sin tickers")

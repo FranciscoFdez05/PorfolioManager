@@ -3,6 +3,7 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
+from decimal import Decimal
 from urllib.error import HTTPError, URLError
 
 from flask import Blueprint, jsonify, request
@@ -24,7 +25,7 @@ from providers.tradingview_client import (
     searchSymbol as searchTradingviewSymbol,
 )
 from providers.yahoo_finance_client import searchSymbol as buscarSimboloYahoo
-from stores import benchmark
+from stores import benchmark, rendimiento_activo
 from stores.asset_store import listAssets
 from stores.asset_utils import SUPPORTED_ASSET_CURRENCIES
 from stores.divisas_historico import HistoricoInvalido, historicoPar
@@ -177,6 +178,50 @@ def searchFinnhubSymbol():
     return jsonify({"ok": True, "results": results})
 
 
+# Una variación mayor que esto no es un movimiento de precio sino un snapshot
+# erróneo (un punto guardado con otra escala, una cartera a medio cargar): se
+# descarta en vez de mostrarla como dato, y el activo cae al proveedor o a N/D.
+_VARIACION_MAXIMA_CREIBLE = 1000
+
+
+def _esCreible(variacion) -> bool:
+    return abs(variacion) <= _VARIACION_MAXIMA_CREIBLE
+
+
+def _datosDePosicion(conn) -> dict:
+    """Filas, operaciones, ventas, transacciones y conversiones de cada activo."""
+    return rendimiento_activo.cargarPosiciones(conn)
+
+
+def _variacionDePrecio(posicion, asset, valorAhora, valorAntes, tsAntes):
+    """% de variación del precio por participación entre un snapshot y el último, o None.
+
+    Divide el valor de cada snapshot entre las participaciones que había en esa
+    fecha según las operaciones. Si no se puede saber (sin operaciones, o sin
+    posición en alguna de las dos fechas) devuelve None.
+    """
+    if not posicion:
+        return None
+    esCripto = str(asset.get("type") or "").strip().lower() == "cripto"
+
+    def cantidad(hasta):
+        lotes = rendimiento_activo.lotesVivos(
+            posicion["filas"], posicion["operaciones"], esCripto, posicion["ventas"], hasta=hasta,
+            transacciones=posicion["transacciones"], conversiones=posicion["conversiones"],
+        )
+        return sum((lote["cantidad"] for lote in lotes), Decimal("0"))
+
+    antes = cantidad(datetime.fromtimestamp(tsAntes).date())
+    ahora = cantidad(None)
+    if antes <= 0 or ahora <= 0:
+        return None
+    precioAntes = dinero.aDecimal(valorAntes) / antes
+    precioAhora = dinero.aDecimal(valorAhora) / ahora
+    if precioAntes <= 0:
+        return None
+    return float(dinero.redondear((precioAhora - precioAntes) / precioAntes * 100))
+
+
 @marketBp.route("/api/historical-changes", methods=["GET"])
 def getHistoricalChanges():
     period = str(request.args.get("period", "semana")).strip().lower()
@@ -192,7 +237,9 @@ def getHistoricalChanges():
     if ttl > 0 and cached and cached.get("marca") == marca and time.time() - cached["ts"] < ttl:
         return jsonify({"ok": True, "data": cached["data"], "cached": True})
 
-    now = datetime.utcnow()
+    # Hora local, no `utcnow()`: `.timestamp()` interpreta un datetime sin zona
+    # como local, y con UTC la ventana quedaba desplazada el desfase horario.
+    now = datetime.now()
     if period == "semana":
         target = now - timedelta(days=7)
     elif period == "mes":
@@ -210,31 +257,51 @@ def getHistoricalChanges():
     result = {}
 
     # Snapshot más reciente por activo (valor actual)
-    latest: dict[str, float] = {}
+    latest: dict[str, tuple] = {}
     for row in conn.execute(
-        "SELECT asset_id, price_eur FROM asset_snapshots "
+        "SELECT asset_id, price_eur, cost_eur FROM asset_snapshots "
         "WHERE ts = (SELECT MAX(ts) FROM asset_snapshots)"
     ).fetchall():
-        latest[row["asset_id"]] = row["price_eur"]
+        latest[row["asset_id"]] = (row["price_eur"], row["cost_eur"] or 0.0)
 
     # Snapshot del periodo objetivo por activo (primer registro en la ventana)
-    past: dict[str, float] = {}
+    past: dict[str, tuple] = {}
     for row in conn.execute(
-        "SELECT asset_id, price_eur FROM asset_snapshots "
+        "SELECT asset_id, price_eur, cost_eur, ts FROM asset_snapshots "
         "WHERE ts BETWEEN ? AND ? ORDER BY ts ASC",
         (fromTs, toTs)
     ).fetchall():
         if row["asset_id"] not in past:
-            past[row["asset_id"]] = row["price_eur"]
+            past[row["asset_id"]] = (row["price_eur"], row["cost_eur"] or 0.0, row["ts"])
+
+    posiciones = _datosDePosicion(conn)
 
     assetsNeedingApi = []
     for asset in listAssets():
         aid  = asset["id"]
-        cur  = latest.get(aid)
-        prev = past.get(aid)
+        cur, curCost = latest.get(aid, (None, 0.0))
+        prev, prevCost, prevTs = past.get(aid, (None, 0.0, 0))
+        # `price_eur` es el valor de la posición, no el precio de una
+        # participación: solo equivale a la variación del precio si no se ha
+        # comprado ni vendido nada entre los dos puntos, y eso se nota en que el
+        # coste no se ha movido.
+        mismaPosicion = abs((curCost or 0.0) - (prevCost or 0.0)) <= max(0.01, 0.005 * (prevCost or 0.0))
+        if cur and prev and prev > 0 and mismaPosicion:
+            variacion = round((cur - prev) / prev * 100, 2)
+            if _esCreible(variacion):
+                result[aid] = variacion
+                continue
+
+        # Si la posición cambió, el precio de una participación sale de dividir
+        # el valor entre las participaciones que había en cada momento, que se
+        # reconstruyen con las operaciones.
         if cur and prev and prev > 0:
-            result[aid] = round((cur - prev) / prev * 100, 2)
-        elif asset.get("marketSymbol") or asset.get("finnhubSymbol"):
+            variacion = _variacionDePrecio(posiciones.get(aid), asset, cur, prev, prevTs)
+            if variacion is not None and _esCreible(variacion):
+                result[aid] = variacion
+                continue
+
+        if asset.get("marketSymbol") or asset.get("finnhubSymbol"):
             assetsNeedingApi.append(asset)
 
     # Fallback a Finnhub para activos sin snapshots almacenados

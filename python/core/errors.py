@@ -49,13 +49,13 @@ class ApiError(Exception):
     error a mano.
     """
 
-    status_code = 400
+    statusCode = 400
 
     def __init__(self, message, statusCode=None, *, field=None, details=None):
         super().__init__(message)
         self.message = str(message)
         if statusCode is not None:
-            self.status_code = int(statusCode)
+            self.statusCode = int(statusCode)
         self.field = field
         self.details = details
 
@@ -69,21 +69,21 @@ class ApiError(Exception):
 
 
 class ValidationError(ApiError):
-    status_code = 400
+    statusCode = 400
 
 
 class NotFoundError(ApiError):
-    status_code = 404
+    statusCode = 404
 
 
 class ConflictError(ApiError):
-    status_code = 409
+    statusCode = 409
 
 
 class UpstreamError(ApiError):
     """Fallo de un proveedor externo (Finnhub, EODHD, Yahoo, Alpha Vantage)."""
 
-    status_code = 502
+    statusCode = 502
 
 
 # ── Fallos de escritura en disco ──────────────────────────────────────────────
@@ -211,11 +211,11 @@ def registerErrorHandlers(app) -> None:
         log.warning(
             "[%s] %s %s -> %s: %s",
             currentRequestId(), request.method, request.path,
-            error.status_code, error.message,
+            error.statusCode, error.message,
         )
         payload = error.to_dict()
         payload["requestId"] = currentRequestId()
-        return jsonify(payload), error.status_code
+        return jsonify(payload), error.statusCode
 
     @app.errorhandler(HTTPException)
     def _handleHttpException(error: HTTPException):

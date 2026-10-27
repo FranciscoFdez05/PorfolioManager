@@ -15,9 +15,13 @@ que hay que calcular sobre el índice TWR y **no** sobre el valor de la cartera:
 una retirada de 5.000 € hunde el valor sin que se haya perdido nada, y saldría
 como una caída del 30 % que nunca existió.
 
-El flujo de cada periodo se deduce del invertido de cada snapshot (sube al
-comprar y baja al vender), la misma fuente que usa Dietz, para que las tres
-métricas no se contradigan entre sí.
+El flujo de cada periodo es el dinero que de verdad entró o salió: cada snapshot
+guarda el suyo (`f`, ver stores/flujos_snapshot.py), con las compras con
+comisión y las ventas cobradas netas, en euros y con el tipo de cambio de cada
+operación. Donde no hay (los puntos anteriores a guardarlo, o un tramo con una
+operación que no se pudo convertir) se estima con la variación del invertido,
+que es un coste y no dinero, y el tramo sale marcado como estimado. TWR, XIRR y
+Dietz (en el navegador) usan los mismos flujos por tramo para no contradecirse.
 """
 
 import datetime
@@ -52,21 +56,53 @@ def serieDiaria(snaps):
     una métrica de riesgo).
     """
     porDia = {}
+    flujos = {}
+    perdido = False
     for punto in snaps:
         try:
             ts = int(punto["ts"])
             valor = float(punto["v"])
             invertido = float(punto["i"])
         except (KeyError, TypeError, ValueError):
+            perdido = True  # su flujo no se puede sumar: el tramo siguiente se estima
             continue
         if not (math.isfinite(valor) and math.isfinite(invertido)):
+            perdido = True
             continue
         dia = _dia(ts)
+        # El flujo de un día es la suma de los de sus snapshots (cada uno cubre
+        # desde el anterior); basta con que falte uno para que el día se estime.
+        flujo = _flujo(punto)
+        if perdido:
+            flujo, perdido = None, False
+        previo = flujos.get(dia, 0.0)
+        flujos[dia] = None if previo is None or flujo is None else previo + flujo
         anterior = porDia.get(dia)
         if anterior is None or ts >= anterior["ts"]:
             porDia[dia] = {"ts": ts, "dia": dia, "v": valor, "i": invertido}
 
-    return [porDia[d] for d in sorted(porDia)]
+    return [{**porDia[d], "f": flujos[d]} for d in sorted(porDia)]
+
+
+def _flujo(punto):
+    """Flujo real guardado en el punto (`f`), o None si no hay o no es un número."""
+    try:
+        flujo = float(punto["f"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return flujo if math.isfinite(flujo) else None
+
+
+def flujoDelTramo(previo, actual):
+    """`(flujo, estimado)` del tramo entre dos días de la serie.
+
+    El real si el punto lo trae; si no, la variación del invertido, marcada como
+    estimada.
+    """
+    real = actual.get("f")
+    if real is not None:
+        return real, False
+    return actual["i"] - previo["i"], True
 
 
 def _subperiodos(serie):
@@ -80,7 +116,7 @@ def _subperiodos(serie):
     """
     tramos = []
     for previo, actual in pairwise(serie):
-        flujo = actual["i"] - previo["i"]
+        flujo, estimado = flujoDelTramo(previo, actual)
         if previo["v"] <= 0:
             # Cartera vacía (o histórico que empieza en cero): no hay base
             # sobre la que medir un porcentaje. El siguiente tramo reengancha.
@@ -94,6 +130,8 @@ def _subperiodos(serie):
             "ts": actual["ts"],
             "dias": max((actual["dia"] - previo["dia"]).days, 1),
             "factor": factor,
+            "flujo": flujo,
+            "estimado": estimado,
         })
     return tramos
 
@@ -118,14 +156,15 @@ def twr(serie):
     """Rentabilidad time-weighted total y anualizada, en tanto por uno."""
     puntos = indiceTwr(serie)
     if len(puntos) < 2:
-        return {"total": None, "anual": None, "dias": 0}
+        return {"total": None, "anual": None, "dias": 0, "estimado": False}
 
     total = puntos[-1]["idx"] / 100.0 - 1
     dias = max((serie[-1]["dia"] - serie[0]["dia"]).days, 1)
     anual = None
     if dias >= MINIMO_DIAS_ANUALIZAR:
         anual = (1 + total) ** (DIAS_ANIO / dias) - 1
-    return {"total": total, "anual": anual, "dias": dias}
+    estimado = any(tramo["estimado"] for tramo in _subperiodos(serie))
+    return {"total": total, "anual": anual, "dias": dias, "estimado": estimado}
 
 
 # ── XIRR ───────────────────────────────────────────────────────────────────
@@ -144,7 +183,7 @@ def flujosDeCaja(serie):
     if serie[0]["v"] > 0:
         flujos.append({"ts": serie[0]["ts"], "importe": -serie[0]["v"]})
     for previo, actual in pairwise(serie):
-        flujo = actual["i"] - previo["i"]
+        flujo, _estimado = flujoDelTramo(previo, actual)
         if abs(flujo) > 0.005:
             flujos.append({"ts": actual["ts"], "importe": -flujo})
     flujos.append({"ts": serie[-1]["ts"], "importe": serie[-1]["v"]})
@@ -298,10 +337,23 @@ def resumen(snaps, hoy=None):
     """Todas las métricas de una pasada, con la serie del índice TWR."""
     serie = serieDiaria(snaps)
     puntosIndice = indiceTwr(serie)
+    tramosDeFlujo = [flujoDelTramo(previo, actual) for previo, actual in pairwise(serie)]
+    estimados = sum(1 for _flujo, estimado in tramosDeFlujo if estimado)
 
     return {
         "twr":          twr(serie),
         "xirr":         xirr(flujosDeCaja(serie)),
+        # Los mismos flujos por tramo que usan TWR y XIRR, para que Dietz los reutilice.
+        "xirrEstimado": estimados > 0,
+        "flujos": {
+            "tramos": len(tramosDeFlujo),
+            "reales": len(tramosDeFlujo) - estimados,
+            "estimados": estimados,
+            "serie": [
+                {"ts": actual["ts"], "flujo": flujo, "estimado": estimado}
+                for (_previo, actual), (flujo, estimado) in zip(pairwise(serie), tramosDeFlujo, strict=True)
+            ],
+        },
         "drawdown":     drawdown(puntosIndice),
         "volatilidad":  volatilidad(serie),
         "cobertura":    coberturaAnual(snaps, hoy=hoy),

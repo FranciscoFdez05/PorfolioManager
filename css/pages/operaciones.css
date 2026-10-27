@@ -43,16 +43,108 @@
     font-size: 14px;
 }
 
+/* Filtros, saldos y botón en una sola línea; los saldos son los que encogen
+   (ver .operationsPairsSummaryScroll). En pantallas estrechas sí se parte. */
+.operationsToolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: nowrap;
+    padding: 2px 0 6px 0;
+}
+
+.operationsToolbar > .operationsToolbarLeft {
+    flex: none;
+}
+
+@media (max-width: 1100px) {
+    .operationsToolbar {
+        flex-wrap: wrap;
+    }
+}
+
+.operationsToolbarLeft,
+.operationsToolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+/* La derecha no salta de línea: si los saldos no caben, el recuadro encoge y
+   hace scroll por dentro, y "Añadir operación" se queda en su sitio. */
+.operationsToolbarRight {
+    margin-left: auto;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+}
+
+.operationsToolbarRight > button {
+    flex-shrink: 0;
+}
+
 .operationsFilters {
     display: flex;
     flex-wrap: wrap;
-    gap: 20px;
+    gap: 12px;
     align-items: center;
-    padding: 0 0 12px;
+}
+
+/* Puntos de color de los filtros: apagados sin marcar, plenos al marcar,
+   igual que los filtros por tipo de Activos. */
+.operationsFilterOption:has(input[value="Compra"])::before {
+    background: #2ecc7155;
+}
+.operationsFilterOption:has(input[value="Venta"])::before {
+    background: #ef535055;
+}
+.operationsFilterOption:has(input[value="Activo"])::before {
+    background: #e0c06855;
+}
+.operationsFilterOption:has(input[value="Completado"])::before {
+    background: #3a7bd555;
+}
+.operationsFilterOption:has(input[value="Cancelado"])::before {
+    background: #8899bb55;
+}
+
+.operationsFilterOption:has(input[value="Compra"]:checked)::before {
+    background: #2ecc71;
+}
+.operationsFilterOption:has(input[value="Venta"]:checked)::before {
+    background: #ef5350;
+}
+.operationsFilterOption:has(input[value="Activo"]:checked)::before {
+    background: #e0c068;
+}
+.operationsFilterOption:has(input[value="Completado"]:checked)::before {
+    background: #3a7bd5;
+}
+.operationsFilterOption:has(input[value="Cancelado"]:checked)::before {
+    background: #8899bb;
+}
+
+.operationsFilterOption:has(input[value="Compra"]:checked) {
+    border-color: #2ecc7144;
+}
+.operationsFilterOption:has(input[value="Venta"]:checked) {
+    border-color: #ef535044;
+}
+.operationsFilterOption:has(input[value="Activo"]:checked) {
+    border-color: #e0c06844;
+}
+.operationsFilterOption:has(input[value="Completado"]:checked) {
+    border-color: #3a7bd544;
+}
+.operationsFilterOption:has(input[value="Cancelado"]:checked) {
+    border-color: #8899bb44;
 }
 
 .operationsPageCompact .operationsFilters {
-    gap: 14px 20px;
+    gap: 12px;
 }
 
 .operationsFilterGroup {
@@ -173,13 +265,25 @@
     background: var(--bg-elevated) !important;
 }
 
+/* La tabla hace scroll por dentro: el descuento deja sitio fijo al resumen del
+   ejercicio (unos 175px) para que, con muchas ventas, no se salga de la pantalla. */
 .ventasPageExpanded .operationsTableWrapper {
-    max-height: calc(100 * var(--vh) - 293px);
+    max-height: max(180px, calc(100 * var(--vh) - 435px));
     height: auto;
 }
 
+/* Única tabla con cabeceras más pequeñas que el tamaño común de base.css (de
+   ahí el !important): con 15 columnas, a ese tamaño se partían en tres líneas. */
+.ventasPageExpanded .operationsTable thead th {
+    font-size: 0.6rem !important;
+    letter-spacing: 0.02em;
+    padding: 10px 6px;
+}
+
+/* Con los filtros, los saldos y el botón en una sola línea sobra el espacio
+   que antes ocupaba la segunda fila de la barra: la tabla gana unas dos filas. */
 .operationsPageCompact .operationsTableWrapper {
-    max-height: calc(100 * var(--vh) - 313px);
+    max-height: calc(100 * var(--vh) - 213px);
     overflow-y: auto;
 }
 
@@ -236,20 +340,20 @@
     width: 120px;
 } /* Precio actual */
 .cryptoOperationsTable thead th:nth-child(5) {
+    width: 115px;
+} /* Recorrido */
+.cryptoOperationsTable thead th:nth-child(6) {
     width: 85px;
 } /* Orden */
-.cryptoOperationsTable thead th:nth-child(6) {
+.cryptoOperationsTable thead th:nth-child(7) {
     width: 115px;
 } /* Precio orden */
-.cryptoOperationsTable thead th:nth-child(7) {
+.cryptoOperationsTable thead th:nth-child(8) {
     width: 105px;
 } /* Cantidad */
-.cryptoOperationsTable thead th:nth-child(8) {
+.cryptoOperationsTable thead th:nth-child(9) {
     width: 100px;
 } /* Total */
-.cryptoOperationsTable thead th:nth-child(9) {
-    width: 145px;
-} /* Comisiones cripto */
 .cryptoOperationsTable thead th:nth-child(10) {
     width: 115px;
 } /* Comisiones € */
@@ -260,17 +364,30 @@
     width: 110px;
 } /* Fecha cierre */
 
-.operationsTable td[data-field="comisionesCripto"] .operationsFeeAmount {
+/* Recorrido: verde si el precio tiene que subir hasta la orden, rojo si tiene
+   que bajar. El % manda y el importe va debajo, más pequeño. */
+.operationsRecorrido {
     display: block;
     line-height: 1.2;
     white-space: nowrap;
 }
 
-.operationsTable td[data-field="comisionesCripto"] .operationsFeeHint {
+.operationsRecorridoPct {
+    display: block;
+    font-weight: 700;
+}
+
+.operationsRecorridoAmount {
     display: block;
     font-size: 11px;
-    color: var(--text-muted);
-    line-height: 1.2;
+}
+
+.operationsRecorrido.is-up {
+    color: var(--color-pos);
+}
+
+.operationsRecorrido.is-down {
+    color: var(--color-neg);
 }
 
 .operationsTable td[data-field="comisionesCriptoCell"] {
@@ -465,6 +582,42 @@
     min-width: 130px;
 }
 
+/* Popups de añadir/editar más anchos y con los campos en dos columnas para que
+   quepan sin scroll: Operaciones (.operacionRowModal) y los que marca
+   .modalDosColumnas (Transacciones, Trading y, vía ponerModalEnDosColumnas,
+   Dividendos, Renta fija y Mercado privado). En pantallas estrechas, una columna. */
+.operacionRowModal,
+.modalDosColumnas {
+    width: min(760px, 100%);
+    max-height: calc(92 * var(--vh));
+}
+
+.operacionRowModal .assetRowModalFields,
+.modalDosColumnas .assetRowModalFields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 20px;
+    align-content: start;
+}
+
+.modalCampos {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 20px;
+}
+
+.modalCampo {
+    min-width: 0;
+}
+
+@media (max-width: 640px) {
+    .operacionRowModal .assetRowModalFields,
+    .modalDosColumnas .assetRowModalFields,
+    .modalCampos {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 .operationsActions {
     display: flex;
     gap: 12px;
@@ -483,42 +636,99 @@
     gap: 12px;
 }
 
+/* Una sola línea: con varias stablecoins el recuadro se partía en dos filas y
+   empujaba el botón de añadir a otra línea. Ahora encoge y solo las
+   stablecoins se desplazan de lado, arrastrando con el ratón (ver
+   activarArrastreHorizontal) y sin barra visible. */
 .operationsPairsSummary {
     border: 1px solid var(--border-mid);
     background: var(--bg-surface);
-    padding: 8px 16px;
+    padding: 6px 14px;
     border-radius: 10px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    margin-left: auto;
+    gap: 14px;
+    min-width: 0;
+    overflow: hidden;
+    cursor: grab;
+}
+
+.operationsPairsSummary.dragging {
+    cursor: grabbing;
+    user-select: none;
 }
 
 .operationsPairsSummaryLabel {
     color: #8aa3c7;
-    font-size: 12px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .operationsPairsSummaryValues {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 16px;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.operationsPairsSummaryGroup {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.operationsPairsSummaryGroupScroll {
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.operationsPairsSummaryScroll {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.operationsPairsSummaryScroll::-webkit-scrollbar {
+    display: none;
+}
+
+.operationsPairsSummaryTag {
+    flex-shrink: 0;
+}
+
+.operationsPairsSummaryGroup + .operationsPairsSummaryGroup {
+    padding-left: 16px;
+    border-left: 1px solid var(--border-soft);
+}
+
+.operationsPairsSummaryTag {
+    padding: 2px 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: 20px;
+    color: #8aa3c7;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
 }
 
 .operationsPairsSummaryItem {
     color: #e6edf8;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
 }
 
 .operationsPairsSummaryHint {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 400;
     opacity: 0.75;
     margin-left: 6px;
@@ -543,73 +753,97 @@
     min-width: 100%;
 }
 
+/* La tabla ocupa el alto que dejan la barra y las tarjetas (unos 440px) en vez
+   de quedarse en 9 filas fijas con un hueco vacío debajo. */
 .stablecoinsPage .operationsTableWrapper {
-    max-height: calc(9 * 41px + 42px);
+    max-height: max(240px, calc(100 * var(--vh) - 440px));
     overflow-x: auto;
     overflow-y: auto;
 }
 
-.stablecoinsHeaderPanel {
-    border: 1px solid var(--border-mid);
-    background: var(--bg-surface);
-    border-radius: 10px;
-    padding: 8px 12px;
+.stablecoinsToolbar {
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 2px 0 6px;
+}
+
+.stablecoinsToolbarRight {
+    display: flex;
     align-items: center;
     gap: 12px;
-    flex-wrap: wrap;
-}
-
-.stablecoinsHeaderPanel.stablecoinsHeaderPanelCompact {
-    align-items: center;
-}
-
-.stablecoinsHeaderCopy {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.stablecoinsHeaderTools {
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
-    justify-content: flex-end;
-    flex: 1 1 auto;
-}
-
-.stablecoinsCompactBtn {
-    white-space: nowrap;
+    margin-left: auto;
 }
 
 .stablecoinsEnabledMenu {
     display: flex;
-    gap: 10px;
+    gap: 6px;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: flex-end;
-    width: 100%;
 }
 
+/* Color común de las stablecoins (rosa), el mismo que les da Transacciones:
+   no tienen ficha de activo de la que sacar uno propio. */
 .stablecoinToggle.active {
-    border-color: #3b82f6;
+    border-color: #f472b644;
 }
 
+.stablecoinsEnabledMenu .stablecoinToggle::before {
+    background: #f472b655;
+}
+
+.stablecoinsEnabledMenu .stablecoinToggle:has(input:checked)::before {
+    background: #f472b6;
+}
+
+/* Tarjetas de ancho acotado y en una sola fila: con una sola stablecoin, ocupar
+   todo el ancho dejaba la cifra perdida en una franja vacía, y con muchas
+   bajaban a otra fila y empujaban la tabla. Si no caben, scroll lateral. */
 .stablecoinsSummary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 8px;
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    cursor: grab;
+    /* Barra fina con los colores del tema en vez de la blanca del sistema. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+
+.stablecoinsSummary::-webkit-scrollbar {
+    height: 6px;
+}
+
+.stablecoinsSummary::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.stablecoinsSummary::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+/* Arrastrando (ver activarArrastreHorizontal): sin seleccionar texto. */
+.stablecoinsSummary.dragging {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.stablecoinsSummary > .stablecoinSummaryCard {
+    flex: 0 0 340px;
 }
 
 .stablecoinSummaryCard {
     border: 1px solid var(--border-mid);
     background: var(--bg-surface);
     border-radius: 10px;
-    padding: 10px 12px;
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 10px;
 }
 
 .stablecoinSummaryCard.disabled {
@@ -642,6 +876,12 @@
 }
 
 .stablecoinSummaryDeleteBtn {
+    /* Flex y sin padding para centrar el icono: en línea queda apoyado en la
+       línea base, y el padding por defecto de <button> lo descentra. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
     width: 22px;
     height: 22px;
     border: 1px solid rgba(248, 113, 113, 0.45);
@@ -668,16 +908,50 @@
 
 .stablecoinSummaryMain {
     color: var(--text-bright);
-    font-size: 20px;
+    font-size: 24px;
     font-weight: 700;
 }
 
+.stablecoinSummaryEquiv {
+    margin-top: -6px;
+    color: var(--text-subtle);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.stablecoinSummaryEquiv span {
+    color: #8aa3c7;
+    font-weight: 400;
+}
+
 .stablecoinSummaryMeta {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-soft);
     color: #8aa3c7;
     font-size: 11px;
+}
+
+.stablecoinSummaryStat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.stablecoinSummaryStat span {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 10px;
+}
+
+.stablecoinSummaryStat strong {
+    color: var(--text-subtle);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .stablecoinsPage .assetSearchFeedback,
@@ -694,20 +968,91 @@
     margin-bottom: 14px;
 }
 
-@media (max-width: 1280px) {
-    .operationsPairsSummary {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .operationsPairsSummaryValues {
-        justify-content: flex-start;
-    }
-}
-
 .transaccionesPageCompact .operationsTableWrapper {
     max-height: calc(100 * var(--vh) - 325px);
     overflow-y: auto;
+}
+
+.transaccionesToolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: nowrap;
+    padding: 2px 0 6px;
+}
+
+.transaccionesToolbarRight {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+.transaccionesFilters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Cada chip lleva el color de su cripto en --chipColor (lo pone el JS desde el
+   activo): punto apagado sin marcar, pleno y con borde tintado al marcar.
+   También los usa el selector de cripto de Conversiones. */
+.transaccionesFilters .transaccionesFilterChip::before {
+    background: color-mix(in srgb, var(--chipColor) 35%, transparent);
+}
+
+.transaccionesFilters .transaccionesFilterChip:has(input:checked)::before {
+    background: var(--chipColor);
+}
+
+.transaccionesFilters .transaccionesFilterChip:has(input:checked) {
+    border-color: color-mix(in srgb, var(--chipColor) 30%, transparent);
+}
+
+/* En Transacciones la tira va en una sola línea entre la búsqueda y los
+   botones: si no caben las criptos, se desplaza de lado (rueda, arrastre y
+   difuminado de initScrollLateral() vía refrescarTiraPestanas()) en vez de
+   saltar de fila y empujar la tabla hacia abajo. */
+.transaccionesToolbar > .transaccionesFilters {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+    padding-bottom: 6px;
+    margin-bottom: -6px;
+}
+
+.transaccionesToolbar > .transaccionesFilters > * {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.transaccionesToolbar > .transaccionesFilters::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+}
+
+.transaccionesToolbar > .transaccionesFilters::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.transaccionesToolbar > .transaccionesFilters::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.transaccionesToolbar > .transaccionesFilters::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+.transaccionesToolbar > .transaccionesToolbarRight {
+    flex: 0 0 auto;
 }
 
 .transaccionesAssetPanel {
@@ -920,4 +1265,27 @@
 .transaccionesPageCompact .operationsTable tr[data-transaccion-id] td:first-child {
     color: var(--text-muted);
     font-size: 12px;
+}
+
+/* Operaciones (cripto y bolsa) y Transacciones ajustadas al alto visible
+   (fitPageActive, ver base.css): mainContent no hace scroll y la tabla se queda
+   con el hueco que deja la barra de arriba, con scroll por dentro. Solo se
+   aplica en las páginas de la lista fitPages de app-core.js. */
+@media (min-width: 1201px) {
+    .fitPageActive .operationsPageCompact {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .fitPageActive .operationsPageCompact .operationsToolbar,
+    .fitPageActive .operationsPageCompact .transaccionesToolbar {
+        flex: 0 0 auto;
+    }
+
+    .fitPageActive .operationsPageCompact .operationsTableWrapper {
+        flex: 0 1 auto;
+        min-height: 140px;
+        max-height: none;
+    }
 }

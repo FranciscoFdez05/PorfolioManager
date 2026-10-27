@@ -67,6 +67,8 @@ TMP_DIR = DATA_DIR / "tmp"
 ENV_FILE = BASE_DIR / ".env"
 INDEX_FILE = BASE_DIR / "index.html"
 LOGIN_HTML = HTML_DIR / "sesion" / "login.html"
+LOGIN_2FA_HTML = HTML_DIR / "sesion" / "login-2fa.html"
+SETUP_HTML = HTML_DIR / "sesion" / "setup.html"
 
 AUTH_FILE = DATA_DIR / "auth.dat"
 PORTFOLIOS_META_FILE = DATA_DIR / "portfolios.json"
@@ -190,10 +192,12 @@ __all__ = [
     "INDEX_FILE",
     "JSON_DIR",
     "LEGACY_DB",
+    "LOGIN_2FA_HTML",
     "LOGIN_HTML",
     "LOGS_DIR",
     "PORTFOLIOS_DIR",
     "PORTFOLIOS_META_FILE",
+    "SETUP_HTML",
     "TMP_DIR",
     "comprobarEscritura",
     "descripcionProceso",

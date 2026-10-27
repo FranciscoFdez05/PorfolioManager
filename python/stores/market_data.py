@@ -114,7 +114,52 @@ def _storeQuote(cacheKey, quote, ttl):
         _quoteCache[cacheKey] = {"quote": quote, "ts": time.monotonic()}
 
 
-def fetchAssetQuote(symbol, provider=None, useCache=True, targetCurrency=None):
+def _claveDeCotizacion(symbol, provider, targetCurrency):
+    """`(symbol, proveedor, divisa, clave de caché)` normalizados de una cotización."""
+    symbol = str(symbol or "").strip().upper()
+    proveedorPrincipal = normalizeMarketProvider(
+        str(provider or "").strip(), fallback=inferMarketProviderFromSymbol(symbol)
+    )
+    targetCurrency = str(targetCurrency or "").strip().upper() or None
+    return symbol, proveedorPrincipal, targetCurrency, f"{proveedorPrincipal}:{symbol}:{targetCurrency or 'nativa'}"
+
+
+def _ttlEfectivo(maxEdadSegundos):
+    """TTL de la caché, recortado a `maxEdadSegundos` si quien llama pide más frescura."""
+    ttl = settings.cotizacionTtlSegundos()
+    if maxEdadSegundos is None:
+        return ttl
+    return min(ttl, max(0, int(maxEdadSegundos)))
+
+
+def edadEnCache(symbol, provider=None, targetCurrency=None, maxEdadSegundos=None):
+    """Segundos que lleva en caché la cotización que serviría `fetchAssetQuote`, o `None`.
+
+    Permite a la ruta decir si el precio que devuelve es de la caché y cuánto
+    hace que se pidió al proveedor, sin cambiar lo que devuelve `fetchAssetQuote`.
+
+    Args:
+        symbol: Símbolo del activo.
+        provider: Proveedor de mercado; se infiere del símbolo si falta.
+        targetCurrency: Divisa a la que se convertía la cotización.
+        maxEdadSegundos: Si se da, tope a la vigencia (ver `fetchAssetQuote`).
+
+    Returns:
+        Edad en segundos si hay una entrada vigente; `None` si no la hay.
+    """
+    _symbol, _proveedor, _divisa, cacheKey = _claveDeCotizacion(symbol, provider, targetCurrency)
+    ttl = _ttlEfectivo(maxEdadSegundos)
+    if ttl <= 0:
+        return None
+    with _stateLock:
+        entry = _quoteCache.get(cacheKey)
+    if not entry:
+        return None
+    edad = time.monotonic() - entry["ts"]
+    return edad if edad < ttl else None
+
+
+def fetchAssetQuote(symbol, provider=None, useCache=True, targetCurrency=None, maxEdadSegundos=None):
     """Cotización de un símbolo. Devuelve `(quote, error)` como los clientes.
 
     `use_cache=False` salta la lectura de caché sin desactivarla del todo: el
@@ -133,19 +178,15 @@ def fetchAssetQuote(symbol, provider=None, useCache=True, targetCurrency=None):
     convertir en vez de fallar entera: quien necesite la divisa exacta tiene
     que comprobar `quote["currency"]`, como hace ese refresco.
     """
-    symbol = str(symbol or "").strip().upper()
+    symbol, proveedorPrincipal, targetCurrency, cacheKey = _claveDeCotizacion(symbol, provider, targetCurrency)
     if not symbol:
         return None, "symbol requerido"
 
-    proveedorPrincipal = normalizeMarketProvider(
-        str(provider or "").strip(), fallback=inferMarketProviderFromSymbol(symbol)
-    )
-    targetCurrency = str(targetCurrency or "").strip().upper() or None
-
     ttl = settings.cotizacionTtlSegundos()
-    cacheKey = f"{proveedorPrincipal}:{symbol}:{targetCurrency or 'nativa'}"
     if useCache:
-        cachedQuote = _cachedQuote(cacheKey, ttl)
+        # `maxEdadSegundos` recorta solo esta lectura (no lo que se guarda): el
+        # refresco automático no debe recibir un precio más viejo que su intervalo.
+        cachedQuote = _cachedQuote(cacheKey, _ttlEfectivo(maxEdadSegundos))
         if cachedQuote is not None:
             return cachedQuote, None
 

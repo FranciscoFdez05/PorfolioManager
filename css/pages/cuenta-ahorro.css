@@ -17,15 +17,39 @@
     gap: 16px;
 }
 
-/* Mismas medidas que los años de Gastos e Ingresos: una rejilla de 12 columnas
-   que deja a la derecha el hueco de la pestaña "Mensualidades" (unos 136 px más el
-   hueco de 16 px entre elementos), así cada año mide lo mismo que allí. */
+/* Misma tira de años que Intereses, Dividendos y las páginas de Cripto: una
+   sola línea con scroll lateral, y el botón principal y el ··· a la derecha. */
 .cuentaAhorroYearList {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    gap: 5px;
-    flex: 1 1 auto;
-    margin-right: 152px;
+    display: flex;
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+    padding-bottom: 6px;
+}
+
+.cuentaAhorroYearList::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+}
+
+.cuentaAhorroYearList::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.cuentaAhorroYearList > * {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.cuentaAhorroTopBar > #cuentaAhorroAddRowBtn {
+    flex-shrink: 0;
 }
 
 .cuentaAhorroLayout {
@@ -334,7 +358,7 @@
     flex-wrap: wrap;
 }
 
-.cuentaAhorroCuentas .gastosYearBtn {
+.cuentaAhorroCuentas .interesesYearBtn {
     flex: 0 0 auto;
     width: auto;
     padding-left: 14px;

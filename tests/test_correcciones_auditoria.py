@@ -469,7 +469,7 @@ def testLaListaYLaTablaDanLasMismasCifras(tempDb, clienteAutenticado):
 
     for campo in ("rendimiento", "invertidoNeto", "rendimientoPct"):
         assert lista[campo] == tabla[campo], campo
-    assert tabla["invertidoNeto"] == 0.27
+    assert tabla["invertidoNeto"] == 0.22
     assert tabla["netoActual"] == 85.09  # 8,5 participaciones por 10,01
 
 

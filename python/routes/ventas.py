@@ -124,7 +124,9 @@ def _prepararInforme(year):
     if data is None:
         return None, (jsonify({"ok": False, "error": "Año no encontrado"}), 404)
 
-    return informe_renta.construir(normalizedYear, data["rows"], data["resumen"]), None
+    return informe_renta.construir(
+        normalizedYear, data["rows"], data["resumen"], data.get("permutas", ())
+    ), None
 
 
 @ventasBp.route("/api/ventas/<year>/informe.csv", methods=["GET"])

@@ -280,6 +280,7 @@ function mRenderGastosTipoChart(tipoData) {
         .sort((a, b) => b[1] - a[1])
     if (!tipoEntries.length) {
         mDestroyChart("mChartGastosTipo")
+        mRenderDonutLeyenda("mChartGastosTipo", [], [], [], 0)
         return
     }
     const tipoLabels = tipoEntries.map(([k]) => k)
@@ -309,11 +310,12 @@ function mRenderGastosTipoChart(tipoData) {
             },
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
-                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                legend: { display: false },
                 tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } }
             }
         }
     })
+    mRenderDonutLeyenda("mChartGastosTipo", tipoLabels, tipoColors, tipoValues, tipoTotal)
     const canvas = document.getElementById("mChartGastosTipo")
     if (canvas) canvas.style.cursor = "pointer"
 }
@@ -394,7 +396,7 @@ function openGastosTipoPopup(tipoLabel) {
             <span class="gtPopupTitle">Gastos · ${escapeHtml(tipoLabel)}</span>
             <input type="text" id="gtPopupSearch" class="gtPopupSearch" placeholder="Buscar concepto...">
             <span class="gtPopupTotal" id="gtPopupTotalLabel">Total: ${formatEuro(total)} · ${escapeHtml(rows.length)} movimientos</span>
-            <button class="gtPopupClose" id="gtPopupCloseBtn">✕</button>
+            <button class="gtPopupClose" id="gtPopupCloseBtn" title="Cerrar" aria-label="Cerrar">${iconoHtml("Cerrar")}</button>
         </div>
         <div class="gtPopupBody">
             <table class="overviewTable gtPopupTable" id="gtPopupTable">
@@ -711,13 +713,15 @@ function mRenderIngresosCharts(ingresosYearData) {
                 cutout: "55%",
                 plugins: {
                     ...M_CHART_DEFAULTS.plugins,
-                    legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                    legend: { display: false },
                     tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, tipoTotal) } }
                 }
             }
         })
+        mRenderDonutLeyenda("mChartIngresosTipo", tipoLabels, tipoColors, tipoValues, tipoTotal)
     } else {
         mDestroyChart("mChartIngresosTipo")
+        mRenderDonutLeyenda("mChartIngresosTipo", [], [], [], 0)
     }
 
     mEqualizeChartRowHeights()
@@ -858,7 +862,7 @@ function mRenderInteresesSection(interesRows, cuentas) {
 
     const yearToggle = document.getElementById("mInteresesYearToggle")
     if (yearToggle) {
-        yearToggle.innerHTML = years
+        yearToggle.innerHTML = ordenarAniosRecientesPrimero(years)
             .map(
                 (y) =>
                     `<button class="mToggleBtn${y === _metricasInteresesYear ? " active" : ""}" data-intano="${y}">${y}</button>`

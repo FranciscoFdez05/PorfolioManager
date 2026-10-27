@@ -301,7 +301,7 @@ function renderCuentaAhorroCuentas() {
         cuentaAhorroCuentas.forEach((cuenta) => {
             const btn = document.createElement("button")
             btn.type = "button"
-            btn.className = `gastosYearBtn${cuenta.id === cuentaAhorroCuenta ? " active" : ""}`
+            btn.className = `interesesYearBtn${cuenta.id === cuentaAhorroCuenta ? " active" : ""}`
             btn.textContent = cuenta.nombre
             btn.addEventListener("click", async () => {
                 cuentaAhorroCuenta = cuenta.id
@@ -321,10 +321,12 @@ function renderCuentaAhorroYears() {
     const list = document.getElementById("cuentaAhorroYearList")
     if (!list) return
     list.innerHTML = ""
-    cuentaAhorroYears.forEach((year) => {
+    // Como en Intereses: el más reciente a la izquierda. `cuentaAhorroYears`
+    // sigue ascendente porque el resto del código lo da por hecho.
+    ;[...cuentaAhorroYears].reverse().forEach((year) => {
         const btn = document.createElement("button")
         btn.type = "button"
-        btn.className = `gastosYearBtn${year === cuentaAhorroYear ? " active" : ""}`
+        btn.className = `interesesYearBtn${year === cuentaAhorroYear ? " active" : ""}`
         btn.textContent = year
         btn.addEventListener("click", async () => {
             cuentaAhorroYear = year
@@ -332,13 +334,14 @@ function renderCuentaAhorroYears() {
         })
         list.appendChild(btn)
     })
+    refrescarTiraPestanas(list)
 }
 
 function renderCuentaAhorroTabs() {
     document.querySelectorAll("[data-cuenta-ahorro-tab]").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.cuentaAhorroTab === cuentaAhorroTab)
     })
-    const actions = document.getElementById("cuentaAhorroActions")
+    const actions = document.getElementById("cuentaAhorroAddRowBtn")
     if (actions) actions.classList.toggle("hidden", cuentaAhorroTab !== "movimientos")
 }
 
@@ -713,30 +716,42 @@ function openCuentaAhorroMovimientoModal(edit = null) {
 
     openGastosCreateModal({
         title: edit ? "Editar transferencia" : `Añadir movimiento · ${actual.nombre}`,
+        // Dos columnas, como el modal de Mensualidades y el de transferencias de Cuentas.
+        modalClass: "gastosCreateModalWide mensFormModal",
         bodyHtml: `
-            <label class="assetModalLabel" for="cuentaAhorroMovKind">Operación</label>
-            <select id="cuentaAhorroMovKind" class="assetModalSelect">
-                <option value="entrada"${saliendo ? "" : " selected"}>Ingresar dinero en esta cuenta</option>
-                <option value="salida"${saliendo ? " selected" : ""}>Retirar dinero de esta cuenta</option>
-            </select>
-
-            <label class="assetModalLabel" for="cuentaAhorroMovContraparte">Con la cuenta</label>
-            <select id="cuentaAhorroMovContraparte" class="assetModalSelect">${opcionesCuenta}</select>
-
-            <label class="assetModalLabel" for="cuentaAhorroMovFecha">Fecha</label>
-            <input id="cuentaAhorroMovFecha" class="assetModalInput" type="text" value="${escapeGastosHtml(edit?.fecha || todayDateString())}" placeholder="dd-mm-aaaa">
-
-            <label class="assetModalLabel" for="cuentaAhorroMovNombre">Concepto <span class="assetModalLabelHint">opcional</span></label>
-            <input id="cuentaAhorroMovNombre" class="assetModalInput" type="text" maxlength="120" value="${escapeGastosHtml(edit?.nombre || "")}" placeholder="Ej: Ahorro de octubre">
-
-            <label class="assetModalLabel" for="cuentaAhorroMovCantidad">Cantidad</label>
-            <input id="cuentaAhorroMovCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(edit?.cantidad || "")}" placeholder="0,00">
-
-            <label class="assetModalLabel" for="cuentaAhorroMovComision">Comisión <span class="assetModalLabelHint">opcional · la paga la cuenta de origen</span></label>
-            <input id="cuentaAhorroMovComision" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(edit?.comision || "")}" placeholder="0,00">
-
-            <label class="assetModalLabel" for="cuentaAhorroMovNota">Nota <span class="assetModalLabelHint">opcional</span></label>
-            <textarea id="cuentaAhorroMovNota" class="assetModalInput movNotaInput" rows="2" maxlength="300">${escapeGastosHtml(edit?.nota || "")}</textarea>
+            <div class="mensFormGrid">
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cuentaAhorroMovKind">Operación</label>
+                    <select id="cuentaAhorroMovKind" class="assetModalSelect">
+                        <option value="entrada"${saliendo ? "" : " selected"}>Ingresar dinero en esta cuenta</option>
+                        <option value="salida"${saliendo ? " selected" : ""}>Retirar dinero de esta cuenta</option>
+                    </select>
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cuentaAhorroMovContraparte">Con la cuenta</label>
+                    <select id="cuentaAhorroMovContraparte" class="assetModalSelect">${opcionesCuenta}</select>
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cuentaAhorroMovFecha">Fecha</label>
+                    <input id="cuentaAhorroMovFecha" class="assetModalInput" type="text" value="${escapeGastosHtml(edit?.fecha || todayDateString())}" placeholder="dd-mm-aaaa">
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cuentaAhorroMovCantidad">Cantidad</label>
+                    <input id="cuentaAhorroMovCantidad" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(edit?.cantidad || "")}" placeholder="0,00">
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cuentaAhorroMovComision">Comisión <span class="assetModalLabelHint">opcional · la paga el origen</span></label>
+                    <input id="cuentaAhorroMovComision" class="assetModalInput" type="text" inputmode="decimal" value="${escapeGastosHtml(edit?.comision || "")}" placeholder="0,00">
+                </div>
+                <div class="gastosCreateModalField">
+                    <label class="assetModalLabel" for="cuentaAhorroMovNombre">Concepto <span class="assetModalLabelHint">opcional</span></label>
+                    <input id="cuentaAhorroMovNombre" class="assetModalInput" type="text" maxlength="120" value="${escapeGastosHtml(edit?.nombre || "")}" placeholder="Ej: Ahorro de octubre">
+                </div>
+                <div class="gastosCreateModalField mensFormFieldWide">
+                    <label class="assetModalLabel" for="cuentaAhorroMovNota">Nota <span class="assetModalLabelHint">opcional</span></label>
+                    <textarea id="cuentaAhorroMovNota" class="assetModalInput movNotaInput" rows="2" maxlength="300" placeholder="Opcional: motivo del movimiento…">${escapeGastosHtml(edit?.nota || "")}</textarea>
+                </div>
+            </div>
         `,
         submitLabel: "Guardar",
         onSubmit: async ({ getValue, setFeedback }) => {
@@ -1035,7 +1050,6 @@ function bindCuentaAhorroEvents() {
     }
 
     const on = (id, handler) => document.getElementById(id)?.addEventListener("click", handler)
-    on("cuentaAhorroAddBtn", () => openCuentaAhorroMovimientoModal())
     on("cuentaAhorroAddRowBtn", () => openCuentaAhorroMovimientoModal())
     on("cuentaAhorroConfigBtn", openCuentaAhorroConfigModal)
     on("cuentaAhorroCsvBtn", downloadCuentaAhorroCsv)

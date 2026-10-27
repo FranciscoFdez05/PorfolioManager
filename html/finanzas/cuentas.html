@@ -1,10 +1,17 @@
 <section class="cuentasPage">
     <div class="cuentasTopBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#cuentasBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
         <div class="cuentasYearList" id="cuentasYearList"></div>
+        <button id="cuentasAddRowBtn" class="primaryButton" type="button">Nueva transferencia</button>
         <div class="pageActionsMenu" id="cuentasActionsMenu">
             <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
             <div class="pageActionsDropdown" id="cuentasActionsDropdown">
-                <button id="cuentasNuevaTransferenciaBtn" class="pageActionsItem" type="button">Nueva transferencia</button>
                 <button id="cuentasNuevaCuentaBtn" class="pageActionsItem" type="button">Nueva cuenta</button>
                 <button id="cuentasGrafoBtn" class="pageActionsItem" type="button">Ver movimientos en gráfico</button>
                 <button id="cuentasCsvBtn" class="pageActionsItem" type="button">Descargar CSV</button>
@@ -27,10 +34,6 @@
                     <tbody id="cuentasBody"></tbody>
                 </table>
                 <p class="overviewEmpty hidden" id="cuentasEmpty"></p>
-            </div>
-
-            <div class="gastosActions">
-                <button id="cuentasAddRowBtn" class="primaryButton" type="button">Nueva transferencia</button>
             </div>
         </div>
 

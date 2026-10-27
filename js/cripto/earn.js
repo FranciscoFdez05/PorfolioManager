@@ -25,6 +25,18 @@ function renderEarnCriptosSidebar() {
     if (!list) return
     list.innerHTML = ""
 
+    // Sin ninguna cripto la fila se quedaba solo con la lupa: se ofrece crear
+    // la primera desde aquí, con la misma acción que la opción del menú «···».
+    if (!_earnCriptos.length) {
+        const nueva = document.createElement("button")
+        nueva.type = "button"
+        nueva.className = "cuentaItem cuentaItemNueva"
+        nueva.textContent = "+ Añadir cripto/producto"
+        nueva.addEventListener("click", () => document.getElementById("addEarnCriptoBtn")?.click())
+        list.appendChild(nueva)
+        return
+    }
+
     _earnCriptos.forEach((cripto) => {
         const item = document.createElement("div")
         item.className = `cuentaItem${cripto.id === earnCurrentCriptoId ? " active" : ""}`
@@ -32,8 +44,8 @@ function renderEarnCriptosSidebar() {
         item.innerHTML = `
             <span class="cuentaItemName" title="${escapeEarnHtml(cripto.nombre)}">${escapeEarnHtml(cripto.nombre)}</span>
             <div class="cuentaItemActions">
-                <button type="button" class="cuentaItemRenameBtn" data-id="${cripto.id}" title="Renombrar">✎</button>
-                <button type="button" class="cuentaItemDeleteBtn" data-id="${cripto.id}" title="Eliminar">✕</button>
+                <button type="button" class="cuentaItemRenameBtn" data-id="${cripto.id}" title="Renombrar" aria-label="Renombrar">${iconoHtml("Editar")}</button>
+                <button type="button" class="cuentaItemDeleteBtn" data-id="${cripto.id}" title="Eliminar" aria-label="Eliminar">${iconoHtml("Borrar")}</button>
             </div>
         `
         item.addEventListener("click", (e) => {
@@ -42,6 +54,7 @@ function renderEarnCriptosSidebar() {
         })
         list.appendChild(item)
     })
+    refrescarTiraPestanas(list)
 }
 
 function selectEarnCripto(id) {
@@ -78,7 +91,9 @@ function renderEarnYearBar(years) {
     const list = document.getElementById("earnYearList")
     if (!list) return
     list.innerHTML = ""
-    years.forEach((year) => {
+    // El más reciente a la izquierda; `years` sigue ascendente porque el resto
+    // del código toma el último como año por defecto.
+    ;[...years].reverse().forEach((year) => {
         const btn = document.createElement("button")
         btn.type = "button"
         btn.className = `interesesYearBtn${year === earnCurrentYear ? " active" : ""}`
@@ -89,6 +104,7 @@ function renderEarnYearBar(years) {
         })
         list.appendChild(btn)
     })
+    refrescarTiraPestanas(list)
 }
 
 function escapeEarnHtml(value) {
@@ -600,6 +616,8 @@ async function initEarnLogic() {
         earnBody.dataset.bound = "true"
         earnBody.addEventListener("click", handleEarnRowActionClick)
     }
+
+    activarMenuAcciones(document.getElementById("earnMenuBtn"), document.getElementById("earnMenuDropdown"))
 
     const addRowBtn = document.getElementById("addEarnRowBtn")
     if (addRowBtn && !addRowBtn.dataset.bound) {

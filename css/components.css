@@ -1571,14 +1571,48 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     flex: none;
 }
 
+/* Si las tarjetas no caben, scroll lateral solo en ellas (los filtros se quedan
+   fijos), con la barra visible y arrastrable. El relleno de abajo es donde se
+   dibuja la barra y el margen negativo se lo descuenta a la fila; el de arriba
+   y abajo evita que overflow-x recorte la sombra/borde de las tarjetas. */
 .overviewExtremes {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin: -9px 0;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 9px 0 6px;
+    margin: -9px 0 -6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+    cursor: grab;
+}
+
+.overviewExtremes::-webkit-scrollbar {
+    height: 6px;
+}
+
+.overviewExtremes::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.overviewExtremes::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.overviewExtremes::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+.overviewExtremes.dragging {
+    cursor: grabbing;
+    user-select: none;
 }
 
 .overviewExtremeCard {
+    flex: none;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -1590,6 +1624,13 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     border-radius: 8px;
     background: var(--bg-header);
     white-space: nowrap;
+    max-width: 360px;
+}
+
+/* Beneficio realizado solo lleva una cifra: sin ancho mínimo la caja se ajusta
+   a ella y no queda un hueco vacío a la derecha. */
+#overviewRealizedCard {
+    min-width: 0;
 }
 
 .overviewExtremeCardDual {
@@ -1604,7 +1645,9 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 }
 
 .overviewExtremeLine .overviewExtremeLabel {
-    min-width: 128px;
+    min-width: 0;
+    max-width: 130px;
+    flex: 0 1 130px;
 }
 
 .overviewExtremeLine .overviewExtremeValue {
@@ -1615,6 +1658,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     color: var(--text-dim);
     font-size: 0.72rem;
     max-width: 200px;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -1644,32 +1688,23 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     flex-wrap: nowrap;
 }
 
-/* Filtros y tarjetas en una sola línea: si no caben, scroll lateral. El menú
-   «···» queda fuera para que su desplegable no se recorte. */
+/* Filtros y tarjetas en una sola línea: los filtros no se encogen y el scroll
+   lateral lo lleva .overviewExtremes. El menú «···» queda fuera para que su
+   desplegable no se recorte. */
 .overviewScroll {
     display: flex;
     align-items: center;
     gap: 16px;
     flex: 1 1 0;
     min-width: 0;
-    overflow-x: auto;
-    padding: 9px 0;
-    margin: -9px 0;
-    scrollbar-width: none;
-    cursor: grab;
-}
-
-.overviewScroll::-webkit-scrollbar {
-    display: none;
-}
-
-.overviewScroll.dragging {
-    cursor: grabbing;
-    user-select: none;
 }
 
 .overviewScroll > * {
     flex: none;
+}
+
+.overviewScroll > .overviewExtremes {
+    flex: 0 1 auto;
 }
 
 .overviewActionsGroup {
@@ -1679,6 +1714,32 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     gap: 10px;
     margin-left: auto;
     flex-wrap: wrap;
+}
+
+/* «Actualizar cotizaciones» pide precio nuevo de todos los activos: mientras
+   dura queda deshabilitado, porque un segundo clic gastaría la cuota dos
+   veces, y el icono gira para que se vea que está trabajando. Sin
+   pointer-events el :hover de cada tema no lo vuelve a «encender». */
+.overviewRefreshBtn:disabled {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.overviewRefreshBtn[aria-busy="true"] .icono {
+    animation: updatePasoGira 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .overviewRefreshBtn[aria-busy="true"] .icono {
+        animation: none;
+    }
+}
+
+/* Vive en el menú «···» de la Vista general: es el único elemento con icono. */
+.overviewRefreshBtn.pageActionsItem {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .overviewSearch {
@@ -1703,6 +1764,11 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
         background 0.15s,
         border-color 0.15s,
         color 0.15s;
+}
+
+.overviewSearchBtn .icono {
+    width: 15px;
+    height: 15px;
 }
 
 .overviewSearchBtn:hover,
@@ -1805,8 +1871,11 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
     background: #e0c068;
 }
 
-/* estado checked */
-.overviewFilterOption:has(input:checked) {
+/* estado checked: Bonos y Mercado privado usan el mismo encendido que
+   Operaciones y Vista general (sin negrita). */
+.overviewFilterOption:has(input:checked),
+.bonosFilterBtn:has(input:checked),
+.pmFilterBtn:has(input:checked) {
     color: var(--text-subtle);
     border-color: var(--btn-border-hover);
     background: var(--bg-surface);
@@ -1970,6 +2039,7 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 .activosFilterBtn:hover,
 .calFinChip:hover,
 .bonosFilterBtn:hover,
+.pmFilterBtn:hover,
 .mNavTab:hover,
 .mActivosFilterBtn:hover {
     background: var(--btn-bg-hover);
@@ -1977,11 +2047,9 @@ tr.gastosTypeEmpty td:not(.rowActionsCell) {
 }
 
 .activosFilterBtn.active,
-.bonosFilterBtn.active,
 .mNavTab.active,
 .mActivosFilterBtn.active,
 .activosFilterBtn:has(input:checked),
-.bonosFilterBtn:has(input:checked),
 .mNavTab:has(input:checked),
 .mActivosFilterBtn:has(input:checked) {
     color: var(--text-subtle);
@@ -3210,6 +3278,11 @@ table td.numCell [contenteditable="true"] {
 .mensFormGrid .csWrapper,
 .recFormGrid .csWrapper {
     display: block;
+}
+
+/* Las notas largas (Cuentas, Cuenta de ahorro) no caben en los 40 px de alto de arriba. */
+.mensFormGrid .movNotaInput {
+    height: auto;
 }
 
 .mensFormModal .mensFormGrid .csTrigger,
@@ -4527,4 +4600,32 @@ table.tablaHuecosIguales > * > tr > td {
 .grafoFlujosTabla table {
     width: 100%;
     margin-top: 8px;
+}
+
+/* Lupa de búsqueda de las tablas (ver _activarBusquedaTabla en shared-utils.js).
+   No encoge en las barras con scroll lateral y sus filas descartadas se ocultan
+   con una clase propia, aparte de los filtros de cada página. */
+.tablaBusqueda,
+.tablaBusquedaDivisor {
+    flex: none;
+}
+
+.tablaBusquedaDivisor {
+    height: 28px;
+}
+
+tr.filaOcultaBusqueda {
+    display: none !important;
+}
+
+/* Años que no casan con una búsqueda numérica de la lupa. */
+.anioOcultoBusqueda {
+    display: none !important;
+}
+
+/* Tiras enganchadas por _activarArrastreTiras(): que arrastrar no seleccione
+   el texto de las pestañas. */
+:is(.tabs, .gastosMonthTabs, .ingresosMonthTabs, .ahorroMonthTabs, .dividendosMonthTabs, .mToggleGroup).dragging {
+    cursor: grabbing;
+    user-select: none;
 }

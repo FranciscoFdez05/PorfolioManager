@@ -83,7 +83,7 @@ rango no obliga a reiniciar el servidor.
 3. Comprueba desde un equipo de la LAN (con el token de Ajustes › API):
 
    ```
-   curl -H "X-Atajo-Token: <token>" http://192.168.1.X:5000/api/categorias
+   curl -H "X-Atajo-Token: <token>" http://192.168.1.X:5050/api/categorias
    ```
 
    Debe responder 200 con las categorías. Si responde 403, la IP de origen no
@@ -136,7 +136,7 @@ con la ventana de 60 segundos.
 
 ## Pasos del Atajo
 
-Sustituye `192.168.1.X:5000` por la IP y el puerto reales de tu servidor. Por
+Sustituye `192.168.1.X:5050` por la IP y el puerto reales de tu servidor. Por
 WireGuard usarás la IP del túnel, no la de la LAN.
 
 **Cada «Obtener contenido de la URL» lleva la cabecera `X-Atajo-Token`** con el
@@ -172,7 +172,7 @@ Va primero, antes del menú de tipo: así todo el bloque queda fuera de las rama
 y no hay riesgo de meter acciones dentro de una por error.
 
 - **Obtener contenido de la URL**
-  - URL: `http://192.168.1.X:5000/api/portfolios-lista`
+  - URL: `http://192.168.1.X:5050/api/portfolios-lista`
   - Método: `GET`
 - **Establecer variable** `respuesta`
 - **Obtener valor del diccionario** → clave `nombres`, en `respuesta`
@@ -204,7 +204,7 @@ mayúscula también vale.
 **3. Pedir las categorías al servidor**
 
 - **Obtener contenido de la URL**
-  - URL: `http://192.168.1.X:5000/api/categorias?portfolio=` + variable `bbdd`
+  - URL: `http://192.168.1.X:5050/api/categorias?portfolio=` + variable `bbdd`
     + `&tipo=` + variable `clase`
   - Método: `GET`
 - **Establecer variable** `respuesta`
@@ -259,7 +259,7 @@ existía aún en la pestaña de Gastos se crea solo.
 **6. Preparar y firmar el movimiento**
 
 - **Obtener contenido de la URL**
-  - URL: `http://192.168.1.X:5000/api/preparar`
+  - URL: `http://192.168.1.X:5050/api/preparar`
   - Método: `POST`
   - Cuerpo de la solicitud: `JSON`, con un campo de tipo Texto por dato:
     `tipo`, `categoria`, `cuenta`, `nombre`, `importe`, `fecha` y `portfolio`,
@@ -295,7 +295,7 @@ y exige que el texto enviado luego sea idéntico byte a byte.
 **8. Enviar el movimiento**
 
 - **Obtener contenido de la URL**
-  - URL: `http://192.168.1.X:5000/api/movimiento`
+  - URL: `http://192.168.1.X:5050/api/movimiento`
   - Método: `POST`
   - Cabeceras:
     - `Content-Type` = `application/json`
@@ -442,7 +442,7 @@ un campo a mano:
 **Variante con `/api/cuentas-lista`.** En vez de leer `cuentas` de `respuesta`, haz
 tu propia petición antes de elegir:
 
-1. **Obtener contenido de la URL** → `http://192.168.1.X:5000/api/cuentas-lista?portfolio=`
+1. **Obtener contenido de la URL** → `http://192.168.1.X:5050/api/cuentas-lista?portfolio=`
    + variable `bbdd`, método `GET`.
 2. **Obtener valor del diccionario** → clave `nombres`, en esa respuesta →
    **Establecer variable** `opciones` (con el bloque de comprobación si quieres).
@@ -468,7 +468,7 @@ Si siempre pagas con la misma cuenta, es más cómodo duplicar el atajo
 
 ### Comprobarlo
 
-Desde cualquier navegador de la LAN, `http://192.168.1.X:5000/api/categorias`
+Desde cualquier navegador de la LAN, `http://192.168.1.X:5050/api/categorias`
 debe devolver la clave `cuentas`. Tras ejecutar el atajo, el movimiento aparece en
 Gastos o en Ingresos, en su mes, con una etiqueta con el nombre de la cuenta si no
 es la bancaria; y en la ventana de esa cuenta (por ejemplo Gastos › Cuenta de

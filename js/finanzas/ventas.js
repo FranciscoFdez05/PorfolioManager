@@ -117,11 +117,20 @@ async function loadVentasAssets() {
     ventasAssets = Array.isArray(payload?.assets) ? payload.assets : []
 }
 
+// El servidor devuelve los ejercicios de más antiguo a más reciente: abrir el
+// primero dejaba la pantalla en el más viejo. Se abre el año en curso si
+// existe y, si no, el más reciente.
+function chooseDefaultVentasYear(years) {
+    const actual = String(new Date().getFullYear())
+    const lista = Array.isArray(years) ? years.map(String) : []
+    return lista.includes(actual) ? actual : lista[lista.length - 1] || actual
+}
+
 async function initVentasLogic() {
     const [ventasIndex] = await Promise.all([loadVentasIndex(), loadVentasAssets()])
 
     ventasYears = Array.isArray(ventasIndex?.years) ? ventasIndex.years : []
-    currentVentasYear = ventasYears[0] || "2026"
+    currentVentasYear = chooseDefaultVentasYear(ventasYears)
     applyVentasPayload(await loadVentasYear(currentVentasYear))
 
     bindVentasPersistenceGuards()
@@ -185,12 +194,37 @@ async function fusionarVentasTrasConflicto(payload) {
     return respuesta
 }
 
+function closeVentasMenu() {
+    document.getElementById("ventasMenuDropdown")?.classList.add("hidden")
+}
+
+function bindVentasMenu() {
+    const menuBtn = document.getElementById("ventasMenuBtn")
+    const menuDropdown = document.getElementById("ventasMenuDropdown")
+    if (!menuBtn || !menuDropdown || menuBtn.dataset.bound) return
+
+    menuBtn.dataset.bound = "true"
+    menuBtn.addEventListener("click", (event) => {
+        event.stopPropagation()
+        menuDropdown.classList.toggle("hidden")
+    })
+    // Cada visita a la página crea un botón nuevo; el listener del anterior se
+    // desactiva solo al dejar de estar conectado al DOM.
+    document.addEventListener("click", (event) => {
+        if (!menuBtn.isConnected) return
+        if (!event.target.closest("#ventasMenuBtn") && !event.target.closest("#ventasMenuDropdown")) {
+            closeVentasMenu()
+        }
+    })
+}
+
 function bindVentasEvents() {
     const ventasBody = document.getElementById("ventasBody")
     const addYearButton = document.getElementById("addVentasYearBtn")
     const deleteYearButton = document.getElementById("deleteVentasYearBtn")
     const addButton = document.getElementById("addVentaRowBtn")
     const saveButton = document.getElementById("saveVentasBtn")
+    bindVentasMenu()
     if (ventasBody && !ventasBody.dataset.bound) {
         ventasBody.dataset.bound = "true"
         ventasBody.addEventListener("click", handleVentasActionClick)
@@ -199,6 +233,7 @@ function bindVentasEvents() {
     if (addYearButton && !addYearButton.dataset.bound) {
         addYearButton.dataset.bound = "true"
         addYearButton.addEventListener("click", async () => {
+            closeVentasMenu()
             const suggestedYear = String(new Date().getFullYear())
             const year = prompt("Escribe el nuevo año (YYYY)", suggestedYear)?.trim()
 
@@ -221,6 +256,7 @@ function bindVentasEvents() {
     if (deleteYearButton && !deleteYearButton.dataset.bound) {
         deleteYearButton.dataset.bound = "true"
         deleteYearButton.addEventListener("click", () => {
+            closeVentasMenu()
             openConfirmModal({
                 title: "Eliminar año",
                 message: `Vas a eliminar el año ${currentVentasYear}. Sus ventas dejarán de consumir lotes, así que el coste FIFO de los años siguientes se recalculará. Esto no se puede deshacer.`,
@@ -230,7 +266,7 @@ function bindVentasEvents() {
                 onConfirm: async () => {
                     const response = await deleteVentasYearRequest(currentVentasYear)
                     ventasYears = Array.isArray(response.years) ? response.years : (await loadVentasIndex()).years || []
-                    await renderVentasYear(ventasYears[0] || "2026")
+                    await renderVentasYear(chooseDefaultVentasYear(ventasYears))
                 }
             })
         })
@@ -304,9 +340,10 @@ function openVentasModal(rowIndex = -1) {
         <label class="assetModalLabel" for="ventaCantidadInput">Cantidad</label>
         <input id="ventaCantidadInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasNumberInput(rowData.cantidad) || "")}" placeholder="0">
         <label class="assetModalLabel" for="ventaValorInput">Valor de venta (por unidad)</label>
-        <input id="ventaValorInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasMoney(rowData.valorVenta) || "")}" placeholder="0,00">
+        <input id="ventaValorInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasMoney(rowData.valorVenta, getVentaRowCurrency(rowData)) || "")}" placeholder="0,00">
         <label class="assetModalLabel" for="ventaComisionInput">Comisión de la venta</label>
-        <input id="ventaComisionInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasMoney(rowData.comisionVenta) || "")}" placeholder="0,00">
+        <input id="ventaComisionInput" class="assetModalInput" type="text" inputmode="decimal" value="${escapeVentasHtml(formatVentasMoney(rowData.comisionVenta, getVentaRowCurrency(rowData)) || "")}" placeholder="0,00">
+        <p class="assetModalHint" id="ventaMonedaHint"></p>
         <p class="assetModalHint">Los gastos de la venta minoran el valor de transmisión (art. 35.2 LIRPF).</p>
         <p class="gastosCreateModalFeedback hidden" id="ventasModalFeedback"></p>
         <div class="assetModalActions ventasModalActions">
@@ -316,6 +353,18 @@ function openVentasModal(rowIndex = -1) {
     `
 
     initSearchableSelect(modal.querySelector("#ventaActivoInput"))
+
+    // Valor y comisión se teclean en la divisa del activo; el resultado fiscal
+    // se calcula en euros con el tipo de cambio de la fecha de cada operación.
+    const actualizarMoneda = () => {
+        const assetId = modal.querySelector("#ventaActivoInput")?.value.trim() || ""
+        const hint = modal.querySelector("#ventaMonedaHint")
+        if (hint) {
+            hint.textContent = `Valor y comisión en ${getVentasAssetCurrency(assetId || rowData.assetId)}, la divisa del activo.`
+        }
+    }
+    actualizarMoneda()
+    modal.querySelector("#ventaActivoInput")?.addEventListener("change", actualizarMoneda)
 
     const setFeedback = (message = "", isError = false) => {
         const node = modal.querySelector("#ventasModalFeedback")
@@ -342,6 +391,17 @@ function openVentasModal(rowIndex = -1) {
         // El servidor valida de verdad; aquí solo se evita el viaje inútil.
         if (!fecha || !assetId || !cantidad || !valorVenta) {
             setFeedback("Fecha, activo, cantidad y valor de venta son obligatorios.", true)
+            return
+        }
+
+        // Cada venta vive en el ejercicio de su fecha: decirlo aquí evita el
+        // rechazo del servidor con un mensaje que no dice qué ejercicio abrir.
+        const anioFecha = (fecha.match(/(\d{4})\s*$/) || fecha.match(/^(\d{4})/) || [])[1]
+        if (anioFecha && anioFecha !== String(currentVentasYear)) {
+            setFeedback(
+                `La fecha es de ${anioFecha} y estás en el ejercicio ${currentVentasYear}: abre el ejercicio ${anioFecha} para añadirla.`,
+                true
+            )
             return
         }
 
@@ -402,10 +462,11 @@ function renderVentasYearButtons() {
 
     list.innerHTML = ""
 
-    ventasYears.forEach((year) => {
+    // El más reciente a la izquierda; ventasYears sigue en el orden del backend.
+    ;[...ventasYears].reverse().forEach((year) => {
         const button = document.createElement("button")
         button.type = "button"
-        button.className = `gastosYearBtn${year === currentVentasYear ? " active" : ""}`
+        button.className = `interesesYearBtn${year === currentVentasYear ? " active" : ""}`
         button.textContent = year
         button.addEventListener("click", async () => {
             try {
@@ -421,6 +482,7 @@ function renderVentasYearButtons() {
         })
         list.appendChild(button)
     })
+    refrescarTiraPestanas(list)
 }
 
 function createEmptyVentaRow() {
@@ -627,8 +689,8 @@ function buildVentaRow(row, index) {
         <td data-field="assetName">${escapeVentasHtml(getVentasAssetName(row.assetId) || row.activo || "")}</td>
         <td data-field="cantidad">${formatVentasNumber(row.cantidad)}</td>
         <td class="rowTotal" data-field="valorCompra" title="${escapeVentasHtml(describirLotes(row.lotes))}">${formatVentasMoney(row.valorCompra)}</td>
-        <td data-field="valorVenta">${formatVentasMoney(row.valorVenta)}</td>
-        <td data-field="comisionVenta">${formatVentasMoney(row.comisionVenta)}</td>
+        <td data-field="valorVenta">${formatVentasMoney(row.valorVenta, getVentaRowCurrency(row))}</td>
+        <td data-field="comisionVenta">${formatVentasMoney(row.comisionVenta, getVentaRowCurrency(row))}</td>
         <td class="rowTotal" data-field="dineroDeclarar"${avisos.length ? ` title="${escapeVentasHtml(avisos.join(" "))}"` : ""}>${formatVentasTaxColumn(row.dineroDeclarar)}${avisos.length ? " *" : ""}</td>
         <td class="rowTotal" data-field="tramo1">${formatVentasTaxColumn(row.tramo1)}</td>
         <td class="rowTotal" data-field="tramo2">${formatVentasTaxColumn(row.tramo2)}</td>
@@ -699,14 +761,25 @@ function formatVentasNumberInput(value) {
     })
 }
 
-function formatVentasMoney(value) {
+// El valor y la comisión de una venta están en la divisa del activo; el
+// resultado fiscal (coste, ganancia, cuota) va siempre en euros.
+function formatVentasMoney(value, currency = "EUR") {
     const parsedValue = parseLooseNumber(value)
 
     if (parsedValue === null || String(value || "").trim() === "") {
         return ""
     }
 
-    return formatMoney(parsedValue, "EUR")
+    return formatMoney(parsedValue, currency)
+}
+
+function getVentasAssetCurrency(assetId) {
+    const asset = ventasAssets.find((item) => item.id === assetId)
+    return normalizeCurrencyCode(asset?.currency || "EUR")
+}
+
+function getVentaRowCurrency(row) {
+    return normalizeCurrencyCode(row?.currency || getVentasAssetCurrency(row?.assetId))
 }
 
 function formatVentasTaxColumn(value) {

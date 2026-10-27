@@ -1,0 +1,23 @@
+# Dependencias directas solo de desarrollo/CI. NO se instala este fichero: se
+# instala requirements-dev.txt, que se genera a partir de él con
+#
+#     pip-compile --generate-hashes --strip-extras --no-emit-index-url --output-file=requirements-dev.txt requirements-dev.in
+#
+# y lleva la versión exacta y el hash de cada paquete, igual que
+# requirements.txt. La imagen Docker instala únicamente requirements.txt, así
+# que nada de esto llega a producción.
+#
+# -r mete las dependencias de producción en el resultado (así basta un solo
+# `pip install -r requirements-dev.txt`, con hashes en todo) y -c obliga a que
+# lleven exactamente las versiones de requirements.txt: lo que se prueba en el
+# CI es lo que se despliega.
+-r requirements.in
+-c requirements.txt
+
+pytest>=8.3.0
+pytest-cov>=6.0.0
+ruff>=0.16.4
+# Audita requirements.txt contra la base de vulnerabilidades de PyPI. Se ejecuta
+# en su propio job de CI, informativo: un aviso nuevo no debe bloquear un PR que
+# no lo introdujo, pero sí tiene que verse.
+pip-audit>=2.7.3

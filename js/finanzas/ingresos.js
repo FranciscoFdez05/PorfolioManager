@@ -701,7 +701,7 @@ async function loadIngresosYears() {
     const response = await fetch("/api/ingresos")
     if (!response.ok) throw new Error("No se pudo cargar la lista de años de ingresos")
     const data = await response.json()
-    return Array.isArray(data.years) ? data.years : []
+    return Array.isArray(data.years) ? ordenarAniosRecientesPrimero(data.years) : []
 }
 
 async function loadIngresosYear(year) {
@@ -899,7 +899,7 @@ function bindIngresosEvents() {
                 requireText: String(currentIngresosYear),
                 onConfirm: async () => {
                     const response = await deleteIngresosYearRequest(currentIngresosYear)
-                    ingresosYears = Array.isArray(response.years) ? response.years : await loadIngresosYears()
+                    ingresosYears = Array.isArray(response.years) ? ordenarAniosRecientesPrimero(response.years) : await loadIngresosYears()
                     currentIngresosYear = ingresosYears[0]
                     currentIngresosView = "year"
                     currentIngresosMonth = "enero"
@@ -970,6 +970,9 @@ function renderIngresosYearButtons() {
         })
         list.appendChild(button)
     })
+
+    activarArrastreHorizontal(list)
+    list.querySelector(".ingresosYearBtn.active")?.scrollIntoView({ block: "nearest", inline: "nearest" })
 }
 
 function buildMonthlyIncomeTotals() {
@@ -1382,9 +1385,12 @@ function renderCurrentIngresosView() {
     const recurrentesWrapper = document.getElementById("ingresosRecurrentesWrapper")
     const monthHeader = document.getElementById("ingresosMonthHeader")
     const actions = document.getElementById("ingresosActions")
+    // Los KPI resumen el año entero: en un mes o en recurrentes no aportan.
+    const kpiStrip = document.getElementById("ingresosKpiStrip")
     if (!annualWrapper || !movementsWrapper || !monthHeader || !actions) return
 
     const showView = (view) => {
+        kpiStrip?.classList.toggle("hidden", view !== "year")
         annualWrapper.classList.toggle("hidden", view !== "year")
         movementsWrapper.classList.toggle("hidden", view !== "month")
         recurrentesWrapper?.classList.toggle("hidden", view !== "recurrentes")

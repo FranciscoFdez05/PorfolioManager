@@ -57,11 +57,11 @@ async function calFinLoadYears(module) {
 
 async function initCalendarioLogic() {
     const [gastosYears, ingresosYears] = await Promise.all([calFinLoadYears("gastos"), calFinLoadYears("ingresos")])
-    const years = [...new Set([...gastosYears, ...ingresosYears].map(String))].sort()
+    const years = ordenarAniosRecientesPrimero([...new Set([...gastosYears, ...ingresosYears].map(String))])
     const currentYear = String(new Date().getFullYear())
 
     calFinYears = years.length ? years : [currentYear]
-    calFinYear = calFinYears.includes(currentYear) ? currentYear : calFinYears[calFinYears.length - 1]
+    calFinYear = calFinYears[0]
     calFinTipos = new Set(CAL_FIN_TIPOS.map((tipo) => tipo.key))
     calFinSelection = null
 
@@ -92,6 +92,9 @@ function renderCalFinYearButtons() {
                 `<button type="button" class="calFinYearBtn${year === calFinYear ? " active" : ""}" data-cal-year="${escapeGastosHtml(year)}">${escapeGastosHtml(year)}</button>`
         )
         .join("")
+
+    activarArrastreHorizontal(list)
+    list.querySelector(".calFinYearBtn.active")?.scrollIntoView({ block: "nearest", inline: "nearest" })
 }
 
 function renderCalFinChips() {

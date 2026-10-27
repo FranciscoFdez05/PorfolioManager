@@ -42,14 +42,14 @@ mkdir -p \
 # PUID/PGID que se indique en .env). Además de arreglar la escritura, deja los
 # ficheros que crea el contenedor como propiedad del usuario del host, que
 # puede seguir haciendo copias o mirando el directorio sin sudo.
-uid_volumen=$(stat -c '%u' "$DATA_DIR" 2>/dev/null || echo 0)
-gid_volumen=$(stat -c '%g' "$DATA_DIR" 2>/dev/null || echo 0)
+uidVolumen=$(stat -c '%u' "$DATA_DIR" 2>/dev/null || echo 0)
+gidVolumen=$(stat -c '%g' "$DATA_DIR" 2>/dev/null || echo 0)
 
 # El 0 no se adopta: sería ejecutar la aplicación como root, que es justo lo
 # que evita el usuario sin privilegios. Pasa cuando Docker crea él mismo el
 # directorio del bind mount porque no existía en el host.
-[ -n "$PUID" ] || { [ "$uid_volumen" != "0" ] && PUID="$uid_volumen"; } || true
-[ -n "$PGID" ] || { [ "$gid_volumen" != "0" ] && PGID="$gid_volumen"; } || true
+[ -n "$PUID" ] || { [ "$uidVolumen" != "0" ] && PUID="$uidVolumen"; } || true
+[ -n "$PGID" ] || { [ "$gidVolumen" != "0" ] && PGID="$gidVolumen"; } || true
 PUID="${PUID:-$(id -u appuser)}"
 PGID="${PGID:-$(id -g appuser)}"
 
@@ -130,7 +130,7 @@ ajuste() {
     [ -n "$valor" ] && echo "$valor" || echo "$2"
 }
 
-PORT=$(ajuste server.port "${PORT:-5000}")
+PORT=$(ajuste server.port "${PORT:-5050}")
 WORKERS=$(ajuste gunicorn.workers 2)
 THREADS=$(ajuste gunicorn.threads 4)
 TIMEOUT=$(ajuste gunicorn.timeout 120)

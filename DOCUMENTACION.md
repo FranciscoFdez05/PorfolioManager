@@ -48,6 +48,22 @@ cd PorfolioManager
 
 `docker-setup` deja el stack listo en un solo paso: comprueba Docker, crea `.env` a partir de `.env.example` si no existe, genera la `SECRET_KEY`, pide usuario y contraseña la primera vez (guarda el hash, nunca la contraseña), pregunta el puerto y lanza `docker compose up -d --build`. Solo imprime la URL cuando el healthcheck confirma que la aplicación está lista. Puedes pasarle argumentos extra de `docker compose up`, por ejemplo `./docker-setup --force-recreate`.
 
+### Primera cuenta: terminal o web
+
+Si no hay cuenta (ni `data/auth.dat` ni `LOGIN_PASSWORD_HASH`), `docker-setup` pregunta:
+
+```
+1) Desde la web
+2) Desde esta terminal
+3) Cerrar
+```
+
+Cualquier otra respuesta vuelve a preguntar. En la terminal, si las contraseñas no coinciden, están vacías o no llegan al mínimo, se vuelve a pedir la contraseña sin salir del script.
+
+Con la opción web (y siempre que se arranque sin terminal o con `docker compose up` a pelo) la aplicación arranca sin cuenta y genera un código de un solo uso en `data/tmp/alta-inicial.txt`, que también escribe en el log. `docker-setup` lo muestra al terminar junto a la dirección `http://<IP>:<PUERTO>/setup`. En esa página se introducen el código, el usuario y la contraseña; un error vuelve a mostrar el formulario con lo escrito. El código es lo que demuestra que quien crea la cuenta tiene acceso al servidor: los intentos fallidos cuentan para el mismo bloqueo por IP que el login, y en cuanto existe la cuenta el código se borra y `/setup` deja de atender. Un `auth.dat` que no se puede leer (por ejemplo, tras cambiar la `SECRET_KEY`) no abre el alta.
+
+Si no tienes acceso a la salida de `docker-setup`: `docker compose logs porfoliomanager | grep setup`.
+
 Ejecuta el script con tu usuario normal, **sin `sudo`**. Si Docker exige permisos,
 añade una vez tu usuario al grupo `docker` con `sudo usermod -aG docker "$USER"`
 y vuelve a iniciar sesión.
@@ -56,14 +72,14 @@ No hace falta tener Python instalado en el servidor: si no lo encuentra, usa la 
 
 | Acceso | URL |
 |---|---|
-| Misma máquina | `http://localhost:5000` |
-| Red local | `http://<IP_DEL_SERVIDOR>:5000` |
+| Misma máquina | `http://localhost:5050` |
+| Red local | `http://<IP_DEL_SERVIDOR>:5050` |
 
-El contenedor publica el puerto en todas las interfaces del host, así que cualquier dispositivo de la misma red llega poniendo la IP del servidor y el puerto. Si no responde desde otro equipo, casi siempre es el firewall del host: hay que abrir ese puerto (por ejemplo `sudo ufw allow 5000/tcp`).
+El contenedor publica el puerto en todas las interfaces del host, así que cualquier dispositivo de la misma red llega poniendo la IP del servidor y el puerto. Si no responde desde otro equipo, casi siempre es el firewall del host: hay que abrir ese puerto (por ejemplo `sudo ufw allow 5050/tcp`).
 
 > **Eso es HTTP plano.** La contraseña del login y la cookie de sesión viajan en claro por la red, así que cualquiera con acceso a la misma wifi puede leerlas. Para la máquina local da igual; en cuanto entres desde el móvil o desde otro equipo, activa [HTTPS](#https) desde Ajustes › Seguridad › HTTPS — emites el certificado, lo instalas en el aparato y lo enciendes; la dirección no cambia.
 
-El puerto por defecto es `5000`. `docker-setup` lo pregunta en cada arranque —Enter deja el que ya hay— y guarda en `.env` el que elijas, así que también puedes ponerlo ahí a mano (ver [Configuración](#configuración)). El valor de partida se resuelve con la misma capa que usa la aplicación —`.env`, luego `config.ini`, luego el defecto— y se exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse. `docker-update.sh` respeta lo que haya en `.env`, para que actualizar no te cambie el puerto.
+El puerto por defecto es `5050`. `docker-setup` lo pregunta en cada arranque —Enter deja el que ya hay— y guarda en `.env` el que elijas, así que también puedes ponerlo ahí a mano (ver [Configuración](#configuración)). El valor de partida se resuelve con la misma capa que usa la aplicación —`.env`, luego `config.ini`, luego el defecto— y se exporta antes de levantar el stack, de modo que `docker-compose.yml`, `entrypoint.sh` y el healthcheck no puedan desincronizarse. `docker-update.sh` respeta lo que haya en `.env`, para que actualizar no te cambie el puerto.
 
 ```bash
 # Ver logs en tiempo real
@@ -134,7 +150,7 @@ pip install -r requirements.txt
 python python/server.py
 ```
 
-Abre `http://localhost:5000`.
+Abre `http://localhost:5050`.
 
 ---
 
@@ -263,7 +279,7 @@ cd PorfolioManager
 ### Qué versión estoy corriendo
 
 ```bash
-curl -s http://localhost:5000/api/health
+curl -s http://localhost:5050/api/health
 ```
 
 ```json
@@ -434,7 +450,7 @@ El primer rango es tu LAN; el segundo, el de WireGuard — ajústalo al `Address
 
 ### 3. Averiguar la dirección del servidor
 
-El Atajo necesita una IP y un puerto. El puerto es el de `[server] port` (5000 por defecto).
+El Atajo necesita una IP y un puerto. El puerto es el de `[server] port` (5050 por defecto).
 
 ```bash
 # En el servidor (Linux / Banana Pi)
@@ -456,7 +472,7 @@ De ahí salen dos direcciones: la de la LAN (`192.168.1.X`) y la del túnel (`10
 Con el móvil en la misma Wi-Fi (o con WireGuard conectado), abre en Safari:
 
 ```
-http://192.168.1.X:5000/api/categorias
+http://192.168.1.X:5050/api/categorias
 ```
 
 | Lo que ves | Qué significa |
@@ -609,7 +625,7 @@ Un bot de Telegram (lo creas con [@BotFather](https://t.me/BotFather) y pegas el
 | Proveedores | cuota agotada, sin respuesta o fallo de un proveedor de cotizaciones, y cuando vuelve |
 | Copias de seguridad | copia manual o automática creada (tamaño, cuántas hay), copia fallida, restaurada o eliminada |
 | Alertas de precio | un activo alcanza el precio o la variación que pediste |
-| Seguridad | una IP agota los intentos de login, cambio de contraseña o de usuario |
+| Seguridad | una IP agota los intentos de login, cambio de contraseña o de usuario, verificación en dos pasos activada, desactivada o usada la frase de recuperación |
 | Estado del servidor | servidor iniciado, base de datos dañada al arrancar (reparada o restaurada), disco casi lleno |
 | Versión nueva | hay una versión publicada más nueva que la instalada (una vez por versión) |
 | Inicio de sesión | cada login correcto (desactivado de fábrica) |
@@ -937,7 +953,7 @@ El orden de registro importa:
 
 La aplicación habla HTTP y no termina TLS ella misma. Sin nada delante, el `POST /login` lleva la contraseña en el cuerpo y la respuesta devuelve la cookie de sesión, las dos cosas en texto plano: quien comparta la wifi, el switch o el punto de acceso puede leerlas y entrar. No es un riesgo teórico, es leer un paquete.
 
-**Se activa desde la propia aplicación: Ajustes › Seguridad › HTTPS.** No hay que reiniciar nada ni tocar ningún fichero, y **la dirección no cambia**: `http://192.168.1.50:5000` pasa a ser `https://192.168.1.50:5000`.
+**Se activa desde la propia aplicación: Ajustes › Seguridad › HTTPS.** No hay que reiniciar nada ni tocar ningún fichero, y **la dirección no cambia**: `http://192.168.1.50:5050` pasa a ser `https://192.168.1.50:5050`.
 
 1. **Repasa la lista de nombres.** Llega rellena con la dirección por la que has entrado y con la IP del servidor en la red local: esa la calcula `docker-up.sh` en el host y se la pasa al contenedor, porque desde dentro solo se ve la red de Compose. Añade cualquier otra con la que entres —otro nombre DNS, la IP del túnel—, porque **el certificado solo vale para las que estén escritas**.
 2. **Pulsa *Emitir el certificado*.** Se emite, y **no cambia nada todavía**: sigues entrando por la misma dirección y en claro. Lo único que pasa es que a partir de ahí la CA existe y se puede descargar.
@@ -1051,7 +1067,23 @@ PROXY_FIX_HOPS=2   # tu proxy + el Caddy del stack
 
 El número de saltos se declara, no se adivina: `ProxyFix` toma el elemento *n*-ésimo por la derecha de `X-Forwarded-For`, así que declarar más proxies de los que hay deja que el cliente prefije la cabecera y elija con qué IP se le cuenta.
 
-**Esto no convierte la aplicación en algo que exponer a internet.** Sigue sin haber segundo factor ni aislamiento entre usuarios; lo que resuelve el HTTPS es que la contraseña y la sesión dejen de ir en claro por tu propia red. Para llegar desde fuera, VPN (ver [SECURITY.md](SECURITY.md)).
+**Esto no convierte la aplicación en algo que exponer a internet.** Sigue sin haber aislamiento entre usuarios, y la [verificación en dos pasos](#verificación-en-dos-pasos) es opcional; lo que resuelve el HTTPS es que la contraseña y la sesión dejen de ir en claro por tu propia red. Para llegar desde fuera, VPN (ver [SECURITY.md](SECURITY.md)).
+
+### Verificación en dos pasos
+
+Opcional, y solo se puede activar con el bot de [Telegram](#telegram-avisos-alertas-de-precio-y-comandos) configurado. Con ella, usuario y contraseña ya no bastan: el servidor manda un código de 6 dígitos al chat del bot y la sesión no se abre hasta escribirlo en `/login/2fa`.
+
+**Activarla.** Ajustes › Cuenta › Verificación en dos pasos: contraseña actual y largo de la frase de recuperación (6, 12 o 24 palabras). Llega un código por Telegram y se enseña la frase **una sola vez**; para terminar hay que escribir las dos cosas. Así se comprueba que el bot funciona y que la frase está apuntada antes de exigirla.
+
+**La frase de recuperación** son palabras al azar de la lista [BIP39 en español](https://github.com/bitcoin/bips/blob/master/bip-0039/spanish.txt) (`python/core/datos/bip39_es.txt`, 2048 palabras, 11 bits cada una). Se compara sin tildes, mayúsculas ni espacios de más. Sirve **una vez**: al entrar con ella la verificación se desactiva, llega un aviso por Telegram y hay que volver a activarla (con una frase nueva) cuando el bot vuelva a funcionar.
+
+**Desactivarla.** Desde la misma sección, con la contraseña actual más un código («Enviar código») o la frase. Con la verificación activa no se puede quitar el bot de Ajustes › Telegram, y cambiar el token o el ID de chat pide lo mismo que desactivarla: la contraseña más un código enviado al chat **actual** o la frase (la salida cuando el bot actual ya no funciona). El chat anterior recibe un aviso antes del cambio. Guardar sin cambiar nada (lo que hace «Enviar prueba») no pide nada.
+
+**Qué la protege.** El código caduca (`[seguridad] codigo_2fa_minutos`, 5 de serie), admite pocos intentos por envío (`intentos_codigo_2fa`, 5) y cada fallo, de código o de frase, cuenta para el mismo bloqueo por IP que la contraseña. Una contraseña correcta no borra esos fallos mientras falte el segundo paso. Los reenvíos esperan `reenvio_2fa_segundos` (60) y tienen tope. Desde que se acierta la contraseña hay `segundo_paso_minutos` (15) para completar el segundo paso, también con la frase, que además solo vale mientras el código de ese login siga vivo; si la contraseña o el usuario cambian entretanto, hay que volver a empezar. Por encima del bloqueo por IP hay un tope global: `fallos_2fa_por_hora` (20) fallos de código o frase en una hora, desde cualquier IP, suspenden el segundo paso del login durante una hora y avisan por Telegram. Solo puede provocarlo quien ya conoce la contraseña. El código pendiente se guarda en `data/tmp`, nunca en la cookie, que va firmada pero no cifrada.
+
+**Si te quedas fuera** (sin Telegram y sin la frase): borra `data/dos_factores.dat` en el servidor. Eso desactiva la verificación y se entra solo con la contraseña. El fichero va cifrado con la `SECRET_KEY`; si cambia, se trata como desactivada y queda anotado en el log.
+
+Los chats con bots de Telegram no van cifrados de extremo a extremo. Para un código que caduca en minutos basta, pero protege menos que una app TOTP.
 
 ### Límite de peticiones de escritura
 
@@ -1092,8 +1124,8 @@ escrituras_pesadas_por_hora = 30    ; backup, restauración e importación
 **Backend**
 
 ```bash
-pip install -r requirements.txt       # versiones exactas, con hashes
-pip install -r requirements-dev.txt   # herramientas (en otro paso: este no lleva hashes)
+pip install --require-hashes -r requirements-dev.txt   # producción + herramientas, versiones exactas y hashes
+# requirements-dev.txt se genera desde requirements-dev.in con pip-compile --generate-hashes
 
 pytest                      # suite completa
 pytest -m "not network"     # lo que corre en CI

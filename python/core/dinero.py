@@ -59,6 +59,7 @@ emiten, el valor deja de poder releerse sin ambigüedad.
 import math
 import re
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from functools import lru_cache
 
 __all__ = [
     "CENTIMO",
@@ -117,6 +118,32 @@ def _limpiar(texto: str) -> str:
     return texto
 
 
+# Los importes de una columna se repiten mucho ("9,99 €", "0,00"): recordar el
+# resultado evita volver a limpiar y validar el mismo texto cientos de veces por
+# petición. `Decimal` es inmutable, así que compartir la instancia es seguro. El
+# tope acota la memoria aunque los importes no se repitan.
+_TAMANO_CACHE_TEXTOS = 4096
+
+
+@lru_cache(maxsize=_TAMANO_CACHE_TEXTOS)
+def _leerTexto(texto: str) -> Decimal | None:
+    """`Decimal` de un texto ya recortado y no vacío, o `None` si no es un número.
+
+    Args:
+        texto: Importe en canónico o en formato español, con o sin símbolos.
+
+    Returns:
+        El valor, o `None` si el texto no se puede leer como importe.
+    """
+    limpio = _limpiar(texto)
+    if not _NUMERO.match(limpio):
+        return None
+    try:
+        return Decimal(limpio)
+    except InvalidOperation:
+        return None
+
+
 def _fallar(valor, campo, defecto, vacio=False):
     if defecto is not _SIN_DEFECTO:
         return defecto if isinstance(defecto, Decimal) else aDecimal(defecto, campo)
@@ -151,18 +178,26 @@ def aDecimal(valor, campo="importe", *, defecto=_SIN_DEFECTO) -> Decimal:
             return _fallar(valor, campo, defecto)
         return Decimal(repr(valor))
 
+    if type(valor) is str:
+        # Camino rápido para canónico y español ("1234.5", "1.234,50"): hace lo
+        # mismo que _limpiar sin las dos pasadas de regex. Si queda algo que no
+        # sea un número (espacios interiores, símbolos, basura) no casa y se
+        # sigue por el camino lento, que es quien decide el error. Solo `str`
+        # exacto: una subclase puede redefinir strip() o __str__.
+        canonico = valor.strip()
+        if "," in canonico:
+            canonico = canonico.replace(".", "").replace(",", ".")
+        if _NUMERO.match(canonico):
+            return Decimal(canonico)
+
     texto = str(valor).strip()
     if not texto:
         return _fallar(valor, campo, defecto, vacio=True)
 
-    limpio = _limpiar(texto)
-    if not _NUMERO.match(limpio):
+    leido = _leerTexto(texto)
+    if leido is None:
         return _fallar(valor, campo, defecto)
-
-    try:
-        return Decimal(limpio)
-    except InvalidOperation:
-        return _fallar(valor, campo, defecto)
+    return leido
 
 
 def aDecimalONulo(valor, campo="importe"):

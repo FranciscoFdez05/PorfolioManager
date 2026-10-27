@@ -39,7 +39,7 @@ let _metricasSortKey = getChartPref("metricasSortKey", "netoActualEur")
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _metricasSortDir = getChartPref("metricasSortDir", "desc")
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
-let _metricasActivosFilter = new Set(["cripto", "acciones", "etfs", "comoditis", "rentaFija"])
+let _metricasActivosFilter = new Set(["cripto", "acciones", "etfs", "comoditis", "rentaFija", "privateMarket"])
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
 let _metricasGastosTipoFilter = new Set()
 // eslint-disable-next-line prefer-const -- se reasigna desde otro trozo del módulo
@@ -134,7 +134,8 @@ const M_TYPE_COLORS = {
     acciones: "#3a7bd5",
     etfs: "#2ecc71",
     comoditis: "#e0c068",
-    rentaFija: "#00bcd4"
+    rentaFija: "#00bcd4",
+    privateMarket: "#a78bfa"
 }
 
 const M_TYPE_LABELS = {
@@ -142,7 +143,8 @@ const M_TYPE_LABELS = {
     acciones: "Acciones",
     etfs: "ETFs",
     comoditis: "Comoditis",
-    rentaFija: "Renta Fija"
+    rentaFija: "Renta Fija",
+    privateMarket: "Private Market"
 }
 
 const M_CHART_DEFAULTS = {
@@ -308,7 +310,7 @@ async function buildMetricasPayload() {
     if (!window._cuentasDinero.length) await cargarCuentasDinero()
 
     const gastosYearsData = gastosYearsResp ? await gastosYearsResp.json().catch(() => ({ years: [] })) : { years: [] }
-    const gastosYearsList = Array.isArray(gastosYearsData.years) ? gastosYearsData.years : []
+    const gastosYearsList = Array.isArray(gastosYearsData.years) ? ordenarAniosRecientesPrimero(gastosYearsData.years) : []
     // Si el usuario dejó seleccionado otro año, se carga ese en vez del último.
     const prefGastosYear = getChartPref("metricasGastosYear", null)
     const gastosYear = gastosYearsList.map(String).includes(String(prefGastosYear))
@@ -323,7 +325,7 @@ async function buildMetricasPayload() {
     const ingresosYearsData = ingresosYearsResp
         ? await ingresosYearsResp.json().catch(() => ({ years: [] }))
         : { years: [] }
-    const ingresosYearsList = Array.isArray(ingresosYearsData.years) ? ingresosYearsData.years : []
+    const ingresosYearsList = Array.isArray(ingresosYearsData.years) ? ordenarAniosRecientesPrimero(ingresosYearsData.years) : []
     const prefIngresosYear = getChartPref("metricasIngresosYear", null)
     const ingresosYear = ingresosYearsList.map(String).includes(String(prefIngresosYear))
         ? prefIngresosYear
@@ -339,23 +341,31 @@ async function buildMetricasPayload() {
     const anualYears = [...new Set([...gastosYearsList, ...ingresosYearsList].map(Number))]
         .filter((y) => Number.isFinite(y))
         .sort((a, b) => a - b)
+    // Los años restantes llegan de golpe (/api/{gastos,ingresos}/todos) en vez de
+    // una petición por año (40 con veinte años de historia). Si el servidor no
+    // trae alguno se pide individualmente, como antes.
+    const pedirTodos = (ruta) =>
+        fetch(ruta)
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => d?.years ?? null)
+            .catch(() => null)
+    const [gastosTodos, ingresosTodos] = await Promise.all([
+        pedirTodos("/api/gastos/todos"),
+        pedirTodos("/api/ingresos/todos")
+    ])
+    const datosDelAnio = (y, lista, elegido, datosElegido, todos, rutaAnio) => {
+        if (!lista.map(String).includes(String(y))) return null
+        if (String(y) === String(elegido)) return datosElegido
+        if (todos?.[y]) return todos[y]
+        return fetch(`${rutaAnio}/${y}`)
+            .then((r) => r.json())
+            .catch(() => null)
+    }
     const anualData = await Promise.all(
         anualYears.map(async (y) => {
             const [gastos, ingresos] = await Promise.all([
-                gastosYearsList.map(String).includes(String(y))
-                    ? String(y) === String(gastosYear)
-                        ? gastosYearData
-                        : fetch(`/api/gastos/${y}`)
-                              .then((r) => r.json())
-                              .catch(() => null)
-                    : null,
-                ingresosYearsList.map(String).includes(String(y))
-                    ? String(y) === String(ingresosYear)
-                        ? ingresosYearData
-                        : fetch(`/api/ingresos/${y}`)
-                              .then((r) => r.json())
-                              .catch(() => null)
-                    : null
+                datosDelAnio(y, gastosYearsList, gastosYear, gastosYearData, gastosTodos, "/api/gastos"),
+                datosDelAnio(y, ingresosYearsList, ingresosYear, ingresosYearData, ingresosTodos, "/api/ingresos")
             ])
             return { year: y, gastosData: gastos, ingresosData: ingresos }
         })

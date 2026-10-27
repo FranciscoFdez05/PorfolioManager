@@ -1,4 +1,5 @@
 let _bonosCurrentFilter = "all"
+let _bonosSearch = ""
 const _bonosAutosaveTimer = null
 
 const _TIPO_LABELS = {
@@ -227,11 +228,42 @@ function updateBonosTotals() {
     if (bonosTableWrapper) bonosTableWrapper.classList.toggle("hidden", rows.length === 0)
 }
 
+function bindBonosSearch() {
+    const searchInput = document.getElementById("bonosSearch")
+    const searchBox = document.getElementById("bonosSearchBox")
+    const searchBtn = document.getElementById("bonosSearchBtn")
+    if (!searchInput || !searchBtn) return
+
+    _bonosSearch = ""
+    searchBtn.addEventListener("click", () => {
+        const opening = searchInput.hidden
+        searchInput.hidden = !opening
+        searchBox?.classList.toggle("open", opening)
+        if (opening) {
+            searchInput.focus()
+            return
+        }
+        searchInput.value = ""
+        _bonosSearch = ""
+        applyBonosFilter(_bonosCurrentFilter)
+    })
+    searchInput.addEventListener("input", () => {
+        _bonosSearch = searchInput.value
+        applyBonosFilter(_bonosCurrentFilter)
+    })
+    searchInput.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") searchBtn.click()
+    })
+}
+
 function applyBonosFilter(tipo) {
     _bonosCurrentFilter = tipo
     document.querySelectorAll("#bonosBody tr").forEach((row) => {
         const rowTipo = row.dataset.tipo || ""
-        const visible = tipo === "all" || (Array.isArray(tipo) ? tipo.includes(rowTipo) : rowTipo === tipo)
+        const tipoMatches = tipo === "all" || (Array.isArray(tipo) ? tipo.includes(rowTipo) : rowTipo === tipo)
+        const query = _bonosSearch.trim().toLowerCase()
+        const searchMatches = !query || (row.querySelectorAll("td")[3]?.textContent || "").toLowerCase().includes(query)
+        const visible = tipoMatches && searchMatches
         row.style.display = visible ? "" : "none"
     })
 }
@@ -335,6 +367,7 @@ function openBonosEditModal(rowIndex = -1) {
         closeModal()
     })
 
+    ponerModalEnDosColumnas(modal)
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
 }
@@ -346,6 +379,8 @@ async function initBonosLogic() {
     renderBonosTable(allData)
 
     document.getElementById("bonosAddBtn")?.addEventListener("click", () => openBonosEditModal())
+
+    bindBonosSearch()
 
     document.getElementById("saveBonosBtn")?.addEventListener("click", async () => {
         try {

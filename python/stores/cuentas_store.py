@@ -35,6 +35,7 @@ de diciembre no es dinero que ya esté en la cuenta en octubre.
 """
 
 import datetime
+import functools
 import json
 import re
 from decimal import Decimal
@@ -130,7 +131,10 @@ def _saldoInicial(valor):
         raise CuentaInvalida("El saldo inicial no es un número válido") from None
 
 
+@functools.lru_cache(maxsize=8192)
 def _decimal(texto):
+    # Cacheado: los importes se repiten mucho y Decimal es inmutable, así que
+    # compartir el resultado es seguro. Medido en perf/ con un portfolio de 39 MB.
     return aDecimalONulo(texto) or Decimal(0)
 
 
@@ -415,6 +419,12 @@ def _usos(cuentaId, conn):
     # apuntando a una cuenta que ya no existe y pasaban a otra sin avisar.
     for tabla in ("gastos_rows", "ingresos_rows", "dividendos"):
         total += conn.execute(f"SELECT COUNT(*) FROM {tabla} WHERE cuenta = ?", (cuentaId,)).fetchone()[0]
+    # Las mensualidades y los ingresos recurrentes también apuntan a una cuenta
+    # (la habitual o la de algún mes): borrarla movía su dinero a la bancaria.
+    for tabla in ("mensualidades", "ingresos_recurrentes"):
+        for fila in conn.execute(f"SELECT cuenta, cuentas_cobro FROM {tabla}").fetchall():
+            if fila["cuenta"] == cuentaId or cuentaId in _excepcionesDeCuenta(fila["cuentas_cobro"]).values():
+                total += 1
     return total
 
 
@@ -615,17 +625,33 @@ def rendimientos(conn=None, hoy=None, aEuros=None):
     """
     conn = conn or getDb()
     hoy = hoy or datetime.date.today()
-    resultado = {}
+    return _rendimientosEn(conn, [hoy], aEuros)[0]
+
+
+def _rendimientosEn(conn, fechas, aEuros=None):
+    """`rendimientos` para varias fechas de corte, leyendo cada tabla una sola vez.
+
+    Cada fila se interpreta (fecha, importe, cambio) una vez y se suma en el
+    resultado de cada fecha a la que ya ha llegado. Devuelve una lista paralela
+    a `fechas`.
+    """
+    resultados = [{} for _ in fechas]
 
     for fila in conn.execute(
         "SELECT v.cuenta_id, i.fecha, i.acumulado, i.impuestos FROM intereses_v2 i "
         "JOIN cuenta_remunerada_vinculo v ON v.remunerada_id = i.cuenta_id"
     ).fetchall():
         year, month = _anioMes(fila["fecha"])
-        if not year or not _yaOcurrido(year, month, hoy):
+        if not year:
             continue
-        datos = resultado.setdefault(fila["cuenta_id"], {"intereses": Decimal(0), "dividendos": Decimal(0)})
-        datos["intereses"] += _decimal(fila["acumulado"]) - _decimal(fila["impuestos"])
+        neto = None
+        for hoy, resultado in zip(fechas, resultados, strict=True):
+            if not _yaOcurrido(year, month, hoy):
+                continue
+            if neto is None:
+                neto = _decimal(fila["acumulado"]) - _decimal(fila["impuestos"])
+            datos = resultado.setdefault(fila["cuenta_id"], {"intereses": Decimal(0), "dividendos": Decimal(0)})
+            datos["intereses"] += neto
 
     # Cada dividendo va a la cuenta que trae apuntada; los que no la tienen (o la
     # tienen de una cuenta borrada) van a la que cobra los dividendos, si hay.
@@ -636,13 +662,19 @@ def rendimientos(conn=None, hoy=None, aEuros=None):
         if destino is None:
             continue
         year, month = _anioMes(fila["fecha"])
-        if not year or not _yaOcurrido(year, month, hoy):
+        if not year:
             continue
-        aEuros = aEuros or _cambioAEuros()
-        datos = resultado.setdefault(destino, {"intereses": Decimal(0), "dividendos": Decimal(0)})
-        datos["dividendos"] += aEuros(_decimal(fila["total"]), fila["moneda_total"])
+        enEuros = None
+        for hoy, resultado in zip(fechas, resultados, strict=True):
+            if not _yaOcurrido(year, month, hoy):
+                continue
+            if enEuros is None:
+                aEuros = aEuros or _cambioAEuros()
+                enEuros = aEuros(_decimal(fila["total"]), fila["moneda_total"])
+            datos = resultado.setdefault(destino, {"intereses": Decimal(0), "dividendos": Decimal(0)})
+            datos["dividendos"] += enEuros
 
-    return resultado
+    return resultados
 
 
 def saldos(conn=None, hoy=None, aEuros=None):
@@ -650,29 +682,47 @@ def saldos(conn=None, hoy=None, aEuros=None):
     `{id: {inicial, entradas, salidas, comisiones, intereses, dividendos, saldo}}`."""
     conn = conn or getDb()
     hoy = hoy or datetime.date.today()
+    return _saldosEn(conn, [hoy], aEuros)[0]
+
+
+def _saldosEn(conn, fechas, aEuros=None):
+    """`saldos` para varias fechas de corte en un solo recorrido de las tablas.
+
+    `saldosDelMes` necesita el saldo al cierre del mes anterior y al final del
+    mes: leer y convertir cada fila una vez y sumarla en cada corte evita
+    repetir el recorrido entero. Devuelve una lista paralela a `fechas`.
+    """
     cuentas = listarCuentas(conn)
-    acumulado = {
-        c["id"]: {"entradas": Decimal(0), "salidas": Decimal(0), "comisiones": Decimal(0)} for c in cuentas
-    }
-    rendido = rendimientos(conn, hoy, aEuros)
+    acumulados = [
+        {c["id"]: {"entradas": Decimal(0), "salidas": Decimal(0), "comisiones": Decimal(0)} for c in cuentas}
+        for _ in fechas
+    ]
+    rendidos = _rendimientosEn(conn, fechas, aEuros)
+    existentes = acumulados[0]
 
     for fila in conn.execute("SELECT fecha, origen, destino, cantidad, comision FROM transferencias").fetchall():
         year, month = _yearMonth(fila["fecha"])
-        if year and not _yaOcurrido(year, month, hoy):
-            continue
         importe = _decimal(fila["cantidad"])
-        if fila["destino"] in acumulado:
-            acumulado[fila["destino"]]["entradas"] += importe
-        if fila["origen"] in acumulado:
-            acumulado[fila["origen"]]["salidas"] += importe
-            # La comisión se cuenta aparte: no es dinero que llegue a otra cuenta.
-            acumulado[fila["origen"]]["comisiones"] += _decimal(fila["comision"])
+        comision = _decimal(fila["comision"])
+        for hoy, acumulado in zip(fechas, acumulados, strict=True):
+            if year and not _yaOcurrido(year, month, hoy):
+                continue
+            if fila["destino"] in existentes:
+                acumulado[fila["destino"]]["entradas"] += importe
+            if fila["origen"] in existentes:
+                acumulado[fila["origen"]]["salidas"] += importe
+                # La comisión se cuenta aparte: no es dinero que llegue a otra cuenta.
+                acumulado[fila["origen"]]["comisiones"] += comision
 
     for tabla, campo in (("ingresos_rows", "entradas"), ("gastos_rows", "salidas")):
         for fila in conn.execute(f"SELECT year, month, cantidad, cuenta FROM {tabla}").fetchall():
             cuentaId = _cuentaDeFila(fila["cuenta"])
-            if cuentaId in acumulado and _yaOcurrido(fila["year"], fila["month"], hoy):
-                acumulado[cuentaId][campo] += _decimal(fila["cantidad"])
+            if cuentaId not in existentes:
+                continue
+            importe = _decimal(fila["cantidad"])
+            for hoy, acumulado in zip(fechas, acumulados, strict=True):
+                if _yaOcurrido(fila["year"], fila["month"], hoy):
+                    acumulado[cuentaId][campo] += importe
 
     # Mensualidades e ingresos recurrentes: importes por mes, de la cuenta con la
     # que se pagan o en la que se cobran (vacía, o una que ya no existe, = bancaria).
@@ -683,29 +733,43 @@ def saldos(conn=None, hoy=None, aEuros=None):
             # Un mes puede cobrarse con otra cuenta que la habitual de la fila.
             excepciones = _excepcionesDeCuenta(fila["cuentas_cobro"])
             for mes in MONTH_KEYS:
-                if _yaOcurrido(fila["year"], mes, hoy):
-                    destino = _cuentaDeFila(excepciones.get(mes)) if mes in excepciones else habitual
-                    if destino not in acumulado:
-                        destino = ID_BANCO
-                    acumulado[destino][campo] += _decimal(fila[mes])
+                # Una celda vacía vale cero y sumar cero no cambia nada: evita
+                # una conversión (con su excepción) por cada mes sin importe.
+                if not fila[mes]:
+                    continue
+                destino = _cuentaDeFila(excepciones.get(mes)) if mes in excepciones else habitual
+                if destino not in existentes:
+                    destino = ID_BANCO
+                importe = None
+                for hoy, acumulado in zip(fechas, acumulados, strict=True):
+                    if _yaOcurrido(fila["year"], mes, hoy):
+                        if importe is None:
+                            importe = _decimal(fila[mes])
+                        acumulado[destino][campo] += importe
 
-    resultado = {}
-    for cuenta in cuentas:
-        datos = acumulado[cuenta["id"]]
-        inicial = _decimal(cuenta["saldo_inicial"])
-        extra = rendido.get(cuenta["id"], {})
-        intereses = extra.get("intereses", Decimal(0))
-        dividendos = extra.get("dividendos", Decimal(0))
-        resultado[cuenta["id"]] = {
-            "inicial": inicial,
-            "entradas": datos["entradas"],
-            "salidas": datos["salidas"],
-            "comisiones": datos["comisiones"],
-            "intereses": intereses,
-            "dividendos": dividendos,
-            "saldo": inicial + datos["entradas"] - datos["salidas"] - datos["comisiones"] + intereses + dividendos,
+    return [
+        {
+            cuenta["id"]: _saldoDeCuenta(cuenta, acumulado[cuenta["id"]], rendido.get(cuenta["id"], {}))
+            for cuenta in cuentas
         }
-    return resultado
+        for acumulado, rendido in zip(acumulados, rendidos, strict=True)
+    ]
+
+
+def _saldoDeCuenta(cuenta, datos, extra):
+    """Desglose de una cuenta a partir de lo acumulado y de lo que ha rendido."""
+    inicial = _decimal(cuenta["saldo_inicial"])
+    intereses = extra.get("intereses", Decimal(0))
+    dividendos = extra.get("dividendos", Decimal(0))
+    return {
+        "inicial": inicial,
+        "entradas": datos["entradas"],
+        "salidas": datos["salidas"],
+        "comisiones": datos["comisiones"],
+        "intereses": intereses,
+        "dividendos": dividendos,
+        "saldo": inicial + datos["entradas"] - datos["salidas"] - datos["comisiones"] + intereses + dividendos,
+    }
 
 
 def saldosDelMes(year, month, conn=None, aEuros=None):
@@ -721,8 +785,7 @@ def saldosDelMes(year, month, conn=None, aEuros=None):
     primerDia = datetime.date(int(year), indice + 1, 1)
     finDeMes = (primerDia + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
     aEuros = aEuros or _cambioAEuros()
-    antes = saldos(conn, primerDia - datetime.timedelta(days=1), aEuros)
-    despues = saldos(conn, finDeMes, aEuros)
+    antes, despues = _saldosEn(conn, [primerDia - datetime.timedelta(days=1), finDeMes], aEuros)
     return {
         cuentaId: {
             "inicial": datos["saldo"],

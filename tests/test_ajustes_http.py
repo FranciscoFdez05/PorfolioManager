@@ -729,6 +729,94 @@ def testElExportZipLlevaElJsonElDbYLosAjustes(cliente):
     assert "ajustes.json" in nombres
 
 
+def testElJsonExportadoCoincideConLaBaseFilaAFila(cliente):
+    """El JSON se escribe a trozos: que siga siendo JSON válido con tablas
+    vacías, varias filas, nulos y texto no ASCII."""
+    client, _cabeceras, _rutas = cliente
+    from core.db import getDb
+
+    conn = getDb()
+    conn.executemany("INSERT INTO gastos_tipos (label) VALUES (?)", [("Café",), ("Ñu \"comillas\"",), ("😀",)])
+    conn.commit()
+
+    datos = json.loads(client.get("/api/export/json").get_data(as_text=True))
+
+    esperado = [dict(fila) for fila in conn.execute("SELECT * FROM gastos_tipos")]
+    assert datos["tables"]["gastos_tipos"] == esperado
+    assert datos["tables"]["gastos_rows"] == []
+
+
+def testElDbDelZipExportadoEstaIntegro(cliente, tmp_path):
+    client, cabeceras, _rutas = cliente
+    import sqlite3
+
+    contenido = client.post("/api/export/zip", json={}, headers=cabeceras).get_data()
+    with zipfile.ZipFile(io.BytesIO(contenido)) as zf:
+        assert zf.testzip() is None
+        nombreDb = next(n for n in zf.namelist() if n.endswith(".db"))
+        nombreJson = next(n for n in zf.namelist() if n.endswith(".json") and n.startswith("portfolio-export-"))
+        (tmp_path / "copia.db").write_bytes(zf.read(nombreDb))
+        assert json.loads(zf.read(nombreJson))["version"] == 3
+
+    conn = sqlite3.connect(str(tmp_path / "copia.db"))
+    try:
+        assert conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize("peticion", [("get", "/api/export/json"), ("post", "/api/export/zip")])
+def testUnaBaseDanadaNoSeExportaYSeDiceQueFalla(cliente, monkeypatch, peticion):
+    """Antes de exportar se comprueba la integridad de lo que se va a entregar.
+    Un fichero que parece una copia y no sirve para restaurar es peor que un
+    error: el usuario tiene que saber que la base está dañada."""
+    from routes import ajustes
+
+    client, cabeceras, _rutas = cliente
+    monkeypatch.setattr(ajustes, "problemasDeIntegridad", lambda _ruta: ["*** in database main *** Page 7: btreeInitPage() returns error code 11"])
+    metodo, url = peticion
+
+    respuesta = getattr(client, metodo)(url, headers=cabeceras)
+    datos = respuesta.get_json()
+
+    assert respuesta.status_code == 409
+    assert datos["ok"] is False
+    assert "dañada" in datos["error"]
+    assert "Page 7" in datos["error"]
+
+
+def testUnFalloDeDiscoAlExportarDevuelveSuCausa(cliente, monkeypatch):
+    """Mismo criterio que /api/backup: un volumen sin permisos tiene que decirse,
+    no acabar en un «Error al exportar» sin más."""
+    import errno
+
+    from routes import ajustes
+
+    client, _cabeceras, _rutas = cliente
+
+    def _denegado(*_args, **_kwargs):
+        raise PermissionError(errno.EACCES, "Permission denied")
+
+    monkeypatch.setattr(ajustes.tempfile, "TemporaryFile", _denegado)
+
+    respuesta = client.get("/api/export/json")
+
+    assert respuesta.status_code == 500
+    assert "permiso de escritura" in respuesta.get_json()["error"]
+
+
+def testExportarNoDejaTemporalesEnData(cliente):
+    from core import paths
+
+    client, cabeceras, _rutas = cliente
+    antes = set(paths.TMP_DIR.iterdir())
+
+    client.get("/api/export/json").get_data()
+    client.post("/api/export/zip", json={}, headers=cabeceras).get_data()
+
+    assert set(paths.TMP_DIR.iterdir()) - antes == set()
+
+
 # ── Importar ─────────────────────────────────────────────────────────────────
 
 def testImportarSinFicheroEs400(cliente):

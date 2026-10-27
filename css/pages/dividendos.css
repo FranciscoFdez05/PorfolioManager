@@ -225,7 +225,15 @@ html .dividendosTableWrapper {
 }
 
 /* Cuentas y años comparten fila: cada barra por separado dejaba medio ancho vacío. */
-.dividendosLayout .interesesYearBar > .cuentasBar {
+.dividendosLayout .interesesYearBar,
+.interesesLayout .interesesYearBar,
+.dividendosLayout .interesesYearBar > .cuentasBar,
+.interesesLayout .interesesYearBar > .cuentasBar {
+    flex-wrap: nowrap;
+}
+
+.dividendosLayout .interesesYearBar > .cuentasBar,
+.interesesLayout .interesesYearBar > .cuentasBar {
     flex: 0 1 auto;
     min-width: 0;
     max-width: 45%;
@@ -233,24 +241,166 @@ html .dividendosTableWrapper {
 
 /* Una sola línea: si no caben, se desplazan de lado en vez de saltar de fila. */
 .dividendosLayout .interesesYearBar .cuentasList,
-.dividendosLayout .interesesYearBar .interesesYearList {
+.dividendosLayout .interesesYearBar .interesesYearList,
+.interesesLayout .interesesYearBar .cuentasList,
+.interesesLayout .interesesYearBar .interesesYearList {
     flex-wrap: nowrap;
     min-width: 0;
     overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    /* Barra fina como la del panel de métricas y la fila de planes: sin color
+       propio el navegador pintaba la suya, gruesa y con flechas. */
     scrollbar-width: thin;
-    padding-bottom: 4px;
+    scrollbar-color: var(--border-mid) transparent;
+    padding-bottom: 6px;
+}
+
+.dividendosLayout .interesesYearBar .cuentasList::-webkit-scrollbar,
+.dividendosLayout .interesesYearBar .interesesYearList::-webkit-scrollbar,
+.interesesLayout .interesesYearBar .cuentasList::-webkit-scrollbar,
+.interesesLayout .interesesYearBar .interesesYearList::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+}
+
+.dividendosLayout .interesesYearBar .cuentasList::-webkit-scrollbar-thumb,
+.dividendosLayout .interesesYearBar .interesesYearList::-webkit-scrollbar-thumb,
+.interesesLayout .interesesYearBar .cuentasList::-webkit-scrollbar-thumb,
+.interesesLayout .interesesYearBar .interesesYearList::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+/* Arrastrar para desplazar (initScrollLateral() vía refrescarTiraPestanas()):
+   la mano solo cuando de verdad sobra algo, y difuminado en el borde por el
+   que sigue habiendo pestañas. */
+.tiraPestanasScrollable {
+    cursor: grab;
+}
+
+.tiraPestanasDragging {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.tiraPestanasFadeStart {
+    mask-image: linear-gradient(to right, transparent 0, #000 28px);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px);
+}
+
+.tiraPestanasFadeEnd {
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+}
+
+.tiraPestanasFadeStart.tiraPestanasFadeEnd {
+    mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+}
+
+/* Los años que van tras las cuentas llevan a la izquierda la raya que las
+   separa y 16px de relleno: el difuminado empieza después de la raya para no
+   borrarla al desplazar. */
+.interesesYearBar > .cuentasBar:not(.hidden) + .interesesYearList.tiraPestanasFadeStart {
+    mask-image: linear-gradient(to right, #000 1px, transparent 1px, transparent 16px, #000 44px);
+    -webkit-mask-image: linear-gradient(to right, #000 1px, transparent 1px, transparent 16px, #000 44px);
+}
+
+.interesesYearBar > .cuentasBar:not(.hidden) + .interesesYearList.tiraPestanasFadeStart.tiraPestanasFadeEnd {
+    mask-image: linear-gradient(
+        to right,
+        #000 1px,
+        transparent 1px,
+        transparent 16px,
+        #000 44px,
+        #000 calc(100% - 28px),
+        transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+        to right,
+        #000 1px,
+        transparent 1px,
+        transparent 16px,
+        #000 44px,
+        #000 calc(100% - 28px),
+        transparent 100%
+    );
 }
 
 .dividendosLayout .interesesYearBar .cuentaItem,
-.dividendosLayout .interesesYearBar .interesesYearList > * {
+.dividendosLayout .interesesYearBar .interesesYearList > *,
+.interesesLayout .interesesYearBar .cuentaItem,
+.interesesLayout .interesesYearBar .interesesYearList > * {
     flex-shrink: 0;
+    white-space: nowrap;
 }
 
-.dividendosLayout .interesesYearBar > .interesesYearList {
+.dividendosLayout .interesesYearBar > .interesesYearList,
+.interesesLayout .interesesYearBar > .interesesYearList {
     flex: 1 1 0;
 }
 
-.dividendosLayout .interesesYearBar > .cuentasBar:not(.hidden) + .interesesYearList {
+/* Sin años (:empty) no se pinta la línea: quedaba una raya suelta tras las cuentas. */
+.dividendosLayout .interesesYearBar > .cuentasBar:not(.hidden) + .interesesYearList:not(:empty),
+.interesesLayout .interesesYearBar > .cuentasBar:not(.hidden) + .interesesYearList:not(:empty) {
     padding-left: 16px;
     border-left: 1px solid var(--border-soft);
+}
+
+.interesesLayout .interesesYearBar > #addRowBtn,
+.dividendosLayout .interesesYearBar > #addRowDividendoBtn {
+    flex-shrink: 0;
+}
+
+/* Años de Ventas: misma barra que Intereses y Dividendos, en una sola línea con scroll lateral. */
+.ventasPageExpanded .interesesYearBar {
+    flex-wrap: nowrap;
+}
+
+.ventasPageExpanded .interesesYearBar > .interesesYearList {
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    /* Sin color propio el navegador pintaba su barra, gruesa y con flechas. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+    padding-bottom: 6px;
+}
+
+.ventasPageExpanded .interesesYearBar > .interesesYearList::-webkit-scrollbar {
+    display: block;
+    height: 6px;
+}
+
+.ventasPageExpanded .interesesYearBar > .interesesYearList::-webkit-scrollbar-thumb {
+    background: var(--border-mid);
+    border-radius: 3px;
+}
+
+.ventasPageExpanded .interesesYearBar .interesesYearList > * {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.ventasPageExpanded .interesesYearBar > #addVentaRowBtn {
+    flex-shrink: 0;
+}
+
+/* Botón para crear la primera cripto/cuenta cuando la lista está vacía
+   (Staking, Earn): mismo tamaño que una cuenta, con borde discontinuo. */
+.cuentaItem.cuentaItemNueva {
+    border-style: dashed;
+    background: transparent;
+    color: var(--text-subtle);
+    font: inherit;
+    cursor: pointer;
+}
+
+.cuentaItem.cuentaItemNueva:hover {
+    border-color: var(--accent);
+    color: var(--accent);
 }

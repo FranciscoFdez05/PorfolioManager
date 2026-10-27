@@ -356,8 +356,9 @@ describe("crear un plan", () => {
         form.querySelector(".pinvNuevaAddBtn").click()
 
         // La fecha es la de hoy, que pone el formulario por defecto.
+        // B-01: «80.000» se lee como 80 (el punto es decimal), así que 400 € son 5 BTC.
         expect(textos(".pinvOpNueva .pinvOpCheckTexto")[0]).toMatch(
-            /^Compra · 0,005 BTC · a 80\.000,00 € · 400,00 € · \d{2}-\d{2}-\d{4}$/
+            /^Compra · 5 BTC · a 80,00 € · 400,00 € · \d{2}-\d{2}-\d{4}$/
         )
         expect(document.querySelector(".pinvEditorActivoResumen").textContent).toBe("2 operaciones · 600,00 €")
 
@@ -371,8 +372,8 @@ describe("crear un plan", () => {
             assetId: "bitcoin",
             activo: "Bitcoin",
             orden: "Compra",
-            precioOrden: "80000",
-            cantidad: "0,005",
+            precioOrden: "80",
+            cantidad: "5",
             total: "400",
             currency: "EUR",
             par: "BTC/EUR",

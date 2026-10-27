@@ -86,6 +86,10 @@
             margin-top:4px;
         }
         button[type=submit]:hover{background:#1d4ed8}
+        .loginSubtitle code{
+            color:#94a3b8;
+            font-size:0.78rem;
+        }
         .loginError{
             background:rgba(231,76,60,.15);
             border:1px solid rgba(231,76,60,.4);
@@ -102,13 +106,18 @@
 <div class="loginCard">
     <img class="loginLogo" src="/img/logo-192.png" alt="" width="96" height="96">
     <p class="loginTitle">Portfolio <span>Manager</span></p>
-    <p class="loginSubtitle">Primera configuración. Crea las credenciales de acceso.</p>
+    <p class="loginSubtitle">Primera configuración. Crea las credenciales de acceso.<br>
+        El código de verificación lo muestra <code>./docker-setup</code> al terminar, y está en
+        <code>__FICHERO_CODIGO__</code> y en el log del servidor.</p>
     <!-- ERROR_PLACEHOLDER -->
     <form method="POST">
+        <label for="codigo">Código de verificación</label>
+        <input id="codigo" name="codigo" type="text" autocomplete="off" autocapitalize="characters"
+               spellcheck="false" placeholder="XXXX-XXXX-XXXX" value="__CODIGO__" autofocus required>
         <label for="username">Usuario</label>
-        <input id="username" name="username" type="text" autocomplete="username" autofocus required>
-        <label for="password">Contraseña</label>
-        <input id="password" name="password" type="password" autocomplete="new-password" required>
+        <input id="username" name="username" type="text" autocomplete="username" value="__USUARIO__" required>
+        <label for="password">Contraseña (mínimo __MIN_LARGO__ caracteres)</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" minlength="__MIN_LARGO__" required>
         <label for="password2">Repite la contraseña</label>
         <input id="password2" name="password2" type="password" autocomplete="new-password" required>
         <button type="submit">Crear acceso</button>

@@ -29,6 +29,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from core.db import getDb, transaction
+from providers.finnhub_client import fetchExchangeRate
 from providers.yahoo_finance_client import fetchPriceSeries
 
 log = logging.getLogger(__name__)
@@ -149,6 +150,60 @@ def tasa(moneda, fecha, permitirDescarga=True):
     return cacheado[0], cacheado[1], cacheado[2]
 
 
+def _tipoAEuros(moneda):
+    codigo = str(moneda or "").strip().upper()
+    if not codigo or codigo == MONEDA_BASE:
+        return Decimal("1")
+    cacheado, _origen, _fecha = tasaActual(codigo, permitirDescarga=False)
+    if cacheado is not None:
+        return cacheado
+    # El tipo de hoy lo cachea `fetchExchangeRate` (vigencia en `[proveedores]`).
+    tipo, error = fetchExchangeRate(codigo, MONEDA_BASE, timeout=5)
+    if error or not tipo or tipo <= 0:
+        return None
+    return Decimal(str(tipo))
+
+
+def tipoActualEntre(desde, hacia):
+    """Cuántas unidades de `hacia` vale una de `desde` hoy, o None si no se sabe.
+
+    Pasa siempre por el euro, así que ir y volver es exacto. Es el cambio con el
+    que el navegador convierte los importes de un activo a su divisa.
+    """
+    origen = _tipoAEuros(desde)
+    destino = _tipoAEuros(hacia)
+    if origen is None or destino is None or destino <= 0:
+        return None
+    return origen / destino
+
+
+def tipoActualConMemo():
+    """Crea un `tipoActualEntre` con memo propio, pensado para una sola petición.
+
+    Cada par `(desde, hacia)` se resuelve una vez y se reutiliza durante todo el
+    cálculo (también si el resultado es None). El memo vive en la función
+    devuelta y muere con ella: no hay caché entre peticiones, así que un cambio
+    de tipo nunca llega con retraso.
+
+    Returns:
+        Función `(desde, hacia) -> Decimal | None` equivalente a `tipoActualEntre`.
+
+    Example:
+        tipo = tipoActualConMemo()
+        for activo in activos:
+            calcular(..., tipo)
+    """
+    memo = {}
+
+    def tipo(desde, hacia):
+        clave = (desde, hacia)
+        if clave not in memo:
+            memo[clave] = tipoActualEntre(desde, hacia)
+        return memo[clave]
+
+    return tipo
+
+
 def tasaActual(moneda, permitirDescarga=True):
     """Tipo de cambio de hoy. Es el que se aplica al valorar la posición."""
     return tasa(moneda, date.today(), permitirDescarga=permitirDescarga)
@@ -161,7 +216,7 @@ def tasaActual(moneda, permitirDescarga=True):
 _TABLAS = (
     ("activo_rows", "fecha_operacion", "currency"),
     ("activo_operation_rows", "fecha_apertura", "currency"),
-    ("ventas", "fecha", None),   # las ventas heredan la divisa del activo
+    ("ventas", "fecha", "currency"),   # la divisa en que se tecleó la venta
 )
 
 
@@ -177,6 +232,17 @@ def _divisaDeActivos():
 # proveedor lento perdía todo lo resuelto. Lo que no quepa queda para la
 # siguiente llamada, que es como ya funciona el relleno por lotes.
 SEGUNDOS_MAX_POR_PASADA = 60
+
+
+# (moneda, día) que el proveedor no supo dar, con el instante del fallo. Evita
+# volver a pedirlos en cada tanda mientras haya otros por resolver.
+_fallosRecientes = {}
+_ESPERA_REINTENTO_SEGUNDOS = 3600
+
+
+def _falloReciente(clave) -> bool:
+    instante = _fallosRecientes.get(clave)
+    return instante is not None and time.monotonic() - instante < _ESPERA_REINTENTO_SEGUNDOS
 
 
 def rellenarPendientes(limite=500, permitirDescarga=True, segundosMax=SEGUNDOS_MAX_POR_PASADA):
@@ -212,13 +278,15 @@ def rellenarPendientes(limite=500, permitirDescarga=True, segundosMax=SEGUNDOS_M
         if "fx_rate" not in cols:
             continue
 
+        # Sin LIMIT: los que fallan se quedan siempre en la tabla y, con él,
+        # volvían a ser los primeros de cada tanda y tapaban a los nuevos. El
+        # tope (`limite`) se aplica a los que se resuelven.
         filas = conn.execute(
             # `rowid` se alía: en una tabla con `id INTEGER PRIMARY KEY` es un
             # alias de esa columna y sqlite3.Row no expone la clave "rowid".
             f"SELECT rowid AS fila_id, asset_id, {columnaFecha} AS fecha"
             + (f", {columnaDivisa} AS divisa" if columnaDivisa else "")
-            + f" FROM {tabla} WHERE fx_rate = '' LIMIT ?",
-            (limite - resueltas - fallidas,),
+            + f" FROM {tabla} WHERE fx_rate = ''"
         ).fetchall()
 
         for fila in filas:
@@ -234,9 +302,16 @@ def rellenarPendientes(limite=500, permitirDescarga=True, segundosMax=SEGUNDOS_M
 
             clave = (moneda, dia)
             if clave not in memoria:
-                if time.monotonic() > fin:
-                    break  # sin tiempo para más descargas: el resto, en la siguiente pasada
-                memoria[clave] = tasa(moneda, dia, permitirDescarga=permitirDescarga)
+                if _falloReciente(clave):
+                    # Falló hace poco: reintentarlo ahora solo gasta la pasada
+                    # y no deja llegar a los que sí se pueden resolver.
+                    memoria[clave] = (None, "falló hace poco", "")
+                else:
+                    if time.monotonic() > fin:
+                        break  # sin tiempo para más descargas: el resto, en la siguiente pasada
+                    memoria[clave] = tasa(moneda, dia, permitirDescarga=permitirDescarga)
+                    if memoria[clave][0] is None and permitirDescarga:
+                        _fallosRecientes[clave] = time.monotonic()
             rate, origen, fechaUsada = memoria[clave]
 
             if rate is None:
@@ -248,9 +323,9 @@ def rellenarPendientes(limite=500, permitirDescarga=True, segundosMax=SEGUNDOS_M
             )
             resueltas += 1
 
-            if resueltas + fallidas >= limite:
+            if resueltas >= limite:
                 break
-        if resueltas + fallidas >= limite or time.monotonic() > fin:
+        if resueltas >= limite or time.monotonic() > fin:
             break
 
     if actualizaciones:

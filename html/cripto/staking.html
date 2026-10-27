@@ -1,14 +1,25 @@
 <div class="interesesLayout stakingLayout">
-    <div class="cuentasBar">
-        <div class="cuentasList" id="stakingCriptosList"></div>
-        <button id="addStakingCriptoBtn" class="cuentasBarAddBtn" type="button" title="Añadir cripto">+</button>
-    </div>
-
     <div class="interesesYearBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#stakingBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
+        <div class="cuentasBar">
+            <div class="cuentasList" id="stakingCriptosList"></div>
+        </div>
         <div class="interesesYearList" id="stakingYearList"></div>
-        <div class="interesesYearBarActions">
-            <button id="addStakingYearBtn" class="secondaryButton" type="button">+ Año</button>
-            <button id="deleteStakingYearBtn" class="dangerButton" type="button">Eliminar año</button>
+        <button id="addStakingRowBtn" class="primaryButton" type="button">Añadir recompensa</button>
+        <div class="interesesMenuWrapper">
+            <button class="interesesMenuBtn" id="stakingMenuBtn" type="button" title="Acciones">···</button>
+            <div class="interesesMenuDropdown hidden" id="stakingMenuDropdown">
+                <button id="addStakingYearBtn" class="interesesMenuOption" type="button">+ Añadir año</button>
+                <button id="deleteStakingYearBtn" class="interesesMenuOption interesesMenuOptionDanger" type="button">Eliminar año</button>
+                <div class="interesesMenuDivider"></div>
+                <button id="addStakingCriptoBtn" class="interesesMenuOption" type="button" title="Añadir cripto">+ Añadir cripto</button>
+            </div>
         </div>
     </div>
 
@@ -43,9 +54,5 @@
                 <div class="summaryCardValue" id="stakingTotalCripto">0,00</div>
             </div>
         </div>
-    </div>
-
-    <div class="dividendosActions">
-        <button id="addStakingRowBtn" class="primaryButton" type="button">Añadir fila</button>
     </div>
 </div>

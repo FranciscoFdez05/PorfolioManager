@@ -1,14 +1,25 @@
 <div class="interesesLayout earnLayout">
-    <div class="cuentasBar">
-        <div class="cuentasList" id="earnCriptosList"></div>
-        <button id="addEarnCriptoBtn" class="cuentasBarAddBtn" type="button" title="Añadir cripto/producto">+</button>
-    </div>
-
     <div class="interesesYearBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#earnBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
+        <div class="cuentasBar">
+            <div class="cuentasList" id="earnCriptosList"></div>
+        </div>
         <div class="interesesYearList" id="earnYearList"></div>
-        <div class="interesesYearBarActions">
-            <button id="addEarnYearBtn" class="secondaryButton" type="button">+ Año</button>
-            <button id="deleteEarnYearBtn" class="dangerButton" type="button">Eliminar año</button>
+        <button id="addEarnRowBtn" class="primaryButton" type="button">Añadir recompensa</button>
+        <div class="interesesMenuWrapper">
+            <button class="interesesMenuBtn" id="earnMenuBtn" type="button" title="Acciones">···</button>
+            <div class="interesesMenuDropdown hidden" id="earnMenuDropdown">
+                <button id="addEarnYearBtn" class="interesesMenuOption" type="button">+ Añadir año</button>
+                <button id="deleteEarnYearBtn" class="interesesMenuOption interesesMenuOptionDanger" type="button">Eliminar año</button>
+                <div class="interesesMenuDivider"></div>
+                <button id="addEarnCriptoBtn" class="interesesMenuOption" type="button" title="Añadir cripto/producto">+ Añadir cripto/producto</button>
+            </div>
         </div>
     </div>
 
@@ -44,9 +55,5 @@
                 <div class="summaryCardValue" id="earnTotalCripto">0,00</div>
             </div>
         </div>
-    </div>
-
-    <div class="dividendosActions">
-        <button id="addEarnRowBtn" class="primaryButton" type="button">Añadir fila</button>
     </div>
 </div>

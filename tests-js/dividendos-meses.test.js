@@ -30,6 +30,8 @@ beforeAll(() => {
     // formatShareQuantity, formatCellMoneyValue y formatMoney de shared-utils.
     cargarScript("js/core/dom.js")
     cargarScript("js/core/shared-utils.js")
+    // dividendos.js repinta la tira de pestañas con refrescarTiraPestanas, que vive aquí.
+    cargarScript("js/core/app-core.js")
     cargarScript("js/finanzas/dividendos.js")
 })
 

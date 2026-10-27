@@ -80,7 +80,8 @@
     opacity: 0.65;
     background: var(--btn-bg-hover);
 }
-.ajustesDragHandle svg {
+.ajustesDragHandle svg,
+.ajustesDragHandle .icono {
     width: 14px;
     height: 14px;
     pointer-events: none;
@@ -161,7 +162,8 @@
     margin-top: 1px;
 }
 
-.ajustesSectionIconWrap svg {
+.ajustesSectionIconWrap svg,
+.ajustesSectionIconWrap .icono {
     width: 18px;
     height: 18px;
 }
@@ -326,7 +328,8 @@
     padding: 0;
 }
 
-.ajustesToggleBtn svg {
+.ajustesToggleBtn svg,
+.ajustesToggleBtn .icono {
     width: 16px;
     height: 16px;
 }
@@ -361,7 +364,8 @@
         color 0.15s;
 }
 
-.ajustesSecondaryBtn svg {
+.ajustesSecondaryBtn svg,
+.ajustesSecondaryBtn .icono {
     width: 14px;
     height: 14px;
 }
@@ -403,7 +407,8 @@
         color 0.15s;
 }
 
-.ajustesAddBtn svg {
+.ajustesAddBtn svg,
+.ajustesAddBtn .icono {
     width: 14px;
     height: 14px;
     flex-shrink: 0;
@@ -434,7 +439,10 @@
 
 .ajustesActions .primaryButton svg,
 .ajustesActions .secondaryButton svg,
-.ajustesActions .dangerButton svg {
+.ajustesActions .dangerButton svg,
+.ajustesActions .primaryButton .icono,
+.ajustesActions .secondaryButton .icono,
+.ajustesActions .dangerButton .icono {
     width: 14px;
     height: 14px;
     flex-shrink: 0;
@@ -555,7 +563,8 @@
     border-radius: 6px;
 }
 
-.ajustesKeyRowEye svg {
+.ajustesKeyRowEye svg,
+.ajustesKeyRowEye .icono {
     width: 14px;
     height: 14px;
 }
@@ -2071,4 +2080,42 @@
 }
 .ajustesRedesModal .assetModalActions {
     margin-top: 18px;
+}
+
+/* ── Verificación en dos pasos (Ajustes › Cuenta) ── */
+/* Los bloques se muestran u ocultan con el atributo hidden, y .ajustesField y
+   .ajustesActions fijan su propio display, que le ganaría al del navegador. */
+#ajustes2faSection [hidden] {
+    display: none !important;
+}
+/* Los campos van dentro de un bloque y no como hijos directos de la sección,
+   así que no les llega el sangrado de `.ajustesSection > .ajustesField`. */
+#ajustes2faSection > .ajustesSectionDesc,
+.ajustes2faBloque {
+    padding: 14px 20px 0;
+}
+.ajustes2faBloque {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.ajustes2faFrase {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 6px 12px;
+    margin: 0;
+    padding: 12px;
+    /* inside: en rejilla, el número por fuera se montaría sobre la columna de al lado. */
+    list-style-position: inside;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--btn-bg-hover);
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+.ajustes2faTextarea {
+    min-height: 72px;
+    resize: vertical;
+    font-family: inherit;
 }

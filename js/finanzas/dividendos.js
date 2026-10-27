@@ -55,8 +55,8 @@ function renderDividendosCuentasBar() {
         item.innerHTML = `<span class="cuentaItemName">${escapeHtml(cuenta.nombre)}</span>${
             cuenta.id
                 ? `<div class="cuentaItemActions">
-                <button type="button" class="cuentaItemRenameBtn" data-id="${escapeHtml(cuenta.id)}" title="Cambiar de cuenta">✎</button>
-                <button type="button" class="cuentaItemDeleteBtn" data-id="${escapeHtml(cuenta.id)}" title="Quitar de las cuentas de dividendos">✕</button>
+                <button type="button" class="cuentaItemRenameBtn" data-id="${escapeHtml(cuenta.id)}" title="Cambiar de cuenta" aria-label="Cambiar de cuenta">${iconoHtml("Editar")}</button>
+                <button type="button" class="cuentaItemDeleteBtn" data-id="${escapeHtml(cuenta.id)}" title="Quitar de las cuentas de dividendos" aria-label="Quitar de las cuentas de dividendos">${iconoHtml("Borrar")}</button>
             </div>`
                 : ""
         }`
@@ -68,6 +68,7 @@ function renderDividendosCuentasBar() {
         })
         list.appendChild(item)
     })
+    refrescarTiraPestanas(list)
 }
 
 async function setDividendosCuentaCobra(id, cobra) {
@@ -279,7 +280,9 @@ function renderDividendosYearBar(years) {
     const list = document.getElementById("dividendosYearList")
     if (!list) return
     list.innerHTML = ""
-    years.forEach((year) => {
+    // El más reciente a la izquierda; `years` sigue ascendente porque el resto
+    // del código toma el último como año por defecto.
+    ;[...years].reverse().forEach((year) => {
         const btn = document.createElement("button")
         btn.type = "button"
         btn.className = `interesesYearBtn${year === currentDividendosYear ? " active" : ""}`
@@ -291,6 +294,7 @@ function renderDividendosYearBar(years) {
         })
         list.appendChild(btn)
     })
+    refrescarTiraPestanas(list)
 }
 
 function buildDividendosCurrencyOptions(selected, defaultVal = "USD") {
@@ -380,8 +384,6 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
         </div>
     `
 
-    initSearchableSelect(modal.querySelector("#dividendoInstrumentoInput"))
-
     const setFeedback = (message = "", isError = false) => {
         const node = modal.querySelector("#dividendosModalFeedback")
         if (!node) return
@@ -450,6 +452,10 @@ function openDividendosModal(globalIndex = -1, defaultFecha = "") {
         }
     })
 
+    ponerModalEnDosColumnas(modal)
+    // Después de las dos columnas: el buscador envuelve el <select> y, si va
+    // antes, la etiqueta deja de tener el campo al lado y queda fuera de la rejilla.
+    initSearchableSelect(modal.querySelector("#dividendoInstrumentoInput"))
     overlay.appendChild(modal)
     document.body.appendChild(overlay)
 

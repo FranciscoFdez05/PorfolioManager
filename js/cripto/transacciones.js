@@ -1,8 +1,16 @@
 let currentTransaccionesData = { rows: [] }
 let transaccionesAutosaveTimeout = null
 let transaccionesPersistenceBound = false
+// Solo se guarda al ocultar o cerrar la pestaña si hubo cambios locales: sin
+// esta marca, una pestaña con la lista vieja pisaba lo guardado desde otro sitio.
+let transaccionesHasPendingChanges = false
+// Revisión que el servidor tenía al cargar o guardar por última vez, y copia de
+// las filas de entonces: la base de la fusión si otro sitio guarda antes.
+let transaccionesRevision = null
+let transaccionesBaseRows = []
 let transaccionesCryptoAssets = []
-let currentTransaccionAssetId = null
+// Criptos visibles en la tabla; null es «Todos».
+let transaccionesFilter = null
 let transaccionesPersistChain = Promise.resolve()
 const TRANSACCION_WALLET_OPTIONS = [
     { value: "entre_wallet", label: "Entre wallet" },
@@ -32,12 +40,17 @@ async function saveTransaccionesData(payload, options = {}) {
 
     if (!response.ok) {
         const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+        const error = new Error(`HTTP ${response.status}: ${errorText}`)
+        error.status = response.status
+        throw error
     }
+    return await response.json().catch(() => null)
 }
 
 async function initTransaccionesLogic() {
     currentTransaccionesData = await loadTransaccionesData()
+    transaccionesRevision = Number.isInteger(currentTransaccionesData?.revision) ? currentTransaccionesData.revision : null
+    transaccionesBaseRows = JSON.parse(JSON.stringify(currentTransaccionesData?.rows || []))
     await loadTransaccionesCryptoAssets()
     bindTransaccionesPersistenceGuards()
     window.flushPendingPageChanges = flushTransaccionesPendingChanges
@@ -102,19 +115,25 @@ async function loadTransaccionesCryptoAssets() {
 
     transaccionesCryptoAssets = [...cryptoAssets, ...stablecoinAssets]
 
-    const assetIds = new Set(transaccionesCryptoAssets.map((asset) => asset.id))
-
-    if (currentTransaccionAssetId && assetIds.has(currentTransaccionAssetId)) {
-        return
+    // Un filtro guardado de una visita anterior puede apuntar a una cripto que
+    // ya no existe: se descarta y, si no queda ninguna, se vuelve a «Todos».
+    if (transaccionesFilter) {
+        const assetIds = new Set(transaccionesCryptoAssets.map((asset) => asset.id))
+        transaccionesFilter = new Set([...transaccionesFilter].filter((id) => assetIds.has(id)))
+        if (!transaccionesFilter.size) transaccionesFilter = null
     }
-
-    currentTransaccionAssetId = transaccionesCryptoAssets[0]?.id || null
 }
 
 function bindTransaccionesEvents() {
     const body = document.getElementById("transaccionesBody")
     const addButton = document.getElementById("addTransaccionRowBtn")
     const saveButton = document.getElementById("saveTransaccionesBtn")
+    const filtersEl = document.getElementById("transaccionesAssetMenu")
+    if (filtersEl && !filtersEl.dataset.bound) {
+        filtersEl.dataset.bound = "true"
+        filtersEl.addEventListener("change", handleTransaccionesFilterChange)
+    }
+
     if (body && !body.dataset.bound) {
         body.dataset.bound = "true"
         body.addEventListener("click", handleTransaccionesClick)
@@ -124,7 +143,7 @@ function bindTransaccionesEvents() {
     if (addButton && !addButton.dataset.bound) {
         addButton.dataset.bound = "true"
         addButton.addEventListener("click", () => {
-            if (!currentTransaccionAssetId) return
+            if (!transaccionesCryptoAssets.length) return
             openTransaccionRowModal("")
         })
     }
@@ -166,15 +185,15 @@ function bindTransaccionesEvents() {
 }
 
 function createEmptyTransaccionRow() {
-    const selectedAsset = getCurrentTransaccionesAsset()
+    const defaultAsset = getDefaultTransaccionAsset()
 
     return {
         id: `transaccion-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-        assetId: currentTransaccionAssetId || "",
-        assetName: selectedAsset?.name || "",
+        assetId: defaultAsset?.id || "",
+        assetName: defaultAsset?.name || "",
         fechaOperacion: "",
-        total: "0,00000000",
-        comisionRed: "0,00000000",
+        total: "",
+        comisionRed: "",
         walletTipo: "entre_wallet",
         walletDesde: "",
         walletDestino: "",
@@ -183,49 +202,97 @@ function createEmptyTransaccionRow() {
     }
 }
 
+function getTransaccionAsset(assetId) {
+    return transaccionesCryptoAssets.find((asset) => asset.id === assetId) || null
+}
+
+// La cripto que propone «Añadir transacción»: la única filtrada si hay una,
+// si no la primera de la lista.
+function getDefaultTransaccionAsset() {
+    if (transaccionesFilter?.size === 1) return getTransaccionAsset([...transaccionesFilter][0])
+    return transaccionesCryptoAssets[0] || null
+}
+
+// Color del activo tal y como está en Activos, ajustado para que se lea sobre el
+// tema (un activo casi negro desaparecía en el tema oscuro). Las stablecoins no
+// tienen ficha de activo y van todas en el mismo rosa que en su página.
+function getTransaccionAssetColor(asset) {
+    return colorLegibleEnTema(asset?.color || (asset?.type === "stablecoin" ? "#f472b6" : "#8899bb"))
+}
+
+function getVisibleTransaccionesRows() {
+    const rows = currentTransaccionesData.rows || []
+    return transaccionesFilter ? rows.filter((row) => transaccionesFilter.has(row.assetId)) : rows
+}
+
+function buildTransaccionesFilterChip(value, text, color, checked) {
+    const label = document.createElement("label")
+    label.className = "overviewFilterOption transaccionesFilterChip"
+    label.style.setProperty("--chipColor", color)
+    label.innerHTML = `<input type="checkbox" value="${escapeHtml(value)}"${checked ? " checked" : ""}><span>${escapeHtml(text)}</span>`
+    return label
+}
+
 function renderTransaccionesAssetMenu() {
     const menu = document.getElementById("transaccionesAssetMenu")
-    const hint = document.getElementById("transaccionesAssetHint")
     const addButton = document.getElementById("addTransaccionRowBtn")
 
-    if (!menu || !hint || !addButton) {
+    if (!menu || !addButton) {
         return
     }
 
     menu.innerHTML = ""
+    addButton.disabled = !transaccionesCryptoAssets.length
 
     if (!transaccionesCryptoAssets.length) {
-        hint.textContent = "No hay criptos creadas en el menú de activos."
-        addButton.disabled = true
+        refrescarTiraPestanas(menu)
         return
     }
 
-    addButton.disabled = false
-
-    transaccionesCryptoAssets.forEach((asset) => {
-        const button = document.createElement("button")
-        button.type = "button"
-        button.className = `transaccionesAssetBtn${asset.id === currentTransaccionAssetId ? " active" : ""}`
-        button.dataset.assetId = asset.id
-        button.textContent = asset.name || asset.symbol || asset.id
-        button.addEventListener("click", () => {
-            if (asset.id === currentTransaccionAssetId) {
-                return
-            }
-
-            syncTransaccionesDataFromTable()
-            currentTransaccionAssetId = asset.id
-            renderTransaccionesAssetMenu()
-            renderTransaccionesTable()
-        })
-        menu.appendChild(button)
+    const todosMode = !transaccionesFilter
+    menu.appendChild(buildTransaccionesFilterChip("todos", "Todos", "#8899bb", todosMode))
+    transaccionesCryptoAssets.forEach((asset, index) => {
+        // Separador entre las criptos y las stablecoins, que van al final de la lista.
+        const anterior = transaccionesCryptoAssets[index - 1]
+        if (asset.type === "stablecoin" && anterior && anterior.type !== "stablecoin") {
+            const separador = document.createElement("div")
+            separador.className = "filtersDivider"
+            menu.appendChild(separador)
+        }
+        menu.appendChild(
+            buildTransaccionesFilterChip(
+                asset.id,
+                asset.name || asset.symbol || asset.id,
+                getTransaccionAssetColor(asset),
+                todosMode || transaccionesFilter.has(asset.id)
+            )
+        )
     })
+    refrescarTiraPestanas(menu)
+}
 
-    const selectedAsset = getCurrentTransaccionesAsset()
-    const selectedRowsCount = getCurrentAssetRows().length
-    hint.textContent = selectedAsset
-        ? `Viendo ${selectedRowsCount} transacción${selectedRowsCount === 1 ? "" : "es"} entre wallets para ${selectedAsset.name}.`
-        : "Selecciona una cripto para registrar sus movimientos entre wallets."
+// Mismo criterio que el resto de filtros de la app: desde «Todos», pulsar una
+// cripto deja solo esa; luego se suman o quitan; sin ninguna (o con todas)
+// vuelve a «Todos».
+function handleTransaccionesFilterChange(event) {
+    const input = event.target.closest("input")
+    if (!input) return
+
+    const value = input.value
+    if (value === "todos") {
+        transaccionesFilter = null
+    } else if (!transaccionesFilter) {
+        transaccionesFilter = new Set([value])
+    } else {
+        if (transaccionesFilter.has(value)) transaccionesFilter.delete(value)
+        else transaccionesFilter.add(value)
+        if (!transaccionesFilter.size || transaccionesFilter.size === transaccionesCryptoAssets.length) {
+            transaccionesFilter = null
+        }
+    }
+
+    renderTransaccionesAssetMenu()
+    renderTransaccionesTable()
 }
 
 function renderTransaccionesTable() {
@@ -241,17 +308,16 @@ function renderTransaccionesTable() {
     const noAssetEl = document.getElementById("transaccionesNoAssetMsg")
     const transaccionesEmptyEl = document.getElementById("transaccionesEmptyMsg")
 
-    if (!currentTransaccionAssetId) {
+    if (!transaccionesCryptoAssets.length) {
         if (tableWrapper) tableWrapper.classList.add("hidden")
         if (noAssetEl) noAssetEl.classList.remove("hidden")
         if (transaccionesEmptyEl) transaccionesEmptyEl.classList.add("hidden")
-        renderTransaccionesAssetMenu()
         return
     }
 
     if (noAssetEl) noAssetEl.classList.add("hidden")
 
-    const rows = getCurrentAssetRows()
+    const rows = getVisibleTransaccionesRows()
 
     if (!rows.length) {
         if (tableWrapper) tableWrapper.classList.add("hidden")
@@ -265,7 +331,6 @@ function renderTransaccionesTable() {
         body.appendChild(buildTransaccionRow(row))
     })
 
-    renderTransaccionesAssetMenu()
     bindTableSort(body.closest("table"), "transacciones")
 }
 
@@ -310,8 +375,12 @@ function buildTransaccionRow(row) {
         TRANSACCION_WALLET_OPTIONS.find((o) => o.value === normalizeTransaccionWalletTipo(row.walletTipo))?.label ||
         row.walletTipo ||
         ""
+    const asset = getTransaccionAsset(row.assetId)
+    const assetColor = getTransaccionAssetColor(asset)
+    const assetName = asset?.name || row.assetName || ""
     tr.dataset.transaccionId = row.id
     tr.innerHTML = `
+        <td><span class="mTypeBadge" style="background:${assetColor}22;color:${assetColor};border-color:${assetColor}44">${escapeHtml(assetName)}</span></td>
         <td>${escapeHtml(row.fechaOperacion)}</td>
         <td>${formatTransaccionesNumber(row.total)}</td>
         <td>${formatTransaccionesNumber(row.comisionRed)}</td>
@@ -410,12 +479,13 @@ function syncTransaccionesDataFromTable() {
 }
 
 function scheduleTransaccionesAutosave(delay = 500) {
+    transaccionesHasPendingChanges = true
     window.clearTimeout(transaccionesAutosaveTimeout)
     transaccionesAutosaveTimeout = window.setTimeout(async () => {
         try {
             await persistTransaccionesData()
         } catch (error) {
-            console.error("Error en autoguardado de transacciones:", error)
+            showError("No se pudieron guardar las transacciones", error, { persistent: true })
         }
     }, delay)
 }
@@ -427,19 +497,68 @@ async function persistTransaccionesData(options = {}) {
         rows: (currentTransaccionesData.rows || []).map((row) => ({ ...row }))
     }
 
+    transaccionesHasPendingChanges = false
     transaccionesPersistChain = transaccionesPersistChain
         .catch(() => {})
-        .then(() => saveTransaccionesData(snapshot, options))
+        .then(() =>
+            saveTransaccionesData(
+                { ...snapshot, ...(Number.isInteger(transaccionesRevision) ? { revision: transaccionesRevision } : {}) },
+                options
+            )
+        )
 
-    await transaccionesPersistChain
+    try {
+        let respuesta
+        try {
+            respuesta = await transaccionesPersistChain
+        } catch (error) {
+            // Con keepalive la página puede estar cerrándose: no hay tiempo de
+            // fusionar, y en el servidor no se ha borrado nada.
+            if (error?.status !== 409 || options.keepalive) throw error
+            respuesta = await fusionarTransaccionesTrasConflicto(snapshot)
+        }
+        if (Number.isInteger(respuesta?.revision)) transaccionesRevision = respuesta.revision
+        transaccionesBaseRows = JSON.parse(JSON.stringify(currentTransaccionesData.rows || []))
+    } catch (error) {
+        transaccionesHasPendingChanges = true
+        throw error
+    }
 
     if (!options.keepalive) {
         await refreshAssetsSidebar(currentAssetId, false)
     }
 }
 
+// Otra pestaña u otro dispositivo guardó las transacciones entretanto: se
+// aplican los cambios de esta pestaña (respecto a lo que cargó) sobre lo que hay.
+async function fusionarTransaccionesTrasConflicto(snapshot) {
+    const servidor = await loadTransaccionesData()
+    const filasServidor = servidor.rows || []
+    const { filas, descartadas } = resolverConflictosPorId(
+        fusionarListaTresVias(transaccionesBaseRows, snapshot.rows, filasServidor, claveEstableAnual),
+        filasServidor
+    )
+    currentTransaccionesData = { ...currentTransaccionesData, rows: filas }
+    let respuesta
+    try {
+        respuesta = await saveTransaccionesData({ rows: filas, revision: servidor.revision })
+    } catch (error) {
+        // No se ha podido guardar: la pestaña vuelve a lo que hay en el servidor
+        // para no enseñar como guardado lo que no lo está.
+        currentTransaccionesData = { ...currentTransaccionesData, rows: filasServidor }
+        transaccionesRevision = Number.isInteger(servidor.revision) ? servidor.revision : null
+        transaccionesBaseRows = JSON.parse(JSON.stringify(filasServidor))
+        renderTransaccionesTable()
+        error.message = `No se han guardado tus cambios en las transacciones; se han recargado las del servidor. (${error.message})`
+        throw error
+    }
+    renderTransaccionesTable()
+    avisarFusion("las transacciones", descartadas.length)
+    return respuesta
+}
+
 async function flushTransaccionesPendingChanges() {
-    if (!document.getElementById("transaccionesBody")) {
+    if (!document.getElementById("transaccionesBody") || !transaccionesHasPendingChanges) {
         return
     }
 
@@ -454,7 +573,7 @@ function bindTransaccionesPersistenceGuards() {
     transaccionesPersistenceBound = true
 
     window.addEventListener("beforeunload", () => {
-        if (!document.getElementById("transaccionesBody")) {
+        if (!document.getElementById("transaccionesBody") || !transaccionesHasPendingChanges) {
             return
         }
 
@@ -464,7 +583,11 @@ function bindTransaccionesPersistenceGuards() {
     })
 
     document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState !== "hidden" || !document.getElementById("transaccionesBody")) {
+        if (
+            document.visibilityState !== "hidden" ||
+            !document.getElementById("transaccionesBody") ||
+            !transaccionesHasPendingChanges
+        ) {
             return
         }
 
@@ -472,14 +595,6 @@ function bindTransaccionesPersistenceGuards() {
             console.error("Error al guardar transacciones al cambiar de ventana:", error)
         })
     })
-}
-
-function getCurrentTransaccionesAsset() {
-    return transaccionesCryptoAssets.find((asset) => asset.id === currentTransaccionAssetId) || null
-}
-
-function getCurrentAssetRows() {
-    return (currentTransaccionesData.rows || []).filter((row) => row.assetId === currentTransaccionAssetId)
 }
 
 function openTransaccionRowModal(rowId) {
@@ -494,18 +609,31 @@ function openTransaccionRowModal(rowId) {
             `<option value="${escapeHtml(opt.value)}"${rowData.walletTipo === opt.value ? " selected" : ""}>${escapeHtml(opt.label)}</option>`
     ).join("")
 
+    const assetOptions = transaccionesCryptoAssets
+        .map(
+            (asset) =>
+                `<option value="${escapeHtml(asset.id)}"${asset.id === rowData.assetId ? " selected" : ""}>${escapeHtml(asset.name || asset.symbol || asset.id)}</option>`
+        )
+        .join("")
+
     const fieldsHtml = `
+        <div class="assetRowModalField">
+            <label class="assetRowModalLabel">Cripto</label>
+            <select id="txModalAsset" class="assetRowModalSelect">
+                ${assetOptions}
+            </select>
+        </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Fecha operación</label>
             <input id="txModalFecha" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.fechaOperacion)}" placeholder="dd-mm-aaaa">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Total cripto</label>
-            <input id="txModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.total)}">
+            <input id="txModalTotal" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="0,05" value="${escapeHtml(rowData.total)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Comisión red</label>
-            <input id="txModalComision" class="assetRowModalInput" type="text" inputmode="decimal" value="${escapeHtml(rowData.comisionRed)}">
+            <input id="txModalComision" class="assetRowModalInput" type="text" inputmode="decimal" placeholder="0,0001" value="${escapeHtml(rowData.comisionRed)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Wallet</label>
@@ -519,15 +647,15 @@ function openTransaccionRowModal(rowId) {
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Wallet destino</label>
-            <input id="txModalWalletDestino" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.walletDestino)}">
+            <input id="txModalWalletDestino" class="assetRowModalInput" type="text" placeholder="Ej: Ledger" value="${escapeHtml(rowData.walletDestino)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Hash transacción</label>
-            <input id="txModalHash" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.hashTransaccion)}">
+            <input id="txModalHash" class="assetRowModalInput" type="text" placeholder="Ej: 0x3f5e…a91c" value="${escapeHtml(rowData.hashTransaccion)}">
         </div>
         <div class="assetRowModalField">
             <label class="assetRowModalLabel">Nota</label>
-            <input id="txModalNota" class="assetRowModalInput" type="text" value="${escapeHtml(rowData.nota)}">
+            <input id="txModalNota" class="assetRowModalInput" type="text" placeholder="Opcional: motivo del envío…" value="${escapeHtml(rowData.nota)}">
         </div>
     `
 
@@ -537,7 +665,7 @@ function openTransaccionRowModal(rowId) {
     overlay.dataset.rowId = rowId || ""
 
     const modal = document.createElement("div")
-    modal.className = "assetModal assetRowModal"
+    modal.className = "assetModal assetRowModal modalDosColumnas"
 
     const titleEl = document.createElement("h3")
     titleEl.className = "assetModalTitle assetRowModalTitle"
@@ -582,13 +710,21 @@ function openTransaccionRowModal(rowId) {
 }
 
 // Gráfico de la moneda seleccionada: no se mezclan monedas porque las cantidades
-// van en unidades. Sin wallet indicada, lo recibido viene de «Externa» y lo
-// enviado va a «Externa»; el resto queda como «Sin indicar».
+// van en unidades, así que hace falta tener una sola cripto en el filtro. Sin
+// wallet indicada, lo recibido viene de «Externa» y lo enviado va a «Externa»;
+// el resto queda como «Sin indicar».
 function abrirGrafoTransacciones() {
-    const asset = getCurrentTransaccionesAsset()
-    if (!asset) return
+    const asset = transaccionesFilter?.size === 1 ? getTransaccionAsset([...transaccionesFilter][0]) : null
+    if (!asset) {
+        openConfirmModal({
+            title: "Ver movimientos en gráfico",
+            message: "Deja seleccionada una sola cripto en los filtros para ver el gráfico de sus movimientos.",
+            confirmLabel: "OK"
+        })
+        return
+    }
     const simbolo = String(asset.symbol || asset.name || "").trim()
-    const filas = getCurrentAssetRows()
+    const filas = getVisibleTransaccionesRows()
     const sinOrigen = filas.some(
         (row) => !String(row.walletDesde || "").trim() && normalizeTransaccionWalletTipo(row.walletTipo) !== "recibida"
     )
@@ -618,11 +754,11 @@ function saveTransaccionRowFromModal() {
     const overlay = document.getElementById("transaccionRowModalOverlay")
     const rowId = overlay?.dataset.rowId || ""
     const g = (id) => document.getElementById(id)?.value ?? ""
-    const selectedAsset = getCurrentTransaccionesAsset()
+    const selectedAsset = getTransaccionAsset(g("txModalAsset"))
 
     const rowData = {
         id: rowId || `transaccion-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-        assetId: currentTransaccionAssetId || "",
+        assetId: selectedAsset?.id || "",
         assetName: selectedAsset?.name || "",
         fechaOperacion: g("txModalFecha"),
         total: g("txModalTotal"),
@@ -641,6 +777,7 @@ function saveTransaccionRowFromModal() {
         currentTransaccionesData.rows.push(rowData)
     }
 
+    renderTransaccionesAssetMenu()
     renderTransaccionesTable()
     scheduleTransaccionesAutosave()
     closeTransaccionRowModal()

@@ -262,7 +262,7 @@
 .pinvTableWrap {
     flex: 0 0 auto;
     min-height: 0;
-    max-height: calc(38px + 12 * 46px);
+    max-height: calc(38px + 13 * 46px);
     overflow: auto;
     border: 1px solid var(--border-soft);
     border-radius: 10px;
@@ -382,6 +382,14 @@
 .pinvAssetRowOpen .pinvChevron,
 .pinvEditorActivoAbierto .pinvChevron {
     transform: rotate(90deg);
+}
+
+/* Fila de totales: cierra la tabla y se distingue de las de activo. */
+.pinvTotalRow td {
+    background: var(--bg-elevated);
+    border-bottom: 0;
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
 /* Fila del activo: se pliega y despliega con un clic. */
@@ -532,6 +540,10 @@
 /* El `sticky` va en la columna y no en cada tarjeta: con dos tarjetas pegadas
    ambas al borde superior, la de abajo se montaría encima de la de arriba al
    desplazar. Así suben juntas y conservan su separación. */
+/* Las dos tarjetas de gráficos juntas superaban el alto de la ventana por unos
+   píxeles y hacían aparecer el scroll de toda la página. Con el tope, si no
+   caben se desplazan dentro de su columna. 216px es lo que hay por encima
+   (cabecera, barra de planes) más el relleno inferior de contentArea. */
 .pinvSide {
     position: sticky;
     top: 0;
@@ -540,13 +552,21 @@
     gap: 14px;
     min-width: 0;
     min-height: 0;
+    max-height: calc(100 * var(--vh) - 216px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+
+.pinvSide > * {
+    flex-shrink: 0;
 }
 
 .pinvChartCard {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 16px;
+    gap: 10px;
+    padding: 12px 14px;
     background: var(--bg-surface);
     border: 1px solid var(--border-soft);
     border-radius: 10px;
@@ -561,7 +581,7 @@
 
 .pinvChartWrap {
     position: relative;
-    height: 220px;
+    height: 170px;
 }
 
 /* El canvas necesita quedar por encima del texto central en la pila de

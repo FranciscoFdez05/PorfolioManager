@@ -1,6 +1,17 @@
 <div class="interesesLayout">
-    <div class="cuentasBar">
-        <div class="cuentasList" id="cuentasList"></div>
+    <div class="interesesYearBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#interesesBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
+        <div class="cuentasBar">
+            <div class="cuentasList" id="cuentasList"></div>
+        </div>
+        <div class="interesesYearList" id="interesesYearList"></div>
+        <button id="addRowBtn" class="primaryButton" type="button">Añadir ingreso</button>
         <div class="interesesMenuWrapper">
             <button class="interesesMenuBtn" id="interesesMenuBtn" type="button" title="Acciones">···</button>
             <div class="interesesMenuDropdown hidden" id="interesesMenuDropdown">
@@ -10,10 +21,6 @@
                 <button id="addCuentaBtn" class="interesesMenuOption" type="button">+ Añadir cuenta remunerada</button>
             </div>
         </div>
-    </div>
-
-    <div class="interesesYearBar">
-        <div class="interesesYearList" id="interesesYearList"></div>
     </div>
 
     <div class="interesesMainArea">
@@ -33,6 +40,32 @@
                 </table>
             </div>
             <p class="overviewEmpty hidden" id="interesesEmptyMsg">No hay registros en cuenta remunerada.</p>
+
+            <div class="interesesGraficas hidden" id="interesesGraficas">
+                <div class="interesesGraficaCard">
+                    <div class="interesesGraficaHeader">
+                        <span class="summaryCardTitle">Intereses por mes</span>
+                        <div class="interesesLeyenda">
+                            <span class="interesesLeyendaItem interesesLeyendaNeto">Neto</span>
+                            <span class="interesesLeyendaItem interesesLeyendaImpuestos">Impuestos</span>
+                        </div>
+                    </div>
+                    <div class="interesesGraficaWrap">
+                        <svg class="interesesGrafica" id="interesesGraficaMensual" viewBox="0 0 400 90" role="img" aria-label="Intereses netos e impuestos de cada mes"></svg>
+                        <div class="interesesTooltip hidden" id="interesesTooltipMensual"></div>
+                    </div>
+                </div>
+
+                <div class="interesesGraficaCard">
+                    <div class="interesesGraficaHeader">
+                        <span class="summaryCardTitle">Neto acumulado en el año</span>
+                    </div>
+                    <div class="interesesGraficaWrap">
+                        <svg class="interesesGrafica" id="interesesGraficaAcumulado" viewBox="0 0 400 90" role="img" aria-label="Intereses netos acumulados durante el año"></svg>
+                        <div class="interesesTooltip hidden" id="interesesTooltipAcumulado"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="interesesSummarySection">
@@ -45,10 +78,24 @@
                 <div class="summaryCardTitle">Impuestos</div>
                 <div class="summaryCardValue" id="impuestosResumen">0,00 €</div>
             </div>
-        </div>
-    </div>
 
-    <div class="dividendosActions">
-        <button id="addRowBtn" class="primaryButton" type="button">Añadir fila</button>
+            <div class="summaryCard interesesStatsCard hidden" id="interesesStatsCard">
+                <div class="summaryCardTitle">Resumen del año</div>
+                <dl class="interesesStats">
+                    <dt>Bruto</dt>
+                    <dd class="interesesStatValue" id="interesesStatBruto">—</dd>
+                    <dt>Media mensual</dt>
+                    <dd class="interesesStatValue" id="interesesStatMedia">—</dd>
+                    <dt>Mejor mes <span class="interesesStatNota" id="interesesStatMejorMesNombre"></span></dt>
+                    <dd class="interesesStatValue" id="interesesStatMejorMes">—</dd>
+                    <dt>Retención</dt>
+                    <dd id="interesesStatRetencion">—</dd>
+                    <dt>Vs. año anterior</dt>
+                    <dd id="interesesStatVariacion">—</dd>
+                    <dt>TAE aprox.</dt>
+                    <dd id="interesesStatTae">—</dd>
+                </dl>
+            </div>
+        </div>
     </div>
 </div>

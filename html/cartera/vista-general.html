@@ -4,7 +4,7 @@
         <div class="overviewFilters" id="overviewFilters">
             <div class="overviewSearch" id="overviewSearch">
                 <button class="overviewSearchBtn" id="overviewSearchBtn" type="button" aria-label="Buscar activo" title="Buscar activo">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21"></line></svg>
+                    <span class="icono iconoBuscar" aria-hidden="true"></span>
                 </button>
                 <input class="overviewSearchInput" id="overviewSearchInput" type="text" placeholder="Buscar por nombre…" autocomplete="off" spellcheck="false" hidden>
             </div>
@@ -40,11 +40,15 @@
         </div>
         </div>
 
-        <!-- <button id="refreshOverviewMarketBtn" class="primaryButton" type="button">Actualizar cotizaciones</button> -->
         <div class="overviewActionsGroup">
             <div class="pageActionsMenu" id="overviewActionsMenu">
                 <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
                 <div class="pageActionsDropdown" id="overviewActionsDropdown">
+                    <button id="refreshOverviewMarketBtn" class="pageActionsItem overviewRefreshBtn" type="button" title="Actualizar cotizaciones">
+                        <span class="icono iconoRecargar" aria-hidden="true"></span>
+                        <span class="overviewRefreshTexto">Actualizar cotizaciones</span>
+                    </button>
+                    <div class="pageActionsDivider"></div>
                     <button type="button" id="overviewShowHiddenBtn" class="pageActionsItem" title="Mostrar u ocultar los activos ocultos">Mostrar ocultos</button>
                     <div class="pageActionsDivider"></div>
                     <button type="button" id="downloadOverviewCsvBtn" class="pageActionsItem">Descargar CSV</button>

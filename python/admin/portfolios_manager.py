@@ -4,6 +4,7 @@ import logging
 import re
 import shutil
 import threading
+import time
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -25,10 +26,41 @@ log = logging.getLogger(__name__)
 def _readMeta():
     if not _META_FILE.exists():
         return None
+    # Un fallo de lectura puntual (en Windows, mientras otro proceso hace el
+    # rename del fichero) no es un índice corrupto: se reintenta antes de rendirse.
+    for intento in range(3):
+        try:
+            return json.loads(_META_FILE.read_text("utf-8"))
+        except OSError:
+            time.sleep(0.05 * (intento + 1))
+        except Exception:
+            return None
+    return None
+
+
+def _reconstruirIndice():
+    """Índice nuevo a partir de los .db que hay en disco, conservando el roto.
+
+    Si portfolios.json existe pero no se puede leer, arrancar con un índice por
+    defecto lo sobrescribía y todos los portfolios menos «principal» dejaban de
+    aparecer. El fichero ilegible se aparta y el índice se rehace con lo que hay.
+    """
+    marca = datetime.now().strftime("%Y%m%d_%H%M%S")
     try:
-        return json.loads(_META_FILE.read_text("utf-8"))
-    except Exception:
+        shutil.copy2(str(_META_FILE), str(_META_FILE.with_name(f"portfolios.json.ilegible-{marca}")))
+    except OSError as error:
+        log.error("[portfolios] No se pudo apartar el portfolios.json ilegible: %s", error)
+    ids = sorted(
+        p.stem for p in _PORTFOLIOS_DIR.glob("*.db") if re.fullmatch(r"[a-z0-9_-]{1,64}", p.stem)
+    )
+    if not ids:
         return None
+    log.error("[portfolios] portfolios.json ilegible; índice reconstruido desde %d bases en disco", len(ids))
+    activo = "principal" if "principal" in ids else ids[0]
+    return {
+        "active": activo,
+        "portfolios": [{"id": i, "name": "Principal" if i == "principal" else i} for i in ids],
+    }
 
 
 def _writeMeta(data):
@@ -307,6 +339,12 @@ def initPortfolios():
     """Llamado al arrancar el servidor. Migra el DB legacy si es necesario y activa el portfolio."""
     meta = _readMeta()
 
+    if meta is None and _META_FILE.exists():
+        _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
+        meta = _reconstruirIndice()
+        if meta is not None:
+            _writeMeta(meta)
+
     if meta is None:
         _PORTFOLIOS_DIR.mkdir(parents=True, exist_ok=True)
         defaultId = "principal"
@@ -503,9 +541,9 @@ def deletePortfolio(pid: str):
 
     dbFile = _portfolioDbPath(pid)
 
-    meta["portfolios"] = [p for p in meta["portfolios"] if p["id"] != pid]
-    _writeMeta(meta)
-
+    # Primero se mueve el fichero y después se actualiza el índice: si el move
+    # falla (en Windows, con el .db abierto), el portfolio sigue listado y se
+    # puede reintentar; al revés quedaba un .db huérfano fuera del índice.
     if dbFile.exists():
         _DELETED_DIR.mkdir(parents=True, exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -515,6 +553,9 @@ def deletePortfolio(pid: str):
             sidecar = Path(str(dbFile) + suffix)
             if sidecar.exists():
                 shutil.move(str(sidecar), str(_DELETED_DIR / f"{pid}_{ts}.db{suffix}"))
+
+    meta["portfolios"] = [p for p in meta["portfolios"] if p["id"] != pid]
+    _writeMeta(meta)
 
 
 @_conIndiceBloqueado

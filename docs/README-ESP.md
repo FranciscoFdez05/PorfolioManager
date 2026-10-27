@@ -7,7 +7,7 @@
 <h1 align="center">PorfolioManager</h1>
 
 <p align="center">
-  <a href="../CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-4.8.2-blue" alt="Versión"></a>
+  <a href="../CHANGELOG.md"><img src="https://img.shields.io/badge/versi%C3%B3n-4.9.0-blue" alt="Versión"></a>
   <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker">
@@ -27,7 +27,7 @@ Las cotizaciones externas son opcionales: sin claves de API, los precios los int
 - **Fiscalidad española**: ventas con FIFO, regla de los dos meses y compensación de pérdidas; informe anual en CSV y HTML.
 - **Métricas**: TWR, XIRR, drawdown, volatilidad y comparación con índices.
 - **Cripto**: stablecoins, operaciones, conversiones, staking y earn.
-- **Operación**: backups automáticos, avisos y comandos por Telegram, HTTPS desde la propia aplicación y Atajo de iOS para apuntar gastos desde el móvil.
+- **Operación**: backups automáticos, avisos y comandos por Telegram, verificación en dos pasos opcional con código por Telegram, HTTPS desde la propia aplicación y Atajo de iOS para apuntar gastos desde el móvil.
 - **Actualización segura**: `docker-update.sh` comprueba que la versión nueva responde en `/api/health` y vuelve a la imagen anterior si no lo hace.
 
 ## 🖥️ Requisitos
@@ -47,7 +47,7 @@ cd PorfolioManager
 ./docker-setup   # crea .env, genera SECRET_KEY, pide credenciales y puerto, levanta el stack
 ```
 
-Ejecútalo con tu usuario normal, sin `sudo`. La aplicación queda en `http://localhost:5000` (o `http://<IP_DEL_SERVIDOR>:5000` desde otro equipo de la red local). Los datos se guardan en `data/`, `logs/` y `API/`.
+Ejecútalo con tu usuario normal, sin `sudo`. La aplicación queda en `http://localhost:5050` (o `http://<IP_DEL_SERVIDOR>:5050` desde otro equipo de la red local). Los datos se guardan en `data/`, `logs/` y `API/`.
 
 > [!WARNING]
 > De serie la aplicación se sirve por HTTP plano, así que la contraseña y la cookie de sesión viajan sin cifrar. Antes de usarla desde otro dispositivo, activa HTTPS en **Ajustes › Seguridad › HTTPS**. Consulta [SECURITY.md](../SECURITY.md).
@@ -66,7 +66,7 @@ git clone https://github.com/FranciscoFdez05/PorfolioManager.git
 cd PorfolioManager
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python python/server.py   # http://localhost:5000
+python python/server.py   # http://localhost:5050
 ```
 
 ### Variables de entorno
@@ -80,16 +80,18 @@ Los secretos van en `.env` (copia `.env.example`; `./docker-setup` lo hace por t
 | `LOGIN_PASSWORD_HASH` | Hash de la contraseña inicial (lo genera `docker-setup`) | Sí | vacío |
 | `FINNHUB_API_KEY`, `EODHD_API_KEYS`, `ALPHA_VANTAGE_API_KEYS` | Claves de datos de mercado; lo normal es ponerlas en Ajustes › API | No | vacío |
 | `TZ` | Zona horaria del contenedor (logs y backups) | No | `Europe/Madrid` |
-| `PORT` | Puerto HTTP; sobrescribe `config.ini` | No | `5000` |
+| `PORT` | Puerto HTTP; sobrescribe `config.ini` | No | `5050` |
 | `PUID` / `PGID` | Usuario y grupo con los que escribe el contenedor (Linux) | No | Los fija `docker-setup` |
 
 ## 📋 Guía de uso 🕹️
 
-1. Abre `http://localhost:5000` e inicia sesión con las credenciales que elegiste en `docker-setup`.
+1. Abre `http://localhost:5050` e inicia sesión con las credenciales que elegiste en `docker-setup`.
+   En el primer arranque `docker-setup` pregunta cómo crear la cuenta: **1** desde la web, **2** desde la terminal, **3** cerrar. Si te equivocas, vuelve a preguntar. Con la opción web imprime la dirección de `/setup` y un código de verificación de un solo uso (también en `data/tmp/alta-inicial.txt` y en el log del contenedor), para que nadie más de la red pueda quedarse con la cuenta antes que tú.
 2. Añade tus activos y operaciones. Sin claves de API, introduce los precios a mano.
 3. Opcionalmente, añade claves de Finnhub, EODHD o Alpha Vantage en **Ajustes › API** para tener cotizaciones automáticas.
 4. Activa HTTPS en **Ajustes › Seguridad › HTTPS** si entras desde otros dispositivos.
 5. Opcionalmente, configura Telegram en **Ajustes › Telegram** (avisos y comandos como `/estado`, `/cartera`, `/backup`).
+6. Con Telegram funcionando, puedes activar la verificación en dos pasos en **Ajustes › Cuenta**: cada inicio de sesión pide un código que manda el bot, y una frase de recuperación de 6, 12 o 24 palabras te deja entrar si pierdes el acceso a Telegram.
 
 ```bash
 docker logs -f PorfolioManager   # ver los logs en tiempo real

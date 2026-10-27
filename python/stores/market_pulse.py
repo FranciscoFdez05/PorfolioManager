@@ -71,6 +71,14 @@ _VOLUME_COLUMNS = ["name", "description", "close", "change", "relative_volume_10
 # puede distinguir de forma fiable recortando sufijos a mano.
 _CRYPTO_COLUMNS = ["base_currency", "base_currency_desc", "close", "change", "market_cap_calc"]
 
+# Qué es una stablecoin lo dice la propia categoría de TradingView, no una
+# lista de tickers: solo el screener `coin` (una fila por moneda) rellena
+# `crypto_common_categories`; en el de `crypto` (pares por exchange) llega a
+# null. El catálogo apenas cambia, de ahí el TTL largo.
+_STABLECOIN_CATEGORY = "stablecoins"
+_STABLECOIN_COLUMNS = ["base_currency", "crypto_common_categories"]
+_STABLECOINS_TTL = 6 * 3600
+
 # Columnas para el Nasdaq 100 real: `indexes` trae la lista de índices de los
 # que forma parte cada acción (lo mismo que enseña la propia ficha del activo
 # en tradingview.com), así que la pertenencia sale de ahí, no de una lista de
@@ -255,18 +263,53 @@ def breadth(timeout=None):
     return _cached("breadth", _BREADTH_TTL, _fetch)
 
 
-def topCryptos(limit=30, timeout=None):
+def stablecoinBases(timeout: float | None = None) -> frozenset:
+    """Monedas base que TradingView clasifica como stablecoin.
+
+    Args:
+        timeout: Segundos máximos de la petición al screener.
+
+    Returns:
+        Conjunto de `base_currency` (p. ej. "USDT", "USDC"). Cada fila se
+        vuelve a comprobar contra su lista de categorías en vez de fiarse
+        solo del filtro del servidor.
+
+    Raises:
+        HTTPError, URLError: Igual que `fetchScreener`; no se cachea el fallo.
+    """
+    def _fetch():
+        payload = tradingview_client.fetchScreener(
+            [{"left": "crypto_common_categories", "operation": "has", "right": [_STABLECOIN_CATEGORY]}],
+            _STABLECOIN_COLUMNS, limit=500, market="coin", timeout=timeout,
+        )
+        bases = set()
+        for row in payload.get("data") or []:
+            valores = row.get("d") or []
+            if len(valores) < len(_STABLECOIN_COLUMNS):
+                continue
+            base, categorias = valores[0], valores[1]
+            if base and isinstance(categorias, list) and _STABLECOIN_CATEGORY in categorias:
+                bases.add(base)
+        return frozenset(bases)
+
+    return _cached("stablecoins", _STABLECOINS_TTL, _fetch)
+
+
+def topCryptos(limit=30, timeout=None, excludeStablecoins=False):
     """Las `limit` criptomonedas de mayor capitalización, una fila por moneda
     (no por par de cotización): el mismo par de cotización se repite en
     docenas de exchanges, así que se piden de golpe más filas de las que hacen
     falta (300) y se corta en la primera vez que aparece cada `base_currency`.
+    Con `excludeStablecoins` se saltan las de `stablecoinBases()` antes de
+    contar, para que el límite siga siendo de monedas que sí se mueven.
     """
     def _fetch():
+        excluidas = stablecoinBases(timeout=timeout) if excludeStablecoins else frozenset()
         payload = tradingview_client.fetchScreener(
             [], _CRYPTO_COLUMNS, sortBy="market_cap_calc", sortOrder="desc",
             limit=300, instrumentTypes=["spot"], market="crypto", timeout=timeout,
         )
-        vistos = set()
+        vistos = set(excluidas)
         filas = []
         for row in payload.get("data") or []:
             symbol = row.get("s")
@@ -290,7 +333,7 @@ def topCryptos(limit=30, timeout=None):
                 break
         return filas
 
-    return _cached(f"cryptos_{limit}", _MOVERS_TTL, _fetch)
+    return _cached(f"cryptos_{limit}_{excludeStablecoins}", _MOVERS_TTL, _fetch)
 
 
 def topNasdaq100(limit=40, timeout=None):
@@ -359,7 +402,10 @@ def _universeCripto():
             "change": c["change"], "size": c["marketCap"], "sizeLabel": "Capitalización de mercado",
             "price": c["price"], "currency": "USD",
         }
-        for c in topCryptos(limit=_UNIVERSE_TREEMAP_LIMIT)
+        # Una stablecoin pegada al dólar ocupa sitio de sobra (USDT es la
+        # tercera por capitalización) y siempre sale gris a ±0,01 %: en un
+        # mapa de "qué se mueve hoy" no aporta nada.
+        for c in topCryptos(limit=_UNIVERSE_TREEMAP_LIMIT, excludeStablecoins=True)
     ]
 
 

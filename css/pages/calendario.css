@@ -24,9 +24,28 @@
     gap: 8px;
 }
 
+/* Año en curso a la izquierda; los anteriores, si no caben, se alcanzan
+   arrastrando (activarArrastreHorizontal), como en Gastos e Ingresos. */
 .calFinYearList {
     display: flex;
     gap: 5px;
+    flex-shrink: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    cursor: grab;
+}
+
+.calFinYearList::-webkit-scrollbar {
+    display: none;
+}
+
+.calFinYearList.dragging {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.calFinYearList > .calFinYearBtn {
     flex-shrink: 0;
 }
 
@@ -532,6 +551,29 @@ body.money-hidden .calFinSideTotal span:last-child {
         max-height: 100%;
         overflow-y: auto;
         scrollbar-width: thin;
+        /* Sin color el navegador pinta la barra clara del sistema. */
+        scrollbar-color: var(--border-mid) transparent;
+    }
+
+    .fitPageActive .calFinGrid::-webkit-scrollbar,
+    .fitPageActive .calFinSide::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .fitPageActive .calFinGrid::-webkit-scrollbar-track,
+    .fitPageActive .calFinSide::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .fitPageActive .calFinGrid::-webkit-scrollbar-thumb,
+    .fitPageActive .calFinSide::-webkit-scrollbar-thumb {
+        background: var(--border-mid);
+        border-radius: 3px;
+    }
+
+    .fitPageActive .calFinGrid::-webkit-scrollbar-thumb:hover,
+    .fitPageActive .calFinSide::-webkit-scrollbar-thumb:hover {
+        background: var(--border-hard);
     }
 }
 

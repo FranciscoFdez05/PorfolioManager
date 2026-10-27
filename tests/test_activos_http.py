@@ -50,6 +50,21 @@ def testElNombreEsObligatorio(cliente):
     assert respuesta.get_json()["ok"] is False
 
 
+def testNombreLargoSeAcotaYElIdSigueSiendoManejable(cliente):
+    # Un nombre enorme no debe generar un slug que supere el límite de línea de
+    # gunicorn: si lo hiciera, el DELETE/PUT (id en la URL) dejaría el activo
+    # imborrable. El tope es el mismo que aplica saveActivo (_MAX_NAME).
+    from stores.asset_utils import _MAX_NAME
+
+    client, cabeceras = cliente
+    respuesta = _crear(client, cabeceras, "A" * 5000, "acciones")
+
+    assert respuesta.status_code == 201
+    activo = respuesta.get_json()["asset"]
+    assert len(activo["name"]) <= _MAX_NAME
+    assert len(activo["id"]) <= _MAX_NAME
+
+
 def testUnTipoDeActivoInvalidoSeRechaza(cliente):
     client, cabeceras = cliente
     respuesta = _crear(client, cabeceras, "Algo", tipo="inventado")
@@ -486,7 +501,7 @@ def testElRendimientoDescuentaLasComisionesDelInvertido(cliente):
     assert datos["rendimientoPct"] == pytest.approx(26.32, abs=0.01)
 
 
-def testUnaVentaReduceLasParticipacionesPeroNoLoInvertido(cliente):
+def testUnaVentaReduceLasParticipacionesYElCosteInvertidoPorFifo(cliente):
     client, cabeceras = cliente
     assetId = _fichaConFilas(client, cabeceras, "Apple", "100", [
         {"fechaOperacion": "10-01-2026", "tipoOperacion": "Compra",
@@ -498,7 +513,8 @@ def testUnaVentaReduceLasParticipacionesPeroNoLoInvertido(cliente):
     datos = client.get("/api/activos/rendimiento-batch").get_json()[assetId]
 
     assert datos["netoActual"] == 600.0     # quedan 6 participaciones a 100
-    assert datos["invertidoNeto"] == 1000.0
+    # Las 4 vendidas se llevan su coste FIFO (4 de 10 de los 1000 pagados).
+    assert datos["invertidoNeto"] == 600.0
 
 
 def testVenderMasDeLoQueHayNoProduceUnValorNegativo(cliente):
@@ -633,3 +649,52 @@ def testTiposDeCambioSinServicioResponde503(clienteMercado, monkeypatch):
 
     assert respuesta.status_code == 503
     assert "No se pudo conectar" in respuesta.get_json()["error"]
+
+
+# ── Conversiones ─────────────────────────────────────────────────────────────
+
+def testLaCantidadDeLaContraparteSeGuardaYSeDevuelve(cliente):
+    """Una conversión cambia una cripto por otra: se guardan las dos cantidades."""
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Bitcoin", "cripto")
+    ficha = client.get("/api/activos/bitcoin").get_json()
+    ficha["conversionRows"] = [{
+        "id": "conversion-1", "fecha": "10-01-2026", "par": "BTC/ETH",
+        "tipo": "BTC convertidos", "cantidad": "0,01", "cantidadContraparte": "0,34",
+    }]
+
+    respuesta = client.post("/api/activos/bitcoin", json=ficha, headers=cabeceras)
+
+    assert respuesta.status_code == 200
+    fila = client.get("/api/activos/bitcoin").get_json()["conversionRows"][0]
+    assert fila["cantidad"] == "0,01"
+    assert fila["cantidadContraparte"] == "0,34"
+
+
+def testUnaConversionSinCantidadDeContraparteQuedaVacia(cliente):
+    """Las conversiones de antes no la traen: se guardan igual, sin ese dato."""
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Bitcoin", "cripto")
+    ficha = client.get("/api/activos/bitcoin").get_json()
+    ficha["conversionRows"] = [{"id": "conversion-1", "fecha": "10-01-2026", "par": "BTC/ETH",
+                                "tipo": "Convertidos a BTC", "cantidad": "0,01"}]
+
+    client.post("/api/activos/bitcoin", json=ficha, headers=cabeceras)
+
+    assert client.get("/api/activos/bitcoin").get_json()["conversionRows"][0]["cantidadContraparte"] == ""
+
+
+def testLaComisionDeUnaConversionSeGuardaConSuMoneda(cliente):
+    client, cabeceras = cliente
+    _crear(client, cabeceras, "Bitcoin", "cripto")
+    ficha = client.get("/api/activos/bitcoin").get_json()
+    ficha["conversionRows"] = [{
+        "id": "conversion-1", "fecha": "10-01-2026", "par": "BTC/ETH", "tipo": "BTC convertidos",
+        "cantidad": "0,01", "cantidadContraparte": "0,34", "comision": "0,0001", "comisionMoneda": "eth",
+    }]
+
+    client.post("/api/activos/bitcoin", json=ficha, headers=cabeceras)
+
+    fila = client.get("/api/activos/bitcoin").get_json()["conversionRows"][0]
+    assert fila["comision"] == "0,0001"
+    assert fila["comisionMoneda"] == "ETH", "la moneda se guarda en mayúsculas, como los símbolos"

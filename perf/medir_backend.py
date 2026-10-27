@@ -132,6 +132,7 @@ def main():
     parser.add_argument("--iteraciones", type=int, default=200)
     parser.add_argument("--perfil", action="store_true")
     parser.add_argument("--json")
+    parser.add_argument("--solo", default="", help="Subcadenas separadas por comas: mide solo los endpoints que las contengan.")
     parser.add_argument("--origen", default=str(entorno.RAIZ / "data"))
     args = parser.parse_args()
 
@@ -149,7 +150,10 @@ def main():
 
     cabeceras = {"Accept-Encoding": "gzip"}
     resultados = {}
+    filtros = [f for f in args.solo.split(",") if f]
     for plantilla in ENDPOINTS:
+        if filtros and not any(f in plantilla for f in filtros):
+            continue
         ruta = plantilla.format(activo=activo, year=year, mes=mes)
         for _ in range(5):
             cliente.get(ruta, headers=cabeceras)

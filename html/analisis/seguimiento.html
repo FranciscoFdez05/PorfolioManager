@@ -1,33 +1,43 @@
 <div class="seguimientoPage">
 
     <div class="activosToolbar">
-        <button id="seguimientoAddBtn" class="primaryButton">+ Añadir activo</button>
-        <div class="activosFilters" id="seguimientoFilters">
-            <label class="activosFilterBtn" data-type="all"><input type="checkbox" checked><span>Todos</span></label>
-            <label class="activosFilterBtn" data-type="cripto"><input type="checkbox" checked><span>Cripto</span></label>
-            <label class="activosFilterBtn" data-type="acciones"><input type="checkbox" checked><span>Acciones</span></label>
-            <label class="activosFilterBtn" data-type="etfs"><input type="checkbox" checked><span>ETFs</span></label>
-            <label class="activosFilterBtn" data-type="comoditis"><input type="checkbox" checked><span>Comoditis</span></label>
+        <div class="activosToolbarLeft">
+            <div class="overviewSearch" id="seguimientoSearchBox">
+                <button class="overviewSearchBtn" id="seguimientoSearchBtn" type="button" aria-label="Buscar activo" title="Buscar activo">
+                    <span class="icono iconoBuscar" aria-hidden="true"></span>
+                </button>
+                <input type="text" class="overviewSearchInput" id="seguimientoSearch" aria-label="Buscar activo" placeholder="Buscar activo..." autocomplete="off" spellcheck="false" hidden>
+            </div>
+            <div class="overviewDivider"></div>
+            <div class="activosFilters" id="seguimientoFilters">
+                <label class="activosFilterBtn" data-type="all"><input type="checkbox" checked><span>Todos</span></label>
+                <label class="activosFilterBtn" data-type="cripto"><input type="checkbox" checked><span>Cripto</span></label>
+                <label class="activosFilterBtn" data-type="acciones"><input type="checkbox" checked><span>Acciones</span></label>
+                <label class="activosFilterBtn" data-type="etfs"><input type="checkbox" checked><span>ETFs</span></label>
+                <label class="activosFilterBtn" data-type="comoditis"><input type="checkbox" checked><span>Comoditis</span></label>
+            </div>
+            <div class="filtersDivider"></div>
+            <div class="activosFilters" id="seguimientoSourceFilters">
+                <label class="activosFilterBtn" data-source="all"><input type="checkbox" checked><span>Todos</span></label>
+                <label class="activosFilterBtn" data-source="portfolio"><input type="checkbox" checked><span>Portfolio</span></label>
+                <label class="activosFilterBtn" data-source="operaciones"><input type="checkbox" checked><span>Operaciones</span></label>
+                <label class="activosFilterBtn" data-source="nuevos"><input type="checkbox" checked><span>Nuevos</span></label>
+            </div>
+            <span class="activosCount" id="seguimientoCount"></span>
         </div>
-        <div class="filtersDivider"></div>
-        <div class="activosFilters" id="seguimientoSourceFilters">
-            <label class="activosFilterBtn" data-source="all"><input type="checkbox" checked><span>Todos</span></label>
-            <label class="activosFilterBtn" data-source="portfolio"><input type="checkbox" checked><span>Portfolio</span></label>
-            <label class="activosFilterBtn" data-source="operaciones"><input type="checkbox" checked><span>Operaciones</span></label>
-            <label class="activosFilterBtn" data-source="nuevos"><input type="checkbox" checked><span>Nuevos</span></label>
-        </div>
-        <input type="text" class="activosSearch" id="seguimientoSearch" aria-label="Buscar activo" placeholder="Buscar activo...">
-        <span class="activosCount" id="seguimientoCount"></span>
-        <button id="segHiddenBtn" class="secondaryButton segHiddenToggleBtn" type="button" title="Gestionar activos ocultos" style="display:none">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>Ocultos <span id="segHiddenCount" class="segHiddenBadge">0</span>
-        </button>
-        <div class="avViewToggle" id="seguimientoViewToggle">
-            <button class="avViewBtn active" data-view="cards" title="Vista tarjetas">
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg>
+        <div class="activosToolbarRight">
+            <button id="segHiddenBtn" class="avShowHiddenBtn" type="button" title="Gestionar activos ocultos">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>Ocultos <span id="segHiddenCount" class="segHiddenBadge">0</span>
             </button>
-            <button class="avViewBtn" data-view="table" title="Vista tabla">
-                <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="2" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="6.75" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="11.5" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>
-            </button>
+            <button id="seguimientoAddBtn" class="primaryButton">Añadir activo</button>
+            <div class="avViewToggle" id="seguimientoViewToggle">
+                <button class="avViewBtn active" data-view="cards" title="Vista tarjetas">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></svg>
+                </button>
+                <button class="avViewBtn" data-view="table" title="Vista tabla">
+                    <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="2" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="6.75" width="13" height="1.5" rx="0.75" fill="currentColor"/><rect x="1" y="11.5" width="13" height="1.5" rx="0.75" fill="currentColor"/></svg>
+                </button>
+            </div>
         </div>
     </div>
 

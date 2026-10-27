@@ -22,17 +22,36 @@ function mDistBonoVal(r, metric) {
         : parseEuroNumber(r.invertido || "")
 }
 
-function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], metric = "netoActualEur") {
+// Mercado privado: el valor es el actual del fondo, lo invertido es lo llamado y
+// el rendimiento suma lo ya distribuido, igual que el Neto de su página.
+function mDistPmVal(r, metric) {
+    const llamado = parseEuroNumber(r.llamado || "")
+    const valorActual = parseEuroNumber(r.valorActual || "")
+    if (metric === "invertidoEur") return llamado
+    if (metric === "rendimientoEur") return parseEuroNumber(r.distribuido || "") + valorActual - llamado
+    return valorActual
+}
+
+function mRenderDistTipos(
+    summaries,
+    displayType,
+    bonos = [],
+    rentaFija = [],
+    metric = "netoActualEur",
+    privateMarket = []
+) {
     const types = ["cripto", "acciones", "etfs", "comoditis"]
     const rfTotal =
         bonos.reduce((s, r) => s + mDistBonoVal(r, metric), 0) +
         rentaFija.reduce((s, r) => s + mDistBonoVal(r, metric), 0)
-    const labels = [...types.map((t) => M_TYPE_LABELS[t]), "Renta Fija"]
+    const pmTotal = privateMarket.reduce((s, r) => s + mDistPmVal(r, metric), 0)
+    const labels = [...types.map((t) => M_TYPE_LABELS[t]), "Renta Fija", M_TYPE_LABELS.privateMarket]
     const rawValues = [
         ...types.map((t) => summaries.filter((a) => a.type === t).reduce((s, a) => s + mDistAssetVal(a, metric), 0)),
-        rfTotal
+        rfTotal,
+        pmTotal
     ]
-    const colors = [...types.map((t) => M_TYPE_COLORS[t]), "#00bcd4"]
+    const colors = [...types.map((t) => M_TYPE_COLORS[t]), "#00bcd4", M_TYPE_COLORS.privateMarket]
 
     if (displayType === "doughnut") {
         const values = rawValues.map((v) => Math.max(0, v))
@@ -56,12 +75,14 @@ function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], me
                 cutout: "62%",
                 plugins: {
                     ...M_CHART_DEFAULTS.plugins,
-                    legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                    legend: { display: false },
                     tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, total) } }
                 }
             }
         })
+        mRenderDonutLeyenda("mChartTipos", labels, colors, values, total)
     } else {
+        mRenderDonutLeyenda("mChartTipos", [], [], [], 0)
         mCreateChart("mChartTipos", {
             type: "bar",
             data: {
@@ -91,7 +112,14 @@ function mRenderDistTipos(summaries, displayType, bonos = [], rentaFija = [], me
     }
 }
 
-function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], metric = "netoActualEur") {
+function mRenderDistActivos(
+    summaries,
+    displayType,
+    bonos = [],
+    rentaFija = [],
+    metric = "netoActualEur",
+    privateMarket = []
+) {
     const bonosMap = {}
     if (_metricasActivosFilter.has("rentaFija")) {
         bonos.forEach((r) => {
@@ -106,9 +134,13 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
             rfMap[name] = (rfMap[name] || 0) + mDistBonoVal(r, metric)
         })
     }
+    const pmItems = _metricasActivosFilter.has("privateMarket")
+        ? privateMarket.map((r) => ({ name: r.nombre || "Private Market", _val: mDistPmVal(r, metric) }))
+        : []
     const extras = [
         ...Object.entries(bonosMap).map(([name, val]) => ({ name, _val: val })),
-        ...Object.entries(rfMap).map(([name, val]) => ({ name, _val: val }))
+        ...Object.entries(rfMap).map(([name, val]) => ({ name, _val: val })),
+        ...pmItems
     ]
     const allItems = [
         ...summaries
@@ -133,7 +165,7 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
                         data: values,
                         backgroundColor: colors,
                         borderColor: "#0b1120",
-                        borderWidth: 2,
+                        borderWidth: mDonutBorderWidth(values, total),
                         hoverOffset: 10
                     }
                 ]
@@ -143,12 +175,16 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
                 cutout: "55%",
                 plugins: {
                     ...M_CHART_DEFAULTS.plugins,
-                    legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "right" },
+                    // La leyenda nativa no hace scroll: con muchos activos las
+                    // columnas que no caben en el canvas se cortaban.
+                    legend: { display: false },
                     tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, total) } }
                 }
             }
         })
+        mRenderDonutLeyenda("mChartActivos", labels, colors, values, total)
     } else {
+        mRenderDonutLeyenda("mChartActivos", [], [], [], 0)
         mCreateChart("mChartActivos", {
             type: "bar",
             data: {
@@ -178,6 +214,71 @@ function mRenderDistActivos(summaries, displayType, bonos = [], rentaFija = [], 
     }
 
     mEqualizeChartRowHeights()
+}
+
+/**
+ * Grosor del borde de cada porción de un donut según lo que ocupa.
+ *
+ * Con muchos activos pequeños, el borde fijo de 2px (del color del fondo)
+ * tapaba casi entera cada porción fina y esa zona se veía como franjas
+ * oscuras. Las porciones estrechas llevan menos borde o ninguno.
+ *
+ * @param {number[]} values Valor de cada porción.
+ * @param {number} total Suma de los valores.
+ * @returns {(ctx: {dataIndex: number}) => number} Opción scriptable de Chart.js.
+ */
+function mDonutBorderWidth(values, total) {
+    return (ctx) => {
+        const fraccion = total > 0 ? values[ctx.dataIndex] / total : 0
+        if (fraccion < 0.006) return 0
+        if (fraccion < 0.02) return 1
+        return 2
+    }
+}
+
+/**
+ * Pinta la leyenda HTML de un donut en `#<chartId>Leyenda`, con scroll propio.
+ *
+ * Pulsar un elemento oculta o muestra su porción, como la leyenda de Chart.js.
+ * Sin etiquetas (vista de barras) la leyenda se oculta.
+ *
+ * @param {string} chartId Id del canvas del gráfico.
+ * @param {string[]} labels Nombres, en el mismo orden que los datos.
+ * @param {string[]} colors Color de cada porción.
+ * @param {number[]} values Valor de cada porción.
+ * @param {number} total Suma de los valores, para el porcentaje.
+ */
+function mRenderDonutLeyenda(chartId, labels, colors, values, total) {
+    const lista = document.getElementById(`${chartId}Leyenda`)
+    if (!lista) return
+    lista.hidden = labels.length === 0
+    lista.innerHTML = labels
+        .map((label, i) => {
+            const pct = total > 0 ? `${((values[i] / total) * 100).toFixed(1).replace(".", ",")}%` : "—"
+            return `
+                <li>
+                    <button type="button" class="mDonutLeyendaItem" data-index="${i}" title="${escapeHtml(label)}">
+                        <span class="mDonutLeyendaPunto" style="background:${escapeHtml(colors[i])}"></span>
+                        <span class="mDonutLeyendaNombre">${escapeHtml(label)}</span>
+                        <span class="mDonutLeyendaPct">${pct}</span>
+                    </button>
+                </li>`
+        })
+        .join("")
+    // El gráfico se crea antes de mostrar la leyenda, con todo el ancho: si
+    // el canvas no se entera de que su hueco ha encogido, el donut la pisa.
+    _metricasCharts[chartId]?.resize()
+
+    if (lista.dataset.bound) return
+    lista.dataset.bound = "true"
+    lista.addEventListener("click", (event) => {
+        const item = event.target.closest(".mDonutLeyendaItem")
+        const chart = _metricasCharts[chartId]
+        if (!item || !chart) return
+        chart.toggleDataVisibility(Number(item.dataset.index))
+        chart.update()
+        item.classList.toggle("mDonutLeyendaOculto", !chart.getDataVisibility(Number(item.dataset.index)))
+    })
 }
 
 function mRenderRendTipos(summaries) {
@@ -224,6 +325,22 @@ function mRenderRendTipos(summaries) {
     })
 }
 
+// Filas que se ven a la vez en los gráficos de barras que crecen con el número
+// de elementos (las mismas que Dividendos por instrumento). Con más, el
+// gráfico conserva su alto completo dentro de .mChartScrollInner y la tarjeta
+// hace scroll vertical: así no estira a la tarjeta de al lado hasta cientos
+// de píxeles.
+const M_FILAS_VISIBLES = 9
+
+function mAjustarAltoConScroll(wrapId, filas, altoFila, altoMinimo) {
+    const wrap = document.getElementById(wrapId)
+    if (!wrap) return
+    const completo = Math.max(altoMinimo, filas * altoFila + 40)
+    wrap.style.height = Math.min(completo, M_FILAS_VISIBLES * altoFila + 40) + "px"
+    const inner = wrap.querySelector(".mChartScrollInner")
+    if (inner) inner.style.height = completo + "px"
+}
+
 function mRenderRendActivos(summaries) {
     const sorted = [...summaries]
         .filter((a) => a.invertidoEur !== 0 || a.rendimientoEur !== 0)
@@ -233,8 +350,7 @@ function mRenderRendActivos(summaries) {
     const colors = values.map((v) => (v >= 0 ? "#2ecc71cc" : "#e74c3ccc"))
     const borders = values.map((v) => (v >= 0 ? "#2ecc71" : "#e74c3c"))
 
-    const wrap = document.getElementById("mChartRendActivosWrap")
-    if (wrap) wrap.style.height = Math.max(200, sorted.length * 32 + 40) + "px"
+    mAjustarAltoConScroll("mChartRendActivosWrap", sorted.length, 32, 200)
 
     mCreateChart("mChartRendActivos", {
         type: "bar",
@@ -290,7 +406,7 @@ function mRenderDividendos(dividendos, colorMap = {}) {
 
     const toggle = document.getElementById("mDivYearToggle")
     if (toggle) {
-        const opts = [...years, "total"]
+        const opts = [...ordenarAniosRecientesPrimero(years), "total"]
         toggle.innerHTML = opts
             .map(
                 (y) =>
@@ -437,11 +553,12 @@ function mDrawDividendosCharts(dividendos, colorMap, getYear) {
             layout: { padding: { bottom: 0 } },
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
-                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                legend: { display: false },
                 tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, donutTotal) } }
             }
         }
     })
+    mRenderDonutLeyenda("mChartDividendosDonut", labels, colors, values, donutTotal)
 }
 
 // ── dividendos mensuales ───────────────────────────────────────────────────
@@ -481,7 +598,7 @@ function mRenderDivMensual(dividendos, colorMap = {}) {
 
     const yearToggle = document.getElementById("mDivMensualYearToggle")
     if (yearToggle) {
-        yearToggle.innerHTML = years
+        yearToggle.innerHTML = ordenarAniosRecientesPrimero(years)
             .map(
                 (y) =>
                     `<button class="mToggleBtn${y === _metricasDivMensualYear ? " active" : ""}" data-divmy="${y}">${y}</button>`
@@ -893,14 +1010,17 @@ function mRenderBonosTipos(bonos) {
         .reduce((s, r) => s + parseEuroNumber(r.interesAcumulado || "") - parseEuroNumber(r.impuestos || ""), 0)
     const total = gubNeto + corpNeto
 
+    const bonosLabels = ["Gubernamentales", "Corporativos"]
+    const bonosValues = [Math.max(0, gubNeto), Math.max(0, corpNeto)]
+    const bonosColors = [GUB_COLOR + "cc", CORP_COLOR + "cc"]
     mCreateChart("mChartBonosTipos", {
         type: "doughnut",
         data: {
-            labels: ["Gubernamentales", "Corporativos"],
+            labels: bonosLabels,
             datasets: [
                 {
-                    data: [Math.max(0, gubNeto), Math.max(0, corpNeto)],
-                    backgroundColor: [GUB_COLOR + "cc", CORP_COLOR + "cc"],
+                    data: bonosValues,
+                    backgroundColor: bonosColors,
                     borderColor: "#0b1120",
                     borderWidth: 3,
                     hoverOffset: 10
@@ -912,11 +1032,12 @@ function mRenderBonosTipos(bonos) {
             cutout: "60%",
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
-                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                legend: { display: false },
                 tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, total) } }
             }
         }
     })
+    mRenderDonutLeyenda("mChartBonosTipos", bonosLabels, bonosColors, bonosValues, bonosValues[0] + bonosValues[1])
 }
 
 function mRenderBonosInst(bonos) {
@@ -935,8 +1056,7 @@ function mRenderBonosInst(bonos) {
     const colors = values.map((v) => (v >= 0 ? "#9b59b6bb" : "#e74c3cbb"))
     const borders = values.map((v) => (v >= 0 ? "#9b59b6" : "#e74c3c"))
 
-    const wrap = document.getElementById("mChartBonosInstWrap")
-    if (wrap) wrap.style.height = Math.max(180, sorted.length * 36 + 40) + "px"
+    mAjustarAltoConScroll("mChartBonosInstWrap", sorted.length, 36, 180)
 
     mCreateChart("mChartBonosInst", {
         type: "bar",
@@ -981,14 +1101,17 @@ function mRenderRentaFijaTipos(rentaFija) {
         0
     )
 
+    const rfLabels = ["Interés Fijo"]
+    const rfValues = [Math.max(0, total)]
+    const rfColors = ["#00bcd4cc"]
     mCreateChart("mChartRfTipos", {
         type: "doughnut",
         data: {
-            labels: ["Interés Fijo"],
+            labels: rfLabels,
             datasets: [
                 {
-                    data: [Math.max(0, total)],
-                    backgroundColor: ["#00bcd4cc"],
+                    data: rfValues,
+                    backgroundColor: rfColors,
                     borderColor: "#0b1120",
                     borderWidth: 3,
                     hoverOffset: 10
@@ -1000,11 +1123,12 @@ function mRenderRentaFijaTipos(rentaFija) {
             cutout: "60%",
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
-                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                legend: { display: false },
                 tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, total) } }
             }
         }
     })
+    mRenderDonutLeyenda("mChartRfTipos", rfLabels, rfColors, rfValues, rfValues[0])
 }
 
 function mRenderRentaFijaInst(rentaFija) {
@@ -1021,8 +1145,7 @@ function mRenderRentaFijaInst(rentaFija) {
     const colors = values.map((v) => (v >= 0 ? "#00bcd4bb" : "#e74c3cbb"))
     const borders = values.map((v) => (v >= 0 ? "#00bcd4" : "#e74c3c"))
 
-    const wrap = document.getElementById("mChartRfInstWrap")
-    if (wrap) wrap.style.height = Math.max(180, sorted.length * 36 + 40) + "px"
+    mAjustarAltoConScroll("mChartRfInstWrap", sorted.length, 36, 180)
 
     mCreateChart("mChartRfInst", {
         type: "bar",

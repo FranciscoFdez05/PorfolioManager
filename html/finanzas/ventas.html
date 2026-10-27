@@ -1,9 +1,20 @@
 <section class="operationsPage ventasPageExpanded">
-    <div class="gastosYearBar">
-        <div class="gastosYearList" id="ventasYearList"></div>
-        <div class="gastosYearActions">
-            <button id="deleteVentasYearBtn" class="dangerButton" type="button">Eliminar año</button>
-            <button id="addVentasYearBtn" class="gastosAddYearBtn" type="button">+</button>
+    <div class="interesesYearBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#ventasBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
+        <div class="interesesYearList" id="ventasYearList"></div>
+        <button id="addVentaRowBtn" class="primaryButton" type="button">Añadir venta</button>
+        <div class="interesesMenuWrapper">
+            <button class="interesesMenuBtn" id="ventasMenuBtn" type="button" title="Acciones">···</button>
+            <div class="interesesMenuDropdown hidden" id="ventasMenuDropdown">
+                <button id="addVentasYearBtn" class="interesesMenuOption" type="button">+ Añadir año</button>
+                <button id="deleteVentasYearBtn" class="interesesMenuOption interesesMenuOptionDanger" type="button">Eliminar año</button>
+            </div>
         </div>
     </div>
 
@@ -35,8 +46,4 @@
     <p class="overviewEmpty hidden" id="ventasEmptyMsg">No hay ventas registradas.</p>
 
     <div class="ventasResumen hidden" id="ventasResumen"></div>
-
-    <div class="operationsActions">
-        <button id="addVentaRowBtn" class="primaryButton" type="button">Añadir fila</button>
-    </div>
 </section>

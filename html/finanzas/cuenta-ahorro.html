@@ -2,11 +2,18 @@
     <div class="cuentaAhorroCuentas" id="cuentaAhorroCuentas" hidden></div>
 
     <div class="cuentaAhorroTopBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#cuentaAhorroBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
         <div class="cuentaAhorroYearList" id="cuentaAhorroYearList"></div>
+        <button id="cuentaAhorroAddRowBtn" class="primaryButton" type="button">Añadir movimiento</button>
         <div class="pageActionsMenu" id="cuentaAhorroActionsMenu">
             <button class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true">···</button>
             <div class="pageActionsDropdown" id="cuentaAhorroActionsDropdown">
-                <button id="cuentaAhorroAddBtn" class="pageActionsItem" type="button">Añadir movimiento</button>
                 <button id="cuentaAhorroConfigBtn" class="pageActionsItem" type="button">Configurar cuenta</button>
                 <button id="cuentaAhorroCsvBtn" class="pageActionsItem" type="button">Descargar CSV</button>
                 <button id="cuentaAhorroInformeBtn" class="pageActionsItem" type="button">Descargar informe (PDF)</button>
@@ -32,10 +39,6 @@
                     <tbody id="cuentaAhorroBody"></tbody>
                 </table>
                 <p class="overviewEmpty hidden" id="cuentaAhorroEmpty"></p>
-            </div>
-
-            <div class="gastosActions" id="cuentaAhorroActions">
-                <button id="cuentaAhorroAddRowBtn" class="primaryButton" type="button">Añadir movimiento</button>
             </div>
         </div>
 

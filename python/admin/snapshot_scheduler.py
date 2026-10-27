@@ -95,8 +95,10 @@ def _esperaHastaSiguiente(ahora=None) -> float:
 
 def ejecutarUnaVez(refrescarPrecios=True) -> int:
     """Guarda el punto pendiente en cada portfolio objetivo. Devuelve cuántos."""
+    from core.bloqueo import BloqueoOcupado
+    from routes.backup import bloqueoSiLibre
     from routes.snapshots import guardarSnapshot, reservarBucket
-    from stores.valoracion import valorarPortfolio
+    from stores.valoracion import registrarFallbacks, registrarOmision, valorarPortfolio
 
     guardados = 0
     try:
@@ -109,7 +111,10 @@ def ejecutarUnaVez(refrescarPrecios=True) -> int:
 
     for ruta in rutas:
         try:
-            with useDbPath(ruta):
+            # Una importación o un restore reescribe la cartera: un punto tomado
+            # a medias guardaría un valor que nunca existió. Si hay uno en curso
+            # se salta, sin reclamar el hueco, y se vuelve en el siguiente.
+            with bloqueoSiLibre(), useDbPath(ruta):
                 if not reservarBucket():
                     log.debug("[snapshots] %s: el hueco actual ya está reclamado", ruta.stem)
                     continue
@@ -117,6 +122,15 @@ def ejecutarUnaVez(refrescarPrecios=True) -> int:
                 valoracion = valorarPortfolio(refrescarPrecios=refrescarPrecios)
                 if valoracion["activos"] == 0:
                     log.debug("[snapshots] %s: sin posiciones que valorar", ruta.stem)
+                    continue
+
+                registrarFallbacks(valoracion.get("fallbacks", []))
+                registrarOmision(not valoracion.get("completa", True))
+                if not valoracion.get("completa", True):
+                    log.warning(
+                        "[snapshots] %s: valoración incompleta (falta un tipo de cambio o un precio); "
+                        "no se guarda el punto", ruta.stem,
+                    )
                     continue
 
                 if guardarSnapshot(
@@ -128,6 +142,8 @@ def ejecutarUnaVez(refrescarPrecios=True) -> int:
                         ruta.stem, valoracion["total_value"], valoracion["total_invested"],
                         valoracion["precios_frescos"], valoracion["activos"],
                     )
+        except BloqueoOcupado:
+            log.info("[snapshots] Hay una copia, restauración o importación en curso; se salta este hueco")
         except Exception as e:
             # Un portfolio que falle no puede llevarse por delante a los demás
             # ni matar el hilo: el histórico se recupera en el siguiente hueco.

@@ -1,8 +1,15 @@
 <section class="tradingPage">
 
+    <div class="operationsToolbar tradingToolbar">
     <div class="tradingFilters">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#tradingBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
         <div class="tradingFilterGroup">
-            <span class="tradingFilterLabel">Tipo</span>
             <div class="tradingFilterButtons">
                 <label class="overviewFilterOption tradingFilterOption">
                     <input type="checkbox" value="SCALP" data-tfilter="tipo" checked>
@@ -16,7 +23,6 @@
         </div>
 
         <div class="tradingFilterGroup">
-            <span class="tradingFilterLabel">Dirección</span>
             <div class="tradingFilterButtons">
                 <label class="overviewFilterOption tradingFilterOption">
                     <input type="checkbox" value="LONG" data-tfilter="direccion" checked>
@@ -30,7 +36,6 @@
         </div>
 
         <div class="tradingFilterGroup">
-            <span class="tradingFilterLabel">Resultado</span>
             <div class="tradingFilterButtons">
                 <label class="overviewFilterOption tradingFilterOption">
                     <input type="checkbox" value="PROFIT" data-tfilter="resultado" checked>
@@ -44,7 +49,6 @@
         </div>
 
         <div class="tradingFilterGroup tradingViewToggle">
-            <span class="tradingFilterLabel">Vista</span>
             <div class="tradingFilterButtons">
                 <label class="overviewFilterOption tradingFilterOption">
                     <input type="radio" name="tradingView" value="tabla" checked>
@@ -56,6 +60,11 @@
                 </label>
             </div>
         </div>
+    </div>
+
+    <div class="operationsToolbarRight">
+        <button id="addTradingRowBtn" class="primaryButton" type="button">Añadir trade</button>
+    </div>
     </div>
 
     <!-- Vista tabla general -->
@@ -89,8 +98,3 @@
     </div>
 
 </section>
-
-<div class="tradingActions">
-    <button id="addTradingRowBtn" class="primaryButton" type="button">Añadir fila</button>
-    <button id="saveTradingBtn" class="secondaryButton" type="button">Guardar</button>
-</div>

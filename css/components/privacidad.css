@@ -5,6 +5,10 @@
 /* 30px de alto, los mismos que .navBtn y .navDropdownBtn: es un botón más de la
    barra, y cuatro píxeles de más lo desalineaban de todo lo que tiene al lado. */
 .navMoneyToggleBtn {
+    /* Flex para centrar el icono: en línea queda apoyado en la línea base. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     height: 30px;
     width: 34px;
     padding: 0;
@@ -43,6 +47,7 @@ body.money-hidden #overviewTableBody td:not(.mTdRank):not(.mTdName):not(:nth-chi
     pointer-events: none;
 }
 
+body.money-hidden #detChange,
 body.money-hidden #detPosition,
 body.money-hidden #detInvested,
 body.money-hidden #detPnL,
@@ -54,6 +59,15 @@ body.money-hidden #assetStatPrecioMedio,
 body.money-hidden #assetStatInvertido,
 body.money-hidden #assetStatPnL,
 body.money-hidden #assetStatPnLPct {
+    filter: blur(7px);
+    user-select: none;
+    pointer-events: none;
+}
+
+/* vista general: beneficio realizado y tarjetas de mejor/peor (el nombre del
+   activo se deja a la vista, solo se ocultan las cifras) */
+body.money-hidden .overviewExtremeValue,
+body.money-hidden .overviewExtremePct {
     filter: blur(7px);
     user-select: none;
     pointer-events: none;
@@ -109,7 +123,9 @@ body.money-hidden #dividendosBody td:nth-child(n + 3):not(:last-child) {
 
 /* cards resumen (intereses y dividendos) */
 body.money-hidden .summaryCardValue,
-body.money-hidden .cvStatValue {
+body.money-hidden .cvStatValue,
+body.money-hidden .interesesStatValue,
+body.money-hidden .interesesTooltip span {
     filter: blur(7px);
     user-select: none;
     pointer-events: none;
@@ -163,10 +179,10 @@ body.money-hidden #stablecoinsBody td:nth-child(8) {
 }
 
 /* operaciones (trading) - precio, cantidad, comisiones, total + saldo de pares */
-body.money-hidden #operationsBody td:nth-child(5),
 body.money-hidden #operationsBody td:nth-child(6),
 body.money-hidden #operationsBody td:nth-child(7),
 body.money-hidden #operationsBody td:nth-child(8),
+body.money-hidden #operationsBody td:nth-child(9),
 body.money-hidden .operationsPairsSummaryValues {
     filter: blur(7px);
     user-select: none;
@@ -209,4 +225,77 @@ body.money-hidden .assetCompletedOpsTable td:nth-child(8) {
     filter: blur(7px);
     user-select: none;
     pointer-events: none;
+}
+
+/* Capa neutra: el desenfoque deja ver el tono de la cifra, y con eso basta para
+   saber si es ganancia o pérdida. Todo lo oculto se pinta en gris (texto y
+   descendientes, que suelen traer su propio verde o rojo) y la píldora del
+   rendimiento del detalle pierde su fondo de color. */
+body.money-hidden :is(
+        .metricValue,
+        #overviewTableBody td:not(.mTdRank):not(.mTdName):not(:nth-child(3)):not(:nth-child(6)),
+        .overviewExtremeValue,
+        .overviewExtremePct,
+        #detChange,
+        #detPnL,
+        #assetStatNetoActual,
+        #assetStatPnL,
+        #assetStatPnLPct,
+        .hmSumMoney,
+        .hmCellMoney,
+        .hmTipMoneyVal,
+        .avMetricValue,
+        .rowTotal,
+        .summaryCardValue,
+        .cvStatValue,
+        .bonosSummaryValue,
+        #ventasBody td:nth-child(n + 4):not(:last-child),
+        .operationsPairsSummaryValues,
+        .mkpiValue,
+        #metricasTopBody td:nth-child(n + 4),
+        .assetCompletedOpsTable td:is(:nth-child(4), :nth-child(5), :nth-child(6), :nth-child(7), :nth-child(8)),
+        .calFinCardValue,
+        .calFinMonthTotal,
+        .calFinDayAmount,
+        .calFinSideAmount,
+        .pnMoney,
+        .pinvMoney
+    ),
+body.money-hidden :is(
+        .metricValue,
+        #overviewTableBody td:not(.mTdRank):not(.mTdName):not(:nth-child(3)):not(:nth-child(6)),
+        .overviewExtremeValue,
+        .overviewExtremePct,
+        #detChange,
+        #detPnL,
+        #assetStatNetoActual,
+        #assetStatPnL,
+        #assetStatPnLPct,
+        .hmSumMoney,
+        .hmCellMoney,
+        .hmTipMoneyVal,
+        .avMetricValue,
+        .rowTotal,
+        .summaryCardValue,
+        .cvStatValue,
+        .bonosSummaryValue,
+        #ventasBody td:nth-child(n + 4):not(:last-child),
+        .operationsPairsSummaryValues,
+        .mkpiValue,
+        #metricasTopBody td:nth-child(n + 4),
+        .assetCompletedOpsTable td:is(:nth-child(4), :nth-child(5), :nth-child(6), :nth-child(7), :nth-child(8)),
+        .calFinCardValue,
+        .calFinMonthTotal,
+        .calFinDayAmount,
+        .calFinSideAmount,
+        .pnMoney,
+        .pinvMoney
+    )
+    * {
+    color: var(--text-muted) !important;
+}
+
+body.money-hidden #detChange {
+    background: var(--bg-elevated);
+    border-color: var(--border-mid);
 }

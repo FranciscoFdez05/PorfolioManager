@@ -7,7 +7,7 @@
 <h1 align="center">PorfolioManager</h1>
 
 <p align="center">
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-4.8.2-blue" alt="Version"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-4.9.0-blue" alt="Version"></a>
   <a href="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml"><img src="https://github.com/FranciscoFdez05/PorfolioManager/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-3776AB" alt="Python">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED" alt="Docker">
@@ -27,7 +27,7 @@ Market quotes are optional: without API keys you enter prices yourself. The inte
 - **Spanish taxation**: sales with FIFO, the two-month rule and loss offsetting; annual report in CSV and HTML.
 - **Metrics**: TWR, XIRR, drawdown, volatility and comparison against indices.
 - **Crypto**: stablecoins, trades, conversions, staking and earn.
-- **Operations**: automatic backups, Telegram alerts and commands, HTTPS enabled from the app itself, and an iOS Shortcut to log expenses from your phone.
+- **Operations**: automatic backups, Telegram alerts and commands, optional two-step login with a code sent by Telegram, HTTPS enabled from the app itself, and an iOS Shortcut to log expenses from your phone.
 - **Self-updating**: `docker-update.sh` checks that the new version answers on `/api/health` and rolls back to the previous image if it does not.
 
 ## 🖥️ Requirements
@@ -47,7 +47,7 @@ cd PorfolioManager
 ./docker-setup   # creates .env, generates SECRET_KEY, asks for credentials and port, starts the stack
 ```
 
-Run it as your normal user, without `sudo`. The app is served at `http://localhost:5000` (or `http://<SERVER_IP>:5000` from another device on the LAN). Data is kept in `data/`, `logs/` and `API/`.
+Run it as your normal user, without `sudo`. The app is served at `http://localhost:5050` (or `http://<SERVER_IP>:5050` from another device on the LAN). Data is kept in `data/`, `logs/` and `API/`.
 
 > [!WARNING]
 > Out of the box the app is served over plain HTTP, so the password and session cookie travel unencrypted. Before using it from another device, enable HTTPS in **Ajustes › Seguridad › HTTPS**. See [SECURITY.md](SECURITY.md).
@@ -66,7 +66,7 @@ git clone https://github.com/FranciscoFdez05/PorfolioManager.git
 cd PorfolioManager
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python python/server.py   # http://localhost:5000
+python python/server.py   # http://localhost:5050
 ```
 
 ### Environment variables
@@ -80,16 +80,18 @@ Secrets live in `.env` (copy `.env.example`; `./docker-setup` does it for you). 
 | `LOGIN_PASSWORD_HASH` | Hash of the initial password (`docker-setup` generates it) | Yes | empty |
 | `FINNHUB_API_KEY`, `EODHD_API_KEYS`, `ALPHA_VANTAGE_API_KEYS` | Market data keys; normally set in Ajustes › API instead | No | empty |
 | `TZ` | Container time zone (logs and backups) | No | `Europe/Madrid` |
-| `PORT` | HTTP port; overrides `config.ini` | No | `5000` |
+| `PORT` | HTTP port; overrides `config.ini` | No | `5050` |
 | `PUID` / `PGID` | User and group the container writes as (Linux) | No | Set by `docker-setup` |
 
 ## 📋 Usage guide 🕹️
 
-1. Open `http://localhost:5000` and sign in with the credentials you chose in `docker-setup`.
+1. Open `http://localhost:5050` and sign in with the credentials you chose in `docker-setup`.
+   On the first run `docker-setup` asks how to create the account: **1** from the web, **2** in the terminal, **3** quit. A typo just asks again. With the web option it prints the `/setup` address and a one-time verification code (also in `data/tmp/alta-inicial.txt` and the container log), so nobody else on the LAN can claim the account first.
 2. Add your assets and operations. Without API keys, enter prices manually.
 3. Optionally add Finnhub, EODHD or Alpha Vantage keys in **Ajustes › API** to get automatic quotes.
 4. Enable HTTPS in **Ajustes › Seguridad › HTTPS** if you access it from other devices.
 5. Optionally set up Telegram in **Ajustes › Telegram** (alerts and commands such as `/estado`, `/cartera`, `/backup`).
+6. Once Telegram works, you can turn on two-step verification in **Ajustes › Cuenta**: each login asks for a code sent by the bot, and a 6, 12 or 24-word recovery phrase lets you in if you lose access to Telegram.
 
 ```bash
 docker logs -f PorfolioManager   # follow the logs

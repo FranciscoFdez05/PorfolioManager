@@ -87,7 +87,7 @@ function _crearBotonDeActivo(asset, displayPrice, displayCurrency, { isStale, en
     // un problema —lo ha pedido el usuario en Ajustes—, así que se queda en
     // gris: si la pausa también pintase advertencias, el aviso dejaría de
     // significar «esto hay que mirarlo» cada fin de semana.
-    const aviso = falloApi ? `<span class="assetBtnAviso" aria-hidden="true">⚠</span>` : ""
+    const aviso = falloApi ? `<span class="assetBtnAviso" aria-hidden="true">${iconoHtml("Aviso")}</span>` : ""
 
     const button = document.createElement("button")
     button.className = [

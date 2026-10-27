@@ -2,6 +2,8 @@ import re
 
 from flask import Blueprint, jsonify, request
 
+from core.validation import primerIdDuplicado
+from stores import revisiones
 from stores.app_data import readOperacionesFile, readStablecoinsFile, writeOperacionesFile, writeStablecoinsFile
 from stores.helpers import syncCompletedOperationsIntoAssets
 
@@ -48,12 +50,14 @@ def _sanitizeStablecoinCatalogEntry(entry):
 def getOperaciones():
     data = readOperacionesFile()
     syncCompletedOperationsIntoAssets(data.get("rows", []))
-    return jsonify(data)
+    return jsonify({**data, "revision": revisiones.actual("operaciones", revisiones.CLAVE_UNICA)})
 
 
 @operacionesBp.route("/api/operaciones", methods=["POST"])
 def saveOperaciones():
     requestData = request.get_json(silent=True) or {}
+    if "rows" not in requestData:
+        return jsonify({"ok": False, "error": "JSON inválido: falta rows"}), 400
     rows = requestData.get("rows", [])
 
     if not isinstance(rows, list):
@@ -96,9 +100,21 @@ def saveOperaciones():
             "fechaCierre": str(row.get("fechaCierre", "")).strip()
         })
 
-    writeOperacionesFile({"rows": sanitizedRows})
+    duplicado = primerIdDuplicado(sanitizedRows)
+    if duplicado is not None:
+        return jsonify({"ok": False, "error": f"Hay dos operaciones con el mismo identificador ({duplicado})"}), 400
+
+    try:
+        esperada = revisiones.revisionDePeticion(requestData)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    try:
+        nueva = writeOperacionesFile({"rows": sanitizedRows}, revisionEsperada=esperada)
+    except revisiones.ConflictoRevision as conflicto:
+        return revisiones.respuestaConflicto(conflicto, "Las operaciones han cambiado desde otro sitio (otra pestaña u otro dispositivo)")
     syncCompletedOperationsIntoAssets(sanitizedRows)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "revision": nueva})
 
 
 @operacionesBp.route("/api/stablecoins", methods=["GET"])
@@ -142,7 +158,10 @@ def getStablecoins():
         writeStablecoinsFile(data)
         enabledSymbols = data["enabledSymbols"]
 
-    return jsonify({"catalog": catalog, "enabledSymbols": enabledSymbols, "rows": rows})
+    return jsonify({
+        "catalog": catalog, "enabledSymbols": enabledSymbols, "rows": rows,
+        "revision": revisiones.actual("stablecoins", revisiones.CLAVE_UNICA),
+    })
 
 
 def _catalogoDeSimbolos(simbolos):
@@ -215,9 +234,13 @@ def _filaStablecoin(index, row, activados, simbolosCatalogo):
 @operacionesBp.route("/api/stablecoins", methods=["POST"])
 def saveStablecoins():
     requestData = request.get_json(silent=True) or {}
-    catalog = requestData.get("catalog", requestData.get("availableSymbols", []))
+    if not {"rows", "catalog", "availableSymbols", "enabledSymbols"} & set(requestData):
+        return jsonify({"ok": False, "error": "JSON inválido: faltan los datos de stablecoins"}), 400
+    catalog =requestData.get("catalog", requestData.get("availableSymbols", []))
     enabledSymbols = requestData.get("enabledSymbols", [])
-    rows = requestData.get("rows", [])
+    # Un guardado sin `rows` (solo el catálogo, por ejemplo) no las toca: usar []
+    # las borraba todas.
+    rows = requestData["rows"] if "rows" in requestData else readStablecoinsFile().get("rows", [])
 
     if not isinstance(catalog, list):
         return jsonify({"ok": False, "error": "catalog debe ser una lista"}), 400
@@ -245,5 +268,17 @@ def saveStablecoins():
         "enabledSymbols": activados,
         "rows": [_filaStablecoin(i, row, activados, catalogSymbols) for i, row in enumerate(rows)],
     }
-    writeStablecoinsFile(payload)
-    return jsonify({"ok": True, "data": payload})
+    duplicado = primerIdDuplicado(payload["rows"])
+    if duplicado is not None:
+        return jsonify({"ok": False, "error": f"Hay dos movimientos con el mismo identificador ({duplicado})"}), 400
+
+    try:
+        esperada = revisiones.revisionDePeticion(requestData)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    try:
+        nueva = writeStablecoinsFile(payload, revisionEsperada=esperada)
+    except revisiones.ConflictoRevision as conflicto:
+        return revisiones.respuestaConflicto(conflicto, "Las stablecoins han cambiado desde otro sitio (otra pestaña u otro dispositivo)")
+    return jsonify({"ok": True, "data": payload, "revision": nueva})

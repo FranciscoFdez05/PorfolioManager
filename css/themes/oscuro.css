@@ -377,6 +377,7 @@ html[data-theme="black"] #addAssetRowBtn,
 html[data-theme="black"] #addRowBtn,
 html[data-theme="black"] #addRowDividendoBtn,
 html[data-theme="black"] #bonosAddBtn,
+html[data-theme="black"] #pmAddBtn,
 html[data-theme="black"] #addOperationRowBtn,
 html[data-theme="black"] #addStablecoinRowBtn,
 html[data-theme="black"] #addStakingRowBtn,
@@ -386,7 +387,9 @@ html[data-theme="black"] #addVentaRowBtn,
 html[data-theme="black"] #addTransaccionRowBtn,
 html[data-theme="black"] #addConversionRowBtn,
 html[data-theme="black"] #addGastoRowBtn,
-html[data-theme="black"] #addIngresoRowBtn {
+html[data-theme="black"] #addIngresoRowBtn,
+html[data-theme="black"] #cuentasAddRowBtn,
+html[data-theme="black"] #cuentaAhorroAddRowBtn {
     background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
     border: 1px solid var(--accent) !important;
     border-left: 3px solid var(--accent) !important;
@@ -403,6 +406,7 @@ html[data-theme="black"] #addAssetRowBtn:hover,
 html[data-theme="black"] #addRowBtn:hover,
 html[data-theme="black"] #addRowDividendoBtn:hover,
 html[data-theme="black"] #bonosAddBtn:hover,
+html[data-theme="black"] #pmAddBtn:hover,
 html[data-theme="black"] #addOperationRowBtn:hover,
 html[data-theme="black"] #addStablecoinRowBtn:hover,
 html[data-theme="black"] #addStakingRowBtn:hover,
@@ -412,7 +416,9 @@ html[data-theme="black"] #addVentaRowBtn:hover,
 html[data-theme="black"] #addTransaccionRowBtn:hover,
 html[data-theme="black"] #addConversionRowBtn:hover,
 html[data-theme="black"] #addGastoRowBtn:hover,
-html[data-theme="black"] #addIngresoRowBtn:hover {
+html[data-theme="black"] #addIngresoRowBtn:hover,
+html[data-theme="black"] #cuentasAddRowBtn:hover,
+html[data-theme="black"] #cuentaAhorroAddRowBtn:hover {
     background: linear-gradient(135deg, var(--accent-deep) 0%, var(--accent-deep) 100%) !important;
     border-color: var(--accent-hover) !important;
     border-left-color: var(--accent-soft) !important;
@@ -660,7 +666,7 @@ html[data-theme="black"] .operationsSelect:focus {
 
 /* pages/operaciones.css */
 html[data-theme="black"] .stablecoinToggle.active {
-    border-color: var(--accent);
+    border-color: #f472b6;
 }
 
 /* pages/operaciones.css */
@@ -1152,6 +1158,7 @@ html[data-theme="black"] .planFilterBtn,
 html[data-theme="black"] .calFinChip,
 html[data-theme="black"] .activosFilterBtn,
 html[data-theme="black"] .bonosFilterBtn,
+html[data-theme="black"] .pmFilterBtn,
 html[data-theme="black"] .mNavTab,
 html[data-theme="black"] .mActivosFilterBtn {
     background: var(--bg-panel);
@@ -1165,7 +1172,9 @@ html[data-theme="black"] .calFinChip.active,
 html[data-theme="black"] .activosFilterBtn.active,
 html[data-theme="black"] .activosFilterBtn:has(input:checked),
 html[data-theme="black"] .bonosFilterBtn.active,
+html[data-theme="black"] .pmFilterBtn.active,
 html[data-theme="black"] .bonosFilterBtn:has(input:checked),
+html[data-theme="black"] .pmFilterBtn:has(input:checked),
 html[data-theme="black"] .mNavTab.active,
 html[data-theme="black"] .mNavTab:has(input:checked),
 html[data-theme="black"] .mActivosFilterBtn.active,
@@ -1179,6 +1188,7 @@ html[data-theme="black"] .planFilterBtn::before,
 html[data-theme="black"] .calFinChip::before,
 html[data-theme="black"] .activosFilterBtn::before,
 html[data-theme="black"] .bonosFilterBtn::before,
+html[data-theme="black"] .pmFilterBtn::before,
 html[data-theme="black"] .mNavTab::before,
 html[data-theme="black"] .mActivosFilterBtn::before {
     background: #222;
@@ -1189,6 +1199,7 @@ html[data-theme="black"] .planFilterBtn:hover,
 html[data-theme="black"] .calFinChip:hover,
 html[data-theme="black"] .activosFilterBtn:hover,
 html[data-theme="black"] .bonosFilterBtn:hover,
+html[data-theme="black"] .pmFilterBtn:hover,
 html[data-theme="black"] .mNavTab:hover,
 html[data-theme="black"] .mActivosFilterBtn:hover {
     background: var(--bg-surface);
@@ -1203,6 +1214,7 @@ html[data-theme="black"]
         #addRowBtn,
         #addRowDividendoBtn,
         #bonosAddBtn,
+        #pmAddBtn,
         #addOperationRowBtn,
         #addStablecoinRowBtn,
         #addStakingRowBtn,
@@ -1212,7 +1224,9 @@ html[data-theme="black"]
         #addTransaccionRowBtn,
         #addConversionRowBtn,
         #addGastoRowBtn,
-        #addIngresoRowBtn
+        #addIngresoRowBtn,
+        #cuentasAddRowBtn,
+        #cuentaAhorroAddRowBtn
     ) {
     background: var(--bg-surface) !important;
     border-color: var(--border-mid) !important;
@@ -1229,6 +1243,7 @@ html[data-theme="black"]
         #addRowBtn,
         #addRowDividendoBtn,
         #bonosAddBtn,
+        #pmAddBtn,
         #addOperationRowBtn,
         #addStablecoinRowBtn,
         #addStakingRowBtn,
@@ -1238,7 +1253,9 @@ html[data-theme="black"]
         #addTransaccionRowBtn,
         #addConversionRowBtn,
         #addGastoRowBtn,
-        #addIngresoRowBtn
+        #addIngresoRowBtn,
+        #cuentasAddRowBtn,
+        #cuentaAhorroAddRowBtn
     ):hover {
     background: var(--bg-elevated) !important;
     border-color: var(--border-hard) !important;
@@ -1351,7 +1368,8 @@ html[data-theme="black"] .operationsTable thead th {
     border-color: var(--border-soft);
 }
 
-html[data-theme="black"] #overviewTable thead th {
+html[data-theme="black"] #overviewTable thead th,
+html[data-theme="black"] .tradingTable thead th {
     background: var(--bg-surface);
     color: var(--text-muted);
 }
@@ -1593,11 +1611,6 @@ html[data-theme="black"] .avTrUpdated {
 
 /* ── 10. Cripto ──────────────────────────────────────────────────────────── */
 /* Operaciones, transacciones, conversiones y stablecoins. */
-
-html[data-theme="black"] .stablecoinsHeaderPanel {
-    background: var(--bg-panel);
-    border-color: var(--border-soft);
-}
 
 html[data-theme="black"] .stablecoinSummaryCard {
     background: var(--bg-surface);

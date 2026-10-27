@@ -62,6 +62,54 @@ _FUNDAMENTAL_COLUMNS = [
     "sector",
     "industry",
     "country",
+    "gross_margin",
+    "operating_margin",
+    "net_margin",
+    "free_cash_flow",
+    "enterprise_value_current",
+    "enterprise_value_ebitda_ttm",
+    "earnings_release_next_date",
+    "expense_ratio",
+    # FCF y EV vienen en la divisa de los estados financieros, que no tiene
+    # por qué ser la de cotización (BITVAVO:BTCEUR cotiza en EUR y reporta en USD).
+    "fundamental_currency_code",
+    "beta_1_year",
+]
+
+# Rendimiento, rango de precios, volatilidad y volumen: valen para cualquier
+# tipo de instrumento, a diferencia de los fundamentales.
+_PERFORMANCE_COLUMNS = [
+    "Perf.W",
+    "Perf.1M",
+    "Perf.3M",
+    "Perf.6M",
+    "Perf.YTD",
+    "Perf.Y",
+    "price_52_week_high",
+    "price_52_week_low",
+    "High.All",
+    "ATR",
+    "Volatility.D",
+    "Volatility.W",
+    "Volatility.M",
+    "relative_volume_10d_calc",
+]
+
+# Los pivotes del scanner siguen la temporalidad del gráfico, como el
+# indicador "Pivot Points Standard" de TradingView: sin sufijo (diario) da los
+# mensuales, `|240` (4 h) los semanales y `|1W` los anuales. Comprobado contra
+# (máximo + mínimo + cierre) / 3 de la semana y del año anteriores. `Pivot.W.*`
+# existe como nombre pero llega siempre vacío. DeMark solo publica R1, P y S1;
+# el resto de sus niveles llega como None y la página no los pinta.
+PIVOT_METHODS = ["Classic", "Fibonacci", "Camarilla", "Woodie", "Demark"]
+PIVOT_PERIODS = {"M": "", "W": "|240", "Y": "|1W"}
+PIVOT_LEVELS = ["R3", "R2", "R1", "Middle", "S1", "S2", "S3"]
+
+_PIVOT_COLUMNS = [
+    f"Pivot.M.{method}.{level}{suffix}"
+    for suffix in PIVOT_PERIODS.values()
+    for method in PIVOT_METHODS
+    for level in PIVOT_LEVELS
 ]
 
 _TECHNICAL_COLUMNS = [
@@ -82,16 +130,22 @@ _TECHNICAL_COLUMNS = [
     "ADX",
     "Stoch.K",
     "Stoch.D",
-    "Pivot.M.Classic.R3",
-    "Pivot.M.Classic.R2",
-    "Pivot.M.Classic.R1",
-    "Pivot.M.Classic.Middle",
-    "Pivot.M.Classic.S1",
-    "Pivot.M.Classic.S2",
-    "Pivot.M.Classic.S3",
+    "Stoch.RSI.K",
+    "CCI20",
+    "Mom",
+    "AO",
+    "W.R",
+    "UO",
+    "BB.upper",
+    "BB.lower",
+    "Ichimoku.BLine",
+    "VWMA",
+    "HullMA9",
 ]
 
-_STATS_COLUMNS = _SCAN_COLUMNS + _FUNDAMENTAL_COLUMNS + _TECHNICAL_COLUMNS
+_STATS_COLUMNS = (
+    _SCAN_COLUMNS + _FUNDAMENTAL_COLUMNS + _PERFORMANCE_COLUMNS + _TECHNICAL_COLUMNS + _PIVOT_COLUMNS
+)
 
 # La búsqueda de TradingView contesta 403 a peticiones sin pinta de navegador
 # (a diferencia del scanner de cotizaciones, que no filtra por esto). No es un

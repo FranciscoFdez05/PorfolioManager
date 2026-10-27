@@ -26,7 +26,7 @@ services:
       # Sobrescribe el PORT de .env con el que exporta docker-up.sh
       # (leído de config.ini), para que el contenedor y el mapeo de
       # puertos de abajo nunca puedan desincronizarse.
-      - PORT=${PORT:-5000}
+      - PORT=${PORT:-5050}
       # En Docker SIEMPRE hay un proxy delante (el servicio caddy de abajo), así
       # que ProxyFix va activado aquí y no en config.ini: ese fichero lo comparte
       # la instalación sin Docker, donde no hay ningún proxy y confiar en las
@@ -69,7 +69,7 @@ services:
     # puerta en claro por la que saltarse el TLS escribiendo el puerto en la
     # barra, con lo que tener el proxy delante no serviría de nada.
     expose:
-      - "${PORT:-5000}"
+      - "${PORT:-5050}"
     volumes:
       # El config.ini del host, no la copia que quedó dentro de la imagen al
       # construirla. Sin este montaje, editar el fichero no hacía nada hasta la
@@ -104,7 +104,7 @@ services:
       # disco, así que respondía 200 con la base de datos corrupta o sin montar.
       # Este endpoint ejecuta una consulta contra la BD activa y devuelve 503 si
       # falla, que es lo que hace que Docker marque el contenedor como enfermo.
-      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '5000') + '/api/health')\" || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '5050') + '/api/health')\" || exit 1"]
       interval: ${HEALTHCHECK_INTERVAL:-30s}
       timeout: ${HEALTHCHECK_TIMEOUT:-10s}
       retries: ${HEALTHCHECK_RETRIES:-3}
@@ -123,7 +123,7 @@ services:
   # pedía montarle el socket de Docker, que es root sobre el host.
   caddy:
     container_name: PorfolioManager-caddy
-    image: caddy:2-alpine
+    image: caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
     restart: unless-stopped
     depends_on:
       - porfoliomanager
@@ -141,7 +141,7 @@ services:
     ports:
       # El MISMO puerto de siempre. Activar el HTTPS no mueve la dirección: solo
       # cambia el esquema, de http:// a https://.
-      - "${PORT:-5000}:${PORT:-5000}"
+      - "${PORT:-5050}:${PORT:-5050}"
       # El puerto de comprobación del certificado. Sirve UNA página fija por
       # HTTPS con el mismo certificado que el puerto de arriba, y no hace
       # reverse_proxy a nada: no es una segunda entrada a la aplicación. Se
@@ -151,7 +151,7 @@ services:
       # se sabía antes de mirar.
       - "${CADDY_PREP_PORT:-9443}:${CADDY_PREP_PORT:-9443}"
     environment:
-      - PORT=${PORT:-5000}
+      - PORT=${PORT:-5050}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # La CA interna y los certificados emitidos. Con un volumen anónimo, cada
@@ -174,7 +174,7 @@ services:
       # certificate porque el certificado lo firma la CA interna de Caddy, que
       # no está en el almacén del contenedor: aquí se comprueba que el proxy
       # contesta y que el TLS levanta, no a quién pertenece el certificado.
-      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://127.0.0.1:${PORT:-5000}/api/health || wget -q --spider http://127.0.0.1:${PORT:-5000}/api/health"]
+      test: ["CMD-SHELL", "wget -q --spider --no-check-certificate https://127.0.0.1:${PORT:-5050}/api/health || wget -q --spider http://127.0.0.1:${PORT:-5050}/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -204,11 +204,11 @@ services:
     entrypoint: ["python", "/app/python/vigilante.py"]
     env_file: .env
     environment:
-      - PORT=${PORT:-5000}
+      - PORT=${PORT:-5050}
       - PORTFOLIO_DATA_DIR=/app/data
       - PORTFOLIO_LOGS_DIR=/app/logs
       - PORTFOLIO_API_DIR=/app/API
-      - VIGILANTE_URL=La aplicación=https://caddy:${PORT:-5000}/api/health|http://caddy:${PORT:-5000}/api/health
+      - VIGILANTE_URL=La aplicación=https://caddy:${PORT:-5050}/api/health|http://caddy:${PORT:-5050}/api/health
     volumes:
       - ./config.ini:/app/config.ini:ro
       # Solo lo que necesita: el token de Telegram (cifrado) y los ajustes de

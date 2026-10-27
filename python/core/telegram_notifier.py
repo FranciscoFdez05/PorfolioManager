@@ -343,6 +343,35 @@ MAX_BYTES_DOCUMENTO = 50 * 1024 * 1024
 _TIMEOUT_DOCUMENTO = 120.0
 
 
+class _CuerpoMultipart:
+    """Cuerpo multipart legible por trozos: cabecera, fichero abierto y cierre.
+
+    `urllib` admite un objeto con `read()` como cuerpo siempre que la petición
+    lleve `Content-Length`, y así el fichero nunca se carga entero en memoria.
+    """
+
+    def __init__(self, cabecera: bytes, fichero, cierre: bytes) -> None:
+        self._pendiente = cabecera
+        self._cierre = cierre
+        self._fichero = fichero
+        self._fase = 0
+
+    def read(self, tamano: int = 65536) -> bytes:
+        if self._fase == 0:
+            datos, self._pendiente = self._pendiente[:tamano], self._pendiente[tamano:]
+            if not self._pendiente:
+                self._fase = 1
+            return datos
+        if self._fase == 1:
+            datos = self._fichero.read(tamano)
+            if datos:
+                return datos
+            self._fase = 2
+            self._pendiente = self._cierre
+        datos, self._pendiente = self._pendiente[:tamano], self._pendiente[tamano:]
+        return datos
+
+
 def _enviarDocumento(token: str, chatId: str, ruta, texto: str) -> None:
     ruta = Path(ruta)
     limite = uuid.uuid4().hex
@@ -353,14 +382,21 @@ def _enviarDocumento(token: str, chatId: str, ruta, texto: str) -> None:
         f"--{limite}\r\nContent-Disposition: form-data; name=\"document\"; "
         f"filename=\"{ruta.name}\"\r\nContent-Type: application/zip\r\n\r\n"
     ).encode()
-    cuerpo = cabecera + ruta.read_bytes() + f"\r\n--{limite}--\r\n".encode()
-    request = urllib.request.Request(
-        _API_DOC_URL.format(token=token),
-        data=cuerpo,
-        headers={"Content-Type": f"multipart/form-data; boundary={limite}"},
-    )
-    with urllib.request.urlopen(request, timeout=_TIMEOUT_DOCUMENTO) as response:
-        respuesta = json.loads(response.read().decode("utf-8"))
+    cierre = f"\r\n--{limite}--\r\n".encode()
+    # El fichero se sube por trozos: con `read_bytes()` más la concatenación del
+    # cuerpo, un zip de decenas de MB ocupaba hasta el triple en memoria y el
+    # kernel mataba al worker (SIGKILL por OOM) justo al responder a /backup.
+    with ruta.open("rb") as fichero:
+        request = urllib.request.Request(
+            _API_DOC_URL.format(token=token),
+            data=_CuerpoMultipart(cabecera, fichero, cierre),
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={limite}",
+                "Content-Length": str(len(cabecera) + ruta.stat().st_size + len(cierre)),
+            },
+        )
+        with urllib.request.urlopen(request, timeout=_TIMEOUT_DOCUMENTO) as response:
+            respuesta = json.loads(response.read().decode("utf-8"))
     if not respuesta.get("ok"):
         raise ValueError(respuesta.get("description") or "Telegram rechazó el fichero")
 

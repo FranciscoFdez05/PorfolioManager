@@ -24,7 +24,7 @@ from routes.actualizacion import actualizacionBp
 from routes.ajustes import ajustesBp
 from routes.alertas import alertasBp
 from routes.atajo import atajoBp
-from routes.auth import authBp
+from routes.auth import authBp, prepararAltaInicial
 from routes.backup import backupBp
 from routes.categorias import categoriasBp
 from routes.cuenta_ahorro import cuentaAhorroBp
@@ -178,6 +178,10 @@ app.register_blueprint(ventasBp)
 # test podía alcanzar, porque importar este módulo escribe sobre los datos
 # reales (initPortfolios/ensureDataFile) y la suite tiene prohibido hacerlo.
 seguridad_app.instalar(app)
+
+# Sin ninguna cuenta, deja listo el código de /setup antes de atender nada:
+# docker-up.sh lo lee de data/tmp en cuanto el healthcheck da el visto bueno.
+prepararAltaInicial()
 
 
 # Directorios y ficheros que nunca deben ser accesibles desde el navegador

@@ -491,6 +491,26 @@ function pinvFilaOperacion(fila, activo) {
         </tr>`
 }
 
+/**
+ * Fila final con el total del plan. Cantidad y precio van vacíos: suman
+ * activos distintos y no tienen sentido mezclados.
+ */
+function pinvFilaTotal(calculo) {
+    const vigentes = calculo.activos.reduce((suma, activo) => suma + activo.vigentes, 0)
+    const realizadas = calculo.activos.reduce((suma, activo) => suma + activo.realizadas, 0)
+
+    return `
+        <tr class="pinvTotalRow">
+            <td></td>
+            <td class="pinvTdActivo"><div class="pinvCelda"><span class="pinvActivoNombre">Total</span></div></td>
+            <td></td>
+            <td></td>
+            <td class="pinvTdNum pinvMoney">${calculo.planificadoEur > 0 ? pinvEuros(calculo.planificadoEur) : "—"}</td>
+            <td class="pinvTdNum pinvTdPct">${calculo.planificadoEur > 0 ? pinvPorcentaje(calculo.pctRealizado) : "—"}</td>
+            <td class="pinvTdEstado">${vigentes ? `${realizadas}/${vigentes} realizadas` : ""}</td>
+        </tr>`
+}
+
 function pinvRenderTabla(calculo) {
     const cuerpo = document.getElementById("pinvBodyRows")
     const vacio = document.getElementById("pinvEmptyMsg")
@@ -521,7 +541,7 @@ function pinvRenderTabla(calculo) {
     }
 
     vacio?.classList.add("hidden")
-    cuerpo.innerHTML = calculo.activos
+    const filasActivos = calculo.activos
         .map((activo) => {
             const filas = [pinvFilaActivo(activo)]
             if (_pinvDesplegados.has(activo.assetId)) {
@@ -536,6 +556,7 @@ function pinvRenderTabla(calculo) {
             return filas.join("")
         })
         .join("")
+    cuerpo.innerHTML = filasActivos + pinvFilaTotal(calculo)
 }
 
 // ── Render: gráfica ──────────────────────────────────────────────────────────

@@ -697,7 +697,7 @@ async function saveNewVentaFromAsset(asset, fecha, cantidad, valorVenta) {
     const yearMatch = fecha.match(/(\d{4})$/)
     const year = yearMatch ? yearMatch[1] : String(new Date().getFullYear())
 
-    let yearData = null
+    let yearData
     const yearRes = await fetch(`/api/ventas/${year}`)
     if (yearRes.ok) {
         yearData = await yearRes.json()

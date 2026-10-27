@@ -51,7 +51,12 @@ log = logging.getLogger(__name__)
 # día que alguien añada un `setup` al blueprint nazca público sin querer.
 # `auth.logout` ya no está: cerrar sesión es un POST que pasa por el CSRF
 # como cualquier otra escritura (antes un GET desde otra web bastaba).
-PUBLIC_ENDPOINTS = {"auth.login", "salud.getHealth"}
+# `auth.loginDosPasos` es el segundo paso del login (código de Telegram): aún no
+# hay sesión, y la vista exige el reto que deja una contraseña correcta.
+# `auth.setup` vuelve, ahora con vista: es el alta de la primera cuenta desde la
+# web. Solo atiende mientras no hay ninguna credencial y exige el código de un
+# solo uso que deja el arranque en el servidor (core/alta_inicial.py).
+PUBLIC_ENDPOINTS = {"auth.login", "auth.loginDosPasos", "auth.setup", "salud.getHealth"}
 # Endpoints del Atajo de iOS. No pueden usar la sesión ni el token CSRF (un
 # Atajo no mantiene cookies), así que quedan fuera de requireLogin y de
 # verifyCsrf y se autentican por su cuenta: filtro de IP en core/red_local.py
@@ -196,6 +201,29 @@ def tokenCsrfActual() -> str:
     return token
 
 
+def textoEspera(segundos: int) -> str:
+    """La espera en palabras: «30 segundos», «35 minutos», «2 horas».
+
+    Args:
+        segundos: Espera real que reporta el limitador (la de `Retry-After`).
+
+    Returns:
+        Texto con la unidad que corresponde, redondeando hacia arriba.
+
+    Example:
+        >>> textoEspera(2100)
+        '35 minutos'
+    """
+    segundos = max(1, int(segundos))
+    if segundos < 60:
+        return f"{segundos} segundo" + ("" if segundos == 1 else "s")
+    if segundos < 3600:
+        minutos = -(-segundos // 60)
+        return f"{minutos} minuto" + ("" if minutos == 1 else "s")
+    horas = -(-segundos // 3600)
+    return f"{horas} hora" + ("" if horas == 1 else "s")
+
+
 def _ipCliente() -> str:
     return request.remote_addr or "desconocida"
 
@@ -319,7 +347,7 @@ def instalar(app, *, limiteEscrituras=None, limitePesadas=None):
 
         log.warning("Límite de escrituras alcanzado por %s en %s %s", ip, request.method, request.path)
         respuesta = make_response(
-            {"ok": False, "error": "Demasiadas peticiones. Espera unos segundos e inténtalo de nuevo."},
+            {"ok": False, "error": f"Demasiadas peticiones. Espera {textoEspera(espera)} e inténtalo de nuevo."},
             429,
         )
         respuesta.headers["Retry-After"] = str(espera)

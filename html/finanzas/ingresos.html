@@ -1,5 +1,12 @@
 <section class="ingresosPage">
     <div class="ingresosYearBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#ingresosMovementsBody, #ingresosAnnualBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
         <div class="ingresosYearList" id="ingresosYearList"></div>
         <button class="ingresosMonthTab ingresosRecurrentesTab" id="ingresosRecurrentesTabBtn" type="button">Recurrentes</button>
         <div class="pageActionsMenu" id="ingresosActionsMenu">
@@ -135,6 +142,6 @@
     </div>
 
     <div class="ingresosActions hidden" id="ingresosActions">
-        <button id="addIngresoRowBtn" class="primaryButton" type="button">Añadir fila</button>
+        <button id="addIngresoRowBtn" class="primaryButton" type="button">Añadir ingreso</button>
     </div>
 </section>

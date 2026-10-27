@@ -1,5 +1,12 @@
 <section class="gastosPage">
     <div class="gastosYearBar">
+        <div class="overviewSearch tablaBusqueda" data-busca-en="#gastosMovementsBody, #gastosAnnualBody">
+            <button class="overviewSearchBtn" type="button" aria-label="Buscar en la tabla" title="Buscar en la tabla">
+                <span class="icono iconoBuscar" aria-hidden="true"></span>
+            </button>
+            <input type="text" class="overviewSearchInput" aria-label="Buscar en la tabla" placeholder="Buscar..." autocomplete="off" spellcheck="false" hidden>
+        </div>
+        <div class="overviewDivider tablaBusquedaDivisor"></div>
         <div class="gastosYearList" id="gastosYearList"></div>
         <button class="gastosMonthTab gastosMensualidadesTab" id="gastosMensualidadesTabBtn" type="button">Mensualidades</button>
         <div class="pageActionsMenu" id="gastosActionsMenu">
@@ -108,6 +115,6 @@
     </div>
 
     <div class="gastosActions hidden" id="gastosActions">
-        <button id="addGastoRowBtn" class="primaryButton" type="button">Añadir fila</button>
+        <button id="addGastoRowBtn" class="primaryButton" type="button">Añadir gasto</button>
     </div>
 </section>

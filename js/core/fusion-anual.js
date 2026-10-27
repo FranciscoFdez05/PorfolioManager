@@ -136,6 +136,59 @@
         return datos == null ? null : JSON.parse(JSON.stringify(datos))
     }
 
+    /**
+     * Resultado de una fusión sin dos filas con el mismo `id`.
+     *
+     * Si una fila se editó en las dos pestañas, la fusión por contenido deja la
+     * versión del servidor y la local con el mismo id, y la base de datos (clave
+     * primaria) rechaza el guardado. Gana la que ya estaba guardada: se descarta
+     * la local y se devuelven las filas descartadas para avisar al usuario.
+     */
+    function resolverConflictosPorId(filas, servidor) {
+        const enServidor = new Set((Array.isArray(servidor) ? servidor : []).map(claveEstable))
+        const porId = new Map()
+        ;(Array.isArray(filas) ? filas : []).forEach((fila) => {
+            const id = fila?.id
+            if (!porId.has(id)) porId.set(id, [])
+            porId.get(id).push(fila)
+        })
+
+        const descartadas = []
+        const resultado = []
+        const vistos = new Set()
+        ;(Array.isArray(filas) ? filas : []).forEach((fila) => {
+            const grupo = porId.get(fila?.id)
+            if (grupo.length === 1) {
+                resultado.push(fila)
+                return
+            }
+            if (vistos.has(fila?.id)) return
+            vistos.add(fila?.id)
+            const ganadora = grupo.find((candidata) => enServidor.has(claveEstable(candidata))) || grupo[0]
+            resultado.push(ganadora)
+            grupo.filter((candidata) => candidata !== ganadora).forEach((candidata) => descartadas.push(candidata))
+        })
+        return { filas: resultado, descartadas }
+    }
+
+    /** Aviso tras fusionar: persistente si hubo registros editados en los dos sitios. */
+    function avisarFusion(que, descartadas) {
+        if (typeof showToast !== "function") return
+        if (descartadas > 0) {
+            showToast(
+                `Se han combinado los cambios en ${que}, pero ${descartadas} registro(s) se editaron también en otro sitio: ` +
+                    "se ha conservado la versión que se guardó primero y se han descartado tus cambios en ellos.",
+                { type: "warning", persistent: true }
+            )
+            return
+        }
+        showToast(`${que[0].toUpperCase()}${que.slice(1)} habían cambiado desde otro sitio (otra pestaña, otro dispositivo). Se han combinado los cambios.`, {
+            type: "warning"
+        })
+    }
+
+    window.avisarFusion = avisarFusion
+    window.resolverConflictosPorId = resolverConflictosPorId
     window.claveEstableAnual = claveEstable
     window.fusionarListaTresVias = fusionarListaTresVias
     window.fusionarAnioTresVias = fusionarAnioTresVias

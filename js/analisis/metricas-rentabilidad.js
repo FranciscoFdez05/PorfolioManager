@@ -175,8 +175,10 @@ function mDrawDrawdownChart(indice) {
 //
 //     r = (Vfin − Vini − Flujo) / (Vini + Flujo/2)
 //
-// El flujo se deduce del invertido de cada snapshot (sube al comprar y baja al
-// vender), que es justo el dinero que entra y sale de la cartera.
+// El flujo es el dinero que de verdad entró o salió, el mismo por tramo que usan
+// la TWR y la XIRR del servidor: cada snapshot guarda el suyo (`f`). Donde no
+// hay, se estima con la variación del invertido (que es un coste, no dinero) y
+// el año sale marcado como estimado.
 // Por debajo de este porcentaje de días registrados, la barra del año se
 // dibuja rayada: un 2024 con tres snapshots no mide lo mismo que uno con
 // trescientos, y en un gráfico de barras los dos pesan igual.
@@ -200,6 +202,29 @@ function mPatronRayado(color) {
     ctx.lineTo(14, 2)
     ctx.stroke()
     return ctx.createPattern(tile, "repeat") || color
+}
+
+// Flujo neto entre dos puntos de la serie: la suma de los flujos guardados en los
+// snapshots que hay entre medias. `inicio` y `cierre` son puntos con `ts` e `i`;
+// `cierre` puede ser el valor en vivo (sin `f`), cuyo tramo desde el último
+// snapshot se estima con el invertido. Devuelve `{ flujo, estimado }`.
+function mFlujoDelTramo(snaps, inicio, cierre) {
+    const estimar = () => ({ flujo: cierre.i - inicio.i, estimado: true })
+    const tramo = snaps.filter((p) => p.ts > inicio.ts && p.ts <= (cierre.ts ?? Infinity))
+
+    if (tramo.some((p) => p.f === null || p.f === undefined || !Number.isFinite(Number(p.f)))) {
+        return estimar()
+    }
+    const guardado = tramo.reduce((suma, p) => suma + Number(p.f), 0)
+    const ultimo = tramo.length ? tramo[tramo.length - 1] : inicio
+    const esVivo = cierre.ts === undefined || cierre.ts === null
+
+    if (!esVivo) {
+        return { flujo: guardado, estimado: false }
+    }
+    // El tramo desde el último snapshot hasta el valor en vivo no tiene flujo guardado.
+    const resto = cierre.i - ultimo.i
+    return { flujo: guardado + resto, estimado: Math.abs(resto) > 0.005 }
 }
 
 function mRenderRentabilidadAnual(snaps, currentValue, currentInvested, cobertura = {}) {
@@ -236,7 +261,7 @@ function mRenderRentabilidadAnual(snaps, currentValue, currentInvested, cobertur
         // Un único snapshot en un año ya cerrado no delimita ningún periodo.
         if (!prevData && byYear[yr].first === byYear[yr].last && yr !== currentYear) return
 
-        const flujo = cierre.i - inicio.i
+        const { flujo, estimado } = mFlujoDelTramo(snaps, inicio, cierre)
         const base = inicio.v + flujo / 2
         if (!(base > 0)) return
 
@@ -250,7 +275,15 @@ function mRenderRentabilidadAnual(snaps, currentValue, currentInvested, cobertur
         values.push(parseFloat(ret.toFixed(2)))
         // parcial: el año no arranca en el cierre del anterior, sino en el
         // primer snapshot que hay guardado, así que mide menos de 12 meses.
-        detalle.push({ inicio: inicio.v, cierre: cierre.v, flujo, parcial: !prevData, cobertura: cob, pobre })
+        detalle.push({
+            inicio: inicio.v,
+            cierre: cierre.v,
+            flujo,
+            estimado,
+            parcial: !prevData,
+            cobertura: cob,
+            pobre
+        })
     })
 
     if (labels.length < 1) {
@@ -308,12 +341,13 @@ function mRenderRentabilidadAnual(snaps, currentValue, currentInvested, cobertur
                                 `Valor final: ${formatEuro(d.cierre)}`,
                                 `${d.flujo >= 0 ? "Aportado" : "Retirado"}: ${formatEuro(Math.abs(d.flujo))}`
                             ]
+                            if (d.estimado) lineas.push("Flujo estimado con la variación del invertido")
                             if (d.parcial) lineas.push("Periodo parcial (desde el primer registro)")
                             if (d.cobertura) {
                                 lineas.push(
                                     `Cobertura: ${d.cobertura.dias} de ${d.cobertura.esperados} días (${String(d.cobertura.pct).replace(".", ",")} %)`
                                 )
-                                if (d.pobre) lineas.push("⚠ Pocos puntos: la cifra es orientativa")
+                                if (d.pobre) lineas.push("Aviso: pocos puntos, la cifra es orientativa")
                             }
                             return lineas
                         }
@@ -693,6 +727,7 @@ function mDrawAnualReparto(totalGastado, totalAhorrado) {
     // Un donut no sabe representar un ahorro negativo, así que en ese caso se
     // enseña la comparación como barras.
     if (totalAhorrado < 0) {
+        mRenderDonutLeyenda("mChartAnualReparto", [], [], [], 0)
         mCreateChart("mChartAnualReparto", {
             type: "bar",
             data: {
@@ -722,14 +757,17 @@ function mDrawAnualReparto(totalGastado, totalAhorrado) {
     }
 
     const total = totalGastado + totalAhorrado
+    const repartoLabels = ["Gastado", "Ahorrado"]
+    const repartoValues = [totalGastado, totalAhorrado]
+    const repartoColors = ["#e74c3c", "#2ecc71"]
     mCreateChart("mChartAnualReparto", {
         type: "doughnut",
         data: {
-            labels: ["Gastado", "Ahorrado"],
+            labels: repartoLabels,
             datasets: [
                 {
-                    data: [totalGastado, totalAhorrado],
-                    backgroundColor: ["#e74c3c", "#2ecc71"],
+                    data: repartoValues,
+                    backgroundColor: repartoColors,
                     borderColor: "#0b1120",
                     borderWidth: 2,
                     hoverOffset: 10
@@ -741,11 +779,12 @@ function mDrawAnualReparto(totalGastado, totalAhorrado) {
             cutout: "55%",
             plugins: {
                 ...M_CHART_DEFAULTS.plugins,
-                legend: { ...M_CHART_DEFAULTS.plugins.legend, position: "bottom" },
+                legend: { display: false },
                 tooltip: { callbacks: { label: (c) => mGridTooltip(c.label, c.raw, total) } }
             }
         }
     })
+    mRenderDonutLeyenda("mChartAnualReparto", repartoLabels, repartoColors, repartoValues, total)
 }
 
 function mDrawAnualAcumulado(resumen) {
@@ -890,7 +929,7 @@ function mRenderInvertidoPeriodo(invData) {
 
     const yearToggle = document.getElementById("mInvertidoYearToggle")
     if (yearToggle) {
-        yearToggle.innerHTML = years
+        yearToggle.innerHTML = ordenarAniosRecientesPrimero(years)
             .map(
                 (y) =>
                     `<button class="mToggleBtn${y === _metricasInvertidoYear ? " active" : ""}" data-invyr="${y}">${y}</button>`
@@ -1032,7 +1071,7 @@ function mRenderPasivosCharts(dividendos, intereses) {
 
     const yearToggle = document.getElementById("mPasivosYearToggle")
     if (yearToggle) {
-        yearToggle.innerHTML = years
+        yearToggle.innerHTML = ordenarAniosRecientesPrimero(years)
             .map(
                 (y) =>
                     `<button class="mToggleBtn${y === _metricasPasivosYear ? " active" : ""}" data-pasmy="${y}">${y}</button>`

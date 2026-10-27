@@ -5,8 +5,22 @@ import re
 from core import paths
 from core.db import getDb, initDb, transactional
 from core.secret_store import readSecretLines
+from stores import revisiones
 
 log = logging.getLogger(__name__)
+
+
+def _abrirEscritura(conn, ambito, revisionEsperada):
+    """Toma el bloqueo de escritura y comprueba la revisión dentro de la misma transacción."""
+    revisiones.tomarBloqueo(conn)
+    revisiones.comprobar(conn, ambito, revisiones.CLAVE_UNICA, revisionEsperada)
+
+
+def _cerrarEscritura(conn, ambito):
+    """Avanza la revisión, confirma y devuelve la nueva."""
+    nueva = revisiones.avanzar(conn, ambito, revisiones.CLAVE_UNICA)
+    conn.commit()
+    return nueva
 
 _eodhdKeyRotationIndex = 0
 _alphaVantageKeyRotationIndex = 0
@@ -255,8 +269,10 @@ def readOperacionesFile():
 
 
 @transactional
-def writeOperacionesFile(data):
+def writeOperacionesFile(data, revisionEsperada=None):
+    """Sustituye la lista de operaciones. Devuelve la revisión nueva (ver stores/revisiones.py)."""
     conn = getDb()
+    _abrirEscritura(conn, "operaciones", revisionEsperada)
     conn.execute("DELETE FROM operaciones")
     conn.executemany(
         "INSERT INTO operaciones "
@@ -273,7 +289,7 @@ def writeOperacionesFile(data):
             for r in data.get("rows", [])
         ]
     )
-    conn.commit()
+    return _cerrarEscritura(conn, "operaciones")
 
 
 # --- Trading Journal ---
@@ -302,8 +318,10 @@ def readTradingFile():
 
 
 @transactional
-def writeTradingFile(data):
+def writeTradingFile(data, revisionEsperada=None):
+    """Sustituye la lista de trades. Devuelve la revisión nueva (ver stores/revisiones.py)."""
     conn = getDb()
+    _abrirEscritura(conn, "trading", revisionEsperada)
     conn.execute("DELETE FROM trading")
     conn.executemany(
         "INSERT INTO trading (id, fecha, tipo, moneda, direccion, resultado, capital, capital_currency, roi, ganancia, ganancia_neta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -315,7 +333,7 @@ def writeTradingFile(data):
             for r in data.get("rows", [])
         ]
     )
-    conn.commit()
+    return _cerrarEscritura(conn, "trading")
 
 
 # --- Transacciones ---
@@ -345,8 +363,10 @@ def readTransaccionesFile():
 
 
 @transactional
-def writeTransaccionesFile(data):
+def writeTransaccionesFile(data, revisionEsperada=None):
+    """Sustituye la lista de transacciones. Devuelve la revisión nueva (ver stores/revisiones.py)."""
     conn = getDb()
+    _abrirEscritura(conn, "transacciones", revisionEsperada)
     conn.execute("DELETE FROM transacciones")
     conn.executemany(
         "INSERT INTO transacciones "
@@ -361,7 +381,7 @@ def writeTransaccionesFile(data):
             for r in data.get("rows", [])
         ]
     )
-    conn.commit()
+    return _cerrarEscritura(conn, "transacciones")
 
 
 # --- Dividendo Calendar ---
@@ -446,8 +466,10 @@ def readStablecoinsFile():
 
 
 @transactional
-def writeStablecoinsFile(data):
+def writeStablecoinsFile(data, revisionEsperada=None):
+    """Sustituye catálogo, activadas y filas. Devuelve la revisión nueva (ver stores/revisiones.py)."""
     conn = getDb()
+    _abrirEscritura(conn, "stablecoins", revisionEsperada)
     conn.execute("DELETE FROM stablecoins_catalog")
     conn.execute("DELETE FROM stablecoins_enabled")
     conn.execute("DELETE FROM stablecoins_rows")
@@ -475,7 +497,7 @@ def writeStablecoinsFile(data):
             for r in data.get("rows", [])
         ]
     )
-    conn.commit()
+    return _cerrarEscritura(conn, "stablecoins")
 
 
 # --- Renta Fija ---

@@ -509,8 +509,13 @@
 }
 
 /* ── Mayores subidas / bajadas ── */
+/* La tarjeta no tiene padding (metricasTableCard), así que el título se pegaba
+   al borde: se trata como la cabecera de una tabla, con su fondo y su línea. */
 .smMoversTitle {
     margin-bottom: 4px;
+    padding: 10px 12px;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-soft);
 }
 
 .smMoversList {

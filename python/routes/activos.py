@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from core import dinero, pnl_divisa
 from core.db import getActiveDbPath, getDb
-from providers.finnhub_client import convertAmount
+from providers.finnhub_client import convertAmount, fetchExchangeRate
 from stores import alertas_store, rendimiento_activo, revisiones
 from stores.asset_store import (
     deleteAssetFile,
@@ -16,6 +16,7 @@ from stores.asset_store import (
     writeAssetFile,
 )
 from stores.asset_utils import (
+    _MAX_NAME,
     _MAX_TICKER,
     SUPPORTED_ASSET_CURRENCIES,
     _trunc,
@@ -27,14 +28,15 @@ from stores.asset_utils import (
     sanitizeColor,
     slugify,
 )
+from stores.fx_historico import tipoActualConMemo
 from stores.helpers import (
-    convertAssetRowsCurrency,
+    convertAssetRowsCurrency,  # noqa: F401  (los tests lo sustituyen en el módulo)
     formatDecimal,
     isTemporaryServiceError,
     normalizeCurrencyCode,
     parseLooseNumber,
 )
-from stores.market_data import fetchAssetQuote
+from stores.market_data import edadEnCache, fetchAssetQuote
 
 activosBp = Blueprint("activos", __name__)
 
@@ -58,7 +60,8 @@ def _columna(row, nombre, defecto=""):
     return defecto if valor is None else valor
 
 
-def _descomponerPorDivisa(rows, participacionesVivas, currentPrice, fxActual):
+def _descomponerPorDivisa(rows, participacionesVivas, currentPrice, fxActual, operaciones=(), esCripto=False,
+                          ventas=(), transacciones=(), conversiones=()):
     """Separa el resultado del activo entre efecto activo y efecto divisa.
 
     Cada compra aporta su lote con **su** tipo de cambio: aplicar un tipo medio
@@ -68,16 +71,17 @@ def _descomponerPorDivisa(rows, participacionesVivas, currentPrice, fxActual):
     qué lote pertenece cada participación que queda viva (eso lo sabe el FIFO
     fiscal, y traerlo aquí ataría esta pantalla al módulo de ventas).
     """
+    # Solo cuenta el coste de lo que sigue en cartera: lo vendido ya no está en
+    # el valor actual, y dejarlo en el invertido falseaba los dos efectos.
     compras = []
-    for row in rows:
-        if str(row["tipo_operacion"] or "").strip().lower() == "venta":
-            continue
-        capital = parseLooseNumber(row["capital_invertido_bruto"]) or Decimal("0")
-        if capital <= 0:
+    for lote in rendimiento_activo.lotesVivos(
+        rows, operaciones, esCripto, ventas, None, transacciones, conversiones
+    ):
+        if lote["coste"] <= 0:
             continue
         compras.append({
-            "invertido": capital,
-            "fxCompra": _columna(row, "fx_rate"),
+            "invertido": lote["coste"],
+            "fxCompra": lote["fx"],
         })
 
     invertidoTotal = sum((c["invertido"] for c in compras), Decimal("0"))
@@ -106,32 +110,29 @@ def getRendimientoBatch():
     # resuelven fuera del bucle para no repetir la consulta por cada activo.
     fxActuales = _tiposActuales({str(a["currency"] or "EUR").upper() for a in assets})
 
-    # Dos consultas para toda la cartera, no dos por activo: con decenas de
-    # activos esto se llamaba en cada carga de la tabla principal.
-    filasPorActivo = {}
-    for fila in conn.execute(
-        "SELECT asset_id, tipo_operacion, participaciones, capital_invertido_bruto, "
-        "comisiones, comisiones_fiat, fx_rate FROM activo_rows ORDER BY id"
-    ):
-        filasPorActivo.setdefault(fila["asset_id"], []).append(fila)
-    opsPorActivo = {}
-    for op in conn.execute(
-        "SELECT asset_id, orden, cantidad, comisiones_cripto, total FROM activo_operation_rows "
-        "WHERE estado = 'Completado'"
-    ):
-        opsPorActivo.setdefault(op["asset_id"], []).append(op)
+    # Una carga para toda la cartera, no una por activo: con decenas de activos
+    # esto se llamaba en cada carga de la tabla principal.
+    posiciones = rendimiento_activo.cargarPosiciones(conn)
+    tipoDeCambio = tipoActualConMemo()
 
     for asset in assets:
         assetId = asset["id"]
-        rows = filasPorActivo.get(assetId, [])
+        datos = posiciones.get(assetId, {})
+        rows = datos.get("filas", [])
+        opsDelActivo = datos.get("operaciones", [])
         currentPrice = rendimiento_activo.numero(asset["price"])
         # El cálculo es el de stores/rendimiento_activo, el mismo que usa la
         # lista de activos: antes había una copia aquí y otra allí.
         totales = rendimiento_activo.calcular(
             rows,
-            opsPorActivo.get(assetId, []),
+            opsDelActivo,
             str(asset["type"] or "").strip().lower() == "cripto",
             asset["price"],
+            datos.get("ventas", []),
+            datos.get("transacciones", []),
+            datos.get("conversiones", []),
+            str(asset["currency"] or "EUR").strip().upper() or "EUR",
+            tipoDeCambio,
         )
         result[assetId] = totales.paraJson()
         totalParticipaciones = totales.participaciones
@@ -143,6 +144,11 @@ def getRendimientoBatch():
         moneda = str(asset["currency"] or "EUR").upper()
         descomposicion = _descomponerPorDivisa(
             rows, totalParticipaciones, currentPrice, fxActuales.get(moneda),
+            operaciones=opsDelActivo,
+            esCripto=str(asset["type"] or "").strip().lower() == "cripto",
+            ventas=posiciones.get(assetId, {}).get("ventas", []),
+            transacciones=posiciones.get(assetId, {}).get("transacciones", []),
+            conversiones=posiciones.get(assetId, {}).get("conversiones", []),
         )
         result[assetId]["divisa"] = {
             "moneda": moneda,
@@ -166,14 +172,30 @@ def _tiposActuales(monedas):
     tipos = {}
     for moneda in monedas:
         rate, _origen, _fecha = tasaActual(moneda, permitirDescarga=False)
+        if rate is None:
+            rate = _tipoDelProveedor(moneda)
         tipos[moneda] = rate
     return tipos
+
+
+def _tipoDelProveedor(moneda):
+    """Tipo de hoy de `moneda` a euros pedido al servicio de cambio, o None.
+
+    Sin él, el valor actual de un activo en dólares se sumaba como si fueran
+    euros. No hace falta recordarlo aquí: `fetchExchangeRate` ya cachea cada par
+    unos minutos para todos los llamadores.
+    """
+    rate, error = fetchExchangeRate(moneda, "EUR", timeout=5)
+    return Decimal(str(rate)) if not error and rate and rate > 0 else None
 
 
 @activosBp.route("/api/activos", methods=["POST"])
 def createActivo():
     requestData = request.get_json(silent=True) or {}
-    assetName = str(requestData.get("name", "")).strip()
+    # Se acota como en saveActivo: sin tope, el slug derivado del nombre podía
+    # superar el limit_request_line de gunicorn y dejar el activo imborrable
+    # (DELETE/PUT llevan el id en la URL y caían en 400 antes de llegar a Flask).
+    assetName = _trunc(requestData.get("name", ""), _MAX_NAME).strip()
     assetType = sanitizeAssetType(requestData.get("type", ""))
     marketSymbol = str(requestData.get("marketSymbol", requestData.get("finnhubSymbol", ""))).strip().upper()
     marketProvider = normalizeMarketProvider(
@@ -380,8 +402,25 @@ def refreshActivoMarketData(assetId):
     # lo que hace es cambiar la divisa del activo (precio y compras a la vez,
     # con `/currency`), y así nunca hay dos divisas distintas en juego.
     targetCurrency = normalizeCurrencyCode(assetData.get("currency", ""), fallback="EUR")
+    # Por defecto se pide un precio nuevo al proveedor (botón «Actualizar
+    # cotizaciones»). La carga y el refresco automáticos mandan `usarCache: true`
+    # en el cuerpo para aceptar el del servidor dentro de su TTL; el automático manda
+    # además `maxEdadSegundos` (su intervalo) para no recibir uno más viejo.
+    opciones = request.get_json(silent=True)
+    if not isinstance(opciones, dict):
+        opciones = {}
+    usarCache = opciones.get("usarCache") is True
+    maxEdadSegundos = opciones.get("maxEdadSegundos")
+    if isinstance(maxEdadSegundos, bool) or not isinstance(maxEdadSegundos, int):
+        maxEdadSegundos = None
+    opcionesCache = {}
+    edadCache = None
+    if usarCache:
+        edadCache = edadEnCache(marketSymbol, marketProvider, targetCurrency, maxEdadSegundos)
+        if maxEdadSegundos is not None:
+            opcionesCache["maxEdadSegundos"] = maxEdadSegundos
     quote, error = fetchAssetQuote(
-        marketSymbol, marketProvider, useCache=False, targetCurrency=targetCurrency
+        marketSymbol, marketProvider, useCache=usarCache, targetCurrency=targetCurrency, **opcionesCache
     )
 
     if error:
@@ -432,7 +471,56 @@ def refreshActivoMarketData(assetId):
     return jsonify({
         "ok": True, "asset": assetData, "marketData": quote["marketData"],
         "alertasSaltadas": len(alertas),
+        # De cuándo es el precio lo dice `asset.lastUpdated`; esto solo indica si
+        # salió de la caché del servidor y con cuántos segundos de antigüedad.
+        "desdeCache": edadCache is not None,
+        "edadCacheSegundos": round(edadCache) if edadCache is not None else None,
     })
+
+
+def _tipoDeConversion(origen, destino):
+    """Cuántas unidades de `destino` vale una de `origen`, o `(None, error)`.
+
+    Si una de las dos es el euro, el tipo sale del cambio de la otra a euros (y su
+    inverso exacto en el otro sentido); las demás parejas, directas.
+    """
+    if origen != "EUR" and destino != "EUR":
+        tipo, error = convertAmount(Decimal("1"), origen, destino)
+        return tipo, error
+    otra = destino if origen == "EUR" else origen
+    tipo, error = convertAmount(Decimal("1"), otra, "EUR")
+    if error or tipo is None or tipo <= 0:
+        return None, error or "Tipo de cambio no disponible"
+    return (tipo if destino == "EUR" else Decimal("1") / tipo), None
+
+
+_CAMPOS_DE_IMPORTE = ("precioParticipacion", "capitalInvertidoBruto", "comisiones")
+
+
+def _importeConvertido(valor, tipo):
+    """Importe por el tipo, en texto canónico con hasta ocho decimales.
+
+    No se redondea a céntimos: hacerlo en cada conversión perdía céntimos en una
+    ida y vuelta (1.000 pasaba a 999,99). Lo que queda a menos de una millonésima
+    de un valor de céntimos se ajusta a él, para que el resultado sea 1000 y no
+    999,99999999.
+    """
+    numero = parseLooseNumber(valor)
+    if numero is None:
+        return valor
+    convertido = dinero.redondear(numero * tipo, 8)
+    centimos = dinero.redondear(convertido, 2)
+    if abs(convertido - centimos) < Decimal("0.000001"):
+        convertido = centimos
+    return dinero.aTexto(convertido)
+
+
+def _convertirFila(fila, tipo):
+    convertida = dict(fila)
+    for campo in _CAMPOS_DE_IMPORTE:
+        if campo in convertida:
+            convertida[campo] = _importeConvertido(convertida[campo], tipo)
+    return convertida
 
 
 @activosBp.route("/api/activos/<assetId>/currency", methods=["POST"])
@@ -443,6 +531,9 @@ def changeActivoCurrency(assetId):
     está denominado en ella; si no, quedarían cifras de monedas distintas
     mezcladas en la misma fila.
     """
+    # La revisión se lee ANTES que el activo: si se guardara entre medias, la
+    # revisión leída después ya incluiría ese guardado y la escritura lo pisaría.
+    revisionLeida = revisiones.actual("activos", slugify(assetId))
     assetData = readAssetFile(assetId)
 
     if assetData is None:
@@ -462,32 +553,43 @@ def changeActivoCurrency(assetId):
     if currentCurrency == targetCurrency:
         return jsonify({"ok": True, "asset": assetData, "converted": False})
 
-    revisionLeida = revisiones.actual("activos", slugify(assetId))
+    # Un único tipo para todo (precio y filas), y siempre pasando por el cambio a
+    # euros: así volver a la divisa de partida deshace la conversión exacta, en
+    # vez de multiplicar por dos tipos que no son el inverso uno del otro.
+    rate, errorRate = _tipoDeConversion(currentCurrency, targetCurrency)
+    if errorRate or rate is None or rate <= 0:
+        statusCode = 503 if isTemporaryServiceError(errorRate or "") else 400
+        return jsonify({"ok": False, "error": errorRate or "Tipo de cambio no disponible"}), statusCode
+
     convertedPrice = parseLooseNumber(assetData.get("price", ""))
 
     if convertedPrice is not None:
-        convertedPrice, error = convertAmount(convertedPrice, currentCurrency, targetCurrency)
-
-        if error:
-            statusCode = 503 if isTemporaryServiceError(error) else 400
-            return jsonify({"ok": False, "error": error}), statusCode
-
-        assetData["price"] = formatDecimal(convertedPrice)
+        assetData["price"] = formatDecimal(convertedPrice * rate)
 
     # Las filas de cripto llevan su propia moneda por compra (se compró en EUR o
     # en USD y así queda registrado); las demás están todas en la del activo.
     if not isCrypto:
-        convertedRows, error = convertAssetRowsCurrency(
-            assetData.get("rows", []),
-            currentCurrency,
-            targetCurrency,
-            assetData.get("type", ""),
-            fields=None
-        )
+        convertedRows = [_convertirFila(fila, rate) for fila in assetData.get("rows", [])]
 
-        if error:
-            statusCode = 503 if isTemporaryServiceError(error) else 400
-            return jsonify({"ok": False, "error": error}), statusCode
+        # Cambiar la divisa del activo es un cambio de visualización: no puede
+        # alterar el resultado fiscal de las ventas ya hechas. Los importes de
+        # las filas se convierten con el tipo de hoy (`rate`), así que el tipo
+        # de cambio de cada fila se reescala con el mismo `rate` para que
+        # importe x tipo siga valiendo en euros lo que costó de verdad en su
+        # fecha. Si la fila no tenía tipo no hay nada que conservar y queda como
+        # una fila nueva en la divisa nueva (1 en euros, pendiente en otra).
+        for fila, original in zip(convertedRows, assetData.get("rows", []), strict=True):
+            tipoAnterior = parseLooseNumber(original.get("fxRate", ""))
+            if tipoAnterior is None and str(original.get("currency") or "EUR").upper() == "EUR":
+                tipoAnterior = Decimal("1")
+            fila["currency"] = targetCurrency
+            if tipoAnterior is not None and tipoAnterior > 0:
+                fila["fxRate"] = f"{tipoAnterior / rate:.12f}"
+                fila["fxOrigen"] = "conversion"
+            else:
+                fila["fxRate"] = "1.00000000" if targetCurrency == "EUR" else ""
+                fila["fxFecha"] = ""
+                fila["fxOrigen"] = "base" if targetCurrency == "EUR" else ""
 
         assetData["rows"] = convertedRows
 
