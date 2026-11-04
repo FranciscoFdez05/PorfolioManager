@@ -50,7 +50,7 @@ def testNoAvisaHastaElNumeroDeFallosSeguidos(bandeja):
 
     vigia.procesar(CAIDO, "timeout", 160)
     assert len(bandeja.textos) == 1
-    assert "🔴" in bandeja.textos[0] and "no responde" in bandeja.textos[0]
+    assert "no responde" in bandeja.textos[0]
     assert "timeout" in bandeja.textos[0]
 
 
@@ -101,7 +101,7 @@ def testAvisaDeQueVuelveConLoQueDuro(bandeja):
     vigia.procesar(OK, "", 1000 + 5 * 60)
 
     assert len(bandeja.textos) == 2
-    assert "🟢" in bandeja.textos[1] and "5 min" in bandeja.textos[1]
+    assert "vuelve a responder" in bandeja.textos[1] and "5 min" in bandeja.textos[1]
 
 
 def testNoCuentaLaRecuperacionDeUnaCaidaDeLaQueNoAviso(bandeja):
@@ -121,7 +121,7 @@ def testTrasRecuperarseUnaCaidaNuevaVuelveAAvisar(bandeja):
     vigia.procesar(CAIDO, "x", 300)
 
     assert len(bandeja.textos) == 3
-    assert "🔴" in bandeja.textos[2]
+    assert "no responde" in bandeja.textos[2]
 
 
 def testDegradadoNoEsLoMismoQueCaido(bandeja):
@@ -129,7 +129,7 @@ def testDegradadoNoEsLoMismoQueCaido(bandeja):
 
     vigia.procesar(DEGRADADO, "corrupta", 100)
 
-    assert "⚠️" in bandeja.textos[0] and "degradado" in bandeja.textos[0]
+    assert "degradado" in bandeja.textos[0]
     assert "corrupta" in bandeja.textos[0]
 
 
@@ -140,7 +140,7 @@ def testPasarDeCaidoADegradadoAvisaDelCambio(bandeja):
     vigia.procesar(DEGRADADO, "bd", 130)
 
     assert len(bandeja.textos) == 2
-    assert "⚠️" in bandeja.textos[1]
+    assert "degradado" in bandeja.textos[1]
 
 
 # ── Telegram no disponible ────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ def testSiLaRecuperacionNoSaleSeReintenta(bandeja):
 
     bandeja.disponible = True
     vigia.procesar(OK, "", 230)
-    assert len(bandeja.textos) == 2 and "🟢" in bandeja.textos[1]
+    assert len(bandeja.textos) == 2 and "vuelve a responder" in bandeja.textos[1]
 
     vigia.procesar(OK, "", 260)
     assert len(bandeja.textos) == 2, "y una vez contada no se repite"
@@ -293,7 +293,7 @@ def testElBucleAvisaTrasLosFallosYCuentaLaVuelta(bandeja):
     )
 
     assert len(bandeja.textos) == 2
-    assert "🔴" in bandeja.textos[0] and "🟢" in bandeja.textos[1]
+    assert "no responde" in bandeja.textos[0] and "vuelve a responder" in bandeja.textos[1]
     assert esperas == [30, 30, 30], "duerme entre rondas pero no tras la última"
 
 

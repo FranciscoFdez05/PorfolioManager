@@ -1129,6 +1129,11 @@ html[data-theme="light"] .csOption {
     color: var(--text-subtle);
 }
 
+/* components.css */
+html[data-theme="light"] .calPopup {
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+}
+
 html[data-theme="light"] .csOption:hover {
     background: var(--bg-header);
 }
@@ -2066,6 +2071,20 @@ html[data-theme="light"] .toolsSelectedValue {
 
 html[data-theme="light"] .toolsSelectedMeta {
     color: var(--text-dim);
+}
+
+/* carteras-conocidas.css: en este tema .cancelButton es rojo como .dangerButton;
+   en el catálogo «Editar» o «Todas» no son peligrosos y van neutros. */
+html[data-theme="light"] .carterasModal .cancelButton {
+    background: var(--bg-header);
+    border-color: var(--border-soft);
+    color: var(--text-subtle);
+}
+
+html[data-theme="light"] .carterasModal .cancelButton:hover {
+    background: var(--bg-hover);
+    border-color: var(--border-mid);
+    color: var(--text-primary);
 }
 
 /* ── 11. Bolsa e inversión ───────────────────────────────────────────────── */

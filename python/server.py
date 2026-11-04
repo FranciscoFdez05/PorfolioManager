@@ -26,6 +26,7 @@ from routes.alertas import alertasBp
 from routes.atajo import atajoBp
 from routes.auth import authBp, prepararAltaInicial
 from routes.backup import backupBp
+from routes.carteras_conocidas import carterasConocidasBp
 from routes.categorias import categoriasBp
 from routes.cuenta_ahorro import cuentaAhorroBp
 from routes.cuentas import cuentasBp
@@ -41,10 +42,12 @@ from routes.planes_cartera import planesCarteraBp
 from routes.portfolios import portfoliosBp
 from routes.registros import registrosBp
 from routes.salud import saludBp
+from routes.satoshi import satoshiBp
 from routes.snapshots import snapshotsBp
 from routes.tls import tlsBp
 from routes.trading import tradingBp
 from routes.ventas import ventasBp
+from routes.wallets import walletsBp
 from stores.app_data import ensureDataFile
 
 # .env antes que nada: los ajustes admiten override por variable de entorno, y
@@ -172,6 +175,9 @@ app.register_blueprint(saludBp)
 app.register_blueprint(snapshotsBp)
 app.register_blueprint(tlsBp)
 app.register_blueprint(ventasBp)
+app.register_blueprint(walletsBp)
+app.register_blueprint(carterasConocidasBp)
+app.register_blueprint(satoshiBp)
 
 # CSRF, tope de cuerpo, límite de escrituras, sesión y cabeceras de respuesta.
 # El detalle vive en core/seguridad_app.py: aquí ocupaba 130 líneas que ningún
@@ -267,13 +273,20 @@ def _encryptApiKeysAtRest():
     Se recorre el directorio en vez de una lista fija de nombres: así un
     proveedor nuevo queda cubierto sin tener que acordarse de añadirlo aquí, que
     es justo el descuido que dejaría una clave sin cifrar.
+
+    Se salta wallets.key: lleva su propio cifrado (`WAL1:`) y, al ser texto
+    ASCII, se tomaba por una clave en claro y se envolvía en `ENC1:` en cada
+    arranque, dejando las wallets ilegibles.
     """
     from core.secret_store import migratePlaintextIfNeeded
+    from stores.wallets_store import NOMBRE_FICHERO as walletsFichero
 
     if not API_DIR.is_dir():
         return
 
     for path in sorted(API_DIR.glob("*.key")):
+        if path.name == walletsFichero:
+            continue
         try:
             migratePlaintextIfNeeded(path)
         except Exception as e:
@@ -283,20 +296,25 @@ def _encryptApiKeysAtRest():
 # Inicialización al arrancar, tanto con Gunicorn como con el servidor de desarrollo
 ensureDataFile()
 _encryptApiKeysAtRest()
-# Las copias automáticas se comprueban ya al iniciar portfolios y luego cada
-# hora. Así cambiar la frecuencia en Ajustes no exige reiniciar el servidor.
-startBackupScheduler()
-# El histórico de evolución lo programaba un setInterval del navegador, así que
-# solo existía mientras hubiera una pestaña abierta. Este hilo lo guarda desde
-# el servidor; con varios workers, el primero que reclama el hueco lo escribe.
-snapshot_scheduler.iniciar()
-# Escucha el /start del bot de Telegram: sin ese intercambio previo, Telegram
-# no deja que el bot le escriba primero a nadie. El hilo se queda dormido solo
-# comprobando cada rato si ya hay un bot configurado en Ajustes.
-telegram_listener.iniciar()
-# Alertas de precio, resumen diario, versión nueva y disco: lo que el servidor
-# vigila por su cuenta y cuenta por Telegram (ver admin/avisos_scheduler.py).
-avisos_scheduler.iniciar()
+# Con el servicio worker de Docker, estos hilos corren allí (admin/worker.py) y
+# no ocupan los de gunicorn; sin él, los arranca la web como siempre.
+if settings.tareasEnWeb():
+    # Las copias automáticas se comprueban ya al iniciar portfolios y luego cada
+    # hora. Así cambiar la frecuencia en Ajustes no exige reiniciar el servidor.
+    startBackupScheduler()
+    # El histórico de evolución lo programaba un setInterval del navegador, así que
+    # solo existía mientras hubiera una pestaña abierta. Este hilo lo guarda desde
+    # el servidor; con varios workers, el primero que reclama el hueco lo escribe.
+    snapshot_scheduler.iniciar()
+    # Escucha el /start del bot de Telegram: sin ese intercambio previo, Telegram
+    # no deja que el bot le escriba primero a nadie. El hilo se queda dormido solo
+    # comprobando cada rato si ya hay un bot configurado en Ajustes.
+    telegram_listener.iniciar()
+    # Alertas de precio, resumen diario, versión nueva y disco: lo que el servidor
+    # vigila por su cuenta y cuenta por Telegram (ver admin/avisos_scheduler.py).
+    avisos_scheduler.iniciar()
+else:
+    logging.info("[procesos] Copias, snapshots, Telegram y avisos los lleva el servicio worker")
 # Los dos workers llegan aquí; el aviso de arranque lo manda solo el primero.
 telegram_notifier.notificarArranque(__version__)
 

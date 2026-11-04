@@ -63,10 +63,10 @@ def calcular(refrescarPrecios=True) -> dict:
 
 def formatear(nombre, datos) -> str:
     if not datos["activos"]:
-        return f"📊 {nombre}\nSin posiciones abiertas."
+        return f"{nombre}\nSin posiciones abiertas."
 
     lineas = [
-        f"📊 {nombre}",
+        f"{nombre}",
         f"Valor: {_euros(datos['valor'])}",
         f"Invertido: {_euros(datos['invertido'])}",
     ]

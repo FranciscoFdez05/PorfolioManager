@@ -1753,4 +1753,9 @@
         flex-shrink: 0;
         margin-top: 0;
     }
+
+    /* En Ingresos el botón va pegado al fondo de la página, no debajo de la tabla. */
+    .fitPageActive .ingresosActions {
+        margin-top: auto;
+    }
 }

@@ -36,7 +36,7 @@ import urllib.request
 from urllib.error import HTTPError, URLError
 
 from admin import telegram_comandos
-from core import paths, telegram_notifier
+from core import paths, pulso, telegram_notifier
 from core.bloqueo import exclusivo
 
 log = logging.getLogger(__name__)
@@ -54,6 +54,8 @@ _TIMEOUT_PETICION = _TIMEOUT_TELEGRAM + 10
 _ESPERA_SIN_CONFIGURAR = 30
 # Tras un fallo de red o de Telegram, antes de reintentar.
 _ESPERA_TRAS_FALLO = 15
+# Holgado: una vuelta es una petición larga más los comandos que hayan llegado.
+_plazoVueltaSegundos = 3600
 
 # Un comando más viejo que esto no se ejecuta. Si el servidor estuvo parado, los
 # mensajes se acumulan en Telegram, y ejecutar al arrancar un /backup escrito
@@ -61,7 +63,7 @@ _ESPERA_TRAS_FALLO = 15
 _MAX_EDAD_COMANDO = 300
 
 _MENSAJE_CONFIRMACION = (
-    "✅ Conectado. A partir de ahora avisaré aquí de lo que pase en el servidor "
+    "Conectado. A partir de ahora avisaré aquí de lo que pase en el servidor "
     "(copias de seguridad, alertas de precio, proveedores…) y puedes preguntarme "
     "con comandos. Escribe /ayuda para verlos."
 )
@@ -142,6 +144,7 @@ def _escuchar() -> bool:
     offset = None
 
     while not _parada.is_set():
+        pulso.marcar("telegram", _plazoVueltaSegundos)
         token, chatId = telegram_notifier.leerConfig()
         if not token or not chatId:
             offset = None
@@ -179,6 +182,7 @@ def _rutaBloqueo():
 
 def _bucle():
     while not _parada.is_set():
+        pulso.marcar("telegram", _plazoVueltaSegundos)
         # El bloqueo se mantiene mientras dura la escucha. Si otro worker ya es
         # el oyente, este espera y vuelve a intentarlo: si el otro muere, el
         # sistema suelta su bloqueo y este lo releva.

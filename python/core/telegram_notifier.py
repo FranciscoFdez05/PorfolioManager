@@ -33,6 +33,11 @@ atiende un worker y los avisos salen de los dos.
 
 Lo que responde el bot a un comando no pasa por aquí: es la respuesta a una
 pregunta, no un aviso, y ni las categorías ni el silencio deben callarla.
+
+**Cómo se distinguen.** Cada aviso sale con una imagen de cabecera según su
+categoría y su gravedad (`datos/avisos/<categoria>-<gravedad>.png`, generadas
+con `tools/generar_imagenes_avisos.py`). Si la imagen no se puede mandar, el
+aviso sale igualmente como texto: la cabecera es comodidad, el aviso no.
 """
 
 import json
@@ -50,33 +55,80 @@ from core.secret_store import readSecretLines, writeSecretLines
 log = logging.getLogger(__name__)
 
 _API_URL = "https://api.telegram.org/bot{token}/sendMessage"
+_API_FOTO_URL = "https://api.telegram.org/bot{token}/sendPhoto"
 _TIMEOUT = 10.0
 _COOLDOWN_SEGUNDOS = 1800
 
+CORRECTO = "correcto"
+INFO = "info"
+AVISO = "aviso"
+CRITICO = "critico"
+GRAVEDADES = (CORRECTO, INFO, AVISO, CRITICO)
+
+_DIR_IMAGENES = Path(__file__).with_name("datos") / "avisos"
+# Telegram no admite un pie de foto más largo; lo que no cabe va en otro mensaje.
+_MAX_PIE = 1024
+
 _PLANTILLAS = {
-    "cuota_agotada": "⚠️ Cuota agotada de {sujeto}",
-    "no_responde": "🔌 {sujeto} no responde",
-    "fallo": "❌ Fallo de {sujeto}",
+    "cuota_agotada": "Cuota agotada de {sujeto}",
+    "no_responde": "{sujeto} no responde",
+    "fallo": "Fallo de {sujeto}",
 }
+_GRAVEDAD_PROBLEMA = {"cuota_agotada": AVISO, "no_responde": CRITICO, "fallo": CRITICO}
 
 # Tipos de aviso que el usuario puede activar o apagar en Ajustes > Telegram:
 # clave -> (título que se enseña, ¿activado si no ha elegido nada?). El orden es
 # el de la pantalla. Un aviso de una clave que no esté aquí no se manda: mejor
 # eso que un tipo sin interruptor que nadie puede callar.
 CATEGORIAS_AVISO = {
-    "proveedores": ("Problemas con los proveedores de cotizaciones", True),
-    "backup": ("Copias de seguridad (creadas, fallidas, restauradas)", True),
+    "proveedores": ("Proveedores de cotizaciones", True),
+    "backup": ("Copias de seguridad", True),
     # Aparte y apagado de fábrica: es el ZIP con todas las carteras (y las
     # claves si se incluyen) subido a los servidores de Telegram, que no cifra
     # los chats con bots de extremo a extremo. Antes salía con el aviso de
     # «backup», encendido por defecto, en cuanto se configuraba el bot.
-    "backupFichero": ("Enviar el fichero de cada copia automática (todos tus datos)", False),
-    "precios": ("Alertas de precio de los activos", True),
-    "seguridad": ("Seguridad (login bloqueado, cambio de contraseña)", True),
-    "sistema": ("Estado del servidor (arranque, disco, base de datos)", True),
-    "version": ("Hay una versión nueva publicada", True),
+    "backupFichero": ("Enviar el fichero de cada copia automática", False),
+    "precios": ("Alertas de precio", True),
+    # Además de esto, cada wallet tiene su propio interruptor de avisos
+    # (Cripto > Seguimiento), apagado al enlazarla.
+    "wallets": ("Movimientos en las wallets", True),
+    "seguridad": ("Seguridad", True),
+    "sistema": ("Estado del servidor", True),
+    "version": ("Versión nueva", True),
     "sesion": ("Cada inicio de sesión correcto", False),
     "resumen": ("Resumen diario de la cartera", False),
+}
+
+# Cómo se presenta cada tipo en Ajustes: clave -> (grupo, detalle).
+PRESENTACION_AVISO = {
+    "precios": ("Cartera y mercado", "Un activo llega al precio que fijaste, por arriba o por abajo, o se mueve en "
+                                     "el día el % que pediste. Se configuran en la ficha del activo y cada alerta "
+                                     "salta una sola vez"),
+    "wallets": ("Cartera y mercado", "Movimientos nuevos, saldo fuera de tus límites, wallet que despierta o "
+                                     "actividad sospechosa, solo de las wallets con su interruptor encendido en "
+                                     "Cripto > Seguimiento. También monedas de Satoshi gastadas, si lo vigilas"),
+    "resumen": ("Cartera y mercado", "Un mensaje al día con el valor, lo invertido, el resultado, la variación a "
+                                     "24 h y las posiciones de cada cartera, más sus alertas de precio activas"),
+    "proveedores": ("Cartera y mercado", "Un proveedor agota la cuota, no responde o falla al pedir un precio, y "
+                                         "cuando vuelve a responder; el mismo problema no se repite en "
+                                         f"{_COOLDOWN_SEGUNDOS // 60} min. También si un activo lleva horas "
+                                         "valorado con un valor de reserva"),
+    "backup": ("Copias de seguridad", "Copia manual o automática creada (nombre, tamaño y copias guardadas), copia "
+                                      "o restauración fallida, copia restaurada y copia eliminada"),
+    "backupFichero": ("Copias de seguridad", "Cada copia automática llega como ZIP con todos tus datos, y las claves "
+                                             "de API si las incluyes en las copias; si supera el límite de Telegram, "
+                                             "solo llega un aviso. Telegram no cifra de extremo a extremo los chats "
+                                             "con bots"),
+    "seguridad": ("Seguridad y acceso", "Una IP agota los intentos de login y queda bloqueada, cambio de usuario o "
+                                        "contraseña, verificación en dos pasos activada o desactivada, y entrada "
+                                        "con la frase de recuperación"),
+    "sesion": ("Seguridad y acceso", "Un mensaje por cada entrada correcta, con o sin verificación en dos pasos, "
+                                     "con la IP de origen"),
+    "sistema": ("Servidor", "Servidor iniciado, base de datos dañada (reparada o restaurada), poco espacio en disco "
+                            "y más de una hora sin guardar el histórico. El aviso de aplicación caída lo manda el "
+                            "vigilante y llega aunque apagues esto"),
+    "version": ("Servidor", "Se ha publicado una versión más reciente que la instalada. Indica ambas versiones y "
+                            "llega una sola vez por versión"),
 }
 
 RESUMEN_HORA_DEFECTO = 21
@@ -132,6 +184,66 @@ def _enviar(token: str, chatId: str, texto: str) -> None:
         raise ValueError(cuerpo.get("description") or "Telegram rechazó el mensaje")
 
 
+def _rutaImagen(categoria: str, gravedad: str) -> Path | None:
+    """Imagen de cabecera de un aviso, o None si no hay ninguna para esa combinación."""
+    ruta = _DIR_IMAGENES / f"{categoria}-{gravedad}.png"
+    return ruta if ruta.is_file() else None
+
+
+def _enviarFoto(token: str, chatId: str, ruta: Path, texto: str = "") -> None:
+    """Sube `ruta` como foto, con `texto` de pie y su primera línea en negrita.
+
+    La negrita va por `caption_entities` y no con `parse_mode`: los avisos llevan
+    nombres de fichero y errores tal cual, y un `<` suelto haría que Telegram
+    rechazase el mensaje entero.
+    """
+    campos = {"chat_id": chatId}
+    if texto:
+        titulo = texto.split("\n", 1)[0]
+        # Telegram mide los desplazamientos en unidades UTF-16.
+        largoTitulo = len(titulo.encode("utf-16-le")) // 2
+        campos["caption"] = texto
+        campos["caption_entities"] = json.dumps([{"type": "bold", "offset": 0, "length": largoTitulo}])
+
+    limite = uuid.uuid4().hex
+    cuerpo = b"".join(
+        f"--{limite}\r\nContent-Disposition: form-data; name=\"{nombre}\"\r\n\r\n{valor}\r\n".encode()
+        for nombre, valor in campos.items()
+    ) + (
+        f"--{limite}\r\nContent-Disposition: form-data; name=\"photo\"; "
+        f"filename=\"{ruta.name}\"\r\nContent-Type: image/png\r\n\r\n"
+    ).encode() + ruta.read_bytes() + f"\r\n--{limite}--\r\n".encode()
+
+    request = urllib.request.Request(
+        _API_FOTO_URL.format(token=token),
+        data=cuerpo,
+        headers={"Content-Type": f"multipart/form-data; boundary={limite}"},
+    )
+    with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:
+        respuesta = json.loads(response.read().decode("utf-8"))
+    if not respuesta.get("ok"):
+        raise ValueError(respuesta.get("description") or "Telegram rechazó la imagen")
+
+
+def _entregar(token: str, chatId: str, texto: str, categoria: str, gravedad: str) -> None:
+    """Manda un aviso con su imagen de cabecera; sin ella, solo como texto.
+
+    Raises:
+        Exception: lo que lance `_enviar` si tampoco se puede mandar el texto.
+    """
+    texto = str(texto)
+    ruta = _rutaImagen(categoria, gravedad)
+    cabeEnElPie = len(texto) <= _MAX_PIE
+    if ruta is not None:
+        try:
+            _enviarFoto(token, chatId, ruta, texto if cabeEnElPie else "")
+            if cabeEnElPie:
+                return
+        except Exception as error:
+            log.warning("[telegram] No se pudo mandar la imagen del aviso (%s/%s): %s", categoria, gravedad, error)
+    _enviar(token, chatId, texto)
+
+
 _AVISO_SIN_START = (
     'Telegram no deja que el bot escriba primero: abre el chat con tu bot '
     '(busca el nombre de usuario que te dio @BotFather) y pulsa "Iniciar" '
@@ -145,7 +257,11 @@ def enviarPrueba():
     if not token or not chatId:
         return False, "Falta el token del bot o el ID de chat"
     try:
-        _enviar(token, chatId, "✅ PortfolioManager: conexión con Telegram correcta")
+        _entregar(
+            token, chatId,
+            "Conexión con Telegram correcta\nPortfolioManager ya puede enviarte avisos a este chat.",
+            "sistema", CORRECTO,
+        )
         return True, None
     except HTTPError as error:
         descripcion = ""
@@ -199,7 +315,7 @@ def notificarProblema(categoria: str, sujeto: str, detalle: str = "") -> None:
         texto += f"\n{str(detalle)[:300]}"
 
     try:
-        _enviar(token, chatId, texto)
+        _entregar(token, chatId, texto, "proveedores", _GRAVEDAD_PROBLEMA[categoria])
     except Exception as error:
         log.warning("[telegram] No se pudo enviar el aviso (%s/%s): %s", categoria, sujeto, error)
 
@@ -222,7 +338,7 @@ def notificarRecuperado(sujeto: str) -> None:
             _ultimoAviso.pop(clave, None)
 
     try:
-        _enviar(token, chatId, f"✅ {sujeto} vuelve a responder")
+        _entregar(token, chatId, f"{sujeto} vuelve a responder", "proveedores", CORRECTO)
     except Exception as error:
         log.warning("[telegram] No se pudo enviar el aviso de recuperación (%s): %s", sujeto, error)
 
@@ -299,10 +415,21 @@ def _permitido(categoria: str) -> bool:
 
 # ── Avisos de sucesos ─────────────────────────────────────────────────────────
 
-def notificar(categoria: str, texto: str, *, clave: str | None = None,
+def puedeAvisar(categoria: str) -> bool:
+    """¿Hay Telegram, la categoría está activada y no hay silencio?
+
+    Distingue un aviso que no se ha mandado porque el usuario no quiere de uno que
+    Telegram no ha aceptado: `notificar` devuelve False en los dos casos.
+    """
+    token, chatId = leerConfig()
+    return bool(token and chatId and _permitido(categoria))
+
+
+def notificar(categoria: str, texto: str, *, gravedad: str = INFO, clave: str | None = None,
               cooldown: float = 0, compartido: bool = False) -> bool:
     """Manda `texto` si hay Telegram, la categoría está activada y no hay silencio.
 
+    `categoria` y `gravedad` eligen la imagen de cabecera del aviso.
     `clave` + `cooldown` evitan repetir el mismo aviso antes de `cooldown`
     segundos. Con `compartido=True` esa espera se coordina entre los workers de
     gunicorn (`core.reclamo`), imprescindible para lo que dispara cada uno por
@@ -330,7 +457,7 @@ def notificar(categoria: str, texto: str, *, clave: str | None = None,
                         return False
                     _ultimoAviso[("evento", clave)] = ahora
 
-        _enviar(token, chatId, texto)
+        _entregar(token, chatId, texto, categoria, gravedad)
         return True
     except Exception as error:
         log.warning("[telegram] No se pudo enviar el aviso (%s): %s", categoria, error)
@@ -416,7 +543,7 @@ def notificarArchivo(categoria: str, ruta, texto: str) -> bool:
             return False
         tamano = Path(ruta).stat().st_size
         if tamano > MAX_BYTES_DOCUMENTO:
-            _enviar(token, chatId, f"{texto}\n⚠️ No se ha podido adjuntar: pesa {tamano / 1024 / 1024:.0f} MB y "
+            _enviar(token, chatId, f"{texto}\nNo se ha podido adjuntar: pesa {tamano / 1024 / 1024:.0f} MB y "
                                    "Telegram admite 50 MB como máximo.")
             return True
         _enviarDocumento(token, chatId, ruta, texto)
@@ -438,7 +565,7 @@ def responderArchivo(ruta, texto: str) -> bool:
             return False
         tamano = Path(ruta).stat().st_size
         if tamano > MAX_BYTES_DOCUMENTO:
-            _enviar(token, chatId, f"{texto}\n⚠️ No se ha podido adjuntar: pesa {tamano / 1024 / 1024:.0f} MB y "
+            _enviar(token, chatId, f"{texto}\nNo se ha podido adjuntar: pesa {tamano / 1024 / 1024:.0f} MB y "
                                    "Telegram admite 50 MB como máximo.")
         else:
             _enviarDocumento(token, chatId, ruta, texto)
@@ -448,13 +575,21 @@ def responderArchivo(ruta, texto: str) -> bool:
         return False
 
 
-def responder(texto: str) -> bool:
-    """Manda `texto` al chat configurado sin pasar por categorías ni silencio."""
+def responder(texto: str, *, categoria: str | None = None, gravedad: str = INFO) -> bool:
+    """Manda `texto` al chat configurado sin pasar por categorías ni silencio.
+
+    Con `categoria`, además lleva la imagen de cabecera de los avisos (es lo que
+    usa el vigilante, que tiene que hablar aunque haya silencio). Sin ella es
+    texto y nada más: una respuesta a un comando o un código de verificación.
+    """
     try:
         token, chatId = leerConfig()
         if not token or not chatId:
             return False
-        _enviar(token, chatId, texto)
+        if categoria is None:
+            _enviar(token, chatId, texto)
+        else:
+            _entregar(token, chatId, texto, categoria, gravedad)
         return True
     except Exception as error:
         log.warning("[telegram] No se pudo responder: %s", error)
@@ -463,8 +598,8 @@ def responder(texto: str) -> bool:
 
 def notificarArranque(version: str) -> None:
     """Aviso de servidor iniciado. Los dos workers llegan aquí; solo habla el primero."""
-    notificar("sistema", f"🟢 PortfolioManager {version} iniciado",
-              clave="arranque", cooldown=90, compartido=True)
+    notificar("sistema", f"PortfolioManager {version} iniciado",
+              gravedad=CORRECTO, clave="arranque", cooldown=90, compartido=True)
 
 
 def reiniciarParaPruebas() -> None:

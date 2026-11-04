@@ -1552,6 +1552,438 @@ function _buildDateTodayButton(input) {
     wrap.appendChild(button)
 }
 
+// ── Calendario desplegable ─────────────────────────────────────────────────
+// Sustituye al calendario nativo de los <input type="date">, que el navegador
+// pinta con su propio estilo y no admite CSS. Respeta min/max del input (lo
+// que queda fuera sale apagado y no se puede elegir) y al elegir escribe el
+// valor ISO (AAAA-MM-DD) y lanza input y change, como el nativo.
+//
+// Tres vistas: días del mes; al pulsar el título, los 12 meses del año; al
+// pulsarlo otra vez, los años de 12 en 12. Las flechas ‹ › mueven un mes, un
+// año o un bloque de años según la vista. Teclado: flechas, RePág/AvPág e
+// Inicio/Fin en los días, flechas en meses y años, Esc cierra.
+//
+// Uso: abrirCalendarioFecha(input, botonQueLoAbre)
+
+const _CALENDARIO_DIAS_SEMANA = ["L", "M", "X", "J", "V", "S", "D"]
+const _CALENDARIO_MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+const _CALENDARIO_ANIOS_POR_BLOQUE = 12
+// Columnas de la rejilla de meses y años: 12 celdas en 4 × 3.
+const _CALENDARIO_COLUMNAS_CELDAS = 4
+let _calendarioAbierto = null
+
+function _calendarioIso(fecha) {
+    const mes = String(fecha.getMonth() + 1).padStart(2, "0")
+    const dia = String(fecha.getDate()).padStart(2, "0")
+    return `${fecha.getFullYear()}-${mes}-${dia}`
+}
+
+function _calendarioFecha(iso) {
+    const [anio, mes, dia] = String(iso || "")
+        .split("-")
+        .map(Number)
+    return anio && mes && dia ? new Date(anio, mes - 1, dia) : null
+}
+
+function _calendarioCapitalizar(texto) {
+    return texto.charAt(0).toUpperCase() + texto.slice(1)
+}
+
+// ¿Toca el periodo [desde, hasta] (ISO) algún día permitido por min/max del input?
+function _calendarioPeriodoPermitido(input, desdeIso, hastaIso) {
+    return (!input.min || hastaIso >= input.min) && (!input.max || desdeIso <= input.max)
+}
+
+function _calendarioDiaPermitido(input, iso) {
+    return _calendarioPeriodoPermitido(input, iso, iso)
+}
+
+function _calendarioPermiteMes(input, anio, mes) {
+    return _calendarioPeriodoPermitido(
+        input,
+        _calendarioIso(new Date(anio, mes, 1)),
+        _calendarioIso(new Date(anio, mes + 1, 0))
+    )
+}
+
+function _calendarioPermiteAnios(input, desde, hasta) {
+    return _calendarioPeriodoPermitido(input, `${desde}-01-01`, `${hasta}-12-31`)
+}
+
+// Lleva una fecha dentro de min/max, para que el foco nunca caiga en un día desactivado.
+function _calendarioRecortar(input, fecha) {
+    const iso = _calendarioIso(fecha)
+    if (input.min && iso < input.min) return _calendarioFecha(input.min)
+    if (input.max && iso > input.max) return _calendarioFecha(input.max)
+    return fecha
+}
+
+// Primer año del bloque de 12 que contiene `anio`. Con max, los bloques se
+// cuentan hacia atrás desde el año del max, para que el primero que se ve
+// acabe en él y no enseñe años que no se pueden elegir.
+function _calendarioInicioBloque(input, anio) {
+    const max = _calendarioFecha(input.max)
+    const tamanio = _CALENDARIO_ANIOS_POR_BLOQUE
+    const ultimo = max ? max.getFullYear() : anio - (((anio % tamanio) + tamanio) % tamanio) + tamanio - 1
+    return ultimo - (tamanio - 1) - tamanio * Math.floor((ultimo - anio) / tamanio)
+}
+
+function abrirCalendarioFecha(input, boton) {
+    // El mismo botón abre y cierra.
+    if (_calendarioAbierto?.input === input) {
+        cerrarCalendarioFecha()
+        return
+    }
+    cerrarCalendarioFecha()
+
+    const foco = _calendarioRecortar(input, _calendarioFecha(input.value) || new Date())
+    const panel = document.createElement("div")
+    panel.className = "calPopup"
+    panel.setAttribute("role", "dialog")
+    panel.setAttribute("aria-label", "Elegir fecha")
+    document.body.appendChild(panel)
+
+    const estado = {
+        input,
+        boton,
+        panel,
+        foco,
+        vista: "dias",
+        mes: new Date(foco.getFullYear(), foco.getMonth(), 1)
+    }
+    estado.alPulsarFuera = (event) => {
+        if (!panel.contains(event.target) && !boton?.contains(event.target)) cerrarCalendarioFecha()
+    }
+    estado.recolocar = () => _colocarCalendario(estado)
+    estado.cerrar = () => cerrarCalendarioFecha()
+    panel.addEventListener("click", (event) => _clickCalendario(event, estado))
+    panel.addEventListener("keydown", (event) => _teclaCalendario(event, estado))
+    document.addEventListener("mousedown", estado.alPulsarFuera, true)
+    // En captura: el detalle que contiene el input tiene su propio scroll.
+    window.addEventListener("scroll", estado.recolocar, true)
+    window.addEventListener("resize", estado.cerrar)
+
+    _calendarioAbierto = estado
+    boton?.classList.add("abierto")
+    boton?.setAttribute("aria-expanded", "true")
+    _pintarCalendario(estado)
+    _colocarCalendario(estado)
+    _enfocarCeldaCalendario(estado)
+}
+
+function cerrarCalendarioFecha({ devolverFoco = false } = {}) {
+    const estado = _calendarioAbierto
+    if (!estado) return
+    _calendarioAbierto = null
+    document.removeEventListener("mousedown", estado.alPulsarFuera, true)
+    window.removeEventListener("scroll", estado.recolocar, true)
+    window.removeEventListener("resize", estado.cerrar)
+    estado.panel.remove()
+    estado.boton?.classList.remove("abierto")
+    estado.boton?.setAttribute("aria-expanded", "false")
+    if (devolverFoco && estado.boton?.isConnected) estado.boton.focus()
+}
+
+// Botón de una celda. `marcas` añade clases (hoy, elegido, fuera del mes).
+function _calendarioBotonHtml({ clase, datos, texto, etiqueta, enfocable, elegido, permitido, marcas = [] }) {
+    const clases = [clase, ...marcas.filter(Boolean)].join(" ")
+    return `<button type="button" class="${clases}" ${datos} tabindex="${enfocable ? 0 : -1}" aria-label="${etiqueta}"${elegido ? ' aria-pressed="true"' : ""}${permitido ? "" : " disabled"}>${texto}</button>`
+}
+
+// Seis semanas siempre, empezando en lunes: el panel no cambia de alto al pasar de mes.
+function _calendarioVistaDias(estado) {
+    const { mes, input } = estado
+    const hoyIso = _calendarioIso(new Date())
+    const focoIso = _calendarioIso(estado.foco)
+    const inicio = new Date(mes.getFullYear(), mes.getMonth(), 1 - ((mes.getDay() + 6) % 7))
+    const celdas = Array.from({ length: 42 }, (_, i) => {
+        const dia = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + i)
+        const iso = _calendarioIso(dia)
+        return _calendarioBotonHtml({
+            clase: "calPopupDia",
+            datos: `data-fecha="${iso}"`,
+            texto: dia.getDate(),
+            etiqueta: dia.toLocaleDateString("es-ES", { dateStyle: "full" }),
+            enfocable: iso === focoIso,
+            elegido: iso === input.value,
+            permitido: _calendarioDiaPermitido(input, iso),
+            marcas: [
+                dia.getMonth() !== mes.getMonth() ? "calPopupDiaFuera" : "",
+                iso === hoyIso ? "calPopupHoy" : "",
+                iso === input.value ? "calPopupElegido" : ""
+            ]
+        })
+    }).join("")
+    const anio = mes.getFullYear()
+    const numMes = mes.getMonth()
+    return {
+        titulo: _calendarioCapitalizar(mes.toLocaleDateString("es-ES", { month: "long", year: "numeric" })),
+        tituloVista: "meses",
+        tituloAyuda: "Elegir mes",
+        pasoAyuda: ["Mes anterior", "Mes siguiente"],
+        anteriorPermitido: _calendarioPermiteMes(input, anio, numMes - 1),
+        siguientePermitido: _calendarioPermiteMes(input, anio, numMes + 1),
+        cuerpo: `
+            <div class="calPopupSemana" aria-hidden="true">${_CALENDARIO_DIAS_SEMANA.map((d) => `<span>${d}</span>`).join("")}</div>
+            <div class="calPopupDias">${celdas}</div>`
+    }
+}
+
+function _calendarioVistaMeses(estado) {
+    const { input } = estado
+    const anio = estado.mes.getFullYear()
+    const hoy = new Date()
+    const elegida = _calendarioFecha(input.value)
+    const permitidos = _CALENDARIO_MESES.map((_, mes) => _calendarioPermiteMes(input, anio, mes))
+    // Foco en el mes que se estaba viendo, o en el último permitido si ese no lo está.
+    const enfocado = permitidos[estado.mes.getMonth()] ? estado.mes.getMonth() : permitidos.lastIndexOf(true)
+    const celdas = _CALENDARIO_MESES
+        .map((nombre, mes) => {
+            const esElegido = elegida?.getFullYear() === anio && elegida.getMonth() === mes
+            return _calendarioBotonHtml({
+                clase: "calPopupCelda",
+                datos: `data-mes-elegido="${mes}"`,
+                texto: nombre,
+                etiqueta: _calendarioCapitalizar(
+                    new Date(anio, mes, 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" })
+                ),
+                enfocable: mes === enfocado,
+                elegido: esElegido,
+                permitido: permitidos[mes],
+                marcas: [
+                    hoy.getFullYear() === anio && hoy.getMonth() === mes ? "calPopupHoy" : "",
+                    esElegido ? "calPopupElegido" : ""
+                ]
+            })
+        })
+        .join("")
+    return {
+        titulo: String(anio),
+        tituloVista: "anios",
+        tituloAyuda: "Elegir año",
+        pasoAyuda: ["Año anterior", "Año siguiente"],
+        anteriorPermitido: _calendarioPermiteAnios(input, anio - 1, anio - 1),
+        siguientePermitido: _calendarioPermiteAnios(input, anio + 1, anio + 1),
+        cuerpo: `<div class="calPopupCeldas">${celdas}</div>`
+    }
+}
+
+function _calendarioVistaAnios(estado) {
+    const { input } = estado
+    const actual = estado.mes.getFullYear()
+    const inicio = _calendarioInicioBloque(input, actual)
+    const fin = inicio + _CALENDARIO_ANIOS_POR_BLOQUE - 1
+    const hoy = new Date().getFullYear()
+    const elegido = _calendarioFecha(input.value)?.getFullYear()
+    const anios = Array.from({ length: _CALENDARIO_ANIOS_POR_BLOQUE }, (_, i) => inicio + i)
+    const permitidos = anios.map((anio) => _calendarioPermiteAnios(input, anio, anio))
+    const enfocado = permitidos[anios.indexOf(actual)] ? actual : anios[permitidos.lastIndexOf(true)]
+    const celdas = anios
+        .map((anio, i) =>
+            _calendarioBotonHtml({
+                clase: "calPopupCelda",
+                datos: `data-anio="${anio}"`,
+                texto: anio,
+                etiqueta: String(anio),
+                enfocable: anio === enfocado,
+                elegido: anio === elegido,
+                permitido: permitidos[i],
+                marcas: [anio === hoy ? "calPopupHoy" : "", anio === elegido ? "calPopupElegido" : ""]
+            })
+        )
+        .join("")
+    return {
+        titulo: `${inicio} – ${fin}`,
+        tituloVista: "",
+        pasoAyuda: ["Años anteriores", "Años siguientes"],
+        anteriorPermitido: _calendarioPermiteAnios(input, inicio - _CALENDARIO_ANIOS_POR_BLOQUE, inicio - 1),
+        siguientePermitido: _calendarioPermiteAnios(input, fin + 1, fin + _CALENDARIO_ANIOS_POR_BLOQUE),
+        cuerpo: `<div class="calPopupCeldas">${celdas}</div>`
+    }
+}
+
+const _CALENDARIO_VISTAS = { dias: _calendarioVistaDias, meses: _calendarioVistaMeses, anios: _calendarioVistaAnios }
+
+function _pintarCalendario(estado) {
+    const { panel, input } = estado
+    const vista = _CALENDARIO_VISTAS[estado.vista](estado)
+    const hoyIso = _calendarioIso(new Date())
+    const titulo = vista.tituloVista
+        ? `<button type="button" class="calPopupTitulo" data-vista="${vista.tituloVista}" aria-label="${vista.tituloAyuda}: ${vista.titulo}" aria-live="polite">${vista.titulo}<span class="calPopupTituloFlecha" aria-hidden="true">▾</span></button>`
+        : `<span class="calPopupTitulo" aria-live="polite">${vista.titulo}</span>`
+    panel.innerHTML = `
+        <div class="calPopupCabecera">
+            <button type="button" class="calPopupNav" data-paso="-1" aria-label="${vista.pasoAyuda[0]}"${vista.anteriorPermitido ? "" : " disabled"}>‹</button>
+            ${titulo}
+            <button type="button" class="calPopupNav" data-paso="1" aria-label="${vista.pasoAyuda[1]}"${vista.siguientePermitido ? "" : " disabled"}>›</button>
+        </div>
+        <div class="calPopupCuerpo">${vista.cuerpo}</div>
+        <div class="calPopupPie">
+            <button type="button" class="calPopupAccion" data-accion="borrar"${input.value ? "" : " disabled"}>Borrar</button>
+            <button type="button" class="calPopupAccion" data-accion="hoy"${_calendarioDiaPermitido(input, hoyIso) ? "" : " disabled"}>Hoy</button>
+        </div>`
+    // Meses y años ocupan el mismo alto que los días: el panel no salta al cambiar de vista.
+    const cuerpo = panel.querySelector(".calPopupCuerpo")
+    if (estado.vista === "dias") estado.altoCuerpo = cuerpo.offsetHeight
+    else if (estado.altoCuerpo) cuerpo.style.height = `${estado.altoCuerpo}px`
+}
+
+// Debajo del input, o encima si no cabe; siempre dentro de la ventana.
+function _colocarCalendario(estado) {
+    const { panel, input } = estado
+    if (!input.isConnected) {
+        cerrarCalendarioFecha()
+        return
+    }
+    const rect = (input.closest("label") || input).getBoundingClientRect()
+    const margen = 8
+    const ancho = panel.offsetWidth
+    const alto = panel.offsetHeight
+    const izquierda = Math.min(Math.max(rect.left, margen), window.innerWidth - ancho - margen)
+    const cabeDebajo = rect.bottom + 6 + alto <= window.innerHeight - margen
+    const arriba = cabeDebajo || rect.top - 6 - alto < margen ? rect.bottom + 6 : rect.top - 6 - alto
+    panel.style.left = `${Math.round(izquierda)}px`
+    panel.style.top = `${Math.round(arriba)}px`
+}
+
+// Tras repintar, el foco va a la celda marcada como enfocable (o al título si
+// no hay ninguna permitida), para seguir manejándolo con el teclado.
+function _enfocarCeldaCalendario(estado) {
+    const { panel } = estado
+    ;(
+        panel.querySelector(".calPopupCuerpo [tabindex='0']:not(:disabled)") || panel.querySelector(".calPopupTitulo")
+    )?.focus()
+}
+
+function _cambiarVistaCalendario(estado, vista) {
+    estado.vista = vista
+    _pintarCalendario(estado)
+    _enfocarCeldaCalendario(estado)
+}
+
+function _enfocarDiaCalendario(estado, fecha) {
+    estado.foco = _calendarioRecortar(estado.input, fecha)
+    const { foco } = estado
+    if (foco.getMonth() !== estado.mes.getMonth() || foco.getFullYear() !== estado.mes.getFullYear()) {
+        estado.mes = new Date(foco.getFullYear(), foco.getMonth(), 1)
+        _pintarCalendario(estado)
+    } else {
+        estado.panel.querySelectorAll(".calPopupDia").forEach((celda) => {
+            celda.tabIndex = celda.dataset.fecha === _calendarioIso(foco) ? 0 : -1
+        })
+    }
+    estado.panel.querySelector(`[data-fecha="${_calendarioIso(foco)}"]`)?.focus()
+}
+
+// Mismo día en el mes de destino, o el último si ese mes es más corto.
+function _calendarioMismoDiaEnMes(fecha, anio, mes) {
+    const ultimoDia = new Date(anio, mes + 1, 0).getDate()
+    return new Date(anio, mes, Math.min(fecha.getDate(), ultimoDia))
+}
+
+function _cambiarMesCalendario(estado, delta) {
+    const { foco } = estado
+    return _calendarioMismoDiaEnMes(foco, foco.getFullYear(), foco.getMonth() + delta)
+}
+
+// ‹ › según la vista: un mes, un año o un bloque de años.
+function _pasoCalendario(estado, paso) {
+    const { mes, input } = estado
+    if (estado.vista === "dias") {
+        estado.foco = _calendarioRecortar(
+            input,
+            _calendarioMismoDiaEnMes(estado.foco, mes.getFullYear(), mes.getMonth() + paso)
+        )
+        estado.mes = new Date(mes.getFullYear(), mes.getMonth() + paso, 1)
+    } else {
+        const anios = estado.vista === "meses" ? paso : paso * _CALENDARIO_ANIOS_POR_BLOQUE
+        estado.mes = new Date(mes.getFullYear() + anios, mes.getMonth(), 1)
+    }
+    _pintarCalendario(estado)
+    // Se queda en la flecha pulsada mientras siga activa, para poder repetir.
+    const flecha = estado.panel.querySelector(`[data-paso="${paso}"]`)
+    if (flecha && !flecha.disabled) flecha.focus()
+    else _enfocarCeldaCalendario(estado)
+}
+
+function _elegirFechaCalendario(estado, iso) {
+    const { input } = estado
+    cerrarCalendarioFecha()
+    if (!input.isConnected) return
+    input.value = iso
+    input.dispatchEvent(new Event("input", { bubbles: true }))
+    input.dispatchEvent(new Event("change", { bubbles: true }))
+    input.focus()
+}
+
+function _clickCalendario(event, estado) {
+    const objetivo = event.target.closest("button")
+    if (!objetivo || objetivo.disabled) return
+    const { dataset } = objetivo
+    if (dataset.paso) {
+        _pasoCalendario(estado, Number(dataset.paso))
+    } else if (dataset.vista) {
+        _cambiarVistaCalendario(estado, dataset.vista)
+    } else if (dataset.anio) {
+        estado.mes = new Date(Number(dataset.anio), estado.mes.getMonth(), 1)
+        _cambiarVistaCalendario(estado, "meses")
+    } else if (dataset.mesElegido) {
+        const anio = estado.mes.getFullYear()
+        const mes = Number(dataset.mesElegido)
+        estado.mes = new Date(anio, mes, 1)
+        estado.foco = _calendarioRecortar(estado.input, _calendarioMismoDiaEnMes(estado.foco, anio, mes))
+        _cambiarVistaCalendario(estado, "dias")
+    } else if (dataset.fecha) {
+        _elegirFechaCalendario(estado, dataset.fecha)
+    } else if (dataset.accion) {
+        _elegirFechaCalendario(estado, dataset.accion === "hoy" ? _calendarioIso(new Date()) : "")
+    }
+}
+
+function _teclaDiasCalendario(event, estado) {
+    const { foco } = estado
+    const desplazarDias = (dias) => new Date(foco.getFullYear(), foco.getMonth(), foco.getDate() + dias)
+    const destinos = {
+        ArrowLeft: () => desplazarDias(-1),
+        ArrowRight: () => desplazarDias(1),
+        ArrowUp: () => desplazarDias(-7),
+        ArrowDown: () => desplazarDias(7),
+        Home: () => desplazarDias(-((foco.getDay() + 6) % 7)),
+        End: () => desplazarDias(6 - ((foco.getDay() + 6) % 7)),
+        PageUp: () => _cambiarMesCalendario(estado, -1),
+        PageDown: () => _cambiarMesCalendario(estado, 1)
+    }
+    if (!destinos[event.key]) return
+    event.preventDefault()
+    _enfocarDiaCalendario(estado, destinos[event.key]())
+}
+
+// Meses y años: las flechas recorren la rejilla de 4 × 3 sin salir de ella ni
+// pararse en celdas desactivadas.
+function _teclaCeldasCalendario(event, estado) {
+    const columnas = _CALENDARIO_COLUMNAS_CELDAS
+    const saltos = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -columnas, ArrowDown: columnas }
+    if (!saltos[event.key]) return
+    event.preventDefault()
+    const celdas = [...estado.panel.querySelectorAll(".calPopupCelda")]
+    const destino = celdas[celdas.indexOf(event.target) + saltos[event.key]]
+    if (!destino || destino.disabled) return
+    celdas.forEach((celda) => {
+        celda.tabIndex = celda === destino ? 0 : -1
+    })
+    destino.focus()
+}
+
+function _teclaCalendario(event, estado) {
+    if (event.key === "Escape") {
+        event.preventDefault()
+        cerrarCalendarioFecha({ devolverFoco: true })
+        return
+    }
+    if (event.target.closest(".calPopupDia")) _teclaDiasCalendario(event, estado)
+    else if (event.target.closest(".calPopupCelda")) _teclaCeldasCalendario(event, estado)
+}
+
 new MutationObserver((mutations) => {
     for (const m of mutations) {
         for (const node of m.addedNodes) {

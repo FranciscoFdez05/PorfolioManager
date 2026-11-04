@@ -111,7 +111,7 @@ def cmdActivos(_args):
     filas = _activos()
     if not filas:
         return "No hay activos en esta cartera."
-    return "📈 Activos\n" + "\n".join(_lineaActivo(a) for a in filas[:40])
+    return "Activos\n" + "\n".join(_lineaActivo(a) for a in filas[:40])
 
 
 def cmdPrecio(args):
@@ -128,12 +128,12 @@ def cmdPrecio(args):
         quote, fallo = fetchAssetQuote(simbolo, activo["market_provider"], targetCurrency=moneda)
         if not fallo and quote:
             cambio = str(quote.get("change") or "").strip()
-            return (f"💹 {activo['name'] or activo['id']}\n"
+            return (f"{activo['name'] or activo['id']}\n"
                     f"{quote['price']} {quote.get('currency') or moneda}" + (f" ({cambio})" if cambio else ""))
         log.info("[telegram] /precio %s sin cotización en vivo: %s", activo["id"], fallo)
 
     guardado = f" (último guardado: {activo['last_updated']})" if activo["last_updated"] else ""
-    return f"💹 {_lineaActivo(activo)}{guardado}\nNo he podido pedir la cotización en vivo."
+    return f"{_lineaActivo(activo)}{guardado}\nNo he podido pedir la cotización en vivo."
 
 
 # ── Cartera ───────────────────────────────────────────────────────────────────
@@ -171,9 +171,9 @@ def cmdAlertas(_args):
     nombres = {a["id"]: a["name"] or a["id"] for a in _activos()}
 
     if not activas:
-        texto = "🔔 No hay alertas de precio activas.\nSe crean desde la pestaña Alertas de la ficha de cada activo."
+        texto = "No hay alertas de precio activas.\nSe crean desde la pestaña Alertas de la ficha de cada activo."
     else:
-        texto = "🔔 Alertas activas\n" + "\n".join(_describirAlerta(a, nombres) for a in activas)
+        texto = "Alertas activas\n" + "\n".join(_describirAlerta(a, nombres) for a in activas)
     if saltadas:
         texto += f"\n\n{len(saltadas)} alerta(s) ya saltaron y esperan que las reactives desde la web."
     return texto
@@ -191,17 +191,17 @@ def cmdBackup(_args):
         return "Ya hay otra copia en curso en el servidor. Inténtalo en unos segundos."
     except Exception as error:
         log.warning("[telegram] /backup ha fallado: %s", error)
-        return f"❌ No se pudo hacer la copia: {str(error)[:200]}"
+        return f"No se pudo hacer la copia: {str(error)[:200]}"
 
     try:
         peso = _tamano((_BACKUP_DIR / nombre).stat().st_size)
     except OSError:
         peso = "tamaño desconocido"
-    texto = f"💾 Copia creada\n{nombre} · {peso}"
+    texto = f"Copia creada\n{nombre} · {peso}"
     # El zip viaja con el texto de pie; si no sale, se contesta solo con el texto.
     if telegram_notifier.responderArchivo(_BACKUP_DIR / nombre, texto):
         return None
-    return texto + "\n⚠️ No he podido adjuntar el fichero."
+    return texto + "\nNo he podido adjuntar el fichero."
 
 
 def cmdBackups(_args):
@@ -217,7 +217,7 @@ def cmdBackups(_args):
         except OSError:
             peso = "?"
         lineas.append(f"• {nombre} · {peso}")
-    return f"💾 Copias ({len(copias)} en total)\n" + "\n".join(lineas)
+    return f"Copias ({len(copias)} en total)\n" + "\n".join(lineas)
 
 
 # ── Servidor ──────────────────────────────────────────────────────────────────
@@ -234,7 +234,7 @@ def cmdEstado(_args):
     from routes.salud import _comprobarBd
     from stores import alertas_store
 
-    lineas = [f"🖥 PortfolioManager {__version__}", f"⏱ Activo desde hace {_duracion(time.time() - _ARRANQUE)}"]
+    lineas = [f"PortfolioManager {__version__}", f"Activo desde hace {_duracion(time.time() - _ARRANQUE)}"]
 
     sano, detalle = _comprobarBd()
     ruta = getActiveDbPath()
@@ -243,29 +243,29 @@ def cmdEstado(_args):
             peso = _tamano(ruta.stat().st_size)
         except OSError:
             peso = "?"
-        lineas.append(f"🗄 Base de datos: correcta ({ruta.stem}, esquema {detalle.get('esquema')}, {peso})")
+        lineas.append(f"Base de datos: correcta ({ruta.stem}, esquema {detalle.get('esquema')}, {peso})")
     else:
-        lineas.append(f"🚨 Base de datos con problemas: {detalle.get('bd')} {detalle.get('detalle', '')}".strip())
+        lineas.append(f"Base de datos con problemas: {detalle.get('bd')} {detalle.get('detalle', '')}".strip())
 
     try:
         uso = shutil.disk_usage(paths.DATA_DIR)
-        lineas.append(f"💽 Disco: {_tamano(uso.free)} libres de {_tamano(uso.total)} ({uso.free * 100 // uso.total} %)")
+        lineas.append(f"Disco: {_tamano(uso.free)} libres de {_tamano(uso.total)} ({uso.free * 100 // uso.total} %)")
     except OSError:
-        lineas.append("💽 Disco: no se pudo medir")
+        lineas.append("Disco: no se pudo medir")
 
     copias = _listBackups()
     if copias:
         cuando = _parseDt(copias[0]).strftime("%d/%m/%Y %H:%M")
-        lineas.append(f"💾 Última copia: {cuando} ({len(copias)} guardadas)")
+        lineas.append(f"Última copia: {cuando} ({len(copias)} guardadas)")
     else:
-        lineas.append("💾 Aún no hay copias de seguridad")
+        lineas.append("Aún no hay copias de seguridad")
 
-    lineas.append(f"🔔 Alertas de precio activas: {alertas_store.contarActivas()}")
-    lineas.append(f"🧵 Hilos: {_hilosDeFondo()}")
+    lineas.append(f"Alertas de precio activas: {alertas_store.contarActivas()}")
+    lineas.append(f"Hilos: {_hilosDeFondo()}")
 
     hasta = telegram_notifier.silenciadoHasta()
     if hasta:
-        lineas.append(f"🔇 Avisos silenciados hasta las {datetime.fromtimestamp(hasta).strftime('%H:%M del %d/%m')}")
+        lineas.append(f"Avisos silenciados hasta las {datetime.fromtimestamp(hasta).strftime('%H:%M del %d/%m')}")
     return "\n".join(lineas)
 
 
@@ -274,13 +274,13 @@ def cmdProveedores(_args):
 
     datos = getTodayStats()
     if not datos["counts"]:
-        return "📡 Hoy no se ha llamado a ningún proveedor de cotizaciones."
+        return "Hoy no se ha llamado a ningún proveedor de cotizaciones."
     desglose = "\n".join(f"• {nombre}: {n}" for nombre, n in sorted(datos["counts"].items(), key=lambda x: -x[1]))
-    return f"📡 Llamadas de hoy: {datos['total']}\n{desglose}"
+    return f"Llamadas de hoy: {datos['total']}\n{desglose}"
 
 
 def cmdPing(_args):
-    return "pong 🏓"
+    return "pong"
 
 
 def cmdAyuda(_args):
@@ -321,4 +321,4 @@ def responder(texto: str):
         return manejador(args)
     except Exception as error:
         log.warning("[telegram] /%s ha fallado: %s", comando, error, exc_info=True)
-        return f"⚠️ Algo ha ido mal con /{comando}: {str(error)[:200]}"
+        return f"Algo ha ido mal con /{comando}: {str(error)[:200]}"

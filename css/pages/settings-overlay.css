@@ -138,6 +138,33 @@
     min-width: 0;
     overflow-y: auto;
     padding: 40px 52px;
+
+    /* base.css oculta todas las barras, pero aquí hay secciones que ocupan varias
+       pantallas y sin barra no se ve cuánto queda. El hueco reservado evita que el
+       contenido salte de ancho al cambiar a una sección que sí cabe entera. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-hard) transparent;
+    scrollbar-gutter: stable;
+}
+
+/* Solo para navegadores sin scrollbar-width (Safari): Chromium y Firefox usan las
+   dos propiedades de arriba. El display revierte el display: none de base.css. */
+.sttContent::-webkit-scrollbar {
+    display: block;
+    width: 8px;
+}
+
+.sttContent::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sttContent::-webkit-scrollbar-thumb {
+    background: var(--border-hard);
+    border-radius: 4px;
+}
+
+.sttContent::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
 }
 
 .sttPage {
@@ -163,6 +190,71 @@
     color: var(--text-primary);
     margin: 0 0 28px;
     letter-spacing: -0.015em;
+}
+
+/* sttOverlay responsive: los cortes son los de css/responsive.css. Por debajo de
+   1180 px las dos columnas ya no dan cabida a las filas de botones y desbordan. */
+@media (max-width: 1180px) {
+    .sttPage.active {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .sttContent {
+        padding: 28px 24px;
+    }
+}
+
+/* En móvil el lateral se comería la mitad de la pantalla: pasa a ser una barra
+   superior con las secciones en una fila desplazable. */
+@media (max-width: 768px) {
+    .sttOverlay {
+        flex-direction: column;
+    }
+    .sttSidebar {
+        width: 100%;
+        min-width: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--border-soft);
+    }
+    .sttSidebarHeader {
+        padding: 12px 16px;
+        border-bottom: none;
+    }
+    .sttNav {
+        flex: none;
+        flex-direction: row;
+        padding: 0 8px 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+    }
+    .sttNavBtn {
+        width: auto;
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+    .sttNavDivider {
+        width: 1px;
+        height: auto;
+        margin: 6px 4px;
+    }
+    .sttContent {
+        min-height: 0;
+        padding: 20px 16px;
+    }
+    .sttPageTitle {
+        margin-bottom: 18px;
+    }
+    .sttOverlay .ajustesActions,
+    .sttOverlay .ajustesInputRow,
+    .sttOverlay .ajustesDectipo,
+    .sttOverlay .ajustesDecimalesTipos .ajustesRefreshGrid {
+        flex-wrap: wrap;
+    }
+    .sttOverlay .ajustesActions .primaryButton,
+    .sttOverlay .ajustesActions .secondaryButton,
+    .sttOverlay .ajustesActions .dangerButton {
+        white-space: normal;
+    }
 }
 
 /* Drag handle is inline — reduce right padding */

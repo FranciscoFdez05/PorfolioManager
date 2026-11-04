@@ -35,7 +35,7 @@ import re
 from cryptography.fernet import Fernet, InvalidToken
 from werkzeug.security import _hash_internal
 
-from core import firma_hmac, paths
+from core import firma_hmac, paths, wallets_copia
 from core.secret_store import fernetDerivado, readSecretLines, writeSecretLines
 from stores import app_data
 
@@ -136,6 +136,18 @@ def clavesEnClaro() -> dict:
         claves[CLAVE_ATAJO] = [atajo[0]]
 
     return claves
+
+
+def clavesConWallets() -> dict:
+    """Las claves y, además, todo lo de las wallets. Solo para los paquetes que van cifrados.
+
+    Por eso no es `clavesEnClaro`: un ZIP sin contraseña dejaría en claro qué
+    direcciones son del usuario y cuánto tienen. Las versiones anteriores ignoran
+    la entrada de las wallets como a cualquier proveedor que no conocen.
+    """
+    claves = clavesEnClaro()
+    wallets = wallets_copia.volcar()
+    return {**claves, wallets_copia.CLAVE_PAQUETE: wallets} if wallets else claves
 
 
 class ContrasenaIncorrecta(Exception):
@@ -288,6 +300,10 @@ def restaurarClaves(claves) -> list:
     escritos = []
 
     for proveedor, valores in claves.items():
+        if proveedor == wallets_copia.CLAVE_PAQUETE:
+            escritos.extend(wallets_copia.restaurar(valores))
+            continue
+
         destino = destinoDe(proveedor)
         if destino is None:
             # Un nombre inventado escribiría un fichero arbitrario dentro de

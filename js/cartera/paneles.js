@@ -414,7 +414,7 @@ async function initPanelesLogic() {
 /** Vuelve a la página desde la que se abrieron los paneles. */
 function pnSalir() {
     const anterior = window._paginaAnterior
-    const destino = anterior && anterior !== "paneles" && paginaVisible(anterior) ? anterior : primeraPaginaVisible()
+    const destino = anterior && anterior !== "paneles" && paginaVisible(anterior) ? anterior : paginaDeInicio()
     if (!destino || destino === "paneles") return
     activarBotonNav(destino)
     loadPage(destino)

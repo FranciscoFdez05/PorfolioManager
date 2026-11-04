@@ -23,11 +23,13 @@ import logging
 import random
 import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.parse import urlencode, urlsplit
+from urllib.request import Request
 
 from core import settings
-from providers.api_stats import recordApiCall, recordApiFailure
+from providers.api_stats import recordApiCall, recordApiResult
+from providers.conexion import abrir as urlopen
+from providers.conexion import servidorCaido
 
 log = logging.getLogger(__name__)
 
@@ -128,8 +130,21 @@ def _readJson(response, url: str):
         return json.loads(payload.decode("utf-8", errors="replace"))
     except ValueError as exc:
         # Los proveedores devuelven HTML en mantenimientos y páginas de error.
-        log.warning("Respuesta no-JSON de %s: %s", url, exc)
+        # Solo el servidor: hay proveedores (NodeReal) con la clave en la ruta.
+        log.warning("Respuesta no-JSON de %s: %s", urlsplit(url).netloc, exc)
         raise ProviderResponseError("El proveedor devolvió una respuesta no válida") from exc
+
+
+def _servidorDeUrlCaido(url: str) -> bool:
+    """Si no conectó ninguna IP del servidor de `url` (ver `providers.conexion`)."""
+    partes = urlsplit(url)
+    if not partes.hostname:
+        return False
+    try:
+        puerto = partes.port or (443 if partes.scheme == "https" else 80)
+    except ValueError:
+        return False
+    return servidorCaido(partes.hostname, puerto)
 
 
 def buildUrl(url: str, params=None) -> str:
@@ -137,8 +152,43 @@ def buildUrl(url: str, params=None) -> str:
     return f"{url}?{query}" if query else url
 
 
+# Errores que son culpa de lo pedido (un símbolo que no existe), no del proveedor:
+# no cambian su estado en Ajustes.
+_CODIGOS_DE_PETICION = (400, 404, 422)
+
+
+def estadoPorCodigo(codigo: int) -> str:
+    """Estado de un proveedor según el código HTTP con que falló.
+
+    Example:
+        >>> estadoPorCodigo(429)
+        'limite'
+    """
+    if codigo == 401:
+        return "clave"
+    if codigo == 403:
+        return "plan"
+    if codigo in (402, 429):
+        return "limite"
+    if codigo >= 500:
+        return "caido"
+    return "error"
+
+
+def _anotarFallo(nombre: str, error: Exception, ms: int) -> None:
+    """Guarda el estado que deja un fallo real, salvo si es culpa de la petición."""
+    if isinstance(error, HTTPError):
+        if error.code in _CODIGOS_DE_PETICION:
+            return
+        recordApiResult(nombre, estadoPorCodigo(error.code), f"HTTP {error.code}", ms)
+    elif isinstance(error, (TimeoutError, URLError, OSError)):
+        recordApiResult(nombre, "caido", str(getattr(error, "reason", error)), ms)
+    else:
+        recordApiResult(nombre, "error", str(error), ms)
+
+
 def fetchJson(url, params=None, *, timeout=None, provider=None, headers=None,
-               retries=None, jsonBody=None):
+               retries=None, jsonBody=None, estadoDe=None):
     """GET (o POST con `jsonBody`) + parseo JSON con reintentos.
 
     `provider` es la etiqueta con la que se contabiliza la llamada en las
@@ -152,7 +202,13 @@ def fetchJson(url, params=None, *, timeout=None, provider=None, headers=None,
     `jsonBody`, si se da, convierte la petición en POST con ese cuerpo
     serializado a JSON (lo pide el scanner de TradingView; el resto de
     proveedores solo usan `params` en la query string).
+
+    `estadoDe` es el proveedor cuyo estado (Ajustes › API) refleja la llamada;
+    por defecto, `provider`. Existe para Yahoo, que cuenta sus llamadas por su
+    cuenta y no pasa `provider`.
     """
+    nombreEstado = estadoDe or provider
+    inicio = time.monotonic()
     requestUrl = buildUrl(url, params)
     requestHeaders = _headersBase()
     if headers:
@@ -177,7 +233,10 @@ def fetchJson(url, params=None, *, timeout=None, provider=None, headers=None,
         try:
             request = Request(requestUrl, data=requestData, headers=requestHeaders)
             with urlopen(request, timeout=timeout) as response:
-                return _readJson(response, url)
+                datos = _readJson(response, url)
+            if nombreEstado:
+                recordApiResult(nombreEstado, "ok", "", round((time.monotonic() - inicio) * 1000))
+            return datos
         except HTTPError as error:
             lastError = error
             retryable = error.code in _RETRYABLE_STATUS
@@ -186,21 +245,21 @@ def fetchJson(url, params=None, *, timeout=None, provider=None, headers=None,
             # OSError cubre ConnectionResetError y similares, que urllib deja
             # pasar sin envolver en URLError.
             lastError = error
-            retryable = True
+            # Si no conectó ninguna de sus IPs, reintentar al segundo no lo
+            # arregla y alarga la espera; un timeout de lectura sí se reintenta.
+            retryable = not _servidorDeUrlCaido(requestUrl)
             delay = _sleepFor(attempt, None)
 
         if not retryable or attempt == attempts - 1:
             break
         log.info(
             "Reintento %s/%s de %s tras %s (espera %.2fs)",
-            attempt + 1, attempts - 1, provider or url, lastError, delay,
+            attempt + 1, attempts - 1, provider or urlsplit(url).netloc, lastError, delay,
         )
         time.sleep(delay)
 
-    # Solo los fallos que indican un problema del proveedor (clave, cuota, caída)
-    # disparan un nuevo diagnóstico en Ajustes; un 404 o 400 es culpa del símbolo.
-    if provider and not (isinstance(lastError, HTTPError) and lastError.code in (400, 404, 422)):
-        recordApiFailure(provider)
+    if nombreEstado and lastError is not None:
+        _anotarFallo(nombreEstado, lastError, round((time.monotonic() - inicio) * 1000))
 
     if isinstance(lastError, (HTTPError, URLError, TimeoutError)):
         raise lastError

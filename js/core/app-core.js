@@ -26,6 +26,7 @@ const _PAGE_DIRS = {
     stablecoins: "cripto",
     operaciones: "cripto",
     transacciones: "cripto",
+    walletsSeguimiento: "cripto",
     conversiones: "cripto",
     Staking: "cripto",
     Earn: "cripto",
@@ -91,9 +92,18 @@ const _MODULE_PAGES = {
     panelSuperior: [],
     vistaGeneral: ["vistaGeneral"],
     activos: ["activos", "seguimiento", "heatmap", "fundamentales", "sentimiento", "paneles"],
-    gastos: ["gastos", "ingresos", "cuentas", "cuentaAhorro", "calendario"],
+    gastos: ["gastos", "ingresos", "ahorro", "cuentas", "cuentaAhorro", "calendario"],
     finanzas: ["intereses", "dividendos", "bonos", "ventas", "privateMarket", "operacionesBolsa"],
-    cripto: ["stablecoins", "operaciones", "transacciones", "conversiones", "Trading", "Staking", "Earn"],
+    cripto: [
+        "stablecoins",
+        "operaciones",
+        "transacciones",
+        "walletsSeguimiento",
+        "conversiones",
+        "Trading",
+        "Staking",
+        "Earn"
+    ],
     planes: ["planesInversion"],
     herramientas: ["herramientas"],
     metricas: ["metricas"]
@@ -146,6 +156,25 @@ function primeraPaginaVisible() {
     return null
 }
 
+// El módulo elegido en Ajustes solo vale si sigue encendido y tiene páginas: la
+// preferencia puede venir de una copia restaurada o de otra versión de la app.
+function moduloPrincipalEfectivo() {
+    const elegido = window._moduloPrincipal
+    if (_MODULE_PAGES[elegido]?.length && (window._modulosConfig || {})[elegido] !== false) {
+        return elegido
+    }
+
+    return moduloDePagina(primeraPaginaVisible()) ?? null
+}
+
+function paginaDeInicio() {
+    const principal = moduloPrincipalEfectivo()
+    const botones = [...document.querySelectorAll(".navButtons [data-page]")]
+    const boton = botones.find((item) => moduloDePagina(item.dataset.page) === principal)
+
+    return boton?.dataset.page ?? primeraPaginaVisible()
+}
+
 function activarBotonNav(page) {
     document.querySelectorAll(".navBtn").forEach((item) => item.classList.remove("active"))
     document.querySelectorAll(".navDropdownBtn").forEach((item) => item.classList.remove("active"))
@@ -171,7 +200,7 @@ function applyModulesVisibility() {
     // Si se acaba de apagar el módulo de la página abierta, hay que moverse.
     const actual = window._paginaActual
     if (actual && !paginaVisible(actual)) {
-        const destino = primeraPaginaVisible()
+        const destino = paginaDeInicio()
         if (destino) {
             activarBotonNav(destino)
             loadPage(destino)
@@ -249,7 +278,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initMoneyToggle()
     applyAssetRotation()
 
-    const paginaInicial = primeraPaginaVisible()
+    const paginaInicial = paginaDeInicio()
     if (paginaInicial) {
         activarBotonNav(paginaInicial)
         loadPage(paginaInicial)
@@ -277,6 +306,7 @@ async function loadGlobalSettings() {
             window._metricasSectionsCollapsed = data.metricasSectionsCollapsed ?? []
             window._topMetricsConfig = data.topMetricsConfig ?? {}
             window._modulosConfig = data.modulosConfig ?? {}
+            window._moduloPrincipal = data.moduloPrincipal ?? ""
             window._panelesConfig = data.panelesConfig ?? {}
             window._sidebarCollapsed = data.sidebarCollapsed ?? false
             window._monedaBase = data.monedaBase ?? "EUR"
@@ -325,6 +355,7 @@ async function loadGlobalSettings() {
         window._numLocale = "es-ES"
         window._dateFormat = "DD/MM/YYYY"
         window._modulosConfig = {}
+        window._moduloPrincipal = ""
     }
 }
 
@@ -1124,6 +1155,7 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
                 "operaciones",
                 "operacionesBolsa",
                 "transacciones",
+                "walletsSeguimiento",
                 "conversiones",
                 "Trading",
                 "bonos",
@@ -1159,6 +1191,8 @@ async function loadPage(page, contentArea = document.getElementById("dynamicCont
             await initStakingLogic()
         } else if (page === "Earn") {
             await initEarnLogic()
+        } else if (page === "walletsSeguimiento") {
+            await initWalletsSeguimientoLogic()
         } else if (page === "conversiones") {
             await initConversionesLogic()
         } else if (page === "herramientas") {

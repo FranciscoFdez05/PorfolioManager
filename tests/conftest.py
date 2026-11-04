@@ -63,6 +63,13 @@ def _tmpDeDatosAislado(tmp_path_factory, monkeypatch):
     clavesVacias.mkdir(exist_ok=True)
     monkeypatch.setattr(paths, "API_DIR", clavesVacias, raising=False)
 
+    # Imágenes de los avisos: sin ninguna, todo aviso va por `_enviar`, que es lo
+    # que sustituyen los tests. Con las de verdad, un test que solo cambia
+    # `_enviar` intentaría subir la imagen a Telegram antes de caer en él.
+    from core import telegram_notifier
+
+    monkeypatch.setattr(telegram_notifier, "_DIR_IMAGENES", clavesVacias)
+
     # Estado de revocación de sesiones. Va aquí y no en `datosAislados` por el
     # mismo motivo que los dos de arriba: lo escribe cualquier test que cierre
     # sesión o cambie credenciales, no solo los que piden rutas aisladas, y sin
@@ -100,6 +107,31 @@ def _tmpDeDatosAislado(tmp_path_factory, monkeypatch):
     monkeypatch.setattr(sesion, "SESION_DIR", sesiones, raising=False)
     monkeypatch.setattr(sesion, "ESTADO_FILE", sesiones / "estado.json", raising=False)
     monkeypatch.setattr(sesion, "LOCK_FILE", sesiones / "estado.lock", raising=False)
+
+    # Estado de las APIs: lo escribe cada llamada a un proveedor (también las
+    # falsas de los tests), no solo las rutas aisladas. Uno por test, para que
+    # el resultado de uno no aparezca en el siguiente.
+    from providers import api_stats
+
+    estadoApis = tmp_path_factory.mktemp("api_estado") / "api_estado.json"
+    monkeypatch.setattr(api_stats, "_rutaEstado", lambda: estadoApis)
+    api_stats._ultimos.clear()
+
+    # Listas públicas de tokens: sin esto, cualquier test con un token entre sus
+    # movimientos las descargaría de Internet, y su caché de proceso pasaría de
+    # un test al siguiente. Los que las necesitan inyectan las suyas.
+    from providers import listas_tokens
+
+    monkeypatch.setattr(listas_tokens, "_LISTAS", listas_tokens.ListasTokens(urls=lambda: []))
+
+    # Ritmo entre llamadas a Esplora: con las respuestas falsas de los tests no
+    # protege de nada y añadiría un segundo de espera real por llamada. Los
+    # tests del ritmo lo fijan ellos mismos.
+    from core import settings
+    from providers import blockchain_clients
+
+    monkeypatch.setattr(settings, "walletsEsploraIntervalo", lambda: 0.0)
+    blockchain_clients.olvidarEsploraCaidas()
 
 
 @pytest.fixture

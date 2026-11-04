@@ -97,19 +97,83 @@ def recordApiCall(provider: str) -> None:
             log.debug("[api_stats] No se pudo guardar el contador: %s", error)
 
 
-_fallos: dict = {}
+# ── Resultado de la última llamada real ──────────────────────────────────────
+# El estado de Ajustes › API sale de aquí y no de sondeos propios: cada sondeo
+# gasta cuota, y una pantalla que pregunta sola acababa siendo la que la agotaba.
+# Vive en un JSON compartido por lo mismo que el contador: con dos workers, cada
+# uno vería solo las llamadas que ha hecho él.
+
+# Respaldo en memoria: {proveedor: {"estado", "detalle", "ms", "momento"}}.
+_ultimos: dict = {}
 
 
-def recordApiFailure(provider: str) -> None:
-    """Anota (en memoria) cuándo falló por última vez una llamada real."""
+def _rutaEstado():
+    return paths.JSON_DIR / "api_estado.json"
+
+
+def _rutaBloqueoEstado():
+    return paths.TMP_DIR / "api-estado.lock"
+
+
+def _leerEstado() -> dict:
+    try:
+        datos = json.loads(_rutaEstado().read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(datos, dict):
+        return {}
+    return {str(k): v for k, v in datos.items() if isinstance(v, dict) and v.get("estado")}
+
+
+def recordApiResult(provider: str, estado: str, detalle: str = "", ms: int = 0) -> None:
+    """Anota cómo terminó la última llamada real a un proveedor.
+
+    Args:
+        provider: Nombre visible del proveedor, el mismo que usa el contador.
+        estado: ``ok``, ``clave``, ``plan``, ``limite``, ``caido`` o ``error``.
+        detalle: Motivo legible (nunca la URL: podría llevar la clave).
+        ms: Duración de la llamada.
+    """
+    fila = {"estado": estado, "detalle": str(detalle or "")[:200], "ms": int(ms or 0), "momento": time.time()}
     with _lock:
-        _fallos[provider] = time.monotonic()
+        _ultimos[provider] = fila
+        try:
+            with exclusivo(_rutaBloqueoEstado(), espera=_ESPERA_BLOQUEO, obligatorio=False):
+                datos = _leerEstado()
+                datos[provider] = fila
+                escribirJsonAtomico(_rutaEstado(), datos)
+        except OSError as error:
+            log.debug("[api_stats] No se pudo guardar el estado: %s", error)
 
 
-def lastApiFailure(provider: str) -> float:
-    """Instante monotónico del último fallo real del proveedor; 0 si no hubo."""
+def olvidarApiResult(provider: str) -> None:
+    """Borra el último resultado de un proveedor.
+
+    Al cambiar la API que hay detrás de una fila, el resultado guardado es de la
+    anterior: enseñarlo diría que falla algo que todavía no se ha probado.
+
+    Args:
+        provider: Nombre visible del proveedor, el mismo de `recordApiResult`.
+    """
     with _lock:
-        return _fallos.get(provider, 0.0)
+        _ultimos.pop(provider, None)
+        try:
+            with exclusivo(_rutaBloqueoEstado(), espera=_ESPERA_BLOQUEO, obligatorio=False):
+                datos = _leerEstado()
+                if datos.pop(provider, None) is not None:
+                    escribirJsonAtomico(_rutaEstado(), datos)
+        except OSError as error:
+            log.debug("[api_stats] No se pudo guardar el estado: %s", error)
+
+
+def lastApiResults() -> dict:
+    """El último resultado de cada proveedor, el más reciente entre disco y memoria."""
+    with _lock:
+        datos = _leerEstado()
+        for proveedor, fila in _ultimos.items():
+            if fila["momento"] > datos.get(proveedor, {}).get("momento", 0):
+                datos[proveedor] = fila
+    return datos
 
 
 def getTodayStats() -> dict:
@@ -130,3 +194,4 @@ def reiniciarParaPruebas() -> None:
     with _lock:
         _memoria["date"] = None
         _memoria["counts"] = {}
+        _ultimos.clear()

@@ -1,0 +1,57 @@
+<section class="operationsPage walletsSegPage">
+    <div id="walletsSegDetalle" class="hidden"></div>
+
+    <div id="walletsSegLista">
+        <div class="walletsSegCabecera">
+            <div class="walletsSegTotal">
+                <span class="walletsSegTotalEtiqueta">Total en mis wallets</span>
+                <strong id="walletsSegTotal">0,00 €</strong>
+                <span id="walletsSegTotalNota" class="walletsSegDato"></span>
+            </div>
+            <div class="walletsSegAcciones">
+                <button id="walletsSegEnlazarBtn" class="primaryButton" type="button">Enlazar wallet</button>
+                <div class="pageActionsMenu walletsSegMenu">
+                    <button id="walletsSegMenuBtn" class="pageActionsMenuTrigger" type="button" aria-label="Opciones" aria-haspopup="true" aria-expanded="false" aria-controls="walletsSegMenu">···</button>
+                    <div id="walletsSegMenu" class="pageActionsDropdown">
+                        <div class="walletsSegIntervalo">
+                            <span id="walletsSegIntervaloEtiqueta">Revisar cada</span>
+                            <select id="walletsSegIntervalo" class="assetRowModalSelect" aria-labelledby="walletsSegIntervaloEtiqueta"></select>
+                            <span id="walletsSegIntervaloNota" class="walletsSegMenuNota"></span>
+                        </div>
+                        <div class="pageActionsDivider"></div>
+                        <button id="walletsSegDireccionesBtn" class="pageActionsItem" type="button" title="Marca qué direcciones son tuyas o ajenas y ponles apodo">Direcciones</button>
+                        <button id="walletsSegActualizarBtn" class="pageActionsItem" type="button">Actualizar todo</button>
+                        <div class="pageActionsDivider"></div>
+                        <button id="walletsCatalogoBtn" class="pageActionsItem" type="button">
+                            Carteras conocidas…<span class="walletsSegMenuNota">Binance, Coinbase, Satoshi, gobiernos…</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <p class="ajustesAviso hidden" id="walletsSegSinCifrado">Falta una SECRET_KEY aleatoria de al menos 32 caracteres en .env. Hasta definirla solo se pueden seguir wallets ajenas: las tuyas se guardan cifradas con ella.</p>
+        <p class="overviewEmpty hidden" id="walletsSegVacio">Todavía no sigues ninguna wallet. Pulsa «Enlazar wallet» y pega una dirección pública (tuya o ajena), o la xpub o la clave pública de tu wallet de Bitcoin. Cada seguimiento puede agrupar varias direcciones o claves, aunque sean de redes distintas.</p>
+
+        <div class="walletsSegScroll">
+            <section id="walletsSegPropiasBloque" class="walletsSegBloque walletsSegBloque-propias hidden">
+                <h3 class="walletsSegSeccionCabecera">
+                    <button type="button" class="walletsSegPlegarBtn" data-plegar="propias" aria-expanded="true" aria-controls="walletsSegPropias">
+                        <span class="walletsSegSeccion"><span class="walletsSegChevron" aria-hidden="true">▾</span>Mis wallets <span id="walletsSegPropiasNum" class="walletsSegContador"></span></span>
+                        <span class="walletsSegSeccionNota">Suman al total</span>
+                    </button>
+                </h3>
+                <div id="walletsSegPropias" class="walletsSegRejilla"></div>
+            </section>
+            <section id="walletsSegAjenasBloque"class="walletsSegBloque walletsSegBloque-ajenas hidden">
+                <h3 class="walletsSegSeccionCabecera">
+                    <button type="button" class="walletsSegPlegarBtn" data-plegar="ajenas" aria-expanded="true" aria-controls="walletsSegAjenas">
+                        <span class="walletsSegSeccion"><span class="walletsSegChevron" aria-hidden="true">▾</span>Wallets que sigo <span id="walletsSegAjenasNum" class="walletsSegContador"></span></span>
+                        <span class="walletsSegSeccionNota">Solo seguimiento, no suman al total</span>
+                    </button>
+                </h3>
+                <div id="walletsSegAjenas" class="walletsSegRejilla"></div>
+            </section>
+        </div>
+    </div>
+</section>

@@ -39,7 +39,7 @@ _TYPE_MAP = {
 def _fetchJson(url, params=None, timeout=None):
     # Yahoo no tiene API key ni cuota documentada: las llamadas se contabilizan
     # en las funciones públicas para no inflar el contador con los reintentos.
-    return fetchJson(url, params, timeout=timeout, headers=_HEADERS)
+    return fetchJson(url, params, timeout=timeout, headers=_HEADERS, estadoDe="Yahoo Finance")
 
 
 def _mapQuoteType(quoteType):

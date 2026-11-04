@@ -725,6 +725,10 @@ body.asset-rotation-halted .detailRotationBar span {
     margin: -4px 0 10px 0;
 }
 
+.assetSearchActions > :only-child {
+    grid-column: 1 / -1;
+}
+
 .assetSearchFeedback {
     margin: 0 0 10px 0;
     color: #cbd5e1;
@@ -2671,6 +2675,215 @@ table td.numCell [contenteditable="true"] {
 
 .dateFieldWrap > .assetRowModalInput + .dateTodayBtn {
     border-radius: 8px;
+}
+
+/* Calendario desplegable (abrirCalendarioFecha, js/core/shared-utils.js): el
+   nativo del navegador no admite CSS. Solo usa variables de la paleta, así que
+   sigue a cada tema; Claro solo suaviza la sombra. */
+.calPopup {
+    position: fixed;
+    z-index: 100000;
+    width: 260px;
+    padding: 10px;
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+    font-size: 0.8rem;
+    animation: calPopupEntra 0.12s ease-out;
+}
+
+@keyframes calPopupEntra {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .calPopup {
+        animation: none;
+    }
+}
+
+.calPopupCabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+/* En días y meses el título es un botón que sube de vista (meses, años). */
+.calPopupTitulo {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-bright);
+    font: inherit;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+button.calPopupTitulo {
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.calPopupTituloFlecha {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.calPopupCeldas {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 44px;
+    align-content: space-evenly;
+    gap: 6px;
+    height: 100%;
+    padding: 4px 0;
+    box-sizing: border-box;
+}
+
+.calPopupCelda {
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition:
+        background 0.1s ease,
+        color 0.1s ease;
+}
+
+.calPopupNav {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-subtle);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.calPopupSemana,
+.calPopupDias {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.calPopupSemana span {
+    padding: 4px 0;
+    text-align: center;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.calPopupDia {
+    aspect-ratio: 1;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition:
+        background 0.1s ease,
+        color 0.1s ease;
+}
+
+.calPopupNav:hover:not(:disabled),
+button.calPopupTitulo:hover,
+.calPopupDia:hover:not(:disabled),
+.calPopupCelda:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--text-bright) 9%, transparent);
+    color: var(--text-bright);
+}
+
+.calPopupNav:disabled {
+    opacity: 0.25;
+    cursor: default;
+}
+
+.calPopupDiaFuera {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.calPopupHoy {
+    border-color: var(--accent);
+}
+
+.calPopupDia.calPopupElegido,
+.calPopupDia.calPopupElegido:hover,
+.calPopupCelda.calPopupElegido,
+.calPopupCelda.calPopupElegido:hover {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #ffffff;
+    font-weight: 600;
+    opacity: 1;
+}
+
+.calPopupNav:focus-visible,
+.calPopupTitulo:focus-visible,
+.calPopupDia:focus-visible,
+.calPopupCelda:focus-visible,
+.calPopupAccion:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Lo que queda fuera de min/max (los días futuros si el max es hoy) sale apagado. */
+.calPopupDia:disabled,
+.calPopupCelda:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+}
+
+.calPopupPie {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.calPopupAccion {
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.calPopupAccion:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.calPopupAccion:disabled {
+    color: var(--text-muted);
+    opacity: 0.5;
+    cursor: default;
 }
 
 .segAutocompleteWrap {

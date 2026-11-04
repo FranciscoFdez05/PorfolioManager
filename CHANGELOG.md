@@ -22,6 +22,111 @@ decide cómo se deshace la actualización:
 
 ---
 
+## [5.0.0] — 2026-11-04
+
+**Esquema de base de datos:** no lo toca (sigue en la **26**). Las wallets y sus
+datos no van en la base de datos, sino en `API/`.
+
+**Por qué es mayor:** cambia la forma del despliegue. El stack gana un servicio,
+`worker`, que se lleva las tareas de fondo de la web. `./docker-update.sh` lo crea
+sin pasos manuales, pero deshacer la actualización ya no es solo volver a la
+imagen anterior: hay que volver también al `docker-compose.yml` de la 4.9.0 (el
+commit de esa versión) y ejecutar `docker compose up -d --no-build --remove-orphans`.
+Con el compose nuevo, la imagen 4.9.0 ignora el argumento `worker` y arranca una
+segunda copia de la web.
+
+### Añadido
+
+- **Wallets enlazadas, solo lectura** (Cripto › Transacciones › Wallets enlazadas).
+  Bitcoin por dirección (Legacy, SegWit o Taproot), xpub/ypub/zpub o clave pública;
+  Ethereum y BNB Smart Chain por dirección o clave pública; Solana y XRP. El formato
+  se detecta solo y una clave privada o frase semilla se rechaza. **Sincronizar**
+  importa los movimientos a Transacciones, incluidas las comisiones de red que no
+  mueven la moneda y los tokens ERC-20/BEP-20 con activo o stablecoin del mismo
+  símbolo. Direcciones y xpub se guardan cifradas en `API/wallets.key` y hace falta
+  una `SECRET_KEY` aleatoria de 32 caracteres o más.
+- **Cripto › Seguimiento.** Agrupa wallets propias o ajenas, también de redes
+  distintas, con saldo conjunto, valor en euros y últimos movimientos. Las ajenas
+  solo se siguen: ni se importan ni suman al total. El detalle trae historial con
+  filtros y enlaces al explorador, **gráfico de flujo** de los movimientos, **visor
+  de UTXO** en Bitcoin y **visor de tokens** en Ethereum y BNB.
+- **Tokens: contratos verificados e imitaciones.** Cada token muestra su contrato y
+  su estado. Los contratos de las listas públicas de Uniswap y CoinGecko salen
+  verificados y los demás con ese símbolo en esa red, como imitación, salvo que
+  decidas otra cosa; lo marcado como imitación no se importa. También se le puede
+  poner un ticker de precio a un token sin activo.
+- **Avisos de wallets por Telegram.** Por wallet o por seguimiento: movimientos
+  nuevos, mínimos en moneda o euros, límites de saldo, wallet que despierta tras N
+  días, actividad sospechosa (dirección que imita a otra conocida, wallet casi
+  vaciada, polvo, ráfagas de envíos), agrupación y horas de silencio, con perfiles
+  de un clic.
+- **Libreta de direcciones.** Marca direcciones como propias o ajenas con un apodo.
+  Un movimiento hacia una propia cuenta como **entre mis wallets** en el historial,
+  los avisos y Transacciones.
+- **Carteras conocidas.** Catálogo de wallets públicas incluido en la aplicación
+  (exchanges, fondos y otras), que se busca y se sigue con pocos clics y que admite
+  entradas propias, cifradas en `API/carteras.key`.
+- **Monedas de Satoshi.** Saldo real a partir de una foto incluida de las monedas
+  sin gastar y, si se activa, vigilancia de cada bloque nuevo (~210 MB al día) con
+  aviso por Telegram si se gasta alguna.
+- **Servicio `worker`.** Copias automáticas, snapshots, Telegram y avisos corren en
+  un contenedor aparte con la misma imagen, para no ocupar los hilos de gunicorn. El
+  vigilante lo controla por un fichero de latido (`latido:<fichero>` en
+  `VIGILANTE_URL`). Sin Docker, la web sigue arrancando esas tareas
+  (`[server] tareas_en_web`). Tope de memoria en `PORTFOLIO_WORKER_MEM_LIMIT`, 1 GB
+  por defecto.
+- **Ajustes › Avisos.** Página propia para elegir qué avisos llegan. Cada aviso de
+  Telegram lleva una imagen de cabecera con su tipo y gravedad, y sale como texto si
+  la imagen no se puede enviar.
+- **Módulo de inicio.** Ajustes › Módulos elige, por portfolio, qué módulo se abre
+  al arrancar (columna **Principal**).
+- **Copias con wallets.** Con **Incluir las claves de API y las wallets en las
+  copias**, viajan dentro del paquete cifrado. Una exportación manual solo las lleva
+  si tiene contraseña.
+- **Barra de progreso** en la esquina inferior derecha mientras se leen wallets.
+- **Watchlist: lista Seguimiento**, con la moneda de cada red seguida y los tokens
+  vistos, sin imitaciones.
+- **Nueva configuración:** `ETHERSCAN_API_KEY`, `NODEREAL_API_KEY`, sección
+  `[wallets]` de `config.ini`, `PROVEEDORES_TIMEOUT_CONEXION`,
+  `PORTFOLIO_TAREAS_EN_WEB`, `PORTFOLIO_MEM_LIMIT`, `PORTFOLIO_WORKER_MEM_LIMIT` y
+  `PORTFOLIO_PIDS_LIMIT`.
+
+### Cambiado
+
+- **Estado de las APIs no gasta cuota al abrirse.** Enseña cómo terminó la última
+  petición real a cada proveedor; solo «Comprobar ahora» los sondea. Un límite deja
+  de enseñarse si nadie vuelve a llamar al proveedor: a los 5 minutos si era por
+  segundo y a las 24 horas si era la cuota.
+- **Alpha Vantage sale del respaldo por defecto** (`[mercado] orden_respaldo`). Solo
+  se le llama si un activo o token la tiene elegida, al buscar con su botón o con
+  «Comprobar ahora». Un `MERCADO_ORDEN_RESPALDO` propio se respeta.
+- **Telegram:** los interruptores de avisos pasan de Ajustes › Telegram a Ajustes ›
+  Avisos, y los mensajes dejan los emojis por la cabecera de imagen.
+- **Conexión a servidores con varias IP:** si una no contesta en 3 s se pasa a la
+  siguiente, en vez de agotar el timeout entero.
+- **Watchlist:** los filtros de origen enseñan una sola fuente cada vez.
+
+### Corregido
+
+- **Alpha Vantage con la cuota agotada.** El aviso llega dentro de un 200 y no se
+  reconocía como límite: el proveedor nunca entraba en reposo y cada activo gastaba
+  otra petición. Ahora entra en reposo y Ajustes lo enseña como cuota agotada.
+- **`docker-up.sh` y `docker-update.sh`** ya no se cortan si `docker compose up` da
+  error porque la web tarda en estar sana: llegan al diagnóstico o a la vuelta atrás,
+  y un fallo al volver atrás no se lleva las indicaciones finales.
+- **Cotización de memecoins:** al buscar un activo, un precio como 0,00000493 ya no
+  llega redondeado a 0,00.
+
+### Seguridad
+
+- Las wallets ajenas son direcciones públicas de otros y van sin cifrar en
+  `API/wallets_ajenas.json`. Ese fichero, `API/satoshi_vigilancia.json` y los
+  bloqueos quedan fuera de git, y todo `API/` queda fuera de la imagen Docker.
+- Las wallets enlazadas se muestran enmascaradas: **Ver completas** pide la
+  contraseña de acceso.
+
+---
+
 ## [4.9.0] — 2026-10-27
 
 **Esquema de base de datos:** sube al **26**. Al arrancar se añaden columnas

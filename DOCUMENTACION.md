@@ -390,7 +390,7 @@ Sin ningún archivo de clave la aplicación funciona igualmente; solo no obtendr
 
 ### Estado de los proveedores
 
-**Ajustes › API › Estado de las APIs** comprueba cada proveedor con una cotización de prueba y distingue los casos que se confunden cuando los precios dejan de actualizarse:
+**Ajustes › API › Estado de las APIs** enseña cómo terminó la última petición real que hizo la aplicación a cada proveedor y distingue los casos que se confunden cuando los precios dejan de actualizarse:
 
 | Estado | Qué significa | Qué hacer |
 |---|---|---|
@@ -401,7 +401,9 @@ Sin ningún archivo de clave la aplicación funciona igualmente; solo no obtendr
 | **Cuota agotada** | 429/402, o el aviso de Alpha Vantage dentro de un 200. | Esperar al reinicio diario o añadir otra clave. |
 | **No responde / Caída** | Timeout, corte de red o 5xx. | No es cosa de la instalación. |
 
-La comprobación consume cuota real, así que el resultado se guarda un minuto y la pantalla indica de cuándo es. «Comprobar ahora» fuerza un sondeo nuevo.
+Abrir la pantalla no llama a ningún proveedor. Solo «Comprobar ahora» los sondea, con una cotización de prueba que sí consume cuota. Un límite deja de enseñarse si nadie ha vuelto a llamar al proveedor: a los 5 minutos si era por segundo y a las 24 horas si era la cuota; la fila pasa a **Sin datos**.
+
+Cuando falla el proveedor de un activo se prueban los de `[mercado] orden_respaldo` en `config.ini`. Alpha Vantage ya no está en esa lista por defecto: solo se le llama si un activo o token la tiene elegida, si buscas con su botón o si pulsas «Comprobar ahora».
 
 ### Cifrado en reposo
 
@@ -618,18 +620,22 @@ El intervalo y el alcance (solo el portfolio activo o todos) se eligen en **Ajus
 
 Un bot de Telegram (lo creas con [@BotFather](https://t.me/BotFather) y pegas el token y tu ID de chat en **Ajustes › Telegram**; el token se guarda cifrado en `API/telegram.key`) hace de canal del servidor hacia el móvil. Antes de nada, abre el chat con el bot y pulsa **Iniciar**: un bot no puede escribirle primero a nadie.
 
-**Qué avisa.** Cada tipo se activa o se apaga por separado en Ajustes › Telegram:
+**Qué avisa.** Cada tipo se activa o se apaga por separado en **Ajustes › Avisos**:
 
 | Tipo | Avisa de |
 |---|---|
-| Proveedores | cuota agotada, sin respuesta o fallo de un proveedor de cotizaciones, y cuando vuelve |
-| Copias de seguridad | copia manual o automática creada (tamaño, cuántas hay), copia fallida, restaurada o eliminada |
-| Alertas de precio | un activo alcanza el precio o la variación que pediste |
+| Proveedores | cuota agotada, sin respuesta o fallo de un proveedor de cotizaciones (el mismo problema no se repite en 30 min), cuando vuelve a responder, y un activo que lleva más de 6 h valorado con un valor de reserva |
+| Copias de seguridad | copia manual o automática creada (nombre, tamaño, cuántas hay), copia o restauración fallida, copia restaurada o eliminada |
+| Enviar el fichero de cada copia automática | cada copia automática llega como ZIP, con las claves de API si se incluyen en las copias; si supera los 50 MB de Telegram solo llega un aviso (desactivado de fábrica). Las copias manuales no se envían |
+| Alertas de precio | un activo llega al precio fijado o se mueve en el día el % pedido; cada alerta salta una vez |
+| Movimientos en las wallets | movimientos nuevos, saldo fuera de los límites, wallet que despierta o actividad sospechosa de las wallets con su interruptor encendido en Cripto › Seguimiento; monedas de Satoshi gastadas, si está activada esa vigilancia |
 | Seguridad | una IP agota los intentos de login, cambio de contraseña o de usuario, verificación en dos pasos activada, desactivada o usada la frase de recuperación |
-| Estado del servidor | servidor iniciado, base de datos dañada al arrancar (reparada o restaurada), disco casi lleno |
+| Estado del servidor | servidor iniciado, base de datos dañada al arrancar (reparada o restaurada), disco casi lleno, más de una hora sin guardar snapshots por falta de precios o tipos de cambio. El aviso de aplicación caída lo manda el vigilante y no depende de este interruptor |
 | Versión nueva | hay una versión publicada más nueva que la instalada (una vez por versión) |
-| Inicio de sesión | cada login correcto (desactivado de fábrica) |
-| Resumen diario | valor, resultado y variación a 24 h de cada cartera, a la hora elegida (desactivado de fábrica) |
+| Inicio de sesión | cada login correcto, con o sin verificación en dos pasos, con la IP de origen (desactivado de fábrica) |
+| Resumen diario | valor, invertido, resultado, variación a 24 h y posiciones de cada cartera, más sus alertas activas, a la hora elegida (desactivado de fábrica) |
+
+**Cómo se distinguen.** Cada aviso llega con una imagen de cabecera que indica su tipo y su gravedad (correcto, información, atención o crítico), y el texto debajo. Si la imagen no se puede enviar, el aviso sale igualmente como texto. Los códigos de verificación, las respuestas a comandos y el fichero de cada copia no llevan cabecera. Las imágenes están en `python/core/datos/avisos/` y se generan con `python tools/generar_imagenes_avisos.py`, que requiere Playwright con Chromium solo para ese paso.
 
 **Alertas de precio.** Pestaña *Alertas* en la ficha de cada activo: precio igual o superior a X, igual o inferior a X, o variación del día de ±N %. El servidor las comprueba cada `[avisos] alertas_intervalo_minutos` aunque la web esté cerrada, pidiendo solo la cotización de los activos que tienen alguna alerta activa. Cada alerta salta **una vez** y queda marcada hasta que la reactives.
 
@@ -657,13 +663,13 @@ alertas_intervalo_minutos = 5      ; env AVISOS_ALERTAS_MINUTOS · 0 no las vigi
 espacio_minimo_mb = 1024           ; env AVISOS_ESPACIO_MINIMO_MB · aviso de disco casi lleno
 
 [vigilante]
-url =                              ; env VIGILANTE_URL · vacío = 127.0.0.1:<puerto>/api/health
+url =                              ; env VIGILANTE_URL · vacío = 127.0.0.1:<puerto>/api/health · admite latido:<fichero>
 intervalo_segundos = 30            ; env VIGILANTE_INTERVALO
 fallos_para_avisar = 3             ; env VIGILANTE_FALLOS
 recordatorio_minutos = 60          ; env VIGILANTE_RECORDATORIO_MINUTOS · 0 no repite
 ```
 
-Los avisos se activan o apagan por tipo en Ajustes › Telegram.
+Los avisos se activan o apagan por tipo en Ajustes › Avisos.
 
 ---
 

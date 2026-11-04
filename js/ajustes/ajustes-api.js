@@ -19,6 +19,14 @@ function _initAjustesClaves(settings) {
     const finnhubMsg = document.getElementById("ajustesFinnhubMsg")
     const eodhdMsg = document.getElementById("ajustesEodhdMsg")
     const alphaVantageMsg = document.getElementById("ajustesAlphaVantageMsg")
+    const etherscanInput = document.getElementById("ajustesEtherscanKey")
+    const etherscanStatus = document.getElementById("ajustesEtherscanStatus")
+    const guardarEtherscanBtn = document.getElementById("ajustesGuardarEtherscanBtn")
+    const etherscanMsg = document.getElementById("ajustesEtherscanMsg")
+    const noderealInput = document.getElementById("ajustesNoderealKey")
+    const noderealStatus = document.getElementById("ajustesNoderealStatus")
+    const guardarNoderealBtn = document.getElementById("ajustesGuardarNoderealBtn")
+    const noderealMsg = document.getElementById("ajustesNoderealMsg")
 
     function setKeyStatus(el, count) {
         if (!el) return
@@ -45,12 +53,32 @@ function _initAjustesClaves(settings) {
     const _proveedoresClaves = {
         finnhub: { lista: document.getElementById("ajustesFinnhubKeyList"), estado: finnhubStatus },
         eodhd: { lista: document.getElementById("ajustesEodhdKeyList"), estado: eodhdStatus },
-        alphavantage: { lista: document.getElementById("ajustesAlphaVantageKeyList"), estado: alphaVantageStatus }
+        alphavantage: { lista: document.getElementById("ajustesAlphaVantageKeyList"), estado: alphaVantageStatus },
+        etherscan: { lista: document.getElementById("ajustesEtherscanKeyList"), estado: etherscanStatus },
+        nodereal: { lista: document.getElementById("ajustesNoderealKeyList"), estado: noderealStatus }
     }
 
-    const _mensajesClaves = { finnhub: finnhubMsg, eodhd: eodhdMsg, alphavantage: alphaVantageMsg }
+    const _mensajesClaves = {
+        finnhub: finnhubMsg,
+        eodhd: eodhdMsg,
+        alphavantage: alphaVantageMsg,
+        etherscan: etherscanMsg,
+        nodereal: noderealMsg
+    }
 
-    const _NOMBRES_PROVEEDOR = { finnhub: "Finnhub", eodhd: "EODHD", alphavantage: "Alpha Vantage" }
+    const _NOMBRES_PROVEEDOR = {
+        finnhub: "Finnhub",
+        eodhd: "EODHD",
+        alphavantage: "Alpha Vantage",
+        etherscan: "Etherscan",
+        nodereal: "NodeReal"
+    }
+
+    // Etherscan y NodeReal no dan precios: sin clave lo que se pierde es leer wallets.
+    const _EFECTO_SIN_CLAVE = {
+        etherscan: "dejarán de leerse las wallets que usan Etherscan",
+        nodereal: "dejarán de leerse las wallets de BNB si usan NodeReal"
+    }
 
     function _pintarIconoOjo(btn, visible) {
         const eyeShow = btn.querySelector(".ajustesEyeShow")
@@ -95,7 +123,8 @@ function _initAjustesClaves(settings) {
         const nombre = _NOMBRES_PROVEEDOR[proveedor] || proveedor
         // Que sea la última importa: al quedarse sin claves el proveedor deja
         // de dar precios, y eso no se ve hasta el siguiente refresco.
-        const aviso = restantes === 1 ? ` Es la única que queda, así que ${nombre} dejará de actualizar precios.` : ""
+        const efecto = _EFECTO_SIN_CLAVE[proveedor] || `${nombre} dejará de actualizar precios`
+        const aviso = restantes === 1 ? ` Es la única que queda, así que ${efecto}.` : ""
 
         openConfirmModal({
             title: "Eliminar clave",
@@ -226,7 +255,9 @@ function _initAjustesClaves(settings) {
     const _keyCountMap = {
         finnhubKey: "finnhubKeys",
         eodhdKeys: "eodhdKeys",
-        alphaVantageKeys: "alphaVantageKeys"
+        alphaVantageKeys: "alphaVantageKeys",
+        etherscanKey: "etherscanKeys",
+        noderealKey: "noderealKeys"
     }
 
     async function saveApiKey(fieldName, value, input, statusEl, msgEl, btn) {
@@ -252,7 +283,7 @@ function _initAjustesClaves(settings) {
                 input.value = ""
                 cargarClaves()
             } else {
-                showMsg(msgEl, "Error al guardar", "error")
+                showMsg(msgEl, data.error || "Error al guardar", "error")
             }
         } catch {
             showMsg(msgEl, "Error de red", "error")
@@ -287,6 +318,30 @@ function _initAjustesClaves(settings) {
                 alphaVantageStatus,
                 alphaVantageMsg,
                 guardarAlphaVantageBtn
+            )
+        )
+    }
+    if (guardarEtherscanBtn) {
+        guardarEtherscanBtn.addEventListener("click", () =>
+            saveApiKey(
+                "etherscanKey",
+                etherscanInput?.value || "",
+                etherscanInput,
+                etherscanStatus,
+                etherscanMsg,
+                guardarEtherscanBtn
+            )
+        )
+    }
+    if (guardarNoderealBtn) {
+        guardarNoderealBtn.addEventListener("click", () =>
+            saveApiKey(
+                "noderealKey",
+                noderealInput?.value || "",
+                noderealInput,
+                noderealStatus,
+                noderealMsg,
+                guardarNoderealBtn
             )
         )
     }
@@ -340,6 +395,8 @@ function _initAjustesEstadoApis() {
     // El sondeo consume cuota de los proveedores, así que la carga normal se
     // conforma con lo que el servidor tenga cacheado; solo el botón fuerza una
     // comprobación nueva.
+    // Sin forzar, el servidor no llama a nadie: enseña cómo terminó la última
+    // petición real a cada proveedor.
     const apiEstadoListEl = document.getElementById("ajustesApiEstadoList")
     const refreshApiEstadoBtn = document.getElementById("ajustesRefreshApiEstadoBtn")
     const apiEstadoMsg = document.getElementById("ajustesApiEstadoMsg")
@@ -366,7 +423,10 @@ function _initAjustesEstadoApis() {
         if (!Number.isFinite(segundos) || segundos <= 1) return "ahora mismo"
         if (segundos < 60) return `hace ${segundos} s`
         const minutos = Math.round(segundos / 60)
-        return `hace ${minutos} min`
+        if (minutos < 60) return `hace ${minutos} min`
+        const horas = Math.round(minutos / 60)
+        if (horas < 48) return `hace ${horas} h`
+        return `hace ${Math.round(horas / 24)} días`
     }
 
     async function togglePausaApi(proveedor, boton) {
@@ -387,6 +447,40 @@ function _initAjustesEstadoApis() {
         }
     }
 
+    async function elegirApiBnb(proveedor, selector) {
+        selector.disabled = true
+        try {
+            const res = await fetch("/api/settings/bnb-proveedor", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ proveedor })
+            })
+            const data = await res.json()
+            if (!data.ok) throw new Error(data.error || "")
+            // Sin forzar: elegir una API no debe gastar cuota. Se prueba con «Comprobar ahora».
+            await loadApiEstado()
+        } catch (error) {
+            selector.disabled = false
+            showMsg(apiEstadoMsg, error.message || "No se pudo cambiar la API de BNB", "error")
+        }
+    }
+
+    function _selectorApiBnb(p) {
+        const selector = document.createElement("select")
+        selector.className = "ajustesApiBnbSelect"
+        selector.title = "API que lee las wallets de BNB"
+        selector.setAttribute("aria-label", "API que lee las wallets de BNB")
+        p.opciones.forEach((opcion) => {
+            const elemento = document.createElement("option")
+            elemento.value = opcion.id
+            elemento.textContent = opcion.nombre
+            selector.appendChild(elemento)
+        })
+        selector.value = p.seleccion
+        selector.addEventListener("change", () => elegirApiBnb(selector.value, selector))
+        return selector
+    }
+
     function renderApiEstado(data) {
         const proveedores = data.proveedores || []
         apiEstadoListEl.innerHTML = ""
@@ -399,11 +493,21 @@ function _initAjustesEstadoApis() {
             row.className = "ajustesApiEstadoRow"
             // El detalle (HTTP 429, motivo del corte…) va en el title: en la
             // fila solo cabe la etiqueta, pero al diagnosticar hace falta.
-            if (p.detalle) row.title = p.detalle
+            const edad = Number.isFinite(p.edadSegundos) ? `Última petición ${_edadTexto(p.edadSegundos)}` : ""
+            const titulo = [p.detalle, edad].filter(Boolean).join(" · ")
+            if (titulo) row.title = titulo
 
             const nombre = document.createElement("span")
             nombre.className = "ajustesApiEstadoProvider"
             nombre.textContent = p.nombre
+            // Qué cubre y por qué falla se ven sin pasar el ratón: es justo lo
+            // que hay que saber para decidir si se arregla solo o hay que actuar.
+            if (p.cubre) {
+                const cubre = document.createElement("span")
+                cubre.className = "ajustesApiEstadoCubre"
+                cubre.textContent = p.cubre
+                nombre.appendChild(cubre)
+            }
 
             const badge = document.createElement("span")
             badge.className = `ajustesApiEstadoBadge ${p.estado || "error"}`
@@ -420,6 +524,8 @@ function _initAjustesEstadoApis() {
             }
             row.appendChild(badge)
 
+            if (p.opciones?.length) row.appendChild(_selectorApiBnb(p))
+
             if (p.pausable) {
                 const pausa = document.createElement("button")
                 pausa.type = "button"
@@ -432,12 +538,20 @@ function _initAjustesEstadoApis() {
                 row.appendChild(pausa)
             }
             if (p.pausada) row.classList.add("pausada")
+            if (p.motivo) {
+                const motivo = document.createElement("div")
+                motivo.className = `ajustesApiEstadoMotivo ${p.estado || "error"}`
+                motivo.textContent = p.motivo
+                row.appendChild(motivo)
+            }
             apiEstadoListEl.appendChild(row)
         })
 
         const pie = document.createElement("div")
         pie.className = "ajustesApiEstadoPie"
-        pie.textContent = `Comprobado ${_edadTexto(data.edadSegundos)}`
+        pie.textContent = data.comprobado
+            ? "Comprobado ahora mismo"
+            : "Según la última petición real de cada proveedor (pasa el ratón por una fila para ver cuándo). «Comprobar ahora» los prueba todos y gasta cuota."
         apiEstadoListEl.appendChild(pie)
     }
 

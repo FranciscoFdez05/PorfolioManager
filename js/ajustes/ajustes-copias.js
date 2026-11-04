@@ -119,7 +119,7 @@ function _initAjustesCopias() {
         _abrirModalContrasena({
             titulo: "Las claves de API van con contraseña",
             texto:
-                "Esta copia lleva las claves de API cifradas con la contraseña de las copias (o, si no " +
+                "Esta copia lleva las claves de API y las wallets cifradas con la contraseña de las copias (o, si no " +
                 "había, la de la web) que había al crearla. Escríbela para restaurarlas, o restaura el " +
                 "resto sin las claves.",
             error: error || "",
@@ -326,7 +326,8 @@ function _initAjustesDatos() {
                 titulo: "Proteger las claves de API",
                 texto:
                     "El ZIP va a llevar tus claves de los proveedores y la del Atajo. Con contraseña " +
-                    "van cifradas y se pedirá al importar; sin ella, van en claro y el archivo es un secreto. " +
+                    "van cifradas, junto a tus wallets, y se pedirá al importar; sin ella, las claves van en " +
+                    "claro, el archivo es un secreto y las wallets no se incluyen. " +
                     "Si la olvidas, el resto del ZIP se puede importar igual, pero las claves no.",
                 repetir: true,
                 botones: [
@@ -384,7 +385,7 @@ function _initAjustesDatos() {
         _abrirModalContrasena({
             titulo: "Las claves de API van con contraseña",
             texto:
-                "Este ZIP lleva las claves de API cifradas con la contraseña que se puso al exportar. " +
+                "Este ZIP lleva las claves de API, y las wallets si las tenía, cifradas con la contraseña que se puso al exportar. " +
                 "Escríbela para restaurarlas, o importa el resto sin ellas.",
             error: error || "",
             botones: [

@@ -212,7 +212,11 @@ docker compose build
 
 paso "Levantando"
 fase levantando "$VERSION_NUEVA"
-docker compose up -d
+# `up` da error si la web no está sana a tiempo, porque el worker depende de
+# ello. No puede cortar el script (`set -e`): quien decide es la espera de
+# abajo, y si la versión no responde hay que llegar a la vuelta atrás.
+upFallido=0
+docker compose up -d || upFallido=1
 
 # ── 7. Comprobar que arranca de verdad ────────────────────────────────────────
 # /api/health consulta la base de datos activa y devuelve 503 si falla, así que
@@ -245,6 +249,10 @@ done
 printf '\n'
 
 if [ "$sano" -eq 1 ]; then
+    # La web tardó más de lo que `up` esperaba: falta lo que dependía de ella.
+    if [ "$upFallido" -eq 1 ]; then
+        docker compose up -d || aviso "La web responde, pero algún servicio no ha arrancado: mira  docker compose ps"
+    fi
     paso "Actualización correcta"
     fase correcta "$VERSION_NUEVA"
     salud || true
@@ -263,9 +271,13 @@ docker compose logs --tail 40 "$SERVICIO" 2>&1 || true
 if [ "$VERSION_ANTERIOR" != "desconocida" ] \
    && docker image inspect "porfoliomanager:${VERSION_ANTERIOR}" >/dev/null 2>&1; then
     paso "Levantando de nuevo la $VERSION_ANTERIOR"
-    PORTFOLIO_VERSION="$VERSION_ANTERIOR" docker compose up -d --no-build
-    aviso "Se ha vuelto a la $VERSION_ANTERIOR. El código del repositorio SÍ está actualizado:
+    # Con `if` para que un fallo aquí no se lleve las indicaciones de más abajo.
+    if PORTFOLIO_VERSION="$VERSION_ANTERIOR" docker compose up -d --no-build; then
+        aviso "Se ha vuelto a la $VERSION_ANTERIOR. El código del repositorio SÍ está actualizado:
 para dejarlo también como estaba, ejecuta  git checkout v${VERSION_ANTERIOR}"
+    else
+        error "La $VERSION_ANTERIOR tampoco ha arrancado del todo: mira  docker compose ps"
+    fi
 else
     error "No hay imagen etiquetada de la $VERSION_ANTERIOR; no se puede volver sola."
 fi

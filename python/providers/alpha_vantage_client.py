@@ -10,6 +10,7 @@ from providers import (
     normalizeText as _normalizeText,
     safeFloat as _safeFloat,
 )
+from providers.api_stats import recordApiResult
 
 AV_BASE_URL = "https://www.alphavantage.co/query"
 
@@ -56,7 +57,29 @@ def _isForexPair(symbol):
 
 
 def _fetchJson(params, timeout=None):
-    return fetchJson(AV_BASE_URL, params, timeout=timeout, provider="Alpha Vantage")
+    payload = fetchJson(AV_BASE_URL, params, timeout=timeout, provider="Alpha Vantage")
+    # La cuota agotada llega como un 200 con un aviso en el cuerpo: para
+    # fetchJson la llamada fue bien, así que el estado se corrige aquí.
+    if isinstance(payload, dict) and (payload.get("Note") or payload.get("Information")):
+        recordApiResult("Alpha Vantage", "limite", payload.get("Note") or payload.get("Information"))
+    return payload
+
+
+def _mensajeAviso(payload: dict) -> str:
+    """El error de un aviso de cuota de Alpha Vantage, reconocible como límite.
+
+    La palabra «límite» no es decorativa: es lo que busca `isRateLimitedError`.
+    Con el texto en inglés tal cual, el proveedor nunca entraba en reposo y cada
+    activo que caía en él gastaba otra petición contra un límite ya alcanzado.
+
+    Args:
+        payload: Respuesta con la clave ``Note`` o ``Information``.
+
+    Returns:
+        El mensaje de error, con el aviso del proveedor recortado.
+    """
+    aviso = payload.get("Note") or payload.get("Information", "")
+    return f"Alpha Vantage: límite de peticiones ({aviso[:120]})"
 
 
 def _mapType(avType):
@@ -167,8 +190,7 @@ def searchSymbol(queryText, apiKey, timeout=None, limit=8, assetName="", preferr
         return None, "No se pudo conectar con Alpha Vantage"
 
     if "Note" in payload or "Information" in payload:
-        note = payload.get("Note") or payload.get("Information", "")
-        return None, f"Alpha Vantage: {note[:120]}"
+        return None, _mensajeAviso(payload)
 
     rawResults = payload.get("bestMatches") or []
     normalizedAssetName = _normalizeText(assetName)
@@ -217,8 +239,7 @@ def _fetchForexQuote(fromCur, toCur, apiKey, timeout=None):
         return None, "No se pudo conectar con Alpha Vantage"
 
     if "Note" in payload or "Information" in payload:
-        note = payload.get("Note") or payload.get("Information", "")
-        return None, f"Alpha Vantage: {note[:120]}"
+        return None, _mensajeAviso(payload)
 
     rateData = payload.get("Realtime Currency Exchange Rate") or {}
     if not rateData:
@@ -271,8 +292,7 @@ def fetchQuote(symbol, apiKey, timeout=None):
         return None, "No se pudo conectar con Alpha Vantage"
 
     if "Note" in payload or "Information" in payload:
-        note = payload.get("Note") or payload.get("Information", "")
-        return None, f"Alpha Vantage: {note[:120]}"
+        return None, _mensajeAviso(payload)
 
     quoteData = payload.get("Global Quote") or {}
 

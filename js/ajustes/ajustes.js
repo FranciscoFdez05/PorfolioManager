@@ -16,7 +16,7 @@ async function openSettingsModal() {
             const res = await fetch("/api/settings")
             const data = await res.json()
             if (data.ok) {
-                _syncModulosChecked(data.modulosConfig ?? {})
+                _syncModulosChecked(data.modulosConfig ?? {}, data.moduloPrincipal ?? "")
                 _syncTopMetricsChecked(data.topMetricsConfig ?? {})
             }
         } catch {
@@ -48,6 +48,8 @@ function _initSttShell() {
             document.querySelectorAll(".sttNavBtn").forEach((b) => b.classList.remove("active"))
             document.querySelectorAll(".sttPage").forEach((p) => p.classList.remove("active"))
             btn.classList.add("active")
+            // En móvil las pestañas son una fila desplazable: que no quede cortada.
+            btn.scrollIntoView({ block: "nearest", inline: "nearest" })
             const page = document.getElementById("sttPage-" + btn.dataset.stt)
             if (page) {
                 page.classList.add("active")
@@ -293,6 +295,9 @@ function _buildInlineSelect(sel) {
         buildOptions()
         menu.style.display = "flex"
         trigger.classList.add("open")
+        // En un menú con scroll, la opción elegida tiene que verse al abrirlo.
+        const activa = menu.querySelector(".ajustesDropOption.active")
+        if (activa) menu.scrollTop = activa.offsetTop - (menu.clientHeight - activa.offsetHeight) / 2
     }
 
     function close() {
@@ -719,24 +724,187 @@ function _initTopMetricsToggles(settings) {
     })
 }
 
-const _MODULOS_MAP = {
-    moduloPanelSuperior: "panelSuperior",
-    moduloVistaGeneral: "vistaGeneral",
-    moduloActivos: "activos",
-    moduloGastos: "gastos",
-    moduloFinanzas: "finanzas",
-    moduloCripto: "cripto",
-    moduloPlanes: "planes",
-    moduloHerramientas: "herramientas",
-    moduloMetricas: "metricas"
+// Lo que el menú no dice de cada módulo. El nombre y las secciones se leen de la
+// propia barra de navegación para que esta pantalla no vuelva a quedarse atrás
+// cuando se añade o se renombra una página.
+const _MODULOS_PRESENTACION = {
+    vistaGeneral: { icono: "iconoPortfolio", descripcion: "Resumen del portfolio y sus activos" },
+    activos: { icono: "iconoGraficoLinea" },
+    finanzas: { icono: "iconoPulso" },
+    cripto: { icono: "iconoMoneda" },
+    planes: { icono: "iconoMarcado", descripcion: "Qué activos comprar y con qué operaciones" },
+    herramientas: { icono: "iconoDecimales", descripcion: "Calculadoras y utilidades" },
+    metricas: { icono: "iconoGraficoBarras", descripcion: "Gráficos y análisis del portfolio" },
+    gastos: { icono: "iconoBillete" }
 }
 
-function _syncModulosChecked(cfg) {
+function _modulosDelMenu() {
+    const selector = ".navButtons .navBtn[data-module], .navButtons .navDropdown[data-module]"
+    return [...document.querySelectorAll(selector)].map((el) => {
+        const boton = el.querySelector(".navDropdownBtn") ?? el
+        const secciones = [...el.querySelectorAll(".navDropdownItem")].map((item) => item.textContent.trim())
+        const { icono, descripcion } = _MODULOS_PRESENTACION[el.dataset.module] ?? {}
+        return {
+            id: el.dataset.module,
+            nombre: boton.textContent.replace("▾", "").trim(),
+            icono: icono ?? "iconoModulos",
+            detalle: secciones.join(" · ") || descripcion || ""
+        }
+    })
+}
+
+function _elementoModulos(tag, clase, texto) {
+    const el = document.createElement(tag)
+    el.className = clase
+    if (texto) el.textContent = texto
+    return el
+}
+
+function _crearCeldaModulo({ nombre, icono, detalle }) {
+    const celda = _elementoModulos("div", "modulosModulo")
+    const iconoWrap = _elementoModulos("span", "modulosIcono")
+    const iconoEl = _elementoModulos("span", `icono ${icono}`)
+    iconoEl.setAttribute("aria-hidden", "true")
+    iconoWrap.appendChild(iconoEl)
+
+    const texto = _elementoModulos("div", "modulosTexto")
+    texto.appendChild(_elementoModulos("div", "modulosNombre", nombre))
+    texto.appendChild(_elementoModulos("div", "modulosDetalle", detalle))
+
+    celda.appendChild(iconoWrap)
+    celda.appendChild(texto)
+    return celda
+}
+
+function _crearRadioPrincipal({ id, nombre }) {
+    const label = _elementoModulos("label", "modulosRadio")
+    const radio = document.createElement("input")
+    radio.type = "radio"
+    radio.name = "moduloPrincipal"
+    radio.value = id
+    radio.setAttribute("aria-label", `Abrir ${nombre} al iniciar`)
+    radio.addEventListener("change", () => _elegirModuloPrincipal(id))
+    label.appendChild(radio)
+    return label
+}
+
+function _crearSwitchModulo({ id, nombre }) {
+    const label = _elementoModulos("label", "ajustesSwitch")
+    const chk = document.createElement("input")
+    chk.type = "checkbox"
+    chk.setAttribute("aria-label", `Mostrar ${nombre} en el menú`)
+    chk.addEventListener("change", () => _cambiarVisibilidadModulo(id, chk.checked))
+    label.appendChild(chk)
+    label.appendChild(_elementoModulos("span", "ajustesSwitchTrack"))
+    return label
+}
+
+function _renderModulos() {
+    const lista = document.getElementById("ajustesModulosLista")
+    if (!lista) return
+    lista.replaceChildren()
+
+    const cabecera = _elementoModulos("div", "modulosCabecera")
+    ;["Módulo", "Principal", "Visible"].forEach((titulo) => {
+        cabecera.appendChild(_elementoModulos("span", "", titulo))
+    })
+    lista.appendChild(cabecera)
+
+    _modulosDelMenu().forEach((modulo) => {
+        const fila = _elementoModulos("div", "modulosFila")
+        fila.dataset.modulo = modulo.id
+        fila.appendChild(_crearCeldaModulo(modulo))
+        fila.appendChild(_crearRadioPrincipal(modulo))
+        fila.appendChild(_crearSwitchModulo(modulo))
+        lista.appendChild(fila)
+    })
+}
+
+function _pintarFilaModulo(fila, principal) {
+    const modulo = fila.dataset.modulo
+    const visible = (window._modulosConfig || {})[modulo] !== false
+    const esPrincipal = modulo === principal
+    const radio = fila.querySelector("input[type=radio]")
+    const chk = fila.querySelector("input[type=checkbox]")
+
+    fila.classList.toggle("modulosFilaPrincipal", esPrincipal)
+    fila.classList.toggle("modulosFilaApagada", !visible)
+    radio.checked = esPrincipal
+    radio.disabled = !visible
+    chk.checked = visible
+    // Bloquearlo garantiza que siempre quede un módulo que abrir al arrancar.
+    chk.disabled = esPrincipal
+    chk.parentElement.title = esPrincipal ? "El módulo principal siempre está visible" : ""
+}
+
+function _pintarPanelSuperior() {
+    const visible = (window._modulosConfig || {}).panelSuperior !== false
+    const chk = document.getElementById("moduloPanelSuperior")
+    if (chk) chk.checked = visible
+
+    const metricas = document.getElementById("ajustesTopMetricsList")
+    if (!metricas) return
+    metricas.classList.toggle("ajustesDisabledGroup", !visible)
+    metricas.inert = !visible
+}
+
+function _pintarModulos() {
+    const principal = moduloPrincipalEfectivo()
+    const filas = document.querySelectorAll("#ajustesModulosLista .modulosFila")
+    filas.forEach((fila) => _pintarFilaModulo(fila, principal))
+    _pintarPanelSuperior()
+
+    const nota = document.getElementById("ajustesModulosNota")
+    if (!nota) return
+    const nombre = _modulosDelMenu().find((modulo) => modulo.id === principal)?.nombre
+    nota.textContent = nombre
+        ? `Al iniciar se abre ${nombre}. Para ocultarlo, elige antes otro módulo principal.`
+        : "No hay ningún módulo visible: activa al menos uno."
+}
+
+function _syncModulosChecked(cfg, principal = window._moduloPrincipal) {
     window._modulosConfig = cfg
-    for (const [id, mod] of Object.entries(_MODULOS_MAP)) {
-        const chk = document.getElementById(id)
-        if (chk) chk.checked = cfg[mod] !== false
+    window._moduloPrincipal = principal
+    _pintarModulos()
+}
+
+// Si el servidor rechaza el cambio se deshace en pantalla: lo que se ve tiene que
+// ser lo que habrá al volver a entrar.
+async function _guardarModulos(cambios, deshacer) {
+    try {
+        const res = await fetch("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(cambios)
+        })
+        const data = await res.json()
+        if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`)
+    } catch (err) {
+        deshacer()
+        window.showToast?.(`No se pudo guardar el cambio de módulos: ${err.message}`, { type: "error" })
     }
+}
+
+function _cambiarVisibilidadModulo(modulo, visible) {
+    const anterior = window._modulosConfig || {}
+    const aplicar = (cfg) => {
+        window._modulosConfig = cfg
+        applyModulesVisibility()
+        _pintarModulos()
+    }
+    const nuevo = { ...anterior, [modulo]: visible }
+    aplicar(nuevo)
+    _guardarModulos({ modulosConfig: nuevo }, () => aplicar(anterior))
+}
+
+function _elegirModuloPrincipal(modulo) {
+    const anterior = window._moduloPrincipal
+    const aplicar = (valor) => {
+        window._moduloPrincipal = valor
+        _pintarModulos()
+    }
+    aplicar(modulo)
+    _guardarModulos({ moduloPrincipal: modulo }, () => aplicar(anterior))
 }
 
 function _syncTopMetricsChecked(cfg) {
@@ -752,21 +920,13 @@ function _syncTopMetricsChecked(cfg) {
 }
 
 function _initModulosToggles(settings) {
-    const cfg = settings?.modulosConfig ?? window._modulosConfig ?? {}
-    _syncModulosChecked(cfg)
+    _renderModulos()
+    _syncModulosChecked(
+        settings?.modulosConfig ?? window._modulosConfig ?? {},
+        settings?.moduloPrincipal ?? window._moduloPrincipal ?? ""
+    )
 
-    for (const [id, mod] of Object.entries(_MODULOS_MAP)) {
-        const chk = document.getElementById(id)
-        if (!chk) continue
-        chk.addEventListener("change", () => {
-            window._modulosConfig = window._modulosConfig || {}
-            window._modulosConfig[mod] = chk.checked
-            applyModulesVisibility()
-            fetch("/api/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ modulosConfig: window._modulosConfig })
-            }).catch(() => {})
-        })
-    }
+    document.getElementById("moduloPanelSuperior")?.addEventListener("change", (e) => {
+        _cambiarVisibilidadModulo("panelSuperior", e.target.checked)
+    })
 }

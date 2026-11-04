@@ -23,7 +23,7 @@ def sinCache():
     estado.reiniciarParaPruebas()
 
 
-_LECTORES = ("readFinnhubApiKey", "readEodhdApiKey", "readAlphaVantageApiKey")
+_LECTORES = ("readFinnhubApiKey", "readEodhdApiKey", "readAlphaVantageApiKey", "readEtherscanApiKey")
 # EODHD y Alpha Vantage admiten varias claves y el sondeo las recorre, así que
 # hay que parchear también estos: si no, la prueba acabaría leyendo las claves
 # reales de API/ del equipo que ejecuta la suite.
@@ -335,27 +335,175 @@ def testAlphaVantagePasaALaSiguienteClaveSiLaPrimeraNoTieneCuota(monkeypatch):
 
 # ── Caché ────────────────────────────────────────────────────────────────────
 
-def testElResultadoSeCacheaParaNoGastarCuota(monkeypatch, conClaves):
-    """El sondeo son llamadas reales: refrescar la pantalla no puede repetirlo."""
+def testSinForzarNoSeLlamaANadie(monkeypatch, conClaves):
+    """Abrir o refrescar la pantalla no puede gastar cuota: solo lo hace el botón."""
     llamadas = []
     _respuesta(monkeypatch, lambda *a, **k: llamadas.append(1) or {"c": 1})
 
     estado.obtener()
-    segunda = estado.obtener()
+    datos = estado.obtener()
 
-    assert segunda["cacheado"] is True
+    assert llamadas == []
+    assert datos["comprobado"] is False
+    assert {fila["estado"] for fila in datos["proveedores"]} == {"sin_datos"}
+
+
+def testSinForzarSeEnseñaLaUltimaPeticionReal(monkeypatch, conClaves):
+    from providers.api_stats import recordApiResult
+
+    _respuesta(monkeypatch, lambda *a, **k: pytest.fail("no debe llamar a nadie"))
+    recordApiResult("EODHD", "limite", "HTTP 402")
+    recordApiResult("Finnhub", "ok", "", 120)
+
+    filas = _porId(estado.obtener()["proveedores"])
+
+    assert (filas["eodhd"]["estado"], filas["eodhd"]["etiqueta"]) == ("limite", "Cuota agotada")
+    assert (filas["finnhub"]["estado"], filas["finnhub"]["ms"]) == ("ok", 120)
+    assert filas["finnhub"]["edadSegundos"] >= 0
+    assert filas["yahoo"]["estado"] == "sin_datos"
+
+
+def _limiteDeHace(monkeypatch, proveedor, detalle, segundos):
+    """Anota un límite y hace como si hubieran pasado `segundos` desde entonces."""
+    import time
+
+    from providers.api_stats import recordApiResult
+
+    _respuesta(monkeypatch, lambda *a, **k: pytest.fail("no debe llamar a nadie"))
+    recordApiResult(proveedor, "limite", detalle)
+    ahora = time.time()
+    monkeypatch.setattr(estado.time, "time", lambda: ahora + segundos)
+
+
+@pytest.mark.parametrize("detalle, segundos, esperado", [
+    ("free API requests (1 request per second)", 60, "limite"),
+    ("free API requests (1 request per second)", estado._vigenciaFrenoSegundos + 1, "sin_datos"),
+    ("HTTP 402", estado._vigenciaFrenoSegundos + 1, "limite"),
+    ("HTTP 402", estado._vigenciaCuotaSegundos + 1, "sin_datos"),
+])
+def testUnLimiteViejoDejaDeEnseñarse(monkeypatch, conClaves, detalle, segundos, esperado):
+    """Un proveedor que ya no se usa no recibe peticiones que corrijan su último estado."""
+    _limiteDeHace(monkeypatch, "Alpha Vantage", detalle, segundos)
+
+    assert _porId(estado.obtener()["proveedores"])["alphavantage"]["estado"] == esperado
+
+
+def testOtrosEstadosNoCaducan(monkeypatch, conClaves):
+    """Una clave rechazada sigue siéndolo: que nadie la pruebe no la arregla."""
+    import time
+
+    from providers.api_stats import recordApiResult
+
+    recordApiResult("Finnhub", "clave", "HTTP 401")
+    ahora = time.time()
+    monkeypatch.setattr(estado.time, "time", lambda: ahora + estado._vigenciaCuotaSegundos * 30)
+
+    assert _porId(estado.obtener()["proveedores"])["finnhub"]["estado"] == "clave"
+
+
+def testSinClaveSeDiceSinLlamar(monkeypatch):
+    from providers.api_stats import recordApiResult
+
+    _claves(monkeypatch, None)
+    recordApiResult("Finnhub", "ok")
+
+    assert _porId(estado.obtener()["proveedores"])["finnhub"]["estado"] == "sin_clave"
+
+
+def testForzarCompruebaTodoYQuedaComoUltimaPeticion(monkeypatch, conClaves):
+    llamadas = []
+    _respuesta(monkeypatch, lambda *a, **k: llamadas.append(1) or {"c": 1})
+
+    forzado = estado.obtener(forzar=True)
+    despues = estado.obtener()
+
+    assert forzado["comprobado"] is True
     assert len(llamadas) == len(estado._PROVEEDORES)
+    assert {fila["estado"] for fila in despues["proveedores"]} == {"ok"}
 
 
-def testForzarVuelveAComprobar(monkeypatch, conClaves):
-    llamadas = []
-    _respuesta(monkeypatch, lambda *a, **k: llamadas.append(1) or {"c": 1})
+def testElAvisoDeCuotaDeAlphaVantageQuedaComoUltimaPeticion(monkeypatch, conClaves):
+    _respuesta(monkeypatch, lambda *a, **k: {"Information": "rate limit"} if "alphavantage" in a[0] else {"c": 1})
 
-    estado.obtener()
-    segunda = estado.obtener(forzar=True)
+    estado.obtener(forzar=True)
 
-    assert segunda["cacheado"] is False
-    assert len(llamadas) == 2 * len(estado._PROVEEDORES)
+    assert _porId(estado.obtener()["proveedores"])["alphavantage"]["estado"] == "limite"
+
+
+@pytest.mark.parametrize("respuesta, esperado", [
+    ({"status": "0", "message": "NOTOK", "result": "Max calls per sec rate limit reached (3/sec)"}, "limite"),
+    ({"status": "0", "message": "NOTOK", "result": "Invalid API Key (#err2)|x"}, "clave"),
+    ({"status": "0", "message": "NOTOK", "result": "Free API access is not supported for this chain"}, "plan"),
+    ({"status": "0", "message": "NOTOK", "result": "Algo raro"}, "error"),
+])
+def testEtherscanTraduceLosAvisosDelCuerpo(monkeypatch, conClaves, respuesta, esperado):
+    _respuesta(monkeypatch, lambda *a, **k: respuesta if "etherscan" in a[0] else {"c": 1})
+
+    assert _porId(estado.comprobar())["etherscan"]["estado"] == esperado
+
+
+# ── Lo que anotan las llamadas reales ────────────────────────────────────────
+
+def _urlopen(monkeypatch, funcion):
+    from providers import http
+
+    monkeypatch.setattr(http, "urlopen", funcion)
+
+
+@pytest.mark.parametrize("error, esperado", [
+    (_http(429), "limite"),
+    (_http(402), "limite"),
+    (_http(401), "clave"),
+    (_http(503), "caido"),
+    (URLError("sin red"), "caido"),
+])
+def testUnaLlamadaRealQueFallaDejaElEstado(monkeypatch, error, esperado):
+    from providers.api_stats import lastApiResults
+    from providers.http import fetchJson
+
+    def falla(*a, **k):
+        raise error
+
+    _urlopen(monkeypatch, falla)
+
+    with pytest.raises(Exception):
+        fetchJson("https://proveedor.test", provider="EODHD", retries=0)
+
+    assert lastApiResults()["EODHD"]["estado"] == esperado
+
+
+def testUnSimboloQueNoExisteNoCambiaElEstado(monkeypatch):
+    """Un 404 es culpa del símbolo pedido, no del proveedor."""
+    from providers.api_stats import lastApiResults, recordApiResult
+    from providers.http import fetchJson
+
+    recordApiResult("EODHD", "ok")
+
+    def falla(*a, **k):
+        raise _http(404)
+
+    _urlopen(monkeypatch, falla)
+    with pytest.raises(HTTPError):
+        fetchJson("https://proveedor.test", provider="EODHD", retries=0)
+
+    assert lastApiResults()["EODHD"]["estado"] == "ok"
+
+
+def testLasLecturasDeEtherscanSeCuentanYDejanSuEstado():
+    from providers import blockchain_clients as bc
+    from providers.api_stats import lastApiResults
+
+    pedidas = []
+
+    def obtener(url, params=None, **kwargs):
+        pedidas.append(kwargs.get("provider"))
+        return {"status": "0", "message": "NOTOK", "result": "Max daily rate limit reached"}
+
+    with pytest.raises(bc.ErrorLecturaWallet):
+        bc.LectorEvm("eth", apiKey="K7XQ2M9R4TB8VN3P", obtenerJson=obtener).saldo("direccion", "0x" + "b" * 40)
+
+    assert pedidas == ["Etherscan"]
+    assert lastApiResults()["Etherscan"]["estado"] == "limite"
 
 
 # ── Endpoint ─────────────────────────────────────────────────────────────────
@@ -372,7 +520,7 @@ def testElEndpointDevuelveUnaFilaPorProveedor(cliente, monkeypatch, conClaves):
     client, _cabeceras = cliente
     _respuesta(monkeypatch, lambda *a, **k: {"c": 1})
 
-    datos = client.get("/api/stats/api-estado").get_json()
+    datos = client.get("/api/stats/api-estado?forzar=1").get_json()
 
     assert datos["ok"] is True
     assert len(datos["proveedores"]) == len(estado._PROVEEDORES)
@@ -389,6 +537,9 @@ def testElEndpointNoPublicaLaClave(cliente, monkeypatch):
 
     _respuesta(monkeypatch, falla)
 
+    respuesta = client.get("/api/stats/api-estado?forzar=1")
+
+    assert "clave-secreta-1" not in respuesta.get_data(as_text=True)
     assert "clave-secreta-1" not in client.get("/api/stats/api-estado").get_data(as_text=True)
 
 

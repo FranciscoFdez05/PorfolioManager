@@ -228,6 +228,41 @@ def testUnProveedorMalEscritoEnElOrdenSeIgnora(monkeypatch):
     assert market_data._fallbackChain("finnhub", "AAPL") == ("finnhub", "yahoo")
 
 
+def testAlphaVantageNoEntraEnElRespaldoPorDefecto(monkeypatch):
+    """Un activo que no se cotiza no puede gastar cuota de una API que no se ha elegido."""
+    monkeypatch.delenv("MERCADO_ORDEN_RESPALDO", raising=False)
+
+    assert "alphavantage" not in market_data._fallbackChain("finnhub", "AAPL")
+    assert settings.obtener("mercado.orden_respaldo") == ["finnhub", "yahoo", "tradingview", "eodhd"]
+
+
+def testAlphaVantageSigueFuncionandoSiElActivoLaTieneElegida(monkeypatch):
+    monkeypatch.setattr(settings, "ordenRespaldoProveedores", lambda: ["yahoo"])
+
+    assert market_data._fallbackChain("alphavantage", "AAPL") == ("alphavantage", "yahoo")
+
+
+def testElAvisoDeCuotaDeAlphaVantageLaDejaEnReposo(monkeypatch):
+    """Su límite llega en un 200 y en inglés: sin reposo, cada activo gastaba otra petición."""
+    from providers import alpha_vantage_client
+
+    llamadas = []
+    monkeypatch.setattr(settings, "ordenRespaldoProveedores", lambda: [])
+    monkeypatch.setattr(settings, "reposoLimiteSegundos", lambda: 300)
+    monkeypatch.setattr(market_data.telegram_notifier, "notificarProblema", lambda *a, **k: None)
+    monkeypatch.setattr(alpha_vantage_client, "recordApiResult", lambda *a, **k: None)
+    monkeypatch.setattr(alpha_vantage_client, "fetchJson", lambda *a, **k: llamadas.append(1) or {
+        "Information": "Please consider spreading out your free API requests (1 request per second).",
+    })
+    monkeypatch.setattr(market_data, "callAlphaVantageWithFallbacks", lambda callback: callback("clave"))
+
+    _sinCotizacion, error = market_data.fetchAssetQuote("AAPL", "alphavantage")
+    market_data.fetchAssetQuote("MSFT", "alphavantage")
+
+    assert "límite" in error
+    assert len(llamadas) == 1
+
+
 def testOrdenDeRespaldoVacioEsSinRespaldo(monkeypatch):
     monkeypatch.setattr(settings, "ordenRespaldoProveedores", lambda: [])
 

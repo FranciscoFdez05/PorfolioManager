@@ -33,3 +33,6 @@ coverage.xml
 
 # Evitar que claves locales entren en la imagen
 API/*.key
+# Ni las wallets ajenas que se siguen ni los ficheros de bloqueo: API/ es un
+# volumen y de la imagen solo hace falta el directorio, que crea el Dockerfile.
+API/*

@@ -1,0 +1,3856 @@
+{
+ "version": 1,
+ "generado": "2026-11-02",
+ "fuentes": {
+  "defillama": {
+   "nombre": "DefiLlama Adapters (prueba de reservas publicada por cada exchange)",
+   "url": "https://github.com/DefiLlama/DefiLlama-Adapters",
+   "licencia": "sin licencia declarada en su repositorio (comprobado el 2026-11-04)"
+  },
+  "eth-labels": {
+   "nombre": "eth-labels (etiquetas públicas de Etherscan)",
+   "url": "https://github.com/dawsbot/eth-labels",
+   "licencia": "MIT"
+  },
+  "binance-por": {
+   "nombre": "Binance Proof of Reserves",
+   "url": "https://www.binance.com/en/proof-of-reserves"
+  },
+  "bybit-por": {
+   "nombre": "Bybit Proof of Reserves",
+   "url": "https://www.bybit.com/app/user/proof-of-reserve"
+  },
+  "patoshi": {
+   "nombre": "patoshi-addresses (bloques Patoshi de S. D. Lerner y J. Lopp)",
+   "url": "https://github.com/bensig/patoshi-addresses",
+   "licencia": "sin licencia declarada en su repositorio (comprobado el 2026-11-04)"
+  },
+  "etherscan": {
+   "nombre": "Etiqueta pública de Etherscan",
+   "url": "https://etherscan.io/labelcloud"
+  },
+  "arkham": {
+   "nombre": "Atribución de Arkham Intelligence recogida en prensa",
+   "url": "https://info.arkm.com/announcements/donald-trumps-crypto-holdings-are-now-on-arkham"
+  },
+  "fbi": {
+   "nombre": "FBI: fondos robados por Corea del Norte",
+   "url": "https://www.fbi.gov/news/press-releases/fbi-identifies-cryptocurrency-funds-stolen-by-dprk"
+  }
+ },
+ "entidades": [
+  {
+   "id": "binance",
+   "nombre": "Binance",
+   "categoria": "exchange",
+   "alias": [
+    "bnb",
+    "cz"
+   ],
+   "fuentes": [
+    "binance-por"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "12VuUfQHTGqWDvBzm8TBad1mZBm4hjGEzN",
+     "etiqueta": "Binance BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1DEuKerATHWRfyB14s6QCt4LPkfCTx4zaW",
+     "etiqueta": "Binance BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1KuPikhUYtHz3fmSQ2UvotpUuN672NuEcm",
+     "etiqueta": "Binance BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1PJiGp2yDLvUgqeBsuZVCBADArNsk6XEiw",
+     "etiqueta": "Binance BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1PPWMe42cywnM61nVatkmiggwdRQYLiCyS",
+     "etiqueta": "Binance BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1Pzaqw98PeRfyHypfqyEgg5yycJRsENrE7",
+     "etiqueta": "Binance BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "31jUs8yQNVc9p6YuUPctWCkdhH7u8UiUba",
+     "etiqueta": "Binance BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "32BgTv3NSYbMsBTwDbNNN2GKZPCTJSkqDv",
+     "etiqueta": "Binance BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "32KqbtrRVxC6GLUJgJhVQtFTaCdq4GrgBb",
+     "etiqueta": "Binance BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "32bhzEniykYRFADVaRM5PYswsjC23cxtes",
+     "etiqueta": "Binance BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x030e37ddd7df1b43db172b23916d523f1599c6cb",
+     "etiqueta": "Binance ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x037741ef196087b26abfb173b64d05df23fadc72",
+     "etiqueta": "Binance ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x18e226459ccf0eec276514a4fd3b226d8961e4d1",
+     "etiqueta": "Binance ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x1b46970cfe6a271e884f636663c257a5a571fb2c",
+     "etiqueta": "Binance ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x21a31ee1afc51d94c2efccaa2092ad1028285549",
+     "etiqueta": "Binance ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x22132139bf7f3921b1cadeab931f4fbf7bf2bc9e",
+     "etiqueta": "Binance ETH 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x26bff98f6f37c8d560684eaf2afd1149bf76633e",
+     "etiqueta": "Binance ETH 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x28c6c06298d514db089934071355e5743bf21d60",
+     "etiqueta": "Binance ETH 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x308a2a0712570daeea77c8ba9c27a32cdc4000d4",
+     "etiqueta": "Binance ETH 9"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x32e11a20337ebc79abd0eeab2d91bafbd9591149",
+     "etiqueta": "Binance ETH 10"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x01c952174c24e1210d26961d456a77a39e1f0bb0",
+     "etiqueta": "Binance BNB 1"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x161ba15a5f335c9f06bb5bbb0a9ce14076fbb645",
+     "etiqueta": "Binance BNB 2"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x18e226459ccf0eec276514a4fd3b226d8961e4d1",
+     "etiqueta": "Binance BNB 3"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x1d40c7717b8c43f877644ba86ec353bdc35c03dc",
+     "etiqueta": "Binance BNB 4"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x1fbe2acee135d991592f167ac371f3dd893a508b",
+     "etiqueta": "Binance BNB 5"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x2765ecad695d88b3322a4ff92c3501c64975d759",
+     "etiqueta": "Binance BNB 6"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x28e8d4eab37cfbf49edf7ff39c27377b7ae3a2a0",
+     "etiqueta": "Binance BNB 7"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x29bdfbf7d27462a2d115748ace2bd71a2646946c",
+     "etiqueta": "Binance BNB 8"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x3c783c21a0383057d128bae431894a5c19f9cf06",
+     "etiqueta": "Binance BNB 9"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x40207fdaa6015a765e5be0a7571823f11173eed5",
+     "etiqueta": "Binance BNB 10"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "2ojv9BAiHUrvsm9gxDe7fJSzbNZSJcxZvf8dqmWGHG8S",
+     "etiqueta": "Binance SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "38xCLm9kSExfGU1GdyVuX4vop7SZns9kU2mQyTmmMdUP",
+     "etiqueta": "Binance SOL 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "3JR4ETCTVqnysiARm9LvuigzuXnDydbWXYYYpgZzzhDi",
+     "etiqueta": "Binance SOL 3"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "3PAXpntJPubfTNhWHsaUNJQJwCNQT2Sk9NF1ogVu5jo9",
+     "etiqueta": "Binance SOL 4"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "3gd3dqgtJ4jWfBfLYTX67DALFetjc5iS72sCgRhCkW2u",
+     "etiqueta": "Binance SOL 5"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "3yFwqXBfZY4jBVUafQ1YEXw189y2dN3V5KQq9uzBDy1E",
+     "etiqueta": "Binance SOL 6"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9",
+     "etiqueta": "Binance SOL 7"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "6QJzieMYfp7yr3EdrePaQoG3Ghxs2wM98xSLRu8Xh56U",
+     "etiqueta": "Binance SOL 8"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "6oCa9Tz8VXVp63WiFyruE5PD6yXz3pCsv6oGzUGvg9TP",
+     "etiqueta": "Binance SOL 9"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "8DfHuYFv7VQ6wgcGtVDN2vtFn5ezF52hHNtPWYcqm8hU",
+     "etiqueta": "Binance SOL 10"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r4ncjTqY4ZmXdg7gXpkK9pfiythmyxeecq",
+     "etiqueta": "Binance XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r9GVg3KevshAkEiBwXyPSEAxgw7MUgjcAT",
+     "etiqueta": "Binance XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r9nsQj5fGr1TcDpCGqntaVWYqt53qS7mSN",
+     "etiqueta": "Binance XRP 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rBtttd61FExHC68vsZ8dqmS3DfjFEceA1A",
+     "etiqueta": "Binance XRP 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rDAE53VfMvftPB4ogpWGWvzkQxfht6JPxr",
+     "etiqueta": "Binance XRP 5"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rDNuKeiwTHWRCyBrh1aQUthLPkCUTxhz2W",
+     "etiqueta": "Binance XRP 6"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rEbXa31msPbPDZgmLMKH7CaKaf7VipoLBo",
+     "etiqueta": "Binance XRP 7"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rEy8TFcrAPvhpKrwyrscNYyqBGUkE9hKaJ",
+     "etiqueta": "Binance XRP 8"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rGpxjNG7ovJTqNbahA6obUMyEfi7AnPax4",
+     "etiqueta": "Binance XRP 9"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rJb5KsHsDHF1YS5B5DU6QCkH5NsPaKQTcy",
+     "etiqueta": "Binance XRP 10"
+    }
+   ]
+  },
+  {
+   "id": "coinbase",
+   "nombre": "Coinbase",
+   "categoria": "exchange",
+   "alias": [
+    "cb",
+    "coinbase prime"
+   ],
+   "fuentes": [
+    "defillama",
+    "eth-labels"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qfszruqaal85d88qvgx25e2ttq7zf6ze6kpc5h7",
+     "etiqueta": "Coinbase BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q9e83uh7etgzmfrmjd389p7yjv5etsa6k3dq808",
+     "etiqueta": "Coinbase BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qsefydr2r5ysjep7z4zelvz0ulmj29vlvarraqg",
+     "etiqueta": "Coinbase BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qwfkngwsl3n2yrnttsmv3q849arwjlxzay34v7e",
+     "etiqueta": "Coinbase BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qt8cewcxp50ywvwperagdr9xgn9zw8up9dq35j8",
+     "etiqueta": "Coinbase BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q26umumjl7ha0acmyx5h64sdjqc4hnlg040yz6a",
+     "etiqueta": "Coinbase BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qxhue44m9hw6gkf7szn6pk907lmaevnrptu923c",
+     "etiqueta": "Coinbase BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q059cgrlumrmzd3jat4wmlz7ng3jcg9wc6j04ak",
+     "etiqueta": "Coinbase BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q8lx6xnvasdthhh07fvd9py55t3gftpz6ujztl2",
+     "etiqueta": "Coinbase BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qm4kfqrzzkjsvvqm95qsvx7g4rfumfaqrr4t6z7",
+     "etiqueta": "Coinbase BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x6f52730dba7b02beefcaf0d6998c9ae901ea04f9",
+     "etiqueta": "Coinbase Cold 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x71660c4005ba85c37ccec55d0c4493e66fe775d3",
+     "etiqueta": "Coinbase 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x503828976d22510aad0201ac7ec88293211d23da",
+     "etiqueta": "Coinbase 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xeba20d0f74ecc13130579d21bb53d63c96258652",
+     "etiqueta": "Coinbase Cold 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x281055afc982d96fab65b3a49cac8b878184cb16",
+     "etiqueta": "Coinbase Cold 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xddfabcdc4d8ffc6d5beaf154f18b778f892a0740",
+     "etiqueta": "Coinbase 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x3cd751e6b0078be393132286c442345e5dc49699",
+     "etiqueta": "Coinbase 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xf27daff52c38b2c373ad2b9392652ddf433303c4",
+     "etiqueta": "Coinbase Cold 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x93745feeb3c42f6ab0f9890cbce65b360145b4ab",
+     "etiqueta": "Coinbase Cold 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xb5d85cbf7cb3ee0d56b3bb207d5fc4b82f43f511",
+     "etiqueta": "Coinbase 5"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rKopBmtBSMmUD6NCFNwGTG3b9ZxNzf7Tt4",
+     "etiqueta": "Coinbase XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rU1DGbMWhrFSJLPcrtKuV5iPyD1wrVgeaU",
+     "etiqueta": "Coinbase XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rMbVVXFHaBpSpJhdR1xvy7dkQL1gtnkopg",
+     "etiqueta": "Coinbase XRP 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rGsMk4nK4M8MtcjVbjUeaJBppjjKpXyJ7F",
+     "etiqueta": "Coinbase XRP 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rKif7H93DSSCn8gKEdjRWHUeJDM4b6vurN",
+     "etiqueta": "Coinbase XRP 5"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rU7N8Xzf9EJWXUG6sjAy5ZWMJcUjdyiUma",
+     "etiqueta": "Coinbase XRP 6"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rKCoXM19TiWLaqGAsri3bDFWc94iHtaJpD",
+     "etiqueta": "Coinbase XRP 7"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rKPDtetbuPAPbDyyaVht9MBQPCrFN65Qo5",
+     "etiqueta": "Coinbase XRP 8"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r3YxGciPmY3HyobVEN8gfmMHDxqHFmU3wU",
+     "etiqueta": "Coinbase XRP 9"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r41Jx7vxzTaXH7nK3P53zUjm4owTdPE2CR",
+     "etiqueta": "Coinbase XRP 10"
+    }
+   ]
+  },
+  {
+   "id": "bitvavo",
+   "nombre": "Bitvavo",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qfpeps3wcmzk422hvm5jeq5lelnqlzznjwyfy69",
+     "etiqueta": "Bitvavo BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "37biYvTEcBVMoR1NGkPTGvHUuLTrzcLpiv",
+     "etiqueta": "Bitvavo BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qrd7t2sl5rdfke32qcryyep6r78vyq703mvggq7",
+     "etiqueta": "Bitvavo BTC 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x95b564f3b3bae3f206aa418667ba000afafacc8a",
+     "etiqueta": "Bitvavo ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x079a892628ebf28d0ed8f00151cff225a093dc63",
+     "etiqueta": "Bitvavo ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xedc6bacdc1e29d7c5fa6f6eca6fdd447b9c487c9",
+     "etiqueta": "Bitvavo ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xb0a3a2b60e969afd26561429aa4c1444c57e4411",
+     "etiqueta": "Bitvavo ETH 4"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x079a892628ebf28d0ed8f00151cff225a093dc63",
+     "etiqueta": "Bitvavo BNB 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "5BCgqYg51CANe8qUMPYWJsqRA4Y8HnyfmvkoJxcEmQfY",
+     "etiqueta": "Bitvavo SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "2h8JJq1kAsJvKYVrsEqwhQTcy99p465esHUFcJA94QY2",
+     "etiqueta": "Bitvavo SOL 2"
+    }
+   ]
+  },
+  {
+   "id": "kraken",
+   "nombre": "Kraken",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "defillama",
+    "eth-labels"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qnhmemsqfhycvp6g50v732h7wfwdt68el4ux5ttu8xwsrzngmxv0qr55aga",
+     "etiqueta": "Kraken BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qa5aux0l2c3l99tpmd9c85770kqpksg3g6dxaw03jj6lphnwy4lqq68xfgc",
+     "etiqueta": "Kraken BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q3gqqnn9hr0uachfk6rv3qhf3pp9z8a4z63ksc5qu0c2vvtykqd9qj3fyum",
+     "etiqueta": "Kraken BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qplr053c80nzlqapuatfslyhmns6sfn32qzz3xkdn36jjryw8vsys8y7wlc",
+     "etiqueta": "Kraken BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qhxv3pg2hsnw3m9jukuc6erjwwd03rzwhd2k6zh5uf6s2lwpuv3rq9zefru",
+     "etiqueta": "Kraken BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q08n37tm63z3f0myqe6zjx7ymtng8c9qedpwpplq95qkmx0cpke7qyz4y8v",
+     "etiqueta": "Kraken BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q02cq8du8r7ktuy5l0ltc4cv82xnaw4upaaw8y4rq6uycdp0k5nmquljtzk",
+     "etiqueta": "Kraken BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qcf9qe8ytx5qlcq0ft4vm2xm3fyfvurrkende46hpmwwnzpctfu3szxpve2",
+     "etiqueta": "Kraken BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qrj5vg73fxs6h6pmdjld387j5szkswc2y39rfutw8gl93h647wpksukyln9",
+     "etiqueta": "Kraken BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q9hqaqzyf6zsd330pkvtq5uxcxprzr368zdsxx5srtep7kepx523q2gd0ef",
+     "etiqueta": "Kraken BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x2910543af39aba0cd09dbb2d50200b3e800a63d2",
+     "etiqueta": "Kraken ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xae2d4617c862309a3d75a0ffb358c7a5009c673f",
+     "etiqueta": "Kraken ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x43984d578803891dfa9706bdeee6078d80cfc79e",
+     "etiqueta": "Kraken ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x66c57bf505a85a74609d2c83e94aabb26d691e1f",
+     "etiqueta": "Kraken ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xda9dfa130df4de4673b89022ee50ff26f6ea73cf",
+     "etiqueta": "Kraken ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xa83b11093c858c86321fbc4c20fe82cdbd58e09e",
+     "etiqueta": "Kraken ETH 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x0a869d79a7052c7f1b55a8ebabbea3420f0d1e13",
+     "etiqueta": "Kraken ETH 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xe853c56864a2ebe4576a807d26fdc4a0ada51919",
+     "etiqueta": "Kraken ETH 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x267be1c1d684f78cb4f6a176c4911b741e4ffdc0",
+     "etiqueta": "Kraken ETH 9"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xfa52274dd61e1643d2205169732f29114bc240b3",
+     "etiqueta": "Kraken ETH 10"
+    }
+   ]
+  },
+  {
+   "id": "okx",
+   "nombre": "OKX",
+   "categoria": "exchange",
+   "alias": [
+    "okex"
+   ],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1LnoZawVFFQihU8d8ntxLMpYheZUfyeVAK",
+     "etiqueta": "OKX BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1JQULE6yHr9UaitLr4wahTwJN7DaMX7W1Z",
+     "etiqueta": "OKX BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1DcT5Wij5tfb3oVViF8mA8p4WrG98ahZPT",
+     "etiqueta": "OKX BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1CY7fykRLWXeSbKB885Kr4KjQxmDdvW923",
+     "etiqueta": "OKX BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1quhruqrghgcca950rvhtrg7cpd7u8k6svpzgzmrjy8xyukacl5lkq0r8l2d",
+     "etiqueta": "OKX BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "16rF2zwSJ9goQ9fZfYoti5LsUqqegb5RnA",
+     "etiqueta": "OKX BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1FY6RL8Ju9b6CGsHTK68yYEcnzUasufyCe",
+     "etiqueta": "OKX BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1MbNM3jwxMjRzeA9xyHbMyePN68MY4Jxb",
+     "etiqueta": "OKX BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1Lj2mCPJYbbC2X6oYwV6sXnE8CZ4heK5UD",
+     "etiqueta": "OKX BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "178E8tYZ5WJ6PpADdpmmZd67Se7uPhJCLX",
+     "etiqueta": "OKX BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x03ae1a796dfe0400439211133d065bda774b9d3e",
+     "etiqueta": "OKX ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x5041ed759dd4afc3a72b8192c143f72f4724081a",
+     "etiqueta": "OKX ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x6a4561ef7874a76b4bf0d3edca31dfcd51603414",
+     "etiqueta": "OKX ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xbf94f0ac752c739f623c463b5210a7fb2cbb420b",
+     "etiqueta": "OKX ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xf59869753f41db720127ceb8dbb8afaf89030de4",
+     "etiqueta": "OKX ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x65a0947ba5175359bb457d3b34491edf4cbf7997",
+     "etiqueta": "OKX ETH 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x4d19c0a5357bc48be0017095d3c871d9afc3f21d",
+     "etiqueta": "OKX ETH 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x5c52cc7c96bde8594e5b77d5b76d042cb5fae5f2",
+     "etiqueta": "OKX ETH 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xe9172daf64b05b26eb18f07ac8d6d723acb48f99",
+     "etiqueta": "OKX ETH 9"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xae0cbaba071d58efc278a815b2cb652286e192ff",
+     "etiqueta": "OKX ETH 10"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "CeGyfZdtbjzC5FeVXCBdYE1v397yxxqYgmMcUwtouJUu",
+     "etiqueta": "OKX SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "6Attw9NcFspCAreufvQ3mW8aqXEk6MDceeoC8obw45cJ",
+     "etiqueta": "OKX SOL 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "CE8joA143dBjsCFTeBxBs3kNGNU87WH6Q7GMMfxPzSr2",
+     "etiqueta": "OKX SOL 3"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "FefAbVt2EgXMGxeJb6sB1k5pQJhiGPxw4mB1zeUohZLk",
+     "etiqueta": "OKX SOL 4"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "BEaiMhcc4Kao7B4hoq6r9m8neUpfimUMwhzugKxtkZw6",
+     "etiqueta": "OKX SOL 5"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "5VCwKtCXgCJ6kit5FybXjvriW3xELsFDhYrPSqtJNmcD",
+     "etiqueta": "OKX SOL 6"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "APJmXrtC9TUAg5gcjbcsVUiVzeDv85xLZRLad1GiQTNE",
+     "etiqueta": "OKX SOL 7"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "5kiqH41rz2wPoNH5FuDJ3x8dB3EEe3XGoSWy2485tAp9",
+     "etiqueta": "OKX SOL 8"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "8dUc88Nss8uhqzzFvUQhepkwZaVrfzpoCfKjCXGkdzAG",
+     "etiqueta": "OKX SOL 9"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "44DwSkZbY2PVo9wfFP21D7HG7xf5rw8QaF6xSLGSfm7P",
+     "etiqueta": "OKX SOL 10"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r4G3oDV1FJu1TtTv5M2u1cGbMDHnZzZpdn",
+     "etiqueta": "OKX XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rUzWJkXyEtT8ekSSxkBYPqCvHpngcy6Fks",
+     "etiqueta": "OKX XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rag5wJXFyzEhHyfta2FWLRPHkP9SNe5iPk",
+     "etiqueta": "OKX XRP 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rnHhjhpjchURKdfH7a4mch8gWJ47eBTgrm",
+     "etiqueta": "OKX XRP 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rKyo92WeVbajD8bNR9pm5s4z6t2JrgcYP",
+     "etiqueta": "OKX XRP 5"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rhcr95EAN24JPLpgSEf3mJKCkVKQspSUhR",
+     "etiqueta": "OKX XRP 6"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rBuZfn1m4tA6znziHsRp9AyC1M3qg6rgbF",
+     "etiqueta": "OKX XRP 7"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rLrZX3WepAsLRyAmYbFjV9tVPBjzmLis3J",
+     "etiqueta": "OKX XRP 8"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r4eVDKE3P5vK1zsc98dCeBDUM3JqyE4rUU",
+     "etiqueta": "OKX XRP 9"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rKEt6B3sgP8Qpb1PBdmdx54XmbVynpLRsv",
+     "etiqueta": "OKX XRP 10"
+    }
+   ]
+  },
+  {
+   "id": "bybit",
+   "nombre": "Bybit",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "bybit-por"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q2qqqt87kh33s0er58akh7v9cwjgd83z5smh9rp",
+     "etiqueta": "Bybit BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1GrwDkr33gT6LuumniYjKEGjTLhsL5kmqC",
+     "etiqueta": "Bybit BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qs5vdqkusz4v7qac8ynx0vt9jrekwuupx2fl5udp9jql3sr03z3gsr2mf0f",
+     "etiqueta": "Bybit BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "16jVbMCcqq1deKrMB3esL2HPso7kvqUsec",
+     "etiqueta": "Bybit BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qa2eu6p5rl9255e3xz7fcgm6snn4wl5kdfh7zpt05qp5fad9dmsys0qjg0e",
+     "etiqueta": "Bybit BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1Ko6Sbu8VgZaQNZMfRgNjR8zVzVN9wL7aX",
+     "etiqueta": "Bybit BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "12rFmDggwCNrRL6vuPEjzCDSskTRPjDajP",
+     "etiqueta": "Bybit BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1LrsskS2hmLvevKiqASDymS8xRmJ7Gp83u",
+     "etiqueta": "Bybit BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "14ug9BVtGnxY8ezvd5cr1PXHeXBYXkpsdw",
+     "etiqueta": "Bybit BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qpz86ltanq6042k36rs0yl0wjpd6tgu8fwckan7",
+     "etiqueta": "Bybit BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xf89d7b9c864f589bbf53a82105107622b35eaa40",
+     "etiqueta": "Bybit ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xa7a93fd0a276fc1c0197a5b5623ed117786eed06",
+     "etiqueta": "Bybit ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xee5b5b923ffce93a870b3104b7ca09c3db80047a",
+     "etiqueta": "Bybit ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x6bd869be16359f9e26f0608a50497f6ef122ee3e",
+     "etiqueta": "Bybit ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xbaed383ede0e5d9d72430661f3285daa77e9439f",
+     "etiqueta": "Bybit ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x88a1493366d48225fc3cefbdae9ebb23e323ade3",
+     "etiqueta": "Bybit ETH 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x922fa922da1b0b28d0af5aa274d7326eaa108c3d",
+     "etiqueta": "Bybit ETH 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x6f4565c9d673dbdd379aba0b13f8088d1af3bb0c",
+     "etiqueta": "Bybit ETH 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xdae4fdcb7fc93738ec6d5b1ea92b7c7f75e4f2f6",
+     "etiqueta": "Bybit ETH 9"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xc22166664e820cda6bf4cedbdbb4fa1e6a84c440",
+     "etiqueta": "Bybit ETH 10"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xc416535d86bff7b69039d0c901635316c16c7043",
+     "etiqueta": "Bybit BNB 1"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xc19bb2709321bd6ad6d8396a885b7c151b8d48c5",
+     "etiqueta": "Bybit BNB 2"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xef3aeff9a5f61c6dda33069c58c1434006e13b20",
+     "etiqueta": "Bybit BNB 3"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xc0e17ad342afabd36b3971f8305ff147006962ae",
+     "etiqueta": "Bybit BNB 4"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x62425cd6bdcb6bfe51558ea465b063486b70dc9f",
+     "etiqueta": "Bybit BNB 5"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x18e296053cbdf986196903e889b7dca7a73882f6",
+     "etiqueta": "Bybit BNB 6"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x588846213a30fd36244e0ae0ebb2374516da836c",
+     "etiqueta": "Bybit BNB 7"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xeca33dc9e896072d4edc4a02183910376d4b5e76",
+     "etiqueta": "Bybit BNB 8"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x933646d78ede6f1ef5cf4a0a03e3a819c8057922",
+     "etiqueta": "Bybit BNB 9"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x1c3944173abee256456b1498299fc501ad5bbd6f",
+     "etiqueta": "Bybit BNB 10"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "AC5RDfQFmDS1deWZos921JfqscXdByf8BKHs5ACWjtW2",
+     "etiqueta": "Bybit SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "42brAgAVNzMBP7aaktPvAmBSPEkehnFQejiZc53EpJFd",
+     "etiqueta": "Bybit SOL 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "32cT9eAwkEvAk631rUcUAbXVFPg21DaAXzGiz9AqHTVE",
+     "etiqueta": "Bybit SOL 3"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "FeNayVKekV9FJzhD7ycTd6sbKEyzt9CRCiqxw5nr41yR",
+     "etiqueta": "Bybit SOL 4"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "9Z7S8vCj6nDbK9t4m4AU3vZpKm4UufHAwpmRYyKgZf7r",
+     "etiqueta": "Bybit SOL 5"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "CqQ6AX1fiFfHKKY3saGzT5pgbkLwfLVrrAKpFhUG38oe",
+     "etiqueta": "Bybit SOL 6"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "7ReR6syi6gr7qUrKCL1FB9VFzGhVgHwLJ8wtfNtH9Mv4",
+     "etiqueta": "Bybit SOL 7"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "iGdFcQoyR2MwbXMHQskhmNsqddZ6rinsipHc4TNSdwu",
+     "etiqueta": "Bybit SOL 8"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "CK8i4zFXkDE2KWfyg7g9S748r6mwxajbcKcyGhQMR3qQ",
+     "etiqueta": "Bybit SOL 9"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "5LZkATrLwHYCQj2YuVbjjgsDZzBk6YfL4pFQRJmtboT2",
+     "etiqueta": "Bybit SOL 10"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "raQxZLtqurEXvH5sgijrif7yXMNwvFRkJN",
+     "etiqueta": "Bybit XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "raBWjPDjohBGc9dR6ti3DsP9Sn47jirTi3",
+     "etiqueta": "Bybit XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rwBHqnCgNRnk3Kyoc6zon6Wt4Wujj3HNGe",
+     "etiqueta": "Bybit XRP 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rMvCasZ9cohYrSZRNYPTZfoaaSUQMfgQ8G",
+     "etiqueta": "Bybit XRP 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rpwsiBrcXeVTyNPG445TzPbXSBdL9xHB83",
+     "etiqueta": "Bybit XRP 5"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rKwtFTDNTTeLVcj7ahz9PXBEx2V9bPCg44",
+     "etiqueta": "Bybit XRP 6"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rBdPX224aE6Rsa2cw8uGvaw73fzcpEo5Ue",
+     "etiqueta": "Bybit XRP 7"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rfKSkASYSGwrTvk9FeH65QC5CWiiEjYFpp",
+     "etiqueta": "Bybit XRP 8"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rh37VYCg1TT8WiMs9xErd5Dg3H7C1L8jrC",
+     "etiqueta": "Bybit XRP 9"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rMXWrmn3FpmA65UPyzDTez4Jt29NeqkKes",
+     "etiqueta": "Bybit XRP 10"
+    }
+   ]
+  },
+  {
+   "id": "bitfinex",
+   "nombre": "Bitfinex",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1Kr6QSydW9bFQG1mXiPNNu6WpJGmUa9i1g",
+     "etiqueta": "Bitfinex BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3JZq4atUahhuA9rLhXLMhhTo133J9rF97j",
+     "etiqueta": "Bitfinex BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qgdjqv0av3q56jvd82tkdjpy7gdp9ut8tlqmgrpmv24sq90ecnvqqjwvw97",
+     "etiqueta": "Bitfinex BTC 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x77134cbc06cb00b66f4c7e623d5fdbf6777635ec",
+     "etiqueta": "Bitfinex ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x742d35cc6634c0532925a3b844bc454e4438f44e",
+     "etiqueta": "Bitfinex ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xc61b9bb3a7a0767e3179713f3a5c7a9aedce193c",
+     "etiqueta": "Bitfinex ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x876eabf441b2ee5b5b0554fd502a8e0600950cfa",
+     "etiqueta": "Bitfinex ETH 4"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "FxteHmLwG9nk1eL4pjNve3Eub2goGkkz6g6TbvdmW46a",
+     "etiqueta": "Bitfinex SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "FyJBKcfcEBzGN74uNxZ95GxnCxeuJJujQCELpPv14ZfN",
+     "etiqueta": "Bitfinex SOL 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "GnCRxKqUEPouYMvTb5nJMGrDB3VkTXZnDTaDuVZdnWA3",
+     "etiqueta": "Bitfinex SOL 3"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "J4rzLDLhLWFpjSgCMCcxTU84bQ8AH5vhgjwq7SjYVk8Q",
+     "etiqueta": "Bitfinex SOL 4"
+    }
+   ]
+  },
+  {
+   "id": "bitget",
+   "nombre": "Bitget",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1FWQiwK27EnGXb6BiBMRLJvunJQZZPMcGd",
+     "etiqueta": "Bitget BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1GDn5X4R5vjdSvFPrq1MJubXFkMHVcFJZv",
+     "etiqueta": "Bitget BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3GbdoiTnQrJYatcr2nhq7MYASSCWEKmN6L",
+     "etiqueta": "Bitget BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3HcSp9sR23w6MxeRrLqqyDzLqThtSMaypQ",
+     "etiqueta": "Bitget BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3MdofQ2ouxom9MzC9kKazGUShoL5R3cVLG",
+     "etiqueta": "Bitget BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3Jxc4zsvEruEVAFpvwj818TfZXq5y2DLyF",
+     "etiqueta": "Bitget BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3KUwtHc5UhWQ76z6WrZRQHHVTZMuUWiZcU",
+     "etiqueta": "Bitget BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3H6JnFoz5jcoATKQ83BuQ3cUUCHswqfgtG",
+     "etiqueta": "Bitget BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3AZHcgLnJL5C5xKo33mspyHpQX7x4H5bBw",
+     "etiqueta": "Bitget BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3DSST4myyyRbiGzgCBE1RVHY7GRjDCh4n9",
+     "etiqueta": "Bitget BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x0639556f03714a74a5feeaf5736a4a64ff70d206",
+     "etiqueta": "Bitget ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x149ded7438caf5e5bfdc507a6c25436214d445e1",
+     "etiqueta": "Bitget ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x3a7d1a8c3a8dc9d48a68e628432198a2ead4917c",
+     "etiqueta": "Bitget ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x97b9d2102a9a65a26e1ee82d59e42d1b73b68689",
+     "etiqueta": "Bitget ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xa316c725bc8401c97d6d96f283c14b827541744e",
+     "etiqueta": "Bitget ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xc43999113f8fe724d91356c26105def1449ebdfd",
+     "etiqueta": "Bitget ETH 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x8911b8f5127eec40c14e1ad0500dc4dbd279d7a7",
+     "etiqueta": "Bitget ETH 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x1ff33329a8f8c1927131cbb72362b00abeea02d3",
+     "etiqueta": "Bitget ETH 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x5bdf85216ec1e38d6458c870992a69e38e03f7ef",
+     "etiqueta": "Bitget ETH 9"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x80097a87a7dcde470e34c10b5cceb85abf83b531",
+     "etiqueta": "Bitget ETH 10"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x0639556f03714a74a5feeaf5736a4a64ff70d206",
+     "etiqueta": "Bitget BNB 1"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x149ded7438caf5e5bfdc507a6c25436214d445e1",
+     "etiqueta": "Bitget BNB 2"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x3a7d1a8c3a8dc9d48a68e628432198a2ead4917c",
+     "etiqueta": "Bitget BNB 3"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x97b9d2102a9a65a26e1ee82d59e42d1b73b68689",
+     "etiqueta": "Bitget BNB 4"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xa316c725bc8401c97d6d96f283c14b827541744e",
+     "etiqueta": "Bitget BNB 5"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xc43999113f8fe724d91356c26105def1449ebdfd",
+     "etiqueta": "Bitget BNB 6"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x8911b8f5127eec40c14e1ad0500dc4dbd279d7a7",
+     "etiqueta": "Bitget BNB 7"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x1ff33329a8f8c1927131cbb72362b00abeea02d3",
+     "etiqueta": "Bitget BNB 8"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x5bdf85216ec1e38d6458c870992a69e38e03f7ef",
+     "etiqueta": "Bitget BNB 9"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x80097a87a7dcde470e34c10b5cceb85abf83b531",
+     "etiqueta": "Bitget BNB 10"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "A77HErqtfN1hLLpvZ9pCtu66FEtM8BveoaKbbMoZ4RiR",
+     "etiqueta": "Bitget SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "3bLkLrRvkwHMrqyoCaDSCn6bZnpfJCVsHxcmznUwB1p5",
+     "etiqueta": "Bitget SOL 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "42zAGwv37eZFwwcExfCAV9oSw2kNQX3aBxsbM6zvQECM",
+     "etiqueta": "Bitget SOL 3"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "YiZeibU6zzEHyKiSTjygXUPkMktKj9a3DCAcWmZ4XjF",
+     "etiqueta": "Bitget SOL 4"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "AvLGED7RBzYv4AuvkgFSCFMqyB2WjUff7TVKVEv5MjMs",
+     "etiqueta": "Bitget SOL 5"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "48Zo7g9SReCWmNtCvr2es4H9CLCRQHrSND2Wzi61sCsQ",
+     "etiqueta": "Bitget SOL 6"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "57WSBnNTC2MaqpY6NWLdNjhrELced4jSGV2hLSpjzct9",
+     "etiqueta": "Bitget SOL 7"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "DP1FqoBnE23QNNz4LpT9FCQvETdJN4nph5c11NiinrGg",
+     "etiqueta": "Bitget SOL 8"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "AyhsmFptkM251V1AoH2gf8d4QUnxUkkmaDqFfFwBwGni",
+     "etiqueta": "Bitget SOL 9"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "4S8C1yrRZmJYPzCqzEVjZYf6qCYWFoF7hWLRzssTCotX",
+     "etiqueta": "Bitget SOL 10"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r3AEihLNr81VYUf5PdfH5wLPqtJJyJs6yY",
+     "etiqueta": "Bitget XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rGDreBvnHrX1get7na3J4oowN19ny4GzFn",
+     "etiqueta": "Bitget XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rwTTsHVUDF8Ub2nzV2oAeWxfJzUvobXLEf",
+     "etiqueta": "Bitget XRP 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rMCVBYFYtVJy6F4gUSd7RrM8GXApM6MNDN",
+     "etiqueta": "Bitget XRP 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rGxYmmME93guyy4HuNv1bRf6gak8vGNN4B",
+     "etiqueta": "Bitget XRP 5"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rnQ3YeYzjkLS1oum4FZ9HXzAksm23CaQGS",
+     "etiqueta": "Bitget XRP 6"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rUKr6eh6emrKDg12rT3XDMrAbyeu8r2BnU",
+     "etiqueta": "Bitget XRP 7"
+    }
+   ]
+  },
+  {
+   "id": "kucoin",
+   "nombre": "KuCoin",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q04p5psjsp7j80sq6u4djgqk3c7pk6n93q43ply",
+     "etiqueta": "KuCoin BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "38fJPq4dYGPoJizEUGCL9yWkqg73cJmC2n",
+     "etiqueta": "KuCoin BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q0243pvcnutwtm3m6t005402yk8utq4kfqqghhu",
+     "etiqueta": "KuCoin BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q080rkmk3kj86pxvf5nkxecdrw6nrx3zzy9xl7q",
+     "etiqueta": "KuCoin BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q07yhcr2qmwkc32z4gfaemtjtx90am6e6rpl9sg",
+     "etiqueta": "KuCoin BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q224fr84g5xqvp2lkwmzvyec9frwk5w5f5v5w38",
+     "etiqueta": "KuCoin BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q204dfzksn4l0rhhajm9fyd5h92dac8tnuur8jp",
+     "etiqueta": "KuCoin BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "37nA3mMvQwPGVh6BKdLXKBiPjLFVbRLZEp",
+     "etiqueta": "KuCoin BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q0h72mfwgtsnfkcmpsnt3kmrrp4z5x3v469mz0k",
+     "etiqueta": "KuCoin BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q0l84mekaaszjfst7lswaheu7gcymv2h2k8z6fl",
+     "etiqueta": "KuCoin BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x061f7937b7b2bc7596539959804f86538b6368dc",
+     "etiqueta": "KuCoin ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x1692e170361cefd1eb7240ec13d048fd9af6d667",
+     "etiqueta": "KuCoin ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x41e29c02713929f800419abe5770faa8a5b4dadc",
+     "etiqueta": "KuCoin ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x441454b3d857fe365b7defe8cb3e4f498ec91eac",
+     "etiqueta": "KuCoin ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x446b86a33e2a438f569b15855189e3da28d027ba",
+     "etiqueta": "KuCoin ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x45300136662dd4e58fc0df61e6290dffd992b785",
+     "etiqueta": "KuCoin ETH 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x58edf78281334335effa23101bbe3371b6a36a51",
+     "etiqueta": "KuCoin ETH 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x738cf6903e6c4e699d1c2dd9ab8b67fcdb3121ea",
+     "etiqueta": "KuCoin ETH 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x7491f26a0fcb459111b3a1db2fbfc4035d096933",
+     "etiqueta": "KuCoin ETH 9"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x77f59b595cac829575e262b4c8bbcb17abadb33a",
+     "etiqueta": "KuCoin ETH 10"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x1692e170361cefd1eb7240ec13d048fd9af6d667",
+     "etiqueta": "KuCoin BNB 1"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x17a30350771d02409046a683b18fe1c13ccfc4a8",
+     "etiqueta": "KuCoin BNB 2"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x3ad7d43702bc2177cc9ec655b6ee724136891ef4",
+     "etiqueta": "KuCoin BNB 3"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x53f78a071d04224b8e254e243fffc6d9f2f3fa23",
+     "etiqueta": "KuCoin BNB 4"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xb8e6d31e7b212b2b7250ee9c26c56cebbfbe6b23",
+     "etiqueta": "KuCoin BNB 5"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xd6216fc19db775df9774a6e33526131da7d19a2c",
+     "etiqueta": "KuCoin BNB 6"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xf8ba3ec49212ca45325a2335a8ab1279770df6c0",
+     "etiqueta": "KuCoin BNB 7"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x2933782b5a8d72f2754103d1489614f29bfa4625",
+     "etiqueta": "KuCoin BNB 8"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x175ce6204bfda2a509c7e9c786b74407f569c9cc",
+     "etiqueta": "KuCoin BNB 9"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x2677c4c8757da1857cc7cc4071e0e0dd32ccb975",
+     "etiqueta": "KuCoin BNB 10"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "BmFdpraQhkiDQE6SnfG5omcA1VwzqfXrwtNYBwWTymy6",
+     "etiqueta": "KuCoin SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "EkUy8BB574iEVAQE9dywEiMhp9f2mFBuFu6TBKAkQxFY",
+     "etiqueta": "KuCoin SOL 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "HVh6wHNBAsG3pq1Bj5oCzRjoWKVogEDHwUHkRz3ekFgt",
+     "etiqueta": "KuCoin SOL 3"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "3VRJ7acLUS9RYLLgRMenM6BqBVVQpY7xFXa7jKDdYw6M",
+     "etiqueta": "KuCoin SOL 4"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "EEnu7YoRDnZ1EHHggnnQoFk7fUjNQrXQw33vgFWwMJn",
+     "etiqueta": "KuCoin SOL 5"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "57vSaRTqN9iXaemgh4AoDsZ63mcaoshfMK8NP3Z5QNbs",
+     "etiqueta": "KuCoin SOL 6"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "EfwJn8cXCYhcGrsavxWSDbUFHPrCK9gvdCr6AVywFBPg",
+     "etiqueta": "KuCoin SOL 7"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "DBmae92YTQKLsNzXcPscxiwPqMcz9stQr2prB5ZCAHPd",
+     "etiqueta": "KuCoin SOL 8"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "FZ1t8TZtx7VSCQdBsxvFJiezj9paUBF6Ub7RKA2eTGyE",
+     "etiqueta": "KuCoin SOL 9"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "GL8T72PKygWaYrLKtSteN9UUvYYnuC8azNDunk4eaqqQ",
+     "etiqueta": "KuCoin SOL 10"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rLpvuHZFE46NUyZH5XaMvmYRJZF7aory7t",
+     "etiqueta": "KuCoin XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rBxszqhQkhPALtkSpGuVeqR6hNtZ8xTH3T",
+     "etiqueta": "KuCoin XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rBXAyXMwp2WVPg13nKxUz8iCVn5RjihueQ",
+     "etiqueta": "KuCoin XRP 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "raxYwsodnM9NjTTc4mFsKMEb8eCn3UH9ZZ",
+     "etiqueta": "KuCoin XRP 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rfZ1kn1AUwD8bVMnDsD6ifzw7y2zMRp1Ci",
+     "etiqueta": "KuCoin XRP 5"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rPjmhP2WK4mfTZX9Ywoqz3eMPzfWj2vezU",
+     "etiqueta": "KuCoin XRP 6"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rAnqRGVpsS6XaUbQjwpQmoE4y1MthZhT9",
+     "etiqueta": "KuCoin XRP 7"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rp73u3gCNorHW3AmNtvDok8WWFA9BsFptW",
+     "etiqueta": "KuCoin XRP 8"
+    }
+   ]
+  },
+  {
+   "id": "htx",
+   "nombre": "HTX (Huobi)",
+   "categoria": "exchange",
+   "alias": [
+    "huobi"
+   ],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "12qTdZHx6f77aQ74CPCZGSY47VaRwYjVD8",
+     "etiqueta": "HTX (Huobi) BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "143gLvWYUojXaWZRrxquRKpVNTkhmr415B",
+     "etiqueta": "HTX (Huobi) BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "14XKsv8tT6tt8P8mfDQZgNF8wtN5erNu5D",
+     "etiqueta": "HTX (Huobi) BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1LXzGrDQqKqVBqxfGDUyhC6rTRBN5s8Sbj",
+     "etiqueta": "HTX (Huobi) BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1HckjUpRGcrrRAtFaaCAUaGjsPx9oYmLaZ",
+     "etiqueta": "HTX (Huobi) BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1L15W6b9vkxV81xW5HDtmMBycrdiettHEL",
+     "etiqueta": "HTX (Huobi) BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "14o5ywJJmLPJe8egNo7a5fSdtEgarkus33",
+     "etiqueta": "HTX (Huobi) BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1BuiWj9wPbQwNY97xU53LRPhzqNQccSquM",
+     "etiqueta": "HTX (Huobi) BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1AQLXAB6aXSVbRMjbhSBudLf1kcsbWSEjg",
+     "etiqueta": "HTX (Huobi) BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1ENWYLQZJRAZGtwBmoWrhmTtDUtJ5LseVj",
+     "etiqueta": "HTX (Huobi) BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xa929022c9107643515f5c777ce9a910f0d1e490c",
+     "etiqueta": "HTX (Huobi) ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x18709e89bd403f470088abdacebe86cc60dda12e",
+     "etiqueta": "HTX (Huobi) ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xcac725bef4f114f728cbcfd744a731c2a463c3fc",
+     "etiqueta": "HTX (Huobi) ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x0511509a39377f1c6c78db4330fbfcc16d8a602f",
+     "etiqueta": "HTX (Huobi) ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x1205e4f0d2f02262e667fd72f95a68913b4f7462",
+     "etiqueta": "HTX (Huobi) ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xe4818f8fde0c977a01da4fa467365b8bf22b071e",
+     "etiqueta": "HTX (Huobi) ETH 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x5c985e89dde482efe97ea9f1950ad149eb73829b",
+     "etiqueta": "HTX (Huobi) ETH 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xc589b275e60dda57ad7e117c6dd837ab524a5666",
+     "etiqueta": "HTX (Huobi) ETH 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x6b2286fc3a9265bab3f064808022aca54de4b6ce",
+     "etiqueta": "HTX (Huobi) ETH 9"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x3d655889d197125fb90dcb72e4a287a8410ed1b9",
+     "etiqueta": "HTX (Huobi) ETH 10"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xdd3cb5c974601bc3974d908ea4a86020f9999e0c",
+     "etiqueta": "HTX (Huobi) BNB 1"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x18709e89bd403f470088abdacebe86cc60dda12e",
+     "etiqueta": "HTX (Huobi) BNB 2"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xafdfd157d9361e621e476036fee62f688450692b",
+     "etiqueta": "HTX (Huobi) BNB 3"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "88xTWZMeKfiTgbfEmPLdsUCQcZinwUfk25EBQZ21XMAZ",
+     "etiqueta": "HTX (Huobi) SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "BY4StcU9Y2BpgH8quZzorg31EGE4L1rjomN8FNsCBEcx",
+     "etiqueta": "HTX (Huobi) SOL 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "8NBEbxLknGv5aRYefFrW2qFXoDZyi9fSHJNiJRvEcMBE",
+     "etiqueta": "HTX (Huobi) SOL 3"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "5bJcc9eb2XE7mqcET2xDuAdMGuXWybb4YPmAHLjKLhQG",
+     "etiqueta": "HTX (Huobi) SOL 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rKUDvXFJMFu65LqPTH3Yfpii4rbKT9bSQT",
+     "etiqueta": "HTX (Huobi) XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "raC4udvEeeni6aLPHbz9RKjHTQiWxKPfom",
+     "etiqueta": "HTX (Huobi) XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "ra4haepf6fehiCfVvB33j1D7vmv7JJD8M5",
+     "etiqueta": "HTX (Huobi) XRP 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rNPuS242i9ufMPEMusnjYPxyyu4STqSDGq",
+     "etiqueta": "HTX (Huobi) XRP 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rPzT7GA6vWU3PvYSXBpdP5fQPnzwVLwL24",
+     "etiqueta": "HTX (Huobi) XRP 5"
+    }
+   ]
+  },
+  {
+   "id": "gate",
+   "nombre": "Gate.io",
+   "categoria": "exchange",
+   "alias": [
+    "gate"
+   ],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "14kmvhQrWrNEHbrSKBySj4qHGjemDtS3SF",
+     "etiqueta": "Gate.io BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "162bzZT2hJfv5Gm3ZmWfWfHJjCtMD6rHhw",
+     "etiqueta": "Gate.io BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1EkkGXR7dTbZbrKFKoe6YEP4gj4GzMeKvw",
+     "etiqueta": "Gate.io BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1G47mSr3oANXMafVrR8UC4pzV7FEAzo3r9",
+     "etiqueta": "Gate.io BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1HpED69tpKSaEaWpY3Udt1DtcVcuCUoh2Y",
+     "etiqueta": "Gate.io BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3HroDXv8hmzKRtaSfBffRgedKpru8fgy6M",
+     "etiqueta": "Gate.io BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1ECeVF6wfbiihCRrrpRnkbwrWsZfYmixMG",
+     "etiqueta": "Gate.io BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1FhncfokiSDagazXbuVqKQ6ew4oyDmAzhG",
+     "etiqueta": "Gate.io BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1FLKsCiEsABS7LysfDA8R181TQ6eLjoxPv",
+     "etiqueta": "Gate.io BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1L1SN3BxXaXEAzzGcWqjF9svxmN6F2mBoR",
+     "etiqueta": "Gate.io BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x0d0707963952f2fba59dd06f2b425ace40b492fe",
+     "etiqueta": "Gate.io ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x1c4b70a3968436b9a0a9cf5205c787eb81bb558c",
+     "etiqueta": "Gate.io ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x234ee9e35f8e9749a002fc42970d570db716453b",
+     "etiqueta": "Gate.io ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xd793281182a0e3e023116004778f45c29fc14f19",
+     "etiqueta": "Gate.io ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xc882b111a75c0c657fc507c04fbfcd2cc984f071",
+     "etiqueta": "Gate.io ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x246a2ecd9626f9eda55fffbff5216ed417a904f5",
+     "etiqueta": "Gate.io ETH 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x840760aed6bbd878c46c5850d3af0a61afcd09c8",
+     "etiqueta": "Gate.io ETH 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x35b31ae2604dd81d9456205025ea02418dba8242",
+     "etiqueta": "Gate.io ETH 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xd87c8e083aecc5405b0107c90d8e0c7f70996b84",
+     "etiqueta": "Gate.io ETH 9"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x60618b3c6e3164c4a72d352bde263a5d15f9f7ee",
+     "etiqueta": "Gate.io ETH 10"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x0d0707963952f2fba59dd06f2b425ace40b492fe",
+     "etiqueta": "Gate.io BNB 1"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x1c4b70a3968436b9a0a9cf5205c787eb81bb558c",
+     "etiqueta": "Gate.io BNB 2"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xd793281182a0e3e023116004778f45c29fc14f19",
+     "etiqueta": "Gate.io BNB 3"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xc882b111a75c0c657fc507c04fbfcd2cc984f071",
+     "etiqueta": "Gate.io BNB 4"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xa4992ccf2a74132936b87cbf28b5d52304ba3be7",
+     "etiqueta": "Gate.io BNB 5"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x85faa6c1f2450b9caea300838981c2e6e120c35c",
+     "etiqueta": "Gate.io BNB 6"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x6596da8b65995d5feacff8c2936f0b7a2051b0d0",
+     "etiqueta": "Gate.io BNB 7"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xffeb0f61871acdb4838dfc6d5082f063e738e421",
+     "etiqueta": "Gate.io BNB 8"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xf379a3d1ab6625eef34347d054cfaeafdf8f24a7",
+     "etiqueta": "Gate.io BNB 9"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "u6PJ8DtQuPFnfmwHbGFULQ4u4EgjDiyYKjVEsynXq2w",
+     "etiqueta": "Gate.io SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "HiRpdAZifEsZGdzQ5Xo5wcnaH3D2Jj9SoNsUzcYNK78J",
+     "etiqueta": "Gate.io SOL 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "G9XFfWz6adb9wFDKN2v7HfmJDgAc2hirrTwBmca4w26C",
+     "etiqueta": "Gate.io SOL 3"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "Egf5D8NKBivJavLKmCssE93J7X6fKvEPQwFTWLZUnaSN",
+     "etiqueta": "Gate.io SOL 4"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "AGrghB4tNEJhWsPoQ73We5KAvgp6q512BkBx6fqY4i4b",
+     "etiqueta": "Gate.io SOL 5"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "DevD35PrcsJfg9CwpypmrD7GsYMRQpZQx6rfeSbkVtFp",
+     "etiqueta": "Gate.io SOL 6"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "5zzEaL86dT4cTz6reodbz6Rg9Wvet18216DTiWGEVLFG",
+     "etiqueta": "Gate.io SOL 7"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "J2f6waBNipqqn2k6d9uw3bwpbapGr2pLKZd9mDczCgfz",
+     "etiqueta": "Gate.io SOL 8"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "82KzHDyeqYckpoppcby7ZyWvWUyEwHLxDWfCTSMG6dn9",
+     "etiqueta": "Gate.io SOL 9"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rHcFoo6a9qT5NHiVn1THQRhsEGcxtYCV4d",
+     "etiqueta": "Gate.io XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rLzxZuZuAHM7k3FzfmhGkXVwScM4QSxoY7",
+     "etiqueta": "Gate.io XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rNnWmrc1EtNRe5SEQEs9pFibcjhpvAiVKF",
+     "etiqueta": "Gate.io XRP 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rNu9U5sSouNoFunHp9e9trsLV6pvsSf54z",
+     "etiqueta": "Gate.io XRP 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rhnS6iYGnrmh8NEgEKq3sBgF4FMLD9dHGf",
+     "etiqueta": "Gate.io XRP 5"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rHJ2fHJvW97WY5X7BTBpXKCaJut8yUPxjd",
+     "etiqueta": "Gate.io XRP 6"
+    }
+   ]
+  },
+  {
+   "id": "cryptocom",
+   "nombre": "Crypto.com",
+   "categoria": "exchange",
+   "alias": [
+    "cro"
+   ],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qpy4jwethqenp4r7hqls660wy8287vw0my32lmy",
+     "etiqueta": "Crypto.com BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3LhhDLBVWBZChNQv8Dn4nDKFnCyojG1FqN",
+     "etiqueta": "Crypto.com BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3QsGsAXQ4rqRNvh5pEW55hf3F9PEyb7rVq",
+     "etiqueta": "Crypto.com BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qr4dl5wa7kl8yu792dceg9z5knl2gkn220lk7a9",
+     "etiqueta": "Crypto.com BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1q4c8n5t00jmj8temxdgcc3t32nkg2wjwz24lywv",
+     "etiqueta": "Crypto.com BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "14m3sd9HCCFJW4LymahJCKMabAxTK4DAqW",
+     "etiqueta": "Crypto.com BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qjqy709gqpse60hdsm2d2v0dzzu7yp5dej7fdrpl2x3taccvujq4s0vzsyd",
+     "etiqueta": "Crypto.com BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qcdqj2smprre85c78d942wx5tauw5n7uw92r7wr",
+     "etiqueta": "Crypto.com BTC 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x72a53cdbbcc1b9efa39c834a540550e23463aacb",
+     "etiqueta": "Crypto.com ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x6262998ced04146fa42253a5c0af90ca02dfd2a3",
+     "etiqueta": "Crypto.com ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xcffad3200574698b78f32232aa9d63eabd290703",
+     "etiqueta": "Crypto.com ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x7758e507850da48cd47df1fb5f875c23e3340c50",
+     "etiqueta": "Crypto.com ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x46340b20830761efd32832a74d7169b29feb9758",
+     "etiqueta": "Crypto.com ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xf3b0073e3a7f747c7a38b36b805247b222c302a3",
+     "etiqueta": "Crypto.com ETH 6"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x72a53cdbbcc1b9efa39c834a540550e23463aacb",
+     "etiqueta": "Crypto.com BNB 1"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xcffad3200574698b78f32232aa9d63eabd290703",
+     "etiqueta": "Crypto.com BNB 2"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x7758e507850da48cd47df1fb5f875c23e3340c50",
+     "etiqueta": "Crypto.com BNB 3"
+    }
+   ]
+  },
+  {
+   "id": "gemini",
+   "nombre": "Gemini",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1quq29mutxkgxmjfdr7ayj3zd9ad0ld5mrhh89l2",
+     "etiqueta": "Gemini BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3Kzh9qAqVWQhEsfQz7zEQL1EuSx5tyNLNS",
+     "etiqueta": "Gemini BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3MgEAFWu1HKSnZ5ZsC8qf61ZW18xrP5pgd",
+     "etiqueta": "Gemini BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "38UmuUqPCrFmQo4khkomQwZ4VbY2nZMJ67",
+     "etiqueta": "Gemini BTC 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xf51710015536957a01f32558402902a2d9c35d82",
+     "etiqueta": "Gemini ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xd24400ae8bfebb18ca49be86258a3c749cf46853",
+     "etiqueta": "Gemini ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x07ee55aa48bb72dcc6e9d78256648910de513eca",
+     "etiqueta": "Gemini ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xafcd96e580138cfa2332c632e66308eacd45c5da",
+     "etiqueta": "Gemini ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x61edcdf5bb737adffe5043706e7c5bb1f1a56eea",
+     "etiqueta": "Gemini ETH 5"
+    }
+   ]
+  },
+  {
+   "id": "bitstamp",
+   "nombre": "Bitstamp",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "defillama",
+    "eth-labels"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x00bdb5699745f5b860228c8f939abf1b9ae374ed",
+     "etiqueta": "Bitstamp 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x1522900b6dafac587d499a862861c0869be6e428",
+     "etiqueta": "Bitstamp 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x9a9bed3eb03e386d66f8a29dc67dc29bbb1ccb72",
+     "etiqueta": "Bitstamp 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x059799f2261d37b829c2850cee67b5b975432271",
+     "etiqueta": "Bitstamp 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x4c766def136f59f6494f0969b1355882080cf8e0",
+     "etiqueta": "Bitstamp 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xc5b611f502a0dcf6c3188fd494061ae29b2baa4f",
+     "etiqueta": "Bitstamp 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x0b0f7ebf967146566799229394171fc47f1a765a",
+     "etiqueta": "Bitstamp 7"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rnuDDzvYWTPqXTDVvwE9oLGLgxzV7Rpnpe",
+     "etiqueta": "Bitstamp XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rafKN5p8iQsRP13LZXXoV8SCw2b9ugvjy1",
+     "etiqueta": "Bitstamp XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rGNCoeUNqBzQnEiK2X7EYDzSpJ7PtKQSBb",
+     "etiqueta": "Bitstamp XRP 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rEXmdJZRfjXN3XGVdz99dGSZpQyJqUeirE",
+     "etiqueta": "Bitstamp XRP 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r3rVXDv8HDUBcrckfda9YsnBkX2E62WLyK",
+     "etiqueta": "Bitstamp XRP 5"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rDsbeomae4FXwgQTJp9Rs64Qg9vDiTCdBv",
+     "etiqueta": "Bitstamp XRP 6"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rp8Ygdyi2u7DZuMbchpFKBpsgSeg4LXDFQ",
+     "etiqueta": "Bitstamp XRP 7"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r3KfqsuMjp85ddhNN2xNAAbmrNKUgFbcpk",
+     "etiqueta": "Bitstamp XRP 8"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rG2bzZ2Q9JcpPeCyqXTQts6jHSYsX21G6a",
+     "etiqueta": "Bitstamp XRP 9"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rnTdkgZXF9AsEV8crG8KtngiD4nDC8Dkc2",
+     "etiqueta": "Bitstamp XRP 10"
+    }
+   ]
+  },
+  {
+   "id": "robinhood",
+   "nombre": "Robinhood",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qprdf80adfz7aekh5nejjfrp3jksc8r929svpxk",
+     "etiqueta": "Robinhood BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qmxcagqze2n4hr5rwflyfu35q90y22raxdgcp4p",
+     "etiqueta": "Robinhood BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1ql49ydapnjafl5t2cp9zqpjwe6pdgmxy98859v2",
+     "etiqueta": "Robinhood BTC 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x6081258689a75d253d87ce902a8de3887239fe80",
+     "etiqueta": "Robinhood ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x40b38765696e3d5d8d9d834d8aad4bb6e418e489",
+     "etiqueta": "Robinhood ETH 2"
+    }
+   ]
+  },
+  {
+   "id": "deribit",
+   "nombre": "Deribit",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qa3phj5uhnuauk6r62cku6r6fl9rawqx4n6d690",
+     "etiqueta": "Deribit BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qtq5zfllw9fs9w6stnfgalf9v59fgrcxxyawuvm",
+     "etiqueta": "Deribit BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1MDq7zyLw6oKichbFiDDZ3aaK59byc6CT8",
+     "etiqueta": "Deribit BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1932eKraQ3Ad9MeNBHb14WFQbNrLaKeEpT",
+     "etiqueta": "Deribit BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "13JJ1nxDeX5fMsDeyGHiLoK8rF2ayGq1cX",
+     "etiqueta": "Deribit BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1MdrdcEzfiJdvs6eVSwUx6bWboPX8if5U3",
+     "etiqueta": "Deribit BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "35WHp4Hid61peyH4tuhNunwRj2gtNB41Lo",
+     "etiqueta": "Deribit BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "34ZHV8dd6uucEUABUydWpKi6F4qKQntEUf",
+     "etiqueta": "Deribit BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qzwhw94uldd3c8736lsxrda6t6x56030f8zk8nr",
+     "etiqueta": "Deribit BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qrmuxak470z7zch5f3gz05dc6h4ngwqdq4wx80w",
+     "etiqueta": "Deribit BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x77021d475e36b3ab1921a0e3a8380f069d3263de",
+     "etiqueta": "Deribit ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x5f397b62502e255f68382791947d54c4b2d37f09",
+     "etiqueta": "Deribit ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xcfee6efec3471874022e205f4894733c42cbbf64",
+     "etiqueta": "Deribit ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x2eed6a08fb89a5cd111efa33f8dca46cfbeb370f",
+     "etiqueta": "Deribit ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x6b378be3c9642ccf25b1a27facb8ace24ac34a12",
+     "etiqueta": "Deribit ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xa7e15ef7c01b58ebe5ef74aa73625ae4b11fe754",
+     "etiqueta": "Deribit ETH 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x062448f804191128d71fc72e10a1d13bd7308e7e",
+     "etiqueta": "Deribit ETH 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xa0f6121319a34f24653fb82addc8dd268af5b9e1",
+     "etiqueta": "Deribit ETH 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x904cc2b2694ffa78f04708d6f7de205108213126",
+     "etiqueta": "Deribit ETH 9"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x63f41034871535cee49996cc47719891fe03dff9",
+     "etiqueta": "Deribit ETH 10"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0xc7125da07a7110049ecc68f43bf10de4d45ca84e",
+     "etiqueta": "Deribit BNB 1"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x4e67722883ad992182e83b79bf06a93972963cac",
+     "etiqueta": "Deribit BNB 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "H8z2yZcrKo7ngiMz3Vsuw823nYo11qdCqs3sJDDjeTdD",
+     "etiqueta": "Deribit SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "A5ANHizfayJUDBSwV5Cm7CNXCj6E6AAda49wzzdYPons",
+     "etiqueta": "Deribit SOL 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "BZo9RRbgsWaLMxyaYiJK9D27j2FAVgHrhMJBvAj7GiyG",
+     "etiqueta": "Deribit SOL 3"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "DL165xn6SrdupXGA2MW6woz35B3ssVqpYfwS1xAKdyx",
+     "etiqueta": "Deribit SOL 4"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "7wx23rZmR4tikqW9avcby5Pf8QEuBTo7HKUtpCt9r9nz",
+     "etiqueta": "Deribit SOL 5"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "FbchixvxTEW24Mnzh8AxW31YEZ3J8bq5G5YthxttRgST",
+     "etiqueta": "Deribit SOL 6"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "BeTzsKSyvUhYiSrRDrDkZDN69LU4T7Ho3qKmrK8DvxYN",
+     "etiqueta": "Deribit SOL 7"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "6xASgNpWJzP92LSwWkPZryHt8VMK1XhiU284gkLcVaX1",
+     "etiqueta": "Deribit SOL 8"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "BNqPhvyoyRz4zj4Mmrc3cdqZaqXjro3RZ82dkvGec38n",
+     "etiqueta": "Deribit SOL 9"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rpFXRE1LPyS48a4LMqyksG2sjDg8wmQD5e",
+     "etiqueta": "Deribit XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rE4y6xhfo9QUV2oAxpHtnVkMmGEk632T7R",
+     "etiqueta": "Deribit XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rK6enCZ6sMs84wMhTUgLhnPr9eyrTTNA6W",
+     "etiqueta": "Deribit XRP 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rKK7VZnnqovrh5Gka1ANartX9Usx2aBAZd",
+     "etiqueta": "Deribit XRP 4"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rMsmvyJxCRs9csii8yPdd4ti8cLVS4pkAu",
+     "etiqueta": "Deribit XRP 5"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r349nPzpVGRFqQKkyvPsbvQdzLRQNfobbk",
+     "etiqueta": "Deribit XRP 6"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rHZqS1bfwztYixefmvrbEqn7ZZgjebSphB",
+     "etiqueta": "Deribit XRP 7"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rJryAyxLNirDQduAzcQXUHxnBWeKkRKYCU",
+     "etiqueta": "Deribit XRP 8"
+    }
+   ]
+  },
+  {
+   "id": "mexc",
+   "nombre": "MEXC",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "13uZyaPbt4rTwYQ8xWFySVUzWH3pk2P5c7",
+     "etiqueta": "MEXC BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qrlsks7xe755m05zfreyjdxn34rypc4lnghtcwc",
+     "etiqueta": "MEXC BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "35C2L1pCgwzBHNcDcVL1a5RuoefeWqyjAR",
+     "etiqueta": "MEXC BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "38RB6AuNgLjPyJqt92wJXoas7ZMYq12gHR",
+     "etiqueta": "MEXC BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3FSaQrzxXsVVynU9sqbVhSmmHtNp4DuEKD",
+     "etiqueta": "MEXC BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3MuqQRGgDn1DwHXhExNZ4aiNEDkHJfpo65",
+     "etiqueta": "MEXC BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "384kSJVQVs7DVuHizHnhb25xkPJeTChSiU",
+     "etiqueta": "MEXC BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3Go5RsfBEhqCgQTRHvUqTgC9jm6piHpQ67",
+     "etiqueta": "MEXC BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "32sg7eCLJDm6bYMj49uEMMojoa2rJz3Xij",
+     "etiqueta": "MEXC BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3E7TeLDsGvs2Yhuz3EGA5w4SfYoQk9sqJM",
+     "etiqueta": "MEXC BTC 10"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x3cc936b795a188f0e246cbb2d74c5bd190aecf18",
+     "etiqueta": "MEXC ETH 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x0162cd2ba40e23378bf0fd41f919e1be075f025f",
+     "etiqueta": "MEXC ETH 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x75e89d5979e4f6fba9f97c104c2f0afb3f1dcb88",
+     "etiqueta": "MEXC ETH 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xee136c0389733849dd710ac7104e92c6bf497574",
+     "etiqueta": "MEXC ETH 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xe4e3eca65460c14a5245b09fee15a92ba09458b6",
+     "etiqueta": "MEXC ETH 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xf016e1d45ef23bdd414e7a2e4d46e1b34577b508",
+     "etiqueta": "MEXC ETH 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x12c5e4eeeaa20e25847b5453d23246983c512db7",
+     "etiqueta": "MEXC ETH 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xd67f25ef2399a0c769b1a35634c5ce77166714db",
+     "etiqueta": "MEXC ETH 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xc411ab12837f63935b71b6c6643d0f7000e55e4b",
+     "etiqueta": "MEXC ETH 9"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x1f7370792a057227024e7a8cc15b40e3ed171ffc",
+     "etiqueta": "MEXC ETH 10"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x4982085c9e2f89f2ecb8131eca71afad896e89cb",
+     "etiqueta": "MEXC BNB 1"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x2e8f79ad740de90dc5f5a9f0d8d9661a60725e64",
+     "etiqueta": "MEXC BNB 2"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x7354abb551e41bbd9fb32e2e79f44631349119b8",
+     "etiqueta": "MEXC BNB 3"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x9bb6a22da110c6c9bab745bcaf0ee142ee83af37",
+     "etiqueta": "MEXC BNB 4"
+    },
+    {
+     "red": "bnb",
+     "tipo": "direccion",
+     "valor": "0x1c14fd8bb8a02bc3e3071ae45df9b4d2e00d8e25",
+     "etiqueta": "MEXC BNB 5"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "5PAhQiYdLBd6SVdjzBQDxUAEFyDdF5ExNPQfcscnPRj5",
+     "etiqueta": "MEXC SOL 1"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "ASTyfSima4LLAdDgoFGkgqoKowG1LZFDr9fAQrg7iaJZ",
+     "etiqueta": "MEXC SOL 2"
+    },
+    {
+     "red": "sol",
+     "tipo": "direccion",
+     "valor": "FTAfm7jKGmX9cKtyBVJXLJB5pnovHmuo6W2RLJ2b9mig",
+     "etiqueta": "MEXC SOL 3"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "r3BFHL2EXZN4darZ7vH7BT7tP9tN7tyd6W",
+     "etiqueta": "MEXC XRP 1"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rs2dgzYeqYqsk8bvkQR5YPyqsXYcA24MP2",
+     "etiqueta": "MEXC XRP 2"
+    },
+    {
+     "red": "xrp",
+     "tipo": "direccion",
+     "valor": "rNkcYUTCpFUnLUB1TaP1s9n5ETPNkmnD3t",
+     "etiqueta": "MEXC XRP 3"
+    }
+   ]
+  },
+  {
+   "id": "upbit",
+   "nombre": "Upbit",
+   "categoria": "exchange",
+   "alias": [],
+   "fuentes": [
+    "eth-labels"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xc9cf0ec93d764f5c9571fd12f764bae7fc87c84e",
+     "etiqueta": "Upbit: Cold Wallet"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x390de26d772d2e2005c6d1d24afc902bae37a4bb",
+     "etiqueta": "Upbit"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xba826fec90cefdf6706858e5fbafcb27a290fbe0",
+     "etiqueta": "Upbit 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x5e032243d507c743b061ef021e2ec7fcc6d3ab89",
+     "etiqueta": "Upbit 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x99ddedb236f545061cb0481909428905be9c47e1",
+     "etiqueta": "Upbit 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x4e8eddc514dc4ffbda51db5be0d3e8d82ee4871e",
+     "etiqueta": "Upbit 5"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x015f46294fd72f5448eb602ef8a252574bd9cbcd",
+     "etiqueta": "Upbit 6"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x8913f85a2ae4ba3bf76d2a2a0418f391f2cc1519",
+     "etiqueta": "Upbit 7"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x19d39241e02d612264b9090b74e14acdfb54b8f8",
+     "etiqueta": "Upbit 8"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x32e1931b8c180050a6ed597046502ba50f17ba4d",
+     "etiqueta": "Upbit 9"
+    }
+   ]
+  },
+  {
+   "id": "satoshi",
+   "nombre": "Satoshi Nakamoto",
+   "categoria": "fundador",
+   "alias": [
+    "patoshi",
+    "genesis",
+    "génesis"
+   ],
+   "fuentes": [
+    "patoshi"
+   ],
+   "nota": "Dirección del bloque génesis y claves públicas de los primeros bloques atribuidos a Satoshi (patrón Patoshi). La lista completa tiene 21.953 bloques; aquí van los primeros.",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+     "etiqueta": "Bloque génesis (0)"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3",
+     "etiqueta": "Bloque 9 (pagó a Hal Finney en el bloque 170)"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "0494b9d3e76c5b1629ecf97fff95d7a4bbdac87cc26099ada28066c6ff1eb9191223cd897194a08d0c2726c5747f1db49e8cf90e75dc3e3550ae9b30086f3cd5aa",
+     "etiqueta": "Bloque 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "04184f32b212815c6e522e66686324030ff7e5bf08efb21f8b00614fb7690e19131dd31304c54f37baa40db231c918106bb9fd43373e37ae31a0befc6ecaefb867",
+     "etiqueta": "Bloque 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "0456579536d150fbce94ee62b47db2ca43af0a730a0467ba55c79e2a7ec9ce4ad297e35cdbb8e42a4643a60eef7c9abee2f5822f86b1da242d9c2301c431facfd8",
+     "etiqueta": "Bloque 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "0408ce279174b34c077c7b2043e3f3d45a588b85ef4ca466740f848ead7fb498f0a795c982552fdfa41616a7c0333a269d62108588e260fd5a48ac8e4dbf49e2bc",
+     "etiqueta": "Bloque 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "04a59e64c774923d003fae7491b2a7f75d6b7aa3f35606a8ff1cf06cd3317d16a41aa16928b1df1f631f31f28c7da35d4edad3603adb2338c4d4dd268f31530555",
+     "etiqueta": "Bloque 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "04cc8d85f5e7933cb18f13b97d165e1189c1fb3e9c98b0dd5446b2a1989883ff9e740a8a75da99cc59a21016caf7a7afd3e4e9e7952983e18d1ff70529d62e0ba1",
+     "etiqueta": "Bloque 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "04fcc2888ca91cf0103d8c5797c256bf976e81f280205d002d85b9b622ed1a6f820866c7b5fe12285cfa78c035355d752fc94a398b67597dc4fbb5b386816425dd",
+     "etiqueta": "Bloque 10"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "046cc86ddcd0860b7cef16cbaad7fe31fda1bf073c25cb833fa9e409e7f51e296f39b653a9c8040a2f967319ff37cf14b0991b86173462a2d5907cb6c5648b5b76",
+     "etiqueta": "Bloque 11"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "04c5a68f5fa2192b215016c5dfb384399a39474165eea22603cd39780e653baad9106e36947a1ba3ad5d3789c5cead18a38a538a7d834a8a2b9f0ea946fb4e6f68",
+     "etiqueta": "Bloque 13"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "043e8ac6b8ea64e85928b6469f17db0096de0bcae7d09a4497413d9bba49c00ffdf9cb0ce07c404784928b3976f0beea42fe2691a8f0430bcb2b0daaf5aa02b30e",
+     "etiqueta": "Bloque 14"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "04e0041b4b4d9b6feb7221803a35d997efada6e2b5d24f5fc7205f2ea6b62a1adc9983a7a7dab7e93ea791bed5928e7a32286fa4facadd16313b75b467aea77499",
+     "etiqueta": "Bloque 15"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "04977367164ca24f1f2de2e2cfb9e5c3f22d510d3f33683de200283100af0c8667dba7e4e389fa9953c6cb83d6ea72990e139f529b58cfbbac27607a28207b2a37",
+     "etiqueta": "Bloque 16"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "045ca3b93e90fe9785734e07c8e564fd72a0d68a200bf907ee01dabab784ad5817f59a41f4f7e04edc3e9b80cc370c281b0f406eb58187664bdf93decc5bb63264",
+     "etiqueta": "Bloque 17"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "04cf37a46b304e4dad17e081361502d0eff20af2b1360c7b18392a29f9f08ae5a95aa24f859533dabbc8585598bf8c5c71c0e8d89d3655889aee8c49fd948f59fe",
+     "etiqueta": "Bloque 18"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "04f5efde0c2d30ab28e3dbe804c1a4aaf13066f9b198a4159c76f8f79b3b20caf99f7c979ed6c71481061277a6fc8666977c249da99960c97c8d8714fda9f0e883",
+     "etiqueta": "Bloque 19"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "0408ab2f56361f83064e4ce51acc291fb57c2cbcdb1d6562f6278c43a1406b548fd6cefc11bcc29eb620d5861cb9ed69dc39f2422f54b06a8af4f78c8276cfdc6b",
+     "etiqueta": "Bloque 20"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "042b08ebb6ada0057e47a125d0a2e99dd2b86c201d41aaf7aa295c625c2c2f1997a8bc6cb9dbda889669989b8d12804c400168e54b093ad05d1170c516abca7d28",
+     "etiqueta": "Bloque 21"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "04aef905809d1004da2b0187dd5198e0f5b11ab291230cdcd9606bbc99acd15bc91f951de6307f5adae03f2e18d523ec8778e7d8e9b7c24ba282c8eaa9bcded840",
+     "etiqueta": "Bloque 22"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "041a24b5639c12b2b0a612011eb780a682020b6312782fef0bc29a75eee7cf66abd081121a0b7b5c3076e055648379c25ed52eff8d2b11871e5a7e0c8604f4053f",
+     "etiqueta": "Bloque 23"
+    },
+    {
+     "red": "btc",
+     "tipo": "clave",
+     "valor": "049523af765da5408d0a4f9d33af2e103c57b8b31877969173e7a7c313bf09a9803dcceec9b29d0fab4737173e3cb6dcc11ab7f233d8b1d715748ca4d715770ac3",
+     "etiqueta": "Bloque 24"
+    }
+   ]
+  },
+  {
+   "id": "vitalik",
+   "nombre": "Vitalik Buterin",
+   "categoria": "fundador",
+   "alias": [
+    "vitalik.eth",
+    "ethereum"
+   ],
+   "fuentes": [
+    "etherscan"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+     "etiqueta": "vitalik.eth"
+    }
+   ]
+  },
+  {
+   "id": "wlfi",
+   "nombre": "World Liberty Financial",
+   "categoria": "fondo",
+   "alias": [
+    "wlfi",
+    "trump",
+    "world liberty"
+   ],
+   "fuentes": [
+    "etherscan",
+    "arkham"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x5be9a4959308a0d0c7bc0870e319314d8d957dbb",
+     "etiqueta": "World Liberty: Multisig"
+    }
+   ]
+  },
+  {
+   "id": "mtgox",
+   "nombre": "Mt. Gox (administrador concursal)",
+   "categoria": "exchange-cerrado",
+   "alias": [
+    "gox",
+    "mtgox"
+   ],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "17Tf4bVQaCzwWrDWGRPC97RLCHnU4LY8Qr",
+     "etiqueta": "Mt. Gox (administrador concursal) BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1BzK87zuqidZn489Wb2oLSktrjKrX7TLKe",
+     "etiqueta": "Mt. Gox (administrador concursal) BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1Drshi4RAuvxk4T6Bkq959ZvLbvy7b1wvD",
+     "etiqueta": "Mt. Gox (administrador concursal) BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1EiiKCCnFgHjEvPZdu29qqgdBm8zTvpU3U",
+     "etiqueta": "Mt. Gox (administrador concursal) BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "14p4w3TRCd6NMRSnzTmgdvQhNnbrAmzXmy",
+     "etiqueta": "Mt. Gox (administrador concursal) BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "12KkeeRkiNS13GMbg7zos9KRn9ggvZtZgx",
+     "etiqueta": "Mt. Gox (administrador concursal) BTC 6"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "12T4oSNd4t9ty9fodgNd47TWhK35pAxDYN",
+     "etiqueta": "Mt. Gox (administrador concursal) BTC 7"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "15kNZcrhxeFZgVVLK2Yjzd69tRidbFdJEZ",
+     "etiqueta": "Mt. Gox (administrador concursal) BTC 8"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1LS5EFRRMDgMQusW6zokQUHjzNUfy6HHCQ",
+     "etiqueta": "Mt. Gox (administrador concursal) BTC 9"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "1FrV9hv1AW34BGJvobJatyzUWYDWB9epRW",
+     "etiqueta": "Mt. Gox (administrador concursal) BTC 10"
+    }
+   ]
+  },
+  {
+   "id": "usgov-silkroad",
+   "nombre": "Gobierno de EE. UU. (Silk Road)",
+   "categoria": "gobierno",
+   "alias": [
+    "usa",
+    "fbi",
+    "silk road",
+    "doj"
+   ],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qa5wkgaew2dkv56kfvj49j0av5nml45x9ek9hz6",
+     "etiqueta": "Gobierno de EE. UU. (Silk Road) BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qmxjefnuy06v345v6vhwpwt05dztztmx4g3y7wp",
+     "etiqueta": "Gobierno de EE. UU. (Silk Road) BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qf2yvj48mzkj7uf8lc2a9sa7w983qe256l5c8fs",
+     "etiqueta": "Gobierno de EE. UU. (Silk Road) BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "bc1qe7nk2nlnjewghgw4sgm0r89zkjzsurda7z4rdg",
+     "etiqueta": "Gobierno de EE. UU. (Silk Road) BTC 4"
+    }
+   ]
+  },
+  {
+   "id": "fbi-dprk",
+   "nombre": "Corea del Norte (Lazarus) según el FBI",
+   "categoria": "hackeo",
+   "alias": [
+    "lazarus",
+    "dprk",
+    "bybit hack"
+   ],
+   "fuentes": [
+    "fbi"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3LU8wRu4ZnXP4UM8Yo6kkTiGHM9BubgyiG",
+     "etiqueta": "Corea del Norte (Lazarus) según el FBI BTC 1"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "39idqitN9tYNmq3wYanwg3MitFB5TZCjWu",
+     "etiqueta": "Corea del Norte (Lazarus) según el FBI BTC 2"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3AAUBbKJorvNhEUFhKnep9YTwmZECxE4Nk",
+     "etiqueta": "Corea del Norte (Lazarus) según el FBI BTC 3"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3PjNaSeP8GzLjGeu51JR19Q2Lu8W2Te9oc",
+     "etiqueta": "Corea del Norte (Lazarus) según el FBI BTC 4"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "3NbdrezMzAVVfXv5MTQJn4hWqKhYCTCJoB",
+     "etiqueta": "Corea del Norte (Lazarus) según el FBI BTC 5"
+    },
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "34VXKa5upLWVYMXmgid6bFM4BaQXHxSUoL",
+     "etiqueta": "Corea del Norte (Lazarus) según el FBI BTC 6"
+    }
+   ]
+  },
+  {
+   "id": "elsalvador",
+   "nombre": "El Salvador",
+   "categoria": "gobierno",
+   "alias": [
+    "bukele"
+   ],
+   "fuentes": [
+    "defillama"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "btc",
+     "tipo": "direccion",
+     "valor": "32ixEdVJWo3kmvJGMTZq5jAQVZZeuwnqzo",
+     "etiqueta": "El Salvador BTC 1"
+    }
+   ]
+  },
+  {
+   "id": "tether",
+   "nombre": "Tether",
+   "categoria": "stablecoin",
+   "alias": [
+    "usdt"
+   ],
+   "fuentes": [
+    "eth-labels"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x5754284f345afc66a98fbb0a0afe71e0f007b949",
+     "etiqueta": "Tether: Treasury"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xc6cde7c39eb2f0f0095f41570af89efc2c1ea828",
+     "etiqueta": "Tether: Multisig"
+    }
+   ]
+  },
+  {
+   "id": "ef",
+   "nombre": "Ethereum Foundation",
+   "categoria": "fundacion",
+   "alias": [
+    "ef",
+    "ethereum"
+   ],
+   "fuentes": [
+    "eth-labels"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xde0b295669a9fd93d5f28d9ec85e40f4cb697bae",
+     "etiqueta": "EthDev"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x5ed8cee6b63b1c6afce3ad7c92f4fd7e1b8fad9f",
+     "etiqueta": "EF 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xc06145782f31030db1c40b203be6b0fd53410b6d",
+     "etiqueta": "EF 2"
+    }
+   ]
+  },
+  {
+   "id": "jump",
+   "nombre": "Jump Trading",
+   "categoria": "fondo",
+   "alias": [],
+   "fuentes": [
+    "eth-labels"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xf584f8728b874a6a5c7a8d4d387c9aae9172d621",
+     "etiqueta": "Jump Trading"
+    }
+   ]
+  },
+  {
+   "id": "wintermute",
+   "nombre": "Wintermute",
+   "categoria": "fondo",
+   "alias": [],
+   "fuentes": [
+    "eth-labels"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x0000006daea1723962647b7e189d311d757fb793",
+     "etiqueta": "Wintermute 1"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x000002cba8dfb0a86a47a415592835e17fac080a",
+     "etiqueta": "Wintermute 2"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x5cddebd8a7b3bc60156550187bf5465b1c3290f5",
+     "etiqueta": "Wintermute 3"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xf8191d98ae98d2f7abdfb63a9b0b812b93c873aa",
+     "etiqueta": "Wintermute 4"
+    },
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0xce84449a8ebec019ac110a4b6662e55d0fd9f228",
+     "etiqueta": "Wintermute 5"
+    }
+   ]
+  },
+  {
+   "id": "blackrock",
+   "nombre": "BlackRock (ETF ETHA)",
+   "categoria": "fondo",
+   "alias": [
+    "etha",
+    "ishares"
+   ],
+   "fuentes": [
+    "eth-labels"
+   ],
+   "nota": "",
+   "direcciones": [
+    {
+     "red": "eth",
+     "tipo": "direccion",
+     "valor": "0x33a53681a5a65ddc9ec25e2d4a5cb38df210ae65",
+     "etiqueta": "BlackRock: ETHA Ethereum ETF"
+    }
+   ]
+  }
+ ]
+}

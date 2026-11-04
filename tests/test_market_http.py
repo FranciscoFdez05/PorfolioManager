@@ -191,3 +191,24 @@ def testSinJsonBodySigueSiendoGet(monkeypatch):
 
     assert peticiones[0].get_method() == "GET"
     assert peticiones[0].data is None
+
+
+def testNoReintentaSiNoConectaNingunaIpDelServidor(monkeypatch):
+    # Con todas las IPs sin contestar, reintentar al segundo solo alarga la espera.
+    consultados = []
+    monkeypatch.setattr(marketHttp, "servidorCaido", lambda host, puerto: consultados.append((host, puerto)) or True)
+    intentos = guion(monkeypatch, URLError(TimeoutError("timed out")))
+
+    with pytest.raises(URLError):
+        fetchJson("https://api.test/quote")
+
+    assert len(intentos) == 1
+    assert consultados == [("api.test", 443)]
+
+
+def testUnFalloDeRedConElServidorVivoSiSeReintenta(monkeypatch):
+    monkeypatch.setattr(marketHttp, "servidorCaido", lambda host, puerto: False)
+    intentos = guion(monkeypatch, URLError("sin red"), jsonResponse({"ok": 1}))
+
+    assert fetchJson("http://api.test:8080/quote") == {"ok": 1}
+    assert len(intentos) == 2

@@ -432,3 +432,38 @@ def getAssetFile(assetId):
             return readAssetFile(self._id) is not None
 
     return _ExistenceCheck(assetId)
+
+
+def listarActivosCripto():
+    """Activos de tipo cripto con lo justo para identificarlos, en el orden de Activos.
+
+    `listAssets()` calcula posiciones y rendimientos de toda la cartera; aquí
+    solo hace falta saber qué cripto es cada una.
+    """
+    filas = getDb().execute(
+        "SELECT id, name, symbol, market_symbol FROM activos "
+        "WHERE lower(trim(type)) = 'cripto' ORDER BY sort_order, symbol"
+    ).fetchall()
+    return [
+        {"id": f["id"], "name": f["name"], "symbol": f["symbol"] or "", "marketSymbol": f["market_symbol"] or ""}
+        for f in filas
+    ]
+
+
+def listarActivosParaTokens():
+    """Criptos y ETFs de Activos, en el orden de Activos, para reconocer tokens.
+
+    Los ETF entran porque hay ETFs tokenizados (un token ERC-20 por
+    participación): el visor de tokens los asocia por símbolo como a una cripto.
+    Las criptos van antes para que, si un símbolo coincide con las dos, gane la cripto.
+    """
+    filas = getDb().execute(
+        "SELECT id, name, symbol, market_symbol, lower(trim(type)) AS tipo FROM activos "
+        "WHERE lower(trim(type)) IN ('cripto', 'etfs') "
+        "ORDER BY lower(trim(type)) = 'etfs', sort_order, symbol"
+    ).fetchall()
+    return [
+        {"id": f["id"], "name": f["name"], "symbol": f["symbol"] or "", "marketSymbol": f["market_symbol"] or "",
+         "type": f["tipo"]}
+        for f in filas
+    ]

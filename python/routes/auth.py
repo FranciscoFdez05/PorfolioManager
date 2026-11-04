@@ -147,8 +147,9 @@ def _avisarSiSeBloquea(ip: str) -> None:
     if locked:
         telegram_notifier.notificar(
             "seguridad",
-            f"🔐 Login bloqueado: la IP {ip} ha fallado {settings.maxIntentosLogin()} intentos seguidos.\n"
+            f"Login bloqueado: la IP {ip} ha fallado {settings.maxIntentosLogin()} intentos seguidos.\n"
             f"No podrá volver a probar en {locked // 60 + 1} min. Si no eras tú, cambia la contraseña.",
+            gravedad=telegram_notifier.CRITICO,
             clave=f"login-bloqueo-{ip}", cooldown=settings.bloqueoSegundos(),
         )
 
@@ -313,7 +314,7 @@ def login():
                 if dos_factores.activa():
                     return _pedirSegundoPaso(nextUrl)
                 _abrirSesion(ip)
-                telegram_notifier.notificar("sesion", f"🔑 Inicio de sesión desde {ip}")
+                telegram_notifier.notificar("sesion", f"Inicio de sesión desde {ip}")
                 return redirect(nextUrl)
 
             _recordFailure(ip)
@@ -626,6 +627,7 @@ def _completarSegundoPaso(ip: str, conFrase: bool):
             "seguridad",
             f"Se ha entrado con la frase de recuperación desde {ip}. La verificación en dos pasos "
             "queda desactivada: vuelve a activarla en Ajustes > Cuenta. Si no has sido tú, cambia la contraseña.",
+            gravedad=telegram_notifier.CRITICO,
         )
     else:
         telegram_notifier.notificar("sesion", f"Inicio de sesión con verificación en dos pasos desde {ip}")
@@ -805,7 +807,10 @@ def changeUsername():
     _clearFailures(_clientIp())
     _saveCredentials(newUsername, passwordHash)
     _renovarSesiones()
-    telegram_notifier.notificar("seguridad", f"🔐 Se ha cambiado el usuario de acceso (desde {_clientIp()}).")
+    telegram_notifier.notificar(
+        "seguridad", f"Se ha cambiado el usuario de acceso (desde {_clientIp()}).",
+        gravedad=telegram_notifier.AVISO,
+    )
     return jsonify({"ok": True})
 
 
@@ -840,7 +845,10 @@ def changePassword():
     newHash = generate_password_hash(newPassword, method=settings.metodoHashPassword())
     _saveCredentials(currentUser, newHash)
     _renovarSesiones()
-    telegram_notifier.notificar("seguridad", f"🔐 Se ha cambiado la contraseña de acceso (desde {_clientIp()}).")
+    telegram_notifier.notificar(
+        "seguridad", f"Se ha cambiado la contraseña de acceso (desde {_clientIp()}).",
+        gravedad=telegram_notifier.AVISO,
+    )
     return jsonify({"ok": True})
 
 
@@ -933,7 +941,10 @@ def confirmarActivacionDosFactores():
     except OSError as error:
         logger.error("No se pudo guardar la activación de la 2FA: %s", error)
         return _errorJson("No se pudo guardar la configuración en el servidor", 500)
-    telegram_notifier.notificar("seguridad", f"Verificación en dos pasos activada (desde {_clientIp()}).")
+    telegram_notifier.notificar(
+        "seguridad", f"Verificación en dos pasos activada (desde {_clientIp()}).",
+        gravedad=telegram_notifier.CORRECTO,
+    )
     return jsonify({"ok": True})
 
 
@@ -994,7 +1005,10 @@ def desactivarDosFactores():
     except OSError as error:
         logger.error("No se pudo desactivar la 2FA: %s", error)
         return _errorJson("No se pudo guardar la configuración en el servidor", 500)
-    telegram_notifier.notificar("seguridad", f"Verificación en dos pasos desactivada (desde {ip}).")
+    telegram_notifier.notificar(
+        "seguridad", f"Verificación en dos pasos desactivada (desde {ip}).",
+        gravedad=telegram_notifier.AVISO,
+    )
     return jsonify({"ok": True})
 
 

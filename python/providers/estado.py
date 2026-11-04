@@ -1,4 +1,4 @@
-"""Estado de cada proveedor de datos de mercado.
+"""Estado de cada proveedor de datos de mercado y de lectura de wallets.
 
 El contador de "Peticiones API hoy" dice cuánta cuota se ha gastado, pero no si
 el proveedor responde. Cuando la cartera deja de actualizar precios la pregunta
@@ -15,26 +15,43 @@ de un símbolo conocido— y el fallo se traduce a uno de estos estados:
 * ``limite``    — cuota agotada (429/402, o el aviso en el cuerpo de Alpha Vantage).
 * ``caido``     — no contesta: timeout, corte de red o 5xx.
 * ``error``     — contesta algo que no se entiende.
+* ``sin_datos`` — todavía no se le ha hecho ninguna petición.
 
 Los proveedores que admiten varias claves se comprueban recorriéndolas hasta
 que una responde: el diagnóstico dice si el proveedor sirve, no si sirve la
 primera clave de la lista.
 
-**Las comprobaciones gastan cuota real**, así que se contabilizan en `api_stats`
-como cualquier otra llamada y el resultado se cachea hasta que una llamada real
-falle: ver la pantalla no puede acabar siendo el motivo de que se agote la cuota. Por eso la
-respuesta lleva la antigüedad del dato en vez de fingir que se acaba de
-comprobar.
+**Las comprobaciones gastan cuota real**, así que solo se hacen cuando el
+usuario pulsa «Comprobar ahora». El resto del tiempo el estado es el de la
+última petición real que hizo el servidor a cada proveedor (`api_stats`), con
+su antigüedad: ver la pantalla nunca gasta cuota.
+
+Cada fila dice además qué cubre y, si falla, el motivo y qué hacer
+(`_presentar`), porque una etiqueta como «Fuera del plan» no dice qué ha dejado
+de funcionar ni si se arregla solo.
 """
 
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 
-from core import proveedores_pausados
-from providers.api_stats import lastApiFailure
+from core import proveedor_bnb, proveedores_pausados, settings
+from providers import api_stats
+from providers.api_stats import lastApiResults, recordApiResult
+from providers.blockchain_clients import (
+    _ETHERSCAN_CADENAS,
+    _ETHERSCAN_URL,
+    ESTADO_BNB,
+    ESTADO_ESPLORA,
+    ESTADO_ETHERSCAN,
+    ESTADO_SOLANA,
+    ESTADO_XRPL,
+    estadoPorMensaje,
+    estadoRespuestaEtherscan,
+    urlNodeReal,
+)
 from providers.http import fetchJson
 from stores import app_data
 
@@ -47,8 +64,59 @@ _TIMEOUT = 6.0
 
 _YAHOO_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
-_lock = Lock()
-_cache: dict = {"momento": 0.0, "proveedores": []}
+# Etiqueta de cada estado guardado por `api_stats.recordApiResult`.
+_ETIQUETAS = {
+    "ok": "Operativa",
+    "clave": "Clave rechazada",
+    "plan": "Fuera del plan",
+    "limite": "Cuota agotada",
+    "caido": "No responde",
+    "error": "Error",
+}
+
+# Lectores de claves de cada proveedor que las necesita: (lista, una sola). Por
+# nombre y no por referencia, para leer siempre el de `app_data` de ese momento.
+_LECTORES_CLAVE = {
+    "finnhub": ("readFinnhubApiKeys", "readFinnhubApiKey"),
+    "eodhd": ("readEodhdApiKeys", "readEodhdApiKey"),
+    "alphavantage": ("readAlphaVantageApiKeys", "readAlphaVantageApiKey"),
+    "etherscan": (None, "readEtherscanApiKey"),
+    "nodereal": (None, "readNodeRealApiKey"),
+}
+
+# Una dirección cualquiera: al sondeo solo le importa si la API contesta.
+_DIRECCION_SONDEO_ETHERSCAN = "0x0000000000000000000000000000000000000000"
+
+# Qué cubre cada fila. La de BNB depende de la API elegida (`_cobertura`).
+_COBERTURA = {
+    "finnhub": "Cotizaciones. El plan gratuito no incluye bolsas fuera de EE. UU. ni históricos",
+    "eodhd": "Cotizaciones",
+    "alphavantage": "Cotizaciones",
+    "yahoo": "Cotizaciones, sin clave",
+    "tradingview": "Cotizaciones, sin clave",
+    "divisas": "Tipos de cambio, sin clave",
+    "etherscan": "Wallets y tokens de Ethereum. El plan gratuito no incluye BNB",
+    "esplora": "Wallets de Bitcoin, sin clave",
+    "solana": "Wallets de Solana, sin clave. Solo SOL: los tokens SPL no se leen",
+    "xrpl": "Wallets de XRP, sin clave. Solo XRP: otras divisas del ledger no se leen",
+}
+
+# Los servidores públicos no tienen cuota de una clave: limitan por IP.
+_SIN_CUENTA = ("yahoo", "tradingview", "divisas", "esplora", "solana", "xrpl")
+
+# Cuánto sigue diciendo algo un límite si nadie vuelve a llamar al proveedor. La
+# pantalla solo aprende de peticiones reales: sin esto, un proveedor que la
+# aplicación ya no usa se quedaría para siempre en «Cuota agotada» o «Frenada».
+_vigenciaFrenoSegundos = 5 * 60
+_vigenciaCuotaSegundos = 24 * 3600
+
+
+class _Fallo(Exception):
+    """Contestó 200, pero el cuerpo dice que falló: lleva el estado ya traducido."""
+
+    def __init__(self, estado, detalle):
+        super().__init__(detalle)
+        self.estado = estado
 
 
 class _Limite(Exception):
@@ -209,6 +277,82 @@ def _probarDivisas():
     )
 
 
+def _sondearEtherscan(red, nombre):
+    respuesta = fetchJson(
+        _ETHERSCAN_URL,
+        {"chainid": _ETHERSCAN_CADENAS[red], "module": "account", "action": "balance",
+         "address": _DIRECCION_SONDEO_ETHERSCAN, "tag": "latest", "apikey": _clave(app_data.readEtherscanApiKey)},
+        timeout=_TIMEOUT, provider=nombre, retries=0,
+    )
+    fallo = estadoRespuestaEtherscan(respuesta)
+    if fallo:
+        raise _Fallo(*fallo)
+
+
+def _probarEtherscan():
+    _sondearEtherscan("eth", ESTADO_ETHERSCAN)
+
+
+def _falloRpc(respuesta):
+    """Lanza `_Fallo` si una respuesta JSON-RPC trae un error en el cuerpo."""
+    error = respuesta.get("error") if isinstance(respuesta, dict) else None
+    if error:
+        detalle = str(error.get("message") if isinstance(error, dict) else error)[:200]
+        raise _Fallo(estadoPorMensaje(detalle), detalle)
+
+
+def _probarNodeReal():
+    # Se prueba el historial y no solo la clave: es la consulta de la que depende
+    # que se lean las wallets, y un plan que no la incluya solo se ve así.
+    _falloRpc(fetchJson(
+        urlNodeReal(_clave(app_data.readNodeRealApiKey)),
+        timeout=_TIMEOUT, provider=ESTADO_BNB, retries=0,
+        jsonBody={"jsonrpc": "2.0", "id": 1, "method": "nr_getTransactionByAddress", "params": [{
+            "category": ["external"], "address": _DIRECCION_SONDEO_ETHERSCAN, "order": "desc", "maxCount": "0x1",
+        }]},
+    ))
+
+
+def _probarBnb():
+    if proveedor_bnb.actual() == proveedor_bnb.NODEREAL:
+        _probarNodeReal()
+    else:
+        _sondearEtherscan("bnb", ESTADO_BNB)
+
+
+def _probarEsplora():
+    principal = settings.walletsEsploraUrl().rstrip("/")
+    respaldo = settings.walletsEsploraUrlRespaldo().rstrip("/")
+    try:
+        fetchJson(f"{principal}/blocks/tip/height", timeout=_TIMEOUT, provider=ESTADO_ESPLORA, retries=0)
+    except (HTTPError, TimeoutError, URLError, OSError):
+        if not respaldo or respaldo == principal:
+            raise
+        fetchJson(f"{respaldo}/blocks/tip/height", timeout=_TIMEOUT, provider=ESTADO_ESPLORA, retries=0)
+        return f"Responde el respaldo ({urlsplit(respaldo).netloc}); la principal ({urlsplit(principal).netloc}), no"
+    return ""
+
+
+def _probarSolana():
+    _falloRpc(fetchJson(
+        settings.walletsSolanaRpcUrl(),
+        timeout=_TIMEOUT, provider=ESTADO_SOLANA, retries=0,
+        jsonBody={"jsonrpc": "2.0", "id": 1, "method": "getHealth", "params": []},
+    ))
+
+
+def _probarXrpl():
+    respuesta = fetchJson(
+        settings.walletsXrplRpcUrl(),
+        timeout=_TIMEOUT, provider=ESTADO_XRPL, retries=0,
+        jsonBody={"method": "server_info", "params": [{}]},
+    )
+    resultado = respuesta.get("result") if isinstance(respuesta, dict) else None
+    if isinstance(resultado, dict) and resultado.get("status") == "error":
+        detalle = str(resultado.get("error_message") or resultado.get("error") or "Error")[:200]
+        raise _Fallo(estadoPorMensaje(detalle), detalle)
+
+
 # (id, nombre visible, comprobación)
 _PROVEEDORES = (
     ("finnhub",      "Finnhub",        _probarFinnhub),
@@ -217,6 +361,11 @@ _PROVEEDORES = (
     ("yahoo",        "Yahoo Finance",  _probarYahoo),
     ("tradingview",  "TradingView",    _probarTradingview),
     ("divisas",      "Tipo de cambio", _probarDivisas),
+    ("etherscan",    ESTADO_ETHERSCAN, _probarEtherscan),
+    ("bnb",          ESTADO_BNB,       _probarBnb),
+    ("esplora",      ESTADO_ESPLORA,   _probarEsplora),
+    ("solana",       ESTADO_SOLANA,    _probarSolana),
+    ("xrpl",         ESTADO_XRPL,      _probarXrpl),
 )
 
 
@@ -265,6 +414,8 @@ def _diagnosticar(idProveedor, nombre, probar):
         return fin("limite", "Cuota agotada", error)
     except _Clave as error:
         return fin("clave", "Clave rechazada", error)
+    except _Fallo as error:
+        return fin(error.estado, _ETIQUETAS.get(error.estado, "Error"), error)
     except HTTPError as error:
         estado, etiqueta = _porCodigo(error.code)
         return fin(estado, etiqueta, f"HTTP {error.code}")
@@ -306,56 +457,159 @@ def comprobar():
         return list(pool.map(lambda datos: _diagnosticarOPausa(*datos), _PROVEEDORES))
 
 
-def _falloPosterior(fila) -> bool:
-    """¿Falló una llamada real de este proveedor después de su último diagnóstico?"""
-    return lastApiFailure(fila["nombre"]) > fila.get("_momento", 0.0)
+def _tieneClave(idProveedor) -> bool:
+    """¿Hay clave para el proveedor? Sin red: solo mira lo configurado."""
+    # La clave que necesita la fila de BNB es la de la API elegida.
+    lectores = _LECTORES_CLAVE.get(proveedor_bnb.actual() if idProveedor == "bnb" else idProveedor)
+    if not lectores:
+        return True
+    lista, legado = lectores
+    try:
+        _listaClaves(getattr(app_data, lista) if lista else list, getattr(app_data, legado))
+    except _SinClave:
+        return False
+    return True
+
+
+def _filaDeUltimaPeticion(idProveedor, nombre, ultimo, ahora):
+    estadoUltimo = ultimo.get("estado", "error")
+    fila = _fila(idProveedor, nombre, estadoUltimo, _ETIQUETAS.get(estadoUltimo, "Error"),
+                 ultimo.get("detalle", ""), ultimo.get("ms", 0))
+    fila["edadSegundos"] = max(0, round(ahora - float(ultimo.get("momento") or ahora)))
+    return fila
+
+
+def _esFreno(detalle: str) -> bool:
+    """¿El límite es por segundo (dura segundos) y no la cuota del día?"""
+    return "per sec" in str(detalle).lower()
+
+
+def _limiteCaducado(ultimo: dict, ahora: float) -> bool:
+    """¿Es un límite tan viejo que ya no dice nada del proveedor?
+
+    Args:
+        ultimo: Resultado guardado por `recordApiResult`.
+        ahora: Instante actual, en segundos desde la época.
+
+    Returns:
+        True si es un límite anterior a su vigencia. Otros estados nunca caducan:
+        una clave rechazada sigue siéndolo hasta que alguien la cambie.
+    """
+    if ultimo.get("estado") != "limite":
+        return False
+    vigencia = _vigenciaFrenoSegundos if _esFreno(ultimo.get("detalle", "")) else _vigenciaCuotaSegundos
+    return ahora - float(ultimo.get("momento") or ahora) > vigencia
+
+
+def _desdeUltimasPeticiones():
+    """Una fila por proveedor con cómo terminó su última petición real, sin llamar a nadie."""
+    ultimos = lastApiResults()
+    ahora = time.time()
+    filas = []
+    for idProveedor, nombre, _probar in _PROVEEDORES:
+        if proveedores_pausados.estaPausado(idProveedor):
+            filas.append(_fila(idProveedor, nombre, "pausada", "Pausada", "Pausada desde Ajustes"))
+        elif not _tieneClave(idProveedor):
+            filas.append(_fila(idProveedor, nombre, "sin_clave", "Sin clave", "No hay ninguna clave configurada"))
+        elif nombre in ultimos and _limiteCaducado(ultimos[nombre], ahora):
+            filas.append(_fila(idProveedor, nombre, "sin_datos", "Sin datos",
+                               "Su último límite ya ha caducado y no se le ha vuelto a pedir nada"))
+        elif nombre in ultimos:
+            filas.append(_filaDeUltimaPeticion(idProveedor, nombre, ultimos[nombre], ahora))
+        else:
+            filas.append(_fila(idProveedor, nombre, "sin_datos", "Sin datos",
+                               "Todavía no se le ha hecho ninguna petición; «Comprobar ahora» lo prueba"))
+    return filas
+
+
+def _cobertura(idProveedor: str) -> str:
+    if idProveedor != "bnb":
+        return _COBERTURA.get(idProveedor, "")
+    if proveedor_bnb.actual() == proveedor_bnb.NODEREAL:
+        return "Wallets y tokens de BNB, por NodeReal. No da la comisión de red de los envíos de tokens"
+    return "Wallets y tokens de BNB, por Etherscan. Requiere un plan de pago"
+
+
+def _motivoLimite(idProveedor: str, detalle: str) -> tuple[str, str]:
+    """(etiqueta, motivo) de un límite: no es lo mismo un freno de segundos que la cuota del día."""
+    if idProveedor in _SIN_CUENTA:
+        return "Limitada", "El servicio público está limitando esta IP. Suele levantarse solo en un rato."
+    if _esFreno(detalle):
+        return "Frenada", "Demasiadas peticiones por segundo. Se recupera sola en unos segundos."
+    return "Cuota agotada", ("Se ha gastado la cuota de esta clave. Volverá cuando el proveedor "
+                             "reinicie el contador, o añade otra clave si admite varias.")
+
+
+def _motivoPlan(idProveedor: str, detalle: str) -> str:
+    if idProveedor == "bnb" and proveedor_bnb.actual() == proveedor_bnb.ETHERSCAN:
+        return ("El plan gratuito de Etherscan no incluye BNB Smart Chain; Ethereum sigue funcionando. "
+                "Elige NodeReal en esta fila (clave gratuita) o contrata un plan de pago de Etherscan.")
+    return f"La clave es válida, pero tu plan no cubre lo pedido.{' ' + detalle if detalle else ''}"
+
+
+def _motivoSinClave(idProveedor: str) -> str:
+    if idProveedor == "bnb" and proveedor_bnb.actual() == proveedor_bnb.NODEREAL:
+        return "Falta la clave de NodeReal. Se crea gratis en nodereal.io y se guarda en Claves API."
+    if idProveedor == "bnb":
+        return "Falta la clave de Etherscan, y BNB requiere además un plan de pago. Puedes elegir NodeReal en esta fila."
+    return "Falta la clave. Sin ella no se usa este proveedor; se añade en Claves API."
+
+
+def _presentar(fila: dict) -> dict:
+    """Añade a una fila qué cubre, el motivo de su estado y las APIs que se pueden elegir."""
+    fila = dict(fila, cubre=_cobertura(fila["id"]), motivo="")
+    estadoFila, detalle = fila["estado"], str(fila.get("detalle") or "")
+    if estadoFila == "limite":
+        fila["etiqueta"], fila["motivo"] = _motivoLimite(fila["id"], detalle)
+    elif estadoFila == "plan":
+        fila["motivo"] = _motivoPlan(fila["id"], detalle)
+    elif estadoFila == "sin_clave":
+        fila["motivo"] = _motivoSinClave(fila["id"])
+    elif estadoFila == "clave":
+        fila["motivo"] = "El proveedor rechaza la clave guardada. Se cambia en Claves API."
+    elif estadoFila == "caido":
+        fila["motivo"] = "No contesta. No depende de tu configuración y suele arreglarse solo."
+    elif estadoFila == "error":
+        fila["motivo"] = f"Ha contestado algo inesperado: {detalle}" if detalle else "Ha contestado algo inesperado."
+    elif estadoFila == "ok":
+        # «Responde la clave 2 de 4» o «responde el respaldo»: funciona, pero importa.
+        fila["motivo"] = detalle
+    if fila["id"] == "bnb":
+        fila["opciones"] = [{"id": clave, "nombre": nombre} for clave, nombre in proveedor_bnb.OPCIONES.items()]
+        fila["seleccion"] = proveedor_bnb.actual()
+    return fila
 
 
 def obtener(forzar: bool = False) -> dict:
-    """Estado de los proveedores, sin gastar cuota salvo que haga falta.
+    """Estado de los proveedores.
 
-    El diagnóstico dura hasta que una llamada real de un proveedor falla (clave,
-    cuota, caída): entonces se vuelve a comprobar solo ese. Abrir la pantalla o
-    dejarla abierta no sondea nada. La primera vez tras arrancar no hay nada
-    cacheado y se comprueba todo; `forzar` lo repite todo a petición del usuario.
+    Sin `forzar` no se llama a nadie: cada fila dice cómo terminó la última
+    petición real que hizo el servidor a ese proveedor (al actualizar precios,
+    leer wallets…). Así la pantalla nunca gasta cuota por su cuenta, ni al
+    abrirla ni porque haya fallado una llamada. Solo `forzar`, que es el botón
+    «Comprobar ahora», sondea a todos; su resultado queda como última petición.
+
+    Args:
+        forzar: Sondear ahora todos los proveedores (gasta cuota).
+
+    Returns:
+        {"proveedores": [...], "comprobado": bool}. Cada fila sin forzar lleva
+        `edadSegundos`, lo que hace de su última petición. Todas llevan `cubre` y
+        `motivo`; la de BNB, además, `opciones` y `seleccion`.
     """
-    with _lock:
-        previas = list(_cache["proveedores"])
+    if not forzar:
+        filas = _conPausa(_desdeUltimasPeticiones())
+        return {"proveedores": [_presentar(fila) for fila in filas], "comprobado": False}
 
-    if forzar or not previas:
-        proveedores = comprobar()
-    else:
-        pendientes = {fila["id"] for fila in previas if _falloPosterior(fila)}
-        if not pendientes:
-            return _respuestaCacheada(previas)
-        proveedores = [
-            _diagnosticarOPausa(*datos) if datos[0] in pendientes else fila
-            for datos, fila in zip(_PROVEEDORES, previas, strict=False)
-        ]
-
-    with _lock:
-        _cache["momento"] = time.monotonic()
-        _cache["proveedores"] = proveedores
-
-    return {
-        "proveedores": _conPausa(proveedores),
-        "edadSegundos": 0,
-        "cacheado": False,
-    }
-
-
-def _respuestaCacheada(proveedores) -> dict:
-    with _lock:
-        edad = round(time.monotonic() - _cache["momento"])
-    return {
-        "proveedores": _conPausa(proveedores),
-        "edadSegundos": edad,
-        "cacheado": True,
-    }
+    proveedores = comprobar()
+    # fetchJson ya anota cada llamada, pero no lo que solo ve el diagnóstico (el
+    # aviso de cuota dentro de un 200, «responde la clave 2 de 4»).
+    for fila in proveedores:
+        if fila["estado"] not in ("pausada", "sin_clave"):
+            recordApiResult(fila["nombre"], fila["estado"], fila["detalle"], fila["ms"])
+    return {"proveedores": [_presentar(fila) for fila in _conPausa(proveedores)], "comprobado": True}
 
 
 def reiniciarParaPruebas() -> None:
-    """Vacía la caché. Simula un worker recién arrancado."""
-    with _lock:
-        _cache["momento"] = 0.0
-        _cache["proveedores"] = []
+    """Olvida los últimos resultados en memoria. Simula un worker recién arrancado."""
+    api_stats.reiniciarParaPruebas()

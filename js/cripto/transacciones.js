@@ -168,6 +168,7 @@ function bindTransaccionesEvents() {
         }
         document.addEventListener("click", cerrar)
         document.getElementById("transaccionesGrafoBtn")?.addEventListener("click", abrirGrafoTransacciones)
+        document.getElementById("transaccionesWalletsBtn")?.addEventListener("click", abrirWalletsEnlazadas)
     }
 
     if (saveButton && !saveButton.dataset.bound) {
@@ -555,6 +556,20 @@ async function fusionarTransaccionesTrasConflicto(snapshot) {
     renderTransaccionesTable()
     avisarFusion("las transacciones", descartadas.length)
     return respuesta
+}
+
+// Tras importar movimientos de una wallet (js/cripto/wallets.js) la tabla se
+// relee entera: las filas nuevas las ha escrito el servidor.
+async function recargarTransaccionesDesdeServidor() {
+    if (!document.getElementById("transaccionesBody")) return
+    currentTransaccionesData = await loadTransaccionesData()
+    transaccionesRevision = Number.isInteger(currentTransaccionesData?.revision)
+        ? currentTransaccionesData.revision
+        : null
+    transaccionesBaseRows = JSON.parse(JSON.stringify(currentTransaccionesData?.rows || []))
+    transaccionesHasPendingChanges = false
+    renderTransaccionesAssetMenu()
+    renderTransaccionesTable()
 }
 
 async function flushTransaccionesPendingChanges() {

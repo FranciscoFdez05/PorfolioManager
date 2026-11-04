@@ -14,6 +14,7 @@ function _initAjustesTelegram() {
     const guardarTelegramBtn = document.getElementById("ajustesGuardarTelegramBtn")
     const probarTelegramBtn = document.getElementById("ajustesProbarTelegramBtn")
     const borrarTelegramBtn = document.getElementById("ajustesBorrarTelegramBtn")
+    const avisosSinBot = document.getElementById("ajustesAvisosSinBot")
 
     function setTelegramStatus(configurado) {
         if (!telegramStatus) return
@@ -22,6 +23,7 @@ function _initAjustesTelegram() {
             configurado ? " Configurado" : " No configurado"
         )
         telegramStatus.className = "ajustesKeyStatus " + (configurado ? "ok" : "missing")
+        if (avisosSinBot) avisosSinBot.hidden = configurado
     }
 
     async function cargarTelegram() {
@@ -49,9 +51,25 @@ function _initAjustesTelegram() {
     // Qué tipos de aviso se mandan. Cada interruptor guarda por su cuenta, sin
     // botón: es una preferencia, no un dato que se pueda dejar a medias como el
     // token. Se manda el conjunto entero, que es lo que el servidor guarda.
-    const telegramAvisosBox = document.getElementById("ajustesTelegramAvisos")
+    const telegramAvisosBox = document.getElementById("sttPage-avisos")
     const telegramAvisosMsg = document.getElementById("ajustesTelegramAvisosMsg")
     const telegramResumenHora = document.getElementById("ajustesTelegramResumenHora")
+    const telegramResumenFila = document.getElementById("ajustesTelegramResumenFila")
+
+    // Los mismos iconos que las imágenes de los mensajes, para reconocer cada
+    // tipo de aviso en el chat. El color de cada uno está en ajustes.css.
+    const ICONOS_AVISO = {
+        precios: "GraficoLinea",
+        wallets: "Moneda",
+        resumen: "GraficoBarras",
+        proveedores: "Conexion",
+        backup: "Zip",
+        backupFichero: "Archivo",
+        seguridad: "Escudo",
+        sesion: "Usuario",
+        sistema: "Pulso",
+        version: "Subir"
+    }
 
     async function guardarAvisosTelegram() {
         const avisos = {}
@@ -76,32 +94,54 @@ function _initAjustesTelegram() {
         }
     }
 
+    function crearFilaAviso(aviso) {
+        const fila = document.createElement("div")
+        fila.className = "ajustesSwitchRow ajustesTelegramAviso"
+        fila.dataset.aviso = aviso.clave
+
+        const icono = document.createElement("span")
+        icono.className = "ajustesTelegramAvisoIcono"
+        icono.append(crearIcono(ICONOS_AVISO[aviso.clave] || "Aviso"))
+
+        const etiqueta = document.createElement("div")
+        etiqueta.className = "ajustesSwitchLabel"
+        const detalle = document.createElement("small")
+        detalle.textContent = aviso.detalle
+        etiqueta.append(aviso.titulo, detalle)
+
+        const interruptor = document.createElement("label")
+        interruptor.className = "ajustesSwitch"
+        interruptor.setAttribute("aria-label", aviso.titulo)
+        const input = document.createElement("input")
+        input.type = "checkbox"
+        input.checked = !!aviso.activo
+        input.dataset.aviso = aviso.clave
+        input.addEventListener("change", guardarAvisosTelegram)
+        const pista = document.createElement("span")
+        pista.className = "ajustesSwitchTrack"
+        interruptor.append(input, pista)
+
+        fila.append(icono, etiqueta, interruptor)
+        return fila
+    }
+
+    // Cada grupo es una sección de la página Avisos. Un grupo sin sección cae en
+    // la primera: un interruptor mal colocado es mejor que uno que no se ve.
+    function pintarFilasAvisos(avisos) {
+        const listas = [...telegramAvisosBox.querySelectorAll("[data-aviso-grupo]")]
+        listas.forEach((lista) => lista.replaceChildren())
+        for (const aviso of avisos) {
+            const lista = listas.find((l) => l.dataset.avisoGrupo === aviso.grupo) || listas[0]
+            lista?.append(crearFilaAviso(aviso))
+        }
+    }
+
     function pintarAvisosTelegram(avisos, resumenHora) {
         if (telegramAvisosBox) {
-            telegramAvisosBox.replaceChildren(
-                ...avisos.map((aviso) => {
-                    const fila = document.createElement("div")
-                    fila.className = "ajustesSwitchRow"
-
-                    const etiqueta = document.createElement("div")
-                    etiqueta.className = "ajustesSwitchLabel"
-                    etiqueta.textContent = aviso.titulo
-
-                    const interruptor = document.createElement("label")
-                    interruptor.className = "ajustesSwitch"
-                    const input = document.createElement("input")
-                    input.type = "checkbox"
-                    input.checked = !!aviso.activo
-                    input.dataset.aviso = aviso.clave
-                    input.addEventListener("change", guardarAvisosTelegram)
-                    const pista = document.createElement("span")
-                    pista.className = "ajustesSwitchTrack"
-                    interruptor.append(input, pista)
-
-                    fila.append(etiqueta, interruptor)
-                    return fila
-                })
-            )
+            // La hora va pegada a su interruptor. Se recoloca después de repintar:
+            // está dentro de lo que se vacía, y sus oyentes siguen en el nodo.
+            pintarFilasAvisos(avisos)
+            telegramAvisosBox.querySelector('.ajustesTelegramAviso[data-aviso="resumen"]')?.after(telegramResumenFila)
         }
 
         if (telegramResumenHora && !telegramResumenHora.options.length) {
@@ -112,6 +152,10 @@ function _initAjustesTelegram() {
         }
         if (telegramResumenHora && Number.isInteger(resumenHora)) {
             telegramResumenHora.value = String(resumenHora)
+            // El desplegable de Ajustes se construyó con el <select> aún vacío y
+            // solo refresca su etiqueta con "change"; lanzarlo guardaría al abrir.
+            const etiqueta = telegramResumenHora.closest(".ajustesDropWrapper")?.querySelector(".ajustesDropLabel")
+            if (etiqueta) etiqueta.textContent = telegramResumenHora.options[telegramResumenHora.selectedIndex]?.text || ""
         }
     }
 
@@ -143,6 +187,23 @@ function _initAjustesTelegram() {
         return campo
     }
 
+    function crearOpcionVerificacion(tituloTexto, campo) {
+        const opcion = document.createElement("div")
+        opcion.className = "ajustesTelegramOpcion"
+        const titulo = document.createElement("div")
+        titulo.className = "ajustesTelegramOpcionTitulo"
+        titulo.textContent = tituloTexto
+        opcion.append(titulo, campo)
+        return opcion
+    }
+
+    function crearSeparadorOpciones() {
+        const separador = document.createElement("div")
+        separador.className = "ajustesTelegramOpcionesSeparador"
+        separador.textContent = "o"
+        return separador
+    }
+
     function crearBloqueVerificacion() {
         const acciones = guardarTelegramBtn?.closest(".ajustesActions")
         if (!acciones) return null
@@ -167,16 +228,42 @@ function _initAjustesTelegram() {
         const frase = document.createElement("textarea")
         frase.classList.add("ajustes2faTextarea")
         frase.autocomplete = "off"
+        frase.placeholder = "Las palabras de la frase, en orden, separadas por espacios"
         frase.setAttribute("autocapitalize", "none")
         frase.spellcheck = false
 
         const bloque = document.createElement("div")
         bloque.className = "ajustes2faBloque"
         bloque.hidden = true
+        bloque.classList.add("ajustesTelegramVerificacion")
+
+        const titulo = document.createElement("div")
+        titulo.className = "ajustesTelegramVerificacionTitulo"
+        titulo.textContent = "Confirma que eres tú"
+        const explicacion = document.createElement("p")
+        explicacion.className = "ajustesTelegramVerificacionTexto"
+        explicacion.textContent =
+            "Este bot es tu segundo factor de acceso. Para cambiarlo, escribe tu contraseña y usa una de estas dos opciones."
+
+        const opciones = document.createElement("div")
+        opciones.className = "ajustesTelegramOpciones"
+        opciones.append(
+            crearOpcionVerificacion(
+                "Con un código",
+                crearCampo("ajustesTelegramCodigo2fa", "Código enviado al chat actual", codigo, enviarCodigoBtn)
+            ),
+            crearSeparadorOpciones(),
+            crearOpcionVerificacion(
+                "Si el bot actual ya no funciona",
+                crearCampo("ajustesTelegramFrase2fa", "Frase de recuperación", frase)
+            )
+        )
+
         bloque.append(
+            titulo,
+            explicacion,
             crearCampo("ajustesTelegramPwd2fa", "Contraseña actual", password),
-            crearCampo("ajustesTelegramCodigo2fa", "Código enviado al chat actual", codigo, enviarCodigoBtn),
-            crearCampo("ajustesTelegramFrase2fa", "O, si el bot actual ya no funciona, la frase de recuperación", frase)
+            opciones
         )
         acciones.before(bloque)
 

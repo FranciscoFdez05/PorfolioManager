@@ -1,0 +1,370 @@
+/* ── Carteras conocidas (js/cripto/carteras-conocidas.js) ──────────────────────
+   Se abre desde el menú ⋯ de Cripto › Wallets y, al elegir, abre la ventana de
+   enlazar; por eso va por encima de ella. */
+
+/* Menú ···: reutiliza .pageActionsMenu de Gastos/Transacciones. */
+.walletsSegMenuNota {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-subtle);
+}
+
+/* Botones del catálogo: más bajos que los de pie de ventana para que quepan
+   tres por tarjeta sin romper la línea. */
+.carterasModal .carterasContenido button,
+.carterasBuscador button {
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.carterasModal .carterasContenido button:disabled {
+    opacity: 0.5;
+    cursor: default;
+    transform: none;
+}
+
+.carterasOverlay {
+    z-index: 1005;
+}
+
+.carterasModal {
+    width: min(860px, 100%);
+}
+
+.carterasBuscador {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.carterasBuscador .assetRowModalInput {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+
+.carterasBuscador button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.carterasContenido {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.carterasLista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.carterasItem {
+    padding: 10px 12px;
+    border: 1px solid var(--border-mid);
+    border-radius: 10px;
+    background: var(--bg-elevated);
+    transition: border-color 0.15s ease;
+}
+
+.carterasItem:hover {
+    border-color: var(--btn-border-hover);
+}
+
+.carterasItem-abierta,
+.carterasItem-abierta:hover {
+    border-color: var(--accent);
+}
+
+.carterasItemCabecera {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+}
+
+.carterasItemDatos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-width: 0;
+    font-size: 0.8rem;
+    color: var(--text-subtle);
+}
+
+.carterasItemDatos strong {
+    color: var(--text-bright);
+    font-size: 0.9rem;
+}
+
+.carterasItemAcciones,
+.carterasSeleccionAcciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.carterasSeleccionAcciones {
+    justify-content: flex-end;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.carterasOcultas button {
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+
+.carterasEtiqueta {
+    padding: 1px 7px;
+    border: 1px solid var(--border-soft);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+.carterasEtiqueta-origen {
+    color: var(--text-bright);
+}
+
+.carterasNota,
+.carterasFuentes {
+    margin: 6px 0 0;
+    font-size: 0.76rem;
+    color: var(--text-subtle);
+}
+
+.carterasFuentes a {
+    color: inherit;
+    text-decoration: underline;
+}
+
+.carterasSeleccion {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.carterasRed {
+    margin: 0;
+    padding: 6px 10px 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+}
+
+.carterasRed legend {
+    padding: 0 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-subtle);
+}
+
+.carterasDireccion {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin: 0 -6px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: var(--text-bright);
+    cursor: pointer;
+}
+
+.carterasDireccion:hover {
+    background: var(--btn-bg-hover);
+}
+
+.carterasDireccionCheck {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--accent);
+    cursor: inherit;
+}
+
+.carterasDireccion code {
+    font-size: 0.74rem;
+    color: var(--text-subtle);
+    overflow-wrap: anywhere;
+}
+
+.carterasDireccion-enlazada {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.carterasDireccion-enlazada:hover {
+    background: none;
+}
+
+.carterasOcultas {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--text-subtle);
+}
+
+.carterasEditor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.carterasEditorCampos {
+    display: grid;
+    grid-template-columns: minmax(140px, max-content) minmax(0, 1fr);
+    gap: 6px 10px;
+    align-items: center;
+}
+
+.carterasEditorCampos .assetRowModalInput,
+.carterasEditorCampos .assetRowModalSelect,
+.carterasEditorCampos .csTrigger {
+    margin-bottom: 0;
+}
+
+.carterasEditorNota {
+    resize: vertical;
+}
+
+.carterasEditorFilas {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.carterasEditorFila {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 2fr) minmax(0, 1fr) 36px;
+    gap: 8px;
+    align-items: center;
+}
+
+.carterasEditorFila .assetRowModalInput,
+.carterasEditorFila .assetRowModalSelect {
+    min-width: 0;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.carterasEditorFila .csTrigger {
+    margin-bottom: 0;
+}
+
+.carterasEditorFila .csWrapper {
+    min-width: 0;
+}
+
+.carterasModal .carterasContenido .carterasEditorQuitarBtn {
+    width: 36px;
+    padding: 0;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.carterasModal .carterasContenido .walletsAnadirFilaBtn {
+    align-self: flex-start;
+}
+
+.carterasEditorFila.walletsFila-error .carterasEditorValor,
+.carterasEditor .walletsFila-error {
+    border-color: #f87171;
+}
+
+@media (max-width: 640px) {
+    .carterasBuscador {
+        flex-wrap: wrap;
+    }
+
+    .carterasEditorCampos,
+    .carterasEditorFila {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .carterasEditorFila .carterasEditorQuitarBtn {
+        justify-self: end;
+        width: 36px;
+    }
+}
+
+/* ── Satoshi · todas sus monedas (js/cripto/satoshi-vigilancia.js) ─────────── */
+
+.satoshiBloque {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+}
+
+.satoshiTitulo {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-bright);
+}
+
+.satoshiCabecera {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.satoshiControles {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 18px;
+}
+
+.satoshiControles .ajustesSwitchRow {
+    padding: 0;
+    border: 0;
+    gap: 10px;
+}
+
+.satoshiSubtitulo {
+    margin: 4px 0 0;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-subtle);
+}
+
+.satoshiGastadas {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.8rem;
+    color: var(--text-bright);
+}
+
+.satoshiGastadas a {
+    color: inherit;
+}

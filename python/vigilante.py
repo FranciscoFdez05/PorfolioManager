@@ -23,6 +23,9 @@ Qué avisa:
   * 🟢 vuelve a responder, con lo que duró la caída — solo si se había avisado;
   * un recordatorio cada `[vigilante] recordatorio_minutos` mientras siga mal.
 
+Lo que no atiende HTTP, como el servicio worker, se vigila con un objetivo
+`latido:<fichero>`: está bien mientras ese fichero se siga tocando.
+
 Si Telegram no se puede alcanzar en ese momento (una caída de internet suele
 llevarse las dos cosas), el aviso no se da por hecho y se reintenta en la
 siguiente comprobación.
@@ -30,6 +33,7 @@ siguiente comprobación.
 
 import json
 import logging
+import os
 import ssl
 import sys
 import time
@@ -42,6 +46,10 @@ log = logging.getLogger("vigilante")
 
 OK, DEGRADADO, CAIDO = "ok", "degradado", "caido"
 _TIMEOUT_SONDA = 10.0
+
+
+TEXTO_CAIDO = "no responde"
+TEXTO_RECUPERADO = "vuelve a responder"
 
 
 # ── Qué vigilar ───────────────────────────────────────────────────────────────
@@ -78,6 +86,10 @@ def leerObjetivos(texto: str, puerto: int) -> list:
 _CA_POR_DEFECTO = "/caddy-data/caddy/pki/authorities/local/root.crt"
 _avisadoSinCa = False
 
+_prefijoLatido = "latido:"
+# El mismo margen que el healthcheck del worker en docker-compose.yml.
+_latidoMaximoSegundos = 120
+
 
 def contextoTls(rutaCa=None):
     """Contexto TLS para sondear el proxy.
@@ -110,12 +122,33 @@ def contextoTls(rutaCa=None):
     return ssl._create_unverified_context()
 
 
+def sondearLatido(ruta: str, maximoSegundos: float = _latidoMaximoSegundos) -> tuple[str, str]:
+    """Comprueba que un fichero de latido se ha tocado hace poco. Nunca lanza.
+
+    Args:
+        ruta: Fichero que el proceso vigilado toca periódicamente.
+        maximoSegundos: Antigüedad a partir de la que se le da por caído.
+
+    Returns:
+        (estado, detalle), como `sondear`.
+    """
+    try:
+        antiguedad = time.time() - os.path.getmtime(ruta)
+    except OSError as error:
+        return CAIDO, f"sin latido: {error.strerror or error}"
+    if antiguedad > maximoSegundos:
+        return CAIDO, f"último latido hace {_duracion(antiguedad)}"
+    return OK, ""
+
+
 def sondear(urls, timeout=_TIMEOUT_SONDA, contexto=None):
     """(estado, detalle) tras preguntar a las URL en orden. Nunca lanza."""
     contexto = contexto or contextoTls()
     resultado = (CAIDO, "sin respuesta")
 
     for url in urls:
+        if url.startswith(_prefijoLatido):
+            return sondearLatido(url.removeprefix(_prefijoLatido))
         peticion = Request(url, headers={"User-Agent": "PorfolioManager-vigilante"})
         try:
             with urlopen(peticion, timeout=timeout, context=contexto):
@@ -192,9 +225,9 @@ class Vigia:
     def _avisar(self, estado, detalle, ahora, recordatorio) -> None:
         desde = datetime.fromtimestamp(self.desde or ahora).strftime("%H:%M:%S")
         if estado == CAIDO:
-            texto = f"🔴 {self.nombre} no responde desde las {desde}"
+            texto = f"{self.nombre} {TEXTO_CAIDO} desde las {desde}"
         else:
-            texto = f"⚠️ {self.nombre} responde pero está degradado desde las {desde}"
+            texto = f"{self.nombre} responde pero está degradado desde las {desde}"
         if detalle:
             texto += f"\n{detalle}"
         if recordatorio:
@@ -209,7 +242,7 @@ class Vigia:
     def _recuperado(self, ahora) -> None:
         if self.avisado is not None or self.recuperacionPendiente:
             duracion = _duracion(ahora - (self.desde or ahora))
-            if self.enviar(f"🟢 {self.nombre} vuelve a responder (estuvo mal {duracion})"):
+            if self.enviar(f"{self.nombre} {TEXTO_RECUPERADO} (estuvo mal {duracion})"):
                 self.recuperacionPendiente = False
             else:
                 # Sin poder contarlo: se conserva la hora de la caída y se
@@ -226,12 +259,26 @@ class Vigia:
 
 # ── Bucle ─────────────────────────────────────────────────────────────────────
 
+def _gravedadDe(texto: str) -> str:
+    """Gravedad de un aviso del vigilante, a partir de los textos de `Vigia`.
+
+    `Vigia` solo conoce un `enviar(texto)`; la gravedad es cosa del canal.
+    """
+    from core import telegram_notifier
+
+    if TEXTO_RECUPERADO in texto:
+        return telegram_notifier.CORRECTO
+    if TEXTO_CAIDO in texto:
+        return telegram_notifier.CRITICO
+    return telegram_notifier.AVISO
+
+
 def _enviarPorTelegram(texto: str) -> bool:
     from core import telegram_notifier
 
     # `responder` y no `notificar`: que la aplicación esté caída es lo que el
     # usuario quiere saber aunque haya silenciado los demás avisos.
-    return telegram_notifier.responder(texto)
+    return telegram_notifier.responder(texto, categoria="sistema", gravedad=_gravedadDe(texto))
 
 
 def ejecutar(objetivos, intervalo, umbral, recordatorio, enviar=_enviarPorTelegram,

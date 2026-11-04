@@ -64,6 +64,9 @@ services:
       # el usuario que lanza el stack. Rellénalos en .env solo si quieres otro.
       - PUID=${PUID:-}
       - PGID=${PGID:-}
+      # Copias, snapshots, Telegram y avisos los lleva el servicio worker de
+      # abajo: así esos hilos no ocupan los de gunicorn que atienden la web.
+      - PORTFOLIO_TAREAS_EN_WEB=false
     # Sin `ports`: a la aplicación solo se llega a través de Caddy, que publica
     # el mismo puerto en el host. Publicarlo también aquí sería una segunda
     # puerta en claro por la que saltarse el TLS escribiendo el puerto en la
@@ -105,6 +108,59 @@ services:
       # Este endpoint ejecuta una consulta contra la BD activa y devuelve 503 si
       # falla, que es lo que hace que Docker marque el contenedor como enfermo.
       test: ["CMD-SHELL", "python -c \"import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '5050') + '/api/health')\" || exit 1"]
+      interval: ${HEALTHCHECK_INTERVAL:-30s}
+      timeout: ${HEALTHCHECK_TIMEOUT:-10s}
+      retries: ${HEALTHCHECK_RETRIES:-3}
+      start_period: ${HEALTHCHECK_START_PERIOD:-15s}
+
+  # ── Worker: tareas de fondo, aparte de la web ───────────────────────────────
+  # Misma imagen que la web; el entrypoint, con el argumento «worker», arranca
+  # python/admin/worker.py en vez de gunicorn: copias automáticas, snapshots,
+  # Telegram y avisos (precios, wallets, monedas de Satoshi). Comparte los
+  # mismos volúmenes; SQLite y los ficheros ya se escriben con bloqueos porque
+  # la web tiene varios workers de gunicorn.
+  worker:
+    container_name: PorfolioManager-worker
+    image: porfoliomanager:${PORTFOLIO_VERSION:-latest}
+    # Lleva su `build` por lo mismo que el vigilante: la segunda vez sale de la
+    # caché de capas. Nunca se descarga: en Docker Hub podría haber otra imagen
+    # pública con el mismo nombre.
+    build: .
+    pull_policy: never
+    command: ["worker"]
+    labels:
+      org.opencontainers.image.title: PorfolioManager-worker
+    env_file: .env
+    environment:
+      - PORTFOLIO_DATA_DIR=/app/data
+      - PORTFOLIO_LOGS_DIR=/app/logs
+      - PORTFOLIO_API_DIR=/app/API
+      - PUID=${PUID:-}
+      - PGID=${PGID:-}
+      - PORTFOLIO_TAREAS_EN_WEB=false
+    volumes:
+      - ./config.ini:/app/config.ini:ro
+      - ${PORTFOLIO_HOST_DATA_DIR:-./data}:/app/data
+      - ${PORTFOLIO_HOST_LOGS_DIR:-./logs}:/app/logs
+      - ${PORTFOLIO_HOST_API_DIR:-./API}:/app/API
+    # Después de que la web esté sana: es ella quien comprueba y, si hace falta,
+    # repara las bases de datos al arrancar.
+    depends_on:
+      porfoliomanager:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
+    mem_limit: ${PORTFOLIO_WORKER_MEM_LIMIT:-1g}
+    pids_limit: ${PORTFOLIO_PIDS_LIMIT:-256}
+    # Tiempo para terminar una copia de seguridad en curso antes de que Docker lo mate.
+    stop_grace_period: 30s
+    healthcheck:
+      # El worker toca data/tmp/worker.latido cada 30 s; sano si es de hace
+      # menos de 2 minutos. Sin importar la aplicación: el healthcheck corre
+      # como root y no debe crear nada en los volúmenes.
+      test: ["CMD-SHELL", "python -c \"import os, sys, time; sys.exit(0 if time.time() - os.path.getmtime('/app/data/tmp/worker.latido') < 120 else 1)\""]
       interval: ${HEALTHCHECK_INTERVAL:-30s}
       timeout: ${HEALTHCHECK_TIMEOUT:-10s}
       retries: ${HEALTHCHECK_RETRIES:-3}
@@ -208,7 +264,8 @@ services:
       - PORTFOLIO_DATA_DIR=/app/data
       - PORTFOLIO_LOGS_DIR=/app/logs
       - PORTFOLIO_API_DIR=/app/API
-      - VIGILANTE_URL=La aplicación=https://caddy:${PORT:-5050}/api/health|http://caddy:${PORT:-5050}/api/health
+      # El worker no atiende HTTP: se le vigila por el latido que escribe en data/tmp.
+      - VIGILANTE_URL=La aplicación=https://caddy:${PORT:-5050}/api/health|http://caddy:${PORT:-5050}/api/health,El worker=latido:/app/data/tmp/worker.latido
     volumes:
       - ./config.ini:/app/config.ini:ro
       # Solo lo que necesita: el token de Telegram (cifrado) y los ajustes de

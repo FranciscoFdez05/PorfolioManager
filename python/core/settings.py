@@ -113,6 +113,9 @@ CATALOGO: tuple[Ajuste, ...] = (
            descripcion="Interfaz en la que escucha el servidor de desarrollo."),
     Ajuste("server", "port", ENTERO, 5050, env="PORT", minimo=1, maximo=65535,
            descripcion="Puerto HTTP. Fuente de verdad del proyecto: docker-up.sh lo lee de aquí."),
+    Ajuste("server", "tareas_en_web", BOOLEANO, True, env="PORTFOLIO_TAREAS_EN_WEB",
+           descripcion="Si la web arranca los hilos de fondo (copias, snapshots, Telegram, avisos). "
+                       "En Docker los lleva el servicio worker y la web lo tiene a false."),
     Ajuste("server", "debug", BOOLEANO, False, env="FLASK_DEBUG",
            descripcion="Modo debug de Flask. Nunca en producción: expone la consola de depuración."),
     Ajuste("server", "https_activado", BOOLEANO, False, env="HTTPS_ENABLED",
@@ -233,7 +236,7 @@ CATALOGO: tuple[Ajuste, ...] = (
            minimo=0, maximo=3600,
            descripcion="Vida de la caché de cotizaciones en memoria (dashboard, cartera y gráfico "
                        "piden el mismo activo casi a la vez). 0 desactiva la caché."),
-    Ajuste("mercado", "orden_respaldo", LISTA, ("finnhub", "yahoo", "tradingview", "eodhd", "alphavantage"),
+    Ajuste("mercado", "orden_respaldo", LISTA, ("finnhub", "yahoo", "tradingview", "eodhd"),
            env="MERCADO_ORDEN_RESPALDO", vaciarEsExplicito=True,
            descripcion="Proveedores que se prueban, en este orden, cuando falla el del activo. Vacío: "
                        "sin respaldo, solo el proveedor elegido."),
@@ -258,6 +261,10 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("proveedores", "timeout_segundos", DECIMAL, 10.0, env="PROVEEDORES_TIMEOUT",
            minimo=1.0, maximo=300.0,
            descripcion="Timeout por intento de las llamadas a las APIs de mercado."),
+    Ajuste("proveedores", "timeout_conexion_segundos", DECIMAL, 3.0, env="PROVEEDORES_TIMEOUT_CONEXION",
+           minimo=0.5, maximo=60.0,
+           descripcion="Máximo para conectar con cada IP de un servidor que tiene varias: si una no "
+                       "contesta se pasa a la siguiente en vez de esperar el timeout entero."),
     Ajuste("proveedores", "reintentos", ENTERO, 2, env="PROVEEDORES_REINTENTOS", minimo=0, maximo=10,
            descripcion="Reintentos tras un fallo transitorio (timeout, 5xx, 429)."),
     Ajuste("proveedores", "backoff_inicial_segundos", DECIMAL, 0.4, env="PROVEEDORES_BACKOFF",
@@ -325,6 +332,58 @@ CATALOGO: tuple[Ajuste, ...] = (
     Ajuste("vigilante", "recordatorio_minutos", ENTERO, 60, env="VIGILANTE_RECORDATORIO_MINUTOS",
            minimo=0, maximo=10080,
            descripcion="Mientras siga caída, cada cuántos minutos se repite el aviso. 0 no lo repite."),
+
+    # [wallets] — lectura de movimientos de wallets enlazadas (Cripto > Transacciones).
+    # Las URL sí son ajustes, a diferencia de las de los proveedores de
+    # cotizaciones: Esplora, el RPC de Solana y el de XRPL son APIs estándar que
+    # un nodo propio sirve igual, y usar uno propio evita que un tercero vea qué
+    # direcciones se consultan desde esta IP.
+    Ajuste("wallets", "esplora_url", TEXTO, "https://mempool.space/api", env="WALLETS_ESPLORA_URL",
+           descripcion="API Esplora para Bitcoin: mempool.space, blockstream.info/api o un nodo propio."),
+    # Un ajuste de texto vacío vuelve al valor por defecto: para no usar
+    # respaldo se pone la misma URL que en esplora_url.
+    Ajuste("wallets", "esplora_url_respaldo", TEXTO, "https://blockstream.info/api",
+           env="WALLETS_ESPLORA_URL_RESPALDO",
+           descripcion="Esplora que se usa si la principal no conecta o falla. "
+                       "Para no usar ninguna, pon la misma URL que la principal."),
+    # Las Esploras públicas cortan las ráfagas con 429 y, si siguen, dejan de
+    # aceptar conexiones desde la IP un tiempo. Con un nodo propio, 0.
+    Ajuste("wallets", "esplora_intervalo_segundos", DECIMAL, 1.0, env="WALLETS_ESPLORA_INTERVALO",
+           minimo=0, maximo=30,
+           descripcion="Separación mínima entre dos llamadas a la misma Esplora. 0 para un nodo propio."),
+    # Las ajenas (Satoshi, exchanges, ballenas) son casi todo el gasto de cada
+    # pasada y rara vez se mueven. «Actualizar» las lee siempre en el momento.
+    Ajuste("wallets", "ajenas_cada_minutos", ENTERO, 360, env="WALLETS_AJENAS_CADA_MINUTOS",
+           minimo=0, maximo=10080,
+           descripcion="Cada cuántos minutos, como poco, revisa la vigilancia las wallets ajenas. "
+                       "0: en cada pasada, como las propias."),
+    Ajuste("wallets", "solana_rpc_url", TEXTO, "https://api.mainnet-beta.solana.com",
+           env="WALLETS_SOLANA_RPC_URL",
+           descripcion="RPC JSON de Solana. El público limita mucho las peticiones; uno propio o de pago va mejor."),
+    Ajuste("wallets", "xrpl_rpc_url", TEXTO, "https://s1.ripple.com:51234/", env="WALLETS_XRPL_RPC_URL",
+           descripcion="RPC JSON de un servidor rippled (XRP Ledger)."),
+    Ajuste("wallets", "max_movimientos", ENTERO, 200, env="WALLETS_MAX_MOVIMIENTOS", minimo=10, maximo=5000,
+           descripcion="Movimientos más recientes que se leen por wallet en cada sincronización."),
+    Ajuste("wallets", "gap_limit", ENTERO, 20, env="WALLETS_GAP_LIMIT", minimo=5, maximo=200,
+           descripcion="Direcciones seguidas sin uso tras las que se deja de explorar una xpub (BIP 44)."),
+    Ajuste("wallets", "max_historial", ENTERO, 1000, env="WALLETS_MAX_HISTORIAL", minimo=50, maximo=10000,
+           descripcion="Movimientos que se pueden cargar como mucho en el historial de una wallet (Seguimiento)."),
+    Ajuste("wallets", "max_tokens_visor", ENTERO, 40, env="WALLETS_MAX_TOKENS_VISOR", minimo=1, maximo=300,
+           descripcion="Tokens de una wallet ETH/BNB cuyo saldo se pide a Etherscan en el visor (una llamada cada uno)."),
+    # La sincronización corre dentro de la petición: tiene que acabar antes de
+    # que gunicorn dé el worker por colgado ([gunicorn] timeout, 120 s).
+    Ajuste("wallets", "plazo_segundos", ENTERO, 75, env="WALLETS_PLAZO_SEGUNDOS", minimo=10, maximo=600,
+           descripcion="Tiempo máximo de una sincronización. Déjalo por debajo del timeout de gunicorn."),
+    # Listas en el formato estándar Token Lists (tokenlists.org): cada token
+    # lleva su chainId, así que una misma lista vale para Ethereum y BNB.
+    Ajuste("wallets", "listas_tokens", LISTA,
+           ("https://tokens.uniswap.org",
+            "https://tokens.coingecko.com/uniswap/all.json",
+            "https://tokens.coingecko.com/binance-smart-chain/all.json"),
+           env="WALLETS_LISTAS_TOKENS", vaciarEsExplicito=True,
+           descripcion="Listas públicas de tokens cuyos contratos salen verificados de entrada. Vacío: ninguna."),
+    Ajuste("wallets", "listas_tokens_horas", ENTERO, 24, env="WALLETS_LISTAS_TOKENS_HORAS", minimo=1, maximo=720,
+           descripcion="Cada cuántas horas se vuelven a descargar las listas públicas de tokens."),
 
     # [rutas] — las lee core.paths. Relativas a la raíz del proyecto, o
     # absolutas si se quiere sacar los datos fuera del directorio del código.
@@ -534,12 +593,72 @@ def snapshotServidorGracia() -> int:
     return obtener("mercado.snapshot_servidor_gracia_segundos")
 
 
+def tareasEnWeb() -> bool:
+    return obtener("server.tareas_en_web")
+
+
 def proveedorTimeout() -> float:
     return obtener("proveedores.timeout_segundos")
 
 
+def proveedorTimeoutConexion() -> float:
+    return obtener("proveedores.timeout_conexion_segundos")
+
+
 def proveedorReintentos() -> int:
     return obtener("proveedores.reintentos")
+
+
+def walletsEsploraUrl() -> str:
+    return obtener("wallets.esplora_url")
+
+
+def walletsEsploraUrlRespaldo() -> str:
+    return obtener("wallets.esplora_url_respaldo")
+
+
+def walletsEsploraIntervalo() -> float:
+    return obtener("wallets.esplora_intervalo_segundos")
+
+
+def walletsAjenasCadaMinutos() -> int:
+    return obtener("wallets.ajenas_cada_minutos")
+
+
+def walletsSolanaRpcUrl() -> str:
+    return obtener("wallets.solana_rpc_url")
+
+
+def walletsXrplRpcUrl() -> str:
+    return obtener("wallets.xrpl_rpc_url")
+
+
+def walletsMaxMovimientos() -> int:
+    return obtener("wallets.max_movimientos")
+
+
+def walletsGapLimit() -> int:
+    return obtener("wallets.gap_limit")
+
+
+def walletsMaxHistorial() -> int:
+    return obtener("wallets.max_historial")
+
+
+def walletsMaxTokensVisor() -> int:
+    return obtener("wallets.max_tokens_visor")
+
+
+def walletsPlazoSegundos() -> int:
+    return obtener("wallets.plazo_segundos")
+
+
+def walletsListasTokens() -> list:
+    return obtener("wallets.listas_tokens")
+
+
+def walletsListasTokensHoras() -> int:
+    return obtener("wallets.listas_tokens_horas")
 
 
 def proveedorCambioVigencia() -> int:
@@ -654,6 +773,8 @@ FIJADAS_POR_EL_DESPLIEGUE = frozenset({
     # El servicio `vigilante` de docker-compose.yml apunta a la aplicación por
     # el nombre del servicio, no por localhost.
     "VIGILANTE_URL",
+    # Con el servicio worker, la web no arranca los hilos de fondo.
+    "PORTFOLIO_TAREAS_EN_WEB",
 })
 
 

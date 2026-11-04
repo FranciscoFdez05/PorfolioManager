@@ -11,9 +11,12 @@ const AV_SEG_TYPE_LABELS = {
     comoditis: "Comoditis"
 }
 
+// Orígenes de la watchlist: se ve uno cada vez, el primero por defecto.
+const SEG_SOURCES = ["portfolio", "operaciones", "nuevos", "seguimiento"]
+
 let _segAllItems = []
 let _segFilterType = "all"
-let _segFilterSrc = "all"
+let _segFilterSrc = SEG_SOURCES[0]
 let _segSearch = ""
 let _segViewMode = localStorage.getItem("whitelistViewMode") || "cards"
 
@@ -47,16 +50,12 @@ function segFilteredItems() {
     return _segAllItems.filter((item) => {
         const matchType = _segFilterType === "all" || _segFilterType.includes(item.type)
         const matchSrc =
-            _segFilterSrc === "all" ||
-            (Array.isArray(_segFilterSrc)
-                ? (_segFilterSrc.includes("portfolio") && item._fromPortfolio && !item._isWatchOnly) ||
-                  (_segFilterSrc.includes("operaciones") && item._fromOperaciones) ||
-                  (_segFilterSrc.includes("nuevos") &&
-                      ((!item._fromPortfolio && !item._fromOperaciones) || item._isWatchOnly))
-                : (_segFilterSrc === "portfolio" && item._fromPortfolio && !item._isWatchOnly) ||
-                  (_segFilterSrc === "operaciones" && item._fromOperaciones) ||
-                  (_segFilterSrc === "nuevos" &&
-                      ((!item._fromPortfolio && !item._fromOperaciones) || item._isWatchOnly)))
+            (_segFilterSrc === "portfolio" && item._fromPortfolio && !item._isWatchOnly) ||
+            (_segFilterSrc === "operaciones" && item._fromOperaciones) ||
+            (_segFilterSrc === "nuevos" &&
+                !item._fromWallets &&
+                ((!item._fromPortfolio && !item._fromOperaciones) || item._isWatchOnly)) ||
+            (_segFilterSrc === "seguimiento" && item._fromWallets)
         const q = _segSearch.toLowerCase()
         const matchSearch =
             !q ||
@@ -65,6 +64,18 @@ function segFilteredItems() {
             (item.ticker || "").toLowerCase().includes(q)
         return matchType && matchSrc && matchSearch
     })
+}
+
+function segOrigenTexto(item) {
+    if (item._fromWallets) return item.sospechoso ? "Wallets · sospechoso" : "Wallets"
+    return item._fromPortfolio && !item._isWatchOnly ? "Portfolio" : "Nuevo"
+}
+
+// formatMoney redondea a 2 decimales: una memecoin saldría a 0,00.
+function segFormatoPrecio(valor, currency) {
+    if (valor === 0 || Math.abs(valor) >= 0.01) return formatMoney(valor, currency)
+    const numero = new Intl.NumberFormat(_nl(), { maximumSignificantDigits: 4 }).format(valor)
+    return `${numero} ${currencySuffix(currency)}`
 }
 
 function segBuildCard(item) {
@@ -80,7 +91,7 @@ function segBuildCard(item) {
     const changeAbs = price > 0 ? Math.abs((price * changePct) / 100) : 0
     const changeSign = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
     const changeClass = changePct < 0 ? "avNeg" : changePct > 0 ? "avPos" : ""
-    const changeMoneyStr = changePctStr ? `${changeSign}${formatMoney(changeAbs, currency)}` : "—"
+    const changeMoneyStr = changePctStr ? `${changeSign}${segFormatoPrecio(changeAbs, currency)}` : "—"
     const changePctDisp = changePctStr || "—"
 
     let lastUpdatedStr = "—"
@@ -101,7 +112,10 @@ function segBuildCard(item) {
         : item._fromPortfolio || item._fromOperaciones
           ? `<button type="button" class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${sid}">Ocultar</button>`
           : `<button type="button" class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${sid}">Eliminar</button>`
-    const actionBtns = `
+    // Lo de las wallets se gestiona en Cripto › Seguimiento: aquí solo se le pone ticker, no se edita ni se quita.
+    const actionBtns = item._fromWallets
+        ? segWalletMenuHtml(item)
+        : `
         <div class="rowMenu">
             <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
             <div class="rowMenuDropdown">
@@ -122,8 +136,8 @@ function segBuildCard(item) {
         </div>
         <div class="avCardSymbol">${escapeHtml(item.symbol || item.name || "")}</div>
         <div class="avCardName">${escapeHtml(item.name || item.symbol || "Activo")}</div>
-        <div class="avCardPrice">${price > 0 ? formatMoney(price, currency) : "—"}</div>
-        <div class="avCardTicker">${escapeHtml(provider || ticker || (item._fromPortfolio ? "Sin ticker" : "Sin datos en vivo"))}</div>
+        <div class="avCardPrice">${price > 0 ? segFormatoPrecio(price, currency) : "—"}</div>
+        <div class="avCardTicker">${escapeHtml(provider || ticker || (item._fromPortfolio || item._fromWallets ? "Sin ticker" : "Sin datos en vivo"))}</div>
         <div class="avCardMetrics">
             <div class="avMetricItem">
                 <span class="avMetricLabel">Cambio día</span>
@@ -139,7 +153,7 @@ function segBuildCard(item) {
             </div>
             <div class="avMetricItem">
                 <span class="avMetricLabel">Origen</span>
-                <span class="avMetricValue">${item._fromPortfolio && !item._isWatchOnly ? "Portfolio" : "Nuevo"}</span>
+                <span class="avMetricValue">${segOrigenTexto(item)}</span>
             </div>
         </div>
         <div class="avCardUpdated">Actualizado: ${lastUpdatedStr}</div>
@@ -178,7 +192,7 @@ function segRenderTable(filtered) {
         const changeAbs = price > 0 ? Math.abs((price * changePct) / 100) : 0
         const changeSign = changePct < 0 ? "−" : changePct > 0 ? "+" : ""
         const changeClass = changePct < 0 ? "avNeg" : changePct > 0 ? "avPos" : ""
-        const changeMoneyStr = changePctStr ? `${changeSign}${formatMoney(changeAbs, currency)}` : "—"
+        const changeMoneyStr = changePctStr ? `${changeSign}${segFormatoPrecio(changeAbs, currency)}` : "—"
         const changePctDisp = changePctStr || "—"
         const tsid = escapeHtml(item._segId || "")
         const tHideOrDelItem = item._isWatchOnly
@@ -186,7 +200,9 @@ function segRenderTable(filtered) {
             : item._fromPortfolio || item._fromOperaciones
               ? `<button class="rowMenuItem avActionBtn segHideBtn" data-seg-id="${tsid}">Ocultar</button>`
               : `<button class="rowMenuItem rowMenuItemDanger avActionBtn avDeleteBtn segRemoveBtn" data-seg-id="${tsid}">Eliminar</button>`
-        const removeCell = `
+        const removeCell = item._fromWallets
+            ? segWalletMenuHtml(item)
+            : `
             <div class="rowMenu">
                 <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
                 <div class="rowMenuDropdown">
@@ -200,7 +216,7 @@ function segRenderTable(filtered) {
             <td><span class="avBadge" style="background:${color}22;color:${color};border-color:${color}44">${escapeHtml(typeLabel)}</span></td>
             <td class="avTrName">${escapeHtml(item.name || item.symbol || "—")}</td>
             <td class="avTrProvider">${escapeHtml(ticker)}</td>
-            <td class="avTrPrice">${price > 0 ? formatMoney(price, currency) : "—"}</td>
+            <td class="avTrPrice">${price > 0 ? segFormatoPrecio(price, currency) : "—"}</td>
             <td class="avTrRend ${changeClass}">${changeMoneyStr}</td>
             <td class="avTrRend ${changeClass}">${changePctDisp}</td>
             <td class="avTrProvider">${escapeHtml(provider || "—")}</td>
@@ -236,6 +252,7 @@ function segRenderTable(filtered) {
     tbody.querySelectorAll(".segEditBtn").forEach((btn) => {
         btn.addEventListener("click", () => segOpenEditModal(btn.dataset.segId))
     })
+    segWireWalletMenu(tbody)
 
     tbody.querySelectorAll(".avTableRow").forEach((row) => {
         row.addEventListener("click", (e) => {
@@ -448,6 +465,7 @@ function segRenderGrid() {
                 segOpenEditModal(btn.dataset.segId)
             })
         })
+        segWireWalletMenu(card)
         card.addEventListener("click", (e) => {
             if (e.target.closest(".segRemoveBtn") || e.target.closest(".segEditBtn") || e.target.closest(".rowMenu"))
                 return
@@ -536,7 +554,7 @@ function segMergeAndRender(portfolioAssets) {
 
     const operacionesItems = (window._segOperacionesItems || []).filter((item) => !hidden.has(item._segId))
 
-    _segAllItems = [...portfolioItems, ...operacionesItems, ...customItems]
+    _segAllItems = [...portfolioItems, ...operacionesItems, ...customItems, ...(window._segWalletItems || [])]
     segRenderGrid()
     segUpdateHiddenBtn()
 }
@@ -566,6 +584,177 @@ async function segRefreshCustomPrices() {
         segSaveCustomItems(customs)
         segMergeAndRender(window._segPortfolioAssets || [])
     }
+}
+
+// Lista «Seguimiento»: la cripto de las wallets (python/core/wallets_watchlist.py).
+// Cada entrada se cotiza con el ticker puesto a mano en Cripto › Seguimiento o,
+// si no tiene, con el activo de Activos que le corresponde.
+async function segLoadWalletItems(portfolioAssets) {
+    try {
+        const resp = await fetch("/api/wallets/watchlist")
+        if (!resp.ok) return []
+        const data = await resp.json()
+        return (data.entradas || []).map((entrada) => segWalletItem(entrada, portfolioAssets))
+    } catch {
+        // Sin wallets legibles la lista sale vacía; el resto de la watchlist no se resiente.
+        return []
+    }
+}
+
+function segWalletItem(entrada, portfolioAssets) {
+    const base = {
+        _segId: `wallet_${entrada.id}`,
+        _fromWallets: true,
+        _fromPortfolio: false,
+        _fromOperaciones: false,
+        _red: entrada.red,
+        _redNombre: entrada.redNombre,
+        _contrato: entrada.contrato,
+        // Un mismo símbolo puede estar en dos redes: el token lleva la suya en el nombre.
+        name: entrada.tipo === "token" ? `${entrada.nombre} · ${entrada.redNombre}` : entrada.nombre,
+        symbol: entrada.simbolo,
+        type: "cripto",
+        sospechoso: Boolean(entrada.sospechoso),
+        ticker: "",
+        marketSymbol: "",
+        marketProvider: "",
+        tvSymbol: "",
+        price: "",
+        currency: "EUR",
+        change: "",
+        lastUpdated: null
+    }
+    if (entrada.ticker) {
+        return {
+            ...base,
+            ticker: entrada.ticker,
+            marketSymbol: entrada.ticker,
+            marketProvider: entrada.proveedor,
+            tvSymbol: entrada.proveedor === "tradingview" ? entrada.ticker : "",
+            _quoteTicker: true
+        }
+    }
+    const asset = entrada.assetId ? portfolioAssets.find((a) => String(a.id) === entrada.assetId) : null
+    if (!asset) return base
+    return {
+        ...base,
+        ticker: asset.marketSymbol || asset.finnhubSymbol || "",
+        marketSymbol: asset.marketSymbol || asset.finnhubSymbol || "",
+        marketProvider: asset.marketProvider || "",
+        tvSymbol: asset.tvSymbol || "",
+        price: String(asset.price || ""),
+        currency: asset.currency || "EUR",
+        change: String(asset.change || ""),
+        lastUpdated: asset.lastUpdated || null
+    }
+}
+
+// Solo las que tienen ticker propio: las asociadas a un activo ya traen su precio.
+// En memoria, sin localStorage: se piden cada vez que se abre la watchlist.
+async function segRefreshWalletPrices() {
+    let updated = false
+    for (const item of window._segWalletItems || []) {
+        if (!item._quoteTicker) continue
+        if (await segCotizarWalletItem(item)) updated = true
+    }
+    if (updated) segMergeAndRender(window._segPortfolioAssets || [])
+}
+
+// Devuelve si ha traído precio.
+async function segCotizarWalletItem(item) {
+    try {
+        const params = new URLSearchParams({ symbol: item.ticker, provider: item.marketProvider })
+        const resp = await fetch(`/api/market/quote?${params}`)
+        if (!resp.ok) return false
+        const data = await resp.json()
+        if (!data.ok || !data.price) return false
+        // Número, no texto: String(1e-7) da "1e-7", que parseLooseNumber no sabe leer.
+        item.price = data.currentPrice ?? String(data.price)
+        item.change = String(data.change ?? "")
+        item.currency = data.currency || "EUR"
+        item.lastUpdated = data.lastUpdated || new Date().toISOString()
+        return true
+    } catch {
+        /* una cotización que falla deja el resto como está */
+        return false
+    }
+}
+
+// Menú ··· de una entrada de las wallets: solo el ticker con el que se cotiza.
+function segWalletMenuHtml(item) {
+    const sid = escapeHtml(item._segId)
+    const quitar = item._quoteTicker
+        ? `<button type="button" class="rowMenuItem avActionBtn segWalletTickerQuitarBtn" data-seg-id="${sid}">Quitar ticker de precio</button>`
+        : ""
+    return `
+        <div class="rowMenu">
+            <button type="button" class="rowMenuTrigger" title="Opciones">···</button>
+            <div class="rowMenuDropdown">
+                <button type="button" class="rowMenuItem avActionBtn segWalletTickerBtn" data-seg-id="${sid}">${item._quoteTicker ? "Cambiar" : "Poner"} ticker de precio</button>
+                ${quitar}
+            </div>
+        </div>`
+}
+
+function segWireWalletMenu(raiz) {
+    raiz.querySelectorAll(".segWalletTickerBtn").forEach((btn) => {
+        btn.addEventListener("click", () => segAbrirTickerWallet(btn.dataset.segId))
+    })
+    raiz.querySelectorAll(".segWalletTickerQuitarBtn").forEach((btn) => {
+        btn.addEventListener("click", () => segQuitarTickerWallet(btn.dataset.segId))
+    })
+}
+
+function segWalletItemPorId(segId) {
+    return (window._segWalletItems || []).find((item) => item._segId === segId)
+}
+
+function segAbrirTickerWallet(segId) {
+    const item = segWalletItemPorId(segId)
+    if (!item) return
+    abrirVentanaTicker({
+        titulo: `Ticker de precio de ${item.symbol}`,
+        texto: `${item._contrato ? `Contrato ${item._contrato}` : `Moneda de ${item._redNombre}`}. Con este ticker se cotiza en esta lista.`,
+        simbolo: item.symbol,
+        actual: item._quoteTicker ? { proveedor: item.marketProvider, ticker: item.ticker } : null,
+        guardarTicker: (proveedor, ticker) =>
+            segEnviarTickerWallet(item, "/api/wallets/tokens/precio", { proveedor, ticker })
+    })
+}
+
+async function segQuitarTickerWallet(segId) {
+    const item = segWalletItemPorId(segId)
+    if (!item) return
+    const error = await segEnviarTickerWallet(item, "/api/wallets/tokens/precio/quitar")
+    if (error) showToast(error, { type: "error" })
+}
+
+// Devuelve el mensaje de error, o "" si se guardó.
+async function segEnviarTickerWallet(item, url, datos = {}) {
+    try {
+        await walletsPost(url, { red: item._red, contrato: item._contrato, ...datos })
+    } catch (error) {
+        return error.message || "No se pudo guardar el ticker"
+    }
+    await segRecargarWalletItem(item._segId)
+    return ""
+}
+
+// Solo la entrada que ha cambiado: volver a cotizar todas gastaría cuota de la
+// API en cada cambio y dejaría los demás precios en blanco mientras tanto.
+async function segRecargarWalletItem(segId) {
+    const assets = window._segPortfolioAssets || []
+    const nuevo = (await segLoadWalletItems(assets)).find((item) => item._segId === segId)
+    if (!nuevo) return
+    if (nuevo._quoteTicker) await segCotizarWalletItem(nuevo)
+    window._segWalletItems = window._segWalletItems.map((item) => (item._segId === segId ? nuevo : item))
+    segMergeAndRender(assets)
+}
+
+// El filtro guardado antes de ser de una sola opción era "all" o una lista.
+function segParseSavedSource(saved) {
+    const valor = Array.isArray(saved) ? saved[0] : saved
+    return SEG_SOURCES.includes(valor) ? valor : SEG_SOURCES[0]
 }
 
 async function initSeguimientoLogic() {
@@ -647,13 +836,15 @@ async function initSeguimientoLogic() {
         window._segOperacionesItems = []
     }
 
+    window._segWalletItems = await segLoadWalletItems(portfolioAssets)
+
     // restaurar filtros guardados
     const _pid = _segPid()
     try {
         const st = localStorage.getItem(`seguimientoFilterType_${_pid}`)
         const ss = localStorage.getItem(`seguimientoFilterSrc_${_pid}`)
         if (st) _segFilterType = JSON.parse(st)
-        if (ss) _segFilterSrc = JSON.parse(ss)
+        if (ss) _segFilterSrc = segParseSavedSource(JSON.parse(ss))
     } catch {
         /* ignorar */
     }
@@ -665,6 +856,7 @@ async function initSeguimientoLogic() {
 
     segMergeAndRender(portfolioAssets)
     segRefreshCustomPrices()
+    segRefreshWalletPrices()
 
     hiddenBtn?.addEventListener("click", segOpenHiddenModal)
     hiddenCloseBtn?.addEventListener("click", () => hiddenModalOverlay?.classList.add("hidden"))
@@ -744,55 +936,23 @@ async function initSeguimientoLogic() {
         }
     }
 
-    // filtros de fuente (todos / portfolio / nuevos)
+    // filtros de fuente (portfolio / operaciones / nuevos / seguimiento): uno cada vez
     if (srcFiltersEl) {
-        const todosSInput = srcFiltersEl.querySelector('[data-source="all"] input')
-        const getSrcIndividuals = () => [
-            ...srcFiltersEl.querySelectorAll('.activosFilterBtn:not([data-source="all"]) input')
-        ]
-        const syncSrcState = () => {
-            if (todosSInput?.checked) {
-                _segFilterSrc = "all"
-            } else {
-                const sel = getSrcIndividuals()
-                    .filter((cb) => cb.checked)
-                    .map((cb) => cb.closest(".activosFilterBtn").dataset.source)
-                _segFilterSrc = sel.length ? sel : "all"
-                if (!sel.length && todosSInput) todosSInput.checked = true
-            }
-            localStorage.setItem(`seguimientoFilterSrc_${_segPid()}`, JSON.stringify(_segFilterSrc))
-            updateSegFilterLabel()
-        }
-        if (_segFilterSrc === "all") {
-            if (todosSInput) todosSInput.checked = true
-            getSrcIndividuals().forEach((cb) => {
-                cb.checked = true
-            })
-        } else {
-            if (todosSInput) todosSInput.checked = false
-            getSrcIndividuals().forEach((cb) => {
-                cb.checked = _segFilterSrc.includes(cb.closest(".activosFilterBtn").dataset.source)
+        const getSrcInputs = () => [...srcFiltersEl.querySelectorAll(".activosFilterBtn input")]
+        const marcarSrc = () => {
+            getSrcInputs().forEach((cb) => {
+                cb.checked = cb.closest(".activosFilterBtn").dataset.source === _segFilterSrc
             })
         }
+        marcarSrc()
         if (!srcFiltersEl.dataset.bound) {
             srcFiltersEl.dataset.bound = "true"
             srcFiltersEl.addEventListener("change", (e) => {
-                const changed = e.target
-                if (changed === todosSInput) {
-                    changed.checked = true
-                    getSrcIndividuals().forEach((cb) => {
-                        cb.checked = true
-                    })
-                } else if (todosSInput?.checked) {
-                    todosSInput.checked = false
-                    getSrcIndividuals().forEach((cb) => {
-                        cb.checked = cb === changed
-                    })
-                    changed.checked = true
-                } else {
-                    if (todosSInput) todosSInput.checked = getSrcIndividuals().every((cb) => cb.checked)
-                }
-                syncSrcState()
+                // Pulsar el que ya está elegido no lo apaga: siempre hay uno.
+                _segFilterSrc = e.target.closest(".activosFilterBtn")?.dataset.source || _segFilterSrc
+                marcarSrc()
+                localStorage.setItem(`seguimientoFilterSrc_${_segPid()}`, JSON.stringify(_segFilterSrc))
+                updateSegFilterLabel()
                 segRenderGrid()
             })
         }

@@ -18,7 +18,7 @@ from admin.backup_manager import (
     problemaDePortfolio,
     problemasDeIntegridad,
 )
-from core import clave_copias, exportables, paths, settings, telegram_notifier, zip_seguro
+from core import clave_copias, exportables, paths, settings, telegram_notifier, wallets_copia, zip_seguro
 from core.bloqueo import BloqueoOcupado, exclusivo
 from core.copia_sqlite import copiar as copiarSqlite
 from core.errors import mensajeAlmacenamiento, registrarFalloEscritura
@@ -235,6 +235,10 @@ def _safetyCopyBeforeRestore() -> Path | None:
         if _JSON_DIR.exists():
             for prefsFile in sorted(_JSON_DIR.glob("prefs_*.json")):
                 shutil.copy2(str(prefsFile), str(destDir / prefsFile.name))
+        # Una copia con wallets las sustituye; aquí van tal como están en API/,
+        # cifradas las propias, para poder volver atrás.
+        for fichero in wallets_copia.ficherosGuardados():
+            shutil.copy2(str(fichero), str(destDir / fichero.name))
         log.info(f"[backup] Copia previa al restore guardada en {destDir}")
         _podarCopiasPrevias(destDir.parent)
         return destDir
@@ -382,9 +386,10 @@ def _avisarCopiaCreada(nombre: str, automatica: bool) -> None:
         portfolios = len(list(_PORTFOLIOS_DIR.glob("*.db"))) if _PORTFOLIOS_DIR.exists() else 0
         telegram_notifier.notificar(
             "backup",
-            f"💾 Copia de seguridad {'automática' if automatica else 'manual'} creada\n"
+            f"Copia de seguridad {'automática' if automatica else 'manual'} creada\n"
             f"{nombre} · {_megas(nombre)} · {portfolios} portfolio(s)\n"
             f"Copias guardadas: {len(_listBackups())}",
+            gravedad=telegram_notifier.CORRECTO,
         )
     except Exception as error:
         log.debug("[backup] No se pudo avisar de la copia: %s", error)
@@ -398,7 +403,7 @@ def _enviarCopiaATelegram(nombre: str) -> None:
     """
     portfolios = len(list(_PORTFOLIOS_DIR.glob("*.db"))) if _PORTFOLIOS_DIR.exists() else 0
     claves = " · con claves de API" if _incluirClaves() else ""
-    pie = (f"💾 Copia de seguridad automática\n{nombre} · {_megas(nombre)} · "
+    pie = (f"Copia de seguridad automática\n{nombre} · {_megas(nombre)} · "
            f"{portfolios} portfolio(s){claves}")
     if not telegram_notifier.notificarArchivo("backupFichero", _BACKUP_DIR / nombre, pie):
         _avisarCopiaCreada(nombre, automatica=True)
@@ -420,7 +425,7 @@ def _clavesCifradasParaZip() -> bytes | None:
     if not _incluirClaves():
         return None
     if clave_copias.configurada():
-        claves = exportables.clavesEnClaro()
+        claves = exportables.clavesConWallets()
         paquete = clave_copias.cifrar(claves) if claves else None
         return json.dumps(paquete, ensure_ascii=False).encode("utf-8") if paquete else None
 
@@ -430,7 +435,7 @@ def _clavesCifradasParaZip() -> bytes | None:
     if usuario == "__no_user__":
         log.warning("[backup] Se piden las claves en la copia pero no hay contraseña de acceso: se omiten")
         return None
-    claves = exportables.clavesEnClaro()
+    claves = exportables.clavesConWallets()
     if not claves:
         return None
     paquete = exportables.cifrarClavesConHashApp(claves, hashApp)
@@ -440,8 +445,9 @@ def _clavesCifradasParaZip() -> bytes | None:
 def _avisarCopiaFallida(motivo, automatica: bool) -> None:
     telegram_notifier.notificar(
         "backup",
-        f"❌ Ha fallado la copia de seguridad {'automática' if automatica else 'manual'}\n"
+        f"Ha fallado la copia de seguridad {'automática' if automatica else 'manual'}\n"
         f"{str(motivo)[:300]}",
+        gravedad=telegram_notifier.CRITICO,
     )
 
 
@@ -936,7 +942,10 @@ def _restaurarArchivo(backupPath: Path, filename: str, *, esZip: bool):
         mensaje = registrarFalloEscritura(
             log, f"[backup] Error en restore de {filename}", e, _PORTFOLIOS_DIR
         )
-        telegram_notifier.notificar("backup", f"❌ Ha fallado la restauración de {filename}\n{mensaje[:300]}")
+        telegram_notifier.notificar(
+            "backup", f"Ha fallado la restauración de {filename}\n{mensaje[:300]}",
+            gravedad=telegram_notifier.CRITICO,
+        )
         return jsonify({"ok": False, "error": mensaje, "safetyCopy": copia, "ignorados": ignorados}), 500
     finally:
         # Los .db han cambiado bajo los pies de las conexiones cacheadas
@@ -946,9 +955,10 @@ def _restaurarArchivo(backupPath: Path, filename: str, *, esZip: bool):
         log.warning("[backup] Restauración parcial: %d entradas ignoradas", len(ignorados))
     telegram_notifier.notificar(
         "backup",
-        f"♻️ Copia restaurada: {filename}"
-        + (f"\n⚠️ Restauración parcial: {len(ignorados)} entrada(s) ignorada(s)" if ignorados else "")
+        f"Copia restaurada: {filename}"
+        + (f"\nRestauración parcial: {len(ignorados)} entrada(s) ignorada(s)" if ignorados else "")
         + (f"\nEl estado anterior quedó en {safetyDir}" if safetyDir else ""),
+        gravedad=telegram_notifier.AVISO if ignorados else telegram_notifier.CORRECTO,
     )
     return jsonify({
         "ok": True,
@@ -1113,7 +1123,7 @@ def deleteBackup(filename):
     except BloqueoOcupado:
         return _respuestaBloqueoOcupado()
 
-    telegram_notifier.notificar("backup", f"🗑 Copia eliminada: {filename}")
+    telegram_notifier.notificar("backup", f"Copia eliminada: {filename}")
 
     # Borrar ajustes snapshot legacy si existe
     tsM = re.search(r'portfolio_(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})\.db', filename)

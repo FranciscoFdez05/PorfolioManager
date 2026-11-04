@@ -21,7 +21,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
-from core import paths, settings, telegram_notifier
+from core import paths, pulso, settings, telegram_notifier
 from core.bloqueo import exclusivo
 from core.copia_sqlite import copiar as copiarSqlite
 from core.escritura import temporalPara
@@ -37,6 +37,8 @@ log = logging.getLogger(__name__)
 _AUTO_BACKUP_LOCK = threading.Lock()
 _schedulerThread = None
 _schedulerStarted = False
+# Margen para que acabe una comprobación con copias, además de la hora de espera.
+_plazoCopiaSegundos = 3 * 3600
 
 
 def _configuredBackupDays() -> int:
@@ -326,8 +328,9 @@ def _vigilarIntegridad(dbPath: Path):
     if _emergencyRepair(dbPath):
         telegram_notifier.notificar(
             "sistema",
-            f"🚨 La base de datos {dbPath.name} estaba dañada y se ha reparado sola.\n"
+            f"La base de datos {dbPath.name} estaba dañada y se ha reparado sola.\n"
             "La copia dañada se ha guardado por si hace falta. Revisa que los datos estén bien.",
+            gravedad=telegram_notifier.AVISO,
         )
         return
 
@@ -335,9 +338,10 @@ def _vigilarIntegridad(dbPath: Path):
     restaurada = _restoreFromLatestAutoBackup(dbPath)
     telegram_notifier.notificar(
         "sistema",
-        f"🚨 La base de datos {dbPath.name} estaba dañada y no se pudo reparar.\n"
+        f"La base de datos {dbPath.name} estaba dañada y no se pudo reparar.\n"
         + ("Se ha restaurado desde la última copia válida: puede faltar lo último que guardaste."
            if restaurada else "No se ha encontrado ninguna copia válida. Hay que intervenir a mano."),
+        gravedad=telegram_notifier.CRITICO,
     )
 
 
@@ -403,8 +407,24 @@ def _rutaBloqueo():
 
 def _schedulerLoop(intervalSeconds: int):
     while True:
+        pulso.marcar("copias", intervalSeconds + _plazoCopiaSegundos)
         time.sleep(intervalSeconds)
         checkScheduledBackup()
+
+
+def esperarCopiaEnCurso(timeout: float) -> bool:
+    """Espera a que termine la copia automática de este proceso, si hay alguna.
+
+    Args:
+        timeout: Segundos máximos de espera.
+
+    Returns:
+        True si no queda ninguna en curso; False si se agotó la espera.
+    """
+    if not _AUTO_BACKUP_LOCK.acquire(timeout=max(0.0, timeout)):
+        return False
+    _AUTO_BACKUP_LOCK.release()
+    return True
 
 
 def startScheduler(intervalSeconds: int = 3600):

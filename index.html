@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="css/pages/herramientas.css">
     <link rel="stylesheet" href="css/pages/dividendos.css">
     <link rel="stylesheet" href="css/pages/operaciones.css">
+    <link rel="stylesheet" href="css/pages/carteras-conocidas.css">
     <link rel="stylesheet" href="css/pages/gastos.css">
     <link rel="stylesheet" href="css/pages/ingresos.css">
     <link rel="stylesheet" href="css/pages/calendario-dividendos.css">
@@ -50,6 +51,7 @@
          en el mismo orden que tenían allí. -->
     <link rel="stylesheet" href="css/components/grafico-tradingview.css">
     <link rel="stylesheet" href="css/components/acciones-fila.css">
+    <link rel="stylesheet" href="css/components/progreso.css">
     <link rel="stylesheet" href="css/pages/gastos-popup.css">
     <link rel="stylesheet" href="css/components/privacidad.css">
     <link rel="stylesheet" href="css/pages/heatmap.css">
@@ -82,6 +84,7 @@
          dom.js expone escapeHtml y los helpers que usan todos los módulos. -->
     <script defer src="js/core/api.js"></script>
     <script defer src="js/core/dom.js"></script>
+    <script defer src="js/core/progreso.js"></script>
     <!-- tooltips.js cambia el title nativo del navegador por un tooltip con estilo. -->
     <script defer src="js/core/tooltips.js"></script>
     <!-- tablas.js reparte por igual el hueco entre columnas en todas las tablas. -->
@@ -256,6 +259,7 @@
                         <button class="navBtn navDropdownItem" data-page="stablecoins">Stablecoins</button>
                         <button class="navBtn navDropdownItem" data-page="operaciones">Operaciones</button>
                         <button class="navBtn navDropdownItem" data-page="transacciones">Transacciones</button>
+                        <button class="navBtn navDropdownItem" data-page="walletsSeguimiento">Seguimiento</button>
                         <button class="navBtn navDropdownItem" data-page="conversiones">Conversiones</button>
                         <button class="navBtn navDropdownItem" data-page="Trading">Trading</button>
                         <button class="navBtn navDropdownItem" data-page="Staking">Staking</button>
@@ -735,6 +739,11 @@
             <button class="sttNavBtn" data-stt="conexiones" type="button">
                 <span class="icono iconoConexion" aria-hidden="true"></span>
                 Conexiones
+            </button>
+
+            <button class="sttNavBtn" data-stt="avisos" type="button">
+                <span class="icono iconoAviso" aria-hidden="true"></span>
+                Avisos
             </button>
 
             <button class="sttNavBtn" data-stt="datos" type="button">
@@ -1584,7 +1593,7 @@
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Estado de las APIs</div>
-                        <div class="ajustesSectionDesc">Se comprueba cada proveedor con una cotización de prueba. La comprobación consume cuota, así que el resultado se guarda un minuto.</div>
+                        <div class="ajustesSectionDesc">Cómo terminó la última petición real que hizo el servidor a cada proveedor. Esta pantalla no pregunta nada por su cuenta: «Comprobar ahora» los prueba todos con una consulta de prueba y eso sí consume cuota.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
@@ -1629,7 +1638,7 @@
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Claves API</div>
-                        <div class="ajustesSectionDesc">Las claves se guardan en <code>API/finnhub.key</code>, <code>API/eodhd.key</code> y <code>API/alphavantage.key</code>. Si el <code>.env</code> del servidor define <code>FINNHUB_API_KEY</code>, <code>EODHD_API_KEYS</code> o <code>ALPHA_VANTAGE_API_KEYS</code>, esas tienen prioridad sobre el fichero.</div>
+                        <div class="ajustesSectionDesc">Las claves se guardan en <code>API/finnhub.key</code>, <code>API/eodhd.key</code>, <code>API/alphavantage.key</code>, <code>API/etherscan.key</code> y <code>API/nodereal.key</code>. Si el <code>.env</code> del servidor define <code>FINNHUB_API_KEY</code>, <code>EODHD_API_KEYS</code>, <code>ALPHA_VANTAGE_API_KEYS</code>, <code>ETHERSCAN_API_KEY</code> o <code>NODEREAL_API_KEY</code>, esas tienen prioridad sobre el fichero.</div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
@@ -1680,6 +1689,38 @@
                     </div>
                     <div class="ajustesKeyList" id="ajustesAlphaVantageKeyList" data-proveedor="alphavantage"></div>
                     <span id="ajustesAlphaVantageMsg" class="ajustesStatusMsg"></span>
+                </div>
+                <div class="ajustesField">
+                    <div class="ajustesLabelRow">
+                        <label class="ajustesLabel" for="ajustesEtherscanKey">Etherscan API Key (wallets de ETH; BNB solo con plan de pago)</label>
+                        <span class="ajustesKeyStatus" id="ajustesEtherscanStatus"></span>
+                    </div>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesEtherscanKey" class="ajustesInput" type="password" placeholder="Nueva clave Etherscan (sustituye a la guardada)…" autocomplete="off">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesEtherscanKey" title="Mostrar/ocultar">
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
+                        </button>
+                        <button id="ajustesGuardarEtherscanBtn" class="ajustesAddBtn" type="button" data-no-autohide="true">Guardar</button>
+                    </div>
+                    <div class="ajustesKeyList" id="ajustesEtherscanKeyList" data-proveedor="etherscan"></div>
+                    <span id="ajustesEtherscanMsg" class="ajustesStatusMsg"></span>
+                </div>
+                <div class="ajustesField">
+                    <div class="ajustesLabelRow">
+                        <label class="ajustesLabel" for="ajustesNoderealKey">NodeReal API Key (wallets de BNB; se elige en Estado de las APIs)</label>
+                        <span class="ajustesKeyStatus" id="ajustesNoderealStatus"></span>
+                    </div>
+                    <div class="ajustesInputRow">
+                        <input id="ajustesNoderealKey" class="ajustesInput" type="password" placeholder="Nueva clave NodeReal (sustituye a la guardada)…" autocomplete="off">
+                        <button class="ajustesToggleBtn" type="button" data-target="ajustesNoderealKey" title="Mostrar/ocultar">
+                            <span class="icono iconoOjo ajustesEyeShow" aria-hidden="true"></span>
+                            <span class="icono iconoOjoTachado ajustesEyeHide" aria-hidden="true" style="display:none"></span>
+                        </button>
+                        <button id="ajustesGuardarNoderealBtn" class="ajustesAddBtn" type="button" data-no-autohide="true">Guardar</button>
+                    </div>
+                    <div class="ajustesKeyList" id="ajustesNoderealKeyList" data-proveedor="nodereal"></div>
+                    <span id="ajustesNoderealMsg" class="ajustesStatusMsg"></span>
                 </div>
             </div>
         </div>
@@ -1858,21 +1899,22 @@
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Telegram</div>
                         <div class="ajustesSectionDesc">
-                            Avisos del servidor por Telegram (copias de seguridad, alertas de precio, proveedores,
-                            seguridad, disco…) y comandos para preguntarle por su estado desde el móvil. Crea un bot con
-                            <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a>
-                            y consigue tu ID de chat con <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a>.
+                            Conecta tu bot para recibir avisos en el móvil y consultar el estado del servidor con
+                            comandos. Qué avisos llegan se elige en Ajustes › Avisos.
                         </div>
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
 
-                <div class="ajustesAtajoAviso">
-                    <strong>Último paso, imprescindible:</strong> abre el chat con tu bot en Telegram
-                    (busca el nombre de usuario que te dio @BotFather) y pulsa «Iniciar». Un bot no puede
-                    escribirle primero a nadie, así que sin ese paso los avisos no llegan aunque todo esté
-                    bien guardado aquí. Si otra persona le escribe a tu bot, lo ignora sin responder.
-                </div>
+                <div class="ajustesTelegramSubtitulo">Conexión del bot</div>
+                <ol class="ajustesTelegramPasos">
+                    <li>Crea un bot con <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> y copia su token.</li>
+                    <li>Consigue tu ID de chat con <a href="https://t.me/userinfobot" target="_blank" rel="noopener">@userinfobot</a>.</li>
+                    <li>
+                        <strong>Abre el chat con tu bot y pulsa «Iniciar».</strong> Un bot no puede escribirle
+                        primero a nadie: sin este paso, los avisos no llegan. Si otra persona le escribe, lo ignora.
+                    </li>
+                </ol>
 
                 <div class="ajustesField">
                     <div class="ajustesLabelRow">
@@ -1904,23 +1946,6 @@
                     <span id="ajustesTelegramMsg" class="ajustesStatusMsg"></span>
                 </div>
 
-                <div class="ajustesSectionDivider"></div>
-
-                <div class="ajustesField">
-                    <div class="ajustesLabelRow">
-                        <span class="ajustesLabel">Qué avisos quieres recibir</span>
-                        <span id="ajustesTelegramAvisosMsg" class="ajustesStatusMsg"></span>
-                    </div>
-                </div>
-                <div id="ajustesTelegramAvisos"></div>
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Hora del resumen diario
-                        <small>Solo se envía si tienes activado «Resumen diario de la cartera»</small>
-                    </div>
-                    <select id="ajustesTelegramResumenHora" class="ajustesSelect" data-no-custom aria-label="Hora del resumen diario"></select>
-                </div>
-
                 <details class="ajustesTlsAyuda">
                     <summary>Comandos del bot y aviso de caída</summary>
                     <div class="ajustesTlsAyudaCuerpo">
@@ -1942,6 +1967,84 @@
                         </p>
                     </div>
                 </details>
+            </div>
+
+        </div>
+
+        <!-- ── Avisos ── -->
+        <div class="sttPage" id="sttPage-avisos">
+            <h2 class="sttPageTitle">
+                Avisos
+                <span id="ajustesTelegramAvisosMsg" class="ajustesStatusMsg"></span>
+            </h2>
+
+            <div id="ajustesAvisosSinBot" class="ajustesAviso" hidden>
+                Todavía no hay un bot conectado. Lo que elijas aquí se guarda, pero no llegará ningún aviso hasta
+                configurarlo en Ajustes › Conexiones › Telegram.
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <span class="icono iconoGraficoLinea" aria-hidden="true"></span>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Cartera y mercado</div>
+                        <div class="ajustesSectionDesc">Precios, wallets, resumen diario y proveedores de cotizaciones.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesTelegramAvisosLista" data-aviso-grupo="Cartera y mercado">
+                    <div class="ajustesSwitchRow" id="ajustesTelegramResumenFila">
+                        <div class="ajustesSwitchLabel">
+                            Hora del resumen diario
+                            <small>Solo se envía si tienes activado «Resumen diario de la cartera»</small>
+                        </div>
+                        <select id="ajustesTelegramResumenHora" class="ajustesSelect" data-no-custom aria-label="Hora del resumen diario"></select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <span class="icono iconoZip" aria-hidden="true"></span>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Copias de seguridad</div>
+                        <div class="ajustesSectionDesc">Qué se cuenta de cada copia y si se envía el fichero.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesTelegramAvisosLista" data-aviso-grupo="Copias de seguridad"></div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <span class="icono iconoEscudo" aria-hidden="true"></span>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Seguridad y acceso</div>
+                        <div class="ajustesSectionDesc">Quién entra y qué cambia en tu acceso.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesTelegramAvisosLista" data-aviso-grupo="Seguridad y acceso"></div>
+            </div>
+
+            <div class="ajustesSection">
+                <div class="ajustesSectionHeader">
+                    <div class="ajustesSectionIconWrap">
+                        <span class="icono iconoPulso" aria-hidden="true"></span>
+                    </div>
+                    <div class="ajustesSectionHeaderText">
+                        <div class="ajustesSectionTitle">Servidor</div>
+                        <div class="ajustesSectionDesc">Estado de la aplicación y versiones nuevas.</div>
+                    </div>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+                <div class="ajustesTelegramAvisosLista" data-aviso-grupo="Servidor"></div>
             </div>
 
         </div>
@@ -1998,11 +2101,12 @@
                 <label class="ajustesExportClaves" for="ajustesBackupClaves">
                     <input id="ajustesBackupClaves" type="checkbox">
                     <span>
-                        <strong>Incluir las claves de API en las copias.</strong>
+                        <strong>Incluir las claves de API y las wallets en las copias.</strong>
                         Van cifradas dentro del ZIP con la <em>contraseña de las copias</em> si la defines
                         abajo y, si no, con tu <em>contraseña de acceso a la web</em>. Para restaurarlas se
                         pide esa contraseña (en este servidor, si no ha cambiado, no se pregunta). Sin esta
-                        opción, la copia no lleva ninguna clave.
+                        opción, la copia no lleva ninguna clave ni tus wallets de Cripto › Seguimiento, y al
+                        reinstalar con otra SECRET_KEY habría que volver a enlazarlas.
                     </span>
                 </label>
                 <div class="ajustesField">
@@ -2021,8 +2125,8 @@
                     </div>
                     <span id="ajustesBackupContrasenaMsg" class="ajustesStatusMsg"></span>
                 </div>
-                <div class="ajustesNota">Solo protege las claves de API. Se guarda cifrada con la SECRET_KEY del servidor y puedes volver a verla con «Ver guardada» (te pide tu contraseña de acceso a la web). Sin ella no podrás abrir las claves de una copia en otro servidor. Cambiarla no afecta a las copias ya hechas.</div>
-                <div class="ajustesNota">Con Telegram configurado, cada copia automática avisa por texto (aviso «Copias de seguridad»). Para que además envíe el fichero ZIP, activa «Enviar el fichero de cada copia automática» en Ajustes › Telegram.</div>
+                <div class="ajustesNota">Solo protege las claves de API y las wallets. Se guarda cifrada con la SECRET_KEY del servidor y puedes volver a verla con «Ver guardada» (te pide tu contraseña de acceso a la web). Sin ella no podrás abrir las claves de una copia en otro servidor. Cambiarla no afecta a las copias ya hechas.</div>
+                <div class="ajustesNota">Con Telegram configurado, cada copia automática avisa por texto (aviso «Copias de seguridad»). Para que además envíe el fichero ZIP, activa «Enviar el fichero de cada copia automática» en Ajustes › Avisos.</div>
                 <div class="ajustesActions">
                     <button id="ajustesGuardarBackupFreqBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
                     <span id="ajustesBackupFreqMsg" class="ajustesStatusMsg"></span>
@@ -2179,117 +2283,12 @@
                     </div>
                     <div class="ajustesSectionHeaderText">
                         <div class="ajustesSectionTitle">Módulos visibles</div>
-                        <div class="ajustesSectionDesc">Activa o desactiva los módulos que aparecen en el menú superior. Los cambios se aplican de inmediato y persisten entre reinicios.</div>
+                        <div class="ajustesSectionDesc">Elige qué módulos aparecen en el menú y cuál se abre al iniciar. Los cambios se aplican de inmediato y se guardan en este portfolio.</div>
                     </div>
                 </div>
-                <div class="ajustesSectionDivider"></div>
 
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Panel de métricas superior
-                        <small>Barra con los valores totales del portfolio en la cabecera</small>
-                    </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="moduloPanelSuperior" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Vista general
-                        <small>Resumen del portfolio y sus activos</small>
-                    </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="moduloVistaGeneral" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Activos
-                        <small>Activos, Watchlist y Mapas de calor</small>
-                    </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="moduloActivos" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Gastos
-                        <small>Gastos e Ingresos</small>
-                    </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="moduloGastos" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Finanzas
-                        <small>Operaciones, Cuenta Remunerada, Dividendos, Renta Fija y Ventas</small>
-                    </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="moduloFinanzas" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Cripto
-                        <small>Stablecoins, Operaciones, Transacciones, Conversiones, Trading, Staking y Earn</small>
-                    </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="moduloCripto" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Planes
-                        <small>Planes de inversión: qué activos comprar y con qué operaciones</small>
-                    </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="moduloPlanes" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Herramientas
-                        <small>Calculadoras y utilidades</small>
-                    </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="moduloHerramientas" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
-                <div class="ajustesSectionDivider"></div>
-
-                <div class="ajustesSwitchRow">
-                    <div class="ajustesSwitchLabel">
-                        Métricas
-                        <small>Gráficos y análisis del portfolio</small>
-                    </div>
-                    <label class="ajustesSwitch">
-                        <input type="checkbox" id="moduloMetricas" checked>
-                        <span class="ajustesSwitchTrack"></span>
-                    </label>
-                </div>
+                <div id="ajustesModulosLista" class="modulosTabla"></div>
+                <div id="ajustesModulosNota" class="modulosNota" aria-live="polite"></div>
             </div>
 
             <div class="ajustesSection">
@@ -2303,6 +2302,19 @@
                     </div>
                 </div>
                 <div class="ajustesSectionDivider"></div>
+
+                <div class="ajustesSwitchRow">
+                    <div class="ajustesSwitchLabel">
+                        Mostrar el panel de métricas
+                        <small>Barra con los valores totales del portfolio en la cabecera</small>
+                    </div>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="moduloPanelSuperior" checked>
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <div class="ajustesSectionDivider"></div>
+
                 <div id="ajustesTopMetricsList"></div>
             </div>
         </div>
@@ -2327,6 +2339,10 @@
 <script defer src="js/finanzas/categorias.js"></script>
 <script defer src="js/finanzas/ventas.js"></script>
 <script defer src="js/cripto/transacciones.js"></script>
+<script defer src="js/cripto/wallets.js"></script>
+<script defer src="js/cripto/wallets-seguimiento.js"></script>
+<script defer src="js/cripto/carteras-conocidas.js"></script>
+<script defer src="js/cripto/satoshi-vigilancia.js"></script>
 <script defer src="js/cripto/stablecoins.js"></script>
 <script defer src="js/cripto/operaciones.js"></script>
 <script defer src="js/cripto/trading-journal.js"></script>

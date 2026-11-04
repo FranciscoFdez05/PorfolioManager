@@ -21,6 +21,7 @@ from core import (
     dos_factores,
     exportables,
     paths,
+    proveedor_bnb,
     proveedores_pausados,
     sesion,
     settings,
@@ -29,13 +30,14 @@ from core import (
 )
 from core.copia_sqlite import copiar as copiarSqlite
 from core.db import getActiveDbPath, getDb
-from core.errors import registrarFalloEscritura
+from core.errors import ValidationError, registrarFalloEscritura
 from core.escritura import escribirJsonAtomico, temporalPara
 from core.paths import AJUSTES_JSON as _AJUSTES_JSON, API_DIR as _API_DIR, JSON_DIR
 from core.secret_store import readSecretLines, writeSecretLines
 from core.validation import jsonBody
 from providers import estado as estadoProveedores
-from providers.api_stats import getTodayStats
+from providers.api_stats import getTodayStats, olvidarApiResult
+from providers.blockchain_clients import ESTADO_BNB, ESTADO_ETHERSCAN
 from routes import auth
 from stores import app_data
 from stores.cuenta_ahorro_store import normalizarConfig, vinculosDeConfig
@@ -93,6 +95,11 @@ _GLOBAL_DEFAULTS = {
     # Proveedores de cotizaciones pausados desde Ajustes > API (ver
     # core.proveedores_pausados).
     "apisPausadas": [],
+    # API que lee las wallets de BNB Smart Chain (ver core.proveedor_bnb).
+    "bnbProveedor": proveedor_bnb.POR_DEFECTO,
+    # Cada cuántos minutos se revisan las wallets de Cripto > Seguimiento (0 =
+    # nunca). Lo valida y lo lee core.wallets_vigilancia.
+    "walletsVigilanciaMinutos": 15,
 }
 
 # Claves por portfolio (cada DB tiene su propio archivo prefs_{id}.json)
@@ -108,6 +115,8 @@ _PORTFOLIO_DEFAULTS = {
     "metricasSectionsCollapsed": [],
     "topMetricsConfig": {},
     "modulosConfig": {},
+    # Módulo que se abre al arrancar. Vacío: el primero visible del menú.
+    "moduloPrincipal": "",
     "ahorroConfig": {"objetivoAhorro": 30, "presupuesto": {}},
     # Cuentas de ahorro: por cada una, qué cuentas remuneradas y dividendos
     # cuentan, el objetivo y la aportación mensual (ver stores.cuenta_ahorro_store).
@@ -291,7 +300,43 @@ _FICHEROS_CLAVES = {
     "finnhub": "finnhub.key",
     "eodhd": "eodhd.key",
     "alphavantage": "alphavantage.key",
+    # Lectura de wallets de ETH y BNB (Cripto › Seguimiento). Solo se usa una.
+    "etherscan": "etherscan.key",
+    # Alternativa para las wallets de BNB. Solo se usa una.
+    "nodereal": "nodereal.key",
 }
+
+_MAX_LARGO_CLAVE_ETHERSCAN = 200
+
+
+def _guardarClaveUnica(valor, nombre: str, fichero: str, campo: str) -> None:
+    """Sustituye la clave de un proveedor que no rota entre varias.
+
+    Solo admite letras y números. En NodeReal además es obligatorio para la
+    seguridad: la clave va en la ruta de la URL, y una barra la cambiaría.
+
+    Args:
+        valor: La clave recibida.
+        nombre: Nombre del proveedor para el mensaje de error.
+        fichero: Fichero de `API/` donde se guarda.
+        campo: Campo del formulario al que apunta el error.
+
+    Raises:
+        ValidationError: si no parece una clave válida.
+    """
+    clave = str(valor).strip()
+    if len(clave) > _MAX_LARGO_CLAVE_ETHERSCAN or not clave.isalnum():
+        raise ValidationError(f"Una clave de {nombre} solo lleva letras y números", field=campo)
+    _writeKeyFile(_API_DIR / fichero, clave)
+
+
+def _guardarClaveEtherscan(valor) -> None:
+    """Sustituye la clave de Etherscan: no rota entre varias, solo usa la primera.
+
+    Raises:
+        ValidationError: si no parece una clave de Etherscan.
+    """
+    _guardarClaveUnica(valor, "Etherscan", "etherscan.key", "etherscanKey")
 
 
 def _ficheroDeClaves(proveedor):
@@ -388,6 +433,7 @@ def getSettings():
         "metricasSectionsCollapsed": pcfg.get("metricasSectionsCollapsed") or [],
         "topMetricsConfig":         pcfg.get("topMetricsConfig") or {},
         "modulosConfig":            pcfg.get("modulosConfig") or {},
+        "moduloPrincipal":          pcfg.get("moduloPrincipal") or "",
         "ahorroConfig":             pcfg.get("ahorroConfig") or {"objetivoAhorro": 30, "presupuesto": {}},
         "cuentaAhorroConfig":       normalizarConfig(pcfg.get("cuentaAhorroConfig")),
         "panelesConfig":            normalizarPaneles(pcfg.get("panelesConfig")),
@@ -475,11 +521,22 @@ def appendApiKey():
         _appendKeyFile(_API_DIR / "eodhd.key", str(data["eodhdKeys"]).strip())
     if data.get("alphaVantageKeys"):
         _appendKeyFile(_API_DIR / "alphavantage.key", str(data["alphaVantageKeys"]).strip())
+    if data.get("etherscanKey"):
+        _guardarClaveEtherscan(data["etherscanKey"])
+        # Lo anotado era de la clave anterior, y la vigilancia de wallets pausada
+        # por «fuera de plan» espera a esto para probar la nueva.
+        olvidarApiResult(ESTADO_ETHERSCAN)
+        olvidarApiResult(ESTADO_BNB)
+    if data.get("noderealKey"):
+        _guardarClaveUnica(data["noderealKey"], "NodeReal", "nodereal.key", "noderealKey")
+        olvidarApiResult(ESTADO_BNB)
     return jsonify({
         "ok":               True,
         "finnhubKeys":      len([k for k in _readKeyFile(_API_DIR / "finnhub.key").splitlines() if k.strip()]),
         "eodhdKeys":        len([k for k in _readKeyFile(_API_DIR / "eodhd.key").splitlines() if k.strip()]),
         "alphaVantageKeys": len([k for k in _readKeyFile(_API_DIR / "alphavantage.key").splitlines() if k.strip()]),
+        "etherscanKeys":    len([k for k in _readKeyFile(_API_DIR / "etherscan.key").splitlines() if k.strip()]),
+        "noderealKeys":     len([k for k in _readKeyFile(_API_DIR / "nodereal.key").splitlines() if k.strip()]),
     })
 
 
@@ -531,9 +588,9 @@ def getApiCallStats():
 def getApiEstado():
     """Estado de cada proveedor: operativo, sin clave, sin cuota o caído.
 
-    `?forzar=1` salta la caché. Se deja fuera de la comprobación automática
-    porque cada sondeo gasta cuota real: la pantalla pide el estado cacheado y
-    solo se fuerza cuando el usuario lo pide a mano.
+    Sin parámetros no llama a ningún proveedor: devuelve cómo terminó la última
+    petición real a cada uno. `?forzar=1` (el botón «Comprobar ahora») los
+    sondea todos, porque cada sondeo gasta cuota real.
     """
     forzar = str(request.args.get("forzar", "")).strip().lower() in ("1", "true", "si", "sí")
     try:
@@ -567,6 +624,24 @@ def saveApiPausada():
     return jsonify({"ok": True, "pausados": gcfg["apisPausadas"]})
 
 
+@ajustesBp.route("/api/settings/bnb-proveedor", methods=["POST"])
+def saveBnbProveedor():
+    """Elige la API que lee las wallets de BNB Smart Chain: {proveedor}."""
+    proveedor = str(jsonBody().get("proveedor") or "").strip().lower()
+    if proveedor not in proveedor_bnb.OPCIONES:
+        return jsonify({"ok": False, "error": "Esa API no está disponible para BNB"}), 400
+
+    gcfg = _readAjustes()
+    gcfg["bnbProveedor"] = proveedor
+    try:
+        _writeAjustes(gcfg)
+    except OSError as error:
+        mensaje = registrarFalloEscritura(log, "No se pudo guardar la API de BNB", error, _AJUSTES_JSON)
+        return jsonify({"ok": False, "error": mensaje}), 500
+    olvidarApiResult(ESTADO_BNB)
+    return jsonify({"ok": True, "proveedor": proveedor})
+
+
 @ajustesBp.route("/api/settings/telegram", methods=["GET"])
 def getTelegramSettings():
     token, chatId = telegram_notifier.leerConfig()
@@ -583,7 +658,13 @@ def getTelegramSettings():
         "tokenVista": _enmascararClave(token) if token else "",
         "chatId": chatId,
         "avisos": [
-            {"clave": clave, "titulo": titulo, "activo": activos[clave]}
+            {
+                "clave": clave,
+                "titulo": titulo,
+                "grupo": telegram_notifier.PRESENTACION_AVISO[clave][0],
+                "detalle": telegram_notifier.PRESENTACION_AVISO[clave][1],
+                "activo": activos[clave],
+            }
             for clave, (titulo, _defecto) in telegram_notifier.CATEGORIAS_AVISO.items()
         ],
         "resumenHora": telegram_notifier.resumenHora(),
@@ -684,6 +765,8 @@ _MODULOS = {
     "panelSuperior", "vistaGeneral", "activos", "gastos",
     "finanzas", "cripto", "planes", "herramientas", "metricas",
 }
+# El panel superior es una barra de la cabecera: no tiene página que abrir.
+_MODULOS_CON_PAGINAS = _MODULOS - {"panelSuperior"}
 
 
 def _acotado(minimo, maximo, defecto):
@@ -753,6 +836,10 @@ def _mapaBooleanos(permitidas=None):
         return {k: bool(v) for k, v in valor.items()
                 if isinstance(k, str) and (permitidas is None or k in permitidas)}
     return normalizar
+
+
+def _moduloPrincipal(valor, _cfg):
+    return _opcion(valor, _MODULOS_CON_PAGINAS, _SIN_CAMBIO)
 
 
 def _porcentaje(valor, defecto):
@@ -827,6 +914,7 @@ _NORMALIZADORES_PORTFOLIO = {
     "gastosMostrarPausadas": _booleano,
     "topMetricsConfig": _mapaBooleanos(),
     "modulosConfig": _mapaBooleanos(_MODULOS),
+    "moduloPrincipal": _moduloPrincipal,
     "ahorroConfig": _configAhorro,
     "cuentaAhorroConfig": _configCuentaAhorro,
     "panelesConfig": _configPaneles,
@@ -1108,7 +1196,9 @@ def _escribirZipExport(salida, copia, pid: str, dateStr: str, ui: dict, incluirC
         # van cifradas con ella, en un fichero aparte para que la importación
         # sepa que tiene que pedirla.
         if incluirClaves:
-            claves = exportables.clavesEnClaro()
+            # Las wallets, solo con contraseña: en claro dirían qué direcciones
+            # son del usuario a cualquiera que tenga el ZIP.
+            claves = exportables.clavesConWallets() if contrasena else exportables.clavesEnClaro()
             if claves and contrasena:
                 paquete = exportables.cifrarClaves(claves, contrasena)
                 zf.writestr(exportables.FICHERO_CLAVES_CIFRADAS, json.dumps(paquete, ensure_ascii=False, indent=2))

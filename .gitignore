@@ -46,6 +46,11 @@ venv/
 # APIs KEYs
 # ========================= 
 API/*.key
+# Wallets ajenas que se siguen (sin cifrar: direcciones públicas de otros)
+API/wallets_ajenas.json
+API/satoshi_vigilancia.json
+# Ficheros de bloqueo de lo anterior
+API/.*.lock
 !API/.gitkeep
 
 # =========================

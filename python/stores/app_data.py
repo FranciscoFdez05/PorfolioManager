@@ -63,6 +63,10 @@ API_KEY_SOURCES = {
     "finnhub": ("FINNHUB_API_KEY", "finnhub.key", False),
     "eodhd": ("EODHD_API_KEYS", "eodhd.key", True),
     "alphavantage": ("ALPHA_VANTAGE_API_KEYS", "alphavantage.key", True),
+    # Lectura de wallets de Ethereum y BNB Smart Chain (API v2, una clave para las dos).
+    "etherscan": ("ETHERSCAN_API_KEY", "etherscan.key", False),
+    # Alternativa para las wallets de BNB Smart Chain (ver core.proveedor_bnb).
+    "nodereal": ("NODEREAL_API_KEY", "nodereal.key", False),
 }
 
 
@@ -842,6 +846,16 @@ def readFinnhubApiKeys():
 
 def readFinnhubApiKey():
     claves = readFinnhubApiKeys()
+    return claves[0] if claves else None
+
+
+def readEtherscanApiKey():
+    claves = _clavesEfectivas("etherscan")
+    return claves[0] if claves else None
+
+
+def readNodeRealApiKey():
+    claves = _clavesEfectivas("nodereal")
     return claves[0] if claves else None
 
 

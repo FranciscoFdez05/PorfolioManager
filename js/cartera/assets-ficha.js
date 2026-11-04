@@ -1144,7 +1144,7 @@ function openAssetRowModal(rowIndex) {
     overlay.dataset.rowIndex = isEdit ? String(rowIndex) : "-1"
 
     const modal = document.createElement("div")
-    modal.className = "assetModal assetRowModal"
+    modal.className = "assetModal assetRowModal modalDosColumnas"
 
     const title = document.createElement("h3")
     title.className = "assetModalTitle assetRowModalTitle"

@@ -146,7 +146,7 @@ def _textoAviso(activo, alerta, umbral, precio, cambio, cartera) -> str:
     nombre = activo["name"] or activo["id"]
     simbolo = f" ({activo['symbol']})" if activo["symbol"] else ""
     moneda = activo["currency"] or ""
-    cabecera = f"🔔 Alerta de precio · {nombre}{simbolo}"
+    cabecera = f"Alerta de precio · {nombre}{simbolo}"
 
     if alerta["condicion"] == "var_dia":
         movimiento = f"{'+' if cambio >= 0 else '-'}{dinero.aTextoEs(abs(cambio), decimales=2)} %"
@@ -160,7 +160,7 @@ def _textoAviso(activo, alerta, umbral, precio, cambio, cartera) -> str:
                   f"Tu alerta: precio {signo} {_formato(umbral)} {moneda}")
 
     if alerta["nota"]:
-        cuerpo += f"\n📝 {alerta['nota']}"
+        cuerpo += f"\nNota: {alerta['nota']}"
     if cartera:
         cuerpo += f"\nCartera: {cartera}"
     return f"{cabecera}\n{cuerpo}"

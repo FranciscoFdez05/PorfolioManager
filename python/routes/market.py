@@ -478,6 +478,8 @@ def getMarketQuote():
     return jsonify({
         "ok":          True,
         "price":       quote.get("price"),
+        # `price` va redondeado a 2 decimales: una memecoin (0,00000493) llegaría como 0,00.
+        "currentPrice": (quote.get("marketData") or {}).get("currentPrice"),
         "change":      quote.get("change"),
         "currency":    quote.get("currency", "EUR"),
         "lastUpdated": quote.get("lastUpdated"),

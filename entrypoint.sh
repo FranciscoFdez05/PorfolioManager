@@ -136,6 +136,15 @@ THREADS=$(ajuste gunicorn.threads 4)
 TIMEOUT=$(ajuste gunicorn.timeout 120)
 KEEP_ALIVE=$(ajuste gunicorn.keep_alive 5)
 
+# El servicio worker de docker-compose.yml usa la misma imagen con el argumento
+# «worker»: mismas comprobaciones de permisos de arriba, pero en vez de la web
+# arranca las tareas de fondo (python/admin/worker.py).
+if [ "${1:-}" = "worker" ]; then
+    echo "Arrancando el worker de tareas de fondo: usuario=$PUID:$PGID"
+    cd /app/python
+    exec gosu appuser python -m admin.worker
+fi
+
 echo "Arrancando gunicorn: puerto=$PORT workers=$WORKERS threads=$THREADS timeout=$TIMEOUT usuario=$PUID:$PGID"
 
 exec gosu appuser gunicorn \

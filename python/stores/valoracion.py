@@ -226,6 +226,7 @@ def registrarFallbacks(fallbacks, ahora=None):
                 "proveedores",
                 f"Cartera {cartera}: «{item['id']}» lleva más de {_HORAS_AVISO_FALLBACK} h valorado "
                 f"con un valor de reserva ({item['motivo']}). Revisa su cotización.",
+                gravedad=telegram_notifier.AVISO,
                 clave=f"fallback-{clave}", cooldown=_COOLDOWN_AVISO, compartido=True,
             )
     # Se conserva lo de otras carteras: el estado es común a todas.
@@ -253,6 +254,7 @@ def registrarOmision(omitido, ahora=None):
             "sistema",
             f"Cartera {cartera}: llevan más de una hora sin guardarse snapshots porque la valoración "
             "no es fiable (faltan precios o tipos de cambio).",
+            gravedad=telegram_notifier.AVISO,
             clave=f"omision-{cartera}", cooldown=_COOLDOWN_AVISO, compartido=True,
         )
 

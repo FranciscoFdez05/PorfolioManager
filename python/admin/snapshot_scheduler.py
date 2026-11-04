@@ -18,7 +18,7 @@ import logging
 import threading
 import time
 
-from core import settings
+from core import pulso, settings
 from core.db import getActiveDbPath, useDbPath
 
 log = logging.getLogger(__name__)
@@ -152,6 +152,10 @@ def ejecutarUnaVez(refrescarPrecios=True) -> int:
     return guardados
 
 
+# Valorar un portfolio pide cotizaciones, cada una con su timeout.
+_plazoPasadaSegundos = 3 * 3600
+
+
 def _bucle():
     while not _parada.is_set():
         try:
@@ -161,6 +165,7 @@ def _bucle():
             log.warning("[snapshots] No se pudo calcular la próxima ejecución: %s", e)
             activo, espera = False, _ESPERA_DESACTIVADO
 
+        pulso.marcar("snapshots", espera + _plazoPasadaSegundos)
         if _parada.wait(espera):
             return
         if activo:

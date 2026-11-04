@@ -444,7 +444,12 @@ if [ "$LAN_IP" != "<IP_DEL_SERVIDOR>" ]; then
 fi
 
 # ── 9. Arranque ───────────────────────────────────────────────────────────────
-docker compose up -d --build "$@"
+# Separados: un build roto sí debe parar aquí (`set -e`). `up`, en cambio, da
+# error si la web no está sana a tiempo, porque el worker depende de ello, y
+# cortar ahí se saltaría el diagnóstico de abajo.
+docker compose build
+upFallido=0
+docker compose up -d "$@" || upFallido=1
 
 # `up -d` termina cuando crea el contenedor, no cuando la aplicación puede
 # atender peticiones. Esperar el healthcheck evita dar una URL como correcta si
@@ -478,6 +483,12 @@ if [ "$INTENTOS" -eq 0 ]; then
     echo "ERROR: el contenedor no ha superado la comprobación de salud a tiempo." >&2
     docker compose logs --tail=100 "$SERVICIO" >&2 || true
     exit 1
+fi
+
+# La web ha acabado sana pero tardó más de lo que `up` esperaba: lo que dependía
+# de ella sigue sin crear.
+if [ "$upFallido" -eq 1 ]; then
+    docker compose up -d "$@"
 fi
 
 # El proxy no entra en el bucle de arriba porque su fallo típico no es tardar,

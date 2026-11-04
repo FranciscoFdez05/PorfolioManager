@@ -918,6 +918,8 @@
 
 .ajustesApiEstadoRow {
     display: flex;
+    /* El motivo ocupa su propia línea, debajo de nombre, estado y acciones. */
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
     padding: 8px 12px;
@@ -932,6 +934,49 @@
     font-weight: 500;
     /* Empuja la insignia al borde derecho y deja el tiempo pegado a ella. */
     margin-right: auto;
+    /* Con flex-wrap, sin esto un texto de cobertura largo baja la insignia de línea. */
+    flex: 1 1 200px;
+    min-width: 0;
+}
+
+.ajustesApiEstadoCubre {
+    display: block;
+    color: var(--text-dim);
+    font-size: 0.76rem;
+    font-weight: 400;
+}
+
+.ajustesApiEstadoMotivo {
+    flex-basis: 100%;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+/* Sin ámbar: como texto corrido no se lee sobre el fondo del tema claro, y la
+   insignia ya da el color. */
+.ajustesApiEstadoMotivo.limite,
+.ajustesApiEstadoMotivo.plan,
+.ajustesApiEstadoMotivo.clave {
+    color: var(--text-primary);
+}
+
+.ajustesApiEstadoMotivo.caido,
+.ajustesApiEstadoMotivo.error {
+    color: var(--color-neg-bright);
+}
+
+/* El <select> lo sustituye el desplegable propio (.csWrapper), que por defecto
+   ocupa todo el ancho y aquí tiene que quedarse junto a la insignia. */
+.ajustesApiEstadoRow .csWrapper {
+    flex: 0 0 auto;
+    width: 118px;
+}
+
+.ajustesApiEstadoRow .csTrigger {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    min-height: 0;
 }
 
 .ajustesApiEstadoMs {
@@ -987,7 +1032,8 @@
     background: rgba(248, 113, 113, 0.07);
 }
 
-.ajustesApiEstadoBadge.sin_clave {
+.ajustesApiEstadoBadge.sin_clave,
+.ajustesApiEstadoBadge.sin_datos {
     color: var(--text-dim);
 }
 
@@ -1700,11 +1746,43 @@
     color: var(--text-muted);
     cursor: pointer;
 }
+.ajustesExportClaves:hover {
+    border-color: var(--border-mid);
+}
+.ajustesExportClaves:has(input:checked) {
+    border-color: var(--accent);
+}
+/* Casilla propia, como la de Planes de inversión: la nativa salía como un cuadro
+   blanco ajeno al tema. El fondo es --bg-surface y no --bg-inset porque la caja
+   ya usa este último y la casilla sin marcar se perdía contra ella. */
 .ajustesExportClaves input {
-    margin-top: 3px;
+    appearance: none;
+    -webkit-appearance: none;
     flex: 0 0 auto;
-    accent-color: var(--accent);
+    width: 16px;
+    height: 16px;
+    margin: 2px 0 0;
+    border: 1px solid var(--btn-border);
+    border-radius: 5px;
+    background: var(--bg-surface);
     cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease;
+}
+.ajustesExportClaves input:hover {
+    border-color: var(--accent);
+}
+.ajustesExportClaves input:checked {
+    background: var(--accent)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 10'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M1 5l3.5 3.5L11 1.5'/%3E%3C/svg%3E")
+        no-repeat center;
+    background-size: 10px 8px;
+    border-color: var(--accent);
+}
+.ajustesExportClaves input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 .ajustesExportClaves strong {
     color: var(--text-subtle);
@@ -2118,4 +2196,341 @@
     min-height: 72px;
     resize: vertical;
     font-family: inherit;
+}
+
+/* ── Módulos: principal y visibilidad ─────────────────── */
+.modulosTabla {
+    container-type: inline-size;
+}
+.modulosCabecera,
+.modulosFila {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 72px 56px;
+    align-items: center;
+    column-gap: 12px;
+    padding: 12px 24px;
+}
+.modulosCabecera {
+    padding-block: 10px 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.modulosCabecera > :not(:first-child) {
+    text-align: center;
+}
+.modulosFila {
+    border-top: 1px solid var(--border-soft);
+    transition: background 0.15s;
+}
+.modulosFila:hover {
+    background: var(--btn-bg-hover);
+}
+.modulosFilaPrincipal,
+.modulosFilaPrincipal:hover {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+.modulosModulo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+.modulosIcono {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--btn-bg-hover);
+    color: var(--text-secondary);
+    font-size: 16px;
+}
+.modulosFilaPrincipal .modulosIcono {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--accent);
+}
+.modulosTexto {
+    min-width: 0;
+}
+.modulosNombre {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.35;
+}
+.modulosDetalle {
+    margin-top: 2px;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+.modulosFilaApagada .modulosIcono,
+.modulosFilaApagada .modulosNombre,
+.modulosFilaApagada .modulosDetalle {
+    opacity: 0.5;
+}
+.modulosRadio {
+    display: flex;
+    justify-content: center;
+    padding: 6px;
+    cursor: pointer;
+}
+.modulosRadio input {
+    appearance: none;
+    display: grid;
+    place-content: center;
+    width: 18px;
+    height: 18px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 2px solid var(--text-muted);
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.modulosRadio input::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    transform: scale(0);
+    transition: transform 0.15s;
+}
+.modulosRadio input:hover:not(:disabled),
+.modulosRadio input:checked {
+    border-color: var(--accent);
+}
+.modulosRadio input:checked::before {
+    transform: scale(1);
+}
+.modulosRadio input:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.modulosRadio input:focus-visible,
+.modulosFila .ajustesSwitch input:focus-visible + .ajustesSwitchTrack {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.modulosFila .ajustesSwitch {
+    justify-self: center;
+}
+.modulosFila .ajustesSwitch input:disabled + .ajustesSwitchTrack {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.modulosNota {
+    padding: 12px 24px 16px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+/* Las secciones van a dos columnas, así que manda el ancho de la sección y no el
+   de la ventana. El detalle baja a su propia línea para no partirse palabra a
+   palabra junto a los controles. */
+@container (max-width: 440px) {
+    .modulosCabecera,
+    .modulosFila {
+        grid-template-columns: minmax(0, 1fr) 62px 48px;
+        column-gap: 6px;
+        padding-inline: 14px;
+    }
+    .modulosCabecera {
+        font-size: 0.62rem;
+    }
+    .modulosModulo,
+    .modulosTexto {
+        display: contents;
+    }
+    .modulosIcono {
+        display: none;
+    }
+    .modulosDetalle {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+}
+
+/* ── Tarjeta de Telegram ── */
+/* Un `display` de autor gana al de `[hidden]`: sin esto, estos bloques se ven
+   aunque la verificación en dos pasos no haga falta. */
+.ajustes2faBloque[hidden] {
+    display: none;
+}
+.ajustesTelegramSubtitulo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.ajustesTelegramPasos {
+    margin: 10px 20px 0;
+    padding: 12px 14px 12px 32px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-inset);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+.ajustesTelegramPasos li + li {
+    margin-top: 4px;
+}
+.ajustesTelegramPasos a {
+    color: var(--accent);
+}
+.ajustesTelegramPasos strong {
+    color: var(--text-subtle);
+    font-weight: 600;
+}
+/* Con las columnas apiladas en móvil, sin esto dos secciones quedan pegadas. */
+#sttPage-avisos.active {
+    row-gap: 20px;
+}
+#sttPage-avisos .sttPageTitle {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 8px;
+}
+#ajustesTelegramAvisosMsg {
+    flex: 0 1 auto;
+    width: auto;
+    font-weight: 500;
+    letter-spacing: normal;
+}
+#sttPage-avisos > .ajustesAviso {
+    grid-column: 1 / -1;
+}
+.ajustesTelegramAvisosLista .ajustesSwitchRow {
+    padding: 12px 20px;
+}
+.ajustesTelegramAvisosLista .ajustesSwitchRow + .ajustesSwitchRow {
+    border-top: 1px solid var(--border-soft);
+}
+.ajustesTelegramAvisosLista .ajustesSwitchLabel {
+    flex: 1;
+    min-width: 0;
+}
+/* La hora del resumen cuelga de su interruptor: se alinea con su texto. */
+.ajustesTelegramAvisosLista #ajustesTelegramResumenFila {
+    padding-left: 68px;
+}
+/* Son 24 horas: sin tope, el menú se sale de la pantalla. */
+#ajustesTelegramResumenFila .ajustesDropMenu {
+    max-height: 240px;
+    overflow-y: auto;
+    /* base.css oculta las barras; aquí hace falta ver que hay más horas. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-mid) transparent;
+}
+#ajustesTelegramResumenFila .ajustesDropOption {
+    flex-shrink: 0;
+}
+#ajustesTelegramResumenFila .ajustesDropWrapper {
+    flex: 0 0 120px;
+    width: 120px;
+    min-width: 0;
+}
+.ajustesTelegramAvisoIcono {
+    --avisoColor: var(--text-muted);
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--avisoColor) 40%, transparent);
+    background: color-mix(in srgb, var(--avisoColor) 14%, transparent);
+    color: var(--avisoColor);
+    font-size: 16px;
+}
+/* Los mismos colores que tools/generar_imagenes_avisos.py. */
+[data-aviso="precios"] > .ajustesTelegramAvisoIcono { --avisoColor: #0ea5e9; }
+[data-aviso="wallets"] > .ajustesTelegramAvisoIcono { --avisoColor: #f59e0b; }
+[data-aviso="resumen"] > .ajustesTelegramAvisoIcono { --avisoColor: #8b5cf6; }
+[data-aviso="proveedores"] > .ajustesTelegramAvisoIcono { --avisoColor: #06b6d4; }
+[data-aviso="backup"] > .ajustesTelegramAvisoIcono,
+[data-aviso="backupFichero"] > .ajustesTelegramAvisoIcono { --avisoColor: #818cf8; }
+[data-aviso="seguridad"] > .ajustesTelegramAvisoIcono { --avisoColor: #ec4899; }
+[data-aviso="sesion"] > .ajustesTelegramAvisoIcono { --avisoColor: #14b8a6; }
+[data-aviso="sistema"] > .ajustesTelegramAvisoIcono { --avisoColor: #94a3b8; }
+[data-aviso="version"] > .ajustesTelegramAvisoIcono { --avisoColor: #84cc16; }
+
+.ajustesTelegramVerificacion {
+    margin: 16px 20px 0;
+    padding: 14px;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 10px;
+    background: rgba(251, 191, 36, 0.05);
+}
+.ajustesTelegramVerificacion .ajustesField {
+    padding: 0;
+    margin: 0;
+}
+.ajustesTelegramVerificacionTitulo {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.ajustesTelegramVerificacionTexto {
+    margin: -8px 0 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-muted);
+}
+.ajustesTelegramOpciones {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.ajustesTelegramOpcion {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    background: var(--bg-inset);
+}
+.ajustesTelegramOpcion .ajustesInputRow .ajustesInput {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+}
+.ajustesTelegramOpcionTitulo {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-subtle);
+}
+.ajustesTelegramOpcionesSeparador {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.ajustesTelegramOpcionesSeparador::before,
+.ajustesTelegramOpcionesSeparador::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-soft);
 }

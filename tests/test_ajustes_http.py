@@ -79,7 +79,7 @@ def testLasClavesDeApiNoSeGuardanEnClaroEnDisco(cliente):
 
 # ── Lista de claves y de dónde salen ─────────────────────────────────────────
 
-_VARIABLES = ("FINNHUB_API_KEY", "EODHD_API_KEYS", "ALPHA_VANTAGE_API_KEYS")
+_VARIABLES = ("FINNHUB_API_KEY", "EODHD_API_KEYS", "ALPHA_VANTAGE_API_KEYS", "ETHERSCAN_API_KEY")
 
 
 @pytest.fixture(autouse=True)
@@ -185,8 +185,48 @@ def testLosTresProveedoresSalenAunqueNoTenganClaves(cliente):
 
     proveedores = client.get("/api/settings/apikeys").get_json()["proveedores"]
 
-    assert sorted(proveedores) == ["alphavantage", "eodhd", "finnhub"]
+    assert sorted(proveedores) == ["alphavantage", "eodhd", "etherscan", "finnhub"]
     assert proveedores["eodhd"]["claves"] == []
+
+
+def testLaClaveDeEtherscanSeSustituyeEnVezDeAcumularse(cliente):
+    """Etherscan solo usa una clave: guardar otra reemplaza la anterior."""
+    client, cabeceras, rutas = cliente
+    _anadirClaves(client, cabeceras, "PRIMERA1", "SEGUNDA2", campo="etherscanKey")
+
+    assert [c["clave"] for c in _listar(client, "etherscan")["claves"]] == ["SEGUNDA2"]
+    assert b"SEGUNDA2" not in (rutas["claves"] / "etherscan.key").read_bytes()
+
+
+def testLaClaveDeEtherscanLaUsanLasWallets(cliente):
+    from stores.app_data import readEtherscanApiKey
+
+    client, cabeceras, _rutas = cliente
+    _anadirClaves(client, cabeceras, "K7XQ2M9R4TB8VN3P", campo="etherscanKey")
+
+    assert readEtherscanApiKey() == "K7XQ2M9R4TB8VN3P"
+
+
+def testUnaClaveDeEtherscanRaraSeRechaza(cliente):
+    client, cabeceras, rutas = cliente
+
+    respuesta = client.post("/api/settings/apikey", json={"etherscanKey": "no vale;"}, headers=cabeceras)
+
+    assert respuesta.status_code == 400
+    assert respuesta.get_json()["field"] == "etherscanKey"
+    assert not (rutas["claves"] / "etherscan.key").exists()
+
+
+def testBorrarLaClaveDeEtherscan(cliente):
+    client, cabeceras, _rutas = cliente
+    _anadirClaves(client, cabeceras, "K7XQ2M9R4TB8VN3P", campo="etherscanKey")
+    huella = _listar(client, "etherscan")["claves"][0]["huella"]
+
+    respuesta = client.delete("/api/settings/apikey", json={"proveedor": "etherscan", "huella": huella},
+                              headers=cabeceras)
+
+    assert respuesta.status_code == 200
+    assert _listar(client, "etherscan")["claves"] == []
 
 
 def testCadaProveedorListaSoloSusClaves(cliente):
@@ -552,6 +592,26 @@ def testLosModulosDesconocidosNoEntranEnLaConfiguracion(cliente):
 
     guardado = client.get("/api/settings").get_json()["modulosConfig"]
     assert guardado == {"metricas": False}
+
+
+def testElModuloPrincipalSeGuardaYSeRelee(cliente):
+    client, cabeceras, _rutas = cliente
+    assert client.get("/api/settings").get_json()["moduloPrincipal"] == ""
+
+    _guardar(client, cabeceras, moduloPrincipal="cripto")
+
+    assert client.get("/api/settings").get_json()["moduloPrincipal"] == "cripto"
+
+
+@pytest.mark.parametrize("valor", ["moduloFantasma", "panelSuperior", "", ["cripto"], None, 7])
+def testUnModuloPrincipalNoValidoNoPisaElGuardado(cliente, valor):
+    client, cabeceras, _rutas = cliente
+    _guardar(client, cabeceras, moduloPrincipal="planes")
+
+    respuesta = _guardar(client, cabeceras, moduloPrincipal=valor)
+
+    assert respuesta.status_code == 200
+    assert client.get("/api/settings").get_json()["moduloPrincipal"] == "planes"
 
 
 def testElObjetivoDeAhorroSeAcotaEntre0Y100(cliente):
