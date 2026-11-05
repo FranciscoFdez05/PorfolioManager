@@ -87,7 +87,7 @@ CATEGORIAS_AVISO = {
     # claves si se incluyen) subido a los servidores de Telegram, que no cifra
     # los chats con bots de extremo a extremo. Antes salía con el aviso de
     # «backup», encendido por defecto, en cuanto se configuraba el bot.
-    "backupFichero": ("Enviar el fichero de cada copia automática", False),
+    "backupFichero": ("Enviar el fichero de las copias automáticas y al actualizar", False),
     "precios": ("Alertas de precio", True),
     # Además de esto, cada wallet tiene su propio interruptor de avisos
     # (Cripto > Seguimiento), apagado al enlazarla.
@@ -115,7 +115,8 @@ PRESENTACION_AVISO = {
                                          "valorado con un valor de reserva"),
     "backup": ("Copias de seguridad", "Copia manual o automática creada (nombre, tamaño y copias guardadas), copia "
                                       "o restauración fallida, copia restaurada y copia eliminada"),
-    "backupFichero": ("Copias de seguridad", "Cada copia automática llega como ZIP con todos tus datos, y las claves "
+    "backupFichero": ("Copias de seguridad", "Cada copia automática, y la que se hace al pulsar Actualizar, llega "
+                                             "como ZIP con todos tus datos, y las claves "
                                              "de API si las incluyes en las copias; si supera el límite de Telegram, "
                                              "solo llega un aviso. Telegram no cifra de extremo a extremo los chats "
                                              "con bots"),

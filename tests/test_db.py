@@ -161,6 +161,19 @@ def testUnaBdEnLaVersion0SeMigraYSeMarca(tempDb):
     assert conexion.execute("PRAGMA user_version").fetchone()[0] == db.ESQUEMA_VERSION
 
 
+def testLaMigracion27DejaPendientesSoloLasRecibidasImportadas(tempDb):
+    from core import db
+
+    conexion = db.getDb()
+    filas = [("wallet-a", "recibida"), ("wallet-b", "entre_wallet"), ("wallet-c", "enviada"), ("manual", "recibida")]
+    conexion.executemany("INSERT INTO transacciones (id, wallet_tipo) VALUES (?, ?)", filas)
+
+    db._esquema27(conexion)
+
+    tipos = dict(conexion.execute("SELECT id, wallet_tipo FROM transacciones").fetchall())
+    assert tipos == {"wallet-a": "pendiente", "wallet-b": "entre_wallet", "wallet-c": "enviada", "manual": "recibida"}
+
+
 def testLosPasosSeAplicanEnOrdenYSoloLosPendientes(tempDb, monkeypatch):
     from core import db
 

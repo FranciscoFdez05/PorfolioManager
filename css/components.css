@@ -718,9 +718,10 @@ body.asset-rotation-halted .detailRotationBar span {
     margin-bottom: 10px;
 }
 
+/* Dos columnas si caben; si no, una: en un móvil el texto no entra en media anchura. */
 .assetSearchActions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
     gap: 10px;
     margin: -4px 0 10px 0;
 }

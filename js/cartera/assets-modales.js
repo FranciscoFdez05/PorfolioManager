@@ -155,7 +155,21 @@ function initConfirmModal(confirmModalOverlay, confirmModalAcceptButton, confirm
     window.addEventListener("resize", alignConfirmModalToContent)
 }
 
+let assetModalEnviando = false
+
+// Comprobar las wallets añade una espera antes de crear el activo: un segundo
+// clic o Enter en ese rato lo crearía dos veces.
 async function submitAssetModal() {
+    if (assetModalEnviando) return
+    assetModalEnviando = true
+    try {
+        await enviarAssetModal()
+    } finally {
+        assetModalEnviando = false
+    }
+}
+
+async function enviarAssetModal() {
     const assetNameInput = document.getElementById("assetNameInput")
     const assetTypeSelect = document.getElementById("assetTypeSelect")
     const assetTickerInput = document.getElementById("assetTickerInput")
@@ -192,6 +206,11 @@ async function submitAssetModal() {
         return
     }
 
+    if (!(await walletsActivoValidar("assetWalletsBloque", name))) {
+        setAssetSearchFeedback(assetSearchFeedback, "Revisa las wallets marcadas: el activo aún no se ha creado.", true)
+        return
+    }
+
     try {
         setAssetSearchFeedback(assetSearchFeedback, "")
         const response = await createAssetOnServer(
@@ -204,6 +223,7 @@ async function submitAssetModal() {
             costeAnual
         )
         const createdAsset = response.asset
+        await walletsActivoEnlazar("assetWalletsBloque", createdAsset.id, name)
         closeAssetModal()
         currentAssetId = createdAsset.id
         await refreshAssetsSidebar(createdAsset.id, true)
@@ -492,6 +512,11 @@ function initAssetModal(
     }
 
     assetTypeSelect?.addEventListener("change", syncAssetCosteAnualField)
+    assetTypeSelect?.addEventListener("change", syncAssetWalletsField)
+    const proponerRedWallets = () =>
+        walletsActivoProponerRed("assetWalletsBloque", assetNameInput?.value, assetTickerInput?.value)
+    assetNameInput?.addEventListener("input", proponerRedWallets)
+    assetTickerInput?.addEventListener("input", proponerRedWallets)
 
     if (assetNameInput) {
         assetNameInput.addEventListener("keydown", async (event) => {
@@ -532,6 +557,7 @@ function initAssetModal(
         if (assetNameInput && !assetNameInput.value.trim()) {
             assetNameInput.value = result.description
         }
+        proponerRedWallets()
 
         const sinCotizacion = String(result.price || "").trim() === ""
         const mensaje = sinCotizacion

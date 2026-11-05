@@ -234,6 +234,8 @@ Ejecútalo **con tu usuario, sin `sudo`** (lo rechaza si lo intentas): con `sudo
 
 Mientras ese vigilante no esté instalado, el panel lo dice en vez de dejar el botón girando: la señal se quedaría ahí sin que nadie la recogiera.
 
+**Antes de dejar la señal, el botón hace una copia de seguridad completa** y la manda por Telegram como ZIP, con el mismo interruptor que la copia automática: «Enviar el fichero de las copias automáticas y al actualizar» en Ajustes › Avisos, apagado de fábrica. Con él apagado, o si el fichero no sale, llega solo el aviso de texto. Si la copia falla llega un aviso crítico y la actualización sigue. `./docker-update.sh` por SSH no hace esta copia.
+
 **Antes de pulsar, el panel dice si hay algo que traer.** Lee `python/core/version.py` de la rama en GitHub y lo compara con la versión instalada:
 
 - **Hay actualización** — el botón pasa a «Actualizar a la 2.1.4».
@@ -626,7 +628,7 @@ Un bot de Telegram (lo creas con [@BotFather](https://t.me/BotFather) y pegas el
 |---|---|
 | Proveedores | cuota agotada, sin respuesta o fallo de un proveedor de cotizaciones (el mismo problema no se repite en 30 min), cuando vuelve a responder, y un activo que lleva más de 6 h valorado con un valor de reserva |
 | Copias de seguridad | copia manual o automática creada (nombre, tamaño, cuántas hay), copia o restauración fallida, copia restaurada o eliminada |
-| Enviar el fichero de cada copia automática | cada copia automática llega como ZIP, con las claves de API si se incluyen en las copias; si supera los 50 MB de Telegram solo llega un aviso (desactivado de fábrica). Las copias manuales no se envían |
+| Enviar el fichero de las copias automáticas y al actualizar | cada copia automática, y la que se hace al pulsar Actualizar, llega como ZIP, con las claves de API si se incluyen en las copias; si supera los 50 MB de Telegram solo llega un aviso (desactivado de fábrica). Las demás copias manuales no se envían |
 | Alertas de precio | un activo llega al precio fijado o se mueve en el día el % pedido; cada alerta salta una vez |
 | Movimientos en las wallets | movimientos nuevos, saldo fuera de los límites, wallet que despierta o actividad sospechosa de las wallets con su interruptor encendido en Cripto › Seguimiento; monedas de Satoshi gastadas, si está activada esa vigilancia |
 | Seguridad | una IP agota los intentos de login, cambio de contraseña o de usuario, verificación en dos pasos activada, desactivada o usada la frase de recuperación |
@@ -678,6 +680,9 @@ Los avisos se activan o apagan por tipo en Ajustes › Avisos.
 - **BD activa:** `data/portfolios/<id>.db` (una por portfolio; `data/portfolio.db` es solo el fichero heredado de versiones anteriores)
 - **Backups:** `data/backups/` — ZIP con todos los portfolios, ajustes y preferencias. Los del botón se llaman `backup_<fecha>.zip`; los de la frecuencia de **Auto-backup** llevan `_auto` y salen en la misma lista de Ajustes, desde donde se restauran. **Límite de backups** rota unos y otros
 - **Copias previas a una migración de esquema:** `data/backups/auto/` — exentas de rotación (ver más abajo). Ahí quedan también los `.db` diarios que hacía el auto-backup hasta la 2.1.0; siguen valiendo como último recurso si la BD activa aparece dañada
+- **Qué lleva una copia:** la base de datos y las preferencias de cada portfolio (paneles, métricas del panel superior, módulos y la lista de Análisis › Seguimiento), los ajustes generales y, cifradas, las wallets de Cripto › Seguimiento, la libreta y el catálogo. Las claves de API solo entran con «Incluir las claves de API en las copias». Se quedan fuera las preferencias de vista del navegador (filtros, orden de tablas, tema)
+- **Qué comprueba restaurar:** cada base se valida antes de escribirla y, ya escrita, se compara tabla a tabla con la copia. Los perfiles y preferencias que no estaban en la copia se mueven a `data/deleted/`. Lo que no se ha podido recuperar sale en el aviso de «restauración parcial»
+- **Importar un ZIP de export:** los datos y la configuración van a la cartera de destino, sea cual sea su id. Importarlo como cartera nueva también se lleva su configuración
 - **Copias previas a una restauración:** `data/pre_restore/<fecha>/` — se crean solas antes de sobrescribir nada, por si restauras el backup equivocado
 - **Temporales y bloqueos:** `data/tmp/` — copias a medio hacer y los ficheros con los que los dos workers de gunicorn se coordinan. Se puede vaciar con el servidor parado; no contiene nada que se necesite conservar
 

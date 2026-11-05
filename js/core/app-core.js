@@ -308,6 +308,12 @@ async function loadGlobalSettings() {
             window._modulosConfig = data.modulosConfig ?? {}
             window._moduloPrincipal = data.moduloPrincipal ?? ""
             window._panelesConfig = data.panelesConfig ?? {}
+            window._seguimientoDatos = {
+                lista: data.seguimientoLista ?? [],
+                ocultos: data.seguimientoOcultos ?? [],
+                overrides: data.seguimientoOverrides ?? {}
+            }
+            await window.segMigrarAlServidor?.(data.portfolioId)
             window._sidebarCollapsed = data.sidebarCollapsed ?? false
             window._monedaBase = data.monedaBase ?? "EUR"
             window._fiatCurrencies = (data.fiatCurrencies || []).map((c) => c.code).filter(Boolean)

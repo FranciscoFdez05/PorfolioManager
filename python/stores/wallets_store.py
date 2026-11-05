@@ -157,6 +157,9 @@ class Wallet:
     lecturaIncompleta: bool = False
     # Avisos sospechosos que Telegram no aceptó, para volver a intentarlo.
     avisosReintento: list = field(default_factory=list)
+    # Direcciones con uso de una xpub propia, para contarlas como del usuario sin
+    # volver a explorarlas. Crece con cada revisión. Va cifrada con la wallet.
+    direccionesDerivadas: list = field(default_factory=list)
 
     @property
     def nombreSeguimiento(self) -> str:
@@ -291,7 +294,10 @@ class MovimientoMarcado:
     `propia=False`, en lo que leyó la red. `comision` es la que se descuenta, en
     unidades del activo, y vacía deja la que leyó la red. `contrato` distingue la
     moneda de un token dentro de una misma transacción, y `assetId` localiza su
-    fila en Transacciones, que no guarda el contrato.
+    fila en Transacciones, que no guarda el contrato. `direccionesAnadidas` son las
+    que esta marca dio de alta en la libreta como propias: sin recordarlas, quitar
+    la marca no devolvería la transacción a su estado, porque su dirección seguiría
+    haciéndola «entre wallets».
     """
 
     red: str
@@ -300,6 +306,7 @@ class MovimientoMarcado:
     propia: bool
     comision: str = ""
     assetId: str = ""
+    direccionesAnadidas: tuple[str, ...] = ()
 
 
 # Lo que guarda el fichero de wallets además de las propias wallets.
@@ -440,6 +447,14 @@ class WalletsRepository:
                 "Sin ella no se guardan, para no dejarlas en claro."
             )
         return fernet
+
+    def exigirCifrado(self) -> None:
+        """Comprueba que se pueden guardar wallets propias, sin guardar nada.
+
+        Raises:
+            CifradoNoDisponible: si no hay una SECRET_KEY válida.
+        """
+        self._fernet()
 
     @property
     def rutaAjenas(self) -> Path:

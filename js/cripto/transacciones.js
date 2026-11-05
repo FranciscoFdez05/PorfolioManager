@@ -12,10 +12,18 @@ let transaccionesCryptoAssets = []
 // Criptos visibles en la tabla; null es «Todos».
 let transaccionesFilter = null
 let transaccionesPersistChain = Promise.resolve()
+// Lo que el detalle de una fila necesita de las wallets, leído solo al abrir la
+// primera: la mayoría de visitas a esta página no lo usan.
+let transaccionesWalletsCargadas = false
+const transaccionesHistoriales = new Map()
+let transaccionesAbriendoDetalle = false
+const TRANSACCIONES_LIMITE_HISTORIAL = 500
 const TRANSACCION_WALLET_OPTIONS = [
     { value: "entre_wallet", label: "Entre wallet" },
     { value: "recibida", label: "Recibida" },
-    { value: "enviada", label: "Enviada" }
+    { value: "enviada", label: "Enviada" },
+    // Importada y sin verificar: se ve aquí, pero no suma a la posición.
+    { value: "pendiente", label: "Pendiente de verificar" }
 ]
 
 async function loadTransaccionesData() {
@@ -47,8 +55,45 @@ async function saveTransaccionesData(payload, options = {}) {
     return await response.json().catch(() => null)
 }
 
+function transaccionesFaltaComision(rows = []) {
+    return rows.some(
+        (row) =>
+            String(row?.id || "").startsWith("wallet-") &&
+            normalizeTransaccionWalletTipo(row?.walletTipo) === "entre_wallet" &&
+            !String(row?.comisionRed || "").trim()
+    )
+}
+
+/**
+ * Pide al servidor la comisión de las filas importadas que deberían tenerla.
+ *
+ * Un fallo no impide ver la tabla: la fila sigue como estaba y se reintenta al volver.
+ *
+ * @param {Array<object>} rows Filas recién leídas.
+ * @returns {Promise<boolean>} Si ha cambiado alguna y hay que releerlas.
+ */
+async function completarComisionesDeTransacciones(rows) {
+    if (!transaccionesFaltaComision(rows)) return false
+    try {
+        const response = await fetch("/api/wallets/transacciones/completar-comisiones", { method: "POST" })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const datos = await response.json()
+        return Number(datos?.completadas) > 0
+    } catch (error) {
+        console.warn("No se pudieron completar las comisiones de las transacciones.", error)
+        return false
+    }
+}
+
 async function initTransaccionesLogic() {
+    transaccionesWalletsCargadas = false
+    transaccionesHistoriales.clear()
     currentTransaccionesData = await loadTransaccionesData()
+    if (await completarComisionesDeTransacciones(currentTransaccionesData?.rows)) {
+        currentTransaccionesData = await loadTransaccionesData()
+        // La comisión baja la posición, y Activos tiene su propia copia de las filas.
+        await refreshAssetsSidebar(currentAssetId, false)
+    }
     transaccionesRevision = Number.isInteger(currentTransaccionesData?.revision) ? currentTransaccionesData.revision : null
     transaccionesBaseRows = JSON.parse(JSON.stringify(currentTransaccionesData?.rows || []))
     await loadTransaccionesCryptoAssets()
@@ -366,6 +411,10 @@ function normalizeTransaccionWalletTipo(value) {
         return "enviada"
     }
 
+    if (normalizedValue === "pendiente") {
+        return "pendiente"
+    }
+
     return "entre_wallet"
 }
 
@@ -466,13 +515,153 @@ function handleTransaccionesDeleteClick(event) {
 }
 
 function handleTransaccionesClick(event) {
-    const hashCell = event.target.closest('.transaccionHashCell[data-field="hashTransaccion"]')
+    // Sin hash no hay nada que copiar: esa celda abre el detalle como el resto de la fila.
+    const hashCell = event.target.closest('.transaccionHashCell:not([data-full-value=""])')
 
     if (!hashCell) {
+        // El desplegable ··· está dentro de la fila: un clic en él no la abre.
+        const fila = event.target.closest("tr[data-transaccion-id]")
+        if (fila && !event.target.closest(".rowActionsCell")) abrirDetalleTransaccion(fila.dataset.transaccionId)
         return
     }
 
     copyHashTransaccionToClipboard(hashCell)
+}
+
+// ── Detalle de una fila ───────────────────────────────────────────────────────
+// La misma ventana que en Seguimiento (js/cripto/wallets-seguimiento.js). Las filas
+// no guardan direcciones ni contrato: hay que encontrar su movimiento en las wallets.
+
+// Una transacción puede mover varios tokens: cada fila es solo uno de sus movimientos.
+function transaccionEsDeSuActivo(mov, wallet, row, asset) {
+    if (!mov.contrato && wallet.assetId === row.assetId) return true
+    const simbolo = String(mov.simbolo || "").toUpperCase()
+    return Boolean(simbolo) && [asset?.symbol, asset?.name, row.assetName].some((n) => String(n || "").toUpperCase() === simbolo)
+}
+
+// Si la transacción está en las dos wallets propias que la movieron, se prefiere
+// la que nombra la fila: al importarla, su lado propio se rellena con el nombre
+// del seguimiento, no con el alias de la wallet.
+function transaccionNombraWallet(wallet, row) {
+    return [row.walletDesde, row.walletDestino].includes(wallet.seguimiento)
+}
+
+function buscarMovimientoDeFila(row, wallets, movimientosDe) {
+    const hash = normalizeHashTransaccionValue(row.hashTransaccion).toLowerCase()
+    if (!hash) return null
+    const asset = getTransaccionAsset(row.assetId)
+    const encontrados = wallets.flatMap((wallet) =>
+        movimientosDe(wallet)
+            .filter((mov) => String(mov.hash || "").toLowerCase() === hash && transaccionEsDeSuActivo(mov, wallet, row, asset))
+            .map((mov) => ({ mov, wallet }))
+    )
+    return encontrados.find(({ wallet }) => transaccionNombraWallet(wallet, row)) || encontrados[0] || null
+}
+
+async function asegurarWalletsDeTransacciones() {
+    if (transaccionesWalletsCargadas) return
+    walletsEstado = await walletsPeticion("/api/wallets")
+    walletsSegAnotarPublicos(walletsEstado.tokensPublicos)
+    transaccionesWalletsCargadas = true
+}
+
+// Lo que no está entre los recientes guardados hay que leerlo de la red, y solo de
+// la wallet que nombra la fila: una xpub son decenas de llamadas.
+async function leerHistorialesDeFila(row) {
+    const wallets = walletsEstado.wallets.filter(
+        (wallet) => transaccionNombraWallet(wallet, row) && !transaccionesHistoriales.has(wallet.id)
+    )
+    if (!wallets.length) return
+    const progreso = iniciarProgreso("Buscando la transacción", wallets.length)
+    try {
+        for (const wallet of wallets) {
+            progreso.paso(walletsNombreCompleto(wallet))
+            const datos = await walletsPeticion(`/api/wallets/${encodeURIComponent(wallet.id)}/movimientos?limite=${TRANSACCIONES_LIMITE_HISTORIAL}`)
+            walletsSegAnotarPublicos(datos.tokensPublicos)
+            transaccionesHistoriales.set(wallet.id, datos.movimientos || [])
+        }
+    } finally {
+        progreso.terminar()
+    }
+}
+
+async function localizarMovimientoDeFila(row) {
+    if (!normalizeHashTransaccionValue(row.hashTransaccion)) return null
+    await asegurarWalletsDeTransacciones()
+    const enRecientes = buscarMovimientoDeFila(row, walletsEstado.wallets, (wallet) => wallet.recientes || [])
+    if (enRecientes) return enRecientes
+    await leerHistorialesDeFila(row)
+    return buscarMovimientoDeFila(row, walletsEstado.wallets, (wallet) => transaccionesHistoriales.get(wallet.id) || [])
+}
+
+function transaccionSimbolo(row) {
+    const asset = getTransaccionAsset(row.assetId)
+    return asset?.symbol || asset?.name || row.assetName || ""
+}
+
+function transaccionConSimbolo(valor, row) {
+    const numero = formatTransaccionesNumber(valor)
+    return numero ? `${numero} ${transaccionSimbolo(row)}`.trim() : "—"
+}
+
+function transaccionResumenHtml(row) {
+    const tipo = normalizeTransaccionWalletTipo(row.walletTipo)
+    const cabecera = walletsSegMovCabeceraHtml({
+        tipo,
+        etiqueta: TRANSACCION_WALLET_OPTIONS.find((o) => o.value === tipo)?.label || "Transacción",
+        cantidad: transaccionConSimbolo(row.total, row),
+        fecha: row.fechaOperacion || "—"
+    })
+    return `${cabecera}${walletsSegMovRutaHtml({ titulo: "Origen", valor: row.walletDesde }, { titulo: "Destino", valor: row.walletDestino })}`
+}
+
+function transaccionDatosHtml(row) {
+    const asset = getTransaccionAsset(row.assetId)
+    const filas = [
+        ["Activo", escapeHtml(asset?.name || row.assetName || "—")],
+        ["Comisión", escapeHtml(transaccionConSimbolo(row.comisionRed, row))],
+        ["Hash", walletsSegValorCopiableHtml(normalizeHashTransaccionValue(row.hashTransaccion))],
+        ...(row.nota ? [["Nota", escapeHtml(row.nota)]] : [])
+    ]
+    return filas.map(([clave, valor]) => `<div><dt>${escapeHtml(clave)}</dt><dd>${valor}</dd></div>`).join("")
+}
+
+// Sin movimiento (una fila escrita a mano, o que ya no se encuentra en la red) no
+// hay dirección que marcar: se enseña lo que dice la fila y se puede editar.
+function abrirFilaSinMovimiento(row) {
+    const asset = getTransaccionAsset(row.assetId)
+    const tipo = normalizeTransaccionWalletTipo(row.walletTipo)
+    walletsSegMontarVentanaMovimiento({
+        titulo: `Transacción de ${asset?.name || row.assetName || "cripto"}`,
+        tipo,
+        resumenHtml: transaccionResumenHtml(row),
+        datosHtml: transaccionDatosHtml(row),
+        filaTransaccion: row.id
+    })
+}
+
+async function abrirDetalleTransaccion(rowId) {
+    const row = (currentTransaccionesData.rows || []).find((r) => r.id === rowId)
+    if (!row || transaccionesAbriendoDetalle) return
+    transaccionesAbriendoDetalle = true
+    try {
+        // Marcar relee las filas del servidor: lo que quede por guardar se perdería.
+        if (transaccionesHasPendingChanges) await persistTransaccionesData()
+        const encontrado = await localizarMovimientoDeFila(row)
+        if (!encontrado) {
+            abrirFilaSinMovimiento(row)
+            return
+        }
+        encontrado.mov.walletId = encontrado.wallet.id
+        encontrado.mov.filaTransaccion = row.id
+        abrirMovimientoSeguimiento(encontrado.mov)
+    } catch (error) {
+        // Sin red la fila se puede seguir viendo: solo falta lo que hay que leer.
+        console.warn("No se pudo leer el movimiento de la transacción.", error)
+        abrirFilaSinMovimiento(row)
+    } finally {
+        transaccionesAbriendoDetalle = false
+    }
 }
 
 function syncTransaccionesDataFromTable() {
@@ -561,7 +750,15 @@ async function fusionarTransaccionesTrasConflicto(snapshot) {
 // Tras importar movimientos de una wallet (js/cripto/wallets.js) la tabla se
 // relee entera: las filas nuevas las ha escrito el servidor.
 async function recargarTransaccionesDesdeServidor() {
-    if (!document.getElementById("transaccionesBody")) return
+    if (document.getElementById("transaccionesBody")) await repintarTransaccionesDesdeServidor()
+    // También fuera de esta página: la posición de Activos sale de su propia copia
+    // de las filas, y una marca hecha desde Seguimiento le cambia la comisión.
+    await refreshAssetsSidebar(currentAssetId, false)
+}
+
+async function repintarTransaccionesDesdeServidor() {
+    // Una marca o una dirección nueva dejan desfasado lo leído para el detalle.
+    transaccionesHistoriales.clear()
     currentTransaccionesData = await loadTransaccionesData()
     transaccionesRevision = Number.isInteger(currentTransaccionesData?.revision)
         ? currentTransaccionesData.revision

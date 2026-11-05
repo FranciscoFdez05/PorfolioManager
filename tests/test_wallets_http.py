@@ -138,6 +138,9 @@ def testSincronizarImportaATransacciones(cliente, monkeypatch):
                                   contraparte="bc1qorigen")
     monkeypatch.setattr(wallets_sync, "lectorPara", lambda red: _Lector([movimiento]))
     walletId = _enlazar(client, cabeceras).get_json()["wallet"]["id"]
+    # Una entrada de dinero solo se importa ya verificada por el usuario.
+    client.post(f"/api/wallets/{walletId}/movimientos/marcar", headers=cabeceras,
+                json={"hash": "abc123", "simbolo": "BTC", "sentido": "recibida", "propia": False})
 
     respuesta = client.post(f"/api/wallets/{walletId}/sincronizar", headers=cabeceras)
     otra = client.post(f"/api/wallets/{walletId}/sincronizar", headers=cabeceras)
@@ -1093,6 +1096,20 @@ def testDevolverALaLibretaEsLoContrarioDeVincular(cliente, monkeypatch):
     assert client.get("/api/wallets").get_json()["wallets"] == []
 
 
+def testDevolverALaLibretaBorraSusLecturasGuardadas(cliente, monkeypatch):
+    from stores.wallets_lecturas import SECCION_UTXOS, LecturasRepository
+
+    client, cabeceras, rutas = cliente
+    _ponerContrasena(monkeypatch, rutas)
+    _guardarDireccion(client, cabeceras, propia=True, apodo="Fría")
+    walletId = _vincular(client, cabeceras).get_json()["wallet"]["id"]
+    assert LecturasRepository().guardar(walletId, SECCION_UTXOS, {"utxos": []}) is True
+
+    assert _aLibreta(client, cabeceras, walletId).status_code == 200
+
+    assert LecturasRepository().leer(walletId) == {}
+
+
 @pytest.mark.parametrize("datos", [
     {"tipo": "xpub", "valor": _ZPUB},
     {"tipo": "direccion", "valor": _BECH32, "propia": False, "assetId": ""},
@@ -1140,6 +1157,43 @@ def _walletPropia(client, cabeceras):
     return _enlazar(client, cabeceras, tipo="direccion", valor=_BECH32).get_json()["wallet"]["id"]
 
 
+def testCompletarComisionesExigeCsrfYSinNadaQueHacerDevuelveCero(cliente):
+    client, cabeceras, _ = cliente
+    url = "/api/wallets/transacciones/completar-comisiones"
+
+    assert client.post(url).status_code == 403
+    respuesta = client.post(url, headers=cabeceras)
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json() == {"ok": True, "completadas": 0}
+
+
+def testUnaFilaAntiguaDeBitcoinConOrigenPropioRecuperaLaComision(cliente):
+    from core.wallets_vigilancia import movimientoComoDict
+    from routes import wallets as rutasWallets
+
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+    movimiento = MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 11, 1, tzinfo=timezone.utc), simbolo="BTC",
+                                  cantidad=Decimal("0.01355828"), comision=None, tipo=RECIBIDA, contraparte=_SATOSHI,
+                                  comisionTx=Decimal("0.00000413"))
+    rutasWallets._repositorio().actualizar(walletId, recientes=[movimientoComoDict(movimiento)])
+    filas = {"rows": [{"id": "wallet-antigua", "assetId": "btc", "assetName": "Bitcoin", "fechaOperacion": "01-11-2026",
+                       "total": "0.01355828", "comisionRed": "", "walletTipo": "recibida", "walletDesde": _SATOSHI,
+                       "walletDestino": "Cartera", "hashTransaccion": "abc123", "nota": ""}]}
+    assert client.post("/api/transacciones", json=filas, headers=cabeceras).status_code == 200
+    assert _marcarMovimiento(client, cabeceras, walletId, comision="", direcciones=[_SATOSHI]).status_code == 200
+    fila = client.get("/api/transacciones").get_json()["rows"][0]
+    # Es el estado de partida: marcada y sin comisión, porque lo apuntado de la fila no la lleva.
+    assert (fila["walletTipo"], fila["comisionRed"]) == ("entre_wallet", "")
+
+    respuesta = client.post("/api/wallets/transacciones/completar-comisiones", headers=cabeceras).get_json()
+
+    assert respuesta["completadas"] == 1
+    fila = client.get("/api/transacciones").get_json()["rows"][0]
+    assert (fila["walletTipo"], fila["comisionRed"], fila["total"]) == ("entre_wallet", "0.00000413", "0.01355828")
+
+
 def testMarcarUnRetiroEntreWalletsCorrigeLoImportado(cliente):
     client, cabeceras, _ = cliente
     walletId = _walletPropia(client, cabeceras)
@@ -1167,6 +1221,128 @@ def testQuitarLaMarcaDeUnaTransaccion(cliente):
 
     assert respuesta.status_code == 200
     assert respuesta.get_json()["marca"] is None
+
+
+_ORIGEN_BTC = "bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq"
+
+
+def _libretaManual(client):
+    return {d["direccion"]: d for d in client.get("/api/wallets").get_json()["direcciones"]}
+
+
+def testMarcarEntreMisWalletsDaPorPropiasLasDosDirecciones(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+
+    respuesta = _marcarMovimiento(client, cabeceras, walletId, direcciones=[_BECH32, _ORIGEN_BTC])
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.get_json()
+    # La de la wallet ya era propia por estar enlazada: no se duplica a mano.
+    assert cuerpo["marca"]["direccionesAnadidas"] == [_ORIGEN_BTC]
+    assert list(cuerpo["efectivas"]) == [_ORIGEN_BTC]
+    assert cuerpo["efectivas"][_ORIGEN_BTC]["marca"] == "propia"
+    assert _libretaManual(client)[_ORIGEN_BTC]["propia"] is True
+    assert _BECH32 not in _libretaManual(client)
+
+
+def testMarcarSinLaOtraDireccionNoTocaLaLibreta(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+
+    cuerpo = _marcarMovimiento(client, cabeceras, walletId, direcciones=[_BECH32]).get_json()
+
+    assert cuerpo["marca"]["direccionesAnadidas"] == []
+    assert "efectivas" not in cuerpo
+    assert _libretaManual(client) == {}
+
+
+def testMarcarAjenaNoDaDireccionesPorPropias(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+
+    _marcarMovimiento(client, cabeceras, walletId, propia=False, direcciones=[_ORIGEN_BTC])
+
+    assert _libretaManual(client) == {}
+
+
+def testQuitarLaMarcaSacaLasDireccionesQueAnadio(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+    _marcarMovimiento(client, cabeceras, walletId, direcciones=[_ORIGEN_BTC])
+
+    cuerpo = _marcarMovimiento(client, cabeceras, walletId, propia=None).get_json()
+
+    assert cuerpo["efectivas"] == {_ORIGEN_BTC: None}
+    assert _libretaManual(client) == {}
+
+
+def testDesmarcarLaOtraDireccionAlRemarcarLaSaca(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+    _marcarMovimiento(client, cabeceras, walletId, direcciones=[_ORIGEN_BTC])
+
+    cuerpo = _marcarMovimiento(client, cabeceras, walletId, direcciones=[]).get_json()
+
+    assert cuerpo["marca"]["propia"] is True
+    assert cuerpo["marca"]["direccionesAnadidas"] == []
+    assert _libretaManual(client) == {}
+
+
+def testCambiarLaComisionConservaLaDireccionAnadida(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+    _marcarMovimiento(client, cabeceras, walletId, direcciones=[_ORIGEN_BTC])
+
+    cuerpo = _marcarMovimiento(client, cabeceras, walletId, comision="0,5", direcciones=[_ORIGEN_BTC]).get_json()
+
+    assert cuerpo["marca"]["direccionesAnadidas"] == [_ORIGEN_BTC]
+    assert _ORIGEN_BTC in _libretaManual(client)
+
+
+def testQuitarLaMarcaRespetaLaDireccionQueOtraMarcaNecesita(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+    _marcarMovimiento(client, cabeceras, walletId, direcciones=[_ORIGEN_BTC])
+    # La segunda transacción no la añade (ya es propia), así que no la reclama;
+    # sí la reclama si se marca antes en otra moneda de la misma transacción.
+    _marcarMovimiento(client, cabeceras, walletId, hash="def456", direcciones=[_ORIGEN_BTC])
+
+    _marcarMovimiento(client, cabeceras, walletId, hash="def456", propia=None)
+
+    assert _ORIGEN_BTC in _libretaManual(client)
+
+
+def testQuitarLaMarcaRespetaLaDireccionConApodo(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+    _marcarMovimiento(client, cabeceras, walletId, direcciones=[_ORIGEN_BTC])
+    client.post("/api/wallets/direcciones/guardar", headers=cabeceras,
+                json={"red": "btc", "direccion": _ORIGEN_BTC, "apodo": "Trezor viejo", "propia": True})
+
+    _marcarMovimiento(client, cabeceras, walletId, propia=None)
+
+    assert _libretaManual(client)[_ORIGEN_BTC]["apodo"] == "Trezor viejo"
+
+
+def testUnaDireccionNoValidaNoImpideMarcar(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+
+    respuesta = _marcarMovimiento(client, cabeceras, walletId, direcciones=["", "no-es-una-direccion"])
+
+    assert respuesta.status_code == 200
+    assert respuesta.get_json()["marca"]["propia"] is True
+    assert _libretaManual(client) == {}
+
+
+def testMarcarMasDeDosDireccionesSeRechaza(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _walletPropia(client, cabeceras)
+
+    respuesta = _marcarMovimiento(client, cabeceras, walletId, direcciones=[_BECH32, _ORIGEN_BTC, _ORIGEN_BTC])
+
+    assert respuesta.status_code == 400
 
 
 @pytest.mark.parametrize("cambios, campo", [
@@ -1266,7 +1442,8 @@ def testMarcarUnaDireccionReetiquetaLoImportadoYElHistorial(cliente, monkeypatch
     monkeypatch.setattr(wallets_sync, "lectorPara", lambda red: _Lector([movimiento]))
     monkeypatch.setattr(rutasWallets, "lectorPara", lambda red: _Lector([movimiento]))
     walletId = _enlazar(client, cabeceras).get_json()["wallet"]["id"]
-    client.post(f"/api/wallets/{walletId}/sincronizar", headers=cabeceras)
+    # Una fila «recibida» de antes de existir la verificación de entradas.
+    wallets_sync.SincronizadorWallets(verificarEntradas=False).sincronizar(walletId)
 
     respuesta = _guardarDireccion(client, cabeceras, apodo="Exodus", propia=True).get_json()
 
@@ -1280,7 +1457,7 @@ def testMarcarUnaDireccionReetiquetaLoImportadoYElHistorial(cliente, monkeypatch
 
     client.post("/api/wallets/direcciones/olvidar", json={"red": "btc", "direccion": _BECH32}, headers=cabeceras)
     fila = client.get("/api/transacciones").get_json()["rows"][0]
-    assert (fila["walletTipo"], fila["walletDesde"]) == ("recibida", _BECH32)
+    assert (fila["walletTipo"], fila["walletDesde"]) == ("pendiente", _BECH32)
 
 
 def testEnlazarUnaWalletPropiaReetiquetaLoQueIbaHaciaElla(cliente, monkeypatch):
@@ -1556,6 +1733,153 @@ def testLaWatchlistTraeLaMonedaYLosTokensVistosEnLasWallets(cliente, monkeypatch
         ("moneda", "ETH", "Ethereum"), ("token", "CSPX", "iShares S&P 500")
     ]
     assert direccion not in respuesta.get_data(as_text=True)
+
+
+# ── Entradas por verificar y direcciones de las claves públicas ───────────────
+
+_CLAVE_G = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+
+
+class _LectorRevision(_Lector):
+    def saldo(self, tipo, valor):
+        return Decimal("0.01")
+
+
+def _movimientoEntrada(tipo=RECIBIDA, contraparte="bc1qorigen"):
+    return MovimientoWallet(red="btc", hash="abc123", fecha=datetime(2026, 1, 2, tzinfo=timezone.utc), simbolo="BTC",
+                            cantidad=Decimal("0.01"), comision=None, tipo=tipo, contraparte=contraparte)
+
+
+def _walletRevisada(client, cabeceras, monkeypatch, movimiento):
+    from core import wallets_sync, wallets_vigilancia
+
+    lector = _LectorRevision([movimiento])
+    monkeypatch.setattr(wallets_vigilancia, "lectorPara", lambda red: lector)
+    monkeypatch.setattr(wallets_sync, "lectorPara", lambda red: lector)
+    walletId = _enlazar(client, cabeceras).get_json()["wallet"]["id"]
+    assert client.post(f"/api/wallets/{walletId}/actualizar", headers=cabeceras).status_code == 200
+    return walletId
+
+
+def _recientes(client):
+    return client.get("/api/wallets").get_json()["wallets"][0]["recientes"]
+
+
+def _verificar(client, cabeceras, walletId, propia=False):
+    return client.post(f"/api/wallets/{walletId}/movimientos/marcar", headers=cabeceras,
+                       json={"hash": "abc123", "simbolo": "BTC", "sentido": "recibida", "propia": propia}).get_json()
+
+
+def testUnaEntradaSaleComoPendienteYNoSeImportaAlSincronizar(cliente, monkeypatch):
+    client, cabeceras, _ = cliente
+    walletId = _walletRevisada(client, cabeceras, monkeypatch, _movimientoEntrada())
+
+    assert _recientes(client)[0]["pendiente"] is True
+    sincronizado = client.post(f"/api/wallets/{walletId}/sincronizar", headers=cabeceras).get_json()
+
+    assert (sincronizado["anadidas"], sincronizado["pendientes"]) == (0, 1)
+    assert client.get("/api/transacciones").get_json()["rows"] == []
+
+
+def testUnEnvioNoQuedaPendiente(cliente, monkeypatch):
+    client, cabeceras, _ = cliente
+    _walletRevisada(client, cabeceras, monkeypatch, _movimientoEntrada(tipo=ENVIADA))
+
+    assert _recientes(client)[0]["pendiente"] is False
+
+
+@pytest.mark.parametrize("propia, tipo", [(False, "recibida"), (True, "entre_wallet")])
+def testVerificarUnaEntradaLaImportaSinReleerLaRed(cliente, monkeypatch, propia, tipo):
+    client, cabeceras, _ = cliente
+    walletId = _walletRevisada(client, cabeceras, monkeypatch, _movimientoEntrada())
+
+    respuesta = _verificar(client, cabeceras, walletId, propia)
+
+    assert respuesta["importadas"] == 1
+    assert [f["walletTipo"] for f in client.get("/api/transacciones").get_json()["rows"]] == [tipo]
+    assert _recientes(client)[0]["pendiente"] is False
+
+
+def testVerificarUnaEntradaAntiguaPideSincronizar(cliente):
+    client, cabeceras, _ = cliente
+    walletId = _enlazar(client, cabeceras).get_json()["wallet"]["id"]
+
+    respuesta = _verificar(client, cabeceras, walletId)
+
+    assert respuesta["porSincronizar"] is True
+    assert client.get("/api/transacciones").get_json()["rows"] == []
+
+
+def testUnaRecibidaYaImportadaNoSalePendiente(cliente, monkeypatch):
+    from core import wallets_sync
+
+    client, cabeceras, _ = cliente
+    walletId = _walletRevisada(client, cabeceras, monkeypatch, _movimientoEntrada())
+    wallets_sync.SincronizadorWallets(verificarEntradas=False).sincronizar(walletId)
+
+    assert _recientes(client)[0]["pendiente"] is False
+
+
+def testUnaWalletAjenaNoTieneEntradasPendientes(cliente, monkeypatch):
+    from core import wallets_vigilancia
+
+    client, cabeceras, _ = cliente
+    monkeypatch.setattr(wallets_vigilancia, "lectorPara", lambda red: _LectorRevision([_movimientoEntrada()]))
+    walletId = _enlazar(client, cabeceras, assetId="", propia=False).get_json()["wallet"]["id"]
+    client.post(f"/api/wallets/{walletId}/actualizar", headers=cabeceras)
+
+    assert _recientes(client)[0]["pendiente"] is False
+
+
+def testUnaClavePublicaPropiaSaleEnLaListaConTodasSusDireccionesEnmascaradas(cliente, monkeypatch):
+    from core.cripto_direcciones import direccionesDeClavePublica
+
+    client, cabeceras, rutas = cliente
+    _ponerContrasena(monkeypatch, rutas)
+    walletId = _enlazar(client, cabeceras, tipo="clave", valor=_CLAVE_G).get_json()["wallet"]["id"]
+    direcciones = direccionesDeClavePublica(_CLAVE_G)
+
+    listado = client.get("/api/wallets")
+    enlazadas = listado.get_json()["direccionesEnlazadas"]
+
+    assert [(d["walletId"], d["clave"], d["derivada"]) for d in enlazadas] == [
+        (walletId, f"{walletId}#{indice}", True) for indice in range(4)
+    ]
+    assert not any(direccion in listado.get_data(as_text=True) for direccion in direcciones)
+
+    completas = client.post("/api/wallets/direcciones/ver-completas", headers=cabeceras,
+                            json={"currentPassword": "la-clave-de-la-web"}).get_json()["valores"]
+    assert completas == {f"{walletId}#{indice}": direccion for indice, direccion in enumerate(direcciones)}
+
+
+def testUnMovimientoDesdeUnaDireccionDeLaClaveNoEsUnaEntrada(cliente, monkeypatch):
+    from core.cripto_direcciones import direccionesDeClavePublica
+
+    client, cabeceras, _ = cliente
+    origen = direccionesDeClavePublica(_CLAVE_G)[2]
+    _enlazar(client, cabeceras, alias="Clave", tipo="clave", valor=_CLAVE_G, seguimiento="Clave")
+    _walletRevisada(client, cabeceras, monkeypatch, _movimientoEntrada(contraparte=origen))
+
+    wallets = client.get("/api/wallets").get_json()["wallets"]
+    movimiento = next(w for w in wallets if w["tipo"] == "xpub")["recientes"][0]
+
+    assert (movimiento["tipo"], movimiento["pendiente"]) == ("entre_wallet", False)
+
+
+def testEnlazarUnaClavePublicaReetiquetaLoQueVeniaDeSusDirecciones(cliente, monkeypatch):
+    from core import wallets_sync
+    from core.cripto_direcciones import direccionesDeClavePublica
+
+    client, cabeceras, _ = cliente
+    destino = direccionesDeClavePublica(_CLAVE_G)[3]
+    monkeypatch.setattr(wallets_sync, "lectorPara", lambda red: _Lector([_movimientoEntrada(ENVIADA, destino)]))
+    walletId = _enlazar(client, cabeceras).get_json()["wallet"]["id"]
+    client.post(f"/api/wallets/{walletId}/sincronizar", headers=cabeceras)
+
+    enlazada = _enlazar(client, cabeceras, alias="Clave", tipo="clave", valor=_CLAVE_G, seguimiento="Clave").get_json()
+
+    assert enlazada["reetiquetadas"] == 1
+    assert client.get("/api/transacciones").get_json()["rows"][0]["walletTipo"] == "entre_wallet"
 
 
 def testLaWatchlistSinSesionNoSeVe(crearApp, datosAislados, tempDb):

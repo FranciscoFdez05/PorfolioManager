@@ -13,10 +13,24 @@
 // de cada una, estadísticas e historial leído de la red en el momento, de 100
 // en 100, con flechas para pasar al seguimiento anterior o siguiente.
 const WALLETS_SEG_TIPOS = { recibida: "Recibida", enviada: "Enviada", entre_wallet: "Entre direcciones propias" }
+const WALLETS_SEG_TEXTO_PENDIENTE = "Pendiente de verificar"
+
+// Una entrada de terceros no pasa a Transacciones hasta que el usuario la confirma.
+// Si su origen acaba siendo una dirección propia, ya no es una entrada.
+function walletsSegEsPendiente(mov) {
+    return Boolean(mov.pendiente) && mov.tipo === "recibida"
+}
+
+function walletsSegTextoTipo(mov) {
+    return walletsSegEsPendiente(mov) ? WALLETS_SEG_TEXTO_PENDIENTE : WALLETS_SEG_TIPOS[mov.tipo] || mov.tipo
+}
 const WALLETS_SEG_MOVIMIENTOS_VISIBLES = 2
 // Fichas de moneda o token en la tarjeta; el resto se resume en «+N».
 const WALLETS_SEG_ACTIVOS_VISIBLES = 6
 const WALLETS_SEG_PAGINA = 100
+// Lo leído hace menos de esto no se vuelve a pedir al entrar: pasar con Anterior y
+// Siguiente por varios seguimientos no debe chocar con el límite de las APIs públicas.
+const WALLETS_SEG_FRESCO_MS = 2 * 60 * 1000
 const WALLETS_SEG_SIN_PRECIO = "No suma en euros y su mínimo en euros no filtra. Elige una cripto de Activos en Editar o ponle ticker en Análisis › Seguimiento."
 const WALLETS_SEG_FILTROS = [
     { valor: "todos", texto: "Todos" },
@@ -98,9 +112,10 @@ const WALLETS_SEG_PESTANAS = [
     { clave: "tokens", nombre: "Tokens", disponible: () => true },
     { clave: "utxos", nombre: "UTXOs", disponible: (grupo) => grupo.wallets.some((wallet) => wallet.red === "btc") }
 ]
-// Tokens leídos en el detalle, por id de wallet. Solo en memoria: el servidor no
-// los guarda (Etherscan gratuito pide una llamada por token) y son saldos que no
-// conviene dejar en el navegador. Sirven para que la tarjeta los muestre también.
+// Tokens leídos en el detalle, por id de wallet. Aquí solo en memoria: son saldos
+// que no conviene dejar en el navegador; el servidor los guarda cifrados para la
+// próxima visita (stores/wallets_lecturas.py), porque Etherscan gratuito pide una
+// llamada por token. Sirven para que la tarjeta los muestre también.
 const walletsSegTokensLeidos = new Map()
 // Contratos de las listas públicas de tokens que el servidor manda junto a cada
 // lectura, por «red|contrato». Solo se acumulan: recargar las wallets no debe
@@ -532,7 +547,7 @@ function walletsSegMovimientosHtml(grupo) {
             const sospechoso = !imitacion && Boolean(mov.contrato) && walletsSegEsSospechoso(mov, mov.red)
             return `
             <li class="walletsSegMovimiento walletsSegMov-${escapeHtml(mov.tipo)}">
-                <span class="walletsSegMovTipo">${escapeHtml(WALLETS_SEG_TIPOS[mov.tipo] || mov.tipo)}${varias ? ` · ${escapeHtml(mov.alias)}` : ""} · ${escapeHtml(walletsSegFecha(mov.fecha))}${imitacion ? ` <span class="walletsSegMovImitacion" title="${escapeHtml(WALLETS_SEG_ESTADOS_TOKEN.imitacion.titulo)}">Imitación</span>` : ""}${sospechoso ? ` <span class="walletsSegTokenSospechoso" title="${escapeHtml(WALLETS_SEG_TITULO_SOSPECHOSO)}">Sospechoso</span>` : ""}</span>
+                <span class="walletsSegMovTipo">${escapeHtml(walletsSegTextoTipo(mov))}${varias ? ` · ${escapeHtml(mov.alias)}` : ""} · ${escapeHtml(walletsSegFecha(mov.fecha))}${imitacion ? ` <span class="walletsSegMovImitacion" title="${escapeHtml(WALLETS_SEG_ESTADOS_TOKEN.imitacion.titulo)}">Imitación</span>` : ""}${sospechoso ? ` <span class="walletsSegTokenSospechoso" title="${escapeHtml(WALLETS_SEG_TITULO_SOSPECHOSO)}">Sospechoso</span>` : ""}</span>
                 <span class="walletsSegMovCantidad">${mov.tipo === "enviada" ? "−" : mov.tipo === "recibida" ? "+" : ""}${walletsSegNumero(mov.cantidad)} ${escapeHtml(mov.simbolo)}</span>
             </li>`
         })
@@ -614,6 +629,20 @@ function walletsSegAlertasLectura(wallets) {
     }
     const sinEntregar = wallets.reduce((suma, wallet) => suma + (Number(wallet.avisosReintento) || 0), 0)
     if (sinEntregar) alertas.push(`${sinEntregar} aviso${sinEntregar === 1 ? "" : "s"} sospechoso${sinEntregar === 1 ? "" : "s"} sin entregar: se reintenta en la próxima revisión`)
+    // Las imitaciones no se importan nunca: no hay nada que verificar.
+    const porVerificar = wallets.reduce(
+        (suma, wallet) =>
+            suma +
+            (wallet.recientes || []).filter(
+                (mov) => walletsSegEsPendiente(mov) && walletsSegEstadoToken(mov, wallet.red) !== "imitacion"
+            ).length,
+        0
+    )
+    if (porVerificar) {
+        alertas.push(
+            `${porVerificar} entrada${porVerificar === 1 ? "" : "s"} de dinero por verificar: abre el movimiento y elige «Entrada real» o «Entre mis wallets». Hasta entonces no ${porVerificar === 1 ? "cuenta" : "cuentan"} en la posición`
+        )
+    }
     return alertas
 }
 
@@ -1126,6 +1155,8 @@ function abrirDetalleSeguimiento(clave) {
         historialFecha: leido?.historialFecha || "",
         utxos: leido?.utxos,
         tokens: leido?.tokens,
+        persistente: leido?.persistente || false,
+        guardadoTraido: leido?.guardadoTraido || false,
         cargando: false,
         lecturas: 0
     }
@@ -1140,7 +1171,137 @@ function abrirDetalleSeguimiento(clave) {
     })
     renderWalletsSeguimiento()
     document.getElementById("walletsSegDetalle")?.scrollIntoView({ block: "start" })
-    if (!walletsSegDetalle.historialFecha) cargarHistorialDetalle()
+    if (!walletsSegDetalle.guardadoTraido) walletsSegTraerGuardado(walletsSegDetalle)
+    const fecha = walletsSegDetalle.historialFecha
+    if (!fecha || walletsSegCaducada(walletsSegDetalle, fecha)) cargarHistorialDetalle("nuevos")
+}
+
+// Sin nada guardado en el servidor, volver a leer una página dejaría sin el resto
+// de lo cargado: entonces lo que hay en memoria no caduca.
+function walletsSegCaducada(estado, fecha) {
+    return estado.persistente && Date.now() - new Date(fecha).getTime() >= WALLETS_SEG_FRESCO_MS
+}
+
+// Lo guardado en el servidor, sin tocar la red. Va sin reintentos: es una lectura
+// local, y si falla solo se tarda más en ver los datos.
+async function walletsSegPedirGuardado(clave) {
+    const respuesta = await fetch(`/api/wallets/seguimientos/lecturas?clave=${encodeURIComponent(clave)}`)
+    if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`)
+    return respuesta.json()
+}
+
+async function walletsSegTraerGuardado(estado) {
+    try {
+        walletsSegAplicarGuardado(estado, await walletsSegPedirGuardado(estado.clave))
+    } catch (error) {
+        console.debug("[wallets] Sin lecturas guardadas:", error.message)
+        return
+    }
+    if (walletsSegDetalle !== estado) return
+    walletsSegGuardarLeido(estado)
+    renderDetalleSeguimiento()
+    walletsSegRefrescarPestana(estado)
+}
+
+function walletsSegAplicarGuardado(estado, datos) {
+    estado.persistente = Boolean(datos.disponible)
+    estado.guardadoTraido = true
+    const wallets = walletsSegGrupo(estado.clave)?.wallets || []
+    const lecturas = wallets.map((wallet) => [wallet.id, datos.lecturas?.[wallet.id]]).filter(([, lectura]) => lectura)
+    walletsSegAplicarHistorialGuardado(estado, lecturas)
+    if (!estado.utxos || estado.utxos.cargando) estado.utxos = walletsSegUtxosGuardados(estado.utxos, lecturas) || estado.utxos
+    if (!estado.tokens || estado.tokens.cargando) estado.tokens = walletsSegTokensGuardados(estado.tokens, lecturas) || estado.tokens
+}
+
+// La más antigua: de las demás wallets se sabe algo más nuevo, pero la fecha que
+// se enseña no puede prometer que todo esté tan al día.
+function walletsSegFechaMasAntigua(fechas) {
+    return fechas.filter(Boolean).sort()[0] || ""
+}
+
+function walletsSegAplicarHistorialGuardado(estado, lecturas) {
+    const fechas = []
+    for (const [walletId, lectura] of lecturas) {
+        const guardado = lectura.movimientos
+        if (!guardado) continue
+        walletsSegAnotarPublicos(guardado.tokensPublicos)
+        fechas.push(guardado.fecha)
+        const historial = walletsSegHistorialDe(estado, walletId)
+        // Ya ha contestado la red, y su respuesta incluye lo guardado.
+        if (historial.limite) continue
+        Object.assign(historial, {
+            movimientos: guardado.movimientos.map((mov) => ({ ...mov, walletId })),
+            limite: guardado.limite,
+            maximo: guardado.maximo,
+            agotado: guardado.agotado
+        })
+    }
+    if (!estado.historialFecha) estado.historialFecha = walletsSegFechaMasAntigua(fechas)
+}
+
+function walletsSegUtxosGuardados(visor, lecturas) {
+    const secciones = lecturas.filter(([, lectura]) => lectura.utxos)
+    if (!secciones.length) return null
+    return {
+        lista: secciones
+            .flatMap(([walletId, lectura]) => lectura.utxos.utxos.map((utxo) => ({ ...utxo, walletId })))
+            .sort((a, b) => b.satoshis - a.satoshis),
+        alturaActual: Math.max(...secciones.map(([, lectura]) => Number(lectura.utxos.alturaActual) || 0)),
+        errores: [],
+        fecha: walletsSegFechaMasAntigua(secciones.map(([, lectura]) => lectura.utxos.fecha)),
+        cargando: false,
+        actualizando: Boolean(visor?.cargando)
+    }
+}
+
+function walletsSegTokensGuardados(visor, lecturas) {
+    const secciones = lecturas.filter(([, lectura]) => lectura.tokens)
+    if (!secciones.length) return null
+    const lista = []
+    for (const [walletId, lectura] of secciones) {
+        const tokens = lectura.tokens.tokens.map((token) => ({ ...token, walletId }))
+        walletsSegAnotarPublicos(lectura.tokens.tokensPublicos)
+        walletsSegTokensLeidos.set(walletId, tokens)
+        lista.push(...tokens)
+    }
+    return {
+        lista,
+        sinLeer: secciones.reduce((suma, [, lectura]) => suma + (Number(lectura.tokens.sinLeer) || 0), 0),
+        errores: [],
+        fecha: walletsSegFechaMasAntigua(secciones.map(([, lectura]) => lectura.tokens.fecha)),
+        cargando: false,
+        actualizando: Boolean(visor?.cargando)
+    }
+}
+
+// La pestaña recordada puede ser Tokens o UTXOs: lo guardado ya se ve y toca ponerlo al día.
+function walletsSegRefrescarPestana(estado) {
+    const grupo = walletsSegGrupo(estado.clave)
+    if (!grupo) return
+    const pestana = walletsSegPestanaActiva(estado, grupo)
+    if (pestana === "tokens" && walletsSegVisorCaducado(estado, estado.tokens)) cargarTokensDetalle()
+    if (pestana === "utxos" && walletsSegVisorCaducado(estado, estado.utxos)) cargarUtxosDetalle()
+}
+
+function walletsSegVisorLeyendo(visor) {
+    return Boolean(visor?.cargando || visor?.actualizando)
+}
+
+function walletsSegVisorCaducado(estado, visor) {
+    return Boolean(visor?.fecha) && !walletsSegVisorLeyendo(visor) && walletsSegCaducada(estado, visor.fecha)
+}
+
+// Con algo que enseñar se sigue enseñando mientras llega lo nuevo: la lectura se
+// acumula aparte y lo sustituye de golpe al terminar.
+function walletsSegVisorAlEmpezar(visor, lectura) {
+    return visor?.lista.length ? { ...visor, actualizando: true } : { ...lectura, cargando: true }
+}
+
+// Si alguna wallet ha fallado sigue con sus datos anteriores, y la fecha no puede
+// decir que todo se acaba de leer.
+function walletsSegVisorAlTerminar(visor, lectura) {
+    const fecha = lectura.errores.length && visor?.fecha ? visor.fecha : new Date().toISOString()
+    return { ...lectura, fecha, cargando: false, actualizando: false }
 }
 
 function walletsSegEmpezarLectura(estado) {
@@ -1168,6 +1329,8 @@ function walletsSegGuardarLeido(estado) {
     walletsSegLeidos.set(estado.clave, {
         historiales: estado.historiales,
         historialFecha: estado.historialFecha,
+        persistente: estado.persistente,
+        guardadoTraido: estado.guardadoTraido,
         utxos: estado.utxos?.cargando ? walletsSegLeidos.get(estado.clave)?.utxos : estado.utxos,
         tokens: estado.tokens?.cargando ? walletsSegLeidos.get(estado.clave)?.tokens : estado.tokens
     })
@@ -1177,6 +1340,12 @@ function walletsSegGuardarLeido(estado) {
 function walletsSegConsultadoHtml(fecha, boton) {
     const texto = fecha ? `<span>Última consulta: ${escapeHtml(walletsSegFecha(fecha))}</span>` : ""
     return `<span class="walletsSegConsultado">${texto}${boton}</span>`
+}
+
+// Va encima de los datos, a la vista: la del pie queda debajo de toda la tabla.
+function walletsSegCargadoHtml(fecha, leyendo, textoLeyendo) {
+    if (!fecha) return ""
+    return `<p class="assetModalHint">Cargado el ${escapeHtml(walletsSegFecha(fecha))}${leyendo ? ` · ${escapeHtml(textoLeyendo)}` : ""}</p>`
 }
 
 function walletsSegPestanaGuardada() {
@@ -1203,15 +1372,21 @@ function cambiarPestanaSeguimiento(clave) {
     } catch {
         // Sin localStorage la pestaña cambia igual, solo que no se recuerda.
     }
-    if (clave === "tokens" && !estado.tokens && walletsSegGrupoConTokens(walletsSegGrupo(estado.clave))) cargarTokensDetalle()
-    else if (clave === "utxos" && !estado.utxos) cargarUtxosDetalle()
+    const leerTokens = !estado.tokens || walletsSegVisorCaducado(estado, estado.tokens)
+    if (clave === "tokens" && leerTokens && walletsSegGrupoConTokens(walletsSegGrupo(estado.clave))) cargarTokensDetalle()
+    else if (clave === "utxos" && (!estado.utxos || walletsSegVisorCaducado(estado, estado.utxos))) cargarUtxosDetalle()
     else renderDetalleSeguimiento()
+}
+
+function walletsSegDerivadasDe(grupo) {
+    const ids = new Set(grupo.wallets.map((wallet) => wallet.id))
+    return (walletsEstado.direccionesEnlazadas || []).filter((d) => d.derivada && ids.has(d.walletId))
 }
 
 function walletsSegPestanasHtml(estado, grupo, activa, movimientos) {
     const contadores = {
         movimientos: movimientos.length,
-        direcciones: grupo.wallets.length,
+        direcciones: grupo.wallets.length + walletsSegDerivadasDe(grupo).length,
         tokens: walletsSegContadorTokens(estado, grupo),
         utxos: estado.utxos && !estado.utxos.cargando ? estado.utxos.lista.length : null
     }
@@ -1268,6 +1443,7 @@ function walletsSegPanelMovimientosHtml(estado, grupo, movimientos, tarjetasStat
         </div>
         <p class="assetModalHint">Las cifras son de los movimientos leídos y solo de la moneda nativa de cada red; los tokens se ven en su pestaña.</p>
         <h3 class="walletsSegSeccion">Historial</h3>
+        ${movimientos.length ? walletsSegCargadoHtml(estado.historialFecha, estado.cargando, "Buscando movimientos nuevos…") : ""}
         ${movimientos.length ? walletsSegFechasHtml(estado) : ""}
         <div id="walletsSegHistorial">${walletsSegHistorialHtml(estado, walletsSegGrupoVisible(estado, grupo), movimientos)}</div>`
 }
@@ -1291,44 +1467,56 @@ function walletsSegHistorialDe(estado, walletId) {
     return estado.historiales[walletId]
 }
 
-// Pide la página siguiente de cada wallet que aún tenga más.
-async function cargarHistorialDetalle() {
+// Lo que se pide a la red según lo que se quiera: lo más antiguo («mas», la página
+// siguiente), lo más reciente («nuevos», una página que el servidor junta con lo
+// guardado) o sustituir lo guardado («releer», sin perder cuántos había cargados).
+function walletsSegUrlHistorial(walletId, historial, modo) {
+    const limites = {
+        mas: historial.limite + WALLETS_SEG_PAGINA,
+        nuevos: WALLETS_SEG_PAGINA,
+        releer: Math.max(historial.limite, WALLETS_SEG_PAGINA)
+    }
+    return `/api/wallets/${encodeURIComponent(walletId)}/movimientos?limite=${limites[modo]}${modo === "releer" ? "&reiniciar=1" : ""}`
+}
+
+// Por defecto, la página siguiente de cada wallet que aún tenga más.
+async function cargarHistorialDetalle(modo = "mas") {
     const estado = walletsSegDetalle
     const grupo = estado && walletsSegGrupo(estado.clave)
     if (!grupo || estado.cargando) return
     // «Cargar más» con una red elegida solo pide las wallets de esa red.
-    const pendientes = walletsSegGrupoVisible(estado, grupo).wallets.filter((wallet) => !walletsSegHistorialDe(estado, wallet.id).agotado)
+    const visibles = walletsSegGrupoVisible(estado, grupo).wallets
+    const pendientes = modo === "mas" ? visibles.filter((wallet) => !walletsSegHistorialDe(estado, wallet.id).agotado) : visibles
     if (!pendientes.length) return
     estado.cargando = true
     walletsSegEmpezarLectura(estado)
     renderDetalleSeguimiento()
     const progreso = iniciarProgreso("Leyendo movimientos", pendientes.length)
     try {
-        await walletsSegLeerHistoriales(estado, pendientes, progreso)
+        await walletsSegLeerHistoriales(estado, pendientes, progreso, modo)
     } finally {
         progreso.terminar()
         estado.cargando = false
     }
     if (!walletsSegTerminarLectura(estado)) return
-    estado.historialFecha = new Date().toISOString()
+    // Con un fallo sigue lo anterior de esa wallet: su fecha no es la de ahora.
+    const conFallo = pendientes.some((wallet) => walletsSegHistorialDe(estado, wallet.id).error)
+    if (!conFallo || !estado.historialFecha) estado.historialFecha = new Date().toISOString()
     walletsSegGuardarLeido(estado)
     if (walletsSegDetalle === estado) renderDetalleSeguimiento()
 }
 
-// Descarta lo guardado y vuelve a pedir la primera página de cada wallet.
+// Sustituye lo guardado por lo que diga la red ahora: limpia lo que esta haya
+// descartado. Lo anterior se sigue viendo hasta que llegue, y se queda si falla.
 function releerHistorialDetalle() {
-    const estado = walletsSegDetalle
-    if (!estado || estado.cargando) return
-    estado.historiales = {}
-    estado.historialFecha = ""
-    cargarHistorialDetalle()
+    cargarHistorialDetalle("releer")
 }
 
 function walletsSegAvisoReintento(progreso, wallet) {
     return (intento) => progreso.detalle(`${walletsNombreCompleto(wallet)} · reintentando (${intento} de ${WALLETS_REINTENTOS_MS.length})`)
 }
 
-async function walletsSegLeerHistoriales(estado, pendientes, progreso) {
+async function walletsSegLeerHistoriales(estado, pendientes, progreso, modo) {
     // Una a una: en paralelo, las APIs públicas (Solana, Etherscan) limitan enseguida.
     for (const wallet of pendientes) {
         progreso.paso(walletsNombreCompleto(wallet))
@@ -1337,7 +1525,7 @@ async function walletsSegLeerHistoriales(estado, pendientes, progreso) {
         historial.error = ""
         try {
             const datos = await walletsPeticionConReintentos(
-                `/api/wallets/${encodeURIComponent(wallet.id)}/movimientos?limite=${historial.limite + WALLETS_SEG_PAGINA}`,
+                walletsSegUrlHistorial(wallet.id, historial, modo),
                 walletsSegAvisoReintento(progreso, wallet)
             )
             // Se descartó el estado mientras se leía (se pidió a la red lo último): la respuesta ya no vale.
@@ -1346,10 +1534,13 @@ async function walletsSegLeerHistoriales(estado, pendientes, progreso) {
             historial.movimientos = (datos.movimientos || []).map((mov) => ({ ...mov, walletId: wallet.id }))
             historial.limite = datos.limite
             historial.maximo = datos.maximo
+            estado.persistente = Boolean(datos.guardado)
             // Algunas redes descartan transacciones que no mueven la moneda, así que
             // devolver menos de lo pedido no prueba que no haya más: lo prueba que
-            // pedir más no traiga nada nuevo.
-            historial.agotado = historial.movimientos.length <= anteriores || datos.limite >= datos.maximo
+            // pedir más no traiga nada nuevo. Lo sabe el servidor por lo guardado;
+            // sin nada guardado, solo se ve aquí.
+            const sinMas = modo === "mas" && historial.movimientos.length <= anteriores
+            historial.agotado = sinMas || (datos.agotado ?? datos.limite >= datos.maximo)
         } catch (error) {
             if (!walletsSegLecturaVigente(estado)) return
             historial.error =`${wallet.alias}: ${error.message || "no se pudo leer el historial"}`
@@ -1447,7 +1638,7 @@ function walletsSegFiltrar(movimientos, filtro) {
 function walletsSegComisionHtml(mov, simbolo) {
     if (mov.comision) return `${walletsSegNumero(mov.comision)} ${escapeHtml(simbolo)}`
     if (!mov.comisionTx) return ""
-    return `<span class="walletsSegComisionAjena" title="La pagó quien envió la transacción">${walletsSegNumero(mov.comisionTx)} ${escapeHtml(simbolo)}</span>`
+    return `<span class="walletsSegComisionAjena" title="${escapeHtml(walletsSegComisionDetalle(mov, simbolo).nota)}">${walletsSegNumero(mov.comisionTx)} ${escapeHtml(simbolo)}</span>`
 }
 
 // La contraparte con apodo se enseña por el apodo; la dirección sigue en el
@@ -1473,7 +1664,7 @@ function walletsSegFilaHistorialHtml(mov, wallet, varias, indice) {
         <tr class="walletsSegMov-${escapeHtml(mov.tipo)} walletsSegFilaMov" data-indice="${indice}" title="Haz clic para ver el movimiento completo">
             <td>${escapeHtml(walletsSegFecha(mov.fecha))}</td>
             ${varias ? `<td>${escapeHtml(wallet?.alias || "")}</td>` : ""}
-            <td>${escapeHtml(WALLETS_SEG_TIPOS[mov.tipo] || mov.tipo)}</td>
+            <td>${escapeHtml(walletsSegTextoTipo(mov))}</td>
             <td class="walletsSegMovCantidad">${signo}${walletsSegNumero(mov.cantidad)} ${escapeHtml(mov.simbolo)}</td>
             <td>${wallet ? walletsSegTokenHtml(mov, wallet.red, false) : ""}</td>
             <td>${walletsSegComisionHtml(mov, red?.simbolo || "")}</td>
@@ -1694,29 +1885,114 @@ function walletsSegValorCopiableHtml(valor, nota = "") {
     }`
 }
 
+// ¿La comisión de la transacción es del usuario porque también envió él? Con varios
+// orígenes solo el servidor lo sabe (y entonces ya manda `comision`): aquí, al repintar
+// sin releer, se responde únicamente del caso de un origen.
+function walletsSegOrigenEsPropio(mov) {
+    return mov.contraparteMarca === "propia" && (mov.contrapartes || []).length <= 1
+}
+
+function walletsSegComisionDeOrigenPropio(mov) {
+    const esRecibo = (mov.sentido || mov.tipo) === "recibida"
+    return esRecibo && !mov.contrato && mov.marcaMovimiento !== "ajena" && walletsSegOrigenEsPropio(mov) ? mov.comisionTx || "" : ""
+}
+
+/**
+ * Dice cuánto costó la transacción y quién lo pagó, según su clasificación actual.
+ *
+ * @param {object} mov Movimiento con la libreta aplicada.
+ * @param {string} simbolo Moneda de la red, en la que se paga la comisión.
+ * @returns {{importe: string, nota: string}} Importe con su moneda y quién lo pagó;
+ *     ambos vacíos si la red no informa de la comisión.
+ */
 function walletsSegComisionDetalle(mov, simbolo) {
-    if (mov.comisionMarcada) return `${walletsSegCantidadExacta(mov.comisionMarcada)} ${mov.simbolo} (la has puesto tú)`
-    if (mov.comision) return `${walletsSegCantidadExacta(mov.comision)} ${simbolo} (la pagó esta wallet)`
-    if (mov.comisionTx) return `${walletsSegCantidadExacta(mov.comisionTx)} ${simbolo} (la pagó quien envió la transacción)`
-    return "—"
+    const entreWallets = mov.tipo === "entre_wallet"
+    const importe = (valor, moneda) => `${walletsSegCantidadExacta(valor)} ${moneda}`.trim()
+    const pagadaPorTi = "Pagada por ti: el origen y el destino son tuyos"
+    if (mov.comisionMarcada) {
+        return {
+            importe: importe(mov.comisionMarcada, mov.simbolo),
+            nota: walletsSegOrigenEsPropio(mov) ? pagadaPorTi : "Indicada por ti; se descuenta de la posición"
+        }
+    }
+    if (mov.comision) return { importe: importe(mov.comision, simbolo), nota: entreWallets ? pagadaPorTi : "Pagada por esta wallet" }
+    if (mov.comisionTx) {
+        return {
+            importe: importe(mov.comisionTx, simbolo),
+            nota: entreWallets ? "Pagada en el origen; no se descuenta de la posición" : "Pagada por el remitente; no se descuenta de la posición"
+        }
+    }
+    return { importe: "", nota: "" }
+}
+
+function walletsSegComisionFilaHtml({ importe, nota }) {
+    if (!importe) return "—"
+    return `<strong class="walletsSegMovComision">${escapeHtml(importe)}</strong> <span class="walletsSegDato">${escapeHtml(nota)}</span>`
+}
+
+/**
+ * Pinta la cabecera de la ventana: lo primero que se lee es qué pasó y por cuánto.
+ *
+ * @param {{tipo: string, etiqueta: string, cantidad: string, fecha: string}} datos
+ *     `tipo` elige el color; los demás son texto sin escapar.
+ * @returns {string} El HTML de la cabecera.
+ */
+function walletsSegMovCabeceraHtml({ tipo, etiqueta, cantidad, fecha }) {
+    return `
+        <div class="walletsSegMovCabecera walletsSegMov-${escapeHtml(tipo)}">
+            <span class="walletsSegMovTipoEtiqueta">${escapeHtml(etiqueta)}</span>
+            <strong class="walletsSegMovCantidad">${escapeHtml(cantidad)}</strong>
+            <span class="walletsSegDato">${escapeHtml(fecha)}</span>
+        </div>`
+}
+
+function walletsSegMovExtremoHtml({ titulo, nombre = "", valor, etiqueta = "" }) {
+    return `
+        <div class="walletsSegMovExtremo">
+            <span class="walletsSegMovExtremoTitulo">${escapeHtml(titulo)}${etiqueta ? `<span class="walletsSegMovExtremoEtiqueta">${escapeHtml(etiqueta)}</span>` : ""}</span>
+            ${nombre ? `<span class="walletsSegMovExtremoNombre">${escapeHtml(nombre)}</span>` : ""}
+            ${walletsSegValorCopiableHtml(valor)}
+        </div>`
+}
+
+function walletsSegMovRutaHtml(origen, destino) {
+    return `
+        <div class="walletsSegMovRuta">
+            ${walletsSegMovExtremoHtml(origen)}
+            <svg class="walletsSegMovRutaFlecha" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+            ${walletsSegMovExtremoHtml(destino)}
+        </div>`
+}
+
+function walletsSegMovExtremoPropio(titulo, valor, wallet) {
+    return { titulo, nombre: wallet?.alias || "", valor, etiqueta: "Esta wallet" }
+}
+
+function walletsSegMovExtremoContraparte(titulo, mov) {
+    const propia = mov.contraparteMarca === "propia"
+    const etiqueta = mov.contraparteEnlazada ? "Tuya · enlazada" : propia ? "Tuya" : mov.contraparteMarca ? "Ajena" : "Sin identificar"
+    return { titulo, nombre: mov.contraparteApodo || (propia ? "Dirección propia" : "Dirección externa"), valor: mov.contraparte, etiqueta }
+}
+
+function walletsSegMovResumenHtml(mov, wallet) {
+    const signo = mov.tipo === "enviada" ? "−" : mov.tipo === "recibida" ? "+" : ""
+    const sentido = mov.sentido || mov.tipo
+    const origen = sentido === "recibida" ? walletsSegMovExtremoContraparte("Origen", mov) : walletsSegMovExtremoPropio("Origen", mov.propia, wallet)
+    const destino = sentido === "enviada" ? walletsSegMovExtremoContraparte("Destino", mov) : walletsSegMovExtremoPropio("Destino", mov.propia, wallet)
+    const cabecera = walletsSegMovCabeceraHtml({
+        tipo: walletsSegEsPendiente(mov) ? "pendiente" : mov.tipo,
+        etiqueta: walletsSegTextoTipo(mov) || "Movimiento",
+        cantidad: `${signo}${walletsSegCantidadExacta(mov.cantidad)} ${mov.simbolo}`,
+        fecha: walletsSegFechaCompleta(mov.fecha)
+    })
+    return `${cabecera}${walletsSegMovRutaHtml(origen, destino)}`
 }
 
 function walletsSegMovimientoHtml(mov, wallet) {
     const red = wallet ? walletsSegRed(wallet) : null
-    const signo = mov.tipo === "enviada" ? "−" : mov.tipo === "recibida" ? "+" : ""
-    const sentido = mov.sentido || mov.tipo
-    const origen = sentido === "recibida" ? mov.contraparte : mov.propia
-    const destino = sentido === "enviada" ? mov.contraparte : mov.propia
-    const notaContraparte = walletsSegNotaContraparte(mov)
     const estadoToken = wallet ? walletsSegEstadoToken(mov, wallet.red) : ""
     const filas = [
-        ["Fecha", escapeHtml(walletsSegFechaCompleta(mov.fecha))],
         ["Wallet", escapeHtml([wallet?.alias, red?.nombre || wallet?.red].filter(Boolean).join(" · ") || "—")],
-        ["Tipo", escapeHtml(WALLETS_SEG_TIPOS[mov.tipo] || mov.tipo || "—")],
-        [
-            "Cantidad",
-            `<strong class="walletsSegMovCantidad">${signo}${walletsSegCantidadExacta(mov.cantidad)} ${escapeHtml(mov.simbolo)}</strong>`
-        ],
         [
             "Activo",
             mov.contrato
@@ -1724,36 +2000,32 @@ function walletsSegMovimientoHtml(mov, wallet) {
                 : `${escapeHtml(mov.simbolo)} · moneda de la red`
         ],
         ...(mov.contrato ? [["Contrato", walletsSegValorCopiableHtml(mov.contrato)]] : []),
-        ["Comisión", escapeHtml(walletsSegComisionDetalle(mov, red?.simbolo || ""))],
-        ["Origen", walletsSegValorCopiableHtml(origen, sentido === "recibida" ? notaContraparte : "esta wallet")],
-        ["Destino", walletsSegValorCopiableHtml(destino, sentido === "enviada" ? notaContraparte : "esta wallet")],
+        ["Comisión", walletsSegComisionFilaHtml(walletsSegComisionDetalle(mov, red?.simbolo || ""))],
         ["Hash", walletsSegValorCopiableHtml(mov.hash)],
         ...(mov.nota ? [["Nota", escapeHtml(mov.nota)]] : [])
     ]
     return filas.map(([clave, valor]) => `<div><dt>${escapeHtml(clave)}</dt><dd>${valor}</dd></div>`).join("")
 }
 
-function abrirMovimientoSeguimiento(mov) {
-    if (!mov) return
+// La ventana común: la usan el movimiento leído de la red y, en Transacciones, las
+// filas de las que no hay movimiento (js/cripto/transacciones.js). `filaTransaccion`
+// añade «Editar» para llegar al formulario de esa fila.
+function walletsSegMontarVentanaMovimiento({ titulo, tipo, resumenHtml = "", datosHtml, seccionesHtml = "", enlace = "", filaTransaccion = "" }, alPulsar = () => {}) {
     cerrarMovimientoSeguimiento()
-    const wallet = walletsEstado.wallets.find((w) => w.id === mov.walletId)
-    const red = wallet ? walletsSegRed(wallet) : null
-    const enlace = red?.explorador && mov.hash ? red.explorador.replace("{hash}", encodeURIComponent(mov.hash)) : ""
     const overlay = document.createElement("div")
     overlay.id = "walletsSegMovOverlay"
     overlay.className = "modalOverlay assetRowModalOverlay"
     overlay.innerHTML = `
         <div class="assetModal assetRowModal walletsSegMovModal" role="dialog" aria-modal="true" aria-labelledby="walletsSegMovTitulo">
-            <h3 id="walletsSegMovTitulo" class="assetModalTitle assetRowModalTitle">
-                ${escapeHtml(WALLETS_SEG_TIPOS[mov.tipo] || "Movimiento")} de ${escapeHtml(mov.simbolo)}
-            </h3>
+            <h3 id="walletsSegMovTitulo" class="assetModalTitle assetRowModalTitle">${escapeHtml(titulo)}</h3>
             <div class="assetRowModalFields">
-                <dl class="walletsSegMovDatos walletsSegMov-${escapeHtml(mov.tipo)}">${walletsSegMovimientoHtml(mov, wallet)}</dl>
-                ${walletsSegMarcaMovimientoHtml(mov, wallet)}
-                ${walletsSegContraparteHtml(mov, wallet)}
+                ${resumenHtml}
+                <dl class="walletsSegMovDatos walletsSegMov-${escapeHtml(tipo)}">${datosHtml}</dl>
+                ${seccionesHtml.trim() ? `<div class="walletsSegMovSecciones">${seccionesHtml}</div>` : ""}
             </div>
             <div class="assetRowModalFooter">
                 ${enlace ? `<a class="secondaryButton walletsSegMovExplorador" href="${escapeHtml(enlace)}" target="_blank" rel="noopener noreferrer">Ver en el explorador ↗</a>` : ""}
+                ${filaTransaccion ? `<button type="button" class="cancelButton walletsSegMovEditarBtn">Editar</button>` : ""}
                 <button type="button" class="primaryButton walletsSegMovCerrarBtn">Cerrar</button>
             </div>
         </div>`
@@ -1765,6 +2037,39 @@ function abrirMovimientoSeguimiento(mov) {
             cerrarMovimientoSeguimiento()
             return
         }
+        if (event.target.closest(".walletsSegMovEditarBtn")) {
+            cerrarMovimientoSeguimiento()
+            openTransaccionRowModal(filaTransaccion)
+            return
+        }
+        const copiable = event.target.closest(".walletsSegCopiable")
+        if (copiable && typeof copyHashTransaccionToClipboard === "function") {
+            copyHashTransaccionToClipboard(copiable)
+            return
+        }
+        alPulsar(event)
+    })
+    // En document y no en la ventana: al pulsar un valor para copiarlo el foco
+    // vuelve al body y la ventana ya no recibiría la tecla.
+    document.addEventListener("keydown", walletsSegTeclaMovimiento)
+    overlay.querySelector(".walletsSegMovCerrarBtn").focus()
+}
+
+function abrirMovimientoSeguimiento(mov) {
+    if (!mov) return
+    const wallet = walletsEstado.wallets.find((w) => w.id === mov.walletId)
+    const red = wallet ? walletsSegRed(wallet) : null
+    const enlace = red?.explorador && mov.hash ? red.explorador.replace("{hash}", encodeURIComponent(mov.hash)) : ""
+    const ventana = {
+        titulo: `Detalle de la transacción de ${mov.simbolo}`,
+        tipo: mov.tipo,
+        resumenHtml: walletsSegMovResumenHtml(mov, wallet),
+        datosHtml: walletsSegMovimientoHtml(mov, wallet),
+        seccionesHtml: `${walletsSegMarcaMovimientoHtml(mov, wallet)}${walletsSegContraparteHtml(mov, wallet)}`,
+        enlace,
+        filaTransaccion: mov.filaTransaccion || ""
+    }
+    walletsSegMontarVentanaMovimiento(ventana, (event) => {
         const marcarMovimiento = event.target.closest(".walletsSegMarcaMovBtn")
         if (marcarMovimiento && wallet) {
             const { propia } = marcarMovimiento.dataset
@@ -1778,15 +2083,8 @@ function abrirMovimientoSeguimiento(mov) {
         }
         if (event.target.closest(".walletsSegContraQuitarBtn") && wallet) {
             olvidarContraparteMovimiento(mov, wallet)
-            return
         }
-        const copiable = event.target.closest(".walletsSegCopiable")
-        if (copiable && typeof copyHashTransaccionToClipboard === "function") copyHashTransaccionToClipboard(copiable)
     })
-    // En document y no en la ventana: al pulsar un valor para copiarlo el foco
-    // vuelve al body y la ventana ya no recibiría la tecla.
-    document.addEventListener("keydown", walletsSegTeclaMovimiento)
-    overlay.querySelector(".walletsSegMovCerrarBtn").focus()
 }
 
 function walletsSegTeclaMovimiento(event) {
@@ -1805,16 +2103,6 @@ function cerrarMovimientoSeguimiento() {
 
 const WALLETS_SEG_SENTIDOS = new Set(["enviada", "recibida"])
 
-function walletsSegNotaContraparte(mov) {
-    if (!mov.contraparteMarca) return ""
-    const quien = mov.contraparteEnlazada
-        ? "tuya, wallet enlazada"
-        : mov.contraparteMarca === "propia"
-          ? "tuya"
-          : "ajena"
-    return mov.contraparteApodo ? `${mov.contraparteApodo} (${quien})` : `(${quien})`
-}
-
 function walletsSegDireccionManual(red, direccion) {
     return (walletsEstado.direcciones || []).find((d) => d.red === red && d.direccion === direccion) || null
 }
@@ -1824,17 +2112,18 @@ function walletsSegContraparteHtml(mov, wallet) {
     const manual = walletsSegDireccionManual(wallet.red, mov.contraparteClave)
     const estado = manual
         ? manual.propia
-            ? "La has marcado como tuya"
-            : "La has marcado como ajena"
+            ? "Marcada como tuya"
+            : "Marcada como ajena"
         : mov.contraparteEnlazada
-          ? `Es de tu wallet enlazada «${mov.contraparteApodo}»`
-          : "Sin marcar"
+          ? `De tu wallet enlazada «${mov.contraparteApodo}»`
+          : "Sin identificar"
     const boton = (propia, texto) =>
         `<button type="button" class="${manual?.propia === propia ? "primaryButton" : "cancelButton"} walletsSegContraMarcarBtn" data-propia="${propia}">${texto}</button>`
     return `
         <section class="walletsSegContraparte" aria-labelledby="walletsSegContraTitulo">
             <h4 id="walletsSegContraTitulo" class="walletsSegContraTitulo">${walletsSegContraTitulo(mov)}</h4>
-            <p class="walletsSegDato">${escapeHtml(estado)}. Si es tuya, el movimiento cuenta como «${escapeHtml(WALLETS_SEG_TIPOS.entre_wallet)}» aquí, en los avisos y en Transacciones.</p>
+            <p class="walletsSegMovEstado">${escapeHtml(estado)}</p>
+            <p class="walletsSegDato">Las direcciones marcadas como tuyas clasifican todos sus movimientos como «${escapeHtml(WALLETS_SEG_TIPOS.entre_wallet)}» en Seguimiento, en los avisos y en Transacciones. Si eres quien recibe, también asumes la comisión de la red.</p>
             <label class="walletsSegContraApodo">
                 <span>Apodo</span>
                 <input type="text" class="assetRowModalInput walletsSegContraApodoInput" maxlength="60" autocomplete="off"
@@ -1850,10 +2139,24 @@ function walletsSegContraparteHtml(mov, wallet) {
 
 // La comisión que se propone descontar. En Bitcoin la de la red es la de todo el
 // lote del exchange, y en un token se paga en otra moneda: ahí la escribe el usuario.
+// Si el origen también es suyo, la comisión es suya aunque sea Bitcoin: ya no hay lote ajeno.
 function walletsSegComisionPropuesta(mov, wallet) {
     const leida = mov.comisionMarcada || mov.comisionLeida || mov.comision
     if (leida) return leida
-    return !mov.contrato && wallet.red !== "btc" ? mov.comisionTx || "" : ""
+    return !mov.contrato && (wallet.red !== "btc" || walletsSegOrigenEsPropio(mov)) ? mov.comisionTx || "" : ""
+}
+
+// Por defecto se marcan las dos; una transacción ya marcada conserva lo que se
+// eligió, para que al cambiar su comisión no se dé de alta la dirección del exchange.
+function walletsSegMarcarOtraPorDefecto(mov) {
+    return mov.marcaMovimiento !== "propia" || mov.contraparteMarca === "propia"
+}
+
+// Las direcciones que «Entre mis wallets» da por propias: la de la wallet siempre,
+// la otra si la casilla sigue marcada (si no hay casilla, ya es de una wallet enlazada).
+function walletsSegDireccionesDeMarca(mov, propia, marcarOtra) {
+    if (propia !== true) return []
+    return [mov.propia, marcarOtra ? mov.contraparte : ""].filter(Boolean)
 }
 
 function walletsSegMarcaMovimientoHtml(mov, wallet) {
@@ -1864,21 +2167,35 @@ function walletsSegMarcaMovimientoHtml(mov, wallet) {
         `<button type="button" class="${activo ? "primaryButton" : "cancelButton"} walletsSegMarcaMovBtn" data-propia="${propia}">${texto}</button>`
     const avisoBtc =
         wallet.red === "btc"
-            ? `<p class="walletsSegDato">En Bitcoin, márcala solo si todo lo movido sigue siendo tuyo. Si parte de lo enviado es el cambio a una dirección que no está enlazada, la cantidad no es exacta: enlaza esa wallet con su xpub.</p>`
+            ? `<p class="walletsSegDato">En Bitcoin, clasifícala así solo si todo el importe sigue siendo tuyo. Si parte del envío es el cambio a una dirección sin enlazar, la cantidad no será exacta: enlaza esa wallet con su xpub.</p>`
+            : ""
+    const avisoPendiente = walletsSegEsPendiente(mov)
+        ? `<p class="walletsSegAlerta">Pendiente de verificar: todavía no cuenta en la posición. «Entrada real» la suma; «Entre mis wallets» no.</p>`
+        : ""
+    const textoSentido = walletsSegEsPendiente(mov) ? "Entrada real" : WALLETS_SEG_TIPOS[sentido]
+    const casillaDirecciones =
+        mov.contraparte && !mov.contraparteEnlazada
+            ? `<label class="walletsSegMarcaMovDirecciones">
+                <input type="checkbox" class="walletsSegMarcaMovOtra"${walletsSegMarcarOtraPorDefecto(mov) ? " checked" : ""}>
+                <span>Marcar también la otra dirección como mía</span>
+                <span class="walletsSegDato">Desmárcala si pertenece a un exchange. Si queda como tuya, todos sus movimientos, pasados y futuros, contarán como «entre wallets» sin verificación y asumirás su comisión de red.</span>
+            </label>`
             : ""
     return `
         <section class="walletsSegContraparte" aria-labelledby="walletsSegMarcaMovTitulo">
-            <h4 id="walletsSegMarcaMovTitulo" class="walletsSegContraTitulo">Esta transacción</h4>
-            <p class="walletsSegDato">«Entre mis wallets» es para lo que compraste en un exchange y pasaste a tu wallet: no vuelve a sumar a la posición y solo descuenta la comisión.</p>
+            <h4 id="walletsSegMarcaMovTitulo" class="walletsSegContraTitulo">Clasificación de la transacción</h4>
+            ${avisoPendiente}
+            <p class="walletsSegDato">Usa «Entre mis wallets» si mueves fondos entre direcciones tuyas o retiras de un exchange a tu wallet: la cantidad no vuelve a sumar a la posición y solo se descuenta la comisión.</p>
             ${avisoBtc}
             <label class="walletsSegContraApodo">
                 <span>Comisión a descontar (${escapeHtml(mov.simbolo)})</span>
                 <input type="text" inputmode="decimal" class="assetRowModalInput walletsSegMarcaMovComision" maxlength="40" autocomplete="off"
-                    placeholder="Lo que te descontó el exchange" value="${escapeHtml(walletsSegComisionPropuesta(mov, wallet))}">
+                    placeholder="Importe que te cobró el exchange" value="${escapeHtml(walletsSegComisionPropuesta(mov, wallet))}">
             </label>
+            ${casillaDirecciones}
             <div class="walletsSegContraBotones">
                 ${boton("true", "Entre mis wallets", marca === "propia")}
-                ${boton("false", escapeHtml(WALLETS_SEG_TIPOS[sentido]), marca === "ajena")}
+                ${boton("false", escapeHtml(textoSentido), marca === "ajena")}
                 ${marca ? boton("quitar", "Quitar marca", false) : ""}
             </div>
         </section>`
@@ -1897,13 +2214,14 @@ function walletsSegConMarca(mov, marca) {
     const comisionLeida = mov.comisionLeida ?? mov.comision ?? ""
     const marcaMovimiento = !marca ? "" : marca.propia ? "propia" : "ajena"
     const comisionMarcada = marca?.propia ? marca.comision : ""
+    Object.assign(mov, { sentido, marcaMovimiento })
     Object.assign(mov, {
-        sentido,
-        marcaMovimiento,
         comisionLeida,
         comisionMarcada,
-        comision: comisionMarcada || comisionLeida,
-        tipo: walletsSegTipoEfectivo(sentido, marcaMovimiento, mov.contraparteMarca)
+        comision: comisionMarcada || comisionLeida || walletsSegComisionDeOrigenPropio(mov),
+        tipo: walletsSegTipoEfectivo(sentido, marcaMovimiento, mov.contraparteMarca),
+        // La marca es la verificación. Al quitarla, el servidor decide al volver a cargar.
+        pendiente: marca ? false : mov.pendiente
     })
 }
 
@@ -1925,6 +2243,7 @@ function walletsSegAplicarMarca(mov, red, marca) {
 
 async function marcarMovimientoSeguimiento(mov, wallet, propia) {
     const comision = document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovComision")?.value || ""
+    const marcarOtra = document.querySelector("#walletsSegMovOverlay .walletsSegMarcaMovOtra")?.checked ?? true
     let datos
     try {
         datos = await walletsPost(`/api/wallets/${encodeURIComponent(wallet.id)}/movimientos/marcar`, {
@@ -1934,26 +2253,53 @@ async function marcarMovimientoSeguimiento(mov, wallet, propia) {
             sentido: mov.sentido || mov.tipo,
             propia,
             comision,
-            comisionLeida: mov.comisionLeida ?? mov.comision ?? ""
+            comisionLeida: mov.comisionLeida ?? mov.comision ?? "",
+            direcciones: walletsSegDireccionesDeMarca(mov, propia, marcarOtra)
         })
     } catch (error) {
         showToast(error.message || "No se pudo marcar la transacción", { type: "error" })
         return
     }
+    walletsSegAplicarLibretaDeMarca(wallet.red, datos)
     walletsSegAplicarMarca(mov, wallet.red, datos.marca)
-    renderWalletsSeguimiento()
+    await walletsSegRepintarTrasMarcar()
     abrirMovimientoSeguimiento(mov)
     if (datos.avisoReetiquetado) {
         showToast(datos.avisoReetiquetado, { type: "error", duration: 8000 })
         return
     }
-    showToast(datos.reetiquetadas ? "Transacción marcada y actualizada en Transacciones" : "Transacción marcada", {
-        type: "success"
-    })
+    showToast(walletsSegTextoMarcada(datos), { type: "success" })
+}
+
+// La marca puede haber dado de alta o sacado direcciones de la libreta.
+function walletsSegAplicarLibretaDeMarca(red, datos) {
+    if (!datos.efectivas) return
+    walletsEstado.direcciones = datos.direcciones || []
+    walletsEstado.direccionesEnlazadas = datos.direccionesEnlazadas || []
+    for (const [direccion, efectiva] of Object.entries(datos.efectivas)) walletsSegAplicarLibreta(red, direccion, efectiva)
+}
+
+// La ventana también se abre desde Transacciones: cada página repinta solo si está
+// en pantalla, y allí las filas las ha cambiado el servidor.
+async function walletsSegRepintarTrasMarcar() {
+    if (document.getElementById("walletsSegPropias")) renderWalletsSeguimiento()
+    if (typeof recargarTransaccionesDesdeServidor !== "function") return
+    try {
+        await recargarTransaccionesDesdeServidor()
+    } catch (error) {
+        showError("No se pudieron recargar las transacciones", error)
+    }
+}
+
+function walletsSegTextoMarcada(datos) {
+    if (datos.reetiquetadas) return "Transacción marcada y actualizada en Transacciones"
+    if (datos.importadas) return "Transacción verificada e importada a Transacciones"
+    if (datos.porSincronizar) return "Transacción verificada: pulsa «Sincronizar» para importarla a Transacciones"
+    return "Transacción marcada"
 }
 
 function walletsSegContraTitulo(mov) {
-    return (mov.sentido || mov.tipo) === "enviada" ? "Destino del envío" : "Origen del recibo"
+    return (mov.sentido || mov.tipo) === "enviada" ? "Dirección de destino" : "Dirección de origen"
 }
 
 async function marcarContraparteMovimiento(mov, wallet, propia) {
@@ -1988,6 +2334,7 @@ function walletsSegAplicarLibreta(red, direccion, efectiva) {
             contraparteMarca: efectiva?.marca || "",
             contraparteEnlazada: Boolean(efectiva?.enlazada)
         })
+        mov.comision = mov.comisionMarcada || (mov.comisionLeida ?? mov.comision ?? "") || walletsSegComisionDeOrigenPropio(mov)
     }
     for (const wallet of walletsEstado.wallets) {
         if (wallet.red === red) (wallet.recientes || []).forEach(aplicar)
@@ -2009,7 +2356,7 @@ async function guardarDireccionLibreta(url, cuerpo) {
     walletsEstado.direcciones = datos.direcciones || []
     walletsEstado.direccionesEnlazadas = datos.direccionesEnlazadas || []
     walletsSegAplicarLibreta(datos.red, datos.direccion, datos.efectiva)
-    renderWalletsSeguimiento()
+    await walletsSegRepintarTrasMarcar()
     renderLibretaSeguimiento()
     if (datos.avisoReetiquetado) {
         showToast(datos.avisoReetiquetado, { type: "error", duration: 8000 })
@@ -2036,18 +2383,55 @@ let walletsSegDirEditando = ""
 let walletsSegDirVinculando = ""
 // Id de la wallet enlazada con el formulario de sacarla del seguimiento abierto.
 let walletsSegDirSacando = ""
+// Clave de la fila desplegada. Solo una a la vez: el detalle es alto y la lista,
+// un cajón con scroll en el que varias abiertas harían perder de vista las demás.
+let walletsSegDirAbierta = ""
+
+// Trazos de 24x24; el color y el tamaño los pone el CSS del botón.
+const WALLETS_SEG_DIR_ICONOS = {
+    ver: "M5 12h14M13 6l6 6-6 6",
+    mover: "M7 4v14M3 14l4 4 4-4M17 20V6M13 10l4-4 4 4",
+    editar: "M4 20h4L19 9l-4-4L4 16v4zM13 7l4 4",
+    sacar: "M14 4h5v16h-5M10 8l-4 4 4 4M6 12h9",
+    vincular: "M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1",
+    cambiar: "M4 8h13M13 4l4 4-4 4M20 16H7M11 12l-4 4 4 4",
+    quitar: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13",
+    leer: "M20 11a8 8 0 0 0-14-4L4 9M4 4v5h5M4 13a8 8 0 0 0 14 4l2-2M20 20v-5h-5"
+}
+
+/**
+ * Pinta un botón de acción de la libreta.
+ *
+ * @param {{clase: string, icono: string, texto: string, datos?: string, variante?: string}} opciones
+ *     `clase` es la que busca el manejador de clics, `datos` son atributos ya
+ *     escapados y `variante` («principal» o «peligro») marca su peso visual.
+ * @returns {string} El HTML del botón.
+ */
+function walletsSegDirBotonHtml({ clase, icono, texto, datos = "", variante = "" }) {
+    const claseVariante = variante ? ` walletsSegDirAccion-${variante}` : ""
+    return `<button type="button" class="walletsSegDirAccion${claseVariante} ${clase}" ${datos}>
+            <svg class="walletsSegDirIcono" viewBox="0 0 24 24" aria-hidden="true"><path d="${WALLETS_SEG_DIR_ICONOS[icono]}"></path></svg>
+            <span>${escapeHtml(texto)}</span>
+        </button>`
+}
 
 function walletsSegDirEntradas() {
     const manuales = (walletsEstado.direcciones || []).map((d) => ({ ...d, enlazada: false, texto: d.direccion }))
-    const enlazadas = (walletsEstado.direccionesEnlazadas || []).map((d) => ({
-        red: d.red,
-        apodo: d.apodo,
-        propia: true,
-        enlazada: true,
-        walletId: d.walletId,
-        completa: walletsSegDirCompletas.has(d.walletId),
-        texto: walletsSegDirCompletas.get(d.walletId) || d.valorEnmascarado
-    }))
+    const enlazadas = (walletsEstado.direccionesEnlazadas || []).map((d) => {
+        // Una xpub o una clave pública aporta varias filas con el mismo walletId.
+        const clave = d.clave || d.walletId
+        return {
+            red: d.red,
+            apodo: d.apodo,
+            propia: true,
+            enlazada: true,
+            derivada: Boolean(d.derivada),
+            walletId: d.walletId,
+            clave,
+            completa: walletsSegDirCompletas.has(clave),
+            texto: walletsSegDirCompletas.get(clave) || d.valorEnmascarado
+        }
+    })
     return [...manuales, ...enlazadas]
 }
 
@@ -2077,13 +2461,33 @@ function walletsSegDirSaldoManualHtml(entrada, datosBoton) {
     const leido = walletsSegDirSaldos.get(walletsSegDirClaveSaldo(entrada.red, entrada.direccion))
     if (leido?.cargando) return `<span class="walletsSegDirSaldo walletsSegDato">Leyendo el saldo…</span>`
     if (!leido) {
-        return `<span class="walletsSegDirSaldo"><button type="button" class="walletsSegTokenBtn walletsSegDirSaldoBtn" ${datosBoton}>Ver saldo</button></span>`
+        return `<span class="walletsSegDirSaldo">${walletsSegDirBotonHtml({ clase: "walletsSegDirSaldoBtn", icono: "leer", texto: "Ver saldo", datos: datosBoton })}</span>`
     }
     return `
         <span class="walletsSegDirSaldo" title="Leído ${escapeHtml(walletsSegFecha(leido.fecha))}">
             <strong>${escapeHtml(`${walletsSegNumero(leido.saldo)} ${leido.simbolo}`)}</strong>
-            <button type="button" class="walletsSegTokenBtn walletsSegDirSaldoBtn" ${datosBoton}>Volver a leer</button>
+            ${walletsSegDirBotonHtml({ clase: "walletsSegDirSaldoBtn", icono: "leer", texto: "Volver a leer", datos: datosBoton })}
         </span>`
+}
+
+// El importe de la fila plegada: solo la moneda de la red, los tokens van en el detalle.
+function walletsSegDirImporteHtml(entrada) {
+    const pintar = (cantidad, euros = "") => `
+        <span class="walletsSegDirImporte">
+            <strong>${escapeHtml(cantidad)}</strong>
+            ${euros ? `<span class="walletsSegDato">≈ ${escapeHtml(euros)}</span>` : ""}
+        </span>`
+    const aparte = (texto) => `<span class="walletsSegDirImporte walletsSegDato">${escapeHtml(texto)}</span>`
+    if (entrada.derivada) return aparte("Dentro de su wallet")
+    if (entrada.enlazada) {
+        const wallet = walletsEstado.wallets.find((w) => w.id === entrada.walletId)
+        if (!wallet?.saldoFecha) return aparte("Sin leer")
+        const simbolo = walletsSegRed(wallet)?.simbolo || wallet.red
+        return pintar(`${walletsSegNumero(wallet.saldo || "0")} ${simbolo}`, walletsSegEuros(wallet.valorEur))
+    }
+    const leido = walletsSegDirSaldos.get(walletsSegDirClaveSaldo(entrada.red, entrada.direccion))
+    if (leido?.cargando) return aparte("Leyendo…")
+    return leido ? pintar(`${walletsSegNumero(leido.saldo)} ${leido.simbolo}`) : ""
 }
 
 function walletsSegDirValorHtml(entrada) {
@@ -2170,42 +2574,164 @@ function walletsSegDirAccionesHtml(entrada) {
     if (walletsSegDirVinculando && walletsSegDirVinculando === walletsSegDirClaveVinculo(entrada)) {
         return walletsSegDirVinculoHtml(entrada)
     }
+    // Sale de su xpub o clave pública: se gestiona desde esa wallet, no suelta.
+    if (entrada.derivada) {
+        return `<div class="walletsSegDirAcciones">
+                ${walletsSegDirBotonHtml({ clase: "walletsSegDirVerSeguimientoBtn", icono: "ver", texto: "Ver seguimiento", datos: `data-wallet-id="${escapeHtml(entrada.walletId)}"`, variante: "principal" })}
+            </div>`
+    }
     if (entrada.enlazada) {
         if (walletsSegDirSacando === entrada.walletId) return walletsSegDirSacarHtml(entrada)
         if (walletsSegDirEditando === entrada.walletId) return walletsSegDirApodoEnlazadaHtml(entrada)
-        const walletId = escapeHtml(entrada.walletId)
+        const datos = `data-wallet-id="${escapeHtml(entrada.walletId)}"`
         return `<div class="walletsSegDirAcciones">
-                <button type="button" class="walletsSegTokenBtn walletsSegDirVerSeguimientoBtn" data-wallet-id="${walletId}">Ver seguimiento</button>
-                <button type="button" class="walletsSegTokenBtn walletsSegDirMoverBtn" data-wallet-id="${walletId}">Cambiar de seguimiento</button>
-                <button type="button" class="walletsSegTokenBtn walletsSegDirEditarEnlazadaBtn" data-wallet-id="${walletId}">Editar apodo</button>
-                <button type="button" class="walletsSegTokenBtn walletsSegDirSacarBtn" data-wallet-id="${walletId}">Sacar del seguimiento</button>
+                ${walletsSegDirBotonHtml({ clase: "walletsSegDirVerSeguimientoBtn", icono: "ver", texto: "Ver seguimiento", datos, variante: "principal" })}
+                ${walletsSegDirBotonHtml({ clase: "walletsSegDirMoverBtn", icono: "mover", texto: "Cambiar de seguimiento", datos })}
+                ${walletsSegDirBotonHtml({ clase: "walletsSegDirEditarEnlazadaBtn", icono: "editar", texto: "Editar apodo", datos })}
+                ${walletsSegDirBotonHtml({ clase: "walletsSegDirSacarBtn", icono: "sacar", texto: "Sacar del seguimiento", datos, variante: "peligro" })}
             </div>`
     }
-    const datosBoton = `data-red="${escapeHtml(entrada.red)}" data-direccion="${escapeHtml(entrada.texto)}"`
+    const datos = `data-red="${escapeHtml(entrada.red)}" data-direccion="${escapeHtml(entrada.texto)}"`
     return `<div class="walletsSegDirAcciones">
-                ${entrada.propia ? `<button type="button" class="walletsSegTokenBtn walletsSegDirVincularBtn" ${datosBoton}>Vincular a seguimiento</button>` : ""}
-                <button type="button" class="walletsSegTokenBtn walletsSegDirEditarBtn" ${datosBoton}>Editar</button>
-                <button type="button" class="walletsSegTokenBtn walletsSegDirCambiarBtn" ${datosBoton}>${entrada.propia ? "Es ajena" : "Es mía"}</button>
-                <button type="button" class="walletsSegTokenBtn walletsSegDirQuitarBtn" ${datosBoton}>Quitar</button>
+                ${entrada.propia ? walletsSegDirBotonHtml({ clase: "walletsSegDirVincularBtn", icono: "vincular", texto: "Vincular a seguimiento", datos, variante: "principal" }) : ""}
+                ${walletsSegDirBotonHtml({ clase: "walletsSegDirEditarBtn", icono: "editar", texto: "Editar", datos })}
+                ${walletsSegDirBotonHtml({ clase: "walletsSegDirCambiarBtn", icono: "cambiar", texto: entrada.propia ? "Es ajena" : "Es mía", datos })}
+                ${walletsSegDirBotonHtml({ clase: "walletsSegDirQuitarBtn", icono: "quitar", texto: "Quitar", datos, variante: "peligro" })}
             </div>`
+}
+
+// Identifica la fila en la lista: una xpub aporta varias con el mismo walletId.
+function walletsSegDirClaveFila(entrada) {
+    return entrada.enlazada ? entrada.clave || entrada.walletId : walletsSegDirClaveSaldo(entrada.red, entrada.texto)
+}
+
+// `tamano` («doble» o «ancho») es cuántas columnas de la rejilla ocupa el dato.
+function walletsSegDirDatoHtml(etiqueta, valorHtml, tamano = "") {
+    return `<div class="walletsSegDirDato${tamano ? ` walletsSegDirDato-${tamano}` : ""}"><dt>${escapeHtml(etiqueta)}</dt><dd>${valorHtml}</dd></div>`
+}
+
+// Las enmascaradas avisan a la vista de cómo verlas: en la fila plegada no se copia.
+function walletsSegDirDireccionDetalleHtml(entrada) {
+    const pista = entrada.enlazada && !entrada.completa
+        ? `<span class="walletsSegDato">Enmascarada: «Ver completas» la muestra con la contraseña</span>`
+        : `<span class="walletsSegDato">Haz clic para copiarla</span>`
+    return `${walletsSegDirValorHtml(entrada)}${pista}`
+}
+
+// Red, apodo y seguimiento ya están en el resumen de la fila: aquí solo lo que falta.
+function walletsSegDirDatosEnlazadaHtml(entrada, wallet) {
+    // El saldo guardado es el de toda la xpub o clave, no el de esta dirección.
+    const saldo = entrada.derivada
+        ? `<span class="walletsSegDirSaldo walletsSegDato">Su saldo cuenta en el de la wallet</span>`
+        : walletsSegDirSaldoEnlazadaHtml(entrada)
+    const base = [
+        walletsSegDirDatoHtml(entrada.derivada ? "Dirección derivada" : "Dirección", walletsSegDirDireccionDetalleHtml(entrada), "doble"),
+        walletsSegDirDatoHtml("Saldo", saldo)
+    ]
+    if (!wallet) return base.join("")
+    return [
+        ...base,
+        walletsSegDirDatoHtml("Wallet", escapeHtml(wallet.alias)),
+        walletsSegDirDatoHtml("Tipo", escapeHtml(walletsTipoLargo(wallet.tipo))),
+        walletsSegDirDatoHtml("Cripto en Activos", walletsSegActivoNativaHtml(wallet)),
+        walletsSegDirDatoHtml("Último movimiento", escapeHtml(walletsSegFecha(wallet.ultimoMovimiento))),
+        walletsSegDirDatoHtml("Saldo leído", escapeHtml(walletsSegFecha(wallet.saldoFecha))),
+        walletsSegDirDatoHtml("Avisos", wallet.avisos ? "Activados" : "Desactivados"),
+        walletsSegDirDatoHtml("Enlazada", escapeHtml(walletsSegFecha(wallet.creada))),
+        walletsSegDirDatoHtml("Última importación", escapeHtml(walletsSegFecha(wallet.ultimaSincronizacion)))
+    ].join("")
+}
+
+function walletsSegDirDatosManualHtml(entrada) {
+    const datosBoton = `data-red="${escapeHtml(entrada.red)}" data-direccion="${escapeHtml(entrada.texto)}"`
+    return [
+        walletsSegDirDatoHtml("Dirección", walletsSegDirDireccionDetalleHtml(entrada), "doble"),
+        walletsSegDirDatoHtml("Saldo", walletsSegDirSaldoManualHtml(entrada, datosBoton)),
+        walletsSegDirDatoHtml(
+            "Qué hace",
+            entrada.propia
+                ? "Clasifica movimientos como propios. No se vigila ni suma al total hasta vincularla."
+                : "Solo pone nombre a la contraparte en el historial y los avisos.",
+            "ancho"
+        )
+    ].join("")
+}
+
+// Lo leído por la vigilancia, de la wallet entera aunque la fila sea una derivada.
+function walletsSegDirActividadHtml(entrada, wallet) {
+    if (!wallet) return ""
+    const titulo = entrada.derivada ? "Últimos movimientos de toda la wallet" : "Últimos movimientos"
+    return `
+        <section class="walletsSegDirActividad">
+            <h4 class="walletsSegDirSubtitulo">${titulo}</h4>
+            ${walletsSegMovimientosHtml({ wallets: [wallet] })}
+        </section>`
+}
+
+// Alertas arriba y acciones antes que los movimientos: el cajón de la lista es
+// bajo y lo que se lee o se pulsa primero no debe exigir scroll.
+function walletsSegDirDetalleHtml(entrada) {
+    const wallet = entrada.enlazada ? walletsEstado.wallets.find((w) => w.id === entrada.walletId) : null
+    const datos = entrada.enlazada ? walletsSegDirDatosEnlazadaHtml(entrada, wallet) : walletsSegDirDatosManualHtml(entrada)
+    return `
+        <div class="walletsSegDirDetalle">
+            ${wallet ? walletsSegAlertasHtml([wallet]) : ""}
+            <dl class="walletsSegDirDatos">${datos}</dl>
+            ${walletsSegDirAccionesHtml(entrada)}
+            ${walletsSegDirActividadHtml(entrada, wallet)}
+        </div>`
+}
+
+function walletsSegDirMarcasHtml(entrada) {
+    const titular = `<span class="walletsSegDirMarca walletsSegDirMarca-${entrada.propia ? "propia" : "ajena"}">${entrada.propia ? "Mía" : "Ajena"}</span>`
+    if (entrada.derivada) return `${titular}<span class="walletsSegDirMarca" title="Dirección de una xpub o clave pública enlazada">De su clave pública</span>`
+    if (entrada.enlazada) return `${titular}<span class="walletsSegDirMarca">En seguimiento</span>`
+    if (entrada.propia) return `${titular}<span class="walletsSegDirMarca" title="Solo clasifica movimientos: no se vigila ni suma al total hasta vincularla">Sin seguimiento</span>`
+    return titular
 }
 
 function walletsSegDirFilaHtml(entrada) {
     const red = walletsEstado.redes.find((r) => r.clave === entrada.red)
-    const datosBoton = `data-red="${escapeHtml(entrada.red)}" data-direccion="${escapeHtml(entrada.texto)}"`
-    const saldo = entrada.enlazada ? walletsSegDirSaldoEnlazadaHtml(entrada) : walletsSegDirSaldoManualHtml(entrada, datosBoton)
+    const nombreRed = red?.nombre || entrada.red
+    const clave = walletsSegDirClaveFila(entrada)
+    const abierta = walletsSegDirAbierta === clave
+    // Plegada se abrevia para que la fila no salte de línea; «Ver completas» manda.
+    const direccion = entrada.completa ? entrada.texto : walletsSegAbreviar(entrada.texto)
     return `
-        <li class="walletsSegDirFila">
-            <div class="walletsSegDirCabecera">
-                <strong class="walletsSegDirApodo">${escapeHtml(entrada.apodo || "Sin apodo")}</strong>
-                <span class="walletsSegDirMarca walletsSegDirMarca-${entrada.propia ? "propia" : "ajena"}">${entrada.propia ? "Mía" : "Ajena"}</span>
-                ${entrada.enlazada ? `<span class="walletsSegDirMarca">En seguimiento</span>` : entrada.propia ? `<span class="walletsSegDirMarca" title="Solo clasifica movimientos: no se vigila ni suma al total hasta vincularla">Sin seguimiento</span>` : ""}
-                <span class="walletsSegDato">${escapeHtml(red?.nombre || entrada.red)}</span>
-            </div>
-            ${walletsSegDirValorHtml(entrada)}
-            ${saldo}
-            ${walletsSegDirAccionesHtml(entrada)}
+        <li class="walletsSegDirFila${abierta ? " walletsSegDirFila-abierta" : ""}">
+            <button type="button" class="walletsSegDirResumen" data-clave="${escapeHtml(clave)}" aria-expanded="${abierta}">
+                <span class="walletsSegDirSimbolo">${escapeHtml(red?.simbolo || entrada.red)}</span>
+                <span class="walletsSegDirIdentidad">
+                    <span class="walletsSegDirCabecera">
+                        <strong class="walletsSegDirApodo">${escapeHtml(entrada.apodo || "Sin apodo")}</strong>
+                        ${walletsSegDirMarcasHtml(entrada)}
+                    </span>
+                    <span class="walletsSegDirLinea">
+                        <span class="walletsSegDirLineaDireccion">${escapeHtml(direccion)}</span>
+                        <span aria-hidden="true">·</span>
+                        <span>${escapeHtml(nombreRed)}</span>
+                    </span>
+                </span>
+                ${walletsSegDirImporteHtml(entrada)}
+                <span class="walletsSegDirFlecha" aria-hidden="true"></span>
+            </button>
+            ${abierta ? walletsSegDirDetalleHtml(entrada) : ""}
         </li>`
+}
+
+// Pliega o despliega una fila. Los formularios a medias se descartan: al repintar
+// reaparecerían en una fila que el usuario ya ha dejado atrás.
+function alternarFilaLibreta(clave, overlay) {
+    walletsSegDirAbierta = walletsSegDirAbierta === clave ? "" : clave
+    walletsSegDirEditando = ""
+    walletsSegDirVinculando = ""
+    walletsSegDirSacando = ""
+    renderLibretaSeguimiento()
+    // Repintar destruye el botón pulsado: sin esto el teclado volvería al principio.
+    const boton = [...overlay.querySelectorAll(".walletsSegDirResumen")].find((b) => b.dataset.clave === clave)
+    if (!boton) return
+    boton.focus({ preventScroll: true })
+    boton.closest(".walletsSegDirFila").scrollIntoView({ block: "nearest" })
 }
 
 function renderLibretaSeguimiento() {
@@ -2493,6 +3019,11 @@ function manejarClickLibreta(event, overlay, form) {
         alternarDireccionesCompletas(overlay)
         return
     }
+    const resumen = event.target.closest(".walletsSegDirResumen")
+    if (resumen) {
+        alternarFilaLibreta(resumen.dataset.clave, overlay)
+        return
+    }
     if (manejarClickVinculoLibreta(event, overlay)) return
     const editarEnlazada = event.target.closest(".walletsSegDirEditarEnlazadaBtn")
     if (editarEnlazada) {
@@ -2559,6 +3090,7 @@ function cerrarLibretaSeguimiento() {
     walletsSegDirEditando = ""
     walletsSegDirVinculando = ""
     walletsSegDirSacando = ""
+    walletsSegDirAbierta = ""
 }
 
 // ── Visor de UTXOs (Bitcoin) ──────────────────────────────────────────────────
@@ -2569,26 +3101,26 @@ function cerrarLibretaSeguimiento() {
 async function cargarUtxosDetalle() {
     const estado = walletsSegDetalle
     const grupo = estado && walletsSegGrupo(estado.clave)
-    if (!grupo || estado.utxos?.cargando) return
-    estado.utxos = { cargando: true, lista: [], alturaActual: 0, errores: [] }
+    if (!grupo || walletsSegVisorLeyendo(estado.utxos)) return
+    const lectura = { lista: [], alturaActual: 0, errores: [] }
+    estado.utxos = walletsSegVisorAlEmpezar(estado.utxos, lectura)
     walletsSegEmpezarLectura(estado)
     renderDetalleSeguimiento()
     const wallets = grupo.wallets.filter((w) => w.red === "btc")
     const progreso = iniciarProgreso("Leyendo UTXOs", wallets.length)
     try {
-        await walletsSegLeerUtxos(estado, wallets, progreso)
+        await walletsSegLeerUtxos(estado, lectura, wallets, progreso)
     } finally {
         progreso.terminar()
     }
     if (!walletsSegTerminarLectura(estado)) return
-    estado.utxos.lista.sort((a, b) => b.satoshis - a.satoshis)
-    estado.utxos.cargando = false
-    estado.utxos.fecha = new Date().toISOString()
+    lectura.lista.sort((a, b) => b.satoshis - a.satoshis)
+    estado.utxos = walletsSegVisorAlTerminar(estado.utxos, lectura)
     walletsSegGuardarLeido(estado)
     if (walletsSegDetalle === estado) renderDetalleSeguimiento()
 }
 
-async function walletsSegLeerUtxos(estado, wallets, progreso) {
+async function walletsSegLeerUtxos(estado, lectura, wallets, progreso) {
     // Una a una, como el historial: Esplora pública limita las ráfagas.
     for (const wallet of wallets) {
         progreso.paso(walletsNombreCompleto(wallet))
@@ -2598,11 +3130,13 @@ async function walletsSegLeerUtxos(estado, wallets, progreso) {
                 walletsSegAvisoReintento(progreso, wallet)
             )
             if (!walletsSegLecturaVigente(estado)) return
-            estado.utxos.lista.push(...(datos.utxos || []).map((utxo) => ({ ...utxo, walletId: wallet.id })))
-            estado.utxos.alturaActual = Math.max(estado.utxos.alturaActual, Number(datos.alturaActual) || 0)
+            lectura.lista.push(...(datos.utxos || []).map((utxo) => ({ ...utxo, walletId: wallet.id })))
+            lectura.alturaActual = Math.max(lectura.alturaActual, Number(datos.alturaActual) || 0)
         } catch (error) {
             if (!walletsSegLecturaVigente(estado)) return
-            estado.utxos.errores.push(`${wallet.alias}: ${error.message || "no se pudieron leer los UTXOs"}`)
+            lectura.errores.push(`${wallet.alias}: ${error.message || "no se pudieron leer los UTXOs"}`)
+            lectura.lista.push(...estado.utxos.lista.filter((utxo) => utxo.walletId === wallet.id))
+            lectura.alturaActual = Math.max(lectura.alturaActual, Number(estado.utxos.alturaActual) || 0)
         }
     }
 }
@@ -2737,7 +3271,7 @@ function walletsSegUtxosHtml(estado, grupo, anchoDisponible) {
     }
     const errores = utxos.errores.map((error) => `<p class="ajustesAviso">${escapeHtml(error)}</p>`).join("")
     if (utxos.cargando) return `${cabecera}<p class="assetModalHint">Leyendo los UTXOs de la red…</p>`
-    const recargar = walletsSegConsultadoHtml(utxos.fecha, `<button type="button" class="cancelButton walletsSegUtxosCargarBtn">Volver a leer</button>`)
+    const recargar = walletsSegConsultadoHtml(utxos.fecha, utxos.actualizando ? "Leyendo…" : `<button type="button" class="cancelButton walletsSegUtxosCargarBtn">Volver a leer</button>`)
     if (!utxos.lista.length) {
         const vacio = utxos.errores.length ? "" : `<p class="overviewEmpty">No queda ninguna salida sin gastar.</p>`
         return `${cabecera}${errores}${vacio}${recargar}`
@@ -2750,6 +3284,7 @@ function walletsSegUtxosHtml(estado, grupo, anchoDisponible) {
     estado.utxos.visibles = visibles
     const rects = walletsSegTreemap(bloques.map((bloque) => bloque.peso), ancho, alto)
     return `${cabecera}
+        ${walletsSegCargadoHtml(utxos.fecha, utxos.actualizando, "Buscando cambios…")}
         ${errores}
         ${walletsSegResumenUtxosHtml(utxos.lista)}
         <div class="walletsSegUtxoMapa" style="aspect-ratio:${ancho} / ${alto}" role="group" aria-label="Mapa de UTXOs">
@@ -2860,25 +3395,25 @@ function walletsSegFilaNativaHtml(wallet, varias) {
 async function cargarTokensDetalle() {
     const estado = walletsSegDetalle
     const grupo = estado && walletsSegGrupo(estado.clave)
-    if (!grupo || estado.tokens?.cargando) return
-    estado.tokens = { cargando: true, lista: [], sinLeer: 0, errores: [] }
+    if (!grupo || walletsSegVisorLeyendo(estado.tokens)) return
+    const lectura = { lista: [], sinLeer: 0, errores: [] }
+    estado.tokens = walletsSegVisorAlEmpezar(estado.tokens, lectura)
     walletsSegEmpezarLectura(estado)
     renderDetalleSeguimiento()
     const wallets = grupo.wallets.filter(walletsSegRedConTokens)
     const progreso = iniciarProgreso("Leyendo tokens", wallets.length)
     try {
-        await walletsSegLeerTokens(estado, wallets, progreso)
+        await walletsSegLeerTokens(estado, lectura, wallets, progreso)
     } finally {
         progreso.terminar()
     }
     if (!walletsSegTerminarLectura(estado)) return
-    estado.tokens.cargando = false
-    estado.tokens.fecha = new Date().toISOString()
+    estado.tokens = walletsSegVisorAlTerminar(estado.tokens, lectura)
     walletsSegGuardarLeido(estado)
     if (walletsSegDetalle === estado) renderDetalleSeguimiento()
 }
 
-async function walletsSegLeerTokens(estado, wallets, progreso) {
+async function walletsSegLeerTokens(estado, lectura, wallets, progreso) {
     // Una a una, como el historial: Etherscan gratuito limita las ráfagas.
     for (const wallet of wallets) {
         progreso.paso(walletsNombreCompleto(wallet))
@@ -2891,11 +3426,12 @@ async function walletsSegLeerTokens(estado, wallets, progreso) {
             walletsSegAnotarPublicos(datos.tokensPublicos)
             walletsSegTokensLeidos.set(wallet.id, leidos)
             if (!walletsSegLecturaVigente(estado)) return
-            estado.tokens.lista.push(...leidos)
-            estado.tokens.sinLeer += Number(datos.sinLeer) || 0
+            lectura.lista.push(...leidos)
+            lectura.sinLeer += Number(datos.sinLeer) || 0
         } catch (error) {
             if (!walletsSegLecturaVigente(estado)) return
-            estado.tokens.errores.push(`${wallet.alias}: ${error.message || "no se pudieron leer los tokens"}`)
+            lectura.errores.push(`${wallet.alias}: ${error.message || "no se pudieron leer los tokens"}`)
+            lectura.lista.push(...estado.tokens.lista.filter((token) => token.walletId === wallet.id))
         }
     }
 }
@@ -2957,7 +3493,7 @@ function walletsSegTokensVisorHtml(estado, grupo) {
     const lista = tokens?.lista || []
     const errores = (tokens?.errores || []).map((error) => `<p class="ajustesAviso">${escapeHtml(error)}</p>`).join("")
     const recargar = conTokens
-        ? walletsSegConsultadoHtml(tokens.fecha, `<button type="button" class="cancelButton walletsSegTokensCargarBtn">Volver a leer</button>`)
+        ? walletsSegConsultadoHtml(tokens.fecha, tokens.actualizando ? "Leyendo…" : `<button type="button" class="cancelButton walletsSegTokensCargarBtn">Volver a leer</button>`)
         : ""
     const varias = grupo.wallets.length > 1
     const porId = new Map(grupo.wallets.map((wallet) => [wallet.id, wallet]))
@@ -2978,6 +3514,7 @@ function walletsSegTokensVisorHtml(estado, grupo) {
         ? `<p class="assetModalHint">Quedan ${tokens.sinLeer} tokens sin leer: el tope es [wallets] max_tokens_visor en config.ini.</p>`
         : ""
     return `${cabecera}
+        ${walletsSegCargadoHtml(tokens?.fecha, tokens?.actualizando, "Buscando cambios…")}
         ${errores}
         <div class="walletsSegStats">${tarjetas
             .map(([clave, valor]) => `<div class="walletsSegStat"><span>${escapeHtml(clave)}</span><strong>${escapeHtml(valor)}</strong></div>`)
@@ -3203,10 +3740,22 @@ function walletsSegMiembroDetalleHtml(wallet) {
         </li>`
 }
 
+function walletsSegDerivadasHtml(grupo) {
+    const derivadas = walletsSegDerivadasDe(grupo)
+    if (!derivadas.length) return ""
+    return `
+        <h3 class="walletsSegSeccion">Direcciones de sus claves públicas</h3>
+        <p class="walletsSegDato">Cuentan como tuyas: lo que se mueve entre ellas no es una entrada ni una salida de dinero. Salen enmascaradas; las completas están en el botón «Direcciones», con tu contraseña.</p>
+        <ul class="walletsSegDirLista">${derivadas
+            .map((d) => `<li class="walletsSegDirFila"><span class="walletsSegMovValor">${escapeHtml(d.valorEnmascarado)}</span></li>`)
+            .join("")}</ul>`
+}
+
 function walletsSegDireccionesHtml(grupo) {
     return `
         <h3 class="walletsSegSeccion">Direcciones</h3>
-        <ul class="walletsSegMiembros walletsSegDirecciones">${walletsSegTodasDetalleHtml(grupo)}${grupo.wallets.map(walletsSegMiembroDetalleHtml).join("")}</ul>`
+        <ul class="walletsSegMiembros walletsSegDirecciones">${walletsSegTodasDetalleHtml(grupo)}${grupo.wallets.map(walletsSegMiembroDetalleHtml).join("")}</ul>
+        ${walletsSegDerivadasHtml(grupo)}`
 }
 
 function renderDetalleSeguimiento() {
@@ -3381,6 +3930,8 @@ async function actualizarWalletSeguimiento(walletId, boton = null) {
         walletsSegReabrirDetalleSi([walletId])
     } catch (error) {
         showToast(error.message || "No se pudo leer la wallet", { type: "error" })
+        // El servidor ha guardado el motivo: la tarjeta lo enseña cuando el aviso se va.
+        await cargarWalletsSeguimiento().catch(() => {})
         if (boton?.isConnected) {
             boton.disabled = false
             boton.textContent = textoOriginal
@@ -3441,7 +3992,7 @@ async function sincronizarSeguimiento(clave, boton) {
     if (!grupo?.propia) return
     boton.disabled = true
     boton.textContent = "Sincronizando…"
-    const total = { anadidas: 0, yaImportadas: 0, sinActivo: {} }
+    const total = { anadidas: 0, yaImportadas: 0, pendientes: 0, sinActivo: {} }
     const truncadas = []
     const fallos = []
     const progreso = iniciarProgreso(`Sincronizando «${grupo.nombre}»`, grupo.wallets.length)
@@ -3451,6 +4002,7 @@ async function sincronizarSeguimiento(clave, boton) {
             const resultado = await walletsPost(`/api/wallets/${encodeURIComponent(wallet.id)}/sincronizar`)
             total.anadidas += resultado.anadidas || 0
             total.yaImportadas += resultado.yaImportadas || 0
+            total.pendientes += resultado.pendientes || 0
             if (resultado.truncada) truncadas.push(walletsAvisoTruncada(resultado, walletsNombreCompleto(wallet)))
             for (const [simbolo, n] of Object.entries(resultado.sinActivo || {})) {
                 total.sinActivo[simbolo] = (total.sinActivo[simbolo] || 0) + n

@@ -610,6 +610,13 @@
     min-width: 0;
 }
 
+/* Al abrir columna, su margen superior la descuadraría con la de al lado. */
+@media (min-width: 641px) {
+    .modalCampo > .assetConvertCurrencyRow:first-child {
+        margin-top: 0;
+    }
+}
+
 @media (max-width: 640px) {
     .operacionRowModal .assetRowModalFields,
     .modalDosColumnas .assetRowModalFields,
@@ -1422,6 +1429,121 @@
     width: 140px;
     padding: 6px 8px;
     white-space: nowrap;
+}
+
+/* Wallets en los modales de activo: son más estrechos que la ventana de enlazar,
+   así que la dirección y el nombre ocupan una línea cada uno. */
+.walletsActivoDetalle > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.walletsActivoDetalle > summary::-webkit-details-marker {
+    display: none;
+}
+
+.walletsActivoTitulo {
+    flex: 1;
+    min-width: 0;
+}
+
+.walletsActivoFlecha {
+    font-size: 0.7rem;
+    transition: transform 0.15s ease;
+}
+
+.walletsActivoDetalle[open] .walletsActivoFlecha {
+    transform: rotate(180deg);
+}
+
+.walletsActivoCuerpo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.walletsActivoColumnas,
+.walletsActivoColumna {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.modalDosColumnas .walletsActivoColumnas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 20px;
+    align-items: start;
+}
+
+@media (max-width: 640px) {
+    .modalDosColumnas .walletsActivoColumnas {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.walletsActivoColumna > label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.walletsActivoBloque .walletsFila {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
+    padding: 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+}
+
+/* El mismo reparto que la ficha estrecha de más abajo, a cualquier ancho; el
+   selector más largo gana a esa regla, que va después. */
+.walletsActivoBloque .walletsFila > .walletsFilaValor {
+    grid-column: 1 / 3;
+    grid-row: 1;
+}
+
+.walletsActivoBloque .walletsFila > .walletsFilaQuitarBtn {
+    grid-column: 3;
+    grid-row: 1;
+}
+
+.walletsActivoBloque .walletsFila > .walletsFilaRed,
+.walletsActivoBloque .walletsFila > .csWrapper:has(> .walletsFilaRed) {
+    grid-column: 1;
+}
+
+.walletsActivoBloque .walletsFila > .walletsFilaTipo,
+.walletsActivoBloque .walletsFila > .csWrapper:has(> .walletsFilaTipo) {
+    grid-column: 2 / 4;
+}
+
+.walletsActivoBloque .walletsFila > .walletsFilaAlias {
+    grid-column: 1 / -1;
+}
+
+.walletsActivoLista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.walletsActivoLista li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
 }
 
 .walletsEdicionCabecera {
@@ -2872,7 +2994,193 @@ a.walletsSegTokenContrato:hover {
 }
 
 .walletsSegMovModal {
-    width: min(620px, 100%);
+    width: min(920px, 100%);
+    max-height: calc(94 * var(--vh));
+}
+
+/* Las secciones de marcar, en paralelo mientras quepan: con el ancho extra se
+   evita tener que desplazar la ventana para llegar a la segunda. */
+.walletsSegMovSecciones {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+    gap: 14px;
+    align-items: stretch;
+}
+
+/* Tarjetas de igual alto con los botones abajo, para que queden alineados aunque
+   una explique más que la otra. */
+.walletsSegMovSecciones .walletsSegContraparte {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-elevated);
+}
+
+.walletsSegMovSecciones .walletsSegContraBotones {
+    margin-top: auto;
+    flex-wrap: nowrap;
+}
+
+.walletsSegMovSecciones p {
+    margin: 0;
+}
+
+.walletsSegMovSecciones .walletsSegContraBotones button {
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.walletsSegMovModal .assetRowModalFooter {
+    flex-wrap: wrap;
+}
+
+.walletsSegMovCabecera {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "etiqueta fecha" "cantidad cantidad";
+    align-items: center;
+    justify-items: start;
+    gap: 6px 10px;
+}
+
+.walletsSegMovCabecera .walletsSegDato {
+    grid-area: fecha;
+}
+
+.walletsSegMovCabecera .walletsSegMovCantidad {
+    grid-area: cantidad;
+}
+
+.walletsSegMovTipoEtiqueta {
+    grid-area: etiqueta;
+    padding: 3px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    background: var(--accent-glow);
+    color: var(--text-bright);
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.walletsSegMov-recibida .walletsSegMovTipoEtiqueta {
+    border-color: var(--color-pos);
+    background: transparent;
+}
+
+.walletsSegMov-enviada .walletsSegMovTipoEtiqueta {
+    border-color: var(--color-neg);
+    background: transparent;
+}
+
+.walletsSegMov-pendiente .walletsSegMovTipoEtiqueta {
+    border-color: rgba(251, 191, 36, 0.6);
+    background: rgba(251, 191, 36, 0.08);
+}
+
+.walletsSegMovCabecera .walletsSegMovCantidad {
+    color: var(--text-bright);
+    font-size: 1.55rem;
+    font-weight: 700;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.walletsSegMovCabecera.walletsSegMov-recibida .walletsSegMovCantidad {
+    color: var(--color-pos-bright);
+}
+
+.walletsSegMovCabecera.walletsSegMov-enviada .walletsSegMovCantidad {
+    color: var(--color-neg-bright);
+}
+
+.walletsSegMovRuta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+}
+
+.walletsSegMovRutaFlecha {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: var(--text-muted);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.walletsSegMovExtremo {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-self: stretch;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: var(--bg-elevated);
+}
+
+.walletsSegMovExtremoTitulo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+}
+
+.walletsSegMovExtremoEtiqueta {
+    color: var(--text-subtle);
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.walletsSegMovExtremoNombre {
+    color: var(--text-bright);
+    font-size: 0.88rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.walletsSegMovEstado {
+    margin: 0;
+    color: var(--text-bright);
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.walletsSegMovComision {
+    margin-right: 6px;
+    font-weight: 600;
+}
+
+.walletsSegMarcaMovDirecciones {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 2px 8px;
+    font-size: 0.8rem;
+    color: var(--text-bright);
+    cursor: pointer;
+}
+
+.walletsSegMarcaMovDirecciones .walletsSegDato {
+    grid-column: 2;
+}
+
+#transaccionesBody tr[data-transaccion-id] {
+    cursor: pointer;
 }
 
 .walletsSegMovDatos {
@@ -2959,7 +3267,72 @@ a.walletsSegTokenContrato:hover {
 .walletsSegDirAcciones {
     display: flex;
     flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.walletsSegDirAccion {
+    display: inline-flex;
+    align-items: center;
     gap: 6px;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--btn-border);
+    border-radius: 8px;
+    background: var(--btn-bg);
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.walletsSegDirAccion:hover {
+    border-color: var(--btn-border-hover);
+    background: var(--btn-bg-hover);
+}
+
+.walletsSegDirAccion:focus-visible,
+.walletsSegDirResumen:focus-visible {
+    outline: 2px solid var(--btn-active-border);
+    outline-offset: -2px;
+}
+
+.walletsSegDirAccion-principal,
+.walletsSegDirAccion-principal:hover {
+    border-color: var(--btn-active-border);
+    background: var(--btn-active-bg);
+    color: var(--btn-active-text);
+}
+
+.walletsSegDirAccion-principal:hover {
+    filter: brightness(1.12);
+}
+
+/* A la derecha y separado: es la acción destructiva, que no quede a mano de las otras. */
+.walletsSegDirAccion-peligro {
+    margin-left: auto;
+    border-color: var(--color-neg);
+    background: transparent;
+    color: var(--color-neg-bright);
+}
+
+.walletsSegDirAccion-peligro:hover {
+    border-color: var(--color-neg-bright);
+    background: rgba(231, 76, 60, 0.12);
+}
+
+.walletsSegDirIcono {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .walletsSegDirModal {
@@ -3077,18 +3450,170 @@ a.walletsSegTokenContrato:hover {
 }
 
 .walletsSegDirFila {
-    display: grid;
-    gap: 6px;
-    padding: 10px 12px;
     border: 1px solid var(--border-mid);
-    border-radius: 8px;
+    border-radius: 10px;
+    background: var(--bg-surface);
+    transition: border-color 0.15s ease;
+}
+
+.walletsSegDirFila:hover {
+    border-color: var(--border-hard);
+}
+
+.walletsSegDirFila-abierta,
+.walletsSegDirFila-abierta:hover {
+    border-color: var(--btn-active-border);
+}
+
+.walletsSegDirResumen {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.walletsSegDirResumen:hover {
+    background: var(--bg-elevated);
+}
+
+.walletsSegDirSimbolo {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-hard);
+    border-radius: 10px;
+    background: var(--bg-inset);
+    color: var(--text-bright);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    overflow: hidden;
+}
+
+.walletsSegDirIdentidad {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
 }
 
 .walletsSegDirCabecera {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 10px;
+    gap: 4px 8px;
+}
+
+.walletsSegDirLinea {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    color: var(--text-muted);
+    font-size: 0.74rem;
+}
+
+.walletsSegDirLineaDireccion {
+    font-family: monospace;
+    overflow-wrap: anywhere;
+}
+
+.walletsSegDirImporte {
+    display: grid;
+    justify-items: end;
+    gap: 2px;
+    font-size: 0.82rem;
+    text-align: right;
+}
+
+.walletsSegDirImporte strong {
+    color: var(--text-bright);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Última columna fija: las filas sin importe no descolocan la flecha. */
+.walletsSegDirFlecha {
+    grid-column: 4;
+    width: 8px;
+    height: 8px;
+    margin: 0 4px;
+    border-right: 2px solid var(--text-muted);
+    border-bottom: 2px solid var(--text-muted);
+    transform: rotate(45deg) translate(-2px, -2px);
+    transition: transform 0.15s ease;
+}
+
+.walletsSegDirResumen[aria-expanded="true"] .walletsSegDirFlecha {
+    transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.walletsSegDirDetalle {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+    border-top: 1px solid var(--border-soft);
+}
+
+.walletsSegDirDatos {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 16px;
+    margin: 0;
+}
+
+.walletsSegDirDato {
+    display: grid;
+    align-content: start;
+    gap: 2px;
+    min-width: 0;
+}
+
+.walletsSegDirDato-ancho {
+    grid-column: 1 / -1;
+}
+
+.walletsSegDirDato-doble {
+    grid-column: span 2;
+}
+
+.walletsSegDirDato dt {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.walletsSegDirDato dd {
+    display: grid;
+    gap: 2px;
+    justify-items: start;
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+}
+
+.walletsSegDirActividad {
+    display: grid;
+    gap: 6px;
+}
+
+.walletsSegDirSubtitulo {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
 }
 
 .walletsSegDirApodo {
@@ -3117,6 +3642,41 @@ a.walletsSegTokenContrato:hover {
 }
 
 @media (max-width: 520px) {
+    /* El importe baja bajo el nombre: en una columna aparte estrujaría la dirección. */
+    .walletsSegDirResumen {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .walletsSegDirImporte {
+        grid-column: 2;
+        grid-row: 2;
+        justify-items: start;
+        text-align: left;
+    }
+
+    .walletsSegDirFlecha {
+        grid-column: 3;
+        grid-row: 1;
+    }
+
+    .walletsSegDirDatos {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    /* Con una sola columna, «span 2» crearía otra implícita y desbordaría. */
+    .walletsSegDirDato-doble {
+        grid-column: auto;
+    }
+
+    .walletsSegDirAccion {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+
+    .walletsSegDirAccion-peligro {
+        margin-left: 0;
+    }
+
     .walletsSegMovDatos {
         grid-template-columns: minmax(0, 1fr);
         gap: 2px;
@@ -3124,6 +3684,19 @@ a.walletsSegTokenContrato:hover {
 
     .walletsSegMovDatos dd {
         margin-bottom: 8px;
+    }
+
+    .walletsSegMovRuta {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .walletsSegMovSecciones .walletsSegContraBotones {
+        flex-wrap: wrap;
+    }
+
+    .walletsSegMovRutaFlecha {
+        justify-self: center;
+        transform: rotate(90deg);
     }
 }
 

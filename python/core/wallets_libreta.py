@@ -9,8 +9,9 @@ corrige:
 * **Manual.** El usuario marca una dirección como suya o ajena y le pone un
   apodo (`stores.wallets_store.DireccionMarcada`).
 * **Automática.** Las direcciones de las wallets propias enlazadas cuentan como
-  propias sin marcarlas, con el nombre de su seguimiento. Las xpub y las claves
-  públicas no entran: sus direcciones no se conocen sin derivarlas todas.
+  propias sin marcarlas, con el nombre de su seguimiento. De una clave pública,
+  todas las que puede tener; de una xpub, las que ya tienen uso, que la vigilancia
+  va guardando en `Wallet.direccionesDerivadas`.
 
 * **Por transacción.** Una marca sobre una transacción concreta
   (`stores.wallets_store.MovimientoMarcado`) manda sobre las de su dirección: el
@@ -18,24 +19,44 @@ corrige:
   del exchange no sea del usuario.
 
 Una marca manual manda sobre la automática. Un movimiento hacia o desde una
-dirección propia pasa a «entre wallets»; marcarla ajena lo deja como estaba.
+dirección propia pasa a «entre wallets»; marcarla ajena lo deja como estaba. Si
+una transacción tiene varias contrapartes, solo lo es cuando todas son propias.
+
+Una entrada de dinero de terceros no cuenta hasta que el usuario la verifica con
+una marca (`pendienteDeVerificar`): nada en la red dice si es un ingreso real o
+algo ya comprado en un exchange.
+
 Este módulo solo clasifica: no lee ficheros ni redes, para que lo usen igual la
 pantalla, los avisos y la importación.
 """
 
+import logging
 from dataclasses import dataclass, replace
 from functools import lru_cache
 from typing import Iterable
 
-from core.cripto_direcciones import TIPO_DIRECCION, DatoWalletInvalido, normalizarDatoWallet
+from core.cripto_direcciones import (
+    TIPO_CLAVE_PUBLICA,
+    TIPO_DIRECCION,
+    TIPO_XPUB,
+    DatoWalletInvalido,
+    clavesP2pk,
+    direccionesDeClavePublica,
+    normalizarDatoWallet,
+)
 from providers.blockchain_clients import ENTRE_WALLETS, ENVIADA, RECIBIDA, MovimientoWallet
 from stores.wallets_store import DireccionMarcada, MovimientoMarcado, Wallet, WalletsRepository
+
+log = logging.getLogger(__name__)
 
 MARCA_PROPIA = "propia"
 MARCA_AJENA = "ajena"
 # Solo estos tienen una contraparte que reclasificar: un «entre wallets» de la
 # propia red ya es entre direcciones del usuario.
 SENTIDOS = (ENVIADA, RECIBIDA)
+# Tipo de una fila importada de Transacciones que espera verificación. Sigue a la
+# vista, pero los cálculos de posición solo aceptan los tres tipos de la red: no suma.
+PENDIENTE = "pendiente"
 
 
 @dataclass(frozen=True)
@@ -104,8 +125,8 @@ class Libreta:
         """
         # Primero las enlazadas, para que una marca manual de la misma dirección las sustituya.
         enlazadas = [
-            EntradaLibreta(w.red, w.valor, w.nombreSeguimiento, propia=True, enlazada=True)
-            for w in wallets if entraEnLibreta(w)
+            EntradaLibreta(w.red, destino, w.nombreSeguimiento, propia=True, enlazada=True)
+            for w in wallets for destino in destinosDeWallet(w)
         ]
         manuales = [EntradaLibreta(d.red, d.direccion, d.apodo, d.propia) for d in direcciones]
         return cls([*enlazadas, *manuales], marcas)
@@ -115,6 +136,29 @@ class Libreta:
         if not direccion:
             return None
         return self._indice.get((red, canonica(red, direccion)))
+
+    def paraClasificar(self, red: str, contraparte: str, todas: Iterable[str] = ()) -> EntradaLibreta | None:
+        """La entrada que decide el tipo de un movimiento con esas contrapartes.
+
+        Con una mezcla de propias y de terceros no vale ninguna: tratarla como
+        «entre wallets» escondería el dinero que sí ha entrado o salido.
+
+        Args:
+            red: Red del movimiento.
+            contraparte: La contraparte principal del movimiento.
+            todas: Todas las contrapartes de la transacción, si hay más de una.
+
+        Returns:
+            La entrada de `contraparte`, o None si no se sabe o hay una mezcla.
+        """
+        entrada = self.buscar(red, contraparte)
+        if entrada is None or not entrada.propia:
+            return entrada
+        for otra in todas:
+            otraEntrada = self.buscar(red, otra)
+            if otraEntrada is None or not otraEntrada.propia:
+                return None
+        return entrada
 
     def direccionesDe(self, red: str) -> set[str]:
         """Las direcciones que la libreta conoce en una red, canónicas, propias o ajenas."""
@@ -138,9 +182,78 @@ def libretaDe(repositorio: WalletsRepository) -> Libreta:
     return Libreta.desde(repositorio.direcciones(), repositorio.listar(), repositorio.movimientosMarcados())
 
 
+@lru_cache(maxsize=256)
+def _direccionesDeClave(claveHex: str) -> tuple[str, ...]:
+    # Cacheada: derivar son varias multiplicaciones en la curva y la libreta se
+    # monta en cada listado de wallets.
+    return tuple(direccionesDeClavePublica(claveHex))
+
+
+def direccionesDeWallet(wallet: Wallet) -> list[str]:
+    """Las direcciones que esta wallet enlazada aporta a la libreta; ninguna si es ajena.
+
+    Args:
+        wallet: Wallet enlazada.
+
+    Returns:
+        Su dirección; todas las de su clave pública; o las ya usadas de su xpub.
+    """
+    if not wallet.propia:
+        return []
+    if wallet.tipo == TIPO_DIRECCION:
+        return [wallet.valor]
+    if wallet.tipo == TIPO_XPUB:
+        return list(wallet.direccionesDerivadas)
+    if wallet.tipo != TIPO_CLAVE_PUBLICA:
+        return []
+    try:
+        return list(_direccionesDeClave(wallet.valor))
+    except DatoWalletInvalido as error:
+        # Se validó al enlazarla: solo puede venir de una copia dañada o editada.
+        log.warning("[wallets] Clave pública no válida en %s: %s", wallet.id, error)
+        return []
+
+
+def destinosDeWallet(wallet: Wallet) -> list[str]:
+    """Todo lo que puede aparecer como contraparte de esta wallet: sus direcciones y sus P2PK.
+
+    Las formas P2PK son claves, no direcciones: clasifican movimientos, pero no
+    salen en la lista de direcciones.
+    """
+    direcciones = direccionesDeWallet(wallet)
+    if direcciones and wallet.tipo == TIPO_CLAVE_PUBLICA:
+        return [*direcciones, *clavesP2pk(wallet.valor)]
+    return direcciones
+
+
 def entraEnLibreta(wallet: Wallet) -> bool:
-    """¿Cuenta la dirección de esta wallet enlazada como propia sin marcarla?"""
-    return wallet.propia and wallet.tipo == TIPO_DIRECCION
+    """¿Aporta esta wallet enlazada alguna dirección que cuente como propia sin marcarla?"""
+    return bool(direccionesDeWallet(wallet))
+
+
+def filasLibretaDe(wallet: Wallet) -> list[tuple[str, str, bool]]:
+    """Las filas de esta wallet en la lista de direcciones.
+
+    Returns:
+        (clave de la fila, dirección, ¿derivada de una xpub o clave pública?). La
+        clave de una dirección suelta es el id de la wallet, que usan sus acciones.
+    """
+    derivada = wallet.tipo != TIPO_DIRECCION
+    return [(f"{wallet.id}#{indice}" if derivada else wallet.id, direccion, derivada)
+            for indice, direccion in enumerate(direccionesDeWallet(wallet))]
+
+
+def pendienteDeVerificar(sentido: str, tipoEfectivo: str, marca: MovimientoMarcado | None) -> bool:
+    """¿Es una entrada de dinero que el usuario aún no ha confirmado?
+
+    Las que vienen de una dirección propia ya no son entradas y una marca es la
+    verificación, sea para contarla como entrada real o como «entre wallets».
+
+    Example:
+        >>> pendienteDeVerificar("recibida", "recibida", None)
+        True
+    """
+    return sentido == RECIBIDA and tipoEfectivo == RECIBIDA and marca is None
 
 
 def clasificar(tipo: str, entrada: EntradaLibreta | None) -> str:
@@ -168,15 +281,15 @@ def clasificarMovimiento(tipo: str, entrada: EntradaLibreta | None, marca: Movim
     return ENTRE_WALLETS if marca.propia else tipo
 
 
-def reciboConComision(red: str, sentido: str, contrato: str) -> bool:
+def reciboConComision(sentido: str, contrato: str) -> bool:
     """¿La comisión de la transacción de este recibo es del usuario si el origen es suyo?
 
     Lo recibido no trae comisión porque la pagó quien envió, pero si quien envió
     es otra dirección del usuario, la pagó él. No en un token, que la paga en otra
-    moneda, ni en Bitcoin: si esa «dirección propia» es la de un exchange, la
-    comisión es la de todo su lote.
+    moneda. Una retirada de exchange no llega aquí como origen propio: se marca
+    solo la transacción, porque en Bitcoin su comisión es la de todo el lote.
     """
-    return sentido == RECIBIDA and not contrato and red != "btc"
+    return sentido == RECIBIDA and not contrato
 
 
 def comisionMarcada(marca: MovimientoMarcado | None) -> str:
@@ -192,7 +305,8 @@ def nombreContraparte(direccion: str, entrada: EntradaLibreta | None) -> str:
 def aplicar(movimiento: MovimientoWallet, libreta: Libreta) -> MovimientoWallet:
     """El movimiento con el tipo que le da la libreta (el mismo objeto si no cambia)."""
     marca = libreta.marcaDe(movimiento.red, movimiento.hash, movimiento.contrato)
-    tipo = clasificarMovimiento(movimiento.tipo, libreta.buscar(movimiento.red, movimiento.contraparte), marca)
+    entrada = libreta.paraClasificar(movimiento.red, movimiento.contraparte, movimiento.contrapartes)
+    tipo = clasificarMovimiento(movimiento.tipo, entrada, marca)
     return movimiento if tipo == movimiento.tipo else replace(movimiento, tipo=tipo)
 
 
@@ -211,15 +325,16 @@ def anotar(movimiento: dict, red: str, libreta: Libreta) -> dict:
     sentido = movimiento.get("sentido") or movimiento.get("tipo", "")
     contraparte = movimiento.get("contraparte", "")
     entrada = libreta.buscar(red, contraparte)
+    decisiva = libreta.paraClasificar(red, contraparte, movimiento.get("contrapartes", ()))
     marca = libreta.marcaDe(red, movimiento.get("hash", ""), movimiento.get("contrato", ""))
     comisionLeida = movimiento.get("comisionLeida", movimiento.get("comision", ""))
     comisionOrigenPropio = ""
-    if marca is None and entrada is not None and entrada.propia and reciboConComision(
-            red, sentido, movimiento.get("contrato", "")):
+    if (marca is None or marca.propia) and decisiva is not None and decisiva.propia and reciboConComision(
+            sentido, movimiento.get("contrato", "")):
         comisionOrigenPropio = movimiento.get("comisionTx", "")
     return {
         **movimiento,
-        "tipo": clasificarMovimiento(sentido, entrada, marca),
+        "tipo": clasificarMovimiento(sentido, decisiva, marca),
         "sentido": sentido,
         "comision": comisionMarcada(marca) or comisionLeida or comisionOrigenPropio,
         "comisionLeida": comisionLeida,

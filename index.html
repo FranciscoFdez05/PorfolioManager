@@ -417,47 +417,54 @@
 </div>
 
 <div class="modalOverlay hidden" id="assetModalOverlay">
-    <div class="assetModal" role="dialog" aria-modal="true" aria-labelledby="assetModalTitle">
+    <div class="assetModal modalDosColumnas" role="dialog" aria-modal="true" aria-labelledby="assetModalTitle">
         <h3 class="assetModalTitle" id="assetModalTitle">Nuevo activo</h3>
 
-        <label class="assetModalLabel" for="assetNameInput">Nombre del activo</label>
-        <input id="assetNameInput" class="assetModalInput" type="text" placeholder="Ej: Microsoft o Solana">
+        <div class="modalCampos">
+            <div class="modalCampo">
+                <label class="assetModalLabel" for="assetNameInput">Nombre del activo</label>
+                <input id="assetNameInput" class="assetModalInput" type="text" placeholder="Ej: Microsoft o Solana">
 
-        <label class="assetModalLabel" for="assetTypeSelect">Tipo del activo</label>
-        <select id="assetTypeSelect" class="assetModalSelect" data-no-custom="true">
-            <option value="cripto">Cripto</option>
-            <option value="acciones">Acciones</option>
-            <option value="etfs">ETFs</option>
-            <option value="comoditis">Comoditis</option>
-        </select>
+                <label class="assetModalLabel" for="assetTickerInput">Ticker mercado</label>
+                <input id="assetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
+                <div class="assetSearchActions" id="assetSearchActions">
+                    <button id="searchAssetTickerTradingViewBtn" class="secondaryButton" type="button" data-provider="tradingview">Buscar TradingView</button>
+                    <button id="searchAssetTickerFinnhubBtn" class="secondaryButton" type="button" data-provider="finnhub">Buscar Finnhub</button>
+                    <button id="searchAssetTickerEodhdBtn" class="secondaryButton" type="button" data-provider="eodhd">Buscar EODHD</button>
+                    <button id="searchAssetTickerYahooBtn" class="secondaryButton" type="button" data-provider="yahoo">Buscar Yahoo Finance</button>
+                    <button id="searchAssetTickerAlphaVantageBtn" class="secondaryButton" type="button" data-provider="alphavantage">Buscar Alpha Vantage</button>
+                </div>
+                <div id="assetSearchFeedback" class="assetSearchFeedback hidden"></div>
+                <div id="assetSearchResults" class="assetSearchResults hidden"></div>
+            </div>
+            <div class="modalCampo">
+                <label class="assetModalLabel" for="assetTypeSelect">Tipo del activo</label>
+                <select id="assetTypeSelect" class="assetModalSelect" data-no-custom="true">
+                    <option value="cripto">Cripto</option>
+                    <option value="acciones">Acciones</option>
+                    <option value="etfs">ETFs</option>
+                    <option value="comoditis">Comoditis</option>
+                </select>
 
-        <div id="assetCosteAnualField" class="hidden">
-            <label class="assetModalLabel" for="assetCosteAnualInput">Coste anual del ETF (%) <span class="assetModalLabelHint">(TER, opcional)</span></label>
-            <input id="assetCosteAnualInput" class="assetModalInput" type="text" inputmode="decimal" placeholder="Ej: 0,20">
+                <div id="assetCosteAnualField" class="hidden">
+                    <label class="assetModalLabel" for="assetCosteAnualInput">Coste anual del ETF (%) <span class="assetModalLabelHint">(TER, opcional)</span></label>
+                    <input id="assetCosteAnualInput" class="assetModalInput" type="text" inputmode="decimal" placeholder="Ej: 0,20">
+                </div>
+
+                <button type="button" class="assetModalLabel cpToggleLabel" id="assetColorToggle">
+                    <span>Color del activo</span>
+                    <span class="cpToggleBadge" id="assetColorBadge"></span>
+                    <span class="cpToggleArrow">▼</span>
+                </button>
+                <div class="assetColorPicker cpCollapsed" id="assetColorPicker"></div>
+                <input type="hidden" id="assetColorInput" value="">
+
+                <label class="assetModalLabel assetModalLabelSmall" for="assetTVTickerInput">Ticker TradingView <span class="assetModalLabelHint">(opcional, solo para el gráfico)</span></label>
+                <input id="assetTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: COMEX:GC1! o XAUUSD">
+            </div>
         </div>
 
-        <label class="assetModalLabel" for="assetTickerInput">Ticker mercado</label>
-        <input id="assetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
-        <div class="assetSearchActions" id="assetSearchActions">
-            <button id="searchAssetTickerTradingViewBtn" class="secondaryButton" type="button" data-provider="tradingview">Buscar TradingView</button>
-            <button id="searchAssetTickerFinnhubBtn" class="secondaryButton" type="button" data-provider="finnhub">Buscar Finnhub</button>
-            <button id="searchAssetTickerEodhdBtn" class="secondaryButton" type="button" data-provider="eodhd">Buscar EODHD</button>
-            <button id="searchAssetTickerYahooBtn" class="secondaryButton" type="button" data-provider="yahoo">Buscar Yahoo Finance</button>
-            <button id="searchAssetTickerAlphaVantageBtn" class="secondaryButton" type="button" data-provider="alphavantage">Buscar Alpha Vantage</button>
-        </div>
-        <div id="assetSearchFeedback" class="assetSearchFeedback hidden"></div>
-        <div id="assetSearchResults" class="assetSearchResults hidden"></div>
-
-        <button type="button" class="assetModalLabel cpToggleLabel" id="assetColorToggle">
-            <span>Color del activo</span>
-            <span class="cpToggleBadge" id="assetColorBadge"></span>
-            <span class="cpToggleArrow">▼</span>
-        </button>
-        <div class="assetColorPicker cpCollapsed" id="assetColorPicker"></div>
-        <input type="hidden" id="assetColorInput" value="">
-
-        <label class="assetModalLabel assetModalLabelSmall" for="assetTVTickerInput">Ticker TradingView <span class="assetModalLabelHint">(opcional, solo para el gráfico)</span></label>
-        <input id="assetTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: COMEX:GC1! o XAUUSD">
+        <div id="assetWalletsBloque" class="walletsActivoBloque hidden"></div>
 
         <div class="assetModalActions">
             <button id="cancelAssetModalBtn" class="cancelButton">Cancelar</button>
@@ -543,50 +550,57 @@
 </div>
 
 <div class="modalOverlay hidden" id="editAssetModalOverlay">
-    <div class="assetModal" role="dialog" aria-modal="true" aria-labelledby="editAssetModalTitle">
+    <div class="assetModal modalDosColumnas" role="dialog" aria-modal="true" aria-labelledby="editAssetModalTitle">
         <h3 class="assetModalTitle" id="editAssetModalTitle">Editar activo</h3>
-        <label class="assetModalLabel" for="editAssetNameInput">Nombre del activo</label>
-        <input id="editAssetNameInput" class="assetModalInput" type="text" placeholder="Nuevo nombre del activo">
+        <div class="modalCampos">
+            <div class="modalCampo">
+                <label class="assetModalLabel" for="editAssetNameInput">Nombre del activo</label>
+                <input id="editAssetNameInput" class="assetModalInput" type="text" placeholder="Nuevo nombre del activo">
 
-        <label class="assetModalLabel" for="editAssetTickerInput">Ticker mercado</label>
-        <input id="editAssetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
-        <div class="assetSearchActions" id="editAssetSearchActions">
-            <button id="editSearchAssetTickerTradingViewBtn" class="secondaryButton" type="button" data-provider="tradingview">Buscar TradingView</button>
-            <button id="editSearchAssetTickerFinnhubBtn" class="secondaryButton" type="button" data-provider="finnhub">Buscar Finnhub</button>
-            <button id="editSearchAssetTickerEodhdBtn" class="secondaryButton" type="button" data-provider="eodhd">Buscar EODHD</button>
-            <button id="editSearchAssetTickerYahooBtn" class="secondaryButton" type="button" data-provider="yahoo">Buscar Yahoo Finance</button>
-            <button id="editSearchAssetTickerAlphaVantageBtn" class="secondaryButton" type="button" data-provider="alphavantage">Buscar Alpha Vantage</button>
+                <label class="assetModalLabel" for="editAssetTickerInput">Ticker mercado</label>
+                <input id="editAssetTickerInput" class="assetModalInput" type="text" placeholder="Ej: MSFT o BINANCE:BTCUSDT">
+                <div class="assetSearchActions" id="editAssetSearchActions">
+                    <button id="editSearchAssetTickerTradingViewBtn" class="secondaryButton" type="button" data-provider="tradingview">Buscar TradingView</button>
+                    <button id="editSearchAssetTickerFinnhubBtn" class="secondaryButton" type="button" data-provider="finnhub">Buscar Finnhub</button>
+                    <button id="editSearchAssetTickerEodhdBtn" class="secondaryButton" type="button" data-provider="eodhd">Buscar EODHD</button>
+                    <button id="editSearchAssetTickerYahooBtn" class="secondaryButton" type="button" data-provider="yahoo">Buscar Yahoo Finance</button>
+                    <button id="editSearchAssetTickerAlphaVantageBtn" class="secondaryButton" type="button" data-provider="alphavantage">Buscar Alpha Vantage</button>
+                </div>
+                <div id="editAssetSearchFeedback" class="assetSearchFeedback hidden"></div>
+                <div id="editAssetSearchResults" class="assetSearchResults hidden"></div>
+
+                <div id="editAssetCosteAnualField" class="hidden">
+                    <label class="assetModalLabel" for="editAssetCosteAnualInput">Coste anual del ETF (%) <span class="assetModalLabelHint">(TER)</span></label>
+                    <input id="editAssetCosteAnualInput" class="assetModalInput" type="text" inputmode="decimal" placeholder="Ej: 0,20">
+                </div>
+            </div>
+            <div class="modalCampo">
+                <div class="assetConvertCurrencyRow">
+                    <span class="assetConvertCurrencyLabel">
+                        Convertir la cotización de divisa
+                        <span class="assetModalLabelHint">tipo de cambio en tiempo real</span>
+                    </span>
+                    <label class="ajustesSwitch">
+                        <input type="checkbox" id="editAssetConvertCurrencyToggle">
+                        <span class="ajustesSwitchTrack"></span>
+                    </label>
+                </div>
+                <select id="editAssetConvertCurrencySelect" aria-label="Divisa a la que convertir" class="assetModalInput hidden"></select>
+
+                <button type="button" class="assetModalLabel cpToggleLabel" id="editAssetColorToggle">
+                    <span>Color del activo</span>
+                    <span class="cpToggleBadge" id="editAssetColorBadge"></span>
+                    <span class="cpToggleArrow">▼</span>
+                </button>
+                <div class="assetColorPicker cpCollapsed" id="editAssetColorPicker"></div>
+                <input type="hidden" id="editAssetColorInput" value="">
+
+                <label class="assetModalLabel assetModalLabelSmall" for="editAssetTVTickerInput">Ticker TradingView <span class="assetModalLabelHint">(opcional, solo para el gráfico)</span></label>
+                <input id="editAssetTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: COMEX:GC1! o XAUUSD">
+            </div>
         </div>
-        <div id="editAssetSearchFeedback" class="assetSearchFeedback hidden"></div>
-        <div id="editAssetSearchResults" class="assetSearchResults hidden"></div>
 
-        <div id="editAssetCosteAnualField" class="hidden">
-            <label class="assetModalLabel" for="editAssetCosteAnualInput">Coste anual del ETF (%) <span class="assetModalLabelHint">(TER)</span></label>
-            <input id="editAssetCosteAnualInput" class="assetModalInput" type="text" inputmode="decimal" placeholder="Ej: 0,20">
-        </div>
-
-        <div class="assetConvertCurrencyRow">
-            <span class="assetConvertCurrencyLabel">
-                Convertir la cotización de divisa
-                <span class="assetModalLabelHint">tipo de cambio en tiempo real</span>
-            </span>
-            <label class="ajustesSwitch">
-                <input type="checkbox" id="editAssetConvertCurrencyToggle">
-                <span class="ajustesSwitchTrack"></span>
-            </label>
-        </div>
-        <select id="editAssetConvertCurrencySelect" aria-label="Divisa a la que convertir" class="assetModalInput hidden"></select>
-
-        <button type="button" class="assetModalLabel cpToggleLabel" id="editAssetColorToggle">
-            <span>Color del activo</span>
-            <span class="cpToggleBadge" id="editAssetColorBadge"></span>
-            <span class="cpToggleArrow">▼</span>
-        </button>
-        <div class="assetColorPicker cpCollapsed" id="editAssetColorPicker"></div>
-        <input type="hidden" id="editAssetColorInput" value="">
-
-        <label class="assetModalLabel assetModalLabelSmall" for="editAssetTVTickerInput">Ticker TradingView <span class="assetModalLabelHint">(opcional, solo para el gráfico)</span></label>
-        <input id="editAssetTVTickerInput" class="assetModalInput" type="text" placeholder="Ej: COMEX:GC1! o XAUUSD">
+        <div id="editAssetWalletsBloque" class="walletsActivoBloque hidden"></div>
 
         <div class="assetModalActions">
             <button id="cancelEditAssetModalBtn" class="cancelButton">Cancelar</button>
@@ -2101,12 +2115,13 @@
                 <label class="ajustesExportClaves" for="ajustesBackupClaves">
                     <input id="ajustesBackupClaves" type="checkbox">
                     <span>
-                        <strong>Incluir las claves de API y las wallets en las copias.</strong>
-                        Van cifradas dentro del ZIP con la <em>contraseña de las copias</em> si la defines
-                        abajo y, si no, con tu <em>contraseña de acceso a la web</em>. Para restaurarlas se
-                        pide esa contraseña (en este servidor, si no ha cambiado, no se pregunta). Sin esta
-                        opción, la copia no lleva ninguna clave ni tus wallets de Cripto › Seguimiento, y al
-                        reinstalar con otra SECRET_KEY habría que volver a enlazarlas.
+                        <strong>Incluir las claves de API en las copias.</strong>
+                        Tus wallets de Cripto › Seguimiento entran siempre, con o sin esta opción. Todo va
+                        cifrado dentro del ZIP con la <em>contraseña de las copias</em> si la defines abajo
+                        y, si no, con tu <em>contraseña de acceso a la web</em>. Para restaurarlo se pide
+                        esa contraseña (en este servidor, si no ha cambiado, no se pregunta). Sin esta
+                        opción, la copia no lleva ninguna clave de API, y al reinstalar con otra SECRET_KEY
+                        habría que volver a introducirlas.
                     </span>
                 </label>
                 <div class="ajustesField">
@@ -2126,7 +2141,7 @@
                     <span id="ajustesBackupContrasenaMsg" class="ajustesStatusMsg"></span>
                 </div>
                 <div class="ajustesNota">Solo protege las claves de API y las wallets. Se guarda cifrada con la SECRET_KEY del servidor y puedes volver a verla con «Ver guardada» (te pide tu contraseña de acceso a la web). Sin ella no podrás abrir las claves de una copia en otro servidor. Cambiarla no afecta a las copias ya hechas.</div>
-                <div class="ajustesNota">Con Telegram configurado, cada copia automática avisa por texto (aviso «Copias de seguridad»). Para que además envíe el fichero ZIP, activa «Enviar el fichero de cada copia automática» en Ajustes › Avisos.</div>
+                <div class="ajustesNota">Con Telegram configurado, cada copia automática avisa por texto (aviso «Copias de seguridad»). Para que además envíe el fichero ZIP, activa «Enviar el fichero de las copias automáticas y al actualizar» en Ajustes › Avisos.</div>
                 <div class="ajustesActions">
                     <button id="ajustesGuardarBackupFreqBtn" class="primaryButton" type="button" data-no-autohide="true">Guardar</button>
                     <span id="ajustesBackupFreqMsg" class="ajustesStatusMsg"></span>
@@ -2330,6 +2345,7 @@
 <script defer src="js/cartera/assets-resumen.js"></script>
 <script defer src="js/cartera/assets-ficha.js"></script>
 <script defer src="js/cartera/assets-modales.js"></script>
+<script defer src="js/cartera/assets-wallets.js"></script>
 <script defer src="js/cartera/activos-pagina.js"></script>
 <script defer src="js/finanzas/intereses.js"></script>
 <script defer src="js/finanzas/intereses-resumen.js"></script>

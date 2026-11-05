@@ -24,26 +24,107 @@ function _segPid() {
     return window._activePortfolioId || "default"
 }
 
-function segLoadCustomItems() {
-    const key = `seguimientoList_${_segPid()}`
-    const legacy = "seguimientoList"
-    try {
-        const stored = localStorage.getItem(key)
-        if (stored !== null) return JSON.parse(stored)
-        // Migración desde clave sin namespace
-        const old = localStorage.getItem(legacy)
-        if (old) {
-            localStorage.setItem(key, old)
-            localStorage.removeItem(legacy)
-            return JSON.parse(old)
+// Lista propia, ocultos y símbolos retocados son datos del portfolio: viven en sus
+// preferencias del servidor, que es lo que entra en las copias de seguridad, y
+// aquí solo hay una copia en memoria que carga loadGlobalSettings.
+function _segDatos() {
+    if (!window._seguimientoDatos) window._seguimientoDatos = { lista: [], ocultos: [], overrides: {} }
+    return window._seguimientoDatos
+}
+
+let _segGuardadoEnCola = Promise.resolve()
+let _segDatosSustituidos = false
+
+// Tras restaurar, lo que hay en memoria ya no es lo de la base y no debe volver a ella.
+window.addEventListener("app:datos-restaurados", () => {
+    _segDatosSustituidos = true
+})
+
+// En cola: dos cambios seguidos no pueden llegar al servidor en orden inverso.
+function _segGuardar(campos) {
+    if (_segDatosSustituidos) return
+    _segGuardadoEnCola = _segGuardadoEnCola
+        .then(async () => {
+            const res = await fetch("/api/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(campos)
+            })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        })
+        .catch((error) => {
+            console.error("Error al guardar el seguimiento:", error)
+            window.showToast?.("No se ha podido guardar el seguimiento", { type: "error" })
+        })
+}
+
+// Agrupa por portfolio las claves `seguimiento*` que quedan en este navegador. Las
+// de antes de separar por portfolio (sin sufijo o con "default") van al activo.
+function segAgruparLocal(entradas, pidActivo) {
+    const CAMPOS = { List: "seguimientoLista", Hidden: "seguimientoOcultos", Overrides: "seguimientoOverrides" }
+    const portfolios = {}
+    const claves = {}
+    entradas.forEach(([clave, crudo]) => {
+        const coincide = /^seguimiento(List|Hidden|Overrides)(?:_(.+))?$/.exec(clave)
+        if (!coincide) return
+        const pid = !coincide[2] || coincide[2] === "default" ? pidActivo : coincide[2]
+        let valor
+        try {
+            valor = JSON.parse(crudo)
+        } catch {
+            // Ilegible: no hay nada que subir, y borrarlo no arregla nada.
+            return
         }
-        return []
+        portfolios[pid] = portfolios[pid] || {}
+        const campo = CAMPOS[coincide[1]]
+        if (coincide[1] === "Overrides") {
+            portfolios[pid][campo] = { ...valor, ...(portfolios[pid][campo] || {}) }
+        } else {
+            portfolios[pid][campo] = [...(portfolios[pid][campo] || []), ...(Array.isArray(valor) ? valor : [])]
+        }
+        claves[pid] = [...(claves[pid] || []), clave]
+    })
+    return { portfolios, claves }
+}
+
+// Sube al servidor lo que aún esté en el navegador y solo entonces lo borra de él:
+// si falla, se reintenta en la siguiente carga y no se ha perdido nada.
+async function segMigrarAlServidor(pidActivo) {
+    let entradas
+    try {
+        entradas = Object.keys(localStorage).map((clave) => [clave, localStorage.getItem(clave)])
     } catch {
-        return []
+        return
+    }
+    const { portfolios, claves } = segAgruparLocal(entradas, pidActivo)
+    if (!Object.keys(portfolios).length) return
+    try {
+        const res = await fetch("/api/settings/seguimiento/migrar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ portfolios })
+        })
+        const data = await res.json()
+        if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`)
+        data.migrados.forEach((pid) => (claves[pid] || []).forEach((clave) => localStorage.removeItem(clave)))
+        window._seguimientoDatos = {
+            lista: data.seguimientoLista,
+            ocultos: data.seguimientoOcultos,
+            overrides: data.seguimientoOverrides
+        }
+    } catch (error) {
+        console.error("Error al migrar el seguimiento al servidor:", error)
     }
 }
+window.segMigrarAlServidor = segMigrarAlServidor
+
+// Copia: quien la pide la modifica antes de guardarla, y no debe tocar la de memoria.
+function segLoadCustomItems() {
+    return JSON.parse(JSON.stringify(_segDatos().lista))
+}
 function segSaveCustomItems(items) {
-    localStorage.setItem(`seguimientoList_${_segPid()}`, JSON.stringify(items))
+    _segDatos().lista = items
+    _segGuardar({ seguimientoLista: items })
 }
 
 function segFilteredItems() {
@@ -273,25 +354,11 @@ function segRenderTable(filtered) {
 }
 
 function segLoadHidden() {
-    const key = `seguimientoHidden_${_segPid()}`
-    const legacy = "seguimientoHidden"
-    try {
-        const stored = localStorage.getItem(key)
-        if (stored !== null) return new Set(JSON.parse(stored))
-        // Migración desde clave sin namespace
-        const old = localStorage.getItem(legacy)
-        if (old) {
-            localStorage.setItem(key, old)
-            localStorage.removeItem(legacy)
-            return new Set(JSON.parse(old))
-        }
-        return new Set()
-    } catch {
-        return new Set()
-    }
+    return new Set(_segDatos().ocultos)
 }
 function segSaveHidden(set) {
-    localStorage.setItem(`seguimientoHidden_${_segPid()}`, JSON.stringify([...set]))
+    _segDatos().ocultos = [...set]
+    _segGuardar({ seguimientoOcultos: [...set] })
 }
 
 function segHideItem(segId) {
@@ -530,11 +597,7 @@ function segMergeAndRender(portfolioAssets) {
         }))
 
     const hidden = segLoadHidden()
-    const overrides = JSON.parse(
-        localStorage.getItem(`seguimientoOverrides_${_segPid()}`) ||
-            localStorage.getItem("seguimientoOverrides") ||
-            "{}"
-    )
+    const overrides = _segDatos().overrides
 
     const portfolioItems = portfolioAssets
         .filter((a) => !hidden.has(`portfolio_${a.id}`))
@@ -1300,13 +1363,9 @@ async function initSeguimientoLogic() {
 
         if (allItem?._fromPortfolio || allItem?._fromOperaciones) {
             const tvVal = editTVInput?.value.trim() || ""
-            const overrides = JSON.parse(
-                localStorage.getItem(`seguimientoOverrides_${_segPid()}`) ||
-                    localStorage.getItem("seguimientoOverrides") ||
-                    "{}"
-            )
+            const overrides = _segDatos().overrides
             overrides[_editingSegId] = { ...(overrides[_editingSegId] || {}), tvSymbol: tvVal }
-            localStorage.setItem(`seguimientoOverrides_${_segPid()}`, JSON.stringify(overrides))
+            _segGuardar({ seguimientoOverrides: overrides })
             _editingSegId = null
             editOverlay?.classList.add("hidden")
             segMergeAndRender(portfolioAssets)

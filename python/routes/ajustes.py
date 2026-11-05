@@ -39,7 +39,7 @@ from providers import estado as estadoProveedores
 from providers.api_stats import getTodayStats, olvidarApiResult
 from providers.blockchain_clients import ESTADO_BNB, ESTADO_ETHERSCAN
 from routes import auth
-from stores import app_data
+from stores import app_data, seguimiento_prefs
 from stores.cuenta_ahorro_store import normalizarConfig, vinculosDeConfig
 from stores.cuentas_store import importarVinculos
 from stores.paneles_config import normalizarPaneles
@@ -127,6 +127,11 @@ _PORTFOLIO_DEFAULTS = {
     # Activos > Paneles: los paneles del usuario y sus widgets (ver
     # stores.paneles_config).
     "panelesConfig": {},
+    # Análisis > Seguimiento: lista propia, ocultos y símbolos retocados (ver
+    # stores.seguimiento_prefs).
+    seguimiento_prefs.CLAVE_LISTA: [],
+    seguimiento_prefs.CLAVE_OCULTOS: [],
+    seguimiento_prefs.CLAVE_OVERRIDES: {},
 }
 
 _GLOBAL_KEYS    = set(_GLOBAL_DEFAULTS)
@@ -170,6 +175,9 @@ def _sanear(guardado, defaults: dict) -> dict:
                 for c in valor
             ):
                 continue
+        elif clave == seguimiento_prefs.CLAVE_LISTA:
+            # La única lista de objetos: el filtro de abajo la dejaría vacía.
+            valor = seguimiento_prefs.normalizarLista(valor)
         elif isinstance(valor, list):
             # Todas las demás listas de ajustes son de cadenas (ids, tipos,
             # categorías); un número o un objeto ahí rompía un `in {…}`.
@@ -396,6 +404,7 @@ def getSettings():
     alphavantageRaw = _readKeyFile(_API_DIR / "alphavantage.key")
     return jsonify({
         "ok":                    True,
+        "portfolioId":           pid,
         "finnhubKeyCount":       len([k for k in finnhubRaw.splitlines() if k.strip()]),
         "eodhdKeyCount":         len([k for k in eodhdRaw.splitlines() if k.strip()]),
         "alphaVantageKeyCount":  len([k for k in alphavantageRaw.splitlines() if k.strip()]),
@@ -437,7 +446,47 @@ def getSettings():
         "ahorroConfig":             pcfg.get("ahorroConfig") or {"objetivoAhorro": 30, "presupuesto": {}},
         "cuentaAhorroConfig":       normalizarConfig(pcfg.get("cuentaAhorroConfig")),
         "panelesConfig":            normalizarPaneles(pcfg.get("panelesConfig")),
+        **_seguimientoDe(pcfg),
     })
+
+
+def _seguimientoDe(prefs: dict) -> dict:
+    """Los tres campos de Análisis > Seguimiento, con la forma que espera el navegador."""
+    return {
+        seguimiento_prefs.CLAVE_LISTA: seguimiento_prefs.normalizarLista(prefs.get(seguimiento_prefs.CLAVE_LISTA)),
+        seguimiento_prefs.CLAVE_OCULTOS: seguimiento_prefs.normalizarOcultos(prefs.get(seguimiento_prefs.CLAVE_OCULTOS)),
+        seguimiento_prefs.CLAVE_OVERRIDES: seguimiento_prefs.normalizarOverrides(prefs.get(seguimiento_prefs.CLAVE_OVERRIDES)),
+    }
+
+
+@ajustesBp.route("/api/settings/seguimiento/migrar", methods=["POST"])
+def migrarSeguimiento():
+    """Sube lo que cada portfolio aún tiene en el `localStorage` de este navegador.
+
+    Hay que hacerlo en bloque y no al abrir cada portfolio: uno que no se abra
+    antes de la siguiente copia se quedaría fuera de ella. Un id que no existe
+    (un portfolio ya borrado) se salta y no sale en `migrados`.
+
+    Returns:
+        `migrados`, los portfolios guardados, y los datos del activo ya fusionados.
+    """
+    entrante = jsonBody().get("portfolios")
+    if not isinstance(entrante, dict):
+        return jsonify({"ok": False, "error": "Petición incorrecta"}), 400
+
+    from admin.portfolios_manager import getPortfolios
+
+    conocidos = {p["id"] for p in getPortfolios()["portfolios"]}
+    migrados = []
+    try:
+        for pid, datos in entrante.items():
+            if pid in conocidos and isinstance(datos, dict):
+                _writePrefs(pid, seguimiento_prefs.fusionar(_readPrefs(pid), datos))
+                migrados.append(pid)
+    except OSError as e:
+        mensaje = registrarFalloEscritura(log, "[ajustes] No se pudo migrar el seguimiento", e, JSON_DIR)
+        return jsonify({"ok": False, "error": mensaje, "migrados": migrados}), 500
+    return jsonify({"ok": True, "migrados": migrados, **_seguimientoDe(_readPrefs(_activePortfolioId()))})
 
 
 @ajustesBp.route("/api/settings/apikeys", methods=["GET"])
@@ -879,6 +928,18 @@ def _configPaneles(valor, _cfg):
     return normalizarPaneles(valor)
 
 
+def _seguimientoLista(valor, _cfg):
+    return seguimiento_prefs.normalizarLista(valor) if isinstance(valor, list) else _SIN_CAMBIO
+
+
+def _seguimientoOcultos(valor, _cfg):
+    return seguimiento_prefs.normalizarOcultos(valor) if isinstance(valor, list) else _SIN_CAMBIO
+
+
+def _seguimientoOverrides(valor, _cfg):
+    return seguimiento_prefs.normalizarOverrides(valor) if isinstance(valor, dict) else _SIN_CAMBIO
+
+
 _NORMALIZADORES_GLOBALES = {
     "autoBackupDays": _acotado(0, 365, 0),
     "backupIncluirClaves": lambda valor, _cfg: valor is True,
@@ -918,6 +979,9 @@ _NORMALIZADORES_PORTFOLIO = {
     "ahorroConfig": _configAhorro,
     "cuentaAhorroConfig": _configCuentaAhorro,
     "panelesConfig": _configPaneles,
+    seguimiento_prefs.CLAVE_LISTA: _seguimientoLista,
+    seguimiento_prefs.CLAVE_OCULTOS: _seguimientoOcultos,
+    seguimiento_prefs.CLAVE_OVERRIDES: _seguimientoOverrides,
 }
 
 
@@ -1147,7 +1211,9 @@ def exportZip():
 
     peticion = request.get_json(silent=True) if request.method == "POST" else None
     peticion = peticion if isinstance(peticion, dict) else {}
-    ui = exportables.sanearUi(peticion.get("ui"))
+    # Sin las listas de Seguimiento: las de este portfolio ya van en sus prefs, y
+    # el navegador manda también las de los demás, que aquí no pintan nada.
+    _datos, ui = seguimiento_prefs.separarDeUi(exportables.sanearUi(peticion.get("ui")), None)
     incluirClaves = bool(peticion.get("incluirClaves"))
     contrasena = peticion.get("contrasena")
     contrasena = contrasena if isinstance(contrasena, str) else ""
@@ -1495,7 +1561,68 @@ class _ContenidoImportado:
     base: str | None = None          # entrada .db de la raíz, ya extraída al temporal
     exportJson: dict | None = None  # o, en su lugar, el export JSON
     ajustes: dict | None = None
-    prefs: dict = field(default_factory=dict)
+    prefs: dict | None = None        # preferencias para la cartera de destino
+    ui: dict = field(default_factory=dict)
+
+
+def _prefsDeOrigen(prefsDelZip: dict, pidDestino: str | None) -> tuple[dict | None, str | None]:
+    """De las preferencias de un ZIP, las que corresponden al destino, y de qué portfolio salen.
+
+    El nombre del fichero lleva el id de la cartera EXPORTADA, que no tiene por qué
+    ser el de la cartera donde se importa. Escribirlo tal cual dejaba al destino
+    con su configuración anterior y pisaba la de otra cartera con ese id.
+
+    Args:
+        prefsDelZip: `{nombre de fichero: contenido}`.
+        pidDestino: Portfolio de destino; None si aún no tiene id.
+
+    Returns:
+        `(prefs, pidOrigen)`, o `(None, None)` si no se puede decidir cuáles son.
+    """
+    validas = {n: p for n, p in prefsDelZip.items() if isinstance(p, dict)}
+    propio = f"prefs_{pidDestino}.json"
+    nombre = propio if propio in validas else (next(iter(validas)) if len(validas) == 1 else None)
+    if nombre is None:
+        if validas:
+            log.warning("[import] El ZIP trae preferencias de varias carteras: no se aplica ninguna")
+        return None, None
+    return validas[nombre], nombre.removeprefix("prefs_").removesuffix(".json")
+
+
+def configuracionDelZip(zf, pidDestino: str | None) -> tuple[dict | None, dict]:
+    """Preferencias de la cartera de destino e interfaz, leídas de un ZIP de export.
+
+    Junta lo que en un ZIP antiguo viene por dos sitios: `prefs_<id>.json` y, en
+    `ui.json`, las listas de Seguimiento de cuando vivían en el navegador.
+
+    Args:
+        zf: ZIP ya comprobado con `zip_seguro`.
+        pidDestino: Portfolio de destino; None si aún no tiene id.
+
+    Returns:
+        `(prefs, ui)`: las preferencias a guardar (None si no trae) y el volcado de
+        interfaz sin datos de Seguimiento.
+
+    Raises:
+        ValueError: si alguna entrada no es JSON válido.
+    """
+    prefsDelZip = {}
+    for nombre in zf.namelist():
+        prefsName = Path(nombre).name
+        # El nombre se reduce a su parte final y se valida contra un patrón: solo
+        # sirve para saber de qué cartera salen, no se usa ya como ruta.
+        if _RE_SAFE_PREFS_NAME.match(prefsName):
+            prefsDelZip[prefsName] = _jsonDeZip(zf, nombre)
+        elif prefsName.startswith("prefs_"):
+            log.warning("[import] Entrada de prefs ignorada por nombre inseguro: %r", nombre)
+    prefs, pidOrigen = _prefsDeOrigen(prefsDelZip, pidDestino)
+
+    entradaUi = next((n for n in zf.namelist() if Path(n).name == exportables.FICHERO_UI), None)
+    uiCruda = exportables.sanearUi(_jsonDeZip(zf, entradaUi)) if entradaUi else {}
+    datos, ui = seguimiento_prefs.separarDeUi(uiCruda, pidOrigen)
+    if datos:
+        prefs = seguimiento_prefs.fusionar(prefs or {}, datos)
+    return prefs, ui
 
 
 _SIN_NADA_QUE_IMPORTAR = (
@@ -1504,7 +1631,7 @@ _SIN_NADA_QUE_IMPORTAR = (
 )
 
 
-def _leerContenidoZip(zf, tmpDb) -> _ContenidoImportado:
+def _leerContenidoZip(zf, tmpDb, pidDestino: str) -> _ContenidoImportado:
     """Valida todo lo que se va a usar, sin escribir nada fuera de `tmp_db`."""
     from admin.backup_manager import problemaDePortfolio
 
@@ -1540,15 +1667,7 @@ def _leerContenidoZip(zf, tmpDb) -> _ContenidoImportado:
         if not isinstance(contenido.ajustes, dict):
             raise _ImportacionRechazada("ajustes.json no tiene el formato esperado")
 
-    # El nombre de cada prefs se reduce a su parte final y se valida contra un
-    # patrón: comprobar solo que no hubiera "/" dejaba pasar entradas como
-    # "prefs_..\..\algo.json", que en Windows escriben fuera de data/JSON.
-    for nombre in nombres:
-        prefsName = Path(nombre).name
-        if _RE_SAFE_PREFS_NAME.match(prefsName):
-            contenido.prefs[prefsName] = _jsonDeZip(zf, nombre)
-        elif prefsName.startswith("prefs_"):
-            log.warning("[import] Entrada de prefs ignorada por nombre inseguro: %r", nombre)
+    contenido.prefs, contenido.ui = configuracionDelZip(zf, pidDestino)
     return contenido
 
 
@@ -1578,8 +1697,13 @@ def _aplicarContenido(contenido: _ContenidoImportado, tmpDb, dbPath) -> None:
 
     if contenido.ajustes is not None:
         escribirJsonAtomico(_AJUSTES_JSON, contenido.ajustes)
-    for prefsName, prefs in contenido.prefs.items():
-        escribirJsonAtomico(_AJUSTES_JSON.parent / prefsName, prefs)
+    prefsDestino = _prefsPath(dbPath.stem)
+    if contenido.prefs is not None:
+        escribirJsonAtomico(prefsDestino, contenido.prefs)
+    elif contenido.base:
+        # La cartera exportada no tenía preferencias, y sus datos ya han sustituido
+        # a los de esta: las de antes configurarían una cartera que ya no es.
+        prefsDestino.unlink(missing_ok=True)
 
 
 def _importarZip(rawBytes, clavesDescifradas, sinClaves):
@@ -1596,7 +1720,7 @@ def _importarZip(rawBytes, clavesDescifradas, sinClaves):
     try:
         with zipfile.ZipFile(io.BytesIO(rawBytes), "r") as zf, \
                 temporalPara(dbPath, directorio=paths.TMP_DIR) as tmpDb:
-            contenido = _leerContenidoZip(zf, tmpDb)
+            contenido = _leerContenidoZip(zf, tmpDb, dbPath.stem)
 
             copia, copiaOk = copiaPreviaObligatoria()
             if not copiaOk:
@@ -1608,8 +1732,7 @@ def _importarZip(rawBytes, clavesDescifradas, sinClaves):
                 log.info("[import] Claves de API restauradas: %s", ", ".join(claves))
             # Preferencias de interfaz: no se guardan aquí, se devuelven para
             # que las escriba el navegador, que es donde viven.
-            entradaUi = next((n for n in contenido.nombres if Path(n).name == exportables.FICHERO_UI), None)
-            ui = exportables.sanearUi(_jsonDeZip(zf, entradaUi)) if entradaUi else {}
+            ui = contenido.ui
     except (_ImportacionRechazada, ValueError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     except Exception as e:

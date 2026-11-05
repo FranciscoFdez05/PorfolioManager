@@ -64,6 +64,27 @@ def _enlazar(repositorio, **cambios):
 
 # ── Fallos visibles ───────────────────────────────────────────────────────────
 
+def testUnaLecturaAManoFallidaAnotaElMotivoYSigueSubiendoElError(entorno):
+    repositorio, lector, _enviados, vigilante = entorno
+    wallet = _enlazar(repositorio)
+    lector.errorEn = wv._LIMITE_LECTURA
+
+    with pytest.raises(ErrorLecturaWallet, match="sin red"):
+        vigilante().revisarAnotandoFallo(wallet.id)
+
+    fallida = repositorio.obtener(wallet.id)
+    assert fallida.ultimoError == "sin red" and fallida.ultimoErrorFecha
+
+
+def testUnaLecturaAManoCorrectaDevuelveLoMismoQueRevisar(entorno):
+    repositorio, _lector, _enviados, vigilante = entorno
+    wallet = _enlazar(repositorio)
+
+    leida, avisos = vigilante().revisarAnotandoFallo(wallet.id)
+
+    assert leida.saldoFecha and leida.ultimoError == "" and avisos == 0
+
+
 def testUnFalloQuedaEnLaWalletYSeBorraAlLeerBien(entorno):
     repositorio, lector, _enviados, vigilante = entorno
     wallet = _enlazar(repositorio)

@@ -197,7 +197,12 @@ function _initAjustesCopias() {
                 const res = await fetch("/api/backup", { method: "POST" })
                 const data = await res.json()
                 if (data.ok) {
-                    showMsg(backupMsg, `Creado: ${data.filename}`, "ok")
+                    // Una copia a la que le falta algo no puede anunciarse como buena.
+                    showMsg(
+                        backupMsg,
+                        data.aviso ? `Creado: ${data.filename}. ${data.aviso}` : `Creado: ${data.filename}`,
+                        data.aviso ? "error" : "ok"
+                    )
                     renderBackups(data.backups || [])
                 } else {
                     // El servidor incluye el motivo (por ejemplo permisos del

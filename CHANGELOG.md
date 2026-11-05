@@ -24,8 +24,10 @@ decide cómo se deshace la actualización:
 
 ## [5.0.0] — 2026-11-04
 
-**Esquema de base de datos:** no lo toca (sigue en la **26**). Las wallets y sus
-datos no van en la base de datos, sino en `API/`.
+**Esquema de base de datos:** sube al **27**. Al arrancar, las filas importadas de
+una wallet que estaban como «recibida» pasan a «pendiente». Volver atrás exige
+además restaurar el `.db` que se guarda al migrar. Las wallets y sus datos no van
+en la base de datos, sino en `API/`.
 
 **Por qué es mayor:** cambia la forma del despliegue. El stack gana un servicio,
 `worker`, que se lleva las tareas de fondo de la web. `./docker-update.sh` lo crea
@@ -105,9 +107,28 @@ segunda copia de la web.
 - **Conexión a servidores con varias IP:** si una no contesta en 3 s se pasa a la
   siguiente, en vez de agotar el timeout entero.
 - **Watchlist:** los filtros de origen enseñan una sola fuente cada vez.
+- **Entradas de wallet por verificar.** Una entrada de dinero importada de una wallet
+  no cuenta en la posición hasta verificarla. Las filas «recibida» importadas antes y
+  las que pierden su verificación quedan en Transacciones como «Pendiente de
+  verificar».
+- **Detalle de una transacción.** Nuevo diseño: tipo e importe en cabecera, ruta
+  origen → destino con el dueño de cada dirección y textos revisados.
+- **Lecturas del detalle de un seguimiento.** Los movimientos, tokens y UTXOs leídos
+  se guardan cifrados en `API/wallets_lecturas/`. Al volver a entrar se ven al momento
+  con su fecha de carga mientras se buscan los nuevos, sin vaciar la tabla, y un fallo
+  de la red no se los lleva. **Volver a leer** sustituye lo guardado. No entran en las
+  copias de seguridad: se regeneran leyendo la red.
 
 ### Corregido
 
+- **Comisión de un movimiento «entre wallets» con origen propio.** Decía que la pagó
+  quien envió y, en Bitcoin, dejaba la fila sin comisión. Ahora consta como pagada por
+  ti y se descuenta de la posición, también en Bitcoin. Las filas ya importadas se
+  completan solas al abrir Transacciones. Si solo marcas la transacción y no su origen
+  (retirada de un exchange), la comisión sigue sin aplicarse sola.
+- **Posición de Activos y panel lateral.** No se actualizaban al marcar una
+  transacción, sincronizar una wallet o completar una comisión, hasta el siguiente
+  refresco periódico.
 - **Alpha Vantage con la cuota agotada.** El aviso llega dentro de un 200 y no se
   reconocía como límite: el proveedor nunca entraba en reposo y cada activo gastaba
   otra petición. Ahora entra en reposo y Ajustes lo enseña como cuota agotada.

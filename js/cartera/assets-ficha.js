@@ -849,6 +849,14 @@ function openEditAssetModal(assetData = null) {
     const currentConvertCurrency = assetData?.convertCurrency || assetPage?.dataset.assetConvertCurrency || ""
     const editAssetType = String(assetData?.type || assetPage?.dataset.assetType || "").toLowerCase()
     document.getElementById("editAssetCosteAnualField")?.classList.toggle("hidden", editAssetType !== "etfs")
+    walletsActivoMostrar("editAssetWalletsBloque", editAssetType === "cripto")
+    if (editAssetType === "cripto") {
+        walletsActivoAbrir("editAssetWalletsBloque", {
+            assetId: currentAssetId,
+            nombre: currentName,
+            ticker: currentTicker
+        })
+    }
     const editCosteAnualInput = document.getElementById("editAssetCosteAnualInput")
     if (editCosteAnualInput) {
         editCosteAnualInput.value = assetData?.costeAnual ?? assetPage?.dataset.assetCosteAnual ?? ""
@@ -889,6 +897,7 @@ function closeEditAssetModal() {
 
     editAssetModalOverlay.classList.add("hidden")
     editAssetModalState = null
+    walletsActivoVaciar("editAssetWalletsBloque")
 }
 
 // Base sobre la que se guarda una edición del activo.
@@ -954,6 +963,10 @@ async function submitEditAssetModal() {
         return
     }
 
+    if (!(await walletsActivoValidar("editAssetWalletsBloque", trimmedName))) {
+        return
+    }
+
     if (
         trimmedName === currentName &&
         newColor === (payload.color || "") &&
@@ -963,6 +976,7 @@ async function submitEditAssetModal() {
         newConvertCurrency === (payload.convertCurrency || "") &&
         newCosteAnual === (payload.costeAnual || "")
     ) {
+        await walletsActivoEnlazar("editAssetWalletsBloque", currentAssetId, trimmedName)
         closeEditAssetModal()
         return
     }
@@ -1014,6 +1028,8 @@ async function submitEditAssetModal() {
             console.error(error)
         }
     }
+
+    await walletsActivoEnlazar("editAssetWalletsBloque", currentAssetId, trimmedName)
 
     const fromAvView = _editingAsset !== null
     closeEditAssetModal()
@@ -1537,6 +1553,10 @@ function syncAssetCosteAnualField() {
     document.getElementById("assetCosteAnualField")?.classList.toggle("hidden", !isEtf)
 }
 
+function syncAssetWalletsField() {
+    walletsActivoMostrar("assetWalletsBloque", document.getElementById("assetTypeSelect")?.value === "cripto")
+}
+
 function openAssetModal() {
     const assetModalOverlay = document.getElementById("assetModalOverlay")
     const assetNameInput = document.getElementById("assetNameInput")
@@ -1564,6 +1584,8 @@ function openAssetModal() {
     const costeAnualInput = document.getElementById("assetCosteAnualInput")
     if (costeAnualInput) costeAnualInput.value = ""
     syncAssetCosteAnualField()
+    syncAssetWalletsField()
+    walletsActivoAbrir("assetWalletsBloque")
     reorderProviderSearchButtons("assetSearchActions", "tradingview")
     const tvTickerInput = document.getElementById("assetTVTickerInput")
     if (tvTickerInput) tvTickerInput.value = ""
@@ -1591,6 +1613,7 @@ function closeAssetModal() {
 
     assetModalOverlay.classList.add("hidden")
     assetModalState = null
+    walletsActivoVaciar("assetWalletsBloque")
 }
 
 // Centra el diálogo sobre el área de contenido (#dynamicContent) manteniendo el fondo a pantalla completa.

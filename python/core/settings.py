@@ -374,6 +374,11 @@ CATALOGO: tuple[Ajuste, ...] = (
     # que gunicorn dé el worker por colgado ([gunicorn] timeout, 120 s).
     Ajuste("wallets", "plazo_segundos", ENTERO, 75, env="WALLETS_PLAZO_SEGUNDOS", minimo=10, maximo=600,
            descripcion="Tiempo máximo de una sincronización. Déjalo por debajo del timeout de gunicorn."),
+    # La vigilancia no corre dentro de una petición, así que no la limita gunicorn:
+    # puede esperar su turno aunque otra lectura comparta el ritmo de la misma API.
+    Ajuste("wallets", "plazo_vigilancia_segundos", ENTERO, 300, env="WALLETS_PLAZO_VIGILANCIA_SEGUNDOS",
+           minimo=10, maximo=1800,
+           descripcion="Tiempo máximo de la lectura de una wallet en la vigilancia en segundo plano."),
     # Listas en el formato estándar Token Lists (tokenlists.org): cada token
     # lleva su chainId, así que una misma lista vale para Ethereum y BNB.
     Ajuste("wallets", "listas_tokens", LISTA,
@@ -651,6 +656,10 @@ def walletsMaxTokensVisor() -> int:
 
 def walletsPlazoSegundos() -> int:
     return obtener("wallets.plazo_segundos")
+
+
+def walletsPlazoVigilanciaSegundos() -> int:
+    return obtener("wallets.plazo_vigilancia_segundos")
 
 
 def walletsListasTokens() -> list:

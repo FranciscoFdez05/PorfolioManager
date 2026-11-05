@@ -150,6 +150,17 @@ def clavesConWallets() -> dict:
     return {**claves, wallets_copia.CLAVE_PAQUETE: wallets} if wallets else claves
 
 
+def soloWallets() -> dict:
+    """Lo de las wallets en el formato del paquete de claves, sin ninguna clave de API.
+
+    Para las copias con «incluir claves» apagado: ese interruptor decide sobre las
+    claves de API, que se pueden volver a pedir al proveedor, pero las wallets son
+    datos del usuario y sin ellas la copia no estaría completa.
+    """
+    wallets = wallets_copia.volcar()
+    return {wallets_copia.CLAVE_PAQUETE: wallets} if wallets else {}
+
+
 class ContrasenaIncorrecta(Exception):
     """La contraseña no descifra el fichero de claves del ZIP."""
 

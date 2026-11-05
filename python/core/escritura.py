@@ -26,8 +26,14 @@ import json
 import os
 import secrets
 import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
+
+# Hasta medio segundo en total: el lector que bloquea tarda milisegundos, y más
+# allá ya no es esa carrera sino un problema real que hay que contar.
+_REINTENTOS_SUSTITUIR = 10
+_ESPERA_SUSTITUIR_SEGUNDOS = 0.05
 
 # Sufijos que SQLite crea junto al fichero de base de datos. Al limpiar un
 # temporal hay que llevárselos: quedaban huérfanos y ningún barrido los mira.
@@ -80,6 +86,25 @@ def temporalPara(destino, directorio=None):
         limpiarTemporal(tmp)
 
 
+def _sustituir(tmp, destino) -> None:
+    """`os.replace`, reintentando en Windows si alguien tiene `destino` abierto.
+
+    Windows no deja sustituir un fichero que otro hilo esté leyendo, y lo dice con
+    un PermissionError que dura milisegundos: guardar unos ajustes mientras la
+    página los pedía daba un 500. En POSIX ese error es de permisos de verdad y
+    reintentar solo retrasaría el mensaje.
+    """
+    intentos = _REINTENTOS_SUSTITUIR if os.name == "nt" else 1
+    for intento in range(1, intentos + 1):
+        try:
+            os.replace(tmp, destino)
+            return
+        except PermissionError:
+            if intento == intentos:
+                raise
+            time.sleep(_ESPERA_SUSTITUIR_SEGUNDOS)
+
+
 def escribirAtomico(destino, datos, *, permisos=None):
     """Escribe `datos` en `destino` sin dejarlo nunca a medias.
 
@@ -108,7 +133,7 @@ def escribirAtomico(destino, datos, *, permisos=None):
                 os.chmod(tmp, permisos)
             except OSError:
                 pass  # sistemas de ficheros sin permisos POSIX (p. ej. Windows)
-        os.replace(tmp, destino)
+        _sustituir(tmp, destino)
     except BaseException:
         limpiarTemporal(tmp)
         raise

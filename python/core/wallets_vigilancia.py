@@ -26,10 +26,10 @@ from decimal import Decimal
 from typing import Callable
 
 from core import dinero, paths, settings, telegram_notifier, wallets_avisos
-from core.cripto_direcciones import REDES
+from core.cripto_direcciones import REDES, TIPO_XPUB
 from core.wallets_avisos import ConfigAvisos
 from core.wallets_libreta import Libreta, aplicar, canonica, libretaDe
-from core.wallets_sync import resolverActivoToken, textoDecimal
+from core.wallets_sync import SincronizadorWallets, resolverActivoToken, textoDecimal
 from core.wallets_tokens import (
     IMITACION,
     RECONOCIDO,
@@ -182,7 +182,7 @@ def claveMovimiento(movimiento: MovimientoWallet) -> str:
 
 def movimientoComoDict(movimiento: MovimientoWallet) -> dict:
     """La forma en que se guarda y se enseña un movimiento reciente."""
-    return {
+    guardado = {
         "hash": movimiento.hash,
         "fecha": movimiento.fecha.isoformat(),
         "simbolo": movimiento.simbolo,
@@ -194,6 +194,9 @@ def movimientoComoDict(movimiento: MovimientoWallet) -> dict:
         "propia": movimiento.propia,
         "contrato": movimiento.contrato,
     }
+    if len(movimiento.contrapartes) > 1:
+        guardado["contrapartes"] = list(movimiento.contrapartes)
+    return guardado
 
 
 def _euros(valor: Decimal) -> str:
@@ -404,8 +407,10 @@ class VigilanteWallets:
             )
 
         hashes = list(dict.fromkeys([claveMovimiento(m) for m in movimientos] + list(wallet.hashesConocidos)))
+        nuevasDerivadas = self._direccionesNuevas(lector, wallet)
         actualizada = self._repositorio.actualizar(
             wallet.id,
+            direccionesDerivadas=[*wallet.direccionesDerivadas, *nuevasDerivadas],
             saldo=textoDecimal(saldo),
             saldoFecha=ahoraIso(),
             recientes=[movimientoComoDict(m) for m in movimientos[:_MAX_RECIENTES]],
@@ -422,7 +427,45 @@ class VigilanteWallets:
         )
         anotarConocidos(self._repositorio, wallet.red,
                         ((m.contrato, m.simbolo, "") for m in movimientos if m.contrato))
+        self._reetiquetarNuevas(wallet.red, nuevasDerivadas)
         return actualizada, enviados
+
+    @staticmethod
+    def _direccionesNuevas(lector, wallet: Wallet) -> list[str]:
+        """Las direcciones con uso de una xpub propia que aún no estaban guardadas."""
+        if not wallet.propia or wallet.tipo != TIPO_XPUB or not hasattr(lector, "direccionesUsadas"):
+            return []
+        conocidas = set(wallet.direccionesDerivadas)
+        return [direccion for direccion in lector.direccionesUsadas(wallet.valor) or [] if direccion not in conocidas]
+
+    def _reetiquetarNuevas(self, red: str, direcciones: list[str]) -> None:
+        """Corrige lo ya importado de otras wallets que venía de estas direcciones.
+
+        Un fallo no cuenta como fallo de lectura: lo leído ya está guardado, y
+        la próxima dirección nueva o un cambio en la libreta vuelve a reetiquetar.
+        """
+        if not direcciones:
+            return
+        try:
+            SincronizadorWallets(self._repositorio).reetiquetarVarias(red, direcciones)
+        except (WalletError, ErrorLecturaWallet) as error:
+            log.warning("[wallets] No se pudo reetiquetar Transacciones: %s", error)
+
+    def revisarAnotandoFallo(self, walletId: str) -> tuple[Wallet, int]:
+        """Como `revisar`, pero deja el motivo de un fallo de lectura para enseñarlo en la tarjeta.
+
+        Para las lecturas a mano: el aviso del momento desaparece, y sin esto la
+        tarjeta de una wallet nueva diría que sigue pendiente de leer.
+
+        Raises:
+            WalletNoEncontrada: si la wallet no existe.
+            ErrorLecturaWallet: si la red no responde o responde un error.
+        """
+        try:
+            return self.revisar(walletId)
+        except ErrorLecturaWallet as error:
+            self._anotarFallo(walletId, str(error))
+            raise
 
     def _leerMovimientos(self, lector, wallet: Wallet) -> tuple[list[MovimientoWallet], bool]:
         """Los movimientos que hacen falta para enlazar con lo ya visto.

@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
-from core import settings
+from core import paths, settings
 from core.bloqueo import exclusivo
 from core.escritura import escribirJsonAtomico
 from core.paths import (
@@ -540,19 +540,27 @@ def deletePortfolio(pid: str):
         raise ValueError("Debe existir al menos un portfolio")
 
     dbFile = _portfolioDbPath(pid)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Primero se mueve el fichero y después se actualiza el índice: si el move
     # falla (en Windows, con el .db abierto), el portfolio sigue listado y se
     # puede reintentar; al revés quedaba un .db huérfano fuera del índice.
     if dbFile.exists():
         _DELETED_DIR.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         # Mover en lugar de borrar: el .db queda recuperable en data/deleted/
         shutil.move(str(dbFile), str(_DELETED_DIR / f"{pid}_{ts}.db"))
         for suffix in ("-wal", "-shm"):
             sidecar = Path(str(dbFile) + suffix)
             if sidecar.exists():
                 shutil.move(str(sidecar), str(_DELETED_DIR / f"{pid}_{ts}.db{suffix}"))
+
+    # Sus preferencias se van con él: el id sale del nombre, y una cartera nueva
+    # con ese mismo nombre heredaba los activos ocultos, el seguimiento y los
+    # paneles de la borrada.
+    prefsFile = paths.JSON_DIR / f"prefs_{pid}.json"
+    if prefsFile.exists():
+        _DELETED_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(prefsFile), str(_DELETED_DIR / f"prefs_{pid}_{ts}.json"))
 
     meta["portfolios"] = [p for p in meta["portfolios"] if p["id"] != pid]
     _writeMeta(meta)

@@ -51,6 +51,8 @@ API/wallets_ajenas.json
 API/satoshi_vigilancia.json
 # Ficheros de bloqueo de lo anterior
 API/.*.lock
+# Lecturas guardadas del detalle de cada wallet (cifradas, con sus bloqueos)
+API/wallets_lecturas/
 !API/.gitkeep
 
 # =========================

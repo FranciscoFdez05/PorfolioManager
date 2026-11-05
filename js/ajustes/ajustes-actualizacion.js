@@ -204,6 +204,7 @@ async function _consultarUpdate(refrescar = false) {
 
 function _mensajeConfirmacion() {
     const comun =
+        "Antes se hace una copia de seguridad, que llega por Telegram si tienes activado el envío del fichero. " +
         "La aplicación se reiniciará: estarás un par de minutos sin servicio. Si la " +
         "versión nueva no arranca, el servidor vuelve solo a la anterior."
 
@@ -231,7 +232,7 @@ function _mensajeConfirmacion() {
 // `peso`: parte de la barra que ocupa. `estimado`: segundos típicos, solo para
 // que la barra se mueva dentro del paso. Construir es casi todo el tiempo.
 const _UPD_PASOS = [
-    { clave: "solicitud", texto: "Enviar la petición", peso: 2, estimado: 2 },
+    { clave: "solicitud", texto: "Hacer la copia de seguridad", peso: 6, estimado: 15 },
     { clave: "recogida", texto: "El servidor la recoge", peso: 6, estimado: 20 },
     { clave: "descargando", texto: "Descargar el código nuevo", peso: 8, estimado: 10 },
     { clave: "construyendo", texto: "Construir la imagen", peso: 54, estimado: 150 },

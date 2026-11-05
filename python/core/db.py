@@ -670,7 +670,7 @@ CREATE INDEX IF NOT EXISTS idx_alertas_precio_activo ON alertas_precio(asset_id,
 # y sube ESQUEMA_VERSION. Los pasos deben seguir siendo idempotentes: una base
 # en la versión 0 puede tener ya aplicada parte de un paso posterior, porque
 # antes de existir este contador todos se ejecutaban en cada arranque.
-ESQUEMA_VERSION = 26
+ESQUEMA_VERSION = 27
 
 _MIGRACIONES: list = []  # [(version, funcion)], ordenadas al aplicarse
 
@@ -1718,6 +1718,22 @@ def _esquema26(conn):
     columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(activo_conversion_rows)")}
     if "valor_eur" not in columnas:
         conn.execute("ALTER TABLE activo_conversion_rows ADD COLUMN valor_eur TEXT NOT NULL DEFAULT ''")
+
+
+@_migracion(27)
+def _esquema27(conn):
+    """Las entradas importadas de una wallet dejan de contar hasta verificarlas.
+
+    Se importaban como «recibida» y sumaban a la posición sin que nadie confirmase
+    que eran dinero nuevo. El prefijo `wallet-` es el de las filas importadas: las
+    escritas a mano las ha verificado quien las escribió. Las marcas están cifradas
+    en otro fichero y aquí no se ven: una fila ya verificada la corrige la siguiente
+    sincronización (`SincronizadorWallets._importar`).
+    """
+    conn.execute(
+        "UPDATE transacciones SET wallet_tipo = 'pendiente' "
+        "WHERE wallet_tipo = 'recibida' AND id LIKE 'wallet-%'"
+    )
 
 
 class _CerrarAlTerminarElHilo:

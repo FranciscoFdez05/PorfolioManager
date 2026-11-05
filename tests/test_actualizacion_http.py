@@ -21,6 +21,7 @@ import pytest
 
 from core import actualizacion
 from core.version import __version__
+from tests.test_backup_http import _crearDb
 
 
 @pytest.fixture
@@ -203,6 +204,131 @@ def testPedirLaActualizacionSinCsrfEs403(clienteAutenticado, datosAislados, temp
 
     client, _cabeceras, _app = clienteAutenticado(actualizacionBp)
     assert client.post("/api/actualizacion").status_code == 403
+
+
+# ── Copia previa por Telegram ────────────────────────────────────────────────
+
+@pytest.fixture
+def telegramCapturado(datosAislados, monkeypatch):
+    """Telegram configurado y un portfolio que copiar, sin salir a la red."""
+    from core import paths, telegram_notifier
+
+    monkeypatch.setattr(paths, "API_DIR", datosAislados["claves"])
+    _crearDb(datosAislados["portfolios"] / "principal.db", [("2026-01-01", 100.0, 90.0)])
+    datosAislados["meta"].write_text(json.dumps({"active": "principal"}), encoding="utf-8")
+    telegram_notifier.reiniciarParaPruebas()
+    telegram_notifier.escribirConfig("123456:ABC-token", "987654321")
+
+    capturado = {"ficheros": [], "textos": []}
+
+    def _documento(_token, _chat, ruta, texto):
+        # Si la señal ya estuviera, el vigilante podría matar el envío a medias.
+        capturado["ficheros"].append((ruta.name, texto, _senal().exists()))
+
+    monkeypatch.setattr(telegram_notifier, "_enviarDocumento", _documento)
+    monkeypatch.setattr(telegram_notifier, "_enviar", lambda _t, _c, texto: capturado["textos"].append(texto))
+    return capturado
+
+
+def _activarEnvioDeFichero(rutas):
+    rutas["ajustes"].write_text(json.dumps({"telegramAvisos": {"backupFichero": True}}), encoding="utf-8")
+
+
+def testActualizarMandaLaCopiaAntesDeDejarLaSenal(cliente, datosAislados, telegramCapturado):
+    client, cabeceras = cliente
+    _activarEnvioDeFichero(datosAislados)
+
+    assert client.post("/api/actualizacion", headers=cabeceras).get_json()["ok"] is True
+
+    [(nombre, pie, senalYaPuesta)] = telegramCapturado["ficheros"]
+    assert senalYaPuesta is False
+    assert _senal().exists()
+    assert "previa a la actualización" in pie
+    assert (datosAislados["backups"] / nombre).exists()
+    # Con `_auto` el scheduler creería hecha la copia de esa noche.
+    assert nombre.endswith(".zip") and not nombre.endswith("_auto.zip")
+
+
+def testConElEnvioApagadoSoloLlegaElAvisoDeTexto(cliente, telegramCapturado):
+    """El ZIP sale a los servidores de Telegram: actualizar no se salta ese interruptor."""
+    client, cabeceras = cliente
+
+    assert client.post("/api/actualizacion", headers=cabeceras).get_json()["ok"] is True
+
+    assert telegramCapturado["ficheros"] == []
+    assert len(telegramCapturado["textos"]) == 1
+    assert "Copia de seguridad manual creada" in telegramCapturado["textos"][0]
+
+
+def testSiLaCopiaFallaSeAvisaYSeActualizaIgual(cliente, telegramCapturado, monkeypatch):
+    from routes import backup
+
+    client, cabeceras = cliente
+
+    def _falla(*, automatico):
+        raise OSError("disco lleno")
+
+    monkeypatch.setattr(backup, "_escribirBackup", _falla)
+
+    assert client.post("/api/actualizacion", headers=cabeceras).get_json()["ok"] is True
+
+    assert _senal().exists()
+    assert len(telegramCapturado["textos"]) == 1
+    assert "Ha fallado la copia previa" in telegramCapturado["textos"][0]
+    assert "disco lleno" in telegramCapturado["textos"][0]
+
+
+def testSiTelegramFallaSeActualizaIgual(cliente, datosAislados, telegramCapturado, monkeypatch):
+    from core import telegram_notifier
+
+    client, cabeceras = cliente
+    _activarEnvioDeFichero(datosAislados)
+
+    def _sinRed(*_args):
+        raise OSError("sin red")
+
+    monkeypatch.setattr(telegram_notifier, "_enviarDocumento", _sinRed)
+
+    assert client.post("/api/actualizacion", headers=cabeceras).get_json()["ok"] is True
+
+    assert _senal().exists()
+    assert len(telegramCapturado["textos"]) == 1
+
+
+def testConUnaActualizacionEnMarchaNoSeHaceCopia(cliente, datosAislados, telegramCapturado):
+    client, cabeceras = cliente
+    _activarEnvioDeFichero(datosAislados)
+    _escribirEstado("en_marcha")
+
+    assert client.post("/api/actualizacion", headers=cabeceras).status_code == 409
+
+    assert telegramCapturado["ficheros"] == []
+    assert list(datosAislados["backups"].glob("backup_*.zip")) == []
+
+
+def testUnDobleClicNoMandaDosCopias(cliente, datosAislados, telegramCapturado):
+    client, cabeceras = cliente
+    _activarEnvioDeFichero(datosAislados)
+
+    client.post("/api/actualizacion", headers=cabeceras)
+    client.post("/api/actualizacion", headers=cabeceras)
+
+    assert len(telegramCapturado["ficheros"]) == 1
+
+
+def testUnaSenalAbandonadaNoEvitaLaCopiaDelSiguienteIntento(cliente, datosAislados, telegramCapturado):
+    """Pasado el plazo, la copia que acompañó a esa señal ya no vale como previa."""
+    client, cabeceras = cliente
+    _activarEnvioDeFichero(datosAislados)
+    _senal().parent.mkdir(parents=True, exist_ok=True)
+    _senal().write_text(
+        json.dumps({"momento": _ahora(actualizacion.ESPERA_MAXIMA_SEGUNDOS + 60), "version": __version__}),
+        encoding="utf-8",
+    )
+
+    client.post("/api/actualizacion", headers=cabeceras)
+
+    assert len(telegramCapturado["ficheros"]) == 1
 
 
 # ── Versión publicada ────────────────────────────────────────────────────────

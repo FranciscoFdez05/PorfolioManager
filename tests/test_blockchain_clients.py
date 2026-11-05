@@ -201,6 +201,83 @@ def testUtxosConRespuestaInesperadaEsUnError(utxos, altura):
         lector.utxos("direccion", _AJENA)
 
 
+class EsploraSaldoEHistorial:
+    """Esplora con estadísticas e historial por dirección; anota cada ruta pedida."""
+
+    def __init__(self, estadisticas, historial):
+        self.estadisticas = estadisticas
+        self.historial = historial
+        self.rutas = []
+
+    def __call__(self, url, params=None, **_):
+        ruta = url.split("/api/", 1)[1]
+        self.rutas.append(ruta)
+        direccion = ruta.split("/")[1]
+        if ruta.endswith("/txs"):
+            return self.historial.get(direccion, [])
+        return self.estadisticas.get(direccion, _estadisticasEsplora())
+
+
+def _esploraConUnaDireccionUsada():
+    recibida = _txBtc("t1", [(_AJENA, 150_000)], [(_RECEPCION0, 100_000)], fee=1000)
+    return EsploraSaldoEHistorial({_RECEPCION0: _estadisticasEsplora(recibidas=1)}, {_RECEPCION0: [recibida]})
+
+
+def testLeerTrasElSaldoDeUnaXpubSoloPideLasDireccionesUsadas():
+    esplora = _esploraConUnaDireccionUsada()
+    lector = bc.LectorBitcoin(baseUrl="https://esplora.test/api", gapLimit=3, obtenerJson=esplora)
+
+    lector.saldo("xpub", _BIP84_ZPUB)
+    llamadasSaldo = len(esplora.rutas)
+    movimientos = lector.leer("xpub", _BIP84_ZPUB, 100)
+
+    assert [m.hash for m in movimientos] == ["t1"]
+    assert esplora.rutas[llamadasSaldo:] == [f"address/{_RECEPCION0}/txs"]
+
+
+def testSaldoYLeerDeUnaXpubCabenEnElPlazoConElRitmoDeEsplora(monkeypatch):
+    # Cada llamada cuesta un segundo, como con [wallets] esplora_intervalo_segundos.
+    # Son las 40 direcciones sin uso de una xpub con gap 20: leídas dos veces
+    # pasaban de los 75 s del plazo y la wallet no se actualizaba nunca.
+    ahora = [0.0]
+    monkeypatch.setattr(bc.time, "monotonic", lambda: ahora[0])
+    esplora = _esploraConUnaDireccionUsada()
+
+    def conUnSegundo(*args, **kwargs):
+        ahora[0] += 1.0
+        return esplora(*args, **kwargs)
+
+    lector = bc.LectorBitcoin(baseUrl="https://esplora.test/api", gapLimit=20,
+                              obtenerJson=bc.conPlazo(conUnSegundo, 75))
+
+    lector.saldo("xpub", _BIP84_ZPUB)
+    movimientos = lector.leer("xpub", _BIP84_ZPUB, 100)
+
+    assert [m.hash for m in movimientos] == ["t1"]
+    assert ahora[0] < 75
+
+
+def testUnSaldoFallidoNoDejaUnaListaParcialParaLeer():
+    esplora = _esploraConUnaDireccionUsada()
+    fallar = [True]
+
+    def obtener(url, params=None, **kwargs):
+        if fallar[0] and len(esplora.rutas) == 2:
+            raise HTTPError(url, 400, "mal", None, None)
+        return esplora(url, params, **kwargs)
+
+    lector = bc.LectorBitcoin(baseUrl="https://esplora.test/api", gapLimit=3, obtenerJson=obtener)
+
+    with pytest.raises(bc.ErrorLecturaWallet):
+        lector.saldo("xpub", _BIP84_ZPUB)
+    fallar[0] = False
+    esplora.rutas.clear()
+    lector.leer("xpub", _BIP84_ZPUB, 100)
+
+    # Sin lista guardada, leer explora: recepción 0 usada + 3 sin uso, y 3 de cambio.
+    assert len(esplora.rutas) == 7
+
+
 def testElPlazoCortaLasLlamadasSiguientes(monkeypatch):
     reloj = iter([0.0, 5.0, 11.0])
     monkeypatch.setattr(bc.time, "monotonic", lambda: next(reloj))
@@ -694,6 +771,44 @@ def testSiLaPrincipalFallaPorElServidorSeUsaElRespaldo(esploraLimpia, error):
     _lectorConRespaldo(esplora).saldo("direccion", _AJENA)
 
     assert esplora.bases == [_PRINCIPAL, _RESPALDO]
+
+
+def testConRespaldoLaPrincipalNoSeReintentaYElRespaldoSi(esploraLimpia):
+    reintentosPorBase = {}
+
+    def obtener(url, params=None, **kwargs):
+        base = url.split("/address/", 1)[0]
+        reintentosPorBase[base] = kwargs.get("retries", "por defecto")
+        if base == _PRINCIPAL:
+            raise _sinConexion(url)
+        return _estadisticasEsplora(recibidas=1)
+
+    _lectorConRespaldo(obtener).saldo("direccion", _AJENA)
+
+    assert reintentosPorBase == {_PRINCIPAL: 0, _RESPALDO: "por defecto"}
+
+
+def testSinRespaldoLaUnicaEsploraConservaSusReintentos(esploraLimpia):
+    vistos = []
+
+    def obtener(url, params=None, **kwargs):
+        vistos.append(kwargs.get("retries", "por defecto"))
+        return _estadisticasEsplora(recibidas=1)
+
+    bc.LectorBitcoin(baseUrl=_PRINCIPAL, obtenerJson=obtener).saldo("direccion", _AJENA)
+
+    assert vistos == ["por defecto"]
+
+
+def testLectorParaUsaElPlazoPedidoOElDeLosAjustes(monkeypatch):
+    plazos = []
+    monkeypatch.setattr(bc.settings, "walletsPlazoSegundos", lambda: 75)
+    monkeypatch.setattr(bc, "conPlazo", lambda obtener, segundos: plazos.append(segundos) or obtener)
+
+    bc.lectorPara("btc")
+    bc.lectorPara("btc", 300)
+
+    assert plazos == [75, 300]
 
 
 def testTrasUnaCaidaSeVaDirectoAlRespaldoHastaQuePasaElRato(esploraLimpia):

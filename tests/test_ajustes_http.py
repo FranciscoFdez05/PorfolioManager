@@ -185,7 +185,7 @@ def testLosTresProveedoresSalenAunqueNoTenganClaves(cliente):
 
     proveedores = client.get("/api/settings/apikeys").get_json()["proveedores"]
 
-    assert sorted(proveedores) == ["alphavantage", "eodhd", "etherscan", "finnhub"]
+    assert sorted(proveedores) == ["alphavantage", "eodhd", "etherscan", "finnhub", "nodereal"]
     assert proveedores["eodhd"]["claves"] == []
 
 
@@ -1006,4 +1006,4 @@ def testUnPrefsConRutaDeEscapeNoSaleDeDataJson(cliente, tmp_path):
 
     assert not (rutas["data"] / "robado.json").exists()
     assert not (tmp_path / "robado.json").exists()
-    assert (rutas["json"] / "prefs_principal.json").exists()
+    assert (rutas["json"] / "prefs_test_portfolio.json").exists()

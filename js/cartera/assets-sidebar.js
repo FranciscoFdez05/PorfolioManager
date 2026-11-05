@@ -195,11 +195,7 @@ async function renderAssetsList(assets) {
     }
 
     if (_sidebarFilter === "watchlist" && !window._viewAllPortfolios) {
-        const pid = window._activePortfolioId || "default"
-        let customSeg = []
-        try {
-            customSeg = JSON.parse(localStorage.getItem(`seguimientoList_${pid}`) || "[]")
-        } catch {}
+        const customSeg = typeof segLoadCustomItems === "function" ? segLoadCustomItems() : []
         const dbIds = new Set(visible.map((a) => a.id))
         const dbNames = new Set(visible.map((a) => (a.name || "").toLowerCase()))
         for (const item of customSeg) {

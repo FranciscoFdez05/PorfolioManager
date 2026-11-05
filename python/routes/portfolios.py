@@ -1,4 +1,5 @@
 import io
+import logging
 import sqlite3
 import tempfile
 import zipfile
@@ -19,8 +20,11 @@ from admin.portfolios_manager import (
 )
 from core import paths, settings, zip_seguro
 from core.copia_sqlite import copiar as copiarSqlite
-from core.escritura import limpiarTemporal, rutaTemporal, temporalPara
+from core.escritura import escribirJsonAtomico, limpiarTemporal, rutaTemporal, temporalPara
+from routes.ajustes import configuracionDelZip
 from stores.asset_utils import slugify
+
+log = logging.getLogger(__name__)
 
 portfoliosBp = Blueprint("portfolios", __name__)
 
@@ -304,11 +308,17 @@ def importPortfolio():
     # (admin.portfolios_manager.registrarPortfolio): elegirlo aquí, sin
     # cerrojo, dejaba que dos importaciones simultáneas se quedaran con el mismo.
     tmpDest = rutaTemporal(_PORTFOLIOS_DIR / "importacion.db", directorio=paths.TMP_DIR)
+    prefsImportadas = None
     try:
         if esZip:
             error = _dbDeUnZip(file.stream, tmpDest)
             if error:
                 return jsonify({"ok": False, "error": error}), 400
+            # La configuración de la cartera es parte de ella: se lee aquí, con
+            # el ZIP ya comprobado, para rechazarlo antes de darla de alta.
+            file.stream.seek(0)
+            with zipfile.ZipFile(file.stream, "r") as zf:
+                prefsImportadas, _ui = configuracionDelZip(zf, None)
         else:
             file.save(str(tmpDest))
 
@@ -338,6 +348,15 @@ def importPortfolio():
     finally:
         limpiarTemporal(tmpDest)
 
+    if prefsImportadas is None:
+        return jsonify({"ok": True, "id": pid})
+    try:
+        escribirJsonAtomico(paths.JSON_DIR / f"prefs_{pid}.json", prefsImportadas)
+    except OSError as e:
+        # La cartera ya está dada de alta con sus datos: perderla por esto sería
+        # peor. Se dice, para que se sepa por qué sale sin su configuración.
+        log.error("[portfolios] No se pudieron guardar las preferencias de %s: %s", pid, e)
+        return jsonify({"ok": True, "id": pid, "aviso": "La cartera se ha importado sin su configuración"})
     return jsonify({"ok": True, "id": pid})
 
 

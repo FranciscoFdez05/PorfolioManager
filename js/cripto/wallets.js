@@ -181,7 +181,7 @@ function walletsListaHtml() {
 
 // Una línea de la lista de wallets por enlazar. Los ids no se repiten entre
 // líneas: cada campo se busca por su clase dentro de la suya.
-function walletsFilaHtml() {
+function walletsFilaHtml({ conActivo = true } = {}) {
     const redes = walletsEstado.redes
         .map(
             (red) =>
@@ -207,10 +207,14 @@ function walletsFilaHtml() {
             </select>
             <input class="assetRowModalInput walletsFilaValor" type="text" aria-label="Dirección o clave pública" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Dirección, xpub o clave pública">
             <input class="assetRowModalInput walletsFilaAlias" type="text" maxlength="60" aria-label="Nombre de esta wallet" placeholder="Nombre (opcional)" autocomplete="off">
-            <select class="assetRowModalSelect walletsFilaActivo" aria-label="Cripto en Activos">
+            ${
+                conActivo
+                    ? `<select class="assetRowModalSelect walletsFilaActivo" aria-label="Cripto en Activos">
                 <option value="">Sin cripto (sin €)</option>
                 ${activos}
-            </select>
+            </select>`
+                    : ""
+            }
             <button type="button" class="cancelButton walletsFilaQuitarBtn" title="Quitar esta línea" aria-label="Quitar esta línea">×</button>
             <p class="walletsFilaError hidden"></p>
         </li>`
@@ -1026,6 +1030,9 @@ function walletsResumenSincronizacion(resultado) {
         `${resultado.anadidas} movimiento${resultado.anadidas === 1 ? "" : "s"} nuevo${resultado.anadidas === 1 ? "" : "s"}`
     ]
     if (resultado.yaImportadas) partes.push(`${resultado.yaImportadas} ya estaban`)
+    if (resultado.pendientes) {
+        partes.push(`${resultado.pendientes} entrada${resultado.pendientes === 1 ? "" : "s"} por verificar en Seguimiento`)
+    }
     const sinActivo = Object.entries(resultado.sinActivo || {})
     if (sinActivo.length) {
         partes.push(`sin cripto en Activos: ${sinActivo.map(([simbolo, n]) => `${simbolo} (${n})`).join(", ")}`)

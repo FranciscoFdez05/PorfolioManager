@@ -42,6 +42,7 @@ host— pero no es ninguno: el endpoint exige sesión, como todo lo demás.
 
 import json
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -143,12 +144,32 @@ def panel(forzarComprobacion: bool = False) -> dict:
     return {**estado(), "remota": version_remota.consultar(forzar=forzarComprobacion)}
 
 
-def solicitar() -> tuple[dict, str | None]:
-    """Deja la señal para el vigilante. Devuelve `(estado, error)`."""
+def _senalPendiente(actual: dict) -> bool:
+    """Si ya hay una solicitud reciente que el vigilante aún no ha recogido."""
+    segundos = actual["haceSegundos"]
+    return segundos is not None and segundos < ESPERA_MAXIMA_SEGUNDOS
+
+
+def solicitar(antesDeLaSenal: Callable[[], None] | None = None) -> tuple[dict, str | None]:
+    """Deja la señal para el vigilante.
+
+    Args:
+        antesDeLaSenal: Trabajo que debe terminar antes de dejar la señal. Tiene
+            que ser antes porque el vigilante recrea este contenedor en cuanto la
+            ve, y mataría lo que siguiera en curso. No se ejecuta si ya hay una
+            señal pendiente: un doble clic ya tuvo el suyo. Debe gestionar sus
+            propios errores, porque aquí no se capturan.
+
+    Returns:
+        `(estado, error)`, con `error` a None si la señal se ha dejado.
+    """
     actual = estado()
 
     if actual["enMarcha"]:
         return actual, "Ya hay una actualización en marcha"
+
+    if antesDeLaSenal is not None and not _senalPendiente(actual):
+        antesDeLaSenal()
 
     paths.TMP_DIR.mkdir(parents=True, exist_ok=True)
     escribirJsonAtomico(_archivoSolicitud(), {"momento": _ahora(), "version": __version__})

@@ -6,7 +6,7 @@ import sqlite3
 import threading
 import time
 import zipfile
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -395,18 +395,24 @@ def _avisarCopiaCreada(nombre: str, automatica: bool) -> None:
         log.debug("[backup] No se pudo avisar de la copia: %s", error)
 
 
-def _enviarCopiaATelegram(nombre: str) -> None:
-    """Manda el ZIP de una copia automática al chat de Telegram.
+def _enviarCopiaATelegram(nombre: str, titulo: str = "Copia de seguridad automática",
+                          automatica: bool = True) -> None:
+    """Manda el ZIP de una copia al chat de Telegram.
 
     Si el fichero no sale (sin Telegram, categoría apagada, error de red) se
     cae al aviso de texto de siempre, para que al menos conste que se hizo.
+
+    Args:
+        nombre: Fichero de la copia, dentro de la carpeta de copias.
+        titulo: Primera línea del pie del fichero.
+        automatica: Cómo la describe el aviso de texto si el fichero no sale.
     """
     portfolios = len(list(_PORTFOLIOS_DIR.glob("*.db"))) if _PORTFOLIOS_DIR.exists() else 0
     claves = " · con claves de API" if _incluirClaves() else ""
-    pie = (f"Copia de seguridad automática\n{nombre} · {_megas(nombre)} · "
+    pie = (f"{titulo}\n{nombre} · {_megas(nombre)} · "
            f"{portfolios} portfolio(s){claves}")
     if not telegram_notifier.notificarArchivo("backupFichero", _BACKUP_DIR / nombre, pie):
-        _avisarCopiaCreada(nombre, automatica=True)
+        _avisarCopiaCreada(nombre, automatica=automatica)
 
 
 def _incluirClaves() -> bool:
@@ -416,30 +422,42 @@ def _incluirClaves() -> bool:
 def _clavesCifradasParaZip() -> bytes | None:
     """`claves-api.cifradas.json` listo para meter en el ZIP, o None si no procede.
 
-    Procede si el usuario lo ha pedido en Ajustes. Se cifran con la contraseña
-    propia de las copias si la hay y, si no, con el hash de la contraseña de
-    acceso a la web (con las credenciales por defecto no hay nada con lo que
-    cifrar). Falla hacia «sin claves» y lo deja en el log: una copia sin claves
-    sirve; una con las claves sin proteger no debe existir nunca.
+    Las wallets entran siempre, porque son datos del usuario; las claves de API,
+    solo si se ha pedido en Ajustes. Se cifran con la contraseña propia de las
+    copias si la hay y, si no, con el hash de la contraseña de acceso a la web
+    (con las credenciales por defecto no hay nada con lo que cifrar). Falla hacia
+    «sin claves» y lo deja en el log: una copia sin claves sirve; una con las
+    claves sin proteger no debe existir nunca.
     """
-    if not _incluirClaves():
+    claves = exportables.clavesConWallets() if _incluirClaves() else exportables.soloWallets()
+    if not claves:
         return None
     if clave_copias.configurada():
-        claves = exportables.clavesConWallets()
-        paquete = clave_copias.cifrar(claves) if claves else None
+        paquete = clave_copias.cifrar(claves)
         return json.dumps(paquete, ensure_ascii=False).encode("utf-8") if paquete else None
 
     from routes.auth import _loadCredentials
 
     usuario, hashApp = _loadCredentials()
     if usuario == "__no_user__":
-        log.warning("[backup] Se piden las claves en la copia pero no hay contraseña de acceso: se omiten")
-        return None
-    claves = exportables.clavesConWallets()
-    if not claves:
+        log.warning("[backup] Hay datos que cifrar en la copia pero no hay contraseña de acceso: se omiten")
         return None
     paquete = exportables.cifrarClavesConHashApp(claves, hashApp)
     return json.dumps(paquete, ensure_ascii=False).encode("utf-8")
+
+
+def _avisoDeLaCopia(nombre: str) -> str | None:
+    """Qué decirle al usuario si esta copia ha salido sin parte de sus datos."""
+    try:
+        with zipfile.ZipFile(str(_BACKUP_DIR / nombre), "r") as zf:
+            manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile) as error:
+        log.warning("[backup] No se pudo releer el manifest de %s: %s", nombre, error)
+        return None
+    if manifest.get("walletsFuera"):
+        return ("Esta copia no lleva las wallets: no hay ninguna contraseña con la que cifrarlas. "
+                "Define la contraseña de acceso a la web o la de las copias.")
+    return None
 
 
 def _avisarCopiaFallida(motivo, automatica: bool) -> None:
@@ -496,6 +514,30 @@ def crearBackupManual(avisar=True) -> str:
     if avisar:
         _avisarCopiaCreada(nombre, automatica=False)
     return nombre
+
+
+def copiaPreviaActualizacion() -> None:
+    """Hace una copia y la manda por Telegram antes de actualizar. Nunca lanza.
+
+    Es una copia manual y no `_auto`: el scheduler mira la última `_auto` para
+    decidir si toca la del día, y esta le haría saltarse la de esa noche. El envío
+    sigue el mismo interruptor que el de la copia automática, que está apagado de
+    fábrica porque el ZIP sale a los servidores de Telegram.
+
+    Un fallo no impide actualizar: la copia podría estar fallando por un error que
+    arregla justo la versión nueva, y sin ella quedan las copias anteriores y la
+    previa a la migración del esquema. Por eso se avisa como crítico y se sigue.
+    """
+    try:
+        nombre = crearBackupManual(avisar=False)
+        _enviarCopiaATelegram(nombre, titulo="Copia de seguridad previa a la actualización", automatica=False)
+    except Exception as error:
+        log.error("[backup] Ha fallado la copia previa a la actualización: %s", error)
+        telegram_notifier.notificar(
+            "backup",
+            f"Ha fallado la copia previa a la actualización; la actualización sigue adelante\n{str(error)[:300]}",
+            gravedad=telegram_notifier.CRITICO,
+        )
 
 
 def _prepararDestino():
@@ -574,7 +616,7 @@ def _createBackupLocked():
         return jsonify({"ok": False, "error": mensaje}), 500
 
     _avisarCopiaCreada(filename, automatica=False)
-    return jsonify({"ok": True, "filename": filename, "backups": _listBackups()})
+    return jsonify({"ok": True, "filename": filename, "backups": _listBackups(), "aviso": _avisoDeLaCopia(filename)})
 
 
 def _escribirBackup(*, automatico: bool) -> str:
@@ -643,6 +685,8 @@ def _escribirBackup(*, automatico: bool) -> str:
                 "version": 2,
                 "portfolios": portfolioNames,
                 "claves": claves is not None,
+                # Había wallets y no se han podido cifrar: la copia está incompleta.
+                "walletsFuera": claves is None and bool(exportables.soloWallets()),
             }
             zf.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False))
 
@@ -752,6 +796,45 @@ def _validarZipDeCopia(backupPath: Path):
     return None
 
 
+def _filasPorTabla(ruta: Path) -> dict[str, int]:
+    """Cuántas filas tiene cada tabla de una base. El nombre sale de sqlite_master, entrecomillado."""
+    with closing(sqlite3.connect(str(ruta), timeout=settings.backupSqliteTimeout())) as conn:
+        tablas = [fila[0] for fila in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )]
+        return {
+            tabla: conn.execute('SELECT COUNT(*) FROM "{}"'.format(tabla.replace('"', '""'))).fetchone()[0]
+            for tabla in tablas
+        }
+
+
+def _problemaTrasRestaurar(origen: Path, destino: Path) -> str | None:
+    """Comprueba que la base ya escrita es la de la copia. Devuelve el problema, o None.
+
+    Lo validado hasta aquí es el temporal extraído del ZIP; esto mira el resultado:
+    que el fichero final esté sano y tenga las mismas filas en cada tabla. Sin ello
+    una copia a medias se anunciaba como restaurada y se descubría al abrir un
+    módulo vacío. Corre bajo los cerrojos de restauración, así que nada legítimo
+    puede haber cambiado las filas entre medias.
+
+    Args:
+        origen: Temporal extraído del ZIP.
+        destino: Base ya sustituida en data/portfolios.
+
+    Returns:
+        Descripción del problema, o None si coincide.
+    """
+    with closing(sqlite3.connect(str(destino), timeout=settings.backupSqliteTimeout())) as conn:
+        estado = conn.execute("PRAGMA quick_check(1)").fetchone()
+    if not estado or estado[0] != "ok":
+        return f"la base restaurada está dañada ({estado[0] if estado else 'sin respuesta'})"
+    esperadas, obtenidas = _filasPorTabla(origen), _filasPorTabla(destino)
+    distintas = sorted(t for t in esperadas.keys() | obtenidas.keys() if esperadas.get(t) != obtenidas.get(t))
+    if distintas:
+        return f"la base restaurada no coincide con la copia en: {', '.join(distintas[:5])}"
+    return None
+
+
 def _restaurarUnaBase(zf, name: str, ignorados: list) -> None:
     # Path(...).name descarta cualquier ../ del nombre de entrada
     dbName = Path(name).name
@@ -775,6 +858,10 @@ def _restaurarUnaBase(zf, name: str, ignorados: list) -> None:
             ignorados.append(f"{name}: {problema}")
             return
         _reemplazarAtomicoViaSqlite(tmpPath, dstPath)
+        problema = _problemaTrasRestaurar(tmpPath, dstPath)
+        if problema:
+            log.error(f"[backup] {name}: {problema}")
+            ignorados.append(f"{name}: {problema}")
     except Exception as e:
         # La cabecera "SQLite format 3" son 16 bytes: acertarla no garantiza que
         # el resto del fichero sea legible. Antes, una sola entrada así abortaba
@@ -787,8 +874,8 @@ def _restaurarUnaBase(zf, name: str, ignorados: list) -> None:
         limpiarTemporal(tmpPath)
 
 
-def _restaurarIndice(zf, names, ignorados: list) -> None:
-    """portfolios.json, con escritura atómica.
+def _restaurarIndice(zf, names, ignorados: list) -> bool:
+    """portfolios.json, con escritura atómica. Devuelve si se ha escrito.
 
     Es el único contenido del zip que se usa como ruta: de aquí sale el id del
     portfolio activo, y con él el fichero .db que la aplicación abrirá al
@@ -799,14 +886,15 @@ def _restaurarIndice(zf, names, ignorados: list) -> None:
     directorio de datos.
     """
     if "portfolios.json" not in names:
-        return
+        return False
     metaCruda = zf.read("portfolios.json")
     problema = _problemaDelIndice(metaCruda)
     if problema:
         log.warning("[backup] portfolios.json ignorado: %s", problema)
         ignorados.append(f"portfolios.json: {problema}")
-    else:
-        escribirAtomico(_META_FILE, metaCruda)
+        return False
+    escribirAtomico(_META_FILE, metaCruda)
+    return True
 
 
 def _restaurarPrefs(zf, names, ignorados: list) -> None:
@@ -819,6 +907,67 @@ def _restaurarPrefs(zf, names, ignorados: list) -> None:
             ignorados.append(f"{name}: nombre no admisible")
             continue
         escribirAtomico(_JSON_DIR / prefsName, zf.read(name))
+
+
+def _esCopiaCompleta(zf, names) -> bool:
+    """¿El manifest dice que esta copia lleva el estado entero de la instalación?
+
+    Solo entonces lo que no venga en ella significa «no existía». Un ZIP sin
+    manifest, o hecho a mano, puede traer una parte y no autoriza a retirar nada.
+    """
+    if "manifest.json" not in names:
+        return False
+    try:
+        version = json.loads(zf.read("manifest.json").decode("utf-8")).get("version")
+    except (ValueError, AttributeError):
+        return False
+    return isinstance(version, int) and version >= 2
+
+
+def _archivar(ruta: Path, marca: str) -> None:
+    """Mueve un fichero a data/deleted, de donde se puede recuperar a mano."""
+    destino = DATA_DIR / "deleted"
+    destino.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(ruta), str(destino / f"{ruta.stem}_{marca}{ruta.suffix}"))
+
+
+def _retirarLoQueNoEstabaEnLaCopia(names, ignorados: list) -> None:
+    """Deja data/ como en la copia: fuera los perfiles y preferencias posteriores a ella.
+
+    El índice restaurado no los lista, pero sus ficheros seguían ahí: un `.db`
+    fuera del selector que aun así entraba en las copias siguientes, y unas
+    preferencias que configuraban el perfil restaurado con lo elegido después de
+    la copia. Se mueven en vez de borrarse y, además, ya están en la copia previa.
+    """
+    marca = datetime.now().strftime("%Y%m%d_%H%M%S")
+    basesDeLaCopia = {Path(n).stem for n in names if n.startswith("portfolios/") and n.endswith(".db")}
+    prefsDeLaCopia = {Path(n).name for n in names if n.startswith("prefs/") and n.endswith(".json")}
+    sobrantes = []
+    for dbFile in _PORTFOLIOS_DIR.glob("*.db"):
+        if dbFile.stem not in basesDeLaCopia:
+            sobrantes.append(dbFile)
+            sobrantes.extend(p for p in (Path(f"{dbFile}{s}") for s in ("-wal", "-shm")) if p.exists())
+    sobrantes.extend(p for p in _JSON_DIR.glob("prefs_*.json") if p.name not in prefsDeLaCopia)
+    for fichero in sobrantes:
+        try:
+            _archivar(fichero, marca)
+        except OSError as error:
+            log.error("[backup] No se pudo retirar %s: %s", fichero.name, error)
+            ignorados.append(f"{fichero.name}: no se pudo retirar ({error})")
+
+
+def _comprobarIndiceRestaurado(ignorados: list) -> None:
+    """Avisa de cada perfil del índice restaurado que se ha quedado sin base."""
+    try:
+        listados = json.loads(_META_FILE.read_text("utf-8")).get("portfolios") or []
+    except (OSError, ValueError, AttributeError) as error:
+        ignorados.append(f"portfolios.json: no se puede releer ({error})")
+        return
+    for entrada in listados:
+        pid = entrada.get("id")
+        if not (_PORTFOLIOS_DIR / f"{pid}.db").exists():
+            log.error("[backup] El perfil %s está en el índice pero no tiene base", pid)
+            ignorados.append(f"{pid}: el perfil está en la copia pero falta su base de datos")
 
 
 def _restaurarSnapshotsDe(zf, name: str) -> None:
@@ -860,7 +1009,7 @@ def _restaurarDesdeZip(backupPath: Path, claves, ignorados: list) -> list:
             if name.startswith("portfolios/") and name.endswith(".db"):
                 _restaurarUnaBase(zf, name, ignorados)
 
-        _restaurarIndice(zf, names, ignorados)
+        indiceRestaurado = _restaurarIndice(zf, names, ignorados)
         if "ajustes.json" in names:
             escribirAtomico(_AJUSTES_SRC, zf.read("ajustes.json"))
         # Claves de API: entran en claro y salen cifradas con la SECRET_KEY de
@@ -868,6 +1017,10 @@ def _restaurarDesdeZip(backupPath: Path, claves, ignorados: list) -> list:
         if claves:
             clavesRestauradas = exportables.restaurarClaves(claves)
         _restaurarPrefs(zf, names, ignorados)
+        if indiceRestaurado:
+            if _esCopiaCompleta(zf, names):
+                _retirarLoQueNoEstabaEnLaCopia(names, ignorados)
+            _comprobarIndiceRestaurado(ignorados)
         for name in names:
             if name.startswith("snapshots/") and name.endswith(".json"):
                 _restaurarSnapshotsDe(zf, name)

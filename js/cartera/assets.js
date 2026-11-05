@@ -1163,7 +1163,12 @@ function renderAssetTransaccionesSection(asset) {
         tabBtn.textContent = `Transacciones (${rows.length})`
     }
 
-    const walletLabels = { entre_wallet: "Entre wallet", recibida: "Recibida", enviada: "Enviada" }
+    const walletLabels = {
+        entre_wallet: "Entre wallet",
+        recibida: "Recibida",
+        enviada: "Enviada",
+        pendiente: "Pendiente de verificar"
+    }
 
     const rowsHtml = rows
         .map((row) => {

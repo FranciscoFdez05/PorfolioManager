@@ -22,8 +22,9 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from core import actualizacion
+from routes.backup import copiaPreviaActualizacion
 
-log = logging.getLogger(__name__)
+log =logging.getLogger(__name__)
 
 actualizacionBp = Blueprint("actualizacion", __name__)
 
@@ -36,7 +37,7 @@ def getActualizacion():
 
 @actualizacionBp.route("/api/actualizacion", methods=["POST"])
 def postActualizacion():
-    estado, error = actualizacion.solicitar()
+    estado, error = actualizacion.solicitar(antesDeLaSenal=copiaPreviaActualizacion)
 
     if error:
         # 409: no es un fallo de la petición, es que ya se está haciendo.

@@ -134,6 +134,9 @@ class MovimientoWallet:
     nota: str = ""
     comisionTx: Decimal | None = None
     propia: str = ""
+    # Todas las contrapartes de la transacción cuando hay más de una (Bitcoin): solo
+    # es «entre wallets» si todas son del usuario, no por la primera que se encuentre.
+    contrapartes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -413,6 +416,11 @@ def _destino(salida: dict) -> str:
     return ""
 
 
+def _destinosDistintos(partes: list[dict]) -> tuple[str, ...]:
+    """Direcciones (o claves P2PK) de unas entradas o salidas, sin repetir y en su orden."""
+    return tuple(dict.fromkeys(destino for destino in map(_destino, partes) if destino))
+
+
 class LectorBitcoin:
     """Bitcoin por la API Esplora (mempool.space, blockstream.info o un nodo propio).
 
@@ -450,6 +458,11 @@ class LectorBitcoin:
         self._respaldoUrl = respaldoUrl
         self._reloj = reloj
         self._dormir = dormir
+        # Direcciones usadas de cada xpub según `saldo`, para que `leer` no repita
+        # la exploración: las dos comparten plazo y, al ritmo de una llamada por
+        # segundo, 40 direcciones sin uso por pasada ya lo agotaban. No caduca
+        # porque un lector dura una revisión: `lectorPara` le pone plazo.
+        self._usadasXpub: dict[str, list[str]] = {}
 
     def _bases(self) -> list[str]:
         """Las URL de Esplora válidas, sin repetir: la principal y, si la hay, la de respaldo."""
@@ -466,8 +479,11 @@ class LectorBitcoin:
         bases = _ordenarEsploras(self._bases(), self._reloj())
         for posicion, base in enumerate(bases):
             esperarTurnoEsplora(base, self._dormir)
+            # Con otra Esplora detrás no se reintenta: los reintentos de una caída
+            # gastaban 30 s del plazo de lectura antes de pasar a la que responde.
+            reintentos = {} if posicion == len(bases) - 1 else {"retries": 0}
             try:
-                datos = _llamar("Esplora", self._obtenerJson, f"{base}/{ruta}")
+                datos = _llamar("Esplora", self._obtenerJson, f"{base}/{ruta}", **reintentos)
             except ErrorLecturaWallet as error:
                 if posicion == len(bases) - 1 or not _culpaDelServidor(error):
                     raise
@@ -510,16 +526,32 @@ class LectorBitcoin:
         clave = leerClaveExtendida(valor)
         gapLimit = self._gapLimit or settings.walletsGapLimit()
         total = 0
+        usadas = []
         for rama in (RAMA_RECEPCION, RAMA_CAMBIO):
             nodoRama = clave.hijo(rama)
             sinUso = 0
             for indice in range(_MAX_INDICES_XPUB):
                 if sinUso >= gapLimit:
                     break
-                usada, satoshis = self._estadisticas(nodoRama.hijo(indice).direccion())
+                direccion = nodoRama.hijo(indice).direccion()
+                usada, satoshis = self._estadisticas(direccion)
                 total += satoshis
                 sinUso = 0 if usada else sinUso + 1
+                if usada:
+                    usadas.append(direccion)
+        self._usadasXpub[valor] = usadas
         return _unidades(total, 8)
+
+    def direccionesUsadas(self, valor: str) -> list[str] | None:
+        """Las direcciones con uso de una xpub según el último `saldo` de este lector.
+
+        Args:
+            valor: La xpub, tal como se pasó a `saldo`.
+
+        Returns:
+            Las direcciones, o None si este lector aún no ha explorado esa xpub.
+        """
+        return self._usadasXpub.get(valor)
 
     def utxos(self, tipo: str, valor: str) -> tuple[list[UtxoBitcoin], int]:
         """Las salidas sin gastar de la wallet, la mayor primero, y la altura actual.
@@ -622,6 +654,9 @@ class LectorBitcoin:
     def _historialesXpub(self, xpub: str, limite: int) -> dict[str, list]:
         # La primera página del historial ya dice si la dirección se ha usado:
         # pedir antes /address/{dir} solo para saberlo duplicaba las llamadas.
+        usadas = self._usadasXpub.get(xpub)
+        if usadas is not None:
+            return {direccion: self._historial(direccion, limite)[1] for direccion in usadas}
         clave = leerClaveExtendida(xpub)
         gapLimit = self._gapLimit or settings.walletsGapLimit()
         historiales = {}
@@ -688,15 +723,17 @@ class LectorBitcoin:
             if not salidaExterna and salidaPropia:
                 return MovimientoWallet(**comun, cantidad=_unidades(salidaPropia, 8), comision=comision,
                                         tipo=ENTRE_WALLETS, propia=propia)
-            destino = next((_destino(s) for s in externas if _destino(s)), "")
+            destinos = _destinosDistintos(externas)
             return MovimientoWallet(**comun, cantidad=_unidades(salidaExterna, 8), comision=comision,
-                                    tipo=ENVIADA, contraparte=destino, propia=propia)
+                                    tipo=ENVIADA, contraparte=destinos[0] if destinos else "", propia=propia,
+                                    contrapartes=destinos)
         if not salidaPropia:
             return None
-        origen = next((_destino(e) for e in entradas if _destino(e)), "")
+        origenes = _destinosDistintos(entradas)
         propia = next((_destino(s) for s in salidas if _destino(s) in propias), "")
         return MovimientoWallet(**comun, cantidad=_unidades(salidaPropia, 8), comision=None,
-                                tipo=RECIBIDA, contraparte=origen, propia=propia)
+                                tipo=RECIBIDA, contraparte=origenes[0] if origenes else "", propia=propia,
+                                contrapartes=origenes)
 
 
 # ── Ethereum y BNB Smart Chain (Etherscan v2) ────────────────────────────────
@@ -1530,8 +1567,13 @@ _FABRICAS: dict[str, Callable[[ObtenerJson], LectorWallet]] = {
 }
 
 
-def lectorPara(red: str) -> LectorWallet:
+def lectorPara(red: str, plazoSegundos: int | None = None) -> LectorWallet:
     """El lector de movimientos de una red, con el plazo de [wallets] ya aplicado.
+
+    Args:
+        red: Clave de la red.
+        plazoSegundos: Plazo de la lectura; por defecto, `[wallets] plazo_segundos`,
+            el de una lectura dentro de una petición HTTP.
 
     Raises:
         ErrorLecturaWallet: si la red no está soportada.
@@ -1539,7 +1581,7 @@ def lectorPara(red: str) -> LectorWallet:
     fabrica = _FABRICAS.get(red)
     if fabrica is None:
         raise ErrorLecturaWallet("Red no soportada")
-    return fabrica(conPlazo(fetchJson, settings.walletsPlazoSegundos()))
+    return fabrica(conPlazo(fetchJson, plazoSegundos or settings.walletsPlazoSegundos()))
 
 
 def lectorUtxos() -> LectorBitcoin:

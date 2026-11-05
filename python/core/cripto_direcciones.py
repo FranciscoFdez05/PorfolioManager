@@ -877,6 +877,8 @@ def prepararDatoWallet(red: str, tipo: str, valor: str) -> tuple[str, str]:
         >>> prepararDatoWallet("btc", "auto", "0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798")
         ('clave', '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798')
     """
+    if red not in REDES:
+        raise DatoWalletInvalido("Red no soportada")
     if tipo not in TIPOS_ENTRADA:
         raise DatoWalletInvalido("Tipo de enlace no válido")
     if tipo == TIPO_AUTO:

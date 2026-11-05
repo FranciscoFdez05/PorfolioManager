@@ -1,11 +1,13 @@
 """Pruebas del servicio que importa movimientos de wallets a Transacciones."""
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
 
 from core import wallets_sync as wsync
+from core.wallets_vigilancia import movimientoComoDict
 from providers.blockchain_clients import ENTRE_WALLETS, ENVIADA, RECIBIDA, ComisionPagada, ErrorLecturaWallet, MovimientoWallet
 from providers.listas_tokens import TokenPublico
 from stores import revisiones
@@ -72,7 +74,7 @@ class Lector:
 
 
 def _servicio(movimientos, filas=None, assetId="ethereum", conflictos=0, stablecoins=("USDC",), seguimiento="",
-              tokens=(), marcas=(), publicos=()):
+              tokens=(), marcas=(), publicos=(), verificarEntradas=False):
     estado = {"rows": list(filas or []), "revision": 4, "conflictos": conflictos, "escrituras": 0}
 
     def escribir(datos, revisionEsperada=None):
@@ -99,6 +101,7 @@ def _servicio(movimientos, filas=None, assetId="ethereum", conflictos=0, stablec
         revisionActual=lambda: estado["revision"],
         maxMovimientos=lambda: 100,
         leerTokensPublicos=lambda: list(publicos),
+        verificarEntradas=verificarEntradas,
     )
     return servicio, estado, repositorio
 
@@ -489,9 +492,106 @@ def testVolverASincronizarCompletaLaComisionDeFilasAntiguas():
     assert estado["rows"][0]["comisionRed"] == "0.00002"
 
 
-@pytest.mark.parametrize("red, contrato", [("btc", ""), ("eth", "0x" + "d" * 40)])
-def testEnBitcoinYEnTokensNoSeUsaLaComisionDeLaTransaccion(red, contrato):
-    assert not wsync.reciboConComision(red, RECIBIDA, contrato)
+def testEnTokensNoSeUsaLaComisionDeLaTransaccion():
+    assert not wsync.reciboConComision(RECIBIDA, "0x" + "d" * 40)
+
+
+def testEnBitcoinUnOrigenPropioDescuentaLaComision():
+    assert wsync.reciboConComision(RECIBIDA, "")
+
+
+def testMarcarSoloLaTransaccionNoAplicaLaComisionDelOrigen():
+    # Retirada de un exchange: la de la red sería la de todo su lote.
+    servicio, estado, repositorio = _servicio([_recibo()])
+    repositorio.movimientos = [_marca(comision="")]
+
+    servicio.sincronizar("w1")
+
+    assert (estado["rows"][0]["walletTipo"], estado["rows"][0]["comisionRed"]) == (ENTRE_WALLETS, "")
+
+
+def testSincronizarCompletaLaComisionDeUnaTransaccionMarcadaConOrigenPropio():
+    servicio, estado, repositorio = _servicio([_recibo()])
+    servicio.sincronizar("w1")
+    repositorio.libreta = [DireccionMarcada(red="eth", direccion=_OTRA, apodo="", propia=True)]
+    repositorio.movimientos = [_marca(comision="")]
+    estado["rows"][0]["walletTipo"] = ENTRE_WALLETS
+
+    servicio.sincronizar("w1")
+
+    assert estado["rows"][0]["comisionRed"] == "0.00002"
+
+
+def _filaAntigua(**cambios):
+    """Como quedó una fila importada antes de apuntar la comisión de un origen propio."""
+    return {"id": "wallet-antigua", "assetId": "ethereum", "total": "1", "comisionRed": "", "walletTipo": ENTRE_WALLETS,
+            "walletDesde": _OTRA, "walletDestino": "Ledger", "hashTransaccion": "H1", "nota": "", **cambios}
+
+
+def _conRecientes(repositorio, *movimientos):
+    repositorio.wallet = replace(repositorio.wallet, recientes=[movimientoComoDict(m) for m in movimientos])
+
+
+def testCompletarComisionesArreglaLaFilaAntiguaSinLeerLaRedYSeAprende():
+    servicio, estado, repositorio = _servicio([], filas=[_filaAntigua()])
+    _conRecientes(repositorio, _recibo())
+    repositorio.libreta = [DireccionMarcada(red="eth", direccion=_OTRA, apodo="", propia=True)]
+    repositorio.movimientos = [_marca(comision="")]
+
+    assert servicio.completarComisiones() == 1
+    assert estado["rows"][0]["comisionRed"] == "0.00002"
+    assert repositorio.contrapartes["wallet-antigua"]["comisionTx"] == "0.00002"
+    assert repositorio.sincronizadas == []
+
+    assert servicio.completarComisiones() == 0
+    assert estado["escrituras"] == 1
+
+
+def testCompletarComisionesNoTocaLoQueNoEsSuyo():
+    filas = [
+        _filaAntigua(comisionRed="0"),
+        _filaAntigua(id="wallet-recibida", walletTipo=RECIBIDA),
+        _filaAntigua(id="wallet-otro", assetId="bitcoin"),
+    ]
+    servicio, estado, repositorio = _servicio([], filas=filas)
+    _conRecientes(repositorio, _recibo())
+    repositorio.libreta = [DireccionMarcada(red="eth", direccion=_OTRA, apodo="", propia=True)]
+
+    assert servicio.completarComisiones() == 0
+    assert estado["rows"] == filas
+    assert estado["escrituras"] == 0
+
+
+def testCompletarComisionesRespetaUnExchangeYNoAnadeFilas():
+    # Marcada sin dar el origen por propio: es una retirada, la comisión no es suya.
+    servicio, estado, repositorio = _servicio([], filas=[_filaAntigua()])
+    _conRecientes(repositorio, _recibo(), _recibo(hash_="h2"))
+    repositorio.movimientos = [_marca(comision="")]
+
+    assert servicio.completarComisiones() == 0
+    assert [f["comisionRed"] for f in estado["rows"]] == [""]
+
+
+def testCompletarComisionesReintentaSiLasFilasCambian():
+    servicio, estado, repositorio = _servicio([], filas=[_filaAntigua()], conflictos=1)
+    _conRecientes(repositorio, _recibo())
+    repositorio.libreta = [DireccionMarcada(red="eth", direccion=_OTRA, apodo="", propia=True)]
+
+    assert servicio.completarComisiones() == 1
+    assert estado["rows"][0]["comisionRed"] == "0.00002"
+
+
+def testMarcarComoAjenaAnulaLaComisionDelOrigenPropio():
+    servicio, estado, repositorio = _servicio([_recibo()])
+    servicio.sincronizar("w1")
+    repositorio.libreta = [DireccionMarcada(red="eth", direccion=_OTRA, apodo="", propia=True)]
+    servicio.reetiquetar("eth", _OTRA)
+    assert estado["rows"][0]["comisionRed"] == "0.00002"
+
+    repositorio.movimientos = [_marca(propia=False, comision="")]
+    servicio.reetiquetar("eth", _OTRA)
+
+    assert (estado["rows"][0]["walletTipo"], estado["rows"][0]["comisionRed"]) == (RECIBIDA, "")
 
 
 # ── Transacciones marcadas una a una ──────────────────────────────────────────
